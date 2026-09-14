@@ -3,7 +3,7 @@
  *
  * - 全局信息：采购经办人（搜索下拉）、服务部门（自动带出）、执行状态、备注
  * - 供应商分组卡片：收货方式、预计收货日期、快递单号（条件显示）
- * - 明细表格列与录入页对齐：分类、品牌、资产名称、参数、数量、采购形式、参考单价、成交单价、小计
+ * - 明细表格列与录入页对齐：分类、品牌、资产名称、参数、数量、采购形式、成交单价、小计
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
@@ -16,8 +16,9 @@ import {
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
-  fetchPurchaseOrderDetail, updatePurchaseOrderExec,
+  fetchPurchaseOrderDetail, updatePurchaseOrderExec, fetchAllParamTypes,
   type PurchaseOrder, type ExecStatus, type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
+  type ParamType,
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 
@@ -59,6 +60,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const [employees, setEmployees] = useState<EmployeeItem[]>([])
   const [empLoading, setEmpLoading] = useState(false)
   const [selectedEmp, setSelectedEmp] = useState<EmployeeItem | null>(null)
+  const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -79,6 +81,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           id: 'sg_default',
           supplier: o.supplier || '',
           contact: o.contact || '',
+          contactPhone: o.contactPhone || '',
           orderDate: o.orderDate || '',
           trackingNo: o.trackingNo || '',
           items: o.items.map((it) => ({ ...it })),
@@ -149,6 +152,15 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const showReceiveDate = (dm?: DeliveryMethod) => dm === 'supplier_delivery' || dm === 'express'
   const showTrackingNo = (dm?: DeliveryMethod) => dm === 'express'
 
+  // 參數編碼 → 參數名稱映射
+  useEffect(() => {
+    fetchAllParamTypes().then((list) => {
+      const map = new Map<string, string>()
+      list.forEach((p: ParamType) => { map.set(p.code, p.name) })
+      setParamNameMap(map)
+    }).catch(() => {})
+  }, [])
+
   /* ----- 明细表格列（与 OrderAdd 对齐） ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<PurchaseOrderItem> => [
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
@@ -157,12 +169,12 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       render: (v: string | undefined) => v || '-' },
     { title: '资产名称', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
-      title: '参数', key: 'params', width: 130, ellipsis: true,
+      title: '参数信息', key: 'params', width: 200,
       render: (_: unknown, r: PurchaseOrderItem) => {
         if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        const entries = Object.entries(r.params).filter(([, v]) => v)
+        const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
         if (entries.length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${k}:${v}`).join(' / ')}</span>
+        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
     { title: '数量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
@@ -172,12 +184,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '购买' : '租赁'}</Tag>
         : '-',
     },
-    {
-      title: '参考单价', key: 'price', width: 100, align: 'right',
-      render: (_: unknown, r: PurchaseOrderItem) => (
-        <span style={{ color: '#8c8c8c', fontSize: 12 }}>{r.price ? `MOP ${r.price.toLocaleString()}` : '-'}</span>
-      ),
-    },
+
     {
       title: '成交单价', key: 'confirmedPrice', width: 130,
       render: (_: unknown, r: PurchaseOrderItem) => (
@@ -200,7 +207,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         return <span style={{ fontWeight: 600 }}>MOP ${(cp * r.qty).toLocaleString()}</span>
       },
     },
-  ], [])
+  ], [paramNameMap])
 
   /* ----- 提交 ----- */
   const handleSubmit = async () => {
@@ -219,6 +226,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           ...g,
           supplier: g.supplier.trim(),
           contact: g.contact?.trim() || undefined,
+          contactPhone: g.contactPhone?.trim() || undefined,
           orderDate: g.orderDate || undefined,
           trackingNo: g.trackingNo?.trim() || undefined,
         })),
@@ -354,9 +362,15 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item label="供应商联络人" style={{ marginBottom: 0 }}>
+                  <Form.Item label="供应商联络人姓名" style={{ marginBottom: 0 }}>
                     <Input value={group.contact} onChange={(e) => updateGroup(group.id, { contact: e.target.value })}
-                      placeholder="请输入供应商联络人" allowClear />
+                      placeholder="请输入供应商联络人姓名" allowClear />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="供应商联络人电话" style={{ marginBottom: 0 }}>
+                    <Input value={group.contactPhone} onChange={(e) => updateGroup(group.id, { contactPhone: e.target.value })}
+                      placeholder="请输入供应商联络人电话" allowClear />
                   </Form.Item>
                 </Col>
                 <Col span={6}>
@@ -366,7 +380,11 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                       style={{ width: '100%' }} placeholder="请选择下单日期" />
                   </Form.Item>
                 </Col>
-                <Col span={6}>
+              </Row>
+
+              {/* 收货方式 + 条件字段（并排展示） */}
+              <Row gutter={16} style={{ marginBottom: 16 }}>
+                <Col span={8}>
                   <Form.Item label="收货方式" required style={{ marginBottom: 0 }}>
                     <Select value={group.deliveryMethod}
                       onChange={(v: DeliveryMethod) => updateGroup(group.id, { deliveryMethod: v })}
@@ -379,33 +397,27 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                     />
                   </Form.Item>
                 </Col>
-              </Row>
-
-              {/* 条件字段 */}
-              {(showReceiveDate(dm) || showTrackingNo(dm)) && (
-                <Row gutter={16} style={{ marginBottom: 16 }}>
+                <Col span={8}>
                   {showReceiveDate(dm) && (
-                    <Col span={6}>
-                      <Form.Item label="预计收货日期" style={{ marginBottom: 0 }}>
-                        <DatePicker
-                          value={group.expectedReceiveDate ? dayjs(group.expectedReceiveDate) : null}
-                          onChange={(d: Dayjs | null) => updateGroup(group.id, { expectedReceiveDate: d?.format('YYYY-MM-DD') || '' })}
-                          style={{ width: '100%' }} placeholder="请选择预计收货日期"
-                        />
-                      </Form.Item>
-                    </Col>
+                    <Form.Item label="预计收货日期" style={{ marginBottom: 0 }}>
+                      <DatePicker
+                        value={group.expectedReceiveDate ? dayjs(group.expectedReceiveDate) : null}
+                        onChange={(d: Dayjs | null) => updateGroup(group.id, { expectedReceiveDate: d?.format('YYYY-MM-DD') || '' })}
+                        style={{ width: '100%' }} placeholder="请选择预计收货日期"
+                      />
+                    </Form.Item>
                   )}
+                </Col>
+                <Col span={8}>
                   {showTrackingNo(dm) && (
-                    <Col span={6}>
-                      <Form.Item label="快递单号" style={{ marginBottom: 0 }}>
-                        <Input value={group.trackingNo}
-                          onChange={(e) => updateGroup(group.id, { trackingNo: e.target.value })}
-                          placeholder="请输入快递单号" allowClear style={{ fontFamily: 'monospace' }} />
-                      </Form.Item>
-                    </Col>
+                    <Form.Item label="快递单号" style={{ marginBottom: 0 }}>
+                      <Input value={group.trackingNo}
+                        onChange={(e) => updateGroup(group.id, { trackingNo: e.target.value })}
+                        placeholder="请输入快递单号" allowClear style={{ fontFamily: 'monospace' }} />
+                    </Form.Item>
                   )}
-                </Row>
-              )}
+                </Col>
+              </Row>
 
               {/* 明细表格 */}
               {group.items.length > 0 ? (

@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Space, Input, Select, Table, Tag, Form, DatePicker, Tabs, message } from 'antd'
+import { Button, Space, Input, Select, Table, Tag, Form, DatePicker, Tabs, Modal, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
@@ -558,14 +558,22 @@ export default function OaRequests() {
   const handleApprove = (record: FlowRow) => {
     navigate(`/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`)
   }
-  const handleCancel = async (record: FlowRow) => {
-    try {
-      await cancelOaRequest(record.flowNo)
-      message.success(t('common.cancelSuccess'))
-      loadMyRequests()
-    } catch {
-      // error handled by request interceptor
-    }
+  const handleCancel = (record: FlowRow) => {
+    Modal.confirm({
+      title: t('approvalCenter.cancelTitle'),
+      content: t('approvalCenter.cancelContent', { flowNo: record.flowNo }),
+      okText: t('approvalCenter.cancelOk'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await cancelOaRequest(record.flowNo)
+          message.success(t('approvalCenter.cancelSuccess'))
+          loadMyRequests()
+        } catch {
+          // error handled by request interceptor
+        }
+      },
+    })
   }
 
   /* ==================== 渲染工具 ==================== */
@@ -730,7 +738,7 @@ export default function OaRequests() {
               {t('common.detail')}
             </Button>
             <Button type="link" size="small" danger onClick={() => handleCancel(record)}>
-              {t('common.cancel')}
+              {t('approvalCenter.cancel')}
             </Button>
           </Space>
         )

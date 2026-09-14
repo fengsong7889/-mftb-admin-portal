@@ -72,8 +72,8 @@ public class DataInitializer implements CommandLineRunner {
     //      seedSystemMenus 对已存在菜单不再覆盖 sort_order / name（占位除外），
     //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
         // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/品牌产品库/产品参数库）
-    // v34: 修正 oa-requests 菜单名称（曾与 process-center 重名为"流程中心"，改为"流程事项"）
-    private static final String V_MENU_SEED = "core:menu-seed-v34";
+    // v35: 强制修正基础配置子菜单名称与图标（数据库重置/旧脚本未执行时自动恢复）
+    private static final String V_MENU_SEED = "core:menu-seed-v35";
 
     @Override
     public void run(String... args) {
@@ -1155,6 +1155,21 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key IN ('asset-add','asset-transfer') AND deleted = 0");
         // v24b: 恢复被 v23 清理逻辑误删的 asset-claim / asset-return
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 0, updated_by = 'system' WHERE menu_key IN ('asset-claim','asset-return') AND deleted = 1");
+
+        // v35: 强制修正基础配置子菜单名称与图标（125_rename_basic_menus.sql 可能未执行或数据库被重置）
+        // 基础设置 → 基础配置（图标改为 ControlOutlined，避免与系统配置重复）
+        jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎配置'");
+        // 资产分类 → 资产分类库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '資產分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '資產分類庫'");
+        // 资产型号 → 品牌产品库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '品牌產品庫'");
+        // 参数库 → 产品参数库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '產品參數庫', icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND deleted = 0 AND name != '產品參數庫'");
+        // 同步英文名称
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Basic Configuration'     WHERE menu_key = 'asset-basic'  AND (name_en IS NULL OR name_en != 'Basic Configuration')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Asset Category Library'   WHERE menu_key = 'asset-category' AND (name_en IS NULL OR name_en != 'Asset Category Library')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Brand Product Library'    WHERE menu_key = 'asset-model'    AND (name_en IS NULL OR name_en != 'Brand Product Library')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Product Parameter Library' WHERE menu_key = 'param-library'  AND (name_en IS NULL OR name_en != 'Product Parameter Library')");
     }
 
     /** 角色-菜单权限关联表: 不存在则创建, 存在则补充 actions 列, 并迁移旧 JSON 权限 */

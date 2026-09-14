@@ -22,7 +22,9 @@ import { useAuth } from '../../../contexts/AuthContext'
 import dayjs from 'dayjs'
 import {
   fetchModelList, fetchCategoryList, fetchBrandList,
+  fetchAllParamTypes, fetchParamValuesByType,
   type AssetModel, type AssetCategory, type AssetBrand,
+  type ParamType, type ParamField,
 } from '../../../api/eam'
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
 import { submitOaRequest } from '../../../api/oaRequest'
@@ -137,6 +139,8 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
   const [selectedCategoryCode, setSelectedCategoryCode] = useState<string | undefined>()
   const [selectedBrandId, setSelectedBrandId] = useState<number | undefined>()
   const [selectedModel, setSelectedModel] = useState<AssetModel | undefined>()
+  const [paramTypes, setParamTypes] = useState<ParamType[]>([])
+  const [paramValuesMap, setParamValuesMap] = useState<Record<string, string[]>>({})
 
   // 分類樹
   const categoryTree = useMemo(() => buildCategoryTree(categories.filter((c) => c.status === 'enabled')), [categories])
@@ -158,12 +162,49 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
     [models, selectedCategoryCode, selectedBrandId],
   )
 
-  // 當前分類的參數模板
-  const paramTemplate = useMemo(() => {
-    if (!selectedCategoryCode) return []
-    const cat = categories.find((c) => c.code === selectedCategoryCode)
-    return cat?.paramTemplate || []
-  }, [categories, selectedCategoryCode])
+  // 從參數庫 API 加載參數模板（biz_eam_param_type 表）
+  const paramTemplate: ParamField[] = useMemo(() => {
+    if (!selectedModel) return []
+    return paramTypes
+      .filter((p) => p.categoryCode === selectedModel.categoryCode && p.status === 'enabled')
+      .sort((a, b) => a.sort - b.sort)
+      .map((p) => ({
+        key: p.code,
+        label: p.name,
+        type: p.valueType === 'number' ? 'number' : p.valueType === 'select' ? 'select' : 'text',
+        unit: p.unit || undefined,
+        options: p.valueType === 'select' ? (paramValuesMap[p.code] || []) : undefined,
+      }))
+  }, [paramTypes, selectedModel, paramValuesMap])
+
+  // 加載參數庫數據（弹窗打開時）
+  useEffect(() => {
+    if (!open) return
+    let alive = true
+    fetchAllParamTypes().then((list) => {
+      if (alive) setParamTypes(list)
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [open])
+
+  // 為 select 類型參數加載可選值
+  useEffect(() => {
+    const selectParams = paramTemplate.filter((p) => p.type === 'select')
+    if (selectParams.length === 0) return
+    let alive = true
+    Promise.all(
+      selectParams.map((p) =>
+        fetchParamValuesByType(p.key)
+          .then((vals) => ({ key: p.key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
+          .catch(() => ({ key: p.key, values: [] })),
+      ),
+    ).then((results) => {
+      if (!alive) return
+      const map: Record<string, string[]> = {}
+      results.forEach((r) => { map[r.key] = r.values })
+      setParamValuesMap(map)
+    })
+  }, [paramTemplate])
 
   useEffect(() => {
     if (open && editing) {
@@ -179,6 +220,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
       setSelectedCategoryCode(undefined)
       setSelectedBrandId(undefined)
       setSelectedModel(undefined)
+      setParamValuesMap({})
     }
   }, [open, editing, form, categories, models])
 
@@ -359,6 +401,16 @@ export default function OaPurchaseRequest() {
   const [models, setModels] = useState<AssetModel[]>([])
   const [categories, setCategories] = useState<AssetCategory[]>([])
   const [brands, setBrands] = useState<AssetBrand[]>([])
+
+  // 参数编码 → 参数名称映射
+  const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    fetchAllParamTypes().then((list) => {
+      const map = new Map<string, string>()
+      list.forEach((p: ParamType) => { map.set(p.code, p.name) })
+      setParamNameMap(map)
+    }).catch(() => {})
+  }, [])
 
   // 部門樹數據
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
@@ -652,7 +704,9 @@ export default function OaPurchaseRequest() {
       title: '參數信息', dataIndex: 'params', key: 'params', width: 160,
       render: (v: Record<string, string> | undefined) => {
         if (!v || Object.keys(v).length === 0) return '-'
-        return Object.entries(v).map(([k, val]) => `${k}: ${val}`).join(', ')
+        const entries = Object.entries(v).filter(([, val]) => val && val !== 'undefined')
+        if (entries.length === 0) return '-'
+        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, val]) => `${paramNameMap.get(k) || k}: ${val}`).join(', ')}</span>
       },
     },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 70, align: 'right' },

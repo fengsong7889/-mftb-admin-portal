@@ -9,6 +9,13 @@
  */
 import request, { isBackendUnavailable, SILENT_HEADER } from './request'
 import {
+  mockFetchCategoryList,
+  mockCreateCategory,
+  mockUpdateCategory,
+  mockDeleteCategory,
+  mockToggleCategoryStatus,
+} from './mock/eamCategoryMock'
+import {
   bulkCreateAssets,
   claimAsset,
   fetchAssetDetail,
@@ -86,14 +93,10 @@ export interface AssetModel {
   brandEn?: string
   /** 品牌LOGO（冗余） */
   brandLogo?: string
-  /** 产品型号编码（如 X1 Carbon Gen11） */
-  modelNo?: string
   /** 产品名称（如 ThinkPad X1 Carbon 笔记本） */
   name: string
   /** 计量单位 */
   unit: string
-  /** 参考单价（澳门元） */
-  refPrice?: number
   createdAt: string
   updatedBy?: string
   updatedAt?: string
@@ -217,8 +220,6 @@ export interface PurchaseOrderItem {
   /** 採購形式：購買 / 租賃 */
   purchaseType?: 'purchase' | 'lease'
   qty: number
-  /** 參考單價 */
-  price: number
   /** 實際成交單價 */
   confirmedPrice?: number
   /** 已驗收入庫數量 */
@@ -230,6 +231,7 @@ export interface PurchaseOrderSupplierGroup {
   id: string
   supplier: string
   contact?: string
+  contactPhone?: string
   orderDate?: string
   trackingNo?: string
   /** 收貨方式：自取 / 供應商送貨上門 / 快遞發貨 */
@@ -279,6 +281,7 @@ export interface PurchaseOrder {
   /** 實際下單日期（兼容舊數據） */
   orderDate?: string
   contact?: string
+  contactPhone?: string
   remark?: string
   createdAt: string
   updatedBy?: string
@@ -716,32 +719,57 @@ let mockCompensations: CompensationRecord[] = [
 
 /** 分類列表（平鋪返回，頁面自行構樹） */
 export async function fetchCategoryList(params?: { keyword?: string; name?: string; code?: string; updatedBy?: string; updatedAtStart?: string; updatedAtEnd?: string }): Promise<AssetCategory[]> {
-  const data = await request.get<unknown, AssetCategory[]>('/eam/basic/categories', { params, headers: { [SILENT_HEADER]: '1' } })
-  return (data || []).map((c: any) => ({
-    ...c,
-    paramTemplate: typeof c.paramTemplate === 'string' ? (() => { try { return JSON.parse(c.paramTemplate) } catch { return [] } })() : (c.paramTemplate || []),
-  }))
+  try {
+    const data = await request.get<unknown, AssetCategory[]>('/eam/basic/categories', { params, headers: { [SILENT_HEADER]: '1' } })
+    return (data || []).map((c: any) => ({
+      ...c,
+      paramTemplate: typeof c.paramTemplate === 'string' ? (() => { try { return JSON.parse(c.paramTemplate) } catch { return [] } })() : (c.paramTemplate || []),
+    }))
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchCategoryList()
+    throw e
+  }
 }
 
 export async function createCategory(data: Omit<AssetCategory, 'id'>): Promise<number> {
+  try {
     return await request.post<unknown, number>('/eam/basic/categories', {
       ...data,
       paramTemplate: JSON.stringify(data.paramTemplate || []),
     })
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockCreateCategory(data)
+    throw e
+  }
 }
 
 export async function updateCategory(id: number, data: Partial<AssetCategory>): Promise<void> {
+  try {
     const payload: Record<string, unknown> = { ...data }
     if (data.paramTemplate) payload.paramTemplate = JSON.stringify(data.paramTemplate)
     await request.put(`/eam/basic/categories/${id}`, payload)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockUpdateCategory(id, data)
+    throw e
+  }
 }
 
 export async function deleteCategory(id: number): Promise<void> {
+  try {
     await request.delete(`/eam/basic/categories/${id}`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockDeleteCategory(id)
+    throw e
+  }
 }
 
 export async function toggleCategoryStatus(id: number): Promise<void> {
+  try {
     await request.put(`/eam/basic/categories/${id}/toggle`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockToggleCategoryStatus(id)
+    throw e
+  }
 }
 
 /* ==================== API：品牌庫 ==================== */
@@ -933,7 +961,7 @@ export function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdat
     // 同步更新頂層 items（取所有分組的 items 合併）
     o.items = data.supplierGroups.flatMap((g) => g.items)
     // 重新計算成交金額
-    o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
+    o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || 0) * it.qty, 0)
   }
   if (data.confirmedPrices) {
     const cp = data.confirmedPrices!
@@ -943,7 +971,7 @@ export function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdat
         it.confirmedPrice = cp[mid]
       }
     })
-    o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
+    o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || 0) * it.qty, 0)
   }
   mockPurchaseOrders[idx] = o
   o.updatedBy = 'current_user'
@@ -1109,7 +1137,7 @@ export async function createInboundBatch(data: {
     brand: model.brandZh,
     unit: model.unit,
     quantity: 1,
-    purchaseValue: model.refPrice || 0,
+    purchaseValue: 0,
     purchaseDate: data.inboundDate,
     usageDate: null,
     source: 'self' as const,

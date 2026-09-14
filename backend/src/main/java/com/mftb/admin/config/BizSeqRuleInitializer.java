@@ -45,6 +45,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: AI 使用申请流程编号规则种子（AI+YYYYMMDD+4位） */
     private static final String V_INIT_AI_ACCESS = "seq:init-v6";
 
+    /** 增量版本: 采购订单编号规则种子（DDCG+YYYYMMDD+4位） */
+    private static final String V_INIT_EAM_PO_RULE = "seq:init-v7";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -74,6 +77,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce(V_INIT_AI_ACCESS, () -> {
             seedAiAccessRequestRule();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_PO_RULE, () -> {
+            seedEamPurchaseOrderRule();
         });
     }
 
@@ -147,6 +153,7 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 {"employee_no", "工號", "員工管理", "MF", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
                 {"dept_code", "部門編碼", "組織管理", "BM", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
                 {"position_id", "職位ID", "職位管理", "ZW", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
+                {"eam_purchase_order", "採購訂單編號", "物資管理(EAM)-採購訂單", "DDCG", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
         };
         int inserted = 0;
         for (String[] r : rules) {
@@ -390,6 +397,27 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
             log.info("已写入 AI 使用申请流程编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 采购订单编号规则种子（DDCG + YYYYMMDD + 4位自增序号，归属物资管理）
+     *  使用 ON DUPLICATE KEY UPDATE 确保 rule_key / prefix 冲突时也能修正字段 */
+    private void seedEamPurchaseOrderRule() {
+        int affected = jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_PURCHASE_ORDER, "採購訂單編號", "物資管理(EAM)-採購訂單",
+                "DDCG", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (affected > 0) {
+            log.info("已写入/修正采购订单编号规则种子数据");
             bizSeqService.refreshRules();
         }
     }

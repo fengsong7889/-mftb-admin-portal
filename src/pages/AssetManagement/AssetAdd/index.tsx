@@ -35,8 +35,9 @@ import {
 } from '../../../api/asset'
 import {
   fetchCategoryList, fetchBrandList, fetchModelList, fetchLocationList,
+  fetchAllParamTypes, fetchParamValuesByType,
   type AssetCategory, type AssetBrand, type AssetModel, type AssetLocation,
-  type ParamField,
+  type ParamField, type ParamType,
 } from '../../../api/eam'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 
@@ -113,6 +114,8 @@ export default function AssetAdd() {
   const [selectedBrandId, setSelectedBrandId] = useState<number | undefined>(undefined)
   const [paramFields, setParamFields] = useState<ParamField[]>([])
   const [paramValues, setParamValues] = useState<Record<string, string>>({})
+  const [paramTypes, setParamTypes] = useState<ParamType[]>([])
+  const [paramValuesForSelect, setParamValuesForSelect] = useState<Record<string, string[]>>({})
 
   /* ----- 图片 ----- */
   const [imageFiles, setImageFiles] = useState<UploadFile[]>([])
@@ -141,12 +144,14 @@ export default function AssetAdd() {
       fetchCategoryList(),
       fetchLocationList(),
       fetchDepartments(),
-    ]).then(([catList, locList, deptList]) => {
+      fetchAllParamTypes(),
+    ]).then(([catList, locList, deptList, ptList]) => {
       if (!alive) return
       setCategories(catList.filter((c) => c.status === 'enabled'))
       setCategoryTree(buildCategoryTree(catList.filter((c) => c.status === 'enabled')))
       setLocations(locList)
       setDeptTree(buildDeptTree(deptList))
+      setParamTypes(ptList)
     }).catch(() => { /* 基础数据加载失败不阻塞 */ })
     return () => { alive = false }
   }, [])
@@ -211,6 +216,7 @@ export default function AssetAdd() {
     setSelectedBrandId(undefined)
     setParamFields([])
     setParamValues({})
+    setParamValuesForSelect({})
     form.setFieldsValue({ brand: undefined, assetName: undefined })
     if (!code) { setBrands([]); setModels([]); return }
     // 品牌前缀匹配：选择一级分类时加载其下所有子分类的品牌
@@ -236,19 +242,50 @@ export default function AssetAdd() {
     const model = models.find((m) => m.id === modelId)
     if (model) {
       form.setFieldsValue({ assetName: model.name })
-      // 选择资产名称后才加载参数模板
-      const cat = categories.find((c) => c.code === model.categoryCode)
-      if (cat?.paramTemplate) {
-        setParamFields(cat.paramTemplate)
-      } else {
-        setParamFields([])
-      }
+      // 从参数库 API 加载参数模板（biz_eam_param_type 表）
+      const fields: ParamField[] = paramTypes
+        .filter((p) => p.categoryCode === model.categoryCode && p.status === 'enabled')
+        .sort((a, b) => a.sort - b.sort)
+        .map((p) => ({
+          key: p.code,
+          label: p.name,
+          type: (p.valueType === 'number' ? 'number' : p.valueType === 'select' ? 'select' : 'text') as ParamField['type'],
+          unit: p.unit || undefined,
+        }))
+      setParamFields(fields)
       setParamValues({})
     } else {
       setParamFields([])
       setParamValues({})
     }
-  }, [models, form, categories])
+  }, [models, form, paramTypes])
+
+  /* ----- 为 select 类型参数加载可选值 ----- */
+  useEffect(() => {
+    const selectFields = paramFields.filter((f) => f.type === 'select')
+    if (selectFields.length === 0) return
+    let alive = true
+    Promise.all(
+      selectFields.map((f) =>
+        fetchParamValuesByType(f.key)
+          .then((vals) => ({ key: f.key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
+          .catch(() => ({ key: f.key, values: [] })),
+      ),
+    ).then((results) => {
+      if (!alive) return
+      const map: Record<string, string[]> = {}
+      results.forEach((r) => { map[r.key] = r.values })
+      setParamValuesForSelect(map)
+    })
+  }, [paramFields])
+
+  // 合并可选值到参数字段
+  const paramFieldsWithOptions = useMemo(() => {
+    return paramFields.map((f) => ({
+      ...f,
+      options: f.type === 'select' ? (paramValuesForSelect[f.key] || []) : f.options,
+    }))
+  }, [paramFields, paramValuesForSelect])
 
   /* ----- 位置级联处理 ----- */
   const handleWarehouseChange = (id: number | undefined) => {
@@ -391,7 +428,7 @@ export default function AssetAdd() {
     if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>请先选择资产名称</span>
     return (
       <Row gutter={[16, 16]}>
-        {paramFields.map((field) => (
+        {paramFieldsWithOptions.map((field) => (
           <Col span={8} key={field.key}>
             <Form.Item label={field.label} style={{ marginBottom: 0 }}>
               {field.type === 'select' ? (

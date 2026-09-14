@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS biz_eam_asset (
 -- 以下僅補充 PO/IB/FA 三條規則（手動建庫時使用，Java 初始化器也會幂等寫入）
 
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark)
-VALUES ('eam_purchase_order', '採購訂單編號', '物資管理', 'PO', 'YYYYMMDD', 4, 0, 1, '{prefix} + YYYYMMDD + {n}位自增序號');
+VALUES ('eam_purchase_order', '採購訂單編號', '物資管理', 'DDCG', 'YYYYMMDD', 4, 0, 1, '{prefix} + YYYYMMDD + {n}位自增序號');
 
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark)
 VALUES ('eam_inbound_batch', '驗收入庫批次編號', '物資管理', 'IB', 'YYYYMMDD', 4, 0, 1, '{prefix} + YYYYMMDD + {n}位自增序號');

@@ -11,9 +11,9 @@ import {
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchPurchaseOrderDetail, fetchPurchaseRequestDetail,
+  fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchAllParamTypes,
   type PurchaseOrder, type PurchaseRequest, type ExecStatus,
-  type PurchaseOrderSupplierGroup,
+  type PurchaseOrderSupplierGroup, type ParamType,
 } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
 import DetailPageHeader from '../../../components/DetailPageHeader'
@@ -50,6 +50,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   const [detail, setDetail] = useState<PurchaseOrder | null>(null)
   const [request, setRequest] = useState<PurchaseRequest | null>(null)
   const [empDeptMap, setEmpDeptMap] = useState<Map<string, string>>(new Map())
+  const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -81,6 +82,15 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
       .catch(() => {})
   }, [])
 
+  // 參數編碼 → 參數名稱映射
+  useEffect(() => {
+    fetchAllParamTypes().then((list) => {
+      const map = new Map<string, string>()
+      list.forEach((p: ParamType) => { map.set(p.code, p.name) })
+      setParamNameMap(map)
+    }).catch(() => {})
+  }, [])
+
   /** 明細表格列（與 OrderAdd 一致） */
   const itemColumns: TableColumnsType<PurchaseOrder['items'][number]> = [
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
@@ -89,12 +99,12 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
       render: (v: string | undefined) => v || '-' },
     { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
-      title: '參數', key: 'params', width: 140, ellipsis: true,
+      title: '參數信息', key: 'params', width: 200,
       render: (_: unknown, r) => {
         if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        const entries = Object.entries(r.params).filter(([, v]) => v)
+        const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
         if (entries.length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${k}:${v}`).join(' / ')}</span>
+        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
@@ -104,12 +114,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '購買' : '租賃'}</Tag>
         : '-',
     },
-    {
-      title: '參考單價', key: 'price', width: 100, align: 'right',
-      render: (_: unknown, r) => (
-        <span style={{ color: '#8c8c8c', fontSize: 12 }}>{r.price ? `MOP ${r.price.toLocaleString()}` : '-'}</span>
-      ),
-    },
+
     {
       title: '成交單價', key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r) => (

@@ -37,7 +37,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
 
   return (
     <div style={{
-      position: 'relative', background: '#fff', marginBottom: 16,
+      position: 'relative', background: '#fff', marginBottom: 10,
       borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
     }}>
       {/* 頂部漸變裝飾線（詳情頁全局規範：紫色） */}

@@ -120,6 +120,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setExchangeQty(0);
         order.setConcessionQty(0);
         order.setUpdatedBy(operator);
+        order.setUpdatedAt(LocalDateTime.now());
 
         // 供应商分组 JSON
         List<EamPurchaseSaveDTO.SupplierGroup> groups = dto.getSupplierGroups();
@@ -129,13 +130,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             order.setSupplier(Objects.toString(groups.get(0).getSupplier(), ""));
         }
 
+        // 生成訂單編號（DDCG+年月日+4位自增序號）
+        order.setPoNo(bizSeqService.next(BizSeqService.RULE_EAM_PURCHASE_ORDER));
         orderMapper.insert(order);
-
-        // 生成 PO 编号
-        String poNo = "PO" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-                + String.format("%04d", order.getId());
-        order.setPoNo(poNo);
-        orderMapper.updateById(order);
 
         // 保存明细（从 supplierGroups 中提取）
         if (groups != null) {
@@ -203,6 +200,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         }
 
         wrapper.set(EamPurchaseOrder::getUpdatedBy, operator);
+        wrapper.set(EamPurchaseOrder::getUpdatedAt, LocalDateTime.now());
         orderMapper.update(null, wrapper);
     }
 
@@ -241,13 +239,11 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setStatus("pending");
         order.setAcceptedQty(0);
         order.setUpdatedBy("system");
-        orderMapper.insert(order);
+        order.setUpdatedAt(LocalDateTime.now());
 
-        // 生成 PO 编号
-        String poNo = "PO" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
-                + String.format("%04d", order.getId());
-        order.setPoNo(poNo);
-        orderMapper.updateById(order);
+        // 生成訂單編號（DDCG+年月日+4位自增序號）
+        order.setPoNo(bizSeqService.next(BizSeqService.RULE_EAM_PURCHASE_ORDER));
+        orderMapper.insert(order);
 
         // 回写申请表的 orderId
         requestMapper.update(null, new LambdaUpdateWrapper<EamPurchaseRequest>()
@@ -255,7 +251,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                 .set(EamPurchaseRequest::getOrderId, order.getId())
                 .set(EamPurchaseRequest::getStatus, "approved"));
 
-        log.info("從採購申請自動創建訂單: requestId={}, orderId={}, poNo={}", requestId, order.getId(), poNo);
+        log.info("從採購申請自動創建訂單: requestId={}, orderId={}, poNo={}", requestId, order.getId(), order.getPoNo());
         return order.getId();
     }
 

@@ -375,11 +375,6 @@ export default function ModelList({
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
-      title: '型号编码', dataIndex: 'modelNo', key: 'modelNo', width: 160,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: string | undefined) => v || '-',
-    },
-    {
       title: '品牌', key: 'brand', width: 150,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetModel) => (
@@ -387,11 +382,6 @@ export default function ModelList({
       ),
     },
     { title: t('asset.colUnit'), dataIndex: 'unit', key: 'unit', width: 70, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
-    {
-      title: '参考单价', dataIndex: 'refPrice', key: 'refPrice', width: 100,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: number | undefined) => (v != null ? `¥${v}` : '-'),
-    },
     {
       title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),

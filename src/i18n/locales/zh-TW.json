@@ -342,6 +342,7 @@
     "approveNext": "{{nodeName}}通過，流程進入「{{nextNode}}」節點",
     "rejectDone": "已在「{{nodeName}}」節點駁回，流程已結束",
     "revokeSuccess": "申請已撤銷",
+    "revoke": "撤回",
     "revokeFailed": "撤銷失敗",
     "rejectFailed": "駁回失敗",
     "viewDoc": "點擊查看",

@@ -49,6 +49,9 @@ public class EamPurchaseOrder {
     /** 供应商联络人（兼容旧数据） */
     private String contact;
 
+    /** 供应商联络人电话（兼容旧数据） */
+    private String contactPhone;
+
     /** 下单日期（兼容旧数据） */
     private String orderDate;
 

@@ -54,6 +54,9 @@ public class EamPurchaseSaveDTO {
         /** 联系人 */
         private String contact;
 
+        /** 联系人电话 */
+        private String contactPhone;
+
         /** 下单日期 */
         private String orderDate;
 

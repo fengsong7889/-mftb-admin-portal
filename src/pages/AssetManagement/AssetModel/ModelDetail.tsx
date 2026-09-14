@@ -116,11 +116,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
               <Tag color="blue">{categoryName(model.categoryCode)}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="产品名称">{model.name}</Descriptions.Item>
-            <Descriptions.Item label="型号编码">{model.modelNo || '-'}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colUnit')}>{model.unit}</Descriptions.Item>
-            <Descriptions.Item label="参考单价">
-              {model.refPrice != null ? `¥${model.refPrice}` : '-'}
-            </Descriptions.Item>
             <Descriptions.Item label="最后更新人">{model.updatedBy || '-'}</Descriptions.Item>
             <Descriptions.Item label="最后更新时间">{model.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>

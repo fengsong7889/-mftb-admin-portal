@@ -2,7 +2,7 @@
  * 品牌/产品 新增/编辑独立表单页
  *
  * - type="brand"：品牌表单（所属分类 + 品牌中英文名 + LOGO）
- * - type="product"：产品表单（所属品牌 + 产品名称 + 型号编码 + 单位 + 参考单价）
+ * - type="product"：产品表单（所属品牌 + 产品名称 + 单位）
  * - 无参数配置（参数从参数库读取）
  * - 底部「取消 + 保存」（全局表单规范）
  */
@@ -30,9 +30,7 @@ interface ProductFormValues {
   brandId: number
   categoryCode: string
   name: string
-  modelNo?: string
   unit: string
-  refPrice?: number
 }
 
 interface Props {
@@ -90,9 +88,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               brandId: model.brandId,
               categoryCode: model.categoryCode,
               name: model.name,
-              modelNo: model.modelNo,
               unit: model.unit,
-              refPrice: model.refPrice,
             })
           }
         } else {
@@ -155,9 +151,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
           brandEn: brand?.brandEn,
           brandLogo: brand?.brandLogo,
           name: v.name.trim(),
-          modelNo: v.modelNo?.trim(),
           unit: v.unit,
-          refPrice: v.refPrice,
         }
         setSubmitting(true)
         if (isEdit && id) {
@@ -298,21 +292,11 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               </Row>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Form.Item label="型号编码" name="modelNo">
-                    <Input placeholder="例如：MacBook Pro 16 M3" allowClear />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
                   <Form.Item
                     label={t('asset.colUnit')} name="unit"
                     rules={[{ required: true, message: t('asset.unitRequired') }]}
                   >
                     <Select placeholder={t('asset.unitPh')} options={EAM_UNITS.map((u) => ({ label: u, value: u }))} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="参考单价（元）" name="refPrice">
-                    <Input type="number" placeholder="请输入参考单价" allowClear />
                   </Form.Item>
                 </Col>
               </Row>
