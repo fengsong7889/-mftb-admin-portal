@@ -220,6 +220,8 @@ export interface PurchaseOrderItem {
   /** 採購形式：購買 / 租賃 */
   purchaseType?: 'purchase' | 'lease'
   qty: number
+  /** 採購單價 */
+  price: number
   /** 實際成交單價 */
   confirmedPrice?: number
   /** 已驗收入庫數量 */
