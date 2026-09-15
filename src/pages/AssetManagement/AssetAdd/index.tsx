@@ -2,13 +2,13 @@
  * 资产新增/编辑独立页（简化版）
  *
  * 五大模块卡片布局：
- *  1. 资产信息 — 资产编码/资产分类/品牌/资产名称/资产照片/资产参数信息
+ *  1. 资产信息 — 资产编码/资产分类/资产品牌/资产名称/资产照片/资产参数信息
  *  2. 租/购信息 — 采购形式(自购/租用)/价值/日期/存放位置
  *  3. 当前使用人 — 使用人/所在部门/领用日期
  *  4. 备注信息
  *  5. 入库信息 — 批次号/入库时间/入库数量/验收人（验收入库跳转时自动带入）
  *
- * 级联逻辑：分类 → 品牌 → 产品型号 → 参数模板
+ * 级联逻辑：分类 → 资产品牌 → 产品型号 → 参数模板
  * 采购形式条件：自购显示购买公司，租用显示租用公司+租借公司
  * 位置选择：平铺选择仓库位置
  *
@@ -218,7 +218,7 @@ export default function AssetAdd() {
     }
   }, [searchParams, isEdit, form])
 
-  /* ----- 分类变更 → 加载品牌 ----- */
+  /* ----- 分类变更 → 加载资产品牌 ----- */
   const handleCategoryChange = useCallback((code: string) => {
     setSelectedCategoryCode(code)
     setSelectedBrandId(undefined)
@@ -227,14 +227,14 @@ export default function AssetAdd() {
     setParamValuesForSelect({})
     form.setFieldsValue({ brand: undefined, assetName: undefined })
     if (!code) { setBrands([]); setModels([]); return }
-    // 品牌前缀匹配：选择一级分类时加载其下所有子分类的品牌
+    // 资产品牌前缀匹配：选择一级分类时加载其下所有子分类的资产品牌
     fetchBrandList()
       .then((list) => setBrands(list.filter((b) => b.categoryCode.startsWith(code))))
       .catch(() => setBrands([]))
     setModels([])
   }, [categories, form])
 
-  /* ----- 品牌变更 → 加载型号 ----- */
+  /* ----- 资产品牌变更 → 加载型号 ----- */
   const handleBrandChange = useCallback((brandId: number | undefined) => {
     setSelectedBrandId(brandId)
     form.setFieldValue('assetName', undefined)
@@ -506,7 +506,7 @@ export default function AssetAdd() {
                 </Form.Item>
               </Col>
               <Col span={8}>
-                <Form.Item label="品牌" name="brand">
+                <Form.Item label="资产品牌" name="brand">
                   <Select
                     placeholder="请先选择分类"
                     allowClear
@@ -524,7 +524,7 @@ export default function AssetAdd() {
               <Col span={8}>
                 <Form.Item label="资产名称" name="assetName">
                   <Select
-                    placeholder="请先选择品牌"
+                    placeholder="请先选择资产品牌"
                     allowClear
                     showSearch
                     optionFilterProp="label"

@@ -1,8 +1,8 @@
 /**
- * 品牌/产品 新增/编辑独立表单页
+ * 资产品牌/产品 新增/编辑独立表单页
  *
- * - type="brand"：品牌表单（所属分类 + 品牌中英文名 + LOGO）
- * - type="product"：产品表单（所属品牌 + 产品名称 + 单位）
+ * - type="brand"：资产品牌表单（所属分类 + 资产品牌中英文名 + LOGO）
+ * - type="product"：产品表单（所属资产品牌 + 产品名称 + 单位）
  * - 无参数配置（参数从参数库读取）
  * - 底部「取消 + 保存」（全局表单规范）
  */
@@ -112,7 +112,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
   }, [brandForm, productForm, id, isEdit, isBrand]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBrandCategoryChange = (code: string) => {
-    // 切换分类时清空品牌信息
+    // 切换分类时清空资产品牌信息
     brandForm.setFieldsValue({ brandZh: '', brandEn: '', brandLogo: '' })
   }
 
@@ -136,10 +136,10 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
         setSubmitting(true)
         if (isEdit && id) {
           await updateBrand(id, payload)
-          message.success('品牌更新成功')
+          message.success('资产品牌更新成功')
         } else {
           await createBrand(payload)
-          message.success('品牌创建成功')
+          message.success('资产品牌创建成功')
         }
       } else {
         const v = await productForm.validateFields()
@@ -207,7 +207,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? (isBrand ? '编辑品牌' : '编辑产品') : (isBrand ? '新增品牌' : '新增产品')}
+              {isEdit ? (isBrand ? '编辑资产品牌' : '编辑产品') : (isBrand ? '新增资产品牌' : '新增产品')}
             </h2>
           </div>
         </div>
@@ -220,7 +220,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             ? <ShopOutlined style={{ color: '#E8720C', fontSize: 16 }} />
             : <AppstoreOutlined style={{ color: '#E8720C', fontSize: 16 }} />
           }
-          <span>{isBrand ? '品牌信息' : '产品信息'}</span>
+          <span>{isBrand ? '资产品牌信息' : '产品信息'}</span>
         </div>
         <div style={{ padding: '20px 24px 4px' }}>
           {isBrand ? (
@@ -242,16 +242,16 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                 </Col>
                 <Col span={8}>
                   <Form.Item
-                    label="品牌（中文）" name="brandZh"
-                    rules={[{ required: true, message: '请输入品牌中文名称' }]}
+                    label="资产品牌（中文）" name="brandZh"
+                    rules={[{ required: true, message: '请输入资产品牌中文名称' }]}
                   >
                     <Input placeholder="例如：苹果" allowClear />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
                   <Form.Item
-                    label="品牌（英文）" name="brandEn"
-                    rules={[{ required: true, message: '请输入品牌英文名称' }]}
+                    label="资产品牌（英文）" name="brandEn"
+                    rules={[{ required: true, message: '请输入资产品牌英文名称' }]}
                   >
                     <Input placeholder="例如：Apple" allowClear />
                   </Form.Item>
@@ -263,11 +263,11 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               <Row gutter={16}>
                 <Col span={8}>
                   <Form.Item
-                    label="所属品牌" name="brandId"
-                    rules={[{ required: true, message: '请选择所属品牌' }]}
+                    label="所属资产品牌" name="brandId"
+                    rules={[{ required: true, message: '请选择所属资产品牌' }]}
                   >
                     <Select
-                      placeholder="请选择品牌"
+                      placeholder="请选择资产品牌"
                       showSearch
                       optionFilterProp="label"
                       onChange={handleProductBrandChange}

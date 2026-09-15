@@ -1,9 +1,9 @@
 /**
- * 品牌产品维护列表（左右结构：左侧分类树 + 右侧品牌/产品表格）
+ * 资产品牌产品维护列表（左右结构：左侧分类树 + 右侧资产品牌/产品表格）
  *
  * - 左侧：资产分类树（与资产分类页面一致）
- * - 右侧：选中分类 → 显示品牌列表；选中品牌 → 显示产品列表
- * - 新增：选中分类时新增品牌；选中品牌时新增产品
+ * - 右侧：选中分类 → 显示资产品牌列表；选中资产品牌 → 显示产品列表
+ * - 新增：选中分类时新增资产品牌；选中资产品牌时新增产品
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tooltip, DatePicker, Tree } from 'antd'
@@ -138,7 +138,7 @@ export default function ModelList({
       setBrands(list)
       setTotal(list.length)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '加载品牌失败')
+      message.error(e instanceof Error ? e.message : '加载资产品牌失败')
     } finally {
       setLoading(false)
     }
@@ -162,7 +162,7 @@ export default function ModelList({
       setCategories(list)
       setTreeData(buildTreeData(list))
     }).catch(() => undefined)
-    // 默认加载全部品牌
+    // 默认加载全部资产品牌
     loadBrands()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -211,7 +211,7 @@ export default function ModelList({
     }
   }
 
-  /** 品牌搜索 */
+  /** 资产品牌搜索 */
   const handleBrandSearch = () => {
     const v = brandForm.getFieldsValue()
     const next: BrandQuery = {}
@@ -242,7 +242,7 @@ export default function ModelList({
     }
   }
 
-  /** 品牌行点击 → 切换到产品视图 */
+  /** 资产品牌行点击 → 切换到产品视图 */
   const handleBrandClick = (brand: AssetBrand) => {
     setSelectedBrandId(brand.id)
     setViewMode('products')
@@ -272,7 +272,7 @@ export default function ModelList({
 
   const handleDeleteBrand = (record: AssetBrand) => {
     Modal.confirm({
-      title: '确认删除品牌',
+      title: '确认删除资产品牌',
       content: `${record.brandZh}（${record.brandEn}）`,
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
@@ -311,12 +311,12 @@ export default function ModelList({
     })
   }
 
-  /** 产品视图状态变化时自动加载数据（含分页、搜索、品牌切换等场景） */
+  /** 产品视图状态变化时自动加载数据（含分页、搜索、资产品牌切换等场景） */
   useEffect(() => {
     if (viewMode !== 'products' || !selectedBrandId) return
     const brand = brands.find(b => b.id === selectedBrandId)
     if (!brand) return
-    // 优先用选中分类的 code；未选分类时用品牌自身的 categoryCode 保底
+    // 优先用选中分类的 code；未选分类时用资产品牌自身的 categoryCode 保底
     const catCode = selectedCatId
       ? categories.find(c => c.id === selectedCatId)?.code
       : brand.categoryCode
@@ -330,10 +330,10 @@ export default function ModelList({
 
   const categoryName = (code: string) => categories.find((c) => c.code === code)?.name || code
 
-  /* ── 品牌表格列  */
+  /* ── 资产品牌表格列  */
   const brandColumns: TableColumnsType<AssetBrand> = [
     {
-      title: '品牌', key: 'brand', width: 200,
+      title: '资产品牌', key: 'brand', width: 200,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetBrand) => (
         <Space size={6}>
@@ -377,7 +377,7 @@ export default function ModelList({
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
-      title: '品牌', key: 'brand', width: 150,
+      title: '资产品牌', key: 'brand', width: 150,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetModel) => (
         <span>{r.brandZh}</span>
@@ -407,7 +407,7 @@ export default function ModelList({
     },
   ]
 
-  /** 品牌列字段配置 */
+  /** 资产品牌列字段配置 */
   const brandColumnMeta = brandColumns.map(col => ({ key: col.key as string, title: col.title as string }))
   const { config: brandConfig, configComponent: brandConfigComponent, applyConfig: applyBrandConfig } = useColumnConfig('asset-model-brand', brandColumnMeta)
   const brandScrollX = useMemo(() => {
@@ -461,12 +461,12 @@ export default function ModelList({
             )}
           </div>
 
-          {/* 搜索区（品牌视图） */}
+          {/* 搜索区（资产品牌视图） */}
           {viewMode === 'brands' && (
             <div className="search-section">
               <Form form={brandForm} layout="inline">
-                <Form.Item label="品牌名称" name="brandZh">
-                  <Input placeholder="请输入品牌名称" allowClear onPressEnter={handleBrandSearch} />
+                <Form.Item label="资产品牌名称" name="brandZh">
+                  <Input placeholder="请输入资产品牌名称" allowClear onPressEnter={handleBrandSearch} />
                 </Form.Item>
                 <Form.Item label="最后更新人" name="updatedBy">
                   <Input placeholder="请输入最后更新人" allowClear onPressEnter={handleBrandSearch} />
@@ -517,7 +517,7 @@ export default function ModelList({
                   icon={<ShopOutlined />}
                   onClick={() => { setSelectedBrandId(undefined); setViewMode('brands'); if (selectedCatId) { const cat = categories.find(c => c.id === selectedCatId); loadBrands(cat?.code) } }}
                 >
-                  返回品牌列表
+                  返回资产品牌列表
                 </Button>
               )}
             </div>
@@ -525,7 +525,7 @@ export default function ModelList({
               {viewMode === 'brands' && (
                 <>
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
-                    新增品牌
+                    新增资产品牌
                   </Button>
                   <Tooltip title={selectedCategory ? '按分类配置常用配件，验收时可一键带入' : '请先在左侧选择分类'}>
                     <Button icon={<AppstoreOutlined />} disabled={!selectedCategory}
@@ -550,7 +550,7 @@ export default function ModelList({
           {/* 提示文字 */}
           {viewMode === 'brands' && brands.length > 0 && (
             <div style={{ padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08' }}>
-              💡 点击品牌行可查看该品牌下的产品列表
+              💡 点击资产品牌行可查看该品牌下的产品列表
             </div>
           )}
 

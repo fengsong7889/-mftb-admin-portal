@@ -147,13 +147,13 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
   // 分類樹
   const categoryTree = useMemo(() => buildCategoryTree(categories.filter((c) => c.status === 'enabled')), [categories])
 
-  // 根據分類篩選品牌
+  // 根據分類篩選資產品牌
   const filteredBrands = useMemo(
     () => selectedCategoryCode ? brands.filter((b) => b.categoryCode === selectedCategoryCode) : [],
     [brands, selectedCategoryCode],
   )
 
-  // 根據分類+品牌篩選型號
+  // 根據分類+資產品牌篩選型號
   const filteredModels = useMemo(
     () => models.filter((m) => {
       if (!selectedCategoryCode) return false
@@ -293,11 +293,11 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
           </Col>
           <Col span={8}>
             <Form.Item
-              label="品牌" name="brandId"
-              rules={[{ required: true, message: '請選擇品牌' }]}
+              label="资产品牌" name="brandId"
+              rules={[{ required: true, message: '請選擇資產品牌' }]}
             >
               <Select
-                placeholder={selectedCategoryCode ? '請選擇品牌' : '請先選擇分類'}
+                placeholder={selectedCategoryCode ? '請選擇資產品牌' : '請先選擇分類'}
                 showSearch
                 optionFilterProp="label"
                 disabled={!selectedCategoryCode}
@@ -315,7 +315,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
               rules={[{ required: true, message: '請選擇資產名稱' }]}
             >
               <Select
-                placeholder={selectedBrandId ? '請選擇資產' : '請先選擇品牌'}
+                placeholder={selectedBrandId ? '請選擇資產' : '請先選擇資產品牌'}
                 showSearch
                 optionFilterProp="label"
                 disabled={!selectedBrandId}
@@ -698,7 +698,7 @@ export default function OaPurchaseRequest() {
       render: (v: string) => v || '-',
     },
     {
-      title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 80,
+      title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 80,
       render: (v: string) => v || '-',
     },
     {

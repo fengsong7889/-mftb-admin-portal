@@ -73,9 +73,9 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /* ==================== 品牌库 ==================== */
+    /* ==================== 资产品牌库 ==================== */
 
-    /** 品牌列表 */
+    /** 资产品牌列表 */
     @GetMapping("/brands")
     @RequirePermission(menu = "asset-model")
     public Result<List<Map<String, Object>>> listBrands(
@@ -87,14 +87,14 @@ public class EamBasicDataController {
         return Result.success(basicDataService.listBrands(categoryCode, brandZh, updatedBy, updatedAtStart, updatedAtEnd));
     }
 
-    /** 新增品牌 */
+    /** 新增资产品牌 */
     @PostMapping("/brands")
     @RequirePermission(menu = "asset-model", action = "edit")
     public Result<Long> createBrand(@RequestBody EamBrandSaveDTO dto) {
         return Result.success(basicDataService.createBrand(dto));
     }
 
-    /** 更新品牌 */
+    /** 更新资产品牌 */
     @PutMapping("/brands/{id}")
     @RequirePermission(menu = "asset-model", action = "edit")
     public Result<Void> updateBrand(@PathVariable long id, @RequestBody EamBrandSaveDTO dto) {
@@ -102,7 +102,7 @@ public class EamBasicDataController {
         return Result.success();
     }
 
-    /** 删除品牌 */
+    /** 删除资产品牌 */
     @DeleteMapping("/brands/{id}")
     @RequirePermission(menu = "asset-model", action = "delete")
     public Result<Void> deleteBrand(@PathVariable long id) {
@@ -291,7 +291,7 @@ public class EamBasicDataController {
         return Result.success(basicDataService.listCategoryAccessories(categoryCode, onlyEnabled));
     }
 
-    /** 新增分类配件（品牌产品库配件配置页） */
+    /** 新增分类配件（资产品牌产品库配件配置页） */
     @PostMapping("/category-accessories/{categoryCode}")
     @RequirePermission(menu = "asset-model", action = "edit")
     public Result<Long> createCategoryAccessory(

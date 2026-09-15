@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * EAM 基础数据服务（分类 / 品牌 / 型号 / 位置）
+ * EAM 基础数据服务（分类 / 资产品牌 / 型号 / 位置）
  */
 public interface EamBasicDataService {
 
@@ -35,19 +35,19 @@ public interface EamBasicDataService {
     /** 切换分类状态 */
     void toggleCategoryStatus(long id);
 
-    /* ==================== 品牌库 ==================== */
+    /* ==================== 资产品牌库 ==================== */
 
-    /** 品牌列表 */
+    /** 资产品牌列表 */
     List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
                                           String updatedBy, String updatedAtStart, String updatedAtEnd);
 
-    /** 新增品牌 */
+    /** 新增资产品牌 */
     long createBrand(EamBrandSaveDTO dto);
 
-    /** 更新品牌 */
+    /** 更新资产品牌 */
     void updateBrand(long id, EamBrandSaveDTO dto);
 
-    /** 删除品牌 */
+    /** 删除资产品牌 */
     void deleteBrand(long id);
 
     /* ==================== 产品型号库 ==================== */

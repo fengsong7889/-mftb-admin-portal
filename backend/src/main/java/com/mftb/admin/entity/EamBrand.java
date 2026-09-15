@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 品牌库实体
+ * 资产品牌库实体
  */
 @Data
 @TableName("biz_eam_brand")
@@ -18,13 +18,13 @@ public class EamBrand {
     /** 所属分类编码 */
     private String categoryCode;
 
-    /** 品牌中文 */
+    /** 资产品牌中文 */
     private String brandZh;
 
-    /** 品牌英文 */
+    /** 资产品牌英文 */
     private String brandEn;
 
-    /** 品牌 LOGO URL */
+    /** 资产品牌 LOGO URL */
     private String brandLogo;
 
     @TableField(fill = FieldFill.INSERT)

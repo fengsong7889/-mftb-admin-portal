@@ -3,7 +3,7 @@
  *
  * - 使用 DetailPageHeader 組件（紫色漸變頂條 + 橙色返回 + 藍色標題 + 右側編輯按鈕）
  * - 卡片式佈局：基本信息
- * - 分類僅做層級歸類，參數配置由「品牌型號庫」負責
+ * - 分類僅做層級歸類，參數配置由「資產品牌型號庫」負責
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Spin, Descriptions, Tag } from 'antd'

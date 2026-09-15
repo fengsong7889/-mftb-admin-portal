@@ -65,34 +65,34 @@ export interface AssetCategory {
   updatedAt?: string
 }
 
-/** 品牌庫（所属分类 → 品牌） */
+/** 资产品牌庫（所属分类 → 资产品牌） */
 export interface AssetBrand {
   id: number
   /** 所属分类编码 */
   categoryCode: string
-  /** 品牌中文 */
+  /** 资产品牌中文 */
   brandZh: string
-  /** 品牌英文 */
+  /** 资产品牌英文 */
   brandEn: string
-  /** 品牌LOGO URL */
+  /** 资产品牌LOGO URL */
   brandLogo?: string
   createdAt: string
   updatedBy?: string
   updatedAt?: string
 }
 
-/** 产品庫（品牌 → 产品） */
+/** 产品庫（资产品牌 → 产品） */
 export interface AssetModel {
   id: number
   /** 所属分类编码 */
   categoryCode: string
-  /** 所属品牌ID */
+  /** 所属资产品牌ID */
   brandId: number
-  /** 品牌中文（冗余，方便展示） */
+  /** 资产品牌中文（冗余，方便展示） */
   brandZh: string
-  /** 品牌英文（冗余） */
+  /** 资产品牌英文（冗余） */
   brandEn?: string
-  /** 品牌LOGO（冗余） */
+  /** 资产品牌LOGO（冗余） */
   brandLogo?: string
   /** 产品名称（如 ThinkPad X1 Carbon 笔记本） */
   name: string
@@ -220,7 +220,7 @@ export interface PurchaseOrderItem {
   categoryId?: number
   categoryName?: string
   categoryCode?: string
-  /** 品牌 */
+  /** 资产品牌 */
   brandId?: number
   brandName?: string
   /** 參數信息 */
@@ -370,7 +370,7 @@ export interface ClaimRecord {
   assetName: string
   /** 资产分类 */
   assetType: string
-  /** 品牌 */
+  /** 资产品牌 */
   brand: string
   /** 領用人 */
   claimant: string
@@ -826,7 +826,7 @@ export async function toggleCategoryStatus(id: number): Promise<void> {
   }
 }
 
-/* ==================== API：品牌庫 ==================== */
+/* ==================== API：资产品牌庫 ==================== */
 
 export interface BrandQuery {
   categoryCode?: string

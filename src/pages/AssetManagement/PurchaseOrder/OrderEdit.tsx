@@ -3,7 +3,7 @@
  *
  * - 全局信息：采购经办人（搜索下拉）、服务部门（自动带出）、执行状态、备注
  * - 供应商分组卡片：收货方式、预计收货日期、快递单号（条件显示）
- * - 明细表格列与录入页对齐：分类、品牌、资产名称、参数、数量、采购形式、成交单价、小计
+ * - 明细表格列与录入页对齐：分类、资产品牌、资产名称、参数、数量、采购形式、成交单价、小计
  * - 支持物资拆分/移动/编辑操作
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -253,15 +253,15 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
             </Form.Item>
           </Col>
           <Col span={8}>
-            <Form.Item label="品牌" name="brandId" rules={[{ required: true, message: '請選擇品牌' }]}>
-              <Select placeholder={selectedCategoryCode ? '請選擇品牌' : '請先選擇分類'} showSearch optionFilterProp="label"
+            <Form.Item label="资产品牌" name="brandId" rules={[{ required: true, message: '請選擇資產品牌' }]}>
+              <Select placeholder={selectedCategoryCode ? '請選擇資產品牌' : '請先選擇分類'} showSearch optionFilterProp="label"
                 disabled={!selectedCategoryCode} onChange={handleBrandChange}
                 options={filteredBrands.map((b) => ({ label: b.brandZh, value: b.id }))} />
             </Form.Item>
           </Col>
           <Col span={8}>
             <Form.Item label="資產名稱" name="modelId" rules={[{ required: true, message: '請選擇資產名稱' }]}>
-              <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇品牌'} showSearch optionFilterProp="label"
+              <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇資產品牌'} showSearch optionFilterProp="label"
                 disabled={!selectedBrandId} onChange={handleModelChange}
                 options={filteredModels.map((m) => ({ label: m.name, value: m.id }))} />
             </Form.Item>
@@ -623,7 +623,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 80, ellipsis: true,
+      title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 80, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
@@ -1030,7 +1030,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           <Table<PurchaseOrderItem>
             columns={[
               { title: '分类', dataIndex: 'categoryName', key: 'categoryName', width: 80, ellipsis: true, render: (v: string | undefined) => v || '-' },
-              { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 80, ellipsis: true, render: (v: string | undefined) => v || '-' },
+              { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 80, ellipsis: true, render: (v: string | undefined) => v || '-' },
               { title: '资产名称', dataIndex: 'modelName', key: 'modelName', width: 140, ellipsis: true },
               { title: '数量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
               {

@@ -45,7 +45,7 @@ export interface AssetItem {
   assetName: string
   /** 资产类型 */
   assetType: string
-  /** 品牌 */
+  /** 资产品牌 */
   brand: string
   /** 单位 */
   unit: string

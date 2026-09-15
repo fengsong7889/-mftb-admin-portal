@@ -71,7 +71,7 @@ public class DataInitializer implements CommandLineRunner {
     // v30: 「集团人事」更名为「集团人事(HR)」；「物资管理」更名为「资产管理(EAM)」
     //      seedSystemMenus 对已存在菜单不再覆盖 sort_order / name（占位除外），
     //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
-        // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/品牌产品库/产品参数库）
+        // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/资产品牌产品库/产品参数库）
     // v35: 强制修正基础配置子菜单名称与图标（数据库重置/旧脚本未执行时自动恢复）
     private static final String V_MENU_SEED = "core:menu-seed-v35";
 
@@ -390,7 +390,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         log.info("员工详情页表结构就绪: emp_emergency_contact + emp_position_record");
     }
 
-    /** EAM 基础数据表自动创建: 资产分类 / 品牌库 / 产品型号库 / 仓库位置（幂等） */
+    /** EAM 基础数据表自动创建: 资产分类 / 资产品牌库 / 产品型号库 / 仓库位置（幂等） */
     private void migrateEamBasicTables() {
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS biz_eam_category ("
@@ -415,24 +415,24 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "CREATE TABLE IF NOT EXISTS biz_eam_brand ("
                         + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
                         + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
-                        + "brand_zh VARCHAR(100) NOT NULL COMMENT '品牌中文', "
-                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '品牌英文', "
-                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '品牌LOGO URL', "
+                        + "brand_zh VARCHAR(100) NOT NULL COMMENT '资产品牌中文', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '资产品牌英文', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '资产品牌LOGO URL', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
                         + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
                         + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
                         + "deleted TINYINT NOT NULL DEFAULT 0, "
                         + "KEY idx_category_code (category_code)"
-                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='品牌库'");
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产品牌库'");
 
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS biz_eam_model ("
                         + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
                         + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
-                        + "brand_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属品牌ID', "
-                        + "brand_zh VARCHAR(100) DEFAULT '' COMMENT '品牌中文(冗余)', "
-                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '品牌英文(冗余)', "
-                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '品牌LOGO(冗余)', "
+                        + "brand_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属资产品牌ID', "
+                        + "brand_zh VARCHAR(100) DEFAULT '' COMMENT '资产品牌中文(冗余)', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '资产品牌英文(冗余)', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '资产品牌LOGO(冗余)', "
                         + "model_no VARCHAR(100) DEFAULT '' COMMENT '产品型号编码', "
                         + "name VARCHAR(200) NOT NULL COMMENT '产品名称', "
                         + "unit VARCHAR(32) NOT NULL DEFAULT '台' COMMENT '计量单位', "
@@ -501,6 +501,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "applicant_emp_id VARCHAR(32) DEFAULT '' COMMENT '申请人工号', "
                         + "reason VARCHAR(500) NOT NULL DEFAULT '' COMMENT '采购事由', "
                         + "budget DECIMAL(14,2) DEFAULT 0 COMMENT '预算金额', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
                         + "status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected', "
                         + "order_id BIGINT DEFAULT NULL COMMENT '审批通过后生成的采购订单ID', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
@@ -510,6 +511,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "KEY idx_flow_no (flow_no), "
                         + "KEY idx_status (status)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购申请'");
+        // 144 脚本等效：已有表补 brand 列
+        addColumnIfAbsent("biz_eam_purchase_request", "brand",
+                "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER budget");
 
         // 2. 采购订单 (含 139 brand + 134 contact_phone)
         jdbcTemplate.execute(
@@ -545,6 +549,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "KEY idx_exec_status (exec_status), "
                         + "KEY idx_status (status)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购订单'");
+        // 134/139 脚本等效：已有表补 contact_phone / brand 列
+        addColumnIfAbsent("biz_eam_purchase_order", "contact_phone",
+                "ALTER TABLE biz_eam_purchase_order ADD COLUMN contact_phone VARCHAR(64) DEFAULT NULL COMMENT '供应商联络人电话' AFTER contact");
+        addColumnIfAbsent("biz_eam_purchase_order", "brand",
+                "ALTER TABLE biz_eam_purchase_order ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER department");
 
         // 3. 采购订单明细
         jdbcTemplate.execute(
@@ -1370,8 +1379,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎配置'");
         // 资产分类 → 资产分类库
         jdbcTemplate.update("UPDATE sys_menu SET name = '資產分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '資產分類庫'");
-        // 资产型号 → 品牌产品库
-        jdbcTemplate.update("UPDATE sys_menu SET name = '品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '品牌產品庫'");
+        // 资产型号 → 资产品牌产品库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '資產品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '資產品牌產品庫'");
         // 参数库 → 产品参数库
         jdbcTemplate.update("UPDATE sys_menu SET name = '產品參數庫', icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND deleted = 0 AND name != '產品參數庫'");
         // 同步英文名称
@@ -1670,7 +1679,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
         // 三级菜单 → 基础配置
         menus.put("asset-category",     new String[]{"資產分類庫",       "asset-basic",        "1"});
-        menus.put("asset-model",        new String[]{"品牌產品庫",       "asset-basic",        "2"});
+        menus.put("asset-model",        new String[]{"資產品牌產品庫",       "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         // ── OA中心 ──

@@ -710,7 +710,7 @@ const menuItems: MenuItem[] = [
         label: '基礎配置',
         children: [
           { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類庫' },
-          { key: 'asset-model', icon: <BarcodeOutlined />, label: '品牌產品庫' },
+          { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產品牌產品庫' },
           { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
           { key: 'param-library', icon: <DatabaseOutlined />, label: '產品參數庫' },
         ],
@@ -928,7 +928,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-management': <InboxOutlined />,
   'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
   'asset-category':   <TagsOutlined />,      // 資產分類庫
-  'asset-model':      <BarcodeOutlined />,   // 品牌產品庫
+  'asset-model':      <BarcodeOutlined />,   // 資產品牌產品庫
   'asset-location':   <EnvironmentOutlined />, // 倉庫維護
   'asset-flow-ops':   <SwapOutlined />,
   'asset-maintenance': <ToolOutlined />,

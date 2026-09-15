@@ -199,8 +199,12 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         List<EamPurchaseSaveDTO.SupplierGroup> groups = dto.getSupplierGroups();
         if (groups != null && !groups.isEmpty()) {
             order.setSupplierGroups(JsonUtils.toJson(groups));
-            // 取第一个分组的供应商作为兼容字段
-            order.setSupplier(Objects.toString(groups.get(0).getSupplier(), ""));
+            // 取第一个分组的供应商/联系人/电话作为兼容字段
+            EamPurchaseSaveDTO.SupplierGroup g0 = groups.get(0);
+            order.setSupplier(Objects.toString(g0.getSupplier(), ""));
+            order.setContact(Objects.toString(g0.getContact(), ""));
+            order.setContactPhone(Objects.toString(g0.getContactPhone(), ""));
+            order.setOrderDate(Objects.toString(g0.getOrderDate(), ""));
         }
 
         // 生成訂單編號（DDCG+年月日+4位自增序號）
@@ -277,6 +281,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             }
             wrapper.set(EamPurchaseOrder::getConfirmedAmount, confirmedAmount);
             wrapper.set(EamPurchaseOrder::getSupplier, Objects.toString(groups.get(0).getSupplier(), ""));
+            wrapper.set(EamPurchaseOrder::getContact, Objects.toString(groups.get(0).getContact(), ""));
+            wrapper.set(EamPurchaseOrder::getContactPhone, Objects.toString(groups.get(0).getContactPhone(), ""));
+            wrapper.set(EamPurchaseOrder::getOrderDate, Objects.toString(groups.get(0).getOrderDate(), ""));
 
             // 保留已有明細的已驗收數量（按 groupId + sortOrder 匹配）
             List<EamPurchaseOrderItem> existingItems = itemMapper.selectList(

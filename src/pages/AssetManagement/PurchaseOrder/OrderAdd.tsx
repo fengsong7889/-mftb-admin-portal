@@ -4,7 +4,7 @@
  * - 直接录入采购订单，不经过采购申请审批流程
  * - 全局信息：采购经办人（搜索下拉）、服务部门（自动带出）、订单总计
  * - 供应商分组卡片：收货方式、预计收货日期、快递单号（条件显示）
- * - 明细通过弹窗编辑（分类 → 品牌 → 资产名称 → 参数），统一采购申请风格
+ * - 明细通过弹窗编辑（分类 → 资产品牌 → 资产名称 → 参数），统一采购申请风格
  */
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -226,15 +226,15 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
             </Form.Item>
           </Col>
           <Col span={8}>
-            <Form.Item label="品牌" name="brandId" rules={[{ required: true, message: '請選擇品牌' }]}>
-              <Select placeholder={selectedCategoryCode ? '請選擇品牌' : '請先選擇分類'} showSearch optionFilterProp="label"
+            <Form.Item label="资产品牌" name="brandId" rules={[{ required: true, message: '請選擇資產品牌' }]}>
+              <Select placeholder={selectedCategoryCode ? '請選擇資產品牌' : '請先選擇分類'} showSearch optionFilterProp="label"
                 disabled={!selectedCategoryCode} onChange={handleBrandChange}
                 options={filteredBrands.map((b) => ({ label: b.brandZh, value: b.id }))} />
             </Form.Item>
           </Col>
           <Col span={8}>
             <Form.Item label="資產名稱" name="modelId" rules={[{ required: true, message: '請選擇資產名稱' }]}>
-              <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇品牌'} showSearch optionFilterProp="label"
+              <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇資產品牌'} showSearch optionFilterProp="label"
                 disabled={!selectedBrandId} onChange={handleModelChange}
                 options={filteredModels.map((m) => ({
                   label: m.name, value: m.id,
@@ -408,6 +408,7 @@ export default function OrderAdd() {
       const next = { ...g }
       if (patch.supplier !== undefined) next.supplier = patch.supplier
       if (patch.contact !== undefined) next.contact = patch.contact
+      if (patch.contactPhone !== undefined) next.contactPhone = patch.contactPhone
       if (patch.orderDate !== undefined) next.orderDate = patch.orderDate ? patch.orderDate.format('YYYY-MM-DD') : undefined
       if (patch.trackingNo !== undefined) next.trackingNo = patch.trackingNo
       if (patch.deliveryMethod !== undefined) next.deliveryMethod = patch.deliveryMethod
@@ -492,7 +493,7 @@ export default function OrderAdd() {
   /* ----- 明细展示表格列 ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<PurchaseOrderItem> => [
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true },
-    { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true },
+    { title: '資產品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true },
     { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
       title: '參數信息', key: 'params', width: 200,

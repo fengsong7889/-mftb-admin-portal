@@ -1518,7 +1518,7 @@ export default function ApprovalDetail() {
                 columns={[
                   { title: '序號', width: 60, render: (_: unknown, __: unknown, i: number) => i + 1 },
                   { title: '資產分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, render: (v: string) => v || '--' },
-                  { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 80, render: (v: string) => v || '--' },
+                  { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 80, render: (v: string) => v || '--' },
                   { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 140, render: (v: string) => v || '--' },
                   { title: '參數信息', dataIndex: 'params', key: 'params', width: 260, render: (v: Record<string, string> | undefined) => {
                     if (!v || Object.keys(v).length === 0) return '--'

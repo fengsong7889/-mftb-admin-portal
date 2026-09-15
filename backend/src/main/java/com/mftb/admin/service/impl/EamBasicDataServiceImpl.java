@@ -193,7 +193,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         categoryMapper.updateById(cat);
     }
 
-    /* ==================== 品牌库 ==================== */
+    /* ==================== 资产品牌库 ==================== */
 
     @Override
     public List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
@@ -234,7 +234,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Transactional
     public void updateBrand(long id, EamBrandSaveDTO dto) {
         EamBrand brand = brandMapper.selectById(id);
-        if (brand == null) throw new BusinessException("品牌不存在");
+        if (brand == null) throw new BusinessException("资产品牌不存在");
         if (dto.getCategoryCode() != null) brand.setCategoryCode(dto.getCategoryCode());
         if (dto.getBrandZh() != null) brand.setBrandZh(dto.getBrandZh());
         if (dto.getBrandEn() != null) brand.setBrandEn(dto.getBrandEn());
@@ -248,7 +248,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Transactional
     public void deleteBrand(long id) {
         EamBrand brand = brandMapper.selectById(id);
-        if (brand == null) throw new BusinessException("品牌不存在");
+        if (brand == null) throw new BusinessException("资产品牌不存在");
         brandMapper.deleteById(id);
     }
 

@@ -68,7 +68,7 @@ export default function EmployeeAssetDetail({ claimant, onBack, onAddClaim, onVi
     },
     { title: '资产名称', dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
     { title: '资产分类', dataIndex: 'assetType', key: 'assetType', width: 120 },
-    { title: '品牌', dataIndex: 'brand', key: 'brand', width: 100 },
+    { title: '资产品牌', dataIndex: 'brand', key: 'brand', width: 100 },
     { title: '领用日期', dataIndex: 'claimDate', key: 'claimDate', width: 120 },
     {
       title: '领用原因', dataIndex: 'claimReason', key: 'claimReason', width: 160, ellipsis: true,
@@ -99,7 +99,7 @@ export default function EmployeeAssetDetail({ claimant, onBack, onAddClaim, onVi
     },
     { title: '资产名称', dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
     { title: '资产分类', dataIndex: 'assetType', key: 'assetType', width: 120 },
-    { title: '品牌', dataIndex: 'brand', key: 'brand', width: 100 },
+    { title: '资产品牌', dataIndex: 'brand', key: 'brand', width: 100 },
     { title: '领用日期', dataIndex: 'claimDate', key: 'claimDate', width: 120 },
     {
       title: '归还日期', dataIndex: 'returnDate', key: 'returnDate', width: 120,

@@ -1,7 +1,7 @@
 /**
- * 品牌/产品 详情页（只读模式）
+ * 资产品牌/产品 详情页（只读模式）
  *
- * - type="brand"：品牌详情
+ * - type="brand"：资产品牌详情
  * - type="product"：产品详情（无参数，参数从参数库读取）
  * - 无底部操作栏（详情页全局规范）
  */
@@ -74,7 +74,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
     <>
       {/* ====== 顶部标题栏 ====== */}
       <DetailPageHeader
-        title={isBrand ? '品牌详情' : '产品详情'}
+        title={isBrand ? '资产品牌详情' : '产品详情'}
         meta={<>{isBrand ? brand?.brandZh : model?.name}</>}
         onBack={onBack}
         onEdit={() => onEdit(id)}
@@ -89,7 +89,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
               : <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             }
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{isBrand ? '品牌信息' : '产品信息'}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{isBrand ? '资产品牌信息' : '产品信息'}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         {isBrand && brand ? (
@@ -97,9 +97,9 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
             <Descriptions.Item label="所属分类">
               <Tag color="blue">{categoryName(brand.categoryCode)}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="品牌（中文）">{brand.brandZh}</Descriptions.Item>
-            <Descriptions.Item label="品牌（英文）">{brand.brandEn}</Descriptions.Item>
-            <Descriptions.Item label="品牌LOGO">
+            <Descriptions.Item label="资产品牌（中文）">{brand.brandZh}</Descriptions.Item>
+            <Descriptions.Item label="资产品牌（英文）">{brand.brandEn}</Descriptions.Item>
+            <Descriptions.Item label="资产品牌LOGO">
               {brand.brandLogo ? (
                 <img src={brand.brandLogo} alt={brand.brandEn} style={{ width: 32, height: 32, objectFit: 'contain' }} />
               ) : '-'}
@@ -109,7 +109,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
           </Descriptions>
         ) : model ? (
           <Descriptions column={3} size="middle" bordered>
-            <Descriptions.Item label="所属品牌">
+            <Descriptions.Item label="所属资产品牌">
               <Tag color="orange">{model.brandZh}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="所属分类">

@@ -93,7 +93,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   const itemColumns: TableColumnsType<PurchaseOrder['items'][number]> = [
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true,
+    { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
     { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {

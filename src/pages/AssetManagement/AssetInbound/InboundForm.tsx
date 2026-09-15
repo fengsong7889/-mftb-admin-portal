@@ -140,7 +140,7 @@ export default function InboundForm({ poId, onBack }: Props) {
   // 驗收確認彈窗（通過項：拍照憑證 + 配件清單）
   const [passModal, setPassModal] = useState<{ groupId: string; rowKey: string } | null>(null)
   const [passAccessories, setPassAccessories] = useState<{ name: string; qty: number }[]>([])
-  /** 分類配件配置（品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
+  /** 分類配件配置（资产品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
   const [categoryAccessories, setCategoryAccessories] = useState<Map<string, { name: string; defaultQty: number }[]>>(new Map())
 
   // 照片預覽
@@ -328,7 +328,7 @@ export default function InboundForm({ poId, onBack }: Props) {
     const code = passItem?.categoryCode
     const list = code ? categoryAccessories.get(code) || [] : []
     if (list.length === 0) {
-      message.info('該分類尚未配置配件，可在品牌產品庫按分類維護')
+      message.info('該分類尚未配置配件，可在资产品牌產品庫按分類維護')
       return
     }
     const existing = new Set(passAccessories.map((a) => a.name))
@@ -418,7 +418,7 @@ export default function InboundForm({ poId, onBack }: Props) {
     },
     { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
+    { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
     { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 140, ellipsis: true },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
@@ -796,7 +796,7 @@ export default function InboundForm({ poId, onBack }: Props) {
                 { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
                 { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
                   render: (v: string | undefined) => v || '-' },
-                { title: '品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
+                { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
                   render: (v: string | undefined) => v || '-' },
                 { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
                 {
@@ -911,7 +911,7 @@ export default function InboundForm({ poId, onBack }: Props) {
               )}
             </div>
 
-            {/* 配件清單（分類級配置，品牌產品庫維護） */}
+            {/* 配件清單（分類級配置，资产品牌產品庫維護） */}
             <div>
               <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
                 <AppstoreOutlined style={{ marginRight: 4 }} />
@@ -951,7 +951,7 @@ export default function InboundForm({ poId, onBack }: Props) {
               </div>
               {passAccessories.length === 0 && (
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
-                  可在品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加
+                  可在资产品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加
                 </div>
               )}
             </div>
