@@ -13,9 +13,9 @@ import { SearchOutlined, ReloadOutlined, PlusOutlined, ShoppingCartOutlined } fr
 import { useTranslation } from 'react-i18next'
 
 import {
-  fetchPurchaseOrderList, fetchPurchaseRequestDetail, deletePurchaseOrder,
+  fetchPurchaseOrderList, deletePurchaseOrder,
   updatePurchaseOrderExec,
-  type PurchaseOrder, type PurchaseRequest, type ExecStatus,
+  type PurchaseOrder, type ExecStatus,
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -49,7 +49,6 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<PurchaseOrder[]>([])
-  const [reqMap, setReqMap] = useState<Record<number, PurchaseRequest>>({})
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
@@ -105,17 +104,6 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       setDataSource(res.records || [])
       setTotal(res.total || 0)
 
-      // 後端列表已帶 reqNo；僅 mock 兜底數據缺失時補查申請編號映射
-      const needReqMap = (res.records || []).some((o) => o.reqId > 0 && !o.reqNo)
-      if (needReqMap) {
-        const reqIds = Array.from(new Set((res.records || []).map((o) => o.reqId).filter(Boolean)))
-        const entries = await Promise.all(reqIds.map(async (rid) => {
-          try { return [rid, await fetchPurchaseRequestDetail(rid)] as const } catch { return null }
-        }))
-        setReqMap(Object.fromEntries(entries.filter(Boolean).map((e) => [e![0], e![1]])))
-      } else {
-        setReqMap({})
-      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
@@ -274,7 +262,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     },
     {
       title: t('asset.colReqNo'), dataIndex: 'reqId', key: 'reqId', width: 130,
-      render: (v: number, r: PurchaseOrder) => (v && v > 0 ? (r.reqNo || reqMap[v]?.reqNo || '-') : '-'),
+      render: (v: number, r: PurchaseOrder) => (v > 0 ? (r.reqNo || '-') : '-'),
     },
     { title: t('asset.colSupplier'), dataIndex: 'supplier', key: 'supplier', width: 160, ellipsis: true },
     {
@@ -294,7 +282,9 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: '服務部門', key: 'department', width: 120,
       render: (_: unknown, r: PurchaseOrder) => {
         const dept = r.department || empDeptMap.get(r.purchaser || '') || ''
-        return dept || <span style={{ color: '#bfbfbf' }}>-</span>
+        return dept ? (
+          <span style={{ whiteSpace: 'nowrap' }}>{dept}</span>
+        ) : <span style={{ color: '#bfbfbf' }}>-</span>
       },
     },
     {

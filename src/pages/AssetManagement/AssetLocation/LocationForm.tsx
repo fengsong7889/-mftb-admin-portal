@@ -111,10 +111,10 @@ export default function LocationForm({ id, onBack }: Props) {
       setSubmitting(true)
       if (isEdit && id) {
         await updateLocation(id, payload)
-        message.success(t('asset.updateSuccess'))
+        message.success(t('asset.locationUpdateSuccess'))
       } else {
         await createLocation(payload)
-        message.success(t('asset.createSuccess'))
+        message.success(t('asset.locationCreateSuccess'))
       }
       onBack()
     } catch (e: unknown) {

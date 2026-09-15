@@ -24,6 +24,7 @@ import {
   ShoppingCartOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../components/DetailPageHeader'
+import BrandTag from '../../components/BrandTag'
 import './ApprovalDetail.css'
 import {
   approveCurrentNode,
@@ -231,7 +232,7 @@ export default function ApprovalDetail() {
         applyDate: purchaseLocal?.applyTime || '',
         flowNo,
         flowStatus: purchaseLocal?.flowStatus || 'draft',
-        brand: '--',
+        brand: purchaseExtra.brand != null ? String(purchaseExtra.brand as number | string) : '--',
         notes: (purchaseExtra.reason as string) || '',
         applyDepartment: (purchaseExtra.department as string) || undefined,
         department: (purchaseExtra.serviceDepartment as string) || undefined,
@@ -514,6 +515,7 @@ export default function ApprovalDetail() {
           applicant: applicantText,
           applyDate: oaVo.applyTime || '',
           flowStatus: oaVo.flowStatus,
+          brand: fd.brand != null ? String(fd.brand as number | string) : prev.brand,
           applyDepartment: (fd.department as string) || undefined,
           department: (fd.serviceDepartment as string) || undefined,
           position: (fd.position as string) || undefined,
@@ -910,6 +912,14 @@ export default function ApprovalDetail() {
                     <span className="approval-info-label">{t('aiApply.position')}</span>
                     <span className="approval-info-value">{data.position || '--'}</span>
                   </div>
+                  {type === 'oa_purchase' && (
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('common.colBrand')}</span>
+                      <span className="approval-info-value">
+                        {data.brand && data.brand !== '--' ? <BrandTag value={data.brand} /> : '--'}
+                      </span>
+                    </div>
+                  )}
                   {type === 'oa_purchase' && data.applyDepartment && (
                     <div className="approval-info-item">
                       <span className="approval-info-label">{t('aiApply.applyDepartment')}</span>

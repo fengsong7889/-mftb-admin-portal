@@ -792,6 +792,8 @@
     "transferSuccess": "Asset transferred",
     "returnSuccess": "Asset returned",
     "scrapSuccess": "Asset scrapped",
+    "locationCreateSuccess": "Warehouse created",
+    "locationUpdateSuccess": "Warehouse updated",
     "repairCreated": "Repair record created",
     "repairFinished": "Repair finished",
     "repairFinishFailed": "Failed to finish repair",

@@ -11,13 +11,14 @@ import {
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchAllParamTypes,
-  type PurchaseOrder, type PurchaseRequest, type ExecStatus,
+  fetchPurchaseOrderDetail, fetchAllParamTypes,
+  type PurchaseOrder, type ExecStatus,
   type PurchaseOrderSupplierGroup, type ParamType,
 } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
+import { BrandEnum } from '../../../constants/brand'
 
 const EXEC_META: Record<ExecStatus, { key: string; color: string }> = {
   pending:    { key: 'asset.execPending',    color: 'default' },
@@ -49,7 +50,6 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [detail, setDetail] = useState<PurchaseOrder | null>(null)
-  const [request, setRequest] = useState<PurchaseRequest | null>(null)
   const [empDeptMap, setEmpDeptMap] = useState<Map<string, string>>(new Map())
   const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
 
@@ -58,10 +58,6 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     try {
       const order = await fetchPurchaseOrderDetail(id)
       setDetail(order)
-      // 後端詳情已帶 reqNo；僅 mock 兜底數據缺失時補查申請信息
-      if (order.reqId && !order.reqNo) {
-        try { setRequest(await fetchPurchaseRequestDetail(order.reqId)) } catch { setRequest(null) }
-      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
@@ -192,13 +188,13 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           <Descriptions.Item label="採購單號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail.poNo}</span></Descriptions.Item>
           <Descriptions.Item label="所屬品牌">
             {detail.brand ? <BrandTag value={detail.brand} /> : '-'}
-            {detail.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>當前物資歸屬閃蜂，編碼 TB</span>}
-            {detail.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF', marginLeft: 8 }}>當前物資歸屬 mFood，編碼 MF</span>}
+            {detail.brand === BrandEnum.SHANFENG && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>當前物資歸屬閃蜂，編碼 TB</span>}
+            {detail.brand === BrandEnum.MFOOD && <span style={{ fontSize: 12, color: '#1890FF', marginLeft: 8 }}>當前物資歸屬 mFood，編碼 MF</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colReqNo')}>
-            {detail.reqId ? (
+            {detail.reqId > 0 && detail.reqNo ? (
               <Button type="link" size="small" onClick={() => onViewRequest(detail.reqId)}>
-                {detail.reqNo || request?.reqNo || detail.reqId}
+                {detail.reqNo}
               </Button>
             ) : '-'}
           </Descriptions.Item>

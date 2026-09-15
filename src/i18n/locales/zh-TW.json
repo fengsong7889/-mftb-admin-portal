@@ -793,6 +793,8 @@
     "transferSuccess": "資產轉移成功",
     "returnSuccess": "資產歸還成功",
     "scrapSuccess": "資產報廢成功",
+    "locationCreateSuccess": "倉庫創建成功",
+    "locationUpdateSuccess": "倉庫信息已更新",
     "repairCreated": "維修記錄已創建",
     "repairFinished": "維修已完成",
     "repairFinishFailed": "維修完成操作失敗",

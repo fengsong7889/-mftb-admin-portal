@@ -8,6 +8,7 @@
  * 台賬主數據與操作流水仍由 ./asset 承載，本文件僅擴展 EAM 專屬實體。
  */
 import request, { isBackendUnavailable, SILENT_HEADER } from './request'
+import { BrandEnum } from '../constants/brand'
 import {
   mockFetchCategoryList,
   mockCreateCategory,
@@ -194,6 +195,8 @@ export interface PurchaseRequest {
   applicant: string
   /** 預算金額 */
   budget: number
+  /** 所屬品牌：1=閃蜂, 2=mFood */
+  brand?: number
   items: PurchaseRequestItem[]
   /** 申請理由 */
   reason: string
@@ -587,6 +590,8 @@ function currentUserName(): string {
 function normalizePurchaseOrder(o: Record<string, unknown>): PurchaseOrder {
   return {
     ...(o as unknown as PurchaseOrder),
+    brand: [BrandEnum.SHANFENG, BrandEnum.MFOOD].includes(Number(o.brand)) ? Number(o.brand) : undefined,
+    reqNo: typeof o.reqNo === 'string' ? o.reqNo : undefined,
     items: (o.items as PurchaseOrderItem[] | undefined) || [],
     // 列表接口返回的分組摘要不含 items，補空數組保證結構完整
     supplierGroups: (o.supplierGroups as PurchaseOrderSupplierGroup[] | undefined)
@@ -1063,6 +1068,7 @@ export async function approvePurchaseRequest(
     id: orderId,
     poNo: genNo('PO', orderId),
     reqId: req.id,
+    brand: req.brand,
     supplier: '待定供應商',
     amount,
     deliveryDate: shiftDay(today(), 14),
@@ -1099,6 +1105,12 @@ export interface PurchaseOrderExecUpdate {
 }
 
 /* ---------- Mock 實現（後端不可用時兜底） ---------- */
+
+// 仅为 Mock 订单关联 Mock 申请，页面不再按真实 reqId 补查本地模拟数据。
+function enrichMockPurchaseOrder(order: PurchaseOrder): PurchaseOrder {
+  const req = mockPurchaseRequests.find((r) => r.id === order.reqId)
+  return { ...order, reqNo: order.reqNo || req?.reqNo, brand: order.brand ?? req?.brand }
+}
 
 function mockUpdatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate): Promise<void> {
   const idx = mockPurchaseOrders.findIndex((o) => o.id === id)
@@ -1147,7 +1159,7 @@ export async function updatePurchaseOrderExec(id: number, data: PurchaseOrderExe
 }
 
 function mockFetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<PageResult<PurchaseOrder>> {
-  let list = [...mockPurchaseOrders].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  let list = mockPurchaseOrders.map(enrichMockPurchaseOrder).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   if (params?.status && params.status !== 'all') list = list.filter((o) => o.status === params.status)
   if (params?.execStatus && params.execStatus !== 'all') list = list.filter((o) => o.execStatus === params.execStatus)
   if (params?.keyword) {
@@ -1216,7 +1228,7 @@ export async function fetchPurchaseOrderList(params?: PurchaseOrderQuery): Promi
 function mockFetchPurchaseOrderDetail(id: number): Promise<PurchaseOrder> {
   const item = mockPurchaseOrders.find((o) => o.id === id)
   if (!item) return Promise.reject(new Error('採購訂單不存在'))
-  return delay(item)
+  return delay(enrichMockPurchaseOrder(item))
 }
 
 /** 採購訂單詳情 */

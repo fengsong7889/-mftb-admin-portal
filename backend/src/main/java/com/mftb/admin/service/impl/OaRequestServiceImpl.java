@@ -988,6 +988,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         pr.setApplicant(ConvertUtils.str(formData, "applicant"));
         pr.setApplicantEmpId(ConvertUtils.str(formData, "applicantEmpId"));
         pr.setReason(ConvertUtils.str(formData, "reason"));
+        pr.setBrand(ConvertUtils.toInt(formData.get("brand"), null));
         pr.setStatus("approved");
 
         // 计算预算（items 合计）

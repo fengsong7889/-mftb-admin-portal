@@ -9,9 +9,11 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamPurchaseOrder;
 import com.mftb.admin.entity.EamPurchaseOrderItem;
 import com.mftb.admin.entity.EamPurchaseRequest;
+import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
 import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
+import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
@@ -37,6 +39,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     private final EamPurchaseOrderMapper orderMapper;
     private final EamPurchaseOrderItemMapper itemMapper;
     private final EamPurchaseRequestMapper requestMapper;
+    private final OaRequestMapper oaRequestMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -82,7 +85,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
 
         // 批量补充明细总数、分组级统计与关联申请编号（供列表「验收入库进度/关联申请/供应商分组」展示）
         Map<Long, Integer> totalQtyMap = new HashMap<>();
-        Map<Long, String> reqNoMap = new HashMap<>();
+        Map<Long, EamPurchaseRequest> requests = loadOrderRequests(result.getRecords());
         // 分组级统计：orderId -> (groupId -> [qty 合计, receivedQty 合计])
         Map<Long, Map<String, int[]>> groupQtyMap = new HashMap<>();
         List<Long> orderIds = result.getRecords().stream().map(EamPurchaseOrder::getId).collect(Collectors.toList());
@@ -100,20 +103,12 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                             agg[1] += it.getReceivedQty() == null ? 0 : it.getReceivedQty();
                         }
                     });
-            List<Long> reqIds = result.getRecords().stream()
-                    .map(EamPurchaseOrder::getReqId).filter(rid -> rid != null && rid > 0).collect(Collectors.toList());
-            if (!reqIds.isEmpty()) {
-                requestMapper.selectBatchIds(reqIds)
-                        .forEach(req -> reqNoMap.put(req.getId(), req.getReqNo()));
-            }
         }
 
         List<Map<String, Object>> records = result.getRecords().stream()
                 .map(o -> {
-                    Map<String, Object> m = orderToMap(o);
+                    Map<String, Object> m = orderToMap(o, requests.get(o.getReqId()));
                     m.put("totalQty", totalQtyMap.getOrDefault(o.getId(), 0));
-                    m.put("reqNo", o.getReqId() != null && o.getReqId() > 0
-                            ? reqNoMap.get(o.getReqId()) : null);
                     // 供应商分组摘要（不含 items 明细，供前端按「订单×供应商」拆分行展示与分组级待验收件数）
                     if (o.getSupplierGroups() != null && !o.getSupplierGroups().isBlank()) {
                         Map<String, int[]> gMap = groupQtyMap.get(o.getId());
@@ -148,7 +143,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         EamPurchaseOrder order = orderMapper.selectById(id);
         if (order == null) throw new BusinessException("採購訂單不存在");
 
-        Map<String, Object> map = orderToMap(order);
+        Map<Long, EamPurchaseRequest> requests = loadOrderRequests(List.of(order));
+        Map<String, Object> map = orderToMap(order, requests.get(order.getReqId()));
 
         // 查询明细
         List<EamPurchaseOrderItem> items = itemMapper.selectList(
@@ -342,6 +338,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setDeliveryDate(LocalDate.now().plusDays(14).toString());
         order.setPurchaser(req.getApplicant());
         order.setDepartment(req.getDepartment());
+        order.setBrand(req.getBrand());
         // 保留原始采购事由，追加来源说明
         String originalReason = req.getReason() != null ? req.getReason().trim() : "";
         order.setRemark(originalReason + "\n（由採購申請 " + req.getReqNo() + " 審批通過自動生成）");
@@ -429,18 +426,53 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         itemMapper.insert(entity);
     }
 
-    private Map<String, Object> orderToMap(EamPurchaseOrder o) {
+    /** 列表和详情共用申请关联；旧订单缺少品牌时从原始 OA 表单补充，不修改数据库。 */
+    private Map<Long, EamPurchaseRequest> loadOrderRequests(List<EamPurchaseOrder> orders) {
+        List<Long> reqIds = orders.stream().map(EamPurchaseOrder::getReqId)
+                .filter(id -> id != null && id > 0).distinct().collect(Collectors.toList());
+        Map<Long, EamPurchaseRequest> requests = new HashMap<>();
+        if (reqIds.isEmpty()) return requests;
+
+        requestMapper.selectBatchIds(reqIds).forEach(req -> requests.put(req.getId(), req));
+        Set<String> missingBrandFlows = orders.stream()
+                .filter(order -> order.getBrand() == null)
+                .map(order -> requests.get(order.getReqId()))
+                .filter(Objects::nonNull)
+                .filter(req -> req.getBrand() == null)
+                .map(EamPurchaseRequest::getFlowNo)
+                .filter(flowNo -> flowNo != null && !flowNo.isBlank())
+                .collect(Collectors.toSet());
+        if (missingBrandFlows.isEmpty()) return requests;
+
+        Map<String, Integer> flowBrands = new HashMap<>();
+        oaRequestMapper.selectList(new LambdaQueryWrapper<OaRequest>()
+                        .eq(OaRequest::getProcessCode, "oa_purchase")
+                        .in(OaRequest::getFlowNo, missingBrandFlows)
+                        .select(OaRequest::getFlowNo, OaRequest::getFormData))
+                .forEach(oa -> {
+                    Map<String, Object> formData = JsonUtils.parseMap(oa.getFormData());
+                    if (formData != null) {
+                        flowBrands.put(oa.getFlowNo(), ConvertUtils.toInt(formData.get("brand"), null));
+                    }
+                });
+        requests.values().stream().filter(req -> req.getBrand() == null)
+                .forEach(req -> req.setBrand(flowBrands.get(req.getFlowNo())));
+        return requests;
+    }
+
+    private Map<String, Object> orderToMap(EamPurchaseOrder o, EamPurchaseRequest req) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", o.getId());
         m.put("poNo", o.getPoNo());
         m.put("reqId", o.getReqId());
+        m.put("reqNo", req != null ? req.getReqNo() : null);
         m.put("supplier", o.getSupplier());
         m.put("amount", o.getAmount());
         m.put("confirmedAmount", o.getConfirmedAmount());
         m.put("deliveryDate", o.getDeliveryDate());
         m.put("purchaser", o.getPurchaser());
         m.put("department", o.getDepartment());
-        m.put("brand", o.getBrand());
+        m.put("brand", o.getBrand() != null ? o.getBrand() : req != null ? req.getBrand() : null);
         m.put("remark", o.getRemark());
         m.put("trackingNo", o.getTrackingNo());
         m.put("contact", o.getContact());
