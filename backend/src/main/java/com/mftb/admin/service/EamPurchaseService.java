@@ -3,6 +3,7 @@ package com.mftb.admin.service;
 import com.mftb.admin.dto.EamPurchaseSaveDTO;
 import com.mftb.admin.dto.PageResult;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,9 +13,10 @@ public interface EamPurchaseService {
 
     /**
      * 分页查询采购订单
+     * @param processNo 关联采购申请编号（模糊）
      */
-    PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String supplier,
-                                                String purchaser, String execStatus,
+    PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String processNo,
+                                                String supplier, String purchaser, String execStatus,
                                                 String createdAtStart, String createdAtEnd,
                                                 String updatedAtStart, String updatedAtEnd);
 
@@ -40,7 +42,9 @@ public interface EamPurchaseService {
 
     /**
      * 审批通过 → 自动从采购申请创建采购订单
+     * @param requestId 采购申请 ID
+     * @param formDataItems OA 表单中的物资明细（来自 formData.items）
      * @return 生成的订单 ID
      */
-    long createOrderFromRequest(long requestId);
+    long createOrderFromRequest(long requestId, List<Map<String, Object>> formDataItems);
 }

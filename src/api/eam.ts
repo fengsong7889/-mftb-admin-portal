@@ -285,6 +285,10 @@ export interface PurchaseOrder {
   contact?: string
   contactPhone?: string
   remark?: string
+  /** 明细数量合计（后端列表接口返回，用于验收进度展示） */
+  totalQty?: number
+  /** 关联采购申请编号（后端列表接口返回） */
+  reqNo?: string
   createdAt: string
   updatedBy?: string
   updatedAt?: string
@@ -478,6 +482,8 @@ export interface PurchaseOrderQuery extends EamPageQuery {
   poNo?: string
   processNo?: string
   supplier?: string
+  /** 入庫狀態：pending=待驗收 / partial=部分入庫 / received=全部入庫 */
+  status?: string
   execStatus?: string
   purchaser?: string
   createdAtStart?: string
@@ -549,6 +555,29 @@ function shiftDay(base: string, days: number): string {
 /** 生成單據編號：PREFIX-YYYY-### */
 function genNo(prefix: string, seq: number): string {
   return `${prefix}-${new Date().getFullYear()}-${String(seq).padStart(3, '0')}`
+}
+
+/** 當前登錄人姓名（mock 兜底時記錄「最後更新人」用） */
+function currentUserName(): string {
+  try {
+    return JSON.parse(localStorage.getItem('user_info') || '{}')?.name || 'current_user'
+  } catch {
+    return 'current_user'
+  }
+}
+
+/** 後端訂單記錄 → 前端 PurchaseOrder（列表/詳情通用）
+ *  - items 缺省為 []（列表接口不返回明細）
+ *  - 時間格式 T → 空格 */
+function normalizePurchaseOrder(o: Record<string, unknown>): PurchaseOrder {
+  return {
+    ...(o as unknown as PurchaseOrder),
+    items: (o.items as PurchaseOrderItem[] | undefined) || [],
+    amount: Number(o.amount ?? 0),
+    confirmedAmount: o.confirmedAmount != null ? Number(o.confirmedAmount) : undefined,
+    createdAt: String(o.createdAt || '').replace('T', ' '),
+    updatedAt: o.updatedAt != null ? String(o.updatedAt).replace('T', ' ') : undefined,
+  }
 }
 
 function paginate<T>(list: T[], page?: number, size?: number): PageResult<T> {
@@ -945,8 +974,9 @@ export interface PurchaseOrderExecUpdate {
   supplierGroups?: PurchaseOrderSupplierGroup[]
 }
 
-/** 更新採購執行信息（回填供應商/價格/快遞/狀態推進） */
-export function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate): Promise<void> {
+/* ---------- Mock 實現（後端不可用時兜底） ---------- */
+
+function mockUpdatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate): Promise<void> {
   const idx = mockPurchaseOrders.findIndex((o) => o.id === id)
   if (idx === -1) return Promise.reject(new Error('採購執行單不存在'))
   const o = mockPurchaseOrders[idx]
@@ -976,12 +1006,22 @@ export function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdat
     o.confirmedAmount = o.items.reduce((s, it) => s + (it.confirmedPrice || 0) * it.qty, 0)
   }
   mockPurchaseOrders[idx] = o
-  o.updatedBy = 'current_user'
+  o.updatedBy = currentUserName()
   o.updatedAt = now()
   return delay(undefined as unknown as void)
 }
 
-export function fetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<PageResult<PurchaseOrder>> {
+/** 更新採購執行信息（回填供應商/價格/快遞/狀態推進） */
+export async function updatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate): Promise<void> {
+  try {
+    await request.put(`/eam/purchase/${id}`, data)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockUpdatePurchaseOrderExec(id, data)
+    throw e
+  }
+}
+
+function mockFetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<PageResult<PurchaseOrder>> {
   let list = [...mockPurchaseOrders].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   if (params?.status && params.status !== 'all') list = list.filter((o) => o.status === params.status)
   if (params?.execStatus && params.execStatus !== 'all') list = list.filter((o) => o.execStatus === params.execStatus)
@@ -1018,19 +1058,76 @@ export function fetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<Pag
   return delay(paginate(list, params?.page, params?.size))
 }
 
-export function fetchPurchaseOrderDetail(id: number): Promise<PurchaseOrder> {
+/** 採購執行列表（優先後端，不可用時降級 Mock） */
+export async function fetchPurchaseOrderList(params?: PurchaseOrderQuery): Promise<PageResult<PurchaseOrder>> {
+  try {
+    const data = await request.get<unknown, PageResult<Record<string, unknown>>>('/eam/purchase', {
+      params: {
+        page: params?.page,
+        size: params?.size,
+        poNo: params?.poNo,
+        processNo: params?.processNo,
+        supplier: params?.supplier,
+        status: params?.status,
+        purchaser: params?.purchaser,
+        execStatus: params?.execStatus,
+        createdAtStart: params?.createdAtStart,
+        createdAtEnd: params?.createdAtEnd,
+        updatedAtStart: params?.updatedAtStart,
+        updatedAtEnd: params?.updatedAtEnd,
+      },
+      headers: { [SILENT_HEADER]: '1' },
+    })
+    return {
+      records: (data.records || []).map((o) => normalizePurchaseOrder(o)),
+      total: data.total || 0,
+    }
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchPurchaseOrderList(params)
+    throw e
+  }
+}
+
+function mockFetchPurchaseOrderDetail(id: number): Promise<PurchaseOrder> {
   const item = mockPurchaseOrders.find((o) => o.id === id)
   if (!item) return Promise.reject(new Error('採購訂單不存在'))
   return delay(item)
 }
 
-export function createPurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo' | 'status' | 'execStatus' | 'createdAt'>): Promise<number> {
+/** 採購訂單詳情 */
+export async function fetchPurchaseOrderDetail(id: number): Promise<PurchaseOrder> {
+  try {
+    const data = await request.get<unknown, Record<string, unknown>>(`/eam/purchase/${id}`)
+    return normalizePurchaseOrder(data)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchPurchaseOrderDetail(id)
+    throw e
+  }
+}
+
+function mockCreatePurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo' | 'status' | 'execStatus' | 'createdAt'>): Promise<number> {
   const id = Math.max(0, ...mockPurchaseOrders.map((o) => o.id)) + 1
+  const createdAt = now()
   mockPurchaseOrders = [
-    { ...data, id, poNo: genNo('PO', id), status: 'pending', execStatus: 'pending', createdAt: now() },
+    {
+      ...data, id, poNo: genNo('PO', id), status: 'pending', execStatus: 'pending',
+      createdAt,
+      // 創建時最後更新人/時間直接取創建人與創建時間
+      updatedBy: currentUserName(), updatedAt: createdAt,
+    },
     ...mockPurchaseOrders,
   ]
   return delay(id)
+}
+
+/** 創建採購訂單（訂單編號由後端按規則配置生成） */
+export async function createPurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo' | 'status' | 'execStatus' | 'createdAt'>): Promise<number> {
+  try {
+    return await request.post<unknown, number>('/eam/purchase', data)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockCreatePurchaseOrder(data)
+    throw e
+  }
 }
 
 export function updatePurchaseOrder(id: number, data: Partial<PurchaseOrder>): Promise<void> {
@@ -1040,12 +1137,23 @@ export function updatePurchaseOrder(id: number, data: Partial<PurchaseOrder>): P
   return delay(undefined as unknown as void)
 }
 
-export function deletePurchaseOrder(id: number): Promise<void> {
+function mockDeletePurchaseOrder(id: number): Promise<void> {
   const item = mockPurchaseOrders.find((o) => o.id === id)
   if (!item) return Promise.reject(new Error('採購訂單不存在'))
-  if (item.status !== 'pending') return Promise.reject(new Error('已有入庫記錄，無法刪除'))
+  // 與後端規則對齊：僅待處理（execStatus=pending）的訂單可刪除
+  if (item.execStatus !== 'pending') return Promise.reject(new Error('僅待處理的訂單可刪除'))
   mockPurchaseOrders = mockPurchaseOrders.filter((o) => o.id !== id)
   return delay(undefined as unknown as void)
+}
+
+/** 刪除採購訂單（僅待處理可刪） */
+export async function deletePurchaseOrder(id: number): Promise<void> {
+  try {
+    await request.delete(`/eam/purchase/${id}`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockDeletePurchaseOrder(id)
+    throw e
+  }
 }
 
 /* ==================== API：驗收入庫 ==================== */

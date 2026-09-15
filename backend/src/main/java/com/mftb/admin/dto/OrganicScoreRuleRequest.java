@@ -76,6 +76,15 @@ public class OrganicScoreRuleRequest {
     /** 活动加分配置 JSON 字符串（STB_ACT 活动加分规则使用） */
     private String activityItems;
 
+    /** 倍数梯度计分配置 JSON 字符串（COM_01 满额立减规则使用，以门店客单价为基准） */
+    private String multiplierTiers;
+
+    /** 门槛≤客单价时固定加分（仅 COM_01 使用） */
+    private Integer thresholdScore;
+
+    /** 区域扶持配置 JSON 字符串（仅 PLT_03 商家扶持使用，按区域独立配置） */
+    private String regionConfigs;
+
     /** 服务状态: 1=启用 2=停用 */
     @NotNull(message = "狀態不能為空")
     private Integer status;

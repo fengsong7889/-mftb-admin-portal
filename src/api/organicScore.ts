@@ -22,6 +22,8 @@ export interface OrganicRuleVO {
   rangeScores?: string
   tiers?: string
   conditionItems?: string
+  multiplierTiers?: string
+  thresholdScore?: number
   calcCycle?: string
   calcIntervalHours?: number
   statDaysTotal?: number
@@ -31,6 +33,7 @@ export interface OrganicRuleVO {
   decayCoefficient?: number
   timeRangeScores?: string
   blockedMerchants?: string
+  regionConfigs?: string
   activityItems?: string
   status: number
   builtin: number
@@ -57,6 +60,8 @@ export interface OrganicRulePayload {
   rangeScores?: string
   tiers?: string
   conditionItems?: string
+  multiplierTiers?: string
+  thresholdScore?: number
   calcCycle?: string
   calcIntervalHours?: number
   statDaysTotal?: number
@@ -66,6 +71,7 @@ export interface OrganicRulePayload {
   decayCoefficient?: number
   timeRangeScores?: string
   blockedMerchants?: string
+  regionConfigs?: string
   activityItems?: string
   status: number
 }

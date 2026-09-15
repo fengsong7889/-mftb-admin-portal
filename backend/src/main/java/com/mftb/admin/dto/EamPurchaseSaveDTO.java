@@ -27,6 +27,9 @@ public class EamPurchaseSaveDTO {
     /** 采购人 */
     private String purchaser;
 
+    /** 服务部门 */
+    private String department;
+
     /** 执行状态 */
     private String execStatus;
 

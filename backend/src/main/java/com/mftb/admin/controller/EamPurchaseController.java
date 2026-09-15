@@ -29,6 +29,7 @@ public class EamPurchaseController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String poNo,
+            @RequestParam(required = false) String processNo,
             @RequestParam(required = false) String supplier,
             @RequestParam(required = false) String purchaser,
             @RequestParam(required = false) String execStatus,
@@ -37,7 +38,7 @@ public class EamPurchaseController {
             @RequestParam(required = false) String updatedAtStart,
             @RequestParam(required = false) String updatedAtEnd) {
         return Result.success(purchaseService.pageOrders(
-                page, size, poNo, supplier, purchaser, execStatus,
+                page, size, poNo, processNo, supplier, purchaser, execStatus,
                 createdAtStart, createdAtEnd, updatedAtStart, updatedAtEnd));
     }
 

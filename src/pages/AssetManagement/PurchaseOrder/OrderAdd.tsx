@@ -549,7 +549,8 @@ export default function OrderAdd() {
         supplier: supplierGroups[0]?.supplier || '',
         amount: grandTotal,
         deliveryDate: '',
-        purchaser: v.purchaser || undefined,
+        // 統一提交姓名（下拉選的是工號，與「開始採購」及自動建單口徑一致）
+        purchaser: selectedEmp?.name || v.purchaser || undefined,
         department: selectedEmp?.department || undefined,
         remark: v.remark?.trim() || undefined,
         items: [],

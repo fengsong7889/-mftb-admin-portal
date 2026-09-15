@@ -32,7 +32,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
 
     private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Set<Integer> VALID_DIMENSIONS = Set.of(1, 2, 4);
-    private static final Set<Integer> VALID_MODES = Set.of(1, 2, 3, 4, 5, 6);
+    private static final Set<Integer> VALID_MODES = Set.of(1, 2, 3, 4, 5, 6, 7);
     private static final Set<Integer> VALID_STATUS = Set.of(1, 2);
 
     /** 维度 → 编码前缀映射 */
@@ -138,6 +138,9 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setDecayCoefficient(request.getDecayCoefficient());
         entity.setBlockedMerchants(request.getBlockedMerchants());
         entity.setActivityItems(request.getActivityItems());
+        entity.setMultiplierTiers(request.getMultiplierTiers());
+        entity.setThresholdScore(request.getThresholdScore());
+        entity.setRegionConfigs(request.getRegionConfigs());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -175,6 +178,9 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setDecayCoefficient(request.getDecayCoefficient());
         entity.setBlockedMerchants(request.getBlockedMerchants());
         entity.setActivityItems(request.getActivityItems());
+        entity.setMultiplierTiers(request.getMultiplierTiers());
+        entity.setThresholdScore(request.getThresholdScore());
+        entity.setRegionConfigs(request.getRegionConfigs());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -358,6 +364,9 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setDecayCoefficient(entity.getDecayCoefficient());
         vo.setBlockedMerchants(entity.getBlockedMerchants());
         vo.setActivityItems(entity.getActivityItems());
+        vo.setMultiplierTiers(entity.getMultiplierTiers());
+        vo.setThresholdScore(entity.getThresholdScore());
+        vo.setRegionConfigs(entity.getRegionConfigs());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

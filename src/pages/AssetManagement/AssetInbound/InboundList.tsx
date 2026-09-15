@@ -2,12 +2,14 @@
  * 驗收入庫（雙 Tab 視圖）
  *
  * - 待驗收訂單（默認）：自動同步「採購完成且有待驗收明細」的訂單，點擊「驗收」進入表單
+ *   搜索條件（5 字段）：採購單號、供應商、入庫狀態、採購經辦人、完成採購時間
+ *   搜索條件優先走服務端過濾（/eam/purchase），status 參數待後端接入，前端兜底過濾
  * - 入庫批次：驗收動作的歷史記錄
  *   搜索條件（5 字段）：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間
  *   列表字段：入庫批次號、訂單編號、創建時間、最後更新人、最後更新時間、總數量、已驗收數量、未驗收數量、採購事由、操作
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Table, DatePicker, Tabs, message } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, Tooltip, DatePicker, Tabs, message } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, ExportOutlined,
@@ -18,6 +20,13 @@ import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
+
+/** 入庫狀態展示元數據（待驗收/部分入庫/已入庫） */
+const INBOUND_STATUS_META: Record<PurchaseOrder['status'], { label: string; color: string }> = {
+  pending: { label: '待驗收', color: 'processing' },
+  partial: { label: '部分入庫', color: 'warning' },
+  received: { label: '已入庫', color: 'success' },
+}
 
 interface Props {
   onAdd: (poId: number) => void
@@ -41,6 +50,16 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   }>({})
   const [activeTab, setActiveTab] = useState<'pending' | 'batches'>('pending')
 
+  /* ----- 待驗收訂單搜索（獨立 form 實例，避免與入庫批次搜索區字段互擾） ----- */
+  const [poForm] = Form.useForm()
+  const [poFilters, setPoFilters] = useState<{
+    poNo?: string
+    supplier?: string
+    status?: string
+    purchaser?: string
+    updatedAtRange?: [string, string]
+  }>({})
+
   /* ----- 待驗收訂單（自動同步採購完成的訂單） ----- */
   const [poLoading, setPoLoading] = useState(false)
   const [pendingOrders, setPendingOrders] = useState<PurchaseOrder[]>([])
@@ -48,19 +67,34 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const loadPendingOrders = useCallback(async () => {
     setPoLoading(true)
     try {
-      const res = await fetchPurchaseOrderList({ size: 200 })
-      // 與採購訂單頁驗收入庫入口規則一致：僅採購完成且有待驗收明細的訂單
+      const [updatedAtStart, updatedAtEnd] = poFilters.updatedAtRange || []
+      // 搜索條件優先走服務端過濾（execStatus 固定 completed；status 為後端待接入參數）
+      const res = await fetchPurchaseOrderList({
+        size: 200,
+        execStatus: 'completed',
+        poNo: poFilters.poNo,
+        supplier: poFilters.supplier,
+        purchaser: poFilters.purchaser,
+        status: poFilters.status,
+        updatedAtStart,
+        updatedAtEnd,
+      })
+      // 與採購訂單頁驗收入庫入口規則一致：僅採購完成且未全部入庫的訂單
       //（待處理/採購中的訂單貨未到，不可驗收；已全部入庫的訂單無明細可驗收）
-      const available = (res.records || []).filter((o) =>
-        o.execStatus === 'completed' && o.items.some((it) => it.receivedQty < it.qty)
-      )
+      const available = (res.records || []).filter((o) => {
+        if (o.execStatus !== 'completed' || o.status === 'received') return false
+        // 後端未支持 status 過濾時前端兜底
+        if (poFilters.status && o.status !== poFilters.status) return false
+        // 有明細數據（mock 兜底）時按明細判斷；後端列表無明細時按訂單級狀態判斷
+        return (o.items || []).length === 0 || o.items.some((it) => (it.receivedQty || 0) < it.qty)
+      })
       setPendingOrders(available)
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
       setPoLoading(false)
     }
-  }, [t])
+  }, [t, poFilters])
 
   useEffect(() => { loadPendingOrders() }, [loadPendingOrders])
 
@@ -113,6 +147,21 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     setPage(1)
   }
   const handleReset = () => { form.resetFields(); setFilters({}); setPage(1) }
+
+  /* ----- 待驗收訂單搜索 ----- */
+  const handlePoSearch = () => {
+    const v = poForm.getFieldsValue()
+    const next: typeof poFilters = {}
+    if (v.poNo) next.poNo = v.poNo
+    if (v.supplier) next.supplier = v.supplier
+    if (v.purchaser) next.purchaser = v.purchaser
+    if (v.status) next.status = v.status
+    if (v.updatedAtRange && v.updatedAtRange.length === 2) {
+      next.updatedAtRange = [v.updatedAtRange[0].format('YYYY-MM-DD'), v.updatedAtRange[1].format('YYYY-MM-DD')]
+    }
+    setPoFilters(next)
+  }
+  const handlePoReset = () => { poForm.resetFields(); setPoFilters({}) }
   const handleTableChange = (p: TablePaginationConfig) => {
     setPage(p.current || 1)
     setSize(p.pageSize || 10)
@@ -252,7 +301,23 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       ),
     },
     {
+      title: '入庫狀態', dataIndex: 'status', key: 'status', width: 110,
+      render: (v: PurchaseOrder['status'], r: PurchaseOrder) => {
+        const meta = INBOUND_STATUS_META[v] || INBOUND_STATUS_META.pending
+        const progress = r.totalQty != null && r.totalQty > 0
+          ? `已驗收 ${r.acceptedQty || 0} / 共 ${r.totalQty} 件`
+          : undefined
+        return (
+          <Tooltip title={progress}>
+            <Tag color={meta.color} style={{ margin: 0 }}>{meta.label}</Tag>
+          </Tooltip>
+        )
+      },
+    },
+    {
       title: '完成採購時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      sorter: (a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
+      defaultSortOrder: 'ascend',
       render: (v: string | undefined) => v || '-',
     },
     {
@@ -273,6 +338,41 @@ export default function InboundList({ onAdd, onDetail }: Props) {
           label: `待驗收訂單 (${pendingOrders.length})`,
           children: (
             <>
+              {/* ====== 搜索區 ====== */}
+              <div className="search-section">
+                <Form form={poForm} layout="inline">
+                  <Form.Item label="採購單號" name="poNo">
+                    <Input placeholder="請輸入採購單號" allowClear onPressEnter={handlePoSearch} />
+                  </Form.Item>
+                  <Form.Item label="供應商" name="supplier">
+                    <Input placeholder="請輸入供應商名稱" allowClear onPressEnter={handlePoSearch} />
+                  </Form.Item>
+                  <Form.Item label="入庫狀態" name="status">
+                    <Select
+                      placeholder="全部"
+                      allowClear
+                      style={{ width: 140 }}
+                      options={[
+                        { value: 'pending', label: '待驗收' },
+                        { value: 'partial', label: '部分入庫' },
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item label="採購經辦人" name="purchaser">
+                    <Input placeholder="請輸入採購經辦人" allowClear onPressEnter={handlePoSearch} />
+                  </Form.Item>
+                  <Form.Item label="完成採購時間" name="updatedAtRange">
+                    <RangePicker style={{ width: '100%' }} />
+                  </Form.Item>
+                  <Form.Item>
+                    <div className="search-actions">
+                      <Button type="primary" icon={<SearchOutlined />} onClick={handlePoSearch}>查詢</Button>
+                      <Button icon={<ReloadOutlined />} onClick={handlePoReset}>重置</Button>
+                    </div>
+                  </Form.Item>
+                </Form>
+              </div>
+
               <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
                 採購完成的訂單自動同步至此，請核對到貨物資後點擊「驗收」；支持分批多次驗收
               </div>

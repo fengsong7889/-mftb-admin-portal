@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip } from 'antd'
+import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip, Segmented } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ServiceStatus } from './constants'
@@ -15,7 +15,8 @@ import {
   RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
   TIME_PERIOD_KEYS, TIME_PERIOD_LABELS,
   TIER_DIRECTION_LABEL,
-  type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem,
+  type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem, type MultiplierTier, type RegionSupportConfig, type RegionOverheatConfig, type RegionKey,
+  REGION_KEYS, REGION_LABELS, REGION_COLORS,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -51,6 +52,10 @@ interface RuleFormValues {
   tiers?: ScoreTier[]
   /** 條件計分子項（僅 mode=CONDITIONAL 時使用） */
   conditionItems?: ScoreConditionItem[]
+  /** 倍數梯度檔位（僅 mode=TIERED_MULTIPLIER 時使用） */
+  multiplierTiers?: MultiplierTier[]
+  /** 門檻≤客單價時固定加分（僅 COM_01 使用） */
+  thresholdScore?: number
   /** 計算周期（僅 mode=TIERED 時使用） */
   calcCycle?: CalcCycle
   /** 歷史基線天數 */
@@ -97,10 +102,12 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   let rangeScores: RangeScores | undefined
   let conditionItems: ScoreConditionItem[] | undefined
   let peakTimeRanges: PeakTimeRange[] | undefined
+  let multiplierTiers: MultiplierTier[] | undefined
   try { tiers = vo.tiers ? JSON.parse(vo.tiers) : undefined } catch { tiers = undefined }
   try { rangeScores = vo.rangeScores ? JSON.parse(vo.rangeScores) : undefined } catch { rangeScores = undefined }
   try { conditionItems = vo.conditionItems ? JSON.parse(vo.conditionItems) : undefined } catch { conditionItems = undefined }
   try { peakTimeRanges = vo.peakTimeRanges ? JSON.parse(vo.peakTimeRanges) : undefined } catch { peakTimeRanges = undefined }
+  try { multiplierTiers = vo.multiplierTiers ? JSON.parse(vo.multiplierTiers) : undefined } catch { multiplierTiers = undefined }
   return {
     id: vo.ruleCode,
     dimension: vo.dimension as ScoreDimension,
@@ -113,6 +120,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     rangeScores,
     tiers,
     conditionItems,
+    multiplierTiers,
+    thresholdScore: vo.thresholdScore ?? undefined,
     calcCycle: vo.calcCycle as CalcCycle | undefined,
     calcIntervalHours: vo.calcIntervalHours ?? undefined,
     statDaysTotal: vo.statDaysTotal ?? undefined,
@@ -122,6 +131,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     decayCoefficient: vo.decayCoefficient ?? undefined,
     timeRangeScores: vo.timeRangeScores ? (() => { try { return JSON.parse(vo.timeRangeScores) as TimeRangeScores } catch { return undefined } })() : undefined,
     blockedMerchants: vo.blockedMerchants ? (() => { try { return JSON.parse(vo.blockedMerchants) as string[] } catch { return undefined } })() : undefined,
+    regionConfigs: vo.regionConfigs ? (() => { try { return JSON.parse(vo.regionConfigs) as Record<string, RegionSupportConfig | RegionOverheatConfig> } catch { return undefined } })() : undefined,
     activityItems: vo.activityItems ? (() => { try { return JSON.parse(vo.activityItems) as ActivityScoreItem[] } catch { return undefined } })() : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
@@ -258,6 +268,54 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               }
             }
           }
+          if (r.id === 'COM_01') {
+            r.name = '滿額立減'
+            r.dimension = ScoreDimension.COMMERCIAL
+            // 升級舊模式為倍數梯度計分
+            if (r.mode !== ScoreMode.TIERED_MULTIPLIER) {
+              r.mode = ScoreMode.TIERED_MULTIPLIER
+              r.score = 0
+            }
+            if (!r.multiplierTiers?.length) {
+              r.multiplierTiers = [
+                { multiplier: 1, score: 30 },
+                { multiplier: 2, score: 20 },
+                { multiplier: 3, score: 10 },
+              ]
+            }
+            // 舊數據無門檻≤客單價加分配置時補預設值
+            if (r.thresholdScore == null) r.thresholdScore = 10
+          }
+          if (r.id === 'PLT_03') {
+            r.name = '商家扶持'
+            // 升級舊格式為區域配置
+            if (!r.regionConfigs) {
+              const defaultTier = { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 }
+              r.regionConfigs = {
+                MACAU: { prerequisites: r.prerequisites || 'UNCONDITIONAL', statDays: r.statDays || 30, tiers: r.tiers?.length ? r.tiers : [defaultTier] },
+                TAIPA: { prerequisites: r.prerequisites || 'UNCONDITIONAL', statDays: r.statDays || 30, tiers: r.tiers?.length ? r.tiers : [defaultTier] },
+              }
+            }
+            if (!r.blockedMerchants) r.blockedMerchants = []
+          }
+          if (r.id === 'PLT_04') {
+            r.name = '訂單過熱調控'
+            r.dimension = ScoreDimension.PLATFORM
+            r.calcCycle = CalcCycle.SCHEDULED
+            if (!r.calcIntervalHours) r.calcIntervalHours = 1
+            // 升級舊格式為區域配置
+            if (!r.regionConfigs) {
+              const defaultTiers = r.tiers?.length ? r.tiers : [
+                { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
+                { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
+                { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
+              ]
+              r.regionConfigs = {
+                MACAU: { calcIntervalHours: r.calcIntervalHours || 1, tiers: defaultTiers },
+                TAIPA: { calcIntervalHours: r.calcIntervalHours || 1, tiers: defaultTiers },
+              }
+            }
+          }
         })
         // 保底：STB_ACT 活動加分尚未種子時，以前端默認模板補充（只讀展示不影響）
         if (!loaded.some(r => r.id === 'STB_ACT')) {
@@ -299,6 +357,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     [ScoreMode.AMOUNT_MULTIPLIER]: t('organicTrafficScore.modeAmountMultiplier'),
     [ScoreMode.TIERED]: '梯度計分',
     [ScoreMode.CONDITIONAL]: '條件計分',
+    [ScoreMode.TIERED_MULTIPLIER]: '倍數梯度計分',
   }
   /** 配送範圍分層標籤（依賴 t） */
   const RANGE_LABEL: Record<keyof RangeScores, string> = {
@@ -315,6 +374,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     { label: MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
     { label: MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
     { label: MODE_LABEL[ScoreMode.CONDITIONAL], value: ScoreMode.CONDITIONAL },
+    { label: MODE_LABEL[ScoreMode.TIERED_MULTIPLIER], value: ScoreMode.TIERED_MULTIPLIER },
   ]
   const [dimensionWeight, setDimensionWeight] = useState<Record<ScoreDimension, number>>(DEFAULT_DIMENSION_WEIGHT)
   const [savingWeights, setSavingWeights] = useState(false)
@@ -350,6 +410,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
   /** PLT_03 屏蔽商家輸入框臨時值 */
   const [blockedMerchantInput, setBlockedMerchantInput] = useState('')
+  /** PLT_03 區域切換狀態 */
+  const [plt03Region, setPlt03Region] = useState<Record<string, RegionKey>>({})
+  /** PLT_04 區域切換狀態 */
+  const [plt04Region, setPlt04Region] = useState<Record<string, RegionKey>>({})
   /** PLT_03 門店選擇彈窗狀態 */
   const [storeModalVisible, setStoreModalVisible] = useState(false)
   /** 門店彈窗是否為只讀模式 */
@@ -469,39 +533,69 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const handleInlineSave = async (ruleId: string) => {
     const values = inlineForm[ruleId]
     if (!values) return
-    // PLT_03 梯度配置校驗：不允許空值
+    // PLT_03 區域梯度配置校驗：每個區域不允許空梯度
     if (ruleId === 'PLT_03') {
-      const tiers: ScoreTier[] = values.tiers || []
-      if (tiers.length === 0) {
-        message.warning('請至少配置一個梯度')
-        return
-      }
-      for (let i = 0; i < tiers.length; i++) {
-        if (!tiers[i].threshold || tiers[i].threshold <= 0) {
-          message.warning(`第 ${i + 1} 個梯度請輸入訂單量閾值`)
-          return
-        }
-        if (tiers[i].score === undefined || tiers[i].score === null) {
-          message.warning(`第 ${i + 1} 個梯度請輸入加分分數`)
-          return
+      const rc = (values as any).regionConfigs as Record<string, RegionSupportConfig> | undefined
+      if (rc) {
+        for (const key of REGION_KEYS) {
+          const region = rc[key]
+          if (!region) continue
+          const tiers = region.tiers || []
+          if (tiers.length === 0) {
+            message.warning(`${REGION_LABELS[key]}請至少配置一個梯度`)
+            return
+          }
+          for (let i = 0; i < tiers.length; i++) {
+            if (!tiers[i].threshold || tiers[i].threshold <= 0) {
+              message.warning(`${REGION_LABELS[key]}第 ${i + 1} 個梯度請輸入訂單量閾值`)
+              return
+            }
+            if (tiers[i].score === undefined || tiers[i].score === null) {
+              message.warning(`${REGION_LABELS[key]}第 ${i + 1} 個梯度請輸入加分分數`)
+              return
+            }
+          }
         }
       }
     }
-    // PLT_04 梯度配置校驗：不允許空值
+    // PLT_04 梯度配置校驗：按區域校驗，不允許空值
     if (ruleId === 'PLT_04') {
-      const tiers: ScoreTier[] = values.tiers || []
-      if (tiers.length === 0) {
-        message.warning('請至少配置一個梯度')
-        return
-      }
-      for (let i = 0; i < tiers.length; i++) {
-        if (!tiers[i].threshold || tiers[i].threshold <= 0) {
-          message.warning(`第 ${i + 1} 個梯度請輸入訂單量閾值`)
+      const rc = (values as any).regionConfigs as Record<string, RegionOverheatConfig> | undefined
+      if (rc) {
+        for (const key of REGION_KEYS) {
+          const region = rc[key]
+          if (!region) continue
+          const tiers = region.tiers || []
+          if (tiers.length === 0) {
+            message.warning(`${REGION_LABELS[key]}請至少配置一個梯度`)
+            return
+          }
+          for (let i = 0; i < tiers.length; i++) {
+            if (!tiers[i].threshold || tiers[i].threshold <= 0) {
+              message.warning(`${REGION_LABELS[key]}第 ${i + 1} 個梯度請輸入訂單量閾值`)
+              return
+            }
+            if (tiers[i].score === undefined || tiers[i].score === null) {
+              message.warning(`${REGION_LABELS[key]}第 ${i + 1} 個梯度請輸入減分分數`)
+              return
+            }
+          }
+        }
+      } else {
+        const tiers: ScoreTier[] = values.tiers || []
+        if (tiers.length === 0) {
+          message.warning('請至少配置一個梯度')
           return
         }
-        if (tiers[i].score === undefined || tiers[i].score === null) {
-          message.warning(`第 ${i + 1} 個梯度請輸入減分分數`)
-          return
+        for (let i = 0; i < tiers.length; i++) {
+          if (!tiers[i].threshold || tiers[i].threshold <= 0) {
+            message.warning(`第 ${i + 1} 個梯度請輸入訂單量閾值`)
+            return
+          }
+          if (tiers[i].score === undefined || tiers[i].score === null) {
+            message.warning(`第 ${i + 1} 個梯度請輸入減分分數`)
+            return
+          }
         }
       }
     }
@@ -599,6 +693,29 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         }
       }
     }
+    // COM_01 滿額立減校驗：門檻≤客單價加分與倍數梯度配置不允許空值
+    if (ruleId === 'COM_01') {
+      const ts = (values as any).thresholdScore
+      if (ts === undefined || ts === null || ts < 0) {
+        message.warning('請輸入門檻≤客單價對應的固定加分')
+        return
+      }
+      const mt: MultiplierTier[] = (values as any).multiplierTiers || []
+      if (mt.length === 0) {
+        message.warning('請至少配置一個倍數梯度檔位')
+        return
+      }
+      for (let i = 0; i < mt.length; i++) {
+        if (!mt[i].multiplier || mt[i].multiplier <= 0) {
+          message.warning(`第 ${i + 1} 個梯度請輸入倍數閾值`)
+          return
+        }
+        if (mt[i].score === undefined || mt[i].score === null || mt[i].score < 0) {
+          message.warning(`第 ${i + 1} 個梯度請輸入加分分值`)
+          return
+        }
+      }
+    }
     const payload = {
       dimension: values.dimension!,
       name: values.name!,
@@ -610,6 +727,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
       tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
       conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
+      multiplierTiers: values.multiplierTiers ? JSON.stringify(values.multiplierTiers) : undefined,
+      thresholdScore: (values as any).thresholdScore,
       calcCycle: values.calcCycle,
       calcIntervalHours: values.calcIntervalHours,
       statDaysTotal: values.statDaysTotal,
@@ -619,6 +738,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       decayCoefficient: (values as any).decayCoefficient,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
       blockedMerchants: (values as any).blockedMerchants ? JSON.stringify((values as any).blockedMerchants) : undefined,
+      regionConfigs: (values as any).regionConfigs ? JSON.stringify((values as any).regionConfigs) : undefined,
       activityItems: (values as any).activityItems?.length
         ? JSON.stringify(((values as any).activityItems as ActivityScoreItem[]).map(it => ({
             activityId: it.activityId.trim(),
@@ -643,6 +763,18 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       if ((values as any).activityItems !== undefined) {
         savedRule.activityItems = (values as any).activityItems
       }
+      // 保留前端編輯過的倍數梯度配置（API 可能未返回該字段）
+      if ((values as any).multiplierTiers !== undefined) {
+        savedRule.multiplierTiers = (values as any).multiplierTiers
+      }
+      // 保留前端編輯過的門檻≤客單價加分配置（API 可能未返回該字段）
+      if ((values as any).thresholdScore !== undefined) {
+        savedRule.thresholdScore = (values as any).thresholdScore
+      }
+      // 保留前端編輯過的區域扶持配置（API 可能未返回該字段）
+      if ((values as any).regionConfigs !== undefined) {
+        savedRule.regionConfigs = (values as any).regionConfigs
+      }
       setRules(prev => prev.map(r => r.id === ruleId ? savedRule : r))
       message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
     } catch {
@@ -666,6 +798,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [tierRows, setTierRows] = useState<ScoreTier[]>([])
   /** 條件計分子項本地狀態（彈窗內編輯） */
   const [conditionRows, setConditionRows] = useState<ScoreConditionItem[]>([])
+  /** 倍數梯度檔位本地狀態（彈窗內編輯） */
+  const [multiplierTierRows, setMultiplierTierRows] = useState<MultiplierTier[]>([])
   /** 新增彈窗中選中的模板 ID */
   const [addTemplateId, setAddTemplateId] = useState<string | undefined>(undefined)
 
@@ -727,6 +861,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     ruleForm.resetFields()
     setTierRows([])
     setConditionRows([])
+    setMultiplierTierRows([])
     setModalOpen(true)
   }
 
@@ -747,6 +882,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     // 重置梯度/條件行
     setTierRows(tpl.tiers ? [...tpl.tiers] : [])
     setConditionRows(tpl.conditionItems ? [...tpl.conditionItems] : [])
+    setMultiplierTierRows(tpl.multiplierTiers ? [...tpl.multiplierTiers] : [])
   }
 
   /** 當前選中的模板 */
@@ -775,6 +911,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       if (!tpl) {
         message.error('模板不存在，請重新選擇')
         return
+      }
+      // COM_01 模板新增時帶入門檻≤客單價加分默認配置
+      if (tpl.id === 'COM_01') {
+        ;(values as any).thresholdScore = tpl.thresholdScore
+      }
+      // PLT_03 模板新增時帶入區域配置
+      if (tpl.id === 'PLT_03') {
+        ;(values as any).regionConfigs = tpl.regionConfigs
+        ;(values as any).blockedMerchants = tpl.blockedMerchants || []
       }
       // 模板特有參數校驗
       if (tpl.mode === ScoreMode.RULE_DEDUCTION) {
@@ -822,6 +967,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       }
       values.conditionItems = [...conditionRows]
     }
+    // 倍數梯度計分模式時，將 multiplierTierRows 寫入 multiplierTiers
+    if (values.mode === ScoreMode.TIERED_MULTIPLIER) {
+      if (multiplierTierRows.length === 0) {
+        message.warning('請至少配置一個倍數梯度檔位')
+        return
+      }
+      values.multiplierTiers = [...multiplierTierRows]
+    }
     const payload = {
       dimension: editingRule ? editingRule.dimension : modalDimension,
       name: values.name,
@@ -833,6 +986,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
       tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
       conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
+      multiplierTiers: values.multiplierTiers ? JSON.stringify(values.multiplierTiers) : undefined,
       calcCycle: values.calcCycle,
       statDaysTotal: values.statDaysTotal,
       statDaysRecent: values.statDaysRecent,
@@ -843,6 +997,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
       // STB_ACT 活動加分：保留已有配置（彈窗路徑不編輯活動明細）
       activityItems: editingRule?.id === 'STB_ACT'
         ? JSON.stringify(editingRule.activityItems || [])
+        : undefined,
+      // COM_01 門檻≤客單價加分：新增時取模板預填值，編輯時保留已有配置
+      thresholdScore: (values as any).thresholdScore ?? (editingRule?.id === 'COM_01' ? editingRule.thresholdScore : undefined),
+      // PLT_03/PLT_04 區域配置：新增時取模板預填值，編輯時保留已有配置
+      regionConfigs: (values as any).regionConfigs
+        ? JSON.stringify((values as any).regionConfigs)
+        : ((editingRule?.id === 'PLT_03' || editingRule?.id === 'PLT_04') ? JSON.stringify(editingRule.regionConfigs || {}) : undefined),
+      blockedMerchants: editingRule?.id === 'PLT_03'
+        ? JSON.stringify(editingRule.blockedMerchants || [])
         : undefined,
       status: values.status,
     }
@@ -1045,9 +1208,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                       {!isEditingInline && (
                         <>
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && (
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'COM_01' && (
                             <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
-                              {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
+                              {(rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
                                 ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
                                 : MODE_LABEL[rule.mode]}
                             </Tag>
@@ -1082,10 +1245,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           {rule.id === 'PLT_01' && (
                             <Tag color="#1890FF" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
                           )}
+                          {rule.id === 'COM_01' && (
+                            <Tag color="#E8720C" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
+                          )}
 
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && ((rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
                             rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_01' ? '立減金額' : rule.id === 'COM_02' ? '運費金額' : rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
+                              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_02' ? '運費金額' : rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
                               : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
                           ) : (
                             <>
@@ -1296,36 +1462,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </div>
                           )
                         })()}
-                        {/* PLT_03 商家扶持自定義只讀顯示 */}
+                        {/* PLT_03 商家扶持自定義只讀顯示（區域維度） */}
                         {rule.id === 'PLT_03' && (() => {
-                          const tiers = rule.tiers || []
-                          const days = rule.statDays || 30
-                          const prereq = rule.prerequisites || 'UNCONDITIONAL'
+                          const blocked = rule.blockedMerchants || []
+                          const rc = (rule.regionConfigs || {}) as Record<string, RegionSupportConfig>
+                          const activeRegion: RegionKey = plt03Region[rule.id] || 'MACAU'
+                          const regionData = rc[activeRegion] || { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [] }
+                          const prereq = regionData.prerequisites || 'UNCONDITIONAL'
                           const isUnconditional = prereq === 'UNCONDITIONAL'
                           const selectedConditions: string[] = isUnconditional ? [] : (() => { try { return JSON.parse(prereq) } catch { return [] } })()
-                          const blocked = rule.blockedMerchants || []
+                          const tiers = regionData.tiers || []
+                          const days = regionData.statDays || 30
+                          const regionColor = REGION_COLORS[activeRegion]
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計週期：</span>過去 <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天
-                                </div>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1' }}>前提條件：</span>
-                                  {isUnconditional ? (
-                                    <Tag color="green" style={{ fontSize: 12, margin: 0 }}>無條件</Tag>
-                                  ) : (
-                                    <span style={{ display: 'inline-flex', gap: 6 }}>
-                                      {PLT_03_PREREQ_OPTIONS.filter(o => selectedConditions.includes(o.value)).map(o => (
-                                        <Tag key={o.value} color="blue" style={{ fontSize: 12, margin: 0 }}>{o.label}</Tag>
-                                      ))}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                              {/* 屏蔽商家（全局） */}
                               {blocked.length > 0 && (
-                                <div style={{ marginBottom: 10, padding: '6px 12px', background: '#FFF2F0', borderRadius: 6, border: '1px solid #FFCCC7', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <div style={{ padding: '8px 14px', background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: 11, fontWeight: 600, color: '#FF4D4F', whiteSpace: 'nowrap' }}>🚫 屏蔽商家（{blocked.length} 家）</span>
+                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>全局生效，所有區域共享</span>
                                   <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                                     {blocked.slice(0, 5).map(code => (
                                       <Tag key={code} color="error" style={{ fontSize: 11, margin: 0 }}>{code}</Tag>
@@ -1346,82 +1501,143 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   </span>
                                 </div>
                               )}
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                {tiers.map((tier, idx) => {
-                                  const isLast = idx === tiers.length - 1
-                                  return (
-                                    <div key={idx} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8,
-                                      padding: '10px 0',
-                                      borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                    }}>
-                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                      <span style={{ fontSize: 13, color: '#595959' }}>
-                                        訂單量 ≤ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
+                              {/* 區域切換 */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <Segmented
+                                  value={activeRegion}
+                                  onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
+                                  options={REGION_KEYS.map(k => ({
+                                    value: k,
+                                    label: (
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
+                                        {REGION_LABELS[k]}
                                       </span>
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                        color: '#52C41A',
-                                        background: '#f6ffed',
-                                        border: '1px solid #b7eb8f',
+                                    ),
+                                  }))}
+                                  style={{ background: '#f0f0f0' }}
+                                />
+                              </div>
+                              {/* 區域配置卡片 */}
+                              <div style={{ padding: '14px 16px', background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                                  <div style={{ fontSize: 13, color: '#595959' }}>
+                                    <span style={{ fontWeight: 600, color: '#262626' }}>統計週期：</span>過去 <span style={{ fontWeight: 600, color: regionColor.primary }}>{days}</span> 天
+                                  </div>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1' }}>前提條件：</span>
+                                    {isUnconditional ? (
+                                      <Tag color="green" style={{ fontSize: 12, margin: 0 }}>無條件</Tag>
+                                    ) : (
+                                      <span style={{ display: 'inline-flex', gap: 6 }}>
+                                        {PLT_03_PREREQ_OPTIONS.filter(o => selectedConditions.includes(o.value)).map(o => (
+                                          <Tag key={o.value} color="blue" style={{ fontSize: 12, margin: 0 }}>{o.label}</Tag>
+                                        ))}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                  {tiers.map((tier, idx) => {
+                                    const isLast = idx === tiers.length - 1
+                                    return (
+                                      <div key={idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        padding: '10px 0',
+                                        borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
                                       }}>
-                                        固定加分
-                                      </span>
-                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
-                                        {tier.score} 分
-                                      </span>
-                                    </div>
-                                  )
-                                })}
+                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: 13, color: '#595959' }}>
+                                          訂單量 ≤ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
+                                        </span>
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                          color: '#52C41A',
+                                          background: '#f6ffed',
+                                          border: '1px solid #b7eb8f',
+                                        }}>
+                                          固定加分
+                                        </span>
+                                        <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
+                                          {tier.score} 分
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               </div>
                             </div>
                           )
                         })()}
-                        {/* PLT_04 訂單過熱調控自定義只讀顯示 */}
+                        {/* PLT_04 訂單過熱調控自定義只讀顯示（區域維度） */}
                         {rule.id === 'PLT_04' && (() => {
-                          const tiers = rule.tiers || []
-                          const hours = rule.calcIntervalHours ?? 1
+                          const rc = (rule.regionConfigs || {}) as Record<string, RegionOverheatConfig>
+                          const activeRegion: RegionKey = plt04Region[rule.id] || 'MACAU'
+                          const regionData = rc[activeRegion] || { calcIntervalHours: 1, tiers: [] }
+                          const tiers = regionData.tiers || []
+                          const hours = regionData.calcIntervalHours ?? 1
+                          const regionColor = REGION_COLORS[activeRegion]
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>監控方式：</span>
-                                  <span style={{ fontWeight: 600, color: '#722ED1' }}>定時監控</span>
-                                  <span style={{ margin: '0 4px', color: '#8C8C8C' }}>·</span>
-                                  <span>每 <span style={{ fontWeight: 600, color: '#E8720C' }}>{hours}</span> 小時校驗一次</span>
-                                </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                              {/* 區域切換 */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <Segmented
+                                  value={activeRegion}
+                                  onChange={val => setPlt04Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
+                                  options={REGION_KEYS.map(k => ({
+                                    value: k,
+                                    label: (
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
+                                        {REGION_LABELS[k]}
+                                      </span>
+                                    ),
+                                  }))}
+                                  style={{ background: '#f0f0f0' }}
+                                />
                               </div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                {tiers.map((tier, idx) => {
-                                  const isLast = idx === tiers.length - 1
-                                  return (
-                                    <div key={idx} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8,
-                                      padding: '10px 0',
-                                      borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                    }}>
-                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                      <span style={{ fontSize: 13, color: '#595959' }}>
-                                        訂單量 ≥ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
-                                      </span>
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                        color: '#FF4D4F',
-                                        background: '#fff2f0',
-                                        border: '1px solid #ffccc7',
+                              {/* 區域配置卡片 */}
+                              <div style={{ padding: '14px 16px', background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                  <div style={{ fontSize: 13, color: '#595959' }}>
+                                    <span style={{ fontWeight: 600, color: '#262626' }}>監控方式：</span>
+                                    <span style={{ fontWeight: 600, color: '#722ED1' }}>定時監控</span>
+                                    <span style={{ margin: '0 4px', color: '#8C8C8C' }}>·</span>
+                                    <span>每 <span style={{ fontWeight: 600, color: regionColor.primary }}>{hours}</span> 小時校驗一次</span>
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                  {tiers.map((tier, idx) => {
+                                    const isLast = idx === tiers.length - 1
+                                    return (
+                                      <div key={idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        padding: '10px 0',
+                                        borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
                                       }}>
-                                        固定減分
-                                      </span>
-                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#FF4D4F' }}>
-                                        {Math.abs(tier.score)} 分
-                                      </span>
-                                    </div>
-                                  )
-                                })}
+                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: 13, color: '#595959' }}>
+                                          訂單量 ≥ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
+                                        </span>
+                                        <span style={{
+                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                          color: '#FF4D4F',
+                                          background: '#fff2f0',
+                                          border: '1px solid #ffccc7',
+                                        }}>
+                                          固定減分
+                                        </span>
+                                        <span style={{ fontSize: 15, fontWeight: 600, color: '#FF4D4F' }}>
+                                          {Math.abs(tier.score)} 分
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               </div>
                             </div>
                           )
@@ -1700,6 +1916,71 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
+                        {/* COM_01 滿額立減計分展示：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
+                        {rule.id === 'COM_01' && rule.multiplierTiers && rule.multiplierTiers.length > 0 && (
+                          <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            {/* ① 基礎條件加分：門檻 ≤ 客單價 → 直接給分 */}
+                            <div style={{ marginBottom: 12 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>基礎條件加分</div>
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '10px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
+                              }}>
+                                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>—</span>
+                                <span style={{ fontSize: 13, color: '#595959' }}>
+                                  滿額立減門檻 ≤ 客單價
+                                </span>
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                  color: '#52C41A',
+                                  background: '#f6ffed',
+                                  border: '1px solid #b7eb8f',
+                                }}>
+                                  固定加分
+                                </span>
+                                <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
+                                  {rule.thresholdScore ?? 10} 分
+                                </span>
+                              </div>
+                            </div>
+                            {/* ② 倍數梯度加分：門檻 < 客單價 × 倍數 → 按檔加分 */}
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>倍數梯度加分（以門店客單價為基準）</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                {[...rule.multiplierTiers].sort((a, b) => a.multiplier - b.multiplier).map((tier, idx, arr) => {
+                                  const isLast = idx === arr.length - 1
+                                  return (
+                                    <div key={idx} style={{
+                                      display: 'flex', alignItems: 'center', gap: 8,
+                                      padding: '10px 0',
+                                      borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
+                                    }}>
+                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                      <span style={{ fontSize: 13, color: '#595959' }}>
+                                        滿額立減門檻 {'<'} 客單價 ×{' '}
+                                        <span style={{ fontWeight: 600, color: '#E8720C' }}>{tier.multiplier}</span>
+                                        {tier.multiplier === 1 ? '（即低於客單價）' : '倍'}
+                                      </span>
+                                      <span style={{
+                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
+                                        color: '#52C41A',
+                                        background: '#f6ffed',
+                                        border: '1px solid #b7eb8f',
+                                      }}>
+                                        固定加分
+                                      </span>
+                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
+                                        {tier.score} 分
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {/* 備註（描述 + 前提條件）放最下面 */}
                         <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e8e8e8' }}>
                           <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
@@ -1734,143 +2015,268 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
                             </div>
                           )}
-                          {/* PLT_03 自定義前提條件 */}
+                          {/* PLT_03 區域扶持配置（屏蔽商家 + 區域切換 + 前提條件/統計天數/梯度） */}
                           {rule.id === 'PLT_03' && (() => {
-                            const prereqVal = (form as any).prerequisites || 'UNCONDITIONAL'
+                            const activeRegion: RegionKey = plt03Region[rule.id] || 'MACAU'
+                            const rc: Record<string, RegionSupportConfig> = (form as any).regionConfigs || {}
+                            const regionData = rc[activeRegion] || { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [] }
+                            const blocked: string[] = (form as any).blockedMerchants || []
+                            const regionColor = REGION_COLORS[activeRegion]
+                            const prereqVal = regionData.prerequisites || 'UNCONDITIONAL'
                             const isUnconditional = prereqVal === 'UNCONDITIONAL'
                             const selectedConds: string[] = isUnconditional ? [] : (() => { try { return JSON.parse(prereqVal) } catch { return [] } })()
+                            const updateRegion = (key: RegionKey, patch: Partial<RegionSupportConfig>) => {
+                              const cur = (form as any).regionConfigs || {}
+                              const updated = { ...cur, [key]: { ...(cur[key] || {}), ...patch } }
+                              setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], regionConfigs: updated } }) as any)
+                            }
                             return (
-                              <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                                <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>前提條件</div>
-                                <Radio.Group
-                                  value={isUnconditional ? 'UNCONDITIONAL' : 'CONDITIONAL'}
-                                  onChange={e => {
-                                    const val = e.target.value
-                                    setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], prerequisites: val === 'UNCONDITIONAL' ? 'UNCONDITIONAL' : '[]' } }) as any)
-                                  }}
-                                  style={{ marginBottom: 10 }}
-                                >
-                                  <Radio.Button value="UNCONDITIONAL">無條件</Radio.Button>
-                                  <Radio.Button value="CONDITIONAL">指定條件</Radio.Button>
-                                </Radio.Group>
-                                {!isUnconditional && (
-                                  <Checkbox.Group
-                                    value={selectedConds}
-                                    onChange={vals => {
-                                      setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], prerequisites: JSON.stringify(vals) } }) as any)
-                                    }}
-                                    style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
-                                  >
-                                    {PLT_03_PREREQ_OPTIONS.map(o => (
-                                      <Checkbox key={o.value} value={o.value}>{o.label}</Checkbox>
-                                    ))}
-                                  </Checkbox.Group>
-                                )}
-                              </div>
-                            )
-                          })()}
-                          {/* PLT_03 屏蔽商家（獨立區域） */}
-                          {rule.id === 'PLT_03' && (() => {
-                            const blocked: string[] = (form as any).blockedMerchants || []
-                            return (
-                              <div style={{ padding: 12, background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: blocked.length > 0 ? 8 : 0 }}>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: '#FF4D4F', whiteSpace: 'nowrap' }}>🚫 屏蔽商家</div>
-                                  <Button
-                                    size="small"
-                                    icon={<ShopOutlined />}
-                                    onClick={() => {
-                                      setStoreModalReadOnly(false)
-                                      const currentBlocked = (form as any).blockedMerchants || []
-                                      setTempBlockedStores(
-                                        dbStores.filter(s => currentBlocked.includes(s.storeCode))
-                                      )
-                                      storeSearchForm.resetFields()
-                                      setStoreSearchValues({})
-                                      setStoreModalVisible(true)
-                                    }}
-                                  >選擇門店</Button>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {/* 屏蔽商家（全局） */}
+                                <div style={{ padding: 12, background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: blocked.length > 0 ? 8 : 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: '#FF4D4F', whiteSpace: 'nowrap' }}>🚫 屏蔽商家</span>
+                                      <span style={{ fontSize: 11, color: '#8C8C8C' }}>全局生效，所有區域共享</span>
+                                    </div>
+                                    <Button
+                                      size="small"
+                                      icon={<ShopOutlined />}
+                                      onClick={() => {
+                                        setStoreModalReadOnly(false)
+                                        const currentBlocked = (form as any).blockedMerchants || []
+                                        setTempBlockedStores(
+                                          dbStores.filter(s => currentBlocked.includes(s.storeCode))
+                                        )
+                                        storeSearchForm.resetFields()
+                                        setStoreSearchValues({})
+                                        setStoreModalVisible(true)
+                                      }}
+                                    >選擇門店</Button>
+                                  </div>
+                                  {blocked.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                                      {blocked.slice(0, 3).map(code => (
+                                        <Tag
+                                          key={code}
+                                          color="error"
+                                          closable
+                                          onClose={() => {
+                                            setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], blockedMerchants: blocked.filter(c => c !== code) } }) as any)
+                                          }}
+                                          style={{ fontSize: 11, margin: 0 }}
+                                        >{code}</Tag>
+                                      ))}
+                                      {blocked.length > 3 && (
+                                        <Tag
+                                          color="error"
+                                          style={{ fontSize: 11, margin: 0, cursor: 'pointer' }}
+                                          onClick={() => {
+                                            setStoreModalReadOnly(false)
+                                            setTempBlockedStores(dbStores.filter(s => blocked.includes(s.storeCode)))
+                                            storeSearchForm.resetFields()
+                                            setStoreSearchValues({})
+                                            setStoreModalVisible(true)
+                                          }}
+                                        >+{blocked.length - 3} 家</Tag>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                                {blocked.length > 0 && (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                                    {blocked.slice(0, 3).map(code => (
-                                      <Tag
-                                        key={code}
-                                        color="error"
-                                        closable
-                                        onClose={() => {
-                                          setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], blockedMerchants: blocked.filter(c => c !== code) } }) as any)
+                                {/* 區域切換 */}
+                                <Segmented
+                                  value={activeRegion}
+                                  onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
+                                  options={REGION_KEYS.map(k => ({
+                                    value: k,
+                                    label: (
+                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
+                                        {REGION_LABELS[k]}
+                                      </span>
+                                    ),
+                                  }))}
+                                  style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
+                                />
+                                {/* 區域配置卡片 */}
+                                <div style={{ padding: 12, background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                                  {/* 前提條件 */}
+                                  <div style={{ marginBottom: 12 }}>
+                                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>前提條件</div>
+                                    <Radio.Group
+                                      value={isUnconditional ? 'UNCONDITIONAL' : 'CONDITIONAL'}
+                                      onChange={e => {
+                                        const val = e.target.value
+                                        updateRegion(activeRegion, { prerequisites: val === 'UNCONDITIONAL' ? 'UNCONDITIONAL' : '[]' })
+                                      }}
+                                      style={{ marginBottom: 8 }}
+                                    >
+                                      <Radio.Button value="UNCONDITIONAL">無條件</Radio.Button>
+                                      <Radio.Button value="CONDITIONAL">指定條件</Radio.Button>
+                                    </Radio.Group>
+                                    {!isUnconditional && (
+                                      <Checkbox.Group
+                                        value={selectedConds}
+                                        onChange={vals => {
+                                          updateRegion(activeRegion, { prerequisites: JSON.stringify(vals) })
                                         }}
-                                        style={{ fontSize: 11, margin: 0 }}
-                                      >{code}</Tag>
-                                    ))}
-                                    {blocked.length > 3 && (
-                                      <Tag
-                                        color="error"
-                                        style={{ fontSize: 11, margin: 0, cursor: 'pointer' }}
-                                        onClick={() => {
-                                          setStoreModalReadOnly(false)
-                                          setTempBlockedStores(dbStores.filter(s => blocked.includes(s.storeCode)))
-                                          storeSearchForm.resetFields()
-                                          setStoreSearchValues({})
-                                          setStoreModalVisible(true)
-                                        }}
-                                      >+{blocked.length - 3} 家</Tag>
+                                        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+                                      >
+                                        {PLT_03_PREREQ_OPTIONS.map(o => (
+                                          <Checkbox key={o.value} value={o.value}>{o.label}</Checkbox>
+                                        ))}
+                                      </Checkbox.Group>
                                     )}
                                   </div>
-                                )}
+                                  {/* 統計天數 */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
+                                    <InputNumber
+                                      value={regionData.statDays ?? 30}
+                                      min={1}
+                                      max={365}
+                                      style={{ width: 100 }}
+                                      addonAfter="天"
+                                      onChange={val => updateRegion(activeRegion, { statDays: val ?? 30 })}
+                                    />
+                                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>過去 N 天內的訂單數據</span>
+                                  </div>
+                                  {/* 梯度配置 */}
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
+                                      <div key={idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: 8,
+                                        padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
+                                      }}>
+                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
+                                        <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≤</span>
+                                        <InputNumber
+                                          value={tier.threshold || undefined}
+                                          min={0}
+                                          style={{ width: 100 }}
+                                          placeholder="輸入閾值"
+                                          onChange={val => {
+                                            const newTiers = [...(regionData.tiers || [])]
+                                            newTiers[idx] = { ...newTiers[idx], threshold: val ?? 0 }
+                                            updateRegion(activeRegion, { tiers: newTiers })
+                                          }}
+                                        />
+                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
+                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
+                                        <InputNumber
+                                          value={tier.score || undefined}
+                                          min={0}
+                                          max={200}
+                                          style={{ width: 110 }}
+                                          addonAfter="分"
+                                          placeholder="輸入分數"
+                                          onChange={val => {
+                                            const newTiers = [...(regionData.tiers || [])]
+                                            newTiers[idx] = { ...newTiers[idx], score: val ?? 0 }
+                                            updateRegion(activeRegion, { tiers: newTiers })
+                                          }}
+                                        />
+                                        <Button
+                                          type="text"
+                                          danger
+                                          size="small"
+                                          icon={<DeleteOutlined />}
+                                          onClick={() => {
+                                            const newTiers = (regionData.tiers || []).filter((_: ScoreTier, i: number) => i !== idx)
+                                            updateRegion(activeRegion, { tiers: newTiers })
+                                          }}
+                                          style={{ padding: '0 4px', marginLeft: 'auto' }}
+                                        />
+                                      </div>
+                                    ))}
+                                    <Button
+                                      type="dashed"
+                                      icon={<PlusOutlined />}
+                                      onClick={() => {
+                                        const currentTiers = regionData.tiers || []
+                                        const newTiers: ScoreTier[] = [...currentTiers, { threshold: 0, direction: TierDirection.LESS_THAN, score: 0 }]
+                                        updateRegion(activeRegion, { tiers: newTiers })
+                                      }}
+                                      style={{ width: '100%' }}
+                                    >
+                                      新增梯度
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             )
                           })()}
-                          {/* PLT_03 統計天數 + 梯度配置 */}
-                          {rule.id === 'PLT_03' && (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+
+                          {/* COM_01 滿額立減計分配置：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
+                          {rule.id === 'COM_01' && (
+                            <div style={{ padding: 12, background: '#FFF7E6', borderRadius: 8, border: '1px solid #FFE7D1' }}>
+                              {/* ① 基礎條件加分 */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                                <InputNumber
-                                  value={(form as any).statDays ?? 30}
-                                  min={1}
-                                  max={365}
-                                  style={{ width: 100 }}
-                                  addonAfter="天"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 30 } }) as any)}
-                                />
-                                <span style={{ fontSize: 11, color: '#8C8C8C' }}>過去 N 天內的訂單數據</span>
+                                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#52C41A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>①</span>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>基礎條件加分</span>
+                                <span style={{ fontSize: 11, color: '#8C8C8C' }}>門檻≤客單價直接給分</span>
                               </div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                              <div style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0', marginBottom: 16,
+                              }}>
+                                <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>滿額立減門檻 ≤ 客單價</span>
+                                <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
+                                <InputNumber
+                                  value={(form as any).thresholdScore ?? undefined}
+                                  min={0}
+                                  max={200}
+                                  style={{ width: 110 }}
+                                  addonAfter="分"
+                                  placeholder="輸入分數"
+                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], thresholdScore: val ?? 0 } }) as any)}
+                                />
+                              </div>
+                              {/* ② 倍數梯度計分 */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#E8720C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>②</span>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>倍數梯度配置</span>
+                                <span style={{ fontSize: 11, color: '#8C8C8C' }}>以門店客單價為基準，滿額立減門檻越低得分越高</span>
+                              </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {((form as any).tiers || []).map((tier: ScoreTier, idx: number) => (
+                                {((form as any).multiplierTiers || []).map((tier: MultiplierTier, idx: number) => (
                                   <div key={idx} style={{
                                     display: 'flex', alignItems: 'center', gap: 8,
                                     padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
                                   }}>
                                     <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
-                                    <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≤</span>
+                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
                                     <InputNumber
-                                      value={tier.threshold || undefined}
-                                      min={0}
+                                      value={tier.multiplier || undefined}
+                                      min={0.1}
+                                      step={0.5}
                                       style={{ width: 100 }}
-                                      placeholder="輸入閾值"
+                                      placeholder="倍數"
+                                      addonAfter="倍"
                                       onChange={val => {
-                                        const newTiers = [...(form as any).tiers]
-                                        newTiers[idx] = { ...newTiers[idx], threshold: val ?? 0 }
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
+                                        const newTiers = [...(form as any).multiplierTiers]
+                                        newTiers[idx] = { ...newTiers[idx], multiplier: val ?? 1 }
+                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
                                       }}
                                     />
-                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
                                     <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
                                     <InputNumber
-                                      value={tier.score || undefined}
+                                      value={tier.score ?? undefined}
                                       min={0}
                                       max={200}
                                       style={{ width: 110 }}
                                       addonAfter="分"
                                       placeholder="輸入分數"
                                       onChange={val => {
-                                        const newTiers = [...(form as any).tiers]
+                                        const newTiers = [...(form as any).multiplierTiers]
                                         newTiers[idx] = { ...newTiers[idx], score: val ?? 0 }
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
+                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
                                       }}
                                     />
                                     <Button
@@ -1879,8 +2285,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       size="small"
                                       icon={<DeleteOutlined />}
                                       onClick={() => {
-                                        const newTiers = ((form as any).tiers || []).filter((_: ScoreTier, i: number) => i !== idx)
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
+                                        const newTiers = ((form as any).multiplierTiers || []).filter((_: MultiplierTier, i: number) => i !== idx)
+                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
                                       }}
                                       style={{ padding: '0 4px', marginLeft: 'auto' }}
                                     />
@@ -1890,9 +2296,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   type="dashed"
                                   icon={<PlusOutlined />}
                                   onClick={() => {
-                                    const currentTiers = (form as any).tiers || []
-                                    const newTiers = [...currentTiers, { threshold: undefined, direction: TierDirection.LESS_THAN, score: undefined }]
-                                    setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
+                                    const currentTiers = (form as any).multiplierTiers || []
+                                    const newTiers = [...currentTiers, { multiplier: undefined, score: undefined }]
+                                    setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
                                   }}
                                   style={{ width: '100%' }}
                                 >
@@ -2031,89 +2437,120 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* PLT_04 訂單過熱調控自定義編輯 */}
-                        {rule.id === 'PLT_04' && (
-                          <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                              <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>監控方式</span>
-                              <Tag color="purple" style={{ fontSize: 12, margin: 0 }}>定時監控</Tag>
-                              <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>校驗間隔</span>
-                              <InputNumber
-                                value={(form as any).calcIntervalHours ?? 1}
-                                min={0.1}
-                                max={24}
-                                step={0.5}
-                                style={{ width: 120 }}
-                                addonAfter="小時"
-                                placeholder="輸入小時數"
-                                onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], calcIntervalHours: val ?? 1, calcCycle: CalcCycle.SCHEDULED } }) as any)}
+                        {/* PLT_04 訂單過熱調控自定義編輯（區域維度） */}
+                        {rule.id === 'PLT_04' && (() => {
+                          const activeRegion: RegionKey = plt04Region[rule.id] || 'MACAU'
+                          const rc: Record<string, RegionOverheatConfig> = (form as any).regionConfigs || {}
+                          const regionData = rc[activeRegion] || { calcIntervalHours: 1, tiers: [] }
+                          const regionColor = REGION_COLORS[activeRegion]
+                          const updateRegion = (key: RegionKey, patch: Partial<RegionOverheatConfig>) => {
+                            const cur = (form as any).regionConfigs || {}
+                            const updated = { ...cur, [key]: { ...(cur[key] || {}), ...patch } }
+                            setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], regionConfigs: updated } }) as any)
+                          }
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                              {/* 區域切換 */}
+                              <Segmented
+                                value={activeRegion}
+                                onChange={val => setPlt04Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
+                                options={REGION_KEYS.map(k => ({
+                                  value: k,
+                                  label: (
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
+                                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
+                                      {REGION_LABELS[k]}
+                                    </span>
+                                  ),
+                                }))}
+                                style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
                               />
-                              <span style={{ fontSize: 11, color: '#8C8C8C' }}>（如 0.5 = 30 分鐘）</span>
-                            </div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {((form as any).tiers || []).map((tier: ScoreTier, idx: number) => (
-                                <div key={idx} style={{
-                                  display: 'flex', alignItems: 'center', gap: 8,
-                                  padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                                }}>
-                                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
-                                  <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≥</span>
+                              {/* 區域配置卡片 */}
+                              <div style={{ padding: 12, background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                                {/* 校驗間隔 */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>監控方式</span>
+                                  <Tag color="purple" style={{ fontSize: 12, margin: 0 }}>定時監控</Tag>
+                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>校驗間隔</span>
                                   <InputNumber
-                                    value={tier.threshold || undefined}
-                                    min={0}
-                                    style={{ width: 100 }}
-                                    placeholder="輸入閾值"
-                                    onChange={val => {
-                                      const newTiers = [...(form as any).tiers]
-                                      newTiers[idx] = { ...newTiers[idx], threshold: val ?? 0 }
-                                      setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
-                                    }}
+                                    value={regionData.calcIntervalHours ?? 1}
+                                    min={0.1}
+                                    max={24}
+                                    step={0.5}
+                                    style={{ width: 120 }}
+                                    addonAfter="小時"
+                                    placeholder="輸入小時數"
+                                    onChange={val => updateRegion(activeRegion, { calcIntervalHours: val ?? 1 })}
                                   />
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
-                                  <span style={{ fontSize: 12, color: '#FF4D4F', whiteSpace: 'nowrap' }}>固定減分</span>
-                                  <InputNumber
-                                    value={Math.abs(tier.score) || undefined}
-                                    min={0}
-                                    max={200}
-                                    style={{ width: 110 }}
-                                    addonAfter="分"
-                                    placeholder="輸入分數"
-                                    onChange={val => {
-                                      const newTiers = [...(form as any).tiers]
-                                      newTiers[idx] = { ...newTiers[idx], score: -(val ?? 0) }
-                                      setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
-                                    }}
-                                  />
-                                  <Button
-                                    type="text"
-                                    danger
-                                    size="small"
-                                    icon={<DeleteOutlined />}
-                                    onClick={() => {
-                                      const newTiers = ((form as any).tiers || []).filter((_: ScoreTier, i: number) => i !== idx)
-                                      setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
-                                    }}
-                                    style={{ padding: '0 4px', marginLeft: 'auto' }}
-                                  />
+                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（如 0.5 = 30 分鐘）</span>
                                 </div>
-                              ))}
-                              <Button
-                                type="dashed"
-                                icon={<PlusOutlined />}
-                                onClick={() => {
-                                  const currentTiers = (form as any).tiers || []
-                                  const newTiers = [...currentTiers, { threshold: undefined, direction: TierDirection.MORE_THAN, score: undefined }]
-                                  setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], tiers: newTiers } }) as any)
-                                }}
-                                style={{ width: '100%' }}
-                              >
-                                新增梯度
-                              </Button>
+                                {/* 梯度配置 */}
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
+                                    <div key={idx} style={{
+                                      display: 'flex', alignItems: 'center', gap: 8,
+                                      padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
+                                    }}>
+                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
+                                      <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≥</span>
+                                      <InputNumber
+                                        value={tier.threshold || undefined}
+                                        min={0}
+                                        style={{ width: 100 }}
+                                        placeholder="輸入閾值"
+                                        onChange={val => {
+                                          const newTiers = [...(regionData.tiers || [])]
+                                          newTiers[idx] = { ...newTiers[idx], threshold: val ?? 0 }
+                                          updateRegion(activeRegion, { tiers: newTiers })
+                                        }}
+                                      />
+                                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
+                                      <span style={{ fontSize: 12, color: '#FF4D4F', whiteSpace: 'nowrap' }}>固定減分</span>
+                                      <InputNumber
+                                        value={Math.abs(tier.score) || undefined}
+                                        min={0}
+                                        max={200}
+                                        style={{ width: 110 }}
+                                        addonAfter="分"
+                                        placeholder="輸入分數"
+                                        onChange={val => {
+                                          const newTiers = [...(regionData.tiers || [])]
+                                          newTiers[idx] = { ...newTiers[idx], score: -(val ?? 0) }
+                                          updateRegion(activeRegion, { tiers: newTiers })
+                                        }}
+                                      />
+                                      <Button
+                                        type="text"
+                                        danger
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        onClick={() => {
+                                          const newTiers = (regionData.tiers || []).filter((_: ScoreTier, i: number) => i !== idx)
+                                          updateRegion(activeRegion, { tiers: newTiers })
+                                        }}
+                                        style={{ padding: '0 4px', marginLeft: 'auto' }}
+                                      />
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="dashed"
+                                    icon={<PlusOutlined />}
+                                    onClick={() => {
+                                      const currentTiers = regionData.tiers || []
+                                      const newTiers: ScoreTier[] = [...currentTiers, { threshold: 0, direction: TierDirection.MORE_THAN, score: 0 }]
+                                      updateRegion(activeRegion, { tiers: newTiers })
+                                    }}
+                                    style={{ width: '100%' }}
+                                  >
+                                    新增梯度
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )
+                        })()}
                         {/* STB_05 出餐速度自定義編輯 */}
                         {rule.id === 'STB_05' && (() => {
                           const items: ScoreConditionItem[] = (form as any).conditionItems || []
@@ -2423,15 +2860,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         )}
-                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT 顯示標準計分方式 */}
-                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && (
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT/COM_01 顯示標準計分方式 */}
+                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && (
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
                                 options={rule.id === 'STB_01' || rule.id === 'STB_04' ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
-                                ] : (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') ? [
+                                ] : (rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
                                   { label: '動態加分', value: ScoreMode.AMOUNT_MULTIPLIER },
                                 ] : MODE_OPTIONS}
@@ -2789,6 +3226,36 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                       </div>
                     )}
 
+                    {/* TIERED_MULTIPLIER：倍數梯度計分配置 */}
+                    {tpl.mode === ScoreMode.TIERED_MULTIPLIER && (
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>倍數梯度計分配置</div>
+                        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
+                        {multiplierTierRows.length === 0 && (
+                          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                          {multiplierTierRows.map((tier, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                              <span style={{ fontSize: 12, color: '#595959' }}>門檻 {'<'} 客單價 ×</span>
+                              <InputNumber value={tier.multiplier || undefined} min={0.1} step={0.5} size="small" style={{ width: 80 }} placeholder="倍數" addonAfter="倍"
+                                onChange={val => { const n = [...multiplierTierRows]; n[idx] = { ...n[idx], multiplier: val ?? 1 }; setMultiplierTierRows(n) }} />
+                              <span style={{ fontSize: 12, color: '#595959' }}>固定加分</span>
+                              <InputNumber value={tier.score ?? undefined} min={0} max={200} size="small" style={{ width: 80 }} placeholder="分值" addonAfter="分"
+                                onChange={val => { const n = [...multiplierTierRows]; n[idx] = { ...n[idx], score: val ?? 0 }; setMultiplierTierRows(n) }} />
+                              <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}
+                                onClick={() => setMultiplierTierRows(prev => prev.filter((_, i) => i !== idx))} />
+                            </div>
+                          ))}
+                        </div>
+                        <Button type="dashed" size="small" icon={<PlusOutlined />} block
+                          onClick={() => setMultiplierTierRows(prev => [...prev, { multiplier: undefined as unknown as number, score: 0 }])}>
+                          新增檔位
+                        </Button>
+                      </div>
+                    )}
+
                     {/* 狀態開關 */}
                     <Form.Item
                       label={t('organicTrafficScore.status')}
@@ -2822,7 +3289,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               <Form.Item label={t('organicTrafficScore.scoringMode')} name="mode" rules={[{ required: true, message: t('organicTrafficScore.scoringModeRequired') }]}>
                 <Select options={MODE_OPTIONS} placeholder={t('organicTrafficScore.selectScoringMode')} disabled={editingRule?.mode === ScoreMode.TIERED} />
               </Form.Item>
-              {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && ruleFormMode !== ScoreMode.CONDITIONAL && (
+              {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && ruleFormMode !== ScoreMode.CONDITIONAL && ruleFormMode !== ScoreMode.TIERED_MULTIPLIER && (
                 <Form.Item label={t('organicTrafficScore.score')} name="score"
                   rules={[{ required: !isDeliveryRange(editingRule?.id), message: t('organicTrafficScore.scoreRequired') }]}
                   extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER ? t('organicTrafficScore.scoreExtraMultiplier') : t('organicTrafficScore.scoreExtraNormal')}>
@@ -2981,6 +3448,74 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 onClick={() => setConditionRows(prev => [...prev, { condition: '', score: 10 }])}
               >
                 新增條件
+              </Button>
+            </div>
+          )}
+          {/* 倍數梯度計分配置：以門店客單價為基準，按倍數閾值分檔 */}
+          {ruleFormMode === ScoreMode.TIERED_MULTIPLIER && (
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>倍數梯度計分配置</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
+              {multiplierTierRows.length === 0 && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {multiplierTierRows.map((tier, idx) => (
+                  <div key={idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', background: '#fff', borderRadius: 6,
+                    border: '1px solid #f0f0f0',
+                  }}>
+                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
+                    <InputNumber
+                      value={tier.multiplier || undefined}
+                      min={0.1}
+                      step={0.5}
+                      size="small"
+                      style={{ width: 80 }}
+                      placeholder="倍數"
+                      addonAfter="倍"
+                      onChange={val => {
+                        const next = [...multiplierTierRows]
+                        next[idx] = { ...next[idx], multiplier: val ?? 1 }
+                        setMultiplierTierRows(next)
+                      }}
+                    />
+                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
+                    <InputNumber
+                      value={tier.score ?? undefined}
+                      min={0}
+                      max={200}
+                      size="small"
+                      style={{ width: 80 }}
+                      placeholder="分值"
+                      addonAfter="分"
+                      onChange={val => {
+                        const next = [...multiplierTierRows]
+                        next[idx] = { ...next[idx], score: val ?? 0 }
+                        setMultiplierTierRows(next)
+                      }}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      style={{ marginLeft: 'auto' }}
+                      onClick={() => setMultiplierTierRows(prev => prev.filter((_, i) => i !== idx))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<PlusOutlined />}
+                block
+                onClick={() => setMultiplierTierRows(prev => [...prev, { multiplier: undefined as unknown as number, score: 0 }])}
+              >
+                新增檔位
               </Button>
             </div>
           )}

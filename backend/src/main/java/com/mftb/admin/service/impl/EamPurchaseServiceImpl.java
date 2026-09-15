@@ -14,6 +14,7 @@ import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -42,8 +43,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     /* ==================== 分页查询 ==================== */
 
     @Override
-    public PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String supplier,
-                                                       String purchaser, String execStatus,
+    public PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String processNo,
+                                                       String supplier, String purchaser, String execStatus,
                                                        String createdAtStart, String createdAtEnd,
                                                        String updatedAtStart, String updatedAtEnd) {
         LambdaQueryWrapper<EamPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
@@ -55,13 +56,47 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         if (createdAtEnd != null) wrapper.lt(EamPurchaseOrder::getCreatedAt, createdAtEnd + " 23:59:59");
         if (updatedAtStart != null) wrapper.ge(EamPurchaseOrder::getUpdatedAt, updatedAtStart);
         if (updatedAtEnd != null) wrapper.lt(EamPurchaseOrder::getUpdatedAt, updatedAtEnd + " 23:59:59");
+        // 关联采购申请编号筛选：先查匹配的申请 ID，再按 req_id IN 过滤
+        if (processNo != null && !processNo.isBlank()) {
+            List<Long> reqIds = requestMapper.selectList(new LambdaQueryWrapper<EamPurchaseRequest>()
+                            .like(EamPurchaseRequest::getReqNo, processNo.trim())
+                            .select(EamPurchaseRequest::getId))
+                    .stream().map(EamPurchaseRequest::getId).collect(Collectors.toList());
+            if (reqIds.isEmpty()) {
+                return new PageResult<Map<String, Object>>(java.util.Collections.emptyList(), 0L);
+            }
+            wrapper.in(EamPurchaseOrder::getReqId, reqIds);
+        }
         wrapper.orderByDesc(EamPurchaseOrder::getCreatedAt);
 
         Page<EamPurchaseOrder> pageObj = new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size));
         Page<EamPurchaseOrder> result = orderMapper.selectPage(pageObj, wrapper);
 
+        // 批量补充明细总数与关联申请编号（供列表「验收入库进度/关联申请」列展示）
+        Map<Long, Integer> totalQtyMap = new HashMap<>();
+        Map<Long, String> reqNoMap = new HashMap<>();
+        List<Long> orderIds = result.getRecords().stream().map(EamPurchaseOrder::getId).collect(Collectors.toList());
+        if (!orderIds.isEmpty()) {
+            itemMapper.selectList(new LambdaQueryWrapper<EamPurchaseOrderItem>()
+                            .in(EamPurchaseOrderItem::getOrderId, orderIds)
+                            .select(EamPurchaseOrderItem::getOrderId, EamPurchaseOrderItem::getQty))
+                    .forEach(it -> totalQtyMap.merge(it.getOrderId(), it.getQty() == null ? 0 : it.getQty(), Integer::sum));
+            List<Long> reqIds = result.getRecords().stream()
+                    .map(EamPurchaseOrder::getReqId).filter(rid -> rid != null && rid > 0).collect(Collectors.toList());
+            if (!reqIds.isEmpty()) {
+                requestMapper.selectBatchIds(reqIds)
+                        .forEach(req -> reqNoMap.put(req.getId(), req.getReqNo()));
+            }
+        }
+
         List<Map<String, Object>> records = result.getRecords().stream()
-                .map(this::orderToMap)
+                .map(o -> {
+                    Map<String, Object> m = orderToMap(o);
+                    m.put("totalQty", totalQtyMap.getOrDefault(o.getId(), 0));
+                    m.put("reqNo", o.getReqId() != null && o.getReqId() > 0
+                            ? reqNoMap.get(o.getReqId()) : null);
+                    return m;
+                })
                 .collect(Collectors.toList());
         return new PageResult<>(records, result.getTotal());
     }
@@ -112,6 +147,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setAmount(dto.getAmount() != null ? dto.getAmount() : BigDecimal.ZERO);
         order.setDeliveryDate(Objects.toString(dto.getDeliveryDate(), ""));
         order.setPurchaser(Objects.toString(dto.getPurchaser(), ""));
+        order.setDepartment(Objects.toString(dto.getDepartment(), ""));
         order.setRemark(Objects.toString(dto.getRemark(), ""));
         order.setExecStatus("pending");
         order.setStatus("pending");
@@ -156,6 +192,22 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     public void updateOrderExec(long id, EamPurchaseSaveDTO dto) {
         EamPurchaseOrder order = orderMapper.selectById(id);
         if (order == null) throw new BusinessException("採購訂單不存在");
+        // 已驗收入庫的訂單不允許修改
+        if ("received".equals(order.getStatus())) {
+            throw new BusinessException("訂單已全部驗收入庫，不可修改");
+        }
+
+        // 執行狀態設為「已完成」時，所有明細的成交單價必須填寫
+        if ("completed".equals(dto.getExecStatus()) && groups != null) {
+            for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
+                if (group.getItems() == null) continue;
+                for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
+                    if (item.getConfirmedPrice() == null || item.getConfirmedPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new BusinessException("執行狀態為「已完成」時，所有物資明細的成交單價必須填寫且大於零：" + item.getModelName());
+                    }
+                }
+            }
+        }
 
         String operator = operatorResolver.currentOperatorName();
 
@@ -163,6 +215,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         wrapper.eq(EamPurchaseOrder::getId, id);
 
         if (dto.getPurchaser() != null) wrapper.set(EamPurchaseOrder::getPurchaser, dto.getPurchaser());
+        if (dto.getDepartment() != null) wrapper.set(EamPurchaseOrder::getDepartment, dto.getDepartment());
         if (dto.getExecStatus() != null) wrapper.set(EamPurchaseOrder::getExecStatus, dto.getExecStatus());
         if (dto.getRemark() != null) wrapper.set(EamPurchaseOrder::getRemark, dto.getRemark());
         if (dto.getTrackingNo() != null) wrapper.set(EamPurchaseOrder::getTrackingNo, dto.getTrackingNo());
@@ -187,14 +240,29 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             wrapper.set(EamPurchaseOrder::getConfirmedAmount, confirmedAmount);
             wrapper.set(EamPurchaseOrder::getSupplier, Objects.toString(groups.get(0).getSupplier(), ""));
 
-            // 同步更新明细表
+            // 保留已有明細的已驗收數量（按 groupId + sortOrder 匹配）
+            List<EamPurchaseOrderItem> existingItems = itemMapper.selectList(
+                    new LambdaQueryWrapper<EamPurchaseOrderItem>()
+                            .eq(EamPurchaseOrderItem::getOrderId, id)
+                            .orderByAsc(EamPurchaseOrderItem::getSortOrder));
+            Map<String, Integer> receivedQtyMap = new HashMap<>();
+            for (EamPurchaseOrderItem ei : existingItems) {
+                String compositeKey = ei.getGroupId() + ":" + ei.getSortOrder();
+                receivedQtyMap.put(compositeKey, ei.getReceivedQty() != null ? ei.getReceivedQty() : 0);
+            }
+
+            // 同步更新明细表（先刪後插）
             itemMapper.delete(new LambdaQueryWrapper<EamPurchaseOrderItem>()
                     .eq(EamPurchaseOrderItem::getOrderId, id));
             int sort = 0;
             for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
                 if (group.getItems() == null) continue;
                 for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
-                    saveOrderItem(id, group.getId(), item, sort++);
+                    // 查找匹配的已验收数量
+                    String compositeKey = group.getId() + ":" + sort;
+                    Integer preservedReceivedQty = receivedQtyMap.get(compositeKey);
+                    saveOrderItem(id, group.getId(), item, sort, preservedReceivedQty);
+                    sort++;
                 }
             }
         }
@@ -220,13 +288,11 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public long createOrderFromRequest(long requestId) {
+    public long createOrderFromRequest(long requestId, List<Map<String, Object>> formDataItems) {
         EamPurchaseRequest req = requestMapper.selectById(requestId);
         if (req == null) throw new BusinessException("採購申請不存在");
         if (req.getOrderId() != null) throw new BusinessException("該申請已生成採購訂單");
 
-        // 解析 formData 中的 items（如果有的话，从 OA formData JSON 中提取）
-        // 这里从 request 的基本信息构建订单
         EamPurchaseOrder order = new EamPurchaseOrder();
         order.setReqId(req.getId());
         order.setSupplier("待定供應商");
@@ -234,7 +300,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setDeliveryDate(LocalDate.now().plusDays(14).toString());
         order.setPurchaser(req.getApplicant());
         order.setDepartment(req.getDepartment());
-        order.setRemark("由採購申請 " + req.getReqNo() + " 審批通過自動生成");
+        // 保留原始采购事由，追加来源说明
+        String originalReason = req.getReason() != null ? req.getReason().trim() : "";
+        order.setRemark(originalReason + "\n（由採購申請 " + req.getReqNo() + " 審批通過自動生成）");
         order.setExecStatus("pending");
         order.setStatus("pending");
         order.setAcceptedQty(0);
@@ -245,19 +313,55 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setPoNo(bizSeqService.next(BizSeqService.RULE_EAM_PURCHASE_ORDER));
         orderMapper.insert(order);
 
+        // 从 formData items 创建订单明细
+        if (formDataItems != null && !formDataItems.isEmpty()) {
+            int sort = 0;
+            for (Map<String, Object> it : formDataItems) {
+                EamPurchaseOrderItem item = new EamPurchaseOrderItem();
+                item.setOrderId(order.getId());
+                item.setGroupId(null);
+                item.setModelId(ConvertUtils.toLong(it.get("modelId"), null));
+                item.setModelName(Objects.toString(it.get("modelName"), ""));
+                item.setCategoryName(Objects.toString(it.get("categoryName"), ""));
+                item.setCategoryCode("");
+                item.setBrandName(Objects.toString(it.get("brandName"), ""));
+                // params JSON
+                Object paramsObj = it.get("params");
+                if (paramsObj != null) {
+                    item.setParams(JsonUtils.toJson(paramsObj));
+                }
+                item.setPurchaseType("purchase");
+                item.setQty(it.get("qty") instanceof Number n ? n.intValue() : 1);
+                // 前端 estPrice 作为参考价
+                item.setPrice(it.get("estPrice") instanceof Number n
+                        ? BigDecimal.valueOf(n.doubleValue()) : BigDecimal.ZERO);
+                item.setConfirmedPrice(null);
+                item.setReceivedQty(0);
+                item.setSortOrder(sort++);
+                itemMapper.insert(item);
+            }
+        }
+
         // 回写申请表的 orderId
         requestMapper.update(null, new LambdaUpdateWrapper<EamPurchaseRequest>()
                 .eq(EamPurchaseRequest::getId, req.getId())
                 .set(EamPurchaseRequest::getOrderId, order.getId())
                 .set(EamPurchaseRequest::getStatus, "approved"));
 
-        log.info("從採購申請自動創建訂單: requestId={}, orderId={}, poNo={}", requestId, order.getId(), order.getPoNo());
+        log.info("從採購申請自動創建訂單: requestId={}, orderId={}, poNo={}, items={}",
+                requestId, order.getId(), order.getPoNo(),
+                formDataItems != null ? formDataItems.size() : 0);
         return order.getId();
     }
 
     /* ==================== 内部方法 ==================== */
 
     private void saveOrderItem(long orderId, String groupId, EamPurchaseSaveDTO.SupplierItem item, int sort) {
+        saveOrderItem(orderId, groupId, item, sort, null);
+    }
+
+    private void saveOrderItem(long orderId, String groupId, EamPurchaseSaveDTO.SupplierItem item, int sort,
+                                Integer preservedReceivedQty) {
         EamPurchaseOrderItem entity = new EamPurchaseOrderItem();
         entity.setOrderId(orderId);
         entity.setGroupId(groupId);
@@ -272,7 +376,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         entity.setQty(item.getQty() != null ? item.getQty() : 1);
         entity.setPrice(item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO);
         entity.setConfirmedPrice(item.getConfirmedPrice());
-        entity.setReceivedQty(0);
+        // 保留已验收数量：更新时传入已有值，创建时为 null → 默认 0
+        entity.setReceivedQty(preservedReceivedQty != null ? preservedReceivedQty : 0);
         entity.setSortOrder(sort);
 
         // params JSON

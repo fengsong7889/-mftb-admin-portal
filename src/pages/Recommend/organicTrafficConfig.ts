@@ -30,6 +30,8 @@ export enum ScoreMode {
   TIERED = 5,
   /** 條件計分：多組「條件描述 → 分值」，每組獨立計分 */
   CONDITIONAL = 6,
+  /** 倍數梯度計分：以門店客單價為基準，按倍數閾值分檔計分 */
+  TIERED_MULTIPLIER = 7,
 }
 
 /** 梯度比較方向 */
@@ -83,6 +85,7 @@ export const SCORE_MODE_LABEL: Record<ScoreMode, string> = {
   [ScoreMode.AMOUNT_MULTIPLIER]: '金額倍率',
   [ScoreMode.TIERED]: '梯度計分',
   [ScoreMode.CONDITIONAL]: '條件計分',
+  [ScoreMode.TIERED_MULTIPLIER]: '倍數梯度計分',
 }
 
 export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
@@ -92,6 +95,7 @@ export const SCORE_MODE_COLOR: Record<ScoreMode, string> = {
   [ScoreMode.AMOUNT_MULTIPLIER]: 'gold',
   [ScoreMode.TIERED]: 'cyan',
   [ScoreMode.CONDITIONAL]: 'geekblue',
+  [ScoreMode.TIERED_MULTIPLIER]: 'volcano',
 }
 
 export const SCORE_MODE_OPTIONS = [
@@ -101,6 +105,7 @@ export const SCORE_MODE_OPTIONS = [
   { label: SCORE_MODE_LABEL[ScoreMode.AMOUNT_MULTIPLIER], value: ScoreMode.AMOUNT_MULTIPLIER },
   { label: SCORE_MODE_LABEL[ScoreMode.TIERED], value: ScoreMode.TIERED },
   { label: SCORE_MODE_LABEL[ScoreMode.CONDITIONAL], value: ScoreMode.CONDITIONAL },
+  { label: SCORE_MODE_LABEL[ScoreMode.TIERED_MULTIPLIER], value: ScoreMode.TIERED_MULTIPLIER },
 ]
 
 export const TIER_DIRECTION_LABEL: Record<TierDirection, string> = {
@@ -165,6 +170,46 @@ export interface ScoreTier {
   statDays?: number
 }
 
+/** 倍數梯度計分檔位（以門店客單價為基準，滿額立減門檻 < 客單價 × 倍數 → 加分） */
+export interface MultiplierTier {
+  /** 倍數閾值（如 1 表示客單價的 1 倍） */
+  multiplier: number
+  /** 該檔位對應分值（正=加分） */
+  score: number
+}
+
+/** 區域扶持配置（PLT_03 商家扶持按區域獨立配置前提條件、統計天數、梯度） */
+export interface RegionSupportConfig {
+  /** 前提條件描述（如 'UNCONDITIONAL' 或 JSON 數組） */
+  prerequisites?: string
+  /** 統計天數 */
+  statDays?: number
+  /** 梯度檔位 */
+  tiers?: ScoreTier[]
+}
+
+/** 區域過熱調控配置（PLT_04 訂單過熱調控按區域獨立配置校驗間隔、梯度） */
+export interface RegionOverheatConfig {
+  /** 校驗間隔（小時） */
+  calcIntervalHours?: number
+  /** 梯度檔位 */
+  tiers?: ScoreTier[]
+}
+
+/** 區域鍵枚舉（PLT_03 商家扶持） */
+export const REGION_KEYS = ['MACAU', 'TAIPA'] as const
+export type RegionKey = typeof REGION_KEYS[number]
+
+export const REGION_LABELS: Record<RegionKey, string> = {
+  MACAU: '澳門區域',
+  TAIPA: '氹仔區域',
+}
+
+export const REGION_COLORS: Record<RegionKey, { primary: string; bg: string; border: string }> = {
+  MACAU: { primary: '#1890FF', bg: '#E6F7FF', border: '#91D5FF' },
+  TAIPA: { primary: '#722ED1', bg: '#F9F0FF', border: '#D3ADF7' },
+}
+
 /** 條件計分子項（一組條件描述 → 分值） */
 export interface ScoreConditionItem {
   /** 條件描述（如「報名免運費活動」） */
@@ -214,6 +259,10 @@ export interface OrganicScoreRule {
   tiers?: ScoreTier[]
   /** 條件計分子項（僅 mode=CONDITIONAL 時使用） */
   conditionItems?: ScoreConditionItem[]
+  /** 倍數梯度檔位（僅 mode=TIERED_MULTIPLIER 時使用，以客單價為基準） */
+  multiplierTiers?: MultiplierTier[]
+  /** 門檻≤客單價時固定加分（僅 COM_01 使用） */
+  thresholdScore?: number
   /** 計算周期（僅 mode=TIERED 時使用） */
   calcCycle?: CalcCycle
   /** 定時監控間隔小時數（僅 calcCycle=SCHEDULED 時使用，支持小數如 0.5） */
@@ -228,8 +277,10 @@ export interface OrganicScoreRule {
   deductionPerOrder?: number
   /** 衰减系数（距離衰減規則使用，每公里扣除的分數） */
   decayCoefficient?: number
-  /** 屏蔽商家列表（店鋪代碼，即使滿足條件也不扶持） */
+  /** 屏蔽商家列表（店鋪代碼，即使滿足條件也不扶持）—— 全局共享，不受區域限制 */
   blockedMerchants?: string[]
+  /** 區域配置（PLT_03 商家扶持用 RegionSupportConfig，PLT_04 訂單過熱調控用 RegionOverheatConfig） */
+  regionConfigs?: Record<string, RegionSupportConfig | RegionOverheatConfig>
   /** 活動加分配置（僅 STB_ACT 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
   activityItems?: ActivityScoreItem[]
   status: ServiceStatus
@@ -256,7 +307,11 @@ const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   // ===== 商業維度（商家營銷投入與付費推廣） =====
-  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動加分：門檻≤客單價直接給分，再以門店客單價為基準按倍數梯度計分（門檻越低得分越高）', mode: ScoreMode.TIERED_MULTIPLIER, score: 0, status: ENABLED, builtin: true, thresholdScore: 10, multiplierTiers: [
+    { multiplier: 1, score: 30 },
+    { multiplier: 2, score: 20 },
+    { multiplier: 3, score: 10 },
+  ] },
   { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費加分', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true },
   { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '商家設置進店領券加分', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減活動加分', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
@@ -282,14 +337,26 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
     { condition: 'fixed_deduction', score: 20 },
     { condition: 'fixed_deduction', score: 50 },
   ] },
-  { id: 'PLT_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '統計有效訂單數，按梯度加分：訂單越多得分越高', mode: ScoreMode.TIERED, score: 0, statDays: 30, prerequisites: 'UNCONDITIONAL', tiers: [
-    { threshold: 50, direction: TierDirection.LESS_THAN, score: 20, statDays: 30 },
-  ], status: ENABLED, builtin: true },
-  { id: 'PLT_04', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '定時監控商家訂單過熱時按梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, tiers: [
-    { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
-    { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
-    { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
-  ], status: ENABLED, builtin: true },
+  { id: 'PLT_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '按區域配置商家扶持：每個區域獨立設置前提條件、統計天數與梯度加分，屏蔽商家全局統一', mode: ScoreMode.TIERED, score: 0, status: ENABLED, builtin: true, blockedMerchants: [], regionConfigs: {
+    MACAU: { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [
+      { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
+    ] },
+    TAIPA: { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [
+      { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
+    ] },
+  } },
+  { id: 'PLT_04', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '按區域配置訂單過熱調控：每個區域獨立設置校驗間隔與梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, status: ENABLED, builtin: true, regionConfigs: {
+    MACAU: { calcIntervalHours: 1, tiers: [
+      { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
+      { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
+      { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
+    ] },
+    TAIPA: { calcIntervalHours: 1, tiers: [
+      { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
+      { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
+      { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
+    ] },
+  } },
   { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐速度', description: '統計過去N天（不含當天）出餐均值，當天出餐時間超過均值即扣分', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, conditionItems: [
     { condition: 'over_avg_deduction', score: 30 },
   ], status: ENABLED, builtin: true },

@@ -83,23 +83,38 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const execStatusFilter = activeTab === 'all' ? undefined : activeTab
+      // Tab 統計：按狀態並行查 count（size=1 僅取 total），規避後端分頁上限並保證統計不被狀態篩選污染
+      const baseFilters = { ...filters, execStatus: undefined }
+      const [allRes, pendingRes, purchasingRes, completedRes] = await Promise.all([
+        fetchPurchaseOrderList({ page: 1, size: 1, ...baseFilters }),
+        fetchPurchaseOrderList({ page: 1, size: 1, ...baseFilters, execStatus: 'pending' }),
+        fetchPurchaseOrderList({ page: 1, size: 1, ...baseFilters, execStatus: 'purchasing' }),
+        fetchPurchaseOrderList({ page: 1, size: 1, ...baseFilters, execStatus: 'completed' }),
+      ])
+      setStats({
+        all: allRes.total,
+        pending: pendingRes.total,
+        purchasing: purchasingRes.total,
+        completed: completedRes.total,
+      })
 
-      const statsRes = await fetchPurchaseOrderList({ page: 1, size: 9999, ...filters })
-      const next: Record<ExecStatus | 'all', number> = { all: 0, pending: 0, purchasing: 0, completed: 0 }
-      ;(statsRes.records || []).forEach((o) => { next[o.execStatus] += 1 })
-      next.all = next.pending + next.purchasing + next.completed
-      setStats(next)
-
+      // 選中具體狀態 Tab 時優先生效；「全部」Tab 下應用搜索表單的狀態篩選
+      const execStatusFilter = activeTab !== 'all' ? activeTab : filters.execStatus
       const res = await fetchPurchaseOrderList({ page, size, ...filters, execStatus: execStatusFilter })
       setDataSource(res.records || [])
       setTotal(res.total || 0)
 
-      const reqIds = Array.from(new Set((res.records || []).map((o) => o.reqId).filter(Boolean)))
-      const entries = await Promise.all(reqIds.map(async (rid) => {
-        try { return [rid, await fetchPurchaseRequestDetail(rid)] as const } catch { return null }
-      }))
-      setReqMap(Object.fromEntries(entries.filter(Boolean).map((e) => [e![0], e![1]])))
+      // 後端列表已帶 reqNo；僅 mock 兜底數據缺失時補查申請編號映射
+      const needReqMap = (res.records || []).some((o) => o.reqId > 0 && !o.reqNo)
+      if (needReqMap) {
+        const reqIds = Array.from(new Set((res.records || []).map((o) => o.reqId).filter(Boolean)))
+        const entries = await Promise.all(reqIds.map(async (rid) => {
+          try { return [rid, await fetchPurchaseRequestDetail(rid)] as const } catch { return null }
+        }))
+        setReqMap(Object.fromEntries(entries.filter(Boolean).map((e) => [e![0], e![1]])))
+      } else {
+        setReqMap({})
+      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
@@ -253,7 +268,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     },
     {
       title: t('asset.colReqNo'), dataIndex: 'reqId', key: 'reqId', width: 130,
-      render: (v: number) => (v && reqMap[v] ? reqMap[v].reqNo : '-'),
+      render: (v: number, r: PurchaseOrder) => (v && v > 0 ? (r.reqNo || reqMap[v]?.reqNo || '-') : '-'),
     },
     { title: t('asset.colSupplier'), dataIndex: 'supplier', key: 'supplier', width: 160, ellipsis: true },
     {
@@ -272,7 +287,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     {
       title: '服務部門', key: 'department', width: 120,
       render: (_: unknown, r: PurchaseOrder) => {
-        const dept = empDeptMap.get(r.purchaser || '') || ''
+        const dept = r.department || empDeptMap.get(r.purchaser || '') || ''
         return dept || <span style={{ color: '#bfbfbf' }}>-</span>
       },
     },
@@ -284,8 +299,9 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: t('asset.inboundTitle'), key: 'inboundProgress', width: 220,
       render: (_: unknown, r: PurchaseOrder) => {
         if (r.execStatus !== 'completed') return <span style={{ color: '#bfbfbf', fontSize: 12 }}>—</span>
-        const totalQty = r.items.reduce((s, it) => s + it.qty, 0)
-        const accepted = r.acceptedQty ?? r.items.reduce((s, it) => s + it.receivedQty, 0)
+        // 列表接口不返回明細，優先用後端 totalQty/acceptedQty 計算
+        const totalQty = r.totalQty ?? (r.items || []).reduce((s, it) => s + it.qty, 0)
+        const accepted = r.acceptedQty ?? (r.items || []).reduce((s, it) => s + it.receivedQty, 0)
         const pending = totalQty - accepted - (r.returnQty || 0) - (r.exchangeQty || 0) - (r.concessionQty || 0)
         const returnQty = r.returnQty || 0
         const exchangeQty = r.exchangeQty || 0

@@ -83,6 +83,15 @@ public class OrganicScoreRule {
     /** 活动加分配置 JSON（[{activityId, activityName, score}]，仅 STB_ACT 规则使用） */
     private String activityItems;
 
+    /** 倍数梯度计分配置 JSON（[{multiplier, score}]，仅 COM_01 满额立减规则使用，以门店客单价为基准） */
+    private String multiplierTiers;
+
+    /** 门槛≤客单价时固定加分（仅 COM_01 使用） */
+    private Integer thresholdScore;
+
+    /** 区域配置 JSON（PLT_03 商家扶持 / PLT_04 订单过热调控，按区域独立配置） */
+    private String regionConfigs;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

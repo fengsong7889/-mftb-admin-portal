@@ -1005,8 +1005,8 @@ public class OaRequestServiceImpl implements OaRequestService {
         pr.setBudget(budget);
         eamPurchaseRequestMapper.insert(pr);
 
-        // 自动创建采购订单
-        long orderId = eamPurchaseService.createOrderFromRequest(pr.getId());
+        // 自动创建采购订单（传入 formData items 以便复制到订单明细）
+        long orderId = eamPurchaseService.createOrderFromRequest(pr.getId(), items);
         log.info("採購申請審批回調完成: flowNo={}, orderId={}",
                 oaRequest.getFlowNo(), orderId);
     }

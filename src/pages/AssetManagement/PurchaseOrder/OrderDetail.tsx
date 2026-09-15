@@ -57,7 +57,8 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     try {
       const order = await fetchPurchaseOrderDetail(id)
       setDetail(order)
-      if (order.reqId) {
+      // 後端詳情已帶 reqNo；僅 mock 兜底數據缺失時補查申請信息
+      if (order.reqId && !order.reqNo) {
         try { setRequest(await fetchPurchaseRequestDetail(order.reqId)) } catch { setRequest(null) }
       }
     } catch (e: unknown) {
@@ -147,7 +148,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     : [{ id: 'default', supplier: detail.supplier, contact: detail.contact, orderDate: detail.orderDate, trackingNo: detail.trackingNo, items: detail.items }]
 
   const grandTotal = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + (it.confirmedPrice || it.price) * it.qty, 0), 0)
-  const purchaserDept = empDeptMap.get(detail.purchaser || '') || ''
+  const purchaserDept = detail.department || empDeptMap.get(detail.purchaser || '') || ''
   const execMeta = EXEC_META[detail.execStatus]
   const inboundMeta = INBOUND_META[detail.status]
 
@@ -191,7 +192,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           <Descriptions.Item label={t('asset.colReqNo')}>
             {detail.reqId ? (
               <Button type="link" size="small" onClick={() => onViewRequest(detail.reqId)}>
-                {request?.reqNo || detail.reqId}
+                {detail.reqNo || request?.reqNo || detail.reqId}
               </Button>
             ) : '-'}
           </Descriptions.Item>
@@ -264,8 +265,8 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
       {/* ====== 驗收入庫進度 ====== */}
       {detail.execStatus === 'completed' && (() => {
-        const totalQty = detail.items.reduce((s, it) => s + it.qty, 0)
-        const receivedQty = detail.items.reduce((s, it) => s + it.receivedQty, 0)
+        const totalQty = detail.totalQty ?? detail.items.reduce((s, it) => s + it.qty, 0)
+        const receivedQty = detail.items.reduce((s, it) => s + (it.receivedQty || 0), 0)
         const percent = totalQty ? Math.round((receivedQty / totalQty) * 100) : 0
         return (
           <div style={{
