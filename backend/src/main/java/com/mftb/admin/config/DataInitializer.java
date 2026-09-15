@@ -80,6 +80,10 @@ public class DataInitializer implements CommandLineRunner {
         // 一次性迁移按版本执行, 已执行的步骤重启时直接跳过 (启动提速);
         // 菜单种子独立版本: 菜单改动只需递增 V_MENU_SEED, 不影响其他迁移
         versionTracker.applyOnce(V_SCHEMA, this::migrateSchema);
+        // EAM 仓库位置省/市/区字段补列 (140 脚本等效, 每次启动幂等检查, 不受 V_SCHEMA 版本门控)
+        migrateEamLocationColumns();
+        // EAM 采购/入库/资产台账/配件配置表自动创建 (117/141/142/143 脚本等效, 每次启动幂等检查)
+        migrateEamPurchaseInboundTables();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -462,6 +466,211 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='仓库/存放位置'");
 
         log.info("EAM 基础数据表就绪: biz_eam_category + biz_eam_brand + biz_eam_model + biz_eam_location");
+    }
+
+    /** 140 脚本等效: 仓库维护重构——补充省/市/区字段 (每次启动幂等检查, 不受 V_SCHEMA 版本门控) */
+    private void migrateEamLocationColumns() {
+        Integer tableCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_location'",
+                Integer.class);
+        if (tableCount == null || tableCount == 0) return;
+        addColumnIfAbsent("biz_eam_location", "province",
+                "ALTER TABLE biz_eam_location ADD COLUMN province VARCHAR(64) DEFAULT '' COMMENT '省份（如：广东省）' AFTER type");
+        addColumnIfAbsent("biz_eam_location", "city",
+                "ALTER TABLE biz_eam_location ADD COLUMN city VARCHAR(64) DEFAULT '' COMMENT '城市（如：珠海市）' AFTER province");
+        addColumnIfAbsent("biz_eam_location", "district",
+                "ALTER TABLE biz_eam_location ADD COLUMN district VARCHAR(64) DEFAULT '' COMMENT '区县（如：香洲区）' AFTER city");
+    }
+
+    /**
+     * EAM 采购/入库/资产台账/配件配置表自动创建 (117/141/142/143 脚本等效, 幂等)
+     * 包含: 采购申请、采购订单、订单明细、入库批次、批次明细、资产台账、分类配件
+     */
+    private void migrateEamPurchaseInboundTables() {
+        // 1. 采购申请
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_purchase_request ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "req_no VARCHAR(32) NOT NULL COMMENT '申请编号', "
+                        + "flow_no VARCHAR(32) DEFAULT NULL COMMENT '关联OA流程编号', "
+                        + "title VARCHAR(200) NOT NULL COMMENT '申请标题', "
+                        + "department VARCHAR(100) NOT NULL DEFAULT '' COMMENT '申请部门', "
+                        + "department_id BIGINT DEFAULT NULL COMMENT '申请部门ID', "
+                        + "applicant VARCHAR(64) NOT NULL COMMENT '申请人', "
+                        + "applicant_emp_id VARCHAR(32) DEFAULT '' COMMENT '申请人工号', "
+                        + "reason VARCHAR(500) NOT NULL DEFAULT '' COMMENT '采购事由', "
+                        + "budget DECIMAL(14,2) DEFAULT 0 COMMENT '预算金额', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected', "
+                        + "order_id BIGINT DEFAULT NULL COMMENT '审批通过后生成的采购订单ID', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_req_no (req_no), "
+                        + "KEY idx_flow_no (flow_no), "
+                        + "KEY idx_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购申请'");
+
+        // 2. 采购订单 (含 139 brand + 134 contact_phone)
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_purchase_order ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "po_no VARCHAR(32) NOT NULL COMMENT '订单编号', "
+                        + "req_id BIGINT DEFAULT 0 COMMENT '关联采购申请ID', "
+                        + "supplier VARCHAR(200) NOT NULL DEFAULT '' COMMENT '供应商', "
+                        + "amount DECIMAL(14,2) DEFAULT 0 COMMENT '订单金额', "
+                        + "confirmed_amount DECIMAL(14,2) DEFAULT NULL COMMENT '实际成交金额', "
+                        + "delivery_date VARCHAR(32) DEFAULT '' COMMENT '预计交货日期', "
+                        + "purchaser VARCHAR(64) DEFAULT '' COMMENT '采购经办人', "
+                        + "department VARCHAR(100) DEFAULT '' COMMENT '服务部门', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '采购事由/备注', "
+                        + "tracking_no VARCHAR(64) DEFAULT '' COMMENT '快递单号', "
+                        + "contact VARCHAR(64) DEFAULT '' COMMENT '供应商联络人', "
+                        + "contact_phone VARCHAR(64) DEFAULT NULL COMMENT '供应商联络人电话', "
+                        + "order_date VARCHAR(32) DEFAULT '' COMMENT '下单日期', "
+                        + "exec_status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/purchasing/completed', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT '验收状态', "
+                        + "accepted_qty INT DEFAULT 0 COMMENT '已验收总数', "
+                        + "return_qty INT DEFAULT 0 COMMENT '退货总数', "
+                        + "exchange_qty INT DEFAULT 0 COMMENT '换货总数', "
+                        + "concession_qty INT DEFAULT 0 COMMENT '让步接收总数', "
+                        + "supplier_groups JSON DEFAULT NULL COMMENT '供应商分组JSON', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_po_no (po_no), "
+                        + "KEY idx_req_id (req_id), "
+                        + "KEY idx_exec_status (exec_status), "
+                        + "KEY idx_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购订单'");
+
+        // 3. 采购订单明细
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_purchase_order_item ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "order_id BIGINT NOT NULL COMMENT '所属订单ID', "
+                        + "group_id VARCHAR(64) DEFAULT '' COMMENT '所属供应商分组ID', "
+                        + "model_id BIGINT DEFAULT NULL COMMENT '资产型号ID', "
+                        + "model_name VARCHAR(200) DEFAULT '' COMMENT '资产名称', "
+                        + "category_id BIGINT DEFAULT NULL COMMENT '分类ID', "
+                        + "category_name VARCHAR(100) DEFAULT '' COMMENT '分类名称', "
+                        + "category_code VARCHAR(64) DEFAULT '' COMMENT '分类编码', "
+                        + "brand_id BIGINT DEFAULT NULL COMMENT '品牌ID', "
+                        + "brand_name VARCHAR(100) DEFAULT '' COMMENT '品牌名称', "
+                        + "params JSON DEFAULT NULL COMMENT '参数信息JSON', "
+                        + "purchase_type VARCHAR(16) DEFAULT 'purchase' COMMENT 'purchase/lease', "
+                        + "qty INT NOT NULL DEFAULT 1 COMMENT '数量', "
+                        + "price DECIMAL(14,2) DEFAULT 0 COMMENT '参考单价', "
+                        + "confirmed_price DECIMAL(14,2) DEFAULT NULL COMMENT '成交单价', "
+                        + "received_qty INT NOT NULL DEFAULT 0 COMMENT '已验收数量', "
+                        + "sort_order INT DEFAULT 0, "
+                        + "KEY idx_order_id (order_id), "
+                        + "KEY idx_group_id (group_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购订单明细'");
+
+        // 4. 验收入库批次 (含 141 brand)
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_inbound_batch ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "batch_no VARCHAR(32) NOT NULL COMMENT '批次编号', "
+                        + "po_id BIGINT NOT NULL COMMENT '关联采购订单ID', "
+                        + "po_no VARCHAR(32) NOT NULL COMMENT '采购订单号', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
+                        + "inbound_date VARCHAR(32) NOT NULL COMMENT '验收日期', "
+                        + "operator VARCHAR(64) NOT NULL DEFAULT '' COMMENT '操作人', "
+                        + "total_qty INT NOT NULL DEFAULT 0 COMMENT '入库总数', "
+                        + "accepted_qty INT NOT NULL DEFAULT 0 COMMENT '已验收数量', "
+                        + "pending_qty INT NOT NULL DEFAULT 0 COMMENT '未验收数量', "
+                        + "return_qty INT DEFAULT 0 COMMENT '退货数量', "
+                        + "exchange_qty INT DEFAULT 0 COMMENT '换货数量', "
+                        + "concession_qty INT DEFAULT 0 COMMENT '让步接收数量', "
+                        + "purchase_reason VARCHAR(500) DEFAULT '' COMMENT '采购事由', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_batch_no (batch_no), "
+                        + "KEY idx_po_id (po_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='验收入库批次'");
+
+        // 5. 验收入库批次明细 (含 121 disposition/reject_reason + 126 photos + 141 accessories)
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_inbound_batch_item ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "batch_id BIGINT NOT NULL COMMENT '所属批次ID', "
+                        + "model_id BIGINT NOT NULL COMMENT '资产型号ID', "
+                        + "model_name VARCHAR(200) DEFAULT '' COMMENT '资产名称', "
+                        + "qty INT NOT NULL DEFAULT 1 COMMENT '验收数量', "
+                        + "location_id BIGINT DEFAULT NULL COMMENT '存放位置ID', "
+                        + "asset_nos JSON DEFAULT NULL COMMENT '生成的资产编号列表JSON', "
+                        + "disposition VARCHAR(16) DEFAULT NULL COMMENT '验收处置方式', "
+                        + "reject_reason VARCHAR(500) DEFAULT NULL COMMENT '验收不通过原因', "
+                        + "photos JSON DEFAULT NULL COMMENT '验收照片JSON数组', "
+                        + "accessories JSON DEFAULT NULL COMMENT '配件清单JSON数组', "
+                        + "sort_order INT DEFAULT 0, "
+                        + "KEY idx_batch_id (batch_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='验收入库批次明细'");
+
+        // 6. 资产台账 (含 141 images)
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_asset ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "asset_no VARCHAR(64) NOT NULL COMMENT '资产编号', "
+                        + "asset_name VARCHAR(200) NOT NULL DEFAULT '' COMMENT '资产名称', "
+                        + "asset_type VARCHAR(100) DEFAULT '' COMMENT '资产分类名称', "
+                        + "category_id BIGINT DEFAULT NULL COMMENT '分类ID', "
+                        + "category_code VARCHAR(64) DEFAULT '' COMMENT '分类编码', "
+                        + "brand VARCHAR(100) DEFAULT '' COMMENT '品牌', "
+                        + "brand_id BIGINT DEFAULT NULL COMMENT '品牌ID', "
+                        + "model_id BIGINT DEFAULT NULL COMMENT '型号ID', "
+                        + "params JSON DEFAULT NULL COMMENT '参数信息JSON', "
+                        + "images LONGTEXT DEFAULT NULL COMMENT '资产照片', "
+                        + "unit VARCHAR(32) DEFAULT '' COMMENT '单位', "
+                        + "purchase_value DECIMAL(14,2) DEFAULT 0 COMMENT '购买价值', "
+                        + "purchase_date VARCHAR(32) DEFAULT '' COMMENT '购买日期', "
+                        + "purchase_type VARCHAR(16) DEFAULT 'purchase' COMMENT 'purchase/lease', "
+                        + "source VARCHAR(16) DEFAULT '' COMMENT '来源', "
+                        + "company VARCHAR(100) DEFAULT '' COMMENT '所属公司', "
+                        + "location VARCHAR(200) DEFAULT '' COMMENT '存放地点名称', "
+                        + "location_id BIGINT DEFAULT NULL COMMENT '存放位置ID', "
+                        + "department VARCHAR(100) DEFAULT '' COMMENT '归属部门', "
+                        + "user_name VARCHAR(64) DEFAULT '' COMMENT '使用人', "
+                        + "status VARCHAR(16) DEFAULT 'idle' COMMENT 'idle/in_use/in_repair/scrapped', "
+                        + "hold_type VARCHAR(16) DEFAULT '' COMMENT 'owned/borrowed', "
+                        + "order_id BIGINT DEFAULT NULL COMMENT '关联采购订单ID', "
+                        + "batch_id BIGINT DEFAULT NULL COMMENT '关联入库批次ID', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_asset_no (asset_no), "
+                        + "KEY idx_category_code (category_code), "
+                        + "KEY idx_model_id (model_id), "
+                        + "KEY idx_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产台账'");
+
+        // 7. 分类配件配置 (含 143 status)
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_category_accessory ("
+                        + "id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID', "
+                        + "category_code VARCHAR(32) NOT NULL COMMENT '所属分类编码', "
+                        + "name VARCHAR(64) NOT NULL COMMENT '配件名称', "
+                        + "default_qty INT NOT NULL DEFAULT 1 COMMENT '默认数量', "
+                        + "sort INT NOT NULL DEFAULT 0 COMMENT '排序', "
+                        + "status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1=启用,0=停用', "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                        + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人', "
+                        + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间', "
+                        + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                        + "PRIMARY KEY (id), "
+                        + "KEY idx_eca_category_code (category_code)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM分类配件配置表'");
+
+        log.info("EAM 采购/入库/资产台账/配件配置表就绪");
     }
 
     /** EAM 验收入库批次明细增加照片字段 (126 脚本等效) */
