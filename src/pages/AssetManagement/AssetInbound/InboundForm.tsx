@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message, Upload, AutoComplete,
+  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message, Upload, AutoComplete, Alert,
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
 import {
@@ -20,7 +20,7 @@ import BrandTag from '../../../components/BrandTag'
 import {
   fetchPurchaseOrderDetail, fetchLocationList, createInboundBatch,
   saveInboundDraft, loadInboundDraft, deleteInboundDraft,
-  uploadInboundPhoto, fetchCategoryAccessories,
+  uploadInboundPhoto, fetchCategoryAccessories, fetchInboundList,
   type PurchaseOrder, type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetLocation,
 } from '../../../api/eam'
@@ -87,6 +87,20 @@ const REJECT_OPTIONS: { value: RejectStatus; label: string; desc: string }[] = [
 const REJECT_LABEL: Record<RejectStatus, string> = { return: '退貨', exchange: '換貨', concession: '讓步接收' }
 const REJECT_COLOR: Record<RejectStatus, string> = { return: 'error', exchange: 'warning', concession: 'processing' }
 
+/**
+ * 歷史已完全處理（累計已驗收 + 累計退貨 ≥ 採購數量，無剩餘可驗）。
+ * 此類行不參與本次驗收操作：不提供通過/不通過按鈕、輸入禁用。
+ */
+function isFullyAccepted(it: { qty: number; receivedQty?: number; histReturnQty?: number }): boolean {
+  return (it.receivedQty || 0) + (it.histReturnQty || 0) >= it.qty
+}
+
+/** 歷史已全退貨（剩餘待驗部分全部被退貨，終態）：僅展示退貨標記，不可再驗收 */
+function isFullyReturned(it: { qty: number; receivedQty?: number; histReturnQty?: number }): boolean {
+  const remaining = it.qty - (it.receivedQty || 0)
+  return (it.histReturnQty || 0) > 0 && (it.histReturnQty || 0) >= remaining
+}
+
 /* ==================== 驗收狀態 ==================== */
 
 interface InboundItem extends PurchaseOrderItem {
@@ -106,6 +120,10 @@ interface InboundItem extends PurchaseOrderItem {
   photos: { name: string; dataUrl: string }[]
   /** 配件清單 [{name, qty}]（隨驗收記錄保存） */
   accessories: { name: string; qty: number }[]
+  /** 歷史累計退貨件數（從入庫批次反查，終態不計入待驗收） */
+  histReturnQty?: number
+  /** 歷史累計換貨件數（從入庫批次反查，等待供應商二次發貨） */
+  histExchangeQty?: number
 }
 
 interface InboundGroup extends PurchaseOrderSupplierGroup {
@@ -116,10 +134,12 @@ interface InboundGroup extends PurchaseOrderSupplierGroup {
 
 interface Props {
   poId?: number
+  /** 供應商分組 ID：傳入時僅驗收該供應商的物資（與列表按供應商一行展示對應，獨立驗收） */
+  groupId?: string
   onBack: () => void
 }
 
-export default function InboundForm({ poId, onBack }: Props) {
+export default function InboundForm({ poId, groupId, onBack }: Props) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -142,6 +162,10 @@ export default function InboundForm({ poId, onBack }: Props) {
   const [passAccessories, setPassAccessories] = useState<{ name: string; qty: number }[]>([])
   /** 分類配件配置（资产品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
   const [categoryAccessories, setCategoryAccessories] = useState<Map<string, { name: string; defaultQty: number }[]>>(new Map())
+
+  // 配件選擇彈窗（快速選擇配件：勾選後批量添加）
+  const [accessorySelectOpen, setAccessorySelectOpen] = useState(false)
+  const [selectedAccessoryNames, setSelectedAccessoryNames] = useState<Set<string>>(new Set())
 
   // 照片預覽
   const [previewVisible, setPreviewVisible] = useState(false)
@@ -166,6 +190,23 @@ export default function InboundForm({ poId, onBack }: Props) {
       setLocations(locList)
       const defaultLoc = locList[0]?.id
 
+      // 歷史驗收處置反查：從入庫批次按明細匯總退貨/換貨件數（用於行級標記）
+      const histMap = new Map<number, { ret: number; exc: number }>()
+      try {
+        const batchRes = await fetchInboundList({ page: 1, size: 200 })
+        ;(batchRes.records || [])
+          .filter((b) => b.poId === orderData.id)
+          .forEach((b) => {
+            (b.items || []).forEach((bi) => {
+              if (bi.orderItemId == null) return
+              const cur = histMap.get(bi.orderItemId) || { ret: 0, exc: 0 }
+              if (bi.disposition === 'return') cur.ret += bi.qty || 0
+              else if (bi.disposition === 'exchange') cur.exc += bi.qty || 0
+              histMap.set(bi.orderItemId, cur)
+            })
+          })
+      } catch { /* 歷史處置查詢失敗不阻斷主流程 */ }
+
       // 初始化供應商分組（含驗收字段）
       const srcGroups: PurchaseOrderSupplierGroup[] = orderData.supplierGroups?.length
         ? orderData.supplierGroups
@@ -178,11 +219,13 @@ export default function InboundForm({ poId, onBack }: Props) {
             items: orderData.items.map((it) => ({ ...it })),
           }]
 
-      const inboundGroups: InboundGroup[] = srcGroups.map((g) => ({
+      const inboundGroupsAll: InboundGroup[] = srcGroups.map((g) => ({
         ...g,
         inboundDate: dayjs(),
         items: g.items.map((it, idx) => {
-          const remaining = Math.max(0, it.qty - it.receivedQty)
+          // 剩餘可驗 = 總數 - 已驗收 - 歷史退貨（終態）；與後端校驗口徑一致，避免 InputNumber 初值超限
+          const remaining = Math.max(0, it.qty - (it.receivedQty || 0) - (it.returnedQty || 0))
+          const hist = it.id != null ? histMap.get(it.id) : undefined
           return {
             ...it,
             key: it.key || `${g.id}_${idx}_${it.modelId || 'x'}`,
@@ -194,23 +237,29 @@ export default function InboundForm({ poId, onBack }: Props) {
             rejectReason: '',
             photos: [],
             accessories: [],
+            histReturnQty: it.returnedQty ?? hist?.ret ?? 0,
+            histExchangeQty: it.exchangedQty ?? hist?.exc ?? 0,
           }
         }),
       }))
+      // 按供應商獨立驗收：指定分組時僅載入該供應商的物資明細（與列表按供應商一行展示口徑一致）
+      const inboundGroups = groupId && inboundGroupsAll.some((g) => g.id === groupId)
+        ? inboundGroupsAll.filter((g) => g.id === groupId)
+        : inboundGroupsAll
       setGroups(inboundGroups)
 
-      // 嘗試恢復草稿
-      const draft = await loadInboundDraft(poId)
+      // 嘗試恢復草稿（分組級草稿優先）
+      const draft = await loadInboundDraft(poId, groupId)
       if (draft && draft.items.length > 0) {
         const restored = inboundGroups.map((g) => ({
           ...g,
           inboundDate: draft.inboundDate ? dayjs(draft.inboundDate) : g.inboundDate,
           items: g.items.map((it) => {
-            const di = draft.items.find((d) => d.modelId === it.modelId)
+            const di = draft.items.find((d) => d.orderItemId != null && d.orderItemId === it.id)
             if (!di) return it
             return {
               ...it,
-              inboundQty: di.qty,
+              inboundQty: Math.min(di.qty, Math.max(0, it.qty - it.receivedQty)),
               locationId: di.locationId || it.locationId,
               confirmed: di.status === 'pass',
               rejectStatus: di.status !== 'pass' ? di.status : undefined,
@@ -235,7 +284,7 @@ export default function InboundForm({ poId, onBack }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [poId, t])
+  }, [poId, groupId, t])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -323,21 +372,23 @@ export default function InboundForm({ poId, onBack }: Props) {
     return (categoryAccessories.get(code) || []).map((a) => ({ value: a.name }))
   }, [passItem, categoryAccessories])
 
-  /** 一鍵帶入該分類配置的配件（跳過已存在的名稱，數量取默認配置） */
-  const handleImportAccessories = () => {
+  /** 打開配件選擇彈窗（預勾選已存在的配件） */
+  const handleOpenAccessorySelect = () => {
+    const existing = new Set(passAccessories.map((a) => a.name))
+    setSelectedAccessoryNames(existing)
+    setAccessorySelectOpen(true)
+  }
+
+  /** 確認配件選擇：僅將勾選的配件添加到清單（跳過已存在的名稱，數量取默認配置） */
+  const handleAccessorySelectConfirm = () => {
     const code = passItem?.categoryCode
     const list = code ? categoryAccessories.get(code) || [] : []
-    if (list.length === 0) {
-      message.info('該分類尚未配置配件，可在资产品牌產品庫按分類維護')
-      return
-    }
     const existing = new Set(passAccessories.map((a) => a.name))
-    const additions = list.filter((a) => !existing.has(a.name)).map((a) => ({ name: a.name, qty: a.defaultQty || 1 }))
-    if (additions.length === 0) {
-      message.info('分類配件已全部帶入')
-      return
-    }
+    const additions = list
+      .filter((a) => selectedAccessoryNames.has(a.name) && !existing.has(a.name))
+      .map((a) => ({ name: a.name, qty: a.defaultQty || 1 }))
     setPassAccessories((prev) => [...prev, ...additions])
+    setAccessorySelectOpen(false)
   }
 
   /** 確認通過：寫入配件清單並標記驗收通過（照片至少 1 張，作為到貨憑證） */
@@ -361,7 +412,7 @@ export default function InboundForm({ poId, onBack }: Props) {
   const toggleGroupAll = (groupId: string, checked: boolean) => {
     setGroups((prev) => prev.map((g) => {
       if (g.id !== groupId) return g
-      return { ...g, items: g.items.map((it) => ((it.confirmed || it.rejectStatus) ? it : { ...it, selected: checked })) }
+      return { ...g, items: g.items.map((it) => ((it.confirmed || it.rejectStatus || isFullyAccepted(it)) ? it : { ...it, selected: checked })) }
     }))
   }
 
@@ -397,7 +448,7 @@ export default function InboundForm({ poId, onBack }: Props) {
         const items = g?.items || []
         const allSelected = items.length > 0 && items.every((it) => it.selected)
         const someSelected = items.some((it) => it.selected)
-        const allLocked = items.length > 0 && items.every((it) => it.confirmed || it.rejectStatus)
+        const allLocked = items.length > 0 && items.every((it) => it.confirmed || it.rejectStatus || isFullyAccepted(it))
         return (
           <Checkbox
             checked={allSelected}
@@ -411,7 +462,7 @@ export default function InboundForm({ poId, onBack }: Props) {
       render: (_: unknown, r: InboundItem) => (
         <Checkbox
           checked={r.selected}
-          disabled={r.confirmed || !!r.rejectStatus}
+          disabled={r.confirmed || !!r.rejectStatus || isFullyAccepted(r)}
           onChange={(e) => updateGroupItem(groupId, r.key!, { selected: e.target.checked })}
         />
       ),
@@ -438,8 +489,15 @@ export default function InboundForm({ poId, onBack }: Props) {
       },
     },
     {
-      title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 70, align: 'right',
-      render: (v: number) => <Tag color={v > 0 ? 'success' : 'default'}>{v}</Tag>,
+      title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 90, align: 'right',
+      render: (v: number, r: InboundItem) => (
+        <Space size={2} style={{ justifyContent: 'flex-end' }}>
+          <Tag color={v > 0 ? 'success' : 'default'} style={{ margin: 0 }}>{v}</Tag>
+          {isFullyAccepted(r) && (
+            <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>完成</Tag>
+          )}
+        </Space>
+      ),
     },
     {
       title: '本次驗收', key: 'inboundQty', width: 110,
@@ -449,9 +507,9 @@ export default function InboundForm({ poId, onBack }: Props) {
           onChange={(v) => updateGroupItem(groupId, r.key!, { inboundQty: v ?? 0 })}
           style={{ width: '100%' }}
           min={0}
-          max={Math.max(0, r.qty - r.receivedQty)}
+          max={Math.max(0, r.qty - r.receivedQty - (r.histReturnQty || 0))}
           size="small"
-          disabled={!r.selected || r.confirmed || !!r.rejectStatus}
+          disabled={!r.selected || r.confirmed || !!r.rejectStatus || isFullyAccepted(r)}
         />
       ),
     },
@@ -466,14 +524,14 @@ export default function InboundForm({ poId, onBack }: Props) {
           treeData={locationTree}
           treeDefaultExpandAll
           placeholder="請選擇存放位置"
-          disabled={!r.selected || r.confirmed || !!r.rejectStatus}
+          disabled={!r.selected || r.confirmed || !!r.rejectStatus || isFullyAccepted(r)}
         />
       ),
     },
     {
       title: '操作', key: 'action', width: 120, align: 'center',
       render: (_: unknown, r: InboundItem) => {
-        const maxQty = Math.max(0, r.qty - r.receivedQty)
+        const maxQty = Math.max(0, r.qty - r.receivedQty - (r.histReturnQty || 0))
         // 已不通過 → 顯示處置標籤 + 撤銷
         if (r.rejectStatus) {
           return (
@@ -510,10 +568,24 @@ export default function InboundForm({ poId, onBack }: Props) {
             </div>
           )
         }
-        // 未處理 → 驗收確認（彈窗內拍照 + 配件清單）/ 驗收不通過
+        // 歷史已全退貨（終態）→ 僅顯示「退貨」標記，不提供操作按鈕
+        if (isFullyReturned(r)) {
+          return <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨</Tag>
+        }
+        // 歷史已完全驗收（無剩餘可驗）→ 僅顯示「已驗收」標記，不提供操作按鈕
+        if (maxQty <= 0) {
+          return <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收</Tag>
+        }
+        // 未處理 → 驗收確認（彈窗內拍照 + 配件清單）/ 驗收不通過；歷史換貨/部分退貨以標籤前置提示
         return (
           <div>
-            <Space size={4}>
+            <Space size={4} wrap>
+              {(r.histExchangeQty || 0) > 0 && (
+                <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>換貨{r.histExchangeQty}</Tag>
+              )}
+              {(r.histReturnQty || 0) > 0 && (
+                <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨{r.histReturnQty}</Tag>
+              )}
               <Button
                 type="link" size="small"
                 disabled={!r.selected || r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
@@ -540,6 +612,9 @@ export default function InboundForm({ poId, onBack }: Props) {
   /* ----- 提交 / 保存 ----- */
   const [saving, setSaving] = useState(false)
 
+  /** 當前驗收範圍的供應商名稱（按分組進入時展示，訂單級進入為空） */
+  const scopeSupplier = groupId ? groups[0]?.supplier || '' : ''
+
   /** 保存草稿（不跳轉，保留當前狀態） */
   const handleSave = async () => {
     if (!order) return
@@ -549,7 +624,9 @@ export default function InboundForm({ poId, onBack }: Props) {
         g.items
           .filter((it) => it.confirmed || it.rejectStatus)
           .map((it) => ({
+            orderItemId: it.id,
             modelId: it.modelId!,
+            inboundDate: g.inboundDate.format('YYYY-MM-DD'),
             qty: it.inboundQty,
             locationId: it.locationId || 0,
             status: (it.confirmed ? 'pass' : it.rejectStatus) as 'pass' | 'return' | 'exchange' | 'concession',
@@ -559,10 +636,11 @@ export default function InboundForm({ poId, onBack }: Props) {
       )
       await saveInboundDraft({
         poId: order.id,
+        groupId,
         inboundDate: groups[0]?.inboundDate.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         operator: selectedEmp?.name || order.purchaser || '',
         items: draftItems,
-        remark: `採購訂單 ${order.poNo} 驗收草稿`,
+        remark: `採購訂單 ${order.poNo} 驗收草稿${scopeSupplier ? `（供應商：${scopeSupplier}）` : ''}`,
       })
       message.success('草稿保存成功')
     } catch (e: unknown) {
@@ -580,7 +658,9 @@ export default function InboundForm({ poId, onBack }: Props) {
       g.items
         .filter((it) => it.selected && it.confirmed && it.inboundQty > 0 && it.locationId)
         .map((it) => ({
-          modelId: it.modelId!,
+          orderItemId: it.id!,
+          modelId: it.modelId,
+          inboundDate: g.inboundDate.format('YYYY-MM-DD'),
           qty: it.inboundQty,
           locationId: it.locationId!,
           disposition: 'pass' as const,
@@ -593,7 +673,9 @@ export default function InboundForm({ poId, onBack }: Props) {
       g.items
         .filter((it) => it.selected && it.rejectStatus)
         .map((it) => ({
-          modelId: it.modelId!,
+          orderItemId: it.id!,
+          modelId: it.modelId,
+          inboundDate: g.inboundDate.format('YYYY-MM-DD'),
           qty: it.inboundQty,
           locationId: 0,
           disposition: it.rejectStatus!,
@@ -603,28 +685,48 @@ export default function InboundForm({ poId, onBack }: Props) {
         }))
     )
     const allItems = [...passItems, ...rejectItems]
+    if (allItems.some((it) => !it.orderItemId || it.qty <= 0)) {
+      message.warning('驗收明細或數量無效，請重新載入採購訂單')
+      return
+    }
     if (!allItems.length) {
       message.warning('請至少驗收一條明細')
       return
     }
-    setSubmitting(true)
-    try {
+    Modal.confirm({
+      title: '確認提交驗收入庫？',
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>採購訂單：</span><b>{order.poNo}</b></div>
+          {scopeSupplier && <div className="confirm-info-row"><span>供應商：</span><b>{scopeSupplier}</b></div>}
+          <div className="confirm-info-row"><span>驗收數量：</span><b>{allItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
+          <div className="confirm-info-row"><span>生成資產：</span><b>{passItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
+        </div>
+      ),
+      okText: '確認提交', cancelText: '取消',
+      onOk: async () => {
+        setSubmitting(true)
+        try {
       const batch = await createInboundBatch({
         poId: order.id,
         inboundDate: groups[0]?.inboundDate.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         operator: selectedEmp?.name || order.purchaser || '',
         items: allItems,
-        remark: `採購訂單 ${order.poNo} 驗收入庫`,
+        remark: `採購訂單 ${order.poNo} 驗收入庫${scopeSupplier ? `（供應商：${scopeSupplier}）` : ''}`,
       })
-      // 驗收成功後清除草稿
-      await deleteInboundDraft(order.id)
-      message.success(t('asset.inboundSuccess', { count: batch.totalQty }))
+      // 驗收成功後清除草稿（僅清當前驗收範圍，不影響其他供應商草稿）
+      await deleteInboundDraft(order.id, groupId)
+      message.success(t('asset.inboundSuccess', { count: batch.generatedAssetCount }))
       onBack()
     } catch (e: unknown) {
       if (e instanceof Error && e.message) message.error(e.message)
-    } finally {
-      setSubmitting(false)
-    }
+        } finally {
+          setSubmitting(false)
+        }
+      },
+    })
   }
 
   if (loading || !order) {
@@ -655,6 +757,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>驗收入庫</h2>
           <Tag color="orange" style={{ marginLeft: 4 }}>{order.poNo}</Tag>
+          {scopeSupplier && <Tag color="purple">供應商：{scopeSupplier}</Tag>}
         </div>
       </div>
 
@@ -698,6 +801,29 @@ export default function InboundForm({ poId, onBack }: Props) {
         </Row>
 
       </div>
+
+      {/* ====== 歷史驗收異常提示（訂單級：退貨/換貨/讓步接收） ====== */}
+      {(order.returnQty || order.exchangeQty || order.concessionQty) ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="本訂單歷史驗收存在異常處置，請留意對應明細"
+          description={(
+            <Space size={16} wrap>
+              {(order.returnQty || 0) > 0 && (
+                <span>退貨 <b style={{ color: '#FF4D4F' }}>{order.returnQty}</b> 件（終態，供應商不補貨）</span>
+              )}
+              {(order.exchangeQty || 0) > 0 && (
+                <span>換貨 <b style={{ color: '#FA8C16' }}>{order.exchangeQty}</b> 件（等待供應商二次發貨，到貨後重新驗收）</span>
+              )}
+              {(order.concessionQty || 0) > 0 && (
+                <span>讓步接收 <b style={{ color: '#1890FF' }}>{order.concessionQty}</b> 件</span>
+              )}
+            </Space>
+          )}
+        />
+      ) : null}
 
       {/* ====== 採購物資分組 ====== */}
       {groups.map((group, gi) => {
@@ -767,6 +893,9 @@ export default function InboundForm({ poId, onBack }: Props) {
               scroll={{ x: 1200 }}
               rowClassName={(r) => {
                 if (r.rejectStatus) return 'inbound-rejected-row'
+                if ((r.histReturnQty || 0) > 0 && !r.confirmed) return 'inbound-returned-row'
+                if ((r.histExchangeQty || 0) > 0 && !r.confirmed) return 'inbound-exchanged-row'
+                if (isFullyAccepted(r) && !r.confirmed) return 'inbound-accepted-row'
                 if (!r.selected && !r.confirmed) return 'inbound-unselected-row'
                 return ''
               }}
@@ -940,12 +1069,12 @@ export default function InboundForm({ poId, onBack }: Props) {
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button type="dashed" icon={<PlusOutlined />} style={{ flex: 1 }}
                   onClick={() => setPassAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
-                  添加配件
+                  手动输入配件
                 </Button>
                 {passAccessoryOptions.length > 0 && (
                   <Button type="dashed" icon={<AppstoreOutlined />} style={{ flex: 1 }}
-                    onClick={handleImportAccessories}>
-                    帶入分類配件（{passAccessoryOptions.length}）
+                    onClick={handleOpenAccessorySelect}>
+                    快速选择配件（{passAccessoryOptions.length}）
                   </Button>
                 )}
               </div>
@@ -1035,6 +1164,64 @@ export default function InboundForm({ poId, onBack }: Props) {
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* ====== 配件選擇彈窗（快速選擇配件） ====== */}
+      <Modal
+        title="快速選擇配件"
+        open={accessorySelectOpen}
+        onOk={handleAccessorySelectConfirm}
+        onCancel={() => setAccessorySelectOpen(false)}
+        okText="確認添加"
+        cancelText="取消"
+        width={480}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+          請勾選需要添加的配件（已存在于清單中的配件會自動跳過）
+        </div>
+        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+          {(() => {
+            const code = passItem?.categoryCode
+            const list = code ? categoryAccessories.get(code) || [] : []
+            if (list.length === 0) {
+              return <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>該分類尚未配置配件</div>
+            }
+            return list.map((acc) => {
+              const checked = selectedAccessoryNames.has(acc.name)
+              const alreadyAdded = passAccessories.some((a) => a.name === acc.name)
+              return (
+                <div key={acc.name} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 4px', borderBottom: '1px solid #f5f5f5',
+                }}>
+                  <Checkbox
+                    checked={checked}
+                    onChange={(e) => {
+                      setSelectedAccessoryNames((prev) => {
+                        const next = new Set(prev)
+                        if (e.target.checked) next.add(acc.name)
+                        else next.delete(acc.name)
+                        return next
+                      })
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: '#262626' }}>{acc.name}</span>
+                    {alreadyAdded && (
+                      <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>已添加</Tag>
+                    )}
+                  </Checkbox>
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>默認 {acc.defaultQty || 1} 件</span>
+                </div>
+              )
+            })
+          })()}
+        </div>
+        {selectedAccessoryNames.size > 0 && (
+          <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', textAlign: 'right' }}>
+            已選擇 <b style={{ color: '#E8720C' }}>{selectedAccessoryNames.size}</b> 項
+          </div>
+        )}
       </Modal>
 
       {/* ====== 照片預覽 ====== */}

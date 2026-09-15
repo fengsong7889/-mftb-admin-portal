@@ -30,8 +30,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
-  createAsset, updateAsset, fetchAssetDetail,
-  type AssetItem, type AssetSource,
+  createAsset, updateAsset, fetchAssetDetail, parseAssetImages,
+  type AssetItem, type AssetSaveData,
 } from '../../../api/asset'
 import {
   fetchCategoryList, fetchBrandList, fetchModelList, fetchLocationList,
@@ -44,6 +44,16 @@ import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 const { TextArea } = Input
 
 const COMPANY_OPTIONS = ['澳觅科技', '闪蜂', 'mFood']
+
+type AssetFormValues = Omit<AssetSaveData, 'purchaseDate' | 'usageDate' | 'rentalPeriod'> & {
+  purchaseDate?: Dayjs
+  usageDate?: Dayjs
+  rentalPeriod?: [Dayjs, Dayjs]
+  inboundBatchNo?: string
+  inboundDate?: Dayjs
+  inboundQty?: number
+  inspector?: string
+}
 
 /* ==================== 树形部门数据构建 ==================== */
 function buildDeptTree(depts: DepartmentItem[]): { title: string; value: string; children?: { title: string; value: string }[] }[] {
@@ -97,7 +107,9 @@ export default function AssetAdd() {
   const editingId = searchParams.get('id') ? Number(searchParams.get('id')) : null
   const isEdit = editingId !== null
 
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<AssetFormValues>()
+  const [editingAsset, setEditingAsset] = useState<AssetItem | null>(null)
+  const [selectedModelId, setSelectedModelId] = useState<number | undefined>()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -170,10 +182,19 @@ export default function AssetAdd() {
     setLoading(true)
     fetchAssetDetail(editingId)
       .then((data: AssetItem) => {
+        setEditingAsset(data)
+        setSelectedCategoryCode(data.categoryCode || '')
+        setSelectedBrandId(data.brandId || undefined)
+        setSelectedModelId(data.modelId || undefined)
+        setSelectedLocationId(data.locationId || undefined)
+        setParamValues(data.params || {})
+        setParamFields(Object.keys(data.params || {}).map((key) => ({ key, label: key, type: 'text' })))
+        fetchBrandList().then(setBrands).catch(() => setBrands([]))
+        if (data.brandId) fetchModelList({ brandId: data.brandId, size: 1000 }).then((res) => setModels(res.records)).catch(() => setModels([]))
         form.setFieldsValue({
           assetNo: data.assetNo,
           assetName: data.assetName,
-          assetType: data.assetType,
+          assetType: data.categoryCode || data.assetType,
           brand: data.brand,
           purchaseValue: data.purchaseValue,
           purchaseDate: data.purchaseDate ? dayjs(data.purchaseDate) : undefined,
@@ -184,19 +205,20 @@ export default function AssetAdd() {
           userName: data.userName,
           remark: data.remark || undefined,
           // 租用专属字段（如有）
-          rentalCost: (data as any).rentalCost || undefined,
-          rentalPeriod: (data as any).rentalPeriod && (data as any).rentalPeriod[0]
-            ? [dayjs((data as any).rentalPeriod[0]), dayjs((data as any).rentalPeriod[1])]
+          rentalCost: data.rentalCost ?? undefined,
+          leaseCompany: data.leaseCompany || '',
+          rentalPeriod: data.rentalPeriod?.length === 2
+            ? [dayjs(data.rentalPeriod[0]), dayjs(data.rentalPeriod[1])]
             : undefined,
           // 入库信息（如有）
-          inboundBatchNo: (data as any).inboundBatchNo || undefined,
-          inboundDate: (data as any).inboundDate ? dayjs((data as any).inboundDate) : undefined,
-          inboundQty: (data as any).inboundQty || undefined,
-          inspector: (data as any).inspector || undefined,
+          inboundBatchNo: data.inboundBatchNo || undefined,
+          inboundDate: data.inboundDate ? dayjs(data.inboundDate) : undefined,
+          inboundQty: data.inboundQty || undefined,
+          inspector: data.inspector || undefined,
         })
         // 回填图片
         if (data.images) {
-          setImageFiles(data.images.split(',').filter(Boolean).map((url, i) => ({
+          setImageFiles(parseAssetImages(data.images).map((url, i) => ({
             uid: String(i), name: `image-${i}`, url,
           })))
         }
@@ -221,6 +243,7 @@ export default function AssetAdd() {
   /* ----- 分类变更 → 加载资产品牌 ----- */
   const handleCategoryChange = useCallback((code: string) => {
     setSelectedCategoryCode(code)
+    setSelectedModelId(undefined)
     setSelectedBrandId(undefined)
     setParamFields([])
     setParamValues({})
@@ -237,6 +260,7 @@ export default function AssetAdd() {
   /* ----- 资产品牌变更 → 加载型号 ----- */
   const handleBrandChange = useCallback((brandId: number | undefined) => {
     setSelectedBrandId(brandId)
+    setSelectedModelId(undefined)
     form.setFieldValue('assetName', undefined)
     if (!brandId || !selectedCategoryCode) { setModels([]); return }
     // 型号前缀匹配：选择一级分类时加载其下所有子分类的型号
@@ -247,6 +271,7 @@ export default function AssetAdd() {
 
   /* ----- 型号变更 → 预填名称 + 加载参数模板 ----- */
   const handleModelChange = useCallback((modelId: number | undefined) => {
+    setSelectedModelId(modelId)
     const model = models.find((m) => m.id === modelId)
     if (model) {
       form.setFieldsValue({ assetName: model.name })
@@ -325,41 +350,43 @@ export default function AssetAdd() {
       const locationParts = loc ? [loc.province, loc.city, loc.district, loc.address].filter(Boolean).join(' ') || loc.name : ''
 
       setSubmitting(true)
-      const payload = {
+      const category = categories.find((c) => c.code === selectedCategoryCode)
+      const payload: AssetSaveData = {
         assetNo: v.assetNo.trim(),
         assetName: v.assetName || '',
-        assetType: v.assetType || '',
+        assetType: category?.name || editingAsset?.assetType || v.assetType || '',
+        categoryCode: selectedCategoryCode || undefined,
+        categoryId: category?.id,
+        brandId: selectedBrandId,
+        modelId: selectedModelId,
+        unit: models.find((m) => m.id === selectedModelId)?.unit || editingAsset?.unit || '',
+        quantity: 1,
         brand: v.brand || '',
         purchaseValue: v.purchaseValue || 0,
-        purchaseDate: v.purchaseDate ? v.purchaseDate.format('YYYY-MM-DD') : null,
-        usageDate: v.usageDate ? v.usageDate.format('YYYY-MM-DD') : null,
-        source: v.source || 'self' as AssetSource,
+        purchaseDate: v.purchaseDate ? v.purchaseDate.format('YYYY-MM-DD') : '',
+        usageDate: v.usageDate ? v.usageDate.format('YYYY-MM-DD') : '',
+        source: v.source || 'self',
         company: v.company || '',
         // 租用专属字段
-        rentalCost: v.rentalCost || null,
+        rentalCost: v.rentalCost ?? 0,
+        leaseCompany: v.leaseCompany || '',
         rentalPeriod: v.rentalPeriod
           ? [v.rentalPeriod[0]?.format('YYYY-MM-DD'), v.rentalPeriod[1]?.format('YYYY-MM-DD')]
-          : null,
-        location: locationParts,
+          : [],
+        locationId: selectedLocationId,
+        location: locationParts || editingAsset?.location || '',
         department: v.department || '',
         userName: v.userName || '',
-        status: 'idle' as const,
-        images: imageFiles.filter((f) => f.url).map((f) => f.url).join(',') || null,
-        remark: v.remark || null,
-        applicant: '当前用户',
-        scrapTime: null,
-        params: Object.keys(paramValues).length ? paramValues : undefined,
-        // 入库信息
-        inboundBatchNo: v.inboundBatchNo || '',
-        inboundDate: v.inboundDate ? v.inboundDate.format('YYYY-MM-DD') : null,
-        inboundQty: v.inboundQty || 1,
-        inspector: v.inspector || '',
+        status: editingAsset?.status || 'idle',
+        images: JSON.stringify(imageFiles.filter((f) => f.url).map((f) => f.url)),
+        remark: v.remark || '',
+        params: paramValues,
       }
       if (isEdit && editingId) {
-        await updateAsset(editingId, payload as any)
+        await updateAsset(editingId, payload)
         message.success('更新成功')
       } else {
-        await createAsset(payload as any)
+        await createAsset(payload)
         message.success('新增成功')
       }
       navigate('/asset-list')
@@ -489,7 +516,7 @@ export default function AssetAdd() {
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label="资产编码" name="assetNo" rules={[{ required: true, message: '请输入资产编码' }]}>
-                  <Input placeholder="如 ZC-2024-0001" allowClear style={{ fontFamily: 'monospace' }} />
+                  <Input placeholder="如 ZC-2024-0001" allowClear disabled={!!editingAsset?.batchId} style={{ fontFamily: 'monospace' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
@@ -710,22 +737,22 @@ export default function AssetAdd() {
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item label="入库批次号" name="inboundBatchNo">
-                  <Input placeholder="如 RK-2024-0001" allowClear disabled={isEdit || !!searchParams.get('inboundBatchNo')} />
+                  <Input placeholder="由驗收入庫自動生成" disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
                 <Form.Item label="入库时间" name="inboundDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="请选择入库时间" />
+                  <DatePicker style={{ width: '100%' }} placeholder="由驗收入庫自動生成" disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
                 <Form.Item label="入库数量" name="inboundQty" initialValue={1}>
-                  <InputNumber min={1} max={100} step={1} placeholder="请输入数量" style={{ width: '100%' }} />
+                  <InputNumber min={1} max={1} style={{ width: '100%' }} disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
                 <Form.Item label="验收人" name="inspector">
-                  <Input placeholder="请输入验收人" allowClear />
+                  <Input placeholder="由驗收入庫自動生成" disabled />
                 </Form.Item>
               </Col>
             </Row>

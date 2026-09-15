@@ -2696,3 +2696,43 @@
   opacity: 0.45;
 }
 
+/* ========================================================================
+   验收入库 - 历史已完全验收行：绿底 + 左侧绿边标记（不参与本次操作）
+   ======================================================================== */
+.inbound-accepted-row > td {
+  background: #f6ffed !important;
+}
+.inbound-accepted-row > td:first-child {
+  border-left: 3px solid #52C41A;
+}
+.inbound-accepted-row:hover > td {
+  background: #efffe8 !important;
+}
+
+/* ========================================================================
+   验收入库 - 历史已退货行：灰底 + 左侧红边（终态，不再验收）
+   ======================================================================== */
+.inbound-returned-row > td {
+  background: #f5f5f5 !important;
+  color: #8C8C8C;
+}
+.inbound-returned-row > td:first-child {
+  border-left: 3px solid #FF4D4F;
+}
+.inbound-returned-row:hover > td {
+  background: #ededed !important;
+}
+
+/* ========================================================================
+   验收入库 - 历史换货在途行：橙底 + 左侧橙边（等待二次发货）
+   ======================================================================== */
+.inbound-exchanged-row > td {
+  background: #fff7e6 !important;
+}
+.inbound-exchanged-row > td:first-child {
+  border-left: 3px solid #FA8C16;
+}
+.inbound-exchanged-row:hover > td {
+  background: #fff1d6 !important;
+}
+

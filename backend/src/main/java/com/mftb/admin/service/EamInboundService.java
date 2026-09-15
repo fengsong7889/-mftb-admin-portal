@@ -27,4 +27,9 @@ public interface EamInboundService {
      * 3. 回写采购订单 status / acceptedQty / receivedQty
      */
     Map<String, Object> createBatch(EamInboundCreateDTO dto);
+
+    /**
+     * 登記換貨二次發貨（PR-3）：寫入物流單號/預計到貨日，狀態置為 shipped
+     */
+    Map<String, Object> registerExchangeShipment(long batchId, long itemId, String trackingNo, String expectedDate);
 }

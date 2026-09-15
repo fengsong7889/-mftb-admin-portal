@@ -18,6 +18,12 @@ public class EamInboundBatchItem {
     /** 所属批次 ID */
     private Long batchId;
 
+    /** 原采购明细及供应商分组快照 */
+    private Long orderItemId;
+    private String groupId;
+    private String inboundDate;
+    private String locationName;
+
     /** 资产型号 ID */
     private Long modelId;
 
@@ -41,6 +47,18 @@ public class EamInboundBatchItem {
     
     /** 验收照片 JSON 数组 [{name,dataUrl}] */
     private String photos;
+
+    /** 换货二次发货物流单号（PR-3） */
+    private String exchangeTrackingNo;
+
+    /** 换货预计到货日（PR-3） */
+    private String exchangeExpectedDate;
+
+    /** 换货状态：pending/shipped/received/closed（PR-3） */
+    private String exchangeStatus;
+
+    /** 二次验收生成的批次 ID（PR-3） */
+    private Long followupBatchId;
 
     /** 配件清单 JSON 数组 [{name,qty}] */
     private String accessories;

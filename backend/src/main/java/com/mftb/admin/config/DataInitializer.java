@@ -679,6 +679,44 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "KEY idx_eca_category_code (category_code)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM分类配件配置表'");
 
+        // PR-2/PR-3 新增列随版本递增重跑（addColumnIfAbsent 幂等）
+        versionTracker.applyOnce("eam:asset-ledger-v1.1", () -> {
+            addColumnIfAbsent("biz_eam_asset", "lease_company", "ALTER TABLE biz_eam_asset ADD COLUMN lease_company VARCHAR(200) DEFAULT NULL COMMENT '租借公司'");
+            addColumnIfAbsent("biz_eam_asset", "images", "ALTER TABLE biz_eam_asset ADD COLUMN images LONGTEXT DEFAULT NULL COMMENT '资产照片'");
+            addColumnIfAbsent("biz_eam_asset", "usage_date", "ALTER TABLE biz_eam_asset ADD COLUMN usage_date VARCHAR(32) DEFAULT NULL COMMENT '使用日期'");
+            addColumnIfAbsent("biz_eam_asset", "scrap_time", "ALTER TABLE biz_eam_asset ADD COLUMN scrap_time VARCHAR(32) DEFAULT NULL COMMENT '报废日期'");
+            addColumnIfAbsent("biz_eam_asset", "rental_cost", "ALTER TABLE biz_eam_asset ADD COLUMN rental_cost DECIMAL(14,2) DEFAULT NULL COMMENT '租赁费用'");
+            addColumnIfAbsent("biz_eam_asset", "rental_period", "ALTER TABLE biz_eam_asset ADD COLUMN rental_period JSON DEFAULT NULL COMMENT '租赁起止日期'");
+            addColumnIfAbsent("biz_eam_inbound_batch", "brand", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "disposition", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN disposition VARCHAR(16) DEFAULT NULL COMMENT '验收处置'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "reject_reason", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN reject_reason VARCHAR(500) DEFAULT NULL COMMENT '不通过原因'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "photos", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN photos JSON DEFAULT NULL COMMENT '验收照片'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "accessories", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN accessories JSON DEFAULT NULL COMMENT '配件清单'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "order_item_id", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN order_item_id BIGINT DEFAULT NULL COMMENT '采购明细ID'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "group_id", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN group_id VARCHAR(64) DEFAULT NULL COMMENT '供应商分组快照'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "inbound_date", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN inbound_date VARCHAR(32) DEFAULT NULL COMMENT '分组验收日期'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "location_name", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN location_name VARCHAR(200) DEFAULT NULL COMMENT '存放位置快照'");
+            // PR-2: 入庫批次實際生成資產數（反規範化，讀時 O(1)）
+            addColumnIfAbsent("biz_eam_inbound_batch", "generated_asset_count", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN generated_asset_count INT DEFAULT 0 COMMENT '实际生成资产数'");
+            // PR-2: 採購明細級終態跟蹤（退貨終態扣減待驗收；換貨在途標記）
+            addColumnIfAbsent("biz_eam_purchase_order_item", "returned_qty", "ALTER TABLE biz_eam_purchase_order_item ADD COLUMN returned_qty INT NOT NULL DEFAULT 0 COMMENT '累计退货数量(终态)'");
+            addColumnIfAbsent("biz_eam_purchase_order_item", "exchanged_qty", "ALTER TABLE biz_eam_purchase_order_item ADD COLUMN exchanged_qty INT NOT NULL DEFAULT 0 COMMENT '累计换货在途数量'");
+            // PR-3: 換貨二次發貨跟蹤
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "exchange_tracking_no", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN exchange_tracking_no VARCHAR(64) DEFAULT NULL COMMENT '换货二次发货物流单号'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "exchange_expected_date", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN exchange_expected_date VARCHAR(32) DEFAULT NULL COMMENT '换货预计到货日'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "exchange_status", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN exchange_status VARCHAR(16) DEFAULT NULL COMMENT '换货状态:pending/shipped/received/closed'");
+            addColumnIfAbsent("biz_eam_inbound_batch_item", "followup_batch_id", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN followup_batch_id BIGINT DEFAULT NULL COMMENT '二次验收生成的批次ID'");
+        });
+
+        // PR-2: 歷史批次 generated_asset_count 回填（按資產台賬 batch_id 計數）
+        try {
+            jdbcTemplate.update("UPDATE biz_eam_inbound_batch b SET b.generated_asset_count = "
+                    + "(SELECT COUNT(*) FROM biz_eam_asset a WHERE a.batch_id = b.id) "
+                    + "WHERE b.generated_asset_count IS NULL OR b.generated_asset_count = 0");
+        } catch (Exception e) {
+            log.warn("回填 generated_asset_count 失敗（可忽略）: {}", e.getMessage());
+        }
+
         log.info("EAM 采购/入库/资产台账/配件配置表就绪");
     }
 

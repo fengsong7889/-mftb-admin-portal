@@ -17,7 +17,6 @@ import {
   mockToggleCategoryStatus,
 } from './mock/eamCategoryMock'
 import {
-  bulkCreateAssets,
   claimAsset,
   fetchAssetDetail,
   fetchAssetList,
@@ -212,6 +211,8 @@ export interface PurchaseRequest {
 
 /** 採購訂單明細行 */
 export interface PurchaseOrderItem {
+  id?: number
+  groupId?: string
   /** 唯一行 key（前端用） */
   key?: string
   modelId?: number
@@ -234,6 +235,10 @@ export interface PurchaseOrderItem {
   confirmedPrice?: number
   /** 已驗收入庫數量 */
   receivedQty: number
+  /** 累計退貨數量（終態，PR-2） */
+  returnedQty?: number
+  /** 累計換貨在途數量（PR-2） */
+  exchangedQty?: number
 }
 
 /** 供應商分組（一個採購訂單可包含多個供應商） */
@@ -253,6 +258,8 @@ export interface PurchaseOrderSupplierGroup {
   totalQty?: number
   receivedQty?: number
   pendingQty?: number
+  /** 分組級累計退貨（終態，PR-2） */
+  returnedQty?: number
 }
 
 /** 採購執行狀態 */
@@ -310,10 +317,15 @@ export interface PurchaseOrder {
 
 /** 入庫批次明細行 */
 export interface InboundBatchItem {
+  id?: number
+  orderItemId?: number
+  groupId?: string
+  inboundDate?: string
+  locationName?: string | null
   modelId: number
   modelName: string
   qty: number
-  locationId: number
+  locationId: number | null
   /** 驗收處置方式：pass=通過 / return=退貨 / exchange=換貨 / concession=讓步接收 */
   disposition?: 'pass' | 'return' | 'exchange' | 'concession'
   /** 驗收不通過原因 */
@@ -324,10 +336,19 @@ export interface InboundBatchItem {
   accessories?: { name: string; qty: number }[]
   /** 入庫後生成的資產編號 */
   assetNos: string[]
+  /** 換貨二次發貨物流單號（PR-3） */
+  exchangeTrackingNo?: string
+  /** 換貨預計到貨日（PR-3） */
+  exchangeExpectedDate?: string
+  /** 換貨狀態：pending/shipped/received/closed（PR-3） */
+  exchangeStatus?: 'pending' | 'shipped' | 'received' | 'closed'
+  /** 二次驗收生成的批次 ID（PR-3） */
+  followupBatchId?: number
 }
 
 /** 驗收入庫批次 */
 export interface InboundBatch {
+  generatedAssetCount: number
   id: number
   batchNo: string
   poId: number
@@ -1295,36 +1316,23 @@ export async function deletePurchaseOrder(id: number): Promise<void> {
 
 /* ==================== API：驗收入庫 ==================== */
 
-export async function fetchInboundList(params?: EamPageQuery): Promise<PageResult<InboundBatch>> {
-  try {
-    // 後端優先：分頁查詢入庫批次（含 brand）
-    return await request.get<unknown, PageResult<InboundBatch>>('/eam/inbound', { params })
-  } catch (e) {
-    if (!isBackendUnavailable(e)) throw e
-    // 後端不可用時降級本地 mock
-    let list = [...mockInboundBatches].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    if (params?.keyword) {
-      list = list.filter((b) => matchKeyword(b, ['batchNo', 'poNo', 'operator'], params.keyword))
-    }
-    return delay(paginate(list, params?.page, params?.size))
-  }
+export function fetchInboundList(params?: EamPageQuery): Promise<PageResult<InboundBatch>> {
+  return request.get<unknown, PageResult<InboundBatch>>('/eam/inbound', { params })
 }
 
 /** 入庫批次詳情 */
-export async function fetchInboundDetail(batchId: number): Promise<InboundBatch | null> {
-  try {
-    return await request.get<unknown, InboundBatch>(`/eam/inbound/${batchId}`)
-  } catch (e) {
-    if (!isBackendUnavailable(e)) throw e
-    const batch = mockInboundBatches.find((b) => b.id === batchId) || null
-    return delay(batch)
-  }
+export function fetchInboundDetail(batchId: number): Promise<InboundBatch> {
+  return request.get<unknown, InboundBatch>(`/eam/inbound/${batchId}`)
 }
 
 /** 待入庫訂單（仍有未驗收數量的訂單） */
-export function fetchPendingInboundOrders(): Promise<PurchaseOrder[]> {
-  const list = mockPurchaseOrders.filter((o) => o.execStatus === 'completed' && o.status !== 'received')
-  return delay(list)
+export async function fetchPendingInboundOrders(): Promise<PurchaseOrder[]> {
+  const orders: PurchaseOrder[] = []
+  for (let page = 1; ; page += 1) {
+    const result = await fetchPurchaseOrderList({ page, size: 100, execStatus: 'completed' })
+    orders.push(...result.records.filter((order) => order.status !== 'received'))
+    if (page * 100 >= result.total || !result.records.length) return orders
+  }
 }
 
 /** 上傳驗收照片，返回 {name, dataUrl} */
@@ -1351,12 +1359,14 @@ export async function uploadInboundPhoto(file: File): Promise<{ name: string; da
 /**
  * 創建入庫批次：按型號+數量批量生成資產寫入台賬，並回寫訂單已驗收數量與狀態
  */
-export async function createInboundBatch(data: {
+export interface InboundCreateData {
   poId: number
   inboundDate: string
   operator: string
   items: {
-    modelId: number
+    orderItemId: number
+    modelId?: number
+    inboundDate?: string
     qty: number
     locationId: number
     /** 驗收處置方式：缺省視為 pass；不通過項不生成資產 */
@@ -1368,121 +1378,71 @@ export async function createInboundBatch(data: {
     accessories?: { name: string; qty: number }[]
   }[]
   remark?: string
-}): Promise<InboundBatch> {
-  // 並行加載型號、分類、位置數據
-  const [models, categories, locations] = await Promise.all([
-    fetchModelList({ page: 1, size: 1000 }),
-    fetchCategoryList(),
-    fetchLocationList(),
-  ])
-
-  const modelMap = new Map(models.records.map((m: AssetModel) => [m.id, m]))
-  const categoryMap = new Map(categories.map((c) => [c.code, c.name]))
-  const locationMap = new Map(locations.map((l) => [l.id, l.name]))
-
-  // 逐條展開為單件資產（一物一碼，不通過項不生成資產；同明細行照片寫入每件資產主圖）
-  const flat: { model: AssetModel; locationId: number; images: string | null }[] = []
-  data.items.forEach((it) => {
-    const model = modelMap.get(it.modelId)
-    if (!model) throw new Error('型號不存在')
-    if (it.disposition && it.disposition !== 'pass') return
-    const images = it.photos && it.photos.length > 0 ? it.photos.map((p) => p.dataUrl).join(',') : null
-    for (let i = 0; i < it.qty; i += 1) flat.push({ model, locationId: it.locationId, images })
-  })
-
-  const categoryOf = (code: string) => categoryMap.get(code) || code
-  const locationOf = (id: number) => locationMap.get(id) || ''
-
-  const payload = flat.map(({ model, locationId, images }) => ({
-    assetName: model.name,
-    assetType: categoryOf(model.categoryCode),
-    brand: model.brandZh,
-    unit: model.unit,
-    quantity: 1,
-    purchaseValue: 0,
-    purchaseDate: data.inboundDate,
-    usageDate: null,
-    source: 'self' as const,
-    company: '澳覓科技',
-    location: locationOf(locationId),
-    department: '物資部',
-    userName: '',
-    status: 'idle' as const,
-    images,
-    remark: `採購訂單入庫`,
-    applicant: data.operator,
-    scrapTime: null,
-    modelId: model.id,
-    locationId,
-    holdType: 'owned' as const,
-  }))
-
-  const assetNos = await bulkCreateAssets(payload as unknown as Omit<AssetItem, 'id' | 'createdAt' | 'updatedAt' | 'assetNo'>[])
-
-  // 組織批次明細（按型號聚合生成的編號，不通過項攜帶處置方式與原因）
-  let cursor = 0
-  const items: InboundBatchItem[] = data.items.map((it) => {
-    const model = modelMap.get(it.modelId)!
-    const isPass = !it.disposition || it.disposition === 'pass'
-    const nos = isPass ? assetNos.slice(cursor, cursor + it.qty) : []
-    if (isPass) cursor += it.qty
-    return {
-      modelId: it.modelId, modelName: model.name, qty: it.qty,
-      locationId: it.locationId, assetNos: nos,
-      disposition: it.disposition || 'pass',
-      rejectReason: it.rejectReason,
-      photos: it.photos,
-      accessories: it.accessories,
-    }
-  })
-
-  // 調用後端 API 創建入庫批次
-  return await request.post<unknown, InboundBatch>('/eam/inbound', {
-    poId: data.poId,
-    inboundDate: data.inboundDate,
-    operator: data.operator,
-    items,
-    totalQty: assetNos.length,
-    remark: data.remark,
-  })
 }
 
-/** 保存驗收入庫草稿（不創建資產，僅暫存當前驗收狀態） */
+export function createInboundBatch(data: InboundCreateData): Promise<InboundBatch> {
+  // 编号、数量和来源快照统一由后端事务生成，不在浏览器预创建资产。
+  return request.post<unknown, InboundBatch>('/eam/inbound', data)
+}
+
+/** 登記換貨二次發貨（PR-3）：寫入物流單號/預計到貨日，狀態置為 shipped */
+export function registerExchangeShipment(
+  batchId: number,
+  itemId: number,
+  data: { trackingNo: string; expectedDate?: string }
+): Promise<InboundBatchItem> {
+  return request.post<unknown, InboundBatchItem>(
+    `/eam/inbound/${batchId}/items/${itemId}/exchange-shipment`, data)
+}
+
+/** 保存驗收入庫草稿（不創建資產，僅暫存當前驗收狀態；groupId 傳入時按供應商分組隔離） */
 export function saveInboundDraft(data: {
   poId: number
+  groupId?: string
   inboundDate: string
   operator: string
-  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
+  items: { orderItemId?: number; modelId: number; inboundDate?: string; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
   remark?: string
 }): Promise<void> {
-  // 草稿暫存於 localStorage
-  const key = `inbound_draft_${data.poId}`
+  // 草稿暫存於 localStorage（分組級草稿獨立 key，避免多供應商互相覆蓋）
+  const key = data.groupId ? `inbound_draft_${data.poId}_${data.groupId}` : `inbound_draft_${data.poId}`
   const draft = { ...data, savedAt: new Date().toISOString() }
   try { localStorage.setItem(key, JSON.stringify(draft)) } catch { /* quota */ }
   return delay(undefined as unknown as void)
 }
 
-/** 讀取驗收入庫草稿 */
-export function loadInboundDraft(poId: number): Promise<{
+/** 讀取驗收入庫草稿（groupId 傳入時優先讀分組級草稿，缺失時回退訂單級舊草稿） */
+export function loadInboundDraft(poId: number, groupId?: string): Promise<{
   poId: number
   inboundDate: string
   operator: string
-  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
+  items: { orderItemId?: number; modelId: number; inboundDate?: string; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
   remark?: string
   savedAt: string
 } | null> {
-  const key = `inbound_draft_${poId}`
   try {
-    const raw = localStorage.getItem(key)
+    const raw = groupId
+      ? (localStorage.getItem(`inbound_draft_${poId}_${groupId}`) || localStorage.getItem(`inbound_draft_${poId}`))
+      : localStorage.getItem(`inbound_draft_${poId}`)
     return delay(raw ? JSON.parse(raw) : null)
   } catch {
     return delay(null)
   }
 }
 
-/** 刪除驗收入庫草稿 */
-export function deleteInboundDraft(poId: number): Promise<void> {
-  try { localStorage.removeItem(`inbound_draft_${poId}`) } catch { /* noop */ }
+/** 刪除驗收入庫草稿（groupId 傳入時僅清該分組與訂單級舊草稿；未傳時清該訂單全部草稿） */
+export function deleteInboundDraft(poId: number, groupId?: string): Promise<void> {
+  try {
+    if (groupId) {
+      localStorage.removeItem(`inbound_draft_${poId}_${groupId}`)
+      localStorage.removeItem(`inbound_draft_${poId}`)
+    } else {
+      const prefix = `inbound_draft_${poId}`
+      Object.keys(localStorage)
+        .filter((k) => k === prefix || k.startsWith(`${prefix}_`))
+        .forEach((k) => localStorage.removeItem(k))
+    }
+  } catch { /* noop */ }
   return delay(undefined as unknown as void)
 }
 

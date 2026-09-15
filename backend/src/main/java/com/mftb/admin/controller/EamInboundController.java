@@ -50,6 +50,17 @@ public class EamInboundController {
         return Result.success(inboundService.createBatch(dto));
     }
 
+    /** 登记换货二次发货（PR-3） */
+    @PostMapping("/{batchId}/items/{itemId}/exchange-shipment")
+    @RequirePermission(menu = MENU, action = "edit")
+    public Result<Map<String, Object>> registerExchangeShipment(
+            @PathVariable long batchId,
+            @PathVariable long itemId,
+            @RequestBody Map<String, String> body) {
+        return Result.success(inboundService.registerExchangeShipment(
+                batchId, itemId, body.get("trackingNo"), body.get("expectedDate")));
+    }
+
     /** 上传验收照片，返回 Base64 Data URL */
     @PostMapping("/photo/upload")
     @RequirePermission(menu = MENU, action = "edit")

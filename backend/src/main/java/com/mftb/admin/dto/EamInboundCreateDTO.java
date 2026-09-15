@@ -26,6 +26,12 @@ public class EamInboundCreateDTO {
     @Data
     public static class InboundItem {
 
+        /** 采购订单明细 ID，避免同型号跨供应商串行 */
+        private Long orderItemId;
+
+        /** 分组验收日期，缺省使用批次日期 */
+        private String inboundDate;
+
         /** 型号ID (eam_model.id) */
         private Long modelId;
 

@@ -26,7 +26,7 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchAssetList, deleteAsset,
+  fetchAssetList, fetchAssetStatusCounts, deleteAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
 } from '../../../api/asset'
 import { fetchCategoryList } from '../../../api/eam'
@@ -105,17 +105,8 @@ export default function AssetList() {
       const statusFilter = filters.status || (activeTab === 'all' ? undefined : activeTab)
       const { status: _searchStatus, ...restFilters } = filters
 
-      // 1) 调一次不带 status 的查询来计算各 Tab 统计（受其他过滤条件影响）
-      const statsRes = await fetchAssetList({
-        page: 1, size: 9999,
-        ...restFilters,
-      })
-      const allData = statsRes.records || []
-      const newStats: Record<AssetStatus | 'all', number> = {
-        all: statsRes.total || 0,
-        in_use: 0, idle: 0, in_repair: 0, scrapped: 0,
-      }
-      allData.forEach((a) => { newStats[a.status] += 1 })
+      // 各状态数量由后端汇总，避免分页上限导致徽标数量不完整。
+      const newStats = await fetchAssetStatusCounts(restFilters)
       setStats(newStats)
 
       // 2) 调分页查询（带 status filter）

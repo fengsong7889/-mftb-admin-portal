@@ -62,6 +62,12 @@ public class EamPurchaseOrderItem {
     /** 已验收数量 */
     private Integer receivedQty;
 
+    /** 累计退货数量（终态，PR-2） */
+    private Integer returnedQty;
+
+    /** 累计换货在途数量（PR-2） */
+    private Integer exchangedQty;
+
     /** 排序 */
     private Integer sortOrder;
 }

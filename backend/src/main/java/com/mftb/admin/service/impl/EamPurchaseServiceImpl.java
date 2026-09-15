@@ -11,6 +11,8 @@ import com.mftb.admin.entity.EamPurchaseOrderItem;
 import com.mftb.admin.entity.EamPurchaseRequest;
 import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
+import com.mftb.admin.mapper.EamInboundBatchMapper;
+import com.mftb.admin.entity.EamInboundBatch;
 import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class EamPurchaseServiceImpl implements EamPurchaseService {
 
     private final EamPurchaseOrderMapper orderMapper;
+    private final EamInboundBatchMapper inboundBatchMapper;
     private final EamPurchaseOrderItemMapper itemMapper;
     private final EamPurchaseRequestMapper requestMapper;
     private final OaRequestMapper oaRequestMapper;
@@ -85,33 +88,43 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
 
         // 批量补充明细总数、分组级统计与关联申请编号（供列表「验收入库进度/关联申请/供应商分组」展示）
         Map<Long, Integer> totalQtyMap = new HashMap<>();
+        Map<Long, Integer> receivedQtyMap = new HashMap<>();
         Map<Long, EamPurchaseRequest> requests = loadOrderRequests(result.getRecords());
         // 分组级统计：orderId -> (groupId -> [qty 合计, receivedQty 合计])
+        // 注意：groupId 为 null/blank 的明细统一聚合到 "" 键（兼容自动建单/旧数据）
         Map<Long, Map<String, int[]>> groupQtyMap = new HashMap<>();
         List<Long> orderIds = result.getRecords().stream().map(EamPurchaseOrder::getId).collect(Collectors.toList());
         if (!orderIds.isEmpty()) {
             itemMapper.selectList(new LambdaQueryWrapper<EamPurchaseOrderItem>()
                             .in(EamPurchaseOrderItem::getOrderId, orderIds)
                             .select(EamPurchaseOrderItem::getOrderId, EamPurchaseOrderItem::getGroupId,
-                                    EamPurchaseOrderItem::getQty, EamPurchaseOrderItem::getReceivedQty))
+                                    EamPurchaseOrderItem::getQty, EamPurchaseOrderItem::getReceivedQty,
+                                    EamPurchaseOrderItem::getReturnedQty))
                     .forEach(it -> {
-                        totalQtyMap.merge(it.getOrderId(), it.getQty() == null ? 0 : it.getQty(), Integer::sum);
-                        if (it.getGroupId() != null && !it.getGroupId().isBlank()) {
-                            int[] agg = groupQtyMap.computeIfAbsent(it.getOrderId(), k -> new HashMap<>())
-                                    .computeIfAbsent(it.getGroupId(), k -> new int[2]);
-                            agg[0] += it.getQty() == null ? 0 : it.getQty();
-                            agg[1] += it.getReceivedQty() == null ? 0 : it.getReceivedQty();
-                        }
+                        int qty = it.getQty() == null ? 0 : it.getQty();
+                        int received = it.getReceivedQty() == null ? 0 : it.getReceivedQty();
+                        int returned = it.getReturnedQty() == null ? 0 : it.getReturnedQty();
+                        totalQtyMap.merge(it.getOrderId(), qty, Integer::sum);
+                        receivedQtyMap.merge(it.getOrderId(), received, Integer::sum);
+                        // 统一使用 groupId 或空字符串作为聚合 key（兼容 groupId=null 的旧数据）
+                        String gid = (it.getGroupId() != null && !it.getGroupId().isBlank()) ? it.getGroupId() : "";
+                        int[] agg = groupQtyMap.computeIfAbsent(it.getOrderId(), k -> new HashMap<>())
+                                .computeIfAbsent(gid, k -> new int[3]);
+                        agg[0] += qty;
+                        agg[1] += received;
+                        agg[2] += returned;
                     });
         }
 
         List<Map<String, Object>> records = result.getRecords().stream()
                 .map(o -> {
                     Map<String, Object> m = orderToMap(o, requests.get(o.getReqId()));
-                    m.put("totalQty", totalQtyMap.getOrDefault(o.getId(), 0));
+                    int orderTotalQty = totalQtyMap.getOrDefault(o.getId(), 0);
+                    int orderReceivedQty = receivedQtyMap.getOrDefault(o.getId(), 0);
+                    m.put("totalQty", orderTotalQty);
                     // 供应商分组摘要（不含 items 明细，供前端按「订单×供应商」拆分行展示与分组级待验收件数）
+                    Map<String, int[]> gMap = groupQtyMap.get(o.getId());
                     if (o.getSupplierGroups() != null && !o.getSupplierGroups().isBlank()) {
-                        Map<String, int[]> gMap = groupQtyMap.get(o.getId());
                         List<Map<String, Object>> summaries = JsonUtils.parseMapList(o.getSupplierGroups())
                                 .stream().map(group -> {
                                     Map<String, Object> s = new LinkedHashMap<>();
@@ -120,15 +133,36 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                                     s.put("deliveryMethod", group.get("deliveryMethod"));
                                     s.put("trackingNo", group.get("trackingNo"));
                                     s.put("expectedReceiveDate", group.get("expectedReceiveDate"));
-                                    int[] agg = gMap != null ? gMap.get(String.valueOf(group.get("id"))) : null;
+                                    String groupId = String.valueOf(group.get("id"));
+                                    int[] agg = gMap != null ? gMap.get(groupId) : null;
+                                    // 如果分组 ID 无匹配明细，尝试使用无分组明细的聚合（兼容旧数据/自动建单）
+                                    if (agg == null && gMap != null) {
+                                        agg = gMap.get("");
+                                    }
                                     int gQty = agg != null ? agg[0] : 0;
                                     int gReceived = agg != null ? agg[1] : 0;
+                                    int gReturned = agg != null ? agg[2] : 0;
                                     s.put("totalQty", gQty);
                                     s.put("receivedQty", gReceived);
-                                    s.put("pendingQty", Math.max(0, gQty - gReceived));
+                                    s.put("returnedQty", gReturned);
+                                    s.put("pendingQty", Math.max(0, gQty - gReceived - gReturned));
                                     return s;
                                 }).collect(Collectors.toList());
                         m.put("supplierGroups", summaries);
+                    } else {
+                        // 无分组 JSON 时，构造默认分组摘要（兼容旧数据/自动建单）
+                        int[] agg = gMap != null ? gMap.get("") : null;
+                        int gQty = agg != null ? agg[0] : orderTotalQty;
+                        int gReceived = agg != null ? agg[1] : orderReceivedQty;
+                        int gReturned = agg != null ? agg[2] : 0;
+                        Map<String, Object> defaultGroup = new LinkedHashMap<>();
+                        defaultGroup.put("id", "default");
+                        defaultGroup.put("supplier", o.getSupplier());
+                        defaultGroup.put("totalQty", gQty);
+                        defaultGroup.put("receivedQty", gReceived);
+                        defaultGroup.put("returnedQty", gReturned);
+                        defaultGroup.put("pendingQty", Math.max(0, gQty - gReceived - gReturned));
+                        m.put("supplierGroups", List.of(defaultGroup));
                     }
                     return m;
                 })
@@ -231,11 +265,15 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOrderExec(long id, EamPurchaseSaveDTO dto) {
-        EamPurchaseOrder order = orderMapper.selectById(id);
+        EamPurchaseOrder order = orderMapper.selectForUpdate(id);
         if (order == null) throw new BusinessException("採購訂單不存在");
         // 已驗收入庫的訂單不允許修改
         if ("received".equals(order.getStatus())) {
             throw new BusinessException("訂單已全部驗收入庫，不可修改");
+        }
+
+        if (inboundBatchMapper.selectCount(new LambdaQueryWrapper<EamInboundBatch>().eq(EamInboundBatch::getPoId, id)) > 0) {
+            throw new BusinessException("訂單已有驗收記錄，不可重建採購明細或修改執行信息");
         }
 
         // 執行狀態設為「已完成」時，所有明細的成交單價必須填寫（groups 聲明見下方供應商分組更新段）
@@ -320,8 +358,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     /* ==================== 删除订单 ==================== */
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteOrder(long id) {
-        EamPurchaseOrder order = orderMapper.selectById(id);
+        EamPurchaseOrder order = orderMapper.selectForUpdate(id);
         if (order == null) throw new BusinessException("採購訂單不存在");
         if (!"pending".equals(order.getExecStatus())) throw new BusinessException("僅待處理的訂單可刪除");
         orderMapper.deleteById(id);
@@ -514,6 +553,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         m.put("price", it.getPrice());
         m.put("confirmedPrice", it.getConfirmedPrice());
         m.put("receivedQty", it.getReceivedQty());
+        m.put("returnedQty", it.getReturnedQty());
+        m.put("exchangedQty", it.getExchangedQty());
         m.put("groupId", it.getGroupId());
         return m;
     }

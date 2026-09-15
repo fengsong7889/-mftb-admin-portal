@@ -392,6 +392,8 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'ai_access', label: 'AI申請流程編號', type: 'table', value: 'AI', defaultValue: 'AI', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'AI202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       { key: 'eam_purchase_request', label: '採購申請流程編號', type: 'table', value: 'CG', defaultValue: 'CG', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'CG202609110001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       { key: 'eam_purchase_order', label: '採購訂單編號', type: 'table', value: 'DDCG', defaultValue: 'DDCG', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDCG202609140000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-採購訂單' },
+      { key: 'eam_inbound_batch', label: '驗收入庫批次編號', type: 'table', value: 'IB', defaultValue: 'IB', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'IB202609160000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-驗收入庫' },
+      { key: 'eam_asset', label: '資產編號', type: 'table', value: 'FA', defaultValue: 'FA', dateFormat: 'YYYYMMDD', min: 6, max: 6, unit: 'FA20260916000000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-資產台賬' },
       { key: 'workflow_config', label: '流程配置ID', type: 'table', value: 'LC', defaultValue: 'LC', dateFormat: '', min: 5, max: 5, unit: 'LC00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '審批中心' },
       /* ── 員工管理 ── */
       { key: 'employee_no', label: '工號', type: 'table', value: 'MF', defaultValue: 'MF', dateFormat: '', min: 5, max: 5, unit: 'MF00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '員工管理' },

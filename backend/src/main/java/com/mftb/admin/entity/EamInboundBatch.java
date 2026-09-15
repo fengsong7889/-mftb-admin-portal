@@ -51,6 +51,9 @@ public class EamInboundBatch {
     /** 让步接收数量 */
     private Integer concessionQty;
 
+    /** 实际生成资产数（反规范化，PR-2） */
+    private Integer generatedAssetCount;
+
     /** 采购事由 */
     private String purchaseReason;
 

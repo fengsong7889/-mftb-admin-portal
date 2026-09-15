@@ -10,18 +10,19 @@ import InboundList from './InboundList'
 import InboundForm from './InboundForm'
 import InboundDetail from './InboundDetail'
 
-type View = { mode: 'list' } | { mode: 'form'; poId?: number } | { mode: 'detail'; batchId: number }
+type View = { mode: 'list' } | { mode: 'form'; poId?: number; groupId?: string } | { mode: 'detail'; batchId: number }
 
 export default function AssetInbound() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlPoId = searchParams.get('poId') ? Number(searchParams.get('poId')) : null
-  const [view, setView] = useState<View>(urlPoId ? { mode: 'form', poId: urlPoId } : { mode: 'list' })
+  const urlGroupId = searchParams.get('groupId') || undefined
+  const [view, setView] = useState<View>(urlPoId ? { mode: 'form', poId: urlPoId, groupId: urlGroupId } : { mode: 'list' })
 
   // 外部跳轉帶入 poId 時同步打開入庫表單
   useEffect(() => {
-    if (urlPoId) setView({ mode: 'form', poId: urlPoId })
-  }, [urlPoId])
+    if (urlPoId) setView({ mode: 'form', poId: urlPoId, groupId: urlGroupId })
+  }, [urlPoId, urlGroupId])
 
   const backToList = () => {
     setView({ mode: 'list' })
@@ -32,13 +33,13 @@ export default function AssetInbound() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <InboundList
-          onAdd={(poId) => setView({ mode: 'form', poId })}
+          onAdd={(poId, groupId) => setView({ mode: 'form', poId, groupId })}
           onDetail={(batchId) => setView({ mode: 'detail', batchId })}
         />
       ) : view.mode === 'detail' ? (
         <InboundDetail batchId={view.batchId} onBack={backToList} />
       ) : (
-        <InboundForm key={view.poId ?? 'new'} poId={view.poId} onBack={backToList} />
+        <InboundForm key={`${view.poId ?? 'new'}_${view.groupId ?? 'all'}`} poId={view.poId} groupId={view.groupId} onBack={backToList} />
       )}
     </div>
   )

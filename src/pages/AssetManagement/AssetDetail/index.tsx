@@ -21,7 +21,7 @@ import {
   UserOutlined, InboxOutlined, EditOutlined,
 } from '@ant-design/icons'
 import {
-  fetchAssetDetail, type AssetItem, type AssetStatus,
+  fetchAssetDetail, parseAssetImages, type AssetItem, type AssetStatus,
 } from '../../../api/asset'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 
@@ -94,10 +94,10 @@ export default function AssetDetail() {
     )
   }
 
-  const imageList = asset.images ? asset.images.split(',').filter(Boolean) : []
+  const imageList = parseAssetImages(asset.images)
   const params = asset.params || {}
   const paramEntries = Object.entries(params)
-  const a = asset as any
+  const a = asset
 
   return (
     <div className="content-area">

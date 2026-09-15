@@ -85,6 +85,20 @@ export interface AssetItem {
   holdType?: 'owned' | 'borrowed'
   /** 型号参数实例（如 CPU/内存/硬盘） */
   params?: Record<string, string>
+  categoryId?: number | null
+  categoryCode?: string | null
+  brandId?: number | null
+  orderId?: number | null
+  batchId?: number | null
+  purchaseType?: 'purchase' | 'lease'
+  updatedBy?: string
+  inboundBatchNo?: string | null
+  inboundDate?: string | null
+  inboundQty?: number
+  inspector?: string | null
+  leaseCompany?: string | null
+  rentalCost?: number | null
+  rentalPeriod?: string[] | null
   /** 创建时间 */
   createdAt: string
   /** 更新时间 */
@@ -172,6 +186,8 @@ export interface AssetRepairRecord {
 /* ==================== 查询参数 ==================== */
 
 export interface AssetListQuery {
+  orderId?: number
+  batchId?: number
   page?: number
   size?: number
   keyword?: string
@@ -202,40 +218,93 @@ export interface PageResult<T> {
 /* ==================== 后端 API（占位，前端 mock 实现） ==================== */
 
 /** 资产分页列表 */
-export function fetchAssetList(params?: AssetListQuery): Promise<PageResult<AssetItem>> {
-  // 待后端接口就绪后切换为真实接口：
-  // return request.get('/asset/list', { params })
-  return mockFetchAssetList(params)
+export async function fetchAssetList(params?: AssetListQuery): Promise<PageResult<AssetItem>> {
+  const result = await request.get<unknown, PageResult<AssetItem>>('/eam/assets', { params: assetQueryParams(params) })
+  return { ...result, records: result.records.map(normalizeAsset) }
+}
+
+export type AssetStatusCounts = Record<AssetStatus | 'all', number>
+
+export function fetchAssetStatusCounts(params?: AssetListQuery): Promise<AssetStatusCounts> {
+  return request.get<unknown, AssetStatusCounts>('/eam/assets/status-counts', { params: assetQueryParams(params) })
+}
+
+function assetQueryParams(params: AssetListQuery = {}) {
+  const { purchaseDate, scrapDate, updatedAt, status, ...rest } = params
+  return {
+    ...rest, status: status === 'all' ? undefined : status,
+    purchaseDateStart: purchaseDate?.[0], purchaseDateEnd: purchaseDate?.[1],
+    scrapDateStart: scrapDate?.[0], scrapDateEnd: scrapDate?.[1],
+    updatedAtStart: updatedAt?.[0], updatedAtEnd: updatedAt?.[1],
+  }
+}
+
+function normalizeAsset(asset: AssetItem): AssetItem {
+  return {
+    ...asset,
+    brand: asset.brand || '', unit: asset.unit || '', company: asset.company || '',
+    department: asset.department || '', userName: asset.userName || '', location: asset.location || '',
+    purchaseDate: asset.purchaseDate || null, usageDate: asset.usageDate || null,
+    scrapTime: asset.scrapTime || null, params: asset.params || {},
+    applicant: asset.updatedBy || asset.applicant || '',
+  }
+}
+
+/** 可编辑字段白名单：不允许由客户端覆盖采购来源、批次和审计信息。 */
+export type AssetSaveData = Partial<Pick<AssetItem,
+  'assetNo' | 'assetName' | 'assetType' | 'categoryId' | 'categoryCode' | 'brand' | 'brandId' |
+  'modelId' | 'params' | 'images' | 'unit' | 'quantity' | 'purchaseValue' | 'purchaseDate' |
+  'usageDate' | 'source' | 'company' | 'location' | 'locationId' | 'department' | 'userName' |
+  'status' | 'holdType' | 'scrapTime' | 'leaseCompany' | 'rentalCost' | 'rentalPeriod' | 'remark'>>
+
+/** 支持历史逗号拼接与 JSON 数组；保留 Data URL 自带的 base64 逗号。 */
+export function parseAssetImages(images?: string | null): string[] {
+  if (!images) return []
+  const trimmed = images.trim()
+  if (trimmed.startsWith('[')) {
+    try {
+      const values: unknown = JSON.parse(trimmed)
+      return Array.isArray(values)
+        ? values.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim())
+        : []
+    } catch { return [] }
+  }
+  // 逗号拼接：仅在下一段以 data: / http(s):// 起始处切分，
+  // 避免误切 Data URL 内部 base64（如 JPEG 的 "/9j" 以斜杠开头）。
+  return trimmed
+    .split(/,(?=\s*(?:data:|https?:\/\/))/i)
+    .map((url) => url.trim().replace(/,+$/, ''))
+    .filter(Boolean)
 }
 
 /** 资产详情 */
-export function fetchAssetDetail(id: number): Promise<AssetItem> {
-  return mockFetchAssetDetail(id)
+export async function fetchAssetDetail(id: number): Promise<AssetItem> {
+  return normalizeAsset(await request.get<unknown, AssetItem>(`/eam/assets/${id}`))
 }
 
 /** 新增资产 */
-export function createAsset(data: Omit<AssetItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
-  return mockCreateAsset(data)
+export function createAsset(data: AssetSaveData): Promise<number> {
+  return request.post<unknown, number>('/eam/assets', data)
 }
 
 /** 更新资产 */
-export function updateAsset(id: number, data: Partial<AssetItem>): Promise<void> {
-  return mockUpdateAsset(id, data)
+export function updateAsset(id: number, data: AssetSaveData): Promise<void> {
+  return request.put<unknown, void>(`/eam/assets/${id}`, data)
 }
 
 /** 删除资产（软删除） */
 export function deleteAsset(id: number): Promise<void> {
-  return mockDeleteAsset(id)
+  return request.delete<unknown, void>(`/eam/assets/${id}`)
 }
 
 /** 批量入库（采购验收调用）：按传入条目生成资产编号并写入台账，返回生成的编号列表 */
 export function bulkCreateAssets(items: Omit<AssetItem, 'id' | 'createdAt' | 'updatedAt' | 'assetNo'>[]): Promise<string[]> {
-  return mockBulkCreateAssets(items)
+  return unavailableAssetOperation('批量建档：请通过采购验收入库提交')
 }
 
 /** 校验资产编号唯一性 */
 export function checkAssetNoUnique(assetNo: string, excludeId?: number): Promise<boolean> {
-  return mockCheckAssetNoUnique(assetNo, excludeId)
+  return request.get<unknown, boolean>('/eam/assets/check-no', { params: { assetNo, excludeId } })
 }
 
 /** 资产操作动态查询参数（EAM 变更历史页共用） */
@@ -253,67 +322,67 @@ export interface AssetLogQuery {
 
 /** 资产操作动态 */
 export function fetchAssetLogs(params?: AssetLogQuery): Promise<PageResult<AssetLog>> {
-  return mockFetchAssetLogs(params)
+  return unavailableAssetOperation('资产操作流水查询')
 }
 
 /** 写入一条资产操作流水（EAM 业务模块共用：借用/续借/交接/赔付等） */
 export function logAssetOperation(data: Omit<AssetLog, 'id'>): Promise<void> {
-  return mockLogAssetOperation(data)
+  return unavailableAssetOperation('资产操作流水')
 }
 
 /** 资产领用 */
 export function claimAsset(data: { assetId: number; userName: string; department: string; usageDate: string; remark?: string }): Promise<void> {
-  return mockClaimAsset(data)
+  return unavailableAssetOperation('资产领用')
 }
 
 /** 资产转移 */
 export function transferAsset(data: { assetId: number; toUser: string; toDepartment: string; reason: string; applyBy: string }): Promise<void> {
-  return mockTransferAsset(data)
+  return unavailableAssetOperation('资产转移')
 }
 
 /** 资产归还 */
 export function returnAsset(data: { assetId: number; returnDate: string; condition: string; applyBy: string }): Promise<void> {
-  return mockReturnAsset(data)
+  return unavailableAssetOperation('资产归还')
 }
 
 /** 资产报废 */
 export function scrapAsset(data: { assetId: number; reason: string; scrapDate: string; applyBy: string }): Promise<void> {
-  return mockScrapAsset(data)
+  return unavailableAssetOperation('资产报废')
 }
 
 /** 资产维修 */
 export function repairAsset(data: Omit<AssetRepairRecord, 'id'>): Promise<number> {
-  return mockRepairAsset(data)
+  return unavailableAssetOperation('资产维修')
 }
 
 /** 维修记录列表（按资产ID过滤） */
 export function fetchRepairList(params?: { assetId?: number; status?: 'repairing' | 'done' }): Promise<AssetRepairRecord[]> {
-  return mockFetchRepairList(params)
+  return unavailableAssetOperation('维修记录查询')
 }
 
 /** 维修完成 */
 export function finishRepair(id: number, finishDate: string): Promise<void> {
-  return mockFinishRepair(id, finishDate)
+  return unavailableAssetOperation('维修完成')
 }
 
 /** 资产盘点列表 */
 export function fetchInventoryList(params?: { page?: number; size?: number }): Promise<PageResult<AssetInventoryRecord>> {
-  return mockFetchInventoryList(params)
+  return unavailableAssetOperation('盘点记录查询')
 }
 
 /** 发起盘点 */
 export function createInventory(taskName: string, operator: string): Promise<string> {
-  return mockCreateInventory(taskName, operator)
+  return unavailableAssetOperation('发起盘点')
 }
 
 /** 提交盘点结果 */
 export function submitInventoryResult(taskNo: string, actual: { assetId: number; status: 'normal' | 'lost' | 'damaged'; remark?: string }[]): Promise<void> {
-  return mockSubmitInventoryResult(taskNo, actual)
+  return unavailableAssetOperation('提交盘点')
 }
 
 /** 资产统计 */
 export function fetchAssetStatistics(): Promise<AssetStatistics> {
-  return mockFetchAssetStatistics()
+  return unavailableAssetOperation('资产看板统计')
 }
 
 /* ==================== 统计 ==================== */
@@ -339,6 +408,11 @@ export interface AssetStatistics {
   sourceDistribution: { source: AssetSource; count: number }[]
   /** 月度入库趋势 */
   monthlyTrend: { month: string; count: number; value: number }[]
+}
+
+/** 未接入后端的周边模块必须明确失败，不能拿真实资产 ID 操作模拟台账。 */
+function unavailableAssetOperation<T>(operation: string): Promise<T> {
+  return Promise.reject(new Error(`${operation}尚未接入真实 API`))
 }
 
 /* ==================== Mock 数据实现 ==================== */

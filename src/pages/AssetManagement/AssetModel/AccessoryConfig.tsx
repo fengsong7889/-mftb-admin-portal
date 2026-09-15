@@ -127,9 +127,9 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
+      // 不同分類配件的計量單位不一致（件/條/瓶等），默認數量僅展示純數字
       title: '默認數量', dataIndex: 'defaultQty', key: 'defaultQty', width: 120,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: number) => `${v} 件`,
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
@@ -265,7 +265,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
             name="defaultQty"
             rules={[{ required: true, message: '請輸入默認數量' }]}
           >
-            <InputNumber min={1} precision={0} addonAfter="件" style={{ width: 160 }} />
+            <InputNumber min={1} precision={0} style={{ width: 160 }} />
           </Form.Item>
         </Form>
       </Modal>

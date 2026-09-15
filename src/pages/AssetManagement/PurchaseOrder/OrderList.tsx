@@ -242,6 +242,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     { key: 'purchaser', title: t('asset.colPurchaser') },
     { key: 'department', title: '服務部門' },
     { key: 'execStatus', title: t('asset.execStatus') },
+    { key: 'inboundStatus', title: '入庫狀態' },
     { key: 'inboundProgress', title: t('asset.inboundTitle') },
     { key: 'createdAt', title: t('asset.colCreatedAt') },
     { key: 'updatedBy', title: t('asset.colUpdatedBy') },
@@ -290,6 +291,13 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     {
       title: t('asset.execStatus'), dataIndex: 'execStatus', key: 'execStatus', width: 100,
       render: (v: ExecStatus) => <Tag color={EXEC_META[v].color}>{t(EXEC_META[v].key)}</Tag>,
+    },
+    {
+      title: '入庫狀態', dataIndex: 'status', key: 'inboundStatus', width: 100,
+      render: (v: PurchaseOrder['status']) => {
+        const meta = INBOUND_META[v] || INBOUND_META.pending
+        return <Tag color={meta.color}>{t(meta.key)}</Tag>
+      },
     },
     {
       title: t('asset.inboundTitle'), key: 'inboundProgress', width: 220,

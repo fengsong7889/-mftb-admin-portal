@@ -55,6 +55,13 @@ public class EamAsset {
     /** 购买日期 */
     private String purchaseDate;
 
+    /** 使用日期、报废日期及租赁信息 */
+    private String usageDate;
+    private String scrapTime;
+    private String leaseCompany;
+    private BigDecimal rentalCost;
+    private String rentalPeriod;
+
     /** purchase/lease */
     private String purchaseType;
 

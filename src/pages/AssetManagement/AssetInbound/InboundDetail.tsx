@@ -6,7 +6,7 @@
  * - 遵循全局详情页规范：DetailPageHeader（紫色渐变顶条）+ 卡片布局 + 无底部操作栏
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Table, Tag, Row, Col, Spin, message, Modal } from 'antd'
+import { Table, Tag, Row, Col, Spin, message, Modal, Button, Input, Space, Tooltip } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined, CheckCircleOutlined,
@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
-import { fetchInboundDetail, fetchLocationList, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
+import { fetchInboundDetail, fetchLocationList, registerExchangeShipment, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
 
 interface Props {
   batchId: number
@@ -42,6 +42,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewImage, setPreviewImage] = useState('')
 
+  // PR-3: 換貨二次發貨登記彈窗
+  const [exchangeModal, setExchangeModal] = useState<InboundBatchItem | null>(null)
+  const [exchangeTrackingNo, setExchangeTrackingNo] = useState('')
+  const [exchangeExpectedDate, setExchangeExpectedDate] = useState('')
+  const [exchangeSubmitting, setExchangeSubmitting] = useState(false)
+
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -60,12 +66,34 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
   useEffect(() => { loadData() }, [loadData])
 
-  /** 位置 ID → 名称映射 */
+  /** 位置 ID → 名稱映射 */
   const locationMap = useMemo(() => {
     const map = new Map<number, string>()
     locations.forEach((loc) => map.set(loc.id, loc.name))
     return map
   }, [locations])
+  
+  /** PR-3: 提交換貨二次發貨登記 */
+  const handleExchangeSubmit = async () => {
+    if (!exchangeModal || exchangeModal.id == null) return
+    if (!exchangeTrackingNo.trim()) { message.warning('請填寫物流單號'); return }
+    setExchangeSubmitting(true)
+    try {
+      await registerExchangeShipment(batchId, exchangeModal.id, {
+        trackingNo: exchangeTrackingNo.trim(),
+        expectedDate: exchangeExpectedDate.trim() || undefined,
+      })
+      message.success('二次發貨登記成功')
+      setExchangeModal(null)
+      setExchangeTrackingNo('')
+      setExchangeExpectedDate('')
+      loadData()
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : '登記失敗')
+    } finally {
+      setExchangeSubmitting(false)
+    }
+  }
 
   /* ----- 明细表格列 ----- */
   const itemColumns: TableColumnsType<InboundBatchItem> = [
@@ -138,6 +166,29 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           }
         </div>
       ),
+    },
+    {
+      title: '換貨跟蹤', key: 'exchange', width: 160,
+      render: (_: unknown, r: InboundBatchItem) => {
+        if (r.disposition !== 'exchange') return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Space size={4} wrap>
+            {r.exchangeStatus === 'shipped' ? (
+              <Tooltip title={`單號 ${r.exchangeTrackingNo || '-'}${r.exchangeExpectedDate ? ` · 預計 ${r.exchangeExpectedDate}` : ''}`}>
+                <Tag color="blue" style={{ margin: 0 }}>已發貨</Tag>
+              </Tooltip>
+            ) : (
+              <Tag color="orange" style={{ margin: 0 }}>待發貨</Tag>
+            )}
+            {r.exchangeStatus !== 'shipped' && (
+              <Button type="link" size="small" style={{ fontSize: 12, padding: '0 2px' }}
+                onClick={() => { setExchangeModal(r); setExchangeTrackingNo(''); setExchangeExpectedDate('') }}>
+                登記發貨
+              </Button>
+            )}
+          </Space>
+        )
+      },
     },
   ]
 
@@ -319,6 +370,35 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         centered
       >
         <img alt="preview" style={{ width: '100%' }} src={previewImage} />
+      </Modal>
+
+      {/* ====== 換貨二次發貨登記（PR-3） ====== */}
+      <Modal
+        title="登記換貨二次發貨"
+        open={!!exchangeModal}
+        onOk={handleExchangeSubmit}
+        onCancel={() => setExchangeModal(null)}
+        okText="確認登記"
+        cancelText="取消"
+        confirmLoading={exchangeSubmitting}
+        destroyOnClose
+      >
+        {exchangeModal && (
+          <div>
+            <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+              <div><span style={{ color: '#8C8C8C' }}>資產名稱：</span><b>{exchangeModal.modelName}</b></div>
+              <div><span style={{ color: '#8C8C8C' }}>換貨數量：</span><b style={{ color: '#FA8C16' }}>{exchangeModal.qty}</b> 件</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>物流單號 <span style={{ color: '#FF4D4F' }}>*</span></div>
+              <Input value={exchangeTrackingNo} onChange={(e) => setExchangeTrackingNo(e.target.value)} placeholder="請輸入供應商二次發貨的物流單號" allowClear />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>預計到貨日</div>
+              <Input value={exchangeExpectedDate} onChange={(e) => setExchangeExpectedDate(e.target.value)} placeholder="YYYY-MM-DD（可選）" allowClear />
+            </div>
+          </div>
+        )}
       </Modal>
     </>
   )

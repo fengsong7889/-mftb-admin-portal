@@ -1,0 +1,240 @@
+package com.mftb.admin.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.*;
+import com.mftb.admin.entity.*;
+import com.mftb.admin.mapper.*;
+import com.mftb.admin.service.EamAssetService;
+import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.OperatorResolver;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.BeanWrapper;
+import org.springframework.beans.BeanWrapperImpl;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class EamAssetServiceImpl implements EamAssetService {
+    private final EamAssetMapper assetMapper;
+    private final EamInboundBatchMapper batchMapper;
+    private final EamLocationMapper locationMapper;
+    private final EamModelMapper modelMapper;
+    private final EamCategoryMapper categoryMapper;
+    private final EamBrandMapper brandMapper;
+    private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
+    private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped");
+
+    @Override
+    public PageResult<EamAssetVO> page(EamAssetQuery query) {
+        Page<EamAsset> page = assetMapper.selectPage(
+                new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
+                queryWrapper(query).orderByDesc(EamAsset::getCreatedAt, EamAsset::getId));
+        List<Long> batchIds = page.getRecords().stream().map(EamAsset::getBatchId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, EamInboundBatch> batches = batchIds.isEmpty() ? Map.of() : batchMapper.selectBatchIds(batchIds)
+                .stream().collect(Collectors.toMap(EamInboundBatch::getId, b -> b));
+        return new PageResult<>(page.getRecords().stream().map(a -> toVO(a, a.getBatchId() == null ? null : batches.get(a.getBatchId()))).toList(), page.getTotal());
+    }
+
+    @Override
+    public Map<String, Long> statusCounts(EamAssetQuery query) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        // 独立 COUNT 查询，不依赖分页上限或携带大体积图片的全量列表。
+        LambdaQueryWrapper<EamAsset> all = queryWrapper(query);
+        counts.put("all", assetMapper.selectCount(all));
+        for (String status : STATUSES) {
+            counts.put(status, assetMapper.selectCount(queryWrapper(query).eq(EamAsset::getStatus, status)));
+        }
+        return counts;
+    }
+
+    @Override
+    public EamAssetVO detail(long id) {
+        EamAsset asset = requireAsset(id);
+        return toVO(asset, asset.getBatchId() == null ? null : batchMapper.selectById(asset.getBatchId()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public long create(EamAssetSaveDTO dto) {
+        EamAsset asset = new EamAsset();
+        asset.setStatus("idle");
+        asset.setSource("self");
+        asset.setHoldType("owned");
+        asset.setPurchaseValue(BigDecimal.ZERO);
+        apply(dto, asset);
+        if (!hasText(asset.getAssetNo())) asset.setAssetNo(bizSeqService.next(BizSeqService.RULE_EAM_ASSET));
+        validate(asset);
+        if (!isAssetNoUnique(asset.getAssetNo(), null)) throw new BusinessException("資產編號已存在");
+        try {
+            assetMapper.insert(asset);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("資產編號已存在");
+        }
+        return asset.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void update(long id, EamAssetSaveDTO dto) {
+        EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, id).last("FOR UPDATE"));
+        if (asset == null) throw new BusinessException("資產不存在");
+        if (asset.getBatchId() != null && dto.getAssetNo() != null && !Objects.equals(asset.getAssetNo(), dto.getAssetNo().trim())) {
+            throw new BusinessException("驗收入庫資產編號不可修改");
+        }
+        apply(dto, asset);
+        validate(asset);
+        if (!isAssetNoUnique(asset.getAssetNo(), id)) throw new BusinessException("資產編號已存在");
+        try {
+            assetMapper.updateById(asset);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("資產編號已存在");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(long id) {
+        EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, id).last("FOR UPDATE"));
+        if (asset == null) throw new BusinessException("資產不存在");
+        if (!"idle".equals(asset.getStatus())) throw new BusinessException("僅閒置資產可刪除");
+        assetMapper.deleteById(id);
+    }
+
+    @Override
+    public boolean isAssetNoUnique(String assetNo, Long excludeId) {
+        if (!hasText(assetNo)) return false;
+        // 唯一键包含软删除记录，已使用过的编号不可复用。
+        return assetMapper.countAssetNo(assetNo.trim(), excludeId) == 0;
+    }
+
+    private EamAsset requireAsset(long id) {
+        EamAsset asset = assetMapper.selectById(id);
+        if (asset == null) throw new BusinessException("資產不存在");
+        return asset;
+    }
+
+    private void apply(EamAssetSaveDTO dto, EamAsset asset) {
+        if (dto.getQuantity() != null && dto.getQuantity() != 1) throw new BusinessException("資產台賬採用一物一碼，數量必須為 1");
+        BeanWrapper source = new BeanWrapperImpl(dto);
+        List<String> ignored = new ArrayList<>(List.of("params", "rentalPeriod"));
+        Arrays.stream(source.getPropertyDescriptors()).forEach(p -> {
+            if (source.getPropertyValue(p.getName()) == null) ignored.add(p.getName());
+        });
+        // 仅复制 DTO 白名单中的非空字段，部分更新不会清空来源及未提交的值。
+        BeanUtils.copyProperties(dto, asset, ignored.toArray(String[]::new));
+        if (dto.getParams() != null) asset.setParams(JsonUtils.toJson(dto.getParams()));
+        if (dto.getRentalPeriod() != null) {
+            if (!dto.getRentalPeriod().isEmpty() && dto.getRentalPeriod().size() != 2) throw new BusinessException("租賃期間需包含起止日期");
+            dto.getRentalPeriod().forEach(this::validateDate);
+            asset.setRentalPeriod(JsonUtils.toJson(dto.getRentalPeriod()));
+        }
+        if (dto.getModelId() != null) {
+            EamModel model = modelMapper.selectById(dto.getModelId());
+            if (model == null) throw new BusinessException("型號不存在");
+            asset.setAssetName(model.getName());
+            asset.setUnit(model.getUnit());
+            asset.setCategoryCode(model.getCategoryCode());
+            asset.setBrandId(model.getBrandId());
+            asset.setBrand(model.getBrandZh());
+        }
+        if (dto.getCategoryCode() != null || dto.getCategoryId() != null || dto.getModelId() != null) {
+            EamCategory category = hasText(asset.getCategoryCode())
+                    ? categoryMapper.selectOne(new LambdaQueryWrapper<EamCategory>().eq(EamCategory::getCode, asset.getCategoryCode()))
+                    : categoryMapper.selectById(asset.getCategoryId());
+            if (category == null) throw new BusinessException("分類不存在");
+            asset.setCategoryId(category.getId());
+            asset.setCategoryCode(category.getCode());
+            asset.setAssetType(category.getName());
+        }
+        if (dto.getBrandId() != null && dto.getModelId() == null) {
+            EamBrand brand = brandMapper.selectById(dto.getBrandId());
+            if (brand == null) throw new BusinessException("品牌不存在");
+            asset.setBrand(brand.getBrandZh());
+        }
+        if (dto.getLocationId() != null) {
+            EamLocation location = locationMapper.selectById(dto.getLocationId());
+            if (location == null) throw new BusinessException("存放位置不存在");
+            asset.setLocation(location.getName());
+        }
+        asset.setPurchaseType("lease".equals(asset.getSource()) ? "lease" : "purchase");
+        if (asset.getAssetNo() != null) asset.setAssetNo(asset.getAssetNo().trim());
+        asset.setUpdatedBy(operatorResolver.currentOperatorName());
+        asset.setUpdatedAt(java.time.LocalDateTime.now());
+    }
+
+    private void validate(EamAsset asset) {
+        if (!hasText(asset.getAssetName()) || !hasText(asset.getAssetType())) throw new BusinessException("資產名稱及分類不能為空");
+        if (!hasText(asset.getAssetNo()) || asset.getAssetNo().length() > 64) throw new BusinessException("資產編號長度需為 1 至 64 字元");
+        if (!STATUSES.contains(asset.getStatus())) throw new BusinessException("無效的資產狀態");
+        if (!Set.of("self", "lease").contains(asset.getSource())) throw new BusinessException("無效的採購形式");
+        if (!Set.of("owned", "borrowed").contains(asset.getHoldType())) throw new BusinessException("無效的持有方式");
+        if (asset.getPurchaseValue() != null && asset.getPurchaseValue().signum() < 0) throw new BusinessException("購買價值不能為負數");
+        validateDate(asset.getPurchaseDate());
+        validateDate(asset.getUsageDate());
+        validateDate(asset.getScrapTime());
+    }
+
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch) {
+        EamAssetVO vo = new EamAssetVO();
+        BeanUtils.copyProperties(asset, vo, "params", "rentalPeriod", "createdAt", "updatedAt");
+        Map<String, String> params = new LinkedHashMap<>();
+        JsonUtils.parseMap(asset.getParams()).forEach((key, value) -> params.put(key, Objects.toString(value, "")));
+        vo.setParams(params);
+        vo.setRentalPeriod(JsonUtils.parseStringList(asset.getRentalPeriod()));
+        vo.setQuantity(1);
+        vo.setApplicant(Objects.toString(asset.getUpdatedBy(), ""));
+        vo.setCreatedAt(asset.getCreatedAt() == null ? null : asset.getCreatedAt().toString());
+        vo.setUpdatedAt(asset.getUpdatedAt() == null ? null : asset.getUpdatedAt().toString());
+        if (batch != null) {
+            vo.setInboundBatchNo(batch.getBatchNo());
+            vo.setInboundDate(asset.getPurchaseDate());
+            vo.setInboundQty(1);
+            vo.setInspector(batch.getOperator());
+        }
+        return vo;
+    }
+
+    private LambdaQueryWrapper<EamAsset> queryWrapper(EamAssetQuery q) {
+        LambdaQueryWrapper<EamAsset> w = new LambdaQueryWrapper<>();
+        if (hasText(q.getKeyword())) w.and(x -> x.like(EamAsset::getAssetNo, q.getKeyword().trim())
+                .or().like(EamAsset::getAssetName, q.getKeyword().trim()).or().like(EamAsset::getUserName, q.getKeyword().trim()));
+        w.like(hasText(q.getAssetNo()), EamAsset::getAssetNo, q.getAssetNo())
+                .like(hasText(q.getAssetName()), EamAsset::getAssetName, q.getAssetName())
+                .eq(hasText(q.getAssetType()), EamAsset::getAssetType, q.getAssetType())
+                .eq(hasText(q.getBrand()), EamAsset::getBrand, q.getBrand())
+                .eq(hasText(q.getStatus()) && !"all".equals(q.getStatus()), EamAsset::getStatus, q.getStatus())
+                .eq(hasText(q.getCompany()), EamAsset::getCompany, q.getCompany())
+                .eq(hasText(q.getDepartment()), EamAsset::getDepartment, q.getDepartment())
+                .like(hasText(q.getUserName()), EamAsset::getUserName, q.getUserName())
+                .eq(hasText(q.getSource()), EamAsset::getSource, q.getSource())
+                .eq(q.getOrderId() != null, EamAsset::getOrderId, q.getOrderId())
+                .eq(q.getBatchId() != null, EamAsset::getBatchId, q.getBatchId())
+                .like(hasText(q.getUpdatedBy()), EamAsset::getUpdatedBy, q.getUpdatedBy());
+        if (hasText(q.getPurchaseDateStart())) w.ge(EamAsset::getPurchaseDate, date(q.getPurchaseDateStart()));
+        if (hasText(q.getPurchaseDateEnd())) w.lt(EamAsset::getPurchaseDate, date(q.getPurchaseDateEnd()).plusDays(1).toString());
+        if (hasText(q.getScrapDateStart())) w.ge(EamAsset::getScrapTime, date(q.getScrapDateStart()));
+        if (hasText(q.getScrapDateEnd())) w.lt(EamAsset::getScrapTime, date(q.getScrapDateEnd()).plusDays(1).toString());
+        if (hasText(q.getUpdatedAtStart())) w.ge(EamAsset::getUpdatedAt, date(q.getUpdatedAtStart()).atStartOfDay());
+        if (hasText(q.getUpdatedAtEnd())) w.lt(EamAsset::getUpdatedAt, date(q.getUpdatedAtEnd()).plusDays(1).atStartOfDay());
+        return w;
+    }
+
+    private boolean hasText(String text) { return text != null && !text.isBlank(); }
+    private void validateDate(String value) { if (hasText(value)) date(value); }
+    private LocalDate date(String value) {
+        try { return LocalDate.parse(value); }
+        catch (RuntimeException e) { throw new BusinessException("日期格式應為 yyyy-MM-dd"); }
+    }
+}

@@ -36,10 +36,14 @@ public class VersionHistoryDataInitializer implements CommandLineRunner {
                     throw new IllegalStateException("读取初始化脚本失败: " + INIT_SCRIPT, e);
                 }
             });
-            // 增量迁移：添加 commit_hash 字段
+            // 增量迁移：添加 commit_hash 字段（幂等：列已存在则跳过，避免重复启动报 Duplicate column）
             versionTracker.applyOnce("version_history:" + MIGRATION_SCRIPT + ":v1", () -> {
                 try {
-                    executeSqlScript(MIGRATION_SCRIPT);
+                    if (!columnExists("sys_version_history", "commit_hash")) {
+                        executeSqlScript(MIGRATION_SCRIPT);
+                    } else {
+                        log.info("sys_version_history.commit_hash 已存在，跳过 109 迁移");
+                    }
                 } catch (java.io.IOException e) {
                     throw new IllegalStateException("读取迁移脚本失败: " + MIGRATION_SCRIPT, e);
                 }
@@ -55,6 +59,14 @@ public class VersionHistoryDataInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.error("版本发布历史表初始化失败: {}", e.getMessage(), e);
         }
+    }
+
+    private boolean columnExists(String table, String column) {
+        Integer c = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+        return c != null && c > 0;
     }
 
     private void executeSqlScript(String scriptName) throws java.io.IOException {
