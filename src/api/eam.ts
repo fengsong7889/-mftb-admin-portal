@@ -102,14 +102,19 @@ export interface AssetModel {
   updatedAt?: string
 }
 
-/** 存放位置（樹形：倉庫/樓層/辦公室） */
+/** 存放位置（按省-市-区-详细地址维度，无层级关系） */
 export interface AssetLocation {
   id: number
   code: string
   name: string
-  parentId: number
-  type: 'warehouse' | 'floor' | 'room'
+  /** @deprecated 保留兼容旧数据，前端始终为 0 */
+  parentId?: number
+  /** @deprecated 保留兼容旧数据，不再使用 */
+  type?: string
   sort: number
+  province?: string
+  city?: string
+  district?: string
   address?: string
   remark?: string
   updatedBy?: string
@@ -241,6 +246,10 @@ export interface PurchaseOrderSupplierGroup {
   /** 預計收貨日期（從全局移入分組） */
   expectedReceiveDate?: string
   items: PurchaseOrderItem[]
+  /** 列表接口返回的分組級統計（摘要不含 items 明細時使用） */
+  totalQty?: number
+  receivedQty?: number
+  pendingQty?: number
 }
 
 /** 採購執行狀態 */
@@ -252,6 +261,8 @@ export interface PurchaseOrder {
   poNo: string
   /** 關聯採購申請 ID（0 表示直接下單） */
   reqId: number
+  /** 所屬品牌：1=閃蜂, 2=mFood */
+  brand?: number
   supplier: string
   /** 訂單金額（預估） */
   amount: number
@@ -274,7 +285,7 @@ export interface PurchaseOrder {
   exchangeQty?: number
   /** 讓步接收數量 */
   concessionQty?: number
-  /** 快遞/物流單號（兼容舊數據） */
+  /** 快遞單號（兼容舊數據） */
   trackingNo?: string
   /** 採購經辦人 */
   purchaser?: string
@@ -306,6 +317,8 @@ export interface InboundBatchItem {
   rejectReason?: string
   /** 驗收照片 [{name, dataUrl}] */
   photos?: { name: string; dataUrl: string }[]
+  /** 配件清單 [{name, qty}] */
+  accessories?: { name: string; qty: number }[]
   /** 入庫後生成的資產編號 */
   assetNos: string[]
 }
@@ -316,6 +329,8 @@ export interface InboundBatch {
   batchNo: string
   poId: number
   poNo: string
+  /** 所屬品牌：1=閃蜂, 2=mFood（創建批次時從採購訂單帶入） */
+  brand?: number
   inboundDate: string
   operator: string
   items: InboundBatchItem[]
@@ -573,6 +588,9 @@ function normalizePurchaseOrder(o: Record<string, unknown>): PurchaseOrder {
   return {
     ...(o as unknown as PurchaseOrder),
     items: (o.items as PurchaseOrderItem[] | undefined) || [],
+    // 列表接口返回的分組摘要不含 items，補空數組保證結構完整
+    supplierGroups: (o.supplierGroups as PurchaseOrderSupplierGroup[] | undefined)
+      ?.map((g) => ({ ...g, items: g.items || [] })),
     amount: Number(o.amount ?? 0),
     confirmedAmount: o.confirmedAmount != null ? Number(o.confirmedAmount) : undefined,
     createdAt: String(o.createdAt || '').replace('T', ' '),
@@ -853,7 +871,7 @@ export async function deleteModel(id: number): Promise<void> {
 
 /* ==================== API：存放位置 ==================== */
 
-export async function fetchLocationList(params?: { name?: string; code?: string; type?: string; updatedBy?: string; keyword?: string }): Promise<AssetLocation[]> {
+export async function fetchLocationList(params?: { name?: string; code?: string; province?: string; city?: string; district?: string; updatedBy?: string; keyword?: string }): Promise<AssetLocation[]> {
   return await request.get<unknown, AssetLocation[]>('/eam/basic/locations', { params, headers: { [SILENT_HEADER]: '1' } })
 }
 
@@ -867,6 +885,110 @@ export async function updateLocation(id: number, data: Partial<AssetLocation>): 
 
 export async function deleteLocation(id: number): Promise<void> {
     await request.delete(`/eam/basic/locations/${id}`)
+}
+
+/* ==================== API：分類配件配置 ==================== */
+
+/** 分類配件配置（同分類下所有產品共用，驗收時可一鍵帶入） */
+export interface CategoryAccessory {
+  id?: number
+  categoryCode?: string
+  /** 配件名稱 */
+  name: string
+  /** 默認數量 */
+  defaultQty: number
+  /** 狀態：1=啟用, 0=停用 */
+  status?: number
+  sort?: number
+  /** 最後更新人 */
+  updatedBy?: string
+  /** 最後更新時間 */
+  updatedAt?: string
+}
+
+const CATEGORY_ACCESSORY_KEY = 'eam_category_accessories'
+
+/** 讀取本地 mock 的分類配件配置（後端不可用時降級） */
+function readLocalCategoryAccessories(): Record<string, CategoryAccessory[]> {
+  try {
+    return JSON.parse(localStorage.getItem(CATEGORY_ACCESSORY_KEY) || '{}') as Record<string, CategoryAccessory[]>
+  } catch {
+    return {}
+  }
+}
+
+/** 寫回本地 mock */
+function writeLocalCategoryAccessories(all: Record<string, CategoryAccessory[]>): void {
+  localStorage.setItem(CATEGORY_ACCESSORY_KEY, JSON.stringify(all))
+}
+
+/** 分類配件列表（onlyEnabled=true 時僅返回啟用狀態，驗收彈窗選項用） */
+export async function fetchCategoryAccessories(categoryCode: string, onlyEnabled = false): Promise<CategoryAccessory[]> {
+  try {
+    return await request.get<unknown, CategoryAccessory[]>('/eam/basic/category-accessories', { params: { categoryCode, onlyEnabled } })
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    let list = readLocalCategoryAccessories()[categoryCode] || []
+    if (onlyEnabled) list = list.filter((a) => a.status !== 0)
+    return delay(list)
+  }
+}
+
+/** 新增分類配件，返回新記錄 ID */
+export async function createCategoryAccessory(categoryCode: string, item: { name: string; defaultQty: number }): Promise<number> {
+  try {
+    return await request.post<unknown, number>(`/eam/basic/category-accessories/${encodeURIComponent(categoryCode)}`, item)
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    const all = readLocalCategoryAccessories()
+    const list = all[categoryCode] || []
+    const id = Date.now()
+    all[categoryCode] = [...list, { id, categoryCode, name: item.name, defaultQty: item.defaultQty, status: 1, sort: list.length }]
+    writeLocalCategoryAccessories(all)
+    return delay(id)
+  }
+}
+
+/** 修改分類配件（名稱/默認數量） */
+export async function updateCategoryAccessory(id: number, item: { name: string; defaultQty: number }): Promise<void> {
+  try {
+    await request.put(`/eam/basic/category-accessories/item/${id}`, item)
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    const all = readLocalCategoryAccessories()
+    Object.keys(all).forEach((code) => {
+      all[code] = all[code].map((a) => (a.id === id ? { ...a, ...item, updatedAt: now() } : a))
+    })
+    writeLocalCategoryAccessories(all)
+  }
+}
+
+/** 啟用/停用分類配件（status: 1=啟用, 0=停用） */
+export async function updateCategoryAccessoryStatus(id: number, status: number): Promise<void> {
+  try {
+    await request.put(`/eam/basic/category-accessories/item/${id}/status`, null, { params: { status } })
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    const all = readLocalCategoryAccessories()
+    Object.keys(all).forEach((code) => {
+      all[code] = all[code].map((a) => (a.id === id ? { ...a, status, updatedAt: now() } : a))
+    })
+    writeLocalCategoryAccessories(all)
+  }
+}
+
+/** 刪除分類配件（邏輯刪除） */
+export async function deleteCategoryAccessory(id: number): Promise<void> {
+  try {
+    await request.delete(`/eam/basic/category-accessories/item/${id}`)
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    const all = readLocalCategoryAccessories()
+    Object.keys(all).forEach((code) => {
+      all[code] = all[code].filter((a) => a.id !== id)
+    })
+    writeLocalCategoryAccessories(all)
+  }
 }
 
 /* ==================== API：採購申請 ==================== */
@@ -965,6 +1087,8 @@ export interface PurchaseOrderExecUpdate {
   trackingNo?: string
   purchaser?: string
   department?: string
+  /** 所屬品牌：1=閃蜂, 2=mFood */
+  brand?: number
   orderDate?: string
   contact?: string
   remark?: string
@@ -984,6 +1108,7 @@ function mockUpdatePurchaseOrderExec(id: number, data: PurchaseOrderExecUpdate):
   if (data.trackingNo !== undefined) o.trackingNo = data.trackingNo
   if (data.purchaser !== undefined) o.purchaser = data.purchaser
   if (data.department !== undefined) o.department = data.department
+  if (data.brand !== undefined) o.brand = data.brand
   if (data.orderDate !== undefined) o.orderDate = data.orderDate
   if (data.contact !== undefined) o.contact = data.contact
   if (data.remark !== undefined) o.remark = data.remark
@@ -1158,18 +1283,30 @@ export async function deletePurchaseOrder(id: number): Promise<void> {
 
 /* ==================== API：驗收入庫 ==================== */
 
-export function fetchInboundList(params?: EamPageQuery): Promise<PageResult<InboundBatch>> {
-  let list = [...mockInboundBatches].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  if (params?.keyword) {
-    list = list.filter((b) => matchKeyword(b, ['batchNo', 'poNo', 'operator'], params.keyword))
+export async function fetchInboundList(params?: EamPageQuery): Promise<PageResult<InboundBatch>> {
+  try {
+    // 後端優先：分頁查詢入庫批次（含 brand）
+    return await request.get<unknown, PageResult<InboundBatch>>('/eam/inbound', { params })
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    // 後端不可用時降級本地 mock
+    let list = [...mockInboundBatches].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    if (params?.keyword) {
+      list = list.filter((b) => matchKeyword(b, ['batchNo', 'poNo', 'operator'], params.keyword))
+    }
+    return delay(paginate(list, params?.page, params?.size))
   }
-  return delay(paginate(list, params?.page, params?.size))
 }
 
 /** 入庫批次詳情 */
-export function fetchInboundDetail(batchId: number): Promise<InboundBatch | null> {
-  const batch = mockInboundBatches.find((b) => b.id === batchId) || null
-  return delay(batch)
+export async function fetchInboundDetail(batchId: number): Promise<InboundBatch | null> {
+  try {
+    return await request.get<unknown, InboundBatch>(`/eam/inbound/${batchId}`)
+  } catch (e) {
+    if (!isBackendUnavailable(e)) throw e
+    const batch = mockInboundBatches.find((b) => b.id === batchId) || null
+    return delay(batch)
+  }
 }
 
 /** 待入庫訂單（仍有未驗收數量的訂單） */
@@ -1215,6 +1352,8 @@ export async function createInboundBatch(data: {
     rejectReason?: string
     /** 驗收照片 [{name, dataUrl}] */
     photos?: { name: string; dataUrl: string }[]
+    /** 配件清單 [{name, qty}]，隨驗收記錄保存 */
+    accessories?: { name: string; qty: number }[]
   }[]
   remark?: string
 }): Promise<InboundBatch> {
@@ -1229,19 +1368,20 @@ export async function createInboundBatch(data: {
   const categoryMap = new Map(categories.map((c) => [c.code, c.name]))
   const locationMap = new Map(locations.map((l) => [l.id, l.name]))
 
-  // 逐條展開為單件資產（一物一碼，不通過項不生成資產）
-  const flat: { model: AssetModel; locationId: number }[] = []
+  // 逐條展開為單件資產（一物一碼，不通過項不生成資產；同明細行照片寫入每件資產主圖）
+  const flat: { model: AssetModel; locationId: number; images: string | null }[] = []
   data.items.forEach((it) => {
     const model = modelMap.get(it.modelId)
     if (!model) throw new Error('型號不存在')
     if (it.disposition && it.disposition !== 'pass') return
-    for (let i = 0; i < it.qty; i += 1) flat.push({ model, locationId: it.locationId })
+    const images = it.photos && it.photos.length > 0 ? it.photos.map((p) => p.dataUrl).join(',') : null
+    for (let i = 0; i < it.qty; i += 1) flat.push({ model, locationId: it.locationId, images })
   })
 
   const categoryOf = (code: string) => categoryMap.get(code) || code
   const locationOf = (id: number) => locationMap.get(id) || ''
 
-  const payload = flat.map(({ model, locationId }) => ({
+  const payload = flat.map(({ model, locationId, images }) => ({
     assetName: model.name,
     assetType: categoryOf(model.categoryCode),
     brand: model.brandZh,
@@ -1251,12 +1391,12 @@ export async function createInboundBatch(data: {
     purchaseDate: data.inboundDate,
     usageDate: null,
     source: 'self' as const,
-    company: '澳觅科技',
+    company: '澳覓科技',
     location: locationOf(locationId),
-    department: '物资部',
+    department: '物資部',
     userName: '',
     status: 'idle' as const,
-    images: null,
+    images,
     remark: `採購訂單入庫`,
     applicant: data.operator,
     scrapTime: null,
@@ -1280,6 +1420,7 @@ export async function createInboundBatch(data: {
       disposition: it.disposition || 'pass',
       rejectReason: it.rejectReason,
       photos: it.photos,
+      accessories: it.accessories,
     }
   })
 
@@ -1299,7 +1440,7 @@ export function saveInboundDraft(data: {
   poId: number
   inboundDate: string
   operator: string
-  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string }[]
+  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
   remark?: string
 }): Promise<void> {
   // 草稿暫存於 localStorage
@@ -1314,7 +1455,7 @@ export function loadInboundDraft(poId: number): Promise<{
   poId: number
   inboundDate: string
   operator: string
-  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string }[]
+  items: { modelId: number; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
   remark?: string
   savedAt: string
 } | null> {

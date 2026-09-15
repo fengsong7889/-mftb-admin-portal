@@ -1,13 +1,12 @@
 /**
  * 仓库维护 詳情頁（只讀）
  *
- * - 使用 DetailPageHeader 組件（紫色漸變頂條 + 橙色返回 + 藍色標題 + 右側編輯按鈕）
- * - 卡片式佈局：基本信息
+ * - 使用 DetailPageHeader 組件（橙色返回 + 藍色標題 + 右側編輯按鈕）
+ * - 卡片式佈局：基本信息（編碼、名稱、省-市-区-详细地址）
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Spin, Descriptions, Tag } from 'antd'
+import { Spin, Descriptions } from 'antd'
 import { HomeOutlined } from '@ant-design/icons'
-import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import { fetchLocationList, type AssetLocation } from '../../../api/eam'
 
@@ -17,17 +16,9 @@ interface Props {
   onEdit: (id: number) => void
 }
 
-const TYPE_META: Record<AssetLocation['type'], { label: string; color: string }> = {
-  warehouse: { label: '倉庫', color: 'blue' },
-  floor:     { label: '樓層', color: 'cyan' },
-  room:      { label: '房号', color: 'green' },
-}
-
 export default function LocationDetail({ id, onBack, onEdit }: Props) {
-  const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [location, setLocation] = useState<AssetLocation | null>(null)
-  const [parentName, setParentName] = useState<string>('—')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -36,12 +27,6 @@ export default function LocationDetail({ id, onBack, onEdit }: Props) {
       const cur = list.find((l) => l.id === id)
       if (cur) {
         setLocation(cur)
-        if (cur.parentId && cur.parentId !== 0) {
-          const parent = list.find((l) => l.id === cur.parentId)
-          if (parent) setParentName(`${parent.name}（${parent.code}）`)
-        } else {
-          setParentName('—（頂級）')
-        }
       }
     } catch {
       setLocation(null)
@@ -84,14 +69,14 @@ export default function LocationDetail({ id, onBack, onEdit }: Props) {
     )
   }
 
-  const typeMeta = TYPE_META[location.type]
+  const fullAddress = [location.province, location.city, location.district, location.address].filter(Boolean).join(' ') || '—'
 
   return (
     <>
       {/* ====== 頂部標題欄（全局 DetailPageHeader） ====== */}
       <DetailPageHeader
         title={location.name}
-        meta={<>{location.code} · {typeMeta.label}</>}
+        meta={<>{location.code}</>}
         onBack={onBack}
         onEdit={() => onEdit(id)}
       />
@@ -108,11 +93,11 @@ export default function LocationDetail({ id, onBack, onEdit }: Props) {
             <span style={{ fontFamily: 'monospace' }}>{location.code}</span>
           </Descriptions.Item>
           <Descriptions.Item label="倉庫名稱">{location.name}</Descriptions.Item>
-          <Descriptions.Item label="位置類型">
-            <Tag color={typeMeta.color}>{typeMeta.label}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="上級倉庫">{parentName}</Descriptions.Item>
-          <Descriptions.Item label="倉庫地址" span={2}>{location.address || '—'}</Descriptions.Item>
+          <Descriptions.Item label="省份">{location.province || '—'}</Descriptions.Item>
+          <Descriptions.Item label="城市">{location.city || '—'}</Descriptions.Item>
+          <Descriptions.Item label="區縣">{location.district || '—'}</Descriptions.Item>
+          <Descriptions.Item label="詳細地址">{location.address || '—'}</Descriptions.Item>
+          <Descriptions.Item label="完整地址" span={3}>{fullAddress}</Descriptions.Item>
           <Descriptions.Item label="最後更新人">{location.updatedBy || '—'}</Descriptions.Item>
           <Descriptions.Item label="最後更新時間" span={2}>{location.updatedAt || '—'}</Descriptions.Item>
           <Descriptions.Item label="備註" span={3}>{location.remark || '—'}</Descriptions.Item>

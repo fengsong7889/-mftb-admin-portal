@@ -24,6 +24,9 @@ public class EamInboundBatch {
     /** 采购订单号（冗余） */
     private String poNo;
 
+    /** 所属品牌：1=閃蜂, 2=mFood */
+    private Integer brand;
+
     /** 验收日期 */
     private String inboundDate;
 

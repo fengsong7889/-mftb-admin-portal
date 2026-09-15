@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
 import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
@@ -71,7 +72,7 @@ public interface EamBasicDataService {
     /* ==================== 仓库 / 存放位置 ==================== */
 
     /** 位置列表（平铺返回，页面自行构树） */
-    List<Map<String, Object>> listLocations(String keyword, String name, String code, String type, String updatedBy);
+    List<Map<String, Object>> listLocations(String keyword, String name, String code, String province, String city, String district, String updatedBy);
 
     /** 新增位置 */
     long createLocation(EamLocationSaveDTO dto);
@@ -110,4 +111,26 @@ public interface EamBasicDataService {
 
     /** 删除参数值 */
     void deleteParamValue(long id);
+
+    /* ==================== 分类配件配置 ==================== */
+
+    /**
+     * 分类配件列表（同分类下所有产品共用）。
+     *
+     * @param categoryCode 分类编码，空则返回全部分类
+     * @param onlyEnabled  true 时仅返回启用状态的配件（验收弹窗选项用）
+     */
+    List<Map<String, Object>> listCategoryAccessories(String categoryCode, boolean onlyEnabled);
+
+    /** 新增分类配件，返回新记录 ID */
+    Long createCategoryAccessory(String categoryCode, EamCategoryAccessorySaveDTO dto);
+
+    /** 修改分类配件（名称/默认数量） */
+    void updateCategoryAccessory(long id, EamCategoryAccessorySaveDTO dto);
+
+    /** 启用/停用分类配件（status: 1=启用, 0=停用） */
+    void updateCategoryAccessoryStatus(long id, Integer status);
+
+    /** 删除分类配件（逻辑删除） */
+    void deleteCategoryAccessory(long id);
 }

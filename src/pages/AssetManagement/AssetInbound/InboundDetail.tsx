@@ -13,6 +13,7 @@ import {
   ExclamationCircleOutlined, SwapOutlined, RollbackOutlined, CameraOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import BrandTag from '../../../components/BrandTag'
 import { fetchInboundDetail, fetchLocationList, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
 
 interface Props {
@@ -85,6 +86,20 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     {
       title: '不通过原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
       render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
+    },
+    {
+      title: '配件清單', key: 'accessories', width: 220,
+      render: (_: unknown, r: InboundBatchItem) => {
+        const accs = r.accessories || []
+        if (accs.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {accs.map((a, i) => (
+              <Tag key={i} style={{ margin: 0, fontSize: 12 }}>{a.name} × {a.qty}</Tag>
+            ))}
+          </div>
+        )
+      },
     },
     {
       title: '验收照片', key: 'photos', width: 120,
@@ -176,6 +191,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.operator || '-'}</div>
           </Col>
           <Col span={8}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬品牌</div>
+            <div style={{ fontSize: 14 }}>
+              {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
+            </div>
+          </Col>
+          <Col span={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>創建時間</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.createdAt}</div>
           </Col>
@@ -265,6 +286,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           rowKey={(r) => r.modelId?.toString() || Math.random().toString()}
           size="small"
           pagination={false}
+          scroll={{ x: 1320 }}
         />
       </div>
 

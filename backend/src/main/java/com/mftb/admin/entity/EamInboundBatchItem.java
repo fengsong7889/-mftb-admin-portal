@@ -42,6 +42,9 @@ public class EamInboundBatchItem {
     /** 验收照片 JSON 数组 [{name,dataUrl}] */
     private String photos;
 
+    /** 配件清单 JSON 数组 [{name,qty}] */
+    private String accessories;
+
     /** 排序 */
     private Integer sortOrder;
 }

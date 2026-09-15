@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker } from 'antd'
+import { Button, Form, Input, Select, Table, Modal, message, Space, Tabs, DatePicker, Tag } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import dayjs from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
@@ -20,6 +20,7 @@ import {
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import BrandTag from '../../../components/BrandTag'
 
 const EXEC_STATUS_LIST: ExecStatus[] = ['pending', 'purchasing', 'completed']
 
@@ -245,6 +246,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
     { key: 'poNo', title: t('asset.colPoNo') },
+    { key: 'brand', title: '所屬品牌' },
     { key: 'reqId', title: t('asset.colReqNo') },
     { key: 'supplier', title: t('asset.colSupplier') },
     { key: 'confirmedAmount', title: t('asset.colConfirmedAmount') },
@@ -265,6 +267,10 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     {
       title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+    },
+    {
+      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
       title: t('asset.colReqNo'), dataIndex: 'reqId', key: 'reqId', width: 130,
@@ -423,7 +429,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2270 }}
+        scroll={{ x: 2370 }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,

@@ -10,7 +10,7 @@
  *
  * 级联逻辑：分类 → 品牌 → 产品型号 → 参数模板
  * 采购形式条件：自购显示购买公司，租用显示租用公司+租借公司
- * 位置级联：仓库 → 楼层 → 办公室
+ * 位置选择：平铺选择仓库位置
  *
  * URL 参数：
  *  - ?id= 编辑模式
@@ -123,19 +123,27 @@ export default function AssetAdd() {
   /* ----- 采购形式条件显示 ----- */
   const source = Form.useWatch('source', form)
 
-  /* ----- 位置级联 ----- */
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | undefined>(undefined)
-  const [selectedFloorId, setSelectedFloorId] = useState<number | undefined>(undefined)
+  /* ----- 存放位置（平铺选择） ----- */
+  const [selectedLocationId, setSelectedLocationId] = useState<number | undefined>(undefined)
 
-  const warehouses = useMemo(() => locations.filter((l) => l.type === 'warehouse'), [locations])
-  const floors = useMemo(
-    () => locations.filter((l) => l.type === 'floor' && l.parentId === selectedWarehouseId),
-    [locations, selectedWarehouseId],
-  )
-  const rooms = useMemo(
-    () => locations.filter((l) => l.type === 'room' && l.parentId === selectedFloorId),
-    [locations, selectedFloorId],
-  )
+  const locationTreeData = useMemo(() => {
+    const nodeMap = new Map<number, { title: string; value: number; children?: { title: string; value: number }[] }>()
+    locations.forEach(loc => {
+      nodeMap.set(loc.id, { title: `${loc.name}（${loc.code}）`, value: loc.id, children: [] })
+    })
+    const roots: { title: string; value: number; children?: { title: string; value: number }[] }[] = []
+    locations.forEach(loc => {
+      const node = nodeMap.get(loc.id)!
+      const parent = loc.parentId ? nodeMap.get(loc.parentId) : undefined
+      if (parent) {
+        parent.children = parent.children || []
+        parent.children.push(node)
+      } else {
+        roots.push(node)
+      }
+    })
+    return roots
+  }, [locations])
 
   /* ----- 加载基础数据 ----- */
   useEffect(() => {
@@ -287,16 +295,9 @@ export default function AssetAdd() {
     }))
   }, [paramFields, paramValuesForSelect])
 
-  /* ----- 位置级联处理 ----- */
-  const handleWarehouseChange = (id: number | undefined) => {
-    setSelectedWarehouseId(id)
-    setSelectedFloorId(undefined)
-    form.setFieldValue('locationFloor', undefined)
-    form.setFieldValue('locationRoom', undefined)
-  }
-  const handleFloorChange = (id: number | undefined) => {
-    setSelectedFloorId(id)
-    form.setFieldValue('locationRoom', undefined)
+  /* ----- 位置选择处理 ----- */
+  const handleLocationChange = (id: number | undefined) => {
+    setSelectedLocationId(id)
   }
 
   /* ----- 图片上传 ----- */
@@ -320,10 +321,8 @@ export default function AssetAdd() {
       if (!v.assetNo?.trim()) { message.error('请填写资产编码'); return }
 
       // 拼接位置信息
-      const wh = warehouses.find((w) => w.id === selectedWarehouseId)
-      const fl = floors.find((f) => f.id === selectedFloorId)
-      const rm = rooms.find((r) => r.id === v.locationRoom)
-      const locationParts = [wh?.name, fl?.name, rm?.name].filter(Boolean).join('-')
+      const loc = locations.find((l) => l.id === selectedLocationId)
+      const locationParts = loc ? [loc.province, loc.city, loc.district, loc.address].filter(Boolean).join(' ') || loc.name : ''
 
       setSubmitting(true)
       const payload = {
@@ -635,41 +634,16 @@ export default function AssetAdd() {
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>存放位置</div>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Form.Item label="仓库" style={{ marginBottom: 0 }}>
-                    <Select
-                      placeholder="请选择仓库"
+                  <Form.Item label="仓库位置" style={{ marginBottom: 0 }}>
+                    <TreeSelect
+                      placeholder="请选择仓库位置"
                       allowClear
                       showSearch
-                      optionFilterProp="label"
-                      options={warehouses.map((w) => ({ label: `${w.name}（${w.code}）`, value: w.id }))}
-                      value={selectedWarehouseId}
-                      onChange={handleWarehouseChange}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="楼层" style={{ marginBottom: 0 }}>
-                    <Select
-                      placeholder="请选择楼层"
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      disabled={!selectedWarehouseId}
-                      options={floors.map((f) => ({ label: `${f.name}（${f.code}）`, value: f.id }))}
-                      value={selectedFloorId}
-                      onChange={handleFloorChange}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item name="locationRoom" label="办公室" style={{ marginBottom: 0 }}>
-                    <Select
-                      placeholder="请选择办公室"
-                      allowClear
-                      showSearch
-                      optionFilterProp="label"
-                      disabled={!selectedFloorId}
-                      options={rooms.map((r) => ({ label: `${r.name}（${r.code}）`, value: r.id }))}
+                      treeNodeFilterProp="title"
+                      treeData={locationTreeData}
+                      treeDefaultExpandAll
+                      value={selectedLocationId}
+                      onChange={handleLocationChange}
                     />
                   </Form.Item>
                 </Col>

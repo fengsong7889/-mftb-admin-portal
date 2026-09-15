@@ -1,120 +1,110 @@
 /**
  * 仓库维护 新增/編輯獨立表單頁
  *
- * - 位置分三類：倉庫 / 樓層 / 辦公室（room 必須掛在 floor 或 warehouse 下）
+ * - 按省-市-区-详细地址维度管理仓库位置
+ * - 编码由人工手动填写，全局唯一
+ * - 省/市/区 Select 三级联动
  * - 底部「取消 + 保存」（全局表單規範）
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
-  Button, Form, Input, Select, TreeSelect, Row, Col, Space, Spin, message,
+  Button, Form, Input, Select, Spin, message, Space,
 } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchLocationList, createLocation, updateLocation, type AssetLocation,
+  fetchLocationList, createLocation, updateLocation,
 } from '../../../api/eam'
-import { buildTree, toTreeSelectData, type TreeSelectNode } from '../eamUtils'
-import { generateLocationCode } from '../../../utils/generateCode'
-
-const TYPE_OPTIONS: { value: AssetLocation['type']; label: string }[] = [
-  { value: 'warehouse', label: '倉庫' },
-  { value: 'floor', label: '樓層' },
-  { value: 'room', label: '房号' },
-]
+import { regionData, getProvinces, getCities, getDistricts } from '../../../constants/regionData'
 
 interface FormValues {
-  code?: string
+  code: string
   name: string
-  parentId?: number
-  type: AssetLocation['type']
+  province?: string
+  city?: string
+  district?: string
   address?: string
   remark?: string
 }
 
 interface Props {
   id?: number
-  parentId?: number
   onBack: () => void
 }
 
-export default function LocationForm({ id, parentId, onBack }: Props) {
+export default function LocationForm({ id, onBack }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [treeData, setTreeData] = useState<TreeSelectNode[]>([])
-  const [existingCode, setExistingCode] = useState<string>('')
-  const [existingCodes, setExistingCodes] = useState<string[]>([])
-  const [idToInfo, setIdToInfo] = useState<Map<number, { code: string; type: string }>>(new Map())
+
+  // 省市区联动：用 state 追踪已选值（比 Form.useWatch 更稳定）
+  const [selectedProvince, setSelectedProvince] = useState<string>()
+  const [selectedCity, setSelectedCity] = useState<string>()
+
+  const provinceOptions = useMemo(() => getProvinces(regionData).map(p => ({ label: p, value: p })), [])
+  const cityOptions = useMemo(
+    () => (selectedProvince ? getCities(regionData, selectedProvince).map(c => ({ label: c, value: c })) : []),
+    [selectedProvince],
+  )
+  const districtOptions = useMemo(
+    () => (selectedProvince && selectedCity ? getDistricts(regionData, selectedProvince, selectedCity).map(d => ({ label: d, value: d })) : []),
+    [selectedProvince, selectedCity],
+  )
 
   useEffect(() => {
     let alive = true
-    setLoading(true)
-    fetchLocationList()
-      .then((list) => {
-        if (!alive) return
-        setTreeData(toTreeSelectData(buildTree(list), isEdit && id ? [id] : []))
-        setExistingCodes(list.map(l => l.code))
-        setIdToInfo(new Map(list.map(l => [l.id, { code: l.code, type: l.type }])))
-        if (isEdit && id) {
+    if (isEdit && id) {
+      setLoading(true)
+      fetchLocationList()
+        .then((list) => {
+          if (!alive) return
           const cur = list.find((l) => l.id === id)
           if (cur) {
-            setExistingCode(cur.code)
             form.setFieldsValue({
               code: cur.code,
               name: cur.name,
-              parentId: cur.parentId || undefined,
-              type: cur.type,
+              province: cur.province || undefined,
+              city: cur.city || undefined,
+              district: cur.district || undefined,
               address: cur.address,
               remark: cur.remark,
             })
+            setSelectedProvince(cur.province || undefined)
+            setSelectedCity(cur.city || undefined)
           }
-        } else {
-          form.setFieldsValue({ parentId: parentId || undefined, type: 'warehouse' })
-          // 新增模式：自动生成编码
-          const parentInfo = parentId ? list.find(l => l.id === parentId) : undefined
-          const autoCode = generateLocationCode(
-            list.map(l => l.code),
-            'warehouse',
-            parentId,
-            parentInfo?.code,
-            parentInfo?.type,
-          )
-          form.setFieldsValue({ code: autoCode })
-        }
-      })
-      .catch((e: Error) => message.error(e.message))
-      .finally(() => { if (alive) setLoading(false) })
+        })
+        .catch((e: Error) => message.error(e.message))
+        .finally(() => { if (alive) setLoading(false) })
+    }
     return () => { alive = false }
-  }, [form, id, isEdit, parentId])
+  }, [form, id, isEdit])
 
-  /** 位置类型或上级变更时重新生成编码 */
-  const handleTypeOrParentChange = () => {
-    if (isEdit) return
-    const values = form.getFieldsValue()
-    const type = values.type || 'warehouse'
-    const parentId = values.parentId
-    const parentInfo = parentId ? idToInfo.get(parentId) : undefined
-    const autoCode = generateLocationCode(
-      existingCodes,
-      type,
-      parentId,
-      parentInfo?.code,
-      parentInfo?.type,
-    )
-    form.setFieldsValue({ code: autoCode })
+  /** 省份变更时清空市/区县 */
+  const handleProvinceChange = (value: string | undefined) => {
+    setSelectedProvince(value)
+    setSelectedCity(undefined)
+    form.setFieldsValue({ city: undefined, district: undefined })
+  }
+
+  /** 城市变更时清空区县 */
+  const handleCityChange = (value: string | undefined) => {
+    setSelectedCity(value)
+    form.setFieldsValue({ district: undefined })
   }
 
   const handleSubmit = async () => {
     try {
       const v = await form.validateFields()
       const payload = {
-        code: v.code?.trim() || existingCode,
+        code: v.code.trim(),
         name: v.name.trim(),
-        parentId: v.parentId || 0,
-        type: v.type,
+        parentId: 0,
         sort: 1,
+        province: v.province?.trim(),
+        city: v.city?.trim(),
+        district: v.district?.trim(),
         address: v.address?.trim(),
         remark: v.remark,
       }
@@ -156,61 +146,82 @@ export default function LocationForm({ id, parentId, onBack }: Props) {
         </div>
       </div>
 
-      {/* ====== 表單區 ====== */}
+      {/* ====== 基本信息 ====== */}
       <div style={{
-        background: '#fff', borderRadius: 8, padding: 24,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
-        <Form<FormValues> form={form} layout="vertical">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label="編碼"
-                name="code"
-              >
-                <Input
-                  placeholder="系统自动生成"
-                  disabled={!isEdit}
-                  style={{ fontFamily: 'monospace' }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="倉庫名稱" name="name"
-                rules={[{ required: true, message: t('asset.nameRequired') }]}
-              >
-                <Input placeholder="請輸入倉庫名稱" allowClear />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="位置類型" name="type"
-                rules={[{ required: true }]}
-              >
-                <Select options={TYPE_OPTIONS} onChange={handleTypeOrParentChange} />
-              </Form.Item>
-            </Col>
-          </Row>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 14, color: '#1890ff' }}>📍</span>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基本信息</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
 
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item label="上級倉庫" name="parentId">
-                <TreeSelect
-                  treeData={treeData}
-                  placeholder="請選擇上級倉庫"
-                  allowClear
-                  treeDefaultExpandAll
-                  onChange={handleTypeOrParentChange}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={16}>
-              <Form.Item label="倉庫地址" name="address">
-                <Input placeholder="請輸入倉庫地址" allowClear />
-              </Form.Item>
-            </Col>
-          </Row>
+        <Form<FormValues> form={form} layout="vertical">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            <Form.Item
+              label="編碼"
+              name="code"
+              rules={[{ required: true, message: '請輸入編碼' }]}
+            >
+              <Input
+                placeholder="請輸入編碼（全局唯一）"
+                style={{ fontFamily: 'monospace' }}
+              />
+            </Form.Item>
+            <Form.Item
+              label="倉庫名稱" name="name"
+              rules={[{ required: true, message: t('asset.nameRequired') }]}
+            >
+              <Input placeholder="請輸入倉庫名稱" allowClear />
+            </Form.Item>
+            <div /> {/* 占位空行 */}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <Form.Item
+              label="省份" name="province"
+              rules={[{ required: true, message: '請選擇省份' }]}
+            >
+              <Select
+                placeholder="請選擇省份"
+                allowClear
+                showSearch
+                options={provinceOptions}
+                onChange={handleProvinceChange}
+              />
+            </Form.Item>
+            <Form.Item
+              label="城市" name="city"
+              rules={[{ required: true, message: '請選擇城市' }]}
+            >
+              <Select
+                placeholder={selectedProvince ? '請選擇城市' : '請先選擇省份'}
+                allowClear
+                showSearch
+                disabled={!selectedProvince}
+                options={cityOptions}
+                onChange={handleCityChange}
+              />
+            </Form.Item>
+            <Form.Item
+              label="區縣" name="district"
+              rules={[{ required: true, message: '請選擇區縣' }]}
+            >
+              <Select
+                placeholder={selectedCity ? '請選擇區縣' : '請先選擇城市'}
+                allowClear
+                showSearch
+                disabled={!selectedCity}
+                options={districtOptions}
+              />
+            </Form.Item>
+            <Form.Item label="詳細地址" name="address">
+              <Input placeholder="請輸入完整詳細地址（街道、門牌號等）" allowClear />
+            </Form.Item>
+          </div>
 
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea

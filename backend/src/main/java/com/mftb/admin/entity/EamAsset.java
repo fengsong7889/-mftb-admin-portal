@@ -43,6 +43,9 @@ public class EamAsset {
     /** 参数信息 JSON */
     private String params;
 
+    /** 资产照片（Data URL，多张逗号分隔） */
+    private String images;
+
     /** 单位 */
     private String unit;
 

@@ -17,6 +17,7 @@ public interface EamPurchaseService {
      */
     PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String processNo,
                                                 String supplier, String purchaser, String execStatus,
+                                                String status,
                                                 String createdAtStart, String createdAtEnd,
                                                 String updatedAtStart, String updatedAtEnd);
 

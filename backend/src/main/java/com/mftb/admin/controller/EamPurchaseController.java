@@ -33,12 +33,13 @@ public class EamPurchaseController {
             @RequestParam(required = false) String supplier,
             @RequestParam(required = false) String purchaser,
             @RequestParam(required = false) String execStatus,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) String createdAtStart,
             @RequestParam(required = false) String createdAtEnd,
             @RequestParam(required = false) String updatedAtStart,
             @RequestParam(required = false) String updatedAtEnd) {
         return Result.success(purchaseService.pageOrders(
-                page, size, poNo, processNo, supplier, purchaser, execStatus,
+                page, size, poNo, processNo, supplier, purchaser, execStatus, status,
                 createdAtStart, createdAtEnd, updatedAtStart, updatedAtEnd));
     }
 

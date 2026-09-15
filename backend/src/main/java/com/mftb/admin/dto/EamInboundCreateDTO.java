@@ -49,5 +49,8 @@ public class EamInboundCreateDTO {
 
         /** 验收照片(JSON数组原样透传) */
         private Object photos;
+
+        /** 配件清单(JSON数组原样透传 [{name,qty}]) */
+        private Object accessories;
     }
 }

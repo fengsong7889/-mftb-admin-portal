@@ -1841,6 +1841,11 @@ export default function EmployeeDetail() {
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.empIdLabel')}：</span>
                 <span style={{ fontSize: 14, color: '#262626' }}>{employee.empId}</span>
               </div>
+              {/* 任職公司 */}
+              <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.colPosCompany')}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.company || '-'}</span>
+              </div>
               {/* 所屬部門 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.deptLabel')}：</span>

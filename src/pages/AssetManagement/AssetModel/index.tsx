@@ -7,9 +7,11 @@ import { useState } from 'react'
 import ModelList from './ModelList'
 import ModelForm from './ModelForm'
 import ModelDetail from './ModelDetail'
+import AccessoryConfig from './AccessoryConfig'
 
 type View =
   | { mode: 'list' }
+  | { mode: 'accessoryConfig'; categoryCode: string; categoryName: string }
   | { mode: 'brandDetail'; id: number }
   | { mode: 'productDetail'; id: number }
   | { mode: 'brandForm'; id?: number; categoryCode?: string }
@@ -28,6 +30,14 @@ export default function AssetModel() {
           onEditProduct={(id) => setView({ mode: 'productForm', id })}
           onDetailBrand={(id) => setView({ mode: 'brandDetail', id })}
           onDetailProduct={(id) => setView({ mode: 'productDetail', id })}
+          onAccessoryConfig={(categoryCode, categoryName) => setView({ mode: 'accessoryConfig', categoryCode, categoryName })}
+        />
+      ) : view.mode === 'accessoryConfig' ? (
+        <AccessoryConfig
+          key={view.categoryCode}
+          categoryCode={view.categoryCode}
+          categoryName={view.categoryName}
+          onBack={() => setView({ mode: 'list' })}
         />
       ) : view.mode === 'brandDetail' ? (
         <ModelDetail

@@ -25,6 +25,7 @@ interface Props {
   onEditProduct: (id: number) => void
   onDetailBrand: (id: number) => void
   onDetailProduct: (id: number) => void
+  onAccessoryConfig: (categoryCode: string, categoryName: string) => void
 }
 
 interface SearchFormValues {
@@ -91,6 +92,7 @@ export default function ModelList({
   onAddBrand, onAddProduct,
   onEditBrand, onEditProduct,
   onDetailBrand, onDetailProduct,
+  onAccessoryConfig,
 }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<SearchFormValues>()
@@ -525,6 +527,12 @@ export default function ModelList({
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
                     新增品牌
                   </Button>
+                  <Tooltip title={selectedCategory ? '按分类配置常用配件，验收时可一键带入' : '请先在左侧选择分类'}>
+                    <Button icon={<AppstoreOutlined />} disabled={!selectedCategory}
+                      onClick={() => selectedCategory && onAccessoryConfig(selectedCategory.code, selectedCategory.name)}>
+                      配件配置
+                    </Button>
+                  </Tooltip>
                   {brandConfigComponent}
                 </>
               )}

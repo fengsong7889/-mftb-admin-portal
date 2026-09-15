@@ -15,9 +15,10 @@ import {
   SearchOutlined, ReloadOutlined, ExportOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchInboundList, fetchPurchaseOrderList, type InboundBatch, type PurchaseOrder } from '../../../api/eam'
+import { fetchInboundList, fetchPurchaseOrderList, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup } from '../../../api/eam'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import BrandTag from '../../../components/BrandTag'
 
 const { RangePicker } = DatePicker
 
@@ -26,6 +27,27 @@ const INBOUND_STATUS_META: Record<PurchaseOrder['status'], { label: string; colo
   pending: { label: '待驗收', color: 'processing' },
   partial: { label: '部分入庫', color: 'warning' },
   received: { label: '已入庫', color: 'success' },
+}
+
+/** 收貨方式展示文案 */
+const DELIVERY_METHOD_LABEL: Record<string, string> = {
+  self_pickup: '自取',
+  supplier_delivery: '供應商送貨上門',
+  express: '快遞發貨',
+}
+
+/** 待驗收列表行：採購訂單 × 供應商分組（多供應商訂單按分組拆分展示，對齊行業 ASN 收貨實踐） */
+interface PendingRow {
+  orderId: number
+  poNo: string
+  groupId: string
+  supplier: string
+  deliveryMethod?: PurchaseOrderSupplierGroup['deliveryMethod']
+  trackingNo?: string
+  groupTotalQty: number
+  groupReceivedQty: number
+  groupPendingQty: number
+  order: PurchaseOrder
 }
 
 interface Props {
@@ -59,6 +81,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     purchaser?: string
     updatedAtRange?: [string, string]
   }>({})
+  const [poPage, setPoPage] = useState(1)
+  const [poSize, setPoSize] = useState(10)
 
   /* ----- 待驗收訂單（自動同步採購完成的訂單） ----- */
   const [poLoading, setPoLoading] = useState(false)
@@ -160,8 +184,13 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       next.updatedAtRange = [v.updatedAtRange[0].format('YYYY-MM-DD'), v.updatedAtRange[1].format('YYYY-MM-DD')]
     }
     setPoFilters(next)
+    setPoPage(1)
   }
-  const handlePoReset = () => { poForm.resetFields(); setPoFilters({}) }
+  const handlePoReset = () => { poForm.resetFields(); setPoFilters({}); setPoPage(1) }
+  const handlePoTableChange = (p: TablePaginationConfig) => {
+    setPoPage(p.current || 1)
+    setPoSize(p.pageSize || 10)
+  }
   const handleTableChange = (p: TablePaginationConfig) => {
     setPage(p.current || 1)
     setSize(p.pageSize || 10)
@@ -172,6 +201,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     const cols = [
       { title: '入庫批次號', dataIndex: 'batchNo' },
       { title: '訂單編號', dataIndex: 'poNo' },
+      { title: '所屬品牌', dataIndex: 'brand', render: (v: number | undefined) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '') },
       { title: '創建時間', dataIndex: 'createdAt' },
       { title: '最後更新人', dataIndex: 'updatedBy' },
       { title: '最後更新時間', dataIndex: 'updatedAt' },
@@ -196,6 +226,10 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     {
       title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 140,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
+    },
+    {
+      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     { title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
     { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 130 },
@@ -251,6 +285,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const columnMeta = useMemo(() => [
     { key: 'batchNo', title: '入庫批次號' },
     { key: 'poNo', title: '訂單編號' },
+    { key: 'brand', title: '所屬品牌' },
     { key: 'createdAt', title: '創建時間' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
@@ -271,41 +306,87 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     message.info('刪除功能開發中')
   }
 
-  /* ----- 待驗收訂單表格列 ----- */
-  const pendingQtyOf = (o: PurchaseOrder) =>
-    o.items.reduce((s, it) => s + Math.max(0, it.qty - it.receivedQty), 0)
+  /* ----- 待驗收行展開：訂單 × 供應商分組（分組級統計優先用後端摘要，mock 走明細計算） ----- */
+  const pendingRows = useMemo<PendingRow[]>(() => {
+    const kw = (poFilters.supplier || '').trim().toLowerCase()
+    const rows: PendingRow[] = []
+    pendingOrders.forEach((o) => {
+      // 兼容舊數據：無分組時以訂單級供應商構造默認分組
+      const groups: PurchaseOrderSupplierGroup[] = (o.supplierGroups && o.supplierGroups.length > 0)
+        ? o.supplierGroups
+        : [{ id: 'default', supplier: o.supplier || '', items: o.items || [] }]
+      groups.forEach((g) => {
+        // 供應商過濾兜底：分組內供應商在此二次匹配
+        if (kw && !(g.supplier || '').toLowerCase().includes(kw)) return
+        const items = g.items || []
+        const gTotal = g.totalQty ?? items.reduce((s, it) => s + (it.qty || 0), 0)
+        const gReceived = g.receivedQty ?? items.reduce((s, it) => s + (it.receivedQty || 0), 0)
+        rows.push({
+          orderId: o.id,
+          poNo: o.poNo,
+          groupId: g.id,
+          supplier: g.supplier || '',
+          deliveryMethod: g.deliveryMethod,
+          trackingNo: g.trackingNo,
+          groupTotalQty: gTotal,
+          groupReceivedQty: gReceived,
+          groupPendingQty: Math.max(0, gTotal - gReceived),
+          order: o,
+        })
+      })
+    })
+    return rows
+  }, [pendingOrders, poFilters.supplier])
 
-  const pendingColumns: TableColumnsType<PurchaseOrder> = [
+  const pendingColumns: TableColumnsType<PendingRow> = [
     {
-      title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 160,
+      title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 160, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     {
+      title: '所屬品牌', key: 'brand', width: 100,
+      render: (_: unknown, r: PendingRow) => r.order.brand
+        ? <BrandTag value={r.order.brand} />
+        : <span style={{ color: '#bfbfbf' }}>-</span>,
+    },
+    {
       title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 180, ellipsis: true,
-      render: (v: string | undefined) => v || '待定',
+      render: (v: string) => v || '待定',
     },
     {
-      title: '採購經辦人', dataIndex: 'purchaser', key: 'purchaser', width: 120,
-      render: (v: string | undefined) => v || '-',
+      title: '採購經辦人', key: 'purchaser', width: 120,
+      render: (_: unknown, r: PendingRow) => r.order.purchaser || '-',
     },
     {
-      title: '訂單總計', dataIndex: 'confirmedAmount', key: 'confirmedAmount', width: 130, align: 'right',
-      render: (v: number | undefined, r: PurchaseOrder) => (
-        <span style={{ fontWeight: 600 }}>MOP {(v ?? r.amount).toLocaleString()}</span>
+      title: '收貨方式', dataIndex: 'deliveryMethod', key: 'deliveryMethod', width: 130,
+      render: (v: string | undefined) => (v && DELIVERY_METHOD_LABEL[v]) || '-',
+    },
+    {
+      title: '快遞單號', dataIndex: 'trackingNo', key: 'trackingNo', width: 140,
+      render: (v: string | undefined) => v
+        ? <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span>
+        : <span style={{ color: '#bfbfbf' }}>-</span>,
+    },
+    {
+      title: '訂單總計', key: 'confirmedAmount', width: 130, align: 'right',
+      render: (_: unknown, r: PendingRow) => (
+        <span style={{ fontWeight: 600 }}>MOP {(r.order.confirmedAmount ?? r.order.amount).toLocaleString()}</span>
       ),
     },
     {
-      title: '待驗收件數', key: 'pendingQty', width: 110, align: 'right',
-      render: (_: unknown, r: PurchaseOrder) => (
-        <span style={{ color: '#FF4D4F', fontWeight: 600 }}>{pendingQtyOf(r)}</span>
+      title: '待驗收件數', key: 'groupPendingQty', width: 110, align: 'right',
+      render: (_: unknown, r: PendingRow) => (
+        <Tooltip title={`已驗收 ${r.groupReceivedQty} / 共 ${r.groupTotalQty} 件`}>
+          <span style={{ color: r.groupPendingQty > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 600 }}>{r.groupPendingQty}</span>
+        </Tooltip>
       ),
     },
     {
-      title: '入庫狀態', dataIndex: 'status', key: 'status', width: 110,
-      render: (v: PurchaseOrder['status'], r: PurchaseOrder) => {
-        const meta = INBOUND_STATUS_META[v] || INBOUND_STATUS_META.pending
-        const progress = r.totalQty != null && r.totalQty > 0
-          ? `已驗收 ${r.acceptedQty || 0} / 共 ${r.totalQty} 件`
+      title: '入庫狀態', key: 'status', width: 110,
+      render: (_: unknown, r: PendingRow) => {
+        const meta = INBOUND_STATUS_META[r.order.status] || INBOUND_STATUS_META.pending
+        const progress = r.order.totalQty != null && r.order.totalQty > 0
+          ? `整單已驗收 ${r.order.acceptedQty || 0} / 共 ${r.order.totalQty} 件`
           : undefined
         return (
           <Tooltip title={progress}>
@@ -315,15 +396,15 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       },
     },
     {
-      title: '完成採購時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
-      sorter: (a, b) => (a.updatedAt || '').localeCompare(b.updatedAt || ''),
+      title: '完成採購時間', key: 'updatedAt', width: 170,
+      sorter: (a, b) => (a.order.updatedAt || '').localeCompare(b.order.updatedAt || ''),
       defaultSortOrder: 'ascend',
-      render: (v: string | undefined) => v || '-',
+      render: (_: unknown, r: PendingRow) => r.order.updatedAt || '-',
     },
     {
       title: '操作', key: 'action', width: 90, fixed: 'right',
-      render: (_: unknown, r: PurchaseOrder) => (
-        <Button type="link" size="small" onClick={() => onAdd(r.id)}>驗收</Button>
+      render: (_: unknown, r: PendingRow) => (
+        <Button type="link" size="small" onClick={() => onAdd(r.orderId)}>驗收</Button>
       ),
     },
   ]
@@ -335,7 +416,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       items={[
         {
           key: 'pending',
-          label: `待驗收訂單 (${pendingOrders.length})`,
+          label: `待驗收訂單 (${pendingRows.length})`,
           children: (
             <>
               {/* ====== 搜索區 ====== */}
@@ -376,13 +457,19 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
                 採購完成的訂單自動同步至此，請核對到貨物資後點擊「驗收」；支持分批多次驗收
               </div>
-              <Table<PurchaseOrder>
+              <Table<PendingRow>
                 columns={pendingColumns}
-                dataSource={pendingOrders}
-                rowKey="id"
+                dataSource={pendingRows}
+                rowKey={(r) => `${r.orderId}_${r.groupId}`}
                 loading={poLoading}
                 size="middle"
-                pagination={{ showSizeChanger: false, showTotal: (tt) => `共 ${tt} 條` }}
+                scroll={{ x: 1440 }}
+                pagination={{
+                  current: poPage, pageSize: poSize, total: pendingRows.length,
+                  showSizeChanger: true, showQuickJumper: true,
+                  showTotal: (tt) => `共 ${tt} 條`,
+                }}
+                onChange={handlePoTableChange}
               />
             </>
           ),
@@ -436,7 +523,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 rowKey="id"
                 loading={loading}
                 size="middle"
-                scroll={{ x: 1850 }}
+                scroll={{ x: 1950 }}
                 expandable={{
                   expandedRowRender: (record) => (
                     <div style={{ padding: '4px 0' }}>
@@ -459,7 +546,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                   ),
                 }}
                 pagination={{
-                  current: page, pageSize: size, total, showSizeChanger: true,
+                  current: page, pageSize: size, total,
+                  showSizeChanger: true, showQuickJumper: true,
                   showTotal: (tt) => `共 ${tt} 條`,
                 }}
                 onChange={handleTableChange}

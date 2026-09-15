@@ -30,13 +30,16 @@ public class EamPurchaseSaveDTO {
     /** 服务部门 */
     private String department;
 
+    /** 所属品牌：1=闪蜂, 2=mFood */
+    private Integer brand;
+
     /** 执行状态 */
     private String execStatus;
 
     /** 备注 */
     private String remark;
 
-    /** 物流单号 */
+    /** 快递单号 */
     private String trackingNo;
 
     /** 供应商分组（含明细） */
@@ -63,7 +66,7 @@ public class EamPurchaseSaveDTO {
         /** 下单日期 */
         private String orderDate;
 
-        /** 物流单号 */
+        /** 快递单号 */
         private String trackingNo;
 
         /** 收货方式：self_pickup / supplier_delivery / express */

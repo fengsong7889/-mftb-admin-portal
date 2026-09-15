@@ -3,6 +3,7 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
 import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
@@ -167,9 +168,11 @@ public class EamBasicDataController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String code,
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String district,
             @RequestParam(required = false) String updatedBy) {
-        return Result.success(basicDataService.listLocations(keyword, name, code, type, updatedBy));
+        return Result.success(basicDataService.listLocations(keyword, name, code, province, city, district, updatedBy));
     }
 
     /** 新增位置 */
@@ -271,6 +274,57 @@ public class EamBasicDataController {
     @RequirePermission(menu = "param-library", action = "delete")
     public Result<Void> deleteParamValue(@PathVariable long id) {
         basicDataService.deleteParamValue(id);
+        return Result.success();
+    }
+
+    /* ==================== 分类配件配置 ==================== */
+
+    /**
+     * 分类配件列表（同分类下所有产品共用，验收时可一键带入）。
+     * 仅需登录即可读：验收入库等模块需按分类加载配件选项，验收人未必持有基础数据菜单权限。
+     * onlyEnabled=true 时仅返回启用状态的配件（验收弹窗选项用）。
+     */
+    @GetMapping("/category-accessories")
+    public Result<List<Map<String, Object>>> listCategoryAccessories(
+            @RequestParam(required = false) String categoryCode,
+            @RequestParam(required = false, defaultValue = "false") boolean onlyEnabled) {
+        return Result.success(basicDataService.listCategoryAccessories(categoryCode, onlyEnabled));
+    }
+
+    /** 新增分类配件（品牌产品库配件配置页） */
+    @PostMapping("/category-accessories/{categoryCode}")
+    @RequirePermission(menu = "asset-model", action = "edit")
+    public Result<Long> createCategoryAccessory(
+            @PathVariable String categoryCode,
+            @RequestBody EamCategoryAccessorySaveDTO dto) {
+        return Result.success(basicDataService.createCategoryAccessory(categoryCode, dto));
+    }
+
+    /** 修改分类配件（名称/默认数量） */
+    @PutMapping("/category-accessories/item/{id}")
+    @RequirePermission(menu = "asset-model", action = "edit")
+    public Result<Void> updateCategoryAccessory(
+            @PathVariable long id,
+            @RequestBody EamCategoryAccessorySaveDTO dto) {
+        basicDataService.updateCategoryAccessory(id, dto);
+        return Result.success();
+    }
+
+    /** 启用/停用分类配件（status: 1=启用, 0=停用） */
+    @PutMapping("/category-accessories/item/{id}/status")
+    @RequirePermission(menu = "asset-model", action = "edit")
+    public Result<Void> updateCategoryAccessoryStatus(
+            @PathVariable long id,
+            @RequestParam Integer status) {
+        basicDataService.updateCategoryAccessoryStatus(id, status);
+        return Result.success();
+    }
+
+    /** 删除分类配件（逻辑删除） */
+    @DeleteMapping("/category-accessories/item/{id}")
+    @RequirePermission(menu = "asset-model", action = "edit")
+    public Result<Void> deleteCategoryAccessory(@PathVariable long id) {
+        basicDataService.deleteCategoryAccessory(id);
         return Result.success();
     }
 }

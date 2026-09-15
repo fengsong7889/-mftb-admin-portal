@@ -17,6 +17,7 @@ import {
 } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import BrandTag from '../../../components/BrandTag'
 
 const EXEC_META: Record<ExecStatus, { key: string; color: string }> = {
   pending:    { key: 'asset.execPending',    color: 'default' },
@@ -189,6 +190,11 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
         <Descriptions column={4} size="middle">
           <Descriptions.Item label="採購單號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail.poNo}</span></Descriptions.Item>
+          <Descriptions.Item label="所屬品牌">
+            {detail.brand ? <BrandTag value={detail.brand} /> : '-'}
+            {detail.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>當前物資歸屬閃蜂，編碼 TB</span>}
+            {detail.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF', marginLeft: 8 }}>當前物資歸屬 mFood，編碼 MF</span>}
+          </Descriptions.Item>
           <Descriptions.Item label={t('asset.colReqNo')}>
             {detail.reqId ? (
               <Button type="link" size="small" onClick={() => onViewRequest(detail.reqId)}>

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.EamBrandSaveDTO;
+import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
 import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
@@ -12,11 +13,13 @@ import com.mftb.admin.dto.EamParamValueSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamBrand;
 import com.mftb.admin.entity.EamCategory;
+import com.mftb.admin.entity.EamCategoryAccessory;
 import com.mftb.admin.entity.EamLocation;
 import com.mftb.admin.entity.EamModel;
 import com.mftb.admin.entity.EamParamType;
 import com.mftb.admin.entity.EamParamValue;
 import com.mftb.admin.mapper.EamBrandMapper;
+import com.mftb.admin.mapper.EamCategoryAccessoryMapper;
 import com.mftb.admin.mapper.EamCategoryMapper;
 import com.mftb.admin.mapper.EamLocationMapper;
 import com.mftb.admin.mapper.EamModelMapper;
@@ -48,6 +51,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     private final EamLocationMapper locationMapper;
     private final EamParamTypeMapper paramTypeMapper;
     private final EamParamValueMapper paramValueMapper;
+    private final EamCategoryAccessoryMapper categoryAccessoryMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
 
@@ -337,7 +341,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     /* ==================== 仓库 / 存放位置 ==================== */
 
     @Override
-    public List<Map<String, Object>> listLocations(String keyword, String name, String code, String type, String updatedBy) {
+    public List<Map<String, Object>> listLocations(String keyword, String name, String code, String province, String city, String district, String updatedBy) {
         LambdaQueryWrapper<EamLocation> wrapper = new LambdaQueryWrapper<>();
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(EamLocation::getCode, keyword.trim())
@@ -345,7 +349,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         }
         if (name != null && !name.isBlank()) wrapper.like(EamLocation::getName, name.trim());
         if (code != null && !code.isBlank()) wrapper.like(EamLocation::getCode, code.trim());
-        if (type != null && !type.isBlank()) wrapper.eq(EamLocation::getType, type);
+        if (province != null && !province.isBlank()) wrapper.like(EamLocation::getProvince, province.trim());
+        if (city != null && !city.isBlank()) wrapper.like(EamLocation::getCity, city.trim());
+        if (district != null && !district.isBlank()) wrapper.like(EamLocation::getDistrict, district.trim());
         if (updatedBy != null && !updatedBy.isBlank()) wrapper.like(EamLocation::getUpdatedBy, updatedBy.trim());
         wrapper.orderByAsc(EamLocation::getParentId).orderByAsc(EamLocation::getSort);
 
@@ -358,22 +364,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Transactional
     public long createLocation(EamLocationSaveDTO dto) {
         String code = dto.getCode();
-
-        // 自动生成编码逻辑
-        if ("__auto__".equals(code) || code == null || code.isBlank()) {
-            String type = dto.getType() == null ? "warehouse" : dto.getType();
-            String prefix;
-            switch (type) {
-                case "floor": prefix = "CKDZ"; break;
-                case "room": prefix = "CKDZXQ"; break;
-                default: prefix = "CK"; break;
-            }
-            String today = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String p = prefix + today;
-            Long sameDayCount = locationMapper.selectCount(
-                    new LambdaQueryWrapper<EamLocation>().likeRight(EamLocation::getCode, p));
-            code = p + String.format("%03d", sameDayCount + 1);
-        }
+        if (code == null || code.isBlank()) throw new BusinessException("位置編碼不能為空");
 
         // 唯一性校验
         Long count = locationMapper.selectCount(
@@ -384,8 +375,10 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         loc.setCode(code);
         loc.setName(dto.getName());
         loc.setParentId(dto.getParentId() == null ? 0L : dto.getParentId());
-        loc.setType(dto.getType() == null ? "warehouse" : dto.getType());
         loc.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        loc.setProvince(Objects.toString(dto.getProvince(), ""));
+        loc.setCity(Objects.toString(dto.getCity(), ""));
+        loc.setDistrict(Objects.toString(dto.getDistrict(), ""));
         loc.setAddress(Objects.toString(dto.getAddress(), ""));
         loc.setRemark(Objects.toString(dto.getRemark(), ""));
         loc.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -403,7 +396,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         if (loc == null) throw new BusinessException("位置不存在");
 
         String newCode = dto.getCode();
-        if (newCode != null && !newCode.isBlank() && !"__auto__".equals(newCode) && !newCode.equals(loc.getCode())) {
+        if (newCode != null && !newCode.isBlank() && !newCode.equals(loc.getCode())) {
             Long count = locationMapper.selectCount(
                     new LambdaQueryWrapper<EamLocation>().eq(EamLocation::getCode, newCode));
             if (count > 0) throw new BusinessException("位置編碼已存在");
@@ -411,8 +404,10 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         }
         if (dto.getName() != null) loc.setName(dto.getName());
         if (dto.getParentId() != null) loc.setParentId(dto.getParentId());
-        if (dto.getType() != null) loc.setType(dto.getType());
         if (dto.getSort() != null) loc.setSort(dto.getSort());
+        if (dto.getProvince() != null) loc.setProvince(dto.getProvince());
+        if (dto.getCity() != null) loc.setCity(dto.getCity());
+        if (dto.getDistrict() != null) loc.setDistrict(dto.getDistrict());
         if (dto.getAddress() != null) loc.setAddress(dto.getAddress());
         if (dto.getRemark() != null) loc.setRemark(dto.getRemark());
         loc.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -490,6 +485,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("name", loc.getName());
         map.put("parentId", loc.getParentId());
         map.put("type", loc.getType());
+        map.put("province", loc.getProvince());
+        map.put("city", loc.getCity());
+        map.put("district", loc.getDistrict());
         map.put("sort", loc.getSort());
         map.put("address", loc.getAddress());
         map.put("remark", loc.getRemark());
@@ -642,6 +640,122 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         EamParamValue pv = paramValueMapper.selectById(id);
         if (pv == null) throw new BusinessException("參數值不存在");
         paramValueMapper.deleteById(id);
+    }
+
+    /* ==================== 分类配件配置 ==================== */
+
+    @Override
+    public List<Map<String, Object>> listCategoryAccessories(String categoryCode, boolean onlyEnabled) {
+        LambdaQueryWrapper<EamCategoryAccessory> wrapper = new LambdaQueryWrapper<>();
+        if (categoryCode != null && !categoryCode.isBlank()) {
+            wrapper.eq(EamCategoryAccessory::getCategoryCode, categoryCode);
+        }
+        if (onlyEnabled) {
+            wrapper.eq(EamCategoryAccessory::getStatus, 1);
+        }
+        wrapper.orderByAsc(EamCategoryAccessory::getSort)
+                .orderByAsc(EamCategoryAccessory::getId);
+        return categoryAccessoryMapper.selectList(wrapper).stream()
+                .map(this::categoryAccessoryToMap)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Long createCategoryAccessory(String categoryCode, EamCategoryAccessorySaveDTO dto) {
+        if (categoryCode == null || categoryCode.isBlank()) {
+            throw new BusinessException("分類編碼不能為空");
+        }
+        EamCategoryAccessorySaveDTO body = dto == null ? new EamCategoryAccessorySaveDTO() : dto;
+        String name = body.getName() == null ? "" : body.getName().trim();
+        if (name.isEmpty()) {
+            throw new BusinessException("配件名稱不能為空");
+        }
+        if (accessoryNameExists(categoryCode, name, null)) {
+            throw new BusinessException("該分類下已存在同名配件：" + name);
+        }
+        EamCategoryAccessory acc = new EamCategoryAccessory();
+        acc.setCategoryCode(categoryCode);
+        acc.setName(name);
+        acc.setDefaultQty(body.getDefaultQty() == null || body.getDefaultQty() < 1 ? 1 : body.getDefaultQty());
+        acc.setStatus(1);
+        acc.setSort(Math.toIntExact(categoryAccessoryMapper.selectCount(
+                new LambdaQueryWrapper<EamCategoryAccessory>().eq(EamCategoryAccessory::getCategoryCode, categoryCode))));
+        LocalDateTime now = LocalDateTime.now();
+        acc.setCreatedAt(now);
+        acc.setUpdatedAt(now);
+        acc.setUpdatedBy(operatorResolver.currentOperatorName());
+        acc.setDeleted(0);
+        categoryAccessoryMapper.insert(acc);
+        return acc.getId();
+    }
+    
+    @Override
+    public void updateCategoryAccessory(long id, EamCategoryAccessorySaveDTO dto) {
+        EamCategoryAccessory acc = categoryAccessoryMapper.selectById(id);
+        if (acc == null) {
+            throw new BusinessException("配件不存在或已被刪除");
+        }
+        EamCategoryAccessorySaveDTO body = dto == null ? new EamCategoryAccessorySaveDTO() : dto;
+        String name = body.getName() == null ? "" : body.getName().trim();
+        if (name.isEmpty()) {
+            throw new BusinessException("配件名稱不能為空");
+        }
+        if (accessoryNameExists(acc.getCategoryCode(), name, id)) {
+            throw new BusinessException("該分類下已存在同名配件：" + name);
+        }
+        acc.setName(name);
+        if (body.getDefaultQty() != null) {
+            acc.setDefaultQty(Math.max(body.getDefaultQty(), 1));
+        }
+        acc.setUpdatedBy(operatorResolver.currentOperatorName());
+        acc.setUpdatedAt(LocalDateTime.now());
+        categoryAccessoryMapper.updateById(acc);
+    }
+    
+    @Override
+    public void updateCategoryAccessoryStatus(long id, Integer status) {
+        EamCategoryAccessory acc = categoryAccessoryMapper.selectById(id);
+        if (acc == null) {
+            throw new BusinessException("配件不存在或已被刪除");
+        }
+        acc.setStatus(status != null && status == 0 ? 0 : 1);
+        acc.setUpdatedBy(operatorResolver.currentOperatorName());
+        acc.setUpdatedAt(LocalDateTime.now());
+        categoryAccessoryMapper.updateById(acc);
+    }
+    
+    @Override
+    public void deleteCategoryAccessory(long id) {
+        EamCategoryAccessory acc = categoryAccessoryMapper.selectById(id);
+        if (acc == null) {
+            throw new BusinessException("配件不存在或已被刪除");
+        }
+        // @TableLogic 下 deleteById 为逻辑删除
+        categoryAccessoryMapper.deleteById(id);
+    }
+    
+    /** 同分类下配件名稱是否已存在（excludeId 用于修改时排除自身） */
+    private boolean accessoryNameExists(String categoryCode, String name, Long excludeId) {
+        LambdaQueryWrapper<EamCategoryAccessory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamCategoryAccessory::getCategoryCode, categoryCode)
+                .eq(EamCategoryAccessory::getName, name);
+        if (excludeId != null) {
+            wrapper.ne(EamCategoryAccessory::getId, excludeId);
+        }
+        return categoryAccessoryMapper.selectCount(wrapper) > 0;
+    }
+
+    private Map<String, Object> categoryAccessoryToMap(EamCategoryAccessory acc) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", acc.getId());
+        map.put("categoryCode", acc.getCategoryCode());
+        map.put("name", acc.getName());
+        map.put("defaultQty", acc.getDefaultQty());
+        map.put("status", acc.getStatus());
+        map.put("sort", acc.getSort());
+        map.put("updatedBy", acc.getUpdatedBy());
+        map.put("updatedAt", acc.getUpdatedAt() != null ? acc.getUpdatedAt().format(DT_FMT) : "");
+        return map;
     }
 
     private Map<String, Object> paramTypeToMap(EamParamType pt) {

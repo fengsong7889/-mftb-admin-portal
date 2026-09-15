@@ -1,6 +1,7 @@
 package com.mftb.admin.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -60,7 +61,14 @@ public class GlobalExceptionHandler {
         return Result.error(ResultCode.PARAM_ERROR.getCode(), "數據已存在（可能為並發寫入或歷史殘留），請刷新後重試");
     }
 
-    /** 其它未捕获异常（含 SQL 异常） */
+    /** Spring 数据访问异常（含 BadSqlGrammarException 等 MyBatis 包装的 SQL 异常） */
+    @ExceptionHandler(DataAccessException.class)
+    public Result<Void> handleDataAccessException(DataAccessException e) {
+        log.error("数据访问异常 [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+        return Result.error(ResultCode.ERROR.getCode(), "數據庫操作異常, 請稍後重試");
+    }
+
+    /** 其它未捕获异常 */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
         // 沿 cause 链向下查找，定位真正的异常根因（MyBatis 常将 SQLException 包裹为 MyBatisSystemException）

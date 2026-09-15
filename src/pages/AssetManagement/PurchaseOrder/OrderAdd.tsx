@@ -26,6 +26,7 @@ import {
   type ParamType, type ParamField,
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { BRAND_OPTIONS_NUMERIC, BrandEnum } from '../../../constants/brand'
 
 /* ==================== 分类树（TreeSelect） ==================== */
 
@@ -308,6 +309,7 @@ interface SupplierGroupForm {
 interface GlobalFormValues {
   purchaser: string
   department: string
+  brand: number | undefined
   remark: string
 }
 
@@ -316,6 +318,7 @@ export default function OrderAdd() {
   const navigate = useNavigate()
   const [form] = Form.useForm<GlobalFormValues>()
   const [submitting, setSubmitting] = useState(false)
+  const watchedBrand = Form.useWatch('brand', form)
 
   /* ----- 基礎数据 ----- */
   const [categories, setCategories] = useState<AssetCategory[]>([])
@@ -552,6 +555,7 @@ export default function OrderAdd() {
         // 統一提交姓名（下拉選的是工號，與「開始採購」及自動建單口徑一致）
         purchaser: selectedEmp?.name || v.purchaser || undefined,
         department: selectedEmp?.department || undefined,
+        brand: v.brand,
         remark: v.remark?.trim() || undefined,
         items: [],
         supplierGroups: supplierGroups.map((g) => ({
@@ -642,7 +646,22 @@ export default function OrderAdd() {
             </Col>
           </Row>
           <Row gutter={24}>
-            <Col span={24}>
+            <Col span={8}>
+              <Form.Item label="所屬品牌" name="brand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
+                <Select placeholder="請選擇品牌" options={BRAND_OPTIONS_NUMERIC} />
+              </Form.Item>
+              {watchedBrand === BrandEnum.SHANFENG && (
+                <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
+                  當前物資歸屬閃蜂，編碼 TB
+                </div>
+              )}
+              {watchedBrand === BrandEnum.MFOOD && (
+                <div style={{ fontSize: 12, color: '#1890FF', marginTop: -18, marginBottom: 8 }}>
+                  當前物資歸屬 mFood，編碼 MF
+                </div>
+              )}
+            </Col>
+            <Col span={16}>
               <Form.Item label="採購事由" name="remark" style={{ marginBottom: 0 }}>
                 <Input.TextArea rows={2} placeholder="請輸入備註信息" maxLength={300} showCount style={{ resize: 'none' }} />
               </Form.Item>

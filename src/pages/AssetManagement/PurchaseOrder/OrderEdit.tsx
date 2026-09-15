@@ -25,6 +25,7 @@ import {
   type ParamType, type AssetCategory, type AssetBrand, type AssetModel,
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { BRAND_OPTIONS_NUMERIC, BrandEnum } from '../../../constants/brand'
 
 /* ==================== 分类树（TreeSelect） ==================== */
 
@@ -69,6 +70,7 @@ type DeliveryMethod = 'self_pickup' | 'supplier_delivery' | 'express'
 interface GlobalFormValues {
   purchaser: string
   department: string
+  brand: number | undefined
   execStatus: ExecStatus
   remark: string
 }
@@ -324,6 +326,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [order, setOrder] = useState<PurchaseOrder | null>(null)
   const [supplierGroups, setSupplierGroups] = useState<PurchaseOrderSupplierGroup[]>([])
+  const watchedBrand = Form.useWatch('brand', form)
 
   // 員工搜索
   const [employees, setEmployees] = useState<EmployeeItem[]>([])
@@ -352,6 +355,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       form.setFieldsValue({
         purchaser: o.purchaser || '',
         department: o.department || '',
+        brand: o.brand,
         execStatus: o.execStatus,
         remark: o.remark || '',
       })
@@ -743,6 +747,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       await updatePurchaseOrderExec(id, {
         purchaser: purchaserName,
         department: v.department?.trim() || undefined,
+        brand: v.brand,
         execStatus: v.execStatus,
         remark: v.remark?.trim() || undefined,
         supplierGroups: supplierGroups.map((g) => ({
@@ -844,14 +849,31 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
             </Col>
           </Row>
           <Row gutter={24}>
-            <Col span={16}>
-              <Form.Item label="采购事由" name="remark" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={2} placeholder={t('asset.remarkPh')} maxLength={300} showCount style={{ resize: 'none' }} />
+            <Col span={8}>
+              <Form.Item label="所屬品牌" name="brand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
+                <Select placeholder="請選擇品牌" options={BRAND_OPTIONS_NUMERIC} />
               </Form.Item>
+              {watchedBrand === BrandEnum.SHANFENG && (
+                <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
+                  當前物資歸屬閃蜂，編碼 TB
+                </div>
+              )}
+              {watchedBrand === BrandEnum.MFOOD && (
+                <div style={{ fontSize: 12, color: '#1890FF', marginTop: -18, marginBottom: 8 }}>
+                  當前物資歸屬 mFood，編碼 MF
+                </div>
+              )}
             </Col>
             <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>订单总计</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>訂單總計</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
+            </Col>
+          </Row>
+          <Row gutter={24}>
+            <Col span={24}>
+              <Form.Item label="採購事由" name="remark" style={{ marginBottom: 0 }}>
+                <Input.TextArea rows={2} placeholder={t('asset.remarkPh')} maxLength={300} showCount style={{ resize: 'none' }} />
+              </Form.Item>
             </Col>
           </Row>
         </div>

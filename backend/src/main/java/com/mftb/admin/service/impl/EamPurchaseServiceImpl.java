@@ -45,13 +45,21 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     @Override
     public PageResult<Map<String, Object>> pageOrders(int page, int size, String poNo, String processNo,
                                                        String supplier, String purchaser, String execStatus,
+                                                       String status,
                                                        String createdAtStart, String createdAtEnd,
                                                        String updatedAtStart, String updatedAtEnd) {
         LambdaQueryWrapper<EamPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
         if (poNo != null && !poNo.isBlank()) wrapper.like(EamPurchaseOrder::getPoNo, poNo.trim());
-        if (supplier != null && !supplier.isBlank()) wrapper.like(EamPurchaseOrder::getSupplier, supplier.trim());
+        if (supplier != null && !supplier.isBlank()) {
+            // 同時匹配頂層 supplier 與 supplierGroups JSON 內的分組供應商（多供應商訂單）
+            String kw = supplier.trim();
+            wrapper.and(w -> w.like(EamPurchaseOrder::getSupplier, kw)
+                    .or().like(EamPurchaseOrder::getSupplierGroups, kw));
+        }
         if (purchaser != null && !purchaser.isBlank()) wrapper.like(EamPurchaseOrder::getPurchaser, purchaser.trim());
         if (execStatus != null && !execStatus.isBlank()) wrapper.eq(EamPurchaseOrder::getExecStatus, execStatus);
+        // 入庫狀態過濾：pending=待驗收 / partial=部分入庫 / received=全部入庫
+        if (status != null && !status.isBlank()) wrapper.eq(EamPurchaseOrder::getStatus, status.trim());
         if (createdAtStart != null) wrapper.ge(EamPurchaseOrder::getCreatedAt, createdAtStart);
         if (createdAtEnd != null) wrapper.lt(EamPurchaseOrder::getCreatedAt, createdAtEnd + " 23:59:59");
         if (updatedAtStart != null) wrapper.ge(EamPurchaseOrder::getUpdatedAt, updatedAtStart);
@@ -72,15 +80,26 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         Page<EamPurchaseOrder> pageObj = new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size));
         Page<EamPurchaseOrder> result = orderMapper.selectPage(pageObj, wrapper);
 
-        // 批量补充明细总数与关联申请编号（供列表「验收入库进度/关联申请」列展示）
+        // 批量补充明细总数、分组级统计与关联申请编号（供列表「验收入库进度/关联申请/供应商分组」展示）
         Map<Long, Integer> totalQtyMap = new HashMap<>();
         Map<Long, String> reqNoMap = new HashMap<>();
+        // 分组级统计：orderId -> (groupId -> [qty 合计, receivedQty 合计])
+        Map<Long, Map<String, int[]>> groupQtyMap = new HashMap<>();
         List<Long> orderIds = result.getRecords().stream().map(EamPurchaseOrder::getId).collect(Collectors.toList());
         if (!orderIds.isEmpty()) {
             itemMapper.selectList(new LambdaQueryWrapper<EamPurchaseOrderItem>()
                             .in(EamPurchaseOrderItem::getOrderId, orderIds)
-                            .select(EamPurchaseOrderItem::getOrderId, EamPurchaseOrderItem::getQty))
-                    .forEach(it -> totalQtyMap.merge(it.getOrderId(), it.getQty() == null ? 0 : it.getQty(), Integer::sum));
+                            .select(EamPurchaseOrderItem::getOrderId, EamPurchaseOrderItem::getGroupId,
+                                    EamPurchaseOrderItem::getQty, EamPurchaseOrderItem::getReceivedQty))
+                    .forEach(it -> {
+                        totalQtyMap.merge(it.getOrderId(), it.getQty() == null ? 0 : it.getQty(), Integer::sum);
+                        if (it.getGroupId() != null && !it.getGroupId().isBlank()) {
+                            int[] agg = groupQtyMap.computeIfAbsent(it.getOrderId(), k -> new HashMap<>())
+                                    .computeIfAbsent(it.getGroupId(), k -> new int[2]);
+                            agg[0] += it.getQty() == null ? 0 : it.getQty();
+                            agg[1] += it.getReceivedQty() == null ? 0 : it.getReceivedQty();
+                        }
+                    });
             List<Long> reqIds = result.getRecords().stream()
                     .map(EamPurchaseOrder::getReqId).filter(rid -> rid != null && rid > 0).collect(Collectors.toList());
             if (!reqIds.isEmpty()) {
@@ -95,6 +114,27 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                     m.put("totalQty", totalQtyMap.getOrDefault(o.getId(), 0));
                     m.put("reqNo", o.getReqId() != null && o.getReqId() > 0
                             ? reqNoMap.get(o.getReqId()) : null);
+                    // 供应商分组摘要（不含 items 明细，供前端按「订单×供应商」拆分行展示与分组级待验收件数）
+                    if (o.getSupplierGroups() != null && !o.getSupplierGroups().isBlank()) {
+                        Map<String, int[]> gMap = groupQtyMap.get(o.getId());
+                        List<Map<String, Object>> summaries = JsonUtils.parseMapList(o.getSupplierGroups())
+                                .stream().map(group -> {
+                                    Map<String, Object> s = new LinkedHashMap<>();
+                                    s.put("id", group.get("id"));
+                                    s.put("supplier", group.get("supplier"));
+                                    s.put("deliveryMethod", group.get("deliveryMethod"));
+                                    s.put("trackingNo", group.get("trackingNo"));
+                                    s.put("expectedReceiveDate", group.get("expectedReceiveDate"));
+                                    int[] agg = gMap != null ? gMap.get(String.valueOf(group.get("id"))) : null;
+                                    int gQty = agg != null ? agg[0] : 0;
+                                    int gReceived = agg != null ? agg[1] : 0;
+                                    s.put("totalQty", gQty);
+                                    s.put("receivedQty", gReceived);
+                                    s.put("pendingQty", Math.max(0, gQty - gReceived));
+                                    return s;
+                                }).collect(Collectors.toList());
+                        m.put("supplierGroups", summaries);
+                    }
                     return m;
                 })
                 .collect(Collectors.toList());
@@ -148,6 +188,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         order.setDeliveryDate(Objects.toString(dto.getDeliveryDate(), ""));
         order.setPurchaser(Objects.toString(dto.getPurchaser(), ""));
         order.setDepartment(Objects.toString(dto.getDepartment(), ""));
+        order.setBrand(dto.getBrand());
         order.setRemark(Objects.toString(dto.getRemark(), ""));
         order.setExecStatus("pending");
         order.setStatus("pending");
@@ -197,9 +238,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             throw new BusinessException("訂單已全部驗收入庫，不可修改");
         }
 
-        // 執行狀態設為「已完成」時，所有明細的成交單價必須填寫
-        if ("completed".equals(dto.getExecStatus()) && groups != null) {
-            for (EamPurchaseSaveDTO.SupplierGroup group : groups) {
+        // 執行狀態設為「已完成」時，所有明細的成交單價必須填寫（groups 聲明見下方供應商分組更新段）
+        if ("completed".equals(dto.getExecStatus()) && dto.getSupplierGroups() != null) {
+            for (EamPurchaseSaveDTO.SupplierGroup group : dto.getSupplierGroups()) {
                 if (group.getItems() == null) continue;
                 for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
                     if (item.getConfirmedPrice() == null || item.getConfirmedPrice().compareTo(BigDecimal.ZERO) <= 0) {
@@ -218,6 +259,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         if (dto.getDepartment() != null) wrapper.set(EamPurchaseOrder::getDepartment, dto.getDepartment());
         if (dto.getExecStatus() != null) wrapper.set(EamPurchaseOrder::getExecStatus, dto.getExecStatus());
         if (dto.getRemark() != null) wrapper.set(EamPurchaseOrder::getRemark, dto.getRemark());
+        if (dto.getBrand() != null) wrapper.set(EamPurchaseOrder::getBrand, dto.getBrand());
         if (dto.getTrackingNo() != null) wrapper.set(EamPurchaseOrder::getTrackingNo, dto.getTrackingNo());
 
         // 供应商分组更新
@@ -398,6 +440,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         m.put("deliveryDate", o.getDeliveryDate());
         m.put("purchaser", o.getPurchaser());
         m.put("department", o.getDepartment());
+        m.put("brand", o.getBrand());
         m.put("remark", o.getRemark());
         m.put("trackingNo", o.getTrackingNo());
         m.put("execStatus", o.getExecStatus());

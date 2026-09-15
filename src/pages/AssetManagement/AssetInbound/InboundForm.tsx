@@ -7,19 +7,20 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message, Upload,
+  Button, Checkbox, InputNumber, Select, TreeSelect, DatePicker, Row, Col, Table, Tag, Space, Spin, Modal, Input, Radio, message, Upload, AutoComplete,
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, ShoppingCartOutlined, ExclamationCircleOutlined,
-  CameraOutlined, DeleteOutlined, EyeOutlined, PlusOutlined,
+  CameraOutlined, DeleteOutlined, EyeOutlined, PlusOutlined, AppstoreOutlined, UploadOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
+import BrandTag from '../../../components/BrandTag'
 import {
   fetchPurchaseOrderDetail, fetchLocationList, createInboundBatch,
   saveInboundDraft, loadInboundDraft, deleteInboundDraft,
-  uploadInboundPhoto,
+  uploadInboundPhoto, fetchCategoryAccessories,
   type PurchaseOrder, type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetLocation,
 } from '../../../api/eam'
@@ -74,6 +75,9 @@ function buildLocationTree(list: AssetLocation[]): LocationTreeNode[] {
 
 type RejectStatus = 'return' | 'exchange' | 'concession'
 
+/** 現場照片上限（與全局憑證上傳一致：OA 採購/充值/轉賬均限 5 張） */
+const MAX_PHOTOS = 5
+
 const REJECT_OPTIONS: { value: RejectStatus; label: string; desc: string }[] = [
   { value: 'return', label: '退貨', desc: '退回供應商，生成退貨記錄' },
   { value: 'exchange', label: '換貨', desc: '退回供應商，等待供應商重新送貨' },
@@ -100,6 +104,8 @@ interface InboundItem extends PurchaseOrderItem {
   rejectReason?: string
   /** 驗收照片 [{name, dataUrl}] */
   photos: { name: string; dataUrl: string }[]
+  /** 配件清單 [{name, qty}]（隨驗收記錄保存） */
+  accessories: { name: string; qty: number }[]
 }
 
 interface InboundGroup extends PurchaseOrderSupplierGroup {
@@ -131,6 +137,12 @@ export default function InboundForm({ poId, onBack }: Props) {
   const [rejectReason, setRejectReason] = useState('')
   const [rejectPhotos, setRejectPhotos] = useState<{ name: string; dataUrl: string }[]>([])
 
+  // 驗收確認彈窗（通過項：拍照憑證 + 配件清單）
+  const [passModal, setPassModal] = useState<{ groupId: string; rowKey: string } | null>(null)
+  const [passAccessories, setPassAccessories] = useState<{ name: string; qty: number }[]>([])
+  /** 分類配件配置（品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
+  const [categoryAccessories, setCategoryAccessories] = useState<Map<string, { name: string; defaultQty: number }[]>>(new Map())
+
   // 照片預覽
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewImage, setPreviewImage] = useState('')
@@ -152,7 +164,7 @@ export default function InboundForm({ poId, onBack }: Props) {
       ])
       setOrder(orderData)
       setLocations(locList)
-      const defaultLoc = locList.find((l) => l.type === 'warehouse')?.id || locList[0]?.id
+      const defaultLoc = locList[0]?.id
 
       // 初始化供應商分組（含驗收字段）
       const srcGroups: PurchaseOrderSupplierGroup[] = orderData.supplierGroups?.length
@@ -181,6 +193,7 @@ export default function InboundForm({ poId, onBack }: Props) {
             rejectStatus: undefined,
             rejectReason: '',
             photos: [],
+            accessories: [],
           }
         }),
       }))
@@ -202,6 +215,7 @@ export default function InboundForm({ poId, onBack }: Props) {
               confirmed: di.status === 'pass',
               rejectStatus: di.status !== 'pass' ? di.status : undefined,
               rejectReason: di.reason || '',
+              accessories: di.accessories || [],
             }
           }),
         }))
@@ -284,6 +298,59 @@ export default function InboundForm({ poId, onBack }: Props) {
       return next
     })
   }, [])
+
+  /** 驗收確認彈窗當前行（展示物資信息 / 照片 / 配件） */
+  const passItem = useMemo(() => {
+    if (!passModal) return null
+    return groups.find((g) => g.id === passModal.groupId)?.items.find((it) => it.key === passModal.rowKey) || null
+  }, [passModal, groups])
+
+  /** 彈窗打開時按分類加載配件配置（AutoComplete 選項 + 一鍵帶入數據源；取代寫死枚舉） */
+  useEffect(() => {
+    if (!passModal) return
+    const item = groups.find((g) => g.id === passModal.groupId)?.items.find((it) => it.key === passModal.rowKey)
+    const code = item?.categoryCode
+    if (!code || categoryAccessories.has(code)) return
+    fetchCategoryAccessories(code, true)
+      .then((list) => setCategoryAccessories((prev) => new Map(prev).set(code, list.map((a) => ({ name: a.name, defaultQty: a.defaultQty || 1 })))))
+      .catch(() => setCategoryAccessories((prev) => new Map(prev).set(code, [])))
+  }, [passModal, groups, categoryAccessories])
+
+  /** 當前分類已配置的配件選項（AutoComplete 仍支持手動輸入其他名稱） */
+  const passAccessoryOptions = useMemo(() => {
+    const code = passItem?.categoryCode
+    if (!code) return []
+    return (categoryAccessories.get(code) || []).map((a) => ({ value: a.name }))
+  }, [passItem, categoryAccessories])
+
+  /** 一鍵帶入該分類配置的配件（跳過已存在的名稱，數量取默認配置） */
+  const handleImportAccessories = () => {
+    const code = passItem?.categoryCode
+    const list = code ? categoryAccessories.get(code) || [] : []
+    if (list.length === 0) {
+      message.info('該分類尚未配置配件，可在品牌產品庫按分類維護')
+      return
+    }
+    const existing = new Set(passAccessories.map((a) => a.name))
+    const additions = list.filter((a) => !existing.has(a.name)).map((a) => ({ name: a.name, qty: a.defaultQty || 1 }))
+    if (additions.length === 0) {
+      message.info('分類配件已全部帶入')
+      return
+    }
+    setPassAccessories((prev) => [...prev, ...additions])
+  }
+
+  /** 確認通過：寫入配件清單並標記驗收通過（照片至少 1 張，作為到貨憑證） */
+  const handlePassConfirm = () => {
+    if (!passModal || !passItem) return
+    if (passItem.photos.length === 0) { message.warning('請至少上傳 1 張現場照片作為驗收憑證'); return }
+    if (passAccessories.some((a) => !a.name.trim())) { message.warning('請填寫配件名稱'); return }
+    if (passAccessories.some((a) => a.qty <= 0)) { message.warning('配件數量需大於 0'); return }
+    const accessories = passAccessories.map((a) => ({ name: a.name.trim(), qty: a.qty }))
+    updateGroupItem(passModal.groupId, passModal.rowKey, { confirmed: true, selected: true, accessories })
+    setPassModal(null)
+    setPassAccessories([])
+  }
 
   const groupSubtotal = (group: InboundGroup) =>
     group.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
@@ -404,48 +471,10 @@ export default function InboundForm({ poId, onBack }: Props) {
       ),
     },
     {
-      title: '操作', key: 'action', width: 200, align: 'center',
+      title: '操作', key: 'action', width: 120, align: 'center',
       render: (_: unknown, r: InboundItem) => {
         const maxQty = Math.max(0, r.qty - r.receivedQty)
-        const photoCount = r.photos.length
-        // 照片上傳區域（通過/不通過均可拍照）
-        const photoSection = (
-          <div style={{ marginTop: 4 }}>
-            <Upload
-              showUploadList={false}
-              beforeUpload={(file) => { handleItemPhotoUpload(groupId, r.key!, file); return false }}
-              accept="image/*"
-              disabled={!r.selected}
-            >
-              <Button
-                type="link" size="small"
-                icon={<CameraOutlined />}
-                loading={uploading}
-                style={{ fontSize: 11, padding: '0 2px', color: photoCount > 0 ? '#1890ff' : '#8c8c8c' }}
-              >
-                {photoCount > 0 ? `${photoCount}張` : '拍照'}
-              </Button>
-            </Upload>
-            {photoCount > 0 && (
-              <div style={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-                {r.photos.map((p, idx) => (
-                  <div key={idx} style={{ position: 'relative', width: 32, height: 32 }}>
-                    <img
-                      src={p.dataUrl} alt={p.name}
-                      style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #d9d9d9', cursor: 'pointer' }}
-                      onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
-                    />
-                    <span
-                      onClick={() => handleItemPhotoRemove(groupId, r.key!, idx)}
-                      style={{ position: 'absolute', top: -4, right: -4, width: 14, height: 14, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1 }}
-                    >×</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-        // 已不通過 → 顯示處置標籤 + 撤銷 + 照片
+        // 已不通過 → 顯示處置標籤 + 撤銷
         if (r.rejectStatus) {
           return (
             <div>
@@ -461,33 +490,34 @@ export default function InboundForm({ poId, onBack }: Props) {
                   撤銷
                 </Button>
               </Space>
-              {photoSection}
             </div>
           )
         }
-        // 已驗收通過 → 撤銷 + 照片
+        // 已驗收通過 → 已驗收標籤 + 撤銷
         if (r.confirmed) {
           return (
             <div>
-              <Button
-                type="link" size="small" danger
-                onClick={() => updateGroupItem(groupId, r.key!, { confirmed: false })}
-                style={{ fontSize: 12 }}
-              >
-                撤銷
-              </Button>
-              {photoSection}
+              <Space size={4}>
+                <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收</Tag>
+                <Button
+                  type="link" size="small" danger
+                  onClick={() => updateGroupItem(groupId, r.key!, { confirmed: false })}
+                  style={{ fontSize: 12, padding: '0 2px' }}
+                >
+                  撤銷
+                </Button>
+              </Space>
             </div>
           )
         }
-        // 未處理 → 驗收通過 / 驗收不通過 + 照片
+        // 未處理 → 驗收確認（彈窗內拍照 + 配件清單）/ 驗收不通過
         return (
           <div>
             <Space size={4}>
               <Button
                 type="link" size="small"
                 disabled={!r.selected || r.inboundQty <= 0 || !r.locationId || maxQty <= 0}
-                onClick={() => updateGroupItem(groupId, r.key!, { confirmed: true, selected: true })}
+                onClick={() => { setPassModal({ groupId, rowKey: r.key! }); setPassAccessories(r.accessories.length > 0 ? [...r.accessories] : []) }}
                 style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
               >
                 通過
@@ -501,7 +531,6 @@ export default function InboundForm({ poId, onBack }: Props) {
                 不通過
               </Button>
             </Space>
-            {photoSection}
           </div>
         )
       },
@@ -525,6 +554,7 @@ export default function InboundForm({ poId, onBack }: Props) {
             locationId: it.locationId || 0,
             status: (it.confirmed ? 'pass' : it.rejectStatus) as 'pass' | 'return' | 'exchange' | 'concession',
             reason: it.rejectReason || undefined,
+            accessories: it.accessories.length > 0 ? it.accessories : undefined,
           }))
       )
       await saveInboundDraft({
@@ -555,6 +585,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           locationId: it.locationId!,
           disposition: 'pass' as const,
           photos: it.photos.length > 0 ? it.photos : undefined,
+          accessories: it.accessories.length > 0 ? it.accessories : undefined,
         }))
     )
     // 驗收不通過項：退貨/換貨/讓步接收，隨批次提交留痕（不生成資產）
@@ -568,6 +599,7 @@ export default function InboundForm({ poId, onBack }: Props) {
           disposition: it.rejectStatus!,
           rejectReason: it.rejectReason || undefined,
           photos: it.photos.length > 0 ? it.photos : undefined,
+          accessories: it.accessories.length > 0 ? it.accessories : undefined,
         }))
     )
     const allItems = [...passItems, ...rejectItems]
@@ -637,15 +669,23 @@ export default function InboundForm({ poId, onBack }: Props) {
         </div>
 
         <Row gutter={24}>
-          <Col span={8}>
+          <Col span={6}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購經辦人</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{order.purchaser || '-'}</div>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>服務部門</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{purchaserDept || '-'}</div>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬品牌</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {order.brand ? <BrandTag value={order.brand} /> : <span style={{ color: '#bfbfbf', fontSize: 14 }}>-</span>}
+              {order.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C' }}>編碼 TB</span>}
+              {order.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF' }}>編碼 MF</span>}
+            </div>
+          </Col>
+          <Col span={6}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>訂單總計</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
           </Col>
@@ -803,6 +843,122 @@ export default function InboundForm({ poId, onBack }: Props) {
         </Space>
       </div>
 
+      {/* ====== 驗收確認彈窗（通過項：拍照憑證 + 配件清單） ====== */}
+      <Modal
+        title="驗收確認"
+        open={!!passModal}
+        onOk={handlePassConfirm}
+        onCancel={() => { setPassModal(null); setPassAccessories([]) }}
+        okText="確認通過"
+        cancelText="取消"
+        width={720}
+        destroyOnClose
+      >
+        {passItem && (
+          <>
+            {/* 物資信息 */}
+            <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 10, fontSize: 13 }}>
+                <div><span style={{ color: '#8C8C8C' }}>資產名稱：</span><span style={{ fontWeight: 600 }}>{passItem.modelName}</span></div>
+                <div><span style={{ color: '#8C8C8C' }}>分類：</span>{passItem.categoryName || '-'}</div>
+                <div><span style={{ color: '#8C8C8C' }}>本次驗收數量：</span><span style={{ fontWeight: 700, color: '#E8720C' }}>{passItem.inboundQty}</span> 件</div>
+                <div><span style={{ color: '#8C8C8C' }}>存放位置：</span>{locations.find((l) => l.id === passItem.locationId)?.name || '-'}</div>
+              </div>
+            </div>
+
+            {/* 現場照片（到貨憑證，同步寫入資產主圖；全局統一憑證上傳樣式） */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+                <CameraOutlined style={{ marginRight: 4 }} />
+                現場照片（到貨憑證，同步寫入資產主圖）
+                <span style={{ color: '#FF4D4F' }}> *</span>
+                <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>最多 {MAX_PHOTOS} 張，至少 1 張</span>
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                {passItem.photos.map((p, idx) => (
+                  <div key={idx} style={{ position: 'relative', width: 88, height: 88 }}>
+                    <img
+                      src={p.dataUrl} alt={p.name}
+                      style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: '#fafafa' }}
+                      onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+                    />
+                    <Button type="text" size="small" danger
+                      style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, minWidth: 20, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      onClick={() => { if (passModal) handleItemPhotoRemove(passModal.groupId, passModal.rowKey, idx) }}
+                    >×</Button>
+                  </div>
+                ))}
+                {passItem.photos.length < MAX_PHOTOS && (
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => { if (passModal) handleItemPhotoUpload(passModal.groupId, passModal.rowKey, file); return false }}
+                    accept="image/*"
+                  >
+                    <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa', transition: 'all 0.3s' }}
+                      onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
+                      onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
+                    >
+                      <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
+                      <span>{uploading ? '上傳中…' : '拍照 / 上傳'}</span>
+                    </div>
+                  </Upload>
+                )}
+              </div>
+              {passItem.photos.length > 0 && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+                  已上傳 {passItem.photos.length}/{MAX_PHOTOS} 張，點擊圖片可預覽
+                </div>
+              )}
+            </div>
+
+            {/* 配件清單（分類級配置，品牌產品庫維護） */}
+            <div>
+              <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+                <AppstoreOutlined style={{ marginRight: 4 }} />
+                配件清單（隨驗收記錄一同保存）
+              </div>
+              {passAccessories.map((acc, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <AutoComplete
+                    value={acc.name}
+                    options={passAccessoryOptions}
+                    placeholder="選擇或輸入配件名稱"
+                    style={{ flex: 1 }}
+                    filterOption={(input, option) => String(option?.value ?? '').includes(input)}
+                    onChange={(v: string) => setPassAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, name: v } : a)))}
+                  />
+                  <InputNumber
+                    min={1} precision={0} value={acc.qty}
+                    style={{ width: 110 }}
+                    addonAfter="件"
+                    onChange={(v) => setPassAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, qty: v || 1 } : a)))}
+                  />
+                  <Button type="text" danger icon={<DeleteOutlined />}
+                    onClick={() => setPassAccessories((prev) => prev.filter((_, i) => i !== idx))} />
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button type="dashed" icon={<PlusOutlined />} style={{ flex: 1 }}
+                  onClick={() => setPassAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
+                  添加配件
+                </Button>
+                {passAccessoryOptions.length > 0 && (
+                  <Button type="dashed" icon={<AppstoreOutlined />} style={{ flex: 1 }}
+                    onClick={handleImportAccessories}>
+                    帶入分類配件（{passAccessoryOptions.length}）
+                  </Button>
+                )}
+              </div>
+              {passAccessories.length === 0 && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+                  可在品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </Modal>
+
       {/* ====== 驗收不通過彈窗 ====== */}
       <Modal
         title="驗收不通過"
@@ -812,6 +968,7 @@ export default function InboundForm({ poId, onBack }: Props) {
         okText="確認"
         cancelText="取消"
         okButtonProps={{ danger: true }}
+        width={640}
         destroyOnClose
       >
         <div style={{ marginBottom: 16 }}>
@@ -845,36 +1002,38 @@ export default function InboundForm({ poId, onBack }: Props) {
           <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
             <CameraOutlined style={{ marginRight: 4 }} />
             現場照片（損壞/不符憑證）
+            <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>最多 {MAX_PHOTOS} 張</span>
           </div>
-          <Upload
-            showUploadList={false}
-            beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
-            accept="image/*"
-            listType="picture-card"
-          >
-            <div style={{ padding: '8px 0' }}>
-              <Button icon={<CameraOutlined />} loading={uploading} size="small">
-                拍照 / 上傳
-              </Button>
-            </div>
-          </Upload>
-          {rejectPhotos.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-              {rejectPhotos.map((p, idx) => (
-                <div key={idx} style={{ position: 'relative', width: 56, height: 56 }}>
-                  <img
-                    src={p.dataUrl} alt={p.name}
-                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #d9d9d9', cursor: 'pointer' }}
-                    onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
-                  />
-                  <span
-                    onClick={() => handleRejectPhotoRemove(idx)}
-                    style={{ position: 'absolute', top: -5, right: -5, width: 16, height: 16, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', lineHeight: 1 }}
-                  >×</span>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            {rejectPhotos.map((p, idx) => (
+              <div key={idx} style={{ position: 'relative', width: 88, height: 88 }}>
+                <img
+                  src={p.dataUrl} alt={p.name}
+                  style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: '#fafafa' }}
+                  onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+                />
+                <Button type="text" size="small" danger
+                  style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, minWidth: 20, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  onClick={() => handleRejectPhotoRemove(idx)}
+                >×</Button>
+              </div>
+            ))}
+            {rejectPhotos.length < MAX_PHOTOS && (
+              <Upload
+                showUploadList={false}
+                beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
+                accept="image/*"
+              >
+                <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa', transition: 'all 0.3s' }}
+                  onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
+                  onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
+                >
+                  <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
+                  <span>{uploading ? '上傳中…' : '拍照 / 上傳'}</span>
                 </div>
-              ))}
-            </div>
-          )}
+              </Upload>
+            )}
+          </div>
         </div>
       </Modal>
 

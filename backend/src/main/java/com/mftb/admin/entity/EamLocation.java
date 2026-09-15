@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 仓库 / 存放位置实体（树形：仓库/楼层/办公室）
+ * 仓库 / 存放位置实体（按省-市-区-详细地址维度管理）
  */
 @Data
 @TableName("biz_eam_location")
@@ -24,13 +24,22 @@ public class EamLocation {
     /** 父级 ID，0 为顶级 */
     private Long parentId;
 
-    /** 类型：warehouse / floor / room */
+    /** 类型（已废弃，保留兼容旧数据） */
     private String type;
+
+    /** 省份（如：广东省） */
+    private String province;
+
+    /** 城市（如：珠海市） */
+    private String city;
+
+    /** 区县（如：香洲区） */
+    private String district;
 
     /** 排序 */
     private Integer sort;
 
-    /** 地址 */
+    /** 详细地址（街道、门牌号等） */
     private String address;
 
     /** 备注 */

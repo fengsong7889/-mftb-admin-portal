@@ -88,6 +88,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
             m.put("rejectReason", it.getRejectReason());
             m.put("photos", it.getPhotos() != null ? JsonUtils.parseMapList(it.getPhotos()) : List.of());
+            m.put("accessories", it.getAccessories() != null ? JsonUtils.parseMapList(it.getAccessories()) : List.of());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList());
@@ -214,6 +215,11 @@ public class EamInboundServiceImpl implements EamInboundService {
                         asset.setPurchaseValue(price != null ? price : BigDecimal.ZERO);
                     }
                     asset.setPurchaseDate(inboundDate);
+                    // 驗收照片同步寫入資產主圖（images：Data URL 逗號分隔）
+                    String images = extractPhotoDataUrls(item.getPhotos());
+                    if (!images.isEmpty()) {
+                        asset.setImages(images);
+                    }
                     asset.setSource("self");
                     asset.setLocation(locationName);
                     asset.setLocationId(locationId);
@@ -238,6 +244,10 @@ public class EamInboundServiceImpl implements EamInboundService {
             if (item.getPhotos() != null) {
                 batchItem.setPhotos(JsonUtils.toJson(item.getPhotos()));
             }
+            // 配件清單 JSON
+            if (item.getAccessories() != null) {
+                batchItem.setAccessories(JsonUtils.toJson(item.getAccessories()));
+            }
             batchItem.setAssetNos(JsonUtils.toJson(assetNos));
             batchItem.setSortOrder(sort++);
             batchItemsToInsert.add(batchItem);
@@ -248,6 +258,7 @@ public class EamInboundServiceImpl implements EamInboundService {
         batch.setBatchNo(batchNo);
         batch.setPoId(poId);
         batch.setPoNo(order.getPoNo());
+        batch.setBrand(order.getBrand());
         batch.setInboundDate(inboundDate);
         batch.setOperator(operator);
         batch.setTotalQty(totalQty);
@@ -346,6 +357,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             m.put("disposition", it.getDisposition() != null ? it.getDisposition() : "pass");
             m.put("rejectReason", it.getRejectReason());
             m.put("photos", it.getPhotos() != null ? JsonUtils.parseMapList(it.getPhotos()) : List.of());
+            m.put("accessories", it.getAccessories() != null ? JsonUtils.parseMapList(it.getAccessories()) : List.of());
             m.put("assetNos", it.getAssetNos() != null ? JsonUtils.parseStringList(it.getAssetNos()) : List.of());
             return m;
         }).collect(Collectors.toList()));
@@ -355,12 +367,32 @@ public class EamInboundServiceImpl implements EamInboundService {
 
     /* ==================== 内部方法 ==================== */
 
+    /**
+     * 提取验收照片 Data URL（逗号分隔），用于写入资产主图 images
+     * photos 结构：[{name, dataUrl}]（Object 透传，Jackson 反序列化为 List<Map>）
+     */
+    private String extractPhotoDataUrls(Object photos) {
+        if (!(photos instanceof List<?> list)) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Object p : list) {
+            if (p instanceof Map<?, ?> m) {
+                Object dataUrl = m.get("dataUrl");
+                if (dataUrl != null && !String.valueOf(dataUrl).isBlank()) {
+                    if (sb.length() > 0) sb.append(',');
+                    sb.append(dataUrl);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
     private Map<String, Object> batchToMap(EamInboundBatch b) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", b.getId());
         m.put("batchNo", b.getBatchNo());
         m.put("poId", b.getPoId());
         m.put("poNo", b.getPoNo());
+        m.put("brand", b.getBrand());
         m.put("inboundDate", b.getInboundDate());
         m.put("operator", b.getOperator());
         m.put("totalQty", b.getTotalQty());
