@@ -146,7 +146,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   // 構建供應商分組（兼容舊數據）
   const groups: PurchaseOrderSupplierGroup[] = detail.supplierGroups && detail.supplierGroups.length > 0
     ? detail.supplierGroups
-    : [{ id: 'default', supplier: detail.supplier, contact: detail.contact, orderDate: detail.orderDate, trackingNo: detail.trackingNo, items: detail.items }]
+    : [{ id: 'default', supplier: detail.supplier, contact: detail.contact, contactPhone: detail.contactPhone, orderDate: detail.orderDate, trackingNo: detail.trackingNo, items: detail.items }]
 
   const grandTotal = groups.reduce((s, g) => s + g.items.reduce((ss, it) => ss + (it.confirmedPrice || it.price) * it.qty, 0), 0)
   const purchaserDept = detail.department || empDeptMap.get(detail.purchaser || '') || ''
@@ -241,6 +241,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
             <Descriptions column={4} size="small" style={{ marginBottom: 16 }}>
               <Descriptions.Item label="供應商名稱">{group.supplier || '-'}</Descriptions.Item>
               <Descriptions.Item label="供應商聯絡人">{group.contact || '-'}</Descriptions.Item>
+              <Descriptions.Item label="供應商聯絡人電話">{group.contactPhone || '-'}</Descriptions.Item>
               <Descriptions.Item label="下單日期">{group.orderDate || '-'}</Descriptions.Item>
               <Descriptions.Item label="收貨方式">{dm ? DELIVERY_METHOD_LABEL[dm] || '-' : '-'}</Descriptions.Item>
               {dm === 'supplier_delivery' && (

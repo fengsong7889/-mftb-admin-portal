@@ -443,6 +443,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         m.put("brand", o.getBrand());
         m.put("remark", o.getRemark());
         m.put("trackingNo", o.getTrackingNo());
+        m.put("contact", o.getContact());
+        m.put("contactPhone", o.getContactPhone());
+        m.put("orderDate", o.getOrderDate());
         m.put("execStatus", o.getExecStatus());
         m.put("status", o.getStatus());
         m.put("acceptedQty", o.getAcceptedQty());
