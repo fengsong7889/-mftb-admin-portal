@@ -5,6 +5,7 @@ import { DatabaseOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchO
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { fetchCategoryList, fetchParamTypeList, deleteParamType, updateParamType } from '../../../api/eam'
 import type { AssetCategory, ParamType } from '../../../api/eam'
+import { useTranslation } from 'react-i18next'
 import './index.css'
 
 interface ParamLibraryListProps {
@@ -72,6 +73,7 @@ function collectDescendantCodes(list: AssetCategory[], rootId: number): Set<stri
 }
 
 export default function ParamLibraryList({ onAddType, onEditType }: ParamLibraryListProps) {
+  const { t } = useTranslation()
   const [categories, setCategories] = useState<AssetCategory[]>([])
   const [paramTypes, setParamTypes] = useState<ParamType[]>([])
   const [loading, setLoading] = useState(false)
@@ -207,7 +209,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
   const handleDeleteType = async (record: ParamType) => {
     try {
       await deleteParamType(record.id)
-      message.success('删除成功')
+      message.success(t('common.deleteSuccess'))
       if (selectedCatId) {
         const codes = collectDescendantCodes(categories, selectedCatId)
         fetchParamTypesByCodes(codes)
@@ -224,7 +226,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
     try {
       await updateParamType(record.id, { status: newStatus })
-      message.success(newStatus === 'enabled' ? '已启用' : '已停用')
+      message.success(newStatus === 'enabled' ? t('asset.enabledLabel') : t('asset.disabledLabel'))
       if (selectedCatId) {
         const codes = collectDescendantCodes(categories, selectedCatId)
         fetchParamTypesByCodes(codes)
@@ -237,52 +239,52 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
   }
 
   const typeColumns: TableColumnsType<ParamType> = [
-    { title: '参数编码', dataIndex: 'code', key: 'code', width: 120 },
-    { title: '参数名称', dataIndex: 'name', key: 'name', width: 140 },
-    { title: '单位', dataIndex: 'unit', key: 'unit', width: 80, render: (v: string) => v || '-' },
+    { title: t('asset.paramCodeLabel'), dataIndex: 'code', key: 'code', width: 120 },
+    { title: t('asset.paramNameLabel'), dataIndex: 'name', key: 'name', width: 140 },
+    { title: t('asset.colUnitLabel'), dataIndex: 'unit', key: 'unit', width: 80, render: (v: string) => v || '-' },
     {
-      title: '值类型',
+      title: t('asset.colValueType'),
       dataIndex: 'valueType',
       key: 'valueType',
       width: 100,
       render: (v: string) => {
-        const map: Record<string, string> = { select: '下拉选择', text: '文本', number: '数字' }
+        const map: Record<string, string> = { select: t('asset.valueTypeSelect'), text: t('asset.valueTypeText'), number: t('asset.valueTypeNumber') }
         return map[v] || v
       },
     },
     {
-      title: '状态',
+      title: t('asset.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status: string, record: ParamType) => (
         <Switch
           checked={status === 'enabled'}
-          checkedChildren="启用"
-          unCheckedChildren="停用"
+          checkedChildren={t('asset.enabledStatus')}
+          unCheckedChildren={t('asset.disabledStatus')}
           onChange={() => handleToggleTypeStatus(record)}
         />
       ),
     },
-    { title: '描述', dataIndex: 'description', key: 'description', width: 160, render: (v: string) => v || '-' },
-    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { title: t('asset.colDescLabel'), dataIndex: 'description', key: 'description', width: 160, render: (v: string) => v || '-' },
+    { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
+    { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     {
-      title: '操作',
+      title: t('asset.colAction'),
       key: 'action',
       width: 100,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); onEditType(record.id) }}>编辑</Button>
+          <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); onEditType(record.id) }}>{t('common.edit')}</Button>
           <Popconfirm
-            title="确认删除"
-            description={`确认删除参数类型「${record.name}」？`}
+            title={t('asset.confirmDeleteParamType')}
+            description={t('asset.deleteParamTypeHint', { name: record.name })}
             onConfirm={(e) => { e?.stopPropagation(); handleDeleteType(record) }}
             onCancel={(e) => e?.stopPropagation()}
-            okText="确认"
-            cancelText="取消"
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
           >
-            <Button type="link" size="small" danger onClick={(e) => e.stopPropagation()}>删除</Button>
+            <Button type="link" size="small" danger onClick={(e) => e.stopPropagation()}>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
       ),
@@ -303,7 +305,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
       <div className="cat-tree-panel">
         <h3 className="cat-tree-panel-title">
           <DatabaseOutlined className="cat-tree-panel-title-icon" />
-          分类结构
+          {t('asset.catStructureTitle')}
         </h3>
         <Tree
           treeData={treeData}
@@ -321,22 +323,22 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
         {/* 搜索区 */}
         <div className="search-section">
           <Form form={searchForm} layout="inline">
-            <Form.Item label="参数名称" name="name">
-              <Input placeholder="请输入参数名称" allowClear onPressEnter={handleSearch} />
+            <Form.Item label={t('asset.paramNameLabel')} name="name">
+              <Input placeholder={t('asset.paramNamePh')} allowClear onPressEnter={handleSearch} />
             </Form.Item>
-            <Form.Item label="参数编码" name="code">
-              <Input placeholder="请输入参数编码" allowClear onPressEnter={handleSearch} />
+            <Form.Item label={t('asset.paramCodeLabel')} name="code">
+              <Input placeholder={t('asset.paramCodePh')} allowClear onPressEnter={handleSearch} />
             </Form.Item>
-            <Form.Item label="状态" name="status">
-              <Select placeholder="全部" allowClear options={[
-                { value: 'enabled', label: '启用' },
-                { value: 'disabled', label: '停用' },
+            <Form.Item label={t('asset.colStatus')} name="status">
+              <Select placeholder={t('common.all')} allowClear options={[
+                { value: 'enabled', label: t('asset.statusEnabled') },
+                { value: 'disabled', label: t('asset.statusDisabled') },
               ]} />
             </Form.Item>
             <Form.Item>
               <div className="search-actions">
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
-                <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
               </div>
             </Form.Item>
           </Form>
@@ -347,7 +349,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
           <div className="action-section-left"></div>
           <div className="action-section-right">
             <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAddType}>
-              新增参数类型
+              {t('asset.addParamTypeBtn')}
             </Button>
             {typeConfigComponent}
           </div>
@@ -363,7 +365,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total) => t('asset.totalItems', { total }),
           }}
         />
       </div>

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal, Upload, Table, Button, Space, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { InboxOutlined, DownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
@@ -24,6 +25,7 @@ interface CategoryImportModalProps {
  * @param props 见 {@link CategoryImportModalProps}
  */
 export default function CategoryImportModal({ open, onClose, onImport, existingCategories }: CategoryImportModalProps) {
+  const { t } = useTranslation()
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [parsedRows, setParsedRows] = useState<ParsedCategoryRow[]>([])
@@ -39,22 +41,22 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
       setParsedRows(result.rows)
       setErrors(result.errors)
       if (result.rows.length === 0 && result.errors.length === 0) {
-        message.warning('文件中未找到有效数据')
+        message.warning(t('asset.noValidData'))
       }
     } catch {
-      message.error('文件解析失败，请确认文件格式为 .xlsx / .xls')
+      message.error(t('asset.parseFailed'))
     } finally {
       setParsing(false)
     }
     return false // 阻止自动上传
-  }, [])
+  }, [t])
 
   /** 下载导入模板（xlsx） */
   const handleDownloadTemplate = async () => {
     const url = await generateCategoryImportTemplate()
     const a = document.createElement('a')
     a.href = url
-    a.download = '分类导入模板.xlsx'
+    a.download = t('asset.categoryImportTemplate')
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -62,20 +64,20 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
   /** 确认导入：校验编码重复后回调 onImport */
   const handleConfirm = async () => {
     if (parsedRows.length === 0) {
-      message.warning('无有效数据可导入')
+      message.warning(t('asset.noDataToImport'))
       return
     }
     // 校验编码重复
     const existingCodes = new Set(existingCategories.map(c => c.code))
     const duplicateRows = parsedRows.filter(r => existingCodes.has(r.code))
     if (duplicateRows.length > 0) {
-      message.error(`以下分类编码已存在：${duplicateRows.map(r => r.code).join('、')}`)
+      message.error(t('asset.duplicateCodes', { codes: duplicateRows.map(r => r.code).join('、') }))
       return
     }
     setImporting(true)
     try {
       await onImport(parsedRows)
-      message.success(`成功导入 ${parsedRows.length} 条分类`)
+      message.success(t('asset.importSuccess', { count: parsedRows.length }))
       handleClose()
     } catch {
       // 错误由 onImport 处理
@@ -92,26 +94,26 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
   }
 
   const columns: TableColumnsType<ParsedCategoryRow> = [
-    { title: '分类编码', dataIndex: 'code', key: 'code', width: 120 },
-    { title: '分类名称', dataIndex: 'name', key: 'name', width: 140 },
+    { title: t('asset.colCatCode'), dataIndex: 'code', key: 'code', width: 120 },
+    { title: t('asset.colCatName'), dataIndex: 'name', key: 'name', width: 140 },
     {
-      title: '上级分类编码', dataIndex: 'parentCode', key: 'parentCode', width: 140,
+      title: t('asset.colParentCode'), dataIndex: 'parentCode', key: 'parentCode', width: 140,
       render: (v: string) => v || '-',
     },
     {
-      title: '状态', dataIndex: 'status', key: 'status', width: 80,
+      title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 80,
       render: (v: string) => (
         <Tag color={v === 'enabled' ? 'success' : 'default'}>
-          {v === 'enabled' ? '启用' : '停用'}
+          {v === 'enabled' ? t('asset.statusEnabled') : t('asset.statusDisabled')}
         </Tag>
       ),
     },
-    { title: '备注', dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
+    { title: t('asset.colRemark'), dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
   ]
 
   return (
     <Modal
-      title="批量导入分类"
+      title={t('asset.batchImportTitle')}
       open={open}
       onCancel={handleClose}
       width={720}
@@ -120,9 +122,9 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
         parsedRows.length > 0
           ? (
             <Space>
-              <Button onClick={handleClose}>取消</Button>
+              <Button onClick={handleClose}>{t('common.cancel')}</Button>
               <Button type="primary" icon={<CheckCircleOutlined />} loading={importing} onClick={handleConfirm}>
-                确认导入（{parsedRows.length} 条）
+                {t('asset.confirmImport', { count: parsedRows.length })}
               </Button>
             </Space>
           )
@@ -133,10 +135,10 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <span style={{ fontSize: 13, color: '#595959' }}>
-            请先下载模板，按模板格式填写数据后上传
+            {t('asset.templateHint')}
           </span>
           <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
-            下载导入模板
+            {t('asset.downloadTemplate')}
           </Button>
         </div>
         <Upload.Dragger
@@ -147,8 +149,8 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
           disabled={parsing || importing}
         >
           <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">{parsing ? '解析中…' : '点击或拖拽 Excel 文件到此处'}</p>
-          <p className="ant-upload-hint">支持 .xlsx / .xls 格式</p>
+          <p className="ant-upload-text">{parsing ? t('asset.parsingText') : t('asset.clickOrDragUpload')}</p>
+          <p className="ant-upload-hint">{t('asset.formatHint')}</p>
         </Upload.Dragger>
       </div>
 
@@ -157,7 +159,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
         <div style={{ marginBottom: 16 }}>
           <div style={{ color: '#FF4D4F', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
             <CloseCircleOutlined style={{ marginRight: 4 }} />
-            解析发现 {errors.length} 个错误：
+            {t('asset.parseErrorsFound', { count: errors.length })}
           </div>
           <div style={{ maxHeight: 120, overflow: 'auto', background: '#FFF2F0', border: '1px solid #FFCCC7', borderRadius: 6, padding: '8px 12px' }}>
             {errors.map((err, i) => (
@@ -172,7 +174,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
         <div>
           <div style={{ fontSize: 13, color: '#52C41A', fontWeight: 600, marginBottom: 8 }}>
             <CheckCircleOutlined style={{ marginRight: 4 }} />
-            解析成功，共 {parsedRows.length} 条有效数据
+            {t('asset.parseSuccessTotal', { count: parsedRows.length })}
           </div>
           <Table
             columns={columns}

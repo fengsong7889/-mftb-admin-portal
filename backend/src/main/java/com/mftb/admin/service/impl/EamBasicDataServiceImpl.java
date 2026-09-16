@@ -10,6 +10,9 @@ import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
 import com.mftb.admin.dto.EamParamTypeSaveDTO;
 import com.mftb.admin.dto.EamParamValueSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactVO;
+import com.mftb.admin.dto.EamSupplierSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamBrand;
 import com.mftb.admin.entity.EamCategory;
@@ -18,6 +21,8 @@ import com.mftb.admin.entity.EamLocation;
 import com.mftb.admin.entity.EamModel;
 import com.mftb.admin.entity.EamParamType;
 import com.mftb.admin.entity.EamParamValue;
+import com.mftb.admin.entity.EamSupplier;
+import com.mftb.admin.entity.EamSupplierContact;
 import com.mftb.admin.mapper.EamBrandMapper;
 import com.mftb.admin.mapper.EamCategoryAccessoryMapper;
 import com.mftb.admin.mapper.EamCategoryMapper;
@@ -25,7 +30,10 @@ import com.mftb.admin.mapper.EamLocationMapper;
 import com.mftb.admin.mapper.EamModelMapper;
 import com.mftb.admin.mapper.EamParamTypeMapper;
 import com.mftb.admin.mapper.EamParamValueMapper;
+import com.mftb.admin.mapper.EamSupplierMapper;
+import com.mftb.admin.mapper.EamSupplierContactMapper;
 import com.mftb.admin.service.EamBasicDataService;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +60,10 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     private final EamParamTypeMapper paramTypeMapper;
     private final EamParamValueMapper paramValueMapper;
     private final EamCategoryAccessoryMapper categoryAccessoryMapper;
+    private final EamSupplierMapper supplierMapper;
+    private final EamSupplierContactMapper supplierContactMapper;
     private final OperatorResolver operatorResolver;
+    private final BizSeqService bizSeqService;
     private final JdbcTemplate jdbcTemplate;
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -786,5 +797,231 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("updatedAt", pv.getUpdatedAt() != null ? pv.getUpdatedAt().format(DT_FMT) : "");
         map.put("createdAt", pv.getCreatedAt() != null ? pv.getCreatedAt().format(DT_FMT) : "");
         return map;
+    }
+
+    /* ==================== 供应商管理 ==================== */
+
+    @Override
+    public List<Map<String, Object>> listSuppliers(String name, String code, String contactPerson,
+                                                    String status, Integer page, Integer size) {
+        LambdaQueryWrapper<EamSupplier> wrapper = new LambdaQueryWrapper<>();
+        if (name != null && !name.isBlank()) wrapper.like(EamSupplier::getName, name.trim());
+        if (code != null && !code.isBlank()) wrapper.like(EamSupplier::getCode, code.trim());
+        if (contactPerson != null && !contactPerson.isBlank()) wrapper.like(EamSupplier::getContactPerson, contactPerson.trim());
+        if (status != null && !status.isBlank()) wrapper.eq(EamSupplier::getStatus, status.trim());
+        wrapper.orderByAsc(EamSupplier::getCode);
+
+        // page+size 同时传入时服务端分页，否则全量返回（列表页前端过滤使用）
+        List<EamSupplier> list;
+        if (page != null && size != null && size > 0) {
+            Page<EamSupplier> p = supplierMapper.selectPage(new Page<>(page, size), wrapper);
+            list = p.getRecords();
+        } else {
+            list = supplierMapper.selectList(wrapper);
+        }
+        return list.stream().map(this::supplierToMap).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public long createSupplier(EamSupplierSaveDTO dto) {
+        if (dto.getName() == null || dto.getName().isBlank()) throw new BusinessException("供應商名稱不能為空");
+        EamSupplier supplier = new EamSupplier();
+        // 编码系统自动生成（CGSJ + 6位全局自增，行锁保证并发不重号），禁止前端传码
+        supplier.setCode(bizSeqService.next(BizSeqService.RULE_EAM_SUPPLIER_CODE));
+        supplier.setName(dto.getName().trim());
+        supplier.setContactPerson(Objects.toString(dto.getContactPerson(), ""));
+        supplier.setContactPhone(Objects.toString(dto.getContactPhone(), ""));
+        supplier.setBankName(Objects.toString(dto.getBankName(), ""));
+        supplier.setBankAccount(Objects.toString(dto.getBankAccount(), ""));
+        supplier.setRemark(Objects.toString(dto.getRemark(), ""));
+        supplier.setStatus("enabled");
+        supplier.setUpdatedBy(operatorResolver.currentOperatorName());
+        supplier.setCreatedAt(LocalDateTime.now());
+        supplier.setUpdatedAt(LocalDateTime.now());
+        supplier.setDeleted(0);
+        supplierMapper.insert(supplier);
+
+        // 同步保存联系人列表（新结构）
+        if (dto.getContacts() != null && !dto.getContacts().isEmpty()) {
+            saveSupplierContacts(supplier.getId(), dto.getContacts());
+        }
+
+        return supplier.getId();
+    }
+
+    @Override
+    @Transactional
+    public void updateSupplier(long id, EamSupplierSaveDTO dto) {
+        EamSupplier supplier = supplierMapper.selectById(id);
+        if (supplier == null) throw new BusinessException("供應商不存在");
+        if (dto.getName() != null) {
+            if (dto.getName().isBlank()) throw new BusinessException("供應商名稱不能為空");
+            supplier.setName(dto.getName().trim());
+        }
+        if (dto.getContactPerson() != null) supplier.setContactPerson(dto.getContactPerson());
+        if (dto.getContactPhone() != null) supplier.setContactPhone(dto.getContactPhone());
+        if (dto.getBankName() != null) supplier.setBankName(dto.getBankName());
+        if (dto.getBankAccount() != null) supplier.setBankAccount(dto.getBankAccount());
+        if (dto.getRemark() != null) supplier.setRemark(dto.getRemark());
+        // 编码/状态不在 DTO 中，天然不可通过修改接口变更（状态只能走 toggle）
+        supplier.setUpdatedBy(operatorResolver.currentOperatorName());
+        supplier.setUpdatedAt(LocalDateTime.now());
+        supplierMapper.updateById(supplier);
+
+        // 同步更新联系人列表（新结构：先删后插）
+        if (dto.getContacts() != null) {
+            saveSupplierContacts(id, dto.getContacts());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteSupplier(long id) {
+        EamSupplier supplier = supplierMapper.selectById(id);
+        if (supplier == null) throw new BusinessException("供應商不存在");
+        supplierMapper.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public void toggleSupplierStatus(long id) {
+        EamSupplier supplier = supplierMapper.selectById(id);
+        if (supplier == null) throw new BusinessException("供應商不存在");
+        supplier.setStatus("enabled".equals(supplier.getStatus()) ? "disabled" : "enabled");
+        supplier.setUpdatedBy(operatorResolver.currentOperatorName());
+        supplier.setUpdatedAt(LocalDateTime.now());
+        supplierMapper.updateById(supplier);
+    }
+
+    private Map<String, Object> supplierToMap(EamSupplier s) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", s.getId());
+        map.put("code", s.getCode());
+        map.put("name", s.getName());
+        map.put("contactPerson", s.getContactPerson());
+        map.put("contactPhone", s.getContactPhone());
+        map.put("bankName", s.getBankName());
+        map.put("bankAccount", s.getBankAccount());
+        map.put("remark", s.getRemark());
+        map.put("status", s.getStatus());
+        map.put("updatedBy", s.getUpdatedBy());
+        map.put("updatedAt", s.getUpdatedAt() != null ? s.getUpdatedAt().format(DT_FMT) : "");
+        map.put("createdAt", s.getCreatedAt() != null ? s.getCreatedAt().format(DT_FMT) : "");
+        // 联系人数量（新结构）
+        long contactCount = supplierContactMapper.selectCount(
+                new LambdaQueryWrapper<EamSupplierContact>()
+                        .eq(EamSupplierContact::getSupplierId, s.getId())
+                        .eq(EamSupplierContact::getStatus, "enabled"));
+        map.put("contactCount", contactCount);
+        return map;
+    }
+
+    /* ==================== 供应商联系人 ==================== */
+
+    @Override
+    public Long createSupplierContact(Long supplierId, EamSupplierContactSaveDTO dto) {
+        EamSupplierContact c = new EamSupplierContact();
+        c.setSupplierId(supplierId);
+        c.setContactName(dto.getContactName());
+        c.setContactPhone(dto.getContactPhone());
+        c.setStatus(dto.getStatus() != null ? dto.getStatus() : "enabled");
+        supplierContactMapper.insert(c);
+        return c.getId();
+    }
+
+    @Override
+    public List<EamSupplierContactVO> listContactsBySupplier(Long supplierId) {
+        LambdaQueryWrapper<EamSupplierContact> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamSupplierContact::getSupplierId, supplierId)
+               .orderByDesc(EamSupplierContact::getCreatedAt);
+        List<EamSupplierContact> list = supplierContactMapper.selectList(wrapper);
+        return list.stream().map(this::contactToVO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void saveSupplierContacts(Long supplierId, List<EamSupplierContactSaveDTO> contacts) {
+        // 先逻辑删除该供应商的所有旧联系人
+        LambdaQueryWrapper<EamSupplierContact> delWrapper = new LambdaQueryWrapper<>();
+        delWrapper.eq(EamSupplierContact::getSupplierId, supplierId);
+        supplierContactMapper.delete(delWrapper);
+
+        // 批量插入新联系人
+        if (contacts != null && !contacts.isEmpty()) {
+            for (EamSupplierContactSaveDTO dto : contacts) {
+                if (dto.getContactName() == null || dto.getContactName().isBlank()) continue;
+                EamSupplierContact c = new EamSupplierContact();
+                c.setSupplierId(supplierId);
+                c.setContactName(dto.getContactName().trim());
+                c.setContactPhone(dto.getContactPhone());
+                c.setStatus(dto.getStatus() != null ? dto.getStatus() : "enabled");
+                c.setCreatedAt(LocalDateTime.now());
+                c.setUpdatedAt(LocalDateTime.now());
+                c.setDeleted(0);
+                supplierContactMapper.insert(c);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateSupplierContact(Long contactId, EamSupplierContactSaveDTO dto) {
+        EamSupplierContact contact = supplierContactMapper.selectById(contactId);
+        if (contact == null) throw new BusinessException("联系人不存在");
+        if (dto.getContactName() != null) contact.setContactName(dto.getContactName().trim());
+        if (dto.getContactPhone() != null) contact.setContactPhone(dto.getContactPhone());
+        if (dto.getStatus() != null) contact.setStatus(dto.getStatus());
+        contact.setUpdatedAt(LocalDateTime.now());
+        supplierContactMapper.updateById(contact);
+    }
+
+    @Override
+    @Transactional
+    public void deleteSupplierContact(Long contactId) {
+        EamSupplierContact contact = supplierContactMapper.selectById(contactId);
+        if (contact == null) throw new BusinessException("联系人不存在");
+        supplierContactMapper.deleteById(contactId);
+    }
+
+    @Override
+    @Transactional
+    public void toggleSupplierContactStatus(Long contactId) {
+        EamSupplierContact contact = supplierContactMapper.selectById(contactId);
+        if (contact == null) throw new BusinessException("联系人不存在");
+        contact.setStatus("enabled".equals(contact.getStatus()) ? "disabled" : "enabled");
+        contact.setUpdatedAt(LocalDateTime.now());
+        supplierContactMapper.updateById(contact);
+    }
+
+    @Override
+    public List<Map<String, Object>> listSuppliersDropdown(String keyword) {
+        LambdaQueryWrapper<EamSupplier> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamSupplier::getStatus, "enabled");
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(EamSupplier::getName, kw).or().like(EamSupplier::getCode, kw));
+        }
+        wrapper.orderByAsc(EamSupplier::getCode).last("LIMIT 50");
+        List<EamSupplier> list = supplierMapper.selectList(wrapper);
+        return list.stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("code", s.getCode());
+            m.put("name", s.getName());
+            return m;
+        }).collect(Collectors.toList());
+    }
+
+    private EamSupplierContactVO contactToVO(EamSupplierContact c) {
+        EamSupplierContactVO vo = new EamSupplierContactVO();
+        vo.setId(c.getId());
+        vo.setSupplierId(c.getSupplierId());
+        vo.setContactName(c.getContactName());
+        vo.setContactPhone(c.getContactPhone());
+        vo.setStatus(c.getStatus());
+        vo.setCreatedAt(c.getCreatedAt() != null ? c.getCreatedAt().format(DT_FMT) : "");
+        vo.setUpdatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().format(DT_FMT) : "");
+        return vo;
     }
 }

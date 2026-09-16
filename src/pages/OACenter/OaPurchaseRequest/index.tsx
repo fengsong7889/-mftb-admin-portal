@@ -29,7 +29,7 @@ import {
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
 import { submitOaRequest } from '../../../api/oaRequest'
 import { useWorkflowConfig } from '../../../hooks/useWorkflowConfig'
-import { BRAND_OPTIONS_NUMERIC, BrandEnum } from '../../../constants/brand'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 
 /** 流程標籤 → 顏色映射（與 WorkflowConfig 保持一致） */
 const FLOW_TAG_COLOR: Record<string, string> = {
@@ -388,6 +388,7 @@ export default function OaPurchaseRequest() {
   const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
   const watchedBrand = Form.useWatch('brand', form)
+  const { numericOptions, codeHint, labelMap } = useCompanyBrand()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   /** 提交成功彈窗（與充值/扣款/轉賬/合併/贈送/AI申請等流程保持一致） */
@@ -904,16 +905,11 @@ export default function OaPurchaseRequest() {
                 label="所屬品牌" name="brand"
                 rules={[{ required: true, message: '請選擇所屬品牌' }]}
               >
-                <Select placeholder="請選擇品牌" options={BRAND_OPTIONS_NUMERIC} />
+                <Select placeholder="請選擇品牌" options={numericOptions} />
               </Form.Item>
-              {watchedBrand === BrandEnum.SHANFENG && (
+              {watchedBrand && codeHint[watchedBrand] && (
                 <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
-                  當前物資歸屬閃蜂，編碼 TB
-                </div>
-              )}
-              {watchedBrand === BrandEnum.MFOOD && (
-                <div style={{ fontSize: 12, color: '#1890FF', marginTop: -18, marginBottom: 8 }}>
-                  當前物資歸屬 mFood，編碼 MF
+                  當前物資歸屬 {labelMap[watchedBrand]}，編碼 {codeHint[watchedBrand]}
                 </div>
               )}
             </Col>

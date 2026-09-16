@@ -12,6 +12,7 @@ import {
   ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SwapOutlined, RollbackOutlined, CameraOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
 import { fetchInboundDetail, fetchLocationList, registerExchangeShipment, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
@@ -23,11 +24,12 @@ interface Props {
 
 /** 验收处置方式展示映射 */
 type Disposition = 'pass' | 'return' | 'exchange' | 'concession'
-const DISPOSITION_META: Record<Disposition, { label: string; color: string }> = {
-  pass: { label: '通过', color: 'success' },
-  return: { label: '退货', color: 'error' },
-  exchange: { label: '换货', color: 'warning' },
-  concession: { label: '让步接收', color: 'processing' },
+/** labelKey 為 asset 段 key（復用驗收表單的处置方式文案），渲染時經 t() 轉換 */
+const DISPOSITION_META: Record<Disposition, { labelKey: string; color: string }> = {
+  pass: { labelKey: 'passBtn', color: 'success' },
+  return: { labelKey: 'rejectReturn', color: 'error' },
+  exchange: { labelKey: 'rejectExchange', color: 'warning' },
+  concession: { labelKey: 'rejectConcession', color: 'processing' },
 }
 
 /**
@@ -36,6 +38,7 @@ const DISPOSITION_META: Record<Disposition, { label: string; color: string }> = 
  * @param props batchId=入库批次 ID；onBack=返回列表
  */
 export default function InboundDetail({ batchId, onBack }: Props) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [batch, setBatch] = useState<InboundBatch | null>(null)
   const [locations, setLocations] = useState<AssetLocation[]>([])
@@ -58,11 +61,11 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       setBatch(data)
       setLocations(locList)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '加載失敗')
+      message.error(e instanceof Error ? e.message : t('asset.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [batchId])
+  }, [batchId, t])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -76,20 +79,20 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   /** PR-3: 提交換貨二次發貨登記 */
   const handleExchangeSubmit = async () => {
     if (!exchangeModal || exchangeModal.id == null) return
-    if (!exchangeTrackingNo.trim()) { message.warning('請填寫物流單號'); return }
+    if (!exchangeTrackingNo.trim()) { message.warning(t('asset.warnTrackingNo')); return }
     setExchangeSubmitting(true)
     try {
       await registerExchangeShipment(batchId, exchangeModal.id, {
         trackingNo: exchangeTrackingNo.trim(),
         expectedDate: exchangeExpectedDate.trim() || undefined,
       })
-      message.success('二次發貨登記成功')
+      message.success(t('asset.exchangeRegistered'))
       setExchangeModal(null)
       setExchangeTrackingNo('')
       setExchangeExpectedDate('')
       loadData()
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '登記失敗')
+      message.error(e instanceof Error ? e.message : t('asset.registerFailed'))
     } finally {
       setExchangeSubmitting(false)
     }
@@ -97,26 +100,26 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
   /* ----- 明细表格列 ----- */
   const itemColumns: TableColumnsType<InboundBatchItem> = [
-    { title: '资产名称', dataIndex: 'modelName', key: 'modelName', width: 180, ellipsis: true },
-    { title: '数量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right',
+    { title: t('asset.colAssetName'), dataIndex: 'modelName', key: 'modelName', width: 180, ellipsis: true },
+    { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 80, align: 'right',
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '处置方式', dataIndex: 'disposition', key: 'disposition', width: 100,
+      title: t('asset.colDisposeMethod'), dataIndex: 'disposition', key: 'disposition', width: 100,
       render: (v: Disposition | undefined) => {
         const meta = DISPOSITION_META[v || 'pass']
-        return <Tag color={meta.color}>{meta.label}</Tag>
+        return <Tag color={meta.color}>{t(`asset.${meta.labelKey}`)}</Tag>
       },
     },
-    { title: '存放位置', dataIndex: 'locationId', key: 'locationId', width: 120,
+    { title: t('asset.colStorageLocation'), dataIndex: 'locationId', key: 'locationId', width: 120,
       render: (v: number) => <span style={{ color: '#262626' }}>{locationMap.get(v) || '-'}</span>,
     },
     {
-      title: '不通过原因', dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
+      title: t('asset.colRejectReason'), dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
       render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
     },
     {
-      title: '配件清單', key: 'accessories', width: 220,
+      title: t('asset.colAccessories'), key: 'accessories', width: 220,
       render: (_: unknown, r: InboundBatchItem) => {
         const accs = r.accessories || []
         if (accs.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
@@ -130,7 +133,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       },
     },
     {
-      title: '验收照片', key: 'photos', width: 120,
+      title: t('asset.colPhotos'), key: 'photos', width: 120,
       render: (_: unknown, r: InboundBatchItem) => {
         const photos = r.photos || []
         if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
@@ -151,7 +154,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       },
     },
     {
-      title: '生成资产编号', key: 'assetNos', width: 300,
+      title: t('asset.colGeneratedNos'), key: 'assetNos', width: 300,
       render: (_: unknown, r: InboundBatchItem) => (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {r.assetNos.length > 0
@@ -168,22 +171,22 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       ),
     },
     {
-      title: '換貨跟蹤', key: 'exchange', width: 160,
+      title: t('asset.colExchangeTracking'), key: 'exchange', width: 160,
       render: (_: unknown, r: InboundBatchItem) => {
         if (r.disposition !== 'exchange') return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
           <Space size={4} wrap>
             {r.exchangeStatus === 'shipped' ? (
-              <Tooltip title={`單號 ${r.exchangeTrackingNo || '-'}${r.exchangeExpectedDate ? ` · 預計 ${r.exchangeExpectedDate}` : ''}`}>
-                <Tag color="blue" style={{ margin: 0 }}>已發貨</Tag>
+              <Tooltip title={`${t('asset.trackingNoPrefix', { no: r.exchangeTrackingNo || '-' })}${r.exchangeExpectedDate ? ` · ${t('asset.expectedPrefix', { date: r.exchangeExpectedDate })}` : ''}`}>
+                <Tag color="blue" style={{ margin: 0 }}>{t('asset.tagShipped')}</Tag>
               </Tooltip>
             ) : (
-              <Tag color="orange" style={{ margin: 0 }}>待發貨</Tag>
+              <Tag color="orange" style={{ margin: 0 }}>{t('asset.tagPendingShipment')}</Tag>
             )}
             {r.exchangeStatus !== 'shipped' && (
               <Button type="link" size="small" style={{ fontSize: 12, padding: '0 2px' }}
                 onClick={() => { setExchangeModal(r); setExchangeTrackingNo(''); setExchangeExpectedDate('') }}>
-                登記發貨
+                {t('asset.registerShipmentBtn')}
               </Button>
             )}
           </Space>
@@ -195,7 +198,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   if (loading || !batch) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="加載中..." />
+        <Spin size="large" tip={t('common.loading')} />
       </div>
     )
   }
@@ -206,7 +209,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     <>
       {/* ====== 页面頭部 ====== */}
       <DetailPageHeader
-        title="验收入库详情"
+        title={t('asset.inboundDetailTitle')}
         tags={<Tag color="orange" style={{ marginLeft: 4 }}>{batch.batchNo}</Tag>}
         meta={<>{batch.poNo} · {batch.operator} · {batch.inboundDate}</>}
         onBack={onBack}
@@ -218,44 +221,44 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>批次信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.batchInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Row gutter={24}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>入库批次号</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colBatchNo')}</div>
             <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace', fontWeight: 600 }}>{batch.batchNo}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購订单号</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colPoNo')}</div>
             <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace' }}>{batch.poNo}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>验收日期</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.inboundDate}</div>
           </Col>
         </Row>
         <Row gutter={24} style={{ marginTop: 16 }}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>操作人</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colOperator')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.operator || '-'}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬品牌</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
             <div style={{ fontSize: 14 }}>
               {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
             </div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>創建時間</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colCreatedAt')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{batch.createdAt}</div>
           </Col>
         </Row>
         {batch.purchaseReason && (
           <Row gutter={24} style={{ marginTop: 16 }}>
             <Col span={24}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購事由</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
               <div style={{ fontSize: 14, color: '#262626' }}>{batch.purchaseReason}</div>
             </Col>
           </Row>
@@ -268,35 +271,35 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShoppingCartOutlined style={{ fontSize: 14, color: '#52c41a' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>验收统计</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.statsTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Row gutter={16}>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>總数量</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('asset.statTotal')}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#262626' }}>{batch.totalQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f22' }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 4 }} />已验收
+                <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 4 }} />{t('asset.colReceived')}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{batch.acceptedQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.pendingQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>未验收</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('asset.statPending')}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.pendingQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.pendingQty}</div>
             </div>
           </Col>
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.returnQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <RollbackOutlined style={{ color: '#FF4D4F', marginRight: 4 }} />退货
+                <RollbackOutlined style={{ color: '#FF4D4F', marginRight: 4 }} />{t('asset.rejectReturn')}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.returnQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.returnQty}</div>
             </div>
@@ -304,7 +307,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.exchangeQty > 0 ? '#fffbe6' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <SwapOutlined style={{ color: '#FAAD14', marginRight: 4 }} />换货
+                <SwapOutlined style={{ color: '#FAAD14', marginRight: 4 }} />{t('asset.rejectExchange')}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.exchangeQty > 0 ? '#FAAD14' : '#8C8C8C' }}>{batch.exchangeQty}</div>
             </div>
@@ -312,7 +315,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Col span={4}>
             <div style={{ textAlign: 'center', padding: '12px 0', background: batch.concessionQty > 0 ? '#e6f7ff' : '#FAFAFA', borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <ExclamationCircleOutlined style={{ color: '#1890FF', marginRight: 4 }} />让步接收
+                <ExclamationCircleOutlined style={{ color: '#1890FF', marginRight: 4 }} />{t('asset.rejectConcession')}
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: batch.concessionQty > 0 ? '#1890FF' : '#8C8C8C' }}>{batch.concessionQty}</div>
             </div>
@@ -326,8 +329,8 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <EnvironmentOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>入库明细</span>
-          <Tag color="blue" style={{ fontSize: 11 }}>共 {batch.items.length} 項</Tag>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.itemsTitle')}</span>
+          <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.exceptionCountTag', { count: batch.items.length })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -345,7 +348,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       {batch.remark && (
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>備註</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.remarkTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ fontSize: 14, color: '#595959', lineHeight: 1.8 }}>{batch.remark}</div>
@@ -358,8 +361,8 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{batch.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{batch.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{batch.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{batch.updatedAt || '-'}</span></span>
       </div>
 
       {/* ====== 照片預覽 ====== */}
@@ -374,28 +377,28 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
       {/* ====== 換貨二次發貨登記（PR-3） ====== */}
       <Modal
-        title="登記換貨二次發貨"
+        title={t('asset.exchangeModalTitle')}
         open={!!exchangeModal}
         onOk={handleExchangeSubmit}
         onCancel={() => setExchangeModal(null)}
-        okText="確認登記"
-        cancelText="取消"
+        okText={t('asset.confirmRegister')}
+        cancelText={t('common.cancel')}
         confirmLoading={exchangeSubmitting}
         destroyOnClose
       >
         {exchangeModal && (
           <div>
             <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
-              <div><span style={{ color: '#8C8C8C' }}>資產名稱：</span><b>{exchangeModal.modelName}</b></div>
-              <div><span style={{ color: '#8C8C8C' }}>換貨數量：</span><b style={{ color: '#FA8C16' }}>{exchangeModal.qty}</b> 件</div>
+              <div><span style={{ color: '#8C8C8C' }}>{t('asset.modelNameLabel')}</span><b>{exchangeModal.modelName}</b></div>
+              <div><span style={{ color: '#8C8C8C' }}>{t('asset.exchangeQtyLabel')}</span><b style={{ color: '#FA8C16' }}>{exchangeModal.qty}</b> {t('asset.unitPiece')}</div>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>物流單號 <span style={{ color: '#FF4D4F' }}>*</span></div>
-              <Input value={exchangeTrackingNo} onChange={(e) => setExchangeTrackingNo(e.target.value)} placeholder="請輸入供應商二次發貨的物流單號" allowClear />
+              <div style={{ fontSize: 13, marginBottom: 6 }}>{t('asset.trackingNoLabel')} <span style={{ color: '#FF4D4F' }}>*</span></div>
+              <Input value={exchangeTrackingNo} onChange={(e) => setExchangeTrackingNo(e.target.value)} placeholder={t('asset.phTrackingNo')} allowClear />
             </div>
             <div>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>預計到貨日</div>
-              <Input value={exchangeExpectedDate} onChange={(e) => setExchangeExpectedDate(e.target.value)} placeholder="YYYY-MM-DD（可選）" allowClear />
+              <div style={{ fontSize: 13, marginBottom: 6 }}>{t('asset.expectedArrivalLabel')}</div>
+              <Input value={exchangeExpectedDate} onChange={(e) => setExchangeExpectedDate(e.target.value)} placeholder={t('asset.phOptionalDate')} allowClear />
             </div>
           </div>
         )}

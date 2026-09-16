@@ -8,7 +8,6 @@
  * 台賬主數據與操作流水仍由 ./asset 承載，本文件僅擴展 EAM 專屬實體。
  */
 import request, { isBackendUnavailable, SILENT_HEADER } from './request'
-import { BrandEnum } from '../constants/brand'
 import {
   mockFetchCategoryList,
   mockCreateCategory,
@@ -16,6 +15,31 @@ import {
   mockDeleteCategory,
   mockToggleCategoryStatus,
 } from './mock/eamCategoryMock'
+import {
+  mockFetchAssetTagList,
+  mockCreateAssetTag,
+  mockUpdateAssetTag,
+  mockDeleteAssetTag,
+  mockToggleAssetTagStatus,
+} from './mock/eamAssetTagMock'
+import {
+  mockFetchAssetTagBindings,
+  mockFetchAssetIdsByTag,
+  mockBindAssetTag,
+  mockUnbindAssetTag,
+  mockSetPrimaryAssetTag,
+  assembleBindings,
+} from './mock/eamAssetTagBindingMock'
+import {
+  mockFetchSupplierList,
+  mockCreateSupplier,
+  mockUpdateSupplier,
+  mockDeleteSupplier,
+  mockToggleSupplierStatus,
+  mockFetchSuppliersDropdown,
+  mockFetchSupplierContacts,
+  mockSyncSupplierContact,
+} from './mock/eamSupplierMock'
 import {
   claimAsset,
   fetchAssetDetail,
@@ -171,6 +195,67 @@ export interface ParamTypeQuery {
   size?: number
 }
 
+/* ==================== 資產標籤模板 ==================== */
+
+/** 資產可展示字段定義（標籤模板可選字段） */
+export interface AssetDisplayField {
+  key: string
+  label: string
+}
+
+/** 資產可展示字段列表（標籤模板配置時可選） */
+export const ASSET_DISPLAY_FIELDS: AssetDisplayField[] = [
+  { key: 'assetNo', label: '資產編號' },
+  { key: 'assetType', label: '資產分類' },
+  { key: 'brand', label: '資產品牌' },
+  { key: 'assetName', label: '資產名稱' },
+  { key: 'status', label: '狀態' },
+  { key: 'userName', label: '使用人' },
+  { key: 'department', label: '所在部門' },
+  { key: 'company', label: '所屬公司' },
+  { key: 'location', label: '存放地點' },
+  { key: 'source', label: '採購形式' },
+  { key: 'purchaseDate', label: '購買日期' },
+]
+
+/** 字段示例值（僅用於配置時預覽標籤效果，非真實資產數據） */
+export const ASSET_FIELD_SAMPLE_VALUES: Record<string, string> = {
+  assetNo: 'ZC-2026-0001',
+  assetType: 'IT設備',
+  brand: 'Apple',
+  assetName: 'MacBook Pro 14',
+  status: '在用',
+  userName: '張三',
+  department: '技術部',
+  company: '閃蜂科技',
+  location: '總部辦公區 3F',
+  source: '集中採購',
+  purchaseDate: '2026-03-15',
+}
+
+/** 資產標籤模板 */
+export interface AssetTagTemplate {
+  id: number
+  /** 標籤名稱 */
+  name: string
+  /** 標籤描述 */
+  description?: string
+  /** 標籤背景色 */
+  bgColor: string
+  /** 標籤文字顏色 */
+  textColor: string
+  /** 展示字段配置（資產字段 key 列表） */
+  displayFields: string[]
+  /** 狀態 */
+  status: 'enabled' | 'disabled'
+  /** 排序 */
+  sort: number
+  /** 已綁定資產數量 */
+  boundCount?: number
+  updatedBy?: string
+  updatedAt?: string
+}
+
 /* ==================== 採購入庫 ==================== */
 
 /** 採購申請明細行 */
@@ -245,6 +330,8 @@ export interface PurchaseOrderItem {
 export interface PurchaseOrderSupplierGroup {
   id: string
   supplier: string
+  /** 供應商 ID（用於下拉選擇和聯繫人查詢） */
+  supplierId?: number
   contact?: string
   contactPhone?: string
   orderDate?: string
@@ -611,7 +698,7 @@ function currentUserName(): string {
 function normalizePurchaseOrder(o: Record<string, unknown>): PurchaseOrder {
   return {
     ...(o as unknown as PurchaseOrder),
-    brand: [BrandEnum.SHANFENG, BrandEnum.MFOOD].includes(Number(o.brand)) ? Number(o.brand) : undefined,
+    brand: Number(o.brand) > 0 ? Number(o.brand) : undefined,
     reqNo: typeof o.reqNo === 'string' ? o.reqNo : undefined,
     items: (o.items as PurchaseOrderItem[] | undefined) || [],
     // 列表接口返回的分組摘要不含 items，補空數組保證結構完整
@@ -911,6 +998,276 @@ export async function updateLocation(id: number, data: Partial<AssetLocation>): 
 
 export async function deleteLocation(id: number): Promise<void> {
     await request.delete(`/eam/basic/locations/${id}`)
+}
+
+/* ==================== API：資產標籤模板 ==================== */
+
+/**
+ * 標籤模板後端端點尚未實現（前端先行策略）：
+ * 後端對未知路徑返回 HTTP 200 + 業務碼 500（「系統繁忙」包裝 404）或 HTTP 5xx，
+ * 兩者均視為後端不可用，靜默降級本地 mock；避免空列表與「錯誤 + 成功」雙通知。
+ * 後端接口落地後，可移除 code 500 降級分支，僅保留 isBackendUnavailable。
+ */
+function isTagBackendPending(e: unknown): boolean {
+  if (isBackendUnavailable(e)) return true
+  return (e as { code?: number } | null)?.code === 500
+}
+
+/** 標籤模板列表 */
+export async function fetchAssetTagList(): Promise<AssetTagTemplate[]> {
+  try {
+    return await request.get<unknown, AssetTagTemplate[]>('/eam/basic/asset-tags', { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockFetchAssetTagList()
+    throw e
+  }
+}
+
+/** 新增標籤模板 */
+export async function createAssetTag(data: Omit<AssetTagTemplate, 'id' | 'boundCount'>): Promise<number> {
+  try {
+    return await request.post<unknown, number>('/eam/basic/asset-tags', data, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockCreateAssetTag(data)
+    throw e
+  }
+}
+
+/** 更新標籤模板 */
+export async function updateAssetTag(id: number, data: Partial<AssetTagTemplate>): Promise<void> {
+  try {
+    await request.put(`/eam/basic/asset-tags/${id}`, data, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockUpdateAssetTag(id, data)
+    throw e
+  }
+}
+
+/** 刪除標籤模板 */
+export async function deleteAssetTag(id: number): Promise<void> {
+  try {
+    await request.delete(`/eam/basic/asset-tags/${id}`, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockDeleteAssetTag(id)
+    throw e
+  }
+}
+
+/** 切換標籤模板狀態 */
+export async function toggleAssetTagStatus(id: number): Promise<void> {
+  try {
+    await request.put(`/eam/basic/asset-tags/${id}/toggle`, undefined, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockToggleAssetTagStatus(id)
+    throw e
+  }
+}
+
+/** 資產-標籤綁定項（含模板配置，渲染直接使用） */
+export interface AssetTagBindingItem {
+  bindingId: number
+  isPrimary: boolean
+  createdBy?: string
+  createdAt?: string
+  tag: AssetTagTemplate
+}
+
+/** 查詢資產已綁標籤（主標籤排前） */
+export async function fetchAssetTagBindings(assetId: number): Promise<AssetTagBindingItem[]> {
+  try {
+    return await request.get<unknown, AssetTagBindingItem[]>(`/eam/basic/assets/${assetId}/tags`, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) {
+      const records = await mockFetchAssetTagBindings(assetId)
+      return assembleBindings(records, await mockFetchAssetTagList())
+    }
+    throw e
+  }
+}
+
+/** 綁定標籤（主標籤策略由後端/mock 決定：顯式指定或無主標籤時自動設主） */
+export async function bindAssetTag(assetId: number, tagId: number, isPrimary?: boolean): Promise<void> {
+  try {
+    await request.post(`/eam/basic/assets/${assetId}/tags`, { tagId, isPrimary }, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockBindAssetTag(assetId, tagId, isPrimary)
+    throw e
+  }
+}
+
+/** 解綁標籤 */
+export async function unbindAssetTag(assetId: number, tagId: number): Promise<void> {
+  try {
+    await request.delete(`/eam/basic/assets/${assetId}/tags/${tagId}`, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockUnbindAssetTag(assetId, tagId)
+    throw e
+  }
+}
+
+/** 設為主標籤（原主標籤自動降級） */
+export async function setPrimaryAssetTag(assetId: number, tagId: number): Promise<void> {
+  try {
+    await request.put(`/eam/basic/assets/${assetId}/tags/${tagId}/primary`, undefined, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockSetPrimaryAssetTag(assetId, tagId)
+    throw e
+  }
+}
+
+/** 按模板反查綁定的資產 ID 列表（批量列印「按模板」數據源） */
+export async function fetchAssetIdsByTag(tagId: number): Promise<number[]> {
+  try {
+    return await request.get<unknown, number[]>(`/eam/basic/asset-tags/${tagId}/asset-ids`, { headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isTagBackendPending(e)) return mockFetchAssetIdsByTag(tagId)
+    throw e
+  }
+}
+
+/* ==================== 供應商管理 ==================== */
+
+/** 供應商（EAM 基礎數據，採購入庫的供貨方） */
+export interface EamSupplier {
+  id: number
+  /** 供應商編碼（全局唯一） */
+  code: string
+  /** 供應商名稱 */
+  name: string
+  /** 聯繫人（舊字段兼容，新數據走 contacts 列表） */
+  contactPerson?: string
+  /** 聯繫電話（舊字段兼容） */
+  contactPhone?: string
+  /** 開戶銀行 */
+  bankName?: string
+  /** 銀行賬號 */
+  bankAccount?: string
+  remark?: string
+  /** 狀態：enabled / disabled */
+  status: 'enabled' | 'disabled'
+  updatedBy?: string
+  updatedAt?: string
+  /** 啟用聯繫人數量（後端返回） */
+  contactCount?: number
+}
+
+/** 供應商聯繫人（新結構：一個供應商可配置多個聯繫人） */
+export interface SupplierContactItem {
+  id?: number
+  supplierId?: number
+  contactName: string
+  contactPhone?: string
+  status?: 'enabled' | 'disabled'
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 供應商下拉精簡項 */
+export interface SupplierDropdownItem {
+  id: number
+  code: string
+  name: string
+}
+
+/** 供應商列表查詢參數（後端支持條件過濾） */
+export interface SupplierListParams {
+  name?: string
+  code?: string
+  contactPerson?: string
+  status?: string
+}
+
+/** 供應商列表（支持 name/code/contactPerson/status 條件過濾） */
+export async function fetchSupplierList(params?: SupplierListParams): Promise<EamSupplier[]> {
+  try {
+    return await request.get<unknown, EamSupplier[]>('/eam/basic/suppliers', { params, headers: { [SILENT_HEADER]: '1' } })
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchSupplierList()
+    throw e
+  }
+}
+
+/** 供應商新增/編輯參數（編碼由後端按規則自動生成，狀態僅能透過 toggle 變更） */
+export type SupplierSaveParams = Omit<EamSupplier, 'id' | 'updatedAt' | 'code' | 'status' | 'contactCount'> & {
+  /** 聯繫人列表（新結構） */
+  contacts?: SupplierContactItem[]
+}
+
+/** 新增供應商，編碼系統自動生成（CGSJ + 6位自增），返回新記錄 ID */
+export async function createSupplier(data: SupplierSaveParams): Promise<number> {
+  try {
+    return await request.post<unknown, number>('/eam/basic/suppliers', data)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockCreateSupplier(data)
+    throw e
+  }
+}
+
+/** 更新供應商（編碼不可修改） */
+export async function updateSupplier(id: number, data: SupplierSaveParams): Promise<void> {
+  try {
+    await request.put(`/eam/basic/suppliers/${id}`, data)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockUpdateSupplier(id, data)
+    throw e
+  }
+}
+
+/** 刪除供應商 */
+export async function deleteSupplier(id: number): Promise<void> {
+  try {
+    await request.delete(`/eam/basic/suppliers/${id}`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockDeleteSupplier(id)
+    throw e
+  }
+}
+
+/** 切換供應商啟用/停用狀態 */
+export async function toggleSupplierStatus(id: number): Promise<void> {
+  try {
+    await request.put(`/eam/basic/suppliers/${id}/toggle`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockToggleSupplierStatus(id)
+    throw e
+  }
+}
+
+/** 供應商下拉列表（精簡版：僅 id/code/name，支持關鍵字過濾） */
+export async function fetchSuppliersDropdown(keyword?: string): Promise<SupplierDropdownItem[]> {
+  try {
+    return await request.get<unknown, SupplierDropdownItem[]>('/eam/basic/suppliers/dropdown', {
+      params: keyword ? { keyword } : undefined,
+      headers: { [SILENT_HEADER]: '1' },
+    })
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchSuppliersDropdown(keyword)
+    throw e
+  }
+}
+
+/** 查詢指定供應商的所有啟用聯繫人 */
+export async function fetchSupplierContacts(supplierId: number): Promise<SupplierContactItem[]> {
+  try {
+    return await request.get<unknown, SupplierContactItem[]>(`/eam/basic/suppliers/${supplierId}/contacts`, {
+      headers: { [SILENT_HEADER]: '1' },
+    })
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockFetchSupplierContacts(supplierId)
+    throw e
+  }
+}
+
+/** 為指定供應商創建/更新聯繫人（採購訂單手動錄入同步用） */
+export async function syncSupplierContact(supplierId: number, contactName: string, contactPhone: string): Promise<void> {
+  try {
+    await request.post('/eam/basic/supplier-contacts', { supplierId, contactName, contactPhone, status: 'enabled' }, {
+      headers: { [SILENT_HEADER]: '1' },
+    })
+  } catch (e) {
+    if (isBackendUnavailable(e)) return mockSyncSupplierContact(supplierId, contactName, contactPhone)
+    throw e
+  }
 }
 
 /* ==================== API：分類配件配置 ==================== */

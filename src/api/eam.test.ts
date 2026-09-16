@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request, { isBackendUnavailable } from './request'
 import { approvePurchaseRequest, createPurchaseRequest, fetchPurchaseRequestDetail, fetchPurchaseOrderDetail, fetchPurchaseOrderList } from './eam'
-import { BrandEnum } from '../constants/brand'
 
 vi.mock('./request', () => ({
   default: { get: vi.fn() },
@@ -14,7 +13,7 @@ const backendOrder = {
   poNo: 'DDCG202609150003',
   reqId: 3,
   reqNo: 'CG202609150002',
-  brand: BrandEnum.SHANFENG,
+  brand: 1,
   amount: '0.00',
   createdAt: '2026-09-15T21:32:41',
 }
@@ -22,7 +21,7 @@ const backendOrder = {
 beforeEach(() => { vi.clearAllMocks() })
 
 describe('采购订单接口映射', () => {
-  it.each([BrandEnum.SHANFENG, BrandEnum.MFOOD, '1', '2'])('保留真实流程编号，并将品牌 %s 转为编辑框的数字枚举', async (brand) => {
+  it.each([1, 2, '1', '2'])('保留真实流程编号，并将品牌 %s 转为编辑框的数字枚举', async (brand) => {
     vi.mocked(request.get).mockResolvedValue({ ...backendOrder, brand })
 
     const result = await fetchPurchaseOrderDetail(30)
@@ -61,7 +60,7 @@ describe('采购订单接口映射', () => {
   it('仅在进入 Mock 数据分支时补充 Mock 申请编号', async () => {
     const requestId = await createPurchaseRequest({
       title: '测试采购申请', department: '测试部门', applicant: '测试申请人',
-      budget: 0, reason: '测试', items: [], brand: BrandEnum.SHANFENG,
+      budget: 0, reason: '测试', items: [], brand: 1,
     })
     const purchaseRequest = await fetchPurchaseRequestDetail(requestId)
     const orderId = await approvePurchaseRequest(requestId, true, '测试审批人')
@@ -76,6 +75,6 @@ describe('采购订单接口映射', () => {
 
     expect(linkedOrder?.reqNo).toBe(purchaseRequest.reqNo)
     expect(detail.reqNo).toBe(purchaseRequest.reqNo)
-    expect(detail.brand).toBe(BrandEnum.SHANFENG)
+    expect(detail.brand).toBe(1)
   })
 })

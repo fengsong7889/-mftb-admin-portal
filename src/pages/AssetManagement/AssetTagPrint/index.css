@@ -1,0 +1,103 @@
+/* ============================================================
+   資產標籤批量列印頁局部樣式（AssetTagPrint）
+   A4 標籤紙網格 + @media print 列印樣式
+   ============================================================ */
+
+/* A4 標籤紙容器（屏幕預覽帶陰影，列印時去除） */
+.tag-a4-sheet {
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  padding: 8mm;
+  margin: 0 auto 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+  page-break-after: always;
+  break-after: page;
+}
+.tag-a4-sheet:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+/* 標籤網格 */
+.tag-print-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), 1fr);
+  gap: 4mm;
+}
+
+/* 單元格：標籤 + 二維碼 */
+.tag-print-cell {
+  border: 1px dashed #e0e0e0;
+  border-radius: 2mm;
+  padding: 2.5mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2mm;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 打印时虚线裁切框保留（便于贴纸裁剪），屏幕缩放预览 */
+.tag-print-preview-zoom {
+  transform: scale(0.72);
+  transform-origin: top center;
+  margin-bottom: -80px;
+}
+
+/* 二維碼 */
+.tag-print-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1mm;
+}
+.tag-print-qr img {
+  width: 18mm;
+  height: 18mm;
+  display: block;
+}
+.tag-print-qr span {
+  font-size: 9px;
+  color: #8c8c8c;
+  line-height: 1.2;
+  max-width: 50mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   列印樣式：僅顯示標籤紙區域（visibility 方案，不依賴外部佈局類名）
+   注意：@page 為全局規則，若未來其他頁面需要不同紙張邊距需重新評估
+   ============================================================ */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .asset-tag-print-area,
+  .asset-tag-print-area * {
+    visibility: visible !important;
+  }
+  .asset-tag-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .tag-print-preview-zoom {
+    transform: none;
+    margin-bottom: 0;
+  }
+  .tag-a4-sheet {
+    box-shadow: none;
+    margin: 0;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}

@@ -51,6 +51,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 验收入库批次编号 (IB) + 资产编号 (FA) 规则种子 */
     private static final String V_INIT_EAM_IB_ASSET_RULE = "seq:init-v8";
 
+    /** 增量版本: 供应商编码规则种子（CGSJ + 6位全局自增，无日期维度） */
+    private static final String V_INIT_EAM_SUPPLIER_RULE = "seq:init-v9";
+
+    /** 增量版本: 领用编号 (LY) + 归还编号 (GH) 规则种子 */
+    private static final String V_INIT_EAM_CLAIM_RETURN_RULE = "seq:init-v10";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -86,6 +92,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce(V_INIT_EAM_IB_ASSET_RULE, () -> {
             seedEamInboundBatchAndAssetRules();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_SUPPLIER_RULE, () -> {
+            seedEamSupplierCodeRule();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_CLAIM_RETURN_RULE, () -> {
+            seedEamClaimReturnRules();
         });
     }
 
@@ -444,7 +456,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 BizSeqService.RULE_EAM_INBOUND_BATCH, "驗收入庫批次編號", "物資管理(EAM)-驗收入庫",
                 "IB", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
-        // 资产编号: FA + YYYYMMDD + 6位自增序号
+        // 资产编号: {品牌编碼}-{倉庫编碼}-{分類碼}-{4位分類內自增序號} (示例: TB-ZH-0101-0001)
+        // 注意: 實際編號由 EamAssetService.generateAssetNo() 生成，不走 BizSeqService 全局序列
+        // 此規則僅供前端規則配置頁展示格式說明
         inserted += jdbcTemplate.update(
                 "INSERT INTO sys_biz_seq_rule "
                         + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
@@ -455,10 +469,63 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
                 BizSeqService.RULE_EAM_ASSET, "資產編號", "物資管理(EAM)-資產台賬",
-                "FA", "YYYYMMDD", 6, 0, 1,
-                "{prefix} + YYYYMMDD + {n}位自增序號");
+                "TB", "", 4, 0, 1,
+                "{品牌编碼}-{倉庫编碼}-{分類碼}-{n}位分類內自增序號");
         if (inserted > 0) {
             log.info("已写入/修正验收入库批次编号 + 资产编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 供应商编码规则种子（CGSJ + 6位全局自增，归属物资管理-供应商管理） */
+    private void seedEamSupplierCodeRule() {
+        int affected = jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_SUPPLIER_CODE, "供應商編碼", "物資管理(EAM)-供應商管理",
+                "CGSJ", "", 6, 1, 1,
+                "{prefix} + {n}位數字自增（全局自增，如 CGSJ000001、CGSJ000002）");
+        if (affected > 0) {
+            log.info("已写入/修正供应商编码规则种子数据 (CGSJ + 6位全局自增)");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 领用编号 (LY+YYYYMMDD+4位) + 归还编号 (GH+YYYYMMDD+4位) 规则种子 */
+    private void seedEamClaimReturnRules() {
+        int inserted = 0;
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_CLAIM, "領用編號", "物資管理(EAM)-領用管理",
+                "LY", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_RETURN, "歸還編號", "物資管理(EAM)-領用管理",
+                "GH", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正领用编号 + 归还编号规则种子数据");
             bizSeqService.refreshRules();
         }
     }

@@ -24,6 +24,7 @@ import {
   fetchAssetDetail, parseAssetImages, type AssetItem, type AssetStatus,
 } from '../../../api/asset'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
 
 const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   idle:      { key: 'asset.statusIdle',     color: 'default' },
@@ -121,7 +122,7 @@ export default function AssetDetail() {
         <ModuleTitle
           icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
           iconBg="#e6f7ff"
-          title="资产信息"
+          title={t('asset.assetInfoTitle')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
           <Field label={t('asset.colAssetNo')}>
@@ -135,7 +136,7 @@ export default function AssetDetail() {
         {/* 参数信息 */}
         {paramEntries.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>参数信息</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>{t('asset.paramInfoTitle')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 12, columnGap: 24 }}>
               {paramEntries.map(([key, val]) => (
                 <Field key={key} label={key}>{val || '-'}</Field>
@@ -147,7 +148,7 @@ export default function AssetDetail() {
         {/* 资产照片 */}
         {imageList.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>资产照片</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>{t('asset.assetPhotoSection')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               {imageList.map((src, i) => (
                 <Image
@@ -165,10 +166,10 @@ export default function AssetDetail() {
         <ModuleTitle
           icon={<DollarOutlined style={{ fontSize: 14, color: '#E8720C' }} />}
           iconBg="#fff7e6"
-          title="租/购信息"
+          title={t('asset.rentPurchaseInfo')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label="採購形式">
+          <Field label={t('asset.purchaseForm')}>
             <Tag color={asset.source === 'self' ? 'blue' : 'orange'}>
               {asset.source === 'self' ? t('asset.sourceSelf') : t('asset.sourceLease')}
             </Tag>
@@ -186,14 +187,14 @@ export default function AssetDetail() {
           )}
           {asset.source === 'lease' && (
             <>
-              <Field label="租用公司">{asset.company || '-'}</Field>
-              <Field label="租借公司">{a.leaseCompany || '-'}</Field>
-              <Field label="租金">
+              <Field label={t('asset.leaseCompanyLabel')}>{asset.company || '-'}</Field>
+              <Field label={t('asset.leaseCompanyLabel2')}>{a.leaseCompany || '-'}</Field>
+              <Field label={t('asset.rentalCostLabel')}>
                 <span style={{ fontWeight: 600, color: '#E8720C' }}>
                   {a.rentalCost ? `MOP ${a.rentalCost.toLocaleString()}` : '-'}
                 </span>
               </Field>
-              <Field label="租用周期">
+              <Field label={t('asset.rentalPeriodLabel')}>
                 {a.rentalPeriod && a.rentalPeriod[0]
                   ? `${a.rentalPeriod[0]} ~ ${a.rentalPeriod[1]}`
                   : '-'}
@@ -209,40 +210,43 @@ export default function AssetDetail() {
         <ModuleTitle
           icon={<UserOutlined style={{ fontSize: 14, color: '#13C2C2' }} />}
           iconBg="#E6FFFB"
-          title="当前使用人"
+          title={t('asset.currentUserTitle')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label="当前使用人">{asset.userName || '-'}</Field>
-          <Field label="所在部门">{asset.department || '-'}</Field>
-          <Field label="领用日期">{asset.usageDate || '-'}</Field>
+          <Field label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Field>
+          <Field label={t('asset.colDepartment')}>{asset.department || '-'}</Field>
+          <Field label={t('asset.colClaimDate')}>{asset.usageDate || '-'}</Field>
         </div>
       </div>
-
-      {/* ====== 模块4：入库信息 ====== */}
+      
+      {/* ====== 模塊4：資產標籤（主標籤 + 次標籤，可綁定/解綁/列印） ====== */}
+      {id !== null && <AssetTagBindingSection assetId={id} asset={asset} />}
+      
+      {/* ====== 模块5：入库信息 ====== */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
         <ModuleTitle
           icon={<InboxOutlined style={{ fontSize: 14, color: '#722ED1' }} />}
           iconBg="#f9f0ff"
-          title="入库信息"
+          title={t('asset.inboundInfo')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label="入库批次号">{a.inboundBatchNo || '-'}</Field>
-          <Field label="入库时间">{a.inboundDate || '-'}</Field>
-          <Field label="入库数量">{a.inboundQty ?? '-'}</Field>
-          <Field label="验收人">{a.inspector || '-'}</Field>
+          <Field label={t('asset.inboundBatchNoLabel')}>{a.inboundBatchNo || '-'}</Field>
+          <Field label={t('asset.inboundDateLabel')}>{a.inboundDate || '-'}</Field>
+          <Field label={t('asset.inboundQtyLabel')}>{a.inboundQty ?? '-'}</Field>
+          <Field label={t('asset.inspectorLabel')}>{a.inspector || '-'}</Field>
         </div>
       </div>
 
-      {/* ====== 模块5：操作记录 ====== */}
+      {/* ====== 模块6：操作记录 ====== */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
         <ModuleTitle
           icon={<EditOutlined style={{ fontSize: 14, color: '#595959' }} />}
           iconBg="#f5f5f5"
-          title="操作记录"
+          title={t('asset.operationRecord')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label="最后更新人">{asset.applicant || '-'}</Field>
-          <Field label="最后更新时间">{asset.updatedAt || '-'}</Field>
+          <Field label={t('asset.colUpdatedBy')}>{asset.applicant || '-'}</Field>
+          <Field label={t('asset.colUpdatedAt')}>{asset.updatedAt || '-'}</Field>
         </div>
       </div>
     </div>

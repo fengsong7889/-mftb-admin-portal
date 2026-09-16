@@ -312,11 +312,11 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         const concessionQty = r.concessionQty || 0
         return (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
-            <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收 {accepted}</Tag>
-            {pending > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>未驗收 {pending}</Tag>}
-            {returnQty > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨 {returnQty}</Tag>}
-            {exchangeQty > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>換貨 {exchangeQty}</Tag>}
-            {concessionQty > 0 && <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>讓步接收 {concessionQty}</Tag>}
+            <Tag color="success" style={{ margin: 0, fontSize: 11 }}>{t('asset.acceptedReceipt')} {accepted}</Tag>
+            {pending > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>{t('asset.pendingReceipt')} {pending}</Tag>}
+            {returnQty > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>{t('asset.returnQty')} {returnQty}</Tag>}
+            {exchangeQty > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>{t('asset.exchangeQty')} {exchangeQty}</Tag>}
+            {concessionQty > 0 && <Tag color="processing" style={{ margin: 0, fontSize: 11 }}>{t('asset.concessionReceipt')} {concessionQty}</Tag>}
           </div>
         )
       },

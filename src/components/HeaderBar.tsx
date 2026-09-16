@@ -13,12 +13,13 @@ import {
   CheckOutlined,
   InboxOutlined,
   SearchOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import PikachuFace from './PikachuFace'
 import { useTranslation } from 'react-i18next'
-import { changeAppLanguage, SUPPORTED_LANGUAGES, injectTranslationBundle } from '../i18n'
+import { changeAppLanguage, SUPPORTED_LANGUAGES, ensureLanguageBundle } from '../i18n'
 import type { AppLanguage } from '../i18n'
 import {
   COUNTRY_INFO,
@@ -29,7 +30,7 @@ import {
   validateLanguageConfigured,
 } from '../utils/translationConfig'
 import type { LangValidationResult } from '../utils/translationConfig'
-import { fetchCoverage, fetchTranslationBundle } from '../api/translation'
+import { fetchCoverage } from '../api/translation'
 import { pinyin } from 'pinyin-pro'
 import { fetchNotifications, markAllNotificationsRead, type NotificationItem } from '../api/notification'
 import { updateAvatarApi, uploadAvatarApi } from '../api/auth'
@@ -116,14 +117,11 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
     setSelectedLang(savedLang && LANG_INFO[savedLang] ? savedLang : 'en')
   }, [])
 
-  /** 执行语言切换（含后端语言包注入） */
+  /** 执行语言切换（含后端语言包注入，会话内同语言去重） */
   const doSwitchLanguage = async (lang: string) => {
     const selected = languageOptions.find(o => o.value === lang)
     // 拉取后端数据库语言包注入 i18next（业务字段/菜单名等动态翻译）
-    const bundle = await fetchTranslationBundle(lang)
-    if (bundle) {
-      injectTranslationBundle(lang, bundle)
-    }
+    await ensureLanguageBundle(lang)
     setSelectedLang(lang)
     localStorage.setItem('app_language', lang)
     if ((SUPPORTED_LANGUAGES as readonly string[]).includes(lang)) {
@@ -364,6 +362,12 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
 
   /** 用户下拉菜单 */
   const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'my-assets',
+      icon: <AppstoreOutlined />,
+      label: t('header.myAssets', '我的资产'),
+      onClick: () => navigate('/my-assets'),
+    },
     {
       key: 'avatar',
       icon: <CameraOutlined />,

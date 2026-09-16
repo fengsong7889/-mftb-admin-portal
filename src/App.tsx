@@ -1,8 +1,10 @@
-import { useState, Suspense, lazy } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { Layout, Spin } from 'antd'
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ensureLanguageBundle, getSavedLanguage } from './i18n'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { CompanyBrandProvider } from './contexts/CompanyBrandContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
 import MenuTabs from './components/MenuTabs'
@@ -166,6 +168,9 @@ const AssetCategory = lazy(() => import('./pages/AssetManagement/AssetCategory')
 const AssetModel = lazy(() => import('./pages/AssetManagement/AssetModel'))
 const AssetLocation = lazy(() => import('./pages/AssetManagement/AssetLocation'))
 const ParamLibrary = lazy(() => import('./pages/AssetManagement/ParamLibrary'))
+const AssetSupplier = lazy(() => import('./pages/AssetManagement/AssetSupplier'))
+const AssetTag = lazy(() => import('./pages/AssetManagement/AssetTag'))
+const AssetTagPrint = lazy(() => import('./pages/AssetManagement/AssetTagPrint'))
 // EAM 採購入庫
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
 const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
@@ -173,11 +178,15 @@ const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
 const AssetClaim = lazy(() => import('./pages/AssetManagement/AssetClaim'))
 const AssetBorrow = lazy(() => import('./pages/AssetManagement/AssetBorrow'))
 const AssetReturn = lazy(() => import('./pages/AssetManagement/AssetReturn'))
+// 員工個人資產入口
+const MyAssets = lazy(() => import('./pages/MyAssets'))
 // EAM 調撥交接
 const AssetTransferList = lazy(() => import('./pages/AssetManagement/AssetTransferList'))
 const AssetHandover = lazy(() => import('./pages/AssetManagement/AssetHandover'))
 // EAM 變更歷史
 const AssetFlow = lazy(() => import('./pages/AssetManagement/AssetFlow'))
+// 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
+const AssetTagView = lazy(() => import('./pages/AssetTagView'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -200,6 +209,12 @@ function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
   const { updateAvailable } = useVersionCheck()
+
+  // 登錄態首次掛載（含刷新恢復）：按持久化語言拉取數據庫語言包，
+  // 否則 ja/ko/ru 的動態翻譯（業務字段/菜單名）刷新後丟失回退英文
+  useEffect(() => {
+    void ensureLanguageBundle(getSavedLanguage())
+  }, [])
 
   return (
     <Layout className="app-layout">
@@ -366,13 +381,21 @@ function AuthenticatedLayout() {
               <Route path="/asset-model"      element={<AssetModel />} />
               <Route path="/asset-location"   element={<AssetLocation />} />
               <Route path="/param-library"    element={<ParamLibrary />} />
+              <Route path="/asset-supplier"   element={<AssetSupplier />} />
+              <Route path="/asset-tag"      element={<AssetTag />} />
+              <Route path="/asset-tag-print" element={<AssetTagPrint />} />
               {/* EAM 採購入庫 */}
               <Route path="/purchase-order"   element={<PurchaseOrder />} />
               <Route path="/asset-inbound"    element={<AssetInbound />} />
               {/* EAM 領用借用 */}
               <Route path="/asset-claim"      element={<AssetClaim />} />
+              <Route path="/asset-claim/add"    element={<AssetClaim />} />
+              <Route path="/asset-claim/detail" element={<AssetClaim />} />
+              <Route path="/asset-claim/record" element={<AssetClaim />} />
               <Route path="/asset-borrow"     element={<AssetBorrow />} />
               <Route path="/asset-return"     element={<AssetReturn />} />
+              {/* 員工個人資產入口 */}
+              <Route path="/my-assets"        element={<MyAssets />} />
               {/* EAM 調撥交接 */}
               <Route path="/asset-transfer-list" element={<AssetTransferList />} />
               <Route path="/asset-handover"   element={<AssetHandover />} />
@@ -400,13 +423,21 @@ function AuthenticatedLayout() {
   )
 }
 
-/** 路由守卫 */
+/** 路由守衛 */
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
+  const location = useLocation()
+
+  // 公開移動端頁面（掃碼查看資產標籤）：無需登錄，不套後台佈局
+  const isPublicMobilePath = location.pathname.startsWith('/m/')
 
   return (
     <Routes>
-      {isAuthenticated ? (
+      {isPublicMobilePath ? (
+        <Route path="/m/asset-tag-view" element={
+          <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
+        } />
+      ) : isAuthenticated ? (
         <Route path="/*" element={<AuthenticatedLayout />} />
       ) : (
         <>
@@ -422,7 +453,9 @@ function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <AppRoutes />
+        <CompanyBrandProvider>
+          <AppRoutes />
+        </CompanyBrandProvider>
       </AuthProvider>
     </HashRouter>
   )

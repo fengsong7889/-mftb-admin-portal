@@ -15,6 +15,7 @@ import type { TableColumnsType } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, DatabaseOutlined, PlusOutlined,
 } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import {
   fetchCategoryList, fetchParamTypeList, createParamType, updateParamType,
   fetchParamValuesByType, createParamValue, updateParamValue, deleteParamValue,
@@ -66,6 +67,7 @@ function buildGroupedTreeData(list: AssetCategory[]) {
 }
 
 export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props) {
+  const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
@@ -137,10 +139,10 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     let alive = true
     setLoading(true)
     loadData()
-      .catch((e: Error) => message.error(e.message || '加載失敗'))
+      .catch((e: Error) => message.error(e.message || t('asset.loadFailed')))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [loadData])
+  }, [loadData, t])
 
   /** 分類 TreeSelect 數據 */
   const categoryTreeData = useMemo(() => buildGroupedTreeData(categories), [categories])
@@ -163,10 +165,10 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
       setSubmitting(true)
       if (isEdit && id) {
         await updateParamType(id, payload)
-        message.success('更新成功')
+        message.success(t('asset.updateSuccess'))
       } else {
         await createParamType(payload)
-        message.success('新增成功')
+        message.success(t('asset.addSuccess'))
       }
       onBack()
     } catch (e: unknown) {
@@ -183,7 +185,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     try {
       const v = await addValueForm.validateFields()
       if (!currentTypeCode) {
-        message.warning('參數類型編碼不存在')
+        message.warning(t('asset.warnParamTypeCodeMissing'))
         return
       }
       await createParamValue({
@@ -194,7 +196,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         updatedBy: '',
         updatedAt: '',
       })
-      message.success('新增成功')
+      message.success(t('asset.addSuccess'))
       setAddValueModalOpen(false)
       addValueForm.resetFields()
       await loadParamValues(currentTypeCode)
@@ -218,7 +220,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         value: v.value.trim(),
         sort: v.sort ?? 0,
       })
-      message.success('更新成功')
+      message.success(t('asset.updateSuccess'))
       setEditValueModalOpen(false)
       editValueForm.resetFields()
       setEditingValue(null)
@@ -232,7 +234,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
   const handleDeleteValue = async (record: ParamValue) => {
     try {
       await deleteParamValue(record.id)
-      message.success('刪除成功')
+      message.success(t('asset.deleteSuccess'))
       if (currentTypeCode) await loadParamValues(currentTypeCode)
     } catch {
       // 錯誤提示由請求層統一處理
@@ -244,7 +246,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
     try {
       await updateParamValue(record.id, { status: newStatus })
-      message.success(newStatus === 'enabled' ? '已啟用' : '已停用')
+      message.success(newStatus === 'enabled' ? t('asset.enabledStatus') : t('asset.disabledStatus'))
       if (currentTypeCode) await loadParamValues(currentTypeCode)
     } catch {
       // 錯誤提示由請求層統一處理
@@ -253,40 +255,40 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
 
   /** 參數值表格列 */
   const valueColumns: TableColumnsType<ParamValue> = [
-    { title: '序號', key: 'index', width: 60, render: (_: unknown, __: unknown, index: number) => index + 1 },
-    { title: '參數值', dataIndex: 'value', key: 'value', width: 200 },
+    { title: t('asset.colIndex'), key: 'index', width: 60, render: (_: unknown, __: unknown, index: number) => index + 1 },
+    { title: t('asset.colParamValue'), dataIndex: 'value', key: 'value', width: 200 },
     {
-      title: '狀態',
+      title: t('asset.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status: string, record: ParamValue) => (
         <Switch
           checked={status === 'enabled'}
-          checkedChildren="啟用"
-          unCheckedChildren="停用"
+          checkedChildren={t('asset.switchEnabled')}
+          unCheckedChildren={t('asset.switchDisabled')}
           size="small"
           onChange={() => handleToggleValueStatus(record)}
         />
       ),
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 100, render: (v: string) => v || '-' },
+    { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     {
-      title: '操作',
+      title: t('asset.colAction'),
       key: 'action',
       width: 120,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleOpenEditValue(record)}>編輯</Button>
+          <Button type="link" size="small" onClick={() => handleOpenEditValue(record)}>{t('common.edit')}</Button>
           <Popconfirm
-            title="確認刪除"
-            description={`確認刪除參數值「${record.value}」？`}
+            title={t('asset.deleteConfirmTitle')}
+            description={t('asset.confirmDeleteParamValue', { value: record.value })}
             onConfirm={() => handleDeleteValue(record)}
-            okText="確認"
-            cancelText="取消"
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
           >
-            <Button type="link" size="small" danger>刪除</Button>
+            <Button type="link" size="small" danger>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
       ),
@@ -322,22 +324,22 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     const items: { key: string; label: string; children: React.ReactNode }[] = [
       {
         key: 'basic',
-        label: '基本信息',
+        label: t('asset.tabBasicInfo'),
         children: (
           <div style={cardShellStyle}>
             {cardTitleRow(
               <DatabaseOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
               '#FFF7E6',
-              '基本信息',
-              '定義資產參數的類型與值類型',
+              t('asset.basicInfoTitle'),
+              t('asset.basicInfoSubtitle'),
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <Form.Item
-                label="所屬分類" name="categoryCode"
-                rules={[{ required: true, message: '請選擇所屬分類' }]}
+                label={t('asset.labelCategory')} name="categoryCode"
+                rules={[{ required: true, message: t('asset.warnSelectCategory') }]}
               >
                 <TreeSelect
-                  placeholder="請選擇所屬分類"
+                  placeholder={t('asset.phSelectCategory')}
                   allowClear={!categoryDisabled}
                   disabled={categoryDisabled}
                   treeDefaultExpandAll
@@ -347,36 +349,36 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
                 />
               </Form.Item>
               <Form.Item
-                label="參數編碼" name="code"
+                label={t('asset.labelParamCode')} name="code"
                 rules={[
-                  { required: true, message: '請輸入參數編碼' },
-                  { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: '僅支持字母、數字、下劃線' },
+                  { required: true, message: t('asset.warnInputParamCode') },
+                  { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: t('asset.patternParamCode') },
                 ]}
               >
                 <Input
-                  placeholder="如 chip / memory / storage"
+                  placeholder={t('asset.phParamCode')}
                   disabled={isEdit}
                   style={{ fontFamily: 'monospace' }}
                 />
               </Form.Item>
               <Form.Item
-                label="參數名稱" name="name"
-                rules={[{ required: true, message: '請輸入參數名稱' }]}
+                label={t('asset.labelParamName')} name="name"
+                rules={[{ required: true, message: t('asset.warnInputParamName') }]}
               >
-                <Input placeholder="如 芯片 / 內存 / 存儲" allowClear />
+                <Input placeholder={t('asset.phParamName')} allowClear />
               </Form.Item>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <Form.Item label="計量單位" name="unit">
-                <Input placeholder="如 GB / 英寸 / W（可選）" allowClear />
+              <Form.Item label={t('asset.labelUnit')} name="unit">
+                <Input placeholder={t('asset.phUnit')} allowClear />
               </Form.Item>
               <Form.Item
                 label={
                   <span>
-                    值類型
+                    {t('asset.labelValueType')}
                     {watchedValueType && watchedValueType !== 'select' && (
                       <span style={{ fontSize: 12, color: '#fa8c16', marginLeft: 6, fontWeight: 400 }}>
-                        （僅下拉選擇，產品信息才能選擇參數值）
+                        {t('asset.valueTypeHint')}
                       </span>
                     )}
                   </span>
@@ -384,17 +386,17 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
                 name="valueType"
               >
                 <Select options={[
-                  { value: 'select', label: '下拉選擇' },
-                  { value: 'text', label: '文本' },
-                  { value: 'number', label: '數字' },
+                  { value: 'select', label: t('asset.valueTypeSelect') },
+                  { value: 'text', label: t('asset.valueTypeText') },
+                  { value: 'number', label: t('asset.valueTypeNumber') },
                 ]} />
               </Form.Item>
-              <Form.Item label="排序" name="sort">
-                <InputNumber style={{ width: '100%' }} placeholder="數字越小越靠前" min={0} />
+              <Form.Item label={t('asset.labelSort')} name="sort">
+                <InputNumber style={{ width: '100%' }} placeholder={t('asset.phSort')} min={0} />
               </Form.Item>
             </div>
-            <Form.Item label="描述" name="description" style={{ marginBottom: 0 }}>
-              <Input.TextArea rows={3} placeholder="參數描述（可選）" maxLength={300} showCount />
+            <Form.Item label={t('asset.labelDescription')} name="description" style={{ marginBottom: 0 }}>
+              <Input.TextArea rows={3} placeholder={t('asset.phDescription')} maxLength={300} showCount />
             </Form.Item>
           </div>
         ),
@@ -405,26 +407,26 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     if (isEdit && currentTypeCode) {
       items.push({
         key: 'values',
-        label: `參數值 (${paramValues.length})`,
+        label: `${t('asset.tabParamValues')} (${paramValues.length})`,
         children: (
           <div style={cardShellStyle}>
             {cardTitleRow(
               <DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
               '#E6F7FF',
-              '參數值管理',
-              `${currentTypeCode} 的可選值列表`,
+              t('asset.paramValueManagement'),
+              t('asset.paramValuesSubtitle', { code: currentTypeCode }),
             )}
             {/* 搜索 + 新增 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <Input
-                placeholder="搜索參數值"
+                placeholder={t('asset.phSearchParamValue')}
                 allowClear
                 value={valueSearch}
                 onChange={(e) => setValueSearch(e.target.value)}
                 style={{ width: 240 }}
               />
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddValueModalOpen(true)}>
-                新增參數值
+                {t('asset.addParamValueBtn')}
               </Button>
             </div>
             <Table
@@ -436,7 +438,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
               pagination={{
                 showSizeChanger: true,
                 showQuickJumper: true,
-                showTotal: (total) => `共 ${total} 條`,
+                showTotal: (total) => t('asset.paginationTotal', { total }),
                 pageSize: 10,
               }}
             />
@@ -474,10 +476,10 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
-            >返回</Button>
+            >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯參數類型' : '新增參數類型'}
+              {isEdit ? t('asset.editParamTypeTitle') : t('asset.addParamTypeTitle')}
             </h2>
           </div>
         </div>
@@ -489,48 +491,48 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
 
       {/* ====== 底部操作欄 ====== */}
       <div className="form-footer">
-        <Button onClick={onBack}>取消</Button>
+        <Button onClick={onBack}>{t('common.cancel')}</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSubmit}>
-          保存
+          {t('common.save')}
         </Button>
       </div>
 
       {/* ====== 新增參數值彈窗 ====== */}
       <Modal
-        title={`新增參數值`}
+        title={t('asset.addParamValueTitle')}
         open={addValueModalOpen}
         onOk={handleAddValue}
         onCancel={() => { setAddValueModalOpen(false); addValueForm.resetFields() }}
-        okText="確認"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={480}
       >
         <Form form={addValueForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="value" label="參數值" rules={[{ required: true, message: '請輸入參數值' }]}>
-            <Input placeholder="如 A17 Pro / 16GB / 256GB" />
+          <Form.Item name="value" label={t('asset.colParamValue')} rules={[{ required: true, message: t('asset.warnInputParamValue') }]}>
+            <Input placeholder={t('asset.phParamValueExample')} />
           </Form.Item>
-          <Form.Item name="sort" label="排序" initialValue={0}>
-            <InputNumber style={{ width: '100%' }} placeholder="數字越小越靠前" min={0} />
+          <Form.Item name="sort" label={t('asset.labelSort')} initialValue={0}>
+            <InputNumber style={{ width: '100%' }} placeholder={t('asset.phSort')} min={0} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* ====== 編輯參數值彈窗 ====== */}
       <Modal
-        title="編輯參數值"
+        title={t('asset.editParamValueTitle')}
         open={editValueModalOpen}
         onOk={handleEditValue}
         onCancel={() => { setEditValueModalOpen(false); editValueForm.resetFields(); setEditingValue(null) }}
-        okText="確認"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         width={480}
       >
         <Form form={editValueForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="value" label="參數值" rules={[{ required: true, message: '請輸入參數值' }]}>
-            <Input placeholder="如 A17 Pro / 16GB / 256GB" />
+          <Form.Item name="value" label={t('asset.colParamValue')} rules={[{ required: true, message: t('asset.warnInputParamValue') }]}>
+            <Input placeholder={t('asset.phParamValueExample')} />
           </Form.Item>
-          <Form.Item name="sort" label="排序">
-            <InputNumber style={{ width: '100%' }} placeholder="數字越小越靠前" min={0} />
+          <Form.Item name="sort" label={t('asset.labelSort')}>
+            <InputNumber style={{ width: '100%' }} placeholder={t('asset.phSort')} min={0} />
           </Form.Item>
         </Form>
       </Modal>

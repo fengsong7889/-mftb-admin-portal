@@ -138,11 +138,11 @@ export default function ModelList({
       setBrands(list)
       setTotal(list.length)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '加载资产品牌失败')
+      message.error(e instanceof Error ? e.message : t('asset.loadBrandFailed'))
     } finally {
       setLoading(false)
     }
-  }, [brandFilters])
+  }, [brandFilters, t])
 
   const loadProducts = useCallback(async (brandId?: number, categoryCode?: string) => {
     setLoading(true)
@@ -151,11 +151,11 @@ export default function ModelList({
       setProducts(res.records || [])
       setTotal(res.total || 0)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '加载产品失败')
+      message.error(e instanceof Error ? e.message : t('asset.loadProductFailed'))
     } finally {
       setLoading(false)
     }
-  }, [filters, page, size])
+  }, [filters, page, size, t])
 
   useEffect(() => {
     fetchCategoryList().then((list) => {
@@ -272,7 +272,7 @@ export default function ModelList({
 
   const handleDeleteBrand = (record: AssetBrand) => {
     Modal.confirm({
-      title: '确认删除资产品牌',
+      title: t('asset.confirmDeleteBrand'),
       content: `${record.brandZh}（${record.brandEn}）`,
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
@@ -280,13 +280,13 @@ export default function ModelList({
       onOk: async () => {
         try {
           await deleteBrand(record.id)
-          message.success('删除成功')
+          message.success(t('common.deleteSuccess'))
           if (selectedCatId) {
             const cat = categories.find(c => c.id === selectedCatId)
             loadBrands(cat?.code)
           }
         } catch (e: unknown) {
-          message.error(e instanceof Error ? e.message : '删除失败')
+          message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
         }
       },
     })
@@ -333,7 +333,7 @@ export default function ModelList({
   /* ── 资产品牌表格列  */
   const brandColumns: TableColumnsType<AssetBrand> = [
     {
-      title: '资产品牌', key: 'brand', width: 200,
+      title: t('asset.colAssetBrand'), key: 'brand', width: 200,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetBrand) => (
         <Space size={6}>
@@ -348,12 +348,12 @@ export default function ModelList({
       render: (v: string) => <Tag color="blue">{categoryName(v)}</Tag>,
     },
     {
-      title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
@@ -362,9 +362,9 @@ export default function ModelList({
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, record: AssetBrand) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => onDetailBrand(record.id)}>详情</Button>
-          <Button type="link" size="small" onClick={() => onEditBrand(record.id)}>修改</Button>
-          <Button type="link" size="small" danger onClick={() => handleDeleteBrand(record)}>删除</Button>
+          <Button type="link" size="small" onClick={() => onDetailBrand(record.id)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => onEditBrand(record.id)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleDeleteBrand(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -377,7 +377,7 @@ export default function ModelList({
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
-      title: '资产品牌', key: 'brand', width: 150,
+      title: t('asset.colAssetBrand'), key: 'brand', width: 150,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetModel) => (
         <span>{r.brandZh}</span>
@@ -385,12 +385,12 @@ export default function ModelList({
     },
     { title: t('asset.colUnit'), dataIndex: 'unit', key: 'unit', width: 70, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
-      title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '最后更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
+      title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v || '-',
     },
@@ -399,9 +399,9 @@ export default function ModelList({
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, record: AssetModel) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => onDetailProduct(record.id)}>详情</Button>
-          <Button type="link" size="small" onClick={() => onEditProduct(record.id)}>修改</Button>
-          <Button type="link" size="small" danger onClick={() => handleDeleteProduct(record)}>删除</Button>
+          <Button type="link" size="small" onClick={() => onDetailProduct(record.id)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => onEditProduct(record.id)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleDeleteProduct(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -433,7 +433,7 @@ export default function ModelList({
         <div className="cat-tree-panel">
           <h3 className="cat-tree-panel-title">
             <FolderOutlined className="cat-tree-panel-title-icon" />
-            分类结构
+            {t('asset.catStructure')}
           </h3>
           <Tree
             treeData={treeData}
@@ -451,7 +451,7 @@ export default function ModelList({
           {/* 面包屑导航 */}
           <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8C8C8C' }}>
             <FolderOutlined style={{ color: '#E8720C' }} />
-            <span>{selectedCategory?.name || '全部'}</span>
+            <span>{selectedCategory?.name || t('common.all')}</span>
             {selectedBrand && (
               <>
                 <span>/</span>
@@ -465,13 +465,13 @@ export default function ModelList({
           {viewMode === 'brands' && (
             <div className="search-section">
               <Form form={brandForm} layout="inline">
-                <Form.Item label="资产品牌名称" name="brandZh">
-                  <Input placeholder="请输入资产品牌名称" allowClear onPressEnter={handleBrandSearch} />
+                <Form.Item label={t('asset.brandNameLabel')} name="brandZh">
+                  <Input placeholder={t('asset.brandNamePh')} allowClear onPressEnter={handleBrandSearch} />
                 </Form.Item>
-                <Form.Item label="最后更新人" name="updatedBy">
-                  <Input placeholder="请输入最后更新人" allowClear onPressEnter={handleBrandSearch} />
+                <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
+                  <Input placeholder={t('asset.updatedByPh')} allowClear onPressEnter={handleBrandSearch} />
                 </Form.Item>
-                <Form.Item label="最后更新时间" name="updatedAtRange">
+                <Form.Item label={t('asset.colUpdatedAt')} name="updatedAtRange">
                   <DatePicker.RangePicker style={{ width: '100%' }} />
                 </Form.Item>
                 <Form.Item>
@@ -488,13 +488,13 @@ export default function ModelList({
           {viewMode === 'products' && (
             <div className="search-section">
               <Form form={form} layout="inline">
-                <Form.Item label="产品名称" name="name">
-                  <Input placeholder="请输入产品名称" allowClear onPressEnter={handleSearch} />
+                <Form.Item label={t('asset.colProductName')} name="name">
+                  <Input placeholder={t('asset.productNamePh')} allowClear onPressEnter={handleSearch} />
                 </Form.Item>
-                <Form.Item label="最后更新人" name="updatedBy">
-                  <Input placeholder="请输入最后更新人" allowClear onPressEnter={handleSearch} />
+                <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
+                  <Input placeholder={t('asset.updatedByPh')} allowClear onPressEnter={handleSearch} />
                 </Form.Item>
-                <Form.Item label="最后更新时间" name="updatedAtRange">
+                <Form.Item label={t('asset.colUpdatedAt')} name="updatedAtRange">
                   <DatePicker.RangePicker style={{ width: '100%' }} />
                 </Form.Item>
                 <Form.Item>
@@ -517,7 +517,7 @@ export default function ModelList({
                   icon={<ShopOutlined />}
                   onClick={() => { setSelectedBrandId(undefined); setViewMode('brands'); if (selectedCatId) { const cat = categories.find(c => c.id === selectedCatId); loadBrands(cat?.code) } }}
                 >
-                  返回资产品牌列表
+                  {t('asset.returnToBrandList')}
                 </Button>
               )}
             </div>
@@ -525,12 +525,12 @@ export default function ModelList({
               {viewMode === 'brands' && (
                 <>
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
-                    新增资产品牌
+                    {t('asset.addBrand')}
                   </Button>
-                  <Tooltip title={selectedCategory ? '按分类配置常用配件，验收时可一键带入' : '请先在左侧选择分类'}>
+                  <Tooltip title={selectedCategory ? t('asset.accessoryConfigTip') : t('asset.selectCategoryFirst')}>
                     <Button icon={<AppstoreOutlined />} disabled={!selectedCategory}
                       onClick={() => selectedCategory && onAccessoryConfig(selectedCategory.code, selectedCategory.name)}>
-                      配件配置
+                      {t('asset.accessoryConfig')}
                     </Button>
                   </Tooltip>
                   {brandConfigComponent}
@@ -539,7 +539,7 @@ export default function ModelList({
               {viewMode === 'products' && selectedBrand && (
                 <>
                   <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddProduct(selectedBrand.categoryCode, selectedBrand.id)}>
-                    新增产品
+                    {t('asset.addProduct')}
                   </Button>
                   {productConfigComponent}
                 </>
@@ -550,7 +550,7 @@ export default function ModelList({
           {/* 提示文字 */}
           {viewMode === 'brands' && brands.length > 0 && (
             <div style={{ padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08' }}>
-              💡 点击资产品牌行可查看该品牌下的产品列表
+              {t('asset.brandClickHint')}
             </div>
           )}
 

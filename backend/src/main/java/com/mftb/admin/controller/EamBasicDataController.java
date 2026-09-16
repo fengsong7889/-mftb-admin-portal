@@ -9,6 +9,9 @@ import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
 import com.mftb.admin.dto.EamParamTypeSaveDTO;
 import com.mftb.admin.dto.EamParamValueSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactVO;
+import com.mftb.admin.dto.EamSupplierSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.EamBasicDataService;
 import lombok.RequiredArgsConstructor;
@@ -325,6 +328,101 @@ public class EamBasicDataController {
     @RequirePermission(menu = "asset-model", action = "edit")
     public Result<Void> deleteCategoryAccessory(@PathVariable long id) {
         basicDataService.deleteCategoryAccessory(id);
+        return Result.success();
+    }
+
+    /* ==================== 供应商管理 ==================== */
+
+    /** 供应商列表（支持名称/编码/联系人/状态过滤；page+size 同时传入时服务端分页） */
+    @GetMapping("/suppliers")
+    @RequirePermission(menu = "asset-supplier")
+    public Result<List<Map<String, Object>>> listSuppliers(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String contactPerson,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return Result.success(basicDataService.listSuppliers(name, code, contactPerson, status, page, size));
+    }
+
+    /** 新增供应商（编码由后端按规则自动生成，前端传码将被忽略） */
+    @PostMapping("/suppliers")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Long> createSupplier(@RequestBody EamSupplierSaveDTO dto) {
+        return Result.success(basicDataService.createSupplier(dto));
+    }
+
+    /** 更新供应商（编码不可修改） */
+    @PutMapping("/suppliers/{id}")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Void> updateSupplier(@PathVariable long id, @RequestBody EamSupplierSaveDTO dto) {
+        basicDataService.updateSupplier(id, dto);
+        return Result.success();
+    }
+
+    /** 删除供应商（逻辑删除） */
+    @DeleteMapping("/suppliers/{id}")
+    @RequirePermission(menu = "asset-supplier", action = "delete")
+    public Result<Void> deleteSupplier(@PathVariable long id) {
+        basicDataService.deleteSupplier(id);
+        return Result.success();
+    }
+
+    /** 切换供应商启用/停用状态 */
+    @PutMapping("/suppliers/{id}/toggle")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Void> toggleSupplierStatus(@PathVariable long id) {
+        basicDataService.toggleSupplierStatus(id);
+        return Result.success();
+    }
+
+    /* ==================== 供应商联系人 ==================== */
+
+    /** 精简版供应商下拉列表（仅 id/code/name，供前端下拉框使用） */
+    @GetMapping("/suppliers/dropdown")
+    @RequirePermission(menu = "asset-supplier")
+    public Result<List<Map<String, Object>>> suppliersDropdown(
+            @RequestParam(required = false) String keyword) {
+        return Result.success(basicDataService.listSuppliersDropdown(keyword));
+    }
+
+    /** 查询指定供应商的所有启用联系人 */
+    @GetMapping("/suppliers/{id}/contacts")
+    @RequirePermission(menu = "asset-supplier")
+    public Result<List<EamSupplierContactVO>> listSupplierContacts(@PathVariable Long id) {
+        return Result.success(basicDataService.listContactsBySupplier(id));
+    }
+
+    /** 创建单个联系人 */
+    @PostMapping("/supplier-contacts")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Long> createSupplierContact(@RequestBody EamSupplierContactSaveDTO dto) {
+        return Result.success(basicDataService.createSupplierContact(dto.getSupplierId(), dto));
+    }
+
+    /** 更新单个联系人 */
+    @PutMapping("/supplier-contacts/{contactId}")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Void> updateSupplierContact(@PathVariable Long contactId,
+                                               @RequestBody EamSupplierContactSaveDTO dto) {
+        basicDataService.updateSupplierContact(contactId, dto);
+        return Result.success();
+    }
+
+    /** 删除单个联系人（逻辑删除） */
+    @DeleteMapping("/supplier-contacts/{contactId}")
+    @RequirePermission(menu = "asset-supplier", action = "delete")
+    public Result<Void> deleteSupplierContact(@PathVariable Long contactId) {
+        basicDataService.deleteSupplierContact(contactId);
+        return Result.success();
+    }
+
+    /** 切换联系人启用/禁用 */
+    @PutMapping("/supplier-contacts/{contactId}/toggle")
+    @RequirePermission(menu = "asset-supplier", action = "edit")
+    public Result<Void> toggleSupplierContact(@PathVariable Long contactId) {
+        basicDataService.toggleSupplierContactStatus(contactId);
         return Result.success();
     }
 }

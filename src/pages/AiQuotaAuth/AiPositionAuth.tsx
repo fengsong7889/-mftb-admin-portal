@@ -5,6 +5,7 @@ import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { fetchMockModels } from '../../api/mock/aiPlatformMock'
 import type { AiModel, EnabledStatus } from '../../api/mock/aiPlatformMock'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useTranslation } from 'react-i18next'
 
 /** 
  * 按职位模型权限映射表数据结构  
@@ -26,9 +27,9 @@ interface PositionModelMapping {
 /* ────────────────── 展示常量 ────────────────── */
 
 const PERMISSION_LEVEL_LABEL: Record<'full' | 'restricted' | 'none', string> = {
-  full: '完全訪問',
-  restricted: '受限訪問',
-  none: '禁止訪問',
+  full: 'permFull',
+  restricted: 'permRestricted',
+  none: 'permNone',
 }
 
 const PERMISSION_LEVEL_COLOR: Record<'full' | 'restricted' | 'none', string> = {
@@ -38,6 +39,7 @@ const PERMISSION_LEVEL_COLOR: Record<'full' | 'restricted' | 'none', string> = {
 }
 
 export default function AiPositionAuth() {
+  const { t } = useTranslation()
   /* ── 基礎數據 ── */
   const [mappings, setMappings] = useState<PositionModelMapping[]>([])
   const [models, setModels] = useState<AiModel[]>([])
@@ -157,14 +159,14 @@ export default function AiPositionAuth() {
           status: 1,
         }
         setMappings((prev) => [...prev, newMapping])
-        message.success(`職位「${newMapping.positionName}」對「${newMapping.modelName}」的權限已設置`)
+        message.success(t('aiQuotaAuth.posPermSet', { pos: newMapping.positionName, model: newMapping.modelName }))
       } else if (editingMapping) {
         setMappings((prev) => prev.map((m) => (
           m.id === editingMapping.id
             ? { ...m, ...values, updatedBy: 'admin', updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19) }
             : m
         )))
-        message.success('職位權限配置已保存')
+        message.success(t('aiQuotaAuth.posPermSaved'))
       }
       setEditingMapping(null)
     })
@@ -172,14 +174,14 @@ export default function AiPositionAuth() {
 
   const handleMappingDelete = (row: PositionModelMapping) => {
     Modal.confirm({
-      title: '確認刪除該職位權限？',
-      content: `刪除後「${row.positionName}」將失去對「${row.modelName}」的訪問權限`,
-      okText: '刪除',
+      title: t('aiQuotaAuth.confirmDeletePosPerm'),
+      content: t('aiQuotaAuth.deletePosPermContent', { pos: row.positionName, model: row.modelName }),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => {
         setMappings((prev) => prev.filter((m) => m.id !== row.id))
-        message.success('職位權限已刪除')
+        message.success(t('aiQuotaAuth.posPermDeleted'))
       },
     })
   }
@@ -187,29 +189,30 @@ export default function AiPositionAuth() {
   /* ── 權限啟停（二次確認） ── */
   const handleMappingToggle = (row: PositionModelMapping) => {
     const toDisable = row.status === 1
-    const actionText = toDisable ? '停用' : '啟用'
+    const action = toDisable ? t('aiQuotaAuth.disableText') : t('aiQuotaAuth.enableText')
+    const effect = toDisable ? t('aiQuotaAuth.cannotCallModel') : t('aiQuotaAuth.canCallModel')
     Modal.confirm({
-      title: `確認${actionText}該職位權限？`,
-      content: `${actionText}後「${row.positionName}」關聯的員工將${toDisable ? '無法調用該模型' : '可恢復調用'} ${row.modelName}`,
-      okText: '確認',
-      cancelText: '取消',
+      title: t('aiQuotaAuth.confirmTogglePosPerm', { action }),
+      content: t('aiQuotaAuth.togglePosPermContent', { action, pos: row.positionName, effect, model: row.modelName }),
+      okText: t('aiQuotaAuth.confirmOk'),
+      cancelText: t('common.cancel'),
       onOk: () => {
         setMappings((prev) => prev.map((m) => (m.id === row.id ? { ...m, status: toDisable ? 0 : 1 } : m)))
-        message.success(`職位權限已${actionText}`)
+        message.success(t('aiQuotaAuth.posPermToggled', { action }))
       },
     })
   }
 
   /* ── 列字段配置 ── */
   const columnMeta = [
-    { key: 'positionName', title: '職位名稱' },
-    { key: 'modelName', title: '授權模型' },
-    { key: 'permissionLevel', title: '權限級別' },
-    { key: 'dailyLimit', title: '每日限额' },
-    { key: 'monthlyLimit', title: '月度限额' },
-    { key: 'priority', title: '優先級' },
-    { key: 'status', title: '狀態' },
-    { key: 'action', title: '操作' },
+    { key: 'positionName', title: t('aiQuotaAuth.positionNameCol') },
+    { key: 'modelName', title: t('aiQuotaAuth.authModelCol') },
+    { key: 'permissionLevel', title: t('aiQuotaAuth.permLevelCol') },
+    { key: 'dailyLimit', title: t('aiQuotaAuth.dailyLimitCol') },
+    { key: 'monthlyLimit', title: t('aiQuotaAuth.monthlyLimitCol') },
+    { key: 'priority', title: t('aiQuotaAuth.priorityCol') },
+    { key: 'status', title: t('aiQuotaAuth.statusCol') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent, applyConfig } = useColumnConfig('ai-pos-auth', columnMeta, [
@@ -218,37 +221,37 @@ export default function AiPositionAuth() {
 
   /* ── 表格列 ── */
   const columns: ColumnsType<PositionModelMapping> = [
-    { title: '職位名稱', key: 'positionName', dataIndex: 'positionName', width: 160 },
+    { title: t('aiQuotaAuth.positionNameCol'), key: 'positionName', dataIndex: 'positionName', width: 160 },
     {
-      key: 'modelName', title: '授權模型', dataIndex: 'modelName', width: 180,
+      key: 'modelName', title: t('aiQuotaAuth.authModelCol'), dataIndex: 'modelName', width: 180,
       render: (_, row) => <span style={{ fontWeight: 500 }}>{row.modelName}</span>,
     },
     {
-      key: 'permissionLevel', title: '權限級別', dataIndex: 'permissionLevel', width: 120, align: 'center',
+      key: 'permissionLevel', title: t('aiQuotaAuth.permLevelCol'), dataIndex: 'permissionLevel', width: 120, align: 'center',
       render: (v: 'full' | 'restricted' | 'none') => (
-        <Tag color={PERMISSION_LEVEL_COLOR[v]}>{PERMISSION_LEVEL_LABEL[v]}</Tag>
+        <Tag color={PERMISSION_LEVEL_COLOR[v]}>{t(`aiQuotaAuth.${PERMISSION_LEVEL_LABEL[v]}`)}</Tag>
       ),
     },
-    { key: 'dailyLimit', title: '每日限额', dataIndex: 'dailyLimit', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
-    { key: 'monthlyLimit', title: '月度限额', dataIndex: 'monthlyLimit', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
-    { key: 'priority', title: '優先級', dataIndex: 'priority', width: 80, align: 'center', render: (v: number) => v.toLocaleString() },
+    { key: 'dailyLimit', title: t('aiQuotaAuth.dailyLimitCol'), dataIndex: 'dailyLimit', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
+    { key: 'monthlyLimit', title: t('aiQuotaAuth.monthlyLimitCol'), dataIndex: 'monthlyLimit', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
+    { key: 'priority', title: t('aiQuotaAuth.priorityCol'), dataIndex: 'priority', width: 80, align: 'center', render: (v: number) => v.toLocaleString() },
     {
-      key: 'status', title: '狀態', dataIndex: 'status', width: 80, align: 'center',
+      key: 'status', title: t('aiQuotaAuth.statusCol'), dataIndex: 'status', width: 80, align: 'center',
       render: (_: unknown, row: PositionModelMapping) => (
         <Switch
           checked={row.status === 1}
-          checkedChildren="啟用"
-          unCheckedChildren="停用"
+          checkedChildren={t('aiQuotaAuth.enableText')}
+          unCheckedChildren={t('aiQuotaAuth.disableText')}
           onChange={() => handleMappingToggle(row)}
         />
       ),
     },
     {
-      title: '操作', key: 'action', width: 140, align: 'center',
+      title: t('common.action'), key: 'action', width: 140, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleMappingEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handleMappingDelete(row)}>刪除</Button>
+          <Button type="link" onClick={() => handleMappingEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handleMappingDelete(row)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -267,18 +270,18 @@ export default function AiPositionAuth() {
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="職位名稱">
+          <Form.Item label={t('aiQuotaAuth.positionNameCol')}>
             <Input
               value={queryPosition}
-              placeholder="請輸入職位名稱"
+              placeholder={t('aiQuotaAuth.positionNamePh')}
               allowClear
               onChange={(e) => setQueryPosition(e.target.value)}
             />
           </Form.Item>
-          <Form.Item label="授權模型">
+          <Form.Item label={t('aiQuotaAuth.authModelCol')}>
             <Select
               value={queryModel}
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               options={modelOptions}
               showSearch
@@ -288,32 +291,32 @@ export default function AiPositionAuth() {
               onChange={(v) => setQueryModel(v)}
             />
           </Form.Item>
-          <Form.Item label="權限級別">
+          <Form.Item label={t('aiQuotaAuth.permLevelLabel')}>
             <Select
               value={queryPermission}
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
               options={[
-                { value: 'full', label: '完全訪問' },
-                { value: 'restricted', label: '受限訪問' },
-                { value: 'none', label: '禁止訪問' },
+                { value: 'full', label: t('aiQuotaAuth.permFull') },
+                { value: 'restricted', label: t('aiQuotaAuth.permRestricted') },
+                { value: 'none', label: t('aiQuotaAuth.permNone') },
               ]}
               onChange={(v) => setQueryPermission(v)}
             />
           </Form.Item>
-          <Form.Item label="狀態">
+          <Form.Item label={t('aiQuotaAuth.statusCol')}>
             <Select
               value={queryStatus}
-              placeholder="全部"
+              placeholder={t('common.all')}
               allowClear
-              options={[{ value: '1', label: '啟用' }, { value: '0', label: '停用' }]}
+              options={[{ value: '1', label: t('aiQuotaAuth.enableText') }, { value: '0', label: t('aiQuotaAuth.disableText') }]}
               onChange={(v) => setQueryStatus(v)}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -323,13 +326,13 @@ export default function AiPositionAuth() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="基於職位的模型權限管理：为不同职位的员工批量分配 AI 模型访问权限和额度限制"
+        message={t('aiQuotaAuth.posAuthAlertMsg')}
       />
 
       {/* 操作區：右側新增 + 列配置 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleMappingCreate}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleMappingCreate}>{t('common.add')}</Button>
           {configComponent}
         </div>
       </div>
@@ -340,24 +343,24 @@ export default function AiPositionAuth() {
         loading={loading}
         columns={applyConfig(columns)}
         dataSource={filteredMappings}
-        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 條記錄` }}
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.recordsTotalPos', { total }) }}
       />
 
       {/* 新增/編輯職位權限彈窗 */}
       <Modal
-        title={editingMapping === 'new' ? '新增職位模型權限' : '編輯職位模型權限'}
+        title={editingMapping === 'new' ? t('aiQuotaAuth.addPosMapping') : t('aiQuotaAuth.editPosMapping')}
         open={editingMapping !== null}
         onOk={handleMappingSave}
         onCancel={() => setEditingMapping(null)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={720}
         destroyOnHidden
       >
         <Form form={mappingForm} layout="vertical">
-          <Form.Item name="positionId" label="職位" rules={[{ required: true, message: '請選擇職位' }]}>
+          <Form.Item name="positionId" label={t('aiQuotaAuth.posLabel')} rules={[{ required: true, message: t('aiQuotaAuth.posRequired') }]}>
             <Select
-              placeholder="請選擇職位"
+              placeholder={t('aiQuotaAuth.posPh')}
               options={positionOptions}
               onChange={(value) => {
                 const selectedPos = positions.find((p) => p.id === value)
@@ -365,11 +368,11 @@ export default function AiPositionAuth() {
               }}
             />
           </Form.Item>
-          <Form.Item name="positionName" label="職位名稱" hidden />
+          <Form.Item name="positionName" label={t('aiQuotaAuth.positionNameCol')} hidden />
 
-          <Form.Item name="modelId" label="授權模型" rules={[{ required: true, message: '請選擇模型' }]}>
+          <Form.Item name="modelId" label={t('aiQuotaAuth.authModelCol')} rules={[{ required: true, message: t('aiQuotaAuth.modelRequired') }]}>
             <Select
-              placeholder="請選擇模型"
+              placeholder={t('aiQuotaAuth.modelPh')}
               options={modelOptions}
               onChange={(value) => {
                 const selectedModel = models.find((m) => m.id === value)
@@ -380,38 +383,38 @@ export default function AiPositionAuth() {
               }}
             />
           </Form.Item>
-          <Form.Item name="modelName" label="模型名稱" hidden />
-          <Form.Item name="modelKey" label="模型 Key" hidden />
+          <Form.Item name="modelName" label={t('aiQuotaAuth.modelNameCol')} hidden />
+          <Form.Item name="modelKey" label={t('aiQuotaAuth.modelKeyCol')} hidden />
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="permissionLevel" label="權限級別" rules={[{ required: true }]}>
+            <Form.Item name="permissionLevel" label={t('aiQuotaAuth.permLevelCol')} rules={[{ required: true }]}>
               <Select
                 options={[
-                  { value: 'full', label: '完全訪問（無限制）' },
-                  { value: 'restricted', label: '受限訪問（可配額度）' },
-                  { value: 'none', label: '禁止訪問' },
+                  { value: 'full', label: t('aiQuotaAuth.permFullUnlimited') },
+                  { value: 'restricted', label: t('aiQuotaAuth.permRestrictedQuota') },
+                  { value: 'none', label: t('aiQuotaAuth.permNone') },
                 ]}
               />
             </Form.Item>
-            <Form.Item name="priority" label="優先級（越大越優先）" initialValue={0}>
+            <Form.Item name="priority" label={t('aiQuotaAuth.priorityLabel')} initialValue={0}>
               <InputNumber min={-1000} max={1000} style={{ width: '100%' }} />
             </Form.Item>
           </div>
 
-          <Form.Item name="dailyLimit" label="每日限额（tokens）" initialValue={0}>
-            <InputNumber min={0} max={999999999} style={{ width: '100%' }} placeholder="0=不限制" />
+          <Form.Item name="dailyLimit" label={t('aiQuotaAuth.dailyLimitLabel')} initialValue={0}>
+            <InputNumber min={0} max={999999999} style={{ width: '100%' }} placeholder={t('aiQuotaAuth.dailyLimitPh')} />
           </Form.Item>
-          <Form.Item name="monthlyLimit" label="月度限额（tokens）" initialValue={0}>
-            <InputNumber min={0} max={999999999} style={{ width: '100%' }} placeholder="0=不限制" />
+          <Form.Item name="monthlyLimit" label={t('aiQuotaAuth.monthlyLimitLabel')} initialValue={0}>
+            <InputNumber min={0} max={999999999} style={{ width: '100%' }} placeholder={t('aiQuotaAuth.monthlyLimitPh')} />
           </Form.Item>
 
-          <Form.Item label="說明">
+          <Form.Item label={t('aiQuotaAuth.noteLabel')}>
             <div style={{ fontSize: 12, color: '#8C8C8C', padding: '8px 12px', background: '#F9F0FF', borderRadius: 6 }}>
-              <strong>提示：</strong><br />
-              1. "完全訪問"：员工可无限制调用该模型<br />
-              2. "受限访问"：需设置日/月额度上限，超出后自动拒绝请求<br />
-              3. "禁止访问"：完全不可调用该模型<br />
-              4. 额度单位为 tokens，0 表示不限制
+              <strong>{t('aiQuotaAuth.tipLabel')}</strong><br />
+              {t('aiQuotaAuth.posNote1')}<br />
+              {t('aiQuotaAuth.posNote2')}<br />
+              {t('aiQuotaAuth.posNote3')}<br />
+              {t('aiQuotaAuth.posNote4')}
             </div>
           </Form.Item>
         </Form>

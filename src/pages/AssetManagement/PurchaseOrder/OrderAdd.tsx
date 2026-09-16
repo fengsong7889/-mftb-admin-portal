@@ -21,12 +21,14 @@ import dayjs, { type Dayjs } from 'dayjs'
 import {
   createPurchaseOrder, fetchModelList, fetchCategoryList, fetchBrandList,
   fetchAllParamTypes, fetchParamValuesByType,
+  fetchSuppliersDropdown, fetchSupplierContacts, syncSupplierContact,
   type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetModel, type AssetCategory, type AssetBrand,
   type ParamType, type ParamField,
+  type SupplierDropdownItem, type SupplierContactItem,
 } from '../../../api/eam'
 import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { BRAND_OPTIONS_NUMERIC, BrandEnum } from '../../../constants/brand'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 
 /* ==================== 分类树（TreeSelect） ==================== */
 
@@ -208,7 +210,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
 
   return (
     <Modal
-      title={editing ? '編輯資產' : '添加資產'}
+      title={editing ? t('asset.editAssetTitle') : t('asset.addAssetTitle')}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
@@ -220,21 +222,21 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
       <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
         <Row gutter={16}>
           <Col span={8}>
-            <Form.Item label="資產分類" name="categoryId" rules={[{ required: true, message: '請選擇資產分類' }]}>
-              <TreeSelect treeData={categoryTree} placeholder="請選擇分類" allowClear treeDefaultExpandAll
+            <Form.Item label={t('asset.colCategory')} name="categoryId" rules={[{ required: true, message: t('asset.warnSelectCategory') }]}>
+              <TreeSelect treeData={categoryTree} placeholder={t('asset.phSelectCategory')} allowClear treeDefaultExpandAll
                 showSearch treeNodeFilterProp="title" onChange={handleCategoryChange} />
             </Form.Item>
           </Col>
           <Col span={8}>
-            <Form.Item label="资产品牌" name="brandId" rules={[{ required: true, message: '請選擇資產品牌' }]}>
-              <Select placeholder={selectedCategoryCode ? '請選擇資產品牌' : '請先選擇分類'} showSearch optionFilterProp="label"
+            <Form.Item label={t('asset.colBrand')} name="brandId" rules={[{ required: true, message: t('asset.warnSelectAssetBrand') }]}>
+              <Select placeholder={selectedCategoryCode ? t('asset.phSelectBrand') : t('asset.phSelectCategoryFirst')} showSearch optionFilterProp="label"
                 disabled={!selectedCategoryCode} onChange={handleBrandChange}
                 options={filteredBrands.map((b) => ({ label: b.brandZh, value: b.id }))} />
             </Form.Item>
           </Col>
           <Col span={8}>
-            <Form.Item label="資產名稱" name="modelId" rules={[{ required: true, message: '請選擇資產名稱' }]}>
-              <Select placeholder={selectedBrandId ? '請選擇資產' : '請先選擇資產品牌'} showSearch optionFilterProp="label"
+            <Form.Item label={t('asset.colAssetName')} name="modelId" rules={[{ required: true, message: t('asset.warnSelectAssetName') }]}>
+              <Select placeholder={selectedBrandId ? t('asset.phSelectAsset') : t('asset.phSelectBrandFirst')} showSearch optionFilterProp="label"
                 disabled={!selectedBrandId} onChange={handleModelChange}
                 options={filteredModels.map((m) => ({
                   label: m.name, value: m.id,
@@ -246,17 +248,17 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
         {/* 參數信息 */}
         {selectedModel && paramTemplate.length > 0 && (
           <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 16px', marginBottom: 16, border: '1px solid #f0f0f0' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>參數信息</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>{t('asset.paramInfoTitle')}</div>
             <Row gutter={12}>
               {paramTemplate.map((p) => (
                 <Col span={8} key={p.key}>
                   <Form.Item label={<span style={{ fontSize: 13 }}>{p.label}{p.unit ? ` (${p.unit})` : ''}</span>}
                     name={['params', p.key]} style={{ marginBottom: 8 }}>
                     {p.type === 'select' ? (
-                      <Select placeholder={`請選擇${p.label}`} allowClear
+                      <Select placeholder={t('asset.phParamSelect', { name: p.label })} allowClear
                         options={p.options?.map((o) => ({ label: o, value: o })) || []} />
                     ) : (
-                      <Input placeholder={`請輸入${p.label}`} allowClear />
+                      <Input placeholder={t('asset.phParamInput', { name: p.label })} allowClear />
                     )}
                   </Form.Item>
                 </Col>
@@ -267,23 +269,23 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
 
         <Row gutter={16}>
           <Col span={8}>
-            <Form.Item label="採購形式" name="purchaseType" rules={[{ required: true, message: '請選擇採購形式' }]}>
-              <Select placeholder="請選擇" options={[
-                { label: '購買', value: 'purchase' }, { label: '租賃', value: 'lease' },
+            <Form.Item label={t('asset.purchaseType')} name="purchaseType" rules={[{ required: true, message: t('asset.warnSelectPurchaseType') }]}>
+              <Select placeholder={t('asset.phSelect')} options={[
+                { label: t('asset.purchaseTypePurchase'), value: 'purchase' }, { label: t('asset.purchaseTypeLease'), value: 'lease' },
               ]} />
             </Form.Item>
           </Col>
           <Col span={8}>
-            <Form.Item label="數量" name="qty" rules={[{ required: true, message: '請輸入數量' }]}>
+            <Form.Item label={t('asset.colQty')} name="qty" rules={[{ required: true, message: t('asset.warnInputQty') }]}>
               <InputNumber style={{ width: '100%' }} min={1} />
             </Form.Item>
           </Col>
         </Row>
         <Row gutter={16}>
           <Col span={8}>
-            <Form.Item label="成交單價" name="confirmedPrice">
+            <Form.Item label={t('asset.confirmedPrice')} name="confirmedPrice">
               <InputNumber style={{ width: '100%' }} min={0} precision={2}
-                addonBefore="MOP" placeholder="可選，實際成交價" />
+                addonBefore="MOP" placeholder={t('asset.phConfirmedPrice')} />
             </Form.Item>
           </Col>
         </Row>
@@ -298,6 +300,7 @@ type DeliveryMethod = 'self_pickup' | 'supplier_delivery' | 'express'
 
 interface SupplierGroupForm {
   supplier: string
+  supplierId?: number
   contact?: string
   contactPhone?: string
   orderDate?: Dayjs
@@ -319,6 +322,7 @@ export default function OrderAdd() {
   const [form] = Form.useForm<GlobalFormValues>()
   const [submitting, setSubmitting] = useState(false)
   const watchedBrand = Form.useWatch('brand', form)
+  const { numericOptions, codeHint, labelMap } = useCompanyBrand()
 
   /* ----- 基礎数据 ----- */
   const [categories, setCategories] = useState<AssetCategory[]>([])
@@ -331,10 +335,23 @@ export default function OrderAdd() {
   const [empLoading, setEmpLoading] = useState(false)
   const [selectedEmp, setSelectedEmp] = useState<EmployeeItem | null>(null)
 
+  // 供应商下拉列表
+  const [supplierOptions, setSupplierOptions] = useState<SupplierDropdownItem[]>([])
+  const [supplierLoading, setSupplierLoading] = useState(false)
+  // 每个分组的联系人（key=groupId）
+  const [groupContacts, setGroupContacts] = useState<Record<string, SupplierContactItem[]>>({})
+  // 跟踪自动带入的联系人（key=groupId，值为自动带入时的联系人姓名）
+  const [autoFilledContact, setAutoFilledContact] = useState<Record<string, string>>({})
+
   // 供应商分组
   const [supplierGroups, setSupplierGroups] = useState<PurchaseOrderSupplierGroup[]>([
     { id: `sg_${Date.now()}`, supplier: '', items: [] },
   ])
+
+  // 加載供應商下拉列表
+  useEffect(() => {
+    fetchSuppliersDropdown().then(setSupplierOptions).catch(() => {})
+  }, [])
 
   // 参数编码 → 参数名称映射
   const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
@@ -383,6 +400,68 @@ export default function OrderAdd() {
     form.setFieldsValue({ department: emp?.department || '' })
   }
 
+  const handleSupplierSearch = (keyword: string) => {
+    setSupplierLoading(true)
+    fetchSuppliersDropdown(keyword || undefined)
+      .then(setSupplierOptions)
+      .catch(() => {})
+      .finally(() => setSupplierLoading(false))
+  }
+
+  /** 選擇供應商後自動帶入聯繫人 */
+  const handleSupplierChange = async (groupId: string, supplierId: number) => {
+    const opt = supplierOptions.find((s) => s.id === supplierId)
+    if (!opt) return
+    // 更新供应商名称
+    updateGroup(groupId, { supplier: opt.name, supplierId: opt.id })
+    // 拉取联系人
+    try {
+      const contacts = await fetchSupplierContacts(supplierId)
+      setGroupContacts((prev) => ({ ...prev, [groupId]: contacts }))
+      if (contacts.length > 0) {
+        const first = contacts[0]
+        updateGroup(groupId, {
+          contact: first.contactName,
+          contactPhone: first.contactPhone,
+        })
+        setAutoFilledContact((prev) => ({ ...prev, [groupId]: first.contactName }))
+      } else {
+        updateGroup(groupId, { contact: '', contactPhone: '' })
+        setAutoFilledContact((prev) => {
+          const next = { ...prev }
+          delete next[groupId]
+          return next
+        })
+      }
+    } catch {
+      setGroupContacts((prev) => ({ ...prev, [groupId]: [] }))
+    }
+  }
+
+  /** 選擇聯繫人後自動帶出電話 */
+  const handleContactChange = (groupId: string, contactName: string) => {
+    const contacts = groupContacts[groupId] || []
+    const matched = contacts.find((c) => c.contactName === contactName)
+    updateGroup(groupId, {
+      contact: contactName,
+      contactPhone: matched?.contactPhone || '',
+    })
+    // 通过下拉选择的联系人视为自动带入
+    if (matched) {
+      setAutoFilledContact((prev) => ({ ...prev, [groupId]: contactName }))
+    }
+  }
+
+  /** 手動輸入聯繫人姓名（清除自动带入标记） */
+  const handleContactManualInput = (groupId: string, value: string) => {
+    updateGroup(groupId, { contact: value })
+    setAutoFilledContact((prev) => {
+      const next = { ...prev }
+      delete next[groupId]
+      return next
+    })
+  }
+
   /* ----- 供应商分组操作 ----- */
   const handleAddGroup = () => {
     setSupplierGroups((prev) => [
@@ -393,8 +472,8 @@ export default function OrderAdd() {
 
   const handleRemoveGroup = (groupId: string) => {
     Modal.confirm({
-      title: '確認刪除',
-      content: '確定刪除此分組及其所有明細？',
+      title: t('asset.deleteConfirmTitle'),
+      content: t('asset.warnDeleteGroup'),
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel'),
@@ -407,6 +486,7 @@ export default function OrderAdd() {
       if (g.id !== groupId) return g
       const next = { ...g }
       if (patch.supplier !== undefined) next.supplier = patch.supplier
+      if (patch.supplierId !== undefined) next.supplierId = patch.supplierId
       if (patch.contact !== undefined) next.contact = patch.contact
       if (patch.contactPhone !== undefined) next.contactPhone = patch.contactPhone
       if (patch.orderDate !== undefined) next.orderDate = patch.orderDate ? patch.orderDate.format('YYYY-MM-DD') : undefined
@@ -492,11 +572,11 @@ export default function OrderAdd() {
 
   /* ----- 明细展示表格列 ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<PurchaseOrderItem> => [
-    { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true },
-    { title: '資產品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true },
-    { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
+    { title: t('asset.colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true },
+    { title: t('asset.colBrand'), dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true },
+    { title: t('asset.colAssetName'), dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
-      title: '參數信息', key: 'params', width: 200,
+      title: t('asset.paramInfoTitle'), key: 'params', width: 200,
       render: (_: unknown, r: PurchaseOrderItem) => {
         if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
         const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
@@ -504,15 +584,15 @@ export default function OrderAdd() {
         return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
+    { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
     {
-      title: '採購形式', key: 'purchaseType', width: 80,
+      title: t('asset.purchaseType'), key: 'purchaseType', width: 80,
       render: (_: unknown, r: PurchaseOrderItem) => r.purchaseType
-        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '購買' : '租賃'}</Tag>
+        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
         : '-',
     },
     {
-      title: '成交單價', key: 'confirmedPrice', width: 100, align: 'right',
+      title: t('asset.confirmedPrice'), key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => (
         <span style={{ color: r.confirmedPrice ? '#262626' : '#bfbfbf', fontSize: 12 }}>
           {r.confirmedPrice ? `MOP ${r.confirmedPrice.toLocaleString()}` : '-'}
@@ -520,32 +600,32 @@ export default function OrderAdd() {
       ),
     },
     {
-      title: '小計', key: 'subtotal', width: 100, align: 'right',
+      title: t('asset.colSubtotal'), key: 'subtotal', width: 100, align: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => {
         const cp = r.confirmedPrice || r.price
         return <span style={{ fontWeight: 600 }}>MOP {(cp * r.qty).toLocaleString()}</span>
       },
     },
     {
-      title: '操作', key: 'action', width: 100, align: 'center', fixed: 'right',
+      title: t('asset.colAction'), key: 'action', width: 100, align: 'center', fixed: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => handleOpenEditModal(groupId, r)}>編輯</Button>
-          <Button type="link" size="small" danger onClick={() => handleRemoveItem(groupId, r.key!)}>刪除</Button>
+          <Button type="link" size="small" onClick={() => handleOpenEditModal(groupId, r)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleRemoveItem(groupId, r.key!)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
-  ], [paramNameMap])
+  ], [paramNameMap, t])
 
   /* ----- 提交 ----- */
   const handleSubmit = async () => {
     try {
       const v = await form.validateFields()
-      if (!selectedEmp) { message.warning('請選擇採購經辦人'); return }
+      if (!selectedEmp) { message.warning(t('asset.warnSelectPurchaser')); return }
       const emptyGroups = supplierGroups.filter((g) => !g.supplier.trim())
-      if (emptyGroups.length > 0) { message.warning('請填寫所有分組的名稱'); return }
+      if (emptyGroups.length > 0) { message.warning(t('asset.warnFillGroupNames')); return }
       const emptyItems = supplierGroups.filter((g) => g.items.length === 0)
-      if (emptyItems.length > 0) { message.warning('請為每個分組添加至少一條明細'); return }
+      if (emptyItems.length > 0) { message.warning(t('asset.warnEmptyGroupItems')); return }
       setSubmitting(true)
 
       await createPurchaseOrder({
@@ -569,7 +649,21 @@ export default function OrderAdd() {
         })),
       })
 
-      message.success('採購訂單創建成功')
+      // 同步手動錄入的聯繫人到供應商管理
+      const syncPromises: Promise<void>[] = []
+      for (const g of supplierGroups) {
+        if (!g.supplierId) continue
+        const contactName = g.contact?.trim()
+        const contactPhone = g.contactPhone?.trim()
+        if (!contactName || !contactPhone) continue
+        // 如果是手动输入的（非自动带入），则同步到供应商联系人
+        if (autoFilledContact[g.id] !== contactName) {
+          syncPromises.push(syncSupplierContact(g.supplierId, contactName, contactPhone).catch(() => {}))
+        }
+      }
+      await Promise.all(syncPromises)
+
+      message.success(t('asset.poCreateSuccess'))
       navigate('/purchase-order')
     } catch (e: unknown) {
       if (e instanceof Error && e.message) message.error(e.message)
@@ -600,8 +694,8 @@ export default function OrderAdd() {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>錄入採購訂單</h2>
-          <span style={{ fontSize: 11, color: '#8c8c8c', background: '#f5f5f5', padding: '2px 8px', borderRadius: 4 }}>直接下單</span>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{t('asset.addPoTitle')}</h2>
+          <span style={{ fontSize: 11, color: '#8c8c8c', background: '#f5f5f5', padding: '2px 8px', borderRadius: 4 }}>{t('asset.directOrderBadge')}</span>
         </div>
       </div>
 
@@ -613,21 +707,21 @@ export default function OrderAdd() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <Row gutter={24}>
             <Col span={8}>
-              <Form.Item label="採購經辦人" name="purchaser" rules={[{ required: true, message: '請選擇採購經辦人' }]}>
+              <Form.Item label={t('asset.colPurchaser')} name="purchaser" rules={[{ required: true, message: t('asset.warnSelectPurchaser') }]}>
                 <Select
                   showSearch
-                  placeholder="輸入姓名/工號搜索"
+                  placeholder={t('asset.phSearchEmp')}
                   loading={empLoading}
                   filterOption={false}
                   onSearch={handleEmpSearch}
                   onChange={handleEmpChange}
-                  notFoundContent={empLoading ? <Spin size="small" /> : '暫無數據'}
+                  notFoundContent={empLoading ? <Spin size="small" /> : t('common.noData')}
                   options={employees.map((e) => ({
                     value: e.empId,
                     label: `${e.name}（${e.empId}）${e.department ? ` · ${e.department}` : ''}`,
@@ -637,34 +731,29 @@ export default function OrderAdd() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item label="服務部門" name="department">
-                <Input disabled placeholder="選擇經辦人後自動帶出" style={{ color: '#262626' }} />
+              <Form.Item label={t('asset.serviceDept')} name="department">
+                <Input disabled placeholder={t('asset.phDeptAutoFill')} style={{ color: '#262626' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>訂單總計</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
             </Col>
           </Row>
           <Row gutter={24}>
             <Col span={8}>
-              <Form.Item label="所屬品牌" name="brand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-                <Select placeholder="請選擇品牌" options={BRAND_OPTIONS_NUMERIC} />
+              <Form.Item label={t('asset.orderBrand')} name="brand" rules={[{ required: true, message: t('asset.warnSelectOrderBrand') }]}>
+                <Select placeholder={t('asset.phSelectBrand')} options={numericOptions} />
               </Form.Item>
-              {watchedBrand === BrandEnum.SHANFENG && (
+              {watchedBrand && codeHint[watchedBrand] && (
                 <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
-                  當前物資歸屬閃蜂，編碼 TB
-                </div>
-              )}
-              {watchedBrand === BrandEnum.MFOOD && (
-                <div style={{ fontSize: 12, color: '#1890FF', marginTop: -18, marginBottom: 8 }}>
-                  當前物資歸屬 mFood，編碼 MF
+                  {t('asset.brandCodeHint', { brand: labelMap[watchedBrand], code: codeHint[watchedBrand] })}
                 </div>
               )}
             </Col>
             <Col span={16}>
-              <Form.Item label="採購事由" name="remark" style={{ marginBottom: 0 }}>
-                <Input.TextArea rows={2} placeholder="請輸入備註信息" maxLength={300} showCount style={{ resize: 'none' }} />
+              <Form.Item label={t('asset.orderReasonLabel')} name="remark" style={{ marginBottom: 0 }}>
+                <Input.TextArea rows={2} placeholder={t('asset.remarkPh')} maxLength={300} showCount style={{ resize: 'none' }} />
               </Form.Item>
             </Col>
           </Row>
@@ -682,14 +771,14 @@ export default function OrderAdd() {
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gIdx + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>採購物資</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.purchaseMaterials')}</span>
                 <Tag color="blue" style={{ fontSize: 11 }}>
-                  小計：MOP {groupSubtotal(group).toLocaleString()}
+                  {t('asset.groupSubtotalTag', { amount: groupSubtotal(group).toLocaleString() })}
                 </Tag>
               </div>
               {supplierGroups.length > 1 && (
                 <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleRemoveGroup(group.id)}>
-                  刪除分組
+                  {t('asset.deleteGroupBtn')}
                 </Button>
               )}
             </div>
@@ -697,28 +786,62 @@ export default function OrderAdd() {
             {/* 供应商信息 */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={6}>
-                <Form.Item label="供應商名稱" required>
-                  <Input value={group.supplier} onChange={(e) => updateGroup(group.id, { supplier: e.target.value })}
-                    placeholder="請輸入供應商名稱" allowClear />
+                <Form.Item label={t('asset.labelSupplierName')} required>
+                  <Select
+                    showSearch
+                    placeholder={t('asset.phSearchSupplier')}
+                    value={group.supplierId || undefined}
+                    onChange={(v: number) => handleSupplierChange(group.id, v)}
+                    onSearch={handleSupplierSearch}
+                    filterOption={false}
+                    loading={supplierLoading}
+                    notFoundContent={supplierLoading ? <Spin size="small" /> : t('common.noData')}
+                    allowClear
+                    options={supplierOptions.map((s) => ({
+                      value: s.id,
+                      label: `${s.name}（${s.code}）`,
+                    }))}
+                  />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="供應商聯絡人姓名">
-                  <Input value={group.contact} onChange={(e) => updateGroup(group.id, { contact: e.target.value })}
-                    placeholder="請輸入供應商聯絡人姓名" allowClear />
+                <Form.Item label={t('asset.labelContactName')}>
+                  {(groupContacts[group.id] || []).length > 1 ? (
+                    <Select
+                      value={group.contact || undefined}
+                      onChange={(v: string) => handleContactChange(group.id, v)}
+                      placeholder={t('asset.phSelectContact')}
+                      allowClear
+                      options={(groupContacts[group.id] || [])
+                        .filter((c) => c.status !== 'disabled')
+                        .map((c) => ({ value: c.contactName, label: c.contactName }))}
+                    />
+                  ) : (
+                    <Input
+                      value={group.contact}
+                      onChange={(e) => handleContactManualInput(group.id, e.target.value)}
+                      placeholder={(groupContacts[group.id] || []).length === 0 && group.supplierId ? t('asset.noSupplierContact') : t('asset.phInputContactName')}
+                      allowClear
+                    />
+                  )}
+                  {group.contact && group.supplierId && autoFilledContact[group.id] !== group.contact && (
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4, whiteSpace: 'nowrap' }}>
+                      {t('asset.contactSyncHint')}
+                    </div>
+                  )}
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="供應商聯絡人電話">
+                <Form.Item label={t('asset.labelContactPhone')}>
                   <Input value={group.contactPhone} onChange={(e) => updateGroup(group.id, { contactPhone: e.target.value })}
-                    placeholder="請輸入供應商聯絡人電話" allowClear />
+                    placeholder={t('asset.phInputContactPhone')} allowClear />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="下單日期">
+                <Form.Item label={t('asset.labelOrderDate')}>
                   <DatePicker value={group.orderDate ? dayjs(group.orderDate) : undefined}
                     onChange={(d) => updateGroup(group.id, { orderDate: d || undefined })}
-                    style={{ width: '100%' }} placeholder="請選擇下單日期" />
+                    style={{ width: '100%' }} placeholder={t('asset.phSelectOrderDate')} />
                 </Form.Item>
               </Col>
             </Row>
@@ -726,35 +849,35 @@ export default function OrderAdd() {
             {/* 收貨方式 + 條件字段（並排展示） */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={8}>
-                <Form.Item label="收貨方式" required>
+                <Form.Item label={t('asset.labelDeliveryMethod')} required>
                   <Select value={group.deliveryMethod}
                     onChange={(v: DeliveryMethod) => updateGroup(group.id, { deliveryMethod: v })}
-                    placeholder="請選擇收貨方式" allowClear
+                    placeholder={t('asset.phSelectDeliveryMethod')} allowClear
                     options={[
-                      { label: '自取', value: 'self_pickup' },
-                      { label: '供應商送貨上門', value: 'supplier_delivery' },
-                      { label: '快遞發貨', value: 'express' },
+                      { label: t('asset.deliverySelfPickup'), value: 'self_pickup' },
+                      { label: t('asset.deliverySupplier'), value: 'supplier_delivery' },
+                      { label: t('asset.deliveryExpress'), value: 'express' },
                     ]}
                   />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 {showReceiveDate(group.deliveryMethod) && (
-                  <Form.Item label="預計收貨日期">
+                  <Form.Item label={t('asset.labelExpectedDate')}>
                     <DatePicker
                       value={group.expectedReceiveDate ? dayjs(group.expectedReceiveDate) : undefined}
                       onChange={(d) => updateGroup(group.id, { expectedReceiveDate: d || undefined })}
-                      style={{ width: '100%' }} placeholder="請選擇預計收貨日期"
+                      style={{ width: '100%' }} placeholder={t('asset.phSelectExpectedDate')}
                     />
                   </Form.Item>
                 )}
               </Col>
               <Col span={8}>
                 {showTrackingNo(group.deliveryMethod) && (
-                  <Form.Item label="快遞單號">
+                  <Form.Item label={t('asset.labelTrackingNo')}>
                     <Input value={group.trackingNo}
                       onChange={(e) => updateGroup(group.id, { trackingNo: e.target.value })}
-                      placeholder="請輸入快遞單號" allowClear />
+                      placeholder={t('asset.phInputTrackingNo')} allowClear />
                   </Form.Item>
                 )}
               </Col>
@@ -768,26 +891,26 @@ export default function OrderAdd() {
               pagination={false}
               size="small"
               scroll={{ x: 1100 }}
-              locale={{ emptyText: '暫無明細，請點擊下方按鈕添加' }}
+              locale={{ emptyText: t('asset.emptyTextWithHint') }}
               style={{ marginBottom: 12 }}
             />
             <Button type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenAddModal(group.id)}>
-              添加資產
+              {t('asset.addAssetBtn')}
             </Button>
           </div>
         ))}
 
         <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddGroup} style={{ width: '100%', marginBottom: 16, height: 40 }}>
-          + 新增供應商分組
+          + {t('asset.addSupplierGroup')}
         </Button>
       </Form>
 
       {/* ====== 底部操作栏 ====== */}
       <div className="form-footer">
         <Space>
-          <Button onClick={handleCancel}>取消</Button>
+          <Button onClick={handleCancel}>{t('common.cancel')}</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSubmit}>
-            保存訂單
+            {t('asset.saveOrderBtn')}
           </Button>
         </Space>
       </div>

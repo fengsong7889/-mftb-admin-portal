@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
 import { Button, Select, Switch, Tag, Tooltip, message } from 'antd'
 import { PlusOutlined, DeleteOutlined, EyeOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
 import type { AiModel } from '../../../api'
 import {
   CAPABILITY_FIELDS,
   CAPABILITY_SHORT_FIELDS,
   MODEL_TYPE_TAG,
-  MODEL_TYPE_LABEL,
+  MODEL_TYPE_LABEL_KEYS,
   modelSupports,
   type CapabilityKey,
   type ModelAuthConfig,
@@ -30,6 +31,7 @@ interface ModelAuthSectionEditableProps {
 }
 
 export function ModelAuthSection({ models, value, onChange, dataResidency, onDataResidencyChange }: ModelAuthSectionEditableProps) {
+  const { t } = useTranslation()
   const modelMap = useMemo(() => new Map(models.map((m) => [m.id, m])), [models])
 
   const residencyOn = dataResidency === 1
@@ -41,7 +43,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       .filter((m) => !residencyOn || m.deployType === 'private')
       .map((m) => ({
         value: m.id,
-        label: `${m.name}${m.type ? `（${MODEL_TYPE_LABEL[m.type] || m.type}）` : ''}`,
+        label: `${m.name}${m.type ? `（${t('aiQuotaAuth.' + (MODEL_TYPE_LABEL_KEYS[m.type] || '')) || m.type}）` : ''}`,
       })),
     [models, value, residencyOn],
   )
@@ -77,7 +79,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       const removed = value.filter((a) => modelMap.get(a.modelId)?.deployType !== 'private')
       if (removed.length > 0) {
         onChange(value.filter((a) => modelMap.get(a.modelId)?.deployType === 'private'))
-        message.warning(`已開啟數據不出域，自動移除 ${removed.length} 個公有雲模型`)
+        message.warning(t('aiQuotaAuth.residencyAutoRemoved', { count: removed.length }))
       }
     }
   }
@@ -88,10 +90,10 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
         <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型授權配置</span>
-        <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>能力顆粒度</Tag>
-        <Tooltip title="模型來自「模型接入」中已啟用的真實模型；按需添加，授權細化到模型能力維度">
-          <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>按需添加模型</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.modelAuthConfigSection')}</span>
+        <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.capabilityGranularity')}</Tag>
+        <Tooltip title={t('aiQuotaAuth.modelAuthTooltip')}>
+          <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.addModelHint')}</span>
         </Tooltip>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
@@ -103,9 +105,9 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
           background: '#F9F0FF', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
         }}>
           <Switch size="small" checked={residencyOn} onChange={handleResidencyChange} />
-          <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>數據不出域</span>
+          <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidencyLabel')}</span>
           <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-            開啟後僅可選擇私有化部署模型，已添加的公有雲模型將被自動移除
+            {t('aiQuotaAuth.dataResidencyHint')}
           </span>
         </div>
       )}
@@ -114,12 +116,12 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       <div style={{ marginBottom: 16 }}>
         <Select
           showSearch
-          placeholder="選擇要授權的模型（添加一個、展示一個）"
+          placeholder={t('aiQuotaAuth.selectModelPlaceholder')}
           value={undefined}
           onChange={handleAddModel}
           optionFilterProp="label"
           options={availableModelOptions}
-          notFoundContent={residencyOn ? '暫無私有化部署模型可添加' : '所有已啟用模型均已添加'}
+          notFoundContent={residencyOn ? t('aiQuotaAuth.noPrivateModel') : t('aiQuotaAuth.allModelsAdded')}
           style={{ width: '100%' }}
           suffixIcon={<PlusOutlined />}
         />
@@ -127,7 +129,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
 
       {value.length === 0 ? (
         <div style={{ padding: '40px 0', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
-          尚未添加任何模型，請從上方下拉框選擇模型進行授權
+          {t('aiQuotaAuth.noModelHint')}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
@@ -145,24 +147,26 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
                     <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>{model.name}</span>
                     {model.type && (
                       <Tag color={MODEL_TYPE_TAG[model.type]} style={{ fontSize: 11 }}>
-                        {MODEL_TYPE_LABEL[model.type] || model.type}
+                        {t('aiQuotaAuth.' + (MODEL_TYPE_LABEL_KEYS[model.type] || '')) || model.type}
                       </Tag>
                     )}
                     <Tag color={model.deployType === 'private' ? 'purple' : 'default'} style={{ fontSize: 11 }}>
-                      {model.deployType === 'private' ? '私有化' : '公有云'}
+                      {model.deployType === 'private' ? t('aiQuotaAuth.privateDeploy') : t('aiQuotaAuth.publicDeploy')}
                     </Tag>
                   </div>
                   <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveModel(auth.modelId)}>移除</Button>
+                    onClick={() => handleRemoveModel(auth.modelId)}>{t('aiQuotaAuth.removeBtn')}</Button>
                 </div>
 
                 {/* 能力开关 */}
                 <div style={{ borderTop: '1px solid #E8D5F5', paddingTop: 12 }}>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {CAPABILITY_FIELDS.map(({ key, label, color, tip }) => {
+                    {CAPABILITY_FIELDS.map(({ key, labelKey, color, tipKey }) => {
                       const supported = modelSupports(model, key)
+                      const label = t('aiQuotaAuth.' + labelKey)
+                      const tip = t('aiQuotaAuth.' + tipKey)
                       return (
-                        <Tooltip key={key} title={supported ? tip : `該模型本身不支持「${label}」，無法開放給授權對象`}>
+                        <Tooltip key={key} title={supported ? tip : t('aiQuotaAuth.capNotSupported', { cap: label })}>
                           <div style={{
                             display: 'flex', alignItems: 'center', gap: 4,
                             padding: '4px 10px', borderRadius: 6,
@@ -176,7 +180,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
                               size="small"
                               disabled={!supported}
                               checked={supported && !!auth[key]}
-                              unCheckedChildren={supported ? undefined : '不支持'}
+                              unCheckedChildren={supported ? undefined : t('aiQuotaAuth.capUnsupported')}
                               onChange={(checked) => handleCapabilityToggle(auth.modelId, key, checked ? 1 : 0)}
                             />
                           </div>
@@ -192,7 +196,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       )}
 
       <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
-        已授權 <strong style={{ color: '#722ED1' }}>{value.length}</strong> 個模型
+        {t('aiQuotaAuth.authorizedCount', { count: <strong style={{ color: '#722ED1' }}>{value.length}</strong> })}
       </div>
     </div>
   )
@@ -205,6 +209,7 @@ interface ModelAuthSectionReadonlyProps {
 
 /** 只讀模式：詳情頁能力矩陣展示（與部門模型權控詳情頁一致） */
 export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionReadonlyProps) {
+  const { t } = useTranslation()
   const modelMap = useMemo(() => new Map(models.map((m) => [m.id, m])), [models])
 
   return (
@@ -213,8 +218,8 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
         <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>授權模型</span>
-        <Tag color="purple">{configs.length} 個模型</Tag>
+        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.authModelSection')}</span>
+        <Tag color="purple">{t('aiQuotaAuth.modelCount', { count: configs.length })}</Tag>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
 
@@ -234,18 +239,18 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
                   </span>
                   {model?.type && (
                     <Tag color={MODEL_TYPE_TAG[model.type]} style={{ fontSize: 11 }}>
-                      {MODEL_TYPE_LABEL[model.type] || model.type}
+                      {t('aiQuotaAuth.' + (MODEL_TYPE_LABEL_KEYS[model.type] || '')) || model.type}
                     </Tag>
                   )}
                 </div>
-                <Tag color="success" style={{ fontSize: 11 }}>已授權</Tag>
+                <Tag color="success" style={{ fontSize: 11 }}>{t('aiQuotaAuth.authorizedTag')}</Tag>
               </div>
 
               {/* 能力矩阵 */}
               <div style={{ borderTop: '1px solid #E8D5F5', paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>能力配置</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.capabilityConfig')}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {CAPABILITY_SHORT_FIELDS.map(({ key, label, color }) => {
+                  {CAPABILITY_SHORT_FIELDS.map(({ key, labelKey, color }) => {
                     const supported = config[key] === 1
                     return (
                       <div key={key} style={{
@@ -259,7 +264,7 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
                         ) : (
                           <CloseCircleFilled style={{ fontSize: 12, color: '#BFBFBF' }} />
                         )}
-                        <span style={{ fontSize: 12, color: supported ? '#262626' : '#BFBFBF' }}>{label}</span>
+                        <span style={{ fontSize: 12, color: supported ? '#262626' : '#BFBFBF' }}>{t('aiQuotaAuth.' + labelKey)}</span>
                       </div>
                     )
                   })}
@@ -270,7 +275,7 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
         })}
         {configs.length === 0 && (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: '#BFBFBF' }}>
-            暫無授權模型
+            {t('aiQuotaAuth.noAuthModel')}
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Modal, Popover, Select, Space, Switch, Table, Tabs, Tag, message, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
@@ -21,6 +22,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { CAPABILITY_SHORT_FIELDS, type CapabilityKey } from './empAuth/modelAuthCapability'
 
 export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } = {}) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   /* ── 基礎數據 ── */
   const [models, setModels] = useState<AiModel[]>([])
@@ -120,18 +122,18 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   const handleGroupDelete = (row: DeptAuthGroupItem) => {
     Modal.confirm({
-      title: '確認刪除該策略？',
-      content: `刪除後「${row.name}」關聯的 ${row.deptIds.length} 個部門將失去模型授權配置`,
-      okText: '刪除',
+      title: t('aiQuotaAuth.confirmDeleteDeptStrategy'),
+      content: t('aiQuotaAuth.deleteDeptStrategyContent', { name: row.name, count: row.deptIds.length }),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await deleteDeptAuthGroup(row.id)
-          message.success(`策略「${row.name}」已刪除`)
+          message.success(t('aiQuotaAuth.deptStrategyDeleted', { name: row.name }))
           loadDeptGroups()
         } catch {
-          message.error('刪除失敗')
+          message.error(t('aiQuotaAuth.deleteFailed'))
         }
       },
     })
@@ -140,19 +142,21 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
   /* ── 策略啟停（二次確認） ── */
   const handleGroupToggle = (row: DeptAuthGroupItem) => {
     const toDisable = row.status === 1
-    const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
-      title: `確認${actionText}該策略？`,
-      content: `${actionText}後「${row.name}」關聯的 ${row.deptIds.length} 個部門${toDisable ? '將失去模型授權配置' : '將恢復模型授權'}`,
-      okText: '確認',
-      cancelText: '取消',
+      title: toDisable ? t('aiQuotaAuth.confirmDisableDept') : t('aiQuotaAuth.confirmEnableDept'),
+      content: toDisable
+        ? t('aiQuotaAuth.disableDeptContent', { name: row.name, count: row.deptIds.length })
+        : t('aiQuotaAuth.enableDeptContent', { name: row.name, count: row.deptIds.length }),
+      okText: t('aiQuotaAuth.confirmOk'),
+      cancelText: t('common.cancel'),
+      okButtonProps: toDisable ? { danger: true } : undefined,
       onOk: async () => {
         try {
           await toggleDeptAuthGroupStatus(row.id, toDisable ? 0 : 1)
-          message.success(`策略「${row.name}」已${actionText}`)
+          message.success(toDisable ? t('aiQuotaAuth.deptStrategyDisabled', { name: row.name }) : t('aiQuotaAuth.deptStrategyEnabled', { name: row.name }))
           loadDeptGroups()
         } catch {
-          message.error(`${actionText}失敗`)
+          message.error(toDisable ? t('aiQuotaAuth.disableFailed') : t('aiQuotaAuth.enableFailed'))
         }
       },
     })
@@ -160,17 +164,17 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   /* ── 列字段配置（部門權控） ── */
   const deptColumnMeta = [
-    { key: 'configCode', title: '配置ID' },
-    { key: 'name', title: '策略名稱' },
-    { key: 'deptNames', title: '適用部門' },
-    { key: 'totalEmployeeCount', title: '覆蓋人數' },
-    { key: 'modelIds', title: '授權模型' },
-    { key: 'capabilities', title: '授權能力' },
-    { key: 'dataResidency', title: '數據不出域' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
+    { key: 'configCode', title: t('aiQuotaAuth.configIdCol') },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol') },
+    { key: 'deptNames', title: t('aiQuotaAuth.deptNamesCol') },
+    { key: 'totalEmployeeCount', title: t('aiQuotaAuth.coverCountCol') },
+    { key: 'modelIds', title: t('aiQuotaAuth.authModelCol') },
+    { key: 'capabilities', title: t('aiQuotaAuth.capabilityCol') },
+    { key: 'dataResidency', title: t('aiQuotaAuth.dataResidencyTag') },
+    { key: 'status', title: t('aiQuotaAuth.statusCol') },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol') },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent: deptConfigComponent, applyConfig: applyDeptConfig } = useColumnConfig('ai-dept-model-auth', deptColumnMeta, [
@@ -180,12 +184,12 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
   /* ── 表格列（部門權控） ── */
   const deptColumns: ColumnsType<DeptAuthGroupItem> = [
     {
-      key: 'configCode', title: '配置ID', dataIndex: 'configCode', width: 160, align: 'center',
+      key: 'configCode', title: t('aiQuotaAuth.configIdCol'), dataIndex: 'configCode', width: 160, align: 'center',
       render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
     },
-    { key: 'name', title: '策略名稱', dataIndex: 'name', width: 170 },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol'), dataIndex: 'name', width: 170 },
     {
-      key: 'deptNames', title: '適用部門', dataIndex: 'deptNames', width: 260,
+      key: 'deptNames', title: t('aiQuotaAuth.deptNamesCol'), dataIndex: 'deptNames', width: 260,
       render: (v: string[]) => (
         <span>
           {v.slice(0, 3).map((name) => (
@@ -200,7 +204,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
                   ))}
                 </div>
               }
-              title={`全部部門（${v.length}）`}
+              title={t('aiQuotaAuth.allDeptPopover', { count: v.length })}
               trigger="click"
             >
               <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C' }}>+{v.length - 3}</Tag>
@@ -209,11 +213,11 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
         </span>
       ),
     },
-    { key: 'totalEmployeeCount', title: '覆蓋人數', dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => `${v.toLocaleString()} 人` },
+    { key: 'totalEmployeeCount', title: t('aiQuotaAuth.coverCountCol'), dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => t('aiQuotaAuth.coverCountRender', { count: v.toLocaleString() }) },
     {
-      key: 'modelIds', title: '授權模型', dataIndex: 'modelIds', width: 200,
+      key: 'modelIds', title: t('aiQuotaAuth.authModelCol'), dataIndex: 'modelIds', width: 200,
       render: (ids: string[]) => {
-        if (!ids?.length) return <Tag color="error">未授權</Tag>
+        if (!ids?.length) return <Tag color="error">{t('aiQuotaAuth.unauthorizedTag')}</Tag>
         return (
           <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {ids.slice(0, 3).map((id) => (
@@ -233,7 +237,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
                     ))}
                   </div>
                 }
-                title={`全部模型（${ids.length}）`}
+                title={t('aiQuotaAuth.allModelPopover', { count: ids.length })}
               >
                 <Tag style={{ color: '#E8720C', borderColor: '#E8720C', cursor: 'pointer' }}>+{ids.length - 3}</Tag>
               </Popover>
@@ -243,19 +247,19 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
       },
     },
     {
-      key: 'capabilities', title: '授權能力', width: 220,
+      key: 'capabilities', title: t('aiQuotaAuth.capabilityCol'), width: 220,
       render: (_: unknown, row: DeptAuthGroupItem) => {
         const configs = buildModelConfigs(row)
-        if (!configs.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>未配置</span>
+        if (!configs.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('aiQuotaAuth.notConfiguredShort')}</span>
         // 去重：收集所有模型中已啟用的能力
         const enabledCaps = CAPABILITY_SHORT_FIELDS.filter(({ key }) =>
           configs.some((c) => c[key] === 1),
         )
-        if (!enabledCaps.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>未開放任何能力</span>
+        if (!enabledCaps.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('aiQuotaAuth.noCapability')}</span>
         return (
           <Popover
             trigger="click"
-            title="各模型授權能力明細"
+            title={t('aiQuotaAuth.capabilityDetailTitle')}
             content={
               <div style={{ maxWidth: 380 }}>
                 {configs.map((c) => {
@@ -265,10 +269,10 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
                       <div style={{ fontWeight: 500, marginBottom: 4 }}>{modelName[c.modelId] ?? `#${c.modelId}`}</div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {caps.length > 0
-                          ? caps.map(({ key, label, color }) => (
-                              <Tag key={key} color={color} style={{ fontSize: 11 }}>{label}</Tag>
+                          ? caps.map(({ key, labelKey, color }) => (
+                              <Tag key={key} color={color} style={{ fontSize: 11 }}>{t('aiQuotaAuth.' + labelKey)}</Tag>
                             ))
-                          : <span style={{ fontSize: 11, color: '#BFBFBF' }}>未開放任何能力</span>
+                          : <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('aiQuotaAuth.noCapability')}</span>
                         }
                       </div>
                     </div>
@@ -278,8 +282,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
             }
           >
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, cursor: 'pointer' }}>
-              {enabledCaps.map(({ key, label, color }) => (
-                <Tag key={key} color={color} style={{ fontSize: 11 }}>{label}</Tag>
+              {enabledCaps.map(({ key, labelKey, color }) => (
+                <Tag key={key} color={color} style={{ fontSize: 11 }}>{t('aiQuotaAuth.' + labelKey)}</Tag>
               ))}
             </div>
           </Popover>
@@ -287,32 +291,32 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
       },
     },
     {
-      key: 'dataResidency', title: '數據不出域', dataIndex: 'dataResidency', width: 100, align: 'center',
-      render: (v: boolean) => (v ? <Tag color="purple">已啟用</Tag> : <Tag color="default">未啟用</Tag>),
+      key: 'dataResidency', title: t('aiQuotaAuth.dataResidencyTag'), dataIndex: 'dataResidency', width: 100, align: 'center',
+      render: (v: boolean) => (v ? <Tag color="purple">{t('aiQuotaAuth.enabledTag')}</Tag> : <Tag color="default">{t('aiQuotaAuth.disabledTag')}</Tag>),
     },
     {
-      key: 'status', title: '狀態', dataIndex: 'status', width: 80, align: 'center',
+      key: 'status', title: t('aiQuotaAuth.statusCol'), dataIndex: 'status', width: 80, align: 'center',
       render: (_: unknown, row: DeptAuthGroupItem) => (
         <Switch
           checked={row.status === 1}
-          checkedChildren="啟用"
-          unCheckedChildren="停用"
+          checkedChildren={t('aiQuotaAuth.enableText')}
+          unCheckedChildren={t('aiQuotaAuth.disableText')}
           onChange={() => handleGroupToggle(row)}
         />
       ),
     },
     {
-      key: 'updatedBy', title: '最後更新人', dataIndex: 'updatedBy', width: 100,
+      key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol'), dataIndex: 'updatedBy', width: 100,
       render: (v: string) => <span>{v}</span>,
     },
-    { key: 'updatedAt', title: '最後更新時間', dataIndex: 'updatedAt', width: 160, render: (v: string) => <span>{v}</span> },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol'), dataIndex: 'updatedAt', width: 160, render: (v: string) => <span>{v}</span> },
     {
-      key: 'action', title: '操作', width: 180, align: 'center',
+      key: 'action', title: t('common.action'), width: 180, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleGroupDetail(row)}>詳情</Button>
-          <Button type="link" onClick={() => handleGroupEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handleGroupDelete(row)}>刪除</Button>
+          <Button type="link" onClick={() => handleGroupDetail(row)}>{t('common.detail')}</Button>
+          <Button type="link" onClick={() => handleGroupEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handleGroupDelete(row)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -357,10 +361,10 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     overrideForm.validateFields().then((values) => {
       if (editingOverride === 'new') {
         setOverrides((prev) => [...prev, { ...values, empId: values.username.toUpperCase() } as EmployeeModelOverride])
-        message.success('員工額外授權已新增')
+        message.success(t('aiQuotaAuth.overrideAdded'))
       } else if (editingOverride) {
         setOverrides((prev) => prev.map((o) => (o.username === editingOverride.username ? { ...o, ...values } : o)))
-        message.success('員工額外授權已保存（在部門授權基礎上追加）')
+        message.success(t('aiQuotaAuth.overrideSavedAiAuth'))
       }
       setEditingOverride(null)
     })
@@ -368,25 +372,25 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   const handleOverrideDelete = (row: EmployeeModelOverride) => {
     Modal.confirm({
-      title: '確認移除該員工的額外授權？',
-      content: `移除後「${row.empName}」將僅保留其所屬部門的基礎模型授權`,
-      okText: '移除',
+      title: t('aiQuotaAuth.confirmRemoveOverride'),
+      content: t('aiQuotaAuth.removeOverrideContent', { name: row.empName }),
+      okText: t('aiQuotaAuth.removeBtnOverride'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => {
         setOverrides((prev) => prev.filter((o) => o.username !== row.username))
-        message.success('已移除該員工的額外授權')
+        message.success(t('aiQuotaAuth.overrideRemovedAiAuth'))
       },
     })
   }
 
   /* ── 列字段配置（員工覆蓋） ── */
   const overrideColumnMeta = [
-    { key: 'employee', title: '員工' },
-    { key: 'deptName', title: '部門' },
-    { key: 'extraModelIds', title: '額外授權模型' },
-    { key: 'remark', title: '備注' },
-    { key: 'action', title: '操作' },
+    { key: 'employee', title: t('aiQuotaAuth.employeeCol') },
+    { key: 'deptName', title: t('aiQuotaAuth.deptLabel') },
+    { key: 'extraModelIds', title: t('aiQuotaAuth.extraAuthModelsCol') },
+    { key: 'remark', title: t('aiQuotaAuth.remarkCol') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent: overrideConfigComponent } = useColumnConfig('ai-auth-override', overrideColumnMeta, [
@@ -396,7 +400,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
   /* ── 表格列（員工覆蓋） ── */
   const overrideColumns: ColumnsType<EmployeeModelOverride> = [
     {
-      title: '員工', key: 'employee', width: 180,
+      title: t('aiQuotaAuth.employeeCol'), key: 'employee', width: 180,
       render: (_, row) => (
         <div>
           <div style={{ fontWeight: 600 }}>{row.empName}</div>
@@ -404,22 +408,22 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
         </div>
       ),
     },
-    { title: '部門', dataIndex: 'deptName', width: 120 },
+    { title: t('aiQuotaAuth.deptLabel'), dataIndex: 'deptName', width: 120 },
     {
-      title: '額外授權模型', dataIndex: 'extraModelIds', width: 280,
+      title: t('aiQuotaAuth.extraAuthModelsCol'), dataIndex: 'extraModelIds', width: 280,
       render: (v: string[]) => (v.length ? v.map((id) => (
         <Tag key={id} style={{ marginRight: 4, color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>
           {modelName[id] ?? id}
         </Tag>
       )) : <span style={{ color: '#BFBFBF' }}>--</span>),
     },
-    { title: '備注', dataIndex: 'remark', ellipsis: true },
+    { title: t('aiQuotaAuth.remarkCol'), dataIndex: 'remark', ellipsis: true },
     {
-      title: '操作', key: 'action', width: 110, align: 'center',
+      title: t('common.action'), key: 'action', width: 110, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleOverrideEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handleOverrideDelete(row)}>移除</Button>
+          <Button type="link" onClick={() => handleOverrideEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handleOverrideDelete(row)}>{t('aiQuotaAuth.removeBtnOverride')}</Button>
         </Space>
       ),
     },
@@ -438,22 +442,22 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
           {/* 查詢區域 */}
           <div className="search-section">
             <Form layout="inline">
-              <Form.Item label="策略名稱">
-                <Input value={queryGroupName} placeholder="請輸入策略名稱" allowClear onChange={(e) => setQueryGroupName(e.target.value)} />
+              <Form.Item label={t('aiQuotaAuth.strategyNameFilterLabel')}>
+                <Input value={queryGroupName} placeholder={t('aiQuotaAuth.strategyNameFilterPh')} allowClear onChange={(e) => setQueryGroupName(e.target.value)} />
               </Form.Item>
-              <Form.Item label="數據不出域">
+              <Form.Item label={t('aiQuotaAuth.dataResidencyTag')}>
                 <Select
                   value={queryResidency}
-                  placeholder="全部"
+                  placeholder={t('aiQuotaAuth.allOption')}
                   allowClear
-                  options={[{ value: '1', label: '已啟用' }, { value: '0', label: '未啟用' }]}
+                  options={[{ value: '1', label: t('aiQuotaAuth.enabledOption') }, { value: '0', label: t('aiQuotaAuth.disabledOption') }]}
                   onChange={(v) => setQueryResidency(v)}
                 />
               </Form.Item>
               <Form.Item>
                 <div className="search-actions">
-                  <Button type="primary" icon={<SearchOutlined />} onClick={handleDeptSearch}>查詢</Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleDeptReset}>重置</Button>
+                  <Button type="primary" icon={<SearchOutlined />} onClick={handleDeptSearch}>{t('common.query')}</Button>
+                  <Button icon={<ReloadOutlined />} onClick={handleDeptReset}>{t('common.reset')}</Button>
                 </div>
               </Form.Item>
             </Form>
@@ -463,18 +467,18 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message="每條策略可關聯多個部門，共享同一組模型授權配置。部門員工的模型選擇器僅展示其所屬策略中已授權的模型。"
+            message={t('aiQuotaAuth.deptAuthGroupAlert')}
           />
 
           {/* 操作區 */}
           <div className="action-section">
             <div className="action-section-left">
               <span style={{ fontSize: 13, color: '#595959' }}>
-                共 {deptGroups.length} 條策略，覆蓋 {totalDeptCount} 個部門 {totalEmployeeCount.toLocaleString()} 人
+                {t('aiQuotaAuth.deptStrategySummary', { count: deptGroups.length, deptCount: totalDeptCount, empCount: totalEmployeeCount.toLocaleString() })}
               </span>
             </div>
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleGroupCreate}>新增</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleGroupCreate}>{t('common.add')}</Button>
               {deptConfigComponent}
             </div>
           </div>
@@ -485,7 +489,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
             loading={loading}
             columns={applyDeptConfig(deptColumns)}
             dataSource={filteredGroups}
-            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 條策略` }}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.paginationTotal', { total }) }}
           />
         </>
   )
@@ -495,13 +499,13 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
           {/* 查詢區域 */}
           <div className="search-section">
             <Form layout="inline">
-              <Form.Item label="員工">
-                <Input value={queryEmp} placeholder="姓名 / 賬號 / 工號" allowClear onChange={(e) => setQueryEmp(e.target.value)} />
+              <Form.Item label={t('aiQuotaAuth.employeeCol')}>
+                <Input value={queryEmp} placeholder={t('aiQuotaAuth.empSearchPh')} allowClear onChange={(e) => setQueryEmp(e.target.value)} />
               </Form.Item>
-              <Form.Item label="部門">
+              <Form.Item label={t('aiQuotaAuth.deptLabel')}>
                 <Select
                   value={queryEmpDept}
-                  placeholder="全部"
+                  placeholder={t('aiQuotaAuth.allOption')}
                   allowClear
                   showSearch
                   options={deptOptions}
@@ -510,8 +514,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
               </Form.Item>
               <Form.Item>
                 <div className="search-actions">
-                  <Button type="primary" icon={<SearchOutlined />} onClick={handleEmpSearch}>查詢</Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleEmpReset}>重置</Button>
+                  <Button type="primary" icon={<SearchOutlined />} onClick={handleEmpSearch}>{t('common.query')}</Button>
+                  <Button icon={<ReloadOutlined />} onClick={handleEmpReset}>{t('common.reset')}</Button>
                 </div>
               </Form.Item>
             </Form>
@@ -520,7 +524,7 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
           {/* 操作區：右側新增 + 列配置 */}
           <div className="action-section">
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleOverrideCreate}>新增</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleOverrideCreate}>{t('common.add')}</Button>
               {overrideConfigComponent}
             </div>
           </div>
@@ -531,14 +535,14 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
             loading={loading}
             columns={overrideColumns}
             dataSource={filteredOverrides}
-            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 條記錄` }}
+            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.recordsTotal', { total }) }}
           />
         </>
   )
 
   const tabItems = [
-    { key: 'dept', label: `部門模型權控（${deptGroups.length}）`, children: deptContent },
-    { key: 'employee', label: `員工額外授權（${overrides.length}）`, children: empContent },
+    { key: 'dept', label: t('aiQuotaAuth.deptModelAuthTab', { count: deptGroups.length }), children: deptContent },
+    { key: 'employee', label: t('aiQuotaAuth.empExtraAuthTab', { count: overrides.length }), children: empContent },
   ]
 
   return (
@@ -547,28 +551,28 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
       {/* 員工額外授權編輯/新增彈窗 */}
       <Modal
-        title={editingOverride === 'new' ? '新增員工額外授權' : '編輯員工額外授權'}
+        title={editingOverride === 'new' ? t('aiQuotaAuth.addOverride') : t('aiQuotaAuth.editOverride')}
         open={editingOverride !== null}
         onOk={handleOverrideSave}
         onCancel={() => setEditingOverride(null)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         destroyOnHidden
       >
         <Form form={overrideForm} layout="vertical">
-          <Form.Item name="username" label="賬號" rules={[{ required: true, message: '請輸入員工賬號' }]}>
-            <Input disabled={editingOverride !== 'new'} placeholder="請輸入員工賬號" />
+          <Form.Item name="username" label={t('aiQuotaAuth.accountLabel')} rules={[{ required: true, message: t('aiQuotaAuth.accountRequired') }]}>
+            <Input disabled={editingOverride !== 'new'} placeholder={t('aiQuotaAuth.accountPh')} />
           </Form.Item>
-          <Form.Item name="empName" label="姓名" rules={[{ required: true, message: '請輸入員工姓名' }]}>
-            <Input placeholder="請輸入員工姓名" />
+          <Form.Item name="empName" label={t('aiQuotaAuth.empNameLabel')} rules={[{ required: true, message: t('aiQuotaAuth.empNameRequired') }]}>
+            <Input placeholder={t('aiQuotaAuth.empNamePh')} />
           </Form.Item>
-          <Form.Item name="deptName" label="部門" rules={[{ required: true, message: '請選擇部門' }]}>
-            <Select showSearch placeholder="請選擇部門" options={deptOptions} />
+          <Form.Item name="deptName" label={t('aiQuotaAuth.deptLabel')} rules={[{ required: true, message: t('aiQuotaAuth.deptRequired') }]}>
+            <Select showSearch placeholder={t('aiQuotaAuth.deptPh')} options={deptOptions} />
           </Form.Item>
-          <Form.Item name="extraModelIds" label="額外授權模型（在部門授權基礎上追加）" rules={[{ required: true, message: '請選擇額外授權模型' }]}>
-            <Select mode="multiple" placeholder="請選擇模型" allowClear options={models.map((m) => ({ value: String(m.id), label: m.name }))} />
+          <Form.Item name="extraModelIds" label={t('aiQuotaAuth.extraAuthModelsLabel')} rules={[{ required: true, message: t('aiQuotaAuth.extraAuthRequired') }]}>
+            <Select mode="multiple" placeholder={t('aiQuotaAuth.selectModelPh')} allowClear options={models.map((m) => ({ value: String(m.id), label: m.name }))} />
           </Form.Item>
-          <Form.Item name="remark" label="備注"><Input placeholder="請輸入備注" /></Form.Item>
+          <Form.Item name="remark" label={t('aiQuotaAuth.remarkCol')}><Input placeholder={t('aiQuotaAuth.remarkPh')} /></Form.Item>
         </Form>
       </Modal>
     </div>

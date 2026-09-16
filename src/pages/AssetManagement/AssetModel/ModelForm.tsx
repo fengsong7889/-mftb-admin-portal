@@ -136,10 +136,10 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
         setSubmitting(true)
         if (isEdit && id) {
           await updateBrand(id, payload)
-          message.success('资产品牌更新成功')
+          message.success(t('asset.brandUpdateSuccess'))
         } else {
           await createBrand(payload)
-          message.success('资产品牌创建成功')
+          message.success(t('asset.brandCreateSuccess'))
         }
       } else {
         const v = await productForm.validateFields()
@@ -207,7 +207,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? (isBrand ? '编辑资产品牌' : '编辑产品') : (isBrand ? '新增资产品牌' : '新增产品')}
+              {isEdit ? (isBrand ? t('asset.editBrandTitle') : t('asset.editProductTitle')) : (isBrand ? t('asset.addBrandTitle') : t('asset.addProductTitle'))}
             </h2>
           </div>
         </div>
@@ -220,7 +220,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             ? <ShopOutlined style={{ color: '#E8720C', fontSize: 16 }} />
             : <AppstoreOutlined style={{ color: '#E8720C', fontSize: 16 }} />
           }
-          <span>{isBrand ? '资产品牌信息' : '产品信息'}</span>
+          <span>{isBrand ? t('asset.brandInfoTitle') : t('asset.productInfoTitle')}</span>
         </div>
         <div style={{ padding: '20px 24px 4px' }}>
           {isBrand ? (
@@ -228,11 +228,11 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               <Row gutter={16}>
                 <Col span={8}>
                   <Form.Item
-                    label="所属分类" name="categoryCode"
-                    rules={[{ required: true, message: '请选择所属分类' }]}
+                    label={t('asset.belongCategory')} name="categoryCode"
+                    rules={[{ required: true, message: t('asset.belongCategoryPh') }]}
                   >
                     <Select
-                      placeholder="请选择资产分类"
+                      placeholder={t('asset.categorySelectPh')}
                       showSearch
                       optionFilterProp="label"
                       onChange={handleBrandCategoryChange}
@@ -242,18 +242,18 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                 </Col>
                 <Col span={8}>
                   <Form.Item
-                    label="资产品牌（中文）" name="brandZh"
-                    rules={[{ required: true, message: '请输入资产品牌中文名称' }]}
+                    label={t('asset.brandZhLabel')} name="brandZh"
+                    rules={[{ required: true, message: t('asset.brandZhRequired') }]}
                   >
-                    <Input placeholder="例如：苹果" allowClear />
+                    <Input placeholder={t('asset.brandZhPh')} allowClear />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
                   <Form.Item
-                    label="资产品牌（英文）" name="brandEn"
-                    rules={[{ required: true, message: '请输入资产品牌英文名称' }]}
+                    label={t('asset.brandEnLabel')} name="brandEn"
+                    rules={[{ required: true, message: t('asset.brandEnRequired') }]}
                   >
-                    <Input placeholder="例如：Apple" allowClear />
+                    <Input placeholder={t('asset.brandEnPh')} allowClear />
                   </Form.Item>
                 </Col>
               </Row>
@@ -263,11 +263,11 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               <Row gutter={16}>
                 <Col span={8}>
                   <Form.Item
-                    label="所属资产品牌" name="brandId"
-                    rules={[{ required: true, message: '请选择所属资产品牌' }]}
+                    label={t('asset.belongBrand')} name="brandId"
+                    rules={[{ required: true, message: t('asset.belongBrandRequired') }]}
                   >
                     <Select
-                      placeholder="请选择资产品牌"
+                      placeholder={t('asset.belongBrandPh')}
                       showSearch
                       optionFilterProp="label"
                       onChange={handleProductBrandChange}
@@ -277,16 +277,16 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item label="所属分类" name="categoryCode">
-                    <Select placeholder="自动带入" disabled options={categoryOptions} />
+                  <Form.Item label={t('asset.belongCategory')} name="categoryCode">
+                    <Select placeholder={t('asset.autoInherit')} disabled options={categoryOptions} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
                   <Form.Item
-                    label="产品名称" name="name"
-                    rules={[{ required: true, message: '请输入产品名称' }]}
+                    label={t('asset.productNameLabel')} name="name"
+                    rules={[{ required: true, message: t('asset.productNameRequired') }]}
                   >
-                    <Input placeholder="例如：MacBook Pro 16 笔记本" allowClear />
+                    <Input placeholder={t('asset.productNamePh')} allowClear />
                   </Form.Item>
                 </Col>
               </Row>

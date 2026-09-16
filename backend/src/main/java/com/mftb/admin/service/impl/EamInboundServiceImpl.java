@@ -20,6 +20,7 @@ import com.mftb.admin.mapper.EamInboundBatchItemMapper;
 import com.mftb.admin.mapper.EamInboundBatchMapper;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
 import com.mftb.admin.mapper.EamPurchaseOrderMapper;
+import com.mftb.admin.service.EamAssetService;
 import com.mftb.admin.service.EamInboundService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -53,6 +54,7 @@ public class EamInboundServiceImpl implements EamInboundService {
     private final EamAssetMapper assetMapper;
     private final EamLocationMapper locationMapper;
     private final EamModelMapper modelMapper;
+    private final EamAssetService assetService;
 
     private static final String PASS = "pass";
     private static final Set<String> DISPOSITIONS = Set.of(PASS, "return", "exchange", "concession");
@@ -217,13 +219,16 @@ public class EamInboundServiceImpl implements EamInboundService {
             List<String> assetNos = new ArrayList<>();
             if (accepted > 0) {
                 for (int i = 0; i < accepted; i++) {
-                    String assetNo = bizSeqService.next(BizSeqService.RULE_EAM_ASSET);
+                    String assetNo = assetService.generateAssetNo(
+                            order.getBrand(), locationId,
+                            orderItem != null ? orderItem.getCategoryCode() : null);
                     assetNos.add(assetNo);
 
                     EamAsset asset = new EamAsset();
                     asset.setAssetNo(assetNo);
                     asset.setAssetName(modelName);
                     asset.setModelId(modelId);
+                    asset.setCompanyBrand(order.getBrand());
                     if (orderItem != null) {
                         asset.setAssetType(orderItem.getCategoryName());
                         asset.setCategoryId(orderItem.getCategoryId());

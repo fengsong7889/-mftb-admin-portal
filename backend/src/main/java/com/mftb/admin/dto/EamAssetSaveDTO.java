@@ -36,4 +36,6 @@ public class EamAssetSaveDTO {
     private BigDecimal rentalCost;
     private List<String> rentalPeriod;
     private String remark;
+    /** 公司品牌：1=闪蜂(TB), 2=mFood(MF) */
+    private Integer companyBrand;
 }

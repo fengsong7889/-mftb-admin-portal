@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Button,
@@ -79,6 +80,7 @@ interface QuotaFormValues {
 }
 
 export default function AiQuotaAuth() {
+  const { t } = useTranslation()
   /* ── 基礎數據 ── */
   const [providers, setProviders] = useState<AiProvider[]>([])
   const [models, setModels] = useState<AiModel[]>([])
@@ -146,11 +148,11 @@ export default function AiQuotaAuth() {
     if (!dept) return
     // 數據不出域校驗：僅可勾選私有化模型
     if (draftResidency && draftModelIds.some((id) => modelProviderType[id] !== 'private')) {
-      message.warning('該部門開啟了「數據不出域」，僅可勾選私有化部署的模型')
+      message.warning(t('aiQuotaAuth.dataResidencyWarning'))
       return
     }
     setDeptAuths((prev) => prev.map((d) => (d.deptId === selectedDeptId ? { ...d, modelIds: [...draftModelIds], dataResidency: draftResidency } : d)))
-    message.success(`${dept.deptName} 的模型授權已保存，模型選擇器將實時同步該部門員工可見的模型`)
+    message.success(t('aiQuotaAuth.deptAuthSaved', { name: dept.deptName }))
   }
 
   /* ── Tab1: 員工覆蓋 ── */
@@ -166,7 +168,7 @@ export default function AiQuotaAuth() {
     overrideForm.validateFields().then((values) => {
       setOverrides((prev) => prev.map((o) => (o.username === editingOverride?.username ? { ...o, ...values } : o)))
       setEditingOverride(null)
-      message.success('員工額外授權已保存（在部門授權基礎上追加）')
+      message.success(t('aiQuotaAuth.overrideSaved'))
     })
   }
 
@@ -205,31 +207,31 @@ export default function AiQuotaAuth() {
         setPolicies((prev) => prev.map((p) => (p.id === editingPolicy.id ? { ...p, ...payload, downgradeModelId: payload.overLimitAction === 'downgrade' ? (payload.downgradeModelId ?? null) : null, downgradeExemptQuota: payload.overLimitAction === 'downgrade' ? (payload.downgradeExemptQuota ?? null) : null } : p)))
       }
       setEditingPolicy(null)
-      message.success('額度策略已保存，網關將在每次請求前檢查額度')
+      message.success(t('aiQuotaAuth.quotaSaved'))
     })
   }
 
   const handlePolicyDelete = (row: QuotaPolicy) => {
     Modal.confirm({
-      title: '確認刪除該額度策略？',
-      content: `刪除後「${row.name}」立即失效，關聯的員工不再受限額約束。`,
-      okText: '刪除',
+      title: t('aiQuotaAuth.confirmDeletePolicy'),
+      content: t('aiQuotaAuth.deletePolicyContent', { name: row.name }),
+      okText: t('common.delete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => {
         setPolicies((prev) => prev.filter((p) => p.id !== row.id))
-        message.success('策略已刪除')
+        message.success(t('aiQuotaAuth.strategyDeleted'))
       },
     })
   }
 
   /* ── 列字段配置（員工覆蓋） ── */
   const overrideColumnMeta = [
-    { key: 'employee', title: '員工' },
-    { key: 'deptName', title: '部門' },
-    { key: 'extraModelIds', title: '額外授權模型' },
-    { key: 'remark', title: '備註' },
-    { key: 'action', title: '操作' },
+    { key: 'employee', title: t('aiQuotaAuth.employeeCol') },
+    { key: 'deptName', title: t('aiQuotaAuth.deptLabel') },
+    { key: 'extraModelIds', title: t('aiQuotaAuth.extraAuthModelsCol') },
+    { key: 'remark', title: t('aiQuotaAuth.remarkCol') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent: overrideConfigComponent } = useColumnConfig('ai-quota-auth-override', overrideColumnMeta, [
@@ -238,14 +240,14 @@ export default function AiQuotaAuth() {
 
   /* ── 列字段配置（額度策略） ── */
   const policyColumnMeta = [
-    { key: 'name', title: '策略名稱' },
-    { key: 'scope', title: '適用範圍' },
-    { key: 'period', title: '週期' },
-    { key: 'quota', title: '限額' },
-    { key: 'soft', title: '軟提醒' },
-    { key: 'overLimitAction', title: '超額動作' },
-    { key: 'status', title: '狀態' },
-    { key: 'action', title: '操作' },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol') },
+    { key: 'scope', title: t('aiQuotaAuth.scopeCol') },
+    { key: 'period', title: t('aiQuotaAuth.periodShortCol') },
+    { key: 'quota', title: t('aiQuotaAuth.quotaShortCol') },
+    { key: 'soft', title: t('aiQuotaAuth.softAlertCol') },
+    { key: 'overLimitAction', title: t('aiQuotaAuth.overLimitCol') },
+    { key: 'status', title: t('aiQuotaAuth.statusCol') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent: policyConfigComponent } = useColumnConfig('ai-quota-auth-policy', policyColumnMeta, [
@@ -273,52 +275,52 @@ export default function AiQuotaAuth() {
 
   const handleDefaultStrategy = (strategyId: 'cost' | 'performance') => {
     setStrategies((prev) => prev.map((s) => ({ ...s, isDefault: s.id === strategyId })))
-    message.success('預設路由策略已更新，Auto 模式默認按該策略調度')
+    message.success(t('aiQuotaAuth.routeUpdated'))
   }
 
   /* ── Tab4: 賬號白名單 ── */
   const handleWhitelistChange = (modelId: string, accounts: string[]) => {
     setWhitelists((prev) => prev.map((w) => (w.modelId === modelId ? { ...w, accounts } : w)))
-    message.success('白名單已保存（空 = 全部賬號可用）')
+    message.success(t('aiQuotaAuth.whitelistSaved'))
   }
 
   /* ── 表格列 ── */
   const overrideColumns: ColumnsType<EmployeeModelOverride> = [
-    { title: '員工', key: 'employee', width: 160, render: (_, row) => `${row.empName}（${row.empId}）` },
-    { title: '部門', dataIndex: 'deptName', width: 100 },
+    { title: t('aiQuotaAuth.employeeCol'), key: 'employee', width: 160, render: (_, row) => `${row.empName}（${row.empId}）` },
+    { title: t('aiQuotaAuth.deptLabel'), dataIndex: 'deptName', width: 100 },
     {
-      title: '額外授權模型', dataIndex: 'extraModelIds', width: 280,
+      title: t('aiQuotaAuth.extraAuthModelsCol'), dataIndex: 'extraModelIds', width: 280,
       render: (v: string[]) => (v.length ? v.map((id) => <Tag key={id} color="orange">{modelName[id] ?? id}</Tag>) : <span style={{ color: '#BFBFBF' }}>--</span>),
     },
-    { title: '備註', dataIndex: 'remark', ellipsis: true },
+    { title: t('aiQuotaAuth.remarkCol'), dataIndex: 'remark', ellipsis: true },
     {
-      title: '操作', key: 'action', width: 110, align: 'center',
+      title: t('common.action'), key: 'action', width: 110, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleOverrideEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => { setOverrides((prev) => prev.filter((o) => o.username !== row.username)); message.success('已移除該員工的額外授權') }}>移除</Button>
+          <Button type="link" onClick={() => handleOverrideEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => { setOverrides((prev) => prev.filter((o) => o.username !== row.username)); message.success(t('aiQuotaAuth.overrideRemoved')) }}>{t('common.remove')}</Button>
         </Space>
       ),
     },
   ]
 
   const policyColumns: ColumnsType<QuotaPolicy> = [
-    { title: '策略名稱', dataIndex: 'name', width: 170 },
+    { title: t('aiQuotaAuth.strategyNameCol'), dataIndex: 'name', width: 170 },
     {
-      title: '適用範圍', key: 'scope', width: 150,
+      title: t('aiQuotaAuth.scopeCol'), key: 'scope', width: 150,
       render: (_, row) => <span>{QUOTA_SCOPE_LABEL[row.scopeType]}{row.scopeType !== 'company' ? ` · ${row.scopeName}` : ''}</span>,
     },
-    { title: '週期', dataIndex: 'period', width: 70, align: 'center', render: (v: QuotaPeriod) => QUOTA_PERIOD_LABEL[v] },
+    { title: t('aiQuotaAuth.periodShortCol'), dataIndex: 'period', width: 70, align: 'center', render: (v: QuotaPeriod) => QUOTA_PERIOD_LABEL[v] },
     {
-      title: '限額', key: 'quota', width: 160, align: 'right',
+      title: t('aiQuotaAuth.quotaShortCol'), key: 'quota', width: 160, align: 'right',
       render: (_, row) => {
         if (row.quotaType === 'cost') return `${CURRENCY_SYMBOL[row.currency]}${row.quotaValue.toLocaleString()} / ${QUOTA_PERIOD_LABEL[row.period]}`
         return `${row.quotaValue.toLocaleString()} ${QUOTA_TYPE_LABEL[row.quotaType]} / ${QUOTA_PERIOD_LABEL[row.period]}`
       },
     },
-    { title: '軟提醒', key: 'soft', width: 90, align: 'center', render: (_, row) => `${row.softThreshold}%` },
+    { title: t('aiQuotaAuth.softAlertCol'), key: 'soft', width: 90, align: 'center', render: (_, row) => `${row.softThreshold}%` },
     {
-      title: '超額動作', dataIndex: 'overLimitAction', width: 110, align: 'center',
+      title: t('aiQuotaAuth.overLimitCol'), dataIndex: 'overLimitAction', width: 110, align: 'center',
       render: (v: OverLimitAction, row) => (
         <Tag color={OVER_LIMIT_TAG[v]}>
           {OVER_LIMIT_ACTION_LABEL[v]}{v === 'downgrade' && row.downgradeModelId ? ` · ${modelName[row.downgradeModelId] ?? row.downgradeModelId}` : ''}
@@ -326,15 +328,15 @@ export default function AiQuotaAuth() {
       ),
     },
     {
-      title: '狀態', dataIndex: 'status', width: 80, align: 'center',
-      render: (_, row) => <Switch checked={row.status === 1} checkedChildren="啟用" unCheckedChildren="停用" onChange={() => handlePolicyToggle(row)} />,
+      title: t('aiQuotaAuth.statusCol'), dataIndex: 'status', width: 80, align: 'center',
+      render: (_, row) => <Switch checked={row.status === 1} checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} onChange={() => handlePolicyToggle(row)} />,
     },
     {
-      title: '操作', key: 'action', width: 110, align: 'center',
+      title: t('common.action'), key: 'action', width: 110, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => openPolicyForm(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handlePolicyDelete(row)}>刪除</Button>
+          <Button type="link" onClick={() => openPolicyForm(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handlePolicyDelete(row)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -350,14 +352,14 @@ export default function AiQuotaAuth() {
           /* ── Tab1: 模型授權 ── */
           {
             key: 'auth',
-            label: '模型授權',
+            label: t('aiQuotaAuth.modelAuthTab'),
             children: (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
                   {/* 部門列表 */}
                   <div style={{ border: '1px solid #F0F0F0', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
                     <div style={{ padding: '10px 16px', borderBottom: '1px solid #F0F0F0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <TeamOutlined style={{ color: '#E8720C' }} />部門
+                      <TeamOutlined style={{ color: '#E8720C' }} />{t('aiQuotaAuth.deptLabel')}
                     </div>
                     {deptAuths.map((d) => (
                       <div
@@ -372,9 +374,9 @@ export default function AiQuotaAuth() {
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>{d.deptName}</span>
-                          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{d.employeeCount} 人</span>
+                          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.personCount', { count: d.employeeCount })}</span>
                         </div>
-                        {d.dataResidency && <Tag color="purple" style={{ marginTop: 4 }}>數據不出域</Tag>}
+                        {d.dataResidency && <Tag color="purple" style={{ marginTop: 4 }}>{t('aiQuotaAuth.dataResidencyTag')}</Tag>}
                       </div>
                     ))}
                   </div>
@@ -384,12 +386,12 @@ export default function AiQuotaAuth() {
                     {selectedDeptId ? (
                       <>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                          <div style={{ fontSize: 15, fontWeight: 600 }}>{deptAuths.find((d) => d.deptId === selectedDeptId)?.deptName} · 可用模型</div>
-                          <Button type="primary" onClick={handleDeptAuthSave}>保存</Button>
+                          <div style={{ fontSize: 15, fontWeight: 600 }}>{deptAuths.find((d) => d.deptId === selectedDeptId)?.deptName} · {t('aiQuotaAuth.availableModels')}</div>
+                          <Button type="primary" onClick={handleDeptAuthSave}>{t('common.save')}</Button>
                         </div>
                         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                           <Switch size="small" checked={draftResidency} onChange={setDraftResidency} />
-                          <span style={{ fontSize: 13 }}>數據不出域（開啟後僅可勾選私有化部署模型，敏感數據不出企業內網）</span>
+                          <span style={{ fontSize: 13 }}>{t('aiQuotaAuth.dataResidencyHint')}</span>
                         </div>
                         <Checkbox.Group
                           value={draftModelIds}
@@ -403,7 +405,7 @@ export default function AiQuotaAuth() {
                                 <span>
                                   <span style={{ fontWeight: 500 }}>{m.displayName}</span>
                                   <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 6 }}>
-                                    {PROVIDER_TYPE_LABEL[modelProviderType[m.id]]} · {contextLengthText(m.contextLength)} 上下文
+                                    {PROVIDER_TYPE_LABEL[modelProviderType[m.id]]} · {contextLengthText(m.contextLength)} {t('aiQuotaAuth.contextSuffix')}
                                   </span>
                                 </span>
                               </label>
@@ -411,20 +413,20 @@ export default function AiQuotaAuth() {
                           </div>
                         </Checkbox.Group>
                         <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 12 }}>
-                          部門授權為該部門員工的基礎權限；個別員工可在下方「員工覆蓋」中追加授權。模型選擇器僅展示已授權模型。
+                          {t('aiQuotaAuth.deptAuthNote')}
                         </div>
                       </>
                     ) : (
-                      <div style={{ padding: '60px 0', textAlign: 'center', color: '#8C8C8C' }}>請選擇左側部門配置可用模型</div>
+                      <div style={{ padding: '60px 0', textAlign: 'center', color: '#8C8C8C' }}>{t('aiQuotaAuth.selectDeptHint')}</div>
                     )}
                   </div>
                 </div>
 
                 {/* 員工覆蓋 */}
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', margin: '24px 0 12px' }}>員工覆蓋（額外授權）</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#262626', margin: '24px 0 12px' }}>{t('aiQuotaAuth.overrideSectionTitle')}</div>
                 <div className="action-section">
                   <div className="action-section-right">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => message.info('新增員工覆蓋將在後端網關落地後正式支持，當前為介面演示')}>新增</Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => message.info(t('aiQuotaAuth.newOverrideHint'))}>{t('common.add')}</Button>
                     {overrideConfigComponent}
                   </div>
                 </div>
@@ -436,31 +438,31 @@ export default function AiQuotaAuth() {
           /* ── Tab2: 額度策略 ── */
           {
             key: 'quota',
-            label: '額度策略',
+            label: t('aiQuotaAuth.quotaStrategyTab'),
             children: (
               <>
                 <div className="search-section">
                   <Form layout="inline">
-                    <Form.Item label="策略名稱">
-                      <Input value={policyQuery} placeholder="請輸入策略名稱" allowClear onChange={(e) => setPolicyQuery(e.target.value)} />
+                    <Form.Item label={t('aiQuotaAuth.strategyNameCol')}>
+                      <Input value={policyQuery} placeholder={t('aiQuotaAuth.strategyNamePh')} allowClear onChange={(e) => setPolicyQuery(e.target.value)} />
                     </Form.Item>
                     <Form.Item>
                       <div className="search-actions">
-                        <Button type="primary" icon={<SearchOutlined />}>查詢</Button>
-                        <Button icon={<ReloadOutlined />} onClick={() => setPolicyQuery('')}>重置</Button>
+                        <Button type="primary" icon={<SearchOutlined />}>{t('common.query')}</Button>
+                        <Button icon={<ReloadOutlined />} onClick={() => setPolicyQuery('')}>{t('common.reset')}</Button>
                       </div>
                     </Form.Item>
                   </Form>
                 </div>
                 <div className="action-section">
                   <div className="action-section-right">
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openPolicyForm('new')}>新增</Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openPolicyForm('new')}>{t('common.add')}</Button>
                     {policyConfigComponent}
                   </div>
                 </div>
                 <Table rowKey="id" size="middle" loading={loading} columns={policyColumns} dataSource={filteredPolicies} pagination={false} />
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 12 }}>
-                  額度由網關在每次請求前檢查（員工級與部門級同時生效，先到先限）；達到軟提醒閾值時通知員工與主管。
+                  {t('aiQuotaAuth.quotaPolicyNote')}
                 </div>
               </>
             ),
@@ -469,15 +471,15 @@ export default function AiQuotaAuth() {
           /* ── Tab3: 路由策略 ── */
           {
             key: 'route',
-            label: '路由策略',
+            label: t('aiQuotaAuth.routeTab'),
             children: (
               <>
                 <Alert
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="Auto 路由策略"
-                  description="「智能路由」在員工已授權的模型範圍內按以下模型池順序調度；故障時自動切換到池內下一個模型並記錄切換日誌。"
+                  message={t('aiQuotaAuth.autoRouteAlert')}
+                  description={t('aiQuotaAuth.autoRouteDesc')}
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                   {strategies.map((s) => (
@@ -485,9 +487,9 @@ export default function AiQuotaAuth() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <div style={{ fontSize: 15, fontWeight: 600 }}>
                           {s.name}
-                          {s.isDefault && <Tag color="orange" style={{ marginLeft: 8 }}>預設</Tag>}
+                          {s.isDefault && <Tag color="orange" style={{ marginLeft: 8 }}>{t('aiQuotaAuth.defaultTag')}</Tag>}
                         </div>
-                        <Radio checked={s.isDefault} onChange={() => handleDefaultStrategy(s.id as 'cost' | 'performance')}>設為預設</Radio>
+                        <Radio checked={s.isDefault} onChange={() => handleDefaultStrategy(s.id as 'cost' | 'performance')}>{t('aiQuotaAuth.setDefaultBtn')}</Radio>
                       </div>
                       <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>{s.desc}</div>
                       {s.modelPool.map((modelId, index) => (
@@ -508,27 +510,27 @@ export default function AiQuotaAuth() {
           /* ── Tab4: 賬號白名單 ── */
           {
             key: 'whitelist',
-            label: '賬號白名單',
+            label: t('aiQuotaAuth.whitelistTab'),
             children: (
               <>
                 <Alert
                   type="warning"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="兜底白名單（過渡期保留）"
-                  description="白名單為全賬號權限的最後一道閘門（空 = 全部賬號可用），由網關以登錄 JWT 服務端判定，防冒名。後端網關遷移完成後，本頁將接管「能耗管控」中的白名單配置，舊頁面隨之下線。"
+                  message={t('aiQuotaAuth.whitelistAlertTitle')}
+                  description={t('aiQuotaAuth.whitelistAlertDesc')}
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
                   {whitelists.map((w) => (
                     <div key={w.modelId} style={{ border: '1px solid #F0F0F0', borderRadius: 8, padding: 20, background: '#fff' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                         <div style={{ fontSize: 15, fontWeight: 600 }}>{modelName[w.modelId] ?? w.modelId}</div>
-                        <Tag color={w.accounts.length ? 'warning' : 'success'}>{w.accounts.length ? `限 ${w.accounts.length} 個賬號` : '全部賬號可用'}</Tag>
+                        <Tag color={w.accounts.length ? 'warning' : 'success'}>{w.accounts.length ? t('aiQuotaAuth.limitedAccounts', { count: w.accounts.length }) : t('aiQuotaAuth.allAccountsAvailable')}</Tag>
                       </div>
                       <Select
                         mode="tags"
                         style={{ width: '100%' }}
-                        placeholder="輸入賬號後回車添加，留空表示全部賬號可用"
+                        placeholder={t('aiQuotaAuth.whitelistPlaceholder')}
                         value={w.accounts}
                         onChange={(values) => handleWhitelistChange(w.modelId, values)}
                         open={false}
@@ -545,49 +547,49 @@ export default function AiQuotaAuth() {
 
       {/* 員工覆蓋編輯彈窗 */}
       <Modal
-        title="編輯員工額外授權"
+        title={t('aiQuotaAuth.editOverrideTitle')}
         open={editingOverride !== null}
         onOk={handleOverrideSave}
         onCancel={() => setEditingOverride(null)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         destroyOnHidden
       >
         <Form form={overrideForm} layout="vertical">
-          <Form.Item name="username" label="賬號">
+          <Form.Item name="username" label={t('aiQuotaAuth.accountLabel')}>
             <Input disabled />
           </Form.Item>
-          <Form.Item name="extraModelIds" label="額外授權模型（在部門授權基礎上追加）">
+          <Form.Item name="extraModelIds" label={t('aiQuotaAuth.extraAuthLabel')}>
             <Select
               mode="multiple"
-              placeholder="請選擇模型"
+              placeholder={t('aiQuotaAuth.selectModelPh')}
               allowClear
               options={models.map((m) => ({ value: m.id, label: m.displayName }))}
             />
           </Form.Item>
-          <Form.Item name="remark" label="備註">
-            <Input placeholder="請輸入備註" />
+          <Form.Item name="remark" label={t('aiQuotaAuth.remarkCol')}>
+            <Input placeholder={t('aiQuotaAuth.remarkPh')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* 額度策略新增/編輯彈窗 */}
       <Modal
-        title={editingPolicy === 'new' ? '新增額度策略' : '編輯額度策略'}
+        title={editingPolicy === 'new' ? t('aiQuotaAuth.addQuotaStrategy') : t('aiQuotaAuth.editQuotaStrategy')}
         open={editingPolicy !== null}
         onOk={handlePolicySave}
         onCancel={() => setEditingPolicy(null)}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         width={560}
         destroyOnHidden
       >
         <Form form={policyForm} layout="vertical" initialValues={{ scopeType: 'company', period: 'daily', quotaType: 'token', currency: 'CNY', softThreshold: 80, overLimitAction: 'reject' }}>
-          <Form.Item name="name" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
-            <Input placeholder="如：普通員工日限額" />
+          <Form.Item name="name" label={t('aiQuotaAuth.strategyNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.strategyNamePh') }]}>
+            <Input placeholder={t('aiQuotaAuth.strategyNameExample')} />
           </Form.Item>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="scopeType" label="適用範圍類型" rules={[{ required: true }]}>
+            <Form.Item name="scopeType" label={t('aiQuotaAuth.scopeTypeLabel')} rules={[{ required: true }]}>
               <Select options={Object.entries(QUOTA_SCOPE_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
             <Form.Item
@@ -595,24 +597,24 @@ export default function AiQuotaAuth() {
               shouldUpdate={(prev, cur) => prev.scopeType !== cur.scopeType}
             >
               {({ getFieldValue }) => getFieldValue('scopeType') === 'company' ? (
-                <Form.Item label="適用對象"><Input disabled value="全員" /></Form.Item>
+                <Form.Item label={t('aiQuotaAuth.scopeTargetLabel')}><Input disabled value={t('aiQuotaAuth.allStaff')} /></Form.Item>
               ) : (
-                <Form.Item name="scopeName" label="適用對象" rules={[{ required: true, message: '請輸入部門或員工' }]}>
-                  <Input placeholder={getFieldValue('scopeType') === 'dept' ? '如：運營部' : '如：陳偉、劉陽等 5 人'} />
+                <Form.Item name="scopeName" label={t('aiQuotaAuth.scopeTargetLabel')} rules={[{ required: true, message: t('aiQuotaAuth.scopeTargetRequired') }]}>
+                  <Input placeholder={getFieldValue('scopeType') === 'dept' ? t('aiQuotaAuth.scopeDeptExample') : t('aiQuotaAuth.scopeEmpExample')} />
                 </Form.Item>
               )}
             </Form.Item>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="period" label="限額週期" rules={[{ required: true }]}>
+            <Form.Item name="period" label={t('aiQuotaAuth.quotaPeriodLabel')} rules={[{ required: true }]}>
               <Select options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
-            <Form.Item name="quotaType" label="限額類型" rules={[{ required: true }]}>
+            <Form.Item name="quotaType" label={t('aiQuotaAuth.quotaTypeLabel')} rules={[{ required: true }]}>
               <Select options={Object.entries(QUOTA_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="quotaValue" label="限額值" rules={[{ required: true, message: '請輸入限額值' }]}>
+            <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
               <InputNumber style={{ width: '100%' }} min={1} />
             </Form.Item>
             <Form.Item
@@ -620,23 +622,23 @@ export default function AiQuotaAuth() {
               shouldUpdate={(prev, cur) => prev.quotaType !== cur.quotaType}
             >
               {({ getFieldValue }) => getFieldValue('quotaType') === 'cost' ? (
-                <Form.Item name="currency" label="計價幣種" rules={[{ required: true }]}>
-                  <Select options={[{ value: 'CNY', label: 'CNY（人民幣）' }, { value: 'USD', label: 'USD（美元）' }]} />
+                <Form.Item name="currency" label={t('aiQuotaAuth.currencyLabel')} rules={[{ required: true }]}>
+                  <Select options={[{ value: 'CNY', label: t('aiQuotaAuth.cnyOption') }, { value: 'USD', label: t('aiQuotaAuth.usdOption') }]} />
                 </Form.Item>
               ) : (
-                <Form.Item label="軟提醒閾值（%）"><Input disabled value="見下方" /></Form.Item>
+                <Form.Item label={t('aiQuotaAuth.softThresholdPercent')}><Input disabled value={t('aiQuotaAuth.seeBelow')} /></Form.Item>
               )}
             </Form.Item>
           </div>
-          <Form.Item name="softThreshold" label="軟限額提醒閾值（達到後通知員工與主管）" rules={[{ required: true }]}>
+          <Form.Item name="softThreshold" label={t('aiQuotaAuth.softThresholdLabel')} rules={[{ required: true }]}>
             <Radio.Group options={[{ value: 60, label: '60%' }, { value: 80, label: '80%' }, { value: 90, label: '90%' }]} />
           </Form.Item>
-          <Form.Item name="overLimitAction" label="超額後動作" rules={[{ required: true }]}>
+          <Form.Item name="overLimitAction" label={t('aiQuotaAuth.overLimitLabel')} rules={[{ required: true }]}>
             <Radio.Group>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <Radio value="reject">拒絕請求：直接提示「額度已用完」</Radio>
-                <Radio value="approve">進入審批：員工可申請臨時提升額度，主管審批</Radio>
-                <Radio value="downgrade">自動降級：切換到更便宜的模型繼續對話</Radio>
+                <Radio value="reject">{t('aiQuotaAuth.overLimitReject')}</Radio>
+                <Radio value="approve">{t('aiQuotaAuth.overLimitApprove')}</Radio>
+                <Radio value="downgrade">{t('aiQuotaAuth.overLimitDowngrade')}</Radio>
               </div>
             </Radio.Group>
           </Form.Item>
@@ -646,11 +648,11 @@ export default function AiQuotaAuth() {
           >
             {({ getFieldValue }) => getFieldValue('overLimitAction') === 'downgrade' ? (
               <>
-                <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}>
-                  <Select placeholder="請選擇降級目標模型" options={models.map((m) => ({ value: m.id, label: m.displayName }))} />
+                <Form.Item name="downgradeModelId" label={t('aiQuotaAuth.downgradeTargetModel')} rules={[{ required: true, message: t('aiQuotaAuth.selectDowngradeModel') }]}>
+                  <Select placeholder={t('aiQuotaAuth.selectDowngradeModel')} options={models.map((m) => ({ value: m.id, label: m.displayName }))} />
                 </Form.Item>
-                <Form.Item name="downgradeExemptQuota" label="降級豁免額度" tooltip="主額度用完後，降級模型可獨立使用的額外額度（跟隨主額度分配方式）">
-                  <InputNumber min={0} style={{ width: '100%' }} placeholder="留空表示不設獨立豁免額度" />
+                <Form.Item name="downgradeExemptQuota" label={t('aiQuotaAuth.downgradeExemptQuota')} tooltip={t('aiQuotaAuth.downgradeExemptTooltip')}>
+                  <InputNumber min={0} style={{ width: '100%' }} placeholder={t('aiQuotaAuth.noExemptQuotaPh')} />
                 </Form.Item>
               </>
             ) : null}

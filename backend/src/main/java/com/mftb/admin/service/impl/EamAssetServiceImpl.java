@@ -7,14 +7,17 @@ import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamAssetService;
+import com.mftb.admin.service.SysCompanyBrandService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeanWrapper;
 import org.springframework.beans.BeanWrapperImpl;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EamAssetServiceImpl implements EamAssetService {
@@ -34,6 +38,8 @@ public class EamAssetServiceImpl implements EamAssetService {
     private final EamBrandMapper brandMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
+    private final JdbcTemplate jdbcTemplate;
+    private final SysCompanyBrandService companyBrandService;
     private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped");
 
     @Override
@@ -44,7 +50,13 @@ public class EamAssetServiceImpl implements EamAssetService {
         List<Long> batchIds = page.getRecords().stream().map(EamAsset::getBatchId).filter(Objects::nonNull).distinct().toList();
         Map<Long, EamInboundBatch> batches = batchIds.isEmpty() ? Map.of() : batchMapper.selectBatchIds(batchIds)
                 .stream().collect(Collectors.toMap(EamInboundBatch::getId, b -> b));
-        return new PageResult<>(page.getRecords().stream().map(a -> toVO(a, a.getBatchId() == null ? null : batches.get(a.getBatchId()))).toList(), page.getTotal());
+        List<Long> locationIds = page.getRecords().stream().map(EamAsset::getLocationId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, EamLocation> locations = locationIds.isEmpty() ? Map.of() : locationMapper.selectBatchIds(locationIds)
+                .stream().collect(Collectors.toMap(EamLocation::getId, l -> l));
+        return new PageResult<>(page.getRecords().stream().map(a -> toVO(a,
+                a.getBatchId() == null ? null : batches.get(a.getBatchId()),
+                a.getLocationId() == null ? null : locations.get(a.getLocationId())
+        )).toList(), page.getTotal());
     }
 
     @Override
@@ -62,7 +74,8 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Override
     public EamAssetVO detail(long id) {
         EamAsset asset = requireAsset(id);
-        return toVO(asset, asset.getBatchId() == null ? null : batchMapper.selectById(asset.getBatchId()));
+        EamLocation location = asset.getLocationId() == null ? null : locationMapper.selectById(asset.getLocationId());
+        return toVO(asset, asset.getBatchId() == null ? null : batchMapper.selectById(asset.getBatchId()), location);
     }
 
     @Override
@@ -74,7 +87,9 @@ public class EamAssetServiceImpl implements EamAssetService {
         asset.setHoldType("owned");
         asset.setPurchaseValue(BigDecimal.ZERO);
         apply(dto, asset);
-        if (!hasText(asset.getAssetNo())) asset.setAssetNo(bizSeqService.next(BizSeqService.RULE_EAM_ASSET));
+        if (!hasText(asset.getAssetNo())) {
+            asset.setAssetNo(generateAssetNo(asset.getCompanyBrand(), asset.getLocationId(), asset.getCategoryCode()));
+        }
         validate(asset);
         if (!isAssetNoUnique(asset.getAssetNo(), null)) throw new BusinessException("資產編號已存在");
         try {
@@ -90,6 +105,10 @@ public class EamAssetServiceImpl implements EamAssetService {
     public void update(long id, EamAssetSaveDTO dto) {
         EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, id).last("FOR UPDATE"));
         if (asset == null) throw new BusinessException("資產不存在");
+        // 领用状态机保护：有活跃领用的资产不可编辑
+        if (asset.getActiveClaimId() != null) {
+            throw new BusinessException("該資產正在領用中，不可編輯；請先歸還後再修改");
+        }
         if (asset.getBatchId() != null && dto.getAssetNo() != null && !Objects.equals(asset.getAssetNo(), dto.getAssetNo().trim())) {
             throw new BusinessException("驗收入庫資產編號不可修改");
         }
@@ -108,6 +127,9 @@ public class EamAssetServiceImpl implements EamAssetService {
     public void delete(long id) {
         EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, id).last("FOR UPDATE"));
         if (asset == null) throw new BusinessException("資產不存在");
+        if (asset.getActiveClaimId() != null) {
+            throw new BusinessException("該資產正在領用中，不可刪除；請先歸還後再刪除");
+        }
         if (!"idle".equals(asset.getStatus())) throw new BusinessException("僅閒置資產可刪除");
         assetMapper.deleteById(id);
     }
@@ -186,7 +208,7 @@ public class EamAssetServiceImpl implements EamAssetService {
         validateDate(asset.getScrapTime());
     }
 
-    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch) {
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location) {
         EamAssetVO vo = new EamAssetVO();
         BeanUtils.copyProperties(asset, vo, "params", "rentalPeriod", "createdAt", "updatedAt");
         Map<String, String> params = new LinkedHashMap<>();
@@ -203,7 +225,17 @@ public class EamAssetServiceImpl implements EamAssetService {
             vo.setInboundQty(1);
             vo.setInspector(batch.getOperator());
         }
+        if (location != null) {
+            vo.setProvince(location.getProvince());
+            vo.setCity(location.getCity());
+            vo.setDistrict(location.getDistrict());
+            vo.setAddress(location.getAddress());
+        }
         return vo;
+    }
+
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch) {
+        return toVO(asset, batch, null);
     }
 
     private LambdaQueryWrapper<EamAsset> queryWrapper(EamAssetQuery q) {
@@ -236,5 +268,47 @@ public class EamAssetServiceImpl implements EamAssetService {
     private LocalDate date(String value) {
         try { return LocalDate.parse(value); }
         catch (RuntimeException e) { throw new BusinessException("日期格式應為 yyyy-MM-dd"); }
+    }
+
+    /* ==================== 資產編號生成（新規則） ==================== */
+
+    /**
+     * 生成資產編號: {品牌編碼}-{倉庫編碼}-{分類碼}-{4位分類內序號}
+     * 示例: TB-ZH-0101-0001（閃蜂-珠海倉庫-手機分類-第1台）
+     */
+    @Override
+    public String generateAssetNo(Integer companyBrand, Long locationId, String categoryCode) {
+        // 优先从 sys_company_brand 表获取品牌编码，失败时回退到静态映射
+        String brandCode = companyBrandService.getCodeById(companyBrand != null ? companyBrand.longValue() : null);
+        if ("XX".equals(brandCode) && companyBrand != null) {
+            log.warn("公司品牌缓存未命中(id={}), 回退到静态映射", companyBrand);
+            brandCode = BizSeqService.companyBrandCode(companyBrand);
+        }
+        String warehouseCode = resolveWarehouseCode(locationId);
+        String catCode = (categoryCode != null && !categoryCode.isBlank()) ? categoryCode : "00";
+        String prefix = brandCode + "-" + warehouseCode + "-" + catCode + "-";
+        int maxSeq = findMaxAssetSeq(prefix);
+        return prefix + String.format("%04d", maxSeq + 1);
+    }
+
+    /** 向上遍歷 location 樹找到頂層倉庫（parentId=0）的 code */
+    private String resolveWarehouseCode(Long locationId) {
+        if (locationId == null) return "00";
+        EamLocation loc = locationMapper.selectById(locationId);
+        while (loc != null && loc.getParentId() != null && loc.getParentId() != 0) {
+            loc = locationMapper.selectById(loc.getParentId());
+        }
+        return (loc != null && loc.getCode() != null && !loc.getCode().isBlank()) ? loc.getCode() : "00";
+    }
+
+    /** 按前綴查 biz_eam_asset 表內最大序號（排除軟刪除） */
+    private int findMaxAssetSeq(String prefix) {
+        String likePattern = prefix + "%";
+        int offset = prefix.length();
+        Integer max = jdbcTemplate.queryForObject(
+                "SELECT IFNULL(MAX(CAST(SUBSTRING(asset_no, ?) AS UNSIGNED)), 0) "
+                        + "FROM biz_eam_asset WHERE asset_no LIKE ? AND deleted = 0",
+                Integer.class, offset + 1, likePattern);
+        return max == null ? 0 : max;
     }
 }

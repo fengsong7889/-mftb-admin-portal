@@ -18,7 +18,14 @@ import {
   fetchAssetDetail, fetchRepairList, repairAsset, finishRepair, type AssetItem, type AssetRepairRecord,
 } from '../../../api/asset'
 
-const REPAIR_BY_OPTIONS = ['HP 授权维修点', 'Dell 售后', '联想服务中心', 'Apple Store', '自修', '其他第三方']
+const REPAIR_BY_OPTIONS = [
+  { value: 'HP 授权维修点', labelKey: 'repairByHp' },
+  { value: 'Dell 售后', labelKey: 'repairByDell' },
+  { value: '联想服务中心', labelKey: 'repairByLenovo' },
+  { value: 'Apple Store', labelKey: 'repairByApple' },
+  { value: '自修', labelKey: 'repairBySelf' },
+  { value: '其他第三方', labelKey: 'repairByOther' },
+]
 
 interface FormValues {
   repairDate: Dayjs
@@ -201,7 +208,7 @@ export default function RepairDetail({ assetId, onBack }: Props) {
             <Col span={12}>
               <Form.Item label={t('asset.colRepairBy')} name="repairBy" rules={[{ required: true, message: t('asset.repairByRequired') }]}>
                 <Select placeholder={t('asset.repairByPh')}>
-                  {REPAIR_BY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
+                  {REPAIR_BY_OPTIONS.map((o) => <Select.Option key={o.value} value={o.value}>{t(`asset.${o.labelKey}`)}</Select.Option>)}
                 </Select>
               </Form.Item>
             </Col>

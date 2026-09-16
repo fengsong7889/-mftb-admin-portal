@@ -8,6 +8,7 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.EamInboundCreateDTO;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
+import com.mftb.admin.service.EamAssetService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -44,6 +47,7 @@ class EamInboundServiceImplTest {
     @Mock private EamAssetMapper assetMapper;
     @Mock private EamLocationMapper locationMapper;
     @Mock private EamModelMapper modelMapper;
+    @Mock private EamAssetService assetService;
     @Mock private OperatorResolver operatorResolver;
     @Mock private BizSeqService bizSeqService;
     @InjectMocks private EamInboundServiceImpl service;
@@ -145,7 +149,8 @@ class EamInboundServiceImplTest {
         when(orderItemMapper.selectList(any()))
                 .thenReturn(List.of(item(10L, MODEL_ID, 3, 0)))
                 .thenReturn(List.of(item(10L, MODEL_ID, 3, 3)));
-        when(bizSeqService.next(BizSeqService.RULE_EAM_ASSET)).thenReturn("FA0001", "FA0002", "FA0003");
+        when(assetService.generateAssetNo(any(), any(), any()))
+                .thenReturn("TB-ZH-EC-0001", "TB-ZH-EC-0002", "TB-ZH-EC-0003");
         when(orderItemMapper.update(isNull(), any())).thenReturn(1);
 
         Map<String, Object> result = service.createBatch(dto(new ArrayList<>(List.of(dtoItem(10L, 3, "pass", true)))));
@@ -165,6 +170,10 @@ class EamInboundServiceImplTest {
             assertEquals("電子設備", a.getAssetType());
             assertEquals("EC", a.getCategoryCode());
             assertEquals("Apple", a.getBrand());
+            assertEquals(8L, a.getBrandId());
+            assertEquals(1, a.getCompanyBrand());
+            assertEquals("物資部", a.getDepartment());
+            assertNull(a.getUserName());
             assertEquals("倉庫A", a.getLocation());
             assertEquals(LOCATION_ID, a.getLocationId());
             assertEquals("台", a.getUnit());
@@ -174,7 +183,7 @@ class EamInboundServiceImplTest {
             assertEquals("張三", a.getUpdatedBy());
             nos.add(a.getAssetNo());
         }
-        assertEquals(List.of("FA0001", "FA0002", "FA0003"), nos);
+        assertEquals(List.of("TB-ZH-EC-0001", "TB-ZH-EC-0002", "TB-ZH-EC-0003"), nos);
 
         // 批次统计与生成资产一致
         ArgumentCaptor<EamInboundBatch> batchCaptor = ArgumentCaptor.forClass(EamInboundBatch.class);
@@ -202,10 +211,13 @@ class EamInboundServiceImplTest {
     @Test
     void returnDispositionCountsSeparatelyAndLeavesOrderPartial() {
         when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
+        EamPurchaseOrderItem updatedItem = item(10L, MODEL_ID, 4, 2);
+        updatedItem.setReturnedQty(1);
         when(orderItemMapper.selectList(any()))
-                .thenReturn(List.of(item(10L, MODEL_ID, 3, 0)))
-                .thenReturn(List.of(item(10L, MODEL_ID, 3, 2)));
-        when(bizSeqService.next(BizSeqService.RULE_EAM_ASSET)).thenReturn("FA0001", "FA0002");
+                .thenReturn(List.of(item(10L, MODEL_ID, 4, 0)))
+                .thenReturn(List.of(updatedItem));
+        when(assetService.generateAssetNo(any(), any(), any()))
+                .thenReturn("TB-ZH-EC-0001", "TB-ZH-EC-0002");
         when(orderItemMapper.update(isNull(), any())).thenReturn(1);
 
         List<EamInboundCreateDTO.InboundItem> items = new ArrayList<>();
@@ -228,6 +240,94 @@ class EamInboundServiceImplTest {
         verify(orderMapper).update(isNull(), oc.capture());
         assertTrue(((LambdaUpdateWrapper<EamPurchaseOrder>) oc.getValue())
                 .getParamNameValuePairs().containsValue("partial"));
+    }
+
+    @Test
+    void allReturnedCompletesOrderWithoutCreatingAssets() {
+        when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
+        EamPurchaseOrderItem returned = item(10L, MODEL_ID, 2, 0);
+        returned.setReturnedQty(2);
+        when(orderItemMapper.selectList(any()))
+                .thenReturn(List.of(item(10L, MODEL_ID, 2, 0)))
+                .thenReturn(List.of(returned));
+
+        Map<String, Object> result = service.createBatch(dto(List.of(dtoItem(10L, 2, "return", false))));
+
+        assertEquals(0, result.get("generatedAssetCount"));
+        verify(assetMapper, never()).insert(any(EamAsset.class));
+        ArgumentCaptor<EamInboundBatch> batch = ArgumentCaptor.forClass(EamInboundBatch.class);
+        verify(batchMapper).insert(batch.capture());
+        assertEquals(0, batch.getValue().getAcceptedQty());
+        assertEquals(2, batch.getValue().getReturnQty());
+        ArgumentCaptor<Wrapper<EamPurchaseOrder>> update = orderUpdateCaptor();
+        verify(orderMapper).update(isNull(), update.capture());
+        assertTrue(((LambdaUpdateWrapper<EamPurchaseOrder>) update.getValue())
+                .getParamNameValuePairs().containsValue("received"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"exchange", "concession"})
+    void nonAcceptedDispositionDoesNotCreateAssetsOrFinishOrder(String disposition) {
+        when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(item(10L, MODEL_ID, 2, 0)));
+
+        Map<String, Object> result = service.createBatch(dto(List.of(dtoItem(10L, 2, disposition, false))));
+
+        assertEquals(0, result.get("generatedAssetCount"));
+        verify(assetMapper, never()).insert(any(EamAsset.class));
+        ArgumentCaptor<EamInboundBatch> batch = ArgumentCaptor.forClass(EamInboundBatch.class);
+        verify(batchMapper).insert(batch.capture());
+        assertEquals(0, batch.getValue().getAcceptedQty());
+        assertEquals(0, batch.getValue().getReturnQty());
+        assertEquals(2, batch.getValue().getPendingQty());
+        assertEquals("exchange".equals(disposition) ? 2 : 0, batch.getValue().getExchangeQty());
+        assertEquals("concession".equals(disposition) ? 2 : 0, batch.getValue().getConcessionQty());
+        ArgumentCaptor<EamInboundBatchItem> row = ArgumentCaptor.forClass(EamInboundBatchItem.class);
+        verify(batchItemMapper).insert(row.capture());
+        assertEquals("exchange".equals(disposition) ? "pending" : null, row.getValue().getExchangeStatus());
+        assertNull(row.getValue().getLocationId());
+        ArgumentCaptor<Wrapper<EamPurchaseOrder>> update = orderUpdateCaptor();
+        verify(orderMapper).update(isNull(), update.capture());
+        assertTrue(((LambdaUpdateWrapper<EamPurchaseOrder>) update.getValue())
+                .getParamNameValuePairs().containsValue("pending"));
+    }
+
+    @Test
+    void repeatedRowsMustShareTheRemainingQuantityIncludingPriorReturns() {
+        when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "partial"));
+        EamPurchaseOrderItem remaining = item(10L, MODEL_ID, 4, 1);
+        remaining.setReturnedQty(1);
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(remaining));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.createBatch(dto(List.of(
+                dtoItem(10L, 1, "pass", false), dtoItem(10L, 2, "return", false)))));
+
+        assertTrue(ex.getMessage().contains("超出訂單剩餘數量"));
+        verifyNoInteractions(batchMapper, batchItemMapper, assetMapper);
+        verify(orderItemMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void leaseSourceStillStartsIdleAndOwnedWithFallbackPrice() {
+        when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
+        EamPurchaseOrderItem leaseItem = item(10L, MODEL_ID, 1, 0);
+        leaseItem.setPurchaseType("lease");
+        leaseItem.setConfirmedPrice(null);
+        leaseItem.setParams("{\"storage\":\"256GB\"}");
+        when(orderItemMapper.selectList(any()))
+                .thenReturn(List.of(leaseItem)).thenReturn(List.of(item(10L, MODEL_ID, 1, 1)));
+        when(orderItemMapper.update(isNull(), any())).thenReturn(1);
+        when(assetService.generateAssetNo(any(), any(), any())).thenReturn("TB-ZH-EC-0001");
+
+        service.createBatch(dto(List.of(dtoItem(10L, 1, "pass", false))));
+
+        ArgumentCaptor<EamAsset> asset = ArgumentCaptor.forClass(EamAsset.class);
+        verify(assetMapper).insert(asset.capture());
+        assertEquals("lease", asset.getValue().getSource());
+        assertEquals("owned", asset.getValue().getHoldType());
+        assertEquals("idle", asset.getValue().getStatus());
+        assertEquals(leaseItem.getPrice(), asset.getValue().getPurchaseValue());
+        assertEquals(leaseItem.getParams(), asset.getValue().getParams());
     }
 
     @Test
@@ -261,7 +361,8 @@ class EamInboundServiceImplTest {
         when(orderItemMapper.selectList(any()))
                 .thenReturn(List.of(item(10L, MODEL_ID, 2, 0), item(11L, MODEL_ID, 2, 0)))
                 .thenReturn(List.of(item(10L, MODEL_ID, 2, 2), item(11L, MODEL_ID, 2, 1)));
-        when(bizSeqService.next(BizSeqService.RULE_EAM_ASSET)).thenReturn("FA0001", "FA0002", "FA0003");
+        when(assetService.generateAssetNo(any(), any(), any()))
+                .thenReturn("TB-ZH-EC-0001", "TB-ZH-EC-0002", "TB-ZH-EC-0003");
         when(orderItemMapper.update(isNull(), any())).thenReturn(1);
 
         List<EamInboundCreateDTO.InboundItem> items = new ArrayList<>();

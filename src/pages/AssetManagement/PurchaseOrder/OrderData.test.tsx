@@ -2,13 +2,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OrderDetail from './OrderDetail'
 import OrderEdit from './OrderEdit'
-import { fetchAllParamTypes, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, type PurchaseOrder } from '../../../api/eam'
+import { fetchAllParamTypes, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchSuppliersDropdown, type PurchaseOrder } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
-import { BrandEnum } from '../../../constants/brand'
 
 vi.mock('../../../api/eam')
 vi.mock('../../../api/employee')
 vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
+vi.mock('../../../contexts/CompanyBrandContext', () => ({
+  useCompanyBrand: () => ({
+    brands: [
+      { id: 1, code: 'TB', labelZh: '閃蜂', labelEn: 'FlashBee' },
+      { id: 2, code: 'MF', labelZh: 'mFood', labelEn: 'mFood' },
+    ],
+    numericOptions: [
+      { label: '閃蜂', value: 1, code: 'TB' },
+      { label: 'mFood', value: 2, code: 'MF' },
+    ],
+    codeMap: { 1: 'TB', 2: 'MF' },
+    labelMap: { 1: '閃蜂', 2: 'mFood' },
+    codeHint: { 1: 'TB', 2: 'MF' },
+    loaded: true,
+  }),
+}))
 vi.mock('react-i18next', () => {
   const t = (key: string) => key
   return { useTranslation: () => ({ t }) }
@@ -19,7 +34,7 @@ const order: PurchaseOrder = {
   poNo: 'DDCG202609150003',
   reqId: 3,
   reqNo: 'CG202609150002',
-  brand: BrandEnum.SHANFENG,
+  brand: 1,
   supplier: '待定供應商',
   amount: 0,
   deliveryDate: '',
@@ -33,6 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchPurchaseOrderDetail).mockResolvedValue({ ...order })
   vi.mocked(fetchAllParamTypes).mockResolvedValue([])
+  vi.mocked(fetchSuppliersDropdown).mockResolvedValue([])
   vi.mocked(fetchEmployees).mockResolvedValue({ records: [], total: 0 })
 })
 
@@ -60,13 +76,13 @@ describe('采购订单品牌与流程编号展示', () => {
   })
 
   it.each([
-    [BrandEnum.SHANFENG, '閃蜂'],
-    [BrandEnum.MFOOD, 'mFood'],
+    [1, '閃蜂'],
+    [2, 'mFood'],
   ] as const)('编辑表单回显品牌 %s（%s）', async (brand, label) => {
     vi.mocked(fetchPurchaseOrderDetail).mockResolvedValue({ ...order, brand })
     render(<OrderEdit id={30} onBack={vi.fn()} onSaved={vi.fn()} />)
 
-    const field = await screen.findByLabelText('所屬品牌')
+    const field = await screen.findByLabelText('asset.orderBrand')
     await waitFor(() => {
       const formItem = field.closest('.ant-form-item')
       expect(formItem).not.toBeNull()

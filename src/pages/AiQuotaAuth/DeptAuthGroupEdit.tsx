@@ -14,25 +14,26 @@ import {
   type ModelConfigItem,
   type DeptAuthGroupDetail,
 } from '../../api'
+import { useTranslation } from 'react-i18next'
 
 /* ────────────────── 能力常量 ────────────────── */
 
 /** 能力字段（与 AiModel / ModelAuthState 的能力键一致） */
 type CapabilityKey = 'visionSupport' | 'functionCalling' | 'jsonMode' | 'streaming' | 'thinkingMode'
 
-const CAPABILITY_FIELDS: { key: CapabilityKey; label: string; color: string; tip: string }[] = [
-  { key: 'visionSupport', label: '視覺理解', color: '#722ED1', tip: '模型可理解圖片內容' },
-  { key: 'functionCalling', label: '工具調用', color: '#1890FF', tip: '模型可調用外部工具/API' },
-  { key: 'jsonMode', label: 'JSON 模式', color: '#13C2C2', tip: '模型可輸出結構化 JSON' },
-  { key: 'streaming', label: '流式響應', color: '#52C41A', tip: '模型支持逐字輸出' },
-  { key: 'thinkingMode', label: '思考模式', color: '#E8720C', tip: '模型支持深度推理' },
+const CAPABILITY_FIELDS: { key: CapabilityKey; labelKey: string; color: string; tipKey: string }[] = [
+  { key: 'visionSupport', labelKey: 'capVision', color: '#722ED1', tipKey: 'capVisionTip' },
+  { key: 'functionCalling', labelKey: 'capFuncCall', color: '#1890FF', tipKey: 'capFuncCallTip' },
+  { key: 'jsonMode', labelKey: 'capJson', color: '#13C2C2', tipKey: 'capJsonTip' },
+  { key: 'streaming', labelKey: 'capStream', color: '#52C41A', tipKey: 'capStreamTip' },
+  { key: 'thinkingMode', labelKey: 'capThink', color: '#E8720C', tipKey: 'capThinkTip' },
 ]
 
 const MODEL_TYPE_TAG: Record<string, string> = {
   chat: 'processing', completion: 'blue', embedding: 'purple', token_count: 'default',
 }
-const MODEL_TYPE_LABEL: Record<string, string> = {
-  chat: '對話', completion: '文本生成', embedding: '向量嵌入', token_count: 'Token 計數',
+const MODEL_TYPE_LABEL_KEYS: Record<string, string> = {
+  chat: 'typeChat', completion: 'typeCompletion', embedding: 'typeEmbedding', token_count: 'typeTokenCount',
 }
 
 /** 模型授權配置狀態（加入列表即視為授權，包含能力開關） */
@@ -88,6 +89,7 @@ const buildDeptTree = (list: DeptOption[], selectedIds: number[]): DeptTreeNode[
 }
 
 export default function DeptAuthGroupEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const groupId = searchParams.get('id')
@@ -150,7 +152,7 @@ export default function DeptAuthGroupEdit() {
           }
         }))
       })
-      .catch(() => { if (!cancelled) message.error('加載數據失敗') })
+      .catch(() => { if (!cancelled) message.error(t('aiQuotaAuth.loadDataFailed')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [groupId, form])
@@ -174,7 +176,7 @@ export default function DeptAuthGroupEdit() {
       .filter((m) => !residencyOn || m.deployType === 'private')
       .map((m) => ({
         value: m.id,
-        label: `${m.name}${m.type ? `（${MODEL_TYPE_LABEL[m.type] || m.type}）` : ''}`,
+        label: `${m.name}${m.type ? `（${t('aiQuotaAuth.' + (MODEL_TYPE_LABEL_KEYS[m.type] || '')) || m.type}）` : ''}`,
       })),
     [models, modelAuths, residencyOn],
   )
@@ -203,7 +205,7 @@ export default function DeptAuthGroupEdit() {
     const removed = modelAuths.filter((a) => modelMap.get(a.modelId)?.deployType !== 'private')
     if (removed.length > 0) {
       setModelAuths((prev) => prev.filter((a) => modelMap.get(a.modelId)?.deployType === 'private'))
-      message.warning(`已開啟數據不出域，自動移除 ${removed.length} 個公有云模型`)
+      message.warning(t('aiQuotaAuth.residencyAutoRemoved', { count: removed.length }))
     }
   }
 
@@ -221,11 +223,11 @@ export default function DeptAuthGroupEdit() {
     const values = await form.validateFields()
 
     if (selectedDeptIds.length === 0) {
-      message.warning('請至少選擇一個部門')
+      message.warning(t('aiQuotaAuth.selectDeptWarning'))
       return
     }
     if (modelAuths.length === 0) {
-      message.warning('請至少添加一個授權模型')
+      message.warning(t('aiQuotaAuth.addModelWarning'))
       return
     }
 
@@ -256,14 +258,14 @@ export default function DeptAuthGroupEdit() {
     try {
       if (isEdit && groupId) {
         await updateDeptAuthGroup(Number(groupId), payload)
-        message.success('策略已保存')
+        message.success(t('aiQuotaAuth.strategySaved'))
       } else {
         await createDeptAuthGroup(payload)
-        message.success('策略已創建')
+        message.success(t('aiQuotaAuth.strategyCreated'))
       }
       navigate('/ai-dept-model-auth')
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '保存失敗')
+      message.error(err instanceof Error ? err.message : t('aiQuotaAuth.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -305,10 +307,10 @@ export default function DeptAuthGroupEdit() {
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯模型授權-部門' : '新增模型授權-部門'}
+              {t(isEdit ? 'aiQuotaAuth.editModelAuthDept' : 'aiQuotaAuth.addModelAuthDept')}
             </h2>
           </div>
         </div>
@@ -321,16 +323,16 @@ export default function DeptAuthGroupEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="name" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
-              <Input placeholder="如：研發通用、門店標準配置" maxLength={50} />
+            <Form.Item name="name" label={t('aiQuotaAuth.strategyNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.strategyNameRequired') }]}>
+              <Input placeholder={t('aiQuotaAuth.strategyNamePh3')} maxLength={50} />
             </Form.Item>
-            <Form.Item name="description" label="描述">
-              <Input placeholder="請輸入策略描述（選填）" maxLength={200} allowClear />
+            <Form.Item name="description" label={t('aiQuotaAuth.descLabel')}>
+              <Input placeholder={t('aiQuotaAuth.descPh')} maxLength={200} allowClear />
             </Form.Item>
           </div>
         </div>
@@ -341,10 +343,10 @@ export default function DeptAuthGroupEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>適用部門</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>穿梭框 · 樹結構</Tag>
-            <Tooltip title="左側按組織層級樹狀展示，勾選部門後點擊箭頭移至右側；重名部門可通過層級與編碼區分">
-              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>穿梭框 · 含編碼</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTreeTag')}</Tag>
+            <Tooltip title={t('aiQuotaAuth.deptAuthGroupTooltip')}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.transferWithCode')}</span>
             </Tooltip>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -362,7 +364,7 @@ export default function DeptAuthGroupEdit() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
-                  可選部門（{deptOptions.length}）
+                  {t('aiQuotaAuth.availableDepts')}（{deptOptions.length}）
                 </span>
                 <a
                   onClick={() => {
@@ -371,11 +373,11 @@ export default function DeptAuthGroupEdit() {
                     setCheckedDeptIds(unchecked)
                   }}
                   style={{ fontSize: 12 }}
-                >全選</a>
+                >{t('aiQuotaAuth.selectAll')}</a>
               </div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                 <Input
-                  placeholder="搜索部門名稱或編碼"
+                  placeholder={t('aiQuotaAuth.searchDeptPh')}
                   allowClear
                   size="small"
                   value={deptSearchKw}
@@ -414,14 +416,14 @@ export default function DeptAuthGroupEdit() {
                   // 將勾選部門移入右側（去重 + 過濾已選）
                   const newIds = checkedDeptIds.filter((id) => !selectedDeptIds.includes(id))
                   if (newIds.length === 0) {
-                    message.warning('所選部門已添加，無需重複添加')
+                    message.warning(t('aiQuotaAuth.deptAlreadyAdded'))
                     setCheckedDeptIds([])
                     return
                   }
                   const skipped = checkedDeptIds.length - newIds.length
                   setSelectedDeptIds((prev) => [...new Set([...prev, ...newIds])])
                   setCheckedDeptIds([])
-                  if (skipped > 0) message.warning(`已跳過 ${skipped} 個已添加的部門`)
+                  if (skipped > 0) message.warning(t('aiQuotaAuth.deptSkipped', { count: skipped }))
                 }}
                 disabled={checkedDeptIds.length === 0}
                 style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
@@ -445,14 +447,14 @@ export default function DeptAuthGroupEdit() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
-                  已選部門（{selectedDeptIds.length}）
+                  {t('aiQuotaAuth.selectedDepts')}（{selectedDeptIds.length}）
                 </span>
-                <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>清空</a>
+                <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearBtn')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedDeptIds.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
-                    請從左側選擇部門
+                    {t('aiQuotaAuth.selectDeptPlease')}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -477,7 +479,10 @@ export default function DeptAuthGroupEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
-                共 <strong>{selectedDeptIds.length}</strong> 個部門，<strong>{selectedEmployeeCount}</strong> 人
+                                {t('aiQuotaAuth.deptsCount', {
+                                  count: <strong>{selectedDeptIds.length}</strong>,
+                                  empCount: <strong>{selectedEmployeeCount}</strong>,
+                                })}
               </div>
             </div>
           </div>
@@ -489,10 +494,10 @@ export default function DeptAuthGroupEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型授權配置</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
-            <Tooltip title="模型來自「模型接入」中已啟用的真實模型；按需添加，添加一個展示一個，避免模型過多佔用空間">
-              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>按需添加模型</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.modelAuthConfig')}</span>
+            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
+            <Tooltip title={t('aiQuotaAuth.modelAuthTooltip')}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.addModelAsNeeded')}</span>
             </Tooltip>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -507,9 +512,9 @@ export default function DeptAuthGroupEdit() {
               getValueProps={(value) => ({ checked: value === 1 })}>
               <Switch size="small" onChange={handleResidencyToggle} />
             </Form.Item>
-            <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>數據不出域</span>
+            <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidency')}</span>
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              開啟後僅可選擇私有化部署模型，已添加的公有云模型將被自動移除
+              {t('aiQuotaAuth.dataResidencyDesc')}
             </span>
           </div>
 
@@ -517,12 +522,12 @@ export default function DeptAuthGroupEdit() {
           <div style={{ marginBottom: 16 }}>
             <Select
               showSearch
-              placeholder="選擇要授權的模型（添加一個、展示一個）"
+              placeholder={t('aiQuotaAuth.selectAuthModelPh')}
               value={undefined}
               onChange={handleAddModel}
               optionFilterProp="label"
               options={availableModelOptions}
-              notFoundContent={residencyOn ? '暫無私有化部署模型可添加（請到「模型接入」將模型部署類型標記為私有化）' : '所有已啟用模型均已添加'}
+              notFoundContent={residencyOn ? t('aiQuotaAuth.noPrivateModel') : t('aiQuotaAuth.allModelsAdded')}
               style={{ width: '100%' }}
               suffixIcon={<PlusOutlined />}
             />
@@ -530,7 +535,7 @@ export default function DeptAuthGroupEdit() {
 
           {modelAuths.length === 0 ? (
             <div style={{ padding: '40px 0', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
-              尚未添加任何模型，請從上方下拉框選擇模型進行授權
+              {t('aiQuotaAuth.noModelAdded')}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
@@ -548,24 +553,26 @@ export default function DeptAuthGroupEdit() {
                         <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>{model.name}</span>
                         {model.type && (
                           <Tag color={MODEL_TYPE_TAG[model.type]} style={{ fontSize: 11 }}>
-                            {MODEL_TYPE_LABEL[model.type] || model.type}
+                            {MODEL_TYPE_LABEL_KEYS[model.type] ? t('aiQuotaAuth.' + MODEL_TYPE_LABEL_KEYS[model.type]) : model.type}
                           </Tag>
                         )}
                         <Tag color={model.deployType === 'private' ? 'purple' : 'default'} style={{ fontSize: 11 }}>
-                          {model.deployType === 'private' ? '私有化' : '公有云'}
+                          {model.deployType === 'private' ? t('aiQuotaAuth.privateDeploy') : t('aiQuotaAuth.publicCloud')}
                         </Tag>
                       </div>
                       <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                        onClick={() => handleRemoveModel(auth.modelId)}>移除</Button>
+                        onClick={() => handleRemoveModel(auth.modelId)}>{t('aiQuotaAuth.removeBtn')}</Button>
                     </div>
 
                     {/* 能力开关 */}
                     <div style={{ borderTop: '1px solid #E8D5F5', paddingTop: 12 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {CAPABILITY_FIELDS.map(({ key, label, color, tip }) => {
+                        {CAPABILITY_FIELDS.map(({ key, labelKey, color, tipKey }) => {
                           const supported = modelSupports(model, key)
+                          const label = t('aiQuotaAuth.' + labelKey)
+                          const tip = t('aiQuotaAuth.' + tipKey)
                           return (
-                            <Tooltip key={key} title={supported ? tip : `該模型本身不支持「${label}」，無法開放給部門用戶`}>
+                            <Tooltip key={key} title={supported ? tip : t('aiQuotaAuth.notSupportedTip', { label })}>
                               <div style={{
                                 display: 'flex', alignItems: 'center', gap: 4,
                                 padding: '4px 10px', borderRadius: 6,
@@ -579,7 +586,7 @@ export default function DeptAuthGroupEdit() {
                                   size="small"
                                   disabled={!supported}
                                   checked={supported && !!auth[key]}
-                                  unCheckedChildren={supported ? undefined : '不支持'}
+                                  unCheckedChildren={supported ? undefined : t('aiQuotaAuth.notSupported')}
                                   onChange={(checked) => handleCapabilityToggle(auth.modelId, key, checked ? 1 : 0)}
                                 />
                               </div>
@@ -595,7 +602,7 @@ export default function DeptAuthGroupEdit() {
           )}
 
           <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
-            已授權 <strong style={{ color: '#722ED1' }}>{modelAuths.length}</strong> 個模型
+            {t('aiQuotaAuth.authorizedCount', { count: modelAuths.length })}
           </div>
         </div>
 
@@ -605,22 +612,22 @@ export default function DeptAuthGroupEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>状态配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item
               name="status"
-              label="啟用狀態"
+              label={t('aiQuotaAuth.statusLabel2')}
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
               initialValue={1}
-              extra="停用後該策略關聯的部門將失去模型授權配置"
+              extra={t('aiQuotaAuth.statusExtraDept')}
             >
-              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+              <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
             </Form.Item>
           </div>
         </div>
@@ -628,9 +635,9 @@ export default function DeptAuthGroupEdit() {
 
       {/* 底部操作按鈕 */}
       <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
+        <Button onClick={handleBack}>{t('common.cancel')}</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          保存
+          {t('common.save')}
         </Button>
       </div>
     </div>

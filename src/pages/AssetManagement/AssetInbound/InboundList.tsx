@@ -24,18 +24,18 @@ import BrandTag from '../../../components/BrandTag'
 
 const { RangePicker } = DatePicker
 
-/** 入庫狀態展示元數據（待驗收/部分入庫/已入庫） */
-const INBOUND_STATUS_META: Record<PurchaseOrder['status'], { label: string; color: string }> = {
-  pending: { label: '待驗收', color: 'processing' },
-  partial: { label: '部分入庫', color: 'warning' },
-  received: { label: '已入庫', color: 'success' },
+/** 入庫狀態展示元數據（待驗收/部分入庫/已入庫）；labelKey 渲染時經 t() 轉換 */
+const INBOUND_STATUS_META: Record<PurchaseOrder['status'], { labelKey: string; color: string }> = {
+  pending: { labelKey: 'poPending', color: 'processing' },
+  partial: { labelKey: 'poPartial', color: 'warning' },
+  received: { labelKey: 'poReceived', color: 'success' },
 }
 
-/** 收貨方式展示文案 */
+/** 收貨方式展示文案（值為 asset 段 key，渲染時經 t() 轉換） */
 const DELIVERY_METHOD_LABEL: Record<string, string> = {
-  self_pickup: '自取',
-  supplier_delivery: '供應商送貨上門',
-  express: '快遞發貨',
+  self_pickup: 'deliverySelfPickup',
+  supplier_delivery: 'deliverySupplier',
+  express: 'deliveryExpress',
 }
 
 /**
@@ -47,11 +47,11 @@ const DELIVERY_METHOD_LABEL: Record<string, string> = {
  */
 type BatchStatus = 'normal' | 'partial' | 'exception' | 'exchange_pending'
 
-const BATCH_STATUS_META: Record<BatchStatus, { label: string; color: string }> = {
-  normal: { label: '正常入庫', color: 'success' },
-  partial: { label: '部分入庫', color: 'warning' },
-  exchange_pending: { label: '換貨在途', color: 'processing' },
-  exception: { label: '退貨終結', color: 'default' },
+const BATCH_STATUS_META: Record<BatchStatus, { labelKey: string; color: string }> = {
+  normal: { labelKey: 'batchNormal', color: 'success' },
+  partial: { labelKey: 'batchPartial', color: 'warning' },
+  exchange_pending: { labelKey: 'batchExchangePending', color: 'processing' },
+  exception: { labelKey: 'batchException', color: 'default' },
 }
 
 function deriveBatchStatus(b: InboundBatch): BatchStatus {
@@ -265,52 +265,52 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     const isExceptionTab = activeTab === 'exceptions'
     const data = isExceptionTab ? exceptionsData : batchesData
     const cols = [
-      { title: '入庫批次號', dataIndex: 'batchNo' },
-      { title: '訂單編號', dataIndex: 'poNo' },
-      { title: '所屬品牌', dataIndex: 'brand', render: (v: number | undefined) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '') },
-      { title: '批次狀態', dataIndex: 'id', render: (_: unknown, r: InboundBatch) => BATCH_STATUS_META[deriveBatchStatus(r)].label },
-      { title: '入庫資產數', dataIndex: 'id', render: (_: unknown, r: InboundBatch) => String(resolveAssetCount(r)) },
-      { title: '入庫總數', dataIndex: 'totalQty' },
-      { title: '通過', dataIndex: 'acceptedQty' },
-      { title: '讓步接收', dataIndex: 'concessionQty' },
-      { title: '退貨', dataIndex: 'returnQty' },
-      { title: '換貨', dataIndex: 'exchangeQty' },
-      { title: '入庫日期', dataIndex: 'inboundDate' },
-      { title: '經辦人', dataIndex: 'operator' },
-      { title: '創建時間', dataIndex: 'createdAt' },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
-      { title: '最後更新時間', dataIndex: 'updatedAt' },
+      { title: t('asset.colBatchNo'), dataIndex: 'batchNo' },
+      { title: t('asset.colPoNo'), dataIndex: 'poNo' },
+      { title: t('asset.colBrand'), dataIndex: 'brand', render: (v: number | undefined) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '') },
+      { title: t('asset.colBatchStatus'), dataIndex: 'id', render: (_: unknown, r: InboundBatch) => t(`asset.${BATCH_STATUS_META[deriveBatchStatus(r)].labelKey}`) },
+      { title: t('asset.colGeneratedCount'), dataIndex: 'id', render: (_: unknown, r: InboundBatch) => String(resolveAssetCount(r)) },
+      { title: t('asset.colTotalQty'), dataIndex: 'totalQty' },
+      { title: t('asset.exportPassed'), dataIndex: 'acceptedQty' },
+      { title: t('asset.exportConcession'), dataIndex: 'concessionQty' },
+      { title: t('asset.colReturnQty'), dataIndex: 'returnQty' },
+      { title: t('asset.colExchangeQty'), dataIndex: 'exchangeQty' },
+      { title: t('asset.colInboundDate'), dataIndex: 'inboundDate' },
+      { title: t('asset.colOperator'), dataIndex: 'operator' },
+      { title: t('asset.colCreatedAt'), dataIndex: 'createdAt' },
+      { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    const prefix = isExceptionTab ? '異常批次' : '入庫批次'
-    exportToCSV(`驗收入庫_${prefix}_${new Date().toISOString().slice(0, 10)}`, cols, data)
-    message.success('導出成功')
+    const prefix = t(isExceptionTab ? 'asset.exportPrefixException' : 'asset.exportPrefixBatch')
+    exportToCSV(`${t('asset.inboundTitle')}_${prefix}_${new Date().toISOString().slice(0, 10)}`, cols, data)
+    message.success(t('common.exportSuccess'))
   }
 
   /* ----- 表格列定義（入庫批次 / 異常批次 共用，審計導向） ----- */
   const allColumns: TableColumnsType<InboundBatch> = [
     {
-      title: '入庫批次號', dataIndex: 'batchNo', key: 'batchNo', width: 150, fixed: 'left',
+      title: t('asset.colBatchNo'), dataIndex: 'batchNo', key: 'batchNo', width: 150, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 140,
+      title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 140,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
     },
     {
-      title: '所屬品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('asset.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: '批次狀態', key: 'batchStatus', width: 110,
-      filters: (Object.keys(BATCH_STATUS_META) as BatchStatus[]).map((k) => ({ text: BATCH_STATUS_META[k].label, value: k })),
+      title: t('asset.colBatchStatus'), key: 'batchStatus', width: 110,
+      filters: (Object.keys(BATCH_STATUS_META) as BatchStatus[]).map((k) => ({ text: t(`asset.${BATCH_STATUS_META[k].labelKey}`), value: k })),
       onFilter: (val, r) => deriveBatchStatus(r) === val,
       render: (_: unknown, r: InboundBatch) => {
         const meta = BATCH_STATUS_META[deriveBatchStatus(r)]
-        return <Tag color={meta.color} style={{ margin: 0 }}>{meta.label}</Tag>
+        return <Tag color={meta.color} style={{ margin: 0 }}>{t(`asset.${meta.labelKey}`)}</Tag>
       },
     },
     {
-      title: '入庫資產數', key: 'generatedAssetCount', width: 110, align: 'right',
+      title: t('asset.colGeneratedCount'), key: 'generatedAssetCount', width: 110, align: 'right',
       sorter: (a, b) => resolveAssetCount(a) - resolveAssetCount(b),
       render: (_: unknown, r: InboundBatch) => {
         const n = resolveAssetCount(r)
@@ -318,36 +318,36 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       },
     },
     {
-      title: '入庫總數', dataIndex: 'totalQty', key: 'totalQty', width: 100, align: 'right',
+      title: t('asset.colTotalQty'), dataIndex: 'totalQty', key: 'totalQty', width: 100, align: 'right',
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '處置匯總', key: 'disposition', width: 260,
+      title: t('asset.colDisposition'), key: 'disposition', width: 260,
       render: (_: unknown, r: InboundBatch) => (
         <Space size={4} wrap>
-          <Tag color="success" style={{ margin: 0 }}>通過 {r.acceptedQty || 0}</Tag>
-          {(r.concessionQty || 0) > 0 && <Tag color="blue" style={{ margin: 0 }}>讓步 {r.concessionQty}</Tag>}
-          {(r.returnQty || 0) > 0 && <Tag color="error" style={{ margin: 0 }}>退貨 {r.returnQty}</Tag>}
-          {(r.exchangeQty || 0) > 0 && <Tag color="warning" style={{ margin: 0 }}>換貨 {r.exchangeQty}</Tag>}
+          <Tag color="success" style={{ margin: 0 }}>{t('asset.exportPassed')} {r.acceptedQty || 0}</Tag>
+          {(r.concessionQty || 0) > 0 && <Tag color="blue" style={{ margin: 0 }}>{t('asset.exportConcession')} {r.concessionQty}</Tag>}
+          {(r.returnQty || 0) > 0 && <Tag color="error" style={{ margin: 0 }}>{t('asset.colReturnQty')} {r.returnQty}</Tag>}
+          {(r.exchangeQty || 0) > 0 && <Tag color="warning" style={{ margin: 0 }}>{t('asset.colExchangeQty')} {r.exchangeQty}</Tag>}
         </Space>
       ),
     },
-    { title: '入庫日期', dataIndex: 'inboundDate', key: 'inboundDate', width: 110 },
-    { title: '經辦人', dataIndex: 'operator', key: 'operator', width: 110 },
+    { title: t('asset.colInboundDate'), dataIndex: 'inboundDate', key: 'inboundDate', width: 110 },
+    { title: t('asset.colOperator'), dataIndex: 'operator', key: 'operator', width: 110 },
     {
-      title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 170,
+      title: t('asset.colCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170,
       sorter: (a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''),
       defaultSortOrder: 'descend',
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 130 },
+    { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 130 },
     {
-      title: '備註', key: 'remark', width: 60, align: 'center',
+      title: t('asset.colRemark'), key: 'remark', width: 60, align: 'center',
       render: (_: unknown, r: InboundBatch) => (r.purchaseReason || r.remark)
         ? (
           <Tooltip title={(
             <div style={{ maxWidth: 280 }}>
-              {r.purchaseReason && <div style={{ marginBottom: 4 }}>採購事由：{r.purchaseReason}</div>}
-              {r.remark && <div>備註：{r.remark}</div>}
+              {r.purchaseReason && <div style={{ marginBottom: 4 }}>{t('asset.purchaseReasonLabel')}{r.purchaseReason}</div>}
+              {r.remark && <div>{t('asset.remarkLabel')}{r.remark}</div>}
             </div>
           )}>
             <InfoCircleOutlined style={{ color: '#8C8C8C', cursor: 'pointer' }} />
@@ -356,14 +356,14 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: '操作', key: 'action', width: 180, fixed: 'right',
+      title: t('asset.colAction'), key: 'action', width: 180, fixed: 'right',
       render: (_: unknown, record: InboundBatch) => (
         <span style={{ display: 'flex', gap: 4 }}>
           {activeTab === 'exceptions' && deriveBatchStatus(record) === 'exchange_pending' && (
-            <Button type="link" size="small" style={{ color: '#1890FF' }} onClick={() => setActiveTab('pending')}>去驗收</Button>
+            <Button type="link" size="small" style={{ color: '#1890FF' }} onClick={() => setActiveTab('pending')}>{t('asset.goAccept')}</Button>
           )}
-          <Button type="link" size="small" onClick={() => onDetail(record.id)}>詳情</Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" onClick={() => onDetail(record.id)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </span>
       ),
     },
@@ -371,26 +371,26 @@ export default function InboundList({ onAdd, onDetail }: Props) {
 
   /* ----- 字段配置（入庫批次 / 異常批次 共用） ----- */
   const columnMeta = useMemo(() => [
-    { key: 'batchNo', title: '入庫批次號' },
-    { key: 'poNo', title: '訂單編號' },
-    { key: 'brand', title: '所屬品牌' },
-    { key: 'batchStatus', title: '批次狀態' },
-    { key: 'generatedAssetCount', title: '入庫資產數' },
-    { key: 'totalQty', title: '入庫總數' },
-    { key: 'disposition', title: '處置匯總' },
-    { key: 'inboundDate', title: '入庫日期' },
-    { key: 'operator', title: '經辦人' },
-    { key: 'createdAt', title: '創建時間' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'remark', title: '備註' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'batchNo', title: t('asset.colBatchNo') },
+    { key: 'poNo', title: t('asset.colPoNo') },
+    { key: 'brand', title: t('asset.colBrand') },
+    { key: 'batchStatus', title: t('asset.colBatchStatus') },
+    { key: 'generatedAssetCount', title: t('asset.colGeneratedCount') },
+    { key: 'totalQty', title: t('asset.colTotalQty') },
+    { key: 'disposition', title: t('asset.colDisposition') },
+    { key: 'inboundDate', title: t('asset.colInboundDate') },
+    { key: 'operator', title: t('asset.colOperator') },
+    { key: 'createdAt', title: t('asset.colCreatedAt') },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'remark', title: t('asset.colRemark') },
+    { key: 'action', title: t('asset.colAction') },
+  ], [t])
 
   const { applyConfig, configComponent } = useColumnConfig('asset-inbound', columnMeta)
 
   /* ----- 刪除操作（mock） ----- */
   const handleDelete = (_record: InboundBatch) => {
-    message.info('刪除功能開發中')
+    message.info(t('asset.deleteWip'))
   }
 
   /* ----- 待驗收行展開：訂單 × 供應商分組（分組級統計優先用後端摘要，mock 走明細計算） ----- */
@@ -443,47 +443,47 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   /* ----- 待驗收訂單表格列（操作導向：強調本次可驗 + 異常預警） ----- */
   const pendingColumns: TableColumnsType<PendingRow> = [
     {
-      title: '訂單編號', dataIndex: 'poNo', key: 'poNo', width: 240, fixed: 'left',
+      title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 240, fixed: 'left',
       render: (v: string, r: PendingRow) => (
         <Space size={4} wrap>
           <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>
           {r.exchangePendingQty > 0 && (
-            <Tooltip title="該訂單存在換貨明細，等待供應商二次發貨">
-              <Tag color="processing" style={{ margin: 0 }}>換貨在途 {r.exchangePendingQty}</Tag>
+            <Tooltip title={t('asset.tipExchangePending')}>
+              <Tag color="processing" style={{ margin: 0 }}>{t('asset.batchExchangePending')} {r.exchangePendingQty}</Tag>
             </Tooltip>
           )}
           {r.overdueDays > 7 && (
-            <Tooltip title="距採購完成已超過 7 天，請盡快驗收">
-              <Tag color="error" style={{ margin: 0 }}>滯後 {r.overdueDays}天</Tag>
+            <Tooltip title={t('asset.tipOverdue')}>
+              <Tag color="error" style={{ margin: 0 }}>{t('asset.tagOverdue', { count: r.overdueDays })}</Tag>
             </Tooltip>
           )}
         </Space>
       ),
     },
     {
-      title: '所屬品牌', key: 'brand', width: 100,
+      title: t('asset.colBrand'), key: 'brand', width: 100,
       render: (_: unknown, r: PendingRow) => r.order.brand
         ? <BrandTag value={r.order.brand} />
         : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 180, ellipsis: true,
-      render: (v: string) => v || '待定',
+      title: t('asset.colSupplier'), dataIndex: 'supplier', key: 'supplier', width: 180, ellipsis: true,
+      render: (v: string) => v || t('asset.supplierTbd'),
     },
     {
-      title: '採購經辦人', key: 'purchaser', width: 110,
+      title: t('asset.colPurchaser'), key: 'purchaser', width: 110,
       render: (_: unknown, r: PendingRow) => r.order.purchaser || '-',
     },
     {
-      title: '總件數', dataIndex: 'groupTotalQty', key: 'groupTotalQty', width: 80, align: 'right',
+      title: t('asset.colGroupTotalQty'), dataIndex: 'groupTotalQty', key: 'groupTotalQty', width: 80, align: 'right',
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '已驗收', dataIndex: 'groupReceivedQty', key: 'groupReceivedQty', width: 80, align: 'right',
+      title: t('asset.colGroupReceivedQty'), dataIndex: 'groupReceivedQty', key: 'groupReceivedQty', width: 80, align: 'right',
       render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '待驗收', dataIndex: 'groupPendingQty', key: 'groupPendingQty', width: 80, align: 'right',
+      title: t('asset.colGroupPendingQty'), dataIndex: 'groupPendingQty', key: 'groupPendingQty', width: 80, align: 'right',
       sorter: (a, b) => a.groupPendingQty - b.groupPendingQty,
       defaultSortOrder: 'descend',
       render: (v: number) => (
@@ -491,48 +491,48 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       ),
     },
     {
-      title: '換貨', dataIndex: 'orderExchangeQty', key: 'orderExchangeQty', width: 70, align: 'right',
+      title: t('asset.colExchangeQty'), dataIndex: 'orderExchangeQty', key: 'orderExchangeQty', width: 70, align: 'right',
       render: (v: number) => (
-        <Tooltip title="訂單級換貨在途匯總（等待供應商二次發貨，到貨後重新驗收）">
+        <Tooltip title={t('asset.tipOrderExchange')}>
           <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C', fontWeight: v > 0 ? 600 : 400 }}>{v}</span>
         </Tooltip>
       ),
     },
     {
-      title: '退貨', dataIndex: 'orderReturnQty', key: 'orderReturnQty', width: 70, align: 'right',
+      title: t('asset.colReturnQty'), dataIndex: 'orderReturnQty', key: 'orderReturnQty', width: 70, align: 'right',
       render: (v: number) => (
-        <Tooltip title="訂單級退貨匯總（終態，已從待驗收扣除）">
+        <Tooltip title={t('asset.tipOrderReturn')}>
           <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: v > 0 ? 600 : 400 }}>{v}</span>
         </Tooltip>
       ),
     },
     {
-      title: '物流', key: 'logistics', width: 160,
+      title: t('asset.colLogistics'), key: 'logistics', width: 160,
       render: (_: unknown, r: PendingRow) => {
-        const method = r.deliveryMethod ? DELIVERY_METHOD_LABEL[r.deliveryMethod] : ''
+        const methodKey = r.deliveryMethod ? DELIVERY_METHOD_LABEL[r.deliveryMethod] : ''
         // 快遞方式：直接顯示快遞單號（未對接物流平台，不判斷發貨狀態）
         if (r.deliveryMethod === 'express') {
           return r.trackingNo
             ? (
-              <Tooltip title={`快遞發貨 · ${r.trackingNo}`}>
+              <Tooltip title={`${t('asset.deliveryExpress')} · ${r.trackingNo}`}>
                 <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.trackingNo}</span>
               </Tooltip>
             )
-            : <span style={{ color: '#bfbfbf' }}>快遞（未填單號）</span>
+            : <span style={{ color: '#bfbfbf' }}>{t('asset.expressNoTracking')}</span>
         }
         // 自取 / 供應商送貨上門 / 未知
-        return <span style={{ color: method ? '#595959' : '#bfbfbf' }}>{method || '-'}</span>
+        return <span style={{ color: methodKey ? '#595959' : '#bfbfbf' }}>{(methodKey && t(`asset.${methodKey}`)) || '-'}</span>
       },
     },
     {
-      title: '入庫狀態', key: 'status', width: 100,
+      title: t('asset.colInboundStatus'), key: 'status', width: 100,
       render: (_: unknown, r: PendingRow) => {
         const meta = INBOUND_STATUS_META[r.order.status] || INBOUND_STATUS_META.pending
-        return <Tag color={meta.color} style={{ margin: 0 }}>{meta.label}</Tag>
+        return <Tag color={meta.color} style={{ margin: 0 }}>{t(`asset.${meta.labelKey}`)}</Tag>
       },
     },
     {
-      title: '完成採購', key: 'updatedAt', width: 110,
+      title: t('asset.colCompletedAt'), key: 'updatedAt', width: 110,
       sorter: (a, b) => (a.order.updatedAt || '').localeCompare(b.order.updatedAt || ''),
       render: (_: unknown, r: PendingRow) => {
         if (!r.order.updatedAt) return '-'
@@ -540,16 +540,16 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         return (
           <Tooltip title={r.order.updatedAt}>
             <span style={{ color: diff > 7 ? '#FF4D4F' : '#8C8C8C' }}>
-              {diff === 0 ? '今天' : `${diff} 天前`}
+              {diff === 0 ? t('asset.today') : t('asset.daysAgo', { count: diff })}
             </span>
           </Tooltip>
         )
       },
     },
     {
-      title: '操作', key: 'action', width: 90, fixed: 'right',
+      title: t('asset.colAction'), key: 'action', width: 90, fixed: 'right',
       render: (_: unknown, r: PendingRow) => (
-        <Button type="link" size="small" onClick={() => onAdd(r.orderId, r.groupId)}>驗收</Button>
+        <Button type="link" size="small" onClick={() => onAdd(r.orderId, r.groupId)}>{t('asset.acceptBtn')}</Button>
       ),
     },
   ]
@@ -558,25 +558,25 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const batchSearchSection = (
     <div className="search-section">
       <Form form={form} layout="inline">
-        <Form.Item label="入庫批次號" name="batchNo">
-          <Input placeholder="請輸入入庫批次號" allowClear />
+        <Form.Item label={t('asset.colBatchNo')} name="batchNo">
+          <Input placeholder={t('asset.phBatchNo')} allowClear />
         </Form.Item>
-        <Form.Item label="訂單編號" name="poNo">
-          <Input placeholder="請輸入訂單編號" allowClear />
+        <Form.Item label={t('asset.colPoNo')} name="poNo">
+          <Input placeholder={t('asset.phPoNo')} allowClear />
         </Form.Item>
-        <Form.Item label="創建時間" name="createdDateRange">
+        <Form.Item label={t('asset.colCreatedAt')} name="createdDateRange">
           <RangePicker style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item label="最後更新人" name="updatedBy">
-          <Input placeholder="請輸入最後更新人" allowClear />
+        <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
+          <Input placeholder={t('asset.phUpdatedBy')} allowClear />
         </Form.Item>
-        <Form.Item label="最後更新時間" name="updatedDateRange">
+        <Form.Item label={t('asset.colUpdatedAt')} name="updatedDateRange">
           <RangePicker style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item>
           <div className="search-actions">
-            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+            <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
           </div>
         </Form.Item>
       </Form>
@@ -587,7 +587,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const batchActionSection = (
     <div className="action-section">
       <div className="action-section-left">
-        <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+        <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
       </div>
       <div className="action-section-right">
         {configComponent}
@@ -618,7 +618,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               ))}
             </div>
           ) : (
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>（本批次未生成資產）</span>
+            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('asset.noGeneratedAssets')}</span>
           )}
         </div>
       )
@@ -632,47 +632,47 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       items={[
         {
           key: 'pending',
-          label: `待驗收訂單 (${pendingRows.length})`,
+          label: t('asset.tabPending', { count: pendingRows.length }),
           destroyOnHidden: true,
           children: (
             <>
               {/* ====== 搜索區 ====== */}
               <div className="search-section">
                 <Form form={poForm} layout="inline">
-                  <Form.Item label="採購單號" name="poNo">
-                    <Input placeholder="請輸入採購單號" allowClear onPressEnter={handlePoSearch} />
+                  <Form.Item label={t('asset.labelPoNo')} name="poNo">
+                    <Input placeholder={t('asset.phPurchaseOrderNo')} allowClear onPressEnter={handlePoSearch} />
                   </Form.Item>
-                  <Form.Item label="供應商" name="supplier">
-                    <Input placeholder="請輸入供應商名稱" allowClear onPressEnter={handlePoSearch} />
+                  <Form.Item label={t('asset.colSupplier')} name="supplier">
+                    <Input placeholder={t('asset.phSupplier')} allowClear onPressEnter={handlePoSearch} />
                   </Form.Item>
-                  <Form.Item label="入庫狀態" name="status">
+                  <Form.Item label={t('asset.colInboundStatus')} name="status">
                     <Select
-                      placeholder="全部"
+                      placeholder={t('common.all')}
                       allowClear
                       style={{ width: 140 }}
                       options={[
-                        { value: 'pending', label: '待驗收' },
-                        { value: 'partial', label: '部分入庫' },
+                        { value: 'pending', label: t('asset.poPending') },
+                        { value: 'partial', label: t('asset.poPartial') },
                       ]}
                     />
                   </Form.Item>
-                  <Form.Item label="採購經辦人" name="purchaser">
-                    <Input placeholder="請輸入採購經辦人" allowClear onPressEnter={handlePoSearch} />
+                  <Form.Item label={t('asset.colPurchaser')} name="purchaser">
+                    <Input placeholder={t('asset.phPurchaser')} allowClear onPressEnter={handlePoSearch} />
                   </Form.Item>
-                  <Form.Item label="完成採購時間" name="updatedAtRange">
+                  <Form.Item label={t('asset.labelCompletedTime')} name="updatedAtRange">
                     <RangePicker style={{ width: '100%' }} />
                   </Form.Item>
                   <Form.Item>
                     <div className="search-actions">
-                      <Button type="primary" icon={<SearchOutlined />} onClick={handlePoSearch}>查詢</Button>
-                      <Button icon={<ReloadOutlined />} onClick={handlePoReset}>重置</Button>
+                      <Button type="primary" icon={<SearchOutlined />} onClick={handlePoSearch}>{t('common.search')}</Button>
+                      <Button icon={<ReloadOutlined />} onClick={handlePoReset}>{t('common.reset')}</Button>
                     </div>
                   </Form.Item>
                 </Form>
               </div>
 
               <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
-                採購完成的訂單自動同步至此，請核對到貨物資後點擊「驗收」；支持分批多次驗收；訂單帶「換貨在途」徽標者需優先處理
+                {t('asset.pendingHint')}
               </div>
               <Table<PendingRow>
                 columns={pendingColumns}
@@ -684,7 +684,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 pagination={{
                   current: poPage, pageSize: poSize, total: pendingRows.length,
                   showSizeChanger: true, showQuickJumper: true,
-                  showTotal: (tt) => `共 ${tt} 條`,
+                  showTotal: (tt) => t('common.total', { count: tt }),
                 }}
                 onChange={handlePoTableChange}
               />
@@ -693,7 +693,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         },
         {
           key: 'batches',
-          label: `入庫批次 (${batchesData.length})`,
+          label: t('asset.tabBatches', { count: batchesData.length }),
           destroyOnHidden: true,
           children: (
             <>
@@ -710,7 +710,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 pagination={{
                   current: page, pageSize: size, total: batchesData.length,
                   showSizeChanger: true, showQuickJumper: true,
-                  showTotal: (tt) => `共 ${tt} 條`,
+                  showTotal: (tt) => t('common.total', { count: tt }),
                 }}
                 onChange={handleTableChange}
               />
@@ -721,7 +721,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
           key: 'exceptions',
           label: (
             <span>
-              異常批次
+              {t('asset.tabExceptions')}
               {exceptionsData.length > 0 && (
                 <span style={{
                   marginLeft: 6, padding: '0 6px', borderRadius: 10,
@@ -739,8 +739,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message="以下批次未產生資產入庫，僅作為驗收異常記錄留存"
-                description="退貨終結：物資已退回供應商，流程結束；換貨在途：等待供應商二次發貨，二次到貨後將在「待驗收訂單」Tab 中重新出現。"
+                message={t('asset.alertMsg')}
+                description={t('asset.alertDesc')}
               />
               {batchSearchSection}
               {batchActionSection}
@@ -755,7 +755,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 pagination={{
                   current: page, pageSize: size, total: exceptionsData.length,
                   showSizeChanger: true, showQuickJumper: true,
-                  showTotal: (tt) => `共 ${tt} 條`,
+                  showTotal: (tt) => t('common.total', { count: tt }),
                 }}
                 onChange={handleTableChange}
               />

@@ -140,6 +140,8 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-model':      'Brand Product Library',
   'asset-location':   'Asset Location',
   'param-library':    'Product Parameter Library',
+  'asset-tag':        'Asset Tag',
+  'asset-supplier':   'Suppliers',
   'purchase-request':  'Purchase Request',
   'purchase-order':   'Purchase Order',
   'asset-inbound':    'Asset Inbound',

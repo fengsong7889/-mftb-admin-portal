@@ -95,6 +95,15 @@ public class EamAsset {
     /** 关联入库批次 ID */
     private Long batchId;
 
+    /** 公司品牌：1=闪蜂(TB), 2=mFood(MF) */
+    private Integer companyBrand;
+
+    /** 当前持有人 ID（sys_user.id，领用后写入，归还后清空） */
+    private Long currentHolderId;
+
+    /** 当前活跃领用 ID（biz_eam_claim.id，归还/取消后清空） */
+    private Long activeClaimId;
+
     /** 备注 */
     private String remark;
 

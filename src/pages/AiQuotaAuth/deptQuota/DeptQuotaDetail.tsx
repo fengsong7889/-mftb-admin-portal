@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Tag, Spin, Progress, Tooltip, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined, QuestionCircleOutlined } from '@ant-design/icons'
@@ -20,12 +21,18 @@ import {
   CURRENCY_SYMBOL,
 } from './deptQuotaStore'
 
+const PERIOD_KEYS: Record<string, string> = { daily: 'periodDaily', monthly: 'periodMonthly' }
+const TYPE_KEYS: Record<string, string> = { token: 'typeToken', cost: 'typeCost', request: 'typeRequest' }
+const ALLOC_KEYS: Record<string, string> = { total: 'allocTotal', per_capita: 'allocPerCapita' }
+const OVER_LIMIT_KEYS: Record<string, string> = { reject: 'overLimitRejectAct', approve: 'overLimitApproveAct', downgrade: 'overLimitDowngradeAct' }
+
 /**
  * 部門額度 — 詳情獨立頁（參考部門模型權控詳情頁佈局）
  * 分區：用量概览（動畫統計卡 + 用量進度） → 適用部門 → 額度配置 → 基础信息
  * 路由：/ai-dept-quota-detail?id=xxx
  */
 export default function DeptQuotaDetail() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const quotaId = searchParams.get('id')
@@ -37,7 +44,7 @@ export default function DeptQuotaDetail() {
 
   useEffect(() => {
     if (!quotaId) {
-      message.error('缺少策略 ID')
+      message.error(t('aiQuotaAuth.missingStrategyId'))
       navigate('/ai-dept-quota')
       return
     }
@@ -53,9 +60,9 @@ export default function DeptQuotaDetail() {
         setDeptOptions(depts)
         setModels(modelList)
         setPolicy(found)
-        if (!found) message.error('額度策略不存在或已刪除')
+        if (!found) message.error(t('aiQuotaAuth.strategyNotFound'))
       })
-      .catch(() => { if (!cancelled) message.error('加載詳情失敗') })
+      .catch(() => { if (!cancelled) message.error(t('aiQuotaAuth.loadDetailFailed')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [quotaId, navigate])
@@ -73,8 +80,8 @@ export default function DeptQuotaDetail() {
   if (!policy) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>額度策略信息加載失敗</div>
-        <Button style={{ marginTop: 16 }} onClick={handleBack}>返回列表</Button>
+        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div>
+        <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
   }
@@ -82,7 +89,7 @@ export default function DeptQuotaDetail() {
   const pct = usagePercent(policy)
   const pctColor = usageColor(policy)
   const pctBg = pct >= 100 ? '#FFF1F0' : pct >= policy.softThreshold ? '#FFFBE6' : '#F6FFED'
-  const statusText = pct >= 100 ? '已超額' : pct >= policy.softThreshold ? '接近上限' : '用量正常'
+  const statusText = pct >= 100 ? t('aiQuotaAuth.overQuota') : pct >= policy.softThreshold ? t('aiQuotaAuth.nearLimit') : t('aiQuotaAuth.usageNormal')
   const statusTagColor = pct >= 100 ? 'error' : pct >= policy.softThreshold ? 'warning' : 'success'
   const remaining = Math.max(0, policy.quotaValue - policy.usedValue)
   const valuePrefix = policy.quotaType === 'cost' ? CURRENCY_SYMBOL[policy.currency] : ''
@@ -95,19 +102,19 @@ export default function DeptQuotaDetail() {
     <div className="content-area">
       {/* 頭部概覽卡（全局統一規範：詳情頁紫色頂條 + 橙色返回 + 權限門控紫色編輯） */}
       <DetailPageHeader
-        title="部門額度詳情"
+        title={t('aiQuotaAuth.deptQuotaDetailTitle')}
         tags={
           <>
             <Tag color={policy.status === 1 ? 'success' : 'default'} style={{ margin: 0 }}>
-              {policy.status === 1 ? '啟用' : '停用'}
+              {policy.status === 1 ? t('aiQuotaAuth.enableText') : t('aiQuotaAuth.disableText')}
             </Tag>
             <Tag color={policy.allocateMode === 'per_capita' ? 'blue' : 'default'} style={{ margin: 0 }}>
-              {ALLOCATE_MODE_LABEL[policy.allocateMode]}
+              {t('aiQuotaAuth.' + (ALLOC_KEYS[policy.allocateMode] || ''))}
             </Tag>
             <Tag color={statusTagColor} style={{ margin: 0 }}>{statusText}</Tag>
           </>
         }
-        meta={<>{policy.name} · 最後更新：{policy.updatedBy ?? '-'} · {policy.updatedAt ?? '-'}</>}
+        meta={<>{policy.name} · {t('aiQuotaAuth.lastUpdateLabel')}：{policy.updatedBy ?? '-'} · {policy.updatedAt ?? '-'}</>}
         onBack={handleBack}
         onEdit={() => navigate(`/ai-dept-quota-edit?id=${policy.id}`)}
         menuKey="ai-dept-quota"
@@ -119,8 +126,8 @@ export default function DeptQuotaDetail() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>用量概览</span>
-          <Tag color="green">{QUOTA_PERIOD_LABEL[policy.period]}重置</Tag>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.usageOverview')}</span>
+          <Tag color="green">{t('aiQuotaAuth.quotaPeriodReset', { period: t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || '')) })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -129,41 +136,41 @@ export default function DeptQuotaDetail() {
             <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>
               <AnimatedNumber value={policy.usedValue} prefix={valuePrefix} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>本期已用{unitLabel ? `（${unitLabel}）` : ''}</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}>
               <AnimatedNumber value={policy.quotaValue} prefix={valuePrefix} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>限額總值{unitLabel ? `（${unitLabel}）` : ''}</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: pctBg, border: `1px solid ${pctColor}22`, transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: pctColor }}>
               <AnimatedNumber value={pct} suffix="%" />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>本期使用率</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>
-              <AnimatedNumber value={policy.totalEmployeeCount} suffix=" 人" />
+              <AnimatedNumber value={policy.totalEmployeeCount} suffix={t('aiQuotaAuth.animatedPersonSuffix')} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>覆蓋人數</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.coverEmpCount')}</div>
           </div>
         </div>
 
         {/* 用量進度條（直觀呈現消耗與軟提醒閾值） */}
         <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>本期用量進度</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: pctColor }}>{pct}%</span>
           </div>
           <Progress percent={Math.min(pct, 100)} strokeColor={pctColor} showInfo={false} size={['100%', 14]} style={{ marginBottom: 12 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
             <span style={{ color: '#595959' }}>
-              已用 <strong style={{ color: pctColor }}>{usedText(policy)}</strong> · 限額 {quotaText(policy)}
+              {t('aiQuotaAuth.usedLabel')} <strong style={{ color: pctColor }}>{usedText(policy)}</strong> · {t('aiQuotaAuth.quotaLimitLabel2')} {quotaText(policy)}
             </span>
             <span style={{ color: '#8C8C8C' }}>
-              軟提醒 {policy.softThreshold}% · 剩余 <strong style={{ color: remaining > 0 ? '#52C41A' : '#FF4D4F' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong>
+              {t('aiQuotaAuth.softAlertLabel')} {policy.softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? '#52C41A' : '#FF4D4F' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong>
             </span>
           </div>
         </div>
@@ -175,8 +182,8 @@ export default function DeptQuotaDetail() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>適用部門</span>
-          <Tag color="blue">{policy.deptNames.length} 個部門</Tag>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptTitle')}</span>
+          <Tag color="blue">{t('aiQuotaAuth.deptCountLabel', { count: policy.deptNames.length })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -184,16 +191,16 @@ export default function DeptQuotaDetail() {
             const d = deptOptions.find((x) => x.deptName === name)
             return (
               <Tag key={name} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>
-                {name}{d ? `（${d.employeeCount} 人）` : ''}
+                {name}{d ? t('aiQuotaAuth.deptEmpCount', { count: d.employeeCount }) : ''}
               </Tag>
             )
           })}
-          {policy.deptNames.length === 0 && <span style={{ color: '#BFBFBF' }}>暫無關聯部門</span>}
+          {policy.deptNames.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.noRelatedDept')}</span>}
         </div>
         <div style={{ marginTop: 12, fontSize: 13, color: '#595959' }}>
-          共覆蓋 <strong>{policy.totalEmployeeCount.toLocaleString()}</strong> 人
+          {t('aiQuotaAuth.totalCoverCount', { count: policy.totalEmployeeCount })}
           {policy.allocateMode === 'per_capita' && (
-            <span style={{ marginLeft: 8, color: '#8C8C8C' }}>· 人均獨立額度，每人 {quotaText(policy)}</span>
+            <span style={{ marginLeft: 8, color: '#8C8C8C' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
           )}
         </div>
       </div>
@@ -204,39 +211,39 @@ export default function DeptQuotaDetail() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FundOutlined style={{ fontSize: 14, color: '#E8720C' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>額度配置</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.quotaConfigTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px 16px' }}>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>額度分配方式</div>
-            <Tag color={policy.allocateMode === 'per_capita' ? 'blue' : 'default'}>{ALLOCATE_MODE_LABEL[policy.allocateMode]}</Tag>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.allocateMethod')}</div>
+            <Tag color={policy.allocateMode === 'per_capita' ? 'blue' : 'default'}>{t('aiQuotaAuth.' + (ALLOC_KEYS[policy.allocateMode] || ''))}</Tag>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>限額周期</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{QUOTA_PERIOD_LABEL[policy.period]}</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div>
+            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || ''))}</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>限額類型</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{QUOTA_TYPE_LABEL[policy.quotaType]}</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div>
+            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (TYPE_KEYS[policy.quotaType] || ''))}</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>限額值</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div>
             <div style={{ fontSize: 14, color: '#E8720C', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaText(policy)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>軟限額提醒閾值</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div>
             <div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{policy.softThreshold}%</div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>超出限額動作 <Tooltip title="該配置需網關側配合才能實際生效，當前僅作策略記錄與展示"><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div>
-            <Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{OVER_LIMIT_ACTION_LABEL[policy.overLimitAction]}</Tag>
-            <div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>需網關側配合生效，當前為策略配置</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div>
+            <Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{t('aiQuotaAuth.' + (OVER_LIMIT_KEYS[policy.overLimitAction] || ''))}</Tag>
+            <div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div>
           </div>
           {policy.overLimitAction === 'downgrade' && (
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>降級目標模型</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelName ?? (policy.downgradeModelId ? `模型 #${policy.downgradeModelId}` : '-')}</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div>
+              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelName ?? (policy.downgradeModelId ? t('aiQuotaAuth.modelIdRef', { id: policy.downgradeModelId }) : '-')}</div>
             </div>
           )}
         </div>
@@ -248,17 +255,17 @@ export default function DeptQuotaDetail() {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
           {([
-            { label: '策略名稱', value: policy.name },
-            { label: '描述', value: policy.description || '-' },
-            { label: '狀態', value: policy.status === 1 ? '啟用' : '停用' },
-            { label: '最後更新人', value: policy.updatedBy ?? '-' },
-            { label: '創建時間', value: policy.createdAt ?? '-' },
-            { label: '更新時間', value: policy.updatedAt ?? '-' },
+            { label: t('aiQuotaAuth.strategyNameCol'), value: policy.name },
+            { label: t('aiQuotaAuth.descLabel'), value: policy.description || '-' },
+            { label: t('aiQuotaAuth.statusCol'), value: policy.status === 1 ? t('aiQuotaAuth.enableText') : t('aiQuotaAuth.disableText') },
+            { label: t('aiQuotaAuth.lastUpdatedByCol'), value: policy.updatedBy ?? '-' },
+            { label: t('aiQuotaAuth.createdAtCol'), value: policy.createdAt ?? '-' },
+            { label: t('aiQuotaAuth.updatedAtCol'), value: policy.updatedAt ?? '-' },
           ] as Array<{ label: string; value: string }>).map((item) => (
             <div key={item.label}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>

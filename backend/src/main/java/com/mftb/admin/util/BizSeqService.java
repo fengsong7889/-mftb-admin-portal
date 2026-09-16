@@ -103,6 +103,25 @@ public class BizSeqService {
     public static final String RULE_EAM_INBOUND_BATCH = "eam_inbound_batch";
     /** EAM 资产编号 */
     public static final String RULE_EAM_ASSET = "eam_asset";
+    /** EAM 领用编号 */
+    public static final String RULE_EAM_CLAIM = "eam_claim";
+    /** EAM 归还编号 */
+    public static final String RULE_EAM_RETURN = "eam_return";
+
+    /**
+     * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）
+     * 已迁移至 sys_company_brand 表动态查询，此方法仅作 fallback。
+     */
+    public static String companyBrandCode(Integer brand) {
+        if (brand == null) return "XX";
+        return switch (brand) {
+            case 1 -> "TB";
+            case 2 -> "MF";
+            default -> "XX";
+        };
+    }
+    /** EAM 供应商编码（CGSJ + 6位全局自增） */
+    public static final String RULE_EAM_SUPPLIER_CODE = "eam_supplier_code";
     /** 流程配置ID */
     public static final String RULE_WORKFLOW_CONFIG = "workflow_config";
 

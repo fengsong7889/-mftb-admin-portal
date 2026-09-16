@@ -10,6 +10,7 @@ import {
   type ModelAuthConfig,
 } from './modelAuthCapability'
 import { createPosStrategy, getPosStrategyById, updatePosStrategy } from '../../../api/empAuth'
+import { useTranslation } from 'react-i18next'
 
 /**
  * 按職位授權 - 新增 / 編輯獨立頁（全局統一：取消彈窗，參考部門模型權控）
@@ -17,6 +18,7 @@ import { createPosStrategy, getPosStrategyById, updatePosStrategy } from '../../
  * 路由：/ai-pos-auth-edit（新增）、/ai-pos-auth-edit?id=xxx（編輯）
  */
 export default function EmpPosAuthEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const ruleId = searchParams.get('id')
@@ -58,7 +60,7 @@ export default function EmpPosAuthEdit() {
         }
       } catch {
         if (!cancelled) {
-          message.error(ruleId ? '授權策略不存在或已刪除' : '加載數據失敗')
+          message.error(ruleId ? t('aiQuotaAuth.posAuthNotFound') : t('aiQuotaAuth.loadDataFailed'))
           if (ruleId) navigate('/ai-emp-model-auth')
         }
       } finally {
@@ -73,7 +75,7 @@ export default function EmpPosAuthEdit() {
     const values = await form.validateFields()
 
     if (modelAuths.length === 0) {
-      message.warning('請至少添加一個授權模型')
+      message.warning(t('aiQuotaAuth.addModelWarning'))
       return
     }
 
@@ -91,14 +93,14 @@ export default function EmpPosAuthEdit() {
     try {
       if (isEdit && ruleId) {
         await updatePosStrategy(ruleId, payload)
-        message.success('職位授權策略已更新，匹配的職位自動生效')
+        message.success(t('aiQuotaAuth.posAuthUpdated'))
       } else {
         await createPosStrategy(payload)
-        message.success('職位授權策略已創建，匹配的職位自動生效')
+        message.success(t('aiQuotaAuth.posAuthCreated'))
       }
       navigate('/ai-emp-model-auth')
     } catch {
-      message.error('保存失敗，請稍後重試')
+      message.error(t('aiQuotaAuth.saveFailedRetry'))
     } finally {
       setSaving(false)
     }
@@ -136,10 +138,10 @@ export default function EmpPosAuthEdit() {
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯模型授權-職位' : '新增模型授權-職位'}
+              {isEdit ? t('aiQuotaAuth.editPosAuth') : t('aiQuotaAuth.addPosAuth')}
             </h2>
           </div>
         </div>
@@ -152,16 +154,16 @@ export default function EmpPosAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="ruleName" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
-              <Input placeholder="如：M序列高職級全模型授權" maxLength={50} allowClear />
+            <Form.Item name="ruleName" label={t('aiQuotaAuth.strategyNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.strategyNamePh') }]}>
+              <Input placeholder={t('aiQuotaAuth.posStrategyNamePh')} maxLength={50} allowClear />
             </Form.Item>
-            <Form.Item name="description" label="描述">
-              <Input placeholder="請輸入策略描述（選填）" maxLength={200} allowClear />
+            <Form.Item name="description" label={t('common.description')}>
+              <Input placeholder={t('aiQuotaAuth.posStrategyDescPh')} maxLength={200} allowClear />
             </Form.Item>
           </div>
         </div>
@@ -172,17 +174,17 @@ export default function EmpPosAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>適用職位</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>職級序列 · 職級</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>匹配所選序列/職級的職位下所有員工自動獲得授權</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.posAuthSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.posSeqLevelTag')}</Tag>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.posMatchHint')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="sequence" label="職級序列" rules={[{ required: true, message: '請選擇職級序列' }]}>
-              <Select placeholder="選擇序列" options={POSITION_SEQUENCE_OPTIONS} mode="multiple" allowClear maxTagCount="responsive" />
+            <Form.Item name="sequence" label={t('aiQuotaAuth.posSeqLabel')} rules={[{ required: true, message: t('aiQuotaAuth.posSeqRequired') }]}>
+              <Select placeholder={t('aiQuotaAuth.posSeqPh')} options={POSITION_SEQUENCE_OPTIONS} mode="multiple" allowClear maxTagCount="responsive" />
             </Form.Item>
-            <Form.Item name="jobLevels" label="職級" rules={[{ required: true, message: '請選擇職級' }]}>
-              <Select placeholder="選擇職級" options={POSITION_RANK_OPTIONS} mode="multiple" allowClear maxTagCount="responsive" />
+            <Form.Item name="jobLevels" label={t('aiQuotaAuth.posLevelLabel')} rules={[{ required: true, message: t('aiQuotaAuth.posLevelRequired') }]}>
+              <Select placeholder={t('aiQuotaAuth.posLevelPh')} options={POSITION_RANK_OPTIONS} mode="multiple" allowClear maxTagCount="responsive" />
             </Form.Item>
           </div>
         </div>
@@ -196,20 +198,20 @@ export default function EmpPosAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>状态配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item
               name="status"
-              label="啟用狀態"
+              label={t('aiQuotaAuth.enableStatusLabel')}
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
-              extra="停用後匹配該策略的職位將立即失去對應模型訪問權"
+              extra={t('aiQuotaAuth.disablePosAuthExtra')}
             >
-              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+              <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
             </Form.Item>
           </div>
         </div>
@@ -217,9 +219,9 @@ export default function EmpPosAuthEdit() {
 
       {/* 底部操作按鈕（全局統一：取消 + 保存） */}
       <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
+        <Button onClick={handleBack}>{t('common.cancel')}</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          保存
+          {t('common.save')}
         </Button>
       </div>
     </div>

@@ -40,6 +40,8 @@ import {
   type ParamField, type ParamType,
 } from '../../../api/eam'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 
 const { TextArea } = Input
 
@@ -102,6 +104,7 @@ function buildCategoryTree(cats: AssetCategory[]): { title: string; value: strin
 /* ==================== 主组件 ==================== */
 export default function AssetAdd() {
   const { t } = useTranslation()
+  const { numericOptions } = useCompanyBrand()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editingId = searchParams.get('id') ? Number(searchParams.get('id')) : null
@@ -327,7 +330,7 @@ export default function AssetAdd() {
 
   /* ----- 图片上传 ----- */
   const handleImageUpload = useCallback((file: File) => {
-    if (file.size > 2 * 1024 * 1024) { message.warning('图片不能超过 2MB'); return false }
+    if (file.size > 2 * 1024 * 1024) { message.warning(t('asset.imageSizeLimitWarn')); return false }
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
@@ -335,7 +338,7 @@ export default function AssetAdd() {
     }
     reader.readAsDataURL(file)
     return false
-  }, [])
+  }, [t])
 
   /* ----- 保存 ----- */
   const handleSubmit = async () => {
@@ -343,7 +346,7 @@ export default function AssetAdd() {
       const v = await form.validateFields()
 
       // 校验资产编码
-      if (!v.assetNo?.trim()) { message.error('请填写资产编码'); return }
+      if (!v.assetNo?.trim()) { message.error(t('asset.assetCodeRequired')); return }
 
       // 拼接位置信息
       const loc = locations.find((l) => l.id === selectedLocationId)
@@ -384,10 +387,10 @@ export default function AssetAdd() {
       }
       if (isEdit && editingId) {
         await updateAsset(editingId, payload)
-        message.success('更新成功')
+        message.success(t('asset.assetUpdateSuccess'))
       } else {
         await createAsset(payload)
-        message.success('新增成功')
+        message.success(t('asset.assetAddSuccess'))
       }
       navigate('/asset-list')
     } catch (e: unknown) {
@@ -442,7 +445,7 @@ export default function AssetAdd() {
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d9d9d9')}
           >
             <PictureOutlined style={{ fontSize: 20, color: '#bfbfbf' }} />
-            <span style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>上传图片</span>
+            <span style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>{t('asset.uploadImage')}</span>
           </div>
         </Upload>
       )}
@@ -451,7 +454,7 @@ export default function AssetAdd() {
 
   /* ==================== 参数动态字段渲染 ==================== */
   const renderParamFields = () => {
-    if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>请先选择资产名称</span>
+    if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>{t('asset.selectAssetNameFirst')}</span>
     return (
       <Row gutter={[16, 16]}>
         {paramFieldsWithOptions.map((field) => (
@@ -459,7 +462,7 @@ export default function AssetAdd() {
             <Form.Item label={field.label} style={{ marginBottom: 0 }}>
               {field.type === 'select' ? (
                 <Select
-                  placeholder={`请选择${field.label}`}
+                  placeholder={t('asset.paramSelectPh', { label: field.label })}
                   allowClear
                   options={(field.options || []).map((o) => ({ label: o, value: o }))}
                   value={paramValues[field.key] || undefined}
@@ -467,7 +470,7 @@ export default function AssetAdd() {
                 />
               ) : (
                 <Input
-                  placeholder={`请输入${field.label}${field.unit ? `（${field.unit}）` : ''}`}
+                  placeholder={t('asset.paramInputPh', { label: `${field.label}${field.unit ? `（${field.unit}）` : ''}` })}
                   allowClear
                   value={paramValues[field.key] || undefined}
                   onChange={(e) => setParamValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
@@ -497,7 +500,7 @@ export default function AssetAdd() {
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1890ff' }}>
-            {isEdit ? '编辑资产' : '新增资产'}
+            {isEdit ? t('asset.editAssetTitle') : t('asset.addAssetTitle')}
           </h2>
         </div>
       </div>
@@ -510,19 +513,19 @@ export default function AssetAdd() {
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: '#52C41A' }} />,
               '#f6ffed',
-              '资产信息',
+              t('asset.assetInfoTitle'),
             )}
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item label="资产编码" name="assetNo" rules={[{ required: true, message: '请输入资产编码' }]}>
-                  <Input placeholder="如 ZC-2024-0001" allowClear disabled={!!editingAsset?.batchId} style={{ fontFamily: 'monospace' }} />
+                <Form.Item label={t('asset.assetNoLabel')} name="assetNo" rules={[{ required: true, message: t('asset.assetCodeRequired') }]}>
+                  <Input placeholder={t('asset.assetNoPh')} allowClear disabled={!!editingAsset?.batchId} style={{ fontFamily: 'monospace' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
-                <Form.Item label="资产分类" name="assetType" rules={[{ required: true, message: '请选择资产分类' }]}>
+                <Form.Item label={t('asset.assetTypeLabel')} name="assetType" rules={[{ required: true, message: t('asset.assetTypeRequired') }]}>
                   <TreeSelect
-                    placeholder="请选择分类"
+                    placeholder={t('asset.assetTypeSelectPh')}
                     allowClear
                     showSearch
                     treeDefaultExpandAll
@@ -533,9 +536,9 @@ export default function AssetAdd() {
                 </Form.Item>
               </Col>
               <Col span={8}>
-                <Form.Item label="资产品牌" name="brand">
+                <Form.Item label={t('asset.assetBrandLabel')} name="brand">
                   <Select
-                    placeholder="请先选择分类"
+                    placeholder={t('asset.selectBrandFirstPh')}
                     allowClear
                     showSearch
                     optionFilterProp="label"
@@ -549,9 +552,9 @@ export default function AssetAdd() {
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item label="资产名称" name="assetName">
+                <Form.Item label={t('asset.assetNameLabel')} name="assetName">
                   <Select
-                    placeholder="请先选择资产品牌"
+                    placeholder={t('asset.selectBrandFirstAssetPh')}
                     allowClear
                     showSearch
                     optionFilterProp="label"
@@ -561,19 +564,28 @@ export default function AssetAdd() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={8}>
+                <Form.Item label={t('asset.companyBrandLabel')} name="companyBrand">
+                  <Select
+                    placeholder={t('asset.selectCompanyBrandPh')}
+                    allowClear
+                    options={numericOptions}
+                  />
+                </Form.Item>
+              </Col>
             </Row>
 
             {/* 资产参数信息 */}
             <div style={{ marginTop: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>参数信息</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.paramInfoSection')}</div>
               {renderParamFields()}
             </div>
 
             {/* 资产照片 */}
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>资产照片</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.assetPhotoSection')}</div>
               {renderImageUpload()}
-              <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>支持 jpg/png，每张不超过 2MB，可上传多张</div>
+              <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>{t('asset.photoUploadHint')}</div>
             </div>
           </div>
 
@@ -582,15 +594,15 @@ export default function AssetAdd() {
             {renderCardTitle(
               <span style={{ fontSize: 14, color: '#E8720C' }}>¥</span>,
               '#fff7e6',
-              '租/购信息',
+              t('asset.rentPurchaseTitle'),
             )}
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item label="採購形式" name="source" initialValue="self" rules={[{ required: true, message: '請選擇採購形式' }]}>
+                <Form.Item label={t('asset.sourceLabel')} name="source" initialValue="self" rules={[{ required: true, message: t('asset.sourceSelectPh') }]}>
                   <Select>
-                    <Select.Option value="self">自购</Select.Option>
-                    <Select.Option value="lease">租用</Select.Option>
+                    <Select.Option value="self">{t('asset.sourceSelfOption')}</Select.Option>
+                    <Select.Option value="lease">{t('asset.sourceLeaseOption')}</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -598,14 +610,14 @@ export default function AssetAdd() {
               {source === 'self' && (
                 <>
                   <Col span={8}>
-                    <Form.Item label="购买公司" name="company" rules={[{ required: true, message: '请选择购买公司' }]} initialValue="澳觅科技">
-                      <Select placeholder="请选择公司">
+                    <Form.Item label={t('asset.purchaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.companyRequired') }]} initialValue="澳觅科技">
+                      <Select placeholder={t('asset.selectCompanyPh')}>
                         {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
                       </Select>
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="购买时价值" name="purchaseValue">
+                    <Form.Item label={t('asset.purchaseValueLabel')} name="purchaseValue">
                       <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
                     </Form.Item>
                   </Col>
@@ -615,15 +627,15 @@ export default function AssetAdd() {
               {source === 'lease' && (
                 <>
                   <Col span={8}>
-                    <Form.Item label="租用公司" name="company" rules={[{ required: true, message: '请选择租用公司' }]}>
-                      <Select placeholder="请选择公司">
+                    <Form.Item label={t('asset.leaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.leaseCompanyRequired') }]}>
+                      <Select placeholder={t('asset.selectCompanyPh')}>
                         {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
                       </Select>
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="租借公司" name="leaseCompany">
-                      <Input placeholder="请输入租借公司" allowClear />
+                    <Form.Item label={t('asset.rentalCompanyLabel')} name="leaseCompany">
+                      <Input placeholder={t('asset.rentalCompanyPh')} allowClear />
                     </Form.Item>
                   </Col>
                 </>
@@ -634,8 +646,8 @@ export default function AssetAdd() {
               {/* 自购 → 购买日期 */}
               {source === 'self' && (
                 <Col span={8}>
-                  <Form.Item label="购买日期" name="purchaseDate">
-                    <DatePicker style={{ width: '100%' }} placeholder="请选择购买日期" />
+                  <Form.Item label={t('asset.purchaseDateLabel')} name="purchaseDate">
+                    <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} />
                   </Form.Item>
                 </Col>
               )}
@@ -643,13 +655,13 @@ export default function AssetAdd() {
               {source === 'lease' && (
                 <>
                   <Col span={8}>
-                    <Form.Item label="租金" name="rentalCost">
+                    <Form.Item label={t('asset.rentalCostLabel')} name="rentalCost">
                       <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="租用周期" name="rentalPeriod">
-                      <DatePicker.RangePicker style={{ width: '100%' }} placeholder={['开始日期', '结束日期']} />
+                    <Form.Item label={t('asset.rentalPeriodLabel')} name="rentalPeriod">
+                      <DatePicker.RangePicker style={{ width: '100%' }} placeholder={[t('asset.startDatePh'), t('asset.endDatePh')]} />
                     </Form.Item>
                   </Col>
                 </>
@@ -658,12 +670,12 @@ export default function AssetAdd() {
 
             {/* 存放位置 */}
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>存放位置</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.storageLocationSection')}</div>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Form.Item label="仓库位置" style={{ marginBottom: 0 }}>
+                  <Form.Item label={t('asset.warehouseLocationLabel')} style={{ marginBottom: 0 }}>
                     <TreeSelect
-                      placeholder="请选择仓库位置"
+                      placeholder={t('asset.selectWarehousePh')}
                       allowClear
                       showSearch
                       treeNodeFilterProp="title"
@@ -683,19 +695,19 @@ export default function AssetAdd() {
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
               '#E6FFFB',
-              '当前使用人',
+              t('asset.currentUserTitle'),
             )}
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item label="当前使用人" name="userName">
-                  <Input placeholder="请输入使用人" allowClear />
+                <Form.Item label={t('asset.currentUserLabel')} name="userName">
+                  <Input placeholder={t('asset.currentUserPh')} allowClear />
                 </Form.Item>
               </Col>
               <Col span={8}>
-                <Form.Item label="所在部门" name="department">
+                <Form.Item label={t('asset.departmentLabel')} name="department">
                   <TreeSelect
-                    placeholder="请选择部门"
+                    placeholder={t('asset.selectDeptPh')}
                     allowClear
                     showSearch
                     treeDefaultExpandAll
@@ -705,8 +717,8 @@ export default function AssetAdd() {
                 </Form.Item>
               </Col>
               <Col span={8}>
-                <Form.Item label="领用日期" name="usageDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="请选择领用日期" />
+                <Form.Item label={t('asset.usageDateLabel')} name="usageDate">
+                  <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} />
                 </Form.Item>
               </Col>
             </Row>
@@ -717,11 +729,11 @@ export default function AssetAdd() {
             {renderCardTitle(
               <span style={{ fontSize: 14, color: '#722ED1' }}></span>,
               '#f9f0ff',
-              '备注信息',
+              t('asset.remarkTitle'),
             )}
 
             <Form.Item name="remark" style={{ marginBottom: 0 }}>
-              <TextArea rows={4} maxLength={500} showCount placeholder="可填写备注信息" style={{ borderRadius: 8 }} />
+              <TextArea rows={4} maxLength={500} showCount placeholder={t('asset.remarkPlaceholder')} style={{ borderRadius: 8 }} />
             </Form.Item>
           </div>
 
@@ -730,35 +742,40 @@ export default function AssetAdd() {
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
               '#e6f7ff',
-              '入库信息',
-              searchParams.get('inboundBatchNo') ? '来自验收入库' : undefined,
+              t('asset.inboundInfoTitle'),
+              searchParams.get('inboundBatchNo') ? t('asset.fromInboundTag') : undefined,
             )}
 
             <Row gutter={16}>
               <Col span={6}>
-                <Form.Item label="入库批次号" name="inboundBatchNo">
-                  <Input placeholder="由驗收入庫自動生成" disabled />
+                <Form.Item label={t('asset.inboundBatchNoLabel')} name="inboundBatchNo">
+                  <Input placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="入库时间" name="inboundDate">
-                  <DatePicker style={{ width: '100%' }} placeholder="由驗收入庫自動生成" disabled />
+                <Form.Item label={t('asset.inboundDateLabel')} name="inboundDate">
+                  <DatePicker style={{ width: '100%' }} placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="入库数量" name="inboundQty" initialValue={1}>
+                <Form.Item label={t('asset.inboundQtyLabel')} name="inboundQty" initialValue={1}>
                   <InputNumber min={1} max={1} style={{ width: '100%' }} disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="验收人" name="inspector">
-                  <Input placeholder="由驗收入庫自動生成" disabled />
+                <Form.Item label={t('asset.inspectorLabel')} name="inspector">
+                  <Input placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>
               </Col>
             </Row>
           </div>
 
         </Form>
+
+        {/* ====== 模塊6：資產標籤（僅編輯模式；新增時無資產 ID，不可綁定） ====== */}
+        {isEdit && editingId !== null && (
+          <AssetTagBindingSection assetId={editingId} asset={editingAsset} />
+        )}
       </Spin>
 
       {/* ====== 底部操作栏（取消+保存） ====== */}

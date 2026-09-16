@@ -1,0 +1,129 @@
+/* ============================================================
+   資產標籤配置頁局部樣式（AssetTag）
+   ============================================================ */
+
+/* 配色方案縮略圖（表單頁左欄畫廊） */
+.asset-tag-style-thumb {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.asset-tag-style-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.asset-tag-style-thumb.selected {
+  border-color: #E8720C;
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.25);
+}
+.asset-tag-style-thumb .thumb-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #E8720C;
+  color: #fff;
+  font-size: 10px;
+}
+.asset-tag-style-thumb.selected .thumb-check {
+  display: flex;
+}
+
+/* 展示字段可選行（表單頁右欄） */
+.asset-tag-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e8eaed;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.asset-tag-field-row:hover {
+  border-color: #F59432;
+}
+.asset-tag-field-row.selected {
+  border-color: #E8720C;
+  background: #FFF7F0;
+}
+
+/* 表單頁三欄工作區（左樣式畫廊 / 中實時預覽 / 右字段配置） */
+.asset-tag-workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.asset-tag-canvas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 380px;
+  padding: 24px;
+  background: #F5F5F5;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+.asset-tag-panel-scroll {
+  max-height: 470px;
+  overflow-y: auto;
+}
+
+/* 標籤模板卡片（列表頁卡片視圖） */
+.asset-tag-card {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.asset-tag-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+.asset-tag-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #FAFAFA;
+  border-bottom: 1px solid #f0f0f0;
+}
+.asset-tag-card-body {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: #fff;
+}
+.asset-tag-card-canvas {
+  background: #FAFAFA;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 16px 20px;
+}
+.asset-tag-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 12px;
+  color: #8C8C8C;
+}

@@ -1,15 +1,14 @@
 import React from 'react'
 import { isShanfeng, BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '../constants/brand'
+import { useCompanyBrand } from '../contexts/CompanyBrandContext'
 
 /**
  * 所屬品牌統一標籤組件
- * 全局統一「閃蜂 / mFood」品牌枚舉的展示樣式
+ * 全局統一品牌展示樣式，標籤從後端動態加載
  *
  * 兼容多種數據表示：
- *  - 枚舉/數字：1 = 閃蜂, 2 = mFood
- *  - 字符串：'1' / '2'
- *  - 字符串：'shanfeng' / 'mfood'
- *  - 字符串：'flashBee' / 'mFood'
+ *  - 數字（公司品牌 ID，從 sys_company_brand 表查詢）
+ *  - 字符串：'flashBee' / 'mFood'（推廣模塊兼容）
  *  - 中文文本：'閃蜂' / 'mFood'
  */
 
@@ -39,8 +38,18 @@ const BRAND_STYLE: Record<'shanfeng' | 'mfood', React.CSSProperties> = {
 }
 
 export default function BrandTag({ value, style }: BrandTagProps) {
+  const { labelMap } = useCompanyBrand()
   const shanfeng = isShanfeng(value)
   const brandStyle = shanfeng ? BRAND_STYLE.shanfeng : BRAND_STYLE.mfood
+
+  // 數字 ID → 從 context 動態取標籤；字符串 → 回退靜態常量
+  let label: string
+  if (typeof value === 'number' && labelMap[value]) {
+    label = labelMap[value]
+  } else {
+    label = shanfeng ? BRAND_SHANFENG_LABEL : BRAND_MFOOD_LABEL
+  }
+
   return (
     <span
       style={{
@@ -59,7 +68,7 @@ export default function BrandTag({ value, style }: BrandTagProps) {
         ...style,
       }}
     >
-      {shanfeng ? BRAND_SHANFENG_LABEL : BRAND_MFOOD_LABEL}
+      {label}
     </span>
   )
 }

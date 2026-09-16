@@ -32,16 +32,25 @@ import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
 /**
+ * 收貨方式展示文案（值為 asset 段 key，渲染時經 t() 轉換；與 InboundList 保持一致）
+ */
+const DELIVERY_METHOD_LABEL: Record<string, string> = {
+  self_pickup: 'deliverySelfPickup',
+  supplier_delivery: 'deliverySupplier',
+  express: 'deliveryExpress',
+}
+
+/**
  * 上傳前 UX 校驗：僅圖片、≤ 5MB。
  * 註：此處僅作即時反饋減少無效請求，後端仍會以 magic bytes 與大小重新校驗（前端不可信）。
  */
-function validatePhotoFile(file: File): boolean {
+function validatePhotoFile(file: File, t: (key: string) => string): boolean {
   if (!file.type.startsWith('image/')) {
-    message.error('僅支持上傳圖片文件')
+    message.error(t('asset.photoOnlyImage'))
     return false
   }
   if (file.size > MAX_PHOTO_SIZE) {
-    message.error('圖片大小不能超過 5MB')
+    message.error(t('asset.photoSizeLimit'))
     return false
   }
   return true
@@ -78,13 +87,14 @@ type RejectStatus = 'return' | 'exchange' | 'concession'
 /** 現場照片上限（與全局憑證上傳一致：OA 採購/充值/轉賬均限 5 張） */
 const MAX_PHOTOS = 5
 
-const REJECT_OPTIONS: { value: RejectStatus; label: string; desc: string }[] = [
-  { value: 'return', label: '退貨', desc: '退回供應商，生成退貨記錄' },
-  { value: 'exchange', label: '換貨', desc: '退回供應商，等待供應商重新送貨' },
-  { value: 'concession', label: '讓步接收', desc: '雖有偏差但仍可用，經審批後降級入庫' },
+/** labelKey/descKey/REJECT_LABEL 值均為 asset 段 key，渲染時經 t() 轉換（模塊級不能調 hook） */
+const REJECT_OPTIONS: { value: RejectStatus; labelKey: string; descKey: string }[] = [
+  { value: 'return', labelKey: 'rejectReturn', descKey: 'rejectReturnDesc' },
+  { value: 'exchange', labelKey: 'rejectExchange', descKey: 'rejectExchangeDesc' },
+  { value: 'concession', labelKey: 'rejectConcession', descKey: 'rejectConcessionDesc' },
 ]
 
-const REJECT_LABEL: Record<RejectStatus, string> = { return: '退貨', exchange: '換貨', concession: '讓步接收' }
+const REJECT_LABEL: Record<RejectStatus, string> = { return: 'rejectReturn', exchange: 'rejectExchange', concession: 'rejectConcession' }
 const REJECT_COLOR: Record<RejectStatus, string> = { return: 'error', exchange: 'warning', concession: 'processing' }
 
 /**
@@ -269,7 +279,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           }),
         }))
         setGroups(restored)
-        message.info('已恢復上次保存的草稿')
+        message.info(t('asset.draftRestored'))
       }
 
       // 經辦人信息
@@ -301,7 +311,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
   /* ----- 照片上傳 ----- */
   const handleItemPhotoUpload = useCallback(async (groupId: string, rowKey: string, file: File) => {
-    if (!validatePhotoFile(file)) return false
+    if (!validatePhotoFile(file, t)) return false
     setUploading(true)
     try {
       const result = await uploadInboundPhoto(file)
@@ -310,12 +320,12 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       })
     } catch (err) {
       // 優先展示後端具體校驗消息（如文件類型/大小/魔數不合法），否則回退通用文案
-      message.error(err instanceof Error && err.message ? err.message : '照片上傳失敗')
+      message.error(err instanceof Error && err.message ? err.message : t('asset.photoUploadFailed'))
     } finally {
       setUploading(false)
     }
     return false // 阻止 antd Upload 自動上傳
-  }, [groups])
+  }, [groups, t])
 
   const handleItemPhotoRemove = useCallback((groupId: string, rowKey: string, idx: number) => {
     const item = groups.find((g) => g.id === groupId)?.items.find((it) => it.key === rowKey)
@@ -326,19 +336,19 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   }, [groups])
 
   const handleRejectPhotoUpload = useCallback(async (file: File) => {
-    if (!validatePhotoFile(file)) return false
+    if (!validatePhotoFile(file, t)) return false
     setUploading(true)
     try {
       const result = await uploadInboundPhoto(file)
       setRejectPhotos((prev) => [...prev, result])
     } catch (err) {
       // 優先展示後端具體校驗消息（如文件類型/大小/魔數不合法），否則回退通用文案
-      message.error(err instanceof Error && err.message ? err.message : '照片上傳失敗')
+      message.error(err instanceof Error && err.message ? err.message : t('asset.photoUploadFailed'))
     } finally {
       setUploading(false)
     }
     return false
-  }, [])
+  }, [t])
 
   const handleRejectPhotoRemove = useCallback((idx: number) => {
     setRejectPhotos((prev) => {
@@ -394,9 +404,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   /** 確認通過：寫入配件清單並標記驗收通過（照片至少 1 張，作為到貨憑證） */
   const handlePassConfirm = () => {
     if (!passModal || !passItem) return
-    if (passItem.photos.length === 0) { message.warning('請至少上傳 1 張現場照片作為驗收憑證'); return }
-    if (passAccessories.some((a) => !a.name.trim())) { message.warning('請填寫配件名稱'); return }
-    if (passAccessories.some((a) => a.qty <= 0)) { message.warning('配件數量需大於 0'); return }
+    if (passItem.photos.length === 0) { message.warning(t('asset.warnPhotoRequired')); return }
+    if (passAccessories.some((a) => !a.name.trim())) { message.warning(t('asset.warnAccessoryName')); return }
+    if (passAccessories.some((a) => a.qty <= 0)) { message.warning(t('asset.warnAccessoryQty')); return }
     const accessories = passAccessories.map((a) => ({ name: a.name.trim(), qty: a.qty }))
     updateGroupItem(passModal.groupId, passModal.rowKey, { confirmed: true, selected: true, accessories })
     setPassModal(null)
@@ -426,7 +436,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   /** 提交不通過 */
   const handleRejectConfirm = () => {
     if (!rejectModal) return
-    if (!rejectReason.trim()) { message.warning('請填寫不通過原因'); return }
+    if (!rejectReason.trim()) { message.warning(t('asset.warnRejectReason')); return }
     updateGroupItem(rejectModal.groupId, rejectModal.rowKey, {
       rejectStatus: rejectType,
       rejectReason: rejectReason.trim(),
@@ -467,14 +477,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         />
       ),
     },
-    { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
+    { title: t('asset.colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
+    { title: t('asset.colBrand'), dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 140, ellipsis: true },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
+    { title: t('asset.colAssetName'), dataIndex: 'modelName', key: 'modelName', width: 140, ellipsis: true },
+    { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
     {
-      title: '成交單價', key: 'confirmedPrice', width: 100, align: 'right',
+      title: t('asset.colUnitPrice'), key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r: InboundItem) => (
         <span style={{ fontWeight: r.confirmedPrice ? 600 : 400, color: r.confirmedPrice ? '#52c41a' : '#bfbfbf' }}>
           {r.confirmedPrice ? `MOP ${r.confirmedPrice.toLocaleString()}` : '-'}
@@ -482,25 +492,25 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       ),
     },
     {
-      title: '小計', key: 'subtotal', width: 100, align: 'right',
+      title: t('asset.colSubtotal'), key: 'subtotal', width: 100, align: 'right',
       render: (_: unknown, r: InboundItem) => {
         const cp = r.confirmedPrice || r.price
         return <span style={{ fontWeight: 600 }}>MOP ${(cp * r.qty).toLocaleString()}</span>
       },
     },
     {
-      title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 90, align: 'right',
+      title: t('asset.colReceived'), dataIndex: 'receivedQty', key: 'receivedQty', width: 90, align: 'right',
       render: (v: number, r: InboundItem) => (
         <Space size={2} style={{ justifyContent: 'flex-end' }}>
           <Tag color={v > 0 ? 'success' : 'default'} style={{ margin: 0 }}>{v}</Tag>
           {isFullyAccepted(r) && (
-            <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>完成</Tag>
+            <Tag color="success" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>{t('asset.tagCompleted')}</Tag>
           )}
         </Space>
       ),
     },
     {
-      title: '本次驗收', key: 'inboundQty', width: 110,
+      title: t('asset.colThisInbound'), key: 'inboundQty', width: 110,
       render: (_: unknown, r: InboundItem) => (
         <InputNumber
           value={r.inboundQty}
@@ -514,7 +524,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       ),
     },
     {
-      title: '存放位置', key: 'locationId', width: 180,
+      title: t('asset.colStorageLocation'), key: 'locationId', width: 180,
       render: (_: unknown, r: InboundItem) => (
         <TreeSelect
           value={r.locationId}
@@ -523,13 +533,13 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           size="small"
           treeData={locationTree}
           treeDefaultExpandAll
-          placeholder="請選擇存放位置"
+          placeholder={t('asset.phSelectLocation')}
           disabled={!r.selected || r.confirmed || !!r.rejectStatus || isFullyAccepted(r)}
         />
       ),
     },
     {
-      title: '操作', key: 'action', width: 120, align: 'center',
+      title: t('asset.colAction'), key: 'action', width: 120, align: 'center',
       render: (_: unknown, r: InboundItem) => {
         const maxQty = Math.max(0, r.qty - r.receivedQty - (r.histReturnQty || 0))
         // 已不通過 → 顯示處置標籤 + 撤銷
@@ -538,14 +548,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             <div>
               <Space size={4}>
                 <Tag color={REJECT_COLOR[r.rejectStatus]} style={{ margin: 0, fontSize: 11 }}>
-                  {REJECT_LABEL[r.rejectStatus]}
+                  {t(`asset.${REJECT_LABEL[r.rejectStatus]}`)}
                 </Tag>
                 <Button
                   type="link" size="small" danger
                   onClick={() => updateGroupItem(groupId, r.key!, { rejectStatus: undefined, rejectReason: '', photos: [] })}
                   style={{ fontSize: 12, padding: '0 2px' }}
                 >
-                  撤銷
+                  {t('asset.undo')}
                 </Button>
               </Space>
             </div>
@@ -556,13 +566,13 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           return (
             <div>
               <Space size={4}>
-                <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收</Tag>
+                <Tag color="success" style={{ margin: 0, fontSize: 11 }}>{t('asset.tagAccepted')}</Tag>
                 <Button
                   type="link" size="small" danger
                   onClick={() => updateGroupItem(groupId, r.key!, { confirmed: false })}
                   style={{ fontSize: 12, padding: '0 2px' }}
                 >
-                  撤銷
+                  {t('asset.undo')}
                 </Button>
               </Space>
             </div>
@@ -570,21 +580,21 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         }
         // 歷史已全退貨（終態）→ 僅顯示「退貨」標記，不提供操作按鈕
         if (isFullyReturned(r)) {
-          return <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨</Tag>
+          return <Tag color="error" style={{ margin: 0, fontSize: 11 }}>{t('asset.rejectReturn')}</Tag>
         }
         // 歷史已完全驗收（無剩餘可驗）→ 僅顯示「已驗收」標記，不提供操作按鈕
         if (maxQty <= 0) {
-          return <Tag color="success" style={{ margin: 0, fontSize: 11 }}>已驗收</Tag>
+          return <Tag color="success" style={{ margin: 0, fontSize: 11 }}>{t('asset.tagAccepted')}</Tag>
         }
         // 未處理 → 驗收確認（彈窗內拍照 + 配件清單）/ 驗收不通過；歷史換貨/部分退貨以標籤前置提示
         return (
           <div>
             <Space size={4} wrap>
               {(r.histExchangeQty || 0) > 0 && (
-                <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>換貨{r.histExchangeQty}</Tag>
+                <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>{t('asset.tagExchangeCount', { count: r.histExchangeQty })}</Tag>
               )}
               {(r.histReturnQty || 0) > 0 && (
-                <Tag color="error" style={{ margin: 0, fontSize: 11 }}>退貨{r.histReturnQty}</Tag>
+                <Tag color="error" style={{ margin: 0, fontSize: 11 }}>{t('asset.tagReturnCount', { count: r.histReturnQty })}</Tag>
               )}
               <Button
                 type="link" size="small"
@@ -592,7 +602,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 onClick={() => { setPassModal({ groupId, rowKey: r.key! }); setPassAccessories(r.accessories.length > 0 ? [...r.accessories] : []) }}
                 style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
               >
-                通過
+                {t('asset.passBtn')}
               </Button>
               <Button
                 type="link" size="small" danger
@@ -600,14 +610,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 onClick={() => { setRejectModal({ groupId, rowKey: r.key! }); setRejectType('return'); setRejectReason(''); setRejectPhotos([]) }}
                 style={{ fontSize: 12, padding: '0 2px' }}
               >
-                不通過
+                {t('asset.failBtn')}
               </Button>
             </Space>
           </div>
         )
       },
     },
-  ], [locations, groups])
+  ], [groups, locationTree, t])
 
   /* ----- 提交 / 保存 ----- */
   const [saving, setSaving] = useState(false)
@@ -640,9 +650,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         inboundDate: groups[0]?.inboundDate.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         operator: selectedEmp?.name || order.purchaser || '',
         items: draftItems,
-        remark: `採購訂單 ${order.poNo} 驗收草稿${scopeSupplier ? `（供應商：${scopeSupplier}）` : ''}`,
+        remark: t('asset.draftRemark', { poNo: order.poNo }) + (scopeSupplier ? t('asset.remarkSupplierPart', { supplier: scopeSupplier }) : ''),
       })
-      message.success('草稿保存成功')
+      message.success(t('asset.draftSaved'))
     } catch (e: unknown) {
       if (e instanceof Error && e.message) message.error(e.message)
     } finally {
@@ -686,26 +696,26 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
     )
     const allItems = [...passItems, ...rejectItems]
     if (allItems.some((it) => !it.orderItemId || it.qty <= 0)) {
-      message.warning('驗收明細或數量無效，請重新載入採購訂單')
+      message.warning(t('asset.warnInvalidItems'))
       return
     }
     if (!allItems.length) {
-      message.warning('請至少驗收一條明細')
+      message.warning(t('asset.warnNoItems'))
       return
     }
     Modal.confirm({
-      title: '確認提交驗收入庫？',
+      title: t('asset.confirmSubmitTitle'),
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>採購訂單：</span><b>{order.poNo}</b></div>
-          {scopeSupplier && <div className="confirm-info-row"><span>供應商：</span><b>{scopeSupplier}</b></div>}
-          <div className="confirm-info-row"><span>驗收數量：</span><b>{allItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
-          <div className="confirm-info-row"><span>生成資產：</span><b>{passItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
+          <div className="confirm-info-row"><span>{t('asset.poLabel')}</span><b>{order.poNo}</b></div>
+          {scopeSupplier && <div className="confirm-info-row"><span>{t('asset.supplierLabel')}</span><b>{scopeSupplier}</b></div>}
+          <div className="confirm-info-row"><span>{t('asset.qtyLabel')}</span><b>{allItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
+          <div className="confirm-info-row"><span>{t('asset.assetsGenLabel')}</span><b>{passItems.reduce((sum, it) => sum + it.qty, 0)}</b></div>
         </div>
       ),
-      okText: '確認提交', cancelText: '取消',
+      okText: t('asset.confirmSubmitOk'), cancelText: t('common.cancel'),
       onOk: async () => {
         setSubmitting(true)
         try {
@@ -714,7 +724,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         inboundDate: groups[0]?.inboundDate.format('YYYY-MM-DD') || dayjs().format('YYYY-MM-DD'),
         operator: selectedEmp?.name || order.purchaser || '',
         items: allItems,
-        remark: `採購訂單 ${order.poNo} 驗收入庫${scopeSupplier ? `（供應商：${scopeSupplier}）` : ''}`,
+        remark: t('asset.inboundRemark', { poNo: order.poNo }) + (scopeSupplier ? t('asset.remarkSupplierPart', { supplier: scopeSupplier }) : ''),
       })
       // 驗收成功後清除草稿（僅清當前驗收範圍，不影響其他供應商草稿）
       await deleteInboundDraft(order.id, groupId)
@@ -755,9 +765,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>驗收入庫</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{t('asset.inboundTitle')}</h2>
           <Tag color="orange" style={{ marginLeft: 4 }}>{order.poNo}</Tag>
-          {scopeSupplier && <Tag color="purple">供應商：{scopeSupplier}</Tag>}
+          {scopeSupplier && <Tag color="purple">{t('asset.supplierLabel')}{scopeSupplier}</Tag>}
         </div>
       </div>
 
@@ -767,35 +777,35 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Row gutter={24}>
           <Col span={6}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購經辦人</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colPurchaser')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{order.purchaser || '-'}</div>
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>服務部門</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderDept')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{purchaserDept || '-'}</div>
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>所屬品牌</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {order.brand ? <BrandTag value={order.brand} /> : <span style={{ color: '#bfbfbf', fontSize: 14 }}>-</span>}
-              {order.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C' }}>編碼 TB</span>}
-              {order.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF' }}>編碼 MF</span>}
+              {order.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C' }}>{t('asset.brandCodeTb')}</span>}
+              {order.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF' }}>{t('asset.brandCodeMf')}</span>}
             </div>
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>訂單總計</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
           </Col>
         </Row>
         <Row gutter={24} style={{ marginTop: 12 }}>
           <Col span={24}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>採購事由</div>
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{order.remark || '-'}</div>
           </Col>
         </Row>
@@ -808,17 +818,17 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="本訂單歷史驗收存在異常處置，請留意對應明細"
+          message={t('asset.histAlertMsg')}
           description={(
             <Space size={16} wrap>
               {(order.returnQty || 0) > 0 && (
-                <span>退貨 <b style={{ color: '#FF4D4F' }}>{order.returnQty}</b> 件（終態，供應商不補貨）</span>
+                <span>{t('asset.rejectReturn')} <b style={{ color: '#FF4D4F' }}>{order.returnQty}</b> {t('asset.histReturnUnit')}</span>
               )}
               {(order.exchangeQty || 0) > 0 && (
-                <span>換貨 <b style={{ color: '#FA8C16' }}>{order.exchangeQty}</b> 件（等待供應商二次發貨，到貨後重新驗收）</span>
+                <span>{t('asset.rejectExchange')} <b style={{ color: '#FA8C16' }}>{order.exchangeQty}</b> {t('asset.histExchangeUnit')}</span>
               )}
               {(order.concessionQty || 0) > 0 && (
-                <span>讓步接收 <b style={{ color: '#1890FF' }}>{order.concessionQty}</b> 件</span>
+                <span>{t('asset.rejectConcession')} <b style={{ color: '#1890FF' }}>{order.concessionQty}</b> {t('asset.histConcessionUnit')}</span>
               )}
             </Space>
           )}
@@ -843,13 +853,13 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gi + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>採購物資</span>
-                <Tag color="blue" style={{ fontSize: 11 }}>小計：MOP {subtotal.toLocaleString()}</Tag>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.groupTitle')}</span>
+                <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.groupSubtotalTag', { amount: subtotal.toLocaleString() })}</Tag>
                 <Tag color={groupConfirmed === groupTotal ? 'success' : 'processing'} style={{ fontSize: 11 }}>
-                  驗收進度：{groupConfirmed}/{groupTotal}
+                  {t('asset.groupProgressTag', { confirmed: groupConfirmed, total: groupTotal })}
                 </Tag>
                 {groupRejected > 0 && (
-                  <Tag color="error" style={{ fontSize: 11 }}>不通過：{groupRejected}</Tag>
+                  <Tag color="error" style={{ fontSize: 11 }}>{t('asset.groupRejectedTag', { count: groupRejected })}</Tag>
                 )}
               </div>
             </div>
@@ -857,23 +867,23 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             {/* 供應商信息（只讀）+ 驗收日期 */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={5}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>供應商名稱</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierName')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.supplier || '-'}</div>
               </Col>
               <Col span={5}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>供應商聯絡人</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierContact')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.contact || '-'}</div>
               </Col>
               <Col span={5}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>下單日期</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelOrderDate')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.orderDate || '-'}</div>
               </Col>
               <Col span={5}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>收貨方式</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{group.deliveryMethod ? ({ self_pickup: '自取', supplier_delivery: '供應商送貨上門', express: '快遞發貨' } as Record<string, string>)[group.deliveryMethod] || '-' : '-'}</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelDeliveryMethod')}</div>
+                <div style={{ fontSize: 14, color: '#262626' }}>{group.deliveryMethod && DELIVERY_METHOD_LABEL[group.deliveryMethod] ? t(`asset.${DELIVERY_METHOD_LABEL[group.deliveryMethod]}`) : '-'}</div>
               </Col>
               <Col span={4}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>驗收日期</div>
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
                 <DatePicker
                   value={group.inboundDate}
                   onChange={(d) => updateGroupDate(group.id, d || dayjs())}
@@ -915,36 +925,36 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff2f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ExclamationCircleOutlined style={{ fontSize: 14, color: '#FF4D4F' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>驗收異常記錄</span>
-              <Tag color="error" style={{ fontSize: 11 }}>共 {totalRejectedQty} 項</Tag>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.exceptionTitle')}</span>
+              <Tag color="error" style={{ fontSize: 11 }}>{t('asset.exceptionCountTag', { count: totalRejectedQty })}</Tag>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <Table
               columns={[
-                { title: '供應商', dataIndex: '_supplier', key: '_supplier', width: 120, ellipsis: true },
-                { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
-                { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
+                { title: t('asset.colSupplier'), dataIndex: '_supplier', key: '_supplier', width: 120, ellipsis: true },
+                { title: t('asset.colAssetName'), dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
+                { title: t('asset.colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 90, ellipsis: true,
                   render: (v: string | undefined) => v || '-' },
-                { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
+                { title: t('asset.colBrand'), dataIndex: 'brandName', key: 'brandName', width: 90, ellipsis: true,
                   render: (v: string | undefined) => v || '-' },
-                { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
+                { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
                 {
-                  title: '處置方式', dataIndex: 'rejectStatus', key: 'rejectStatus', width: 100,
-                  render: (v: RejectStatus) => <Tag color={REJECT_COLOR[v]}>{REJECT_LABEL[v]}</Tag>,
+                  title: t('asset.colDisposeMethod'), dataIndex: 'rejectStatus', key: 'rejectStatus', width: 100,
+                  render: (v: RejectStatus) => <Tag color={REJECT_COLOR[v]}>{t(`asset.${REJECT_LABEL[v]}`)}</Tag>,
                 },
                 {
-                  title: '不通過原因', dataIndex: 'rejectReason', key: 'rejectReason', ellipsis: true,
+                  title: t('asset.colRejectReason'), dataIndex: 'rejectReason', key: 'rejectReason', ellipsis: true,
                   render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
                 },
                 {
-                  title: '操作', key: 'action', width: 80, align: 'center',
+                  title: t('asset.colAction'), key: 'action', width: 80, align: 'center',
                   render: (_: unknown, r: typeof rejectedItems[0]) => (
                     <Button
                       type="link" size="small" danger
                       onClick={() => updateGroupItem(r._groupId, r.key!, { rejectStatus: undefined, rejectReason: '' })}
                       style={{ fontSize: 12 }}
                     >
-                      撤銷
+                      {t('asset.undo')}
                     </Button>
                   ),
                 },
@@ -961,25 +971,25 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       {/* ====== 底部操作欄 ====== */}
       <div className="form-footer">
         <Space>
-          <Button onClick={onBack}>取消</Button>
+          <Button onClick={onBack}>{t('common.cancel')}</Button>
           <Button loading={saving} onClick={handleSave}>
-            保存
+            {t('common.save')}
           </Button>
           <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSubmit}
             disabled={totalInboundQty <= 0 && totalRejectedQty <= 0}>
-            確認驗收（{totalInboundQty} 件）{totalRejectedQty > 0 ? ` · 不通過 ${totalRejectedQty} 項` : ''}
+            {t('asset.submitBtn', { count: totalInboundQty })}{totalRejectedQty > 0 ? t('asset.rejectedSuffix', { count: totalRejectedQty }) : ''}
           </Button>
         </Space>
       </div>
 
       {/* ====== 驗收確認彈窗（通過項：拍照憑證 + 配件清單） ====== */}
       <Modal
-        title="驗收確認"
+        title={t('asset.passModalTitle')}
         open={!!passModal}
         onOk={handlePassConfirm}
         onCancel={() => { setPassModal(null); setPassAccessories([]) }}
-        okText="確認通過"
-        cancelText="取消"
+        okText={t('asset.passOkText')}
+        cancelText={t('common.cancel')}
         width={720}
         destroyOnClose
       >
@@ -988,10 +998,10 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             {/* 物資信息 */}
             <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 10, fontSize: 13 }}>
-                <div><span style={{ color: '#8C8C8C' }}>資產名稱：</span><span style={{ fontWeight: 600 }}>{passItem.modelName}</span></div>
-                <div><span style={{ color: '#8C8C8C' }}>分類：</span>{passItem.categoryName || '-'}</div>
-                <div><span style={{ color: '#8C8C8C' }}>本次驗收數量：</span><span style={{ fontWeight: 700, color: '#E8720C' }}>{passItem.inboundQty}</span> 件</div>
-                <div><span style={{ color: '#8C8C8C' }}>存放位置：</span>{locations.find((l) => l.id === passItem.locationId)?.name || '-'}</div>
+                <div><span style={{ color: '#8C8C8C' }}>{t('asset.modelNameLabel')}</span><span style={{ fontWeight: 600 }}>{passItem.modelName}</span></div>
+                <div><span style={{ color: '#8C8C8C' }}>{t('asset.categoryLabel')}</span>{passItem.categoryName || '-'}</div>
+                <div><span style={{ color: '#8C8C8C' }}>{t('asset.thisQtyLabel')}</span><span style={{ fontWeight: 700, color: '#E8720C' }}>{passItem.inboundQty}</span> {t('asset.unitPiece')}</div>
+                <div><span style={{ color: '#8C8C8C' }}>{t('asset.locationLabel')}</span>{locations.find((l) => l.id === passItem.locationId)?.name || '-'}</div>
               </div>
             </div>
 
@@ -999,9 +1009,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
                 <CameraOutlined style={{ marginRight: 4 }} />
-                現場照片（到貨憑證，同步寫入資產主圖）
+                {t('asset.sitePhotoRequired')}
                 <span style={{ color: '#FF4D4F' }}> *</span>
-                <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>最多 {MAX_PHOTOS} 張，至少 1 張</span>
+                <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoLimitHint', { max: MAX_PHOTOS })}</span>
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 {passItem.photos.map((p, idx) => (
@@ -1028,14 +1038,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                       onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
                     >
                       <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-                      <span>{uploading ? '上傳中…' : '拍照 / 上傳'}</span>
+                      <span>{uploading ? t('asset.uploadingNow') : t('asset.photoUploadBtn')}</span>
                     </div>
                   </Upload>
                 )}
               </div>
               {passItem.photos.length > 0 && (
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
-                  已上傳 {passItem.photos.length}/{MAX_PHOTOS} 張，點擊圖片可預覽
+                  {t('asset.uploadedCount', { current: passItem.photos.length, max: MAX_PHOTOS })}
                 </div>
               )}
             </div>
@@ -1044,14 +1054,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             <div>
               <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
                 <AppstoreOutlined style={{ marginRight: 4 }} />
-                配件清單（隨驗收記錄一同保存）
+                {t('asset.accessoryListTitle')}
               </div>
               {passAccessories.map((acc, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                   <AutoComplete
                     value={acc.name}
                     options={passAccessoryOptions}
-                    placeholder="選擇或輸入配件名稱"
+                    placeholder={t('asset.accessoryPh')}
                     style={{ flex: 1 }}
                     filterOption={(input, option) => String(option?.value ?? '').includes(input)}
                     onChange={(v: string) => setPassAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, name: v } : a)))}
@@ -1059,7 +1069,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   <InputNumber
                     min={1} precision={0} value={acc.qty}
                     style={{ width: 110 }}
-                    addonAfter="件"
+                    addonAfter={t('asset.unitPiece')}
                     onChange={(v) => setPassAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, qty: v || 1 } : a)))}
                   />
                   <Button type="text" danger icon={<DeleteOutlined />}
@@ -1069,18 +1079,18 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               <div style={{ display: 'flex', gap: 8 }}>
                 <Button type="dashed" icon={<PlusOutlined />} style={{ flex: 1 }}
                   onClick={() => setPassAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
-                  手动输入配件
+                  {t('asset.accessoryManual')}
                 </Button>
                 {passAccessoryOptions.length > 0 && (
                   <Button type="dashed" icon={<AppstoreOutlined />} style={{ flex: 1 }}
                     onClick={handleOpenAccessorySelect}>
-                    快速选择配件（{passAccessoryOptions.length}）
+                    {t('asset.accessoryQuickSelect', { count: passAccessoryOptions.length })}
                   </Button>
                 )}
               </div>
               {passAccessories.length === 0 && (
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
-                  可在资产品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加
+                  {t('asset.accessoryTip')}
                 </div>
               )}
             </div>
@@ -1090,24 +1100,24 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
       {/* ====== 驗收不通過彈窗 ====== */}
       <Modal
-        title="驗收不通過"
+        title={t('asset.rejectModalTitle')}
         open={!!rejectModal}
         onOk={handleRejectConfirm}
         onCancel={() => setRejectModal(null)}
-        okText="確認"
-        cancelText="取消"
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
         okButtonProps={{ danger: true }}
         width={640}
         destroyOnClose
       >
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>處置方式</div>
+          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>{t('asset.colDisposeMethod')}</div>
           <Radio.Group value={rejectType} onChange={(e) => setRejectType(e.target.value)} style={{ width: '100%' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               {REJECT_OPTIONS.map((opt) => (
                 <Radio key={opt.value} value={opt.value}>
-                  <span style={{ fontWeight: 500 }}>{opt.label}</span>
-                  <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{opt.desc}</span>
+                  <span style={{ fontWeight: 500 }}>{t(`asset.${opt.labelKey}`)}</span>
+                  <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t(`asset.${opt.descKey}`)}</span>
                 </Radio>
               ))}
             </Space>
@@ -1115,13 +1125,13 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         </div>
         <div>
           <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
-            不通過原因 <span style={{ color: '#FF4D4F' }}>*</span>
+            {t('asset.colRejectReason')} <span style={{ color: '#FF4D4F' }}>*</span>
           </div>
           <Input.TextArea
             rows={3}
             maxLength={200}
             showCount
-            placeholder="請填寫驗收不通過的原因說明"
+            placeholder={t('asset.rejectReasonPh')}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             style={{ resize: 'none' }}
@@ -1130,8 +1140,8 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
             <CameraOutlined style={{ marginRight: 4 }} />
-            現場照片（損壞/不符憑證）
-            <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>最多 {MAX_PHOTOS} 張</span>
+            {t('asset.sitePhotoEvidence')}
+            <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoMaxHint', { max: MAX_PHOTOS })}</span>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {rejectPhotos.map((p, idx) => (
@@ -1158,7 +1168,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
                 >
                   <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-                  <span>{uploading ? '上傳中…' : '拍照 / 上傳'}</span>
+                  <span>{uploading ? t('asset.uploadingNow') : t('asset.photoUploadBtn')}</span>
                 </div>
               </Upload>
             )}
@@ -1168,24 +1178,24 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
       {/* ====== 配件選擇彈窗（快速選擇配件） ====== */}
       <Modal
-        title="快速選擇配件"
+        title={t('asset.accessorySelectTitle')}
         open={accessorySelectOpen}
         onOk={handleAccessorySelectConfirm}
         onCancel={() => setAccessorySelectOpen(false)}
-        okText="確認添加"
-        cancelText="取消"
+        okText={t('asset.accessorySelectOk')}
+        cancelText={t('common.cancel')}
         width={480}
         destroyOnClose
       >
         <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
-          請勾選需要添加的配件（已存在于清單中的配件會自動跳過）
+          {t('asset.accessorySelectTip')}
         </div>
         <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
           {(() => {
             const code = passItem?.categoryCode
             const list = code ? categoryAccessories.get(code) || [] : []
             if (list.length === 0) {
-              return <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>該分類尚未配置配件</div>
+              return <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
             }
             return list.map((acc) => {
               const checked = selectedAccessoryNames.has(acc.name)
@@ -1208,10 +1218,10 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   >
                     <span style={{ fontSize: 13, color: '#262626' }}>{acc.name}</span>
                     {alreadyAdded && (
-                      <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>已添加</Tag>
+                      <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>{t('asset.tagAdded')}</Tag>
                     )}
                   </Checkbox>
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>默認 {acc.defaultQty || 1} 件</span>
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
                 </div>
               )
             })
@@ -1219,7 +1229,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         </div>
         {selectedAccessoryNames.size > 0 && (
           <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', textAlign: 'right' }}>
-            已選擇 <b style={{ color: '#E8720C' }}>{selectedAccessoryNames.size}</b> 項
+            {t('asset.selectedCount', { count: selectedAccessoryNames.size })}
           </div>
         )}
       </Modal>

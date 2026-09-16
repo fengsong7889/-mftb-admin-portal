@@ -65,7 +65,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
   if (loading || (isBrand && !brand) || (!isBrand && !model)) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="载入中..." />
+        <Spin size="large" tip={t('asset.loadingText')} />
       </div>
     )
   }
@@ -74,7 +74,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
     <>
       {/* ====== 顶部标题栏 ====== */}
       <DetailPageHeader
-        title={isBrand ? '资产品牌详情' : '产品详情'}
+        title={isBrand ? t('asset.brandDetailTitle') : t('asset.productDetailTitle')}
         meta={<>{isBrand ? brand?.brandZh : model?.name}</>}
         onBack={onBack}
         onEdit={() => onEdit(id)}
@@ -89,36 +89,36 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
               : <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             }
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{isBrand ? '资产品牌信息' : '产品信息'}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{isBrand ? t('asset.brandInfoTitle') : t('asset.productInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         {isBrand && brand ? (
           <Descriptions column={3} size="middle" bordered>
-            <Descriptions.Item label="所属分类">
+            <Descriptions.Item label={t('asset.belongCategory')}>
               <Tag color="blue">{categoryName(brand.categoryCode)}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="资产品牌（中文）">{brand.brandZh}</Descriptions.Item>
-            <Descriptions.Item label="资产品牌（英文）">{brand.brandEn}</Descriptions.Item>
-            <Descriptions.Item label="资产品牌LOGO">
+            <Descriptions.Item label={t('asset.brandZhLabel')}>{brand.brandZh}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.brandEnLabel')}>{brand.brandEn}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.brandLogoLabel')}>
               {brand.brandLogo ? (
                 <img src={brand.brandLogo} alt={brand.brandEn} style={{ width: 32, height: 32, objectFit: 'contain' }} />
               ) : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="最后更新人">{brand.updatedBy || '-'}</Descriptions.Item>
-            <Descriptions.Item label="最后更新时间">{brand.updatedAt || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colUpdatedBy')}>{brand.updatedBy || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colUpdatedAt')}>{brand.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>
         ) : model ? (
           <Descriptions column={3} size="middle" bordered>
-            <Descriptions.Item label="所属资产品牌">
+            <Descriptions.Item label={t('asset.belongBrand')}>
               <Tag color="orange">{model.brandZh}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="所属分类">
+            <Descriptions.Item label={t('asset.belongCategory')}>
               <Tag color="blue">{categoryName(model.categoryCode)}</Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="产品名称">{model.name}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.productNameLabel')}>{model.name}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colUnit')}>{model.unit}</Descriptions.Item>
-            <Descriptions.Item label="最后更新人">{model.updatedBy || '-'}</Descriptions.Item>
-            <Descriptions.Item label="最后更新时间">{model.updatedAt || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colUpdatedBy')}>{model.updatedBy || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colUpdatedAt')}>{model.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>
         ) : null}
       </div>

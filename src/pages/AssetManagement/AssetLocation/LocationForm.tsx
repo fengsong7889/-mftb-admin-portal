@@ -141,7 +141,7 @@ export default function LocationForm({ id, onBack }: Props) {
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-            {isEdit ? '編輯倉庫' : '新增倉庫'}
+            {isEdit ? t('asset.editLocationTitle') : t('asset.addLocationTitle')}
           </h2>
         </div>
       </div>
@@ -155,38 +155,38 @@ export default function LocationForm({ id, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 14, color: '#1890ff' }}>📍</span>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基本信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.basicInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Form<FormValues> form={form} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item
-              label="編碼"
+              label={t('asset.codeLabel')}
               name="code"
-              rules={[{ required: true, message: '請輸入編碼' }]}
+              rules={[{ required: true, message: t('asset.codeRequired') }]}
             >
               <Input
-                placeholder="請輸入編碼（全局唯一）"
+                placeholder={t('asset.codePh')}
                 style={{ fontFamily: 'monospace' }}
               />
             </Form.Item>
             <Form.Item
-              label="倉庫名稱" name="name"
+              label={t('asset.colWarehouseName')} name="name"
               rules={[{ required: true, message: t('asset.nameRequired') }]}
             >
-              <Input placeholder="請輸入倉庫名稱" allowClear />
+              <Input placeholder={t('asset.warehouseNamePh')} allowClear />
             </Form.Item>
             <div /> {/* 占位空行 */}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <Form.Item
-              label="省份" name="province"
-              rules={[{ required: true, message: '請選擇省份' }]}
+              label={t('asset.colProvince')} name="province"
+              rules={[{ required: true, message: t('asset.provinceRequired') }]}
             >
               <Select
-                placeholder="請選擇省份"
+                placeholder={t('asset.locProvincePh')}
                 allowClear
                 showSearch
                 options={provinceOptions}
@@ -194,11 +194,11 @@ export default function LocationForm({ id, onBack }: Props) {
               />
             </Form.Item>
             <Form.Item
-              label="城市" name="city"
-              rules={[{ required: true, message: '請選擇城市' }]}
+              label={t('asset.colCity')} name="city"
+              rules={[{ required: true, message: t('asset.cityRequired') }]}
             >
               <Select
-                placeholder={selectedProvince ? '請選擇城市' : '請先選擇省份'}
+                placeholder={selectedProvince ? t('asset.locCityPh') : t('asset.locCitySelectFirst')}
                 allowClear
                 showSearch
                 disabled={!selectedProvince}
@@ -207,25 +207,25 @@ export default function LocationForm({ id, onBack }: Props) {
               />
             </Form.Item>
             <Form.Item
-              label="區縣" name="district"
-              rules={[{ required: true, message: '請選擇區縣' }]}
+              label={t('asset.colDistrict')} name="district"
+              rules={[{ required: true, message: t('asset.districtRequired') }]}
             >
               <Select
-                placeholder={selectedCity ? '請選擇區縣' : '請先選擇城市'}
+                placeholder={selectedCity ? t('asset.locDistrictPh') : t('asset.locDistrictSelectFirst')}
                 allowClear
                 showSearch
                 disabled={!selectedCity}
                 options={districtOptions}
               />
             </Form.Item>
-            <Form.Item label="詳細地址" name="address">
-              <Input placeholder="請輸入完整詳細地址（街道、門牌號等）" allowClear />
+            <Form.Item label={t('asset.addressLabel')} name="address">
+              <Input placeholder={t('asset.addressPh')} allowClear />
             </Form.Item>
           </div>
 
-          <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
+          <Form.Item label={t('asset.remarkLabel')} name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea
-              placeholder="請輸入備註"
+              placeholder={t('asset.remarkPh')}
               maxLength={300}
               showCount
               rows={4}

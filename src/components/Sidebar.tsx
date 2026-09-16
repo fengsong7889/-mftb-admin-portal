@@ -74,6 +74,8 @@ import {
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
   TagsOutlined, // 资产分类
+  TagOutlined, // 资产标签
+  ContactsOutlined, // 供应商管理
   BarcodeOutlined, // 產品庫
   EnvironmentOutlined, // 仓库维护
   ShoppingCartOutlined, // 采购申请
@@ -251,11 +253,13 @@ const keyToPath: Record<string, string> = {
   'ai-emp-permission-detail': '/ai-emp-permission-detail',
   // 物資管理（EAM 完整 19 個子菜單）
   'asset-dashboard':     '/asset-dashboard',
+  'asset-supplier':      '/asset-supplier',
   'asset-list':          '/asset-list',
   'asset-category':      '/asset-category',
   'asset-model':         '/asset-model',
   'asset-location':      '/asset-location',
   'param-library':       '/param-library',
+  'asset-tag':           '/asset-tag',
   'asset-inbound':       '/asset-inbound',
   'asset-claim':         '/asset-claim',
   'asset-borrow':        '/asset-borrow',
@@ -704,6 +708,7 @@ const menuItems: MenuItem[] = [
           { key: 'asset-flow', icon: <HistoryOutlined />, label: '變更歷史' },
         ],
       },
+      { key: 'asset-supplier', icon: <ContactsOutlined />, label: '供應商管理' },
       {
         key: 'asset-basic',
         icon: <ControlOutlined />,
@@ -713,6 +718,7 @@ const menuItems: MenuItem[] = [
           { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產品牌產品庫' },
           { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
           { key: 'param-library', icon: <DatabaseOutlined />, label: '產品參數庫' },
+          { key: 'asset-tag', icon: <TagOutlined />, label: '資產標籤' },
         ],
       },
     ],
@@ -926,6 +932,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-emp-permission': <UnlockOutlined />,     // 員工AI權額管理 - 解鎖/權限管理
   // 物資管理
   'asset-management': <InboxOutlined />,
+  'asset-supplier':   <ContactsOutlined />, // 供應商管理
   'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
   'asset-category':   <TagsOutlined />,      // 資產分類庫
   'asset-model':      <BarcodeOutlined />,   // 資產品牌產品庫
@@ -942,6 +949,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-repair':     <ToolOutlined />,
   'asset-inventory':  <AuditOutlined />,
   'param-library':    <DatabaseOutlined />,
+  'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,
   'purchase-request': <ShoppingCartOutlined />,

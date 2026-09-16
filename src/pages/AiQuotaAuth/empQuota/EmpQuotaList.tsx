@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Alert, Button, Form, Input, Modal, Popover, Progress, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, IdcardOutlined, TeamOutlined } from '@ant-design/icons'
@@ -37,6 +38,7 @@ import {
  * 新增/編輯/詳情均為獨立頁面（全局統一，取消彈窗）
  */
 export default function EmpQuotaList() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   /* ── 基础数据 ── */
@@ -105,12 +107,12 @@ export default function EmpQuotaList() {
   /* ── 刪除 ── */
   const handlePosDelete = (row: PosQuotaVO) => {
     Modal.confirm({
-      title: '確認刪除該額度策略？',
-      content: `刪除後「${row.name}」立即失效，關聯的 ${row.totalEmployeeCount} 名員工不再受此限額約束。`,
-      okText: '刪除', okButtonProps: { danger: true }, cancelText: '取消',
+      title: t('aiQuotaAuth.confirmDeleteQuota'),
+      content: t('aiQuotaAuth.deleteQuotaContent', { name: row.name, count: row.totalEmployeeCount }),
+      okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
       onOk: () => {
         deletePosQuota(row.id).then(() => {
-          message.success(`策略「${row.name}」已刪除`)
+          message.success(t('aiQuotaAuth.quotaStrategyDeleted', { name: row.name }))
           fetchPosQuotas().then(setPosPolicies)
         })
       },
@@ -120,14 +122,15 @@ export default function EmpQuotaList() {
   /* ── 啟停 ── */
   const handlePosToggle = (row: PosQuotaVO) => {
     const toDisable = row.status === 1
-    const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
-      title: `確認${actionText}該額度策略？`,
-      content: `${actionText}後「${row.name}」關聯的 ${row.totalEmployeeCount} 名員工${toDisable ? '不再受此限額約束' : '將恢復限額約束'}。`,
-      okText: '確認', cancelText: '取消',
+      title: toDisable ? t('aiQuotaAuth.confirmDisableQuota') : t('aiQuotaAuth.confirmEnableQuota'),
+      content: toDisable
+        ? t('aiQuotaAuth.disableQuotaContent', { name: row.name, count: row.totalEmployeeCount })
+        : t('aiQuotaAuth.enableQuotaContent', { name: row.name, count: row.totalEmployeeCount }),
+      okText: t('aiQuotaAuth.confirmOk'), cancelText: t('common.cancel'),
       onOk: () => {
         togglePosQuotaStatus(row.id, toDisable ? 0 : 1).then(() => {
-          message.success(`策略「${row.name}」已${actionText}`)
+          message.success(toDisable ? t('aiQuotaAuth.quotaStrategyDisabled', { name: row.name }) : t('aiQuotaAuth.quotaStrategyEnabled', { name: row.name }))
           fetchPosQuotas().then(setPosPolicies)
         })
       },
@@ -136,18 +139,18 @@ export default function EmpQuotaList() {
 
   /* ── 列字段配置（職位額度） ── */
   const posColumnMeta = [
-    { key: 'configCode', title: '配置ID' },
-    { key: 'name', title: '策略名稱' },
-    { key: 'positions', title: '適用職位' },
-    { key: 'totalEmployeeCount', title: '覆蓋人數' },
-    { key: 'quota', title: '限額' },
-    { key: 'usage', title: '本期用量' },
-    { key: 'softThreshold', title: '軟提醒' },
-    { key: 'overLimitAction', title: '超額動作' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
+    { key: 'configCode', title: t('aiQuotaAuth.configIdCol') },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol') },
+    { key: 'positions', title: t('aiQuotaAuth.positionsCol') },
+    { key: 'totalEmployeeCount', title: t('aiQuotaAuth.coverCountCol') },
+    { key: 'quota', title: t('aiQuotaAuth.quotaCol') },
+    { key: 'usage', title: t('aiQuotaAuth.usageCol') },
+    { key: 'softThreshold', title: t('aiQuotaAuth.softAlertCol') },
+    { key: 'overLimitAction', title: t('aiQuotaAuth.overLimitCol') },
+    { key: 'status', title: t('aiQuotaAuth.statusCol') },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol') },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol') },
+    { key: 'action', title: t('common.action') },
   ]
   const { configComponent: posConfigComponent, applyConfig: posApplyConfig } = useColumnConfig('ai-emp-quota-position', posColumnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -155,12 +158,12 @@ export default function EmpQuotaList() {
 
   const posColumns: ColumnsType<PosQuotaVO> = [
     {
-      key: 'configCode', title: '配置ID', dataIndex: 'configCode', width: 160, align: 'center',
+      key: 'configCode', title: t('aiQuotaAuth.configIdCol'), dataIndex: 'configCode', width: 160, align: 'center',
       render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
     },
-    { key: 'name', title: '策略名稱', dataIndex: 'name', width: 180 },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol'), dataIndex: 'name', width: 180 },
     {
-      key: 'positions', title: '適用職位', width: 240,
+      key: 'positions', title: t('aiQuotaAuth.positionsCol'), width: 240,
       render: (_, row) => {
         const seqTags = row.sequences.map((s) => (
           <Tag key={`seq-${s}`} color={POSITION_SEQUENCE_TAG_COLOR[s]} style={{ marginRight: 4, marginBottom: 2 }}>
@@ -173,7 +176,7 @@ export default function EmpQuotaList() {
         const extra = row.jobLevels.length > 3 ? (
           <Popover
             content={<div style={{ maxWidth: 300 }}>{row.jobLevels.map((l) => <Tag key={`all-${l}`} style={{ marginRight: 4, marginBottom: 4 }}>{l}</Tag>)}</div>}
-            title={`全部職級（${row.jobLevels.length}）`} trigger="click"
+            title={t('aiQuotaAuth.allJobLevelsPopover', { count: row.jobLevels.length })} trigger="click"
           >
             <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C' }}>+{row.jobLevels.length - 3}</Tag>
           </Popover>
@@ -181,10 +184,10 @@ export default function EmpQuotaList() {
         return <span>{seqTags}{lvlTags}{extra}</span>
       },
     },
-    { key: 'totalEmployeeCount', title: '覆蓋人數', dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => `${v.toLocaleString()} 人` },
-    { key: 'quota', title: '限額', width: 180, align: 'right', render: (_, row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{quotaText(row)}</span> },
+    { key: 'totalEmployeeCount', title: t('aiQuotaAuth.coverCountCol'), dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => t('aiQuotaAuth.coverCountRender', { count: v.toLocaleString() }) },
+    { key: 'quota', title: t('aiQuotaAuth.quotaCol'), width: 180, align: 'right', render: (_, row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{quotaText(row)}</span> },
     {
-      key: 'usage', title: '本期用量', width: 200,
+      key: 'usage', title: t('aiQuotaAuth.usageCol'), width: 200,
       render: (_, row) => {
         const pct = usagePercent(row)
         return (
@@ -198,26 +201,26 @@ export default function EmpQuotaList() {
         )
       },
     },
-    { key: 'softThreshold', title: '軟提醒', dataIndex: 'softThreshold', width: 90, align: 'center', render: (v: number) => `${v}%` },
+    { key: 'softThreshold', title: t('aiQuotaAuth.softAlertCol'), dataIndex: 'softThreshold', width: 90, align: 'center', render: (v: number) => `${v}%` },
     {
-      key: 'overLimitAction', title: '超額動作', dataIndex: 'overLimitAction', width: 150, align: 'center',
+      key: 'overLimitAction', title: t('aiQuotaAuth.overLimitCol'), dataIndex: 'overLimitAction', width: 150, align: 'center',
       render: (v: string, row) => (
         <Tag color={OVER_LIMIT_TAG[v as OverLimitAction]}>{OVER_LIMIT_ACTION_LABEL[v as OverLimitAction]}{v === 'downgrade' && row.downgradeModelId ? ` · ${modelName[row.downgradeModelId] ?? ''}` : ''}</Tag>
       ),
     },
     {
-      key: 'status', title: '狀態', dataIndex: 'status', width: 80, align: 'center',
-      render: (_, row) => <Switch checked={row.status === 1} checkedChildren="啟用" unCheckedChildren="停用" onChange={() => handlePosToggle(row)} />,
+      key: 'status', title: t('aiQuotaAuth.statusCol'), dataIndex: 'status', width: 80, align: 'center',
+      render: (_, row) => <Switch checked={row.status === 1} checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} onChange={() => handlePosToggle(row)} />,
     },
-    { key: 'updatedBy', title: '最後更新人', dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { key: 'updatedAt', title: '最後更新時間', dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol'), dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol'), dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     {
-      key: 'action', title: '操作', width: 160, align: 'center', fixed: 'right',
+      key: 'action', title: t('common.action'), width: 160, align: 'center', fixed: 'right',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handlePosDetail(row)}>詳情</Button>
-          <Button type="link" onClick={() => handlePosEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handlePosDelete(row)}>刪除</Button>
+          <Button type="link" onClick={() => handlePosDetail(row)}>{t('common.detail')}</Button>
+          <Button type="link" onClick={() => handlePosEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handlePosDelete(row)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -229,36 +232,36 @@ export default function EmpQuotaList() {
         type="warning" showIcon style={{ marginBottom: 16 }}
         message={
           <span>
-            按職位額度以規則維度根據職級序列和職級批量配置訪問限額，系統根據每位員工的職位自動匹配序列與職級，自動生效對應額度。
-            <span style={{ color: '#8C8C8C' }}>同一員工符合多條職位規則時，取限額值最大的規則生效。</span>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 4 }}>「超額動作」與「降級目標模型」配置需網關側配合才能實際生效，當前僅作策略記錄與展示。</div>
+            {t('aiQuotaAuth.posQuotaAlertFull')}
+            <span style={{ color: '#8C8C8C' }}>{t('aiQuotaAuth.posQuotaAlertMaxRule')}</span>
+            <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 4 }}>{t('aiQuotaAuth.posQuotaGatewayNote')}</div>
           </span>
         }
       />
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="策略名稱"><Input value={posQuery} placeholder="請輸入策略名稱" allowClear onChange={(e) => setPosQuery(e.target.value)} /></Form.Item>
-          <Form.Item label="職級序列"><Select value={posSeqFilter} placeholder="全部" allowClear options={POSITION_SEQUENCE_OPTIONS} onChange={(v) => setPosSeqFilter(v)} /></Form.Item>
-          <Form.Item label="限額周期"><Select value={posPeriodFilter} placeholder="全部" allowClear options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} onChange={(v) => setPosPeriodFilter(v)} /></Form.Item>
-          <Form.Item label="狀態"><Select value={posStatusFilter} placeholder="全部" allowClear options={[{ value: 1, label: '啟用' }, { value: 0, label: '停用' }]} onChange={(v) => setPosStatusFilter(v)} /></Form.Item>
+          <Form.Item label={t('aiQuotaAuth.strategyNameCol')}><Input value={posQuery} placeholder={t('aiQuotaAuth.ruleNamePh')} allowClear onChange={(e) => setPosQuery(e.target.value)} /></Form.Item>
+          <Form.Item label={t('aiQuotaAuth.sequencesCol')}><Select value={posSeqFilter} placeholder={t('aiQuotaAuth.allOption')} allowClear options={POSITION_SEQUENCE_OPTIONS} onChange={(v) => setPosSeqFilter(v)} /></Form.Item>
+          <Form.Item label={t('aiQuotaAuth.quotaPeriodLabel')}><Select value={posPeriodFilter} placeholder={t('aiQuotaAuth.allOption')} allowClear options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} onChange={(v) => setPosPeriodFilter(v)} /></Form.Item>
+          <Form.Item label={t('aiQuotaAuth.statusCol')}><Select value={posStatusFilter} placeholder={t('aiQuotaAuth.allOption')} allowClear options={[{ value: 1, label: t('aiQuotaAuth.enableText') }, { value: 0, label: t('aiQuotaAuth.disableText') }]} onChange={(v) => setPosStatusFilter(v)} /></Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handlePosSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handlePosReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handlePosSearch}>{t('common.query')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handlePosReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
       </div>
       {/* 操作區 */}
       <div className="action-section">
-        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>共 {filteredPosPolicies.length} 條策略，覆蓋 {totalPosEmployeeCount.toLocaleString()} 人</span></div>
+        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.posStrategyCountCover', { count: filteredPosPolicies.length, empCount: totalPosEmployeeCount.toLocaleString() })}</span></div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handlePosCreate}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handlePosCreate}>{t('common.add')}</Button>
           {posConfigComponent}
         </div>
       </div>
-      <Table rowKey="id" size="middle" loading={loading} columns={posApplyConfig(posColumns)} dataSource={filteredPosPolicies} scroll={{ x: 'max-content' }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 條策略` }} />
+      <Table rowKey="id" size="middle" loading={loading} columns={posApplyConfig(posColumns)} dataSource={filteredPosPolicies} scroll={{ x: 'max-content' }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.paginationTotal', { total }) }} />
     </>
   )
 
@@ -285,12 +288,12 @@ export default function EmpQuotaList() {
   /* ── 刪除 ── */
   const handleRoleDelete = (row: RoleQuotaVO) => {
     Modal.confirm({
-      title: '確認刪除該額度策略？',
-      content: `刪除後「${row.roleName}」立即失效，綁定的 ${row.totalEmployeeCount} 名員工不再受此限額約束。`,
-      okText: '刪除', okButtonProps: { danger: true }, cancelText: '取消',
+      title: t('aiQuotaAuth.confirmDeleteQuota'),
+      content: t('aiQuotaAuth.deleteQuotaContent', { name: row.roleName, count: row.totalEmployeeCount }),
+      okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
       onOk: () => {
         deleteRoleQuota(row.id).then(() => {
-          message.success(`策略「${row.roleName}」已刪除`)
+          message.success(t('aiQuotaAuth.quotaStrategyDeleted', { name: row.roleName }))
           fetchRoleQuotas().then(setRolePolicies)
         })
       },
@@ -300,14 +303,15 @@ export default function EmpQuotaList() {
   /* ── 啟停 ── */
   const handleRoleToggle = (row: RoleQuotaVO) => {
     const toDisable = row.status === 1
-    const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
-      title: `確認${actionText}該額度策略？`,
-      content: `${actionText}後「${row.roleName}」綁定的 ${row.totalEmployeeCount} 名員工${toDisable ? '不再受此限額約束' : '將恢復限額約束'}。`,
-      okText: '確認', cancelText: '取消',
+      title: toDisable ? t('aiQuotaAuth.confirmDisableQuota') : t('aiQuotaAuth.confirmEnableQuota'),
+      content: toDisable
+        ? t('aiQuotaAuth.disableQuotaContent', { name: row.roleName, count: row.totalEmployeeCount })
+        : t('aiQuotaAuth.enableQuotaContent', { name: row.roleName, count: row.totalEmployeeCount }),
+      okText: t('aiQuotaAuth.confirmOk'), cancelText: t('common.cancel'),
       onOk: () => {
         toggleRoleQuotaStatus(row.id, toDisable ? 0 : 1).then(() => {
-          message.success(`策略「${row.roleName}」已${actionText}`)
+          message.success(toDisable ? t('aiQuotaAuth.quotaStrategyDisabled', { name: row.roleName }) : t('aiQuotaAuth.quotaStrategyEnabled', { name: row.roleName }))
           fetchRoleQuotas().then(setRolePolicies)
         })
       },
@@ -316,18 +320,18 @@ export default function EmpQuotaList() {
 
   /* ── 列字段配置（角色額度） ── */
   const roleColumnMeta = [
-    { key: 'configCode', title: '配置ID' },
-    { key: 'roleName', title: '角色名稱' },
-    { key: 'name', title: '策略名稱' },
-    { key: 'userNames', title: '綁定員工' },
-    { key: 'quota', title: '限額' },
-    { key: 'usage', title: '本期用量' },
-    { key: 'softThreshold', title: '軟提醒' },
-    { key: 'overLimitAction', title: '超額動作' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
+    { key: 'configCode', title: t('aiQuotaAuth.configIdCol') },
+    { key: 'roleName', title: t('aiQuotaAuth.roleNameCol') },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol') },
+    { key: 'userNames', title: t('aiQuotaAuth.bindEmpCol') },
+    { key: 'quota', title: t('aiQuotaAuth.quotaCol') },
+    { key: 'usage', title: t('aiQuotaAuth.usageCol') },
+    { key: 'softThreshold', title: t('aiQuotaAuth.softAlertCol') },
+    { key: 'overLimitAction', title: t('aiQuotaAuth.overLimitCol') },
+    { key: 'status', title: t('aiQuotaAuth.statusCol') },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol') },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol') },
+    { key: 'action', title: t('common.action') },
   ]
   const { configComponent: roleConfigComponent, applyConfig: roleApplyConfig } = useColumnConfig('ai-emp-quota-role', roleColumnMeta, [
     { key: 'action', visible: true, locked: 'tail' as const },
@@ -335,13 +339,13 @@ export default function EmpQuotaList() {
 
   const roleColumns: ColumnsType<RoleQuotaVO> = [
     {
-      key: 'configCode', title: '配置ID', dataIndex: 'configCode', width: 160, align: 'center',
+      key: 'configCode', title: t('aiQuotaAuth.configIdCol'), dataIndex: 'configCode', width: 160, align: 'center',
       render: (v: string) => <Tag color="blue">{v || '-'}</Tag>,
     },
-    { key: 'roleName', title: '角色名稱', dataIndex: 'roleName', width: 140, render: (v: string) => <Tag color="purple">{v}</Tag> },
-    { key: 'name', title: '策略名稱', dataIndex: 'name', width: 180 },
+    { key: 'roleName', title: t('aiQuotaAuth.roleNameCol'), dataIndex: 'roleName', width: 140, render: (v: string) => <Tag color="purple">{v}</Tag> },
+    { key: 'name', title: t('aiQuotaAuth.strategyNameCol'), dataIndex: 'name', width: 180 },
     {
-      key: 'userNames', title: '綁定員工', width: 200,
+      key: 'userNames', title: t('aiQuotaAuth.bindEmpCol'), width: 200,
       render: (_, row) => {
         const names = row.userNames.slice(0, 3)
         return (
@@ -350,7 +354,7 @@ export default function EmpQuotaList() {
             {row.userNames.length > 3 && (
               <Popover
                 content={<div style={{ maxWidth: 300 }}>{row.userNames.map((n) => <Tag key={n} style={{ marginRight: 4, marginBottom: 4, fontSize: 12 }}>{n}</Tag>)}</div>}
-                title={`全部員工（${row.totalEmployeeCount} 人）`} trigger="click"
+                title={t('aiQuotaAuth.allEmpPopover', { count: row.totalEmployeeCount })} trigger="click"
               >
                 <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C', fontSize: 12 }}>+{row.userNames.length - 3}</Tag>
               </Popover>
@@ -359,9 +363,9 @@ export default function EmpQuotaList() {
         )
       },
     },
-    { key: 'quota', title: '限額', width: 180, align: 'right', render: (_, row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{roleQuotaText(row)}</span> },
+    { key: 'quota', title: t('aiQuotaAuth.quotaCol'), width: 180, align: 'right', render: (_, row) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{roleQuotaText(row)}</span> },
     {
-      key: 'usage', title: '本期用量', width: 200,
+      key: 'usage', title: t('aiQuotaAuth.usageCol'), width: 200,
       render: (_, row) => {
         const pct = roleUsagePercent(row)
         return (
@@ -375,26 +379,26 @@ export default function EmpQuotaList() {
         )
       },
     },
-    { key: 'softThreshold', title: '軟提醒', dataIndex: 'softThreshold', width: 90, align: 'center', render: (v: number) => `${v}%` },
+    { key: 'softThreshold', title: t('aiQuotaAuth.softAlertCol'), dataIndex: 'softThreshold', width: 90, align: 'center', render: (v: number) => `${v}%` },
     {
-      key: 'overLimitAction', title: '超額動作', dataIndex: 'overLimitAction', width: 150, align: 'center',
+      key: 'overLimitAction', title: t('aiQuotaAuth.overLimitCol'), dataIndex: 'overLimitAction', width: 150, align: 'center',
       render: (v: RoleQuotaVO['overLimitAction'], row) => (
         <Tag color={OVER_LIMIT_TAG[v]}>{OVER_LIMIT_ACTION_LABEL[v]}{v === 'downgrade' && row.downgradeModelId ? ` · ${modelName[row.downgradeModelId] ?? ''}` : ''}</Tag>
       ),
     },
     {
-      key: 'status', title: '狀態', dataIndex: 'status', width: 80, align: 'center',
-      render: (_, row) => <Switch checked={row.status === 1} checkedChildren="啟用" unCheckedChildren="停用" onChange={() => handleRoleToggle(row)} />,
+      key: 'status', title: t('aiQuotaAuth.statusCol'), dataIndex: 'status', width: 80, align: 'center',
+      render: (_, row) => <Switch checked={row.status === 1} checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} onChange={() => handleRoleToggle(row)} />,
     },
-    { key: 'updatedBy', title: '最後更新人', dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { key: 'updatedAt', title: '最後更新時間', dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol'), dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol'), dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     {
-      key: 'action', title: '操作', width: 160, align: 'center', fixed: 'right',
+      key: 'action', title: t('common.action'), width: 160, align: 'center', fixed: 'right',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleRoleDetail(row)}>詳情</Button>
-          <Button type="link" onClick={() => handleRoleEdit(row)}>編輯</Button>
-          <Button type="link" danger onClick={() => handleRoleDelete(row)}>刪除</Button>
+          <Button type="link" onClick={() => handleRoleDetail(row)}>{t('common.detail')}</Button>
+          <Button type="link" onClick={() => handleRoleEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handleRoleDelete(row)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -404,35 +408,35 @@ export default function EmpQuotaList() {
     <>
       <Alert
         type="info" showIcon style={{ marginBottom: 16 }}
-        message={<>角色額度為特定角色綁定員工並批量配置訪問限額，適合為相似崗位的員工統一設定額度標準。角色額度與職位額度同時生效，取兩者中較大的值。<span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>「超額動作」與「降級目標模型」配置需網關側配合才能實際生效，當前僅作策略記錄與展示。</span></>}
+        message={<>{t('aiQuotaAuth.roleQuotaAlertFull')}<span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t('aiQuotaAuth.roleQuotaGatewayNote')}</span></>}
       />
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="角色/策略名稱"><Input value={roleQuery} placeholder="請輸入名稱" allowClear onChange={(e) => setRoleQuery(e.target.value)} /></Form.Item>
+          <Form.Item label={t('aiQuotaAuth.roleStrategyNameLabel')}><Input value={roleQuery} placeholder={t('aiQuotaAuth.roleNamePh')} allowClear onChange={(e) => setRoleQuery(e.target.value)} /></Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={() => {}}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => setRoleQuery('')}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => {}}>{t('common.query')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => setRoleQuery('')}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
       </div>
       {/* 操作區 */}
       <div className="action-section">
-        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>共 {filteredRolePolicies.length} 條策略，綁定 {totalRoleEmployeeCount.toLocaleString()} 人</span></div>
+        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.roleStrategyCountCover', { count: filteredRolePolicies.length, empCount: totalRoleEmployeeCount.toLocaleString() })}</span></div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleRoleCreate}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleRoleCreate}>{t('common.add')}</Button>
           {roleConfigComponent}
         </div>
       </div>
-      <Table rowKey="id" size="middle" loading={loading} columns={roleApplyConfig(roleColumns)} dataSource={filteredRolePolicies} scroll={{ x: 'max-content' }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 條策略` }} />
+      <Table rowKey="id" size="middle" loading={loading} columns={roleApplyConfig(roleColumns)} dataSource={filteredRolePolicies} scroll={{ x: 'max-content' }} pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.paginationTotal', { total }) }} />
     </>
   )
 
   const tabItems = [
-    { key: 'position', label: <Space><IdcardOutlined /><span>按職位額度</span></Space>, children: positionContent },
-    { key: 'role', label: <Space><TeamOutlined /><span>角色額度</span></Space>, children: roleContent },
+    { key: 'position', label: <Space><IdcardOutlined /><span>{t('aiQuotaAuth.posQuotaTab')}</span></Space>, children: positionContent },
+    { key: 'role', label: <Space><TeamOutlined /><span>{t('aiQuotaAuth.roleQuotaTab')}</span></Space>, children: roleContent },
   ]
 
   /** 支持 hash 定位 Tab */

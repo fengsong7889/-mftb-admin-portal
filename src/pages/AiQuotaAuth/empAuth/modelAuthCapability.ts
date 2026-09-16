@@ -11,28 +11,28 @@ import type { AiModel } from '../../../api'
 /** 能力字段（與 AiModel / ModelAuthState 的能力鍵一致） */
 export type CapabilityKey = 'visionSupport' | 'functionCalling' | 'jsonMode' | 'streaming' | 'thinkingMode'
 
-export const CAPABILITY_FIELDS: { key: CapabilityKey; label: string; color: string; tip: string }[] = [
-  { key: 'visionSupport', label: '視覺理解', color: '#722ED1', tip: '模型可理解圖片內容' },
-  { key: 'functionCalling', label: '工具調用', color: '#1890FF', tip: '模型可調用外部工具/API' },
-  { key: 'jsonMode', label: 'JSON 模式', color: '#13C2C2', tip: '模型可輸出結構化 JSON' },
-  { key: 'streaming', label: '流式響應', color: '#52C41A', tip: '模型支持逐字輸出' },
-  { key: 'thinkingMode', label: '思考模式', color: '#E8720C', tip: '模型支持深度推理' },
+export const CAPABILITY_FIELDS: { key: CapabilityKey; labelKey: string; color: string; tipKey: string }[] = [
+  { key: 'visionSupport', labelKey: 'capVision', color: '#722ED1', tipKey: 'capVisionTip' },
+  { key: 'functionCalling', labelKey: 'capFuncCall', color: '#1890FF', tipKey: 'capFuncCallTip' },
+  { key: 'jsonMode', labelKey: 'capJson', color: '#13C2C2', tipKey: 'capJsonTip' },
+  { key: 'streaming', labelKey: 'capStream', color: '#52C41A', tipKey: 'capStreamTip' },
+  { key: 'thinkingMode', labelKey: 'capThink', color: '#E8720C', tipKey: 'capThinkTip' },
 ]
 
 /** 詳情頁緊湊標籤（與 DeptAuthGroupDetail 一致） */
-export const CAPABILITY_SHORT_FIELDS: { key: CapabilityKey; label: string; color: string }[] = [
-  { key: 'visionSupport', label: '視覺', color: '#722ED1' },
-  { key: 'functionCalling', label: '工具', color: '#1890FF' },
-  { key: 'jsonMode', label: 'JSON', color: '#13C2C2' },
-  { key: 'streaming', label: '流式', color: '#52C41A' },
-  { key: 'thinkingMode', label: '思考', color: '#E8720C' },
+export const CAPABILITY_SHORT_FIELDS: { key: CapabilityKey; labelKey: string; color: string }[] = [
+  { key: 'visionSupport', labelKey: 'capVisionShort', color: '#722ED1' },
+  { key: 'functionCalling', labelKey: 'capFuncCallShort', color: '#1890FF' },
+  { key: 'jsonMode', labelKey: 'capJsonShort', color: '#13C2C2' },
+  { key: 'streaming', labelKey: 'capStreamShort', color: '#52C41A' },
+  { key: 'thinkingMode', labelKey: 'capThinkShort', color: '#E8720C' },
 ]
 
 export const MODEL_TYPE_TAG: Record<string, string> = {
   chat: 'processing', completion: 'blue', embedding: 'purple', token_count: 'default',
 }
-export const MODEL_TYPE_LABEL: Record<string, string> = {
-  chat: '對話', completion: '文本生成', embedding: '向量嵌入', token_count: 'Token 計數',
+export const MODEL_TYPE_LABEL_KEYS: Record<string, string> = {
+  chat: 'typeChat', completion: 'typeCompletion', embedding: 'typeEmbedding', token_count: 'typeTokenCount',
 }
 
 /** 判断模型本身是否支持某能力 */

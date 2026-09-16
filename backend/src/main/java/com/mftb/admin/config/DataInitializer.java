@@ -73,7 +73,10 @@ public class DataInitializer implements CommandLineRunner {
     //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
         // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/资产品牌产品库/产品参数库）
     // v35: 强制修正基础配置子菜单名称与图标（数据库重置/旧脚本未执行时自动恢复）
-    private static final String V_MENU_SEED = "core:menu-seed-v35";
+    // v36: 新增「资产标签」菜单（基础配置下第 5 个三级菜单）
+    // v37: 新增「供應商管理」二级直达菜单（asset-management 下）
+    // v38: 供應商管理与基礎配置菜单排序互换（supplier=5, basic=6）
+    private static final String V_MENU_SEED = "core:menu-seed-v38";
 
     @Override
     public void run(String... args) {
@@ -84,6 +87,10 @@ public class DataInitializer implements CommandLineRunner {
         migrateEamLocationColumns();
         // EAM 采购/入库/资产台账/配件配置表自动创建 (117/141/142/143 脚本等效, 每次启动幂等检查)
         migrateEamPurchaseInboundTables();
+        // 149: 公司品牌配置表（sys_company_brand）——品牌编码/标签从后端表动态加载
+        migrateCompanyBrandTable();
+        // 150: 领用管理——签名、归还及事件闭环表自动创建
+        migrateEamClaimTables();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -390,7 +397,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         log.info("员工详情页表结构就绪: emp_emergency_contact + emp_position_record");
     }
 
-    /** EAM 基础数据表自动创建: 资产分类 / 资产品牌库 / 产品型号库 / 仓库位置（幂等） */
+    /** EAM 基础数据表自动创建: 资产分类 / 资产品牌库 / 产品型号库 / 仓库位置 / 供应商（幂等） */
     private void migrateEamBasicTables() {
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS biz_eam_category ("
@@ -514,6 +521,43 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 144 脚本等效：已有表补 brand 列
         addColumnIfAbsent("biz_eam_purchase_request", "brand",
                 "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER budget");
+
+        // 8. 供应商（编码系统自动生成: CGSJ + 6位全局自增，规则见 sys_biz_seq_rule.eam_supplier_code）
+        jdbcTemplate.execute(
+"CREATE TABLE IF NOT EXISTS biz_eam_supplier ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "code VARCHAR(32) NOT NULL COMMENT '供应商编码（系统自动生成，格式 CGSJ + 6位自增数字，如 CGSJ000001）', "
+                        + "name VARCHAR(200) NOT NULL COMMENT '供应商名称', "
+                        + "contact_person VARCHAR(100) DEFAULT '' COMMENT '联系人', "
+                        + "contact_phone VARCHAR(64) DEFAULT '' COMMENT '联系电话', "
+                        + "bank_name VARCHAR(200) DEFAULT '' COMMENT '开户银行', "
+                        + "bank_account VARCHAR(64) DEFAULT '' COMMENT '银行账号', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'enabled' COMMENT '状态：enabled/disabled', "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_supplier_code (code), "
+                        + "KEY idx_supplier_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='供应商管理'");
+        log.info("已自动创建供应商表 biz_eam_supplier");
+
+        // 9. 供应商联系人（一个供应商可配置多个联系人）
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_supplier_contact ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "supplier_id BIGINT NOT NULL COMMENT '关联供应商ID', "
+                        + "contact_name VARCHAR(100) NOT NULL COMMENT '联系人姓名', "
+                        + "contact_phone VARCHAR(64) DEFAULT NULL COMMENT '联系电话', "
+                        + "status VARCHAR(16) DEFAULT 'enabled' COMMENT '状态：enabled/disabled', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT DEFAULT 0, "
+                        + "KEY idx_contact_supplier (supplier_id), "
+                        + "KEY idx_contact_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='供应商联系人'");
+        log.info("已自动创建供应商联系人表 biz_eam_supplier_contact");
 
         // 2. 采购订单 (含 139 brand + 134 contact_phone)
         jdbcTemplate.execute(
@@ -651,6 +695,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "hold_type VARCHAR(16) DEFAULT '' COMMENT 'owned/borrowed', "
                         + "order_id BIGINT DEFAULT NULL COMMENT '关联采购订单ID', "
                         + "batch_id BIGINT DEFAULT NULL COMMENT '关联入库批次ID', "
+                        + "company_brand TINYINT DEFAULT NULL COMMENT '公司品牌：1=闪蜂(TB), 2=mFood(MF)', "
                         + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
                         + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
@@ -708,6 +753,16 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             addColumnIfAbsent("biz_eam_inbound_batch_item", "followup_batch_id", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN followup_batch_id BIGINT DEFAULT NULL COMMENT '二次验收生成的批次ID'");
         });
 
+        // 148: 资产编号规则重构——company_brand 列 + 分类编码迁移
+        versionTracker.applyOnce("eam:asset-code-rule-v1", () -> {
+            migrateAssetCodeRule();
+        });
+
+        // 148-v2: 分类编码二次迁移（中间格式 01-01 → 最终格式 0101）
+        versionTracker.applyOnce("eam:cat-code-dash-v2", () -> {
+            migrateCategoryCodeDashRemoval();
+        });
+
         // PR-2: 歷史批次 generated_asset_count 回填（按資產台賬 batch_id 計數）
         try {
             jdbcTemplate.update("UPDATE biz_eam_inbound_batch b SET b.generated_asset_count = "
@@ -718,6 +773,231 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         }
 
         log.info("EAM 采购/入库/资产台账/配件配置表就绪");
+    }
+
+    /**
+     * 149 脚本等效: 公司品牌配置表 sys_company_brand（幂等建表 + 种子数据）
+     * 品牌编码/标签从后端表动态加载，前端不再硬编码
+     */
+    private void migrateCompanyBrandTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS sys_company_brand ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "code VARCHAR(20) NOT NULL COMMENT '品牌编码（用于资产编号前缀，如 TB/MF）', "
+                        + "label_zh VARCHAR(100) NOT NULL COMMENT '品牌中文名称', "
+                        + "label_en VARCHAR(100) DEFAULT '' COMMENT '品牌英文名称', "
+                        + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序号', "
+                        + "status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1=启用 0=停用', "
+                        + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_code (code)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公司品牌配置表'");
+
+        // 种子数据（INSERT IGNORE 幂等）
+        try {
+            jdbcTemplate.update("INSERT IGNORE INTO sys_company_brand (id, code, label_zh, label_en, sort_order, status) "
+                    + "VALUES (1, 'TB', '閃蜂', 'FlashBee', 1, 1)");
+            jdbcTemplate.update("INSERT IGNORE INTO sys_company_brand (id, code, label_zh, label_en, sort_order, status) "
+                    + "VALUES (2, 'MF', 'mFood', 'mFood', 2, 1)");
+        } catch (Exception e) {
+            log.warn("公司品牌种子数据插入失败（可忽略）: {}", e.getMessage());
+        }
+        log.info("公司品牌配置表 sys_company_brand 就绪");
+    }
+
+    /**
+     * 150 脚本等效：领用管理——签名、归还及事件闭环表自动创建（幂等）
+     */
+    private void migrateEamClaimTables() {
+        // 1. 领用登记主表
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_claim ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "claim_no VARCHAR(32) NOT NULL COMMENT '领用编号', "
+                        + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                        + "employee_id BIGINT NOT NULL COMMENT '领用人 ID', "
+                        + "operator_id BIGINT NULL COMMENT '操作人 ID', "
+                        + "operator_name VARCHAR(64) NOT NULL COMMENT '操作人姓名快照', "
+                        + "status VARCHAR(20) NOT NULL DEFAULT 'pending_signature' COMMENT '状态', "
+                        + "signature_status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT '签署状态', "
+                        + "claim_date DATE NOT NULL COMMENT '领用日期', "
+                        + "claim_reason VARCHAR(500) NULL COMMENT '领用用途', "
+                        + "remark VARCHAR(500) NULL COMMENT '备注', "
+                        + "proxy_mode TINYINT NOT NULL DEFAULT 0 COMMENT '0=本人 1=代办', "
+                        + "proxy_reason VARCHAR(500) NULL COMMENT '代办原因', "
+                        + "signed_at DATETIME NULL COMMENT '签署时间', "
+                        + "signature_evidence_id BIGINT NULL COMMENT '签名凭证 ID', "
+                        + "return_date DATE NULL COMMENT '归还日期', "
+                        + "return_reason VARCHAR(500) NULL COMMENT '归还原因', "
+                        + "return_id BIGINT NULL COMMENT '关联归还记录 ID', "
+                        + "cancelled_reason VARCHAR(500) NULL COMMENT '取消原因', "
+                        + "content_hash VARCHAR(64) NULL COMMENT '内容 SHA-256', "
+                        + "created_by VARCHAR(64) NULL COMMENT '创建人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_claim_no (claim_no), "
+                        + "INDEX idx_asset (asset_id), INDEX idx_employee (employee_id), "
+                        + "INDEX idx_status (status), INDEX idx_signature (signature_status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产领用登记表'");
+
+        // 2. 领用凭证
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_claim_evidence ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "claim_id BIGINT NOT NULL COMMENT '关联领用 ID', "
+                        + "evidence_type VARCHAR(20) NOT NULL DEFAULT 'signature' COMMENT '凭证类型', "
+                        + "file_name VARCHAR(255) NULL COMMENT '原始文件名', "
+                        + "storage_path VARCHAR(500) NOT NULL COMMENT '存储路径或 Data URL', "
+                        + "content_type VARCHAR(64) NULL COMMENT 'MIME 类型', "
+                        + "file_size INT NULL COMMENT '文件大小', "
+                        + "content_hash VARCHAR(64) NULL COMMENT '文件 SHA-256', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "INDEX idx_claim (claim_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='领用/归还凭证附件表'");
+
+        // 3. 归还记录
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_return ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "return_no VARCHAR(32) NOT NULL COMMENT '归还编号', "
+                        + "claim_id BIGINT NOT NULL COMMENT '关联领用 ID', "
+                        + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                        + "employee_id BIGINT NOT NULL COMMENT '归还人 ID', "
+                        + "operator_name VARCHAR(64) NOT NULL COMMENT '操作人姓名', "
+                        + "return_date DATE NOT NULL COMMENT '归还日期', "
+                        + "return_reason VARCHAR(500) NULL COMMENT '归还原因', "
+                        + "condition_note VARCHAR(500) NULL COMMENT '资产状况说明', "
+                        + "return_evidence_id BIGINT NULL COMMENT '归还凭证 ID', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_by VARCHAR(64) NULL, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_return_no (return_no), "
+                        + "INDEX idx_claim (claim_id), INDEX idx_asset (asset_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产归还记录表'");
+
+        // 4. 领用事件流水
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_claim_event ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "claim_id BIGINT NOT NULL COMMENT '关联领用 ID', "
+                        + "event_type VARCHAR(30) NOT NULL COMMENT '事件类型', "
+                        + "operator_name VARCHAR(64) NOT NULL COMMENT '操作人', "
+                        + "remark VARCHAR(500) NULL COMMENT '事件备注', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "INDEX idx_claim (claim_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='领用操作事件流水表'");
+
+        // 5. biz_eam_asset 补列
+        addColumnIfAbsent("biz_eam_asset", "current_holder_id",
+                "ALTER TABLE biz_eam_asset ADD COLUMN current_holder_id BIGINT NULL "
+                        + "COMMENT '当前持有人 ID' AFTER company_brand");
+        addColumnIfAbsent("biz_eam_asset", "active_claim_id",
+                "ALTER TABLE biz_eam_asset ADD COLUMN active_claim_id BIGINT NULL "
+                        + "COMMENT '当前活跃领用 ID' AFTER current_holder_id");
+
+        log.info("领用管理表 biz_eam_claim / biz_eam_claim_evidence / biz_eam_return / biz_eam_claim_event 就绪");
+    }
+
+    /**
+     * 148 脚本等效：资产编号规则重构——补 company_brand 列 + 分类编码迁移（旧长码→每级2位全路径码）
+     * 旧码: 10001/10001001 → 新码: 01/0101
+     */
+    private void migrateAssetCodeRule() {
+        // 1. 补 company_brand 列
+        addColumnIfAbsent("biz_eam_asset", "company_brand",
+                "ALTER TABLE biz_eam_asset ADD COLUMN company_brand TINYINT DEFAULT NULL "
+                        + "COMMENT '公司品牌：1=闪蜂(TB), 2=mFood(MF)' AFTER batch_id");
+
+        // 2. 分类编码迁移（仅当旧码仍存在时执行，幂等）
+        //    旧 L1: 10001→01, 10002→02, 10003→03, 10004→04
+        //    旧 L2: 10001001→0101, ..., 10003002→0302
+        String[][] catMappings = {
+                {"10004", "04"}, {"10003", "03"}, {"10002", "02"}, {"10001", "01"},
+                {"10001004", "0104"}, {"10001003", "0103"}, {"10001002", "0102"}, {"10001001", "0101"},
+                {"10002002", "0202"}, {"10002001", "0201"},
+                {"10003002", "0302"}, {"10003001", "0301"},
+        };
+        String[] refTables = {"biz_eam_brand", "biz_eam_model", "biz_eam_asset"};
+        String refColumn = "category_code";
+
+        for (String[] mapping : catMappings) {
+            String oldCode = mapping[0];
+            String newCode = mapping[1];
+            // 更新分类表
+            try {
+                int updated = jdbcTemplate.update(
+                        "UPDATE biz_eam_category SET code = ? WHERE code = ? AND deleted = 0", newCode, oldCode);
+                if (updated > 0) {
+                    log.info("分类编码迁移: {} → {} ({}条)", oldCode, newCode, updated);
+                }
+            } catch (Exception e) {
+                log.warn("分类编码迁移失败 ({}→{}): {}", oldCode, newCode, e.getMessage());
+            }
+            // 级联更新引用表
+            for (String table : refTables) {
+                try {
+                    jdbcTemplate.update("UPDATE " + table + " SET " + refColumn + " = ? WHERE " + refColumn + " = ?",
+                            newCode, oldCode);
+                } catch (Exception e) {
+                    // 表可能不存在或无数据，忽略
+                    log.debug("级联更新 {}.{} 失败 ({}→{}): {}", table, refColumn, oldCode, newCode, e.getMessage());
+                }
+            }
+        }
+        log.info("资产编号规则重构: company_brand 列就绪 + 分类编码迁移完成");
+    }
+
+    /**
+     * 分类编码去横杠迁移：将中间格式 01-01/01-01-01 转为最终格式 0101/010101
+     * 仅处理包含横杠的编码，幂等安全
+     */
+    private void migrateCategoryCodeDashRemoval() {
+        String[] refTables = {"biz_eam_category", "biz_eam_brand", "biz_eam_model", "biz_eam_asset"};
+        String refColumn = "category_code";
+        String codeColumn = "code";
+
+        // 查询所有含横杠的分类编码
+        try {
+            List<String> dashCodes = jdbcTemplate.queryForList(
+                    "SELECT DISTINCT code FROM biz_eam_category WHERE code LIKE '%-%' AND deleted = 0", String.class);
+            for (String oldCode : dashCodes) {
+                String newCode = oldCode.replace("-", "");
+                // 更新分类表
+                try {
+                    int updated = jdbcTemplate.update(
+                            "UPDATE biz_eam_category SET code = ? WHERE code = ? AND deleted = 0", newCode, oldCode);
+                    if (updated > 0) {
+                        log.info("分类编码去横杠: {} → {} ({}条)", oldCode, newCode, updated);
+                    }
+                } catch (Exception e) {
+                    log.warn("分类表编码去横杠失败 ({}→{}): {}", oldCode, newCode, e.getMessage());
+                }
+                // 级联更新引用表
+                for (String table : refTables) {
+                    if ("biz_eam_category".equals(table)) continue; // 已处理
+                    try {
+                        int updated = jdbcTemplate.update(
+                                "UPDATE " + table + " SET " + refColumn + " = ? WHERE " + refColumn + " = ?",
+                                newCode, oldCode);
+                        if (updated > 0) {
+                            log.info("级联更新 {}.{}: {} → {} ({}条)", table, refColumn, oldCode, newCode, updated);
+                        }
+                    } catch (Exception e) {
+                        log.debug("级联更新 {}.{} 失败 ({}→{}): {}", table, refColumn, oldCode, newCode, e.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("分类编码去横杠迁移失败: {}", e.getMessage());
+        }
+        log.info("分类编码去横杠迁移完成");
     }
 
     /** EAM 验收入库批次明细增加照片字段 (126 脚本等效) */
@@ -1389,6 +1669,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'BarcodeOutlined'   WHERE menu_key = 'asset-model'     AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'EnvironmentOutlined' WHERE menu_key = 'asset-location' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'TagOutlined'     WHERE menu_key = 'asset-tag'    AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ContactsOutlined' WHERE menu_key = 'asset-supplier' AND (icon IS NULL OR icon = '')");
 
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ImportOutlined'    WHERE menu_key = 'asset-inbound'   AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'UserAddOutlined'    WHERE menu_key = 'asset-claim'     AND (icon IS NULL OR icon = '')");
@@ -1426,6 +1708,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Asset Category Library'   WHERE menu_key = 'asset-category' AND (name_en IS NULL OR name_en != 'Asset Category Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Brand Product Library'    WHERE menu_key = 'asset-model'    AND (name_en IS NULL OR name_en != 'Brand Product Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Product Parameter Library' WHERE menu_key = 'param-library'  AND (name_en IS NULL OR name_en != 'Product Parameter Library')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Asset Tag'                WHERE menu_key = 'asset-tag'     AND (name_en IS NULL OR name_en != 'Asset Tag')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Suppliers'                WHERE menu_key = 'asset-supplier' AND (name_en IS NULL OR name_en != 'Suppliers')");
     }
 
     /** 角色-菜单权限关联表: 不存在则创建, 存在则补充 actions 列, 并迁移旧 JSON 权限 */
@@ -1698,7 +1982,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
         menus.put("asset-flow-ops",    new String[]{"資產管理",         "asset-management",   "3"});
         menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "4"});
-        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "5"});
+        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "6"});
         // 三级菜单 → 采购入库
         menus.put("purchase-order",     new String[]{"採購訂單",         "asset-purchase",     "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
@@ -1720,6 +2004,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-model",        new String[]{"資產品牌產品庫",       "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
+        menus.put("asset-tag",         new String[]{"資產標籤",         "asset-basic",        "5"});
+        // 二级直达菜单：供應商管理（基礎配置分组之前）
+        menus.put("asset-supplier",     new String[]{"供應商管理",       "asset-management",   "5"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
         menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
@@ -1894,7 +2181,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * 物资管理菜单分组重构强制修正（幂等，每次启动确保结构正确）
      * 1. 删除旧 asset-overview 分组
      * 2. 资产看板改为直达二级菜单
-     * 3. 分组排序: 采购入库(2) → 资产管理(3) → 维护与处置(4) → 基础设置(5)
+     * 3. 分组排序: 采购入库(2) → 资产管理(3) → 维护与处置(4) → 供應商管理(5) → 基礎配置(6)
      * 4. 确保采购订单存在并挂在采购入库下
      */
     private void fixAssetMenuGrouping() {
@@ -1914,10 +2201,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         Long flowOpsId  = queryMenuIdByKey("asset-flow-ops");
         Long maintId     = queryMenuIdByKey("asset-maintenance");
         Long basicId     = queryMenuIdByKey("asset-basic");
+        Long supplierId  = queryMenuIdByKey("asset-supplier");
         if (purchaseId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE id = ?", purchaseId);
         if (flowOpsId  != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE id = ?", flowOpsId);
         if (maintId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE id = ?", maintId);
-        if (basicId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", basicId);
+        if (supplierId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", supplierId);
+        if (basicId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 6 WHERE id = ?", basicId);
 
         // 4. 确保采购订单存在并挂在采购入库下
         if (purchaseId != null) {

@@ -9,10 +9,10 @@
  * 業務閉環：選閒置資產 → 填領用人/部門/領用日期 → 提交
  *          （自動置資產為「在用」、holdType=owned，並寫入變更歷史流水）
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
-  Button, Form, Input, Select, DatePicker, Row, Col, Spin,
-  message, Alert,
+  Button, Form, Input, Select, DatePicker, Spin, Modal, Pagination, Radio, TreeSelect,
+  Alert,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, DatabaseOutlined,
@@ -20,25 +20,39 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { fetchIdleAssets, createClaim } from '../../../api/eam'
-import type { AssetItem } from '../../../api/asset'
-import { EAM_DEPARTMENTS } from '../eamUtils'
+import type { DepartmentItem } from '../../../api/department'
+import { buildDeptTree, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration } from './claimViewTypes'
 
 const { TextArea } = Input
 
 interface FormValues {
   assetId: number
-  claimant: string
-  department: string
+  employeeId: number
   claimDate: Dayjs
   claimReason?: string
-  operator: string
+  mode: 'standard' | 'proxy'
+  proxyReason?: string
   remark?: string
 }
 
 interface Props {
   onBack: () => void
+  employeeId?: number
+  assetId?: number
+  initialEmployee?: ClaimEmployee
+  initialAsset?: ClaimAssetOption
+  assets?: ClaimPage<ClaimAssetOption>
+  employees?: ClaimPage<ClaimEmployee>
+  departments?: DepartmentItem[]
+  operatorName?: string
+  canProxy?: boolean
+  loading?: boolean
+  error?: string
+  onAssetQuery?: (query: ClaimQuery) => void
+  onEmployeeQuery?: (query: ClaimQuery) => void
+  onSubmit?: (values: ClaimRegistration) => Promise<void>
 }
+const EMPTY_DEPARTMENTS: DepartmentItem[] = []
 
 /* ==================== 卡片樣式常量 ==================== */
 const CARD_STYLE: React.CSSProperties = {
@@ -46,46 +60,76 @@ const CARD_STYLE: React.CSSProperties = {
   padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
 }
 
-export default function ClaimForm({ onBack }: Props) {
+export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee, initialAsset, assets, employees, departments = EMPTY_DEPARTMENTS, operatorName, canProxy = false, loading = false, error, onAssetQuery, onEmployeeQuery, onSubmit }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
-  const [loading, setLoading] = useState(false)
+  const [modal, contextHolder] = Modal.useModal()
   const [submitting, setSubmitting] = useState(false)
-  const [assets, setAssets] = useState<AssetItem[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [submitError, setSubmitError] = useState<string>()
+  const busy = useRef(false)
+  const mounted = useRef(true)
+  const [selected, setSelected] = useState(initialAsset)
+  const [employee, setEmployee] = useState(initialEmployee)
+  const [assetQuery, setAssetQuery] = useState<ClaimQuery>({ page: 1, size: 10 })
+  const [employeeQuery, setEmployeeQuery] = useState<ClaimQuery>({ page: 1, size: 10 })
+  const mode = Form.useWatch('mode', form) ?? 'standard'
+  const deptTree = useMemo(() => buildDeptTree(departments), [departments])
+  const assetOptions = [...(assets?.records ?? [])]
+  if (selected && !assetOptions.some((item) => item.id === selected.id)) assetOptions.unshift(selected)
+  const employeeOptions = [...(employees?.records ?? [])]
+  if (employee && !employeeOptions.some((item) => item.employeeId === employee.employeeId)) employeeOptions.unshift(employee)
 
-  /** 載入全部閒置資產（僅閒置可領用） */
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => { onAssetQuery?.(assetQuery) }, [assetQuery, onAssetQuery])
+  useEffect(() => { onEmployeeQuery?.(employeeQuery) }, [employeeQuery, onEmployeeQuery])
   useEffect(() => {
-    let alive = true
-    setLoading(true)
-    fetchIdleAssets()
-      .then((list) => { if (alive) setAssets(list) })
-      .catch((e: Error) => message.error(e.message))
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [])
-
-  const selected = assets.find((a) => a.id === selectedId)
+    if (initialAsset) { setSelected(initialAsset); form.setFieldValue('assetId', initialAsset.id) }
+  }, [initialAsset, form])
+  useEffect(() => {
+    if (initialEmployee) { setEmployee(initialEmployee); form.setFieldValue('employeeId', initialEmployee.employeeId) }
+  }, [initialEmployee, form])
 
   const handleSubmit = async () => {
+    if (!onSubmit || busy.current) return
+    busy.current = true
+    setSubmitError(undefined)
     try {
       const v = await form.validateFields()
-      setSubmitting(true)
-      await createClaim({
-        assetId: v.assetId,
-        claimant: v.claimant.trim(),
-        department: v.department,
-        claimDate: v.claimDate.format('YYYY-MM-DD'),
-        claimReason: v.claimReason,
-        operator: v.operator.trim(),
-        remark: v.remark,
+      if (!selected || !employee || (v.mode === 'proxy' && !canProxy)) {
+        setSubmitError('请等待资产和员工信息加载完成，并确认当前操作权限。')
+        return
+      }
+      const payload: ClaimRegistration = {
+        assetId: v.assetId, employeeId: v.employeeId, claimDate: v.claimDate.format('YYYY-MM-DD'),
+        claimReason: v.claimReason?.trim(), remark: v.remark?.trim(), mode: v.mode,
+        proxyReason: v.mode === 'proxy' ? v.proxyReason?.trim() : undefined,
+      }
+      const confirmed = await modal.confirm({
+        title: v.mode === 'proxy' ? '确认代办领用？' : '确认登记并发送待签？',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>领用人：</span><b>{employee.empName}（{employee.empNo}）</b></div>
+          <div className="confirm-info-row"><span>资产：</span><b>{selected.assetNo} / {selected.assetName}</b></div>
+          <div className="confirm-info-row"><span>领用日期：</span><b>{payload.claimDate}</b></div>
+          <div className="confirm-info-row"><span>处理结果：</span><b>{v.mode === 'proxy' ? '立即在用，保留代办未签标识' : '预留资产，等待员工本人签署'}</b></div>
+          {v.mode === 'proxy' && <div className="confirm-info-row"><span>代办原因：</span><b>{payload.proxyReason}</b></div>}
+        </div>,
+        okText: t('common.confirm'), cancelText: t('common.cancel'),
       })
-      message.success(t('asset.claimCreated'))
-      onBack()
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message) message.error(e.message)
+      if (!confirmed || !mounted.current) return
+      setSubmitting(true)
+      try {
+        await onSubmit(payload)
+        if (mounted.current) onBack()
+      } catch {
+        if (mounted.current) setSubmitError('登记未完成，填写内容已保留，请核对错误后重试。')
+      }
+    } catch {
+      // 表单自行展示校验错误；统一请求层负责 API 错误提示。
     } finally {
-      setSubmitting(false)
+      busy.current = false
+      if (mounted.current) setSubmitting(false)
     }
   }
 
@@ -102,7 +146,8 @@ export default function ClaimForm({ onBack }: Props) {
   )
 
   return (
-    <div className="content-area" style={{ padding: '20px 24px' }}>
+    <div>
+      {contextHolder}
       {/* ====== 頂部標題欄（橙色漸變頂條） ====== */}
       <div style={{
         position: 'relative', background: '#fff', marginBottom: 16,
@@ -121,11 +166,14 @@ export default function ClaimForm({ onBack }: Props) {
         </div>
       </div>
 
+      {(error || submitError) && <Alert type="error" showIcon className="claim-notice" message={error || submitError} />}
       <Spin spinning={loading}>
         <Form<FormValues>
           form={form}
           layout="vertical"
-          initialValues={{ claimDate: dayjs(), operator: t('asset.currentOperator') }}
+          initialValues={{ claimDate: dayjs(), mode: 'standard', assetId: initialAsset?.id ?? assetId, employeeId: initialEmployee?.employeeId ?? employeeId }}
+          disabled={submitting}
+          onFinish={handleSubmit}
         >
 
           {/* ====== 模塊1：資產選擇 ====== */}
@@ -136,12 +184,9 @@ export default function ClaimForm({ onBack }: Props) {
               '資產選擇',
             )}
 
-            {assets.length === 0 && !loading && (
-              <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={t('asset.noIdleAsset')} />
-            )}
-
-            <Row gutter={16}>
-              <Col span={12}>
+            <Alert type="info" showIcon className="claim-notice" message="仅可选择未被预留的闲置资产；登记后须本人签署才完成领用。" />
+            <div className="claim-form-grid">
+              <div>
                 <Form.Item
                   label={t('asset.colAssetNo')} name="assetId"
                   rules={[{ required: true, message: t('asset.assetRequired') }]}
@@ -149,16 +194,19 @@ export default function ClaimForm({ onBack }: Props) {
                   <Select
                     placeholder={t('asset.searchAssetPh')}
                     showSearch
-                    optionFilterProp="label"
-                    disabled={assets.length === 0}
-                    onChange={(v: number) => setSelectedId(v)}
-                    options={assets.map((a) => ({
+                    filterOption={false}
+                    disabled={!onAssetQuery || submitting}
+                    onSearch={(keyword) => setAssetQuery({ ...assetQuery, keyword: keyword.trim() || undefined, page: 1 })}
+                    onChange={(id: number) => setSelected(assetOptions.find((item) => item.id === id))}
+                    options={assetOptions.map((a) => ({
                       label: `${a.assetNo} / ${a.assetName}`, value: a.id,
                     }))}
                   />
                 </Form.Item>
-              </Col>
-            </Row>
+                <Pagination className="claim-selection-pagination" size="small" current={assetQuery.page} pageSize={assetQuery.size} total={assets?.total ?? 0} showSizeChanger={false} hideOnSinglePage
+                  onChange={(page) => setAssetQuery({ ...assetQuery, page })} />
+              </div>
+            </div>
 
             {/* 所選資產信息展示 */}
             {selected && (
@@ -188,7 +236,7 @@ export default function ClaimForm({ onBack }: Props) {
                   <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
                     <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colPurchaseValue')}</div>
                     <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
-                      {selected.purchaseValue ? `MOP ${selected.purchaseValue.toLocaleString()}` : '—'}
+                      {selected.purchaseValue != null ? `MOP ${selected.purchaseValue.toLocaleString()}` : '—'}
                     </div>
                   </div>
                 </div>
@@ -204,52 +252,41 @@ export default function ClaimForm({ onBack }: Props) {
               '領用信息',
             )}
 
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colClaimant')} name="claimant"
-                  rules={[{ required: true, message: t('asset.claimantRequired') }]}
-                >
-                  <Input placeholder={t('asset.userNamePh')} allowClear />
+            <div className="claim-form-grid">
+              <div>
+                <Form.Item label={t('asset.colClaimant')} name="employeeId" rules={[{ required: true, message: t('asset.claimantRequired') }]}>
+                  <Select showSearch filterOption={false} placeholder="搜索姓名 / 工号" disabled={!onEmployeeQuery || submitting}
+                    onSearch={(keyword) => setEmployeeQuery({ ...employeeQuery, keyword: keyword.trim() || undefined, page: 1 })}
+                    onChange={(id: number) => setEmployee(employeeOptions.find((item) => item.employeeId === id))}
+                    options={employeeOptions.map((item) => ({ value: item.employeeId, label: `${item.empName}（${item.empNo}）` }))} />
                 </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colDepartment')} name="department"
-                  rules={[{ required: true, message: t('asset.departmentRequired') }]}
-                >
-                  <Select
-                    placeholder={t('asset.departmentRequired')}
-                    showSearch
-                    options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colClaimDate')} name="claimDate"
-                  rules={[{ required: true, message: t('asset.claimDateRequired') }]}
-                >
-                  <DatePicker style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item label="领用原因" name="claimReason">
-                  <Input placeholder="请输入领用原因" allowClear />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t('asset.colOperator')} name="operator"
-                  rules={[{ required: true, message: t('asset.operatorRequired') }]}
-                >
-                  <Input placeholder={t('asset.operatorRequired')} allowClear />
-                </Form.Item>
-              </Col>
-            </Row>
+                <Pagination className="claim-selection-pagination" size="small" current={employeeQuery.page} pageSize={employeeQuery.size} total={employees?.total ?? 0} showSizeChanger={false} hideOnSinglePage
+                  onChange={(page) => setEmployeeQuery({ ...employeeQuery, page })} />
+              </div>
+              <Form.Item label={t('asset.colDepartment')}>
+                <TreeSelect disabled treeData={deptTree} value={employee?.departmentId} placeholder={employee?.department || '由员工组织信息带出'} />
+              </Form.Item>
+              <Form.Item label={t('asset.colClaimDate')} name="claimDate" rules={[
+                { required: true, message: t('asset.claimDateRequired') },
+                { validator: (_, date: Dayjs) => !date || !date.isAfter(dayjs(), 'day') ? Promise.resolve() : Promise.reject(new Error('领用日期不能在未来')) },
+              ]}>
+                <DatePicker disabledDate={(date) => date.isAfter(dayjs(), 'day')} />
+              </Form.Item>
+              <Form.Item label="领用用途" name="claimReason"><Input maxLength={200} placeholder="请输入领用用途" allowClear /></Form.Item>
+              <Form.Item label={t('asset.colOperator')}><Input value={operatorName ?? ''} readOnly placeholder="由服务端登录身份确认" /></Form.Item>
+            </div>
+            <Form.Item label="办理方式" name="mode" style={{ marginTop: 20 }}>
+              <Radio.Group>
+                <Radio value="standard">登记并发送待签</Radio>
+                {canProxy && <Radio value="proxy">管理员代办领用</Radio>}
+              </Radio.Group>
+            </Form.Item>
+            {mode === 'proxy' && <>
+              <Alert type="warning" showIcon className="claim-notice" message="代办将立即使资产在用，但不代表员工本人已签署；必须填写原因并由员工补签。" />
+              <Form.Item label="代办原因" name="proxyReason" rules={[{ required: true, whitespace: true, message: '请填写代办原因' }]}>
+                <TextArea rows={3} maxLength={500} showCount />
+              </Form.Item>
+            </>}
           </div>
 
           {/* ====== 模塊3：備注信息 ====== */}
@@ -270,13 +307,13 @@ export default function ClaimForm({ onBack }: Props) {
 
       {/* ====== 底部操作欄（取消+保存） ====== */}
       <div className="form-footer">
-        <Button onClick={onBack}>{t('common.cancel')}</Button>
+        <Button onClick={onBack} disabled={submitting}>{t('common.cancel')}</Button>
         <Button
           type="primary" icon={<SaveOutlined />} loading={submitting}
-          disabled={assets.length === 0}
+          disabled={!onSubmit || loading || !!error}
           onClick={handleSubmit}
         >
-          {t('common.save')}
+          {mode === 'proxy' ? '代办领用' : '登记并发送待签'}
         </Button>
       </div>
     </div>

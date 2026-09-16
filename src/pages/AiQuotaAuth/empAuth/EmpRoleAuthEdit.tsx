@@ -10,6 +10,7 @@ import {
   type ModelAuthConfig,
 } from './modelAuthCapability'
 import { createRoleAuth, fetchRoleAuths, getRoleAuthByCode, updateRoleAuth } from '../../../api/empAuth'
+import { useTranslation } from 'react-i18next'
 
 /**
  * 角色授權 - 新增 / 編輯獨立頁（全局統一：取消彈窗，參考部門模型權控）
@@ -19,6 +20,7 @@ import { createRoleAuth, fetchRoleAuths, getRoleAuthByCode, updateRoleAuth } fro
  * 角色為自定義名稱，與權限系統角色無關；員工來自真實 API，顯示工號避免重名
  */
 export default function EmpRoleAuthEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const roleIdParam = searchParams.get('roleId')
@@ -65,7 +67,7 @@ export default function EmpRoleAuthEdit() {
         }
       } catch {
         if (!cancelled) {
-          message.error(roleIdParam ? '角色配置不存在或已刪除' : '加載數據失敗')
+          message.error(roleIdParam ? t('aiQuotaAuth.roleConfigNotFound') : t('aiQuotaAuth.loadDataFailed'))
           if (roleIdParam) navigate('/ai-emp-model-auth#role')
         }
       } finally {
@@ -101,15 +103,15 @@ export default function EmpRoleAuthEdit() {
     const values = await form.validateFields()
     const roleName = String(values.roleName).trim()
     if (!roleName) {
-      message.warning('請輸入角色名稱')
+      message.warning(t('aiQuotaAuth.roleNamePh'))
       return
     }
     if (boundUsers.length === 0) {
-      message.warning('請至少綁定一名員工')
+      message.warning(t('aiQuotaAuth.bindEmpRequired'))
       return
     }
     if (modelAuths.length === 0) {
-      message.warning('請至少添加一個授權模型')
+      message.warning(t('aiQuotaAuth.addModelWarning'))
       return
     }
 
@@ -126,20 +128,20 @@ export default function EmpRoleAuthEdit() {
     try {
       if (isEdit && roleIdParam) {
         await updateRoleAuth(roleIdParam, payload)
-        message.success('角色授權已更新，綁定員工自動生效')
+        message.success(t('aiQuotaAuth.roleAuthUpdated'))
       } else {
         // 新增前校驗角色名稱唯一（後端 role_code 唯一兜底）
         const existing = await fetchRoleAuths({ name: roleName })
         if (existing.some((c) => c.roleName === roleName)) {
-          message.error('角色名稱已存在，請使用其他名稱')
+          message.error(t('aiQuotaAuth.roleNameExists'))
           return
         }
         await createRoleAuth(payload)
-        message.success('角色授權已創建，綁定員工自動生效')
+        message.success(t('aiQuotaAuth.roleAuthCreated'))
       }
       navigate('/ai-emp-model-auth#role')
     } catch {
-      message.error('保存失敗，請稍後重試')
+      message.error(t('aiQuotaAuth.saveFailedRetry'))
     } finally {
       setSaving(false)
     }
@@ -177,10 +179,10 @@ export default function EmpRoleAuthEdit() {
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯模型授權-角色' : '新增模型授權-角色'}
+              {isEdit ? t('aiQuotaAuth.editRoleAuth') : t('aiQuotaAuth.addRoleAuth')}
             </h2>
           </div>
         </div>
@@ -193,21 +195,21 @@ export default function EmpRoleAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{isEdit ? '角色名稱不可變更' : '自定義角色'}</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{isEdit ? t('aiQuotaAuth.roleNameImmutable') : t('aiQuotaAuth.customRoleTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="roleName" label="角色名稱" rules={[{ required: true, message: '請輸入角色名稱' }]}>
+            <Form.Item name="roleName" label={t('aiQuotaAuth.roleNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.roleNamePh') }]}>
               <Input
-                placeholder="如：AI 研發團隊、數據分析組"
+                placeholder={t('aiQuotaAuth.roleNameExampleAuth')}
                 maxLength={50}
                 allowClear
                 disabled={isEdit}
               />
             </Form.Item>
-            <Form.Item name="description" label="描述">
-              <Input placeholder="請輸入角色描述（選填）" maxLength={200} allowClear />
+            <Form.Item name="description" label={t('common.description')}>
+              <Input placeholder={t('aiQuotaAuth.roleAuthDescPh')} maxLength={200} allowClear />
             </Form.Item>
           </div>
         </div>
@@ -218,9 +220,9 @@ export default function EmpRoleAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>綁定員工</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>穿梭框</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>綁定員工自動獲得該角色的模型授權（顯示工號避免重名）</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.bindEmpLabel')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTag')}</Tag>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.bindEmpAuthHint')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           {/* 穿梭框：左側員工列表 + 右側已選標籤（與部門穿梭框規則一致） */}
@@ -236,7 +238,7 @@ export default function EmpRoleAuthEdit() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
-                  可選員工（{availableEmps.length}）
+                  {t('aiQuotaAuth.availableEmpTitle', { count: availableEmps.length })}
                 </span>
                 <a
                   onClick={() => {
@@ -244,11 +246,11 @@ export default function EmpRoleAuthEdit() {
                     setCheckedEmpIds(unchecked)
                   }}
                   style={{ fontSize: 12 }}
-                >全選</a>
+                >{t('aiQuotaAuth.selectAll')}</a>
               </div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
                 <Input
-                  placeholder="搜索姓名、工號或部門"
+                  placeholder={t('aiQuotaAuth.empSearchPh')}
                   allowClear
                   size="small"
                   value={empSearchKw}
@@ -258,7 +260,7 @@ export default function EmpRoleAuthEdit() {
               <div style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
                 {availableEmps.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
-                    暫無可選員工
+                    {t('aiQuotaAuth.noAvailableEmp')}
                   </div>
                 ) : availableEmps.map((emp) => {
                   const checked = checkedEmpIds.includes(emp.id)
@@ -306,7 +308,7 @@ export default function EmpRoleAuthEdit() {
                 onClick={() => {
                   const newIds = checkedEmpIds.filter((id) => !boundUsers.includes(id))
                   if (newIds.length === 0) {
-                    message.warning('請先勾選要添加的員工')
+                    message.warning(t('aiQuotaAuth.selectEmpFirst'))
                     setCheckedEmpIds([])
                     return
                   }
@@ -338,14 +340,14 @@ export default function EmpRoleAuthEdit() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
-                  已選員工（{boundUsers.length}）
+                  {t('aiQuotaAuth.selectedEmpTitle', { count: boundUsers.length })}
                 </span>
-                <a onClick={() => { setBoundUsers([]); setCheckedEmpIds([]) }} style={{ fontSize: 12 }}>清空</a>
+                <a onClick={() => { setBoundUsers([]); setCheckedEmpIds([]) }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearAll')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedEmpList.length === 0 ? (
                   <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
-                    請從左側選擇員工
+                    {t('aiQuotaAuth.selectEmpFromLeft')}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -366,7 +368,7 @@ export default function EmpRoleAuthEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
-                共 <strong>{boundUsers.length}</strong> 名員工
+                {t('aiQuotaAuth.totalBoundEmp', { count: <strong>{boundUsers.length}</strong> })}
               </div>
             </div>
           </div>
@@ -381,20 +383,20 @@ export default function EmpRoleAuthEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>状态配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item
               name="status"
-              label="啟用狀態"
+              label={t('aiQuotaAuth.enableStatusLabel')}
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
-              extra="停用後綁定員工將立即失去該角色授予的模型訪問權"
+              extra={t('aiQuotaAuth.disableRoleAuthExtra')}
             >
-              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+              <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
             </Form.Item>
           </div>
         </div>
@@ -402,9 +404,9 @@ export default function EmpRoleAuthEdit() {
 
       {/* 底部操作按鈕（全局統一：取消 + 保存） */}
       <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
+        <Button onClick={handleBack}>{t('common.cancel')}</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          保存
+          {t('common.save')}
         </Button>
       </div>
     </div>

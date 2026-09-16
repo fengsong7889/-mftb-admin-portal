@@ -393,7 +393,7 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_purchase_request', label: '採購申請流程編號', type: 'table', value: 'CG', defaultValue: 'CG', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'CG202609110001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '審批中心' },
       { key: 'eam_purchase_order', label: '採購訂單編號', type: 'table', value: 'DDCG', defaultValue: 'DDCG', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDCG202609140000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-採購訂單' },
       { key: 'eam_inbound_batch', label: '驗收入庫批次編號', type: 'table', value: 'IB', defaultValue: 'IB', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'IB202609160000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-驗收入庫' },
-      { key: 'eam_asset', label: '資產編號', type: 'table', value: 'FA', defaultValue: 'FA', dateFormat: 'YYYYMMDD', min: 6, max: 6, unit: 'FA20260916000000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-資產台賬' },
+      { key: 'eam_asset', label: '資產編號', type: 'table', value: 'TB', defaultValue: 'TB', dateFormat: '', min: 4, max: 4, unit: 'TB-ZH-0101-0001', remark: '{品牌编碼}-{倉庫编碼}-{分類碼}-{n}位分類內自增序號', menu: '物資管理(EAM)-資產台賬' },
       { key: 'workflow_config', label: '流程配置ID', type: 'table', value: 'LC', defaultValue: 'LC', dateFormat: '', min: 5, max: 5, unit: 'LC00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '審批中心' },
       /* ── 員工管理 ── */
       { key: 'employee_no', label: '工號', type: 'table', value: 'MF', defaultValue: 'MF', dateFormat: '', min: 5, max: 5, unit: 'MF00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '員工管理' },
@@ -418,6 +418,7 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_location_warehouse', label: '倉庫編碼', type: 'table', value: 'CK-', defaultValue: 'CK-', dateFormat: '', min: 3, max: 3, unit: 'CK-001', remark: '{prefix} + 3位數字自增（全局自增，如 CK-001、CK-002）', menu: '資產管理(EAM)-基礎配置' },
       { key: 'eam_location_floor', label: '樓層編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'DZ-001-01', remark: 'DZ + 父倉庫序號 +「-」+ 2位數字自增（掛倉庫下，如 DZ-001-01、DZ-001-02）', menu: '資產管理(EAM)-基礎配置' },
       { key: 'eam_location_room', label: '房間編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'XQ-001-01-01', remark: 'XQ + 父倉庫序號 + 父樓層序號 +「-」+ 2位數字自增（掛樓層下，如 XQ-001-01-01）', menu: '資產管理(EAM)-基礎配置' },
+      { key: 'eam_supplier_code', label: '供應商編碼', type: 'table', value: 'CGSJ', defaultValue: 'CGSJ', dateFormat: '', min: 6, max: 6, unit: 'CGSJ000001', remark: '{prefix} + 6位數字自增（全局自增，如 CGSJ000001、CGSJ000002）', menu: '資產管理(EAM)-供應商管理' },
     ],
   },
 ]

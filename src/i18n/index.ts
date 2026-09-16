@@ -100,4 +100,26 @@ export function injectTranslationBundle(lang: string, flat: Record<string, strin
   }
 }
 
+/** 已注入过数据库语言包的语言（会话内去重，避免刷新/切换重复请求） */
+let bundleEnsuredLang: string | null = null
+
+/**
+ * 確保指定語言的數據庫語言包已注入（登錄後/刷新後恢復動態翻譯）：
+ * 靜態 JSON 已覆蓋 zh-TW/en 的 UI 文案，但業務字段/菜單名等動態翻譯存於後端
+ * sys_translation；刷新後 i18next 重建資源需重新拉取注入，否則 ja/ko/ru 回退英文。
+ * 同一語言會話內只拉取一次，失敗時清標誌以便下次重試。
+ */
+export async function ensureLanguageBundle(lang: string) {
+  if (!lang || bundleEnsuredLang === lang) return
+  bundleEnsuredLang = lang
+  try {
+    const { fetchTranslationBundle } = await import('../api/translation')
+    const bundle = await fetchTranslationBundle(lang)
+    if (bundle) injectTranslationBundle(lang, bundle)
+  } catch {
+    /* 拉取失敗（未登錄/網絡異常）靜默降級：UI 文案仍由靜態 JSON 兜底 */
+    bundleEnsuredLang = null
+  }
+}
+
 export default i18n

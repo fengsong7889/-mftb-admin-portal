@@ -6,6 +6,7 @@
  * - 支持新增、修改、刪除、啟用停用（停用配件不出現在驗收彈窗選項中）
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, InputNumber, Modal, Table, Tag, message, Space } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, AppstoreOutlined } from '@ant-design/icons'
@@ -28,6 +29,7 @@ interface AccFormValues {
 }
 
 export default function AccessoryConfig({ categoryCode, categoryName, onBack }: Props) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [list, setList] = useState<CategoryAccessory[]>([])
 
@@ -47,11 +49,11 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
       const data = await fetchCategoryAccessories(categoryCode)
       setList(data)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '加載配件列表失敗')
+      message.error(e instanceof Error ? e.message : t('asset.loadAccFailed'))
     } finally {
       setLoading(false)
     }
-  }, [categoryCode])
+  }, [categoryCode, t])
 
   useEffect(() => {
     loadList()
@@ -75,15 +77,15 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
     try {
       if (editing?.id != null) {
         await updateCategoryAccessory(editing.id, { name: values.name.trim(), defaultQty: values.defaultQty })
-        message.success('配件已更新')
+        message.success(t('asset.accessoryUpdated'))
       } else {
         await createCategoryAccessory(categoryCode, { name: values.name.trim(), defaultQty: values.defaultQty })
-        message.success('配件已新增')
+        message.success(t('asset.accessoryAdded'))
       }
       setAccModalOpen(false)
       loadList()
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '保存失敗')
+      message.error(e instanceof Error ? e.message : t('asset.saveOpFailed'))
     } finally {
       setSaving(false)
     }
@@ -92,18 +94,18 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
   /** 刪除（二次確認） */
   const handleDelete = (record: CategoryAccessory) => {
     Modal.confirm({
-      title: '確認刪除配件',
-      content: `刪除後該配件將從本分類的驗收選項中移除：${record.name}`,
-      okText: '確認刪除',
+      title: t('asset.confirmDeleteAcc'),
+      content: t('asset.deleteAccContent', { name: record.name }),
+      okText: t('common.confirmDelete'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await deleteCategoryAccessory(record.id!)
-          message.success('配件已刪除')
+          message.success(t('asset.accessoryDeleted'))
           loadList()
         } catch (e: unknown) {
-          message.error(e instanceof Error ? e.message : '刪除失敗')
+          message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
         }
       },
     })
@@ -114,48 +116,48 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
     const next = record.status === 0 ? 1 : 0
     try {
       await updateCategoryAccessoryStatus(record.id!, next)
-      message.success(next === 1 ? '已啟用' : '已停用')
+      message.success(next === 1 ? t('asset.enabledStatus') : t('asset.disabledStatus'))
       loadList()
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '操作失敗')
+      message.error(e instanceof Error ? e.message : t('asset.opFailed'))
     }
   }
 
   const columns: TableColumnsType<CategoryAccessory> = [
     {
-      title: '配件名稱', dataIndex: 'name', key: 'name', width: 240,
+      title: t('asset.accNameCol'), dataIndex: 'name', key: 'name', width: 240,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
       // 不同分類配件的計量單位不一致（件/條/瓶等），默認數量僅展示純數字
-      title: '默認數量', dataIndex: 'defaultQty', key: 'defaultQty', width: 120,
+      title: t('asset.defaultQtyCol'), dataIndex: 'defaultQty', key: 'defaultQty', width: 120,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v?: number) => (v === 0 ? <Tag>停用</Tag> : <Tag color="success">啟用</Tag>),
+      render: (v?: number) => (v === 0 ? <Tag>{t('asset.disabledStatus')}</Tag> : <Tag color="success">{t('asset.enabledStatus')}</Tag>),
     },
     {
-      title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 140,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v?: string) => v || '-',
-    },
-    {
-      title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 180,
+      title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 140,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v?: string) => v || '-',
     },
     {
-      title: '操作', key: 'action', width: 180, fixed: 'right',
+      title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v?: string) => v || '-',
+    },
+    {
+      title: t('asset.colAction'), key: 'action', width: 180, fixed: 'right',
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, record: CategoryAccessory) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => openModal(record)}>修改</Button>
+          <Button type="link" size="small" onClick={() => openModal(record)}>{t('asset.btnEditLabel')}</Button>
           <Button type="link" size="small" onClick={() => handleToggleStatus(record)}>
-            {record.status === 0 ? '啟用' : '停用'}
+            {record.status === 0 ? t('asset.enabledStatus') : t('asset.disabledStatus')}
           </Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
@@ -182,11 +184,11 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>
-              返回
+              {t('common.back')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              配件配置 - {categoryName}
+              {t('asset.accConfigTitle', { name: categoryName })}
             </h2>
           </div>
         </div>
@@ -197,7 +199,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
         padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591',
         borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08', lineHeight: 1.7,
       }}>
-        按分類統一配置常用配件：該分類下所有產品（如 iPhone 15 / 16 / 17 / Pro / Max）驗收時共用同一套配件清單並可一鍵帶入；停用狀態的配件不會出現在驗收彈窗的「帶入分類配件」選項中。
+        {t('asset.accConfigHint')}
       </div>
 
       {/* 操作區 */}
@@ -205,12 +207,12 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
         <div className="action-section-left">
           <Tag color="orange" style={{ margin: 0 }}>
             <AppstoreOutlined style={{ marginRight: 4 }} />
-            分類：{categoryName}
+            {t('asset.categoryTag', { name: categoryName })}
           </Tag>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-            新增配件
+            {t('asset.addAccessoryBtn')}
           </Button>
         </div>
       </div>
@@ -226,19 +228,19 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
         pagination={{
           current: page, pageSize: size, total: list.length,
           showSizeChanger: true, showQuickJumper: true,
-          showTotal: (tt) => `共 ${tt} 條`,
+          showTotal: (tt) => t('asset.totalItems', { total: tt }),
           onChange: (p, s) => { setPage(p); setSize(s) },
         }}
       />
 
       {/* 新增/編輯彈窗 */}
       <Modal
-        title={editing ? '修改配件' : '新增配件'}
+        title={editing ? t('asset.editAccTitle') : t('asset.addAccTitle')}
         open={accModalOpen}
         onCancel={() => setAccModalOpen(false)}
         onOk={handleSave}
-        okText="保存"
-        cancelText="取消"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         confirmLoading={saving}
         width={480}
         destroyOnClose
@@ -251,19 +253,19 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
           style={{ marginTop: 8 }}
         >
           <Form.Item
-            label="配件名稱"
+            label={t('asset.accNameCol')}
             name="name"
             rules={[
-              { required: true, whitespace: true, message: '請輸入配件名稱' },
-              { max: 64, message: '名稱不能超過 64 字' },
+              { required: true, whitespace: true, message: t('asset.accNameRequired') },
+              { max: 64, message: t('asset.accNameMaxLen') },
             ]}
           >
-            <Input placeholder="請輸入配件名稱（如：數據線、說明書）" allowClear maxLength={64} onPressEnter={handleSave} />
+            <Input placeholder={t('asset.accNamePh')} allowClear maxLength={64} onPressEnter={handleSave} />
           </Form.Item>
           <Form.Item
-            label="默認數量"
+            label={t('asset.defaultQtyCol')}
             name="defaultQty"
-            rules={[{ required: true, message: '請輸入默認數量' }]}
+            rules={[{ required: true, message: t('asset.defaultQtyRequired') }]}
           >
             <InputNumber min={1} precision={0} style={{ width: 160 }} />
           </Form.Item>

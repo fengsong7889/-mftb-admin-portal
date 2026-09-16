@@ -158,23 +158,23 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
 
   const handleExport = () => {
     if (tableData.length === 0) {
-      message.warning('暂无数据可导出')
+      message.warning(t('asset.noDataExport'))
       return
     }
-    message.success('导出功能开发中')
+    message.success(t('common.exportDev'))
   }
 
   /* ── 列字段配置 ── */
   const columnMeta = useMemo(() => [
-    { key: 'code', title: '編碼' },
-    { key: 'name', title: '倉庫名稱' },
-    { key: 'province', title: '省份' },
-    { key: 'city', title: '城市' },
-    { key: 'district', title: '區縣' },
-    { key: 'address', title: '詳細地址' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'remark', title: '備註' },
+    { key: 'code', title: t('asset.colCode') },
+    { key: 'name', title: t('asset.colWarehouseName') },
+    { key: 'province', title: t('asset.colProvince') },
+    { key: 'city', title: t('asset.colCity') },
+    { key: 'district', title: t('asset.colDistrict') },
+    { key: 'address', title: t('asset.colAddress') },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt') },
+    { key: 'remark', title: t('asset.colRemark') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -182,38 +182,38 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
 
   const columns: TableColumnsType<LocationRow> = [
     {
-      title: '編碼', dataIndex: 'code', key: 'code', width: 120, ellipsis: true,
+      title: t('asset.colCode'), dataIndex: 'code', key: 'code', width: 120, ellipsis: true,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
     },
     {
-      title: '倉庫名稱', dataIndex: 'name', key: 'name', width: 140, ellipsis: true,
+      title: t('asset.colWarehouseName'), dataIndex: 'name', key: 'name', width: 140, ellipsis: true,
     },
     {
-      title: '省份', dataIndex: 'province', key: 'province', width: 140, ellipsis: true,
+      title: t('asset.colProvince'), dataIndex: 'province', key: 'province', width: 140, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '城市', dataIndex: 'city', key: 'city', width: 100, ellipsis: true,
+      title: t('asset.colCity'), dataIndex: 'city', key: 'city', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '區縣', dataIndex: 'district', key: 'district', width: 100, ellipsis: true,
+      title: t('asset.colDistrict'), dataIndex: 'district', key: 'district', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '詳細地址', dataIndex: 'address', key: 'address', width: 180, ellipsis: true,
+      title: t('asset.colAddress'), dataIndex: 'address', key: 'address', width: 180, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, ellipsis: true,
+      title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 110, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 170, ellipsis: true,
+      title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
-      title: '備註', dataIndex: 'remark', key: 'remark', width: 140, ellipsis: true,
+      title: t('asset.colRemark'), dataIndex: 'remark', key: 'remark', width: 140, ellipsis: true,
       render: (v: string | undefined) => v || '-',
     },
     {
@@ -239,15 +239,15 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="仓库名称" name="name">
-            <Input placeholder="请输入仓库名称" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('asset.locNameLabel')} name="name">
+            <Input placeholder={t('asset.locNamePh')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="编码" name="code">
-            <Input placeholder="请输入编码" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('asset.locCodeLabel')} name="code">
+            <Input placeholder={t('asset.locCodePh')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="省份" name="province">
+          <Form.Item label={t('asset.colProvince')} name="province">
             <Select
-              placeholder="请选择省份"
+              placeholder={t('asset.locProvincePh')}
               allowClear
               showSearch
               options={provinceOptions}
@@ -255,9 +255,9 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
               style={{ minWidth: 140 }}
             />
           </Form.Item>
-          <Form.Item label="城市" name="city">
+          <Form.Item label={t('asset.colCity')} name="city">
             <Select
-              placeholder={searchProvince ? '请选择城市' : '请先选择省份'}
+              placeholder={searchProvince ? t('asset.locCityPh') : t('asset.locCitySelectFirst')}
               allowClear
               showSearch
               disabled={!searchProvince}
@@ -266,9 +266,9 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
               style={{ minWidth: 140 }}
             />
           </Form.Item>
-          <Form.Item label="区县" name="district">
+          <Form.Item label={t('asset.colDistrict')} name="district">
             <Select
-              placeholder={searchCity ? '请选择区县' : '请先选择城市'}
+              placeholder={searchCity ? t('asset.locDistrictPh') : t('asset.locDistrictSelectFirst')}
               allowClear
               showSearch
               disabled={!searchCity}
@@ -277,11 +277,11 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
               style={{ minWidth: 140 }}
             />
           </Form.Item>
-          <Form.Item label="详细地址" name="address">
-            <Input placeholder="请输入详细地址" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('asset.colAddress')} name="address">
+            <Input placeholder={t('asset.locAddressPh')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="最后更新人" name="updatedBy">
-            <Input placeholder="请输入更新人" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
+            <Input placeholder={t('asset.catUpdatedByPh')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -295,11 +295,11 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
-            新增倉庫
+            {t('asset.addWarehouseBtn')}
           </Button>
           {configComponent}
         </div>
@@ -315,7 +315,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 条`,
+          showTotal: (total) => t('asset.locPaginationTotal', { count: total }),
         }}
       />
     </>

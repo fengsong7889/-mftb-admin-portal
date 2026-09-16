@@ -81,6 +81,14 @@ export interface AssetItem {
   modelId?: number | null
   /** 关联存放位置 ID（EAM 位置树） */
   locationId?: number | null
+  /** 存放位置-省份 */
+  province?: string
+  /** 存放位置-城市 */
+  city?: string
+  /** 存放位置-区县 */
+  district?: string
+  /** 存放位置-详细地址 */
+  address?: string
   /** 持有方式：自有领用/借用（借用语义由 BorrowRecord 承载） */
   holdType?: 'owned' | 'borrowed'
   /** 型号参数实例（如 CPU/内存/硬盘） */
@@ -90,6 +98,8 @@ export interface AssetItem {
   brandId?: number | null
   orderId?: number | null
   batchId?: number | null
+  /** 公司品牌 ID（sys_company_brand.id，从后端动态加载） */
+  companyBrand?: number | null
   purchaseType?: 'purchase' | 'lease'
   updatedBy?: string
   inboundBatchNo?: string | null
@@ -255,7 +265,7 @@ export type AssetSaveData = Partial<Pick<AssetItem,
   'assetNo' | 'assetName' | 'assetType' | 'categoryId' | 'categoryCode' | 'brand' | 'brandId' |
   'modelId' | 'params' | 'images' | 'unit' | 'quantity' | 'purchaseValue' | 'purchaseDate' |
   'usageDate' | 'source' | 'company' | 'location' | 'locationId' | 'department' | 'userName' |
-  'status' | 'holdType' | 'scrapTime' | 'leaseCompany' | 'rentalCost' | 'rentalPeriod' | 'remark'>>
+  'status' | 'holdType' | 'scrapTime' | 'leaseCompany' | 'rentalCost' | 'rentalPeriod' | 'remark' | 'companyBrand'>>
 
 /** 支持历史逗号拼接与 JSON 数组；保留 Data URL 自带的 base64 逗号。 */
 export function parseAssetImages(images?: string | null): string[] {

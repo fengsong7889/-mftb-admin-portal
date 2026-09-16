@@ -19,6 +19,7 @@ import {
   CURRENCY_SYMBOL,
   CURRENCY_OPTIONS,
 } from './deptQuotaStore'
+import { useTranslation } from 'react-i18next'
 
 /** 格式化時間為 YYYY-MM-DD HH:mm:ss */
 const nowText = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ')
@@ -29,6 +30,7 @@ const nowText = (): string => new Date().toISOString().slice(0, 19).replace('T',
  * 路由：/ai-dept-quota-edit（新增）、/ai-dept-quota-edit?id=xxx（編輯）
  */
 export default function DeptQuotaEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const quotaId = searchParams.get('id')
@@ -66,7 +68,7 @@ export default function DeptQuotaEdit() {
           // 從後端 API 載入詳情
           fetchDeptQuotaDetail(Number(quotaId)).then((policy) => {
             if (!policy) {
-              message.error('額度策略不存在或已刪除')
+              message.error(t('aiQuotaAuth.strategyNotFound'))
               navigate('/ai-dept-quota')
               return
             }
@@ -85,10 +87,10 @@ export default function DeptQuotaEdit() {
               status: policy.status,
             })
             setSelectedDeptIds(policy.deptIds)
-          }).catch(() => { message.error('加載詳情失敗') })
+          }).catch(() => { message.error(t('aiQuotaAuth.loadDetailFailed')) })
         }
       })
-      .catch(() => { if (!cancelled) message.error('加載數據失敗') })
+      .catch(() => { if (!cancelled) message.error(t('aiQuotaAuth.loadDataFailed')) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [quotaId, form, navigate])
@@ -146,11 +148,11 @@ export default function DeptQuotaEdit() {
     const values = await form.validateFields()
 
     if (selectedDeptIds.length === 0) {
-      message.warning('請至少選擇一個部門')
+      message.warning(t('aiQuotaAuth.selectDeptWarning'))
       return
     }
     if (values.overLimitAction === 'downgrade' && !values.downgradeModelId) {
-      message.warning('超額動作為「自動降級」時，請選擇降級目標模型')
+      message.warning(t('aiQuotaAuth.downgradeWarning'))
       return
     }
 
@@ -197,7 +199,7 @@ export default function DeptQuotaEdit() {
         status: (values.status ?? 1) as number,
       }
       await saveDeptQuota(payload)
-      message.success(isEdit ? '額度策略已更新' : '額度策略已創建')
+      message.success(isEdit ? t('aiQuotaAuth.quotaUpdated') : t('aiQuotaAuth.quotaCreated'))
       navigate('/ai-dept-quota')
     } finally {
       setSaving(false)
@@ -217,12 +219,12 @@ export default function DeptQuotaEdit() {
   /* ── 實時額度解讀（提升可理解性） ── */
   const deptLabel = selectedDeptIds.length
     ? deptOptions.filter((d) => selectedDeptIds.includes(d.deptId)).map((d) => d.deptName).join('、')
-    : '（尚未選擇部門）'
+    : t('aiQuotaAuth.noDeptSelected')
   const quotaReadable = quotaValue && quotaType && period
     ? (allocateMode === 'per_capita'
-        ? `每人獨立 ${fmtQuota(quotaValue, quotaType, currency ?? 'CNY')} / ${QUOTA_PERIOD_LABEL[period]}，${selectedEmployeeCount} 人合計上限 ${fmtQuota(quotaValue * selectedEmployeeCount, quotaType, currency ?? 'CNY')}`
-        : `${selectedEmployeeCount} 人共享 ${fmtQuota(quotaValue, quotaType, currency ?? 'CNY')} / ${QUOTA_PERIOD_LABEL[period]}`)
-    : '（請完善限額類型、周期與限額值）'
+        ? t('aiQuotaAuth.quotaPerCapita', { quota: fmtQuota(quotaValue, quotaType, currency ?? 'CNY'), period: QUOTA_PERIOD_LABEL[period], count: selectedEmployeeCount, total: fmtQuota(quotaValue * selectedEmployeeCount, quotaType, currency ?? 'CNY') })
+        : t('aiQuotaAuth.quotaShared', { count: selectedEmployeeCount, quota: fmtQuota(quotaValue, quotaType, currency ?? 'CNY'), period: QUOTA_PERIOD_LABEL[period] }))
+    : t('aiQuotaAuth.quotaIncomplete')
 
   return (
     <div className="content-area">
@@ -246,10 +248,10 @@ export default function DeptQuotaEdit() {
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>返回</Button>
+              }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯部門額度' : '新增部門額度'}
+              {t(isEdit ? 'aiQuotaAuth.editDeptQuota' : 'aiQuotaAuth.addDeptQuota')}
             </h2>
           </div>
         </div>
@@ -269,16 +271,16 @@ export default function DeptQuotaEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="name" label="策略名稱" rules={[{ required: true, message: '請輸入策略名稱' }]}>
-              <Input placeholder="如：研發部月度 Token 總額" maxLength={50} allowClear />
+            <Form.Item name="name" label={t('aiQuotaAuth.strategyNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.strategyNameRequired') }]}>
+              <Input placeholder={t('aiQuotaAuth.strategyNamePh2')} maxLength={50} allowClear />
             </Form.Item>
-            <Form.Item name="description" label="描述">
-              <Input placeholder="請輸入策略用途說明（選填）" maxLength={200} allowClear />
+            <Form.Item name="description" label={t('aiQuotaAuth.descLabel')}>
+              <Input placeholder={t('aiQuotaAuth.descPhEdit')} maxLength={200} allowClear />
             </Form.Item>
           </div>
         </div>
@@ -289,10 +291,10 @@ export default function DeptQuotaEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>適用部門</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>穿梭框 · 樹結構</Tag>
-            <Tooltip title="一條額度策略可關聯多個部門，共享同一套限額規則；重名部門可通過層級與編碼區分">
-              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>穿梭框 · 含編碼</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptSection')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTreeTag')}</Tag>
+            <Tooltip title={t('aiQuotaAuth.deptQuotaTooltip')}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.transferWithCode')}</span>
             </Tooltip>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -305,15 +307,15 @@ export default function DeptQuotaEdit() {
                 padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>可選部門（{deptOptions.length}）</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.availableDepts')}（{deptOptions.length}）</span>
                 <a onClick={() => {
                   // 全选：将所有未入选的部门加入勾选
                   const unchecked = deptOptions.map((d) => d.deptId).filter((id) => !selectedDeptIds.includes(id))
                   setCheckedDeptIds(unchecked)
-                }} style={{ fontSize: 12 }}>全選</a>
+                }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.selectAll')}</a>
               </div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
-                <Input placeholder="搜索部門名稱或編碼" allowClear size="small" value={deptSearchKw} onChange={(e) => setDeptSearchKw(e.target.value)} />
+                <Input placeholder={t('aiQuotaAuth.searchDeptPh')} allowClear size="small" value={deptSearchKw} onChange={(e) => setDeptSearchKw(e.target.value)} />
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: '8px 4px' }}>
                 <Tree
@@ -344,14 +346,14 @@ export default function DeptQuotaEdit() {
                   // 將勾選部門移入右側（去重 + 過濾已選）
                   const newIds = checkedDeptIds.filter((id) => !selectedDeptIds.includes(id))
                   if (newIds.length === 0) {
-                    message.warning('所選部門已添加，無需重複添加')
+                    message.warning(t('aiQuotaAuth.deptAlreadyAdded'))
                     setCheckedDeptIds([])
                     return
                   }
                   const skipped = checkedDeptIds.length - newIds.length
                   setSelectedDeptIds((prev) => [...new Set([...prev, ...newIds])])
                   setCheckedDeptIds([])
-                  if (skipped > 0) message.warning(`已跳過 ${skipped} 個已添加的部門`)
+                  if (skipped > 0) message.warning(t('aiQuotaAuth.deptSkipped', { count: skipped }))
                 }}
                 disabled={checkedDeptIds.length === 0}
                 style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }} />
@@ -365,12 +367,12 @@ export default function DeptQuotaEdit() {
                 padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>已選部門（{selectedDeptIds.length}）</span>
-                <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>清空</a>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.selectedDepts')}（{selectedDeptIds.length}）</span>
+                <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearBtn')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedDeptIds.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>請從左側選擇部門</div>
+                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.selectDeptPlease')}</div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {selectedDeptIds.map((id) => {
@@ -389,7 +391,10 @@ export default function DeptQuotaEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
-                共 <strong>{selectedDeptIds.length}</strong> 個部門，<strong>{selectedEmployeeCount}</strong> 人
+                {t('aiQuotaAuth.deptsCount', {
+                                  count: <strong>{selectedDeptIds.length}</strong>,
+                                  empCount: <strong>{selectedEmployeeCount}</strong>,
+                                })}
               </div>
             </div>
           </div>
@@ -401,21 +406,21 @@ export default function DeptQuotaEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FundOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>額度配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>核心</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>網關在每次請求前校驗用量，按此規則限制與提醒</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.quotaConfigSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.coreTag')}</Tag>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.gatewayCheckNote')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           {/* 額度分配方式 */}
-          <Form.Item name="allocateMode" label="額度分配方式" rules={[{ required: true }]}>
+          <Form.Item name="allocateMode" label={t('aiQuotaAuth.allocateModeLabel')} rules={[{ required: true }]}>
             <Radio.Group>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {(['total', 'per_capita'] as AllocateMode[]).map((mode) => {
                   const active = allocateMode === mode
                   const desc = mode === 'total'
-                    ? '所選部門全體員工共用一個額度池，適合統一預算管控'
-                    : '每位員工獨立享有等額額度，防止個別員工超支'
+                    ? t('aiQuotaAuth.allocateModeTotalDesc')
+                    : t('aiQuotaAuth.allocateModePerCapitaDesc')
                   return (
                     <label key={mode} style={{
                       display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer',
@@ -437,22 +442,22 @@ export default function DeptQuotaEdit() {
 
           {/* 限額周期 + 限額類型 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="period" label="限額周期" rules={[{ required: true }]} extra="週期結束自動重置用量（如按月則每月 1 日歸零）">
+            <Form.Item name="period" label={t('aiQuotaAuth.periodLabel')} rules={[{ required: true }]} extra={t('aiQuotaAuth.periodExtra')}>
               <Radio.Group optionType="button" buttonStyle="solid"
                 options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
-            <Form.Item name="quotaType" label="限額類型" rules={[{ required: true }]}>
+            <Form.Item name="quotaType" label={t('aiQuotaAuth.quotaTypeLabel')} rules={[{ required: true }]}>
               <Select options={Object.entries(QUOTA_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
           </div>
 
           {/* 限額值 + 軟限額提醒閾值（並排展示） */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="quotaValue" label="限額值" rules={[{ required: true, message: '請輸入限額值' }]}>
+            <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
               <InputNumber<number>
                 min={1}
                 style={{ width: '100%' }}
-                placeholder={quotaType === 'cost' ? '如：600' : quotaType === 'request' ? '如：5000' : '如：200000000'}
+                placeholder={quotaType === 'cost' ? t('aiQuotaAuth.quotaValueCostPh') : quotaType === 'request' ? t('aiQuotaAuth.quotaValueRequestPh') : t('aiQuotaAuth.quotaValueTokenPh')}
                 addonAfter={valueUnit}
                 formatter={(v) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={(v) => Number(`${v ?? ''}`.replace(/,/g, ''))}
@@ -460,7 +465,7 @@ export default function DeptQuotaEdit() {
             </Form.Item>
             <Form.Item
               name="softThreshold"
-              label={<span>軟限額提醒閾值 <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>（達此比例時通知，不阻斷）</span></span>}
+              label={<span>{t('aiQuotaAuth.softThresholdLabel')} <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>{t('aiQuotaAuth.softThresholdHint')}</span></span>}
             >
               <Slider min={10} max={100} step={5} marks={{ 50: '50%', 80: '80%', 100: '100%' }}
                 tooltip={{ formatter: (v) => `${v}%` }} />
@@ -470,21 +475,21 @@ export default function DeptQuotaEdit() {
           {/* 計價幣種（僅費用類型時） */}
           {quotaType === 'cost' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-              <Form.Item name="currency" label="計價幣種" rules={[{ required: true }]}>
+              <Form.Item name="currency" label={t('aiQuotaAuth.currencyLabel')} rules={[{ required: true }]}>
                 <Select options={CURRENCY_OPTIONS} />
               </Form.Item>
             </div>
           )}
 
           {/* 超額動作 */}
-          <Form.Item name="overLimitAction" label="超出限額後動作" rules={[{ required: true }]}>
+          <Form.Item name="overLimitAction" label={t('aiQuotaAuth.overLimitActionLabel')} rules={[{ required: true }]}>
             <Radio.Group>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {(['reject', 'approve', 'downgrade'] as OverLimitAction[]).map((act) => {
                   const active = overLimitAction === act
-                  const desc = act === 'reject' ? '直接攔截並返回配額不足'
-                    : act === 'approve' ? '轉主管審批，可臨時提額'
-                    : '自動切換到更輕量 / 便宜的模型'
+                  const desc = act === 'reject' ? t('aiQuotaAuth.rejectDesc')
+                    : act === 'approve' ? t('aiQuotaAuth.approveDesc')
+                    : t('aiQuotaAuth.downgradeDesc')
                   return (
                     <label key={act} style={{
                       display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer',
@@ -507,12 +512,12 @@ export default function DeptQuotaEdit() {
           {/* 降級目標模型（僅自動降級時） */}
           {overLimitAction === 'downgrade' && (
             <>
-              <Form.Item name="downgradeModelId" label="降級目標模型" rules={[{ required: true, message: '請選擇降級目標模型' }]}
-                extra="超出限額後，該部門請求自動路由到此模型（通常為更輕量 / 更便宜的模型）">
-                <Select showSearch optionFilterProp="label" placeholder="選擇降級後使用的模型" options={modelOptions} />
+              <Form.Item name="downgradeModelId" label={t('aiQuotaAuth.downgradeModelLabel')} rules={[{ required: true, message: t('aiQuotaAuth.downgradeModelRequired') }]}
+                extra={t('aiQuotaAuth.downgradeModelExtra')}>
+                <Select showSearch optionFilterProp="label" placeholder={t('aiQuotaAuth.downgradeModelPh')} options={modelOptions} />
               </Form.Item>
-              <Form.Item name="downgradeExemptQuota" label="降級豁免額度" tooltip="主額度用完後，降級模型可獨立使用的額外額度（跟隨主額度分配方式）">
-                <InputNumber min={0} style={{ width: '100%' }} placeholder="留空表示不設獨立豁免額度" />
+              <Form.Item name="downgradeExemptQuota" label={t('aiQuotaAuth.downgradeExemptLabel')} tooltip={t('aiQuotaAuth.downgradeExemptTooltip')}>
+                <InputNumber min={0} style={{ width: '100%' }} placeholder={t('aiQuotaAuth.downgradeExemptPh')} />
               </Form.Item>
             </>
           )}
@@ -522,13 +527,13 @@ export default function DeptQuotaEdit() {
             marginTop: 4, padding: '14px 16px', borderRadius: 8,
             background: 'linear-gradient(135deg, #FFF7E6, #FFFBF0)', border: '1px solid #FFE7BA',
           }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#E8720C', marginBottom: 8 }}>額度解讀（實時）</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#E8720C', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretTitle')}</div>
             <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.9 }}>
-              <div>· 適用：<strong style={{ color: '#262626' }}>{deptLabel}</strong></div>
-              <div>· 額度：{quotaReadable}</div>
-              <div>· 提醒：用量達 <strong style={{ color: '#FAAD14' }}>{softThreshold ?? 80}%</strong> 時通知員工與主管（不阻斷）</div>
-              <div>· 超額：<strong style={{ color: '#FF4D4F' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong>
-                {overLimitAction === 'downgrade' ? '到更輕量模型' : ''}</div>
+              <div>· {t('aiQuotaAuth.quotaApplyLabel')}：<strong style={{ color: '#262626' }}>{deptLabel}</strong></div>
+              <div>· {t('aiQuotaAuth.quotaLimitLabel')}：{quotaReadable}</div>
+              <div>· {t('aiQuotaAuth.quotaAlertLabel')}：{t('aiQuotaAuth.quotaAlertText', { percent: <strong style={{ color: '#FAAD14' }}>{softThreshold ?? 80}</strong> })}</div>
+              <div>· {t('aiQuotaAuth.quotaOverLabel')}：<strong style={{ color: '#FF4D4F' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong>
+                {overLimitAction === 'downgrade' ? t('aiQuotaAuth.quotaOverDowngrade') : ''}</div>
             </div>
           </div>
         </div>
@@ -539,21 +544,21 @@ export default function DeptQuotaEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>状态配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusSection')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item
               name="status"
-              label="啟用狀態"
+              label={t('aiQuotaAuth.statusLabel2')}
               valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
-              extra="停用後該策略關聯的部門員工不再受此限額約束"
+              extra={t('aiQuotaAuth.statusExtra')}
             >
-              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
+              <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
             </Form.Item>
           </div>
         </div>
@@ -561,9 +566,9 @@ export default function DeptQuotaEdit() {
 
       {/* 底部操作按鈕（全局統一：取消 + 保存） */}
       <div className="form-footer">
-        <Button onClick={handleBack}>取消</Button>
+        <Button onClick={handleBack}>{t('common.cancel')}</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          保存
+          {t('common.save')}
         </Button>
       </div>
     </div>

@@ -18,18 +18,19 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker,
+  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker, Tooltip,
 } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
-  SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined,
+  SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined, PrinterOutlined, TagsOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
   fetchAssetList, fetchAssetStatusCounts, deleteAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
 } from '../../../api/asset'
-import { fetchCategoryList } from '../../../api/eam'
+import { fetchCategoryList, fetchAssetTagList, bindAssetTag } from '../../../api/eam'
+import type { AssetTagTemplate } from '../../../api/eam'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
@@ -71,6 +72,11 @@ export default function AssetList() {
     urlAssetNo ? { assetNo: urlAssetNo } : {},
   )
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  /* ----- 批量綁定標籤 ----- */
+  const [batchBindOpen, setBatchBindOpen] = useState(false)
+  const [batchTagId, setBatchTagId] = useState<number>()
+  const [batchBinding, setBatchBinding] = useState(false)
+  const [tagTemplates, setTagTemplates] = useState<AssetTagTemplate[]>([])
   /** 各状态统计（受非状态过滤条件影响，用于 Tab 徽标） */
   const [stats, setStats] = useState<Record<AssetStatus | 'all', number>>({
     all: 0, in_use: 0, idle: 0, in_repair: 0, scrapped: 0,
@@ -201,23 +207,52 @@ export default function AssetList() {
       return
     }
     const cols = [
-      { title: '资产编号',     dataIndex: 'assetNo' },
+      { title: t('asset.assetNo'),     dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'),   dataIndex: 'assetName' },
       { title: t('asset.colAssetType'),   dataIndex: 'assetType' },
       { title: t('asset.colBrand'),       dataIndex: 'brand' },
       { title: t('asset.colCompany'),     dataIndex: 'company' },
       { title: t('asset.colLocation'),    dataIndex: 'location' },
       { title: t('asset.colCurrentUserName'), dataIndex: 'userName' },
-      { title: '所在部门',  dataIndex: 'department' },
+      { title: t('asset.colDepartment'),  dataIndex: 'department' },
       { title: t('asset.colClaimDate'), dataIndex: 'usageDate' },
-      { title: '採購形式',      dataIndex: 'source' },
+      { title: t('asset.sourceLabel'),      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
       { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
       { title: t('asset.colUsageDate'),     dataIndex: 'usageDate' },
       { title: t('asset.colStatus'),      dataIndex: 'status' },
     ]
-    exportToCSV(`资产台账_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
+    exportToCSV(`${t('asset.assetLedgerPrefix')}${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
     message.success(t('asset.exportSuccess'))
+  }
+
+  /* ----- 批量綁定標籤 ----- */
+  const openBatchBind = async () => {
+    setBatchTagId(undefined)
+    setBatchBindOpen(true)
+    try {
+      const list = await fetchAssetTagList()
+      setTagTemplates(list.filter(t => t.status === 'enabled'))
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.tagTemplateLoadFailed'))
+    }
+  }
+
+  const handleBatchBind = async () => {
+    if (!batchTagId) {
+      message.warning(t('asset.selectTagTemplate'))
+      return
+    }
+    setBatchBinding(true)
+    try {
+      await Promise.all(selectedRowKeys.map(k => bindAssetTag(Number(k), batchTagId)))
+      message.success(t('asset.batchBindSuccess', { count: selectedRowKeys.length }))
+      setBatchBindOpen(false)
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.batchBindFailed'))
+    } finally {
+      setBatchBinding(false)
+    }
   }
 
   const handleTableChange = (pagination: TablePaginationConfig) => {
@@ -242,7 +277,7 @@ export default function AssetList() {
 
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
-    { key: 'assetNo', title: '资产编号' },
+    { key: 'assetNo', title: t('asset.assetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
     { key: 'assetType', title: t('asset.colAssetType') },
     { key: 'brand', title: t('asset.colBrand') },
@@ -250,9 +285,9 @@ export default function AssetList() {
     { key: 'location', title: t('asset.colLocationName') },
     { key: 'holdType', title: t('asset.colHoldType') },
     { key: 'userName', title: t('asset.colCurrentUserName') },
-    { key: 'department', title: '所在部门' },
+    { key: 'department', title: t('asset.colDepartment') },
     { key: 'usageDate', title: t('asset.colClaimDate') },
-    { key: 'source', title: '採購形式' },
+    { key: 'source', title: t('asset.sourceLabel') },
     { key: 'quantity', title: t('asset.colQuantity') },
     { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
     { key: 'purchaseDate', title: t('asset.colPurchaseDate') },
@@ -269,7 +304,7 @@ export default function AssetList() {
   /* ----- 列定义 ----- */
   const allColumns: TableColumnsType<AssetItem> = [
     {
-      title: '资产编号',
+      title: t('asset.assetNo'),
       dataIndex: 'assetNo', key: 'assetNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
@@ -292,6 +327,16 @@ export default function AssetList() {
     {
       title: t('asset.colLocationName'),
       dataIndex: 'location', key: 'location', width: 180, ellipsis: true,
+      render: (_: string, record: AssetItem) => {
+        const parts = [record.province, record.city, record.district, record.address].filter(Boolean)
+        const full = parts.length > 0 ? parts.join('') : (record.location || '-')
+        if (!record.location && parts.length === 0) return <span style={{ color: '#8C8C8C' }}>-</span>
+        return (
+          <Tooltip title={full}>
+            <span style={{ cursor: 'default' }}>{full}</span>
+          </Tooltip>
+        )
+      },
     },
     {
       title: t('asset.colCurrentUserName'),
@@ -299,7 +344,7 @@ export default function AssetList() {
       render: (v: string) => v || '-',
     },
     {
-      title: '所在部门',
+      title: t('asset.colDepartment'),
       dataIndex: 'department', key: 'department', width: 120,
     },
     {
@@ -308,7 +353,7 @@ export default function AssetList() {
       render: (v: string | null) => v || '-',
     },
     {
-      title: '採購形式',
+      title: t('asset.sourceLabel'),
       dataIndex: 'source', key: 'source', width: 90,
       render: (v: AssetSource) => renderSource(v),
     },
@@ -392,11 +437,11 @@ export default function AssetList() {
   /* ----- 资产类型选项 ----- */
   const assetTypeOptions = [
     { label: t('common.all'), value: '' },
-    { label: '电子设备', value: '电子设备' },
-    { label: '办公家具', value: '办公家具' },
-    { label: '办公设备', value: '办公设备' },
-    { label: '交通工具', value: '交通工具' },
-    { label: '其他', value: '其他' },
+    { label: t('asset.assetTypeElectronic'), value: '电子设备' },
+    { label: t('asset.assetTypeFurniture'), value: '办公家具' },
+    { label: t('asset.assetTypeEquipment'), value: '办公设备' },
+    { label: t('asset.assetTypeVehicle'), value: '交通工具' },
+    { label: t('asset.assetTypeOther'), value: '其他' },
   ]
   const companyOptions = [
     { label: t('common.all'), value: '' },
@@ -422,8 +467,8 @@ export default function AssetList() {
       {/* ====== 搜索区 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="资产编号" name="assetNo">
-            <Input placeholder="请输入资产编号" allowClear style={{ width: '100%' }} />
+          <Form.Item label={t('asset.assetNo')} name="assetNo">
+            <Input placeholder={t('asset.assetNoPh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetType')} name="assetType">
             <Select placeholder={t('common.all')} allowClear options={assetTypeOptions} />
@@ -434,10 +479,10 @@ export default function AssetList() {
           <Form.Item label={t('asset.colCompany')} name="company">
             <Select placeholder={t('common.all')} allowClear options={companyOptions} />
           </Form.Item>
-          <Form.Item label="所在部门" name="department">
-            <Input placeholder="请输入所在部门" allowClear />
+          <Form.Item label={t('asset.colDepartment')} name="department">
+            <Input placeholder={t('asset.departmentPh')} allowClear />
           </Form.Item>
-          <Form.Item label="採購形式" name="source">
+          <Form.Item label={t('asset.sourceLabel')} name="source">
             <Select placeholder={t('common.all')} allowClear options={sourceOptions} />
           </Form.Item>
           <Form.Item label={t('asset.colStatus')} name="status">
@@ -469,6 +514,15 @@ export default function AssetList() {
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
             {t('common.export')}
+          </Button>
+          <Button
+            icon={<PrinterOutlined />} disabled={selectedRowKeys.length === 0}
+            onClick={() => navigate(`/asset-tag-print?ids=${selectedRowKeys.join(',')}`)}
+          >
+            {t('asset.batchPrintTags')}
+          </Button>
+          <Button icon={<TagsOutlined />} disabled={selectedRowKeys.length === 0} onClick={openBatchBind}>
+            {t('asset.batchBindTags')}
           </Button>
         </div>
         <div className="action-section-right">
@@ -536,6 +590,31 @@ export default function AssetList() {
         }}
         onChange={handleTableChange}
       />
+
+      {/* ====== 批量綁定標籤彈窗（輕量動作：僅選模板） ====== */}
+      <Modal
+        title={t('asset.batchBindModalTitle', { count: selectedRowKeys.length })}
+        open={batchBindOpen}
+        onOk={handleBatchBind}
+        onCancel={() => setBatchBindOpen(false)}
+        okText={t('asset.confirmBind')}
+        cancelText={t('common.cancel')}
+        confirmLoading={batchBinding}
+        okButtonProps={{ disabled: !batchTagId }}
+        width={420}
+      >
+        <Select
+          style={{ width: '100%' }}
+          placeholder={t('asset.selectEnabledTemplate')}
+          value={batchTagId}
+          onChange={setBatchTagId}
+          options={tagTemplates.map(t2 => ({ label: t2.name, value: t2.id }))}
+          notFoundContent={<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('asset.noEnabledTemplate')}</span>}
+        />
+        <div style={{ marginTop: 12, fontSize: 12, color: '#8c8c8c' }}>
+          {t('asset.bindSkipHint')}
+        </div>
+      </Modal>
     </div>
   )
 }

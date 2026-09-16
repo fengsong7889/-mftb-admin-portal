@@ -18,7 +18,7 @@ import {
 import { fetchEmployees } from '../../../api/employee'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
-import { BrandEnum } from '../../../constants/brand'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 
 const EXEC_META: Record<ExecStatus, { key: string; color: string }> = {
   pending:    { key: 'asset.execPending',    color: 'default' },
@@ -33,9 +33,9 @@ const INBOUND_META: Record<PurchaseOrder['status'], { key: string; color: string
 }
 
 const DELIVERY_METHOD_LABEL: Record<string, string> = {
-  self_pickup: '自取',
-  supplier_delivery: '供應商送貨上門',
-  express: '快遞發貨',
+  self_pickup: 'deliverySelfPickup',
+  supplier_delivery: 'deliverySupplier',
+  express: 'deliveryExpress',
 }
 
 interface Props {
@@ -48,6 +48,7 @@ interface Props {
 
 export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewRequest }: Props) {
   const { t } = useTranslation()
+  const { codeHint, labelMap } = useCompanyBrand()
   const [loading, setLoading] = useState(false)
   const [detail, setDetail] = useState<PurchaseOrder | null>(null)
   const [empDeptMap, setEmpDeptMap] = useState<Map<string, string>>(new Map())
@@ -91,13 +92,13 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
   /** 明細表格列（與 OrderAdd 一致） */
   const itemColumns: TableColumnsType<PurchaseOrder['items'][number]> = [
-    { title: '分類', dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
+    { title: t('asset.colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '资产品牌', dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true,
+    { title: t('asset.colBrand'), dataIndex: 'brandName', key: 'brandName', width: 100, ellipsis: true,
       render: (v: string | undefined) => v || '-' },
-    { title: '資產名稱', dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
+    { title: t('asset.colAssetName'), dataIndex: 'modelName', key: 'modelName', width: 160, ellipsis: true },
     {
-      title: '參數信息', key: 'params', width: 200,
+      title: t('asset.paramInfoTitle'), key: 'params', width: 200,
       render: (_: unknown, r) => {
         if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
         const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
@@ -105,16 +106,16 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
-    { title: '數量', dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
+    { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
     {
-      title: '採購形式', key: 'purchaseType', width: 80,
+      title: t('asset.purchaseType'), key: 'purchaseType', width: 80,
       render: (_: unknown, r) => r.purchaseType
-        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? '購買' : '租賃'}</Tag>
+        ? <Tag color={r.purchaseType === 'purchase' ? 'blue' : 'green'}>{r.purchaseType === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
         : '-',
     },
 
     {
-      title: '成交單價', key: 'confirmedPrice', width: 100, align: 'right',
+      title: t('asset.confirmedPrice'), key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r) => (
         <span style={{ fontWeight: r.confirmedPrice ? 600 : 400, color: r.confirmedPrice ? '#52c41a' : '#bfbfbf' }}>
           {r.confirmedPrice ? `MOP ${r.confirmedPrice.toLocaleString()}` : '-'}
@@ -122,11 +123,11 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
       ),
     },
     {
-      title: '小計', key: 'subtotal', width: 100, align: 'right',
+      title: t('asset.colSubtotal'), key: 'subtotal', width: 100, align: 'right',
       render: (_: unknown, r) => <span style={{ fontWeight: 600 }}>MOP {((r.confirmedPrice || r.price) * r.qty).toLocaleString()}</span>,
     },
     {
-      title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right',
+      title: t('asset.colReceived'), dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right',
       render: (v: number) => <Tag color={v > 0 ? 'success' : 'default'}>{v}</Tag>,
     },
   ]
@@ -180,16 +181,15 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 14, color: '#fa8c16' }}>🛒</span>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>訂單信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Descriptions column={4} size="middle">
-          <Descriptions.Item label="採購單號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail.poNo}</span></Descriptions.Item>
-          <Descriptions.Item label="所屬品牌">
+          <Descriptions.Item label={t('asset.colPoNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail.poNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.orderBrand')}>
             {detail.brand ? <BrandTag value={detail.brand} /> : '-'}
-            {detail.brand === BrandEnum.SHANFENG && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>當前物資歸屬閃蜂，編碼 TB</span>}
-            {detail.brand === BrandEnum.MFOOD && <span style={{ fontSize: 12, color: '#1890FF', marginLeft: 8 }}>當前物資歸屬 mFood，編碼 MF</span>}
+            {detail.brand && codeHint[detail.brand] && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>{t('asset.brandCodeHint', { brand: labelMap[detail.brand], code: codeHint[detail.brand] })}</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colReqNo')}>
             {detail.reqId > 0 && detail.reqNo ? (
@@ -199,13 +199,13 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
             ) : '-'}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.execStatus')}><Tag color={execMeta.color}>{t(execMeta.key)}</Tag></Descriptions.Item>
-          <Descriptions.Item label="訂單總計">
+          <Descriptions.Item label={t('asset.orderTotal')}>
             <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="採購經辦人">{detail.purchaser || '-'}</Descriptions.Item>
-          <Descriptions.Item label="服務部門">{purchaserDept || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colPurchaser')}>{detail.purchaser || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.serviceDept')}>{purchaserDept || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colCreatedAt')}>{detail.createdAt}</Descriptions.Item>
-          <Descriptions.Item label="採購事由">{detail.remark || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.orderReasonLabel')}>{detail.remark || '-'}</Descriptions.Item>
         </Descriptions>
       </div>
 
@@ -228,25 +228,25 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gIdx + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>採購物資</span>
-                <Tag color="blue" style={{ fontSize: 11 }}>小計：MOP {subtotal.toLocaleString()}</Tag>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.purchaseMaterials')}</span>
+                <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.groupSubtotalTag', { amount: subtotal.toLocaleString() })}</Tag>
               </div>
             </div>
 
             {/* 供應商信息 */}
             <Descriptions column={4} size="small" style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="供應商名稱">{group.supplier || '-'}</Descriptions.Item>
-              <Descriptions.Item label="供應商聯絡人">{group.contact || '-'}</Descriptions.Item>
-              <Descriptions.Item label="供應商聯絡人電話">{group.contactPhone || '-'}</Descriptions.Item>
-              <Descriptions.Item label="下單日期">{group.orderDate || '-'}</Descriptions.Item>
-              <Descriptions.Item label="收貨方式">{dm ? DELIVERY_METHOD_LABEL[dm] || '-' : '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.labelSupplierName')}>{group.supplier || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.labelContactName')}>{group.contact || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.labelContactPhone')}>{group.contactPhone || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.labelOrderDate')}>{group.orderDate || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.labelDeliveryMethod')}>{dm ? (DELIVERY_METHOD_LABEL[dm] ? t(`asset.${DELIVERY_METHOD_LABEL[dm]}`) : '-') : '-'}</Descriptions.Item>
               {dm === 'supplier_delivery' && (
-                <Descriptions.Item label="預計收貨日期">{group.expectedReceiveDate || '-'}</Descriptions.Item>
+                <Descriptions.Item label={t('asset.labelExpectedDate')}>{group.expectedReceiveDate || '-'}</Descriptions.Item>
               )}
               {dm === 'express' && (
                 <>
-                  <Descriptions.Item label="預計收貨日期">{group.expectedReceiveDate || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="快遞單號">
+                  <Descriptions.Item label={t('asset.labelExpectedDate')}>{group.expectedReceiveDate || '-'}</Descriptions.Item>
+                  <Descriptions.Item label={t('asset.labelTrackingNo')}>
                     {group.trackingNo ? <span style={{ fontFamily: 'monospace' }}>{group.trackingNo}</span> : '-'}
                   </Descriptions.Item>
                 </>
@@ -292,8 +292,8 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{detail.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{detail.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{detail.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{detail.updatedAt || '-'}</span></span>
       </div>
     </Spin>
   )

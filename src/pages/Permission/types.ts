@@ -1344,6 +1344,13 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-repair': 'asset-repair',
   '/asset-transfer': 'asset-list',
   '/asset-inventory': 'asset-inventory',
+  // 領用管理（子路由歸屬 asset-claim 菜單）
+  '/asset-claim': 'asset-claim',
+  '/asset-claim/add': 'asset-claim',
+  '/asset-claim/detail': 'asset-claim',
+  '/asset-claim/record': 'asset-claim',
+  // 歸還管理
+  '/asset-return': 'asset-return',
 }
 
 /**

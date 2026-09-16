@@ -5,138 +5,140 @@
  * 列表字段：员工工号、员工姓名、所在部门、在用资产(件)、已归还(件)、最近领用日期、操作
  * 点击「管理」→ 进入员工资产详情页
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, message } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Alert, Button, Empty, Form, Input, TreeSelect, Table, message } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined,
 } from '@ant-design/icons'
-import {
-  fetchEmployeeClaimSummary,
-  type EmployeeClaimSummary, type EmployeeClaimQuery,
-} from '../../../api/eam'
-import { EAM_DEPARTMENTS } from '../eamUtils'
+import type { DepartmentItem } from '../../../api/department'
+import { buildDeptTree, type ClaimEmployeeSummary, type ClaimQuery, type ClaimSummaryData } from './claimViewTypes'
+import ClaimStats from './ClaimStats'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 interface Props {
   onAdd: () => void
-  onManage: (claimant: string) => void
+  onManage: (employeeId: number) => void
+  canAdd?: boolean
+  data?: ClaimSummaryData
+  loading?: boolean
+  error?: string
+  departments?: DepartmentItem[]
+  onQuery?: (query: ClaimQuery) => void
 }
 
-export default function ClaimList({ onAdd, onManage }: Props) {
-  const [form] = Form.useForm()
-  const [loading, setLoading] = useState(false)
-  const [dataSource, setDataSource] = useState<EmployeeClaimSummary[]>([])
-  const [total, setTotal] = useState(0)
+export default function ClaimList({ onAdd, onManage, canAdd = false, data, loading = false, error, departments = [], onQuery }: Props) {
+  const { t } = useTranslation()
+  const [form] = Form.useForm<{ keyword?: string; departmentId?: number }>()
+  const dataSource = data?.records ?? []
+  const total = data?.total ?? 0
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<EmployeeClaimQuery>({})
+  const [filters, setFilters] = useState<Pick<ClaimQuery, 'keyword' | 'departmentId'>>({})
+  const deptTree = useMemo(() => buildDeptTree(departments), [departments])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetchEmployeeClaimSummary({ ...filters, page, size })
-      setDataSource(res.records || [])
-      setTotal(res.total || 0)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '查询失败')
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, page, size])
-
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { onQuery?.({ ...filters, page, size }) }, [filters, page, size, onQuery])
 
   const handleSearch = () => {
     const v = form.getFieldsValue()
     setFilters({
-      empName: v.empName || undefined,
-      department: v.department || undefined,
+      keyword: v.keyword?.trim() || undefined,
+      departmentId: v.departmentId,
     })
     setPage(1)
   }
   const handleReset = () => { form.resetFields(); setFilters({}); setPage(1) }
   const handleTableChange = (p: TablePaginationConfig) => {
-    setPage(p.current || 1)
-    setSize(p.pageSize || 10)
+    const nextSize = p.pageSize || 10
+    setPage(nextSize === size ? p.current || 1 : 1)
+    setSize(nextSize)
   }
 
   /* ----- 导出 ----- */
   const handleExport = () => {
     const cols = [
-      { title: '员工工号', dataIndex: 'empNo' },
-      { title: '员工姓名', dataIndex: 'empName' },
-      { title: '所在部门', dataIndex: 'department' },
-      { title: '在用资产(件)', dataIndex: 'claimedCount' },
-      { title: '已归还(件)', dataIndex: 'returnedCount' },
-      { title: '最近领用日期', dataIndex: 'lastClaimDate' },
+      { title: t('asset.colEmpNo'), dataIndex: 'empNo' },
+      { title: t('asset.colEmpName'), dataIndex: 'empName' },
+      { title: t('asset.colDepartment'), dataIndex: 'department' },
+      { title: t('asset.colClaimedCount'), dataIndex: 'claimedCount' },
+      { title: t('asset.colReturnedCount'), dataIndex: 'returnedCount' },
+      { title: '待签领用', dataIndex: 'pendingCount' },
+      { title: '代办未签', dataIndex: 'proxyPendingCount' },
+      { title: t('asset.colLastClaimDate'), dataIndex: 'lastClaimDate' },
     ]
-    exportToCSV(`领用管理_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
-    message.success('导出成功')
+    exportToCSV(`${t('asset.claimFileName')}_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
+    message.success(t('asset.claimExportSuccess'))
   }
 
   /* ----- 表格列定义 ----- */
-  const allColumns: TableColumnsType<EmployeeClaimSummary> = [
+  const allColumns: TableColumnsType<ClaimEmployeeSummary> = [
     {
-      title: '员工工号', dataIndex: 'empNo', key: 'empNo', width: 120,
+      title: t('asset.colEmpNo'), dataIndex: 'empNo', key: 'empNo', width: 120,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
     },
-    { title: '员工姓名', dataIndex: 'empName', key: 'empName', width: 130 },
-    { title: '所在部门', dataIndex: 'department', key: 'department', width: 120 },
+    { title: t('asset.colEmpName'), dataIndex: 'empName', key: 'empName', width: 130 },
+    { title: t('asset.colDepartment'), dataIndex: 'department', key: 'department', width: 120 },
     {
-      title: '在用资产', dataIndex: 'claimedCount', key: 'claimedCount', width: 110, align: 'center',
+      title: t('asset.colClaimedCount'), dataIndex: 'claimedCount', key: 'claimedCount', width: 110, align: 'center',
       render: (v: number) => (
-        <span style={{ fontWeight: 600, color: v > 0 ? '#1890FF' : '#bfbfbf' }}>{v} 件</span>
+        <span style={{ fontWeight: 600, color: v > 0 ? '#1890FF' : '#bfbfbf' }}>{v} {t('asset.unitItem')}</span>
       ),
     },
     {
-      title: '已归还', dataIndex: 'returnedCount', key: 'returnedCount', width: 100, align: 'center',
+      title: t('asset.colReturnedCount'), dataIndex: 'returnedCount', key: 'returnedCount', width: 100, align: 'center',
       render: (v: number) => (
-        <span style={{ color: v > 0 ? '#8c8c8c' : '#bfbfbf' }}>{v} 件</span>
+        <span style={{ color: v > 0 ? '#8c8c8c' : '#bfbfbf' }}>{v} {t('asset.unitItem')}</span>
       ),
     },
-    { title: '最近领用日期', dataIndex: 'lastClaimDate', key: 'lastClaimDate', width: 140 },
+    { title: '待签领用', dataIndex: 'pendingCount', key: 'pendingCount', width: 110, align: 'center' },
+    { title: '代办未签', dataIndex: 'proxyPendingCount', key: 'proxyPendingCount', width: 110, align: 'center', render: (v: number) => <span style={{ color: v ? '#E8720C' : '#8C8C8C' }}>{v}</span> },
+    { title: t('asset.colLastClaimDate'), dataIndex: 'lastClaimDate', key: 'lastClaimDate', width: 140, render: (v?: string) => v || '—' },
     {
-      title: '操作', key: 'action', width: 100, fixed: 'right',
-      render: (_: unknown, record: EmployeeClaimSummary) => (
+      title: t('asset.colAction'), key: 'action', width: 100, fixed: 'right',
+      render: (_: unknown, record: ClaimEmployeeSummary) => (
         <Button type="link" size="small"
-          onClick={() => onManage(`${record.empName}(${record.empNo})`)}
-        >管理</Button>
+          onClick={() => onManage(record.employeeId)}
+        >{t('asset.claimManage')}</Button>
       ),
     },
   ]
 
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
-    { key: 'empNo', title: '员工工号' },
-    { key: 'empName', title: '员工姓名' },
-    { key: 'department', title: '所在部门' },
-    { key: 'claimedCount', title: '在用资产' },
-    { key: 'returnedCount', title: '已归还' },
-    { key: 'lastClaimDate', title: '最近领用日期' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'empNo', title: t('asset.colEmpNo') },
+    { key: 'empName', title: t('asset.colEmpName') },
+    { key: 'department', title: t('asset.colDepartment') },
+    { key: 'claimedCount', title: t('asset.colClaimedCount') },
+    { key: 'returnedCount', title: t('asset.colReturnedCount') },
+    { key: 'pendingCount', title: '待签领用' },
+    { key: 'proxyPendingCount', title: '代办未签' },
+    { key: 'lastClaimDate', title: t('asset.colLastClaimDate') },
+    { key: 'action', title: t('asset.colAction') },
+  ], [t])
 
   const { applyConfig, configComponent } = useColumnConfig('asset-claim', columnMeta)
 
   return (
     <>
+      <ClaimStats data={error ? undefined : data?.stats} scopeKey={JSON.stringify(filters)} />
+      {error && <Alert type="error" showIcon message={error} className="claim-notice" />}
       {/* ====== 搜索区 ====== */}
       <div className="search-section">
-        <Form form={form} layout="inline">
-          <Form.Item label="员工" name="empName">
-            <Input placeholder="姓名 / 工号" allowClear />
+        <Form form={form} layout="inline" onFinish={handleSearch}>
+          <Form.Item label={t('asset.empLabel')} name="keyword">
+            <Input placeholder={t('asset.empSearchPh')} allowClear />
           </Form.Item>
-          <Form.Item label="部门" name="department">
-            <Select placeholder="全部" allowClear showSearch optionFilterProp="label"
-              options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))}
+          <Form.Item label={t('asset.colDepartment')} name="departmentId">
+            <TreeSelect placeholder={t('common.all')} allowClear showSearch treeNodeFilterProp="title"
+              treeData={deptTree} treeDefaultExpandAll
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} htmlType="submit" disabled={!onQuery}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -145,25 +147,26 @@ export default function ClaimList({ onAdd, onManage }: Props) {
       {/* ====== 操作区 ====== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>导出当前页</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>新增</Button>
+          {canAdd && <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>{t('asset.claimAdd')}</Button>}
           {configComponent}
         </div>
       </div>
 
       {/* ====== 表格 ====== */}
-      <Table<EmployeeClaimSummary>
+      <Table<ClaimEmployeeSummary>
         columns={applyConfig(allColumns)}
-        dataSource={dataSource}
-        rowKey="empNo"
+        dataSource={error ? [] : dataSource}
+        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+        rowKey="employeeId"
         loading={loading}
         size="middle"
-        scroll={{ x: 820 }}
+        scroll={{ x: 1050 }}
         pagination={{
-          current: page, pageSize: size, total, showSizeChanger: true,
-          showTotal: (tt) => `共 ${tt} 条`,
+          current: page, pageSize: size, total, showSizeChanger: true, showQuickJumper: true,
+          showTotal: (count) => t('asset.totalItems', { count }),
         }}
         onChange={handleTableChange}
       />

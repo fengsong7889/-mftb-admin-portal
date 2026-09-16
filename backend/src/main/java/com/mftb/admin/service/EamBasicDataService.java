@@ -7,6 +7,9 @@ import com.mftb.admin.dto.EamLocationSaveDTO;
 import com.mftb.admin.dto.EamModelSaveDTO;
 import com.mftb.admin.dto.EamParamTypeSaveDTO;
 import com.mftb.admin.dto.EamParamValueSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactSaveDTO;
+import com.mftb.admin.dto.EamSupplierContactVO;
+import com.mftb.admin.dto.EamSupplierSaveDTO;
 import com.mftb.admin.dto.PageResult;
 
 import java.util.List;
@@ -133,4 +136,48 @@ public interface EamBasicDataService {
 
     /** 删除分类配件（逻辑删除） */
     void deleteCategoryAccessory(long id);
+
+    /* ==================== 供应商管理 ==================== */
+
+    /**
+     * 供应商列表（支持名称/编码/联系人/状态过滤）。
+     * page+size 同时传入时服务端分页，否则全量返回（列表页前端过滤使用）。
+     */
+    List<Map<String, Object>> listSuppliers(String name, String code, String contactPerson,
+                                             String status, Integer page, Integer size);
+
+    /** 新增供应商，编码由后端按规则自动生成（CGSJ + 6位全局自增），返回新记录 ID */
+    long createSupplier(EamSupplierSaveDTO dto);
+
+    /** 更新供应商（编码不可修改） */
+    void updateSupplier(long id, EamSupplierSaveDTO dto);
+
+    /** 删除供应商（逻辑删除） */
+    void deleteSupplier(long id);
+
+    /** 切换供应商启用/停用状态 */
+    void toggleSupplierStatus(long id);
+
+    /* ==================== 供应商联系人 ==================== */
+
+    /** 按供应商 ID 查询所有启用状态的联系人 */
+    List<EamSupplierContactVO> listContactsBySupplier(Long supplierId);
+
+    /** 创建单个联系人，返回新记录 ID */
+    Long createSupplierContact(Long supplierId, EamSupplierContactSaveDTO dto);
+
+    /** 先删除该供应商旧联系人记录，再批量插入新记录（事务保护） */
+    void saveSupplierContacts(Long supplierId, List<EamSupplierContactSaveDTO> contacts);
+
+    /** 更新单个联系人 */
+    void updateSupplierContact(Long contactId, EamSupplierContactSaveDTO dto);
+
+    /** 逻辑删除单个联系人 */
+    void deleteSupplierContact(Long contactId);
+
+    /** 切换联系人启用/禁用 */
+    void toggleSupplierContactStatus(Long contactId);
+
+    /** 精简版供应商下拉列表（仅 id/code/name，支持关键字过滤） */
+    List<Map<String, Object>> listSuppliersDropdown(String keyword);
 }

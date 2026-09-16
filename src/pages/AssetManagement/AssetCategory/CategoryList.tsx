@@ -8,6 +8,7 @@ import type { AssetCategory } from '../../../api/eam'
 import CategoryImportModal from './CategoryImportModal'
 import type { ParsedCategoryRow } from '../../../utils/categoryImport'
 import './index.css'
+import { useTranslation } from 'react-i18next'
 
 /** 树节点 */
 interface CatTreeNode extends TreeDataNode {
@@ -65,6 +66,7 @@ interface CategoryListProps {
 }
 
 export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProps) {
+  const { t } = useTranslation()
   const [categories, setCategories] = useState<AssetCategory[]>([])
   const [loading, setLoading] = useState(false)
   const [searchForm] = Form.useForm()
@@ -183,20 +185,20 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const handleToggleStatus = async (record: AssetCategory) => {
     const isEnable = record.status === 'disabled'
     Modal.confirm({
-      title: isEnable ? '确认启用该分类？' : '确认禁用该分类？',
+      title: isEnable ? t('asset.confirmEnableCat') : t('asset.confirmDisableCat'),
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       centered: true,
       className: 'custom-confirm-modal',
       width: 520,
       content: isEnable
-        ? `启用后，该分类「${record.name}」将恢复可用。`
-        : `禁用后，该分类「${record.name}」将不可用于新增资产。`,
-      okText: '确认',
-      cancelText: '取消',
+        ? t('asset.enableCatHint', { name: record.name })
+        : t('asset.disableCatHint', { name: record.name }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await toggleCategoryStatus(record.id)
-          message.success(isEnable ? '已启用' : '已禁用')
+          message.success(isEnable ? t('asset.catEnabled') : t('asset.catDisabled'))
           fetchData()
         } catch {
           // 错误提示由请求层统一处理
@@ -209,7 +211,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const handleDelete = async (record: AssetCategory) => {
     try {
       await deleteCategory(record.id)
-      message.success('删除成功')
+      message.success(t('common.deleteSuccess'))
       if (selectedCatId === record.id) {
         setSelectedCatId(undefined)
       }
@@ -222,10 +224,10 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   /** 导出 */
   const handleExport = () => {
     if (tableData.length === 0) {
-      message.warning('暂无数据可导出')
+      message.warning(t('asset.noDataExport'))
       return
     }
-    message.success('导出功能开发中')
+    message.success(t('common.exportDev'))
   }
 
   /** 批量导入 */
@@ -257,10 +259,10 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   }
 
   const columns: TableColumnsType<AssetCategory> = [
-    { title: '分类编码', dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
-    { title: '分类名称', dataIndex: 'name', key: 'name', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    { title: t('asset.colCatCode'), dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    { title: t('asset.colCatName'), dataIndex: 'name', key: 'name', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
-      title: '上级分类',
+      title: t('asset.colParentCat'),
       dataIndex: 'parentId',
       key: 'parentId',
       width: 140,
@@ -272,7 +274,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       },
     },
     {
-      title: '状态',
+      title: t('asset.colStatus'),
       dataIndex: 'status',
       key: 'status',
       width: 100,
@@ -280,16 +282,16 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       render: (status: string, record: AssetCategory) => (
         <Switch
           checked={status === 'enabled'}
-          checkedChildren="启用"
-          unCheckedChildren="停用"
+          checkedChildren={t('asset.statusEnabled')}
+          unCheckedChildren={t('asset.statusDisabled')}
           onChange={() => handleToggleStatus(record)}
         />
       ),
     },
-    { title: '备注', dataIndex: 'remark', key: 'remark', width: 140, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
-    { title: '最后更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: t('asset.colRemark'), dataIndex: 'remark', key: 'remark', width: 140, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
+    { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 110, onCell: () => ({ style: { whiteSpace: 'nowrap' } }), render: (v: string) => v || '-' },
     {
-      title: '最后更新时间',
+      title: t('asset.colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 170,
@@ -297,22 +299,22 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       render: (v: string) => v || '-',
     },
     {
-      title: '操作',
+      title: t('asset.colAction'),
       key: 'action',
       width: 160,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => onView(record.id)}>详情</Button>
-          <Button type="link" size="small" onClick={() => onEdit(record.id)}>修改</Button>
+          <Button type="link" size="small" onClick={() => onView(record.id)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => onEdit(record.id)}>{t('common.edit')}</Button>
           <Popconfirm
-            title="确认删除"
-            description={`确认删除该分类「${record.name}」？`}
+            title={t('common.confirmDelete')}
+            description={t('asset.confirmDeleteCat', { name: record.name })}
             onConfirm={() => handleDelete(record)}
-            okText="确认"
-            cancelText="取消"
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
           >
-            <Button type="link" size="small" danger>删除</Button>
+            <Button type="link" size="small" danger>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
       ),
@@ -336,7 +338,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
         <div className="cat-tree-panel">
           <h3 className="cat-tree-panel-title">
             <FolderOutlined className="cat-tree-panel-title-icon" />
-            分类结构
+            {t('asset.catStructure')}
           </h3>
           <Tree
             treeData={treeData}
@@ -354,28 +356,28 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
           {/* 搜索区 */}
           <div className="search-section">
             <Form form={searchForm} layout="inline">
-              <Form.Item label="分类编码" name="code">
-                <Input placeholder="请输入分类编码" allowClear onPressEnter={handleSearch} />
+              <Form.Item label={t('asset.catCodeLabel')} name="code">
+                <Input placeholder={t('asset.catCodePh')} allowClear onPressEnter={handleSearch} />
               </Form.Item>
-              <Form.Item label="分类名称" name="name">
-                <Input placeholder="请输入分类名称" allowClear onPressEnter={handleSearch} />
+              <Form.Item label={t('asset.catNameLabel')} name="name">
+                <Input placeholder={t('asset.catNamePh')} allowClear onPressEnter={handleSearch} />
               </Form.Item>
-              <Form.Item label="状态" name="status">
-                <Select placeholder="全部" allowClear options={[
-                  { value: 'enabled', label: '启用' },
-                  { value: 'disabled', label: '禁用' },
+              <Form.Item label={t('asset.colStatus')} name="status">
+                <Select placeholder={t('asset.catStatusPh')} allowClear options={[
+                  { value: 'enabled', label: t('asset.statusEnabled') },
+                  { value: 'disabled', label: t('asset.statusDisabled') },
                 ]} />
               </Form.Item>
-              <Form.Item label="最后更新人" name="updatedBy">
-                <Input placeholder="请输入更新人" allowClear onPressEnter={handleSearch} />
+              <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
+                <Input placeholder={t('asset.catUpdatedByPh')} allowClear onPressEnter={handleSearch} />
               </Form.Item>
-              <Form.Item label="最后更新时间" name="updatedAt">
-                <DatePicker placeholder="请选择日期" style={{ width: '100%' }} />
+              <Form.Item label={t('asset.colUpdatedAt')} name="updatedAt">
+                <DatePicker placeholder={t('asset.catDatePh')} style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item>
                 <div className="search-actions">
-                  <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查询</Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+                  <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+                  <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
                 </div>
               </Form.Item>
             </Form>
@@ -384,11 +386,11 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
           {/* 操作区 */}
           <div className="action-section">
             <div className="action-section-left">
-              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
-              <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImportClick}>批量导入分类</Button>
+              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
+              <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImportClick}>{t('asset.batchImportCat')}</Button>
             </div>
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId)}>新增分類</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId)}>{t('asset.addCatBtn')}</Button>
               {configComponent}
             </div>
           </div>
@@ -406,7 +408,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
             pagination={{
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (total) => `共 ${total} 条`,
+              showTotal: (total) => t('common.totalRecords', { count: total }),
             }}
           />
         </div>

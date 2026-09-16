@@ -19,4 +19,12 @@ public class EamAssetVO extends EamAssetSaveDTO {
     private String inboundDate;
     private Integer inboundQty;
     private String inspector;
+    /** 存放位置-省份 */
+    private String province;
+    /** 存放位置-城市 */
+    private String city;
+    /** 存放位置-区县 */
+    private String district;
+    /** 存放位置-详细地址 */
+    private String address;
 }
