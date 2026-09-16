@@ -11,7 +11,7 @@
  */
 import { useState, useEffect } from 'react'
 import {
-  Button, Form, Input, Select, Row, Col, Card, Spin, message, Descriptions, Tag,
+  Button, Form, Input, Select, Row, Col, Card, Spin, message, Descriptions,
 } from 'antd'
 import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'

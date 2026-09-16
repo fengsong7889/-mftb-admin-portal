@@ -1,79 +1,168 @@
 /**
- * 損壞賠付管理（物資管理）
+ * 赔付管理 — 入口组件
  *
- * 同一路由內視圖切換：賠付列表 ⇄ 賠付登記 ⇄ 賠付詳情
- * 支持 URL 參數：
- *  - ?id=X              → 打開賠付詳情
- *  - ?returnId=X&assetId=Y&damageType=damage → 打開賠付登記（從歸還跳轉）
+ * 同一路由内视图切换：列表 ⇄ 详情 ⇄ 定责 ⇄ 免赔 ⇄ 收款 ⇄ 退款 ⇄ 找回复核
+ * 已接通真实后端 API。
  */
-import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { message } from 'antd'
+import { useAuth } from '../../../contexts/AuthContext'
+import {
+  fetchCompensationList, fetchCompensationDetail,
+  setLiability, waiveCompensation, addPayment, reviewCompensation,
+  type CompensationRow, type CompensationQuery,
+  type LiabilityDTO, type WaiveDTO, type PaymentDTO, type ReviewDTO,
+} from '../../../api/eamCompensation'
 import CompensationList from './CompensationList'
-import CompensationForm from './CompensationForm'
 import CompensationDetail from './CompensationDetail'
+import CompensationLiability from './CompensationLiability'
+import CompensationWaive from './CompensationWaive'
+import CompensationPayment from './CompensationPayment'
+import CompensationRefund from './CompensationRefund'
+import CompensationReview from './CompensationReview'
 
-type View =
-  | { mode: 'list' }
-  | { mode: 'form'; returnId?: number; assetId: number; damageType?: 'damage' | 'loss' }
-  | { mode: 'detail'; id: number }
+type View = 'list' | 'detail' | 'liability' | 'waive' | 'payment' | 'refund' | 'review'
+
+function parseId(raw: string | null): number | undefined {
+  if (!raw || !/^[1-9]\d*$/.test(raw)) return undefined
+  return Number(raw)
+}
 
 export default function AssetCompensation() {
   const navigate = useNavigate()
+  const { user, hasPermission } = useAuth()
   const [searchParams] = useSearchParams()
-  const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null
-  const urlReturnId = searchParams.get('returnId') ? Number(searchParams.get('returnId')) : null
-  const urlAssetId = searchParams.get('assetId') ? Number(searchParams.get('assetId')) : null
-  const urlDamageType = searchParams.get('damageType') as 'damage' | 'loss' | null
+  const { pathname } = useLocation()
 
-  const [view, setView] = useState<View>(() => {
-    if (urlId) return { mode: 'detail', id: urlId }
-    if (urlAssetId) return { mode: 'form', returnId: urlReturnId || undefined, assetId: urlAssetId, damageType: urlDamageType || undefined }
-    return { mode: 'list' }
-  })
+  const canEdit = user?.role === 'admin' || hasPermission('asset-compensation:edit')
 
+  const mode = pathname.split('/')[2] || 'list'
+  const view: View = mode === 'detail' ? 'detail'
+    : mode === 'liability' ? 'liability'
+    : mode === 'waive' ? 'waive'
+    : mode === 'payment' ? 'payment'
+    : mode === 'refund' ? 'refund'
+    : mode === 'review' ? 'review'
+    : 'list'
+
+  const recordId = parseId(searchParams.get('id'))
+
+  /* ----- 数据状态 ----- */
+  const [listData, setListData] = useState<{ records: CompensationRow[]; total: number }>()
+  const [detail, setDetail] = useState<CompensationRow>()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>()
+
+  /* ----- 列表查询 ----- */
+  const handleQuery = useCallback(async (query: CompensationQuery) => {
+    setLoading(true)
+    setError(undefined)
+    try {
+      const data = await fetchCompensationList(query)
+      setListData(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  /* ----- 详情查询 ----- */
+  const handleLoadDetail = useCallback(async (id: number) => {
+    setLoading(true)
+    setError(undefined)
+    try {
+      const data = await fetchCompensationDetail(id)
+      setDetail(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  /* ----- 自动加载详情 ----- */
   useEffect(() => {
-    if (urlId) setView({ mode: 'detail', id: urlId })
-    else if (urlAssetId) setView({ mode: 'form', returnId: urlReturnId || undefined, assetId: urlAssetId, damageType: urlDamageType || undefined })
-  }, [urlId, urlReturnId, urlAssetId, urlDamageType])
+    if (view !== 'list' && recordId != null) {
+      handleLoadDetail(recordId)
+    }
+  }, [view, recordId, handleLoadDetail])
 
-  const backToList = () => {
-    setView({ mode: 'list' })
-    navigate('/asset-compensation', { replace: true })
-  }
+  /* ----- 操作回调 ----- */
+  const handleLiability = useCallback(async (dto: LiabilityDTO) => {
+    if (recordId == null) return
+    await setLiability(recordId, dto)
+    message.success('定责成功')
+    handleLoadDetail(recordId)
+  }, [recordId, handleLoadDetail])
 
-  const toAsset = (assetNo: string) => navigate(`/asset-list?assetNo=${encodeURIComponent(assetNo)}`)
+  const handleWaive = useCallback(async (dto: WaiveDTO) => {
+    if (recordId == null) return
+    await waiveCompensation(recordId, dto)
+    message.success('免赔成功')
+    handleLoadDetail(recordId)
+  }, [recordId, handleLoadDetail])
+
+  const handlePayment = useCallback(async (dto: PaymentDTO) => {
+    if (recordId == null) return
+    await addPayment(recordId, dto)
+    message.success('收款登记成功')
+    handleLoadDetail(recordId)
+  }, [recordId, handleLoadDetail])
+
+  const handleRefund = useCallback(async (dto: PaymentDTO) => {
+    if (recordId == null) return
+    await addPayment(recordId, dto)
+    message.success('退款登记成功')
+    handleLoadDetail(recordId)
+  }, [recordId, handleLoadDetail])
+
+  const handleReview = useCallback(async (dto: ReviewDTO) => {
+    if (recordId == null) return
+    await reviewCompensation(recordId, dto)
+    message.success('找回复核成功')
+    handleLoadDetail(recordId)
+  }, [recordId, handleLoadDetail])
+
+  const back = () => navigate('/asset-compensation')
+  const backToDetail = () => recordId != null ? navigate(`/asset-compensation/detail?id=${recordId}`) : back()
 
   return (
-    <div className="content-area">
-      {view.mode === 'list' && (
-        <CompensationList
-          onViewDetail={(id) => {
-            setView({ mode: 'detail', id })
-            navigate(`/asset-compensation?id=${id}`, { replace: true })
-          }}
-          onViewAsset={toAsset}
-        />
+    <div className="content-area claim-module return-module">
+      {view === 'list' && (
+        <CompensationList data={listData} loading={loading} error={error} onQuery={handleQuery} canEdit={canEdit} />
       )}
-      {view.mode === 'form' && (
-        <CompensationForm
-          key={`form-${view.assetId}`}
-          returnId={view.returnId}
-          assetId={view.assetId}
-          damageType={view.damageType}
-          onBack={backToList}
-          onCreated={(compId) => {
-            setView({ mode: 'detail', id: compId })
-            navigate(`/asset-compensation?id=${compId}`, { replace: true })
-          }}
-        />
-      )}
-      {view.mode === 'detail' && (
+
+      {view === 'detail' && recordId != null && (
         <CompensationDetail
-          key={`detail-${view.id}`}
-          compId={view.id}
-          onBack={backToList}
-          onViewAsset={toAsset}
+          record={detail} loading={loading} error={error} canEdit={canEdit}
+          onBack={back} onRefresh={() => handleLoadDetail(recordId)}
         />
+      )}
+
+      {view === 'liability' && recordId != null && (
+        <CompensationLiability record={detail} loading={loading} canEdit={canEdit} onSubmit={handleLiability} onBack={backToDetail} />
+      )}
+
+      {view === 'waive' && recordId != null && (
+        <CompensationWaive record={detail} loading={loading} canEdit={canEdit} onSubmit={handleWaive} onBack={backToDetail} />
+      )}
+
+      {view === 'payment' && recordId != null && (
+        <CompensationPayment record={detail} loading={loading} canEdit={canEdit} onSubmit={handlePayment} onBack={backToDetail} />
+      )}
+
+      {view === 'refund' && recordId != null && (
+        <CompensationRefund record={detail} loading={loading} canEdit={canEdit} onSubmit={handleRefund} onBack={backToDetail} />
+      )}
+
+      {view === 'review' && recordId != null && (
+        <CompensationReview record={detail} loading={loading} canEdit={canEdit} onSubmit={handleReview} onBack={backToDetail} />
+      )}
+
+      {view !== 'list' && recordId == null && (
+        <div className="claim-notice">缺少有效的赔付记录 ID。<button onClick={back}>返回列表</button></div>
       )}
     </div>
   )

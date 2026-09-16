@@ -1,0 +1,11 @@
+.return-module .return-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.return-module .return-grid .ant-select, .return-module .return-grid .ant-picker, .return-module .return-grid .ant-input-number { width: 100%; }
+.return-module .return-search { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 12px; }
+.return-module .return-search .ant-form-item { margin: 0; }
+.return-module .return-search .ant-picker { width: 100%; }
+.return-module .return-search-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.return-module .return-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.return-module .return-evidence { display: flex; flex-wrap: wrap; gap: 12px; }
+.return-module .return-summary { padding: 16px; margin-bottom: 16px; border: 1px solid #FFE7D1; border-radius: 8px; background: #FFF7F0; color: #595959; }
+.return-module .claim-header-body > .ant-btn-primary { background: #E8720C; border-color: #E8720C; }
+.return-module .ant-descriptions-item-content { overflow-wrap: anywhere; }

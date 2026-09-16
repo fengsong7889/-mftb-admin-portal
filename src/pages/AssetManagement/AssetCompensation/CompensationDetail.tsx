@@ -1,295 +1,107 @@
 /**
- * 賠付詳情頁
- *
- * 三階段流轉：
- *  - pending   → 定責確認（補全責任人/部門/賠付方式/金額）
- *  - confirmed → 確認賠付（登記賠付日期）
- *  - paid      → 只讀展示
+ * 赔付详情 — 接通真实后端 API
  */
-import { useState, useEffect, useCallback } from 'react'
-import {
-  Button, Form, Input, Select, Row, Col, Card, Spin, message, Descriptions, Tag, DatePicker, InputNumber, Modal,
-} from 'antd'
-import { SaveOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons'
-import { useTranslation } from 'react-i18next'
-import dayjs from 'dayjs'
-import {
-  fetchCompensationDetail, confirmCompensation, payCompensation,
-  type CompensationRecord,
-} from '../../../api/eam'
-import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
-import { EAM_DEPARTMENTS } from '../eamUtils'
+import { Alert, Button, Descriptions, Empty, Result, Spin, Table, Tabs, Tag } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import type { CompensationRow } from '../../../api/eamCompensation'
+import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
-const STATUS_META: Record<CompensationRecord['status'], { key: string; color: string }> = {
-  pending:   { key: 'asset.compPending',   color: 'warning' },
-  confirmed: { key: 'asset.compConfirmed', color: 'processing' },
-  paid:      { key: 'asset.compPaid',      color: 'success' },
+/* ----- 状态元数据 ----- */
+const DAMAGE_LABEL: Record<string, string> = { damage: '损坏', loss: '遗失' }
+const CAUSE_LABEL: Record<string, string> = { human: '人为', natural: '自然', third_party: '第三方', quality: '质量' }
+const PARTY_LABEL: Record<string, string> = { employee: '员工', department: '部门', company: '公司', none: '未定' }
+const STATUS_LABEL: Record<string, string> = {
+  pending: '待定责', confirmed: '已定责', partially_paid: '部分收款',
+  paid: '已结清', waived: '已免赔', refund_pending: '待退款',
+}
+const STATUS_COLOR: Record<string, string> = {
+  pending: 'default', confirmed: 'processing', partially_paid: 'processing',
+  paid: 'success', waived: 'default', refund_pending: 'error',
 }
 
-const DAMAGE_META: Record<CompensationRecord['damageType'], { key: string; color: string }> = {
-  damage: { key: 'asset.damageDamage', color: 'error' },
-  loss:   { key: 'asset.damageLoss',   color: 'volcano' },
-}
-
-const CAUSE_META: Record<CompensationRecord['causeType'], { key: string }> = {
-  human:       { key: 'asset.causeHuman' },
-  natural:     { key: 'asset.causeNatural' },
-  third_party: { key: 'asset.causeThirdParty' },
-  quality:     { key: 'asset.causeQuality' },
-}
-
-const COMP_TYPE_META: Record<CompensationRecord['compType'], { key: string }> = {
-  repair_cost:   { key: 'asset.compTypeRepair' },
-  replace_price: { key: 'asset.compTypeReplace' },
-  depreciated:   { key: 'asset.compTypeDepreciated' },
-}
-
-interface ConfirmFormValues {
-  responsiblePerson: string
-  responsibleDept: string
-  liabilityDesc: string
-  compType: 'repair_cost' | 'replace_price' | 'depreciated'
-  compAmount: number
-  operator: string
-}
-
-interface PayFormValues {
-  paidDate: string
-  operator: string
+function formatMoney(cents: number): string {
+  return `MOP ${(cents / 100).toFixed(2)}`
 }
 
 interface Props {
-  compId: number
+  record?: CompensationRow
+  loading?: boolean
+  error?: string
+  canEdit?: boolean
   onBack: () => void
-  onViewAsset: (assetNo: string) => void
+  onRefresh?: () => void
 }
 
-export default function CompensationDetail({ compId, onBack, onViewAsset }: Props) {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
-  const [record, setRecord] = useState<CompensationRecord | null>(null)
-  const [asset, setAsset] = useState<AssetItem | null>(null)
+export default function CompensationDetail({ record, loading = false, error, canEdit = false, onBack, onRefresh: _onRefresh }: Props) {
+  const navigate = useNavigate()
 
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [payModalOpen, setPayModalOpen] = useState(false)
-  const [confirmForm] = Form.useForm<ConfirmFormValues>()
-  const [payForm] = Form.useForm<PayFormValues>()
-  const [submitting, setSubmitting] = useState(false)
+  if (loading && !record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
+  if (error) return <Result status="error" title="加载失败" subTitle={error} extra={<Button onClick={onBack}>返回列表</Button>} />
+  if (!record) return <Result status="warning" title="记录不存在" extra={<Button onClick={onBack}>返回列表</Button>} />
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const rec = await fetchCompensationDetail(compId)
-      setRecord(rec)
-      const a = await fetchAssetDetail(rec.assetId)
-      setAsset(a)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [compId, t])
+  const pending = record.status === 'pending' && !record.reviewRequired
+  const confirmed = ['confirmed', 'partially_paid', 'paid'].includes(record.status) && !record.reviewRequired
+  const refund = record.status === 'refund_pending'
 
-  useEffect(() => { loadData() }, [loadData])
-
-  const handleConfirm = async () => {
-    try {
-      const v = await confirmForm.validateFields()
-      setSubmitting(true)
-      await confirmCompensation(record!.id, v)
-      message.success(t('asset.compConfirmed'))
-      setConfirmModalOpen(false)
-      loadData()
-    } catch (e: unknown) {
-      if (e instanceof Error) message.error(e.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handlePay = async () => {
-    try {
-      const v = await payForm.validateFields()
-      setSubmitting(true)
-      await payCompensation(record!.id, dayjs(v.paidDate).format('YYYY-MM-DD'), v.operator)
-      message.success(t('asset.compPaid'))
-      setPayModalOpen(false)
-      loadData()
-    } catch (e: unknown) {
-      if (e instanceof Error) message.error(e.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
-  if (!record) return <div style={{ textAlign: 'center', padding: 60 }}>{t('asset.compensationNotFound')}</div>
-
-  const statusMeta = STATUS_META[record.status]
-
-  return (
-    <>
-      <div style={{ background: '#fff', borderRadius: 8, padding: '16px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Button type="primary" onClick={onBack}>{t('common.back')}</Button>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('asset.compensationDetailTitle')}</h2>
-        <Tag color={statusMeta.color} style={{ marginLeft: 'auto' }}>{t(statusMeta.key)}</Tag>
-      </div>
-
-      {/* 資產信息 */}
-      {asset && (
-        <Card title={t('asset.sectionAssetInfo')} style={{ marginBottom: 16, borderRadius: 8 }} size="small">
-          <Descriptions column={3} size="small">
-            <Descriptions.Item label={t('asset.colAssetNo')}>
-              <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace', fontWeight: 600 }}
-                onClick={() => onViewAsset(asset.assetNo)}
-              >
-                {asset.assetNo}
-              </Button>
-            </Descriptions.Item>
-            <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
-            <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
-          </Descriptions>
-        </Card>
-      )}
-
-      {/* 賠付基本信息 */}
-      <Card title={t('asset.compensationDetailTitle')} style={{ marginBottom: 16, borderRadius: 8 }} size="small">
-        <Descriptions column={3} size="small">
-          <Descriptions.Item label={t('asset.colCompNo')}>
-            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.compNo}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDamageType')}>
-            <Tag color={DAMAGE_META[record.damageType].color}>{t(DAMAGE_META[record.damageType].key)}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colCauseType')}>
-            <Tag>{t(CAUSE_META[record.causeType].key)}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colResponsiblePerson')} span={3}>
-            {record.responsiblePerson || <span style={{ color: '#bfbfbf' }}>-</span>}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colResponsibleDept')}>
-            {record.responsibleDept || '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colCompType')}>
-            {record.compAmount ? t(COMP_TYPE_META[record.compType].key) : '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colCompAmount')}>
-            {record.compAmount ? <span style={{ fontWeight: 600, color: '#f5222d' }}>MOP {record.compAmount.toLocaleString()}</span> : '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colLiabilityDesc')} span={3}>
-            {record.liabilityDesc || '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colPaidDate')}>
-            {record.paidDate || '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colOperator')}>
-            {record.operator}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colCreatedAt')}>
-            {record.createdAt}
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-
-      {/* 操作按鈕 */}
-      <div className="form-footer">
-        {record.status === 'pending' && (
-          <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => {
-            confirmForm.setFieldsValue({
-              responsiblePerson: record.responsiblePerson || '',
-              responsibleDept: record.responsibleDept || '',
-              liabilityDesc: record.liabilityDesc || '',
-              compType: record.compType || 'repair_cost',
-              compAmount: record.compAmount || 0,
-            })
-            setConfirmModalOpen(true)
-          }}>
-            {t('asset.btnCompConfirm')}
-          </Button>
-        )}
-        {record.status === 'confirmed' && (
-          <Button type="primary" icon={<DollarOutlined />} onClick={() => {
-            payForm.setFieldsValue({ paidDate: dayjs().format('YYYY-MM-DD') })
-            setPayModalOpen(true)
-          }}>
-            {t('asset.btnCompPay')}
-          </Button>
-        )}
-      </div>
-
-      {/* 定責確認彈窗 */}
-      <Modal
-        title={t('asset.compensationConfirmTitle')}
-        open={confirmModalOpen}
-        onCancel={() => setConfirmModalOpen(false)}
-        footer={null}
-        width={560}
-        destroyOnClose
-      >
-        <Form<ConfirmFormValues> form={confirmForm} layout="vertical">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label={t('asset.colResponsiblePerson')} name="responsiblePerson" rules={[{ required: true, message: t('asset.responsiblePersonRequired') }]}>
-                <Input placeholder={t('asset.responsiblePersonPh')} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label={t('asset.colResponsibleDept')} name="responsibleDept" rules={[{ required: true, message: t('asset.responsibleDeptRequired') }]}>
-                <Select options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))} placeholder={t('common.pleaseSelect')} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label={t('asset.colLiabilityDesc')} name="liabilityDesc" rules={[{ required: true, message: t('asset.liabilityDescRequired') }]}>
-            <Input.TextArea rows={2} maxLength={500} showCount />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label={t('asset.colCompType')} name="compType" rules={[{ required: true }]}>
-                <Select options={[
-                  { label: t('asset.compTypeRepair'), value: 'repair_cost' },
-                  { label: t('asset.compTypeReplace'), value: 'replace_price' },
-                  { label: t('asset.compTypeDepreciated'), value: 'depreciated' },
-                ]} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label={t('asset.colCompAmount')} name="compAmount" rules={[{ required: true, message: t('asset.compAmountRequired') }]}>
-                <InputNumber min={0} step={100} addonAfter="MOP" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label={t('asset.colOperator')} name="operator" rules={[{ required: true, message: t('asset.operatorRequired') }]}>
-            <Input placeholder={t('asset.userNamePh')} allowClear />
-          </Form.Item>
-          <div style={{ textAlign: 'right', borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
-            <Button onClick={() => setConfirmModalOpen(false)} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleConfirm} loading={submitting}>{t('common.confirm')}</Button>
-          </div>
-        </Form>
-      </Modal>
-
-      {/* 賠付執行彈窗 */}
-      <Modal
-        title={t('asset.btnCompPay')}
-        open={payModalOpen}
-        onCancel={() => setPayModalOpen(false)}
-        footer={null}
-        width={420}
-        destroyOnClose
-      >
-        <Form<PayFormValues> form={payForm} layout="vertical">
-          <Form.Item label={t('asset.colPaidDate')} name="paidDate" rules={[{ required: true, message: t('asset.paidDateRequired') }]}>
-            <DatePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label={t('asset.colOperator')} name="operator" rules={[{ required: true, message: t('asset.operatorRequired') }]}>
-            <Input placeholder={t('asset.userNamePh')} allowClear />
-          </Form.Item>
-          <div style={{ textAlign: 'right', borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
-            <Button onClick={() => setPayModalOpen(false)} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
-            <Button type="primary" icon={<DollarOutlined />} onClick={handlePay} loading={submitting}>{t('common.confirm')}</Button>
-          </div>
-        </Form>
-      </Modal>
-    </>
-  )
+  return <>
+    <ReturnHeader title={`赔付详情 · ${record.compNo}`} onBack={onBack} />
+    {record.reviewRequired > 0 && <Alert className="claim-notice" type="warning" showIcon message="待找回复核"
+      description="资产已找回，原赔付记录保留，需人工复核金额并决定是否退款。" />}
+    {refund && <Alert className="claim-notice" type="error" showIcon message="待退款" description="已收金额超过复核后应赔金额，需登记退款冲减。" />}
+    <ReturnSection title="赔付基本信息">
+      <Descriptions bordered column={3} items={[
+        { key: 'no', label: '赔付单号', children: record.compNo },
+        { key: 'asset', label: '资产', children: `${record.assetName} · ${record.assetNo}` },
+        { key: 'holder', label: '原持有人', children: record.holderName },
+        { key: 'damageType', label: '损失类型', children: <Tag color={record.damageType === 'loss' ? 'error' : 'warning'}>{DAMAGE_LABEL[record.damageType] || record.damageType}</Tag> },
+        { key: 'return', label: '关联归还单', children: record.returnId ? <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${record.returnId}`)}>查看</Button> : '—' },
+        { key: 'status', label: '状态', children: record.reviewRequired > 0 ? <Tag color="warning">待找回复核</Tag> : <Tag color={STATUS_COLOR[record.status] || 'default'}>{STATUS_LABEL[record.status] || record.status}</Tag> },
+        { key: 'party', label: '责任对象', children: record.party ? <Tag>{PARTY_LABEL[record.party] || record.party}</Tag> : '待定' },
+        { key: 'responsible', label: '责任人', children: record.responsibleName || '待定' },
+        { key: 'department', label: '责任部门', children: record.department || '待定' },
+        { key: 'cause', label: '原因', children: record.cause ? CAUSE_LABEL[record.cause] : '待定' },
+        { key: 'basis', label: '定责依据', children: record.basis || '待定' },
+        { key: 'amount', label: '应赔金额', children: record.status === 'pending' ? '待定' : formatMoney(record.amount) },
+        { key: 'netPaid', label: '净收款', children: formatMoney(record.netPaid) },
+        { key: 'reason', label: '异常说明', children: record.reason || record.waiveReason || '—' },
+      ]} />
+    </ReturnSection>
+    <Tabs items={[
+      {
+        key: 'payments', label: '收款 / 退款记录',
+        children: record.payments?.length ? <Table rowKey="id" size="small" pagination={false}
+          dataSource={record.payments} columns={[
+            { key: 'type', title: '类型', dataIndex: 'type', width: 100, render: (v: string) => <Tag color={v === 'payment' ? 'success' : 'error'}>{v === 'payment' ? '收款' : '退款'}</Tag> },
+            { key: 'amount', title: '金额', dataIndex: 'amount', width: 130, align: 'right', render: (v: number) => formatMoney(v) },
+            { key: 'date', title: '业务日期', dataIndex: 'paymentDate', width: 120 },
+            { key: 'reason', title: '说明', dataIndex: 'reason' },
+            { key: 'operator', title: '操作人', dataIndex: 'operatorName', width: 130 },
+          ]} /> : <Empty description="暂无收款 / 退款记录" />,
+      },
+      {
+        key: 'reviews', label: '找回复核记录',
+        children: record.reviews?.length ? <Table rowKey="id" size="small" pagination={false}
+          dataSource={record.reviews} columns={[
+            { key: 'date', title: '复核日期', dataIndex: 'reviewDate', width: 120 },
+            { key: 'before', title: '原应赔', dataIndex: 'beforeAmount', width: 130, align: 'right', render: (v: number) => formatMoney(v) },
+            { key: 'after', title: '复核后应赔', dataIndex: 'afterAmount', width: 130, align: 'right', render: (v: number) => formatMoney(v) },
+            { key: 'reason', title: '调整理由', dataIndex: 'reason' },
+            { key: 'operator', title: '操作人', dataIndex: 'operatorName', width: 130 },
+          ]} /> : <Empty description="暂无复核记录" />,
+      },
+    ]} />
+    <ReturnSection title="操作记录">
+      <Descriptions column={2} items={[
+        { key: 'operator', label: '最后更新人', children: record.operatorName },
+        { key: 'time', label: '最后更新时间', children: record.updatedAt },
+      ]} />
+    </ReturnSection>
+    <div className="form-footer">
+      {canEdit && pending && <Button onClick={() => navigate(`/asset-compensation/liability?id=${record.id}`)}>定责</Button>}
+      {canEdit && pending && <Button onClick={() => navigate(`/asset-compensation/waive?id=${record.id}`)}>免赔</Button>}
+      {canEdit && confirmed && <Button onClick={() => navigate(`/asset-compensation/payment?id=${record.id}`)}>收款</Button>}
+      {canEdit && refund && <Button onClick={() => navigate(`/asset-compensation/refund?id=${record.id}`)}>登记退款</Button>}
+      {canEdit && record.reviewRequired > 0 && <Button type="primary" onClick={() => navigate(`/asset-compensation/review?id=${record.id}`)}>找回复核</Button>}
+    </div>
+  </>
 }

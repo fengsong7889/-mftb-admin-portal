@@ -1349,8 +1349,25 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-claim/add': 'asset-claim',
   '/asset-claim/detail': 'asset-claim',
   '/asset-claim/record': 'asset-claim',
-  // 歸還管理
+  // 借用管理（子路由歸屬 asset-borrow 菜單）
+  '/asset-borrow': 'asset-borrow',
+  '/asset-borrow/add': 'asset-borrow',
+  '/asset-borrow/detail': 'asset-borrow',
+  '/asset-borrow/renew': 'asset-borrow',
+  // 歸還管理（子路由歸屬 asset-return 菜單）
   '/asset-return': 'asset-return',
+  '/asset-return/add': 'asset-return',
+  '/asset-return/detail': 'asset-return',
+  '/asset-return/dispose': 'asset-return',
+  '/asset-return/recover': 'asset-return',
+  // 損壞賠付（子路由歸屬 asset-compensation 菜單）
+  '/asset-compensation': 'asset-compensation',
+  '/asset-compensation/detail': 'asset-compensation',
+  '/asset-compensation/liability': 'asset-compensation',
+  '/asset-compensation/waive': 'asset-compensation',
+  '/asset-compensation/payment': 'asset-compensation',
+  '/asset-compensation/refund': 'asset-compensation',
+  '/asset-compensation/review': 'asset-compensation',
 }
 
 /**

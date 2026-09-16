@@ -1,167 +1,174 @@
 /**
- * 歸還記錄列表
+ * 归还管理 — 列表页
  *
- * - 展示領用/借用資產的歸還登記（單號/資產/歸還人/歸還日期/資產狀況）
- * - 狀況為「損壞/遺失」且未關聯賠付單時，提供「賠付登記」入口（聯動損壞賠付）
+ * 接通真实后端 API，使用 ReturnRow 类型。
  */
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Form, Input, Select, Table, Tag, message, Space } from 'antd'
-import type { TableColumnsType, TablePaginationConfig } from 'antd'
-import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { useState, useEffect, useMemo } from 'react'
+import { Button, DatePicker, Empty, Form, Input, Select, Table, Tag, type TableColumnsType } from 'antd'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchReturnList, type ReturnRecord } from '../../../api/eam'
+import type { Dayjs } from 'dayjs'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import type { ReturnRow, ReturnQuery } from '../../../api/eamReturn'
 
-type ReturnCondition = ReturnRecord['condition']
-
-const CONDITION_META: Record<ReturnCondition, { key: string; color: string }> = {
-  normal:  { key: 'asset.conditionNormal',  color: 'success' },
-  damaged: { key: 'asset.conditionDamaged', color: 'error' },
-  lost:    { key: 'asset.conditionLost',    color: 'volcano' },
-}
+/* ----- 状态元数据 ----- */
+const SOURCE_LABEL: Record<string, string> = { claim: '领用归还', borrow: '借用归还', historical: '历史资产归还' }
+const STATUS_LABEL: Record<string, string> = { completed: '正常完成', exception_pending: '异常处理中', exception_closed: '异常已结束' }
+const STATUS_COLOR: Record<string, string> = { completed: 'success', exception_pending: 'processing', exception_closed: 'default' }
+const CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '损坏', lost: '遗失' }
+const CONDITION_COLOR: Record<string, string> = { normal: 'success', damaged: 'error', lost: 'warning' }
 
 interface Props {
-  onAdd: () => void
-  onViewAsset: (assetNo: string) => void
-  onViewComp: (compId: number) => void
-  onCreateComp: (record: ReturnRecord) => void
+  data?: { records: ReturnRow[]; total: number }
+  loading?: boolean
+  error?: string
+  onQuery?: (query: ReturnQuery) => void
+  canEdit?: boolean
 }
 
-export default function ReturnList({ onAdd, onViewAsset, onViewComp, onCreateComp }: Props) {
+interface Filters { keyword?: string; source?: string; status?: string; condition?: string; dates?: [Dayjs, Dayjs] }
+
+export default function ReturnList({ data, loading = false, error, onQuery, canEdit = false }: Props) {
   const { t } = useTranslation()
-  const [form] = Form.useForm()
-  const [loading, setLoading] = useState(false)
-  const [dataSource, setDataSource] = useState<ReturnRecord[]>([])
-  const [total, setTotal] = useState(0)
+  const navigate = useNavigate()
+  const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<{ keyword?: string; status?: string }>({})
+  const [filters, setFilters] = useState<Pick<ReturnQuery, 'keyword' | 'sourceType' | 'returnStatus' | 'assetCondition' | 'startDate' | 'endDate'>>({})
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      // status 復用為歸還狀況過濾（api 層按 condition 匹配）
-      const res = await fetchReturnList({ ...filters, page, size })
-      setDataSource(res.records || [])
-      setTotal(res.total || 0)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, page, size, t])
+  const dataSource = data?.records ?? []
+  const total = data?.total ?? 0
 
-  useEffect(() => { loadData() }, [loadData])
+  /* ----- 查询触发（与 ClaimList 对齐：filters 变化驱动请求） ----- */
+  useEffect(() => {
+    onQuery?.({ ...filters, page, size })
+  }, [filters, page, size, onQuery])
 
   const handleSearch = () => {
     const v = form.getFieldsValue()
-    setFilters({ keyword: v.keyword || undefined, status: v.condition || undefined })
+    setFilters({
+      keyword: v.keyword?.trim() || undefined,
+      sourceType: v.source || undefined,
+      returnStatus: v.status || undefined,
+      assetCondition: v.condition || undefined,
+      startDate: v.dates?.[0]?.format('YYYY-MM-DD'),
+      endDate: v.dates?.[1]?.format('YYYY-MM-DD'),
+    })
     setPage(1)
   }
+
   const handleReset = () => { form.resetFields(); setFilters({}); setPage(1) }
-  const handleTableChange = (p: TablePaginationConfig) => {
-    setPage(p.current || 1)
-    setSize(p.pageSize || 10)
+
+  const handleTableChange = (p: { current?: number; pageSize?: number }) => {
+    const nextSize = p.pageSize || 10
+    setPage(nextSize === size ? p.current || 1 : 1)
+    setSize(nextSize)
   }
 
-  const conditionOptions = [
-    { label: t('common.all'), value: '' },
-    { label: t('asset.conditionNormal'), value: 'normal' },
-    { label: t('asset.conditionDamaged'), value: 'damaged' },
-    { label: t('asset.conditionLost'), value: 'lost' },
-  ]
-
-  const columns: TableColumnsType<ReturnRecord> = [
+  /* ----- 表格列定义 ----- */
+  const allColumns: TableColumnsType<ReturnRow> = [
     {
-      title: t('asset.colReturnNo'), dataIndex: 'returnNo', key: 'returnNo', width: 140, fixed: 'left',
-      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+      key: 'returnNo', title: t('asset.colReturnNo'), dataIndex: 'returnNo', width: 175, fixed: 'left',
+      render: (v: string, r) => <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>{v}</Button>,
     },
     {
-      title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
-      render: (v: string) => (
-        <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace' }}
-          onClick={() => onViewAsset(v)}
-        >
-          {v}
-        </Button>
+      key: 'source', title: '归还来源', dataIndex: 'sourceType', width: 140,
+      render: (v: string) => SOURCE_LABEL[v] || v,
+    },
+    { key: 'asset', title: '资产', width: 200, render: (_, r) => <>{r.assetName}<div className="claim-muted">{r.assetNo}</div></> },
+    { key: 'holder', title: '原持有人', dataIndex: 'empName', width: 130 },
+    { key: 'actualReturnee', title: '实际归还人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => v || r.empName },
+    { key: 'date', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120 },
+    {
+      key: 'condition', title: '验收状况', dataIndex: 'assetCondition', width: 100,
+      render: (v: string) => <Tag color={CONDITION_COLOR[v] || 'default'}>{CONDITION_LABEL[v] || v}</Tag>,
+    },
+    {
+      key: 'status', title: '处理状态', dataIndex: 'returnStatus', width: 120,
+      render: (v: string) => <Tag color={STATUS_COLOR[v] || 'default'}>{STATUS_LABEL[v] || v}</Tag>,
+    },
+    {
+      key: 'action', title: t('common.colAction'), width: 150, fixed: 'right',
+      render: (_, r) => (
+        <>
+          <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>详情</Button>
+          {r.compensationId && <><span className="action-split">|</span><Button type="link" onClick={() => navigate(`/asset-compensation/detail?id=${r.compensationId}`)}>赔付</Button></>}
+        </>
       ),
     },
-    { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
-    { title: t('asset.colReturnUser'), dataIndex: 'returnUser', key: 'returnUser', width: 110 },
-    { title: t('asset.colReturnDate'), dataIndex: 'returnDate', key: 'returnDate', width: 120 },
-    {
-      title: t('asset.colCondition'), dataIndex: 'condition', key: 'condition', width: 100,
-      render: (v: ReturnCondition) => <Tag color={CONDITION_META[v].color}>{t(CONDITION_META[v].key)}</Tag>,
-    },
-    { title: t('asset.colOperator'), dataIndex: 'operator', key: 'operator', width: 110 },
-    {
-      title: t('asset.colRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true,
-      render: (v: string | undefined) => v || '-',
-    },
-    {
-      title: t('common.colAction'), key: 'action', width: 150, fixed: 'right',
-      render: (_: unknown, record) => {
-        if (record.compensationId) {
-          return (
-            <Button type="link" size="small" onClick={() => onViewComp(record.compensationId!)}>
-              {t('asset.compensationTitle')}
-            </Button>
-          )
-        }
-        if (record.condition !== 'normal') {
-          return (
-            <Button type="link" size="small" danger onClick={() => onCreateComp(record)}>
-              {t('asset.btnNewComp')}
-            </Button>
-          )
-        }
-        return <span style={{ color: '#bfbfbf' }}>-</span>
-      },
-    },
   ]
+
+  /* ----- 字段配置 ----- */
+  const columnMeta = useMemo(() => [
+    { key: 'returnNo', title: t('asset.colReturnNo') },
+    { key: 'source', title: '归还来源' },
+    { key: 'asset', title: '资产' },
+    { key: 'holder', title: '原持有人' },
+    { key: 'actualReturnee', title: '实际归还人' },
+    { key: 'date', title: t('asset.colReturnDate') },
+    { key: 'condition', title: '验收状况' },
+    { key: 'status', title: '处理状态' },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { applyConfig, configComponent } = useColumnConfig('asset-return', columnMeta, [
+    { key: 'returnNo', locked: 'head' }, { key: 'action', locked: 'tail' },
+  ])
 
   return (
     <>
-      {/* ====== 搜索區 ====== */}
+      {/* ====== 搜索区 ====== */}
       <div className="search-section">
-        <Form form={form} layout="inline">
+        <Form form={form} layout="inline" onFinish={handleSearch}>
           <Form.Item label={t('asset.searchKeyword')} name="keyword">
-            <Input placeholder={t('asset.searchKeywordPh')} allowClear style={{ width: 220 }} />
+            <Input allowClear placeholder="单号 / 资产 / 原持有人 / 归还人" />
           </Form.Item>
-          <Form.Item label={t('asset.colCondition')} name="condition">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={conditionOptions} />
+          <Form.Item label="归还来源" name="source">
+            <Select allowClear placeholder="全部来源" options={Object.entries(SOURCE_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          </Form.Item>
+          <Form.Item label="处理状态" name="status">
+            <Select allowClear placeholder="全部状态" options={Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          </Form.Item>
+          <Form.Item label="验收状况" name="condition">
+            <Select allowClear placeholder="全部状况" options={Object.entries(CONDITION_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          </Form.Item>
+          <Form.Item label="归还日期" name="dates">
+            <DatePicker.RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
       </div>
 
-      {/* ====== 操作區 ====== */}
+      {/* ====== 操作区 ====== */}
       <div className="action-section">
-        <div className="action-section-left" />
+        <div className="action-section-left">归还记录 {total > 0 ? `共 ${total} 条` : ''}</div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
-            {t('asset.btnNewReturn')}
-          </Button>
+          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/asset-return/add')}>{t('asset.btnNewReturn')}</Button>}
+          {configComponent}
         </div>
       </div>
 
       {/* ====== 表格 ====== */}
-      <Table<ReturnRecord>
-        columns={columns}
-        dataSource={dataSource}
+      <Table<ReturnRow>
         rowKey="id"
-        loading={loading}
         size="middle"
-        scroll={{ x: 1400 }}
-        pagination={{
-          current: page, pageSize: size, total, showSizeChanger: true,
-          showTotal: (tt) => `${t('common.total', { count: tt })}`,
-        }}
+        scroll={{ x: 1380 }}
+        columns={applyConfig(allColumns) as TableColumnsType<ReturnRow>}
+        dataSource={error ? [] : dataSource}
+        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+        loading={loading}
         onChange={handleTableChange}
+        pagination={{
+          current: page, pageSize: size, total,
+          showSizeChanger: true, showQuickJumper: true,
+          showTotal: (count) => t('common.total', { count }),
+        }}
       />
     </>
   )

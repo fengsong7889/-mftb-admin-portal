@@ -1,123 +1,68 @@
 /**
- * 借用詳情頁（只讀）
- *
- * - 展示借用單信息、逾期提示與續借次數
- * - 未歸還時底部提供「續借」「歸還」入口（歸還跳轉歸還管理並帶入借用單）
+ * 借用详情 — 接通真实后端 API
  */
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Descriptions, Tag, Space, Spin, message, Alert } from 'antd'
-import { useTranslation } from 'react-i18next'
-import { fetchBorrowDetail, type BorrowRecord } from '../../../api/eam'
-import { daysBetween, todayStr } from '../eamUtils'
-import DetailPageHeader from '../../../components/DetailPageHeader'
+import { Alert, Button, Descriptions, Result, Spin, Tag } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
+import type { BorrowRow } from '../../../api/eamBorrow'
+import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
-const STATUS_META: Record<BorrowRecord['status'], { key: string; color: string }> = {
-  borrowing: { key: 'asset.borrowBorrowing', color: 'processing' },
-  returned:  { key: 'asset.borrowReturned',  color: 'success' },
-  overdue:   { key: 'asset.borrowOverdue',   color: 'error' },
-}
+const STATUS_LABEL: Record<string, string> = { active: '借用中', overdue: '已逾期', returned: '已归还', cancelled: '已取消' }
+const STATUS_COLOR: Record<string, string> = { active: 'processing', overdue: 'error', returned: 'success', cancelled: 'default' }
 
 interface Props {
-  id: number
+  record?: BorrowRow
+  loading?: boolean
+  error?: string
+  canEdit?: boolean
+  canReturn?: boolean
   onBack: () => void
-  onRenew: (id: number) => void
-  onReturn: (id: number) => void
-  onViewAsset: (assetNo: string) => void
+  onRefresh?: () => void
 }
 
-export default function BorrowDetail({ id, onBack, onRenew, onReturn, onViewAsset }: Props) {
-  const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
-  const [detail, setDetail] = useState<BorrowRecord | null>(null)
+export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, onBack, onRefresh }: Props) {
+  const navigate = useNavigate()
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      setDetail(await fetchBorrowDetail(id))
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [id, t])
+  if (loading && !record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
+  if (error) return <Result status="error" title="加载失败" subTitle={error} extra={<Button onClick={onBack}>返回列表</Button>} />
+  if (!record) return <Result status="warning" title="记录不存在" extra={<Button onClick={onBack}>返回列表</Button>} />
 
-  useEffect(() => { loadData() }, [loadData])
+  const overdueDays = record.status === 'overdue' ? (record.overdueDays ?? dayjs().diff(record.dueDate, 'day')) : 0
 
-  if (loading || !detail) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip={t('common.loading')} />
+  return <>
+    <ReturnHeader title={`借用详情 · ${record.borrowNo}`} onBack={onBack} />
+    {record.status === 'overdue' && <Alert className="claim-notice" type="error" showIcon message={`已逾期 ${overdueDays} 天，请尽快归还或续借`} />}
+    {record.returnId && <Alert className="claim-notice" type="success" showIcon message="已归还"
+      description={<Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/asset-return/detail?id=${record.returnId}`)}>查看归还单</Button>} />}
+
+    <ReturnSection title="借用信息">
+      <Descriptions bordered column={3} items={[
+        { key: 'no', label: '借用单号', children: record.borrowNo },
+        { key: 'asset', label: '资产', children: `${record.assetName} (${record.assetNo})` },
+        { key: 'holder', label: '借用人', children: record.holderName },
+        { key: 'department', label: '借用部门', children: record.department },
+        { key: 'start', label: '借出日期', children: record.startDate },
+        { key: 'due', label: '到期日期', children: <span style={{ color: record.status === 'overdue' ? '#FF4D4F' : undefined, fontWeight: record.status === 'overdue' ? 600 : 400 }}>{record.dueDate}</span> },
+        { key: 'overdue', label: '逾期天数', children: overdueDays > 0 ? overdueDays : '—' },
+        { key: 'renew', label: '续借次数', children: record.renewCount },
+        { key: 'purpose', label: '借用用途', children: record.purpose || '—' },
+        { key: 'status', label: '状态', children: <Tag color={STATUS_COLOR[record.status]}>{STATUS_LABEL[record.status] || record.status}</Tag> },
+        { key: 'operator', label: '操作人', children: record.operatorName },
+      ]} />
+    </ReturnSection>
+
+    <ReturnSection title="操作记录">
+      <Descriptions column={2} items={[
+        { key: 'created', label: '创建时间', children: record.createdAt },
+        { key: 'updated', label: '最后更新', children: record.updatedAt },
+      ]} />
+    </ReturnSection>
+
+    {record.status !== 'returned' && record.status !== 'cancelled' && (
+      <div className="form-footer">
+        {canEdit && <Button onClick={() => navigate(`/asset-borrow/renew?id=${record.id}`)}>续借</Button>}
+        {canReturn && <Button type="primary" onClick={() => navigate(`/asset-return/add?borrowId=${record.id}`)}>归还</Button>}
       </div>
-    )
-  }
-
-  const statusMeta = STATUS_META[detail.status]
-  const overdueDays = detail.status === 'overdue' ? daysBetween(detail.dueDate, todayStr()) : 0
-
-  return (
-    <Spin spinning={loading}>
-      {/* ====== 詳情頁頭部（全局 DetailPageHeader） ====== */}
-      <DetailPageHeader
-        title={t('asset.borrowDetailTitle')}
-        tags={<Tag color={statusMeta.color}>{t(statusMeta.key)}</Tag>}
-        meta={<>{detail.borrowNo} · {detail.assetName}</>}
-        onBack={onBack}
-      />
-
-      {/* ====== 逾期提示 ====== */}
-      {detail.status === 'overdue' && (
-        <Alert
-          type="error" showIcon style={{ marginBottom: 16 }}
-          message={t('asset.overdueTip', { days: overdueDays })}
-        />
-      )}
-
-      {/* ====== 基本信息 ====== */}
-      <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionBasic')}</h3>
-        <Descriptions column={3} size="middle" bordered>
-          <Descriptions.Item label={t('asset.colBorrowNo')}>{detail.borrowNo}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colAssetNo')}>
-            <Button type="link" size="small" style={{ padding: 0 }} onClick={() => onViewAsset(detail.assetNo)}>
-              {detail.assetNo}
-            </Button>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colAssetName')}>{detail.assetName}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colBorrower')}>{detail.borrower}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDepartment')}>{detail.department}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colPurpose')}>{detail.purpose}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colBorrowDate')}>{detail.borrowDate}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDueDate')}>
-            <span style={{ color: detail.status === 'overdue' ? '#FF4D4F' : undefined, fontWeight: 600 }}>
-              {detail.dueDate}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colOverdueDays')}>
-            {detail.status === 'overdue' ? <Tag color="error">{overdueDays}</Tag> : '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colRenewCount')}>{detail.renewCount}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colReturnDate')}>{detail.returnDate || '-'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colOperator')}>{detail.operator}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colCreatedAt')}>{detail.createdAt}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colRemark')} span={2}>{detail.remark || '-'}</Descriptions.Item>
-        </Descriptions>
-      </div>
-
-      {/* ====== 底部操作欄（未歸還時可續借/歸還） ====== */}
-      {detail.status !== 'returned' && (
-        <div className="form-footer">
-          <Space>
-            <Button onClick={onBack}>{t('common.cancel')}</Button>
-            <Button onClick={() => onRenew(detail.id)}>{t('asset.btnRenew')}</Button>
-            <Button type="primary" onClick={() => onReturn(detail.id)}>
-              {t('asset.btnBorrowReturn')}
-            </Button>
-          </Space>
-        </div>
-      )}
-    </Spin>
-  )
+    )}
+  </>
 }

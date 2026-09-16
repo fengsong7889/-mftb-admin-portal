@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -761,6 +764,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 148-v2: 分类编码二次迁移（中间格式 01-01 → 最终格式 0101）
         versionTracker.applyOnce("eam:cat-code-dash-v2", () -> {
             migrateCategoryCodeDashRemoval();
+        });
+
+        // 153: 舊資產編號遷移至新格式（FA... → TB-ZH-0101-0001）
+        // v2: 先補填 company_brand 再遷移編號
+        versionTracker.applyOnce("eam:asset-no-migrate-v2", () -> {
+            migrateOldAssetNo();
         });
 
         // PR-2: 歷史批次 generated_asset_count 回填（按資產台賬 batch_id 計數）
@@ -2888,6 +2897,169 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         } catch (Exception e) {
             log.warn("刪除 ai_access_request 表失敗（可忽略）: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 153 脚本等效：旧资产编号迁移至新格式
+     * 旧格式: FA20260916xxx 等 → 新格式: {品牌編碼}-{倉庫編碼}-{分類碼}-{4位序號}
+     * 仅处理不符合新格式正则的资产，幂等安全
+     */
+    private void migrateOldAssetNo() {
+        // 新格式正则：两段字母/数字-多段字母/数字-多段字母/数字-4位数字
+        String newFormatRegex = "^[A-Z]{2}-[A-Z0-9]+-[A-Z0-9]+-[0-9]{4}$";
+
+        // 0. 补填 company_brand 为 NULL 的资产（按 id 升序，前半 TB，后半 MF）
+        try {
+            List<Map<String, Object>> nullBrandAssets = jdbcTemplate.queryForList(
+                    "SELECT id FROM biz_eam_asset WHERE deleted = 0 AND company_brand IS NULL ORDER BY id");
+            if (!nullBrandAssets.isEmpty()) {
+                int half = (nullBrandAssets.size() + 1) / 2;
+                for (int i = 0; i < nullBrandAssets.size(); i++) {
+                    Long assetId = ((Number) nullBrandAssets.get(i).get("id")).longValue();
+                    int brand = (i < half) ? 1 : 2; // 前半 TB(1), 后半 MF(2)
+                    jdbcTemplate.update("UPDATE biz_eam_asset SET company_brand = ? WHERE id = ?", brand, assetId);
+                    log.info("补填 company_brand: id={} → {} ({})", assetId, brand, brand == 1 ? "TB" : "MF");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("补填 company_brand 失败: {}", e.getMessage());
+        }
+
+        // 0.5 重置错误迁移的 XX- 前缀编号（v1 迁移时 company_brand 为 NULL 导致生成了 XX- 前缀）
+        try {
+            int resetRows = jdbcTemplate.update(
+                    "UPDATE biz_eam_asset SET asset_no = CONCAT('OLD-', id) "
+                            + "WHERE deleted = 0 AND asset_no LIKE 'XX-%'");
+            if (resetRows > 0) {
+                log.info("重置 {} 条 XX- 前缀资产编号", resetRows);
+            }
+        } catch (Exception e) {
+            log.warn("重置 XX- 前缀编号失败: {}", e.getMessage());
+        }
+
+        // 1. 查询所有需要迁移的资产（按 id 升序保证序号稳定）
+        List<Map<String, Object>> oldAssets;
+        try {
+            oldAssets = jdbcTemplate.queryForList(
+                    "SELECT a.id, a.company_brand, a.location_id, a.category_code, a.asset_no "
+                            + "FROM biz_eam_asset a "
+                            + "WHERE a.deleted = 0 AND a.asset_no NOT REGEXP ? "
+                            + "ORDER BY a.id",
+                    newFormatRegex);
+        } catch (Exception e) {
+            log.warn("查询旧资产编号失败（可忽略）: {}", e.getMessage());
+            return;
+        }
+        if (oldAssets.isEmpty()) {
+            log.info("无旧格式资产编号需要迁移");
+            return;
+        }
+        log.info("发现 {} 条旧格式资产编号待迁移", oldAssets.size());
+
+        // 2. 构建 company_brand_id → brand_code 映射
+        Map<Long, String> brandCodeMap = new HashMap<>();
+        try {
+            List<Map<String, Object>> brands = jdbcTemplate.queryForList(
+                    "SELECT id, code FROM sys_company_brand WHERE deleted = 0 AND status = 1");
+            for (Map<String, Object> b : brands) {
+                Long id = ((Number) b.get("id")).longValue();
+                brandCodeMap.put(id, (String) b.get("code"));
+            }
+        } catch (Exception e) {
+            log.warn("查询公司品牌失败: {}", e.getMessage());
+        }
+
+        // 3. 构建 location_id → 顶级仓库 code 映射
+        //    先查所有顶级仓库（parent_id=0），再为每个 location 向上遍历找到其根
+        Map<Long, String> locationWarehouseMap = new HashMap<>();
+        try {
+            // 查所有 location 的 id + parent_id + code
+            List<Map<String, Object>> allLocs = jdbcTemplate.queryForList(
+                    "SELECT id, parent_id, code FROM biz_eam_location WHERE deleted = 0");
+            Map<Long, Long> locParentMap = new HashMap<>();
+            Map<Long, String> locCodeMap = new HashMap<>();
+            for (Map<String, Object> loc : allLocs) {
+                Long id = ((Number) loc.get("id")).longValue();
+                Long pid = loc.get("parent_id") != null ? ((Number) loc.get("parent_id")).longValue() : 0L;
+                locParentMap.put(id, pid);
+                locCodeMap.put(id, (String) loc.get("code"));
+            }
+            // 为每个 location 向上遍历找顶级仓库
+            for (Long locId : locParentMap.keySet()) {
+                Long cur = locId;
+                int depth = 0;
+                while (cur != null && locParentMap.containsKey(cur) && locParentMap.get(cur) != 0L && depth < 20) {
+                    cur = locParentMap.get(cur);
+                    depth++;
+                }
+                if (cur != null && locCodeMap.containsKey(cur)) {
+                    locationWarehouseMap.put(locId, locCodeMap.get(cur));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("构建位置仓库映射失败: {}", e.getMessage());
+        }
+
+        // 4. 计算新编号：按 (brandCode, warehouseCode, categoryCode) 分组分配序号
+        //    使用 LinkedHashMap 保持插入顺序（已按 id 排序）
+        Map<String, List<Long>> groupMap = new LinkedHashMap<>();
+        Map<Long, String> assetNewNoMap = new HashMap<>();
+
+        for (Map<String, Object> asset : oldAssets) {
+            Long id = ((Number) asset.get("id")).longValue();
+            Integer companyBrand = asset.get("company_brand") != null
+                    ? ((Number) asset.get("company_brand")).intValue() : null;
+            Long locationId = asset.get("location_id") != null
+                    ? ((Number) asset.get("location_id")).longValue() : null;
+            String categoryCode = asset.get("category_code") != null
+                    ? (String) asset.get("category_code") : "";
+
+            // 品牌编码
+            String brandCode = "XX";
+            if (companyBrand != null) {
+                brandCode = brandCodeMap.getOrDefault(companyBrand.longValue(), "XX");
+                if ("XX".equals(brandCode)) {
+                    brandCode = BizSeqService.companyBrandCode(companyBrand);
+                }
+            }
+            // 仓库编码
+            String warehouseCode = "00";
+            if (locationId != null) {
+                warehouseCode = locationWarehouseMap.getOrDefault(locationId, "00");
+            }
+            // 分类编码
+            String catCode = (categoryCode != null && !categoryCode.isBlank()) ? categoryCode : "00";
+
+            String groupKey = brandCode + "|" + warehouseCode + "|" + catCode;
+            groupMap.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(id);
+        }
+
+        // 5. 为每组内资产分配序号
+        for (Map.Entry<String, List<Long>> entry : groupMap.entrySet()) {
+            String[] parts = entry.getKey().split("\\|");
+            String prefix = parts[0] + "-" + parts[1] + "-" + parts[2] + "-";
+            int seq = 1;
+            for (Long assetId : entry.getValue()) {
+                assetNewNoMap.put(assetId, prefix + String.format("%04d", seq++));
+            }
+        }
+
+        // 6. 批量更新（逐条 UPDATE，避免唯一键冲突时全批失败）
+        int updated = 0;
+        for (Map.Entry<Long, String> entry : assetNewNoMap.entrySet()) {
+            try {
+                int rows = jdbcTemplate.update(
+                        "UPDATE biz_eam_asset SET asset_no = ? WHERE id = ? AND asset_no != ?",
+                        entry.getValue(), entry.getKey(), entry.getValue());
+                if (rows > 0) {
+                    updated++;
+                    log.debug("资产编号迁移: id={} → {}", entry.getKey(), entry.getValue());
+                }
+            } catch (Exception e) {
+                log.warn("资产编号迁移失败 id={}: {}", entry.getKey(), e.getMessage());
+            }
+        }
+        log.info("旧资产编号迁移完成: 共更新 {} 条", updated);
     }
 
 }

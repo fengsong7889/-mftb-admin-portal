@@ -107,6 +107,10 @@ public class BizSeqService {
     public static final String RULE_EAM_CLAIM = "eam_claim";
     /** EAM 归还编号 */
     public static final String RULE_EAM_RETURN = "eam_return";
+    /** EAM 借用编号 */
+    public static final String RULE_EAM_BORROW = "eam_borrow";
+    /** EAM 赔付编号 */
+    public static final String RULE_EAM_COMPENSATION = "eam_compensation";
 
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）

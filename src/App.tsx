@@ -374,7 +374,6 @@ function AuthenticatedLayout() {
               <Route path="/asset-repair"     element={<AssetRepair />} />
               <Route path="/asset-transfer"   element={<AssetTransfer />} />
               <Route path="/asset-inventory"  element={<AssetInventory />} />
-              <Route path="/asset-compensation" element={<AssetCompensation />} />
               <Route path="/asset-dashboard"  element={<AssetDashboard />} />
               {/* EAM 基礎數據 */}
               <Route path="/asset-category"   element={<AssetCategory />} />
@@ -393,7 +392,21 @@ function AuthenticatedLayout() {
               <Route path="/asset-claim/detail" element={<AssetClaim />} />
               <Route path="/asset-claim/record" element={<AssetClaim />} />
               <Route path="/asset-borrow"     element={<AssetBorrow />} />
+              <Route path="/asset-borrow/add"   element={<AssetBorrow />} />
+              <Route path="/asset-borrow/detail" element={<AssetBorrow />} />
+              <Route path="/asset-borrow/renew" element={<AssetBorrow />} />
               <Route path="/asset-return"     element={<AssetReturn />} />
+              <Route path="/asset-return/add"   element={<AssetReturn />} />
+              <Route path="/asset-return/detail" element={<AssetReturn />} />
+              <Route path="/asset-return/dispose" element={<AssetReturn />} />
+              <Route path="/asset-return/recover" element={<AssetReturn />} />
+              <Route path="/asset-compensation" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/detail" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/liability" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/waive" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/payment" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/refund" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/review" element={<AssetCompensation />} />
               {/* 員工個人資產入口 */}
               <Route path="/my-assets"        element={<MyAssets />} />
               {/* EAM 調撥交接 */}

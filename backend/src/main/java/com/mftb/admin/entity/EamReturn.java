@@ -43,6 +43,48 @@ public class EamReturn {
     /** 归还凭证 ID */
     private Long returnEvidenceId;
 
+    /** 归还状态：completed/exception_pending/exception_closed */
+    private String returnStatus;
+
+    /** 归还时资产状况：normal/damaged/lost */
+    private String assetCondition;
+
+    /** 异常原因说明 */
+    private String exceptionReason;
+
+    /** 实物处置结果：idle/scrapped/written_off */
+    private String disposition;
+
+    /** 处置日期 */
+    private LocalDate dispositionDate;
+
+    /** 处置凭证 ID */
+    private Long dispositionEvidenceId;
+
+    /** 是否已找回：0=否 1=是 */
+    private Integer recovered;
+
+    /** 找回日期 */
+    private LocalDate recoveredDate;
+
+    /** 找回说明 */
+    private String recoveredNote;
+
+    /** 实际归还人 ID（代还场景） */
+    private Long actualReturneeId;
+
+    /** 实际归还人姓名 */
+    private String actualReturneeName;
+
+    /** 来源类型：claim/borrow */
+    private String sourceType;
+
+    /** 来源 ID（claim_id 或 borrow_id） */
+    private Long sourceId;
+
+    /** 关联赔付记录 ID */
+    private Long compensationId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

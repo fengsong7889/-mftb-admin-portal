@@ -1,0 +1,30 @@
+package com.mftb.admin.dto;
+
+import lombok.Data;
+
+/**
+ * 借用记录视图 VO
+ */
+@Data
+public class EamBorrowVO {
+    private Long id;
+    private String borrowNo;
+    private Long assetId;
+    private String assetNo;
+    private String assetName;
+    private Long holderId;
+    private String holderName;
+    private String department;
+    private String operatorName;
+    private String status;
+    private String startDate;
+    private String dueDate;
+    private String returnDate;
+    private String purpose;
+    private Integer renewCount;
+    private Long returnId;
+    private String createdAt;
+    private String updatedAt;
+    /** 逾期天数（仅 overdue 状态时返回） */
+    private Integer overdueDays;
+}

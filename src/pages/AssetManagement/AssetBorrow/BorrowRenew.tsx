@@ -1,154 +1,64 @@
 /**
- * 借用續借獨立表單頁
- *
- * 業務閉環：展示原借用信息（只讀）→ 填新歸還期限 + 經辦人 → 提交
- *          （續借次數 +1，逾期狀態回置為借用中，並寫入續借流水）
+ * 续借登记 — 接通真实后端 API
  */
-import { useState, useEffect, useCallback } from 'react'
-import {
-  Button, Form, Input, DatePicker, Row, Col, Space, Spin,
-  message, Descriptions, Alert,
-} from 'antd'
-import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
-import { useTranslation } from 'react-i18next'
+import { Alert, Button, DatePicker, Descriptions, Form, InputNumber, Spin } from 'antd'
+import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { fetchBorrowDetail, renewBorrow, type BorrowRecord } from '../../../api/eam'
+import type { BorrowRow } from '../../../api/eamBorrow'
+import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
-interface FormValues {
-  dueDate: Dayjs
-  operator: string
-}
+interface Values { dueDate: Dayjs; extendDays: number }
 
 interface Props {
-  id: number
+  record?: BorrowRow
+  loading?: boolean
+  canEdit?: boolean
+  onSubmit: (newDueDate: string) => void
   onBack: () => void
 }
 
-export default function BorrowRenew({ id, onBack }: Props) {
-  const { t } = useTranslation()
-  const [form] = Form.useForm<FormValues>()
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [detail, setDetail] = useState<BorrowRecord | null>(null)
+export default function BorrowRenew({ record, loading = false, canEdit = true, onSubmit, onBack }: Props) {
+  const [form] = Form.useForm<Values>()
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const d = await fetchBorrowDetail(id)
-      setDetail(d)
-      // 新期限默認在原期限基礎上延長 7 天
-      form.setFieldsValue({ dueDate: dayjs(d.dueDate).add(7, 'day'), operator: t('asset.currentOperator') })
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [id, form, t])
-
-  useEffect(() => { loadData() }, [loadData])
+  if (!record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
 
   const handleSubmit = async () => {
-    if (!detail) return
     try {
-      const v = await form.validateFields()
-      const newDueDate = v.dueDate.format('YYYY-MM-DD')
-      if (newDueDate <= detail.dueDate) {
-        message.error(t('asset.renewDateInvalid'))
-        return
-      }
-      setSubmitting(true)
-      await renewBorrow(detail.id, newDueDate, v.operator.trim())
-      message.success(t('asset.renewSuccess'))
-      onBack()
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message) message.error(e.message)
-    } finally {
-      setSubmitting(false)
-    }
+      const values = await form.validateFields()
+      onSubmit(values.dueDate.format('YYYY-MM-DD'))
+    } catch { /* validation */ }
   }
 
-  if (loading || !detail) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip={t('common.loading')} />
-      </div>
-    )
-  }
+  if (!canEdit) return <Alert type="warning" showIcon message="无借用办理权限" />
 
-  return (
+  return <>
+    <ReturnHeader title={`续借 · ${record.borrowNo}`} onBack={onBack} />
     <Spin spinning={loading}>
-      {/* ====== 頂部標題欄 ====== */}
-      <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        display: 'flex', alignItems: 'center', gap: 12,
-      }}>
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>{t('common.back')}</Button>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('asset.renewAddTitle')}</h2>
-      </div>
-
-      {/* ====== 原借用信息（只讀） ====== */}
-      <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionBasic')}</h3>
-        <Descriptions column={3} size="middle" bordered>
-          <Descriptions.Item label={t('asset.colBorrowNo')}>{detail.borrowNo}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colAssetNo')}>{detail.assetNo}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colAssetName')}>{detail.assetName}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colBorrower')}>{detail.borrower}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDepartment')}>{detail.department}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colBorrowDate')}>{detail.borrowDate}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDueDate')}>
-            <span style={{ color: detail.status === 'overdue' ? '#FF4D4F' : undefined, fontWeight: 600 }}>
-              {detail.dueDate}
-            </span>
-          </Descriptions.Item>
-          <Descriptions.Item label={t('asset.colRenewCount')}>{detail.renewCount}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colPurpose')}>{detail.purpose}</Descriptions.Item>
-        </Descriptions>
-        {detail.status === 'overdue' && (
-          <Alert type="warning" showIcon style={{ marginTop: 16 }} message={t('asset.overdueRenewTip')} />
-        )}
-      </div>
-
-      {/* ====== 續借表單 ====== */}
-      <div style={{
-        background: '#fff', borderRadius: 8, padding: 24, marginBottom: 16,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      }}>
-        <Form<FormValues> form={form} layout="vertical">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label={t('asset.colNewDueDate')} name="dueDate"
-                rules={[{ required: true, message: t('asset.dueDateRequired') }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label={t('asset.colOperator')} name="operator"
-                rules={[{ required: true, message: t('asset.operatorRequired') }]}
-              >
-                <Input placeholder={t('asset.operatorRequired')} allowClear />
-              </Form.Item>
-            </Col>
-          </Row>
+      <ReturnSection title="续借信息">
+        <Descriptions bordered column={2} items={[
+          { key: 'no', label: '借用单号', children: record.borrowNo },
+          { key: 'asset', label: '资产', children: `${record.assetName} (${record.assetNo})` },
+          { key: 'holder', label: '借用人', children: record.holderName },
+          { key: 'department', label: '部门', children: record.department },
+          { key: 'start', label: '借出日期', children: record.startDate },
+          { key: 'old', label: '原到期日期', children: record.dueDate },
+        ]} />
+        <Form<Values> form={form} layout="vertical" disabled={loading} initialValues={{ dueDate: dayjs(record.dueDate).add(7, 'day'), extendDays: 7 }} style={{ marginTop: 16 }}>
+          <div className="return-grid">
+            <Form.Item name="dueDate" label="新到期日期" rules={[{ required: true }, { validator: (_, d: Dayjs) => d && d.isAfter(record.dueDate, 'day') && !d.isBefore(dayjs(), 'day') ? Promise.resolve() : Promise.reject(new Error('须晚于原到期日且不早于今天')) }]}>
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="extendDays" label="延长天数（参考）">
+              <InputNumber min={1} max={365} disabled />
+            </Form.Item>
+          </div>
+          {record.status === 'overdue' && <Alert type="warning" showIcon message="当前已逾期，续借后逾期状态自动解除。" />}
         </Form>
-      </div>
-
-      {/* ====== 底部操作欄 ====== */}
-      <div className="form-footer">
-        <Space>
-          <Button onClick={onBack}>{t('common.cancel')}</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleSubmit}>
-            {t('asset.btnRenew')}
-          </Button>
-        </Space>
-      </div>
+      </ReturnSection>
     </Spin>
-  )
+    <div className="form-footer">
+      <Button onClick={onBack}>取消</Button>
+      <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleSubmit}>确认续借</Button>
+    </div>
+  </>
 }

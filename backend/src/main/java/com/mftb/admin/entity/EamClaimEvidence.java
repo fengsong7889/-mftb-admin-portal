@@ -18,6 +18,12 @@ public class EamClaimEvidence {
     /** 关联领用 ID */
     private Long claimId;
 
+    /** 业务类型：claim/return/borrow/compensation */
+    private String bizType;
+
+    /** 业务 ID（根据 biz_type 关联不同表） */
+    private Long bizId;
+
     /** 凭证类型：signature / photo / return_photo */
     private String evidenceType;
 
