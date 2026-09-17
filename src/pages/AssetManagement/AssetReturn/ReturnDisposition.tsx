@@ -4,6 +4,7 @@
 import { Alert, Button, DatePicker, Descriptions, Form, Input, Radio, Spin } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import type { ReturnRow } from '../../../api/eamReturn'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
 
@@ -32,6 +33,7 @@ interface RecoverValues {
 }
 
 export default function ReturnDisposition({ record, loading = false, canEdit = false, recover = false, onSubmit, onBack }: Props) {
+  const { t } = useTranslation()
   const [dispositionForm] = Form.useForm<DispositionValues>()
   const [recoverForm] = Form.useForm<RecoverValues>()
 
@@ -71,7 +73,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
         <ReturnSection title="歸還記錄">
           <Descriptions column={2}>
             <Descriptions.Item label="歸還單號">{record.returnNo}</Descriptions.Item>
-            <Descriptions.Item label="資產">{record.assetName} ({record.assetNo})</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} ({record.assetNo})</Descriptions.Item>
             <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
             <Descriptions.Item label="驗收狀況">遺失</Descriptions.Item>
           </Descriptions>
@@ -98,7 +100,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
       <ReturnSection title="歸還記錄">
         <Descriptions column={2}>
           <Descriptions.Item label="歸還單號">{record.returnNo}</Descriptions.Item>
-          <Descriptions.Item label="資產">{record.assetName} ({record.assetNo})</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} ({record.assetNo})</Descriptions.Item>
           <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
           <Descriptions.Item label="驗收狀況">{record.assetCondition}</Descriptions.Item>
         </Descriptions>

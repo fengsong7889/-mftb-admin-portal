@@ -287,6 +287,9 @@ public class EamCompensationServiceImpl implements EamCompensationService {
                     .or().like(EamCompensation::getAssetNo, q.getKeyword().trim())
                     .or().like(EamCompensation::getHolderName, q.getKeyword().trim()));
         }
+        if (hasText(q.getCompNo())) w.like(EamCompensation::getCompNo, q.getCompNo().trim());
+        if (hasText(q.getAssetName())) w.like(EamCompensation::getAssetName, q.getAssetName().trim());
+        if (hasText(q.getHolderName())) w.like(EamCompensation::getHolderName, q.getHolderName().trim());
         w.eq(hasText(q.getStatus()), EamCompensation::getStatus, q.getStatus());
         w.eq(hasText(q.getDamageType()), EamCompensation::getDamageType, q.getDamageType());
         w.eq(hasText(q.getParty()), EamCompensation::getParty, q.getParty());

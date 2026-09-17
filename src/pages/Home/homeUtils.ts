@@ -39,6 +39,9 @@ export const defaultFavorites = [
   'approval-center',
 ]
 
+/** 快捷入口收藏上限（后端 sys_user.quick_favorites TEXT 列，前端限制防止超限） */
+export const MAX_FAVORITES = 20
+
 /* ── 纯函数 ── */
 
 /** localStorage key（按用户隔离） */

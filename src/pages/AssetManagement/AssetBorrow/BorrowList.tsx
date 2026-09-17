@@ -88,7 +88,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
 
   const allColumns = [
     { key: 'borrowNo', title: t('asset.colBorrowNo'), dataIndex: 'borrowNo', width: 175, fixed: 'left' as const },
-    { key: 'asset', title: '资产', width: 200, render: (_: unknown, b: BorrowRow) => <>{b.assetName}<div className="claim-muted">{b.assetNo}</div></> },
+    { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_: unknown, b: BorrowRow) => <>{b.assetName}<div className="claim-muted">{b.assetNo}</div></> },
     { key: 'holderName', title: '借用人', dataIndex: 'holderName', width: 130 },
     { key: 'department', title: '借用部门', dataIndex: 'department', width: 120 },
     { key: 'startDate', title: '借出日期', dataIndex: 'startDate', width: 120 },
@@ -110,7 +110,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
 
   const columnMeta = useMemo(() => [
     { key: 'borrowNo', title: t('asset.colBorrowNo') },
-    { key: 'asset', title: '资产' },
+    { key: 'asset', title: t('asset.colAssetName') },
     { key: 'holderName', title: '借用人' },
     { key: 'department', title: '借用部门' },
     { key: 'startDate', title: '借出日期' },

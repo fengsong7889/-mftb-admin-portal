@@ -293,6 +293,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         addColumnIfAbsent("sys_user", "quick_favorites",
                 "ALTER TABLE sys_user ADD COLUMN quick_favorites VARCHAR(1024) NULL "
                         + "COMMENT '快捷入口菜单key列表，JSON数组格式' AFTER force_logout_reason");
+        // 扩容 quick_favorites 为 TEXT（原 VARCHAR(1024) 在收藏较多时可能截断）
+        migrateQuickFavoritesToText();
         addColumnIfAbsent("sys_user", "avatar_url",
                 "ALTER TABLE sys_user ADD COLUMN avatar_url VARCHAR(512) NULL "
                         + "COMMENT '用户选中的在线头像URL（IconFont/DiceBear等外部URL）' AFTER avatar");
@@ -1160,6 +1162,26 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             jdbcTemplate.execute(
                     "ALTER TABLE sys_user MODIFY COLUMN avatar MEDIUMTEXT COMMENT '头像（pikachu expression / dicebear URL / base64）'");
             log.info("已将 sys_user.avatar 扩容为 MEDIUMTEXT");
+        }
+    }
+
+    /** quick_favorites 字段扩容: VARCHAR(1024) → TEXT, 防止收藏较多时 JSON 截断 */
+    private void migrateQuickFavoritesToText() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'quick_favorites'",
+                Integer.class);
+        if (count == null || count == 0) {
+            return;
+        }
+        String type = jdbcTemplate.queryForObject(
+                "SELECT DATA_TYPE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'quick_favorites'",
+                String.class);
+        if (!"text".equalsIgnoreCase(type)) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE sys_user MODIFY COLUMN quick_favorites TEXT COMMENT '快捷入口菜单key列表，JSON数组格式'");
+            log.info("已将 sys_user.quick_favorites 扩容为 TEXT");
         }
     }
 

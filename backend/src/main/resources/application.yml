@@ -11,6 +11,11 @@ server:
 spring:
   application:
     name: mftb-admin
+  main:
+    # 懒初始化开关（高级选项，默认关闭）：开启后 Bean 延迟到首次使用时创建，可缩短启动时间；
+    # 注意 CommandLineRunner（DataInitializer 等迁移逻辑）仍会在启动时执行，不受此开关影响；
+    # 本地快速迭代时可设置环境变量 SPRING_LAZY_INIT=true 开启；生产环境保持默认 false
+    lazy-initialization: ${SPRING_LAZY_INIT:false}
   mail:
     # MCP 外部服務（email_sender）SMTP 配置：全部透過環境變量注入，本地未配置時發送會友好報錯
     host: ${SMTP_HOST:}

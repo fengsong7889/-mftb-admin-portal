@@ -4,6 +4,7 @@
 import { Alert, Button, DatePicker, Descriptions, Form, InputNumber, Spin } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import type { BorrowRow } from '../../../api/eamBorrow'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export default function BorrowRenew({ record, loading = false, canEdit = true, onSubmit, onBack }: Props) {
+  const { t } = useTranslation()
   const [form] = Form.useForm<Values>()
 
   if (!record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -37,7 +39,7 @@ export default function BorrowRenew({ record, loading = false, canEdit = true, o
       <ReturnSection title="续借信息">
         <Descriptions bordered column={2} items={[
           { key: 'no', label: '借用单号', children: record.borrowNo },
-          { key: 'asset', label: '资产', children: `${record.assetName} (${record.assetNo})` },
+          { key: 'asset', label: t('asset.colAssetName'), children: `${record.assetName} (${record.assetNo})` },
           { key: 'holder', label: '借用人', children: record.holderName },
           { key: 'department', label: '部门', children: record.department },
           { key: 'start', label: '借出日期', children: record.startDate },

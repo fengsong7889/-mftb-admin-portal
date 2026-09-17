@@ -345,9 +345,57 @@ export function claimAsset(data: { assetId: number; userName: string; department
   return unavailableAssetOperation('资产领用')
 }
 
-/** 资产转移 */
-export function transferAsset(data: { assetId: number; toUser: string; toDepartment: string; reason: string; applyBy: string }): Promise<void> {
-  return unavailableAssetOperation('资产转移')
+/* ==================== 资产调拨（真实 API） ==================== */
+
+/** 调拨记录（对应后端 EamAssetTransferVO） */
+export interface TransferRecord {
+  id: number
+  transferNo: string
+  assetId: number
+  assetNo: string
+  assetName: string
+  fromUserId: number | null
+  fromUserName: string
+  fromDepartment: string
+  toUserId: number | null
+  toUserName: string
+  toUserEmpId: string | null
+  toDepartment: string
+  transferDate: string
+  reason: string
+  status: 'done' | 'cancelled'
+  operatorName: string
+  remark: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+/** 调拨查询参数 */
+export interface TransferQuery {
+  page?: number
+  size?: number
+  assetNo?: string
+  keyword?: string
+  startDate?: string
+  endDate?: string
+}
+
+/** 资产调拨（调拨登记 → POST /eam/transfers） */
+export function transferAsset(data: {
+  assetId: number
+  toUserName: string
+  toUserEmpId?: string
+  toDepartment: string
+  transferDate: string
+  reason: string
+  remark?: string
+}): Promise<void> {
+  return request.post<unknown, void>('/eam/transfers', data)
+}
+
+/** 调拨记录分页查询 */
+export function fetchTransferList(params?: TransferQuery): Promise<PageResult<TransferRecord>> {
+  return request.get<unknown, PageResult<TransferRecord>>('/eam/transfers', { params })
 }
 
 /** 资产归还 */

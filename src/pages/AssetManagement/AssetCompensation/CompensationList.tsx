@@ -35,7 +35,7 @@ interface Props {
   canEdit?: boolean
 }
 
-interface Filters { keyword?: string; status?: string; damageType?: string; party?: string }
+interface Filters { compNo?: string; assetName?: string; holderName?: string; status?: string; damageType?: string; party?: string }
 
 export default function CompensationList({ data, loading = false, error, onQuery, canEdit: _canEdit = false }: Props) {
   const { t } = useTranslation()
@@ -56,7 +56,9 @@ export default function CompensationList({ data, loading = false, error, onQuery
   const handleSearch = () => {
     const v = form.getFieldsValue()
     setFilters({
-      keyword: v.keyword?.trim() || undefined,
+      compNo: v.compNo?.trim() || undefined,
+      assetName: v.assetName?.trim() || undefined,
+      holderName: v.holderName?.trim() || undefined,
       status: v.status || undefined,
       damageType: v.damageType || undefined,
       party: v.party || undefined,
@@ -78,7 +80,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
       key: 'compNo', title: t('asset.colCompNo'), dataIndex: 'compNo', width: 175, fixed: 'left',
       render: (v: string, c) => <Button type="link" onClick={() => navigate(`/asset-compensation/detail?id=${c.id}`)}>{v}</Button>,
     },
-    { key: 'asset', title: '资产', width: 200, render: (_, c) => <>{c.assetName}<div className="claim-muted">{c.assetNo}</div></> },
+    { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_, c) => <>{c.assetName}<div className="claim-muted">{c.assetNo}</div></> },
     { key: 'holderName', title: '原持有人', dataIndex: 'holderName', width: 130 },
     { key: 'damageType', title: '损失类型', dataIndex: 'damageType', width: 100, render: (v: string) => <Tag color={v === 'loss' ? 'error' : 'warning'}>{DAMAGE_LABEL[v] || v}</Tag> },
     { key: 'party', title: '责任对象', width: 130, render: (_, c) => c.party ? <Tag>{PARTY_LABEL[c.party] || c.party}</Tag> : '待定' },
@@ -100,7 +102,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
     { key: 'compNo', title: t('asset.colCompNo') },
-    { key: 'asset', title: '资产' },
+    { key: 'asset', title: t('asset.colAssetName') },
     { key: 'holderName', title: '原持有人' },
     { key: 'damageType', title: '损失类型' },
     { key: 'party', title: '责任对象' },
@@ -119,8 +121,14 @@ export default function CompensationList({ data, loading = false, error, onQuery
     {/* ====== 搜索区 ====== */}
     <div className="search-section">
       <Form form={form} layout="inline" onFinish={handleSearch}>
-        <Form.Item label="关键词" name="keyword">
-          <Input allowClear placeholder="单号 / 资产 / 持有人 / 责任人" />
+        <Form.Item label={t('asset.colCompNo')} name="compNo">
+          <Input allowClear placeholder="请输入赔付单号" />
+        </Form.Item>
+        <Form.Item label={t('asset.colAssetName')} name="assetName">
+          <Input allowClear placeholder="请输入资产名称" />
+        </Form.Item>
+        <Form.Item label="原持有人" name="holderName">
+          <Input allowClear placeholder="请输入原持有人" />
         </Form.Item>
         <Form.Item label="状态" name="status">
           <Select allowClear placeholder="全部状态" options={Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l }))} />

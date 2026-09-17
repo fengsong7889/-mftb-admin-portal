@@ -28,12 +28,15 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
     private static final String V_EAM_RETURN_CLAIM_NULL = "eam:schema-v2";
     /** v3: 交接表建表（biz_eam_handover + biz_eam_handover_item） */
     private static final String V_EAM_HANDOVER_TABLES = "eam:schema-v3";
+    /** v4: 调拨单建表（biz_eam_transfer） */
+    private static final String V_EAM_TRANSFER_TABLE = "eam:schema-v4";
 
     @Override
     public void run(String... args) {
         versionTracker.applyOnce(V_EAM_RETURN_BORROW_COMP, this::migrateEamSchema);
         versionTracker.applyOnce(V_EAM_RETURN_CLAIM_NULL, this::fixClaimIdNullable);
         versionTracker.applyOnce(V_EAM_HANDOVER_TABLES, this::createHandoverTables);
+        versionTracker.applyOnce(V_EAM_TRANSFER_TABLE, this::createTransferTable);
     }
 
     private void fixClaimIdNullable() {
@@ -92,6 +95,43 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产交接单明细'");
 
         log.info("EAM 交接表结构创建完成");
+    }
+
+    /** v4: 调拨单建表（biz_eam_transfer，与 backend/sql/156_eam_asset_transfer.sql 等效） */
+    private void createTransferTable() {
+        log.info("开始创建 EAM 调拨单表结构 ...");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_transfer ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "transfer_no VARCHAR(64) NOT NULL COMMENT '调拨单号（DB+YYYYMMDD+4位）', "
+                + "asset_id BIGINT NOT NULL COMMENT '资产ID', "
+                + "asset_no VARCHAR(64) NOT NULL COMMENT '资产编号快照', "
+                + "asset_name VARCHAR(200) DEFAULT '' COMMENT '资产名称快照', "
+                + "from_user_id BIGINT NULL COMMENT '原使用人ID', "
+                + "from_user_name VARCHAR(128) DEFAULT '' COMMENT '原使用人快照', "
+                + "from_department VARCHAR(128) DEFAULT '' COMMENT '原归属部门快照', "
+                + "to_user_id BIGINT NULL COMMENT '新使用人ID', "
+                + "to_user_name VARCHAR(128) NOT NULL COMMENT '新使用人姓名', "
+                + "to_user_emp_id VARCHAR(32) DEFAULT '' COMMENT '新使用人工号', "
+                + "to_department VARCHAR(128) NOT NULL COMMENT '新归属部门', "
+                + "transfer_date DATE NOT NULL COMMENT '调拨日期', "
+                + "reason VARCHAR(500) NOT NULL COMMENT '调拨原因', "
+                + "status VARCHAR(32) NOT NULL DEFAULT 'done' COMMENT '状态：done/cancelled', "
+                + "operator_id BIGINT NULL COMMENT '操作人ID', "
+                + "operator_name VARCHAR(128) NOT NULL COMMENT '操作人姓名', "
+                + "remark VARCHAR(512) NULL COMMENT '备注', "
+                + "created_by VARCHAR(128) NULL, "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(128) NULL, "
+                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_transfer_no (transfer_no), "
+                + "INDEX idx_asset_id (asset_id), "
+                + "INDEX idx_asset_no (asset_no), "
+                + "INDEX idx_transfer_date (transfer_date), "
+                + "INDEX idx_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产调拨单'");
+        log.info("EAM 调拨单表结构创建完成");
     }
 
     private void migrateEamSchema() {

@@ -11,8 +11,14 @@ public class EamCompensationQuery {
     private Integer page = 1;
     /** 每页大小 */
     private Integer size = 10;
-    /** 关键词（赔付单号/资产编号/持有人） */
+    /** 关键词（兼容保留：赔付单号/资产编号/持有人） */
     private String keyword;
+    /** 赔付单号（模糊） */
+    private String compNo;
+    /** 资产名称（模糊） */
+    private String assetName;
+    /** 原持有人（模糊） */
+    private String holderName;
     /** 状态：pending/confirmed/partially_paid/paid/waived/refund_pending */
     private String status;
     /** 损失类型：damage/loss */

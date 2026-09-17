@@ -2,15 +2,49 @@
  * 归还登记表单 — 接通真实后端 API
  *
  * 支持从领用(claimId)、借用(borrowId)或资产(assetId)入口进入。
+ * 正常归还支持「归还即承接」：指定接收管理部门与归还位置，后端释放占用时同步归位。
  */
-import { Alert, Button, DatePicker, Descriptions, Form, Input, Radio, Spin } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Alert, Button, DatePicker, Descriptions, Form, Input, Radio, Select, Spin, TreeSelect } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../../../contexts/AuthContext'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { fetchLocationList, type AssetLocation } from '../../../api/eam'
 import type { ReturnRegisterDTO } from '../../../api/eamReturn'
 
 const CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '損壞', lost: '遺失' }
+
+const DEPT_STATUS_ENABLED = 1
+
+interface DeptTreeOption {
+  value: string
+  title: string
+  disabled?: boolean
+  children?: DeptTreeOption[]
+}
+
+/** 平铺部门列表构建 TreeSelect 树数据 */
+function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+  const nodeMap = new Map<number, DeptTreeOption>()
+  list.forEach(dept => {
+    nodeMap.set(dept.id, {
+      value: dept.name,
+      title: dept.name,
+      disabled: dept.status !== DEPT_STATUS_ENABLED,
+      children: [],
+    })
+  })
+  const roots: DeptTreeOption[] = []
+  list.forEach(dept => {
+    const node = nodeMap.get(dept.id)!
+    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+    if (parent) parent.children!.push(node)
+    else roots.push(node)
+  })
+  return roots
+}
 
 interface Values {
   date: Dayjs
@@ -18,6 +52,8 @@ interface Values {
   reason: string
   conditionNote?: string
   actualReturneeName?: string
+  receiveDepartment?: string
+  receiveLocationId?: number
 }
 
 interface Props {
@@ -37,6 +73,16 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
   const condition = Form.useWatch('condition', form) ?? 'normal'
   const hasSource = claimId != null || borrowId != null || assetId != null
 
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [locations, setLocations] = useState<AssetLocation[]>([])
+
+  useEffect(() => {
+    fetchDepartments().then(setDepartments).catch(() => { /* 接口异常时置空 */ })
+    fetchLocationList().then(setLocations).catch(() => { /* 接口异常时置空 */ })
+  }, [])
+
+  const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
@@ -48,6 +94,8 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         returnReason: values.reason,
         conditionNote: values.conditionNote,
         actualReturneeName: values.actualReturneeName || user?.name,
+        receiveDepartment: values.receiveDepartment,
+        receiveLocationId: values.receiveLocationId,
       }
       await onSubmit(dto)
     } catch {
@@ -103,6 +151,39 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
             </Form.Item>
           )}
         </ReturnSection>
+
+        {condition === 'normal' && (
+          <ReturnSection title="接收管理">
+            <Alert className="claim-notice" showIcon type="info"
+              message="指定接收部門與歸還位置後，資產歸還時同步歸位；不填則保持原歸屬部門與原位置。" />
+            <div className="return-grid">
+              <Form.Item name="receiveDepartment" label="接收管理部門">
+                <TreeSelect
+                  treeData={deptTreeData}
+                  placeholder="選擇接收部門（可選）"
+                  treeDefaultExpandAll
+                  showSearch
+                  treeNodeFilterProp="title"
+                  allowClear
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+              <Form.Item name="receiveLocationId" label="歸還位置">
+                <Select
+                  placeholder="選擇歸還位置（可選）"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  style={{ width: '100%' }}
+                  options={locations.map(l => ({
+                    value: l.id,
+                    label: [l.name, l.province, l.city, l.district, l.address].filter(Boolean).join(' - '),
+                  }))}
+                />
+              </Form.Item>
+            </div>
+          </ReturnSection>
+        )}
       </Form>
     </Spin>
 

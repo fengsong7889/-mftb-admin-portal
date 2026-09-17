@@ -60,7 +60,9 @@ export interface ReviewRecord {
 export interface CompensationQuery {
   page: number
   size: number
-  keyword?: string
+  compNo?: string
+  assetName?: string
+  holderName?: string
   status?: string
   damageType?: string
   party?: string
@@ -108,7 +110,9 @@ export async function fetchCompensationList(query: CompensationQuery): Promise<C
     const params = new URLSearchParams()
     params.set('page', String(query.page))
     params.set('size', String(query.size))
-    if (query.keyword) params.set('keyword', query.keyword)
+    if (query.compNo) params.set('compNo', query.compNo)
+    if (query.assetName) params.set('assetName', query.assetName)
+    if (query.holderName) params.set('holderName', query.holderName)
     if (query.status) params.set('status', query.status)
     if (query.damageType) params.set('damageType', query.damageType)
     if (query.party) params.set('party', query.party)

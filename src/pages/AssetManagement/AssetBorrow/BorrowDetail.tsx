@@ -3,6 +3,7 @@
  */
 import { Alert, Button, Descriptions, Result, Spin, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import type { BorrowRow } from '../../../api/eamBorrow'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, onBack, onRefresh: _onRefresh }: Props) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   if (loading && !record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -38,7 +40,7 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
     <ReturnSection title="借用信息">
       <Descriptions bordered column={3} items={[
         { key: 'no', label: '借用单号', children: record.borrowNo },
-        { key: 'asset', label: '资产', children: `${record.assetName} (${record.assetNo})` },
+        { key: 'asset', label: t('asset.colAssetName'), children: `${record.assetName} (${record.assetNo})` },
         { key: 'holder', label: '借用人', children: record.holderName },
         { key: 'department', label: '借用部门', children: record.department },
         { key: 'start', label: '借出日期', children: record.startDate },

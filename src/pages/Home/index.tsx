@@ -12,7 +12,7 @@ import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
-import { FAV_KEY, loadFavorites, defaultFavorites, chineseNameToPinyinEnglish, getGreeting, formatAiText, collectMenuNames, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, chineseNameToPinyinEnglish, getGreeting, formatAiText, collectMenuNames, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import type { AiBlockReason } from './homeUtils'
 import {
   SearchOutlined,
@@ -148,6 +148,8 @@ export default function Home() {
   const { user } = useAuth()
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
+  /** 标记首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
+  const favoritesLoadedRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [menuNameMap, setMenuNameMap] = useState<Record<string, string>>({})
@@ -490,6 +492,8 @@ export default function Home() {
     }).catch(() => {
       // 后端不可用，回退 localStorage
       loadFromLocal()
+    }).finally(() => {
+      if (!cancelled) favoritesLoadedRef.current = true
     })
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -657,7 +661,13 @@ export default function Home() {
     : []
 
   const addFavorite = (key: string) => {
-    if (!favorites.includes(key)) setFavorites([...favorites, key])
+    if (!favorites.includes(key)) {
+      if (favorites.length >= MAX_FAVORITES) {
+        message.warning(`最多收藏 ${MAX_FAVORITES} 個菜單，請先移除不常用的項目`)
+        return
+      }
+      setFavorites([...favorites, key])
+    }
     setShowAddMenu(false)
     setSearchText('')
   }
@@ -668,6 +678,7 @@ export default function Home() {
 
   /** 持久化快捷入口：优先存后端，同时写 localStorage 作为离线缓存 */
   useEffect(() => {
+    if (!favoritesLoadedRef.current) return // 首次加载未完成前不写回，避免默认值覆盖云端数据
     if (user?.username) {
       localStorage.setItem(FAV_KEY(user.username), JSON.stringify(favorites))
       saveQuickFavorites(favorites).catch(() => { /* 后端不可用时仅保留 localStorage */ })

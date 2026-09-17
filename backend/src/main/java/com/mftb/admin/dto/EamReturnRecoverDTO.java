@@ -11,4 +11,8 @@ public class EamReturnRecoverDTO {
     private Long returnId;
     /** 找回说明 */
     private String recoveredNote;
+    /** 接收管理部门（找回后归位用，空则保持原归属部门） */
+    private String receiveDepartment;
+    /** 归还位置 ID（空则保持原位置） */
+    private Long receiveLocationId;
 }

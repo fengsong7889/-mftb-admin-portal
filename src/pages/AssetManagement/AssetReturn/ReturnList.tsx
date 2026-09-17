@@ -95,7 +95,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       key: 'source', title: '歸還來源', dataIndex: 'sourceType', width: 140,
       render: (v: string) => SOURCE_LABEL[v] || v,
     },
-    { key: 'asset', title: '資產', width: 200, render: (_, r) => <>{r.assetName}<div className="claim-muted">{r.assetNo}</div></> },
+    { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_, r) => <>{r.assetName}<div className="claim-muted">{r.assetNo}</div></> },
     { key: 'holder', title: '原持有人', dataIndex: 'empName', width: 130 },
     { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => v || r.empName },
     { key: 'date', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120 },
@@ -122,7 +122,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const columnMeta = useMemo(() => [
     { key: 'returnNo', title: t('asset.colReturnNo') },
     { key: 'source', title: '歸還來源' },
-    { key: 'asset', title: '資產' },
+    { key: 'asset', title: t('asset.colAssetName') },
     { key: 'holder', title: '原持有人' },
     { key: 'actualReturnee', title: '實際歸還人' },
     { key: 'date', title: t('asset.colReturnDate') },

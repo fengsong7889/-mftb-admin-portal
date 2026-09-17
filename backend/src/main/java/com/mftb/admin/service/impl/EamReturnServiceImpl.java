@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.*;
@@ -31,6 +32,7 @@ public class EamReturnServiceImpl implements EamReturnService {
     private final EamAssetMapper assetMapper;
     private final EamClaimEvidenceMapper evidenceMapper;
     private final SysUserMapper userMapper;
+    private final EamLocationMapper locationMapper;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -145,9 +147,9 @@ public class EamReturnServiceImpl implements EamReturnService {
             borrowMapper.updateById(borrow);
         }
 
-        // 释放资产（仅正常归还）
+        // 释放资产（仅正常归还）：按接收管理部门/归还位置归位，实现归还即承接
         if ("completed".equals(ret.getReturnStatus())) {
-            releaseAsset(assetId);
+            releaseAsset(assetId, dto.getReceiveDepartment(), dto.getReceiveLocationId());
         }
 
         return ret.getId();
@@ -189,7 +191,13 @@ public class EamReturnServiceImpl implements EamReturnService {
             switch (dto.getDisposition()) {
                 case "scrapped" -> asset.setStatus("scrapped");
                 case "written_off" -> asset.setStatus("scrapped"); // 注销也标记为报废
-                case "idle" -> asset.setStatus("idle");
+                case "idle" -> {
+                    asset.setStatus("idle");
+                    asset.setCurrentHolderId(null);
+                    asset.setActiveClaimId(null);
+                    asset.setUserName(null);
+                    applyReceiveLocation(asset, dto.getReceiveDepartment(), dto.getReceiveLocationId());
+                }
             }
             assetMapper.updateById(asset);
         }
@@ -213,12 +221,24 @@ public class EamReturnServiceImpl implements EamReturnService {
         ret.setReturnStatus("exception_closed");
         returnMapper.updateById(ret);
 
-        // 资产恢复为闲置
+        // 资产恢复为闲置（按接收管理部门/归还位置归位）
         EamAsset asset = assetMapper.selectById(ret.getAssetId());
         if (asset != null) {
             asset.setStatus("idle");
             asset.setCurrentHolderId(null);
-            assetMapper.updateById(asset);
+            asset.setUserName(null);
+            asset.setActiveClaimId(null);
+            applyReceiveLocation(asset, dto.getReceiveDepartment(), dto.getReceiveLocationId());
+            // MyBatis-Plus updateById 默认 NOT_NULL 策略，null 字段需用 UpdateWrapper 显式清空
+            assetMapper.update(asset, new UpdateWrapper<EamAsset>()
+                    .eq("id", asset.getId())
+                    .set("status", asset.getStatus())
+                    .set("current_holder_id", null)
+                    .set("user_name", null)
+                    .set("active_claim_id", null)
+                    .set("department", asset.getDepartment())
+                    .set("location_id", asset.getLocationId())
+                    .set("location", asset.getLocation()));
         }
     }
 
@@ -228,7 +248,11 @@ public class EamReturnServiceImpl implements EamReturnService {
         return ret;
     }
 
-    private void releaseAsset(long assetId) {
+    /**
+     * 释放资产并归位：清持有人转闲置，同时按「接收管理部门 + 归还位置」更新归属（归还即承接）。
+     * 接收部门/位置未提供时保持原值，兼容旧调用。
+     */
+    private void releaseAsset(long assetId, String receiveDepartment, Long receiveLocationId) {
         EamAsset asset = assetMapper.selectOne(
                 new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, assetId).last("FOR UPDATE"));
         if (asset != null) {
@@ -236,7 +260,33 @@ public class EamReturnServiceImpl implements EamReturnService {
             asset.setActiveClaimId(null);
             asset.setStatus("idle");
             asset.setUserName(null);
-            assetMapper.updateById(asset);
+            applyReceiveLocation(asset, receiveDepartment, receiveLocationId);
+            // MyBatis-Plus updateById 默认 NOT_NULL 策略，null 字段需用 UpdateWrapper 显式清空
+            assetMapper.update(asset, new UpdateWrapper<EamAsset>()
+                    .eq("id", asset.getId())
+                    .set("current_holder_id", null)
+                    .set("active_claim_id", null)
+                    .set("status", "idle")
+                    .set("user_name", null)
+                    .set("department", asset.getDepartment())
+                    .set("location_id", asset.getLocationId())
+                    .set("location", asset.getLocation()));
+        }
+    }
+
+    /** 应用接收管理部门/归还位置（校验部门与位置存在性，非法值忽略并告警） */
+    private void applyReceiveLocation(EamAsset asset, String receiveDepartment, Long receiveLocationId) {
+        if (hasText(receiveDepartment)) {
+            asset.setDepartment(receiveDepartment.trim());
+        }
+        if (receiveLocationId != null && receiveLocationId > 0) {
+            EamLocation location = locationMapper.selectById(receiveLocationId);
+            if (location == null) {
+                log.warn("归还归位失败：存放位置不存在 locationId={}，保持原位置 {}", receiveLocationId, asset.getLocation());
+            } else {
+                asset.setLocationId(location.getId());
+                asset.setLocation(location.getName());
+            }
         }
     }
 

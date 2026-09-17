@@ -63,6 +63,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 交接编号 (JJ) 规则种子 */
     private static final String V_INIT_EAM_HANDOVER_RULE = "seq:init-v12";
 
+    /** 增量版本: 调拨编号 (DB) 规则种子 */
+    private static final String V_INIT_EAM_TRANSFER_RULE = "seq:init-v13";
+
+    /** 增量版本: 修正赔付编号规则触发菜单归属（歸還管理 → 賠付管理），重跑借用+赔付种子幂等修正 */
+    private static final String V_INIT_EAM_COMP_MENU_FIX = "seq:init-v14";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -110,6 +116,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce(V_INIT_EAM_HANDOVER_RULE, () -> {
             seedEamHandoverRule();
+        });
+versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
+            seedEamTransferRule();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_COMP_MENU_FIX, () -> {
+            seedEamBorrowCompRules();
         });
     }
 
@@ -566,7 +578,7 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_COMPENSATION, "賠付編號", "物資管理(EAM)-歸還管理",
+                BizSeqService.RULE_EAM_COMPENSATION, "賠付編號", "物資管理(EAM)-賠付管理",
                 "PF", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -591,6 +603,26 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
             log.info("已写入/修正交接编号规则种子数据 (JJ + YYYYMMDD + 4位)");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 调拨编号 (DB+YYYYMMDD+4位) 规则种子 (v13) */
+    private void seedEamTransferRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_TRANSFER, "調撥單號", "物資管理(EAM)-調撥管理",
+                "DB", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正调拨单号规则种子数据 (DB + YYYYMMDD + 4位)");
             bizSeqService.refreshRules();
         }
     }

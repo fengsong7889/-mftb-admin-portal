@@ -3,6 +3,7 @@
  */
 import { Alert, Button, Descriptions, Empty, Result, Spin, Table, Tabs, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { CompensationRow } from '../../../api/eamCompensation'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function CompensationDetail({ record, loading = false, error, canEdit = false, onBack, onRefresh: _onRefresh }: Props) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   if (loading && !record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -51,7 +53,7 @@ export default function CompensationDetail({ record, loading = false, error, can
     <ReturnSection title="赔付基本信息">
       <Descriptions bordered column={3} items={[
         { key: 'no', label: '赔付单号', children: record.compNo },
-        { key: 'asset', label: '资产', children: `${record.assetName} · ${record.assetNo}` },
+        { key: 'asset', label: t('asset.colAssetName'), children: `${record.assetName} · ${record.assetNo}` },
         { key: 'holder', label: '原持有人', children: record.holderName },
         { key: 'damageType', label: '损失类型', children: <Tag color={record.damageType === 'loss' ? 'error' : 'warning'}>{DAMAGE_LABEL[record.damageType] || record.damageType}</Tag> },
         { key: 'return', label: '关联归还单', children: record.returnId ? <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${record.returnId}`)}>查看</Button> : '—' },

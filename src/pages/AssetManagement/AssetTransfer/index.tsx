@@ -6,17 +6,46 @@
  * - 只能转移状态为「在用」(status='in_use') 的资产
  * - 顶部"返回"按钮，底部"取消+保存"按钮（符合全局规范）
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Button, Form, Input, Select, DatePicker, message, Row, Col, Tag, Alert, Spin,
+  Button, Form, Input, DatePicker, message, Row, Col, Tag, Alert, Spin, TreeSelect,
 } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import { transferAsset, fetchAssetDetail, type AssetItem } from '../../../api/asset'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 
-const DEPARTMENT_OPTIONS = ['研发部', '产品部', '市场部', '设计部', '技术部', '人事部', '财务部', '行政部', '运营部']
+const DEPT_STATUS_ENABLED = 1
+
+interface DeptTreeOption {
+  value: string
+  title: string
+  disabled?: boolean
+  children?: DeptTreeOption[]
+}
+
+/** 平铺部门列表构建 TreeSelect 树数据 */
+function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
+  const nodeMap = new Map<number, DeptTreeOption>()
+  list.forEach(dept => {
+    nodeMap.set(dept.id, {
+      value: dept.name,
+      title: dept.name,
+      disabled: dept.status !== DEPT_STATUS_ENABLED,
+      children: [],
+    })
+  })
+  const roots: DeptTreeOption[] = []
+  list.forEach(dept => {
+    const node = nodeMap.get(dept.id)!
+    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
+    if (parent) parent.children!.push(node)
+    else roots.push(node)
+  })
+  return roots
+}
 
 interface FormValues {
   toUser: string
@@ -37,6 +66,22 @@ export default function AssetTransfer() {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [asset, setAsset] = useState<AssetItem | null>(null)
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+
+  /** 加载部门列表 */
+  const fetchDeptList = useCallback(async () => {
+    try {
+      const list = await fetchDepartments()
+      setDepartments(list)
+    } catch {
+      // 接口异常时部门列表置空
+    }
+  }, [])
+
+  useEffect(() => { fetchDeptList() }, [fetchDeptList])
+
+  /** 部门树数据 */
+  const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
 
   useEffect(() => {
     if (!assetId) {
@@ -67,10 +112,12 @@ export default function AssetTransfer() {
       const toUserFull = `${v.toUser}(${v.toEmpId})`
       await transferAsset({
         assetId: asset.id,
-        toUser: toUserFull,
+        toUserName: toUserFull,
+        toUserEmpId: v.toEmpId,
         toDepartment: v.toDepartment,
+        transferDate: v.transferDate.format('YYYY-MM-DD'),
         reason: v.reason,
-        applyBy: t('asset.currentOperator'),
+        remark: v.remark,
       })
       message.success(t('asset.transferSuccess'))
       navigate('/asset-list')
@@ -169,9 +216,15 @@ export default function AssetTransfer() {
                     name="toDepartment"
                     rules={[{ required: true, message: t('asset.departmentRequired') }]}
                   >
-                    <Select placeholder={t('asset.departmentPh')}>
-                      {DEPARTMENT_OPTIONS.map((d) => <Select.Option key={d} value={d}>{d}</Select.Option>)}
-                    </Select>
+                    <TreeSelect
+                      treeData={deptTreeData}
+                      placeholder={t('asset.departmentPh')}
+                      treeDefaultExpandAll
+                      showSearch
+                      treeNodeFilterProp="title"
+                      allowClear
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                 </Col>
               </Row>

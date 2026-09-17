@@ -1,7 +1,7 @@
 /**
  * 調撥記錄（只讀）
  *
- * 數據來源：資產流水中 opType='transfer' 的記錄（由資產調撥頁 / 批量交接寫入）
+ * 數據來源：後端調撥單 /eam/transfers（由資產調撥頁登記寫入，作廢單據 status='cancelled'）
  * 支持按資產編號 / 關鍵字 / 調撥時間過濾
  */
 import { useState, useEffect, useCallback } from 'react'
@@ -9,7 +9,7 @@ import { Button, Form, Input, Table, Tag, message, Space, DatePicker } from 'ant
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchAssetLogs, type AssetLog } from '../../../api/asset'
+import { fetchTransferList, type TransferRecord } from '../../../api/asset'
 
 interface Props {
   onViewAsset: (assetNo: string) => void
@@ -19,16 +19,16 @@ export default function TransferLogTab({ onViewAsset }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  const [dataSource, setDataSource] = useState<AssetLog[]>([])
+  const [dataSource, setDataSource] = useState<TransferRecord[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<{ assetNo?: string; keyword?: string; dateRange?: [string, string] }>({})
+  const [filters, setFilters] = useState<{ assetNo?: string; keyword?: string; startDate?: string; endDate?: string }>({})
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchAssetLogs({ ...filters, opType: 'transfer', page, size })
+      const res = await fetchTransferList({ ...filters, page, size })
       setDataSource(res.records || [])
       setTotal(res.total || 0)
     } catch (e: unknown) {
@@ -45,9 +45,8 @@ export default function TransferLogTab({ onViewAsset }: Props) {
     setFilters({
       assetNo: v.assetNo || undefined,
       keyword: v.keyword || undefined,
-      dateRange: v.transferDate
-        ? [v.transferDate[0]?.format('YYYY-MM-DD'), v.transferDate[1]?.format('YYYY-MM-DD')]
-        : undefined,
+      startDate: v.transferDate?.[0]?.format('YYYY-MM-DD'),
+      endDate: v.transferDate?.[1]?.format('YYYY-MM-DD'),
     })
     setPage(1)
   }
@@ -57,8 +56,12 @@ export default function TransferLogTab({ onViewAsset }: Props) {
     setSize(p.pageSize || 10)
   }
 
-  const columns: TableColumnsType<AssetLog> = [
-    { title: t('asset.colOperateTime'), dataIndex: 'operateTime', key: 'operateTime', width: 170, fixed: 'left' },
+  const columns: TableColumnsType<TransferRecord> = [
+    {
+      title: t('asset.colTransferNo'), dataIndex: 'transferNo', key: 'transferNo', width: 170, fixed: 'left',
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+    },
+    { title: t('asset.colTransferDate'), dataIndex: 'transferDate', key: 'transferDate', width: 110 },
     {
       title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
       render: (v: string) => (
@@ -74,9 +77,9 @@ export default function TransferLogTab({ onViewAsset }: Props) {
       title: t('asset.colNewUser'), key: 'userChange', width: 210,
       render: (_: unknown, r) => (
         <Space size={4}>
-          <span>{r.fromUser || '-'}</span>
+          <span>{r.fromUserName || '-'}</span>
           <span style={{ color: '#bfbfbf' }}>→</span>
-          <Tag color="blue">{r.toUser || '-'}</Tag>
+          <Tag color="blue">{r.toUserName || '-'}</Tag>
         </Space>
       ),
     },
@@ -90,12 +93,14 @@ export default function TransferLogTab({ onViewAsset }: Props) {
         </Space>
       ),
     },
-    { title: t('asset.colTransferReason'), dataIndex: 'description', key: 'description', ellipsis: true },
-    { title: t('asset.colOperator'), dataIndex: 'operator', key: 'operator', width: 120 },
+    { title: t('asset.colTransferReason'), dataIndex: 'reason', key: 'reason', ellipsis: true },
     {
-      title: t('asset.colFlowNo'), dataIndex: 'flowNo', key: 'flowNo', width: 150,
-      render: (v: string | undefined) => v || '-',
+      title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 100,
+      render: (v: TransferRecord['status']) => v === 'cancelled'
+        ? <Tag color="default">{t('asset.transferCancelled')}</Tag>
+        : <Tag color="success">{t('asset.transferDone')}</Tag>,
     },
+    { title: t('asset.colOperator'), dataIndex: 'operatorName', key: 'operatorName', width: 120 },
   ]
 
   return (
@@ -122,7 +127,7 @@ export default function TransferLogTab({ onViewAsset }: Props) {
       </div>
 
       {/* ====== 表格 ====== */}
-      <Table<AssetLog>
+      <Table<TransferRecord>
         columns={columns}
         dataSource={dataSource}
         rowKey="id"

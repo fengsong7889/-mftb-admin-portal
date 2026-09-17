@@ -31,7 +31,6 @@ import {
   fetchAssetList,
   logAssetOperation,
   returnAsset,
-  transferAsset,
   updateAsset,
   type AssetItem,
   type PageResult,

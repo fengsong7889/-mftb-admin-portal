@@ -67,6 +67,10 @@ export interface ReturnRegisterDTO {
   actualReturneeName?: string
   evidenceDataUrl?: string
   evidenceFileName?: string
+  /** 接收管理部门（正常归还归位用，空则保持原归属部门） */
+  receiveDepartment?: string
+  /** 归还位置 ID（空则保持原位置） */
+  receiveLocationId?: number
 }
 
 export interface ReturnDispositionDTO {

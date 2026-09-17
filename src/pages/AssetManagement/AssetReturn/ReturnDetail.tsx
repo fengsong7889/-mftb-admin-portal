@@ -3,6 +3,7 @@
  */
 import { Alert, Button, Descriptions, Result, Spin, Steps, Tag } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { ReturnRow } from '../../../api/eamReturn'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
 
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export default function ReturnDetail({ record, loading = false, error, canEdit = false, showResult = false, onBack, onRefresh: _onRefresh }: Props) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   if (loading && !record) {
@@ -51,7 +53,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
     <ReturnSection title="歸還事實">
       <Descriptions bordered column={3} items={[
         { key: 'no', label: '歸還單號', children: record.returnNo },
-        { key: 'asset', label: '資產', children: `${record.assetName} (${record.assetNo})` },
+        { key: 'asset', label: t('asset.colAssetName'), children: `${record.assetName} (${record.assetNo})` },
         { key: 'source', label: '歸還來源', children: SOURCE_LABEL[record.sourceType] || record.sourceType },
         { key: 'holder', label: '原持有人', children: record.empName },
         { key: 'returnUser', label: '實際歸還人', children: record.actualReturneeName || record.empName },
