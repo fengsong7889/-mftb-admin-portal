@@ -89,14 +89,14 @@ export default function HandoverForm({ onBack }: Props) {
       }
       setSubmitting(true)
       const record = await createHandover({
-        fromUser: fromUser.trim(),
+        fromUserName: fromUser.trim(),
         fromDepartment,
-        toUser: v.toUser.trim(),
+        toUserName: v.toUser.trim(),
         toDepartment: v.toDepartment,
         handoverDate: v.handoverDate.format('YYYY-MM-DD'),
         assetIds: selectedIds,
         reason: v.reason,
-        operator: v.operator.trim(),
+        operatorName: v.operator.trim(),
         remark: v.remark,
       })
       message.success(t('asset.handoverSuccess', { count: record.assetCount }))

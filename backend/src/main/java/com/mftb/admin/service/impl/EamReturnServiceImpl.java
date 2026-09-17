@@ -8,6 +8,7 @@ import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamReturnService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -245,8 +246,8 @@ public class EamReturnServiceImpl implements EamReturnService {
         vo.setReturnDate(ret.getReturnDate() != null ? ret.getReturnDate().toString() : null);
         vo.setDispositionDate(ret.getDispositionDate() != null ? ret.getDispositionDate().toString() : null);
         vo.setRecoveredDate(ret.getRecoveredDate() != null ? ret.getRecoveredDate().toString() : null);
-        vo.setCreatedAt(ret.getCreatedAt() != null ? ret.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(ret.getUpdatedAt() != null ? ret.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(ret.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(ret.getUpdatedAt()));
 
         // 兼容旧字段
         vo.setClaimId(ret.getClaimId());

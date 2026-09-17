@@ -8,6 +8,7 @@ import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamCompensationService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -231,8 +232,8 @@ public class EamCompensationServiceImpl implements EamCompensationService {
     private EamCompensationVO toVO(EamCompensation comp) {
         EamCompensationVO vo = new EamCompensationVO();
         BeanUtils.copyProperties(comp, vo, "createdAt", "updatedAt");
-        vo.setCreatedAt(comp.getCreatedAt() != null ? comp.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(comp.getUpdatedAt() != null ? comp.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(comp.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(comp.getUpdatedAt()));
 
         // 收款/退款记录
         List<EamCompensationPayment> payments = paymentMapper.selectList(
@@ -248,7 +249,7 @@ public class EamCompensationServiceImpl implements EamCompensationService {
             pvo.setPaymentDate(p.getPaymentDate() != null ? p.getPaymentDate().toString() : null);
             pvo.setReason(p.getReason());
             pvo.setOperatorName(p.getOperatorName());
-            pvo.setCreatedAt(p.getCreatedAt() != null ? p.getCreatedAt().toString() : null);
+            pvo.setCreatedAt(DateTimeUtils.format(p.getCreatedAt()));
             if (p.getEvidenceId() != null) {
                 EamClaimEvidence evidence = evidenceMapper.selectById(p.getEvidenceId());
                 if (evidence != null) pvo.setEvidenceImageUrl(evidence.getStoragePath());
@@ -271,7 +272,7 @@ public class EamCompensationServiceImpl implements EamCompensationService {
             rvo.setAfterAmount(r.getAfterAmount());
             rvo.setReason(r.getReason());
             rvo.setOperatorName(r.getOperatorName());
-            rvo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
+            rvo.setCreatedAt(DateTimeUtils.format(r.getCreatedAt()));
             reviewVOs.add(rvo);
         }
         vo.setReviews(reviewVOs);

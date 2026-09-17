@@ -26,17 +26,72 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
     private static final String V_EAM_RETURN_BORROW_COMP = "eam:schema-v1";
     /** v2: claim_id 改为可空（借用归还场景无 claim_id） */
     private static final String V_EAM_RETURN_CLAIM_NULL = "eam:schema-v2";
+    /** v3: 交接表建表（biz_eam_handover + biz_eam_handover_item） */
+    private static final String V_EAM_HANDOVER_TABLES = "eam:schema-v3";
 
     @Override
     public void run(String... args) {
         versionTracker.applyOnce(V_EAM_RETURN_BORROW_COMP, this::migrateEamSchema);
         versionTracker.applyOnce(V_EAM_RETURN_CLAIM_NULL, this::fixClaimIdNullable);
+        versionTracker.applyOnce(V_EAM_HANDOVER_TABLES, this::createHandoverTables);
     }
 
     private void fixClaimIdNullable() {
         log.info("修复 biz_eam_return.claim_id 为可空 ...");
         jdbcTemplate.execute("ALTER TABLE biz_eam_return MODIFY COLUMN claim_id BIGINT NULL COMMENT '关联领用 ID'");
         log.info("biz_eam_return.claim_id 已修改为可空");
+    }
+
+    private void createHandoverTables() {
+        log.info("开始创建 EAM 交接表结构 ...");
+
+        // ───────────── biz_eam_handover 交接单主表 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_handover ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "handover_no VARCHAR(64) NOT NULL COMMENT '交接单号（JJ+YYYYMMDD+4位）', "
+                + "from_user_id BIGINT NULL COMMENT '交出人 ID', "
+                + "from_user_name VARCHAR(128) NOT NULL COMMENT '交出人姓名快照', "
+                + "from_department VARCHAR(128) NOT NULL COMMENT '交出人部门快照', "
+                + "to_user_id BIGINT NULL COMMENT '接收人 ID', "
+                + "to_user_name VARCHAR(128) NOT NULL COMMENT '接收人姓名', "
+                + "to_department VARCHAR(128) NOT NULL COMMENT '接收人部门', "
+                + "handover_date DATE NOT NULL COMMENT '交接日期', "
+                + "asset_count INT NOT NULL DEFAULT 0 COMMENT '交接资产数量', "
+                + "reason VARCHAR(32) NOT NULL COMMENT '交接原因：resign/transfer/other', "
+                + "status VARCHAR(32) NOT NULL DEFAULT 'done' COMMENT '状态：done/cancelled', "
+                + "operator_id BIGINT NULL COMMENT '操作人 ID', "
+                + "operator_name VARCHAR(128) NOT NULL COMMENT '操作人姓名', "
+                + "remark VARCHAR(512) NULL COMMENT '备注', "
+                + "created_by VARCHAR(128) NULL, "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(128) NULL, "
+                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_handover_no (handover_no), "
+                + "INDEX idx_from_user (from_user_name), "
+                + "INDEX idx_to_user (to_user_name), "
+                + "INDEX idx_handover_date (handover_date), "
+                + "INDEX idx_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产交接单'");
+
+        // ───────────── biz_eam_handover_item 交接单明细 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_handover_item ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "handover_id BIGINT NOT NULL COMMENT '关联交接单 ID', "
+                + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                + "asset_no VARCHAR(64) NOT NULL COMMENT '资产编号快照', "
+                + "asset_name VARCHAR(256) NOT NULL COMMENT '资产名称快照', "
+                + "asset_type VARCHAR(128) NULL COMMENT '资产分类快照', "
+                + "old_department VARCHAR(128) NULL COMMENT '交接前部门', "
+                + "new_department VARCHAR(128) NULL COMMENT '交接后部门', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "INDEX idx_handover_id (handover_id), "
+                + "INDEX idx_asset_id (asset_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产交接单明细'");
+
+        log.info("EAM 交接表结构创建完成");
     }
 
     private void migrateEamSchema() {

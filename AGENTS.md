@@ -433,10 +433,10 @@ Modal.confirm({
 ### C.3 模块卡片（核心规则）
 
 ```tsx
-<div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
-  padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+<div style={{ borderRadius: 8, background: '#fff',
+  padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
   {/* 标题行 */}
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
     <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff',
       display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
@@ -447,6 +447,20 @@ Modal.confirm({
     <span style={{ fontSize: 12, color: '#8c8c8c' }}>可选右侧说明</span>
   </div>
   {/* 内容区 */}
+</div>
+```
+
+**详情页样式基准（2026-09 修订，对齐采购订单详情 `PurchaseOrder/OrderDetail.tsx`）**：
+
+- **详情页模块卡片：不加 border**，阴影统一 `0 2px 8px rgba(0,0,0,0.06)`；信息展示用 `<Descriptions column={4} size="middle">`（非 bordered）
+- **表单页模块卡片**可保留 `border: '1px solid #e8eaed'` + 阴影 0.04 描边样式
+- **详情页必须以「最后更新」footer 收尾**（替代独立的「操作记录」卡片）：
+
+```tsx
+<div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+  border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+  <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新人：<span style={{ color: '#595959' }}>{updatedBy}</span></span>
+  <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新时间：<span style={{ color: '#595959' }}>{updatedAt}</span></span>
 </div>
 ```
 

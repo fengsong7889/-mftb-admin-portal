@@ -695,10 +695,14 @@ export interface AdHotSkinPrice {
   skinName: string
   /** 皮膚日單價（MOP） */
   price: number
-  /** 邊框方式: none=無邊框 color=選擇配色 image=上傳邊框圖 */
+  /** 邊框方式: none=無邊框 color=選擇邊框顏色 image=上傳邊框圖 */
   borderType?: string
   /** 邊框顏色(HEX, borderType=color 時生效) */
   borderColor?: string
+  /** 漸變方式: none=無漸變 color=選擇漸變色 */
+  gradientType?: string
+  /** 漸變顏色(HEX, gradientType=color 時生效) */
+  gradientColor?: string
   /** 菜品展示佈局: grid=大圖拼列 carousel=階梯輪播（單選） */
   dishLayout?: string
   /** 皮膚段位: classic=經典 premium=精選 flagship=旗艦 ultimate=至尊 */
@@ -814,10 +818,14 @@ export interface AdHotInventoryCell {
   skinName: string
   /** 皮膚日單價 */
   price: number
-  /** 邊框方式: none=無邊框 color=選擇配色 image=上傳邊框圖 */
+  /** 邊框方式: none=無邊框 color=選擇邊框顏色 image=上傳邊框圖 */
   borderType?: string
   /** 邊框顏色(HEX, borderType= color 時生效) */
   borderColor?: string
+  /** 漸變方式: none=無漸變 color=選擇漸變色 */
+  gradientType?: string
+  /** 漸變顏色(HEX, gradientType=color 時生效) */
+  gradientColor?: string
   /** 皮膚段位: classic=經典 premium=精選 flagship=旗艦 ultimate=至尊 */
   tier?: string
   /** 菜品展示佈局: grid=大圖拼列 carousel=階梯輪播 */

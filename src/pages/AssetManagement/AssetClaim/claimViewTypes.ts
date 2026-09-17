@@ -70,6 +70,7 @@ export interface ClaimQuery {
   departmentId?: number
   status?: ClaimStatus
   pendingSignature?: boolean
+  employeeId?: number
 }
 export interface ClaimRegistration {
   assetId: number

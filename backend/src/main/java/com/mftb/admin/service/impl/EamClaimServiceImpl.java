@@ -8,6 +8,7 @@ import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamClaimService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,23 +53,41 @@ public class EamClaimServiceImpl implements EamClaimService {
     @Override
     public EamClaimStatsVO stats(EamClaimQuery query) {
         EamClaimStatsVO stats = new EamClaimStatsVO();
+        LambdaQueryWrapper<EamClaim> base = queryWrapperNoKeyword(query);
+        // 关键字需同時匹配員工姓名 → 先解析出匹配的员工 ID 集合
+        if (hasText(query.getKeyword())) {
+            String kw = query.getKeyword().trim();
+            List<SysUser> matchedUsers = userMapper.selectList(
+                    new LambdaQueryWrapper<SysUser>()
+                            .like(SysUser::getName, kw)
+                            .or().like(SysUser::getEmpId, kw));
+            List<Long> empIds = matchedUsers.stream().map(SysUser::getId).toList();
+            boolean opMatch = hasText(query.getKeyword()); // operatorName 也在 queryWrapper 中處理
+            base.and(x -> {
+                x.like(EamClaim::getClaimNo, kw)
+                 .or().like(EamClaim::getOperatorName, kw);
+                if (!empIds.isEmpty()) {
+                    x.or().in(EamClaim::getEmployeeId, empIds);
+                }
+            });
+        }
         // 有领用记录的不同员工数
-        LambdaQueryWrapper<EamClaim> all = queryWrapper(query);
+        LambdaQueryWrapper<EamClaim> all = base.copy();
         stats.setEmployeeCount(claimMapper.selectCount(
                 all.select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId)));
         // 各状态统计
-        stats.setClaimedCount(claimMapper.selectCount(queryWrapper(query).eq(EamClaim::getStatus, "claimed")));
-        stats.setReturnedCount(claimMapper.selectCount(queryWrapper(query).eq(EamClaim::getStatus, "returned")));
-        // 待签记录（含代办补签）= 标准待签(signatureStatus=pending) + 代办补签(claimed 但 signatureStatus=proxy_pending)
+        stats.setClaimedCount(claimMapper.selectCount(base.copy().eq(EamClaim::getStatus, "claimed")));
+        stats.setReturnedCount(claimMapper.selectCount(base.copy().eq(EamClaim::getStatus, "returned")));
+        // 待签记录（含代办补签）
         stats.setPendingSignatureCount(claimMapper.selectCount(
-                queryWrapper(query).in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
+                base.copy().in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
         return stats;
     }
 
     @Override
     public PageResult<EamClaimEmployeeSummaryVO> employeeSummary(EamClaimQuery query) {
-        // 先查全部符合条件的领用记录
-        List<EamClaim> allClaims = claimMapper.selectList(queryWrapper(query));
+        // 先查全部符合条件的领用记录（不在 SQL 層按關鍵字過濾，因為關鍵字需匹配員工姓名/工號/部門，在 Java 層處理）
+        List<EamClaim> allClaims = claimMapper.selectList(queryWrapperNoKeyword(query));
         // 按 employee_id 分组
         Map<Long, List<EamClaim>> grouped = allClaims.stream()
                 .collect(Collectors.groupingBy(EamClaim::getEmployeeId));
@@ -389,10 +408,10 @@ public class EamClaimServiceImpl implements EamClaimService {
         EamClaimVO vo = new EamClaimVO();
         BeanUtils.copyProperties(claim, vo, "claimDate", "signedAt", "returnDate", "createdAt", "updatedAt");
         vo.setClaimDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
-        vo.setSignedAt(claim.getSignedAt() != null ? claim.getSignedAt().toString() : null);
+        vo.setSignedAt(DateTimeUtils.format(claim.getSignedAt()));
         vo.setReturnDate(claim.getReturnDate() != null ? claim.getReturnDate().toString() : null);
-        vo.setCreatedAt(claim.getCreatedAt() != null ? claim.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(claim.getUpdatedAt() != null ? claim.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(claim.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(claim.getUpdatedAt()));
         vo.setOperator(claim.getOperatorName());
 
         // 资产信息
@@ -431,21 +450,28 @@ public class EamClaimServiceImpl implements EamClaimService {
         vo.setEventType(event.getEventType());
         vo.setOperatorName(event.getOperatorName());
         vo.setRemark(event.getRemark());
-        vo.setCreatedAt(event.getCreatedAt() != null ? event.getCreatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(event.getCreatedAt()));
         return vo;
     }
 
-    private LambdaQueryWrapper<EamClaim> queryWrapper(EamClaimQuery q) {
+    /** 不含關鍵字過濾的查詢構造器（用於 employeeSummary / stats 自行處理關鍵字匹配） */
+    private LambdaQueryWrapper<EamClaim> queryWrapperNoKeyword(EamClaimQuery q) {
         LambdaQueryWrapper<EamClaim> w = new LambdaQueryWrapper<>();
-        if (hasText(q.getKeyword())) {
-            w.and(x -> x.like(EamClaim::getClaimNo, q.getKeyword().trim())
-                    .or().like(EamClaim::getOperatorName, q.getKeyword().trim()));
-        }
         w.eq(hasText(q.getStatus()), EamClaim::getStatus, q.getStatus());
         w.eq(q.getEmployeeId() != null, EamClaim::getEmployeeId, q.getEmployeeId());
+        // 注意：departmentId 不在 biz_eam_claim 表中，由 employeeSummary Java 層按員工部門過濾
         if (Boolean.TRUE.equals(q.getPendingSignature())) {
             w.and(x -> x.eq(EamClaim::getStatus, "pending_signature")
                     .or().in(EamClaim::getSignatureStatus, "pending", "proxy_pending"));
+        }
+        return w;
+    }
+
+    private LambdaQueryWrapper<EamClaim> queryWrapper(EamClaimQuery q) {
+        LambdaQueryWrapper<EamClaim> w = queryWrapperNoKeyword(q);
+        if (hasText(q.getKeyword())) {
+            w.and(x -> x.like(EamClaim::getClaimNo, q.getKeyword().trim())
+                    .or().like(EamClaim::getOperatorName, q.getKeyword().trim()));
         }
         return w;
     }

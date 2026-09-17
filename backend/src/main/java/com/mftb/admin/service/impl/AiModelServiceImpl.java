@@ -7,6 +7,7 @@ import com.mftb.admin.entity.AiModel;
 import com.mftb.admin.mapper.AiModelMapper;
 import com.mftb.admin.service.AiModelService;
 import com.mftb.admin.util.ConvertUtils;
+import com.mftb.admin.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -156,10 +157,8 @@ public class AiModelServiceImpl implements AiModelService {
         }
 
         // 格式化时间
-        vo.setCreatedAt(entity.getCreatedAt() != null ?
-            entity.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(entity.getUpdatedAt() != null ?
-            entity.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(entity.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(entity.getUpdatedAt()));
 
         return vo;
     }

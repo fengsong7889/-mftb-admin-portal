@@ -60,6 +60,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 借用编号 (JY) + 赔付编号 (PF) 规则种子 */
     private static final String V_INIT_EAM_BORROW_COMP_RULE = "seq:init-v11";
 
+    /** 增量版本: 交接编号 (JJ) 规则种子 */
+    private static final String V_INIT_EAM_HANDOVER_RULE = "seq:init-v12";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -104,6 +107,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce(V_INIT_EAM_BORROW_COMP_RULE, () -> {
             seedEamBorrowCompRules();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_HANDOVER_RULE, () -> {
+            seedEamHandoverRule();
         });
     }
 
@@ -565,6 +571,26 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
             log.info("已写入/修正借用 + 赔付编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 交接编号 (JJ+YYYYMMDD+4位) 规则种子 (v12) */
+    private void seedEamHandoverRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_HANDOVER, "交接編號", "物資管理(EAM)-交接管理",
+                "JJ", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正交接编号规则种子数据 (JJ + YYYYMMDD + 4位)");
             bizSeqService.refreshRules();
         }
     }

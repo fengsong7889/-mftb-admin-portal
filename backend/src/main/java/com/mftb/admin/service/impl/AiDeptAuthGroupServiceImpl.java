@@ -10,6 +10,7 @@ import com.mftb.admin.mapper.AiDeptAuthGroupMapper;
 import com.mftb.admin.mapper.AiDeptAuthGroupModelMapper;
 import com.mftb.admin.service.AiDeptAuthGroupService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,8 +59,8 @@ public class AiDeptAuthGroupServiceImpl implements AiDeptAuthGroupService {
             vo.setStatus(g.getStatus());
             vo.setTotalEmployeeCount(g.getTotalEmployeeCount());
             vo.setUpdatedBy(g.getUpdatedBy());
-            vo.setCreatedAt(g.getCreatedAt() != null ? g.getCreatedAt().toString().replace("T", " ") : null);
-            vo.setUpdatedAt(g.getUpdatedAt() != null ? g.getUpdatedAt().toString().replace("T", " ") : null);
+            vo.setCreatedAt(DateTimeUtils.format(g.getCreatedAt()));
+            vo.setUpdatedAt(DateTimeUtils.format(g.getUpdatedAt()));
 
             // 查询关联部门
             List<AiDeptAuthGroupDept> depts = groupDeptMapper.selectList(
@@ -119,8 +120,8 @@ public class AiDeptAuthGroupServiceImpl implements AiDeptAuthGroupService {
         vo.setStatus(group.getStatus());
         vo.setTotalEmployeeCount(group.getTotalEmployeeCount());
         vo.setUpdatedBy(group.getUpdatedBy());
-        vo.setCreatedAt(group.getCreatedAt() != null ? group.getCreatedAt().toString().replace("T", " ") : null);
-        vo.setUpdatedAt(group.getUpdatedAt() != null ? group.getUpdatedAt().toString().replace("T", " ") : null);
+        vo.setCreatedAt(DateTimeUtils.format(group.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(group.getUpdatedAt()));
 
         // 查询关联部门（含部门名称和人数）
         List<AiDeptAuthGroupDept> depts = groupDeptMapper.selectList(

@@ -28,6 +28,7 @@ export async function fetchClaimList(query: ClaimQuery): Promise<ClaimPage<Claim
     if (query.departmentId) params.set('departmentId', String(query.departmentId))
     if (query.status) params.set('status', query.status)
     if (query.pendingSignature) params.set('pendingSignature', 'true')
+    if (query.employeeId) params.set('employeeId', String(query.employeeId))
     return await request.get<unknown, ClaimPage<ClaimRow>>(`/eam/claims?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {
@@ -43,6 +44,7 @@ export async function fetchClaimStats(query: Partial<ClaimQuery>): Promise<Claim
     const params = new URLSearchParams()
     if (query.keyword) params.set('keyword', query.keyword)
     if (query.departmentId) params.set('departmentId', String(query.departmentId))
+    if (query.employeeId) params.set('employeeId', String(query.employeeId))
     return await request.get<unknown, ClaimStatsData>(`/eam/claims/stats?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {

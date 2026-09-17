@@ -5,7 +5,8 @@
  * 商家購買後皮膚將應用在 APP 瀑布流列表的商家卡片上。
  *
  * 皮膚組成元素（參考 APP 實際展示樣式）：
- *  - 卡片邊框：支持 無邊框 / 選擇配色 兩種方式，小圖/大圖模式通用
+ *  - 卡片邊框：支持 無邊框 / 選擇邊框顏色 兩種方式，小圖/大圖模式通用
+  *  - 卡片漸變：支持 無漸變 / 選擇漸變色 兩種方式，小圖/大圖模式通用
  *  - 大圖模式左側豎版主圖：必須上傳（小圖模式無需上傳圖片）
  *  - 菜品展示佈局：大圖拼列（1大2小）/ 階梯輪播，單選；
  *    商家自己選擇一種菜品佈局風格購買
@@ -51,6 +52,12 @@ import {
 const BORDER_TYPE_OPTIONS = [
   { value: 'none', labelKey: 'recommend.popularSkin.borderNoneLabel' },
   { value: 'color', labelKey: 'recommend.popularSkin.borderColorLabel' },
+]
+
+/** 漸變方式 */
+const GRADIENT_TYPE_OPTIONS = [
+  { value: 'none', labelKey: 'recommend.popularSkin.gradientNoneLabel' },
+  { value: 'color', labelKey: 'recommend.popularSkin.gradientColorLabel' },
 ]
 
 /** 邊框配色預設色板 */
@@ -119,6 +126,10 @@ interface SkinItem {
   borderType: 'none' | 'color'
   /** 邊框顏色（borderType=color 時生效） */
   borderColor: string
+  /** 漸變方式：無 / 配色 */
+  gradientType: 'none' | 'color'
+  /** 漸變顏色（gradientType=color 時生效） */
+  gradientColor: string
   /** 大圖模式左側豎版主圖（dataURL） */
   bigImage: string | null
 }
@@ -134,6 +145,8 @@ const createSkin = (partial?: Partial<SkinItem>): SkinItem => ({
   dishLayout: 'grid',
   borderType: 'color',
   borderColor: '#FF4D4F',
+  gradientType: 'color',
+  gradientColor: '#FF4D4F',
   bigImage: null,
   ...partial,
 })
@@ -309,6 +322,10 @@ export default function PopularSkinPricing() {
     () => BORDER_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })),
     [t],
   )
+  const tGradientTypeOptions = useMemo(
+    () => GRADIENT_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })),
+    [t],
+  )
   const tDishLayoutOptions = useMemo(
     () => DISH_LAYOUT_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })),
     [t],
@@ -382,6 +399,8 @@ export default function PopularSkinPricing() {
             dishLayout: (s.dishLayout as DishLayout) || 'grid',
             borderType: (s.borderType === 'none' || s.borderType === 'color') ? s.borderType : 'color',
             borderColor: s.borderColor || '#FF4D4F',
+            gradientType: (s.gradientType === 'none' || s.gradientType === 'color') ? s.gradientType : 'color',
+            gradientColor: s.gradientColor || '#FF4D4F',
           })))
         }
       })
@@ -539,6 +558,8 @@ export default function PopularSkinPricing() {
           price: s.price!,
           borderType: s.borderType,
           borderColor: s.borderType === 'color' ? s.borderColor : undefined,
+          gradientType: s.gradientType,
+          gradientColor: s.gradientType === 'color' ? s.gradientColor : undefined,
           dishLayout: s.dishLayout,
         })),
       }
@@ -624,12 +645,19 @@ export default function PopularSkinPricing() {
   )
 
   /** 預覽卡片的邊框樣式（配色 / 邊框圖 / 無） */
-  const previewCardStyle = (skin: SkinItem): React.CSSProperties => ({
-    position: 'relative', background: '#fff', borderRadius: 12, padding: 10,
-    border: skin.borderType === 'color'
+  const previewCardStyle = (skin: SkinItem): React.CSSProperties => {
+    const borderStyle = skin.borderType === 'color'
       ? `2px solid ${skin.borderColor}`
-      : '1px solid #f0f0f0',
-  })
+      : '1px solid #f0f0f0'
+    const gradientStyle = skin.gradientType === 'color'
+      ? `linear-gradient(180deg, ${skin.gradientColor}22 0%, transparent 100%)`
+      : undefined
+    return {
+      position: 'relative', background: '#fff', borderRadius: 12, padding: 10,
+      border: borderStyle,
+      ...(gradientStyle ? { backgroundImage: gradientStyle } : {}),
+    }
+  }
 
   /** 店鋪名稱行（Mock 麥當勞門店，名稱前不展示連鎖圖標） */
   const previewTitleRow = () => (
@@ -1037,6 +1065,31 @@ export default function PopularSkinPricing() {
                       {t('recommend.popularSkin.bigImageHint')}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* 第三行：漸變配置 */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px 16px', marginTop: 14 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ ...fieldLabelStyle, marginBottom: 0 }}>{t('recommend.popularSkin.gradientConfigLabel')}</span>
+                    <Select
+                      style={{ width: 110, flexShrink: 0 }}
+                      value={skin.gradientType}
+                      disabled={isDetailMode}
+                      onChange={v => updateSkin(skin.id, { gradientType: v })}
+                      options={tGradientTypeOptions}
+                    />
+                  </div>
+                  {skin.gradientType === 'color' && (
+                    <ColorPicker
+                      value={skin.gradientColor}
+                      disabled={isDetailMode}
+                      presets={tColorPresets}
+                      showText
+                      onChange={c => updateSkin(skin.id, { gradientColor: c.toHexString() })}
+                    />
+                  )}
                 </div>
               </div>
             </div>

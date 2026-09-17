@@ -111,6 +111,8 @@ public class BizSeqService {
     public static final String RULE_EAM_BORROW = "eam_borrow";
     /** EAM 赔付编号 */
     public static final String RULE_EAM_COMPENSATION = "eam_compensation";
+    /** EAM 交接编号 */
+    public static final String RULE_EAM_HANDOVER = "eam_handover";
 
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）

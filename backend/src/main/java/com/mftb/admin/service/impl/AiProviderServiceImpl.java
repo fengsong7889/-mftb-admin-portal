@@ -7,6 +7,7 @@ import com.mftb.admin.entity.AiProvider;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.mapper.AiProviderMapper;
 import com.mftb.admin.service.AiProviderService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.ProviderKeyCipher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -151,10 +152,8 @@ public class AiProviderServiceImpl implements AiProviderService {
         }
 
         // 格式化时间
-        vo.setCreatedAt(entity.getCreatedAt() != null ?
-            entity.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(entity.getUpdatedAt() != null ?
-            entity.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(entity.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(entity.getUpdatedAt()));
 
         return vo;
     }

@@ -18,11 +18,12 @@ import ClaimList from './ClaimList'
 import ClaimForm from './ClaimForm'
 import EmployeeAssetDetail from './EmployeeAssetDetail'
 import ClaimRecordDetail from './ClaimRecordDetail'
-import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
+import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchAssetList, fetchAssetDetail } from '../../../api/asset'
 import { fetchEmployees } from '../../../api/employee'
+import { CLAIM_STATUS, type ClaimStatsData } from './claimViewTypes'
 import './index.css'
 
 type View = 'list' | 'add' | 'detail' | 'record'
@@ -47,6 +48,8 @@ export default function AssetClaim() {
   /* ----- 数据状态 ----- */
   const [summaryData, setSummaryData] = useState<ClaimSummaryData | undefined>()
   const [detailData, setDetailData] = useState<ClaimPage<ClaimRow> | undefined>()
+  const [detailEmployee, setDetailEmployee] = useState<ClaimEmployee | undefined>()
+  const [detailStats, setDetailStats] = useState<ClaimStatsData | undefined>()
   const [recordData, setRecordData] = useState<ClaimRow | undefined>()
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -78,11 +81,11 @@ export default function AssetClaim() {
   }, [])
 
   /* ----- 员工详情查询 ----- */
-  const handleQueryDetail = useCallback(async (empId: number, query: ClaimQuery) => {
+  const handleQueryDetail = useCallback(async (_empId: number, query: ClaimQuery) => {
     setLoading(true)
     setError(undefined)
     try {
-      const data = await fetchClaimList({ ...query, employeeId: empId } as ClaimQuery & { employeeId: number })
+      const data = await fetchClaimList(query)
       setDetailData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -157,10 +160,25 @@ export default function AssetClaim() {
   /* ----- 自动加载 ----- */
   useEffect(() => {
     if (view === 'detail' && employeeId != null) {
-      handleQueryDetail(employeeId, { page: 1, size: 10 })
+      handleQueryDetail(employeeId, { page: 1, size: 10, status: CLAIM_STATUS.CLAIMED })
+      // 加载员工基本信息（供详情页头部展示）
+      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
+        const emp = (res.records || []).find((e) => e.id === employeeId)
+        if (emp) setDetailEmployee({
+          employeeId: emp.id, empNo: emp.empId, empName: emp.name,
+          departmentId: emp.departmentId ?? undefined, department: emp.department || '',
+        })
+      }).catch(() => {})
+      // 加载个人统计
+      fetchClaimStats({ employeeId }).then(setDetailStats).catch(() => {})
     }
     if (view === 'record' && recordId != null) {
       handleQueryRecord(recordId)
+    }
+    // 离开 detail 视图时清理缓存
+    if (view !== 'detail') {
+      setDetailEmployee(undefined)
+      setDetailStats(undefined)
     }
   }, [view, employeeId, recordId, handleQueryDetail, handleQueryRecord])
 
@@ -224,6 +242,8 @@ export default function AssetClaim() {
       {view === 'detail' && employeeId != null && (
         <EmployeeAssetDetail
           employeeId={employeeId}
+          employee={detailEmployee}
+          stats={detailStats}
           data={detailData}
           loading={loading}
           error={error}
@@ -231,6 +251,7 @@ export default function AssetClaim() {
           onBack={goList}
           onAddClaim={() => goAdd(employeeId)}
           onView={(record) => goRecord(record.id)}
+          onQuery={(q) => handleQueryDetail(employeeId, q)}
         />
       )}
 

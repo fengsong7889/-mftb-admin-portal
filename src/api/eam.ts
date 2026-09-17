@@ -526,25 +526,41 @@ export interface ReturnRecord {
 
 /* ==================== 調撥 / 交接 ==================== */
 
+/** 交接資產明細（詳情頁返回） */
+export interface HandoverItem {
+  assetId: number
+  assetNo: string
+  assetName: string
+  assetType?: string
+  /** 交接前部門 */
+  oldDepartment?: string
+  /** 交接後部門 */
+  newDepartment?: string
+}
+
 /** 交接記錄（離職/調崗批量交接） */
 export interface HandoverRecord {
   id: number
   handoverNo: string
   /** 交出人 */
-  fromUser: string
+  fromUserName: string
   fromDepartment: string
   /** 接收人 */
-  toUser: string
+  toUserName: string
   toDepartment: string
   handoverDate: string
   assetIds: number[]
   assetCount: number
   /** 交接原因：resign=離職 / transfer=調崗 / other */
   reason: 'resign' | 'transfer' | 'other'
-  status: 'done'
-  operator: string
+  status: 'done' | 'cancelled'
+  operatorName: string
   remark?: string
   createdAt: string
+  updatedAt?: string
+  updatedBy?: string
+  /** 交接資產明細（僅詳情接口返回） */
+  items?: HandoverItem[]
 }
 
 /* ==================== 損壞賠付 ==================== */
@@ -838,9 +854,9 @@ let mockReturns: ReturnRecord[] = [
 
 let mockHandovers: HandoverRecord[] = [
   {
-    id: 1, handoverNo: 'JJ-2024-001', fromUser: '錢七(M007)', fromDepartment: '设计部',
-    toUser: '孫八(M008)', toDepartment: '产品部', handoverDate: '2024-08-10',
-    assetIds: [6], assetCount: 1, reason: 'resign', status: 'done', operator: '人事部',
+    id: 1, handoverNo: 'JJ-2024-001', fromUserName: '錢七(M007)', fromDepartment: '设计部',
+    toUserName: '孫八(M008)', toDepartment: '产品部', handoverDate: '2024-08-10',
+    assetIds: [6], assetCount: 1, reason: 'resign', status: 'done', operatorName: '人事部',
     remark: '離職資產批量交接', createdAt: '2024-08-10 15:00:00',
   },
 ]
@@ -2090,12 +2106,72 @@ async function mockCreateReturn(data: {
 
 /* ==================== API：交接 ==================== */
 
-export function fetchHandoverList(params?: EamPageQuery): Promise<PageResult<HandoverRecord>> {
-  let list = [...mockHandovers].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  if (params?.keyword) {
-    list = list.filter((h) => matchKeyword(h, ['handoverNo', 'fromUser', 'toUser', 'fromDepartment', 'toDepartment'], params.keyword))
+/** 交接列表查询参数（精确条件，与后端 EamHandoverQuery 对应） */
+export interface HandoverListParams {
+  page?: number
+  size?: number
+  handoverNo?: string
+  fromUserName?: string
+  toUserName?: string
+  handoverDateStart?: string
+  handoverDateEnd?: string
+  reason?: string
+  operatorName?: string
+}
+
+export async function fetchHandoverList(params?: HandoverListParams): Promise<PageResult<HandoverRecord>> {
+  try {
+    const res = await request.get<unknown, PageResult<HandoverRecord>>('/eam/handovers', {
+      params: {
+        page: params?.page,
+        size: params?.size,
+        handoverNo: params?.handoverNo,
+        fromUserName: params?.fromUserName,
+        toUserName: params?.toUserName,
+        handoverDateStart: params?.handoverDateStart,
+        handoverDateEnd: params?.handoverDateEnd,
+        reason: params?.reason,
+        operatorName: params?.operatorName,
+      },
+    })
+    return res
+  } catch (e) {
+    if (isBackendUnavailable(e)) {
+      let list = [...mockHandovers].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      if (params?.handoverNo) {
+        const kw = params.handoverNo.toLowerCase()
+        list = list.filter((h) => h.handoverNo.toLowerCase().includes(kw))
+      }
+      if (params?.fromUserName) list = list.filter((h) => (h.fromUserName || '').includes(params.fromUserName!))
+      if (params?.toUserName) list = list.filter((h) => (h.toUserName || '').includes(params.toUserName!))
+      if (params?.handoverDateStart) list = list.filter((h) => h.handoverDate >= params.handoverDateStart!)
+      if (params?.handoverDateEnd) list = list.filter((h) => h.handoverDate <= params.handoverDateEnd!)
+      if (params?.reason) list = list.filter((h) => h.reason === params.reason)
+      if (params?.operatorName) list = list.filter((h) => (h.operatorName || '').includes(params.operatorName!))
+      return delay(paginate(list, params?.page, params?.size))
+    }
+    throw e
   }
-  return delay(paginate(list, params?.page, params?.size))
+}
+
+/** 交接詳情（含資產明細 items） */
+export async function fetchHandoverDetail(id: number): Promise<HandoverRecord> {
+  try {
+    return await request.get<unknown, HandoverRecord>(`/eam/handovers/${id}`)
+  } catch (e) {
+    if (isBackendUnavailable(e)) {
+      const record = mockHandovers.find((h) => h.id === id)
+      if (!record) throw new Error('交接記錄不存在', { cause: e })
+      // mock 無獨立明細，由 assetIds 派生佔位明細
+      return delay({
+        ...record,
+        items: record.assetIds.map((assetId) => ({
+          assetId, assetNo: `#${assetId}`, assetName: '-',
+        })),
+      })
+    }
+    throw e
+  }
 }
 
 /** 查詢某使用人名下資產（交接頁勾選用） */
@@ -2105,65 +2181,86 @@ export async function fetchUserAssets(userName: string): Promise<AssetItem[]> {
   return res.records.filter((a) => a.status !== 'scrapped')
 }
 
+/** 取消交接 */
+export async function cancelHandover(id: number, reason: string): Promise<void> {
+  try {
+    await request.post(`/eam/handovers/${id}/cancel`, { reason })
+  } catch (e) {
+    if (isBackendUnavailable(e)) {
+      // mock 降级：直接修改本地数据（实际场景中需刷新列表）
+      return
+    }
+    throw e
+  }
+}
+
 /** 批量交接：逐件變更使用人/部門並寫交接流水 */
 export async function createHandover(data: {
-  fromUser: string
+  fromUserName: string
   fromDepartment: string
-  toUser: string
+  toUserName: string
   toDepartment: string
   handoverDate: string
   assetIds: number[]
   reason: 'resign' | 'transfer' | 'other'
-  operator: string
+  operatorName: string
   remark?: string
 }): Promise<HandoverRecord> {
-  if (!data.assetIds.length) throw new Error('請至少選擇一件資產')
-  if (data.fromUser === data.toUser) throw new Error('接收人不可與交出人相同')
-  const reasonText = data.reason === 'resign' ? '離職交接' : (data.reason === 'transfer' ? '調崗交接' : '其他交接')
-
-  for (const assetId of data.assetIds) {
-    await transferAsset({
-      assetId,
-      toUser: data.toUser,
-      toDepartment: data.toDepartment,
-      reason: `${reasonText}：${data.fromUser} → ${data.toUser}`,
-      applyBy: data.operator,
-    })
-    const asset = await fetchAssetDetail(assetId)
-    await logAssetOperation({
-      assetId,
-      assetNo: asset.assetNo,
-      assetName: asset.assetName,
-      opType: 'handover',
-      operator: data.operator,
-      operateTime: now(),
-      description: `${reasonText}，批量交接至 ${data.toUser}（${data.toDepartment}）`,
-      fromUser: data.fromUser,
+  try {
+    const id = await request.post<unknown, number>('/eam/handovers', {
+      fromUserName: data.fromUserName,
       fromDepartment: data.fromDepartment,
-      toUser: data.toUser,
+      toUserName: data.toUserName,
       toDepartment: data.toDepartment,
+      handoverDate: data.handoverDate,
+      assetIds: data.assetIds,
+      reason: data.reason,
+      operatorName: data.operatorName,
+      remark: data.remark,
     })
+    return {
+      id,
+      handoverNo: '',
+      fromUserName: data.fromUserName,
+      fromDepartment: data.fromDepartment,
+      toUserName: data.toUserName,
+      toDepartment: data.toDepartment,
+      handoverDate: data.handoverDate,
+      assetIds: data.assetIds,
+      assetCount: data.assetIds.length,
+      reason: data.reason,
+      status: 'done',
+      operatorName: data.operatorName,
+      remark: data.remark,
+      createdAt: new Date().toISOString(),
+    }
+  } catch (e) {
+    if (isBackendUnavailable(e)) {
+      // Mock fallback
+      if (!data.assetIds.length) throw new Error('請至少選擇一件資產', { cause: e })
+      if (data.fromUserName === data.toUserName) throw new Error('接收人不可與交出人相同', { cause: e })
+      const id = Math.max(0, ...mockHandovers.map((h) => h.id)) + 1
+      const record: HandoverRecord = {
+        id,
+        handoverNo: genNo('JJ', id),
+        fromUserName: data.fromUserName,
+        fromDepartment: data.fromDepartment,
+        toUserName: data.toUserName,
+        toDepartment: data.toDepartment,
+        handoverDate: data.handoverDate,
+        assetIds: data.assetIds,
+        assetCount: data.assetIds.length,
+        reason: data.reason,
+        status: 'done',
+        operatorName: data.operatorName,
+        remark: data.remark,
+        createdAt: now(),
+      }
+      mockHandovers = [record, ...mockHandovers]
+      return delay(record)
+    }
+    throw e
   }
-
-  const id = Math.max(0, ...mockHandovers.map((h) => h.id)) + 1
-  const record: HandoverRecord = {
-    id,
-    handoverNo: genNo('JJ', id),
-    fromUser: data.fromUser,
-    fromDepartment: data.fromDepartment,
-    toUser: data.toUser,
-    toDepartment: data.toDepartment,
-    handoverDate: data.handoverDate,
-    assetIds: data.assetIds,
-    assetCount: data.assetIds.length,
-    reason: data.reason,
-    status: 'done',
-    operator: data.operator,
-    remark: data.remark,
-    createdAt: now(),
-  }
-  mockHandovers = [record, ...mockHandovers]
-  return delay(record)
 }
 
 /* ==================== API：損壞賠付 ==================== */

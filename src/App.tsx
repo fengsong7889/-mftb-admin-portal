@@ -411,7 +411,9 @@ function AuthenticatedLayout() {
               <Route path="/my-assets"        element={<MyAssets />} />
               {/* EAM 調撥交接 */}
               <Route path="/asset-transfer-list" element={<AssetTransferList />} />
-              <Route path="/asset-handover"   element={<AssetHandover />} />
+              <Route path="/asset-handover"        element={<AssetHandover />} />
+              <Route path="/asset-handover/add"    element={<AssetHandover />} />
+              <Route path="/asset-handover/detail" element={<AssetHandover />} />
               {/* EAM 變更歷史 */}
               <Route path="/asset-flow"       element={<AssetFlow />} />
               {/* 審批流程配置 */}

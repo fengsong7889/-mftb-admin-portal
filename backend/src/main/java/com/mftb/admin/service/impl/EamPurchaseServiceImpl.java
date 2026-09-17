@@ -23,6 +23,7 @@ import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -565,9 +566,9 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         m.put("returnQty", o.getReturnQty());
         m.put("exchangeQty", o.getExchangeQty());
         m.put("concessionQty", o.getConcessionQty());
-        m.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
+        m.put("createdAt", DateTimeUtils.format(o.getCreatedAt()));
         m.put("updatedBy", o.getUpdatedBy());
-        m.put("updatedAt", o.getUpdatedAt() != null ? o.getUpdatedAt().toString() : null);
+        m.put("updatedAt", DateTimeUtils.format(o.getUpdatedAt()));
         return m;
     }
 

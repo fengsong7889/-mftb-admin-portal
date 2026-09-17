@@ -9,6 +9,7 @@ import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamAssetService;
 import com.mftb.admin.service.SysCompanyBrandService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -217,8 +218,8 @@ public class EamAssetServiceImpl implements EamAssetService {
         vo.setRentalPeriod(JsonUtils.parseStringList(asset.getRentalPeriod()));
         vo.setQuantity(1);
         vo.setApplicant(Objects.toString(asset.getUpdatedBy(), ""));
-        vo.setCreatedAt(asset.getCreatedAt() == null ? null : asset.getCreatedAt().toString());
-        vo.setUpdatedAt(asset.getUpdatedAt() == null ? null : asset.getUpdatedAt().toString());
+        vo.setCreatedAt(DateTimeUtils.format(asset.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(asset.getUpdatedAt()));
         if (batch != null) {
             vo.setInboundBatchNo(batch.getBatchNo());
             vo.setInboundDate(asset.getPurchaseDate());

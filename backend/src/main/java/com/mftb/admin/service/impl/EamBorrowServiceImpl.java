@@ -8,6 +8,7 @@ import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamBorrowService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -151,8 +152,8 @@ public class EamBorrowServiceImpl implements EamBorrowService {
         vo.setStartDate(borrow.getStartDate() != null ? borrow.getStartDate().toString() : null);
         vo.setDueDate(borrow.getDueDate() != null ? borrow.getDueDate().toString() : null);
         vo.setReturnDate(borrow.getReturnDate() != null ? borrow.getReturnDate().toString() : null);
-        vo.setCreatedAt(borrow.getCreatedAt() != null ? borrow.getCreatedAt().toString() : null);
-        vo.setUpdatedAt(borrow.getUpdatedAt() != null ? borrow.getUpdatedAt().toString() : null);
+        vo.setCreatedAt(DateTimeUtils.format(borrow.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(borrow.getUpdatedAt()));
 
         // 资产信息
         EamAsset asset = assetMapper.selectById(borrow.getAssetId());

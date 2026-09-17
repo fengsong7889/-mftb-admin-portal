@@ -187,7 +187,7 @@ export default function AssetBorrow() {
           loading={loading}
           canEdit={canEdit}
           onSubmit={handleRenew}
-          onBack={() => recordId != null && navigate(`/asset-borrow/detail?id=${recordId}`)}
+          onBack={back}
         />
       )}
 

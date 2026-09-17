@@ -462,7 +462,7 @@ export default function RuleConfig() {
                         if (menu === '模型授權管理') return { label: '權控', color: '#722ED1' }
                         if (menu === '配額管理') return { label: '額度', color: '#52C41A' }
                         if (menu === 'AI智能中心') return { label: '對話', color: '#13C2C2' }
-                        if (menu.startsWith('物資管理(EAM)')) return { label: '物資', color: '#1890FF' }
+                        if (menu?.startsWith('物資管理(EAM)')) return { label: '物資', color: '#1890FF' }
                         if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }
                         if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }
                         if (key.startsWith('algo_')) return { label: '算法', color: '#722ED1' }

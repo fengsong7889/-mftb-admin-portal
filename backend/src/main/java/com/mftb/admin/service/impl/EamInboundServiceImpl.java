@@ -23,6 +23,7 @@ import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.service.EamAssetService;
 import com.mftb.admin.service.EamInboundService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -517,9 +518,9 @@ public class EamInboundServiceImpl implements EamInboundService {
         m.put("concessionQty", b.getConcessionQty());
         m.put("purchaseReason", b.getPurchaseReason());
         m.put("remark", b.getRemark());
-        m.put("createdAt", b.getCreatedAt() != null ? b.getCreatedAt().toString() : null);
+        m.put("createdAt", DateTimeUtils.format(b.getCreatedAt()));
         m.put("updatedBy", b.getUpdatedBy());
-        m.put("updatedAt", b.getUpdatedAt() != null ? b.getUpdatedAt().toString() : null);
+        m.put("updatedAt", DateTimeUtils.format(b.getUpdatedAt()));
         return m;
     }
 }
