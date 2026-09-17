@@ -4,6 +4,8 @@ import com.mftb.admin.dto.EamAssetTransferQuery;
 import com.mftb.admin.dto.EamAssetTransferSaveDTO;
 import com.mftb.admin.dto.EamAssetTransferVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.EamAssetVO;
+import com.mftb.admin.dto.EamAssetQuery;
 
 /**
  * 资产调拨服务
@@ -12,6 +14,8 @@ import com.mftb.admin.dto.PageResult;
  * 与交接（批量人A→人B）互补，是台账归属部门变更的合法通道之一。
  */
 public interface EamAssetTransferService {
+    PageResult<EamAssetVO> candidates(EamAssetQuery query);
+    EamAssetVO candidate(long id);
 
     /** 分页查询调拨记录 */
     PageResult<EamAssetTransferVO> page(EamAssetTransferQuery query);

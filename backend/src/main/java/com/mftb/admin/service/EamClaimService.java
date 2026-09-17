@@ -39,4 +39,5 @@ public interface EamClaimService {
 
     /** 个人领用列表（当前登录用户） */
     PageResult<EamClaimVO> myClaims(EamClaimQuery query);
+    EamClaimVO myDetail(long id);
 }

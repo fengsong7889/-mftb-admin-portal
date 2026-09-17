@@ -39,10 +39,12 @@ const STATUS_TABS: { key: ClaimStatus; label: string }[] = [
   { key: CLAIM_STATUS.CLAIMED, label: '在用资产' },
   { key: CLAIM_STATUS.RETURNED, label: '已归还资产' },
   { key: CLAIM_STATUS.CANCELLED, label: '已取消' },
+  { key: CLAIM_STATUS.TRANSFERRED, label: 'transfer.transferred' },
 ]
 
 export default function EmployeeAssetDetail({ employeeId, employee, stats, data, loading, error, canAdd, onBack, onAddClaim, onView, onQuery }: Props) {
   const { t } = useTranslation()
+  const statusTabs = STATUS_TABS.map(tab => tab.key === CLAIM_STATUS.TRANSFERRED ? { ...tab, label: t(tab.label) } : tab)
   const [query, setQuery] = useState<ClaimQuery>({ page: 1, size: 10, status: CLAIM_STATUS.CLAIMED })
   const empName = employee?.empName ?? '员工信息待加载'
   const empNo = employee?.empNo ?? '—'
@@ -100,7 +102,7 @@ export default function EmployeeAssetDetail({ employeeId, employee, stats, data,
           <span className="claim-muted">当前部门仅用于身份展示；每次领用保留当时部门。归还请在归还管理办理。</span>
           {canAdd && <Button type="primary" icon={<PlusOutlined />} onClick={onAddClaim}>{t('asset.continueClaim')}</Button>}
         </div>
-        <Tabs activeKey={query.status} items={STATUS_TABS} onChange={(status) => setQuery({ page: 1, size: query.size, status: status as ClaimStatus })} />
+        <Tabs activeKey={query.status} items={statusTabs} onChange={(status) => setQuery({ page: 1, size: query.size, status: status as ClaimStatus })} />
         <ClaimRecordTable data={error ? undefined : data} query={query} loading={loading} pageKey="employee-claim-records" onQuery={setQuery} onView={onView} />
       </ClaimSection>
     </div>

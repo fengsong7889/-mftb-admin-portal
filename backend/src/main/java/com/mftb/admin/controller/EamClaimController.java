@@ -86,6 +86,18 @@ public class EamClaimController {
         return Result.success(claimService.returnAsset(dto));
     }
 
+    /** 本人签署不授予管理权限；服务层强制核对记录归属。 */
+    @PostMapping("/my/sign")
+    public Result<Void> mySign(@RequestBody EamSignDTO dto) {
+        claimService.sign(dto);
+        return Result.success();
+    }
+
+    @GetMapping("/my/{id}")
+    public Result<EamClaimVO> myDetail(@PathVariable long id) {
+        return Result.success(claimService.myDetail(id));
+    }
+
     /** 个人领用列表（当前登录用户） */
     @GetMapping("/my")
     public Result<PageResult<EamClaimVO>> myClaims(@ModelAttribute EamClaimQuery query) {

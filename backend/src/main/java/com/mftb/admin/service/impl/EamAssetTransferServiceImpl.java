@@ -6,13 +6,24 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.EamAsset;
+import com.mftb.admin.entity.EamClaim;
+import com.mftb.admin.entity.SysDepartment;
+import com.mftb.admin.mapper.EamClaimMapper;
+import com.mftb.admin.service.EamAssetService;
+import com.mftb.admin.service.EamTransferLookup;
+import com.mftb.admin.service.EamTransferRules;
+import static com.mftb.admin.service.EamTransferRules.*;
+import com.mftb.admin.util.JsonUtils;
+import org.springframework.util.DigestUtils;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.*;
 import com.mftb.admin.entity.EamAssetTransfer;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.EamAssetTransferMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EamAssetTransferService;
-import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -38,7 +49,10 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
     private final EamAssetTransferMapper transferMapper;
     private final EamAssetMapper assetMapper;
     private final SysUserMapper userMapper;
-    private final DepartmentService departmentService;
+    private final EamClaimMapper claimMapper;
+    private final EamAssetService assetService;
+    private final EamTransferLookup lookup;
+    private final EamTransferRules rules;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -53,6 +67,31 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
     }
 
     @Override
+    public PageResult<EamAssetVO> candidates(EamAssetQuery query) {
+        query.setStatus(IN_USE);
+        PageResult<EamAssetVO> result = assetService.page(query);
+        result.getRecords().forEach(this::enrichCandidate);
+        return result;
+    }
+
+    @Override
+    public EamAssetVO candidate(long id) {
+        EamAssetVO result = assetService.detail(id);
+        enrichCandidate(result);
+        return result;
+    }
+
+    private void enrichCandidate(EamAssetVO vo) {
+        EamAsset asset = new EamAsset();
+        BeanUtils.copyProperties(vo, asset);
+        EamClaim claim = vo.getActiveClaimId() == null ? null : claimMapper.selectById(vo.getActiveClaimId());
+        String blocked = rules.blocked(asset, claim);
+        vo.setTransferable(blocked == null);
+        vo.setTransferBlockedReason(blocked);
+        vo.setClaimDate(claim == null || BORROWED.equals(vo.getHoldType()) ? null : DateTimeUtils.format(claim.getClaimDate()));
+    }
+
+    @Override
     public EamAssetTransferVO detail(long id) {
         return toVO(requireTransfer(id));
     }
@@ -60,113 +99,104 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public long register(EamAssetTransferSaveDTO dto) {
-        // 1. 校验参数
-        if (dto.getAssetId() == null) throw new BusinessException("請選擇要調撥的資產");
-        if (!hasText(dto.getToUserName())) throw new BusinessException("新使用人不能為空");
-        if (!hasText(dto.getToDepartment())) throw new BusinessException("新歸屬部門不能為空");
-        if (!hasText(dto.getReason())) throw new BusinessException("調撥原因不能為空");
+        if (dto.getAssetId() == null || dto.getToUserId() == null || dto.getToDepartmentId() == null)
+            throw new BusinessException("請選擇資產、接收人及調入部門");
+        checkText(dto.getReason(), REASON_LIMIT, true, "調撥原因");
+        checkText(dto.getRemark(), REMARK_LIMIT, false, "備註");
+        if (dto.getExpectedVersion() == null || dto.getExpectedVersion() < 0 || dto.getRequestKey() == null
+                || !dto.getRequestKey().matches("[a-zA-Z0-9-]{16,64}")) throw new BusinessException("請刷新頁面後重新提交");
+        SysUser operator = operatorResolver.currentUser();
+        if (operator == null) throw new BusinessException("請先登入");
+        LocalDate date = parseDate(dto.getTransferDate());
+        if (date.isAfter(LocalDate.now())) throw new BusinessException("調撥日期不可晚於今日");
+        String hash = DigestUtils.md5DigestAsHex(JsonUtils.toJson(dto).getBytes(StandardCharsets.UTF_8));
+        EamAssetTransfer existing = requestRecord(operator.getId(), dto.getRequestKey(), false);
+        if (existing != null) return replay(existing, hash);
 
-        LocalDate transferDate = parseDate(dto.getTransferDate());
-        String toDepartment = departmentService.requireEnabledDepartmentName(dto.getToDepartment());
-
-        // 2. 锁定资产并校验状态
-        EamAsset asset = assetMapper.selectOne(
-                new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, dto.getAssetId()).last("FOR UPDATE"));
-        if (asset == null) throw new BusinessException("資產不存在");
-        if (!"in_use".equals(asset.getStatus()))
-            throw new BusinessException("僅使用中資產可調撥，當前狀態：" + asset.getStatus());
-
-        // 2.1 查询原使用人工号
-        String fromUserEmpId = null;
-        if (asset.getCurrentHolderId() != null) {
-            SysUser fromUser = userMapper.selectById(asset.getCurrentHolderId());
-            if (fromUser != null) fromUserEmpId = fromUser.getEmpId();
-        }
-
-        // 3. 解析新使用人（工号优先精确匹配，回退姓名/账号）
-        SysUser toUser = resolveNewUser(dto.getToUserEmpId(), dto.getToUserName());
-        if (toUser == null) throw new BusinessException("新使用人不存在：" + dto.getToUserName());
-
-        // 4. 生成调拨编号
-        String transferNo = bizSeqService.next(BizSeqService.RULE_EAM_TRANSFER);
-
-        // 5. 落调拨单（快照 from/to）
+        // 与归还、签署保持相同顺序：来源领用 → 资产 → 调拨，锁后再次验证。
+        EamAsset observed = assetMapper.selectById(dto.getAssetId());
+        if (observed == null) throw new BusinessException("資產不存在");
+        EamClaim source = observed.getActiveClaimId() == null ? null : claimMapper.selectForUpdate(observed.getActiveClaimId());
+        EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, dto.getAssetId()).last("FOR UPDATE"));
+        existing = requestRecord(operator.getId(), dto.getRequestKey(), true);
+        if (existing != null) return replay(existing, hash);
+        String blocked = rules.blocked(asset, source);
+        if (blocked != null) throw new BusinessException(blocked);
+        if (!Objects.equals(dto.getExpectedVersion(), asset.getHoldVersion())) throw new BusinessException("資產已被其他人更新，請刷新後重試");
+        if (date.isBefore(source.getClaimDate())) throw new BusinessException("調撥日期不可早於領用日期");
+        EamAssetTransfer latest = latest(asset.getId());
+        if (latest != null && date.isBefore(latest.getTransferDate())) throw new BusinessException("調撥日期不可早於上次調撥日期");
+        SysDepartment department = lookup.requireDepartment(dto.getToDepartmentId());
+        SysUser toUser = userMapper.selectById(dto.getToUserId());
+        if (toUser == null || !Objects.equals(toUser.getStatus(), EamTransferLookup.ENABLED)) throw new BusinessException("接收人不存在或已停用");
+        String userName = toUser.getName() != null ? toUser.getName() : toUser.getUsername();
+        if ((hasText(dto.getToUserEmpId()) && !Objects.equals(dto.getToUserEmpId().trim(), toUser.getEmpId()))
+                || (hasText(dto.getToUserName()) && !Objects.equals(dto.getToUserName().trim(), userName)))
+            throw new BusinessException("接收人姓名或工號不匹配，請重新選擇");
+        if (Objects.equals(toUser.getId(), asset.getCurrentHolderId()) && Objects.equals(department.getName(), asset.getDepartment()))
+            throw new BusinessException("使用人及部門均未改變，無需調撥");
+        SysUser fromUser = userMapper.selectById(asset.getCurrentHolderId());
+        if (fromUser == null) throw new BusinessException("原持有人不存在，請先核對領用關係");
+        String actor = operatorResolver.currentOperatorName();
         EamAssetTransfer transfer = new EamAssetTransfer();
-        transfer.setTransferNo(transferNo);
-        transfer.setAssetId(asset.getId());
-        transfer.setAssetNo(asset.getAssetNo());
-        transfer.setAssetName(asset.getAssetName());
-        transfer.setFromUserId(asset.getCurrentHolderId());
-        transfer.setFromUserName(asset.getUserName() != null ? asset.getUserName() : "");
-        transfer.setFromDepartment(asset.getDepartment() != null ? asset.getDepartment() : "");
-        transfer.setFromUserEmpId(fromUserEmpId);
-        transfer.setToUserId(toUser.getId());
-        transfer.setToUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
-        transfer.setToUserEmpId(toUser.getEmpId() != null ? toUser.getEmpId() : "");
-        transfer.setToDepartment(toDepartment);
-        transfer.setTransferDate(transferDate);
-        transfer.setReason(dto.getReason().trim());
-        transfer.setStatus("done");
-        transfer.setOperatorId(operatorResolver.currentUser() != null ? operatorResolver.currentUser().getId() : null);
-        transfer.setOperatorName(operatorResolver.currentOperatorName());
-        transfer.setRemark(dto.getRemark());
-        transfer.setCreatedBy(operatorResolver.currentOperatorName());
-        transfer.setUpdatedBy(operatorResolver.currentOperatorName());
-        transferMapper.insert(transfer);
+        transfer.setTransferNo(bizSeqService.next(BizSeqService.RULE_EAM_TRANSFER));
+        transfer.setAssetId(asset.getId()); transfer.setAssetNo(asset.getAssetNo()); transfer.setAssetName(asset.getAssetName());
+        transfer.setBrandId(asset.getBrandId()); transfer.setBrand(asset.getBrand()); transfer.setBrandBackfilled(0);
+        transfer.setFromUserId(asset.getCurrentHolderId()); transfer.setFromUserName(asset.getUserName());
+        transfer.setFromUserEmpId(fromUser.getEmpId()); transfer.setFromDepartment(Objects.toString(asset.getDepartment(), ""));
+        transfer.setFromDepartmentId(lookup.uniqueDepartmentId(asset.getDepartment()));
+        transfer.setToUserId(toUser.getId()); transfer.setToUserName(userName); transfer.setToUserEmpId(toUser.getEmpId());
+        transfer.setToDepartmentId(department.getId()); transfer.setToDepartment(department.getName());
+        transfer.setFromClaimId(source.getId()); transfer.setFromUsageDate(asset.getUsageDate());
+        transfer.setTransferDate(date); transfer.setReason(dto.getReason().trim()); transfer.setRemark(trim(dto.getRemark()));
+        transfer.setStatus(DONE); transfer.setOperatorId(operator.getId()); transfer.setOperatorName(actor);
+        transfer.setCreatedBy(actor); transfer.setUpdatedBy(actor);
+        transfer.setRequestKey(dto.getRequestKey()); transfer.setRequestHash(hash);
+        transfer.setAppliedVersion(asset.getHoldVersion() + 1);
+        if (transferMapper.insert(transfer) != 1) throw new BusinessException("調撥建立失敗");
 
-        // 6. 更新资产归属
-        asset.setCurrentHolderId(toUser.getId());
-        asset.setUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
-        asset.setDepartment(toDepartment);
-        asset.setUpdatedBy(operatorResolver.currentOperatorName());
-        assetMapper.updateById(asset);
-
-        log.info("調撥登記成功: {} (資產 {} {} → {})", transferNo, asset.getAssetNo(),
-                transfer.getFromUserName(), transfer.getToUserName());
+        EamClaim successor = new EamClaim();
+        successor.setClaimNo(bizSeqService.next(BizSeqService.RULE_EAM_CLAIM));
+        successor.setAssetId(asset.getId()); successor.setEmployeeId(toUser.getId());
+        successor.setOperatorId(operator.getId()); successor.setOperatorName(actor);
+        successor.setClaimDate(date); successor.setClaimReason(dto.getReason().trim());
+        successor.setStatus(CLAIMED); successor.setSignatureStatus(PROXY_PENDING); successor.setProxyMode(1);
+        successor.setProxyReason("調撥承接：" + transfer.getTransferNo());
+        successor.setSourceTransferId(transfer.getId()); successor.setPreviousClaimId(source.getId());
+        successor.setCreatedBy(actor); successor.setUpdatedBy(actor);
+        if (claimMapper.insert(successor) != 1) throw new BusinessException("承接領用建立失敗");
+        source.setStatus(TRANSFERRED); source.setUpdatedBy(actor);
+        if (claimMapper.updateById(source) != 1) throw new BusinessException("原領用狀態已變更");
+        transfer.setToClaimId(successor.getId());
+        if (transferMapper.updateById(transfer) != 1) throw new BusinessException("調撥狀態已變更");
+        updateHolder(asset, toUser.getId(), userName, department.getName(), successor.getId(), date.toString());
         return transfer.getId();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancel(long id, String reason) {
+        checkText(reason, REASON_LIMIT, true, "撤銷原因");
+        EamAssetTransfer observed = requireTransfer(id);
+        if (observed.getFromClaimId() == null || observed.getToClaimId() == null)
+            throw new BusinessException("歷史調撥缺少責任快照，請人工核查，不可直接撤銷");
+        Map<Long, EamClaim> locked = new HashMap<>();
+        for (Long claimId : new TreeSet<>(List.of(observed.getFromClaimId(), observed.getToClaimId())))
+            locked.put(claimId, claimMapper.selectForUpdate(claimId));
+        EamAsset asset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, observed.getAssetId()).last("FOR UPDATE"));
         EamAssetTransfer transfer = transferMapper.selectForUpdate(id);
-        if (transfer == null) throw new BusinessException("調撥記錄不存在");
-        if ("cancelled".equals(transfer.getStatus())) throw new BusinessException("調撥已取消");
-
-        transfer.setStatus("cancelled");
-        transfer.setRemark(hasText(reason) ? reason : transfer.getRemark());
+        EamClaim source = locked.get(observed.getFromClaimId()), successor = locked.get(observed.getToClaimId());
+        String blocked = cancelBlocked(transfer, asset, source, successor);
+        if (blocked != null) throw new BusinessException(blocked);
+        source.setStatus(CLAIMED); source.setUpdatedBy(operatorResolver.currentOperatorName());
+        successor.setStatus(CANCELLED); successor.setCancelledReason(reason.trim());
+        successor.setSignatureStatus("not_required"); successor.setUpdatedBy(operatorResolver.currentOperatorName());
+        if (claimMapper.updateById(source) != 1 || claimMapper.updateById(successor) != 1) throw new BusinessException("領用狀態已變更");
+        updateHolder(asset, transfer.getFromUserId(), transfer.getFromUserName(), transfer.getFromDepartment(), source.getId(), transfer.getFromUsageDate());
+        transfer.setStatus(CANCELLED); transfer.setCancelReason(reason.trim());
+        transfer.setCancelledBy(operatorResolver.currentOperatorName()); transfer.setCancelledAt(LocalDateTime.now());
         transfer.setUpdatedBy(operatorResolver.currentOperatorName());
-        transferMapper.updateById(transfer);
-
-        // 回滚资产：恢复到原使用人/原部门
-        EamAsset asset = assetMapper.selectById(transfer.getAssetId());
-        if (asset != null && "in_use".equals(asset.getStatus())) {
-            if (transfer.getFromUserId() != null) {
-                asset.setCurrentHolderId(transfer.getFromUserId());
-                asset.setUserName(transfer.getFromUserName());
-            } else {
-                // 原使用人已离职，释放资产
-                asset.setCurrentHolderId(null);
-                asset.setUserName(null);
-                asset.setStatus("idle");
-            }
-            asset.setDepartment(transfer.getFromDepartment());
-            asset.setUpdatedBy(operatorResolver.currentOperatorName());
-            if (transfer.getFromUserId() != null) {
-                assetMapper.updateById(asset);
-            } else {
-                // MyBatis-Plus updateById 默认 NOT_NULL 策略，null 字段需用 UpdateWrapper 显式清空
-                assetMapper.update(asset, new UpdateWrapper<EamAsset>()
-                        .eq("id", asset.getId())
-                        .set("current_holder_id", null)
-                        .set("user_name", null)
-                        .set("status", "idle")
-                        .set("department", asset.getDepartment())
-                        .set("updated_by", asset.getUpdatedBy()));
-            }
-        }
-
-        log.info("調撥取消: {} (資產 {} 已回滾)", transfer.getTransferNo(), transfer.getAssetNo());
+        if (transferMapper.updateById(transfer) != 1) throw new BusinessException("調撥狀態已變更");
     }
 
     // ─────────── 私有方法 ───────────
@@ -177,41 +207,63 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         return t;
     }
 
-    /** 解析新使用人：工号优先精确匹配，回退按姓名/账号 */
-    private SysUser resolveNewUser(String empId, String name) {
-        // 1. 工号精确匹配
-        if (hasText(empId)) {
-            SysUser byEmp = userMapper.selectOne(
-                    new LambdaQueryWrapper<SysUser>().eq(SysUser::getEmpId, empId.trim()).last("LIMIT 1"));
-            if (byEmp != null) return byEmp;
-        }
-        // 2. 姓名解析（兼容 "姓名(工号)" 后缀格式）
-        String cleanName = extractName(name);
-        if (hasText(cleanName)) {
-            SysUser byName = userMapper.selectOne(
-                    new LambdaQueryWrapper<SysUser>().eq(SysUser::getName, cleanName).last("LIMIT 1"));
-            if (byName != null) return byName;
-            // 3. 回退账号匹配
-            return userMapper.selectOne(
-                    new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, cleanName).last("LIMIT 1"));
-        }
-        return null;
+    private void updateHolder(EamAsset asset, Long userId, String name, String department, Long claimId, String usageDate) {
+        EamAsset patch = new EamAsset();
+        patch.setUpdatedBy(operatorResolver.currentOperatorName());
+        if (assetMapper.update(patch, new UpdateWrapper<EamAsset>().eq("id", asset.getId()).eq("hold_version", asset.getHoldVersion())
+                .set("current_holder_id", userId).set("user_name", name).set("department", department)
+                .set("active_claim_id", claimId).set("usage_date", usageDate)) != 1)
+            throw new BusinessException("資產已被其他人更新，請刷新後重試");
     }
 
-    /** 从 "姓名(工号)" 格式中提取纯姓名 */
-    private String extractName(String raw) {
-        if (!hasText(raw)) return null;
-        String s = raw.trim();
-        int idx = s.indexOf('(');
-        if (idx > 0) s = s.substring(0, idx);
-        idx = s.indexOf('（');
-        if (idx > 0) s = s.substring(0, idx);
-        return s.trim();
+    private EamAssetTransfer requestRecord(Long operatorId, String key, boolean lock) {
+        LambdaQueryWrapper<EamAssetTransfer> q = new LambdaQueryWrapper<EamAssetTransfer>()
+                .eq(EamAssetTransfer::getOperatorId, operatorId).eq(EamAssetTransfer::getRequestKey, key);
+        if (lock) q.last("FOR UPDATE");
+        return transferMapper.selectOne(q);
     }
+
+    private long replay(EamAssetTransfer existing, String hash) {
+        if (!Objects.equals(hash, existing.getRequestHash())) throw new BusinessException("請求編號已使用，請刷新後重新提交");
+        return existing.getId();
+    }
+
+    private EamAssetTransfer latest(Long assetId) {
+        return transferMapper.selectOne(new LambdaQueryWrapper<EamAssetTransfer>()
+                .eq(EamAssetTransfer::getAssetId, assetId).eq(EamAssetTransfer::getStatus, DONE)
+                .orderByDesc(EamAssetTransfer::getId).last("LIMIT 1"));
+    }
+
+    private String cancelBlocked(EamAssetTransfer t, EamAsset a, EamClaim from, EamClaim to) {
+        if (t == null || !DONE.equals(t.getStatus())) return "僅已完成調撥可撤銷";
+        if (t.getAppliedVersion() == null || from == null || to == null || t.getFromUserId() == null) return "歷史調撥缺少責任快照，請人工核查";
+        if (a == null || !Objects.equals(a.getHoldVersion(), t.getAppliedVersion())
+                || !Objects.equals(a.getCurrentHolderId(), t.getToUserId()) || !Objects.equals(a.getDepartment(), t.getToDepartment())
+                || !Objects.equals(a.getActiveClaimId(), t.getToClaimId()) || !IN_USE.equals(a.getStatus())) return "資產已有後續業務變更，不可撤銷";
+        if (!TRANSFERRED.equals(from.getStatus()) || !CLAIMED.equals(to.getStatus())
+                || !PROXY_PENDING.equals(to.getSignatureStatus())) return "領用已變更或接收人已簽收，不可撤銷";
+        EamAssetTransfer last = latest(t.getAssetId());
+        if (last == null || !Objects.equals(last.getId(), t.getId())) return "只可撤銷最新調撥";
+        if (userMapper.selectById(t.getFromUserId()) == null) return "原持有人不存在，請人工核查";
+        return rules.blocked(a, to);
+    }
+
+    private void checkText(String value, int max, boolean required, String label) {
+        if (required && !hasText(value)) throw new BusinessException(label + "不能為空");
+        if (value != null && value.length() > max) throw new BusinessException(label + "最多 " + max + " 字元");
+    }
+
+    private String trim(String value) { return value == null ? null : value.trim(); }
 
     private EamAssetTransferVO toVO(EamAssetTransfer t) {
         EamAssetTransferVO vo = new EamAssetTransferVO();
-        BeanUtils.copyProperties(t, vo, "transferDate", "createdAt", "updatedAt");
+        BeanUtils.copyProperties(t, vo, "transferDate", "createdAt", "updatedAt", "cancelledAt");
+        vo.setCancelledAt(DateTimeUtils.format(t.getCancelledAt()));
+        String blocked = cancelBlocked(t, assetMapper.selectById(t.getAssetId()),
+                t.getFromClaimId() == null ? null : claimMapper.selectById(t.getFromClaimId()),
+                t.getToClaimId() == null ? null : claimMapper.selectById(t.getToClaimId()));
+        vo.setCancellable(blocked == null);
+        vo.setCancelBlockedReason(blocked);
         vo.setTransferDate(DateTimeUtils.format(t.getTransferDate()));
         vo.setCreatedAt(DateTimeUtils.format(t.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(t.getUpdatedAt()));
@@ -220,6 +272,24 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
 
     private LambdaQueryWrapper<EamAssetTransfer> queryWrapper(EamAssetTransferQuery q) {
         LambdaQueryWrapper<EamAssetTransfer> w = new LambdaQueryWrapper<>();
+        w.eq(q.getBrandId() != null, EamAssetTransfer::getBrandId, q.getBrandId());
+        if (q.getFromDepartmentId() != null) {
+            Set<Long> ids = lookup.departmentIds(q.getFromDepartmentId());
+            List<String> names = lookup.departmentNames(q.getFromDepartmentId());
+            w.and(x -> {
+                x.in(EamAssetTransfer::getFromDepartmentId, ids);
+                if (!names.isEmpty()) x.or(y -> y.isNull(EamAssetTransfer::getFromDepartmentId).in(EamAssetTransfer::getFromDepartment, names));
+            });
+        }
+        if (q.getToDepartmentId() != null) {
+            Set<Long> ids = lookup.departmentIds(q.getToDepartmentId());
+            List<String> names = lookup.departmentNames(q.getToDepartmentId());
+            w.and(x -> {
+                x.in(EamAssetTransfer::getToDepartmentId, ids);
+                if (!names.isEmpty()) x.or(y -> y.isNull(EamAssetTransfer::getToDepartmentId).in(EamAssetTransfer::getToDepartment, names));
+            });
+        }
+        if (hasText(q.getStatus()) && !Set.of(DONE, CANCELLED).contains(q.getStatus())) throw new BusinessException("無效的調撥狀態");
         if (hasText(q.getTransferNo())) {
             w.like(EamAssetTransfer::getTransferNo, q.getTransferNo().trim());
         }
@@ -250,6 +320,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         LocalDate dateStart = parseDateOrNull(q.getStartDate());
         if (dateStart != null) w.ge(EamAssetTransfer::getTransferDate, dateStart);
         LocalDate dateEnd = parseDateOrNull(q.getEndDate());
+        if (dateStart != null && dateEnd != null && dateStart.isAfter(dateEnd)) throw new BusinessException("開始日期不可晚於結束日期");
         if (dateEnd != null) w.le(EamAssetTransfer::getTransferDate, dateEnd);
         return w;
     }
@@ -263,14 +334,14 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         try {
             return LocalDate.parse(value.trim());
         } catch (RuntimeException e) {
-            return null;
+            throw new BusinessException("日期格式應為 yyyy-MM-dd");
         }
     }
 
     private LocalDate parseDate(String value) {
         if (!hasText(value)) throw new BusinessException("調撥日期不能為空");
         try {
-            return LocalDate.parse(value);
+            return LocalDate.parse(value.trim());
         } catch (RuntimeException e) {
             throw new BusinessException("日期格式應為 yyyy-MM-dd");
         }

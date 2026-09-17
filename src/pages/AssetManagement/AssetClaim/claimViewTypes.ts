@@ -3,7 +3,7 @@ import type { DepartmentItem } from '../../../api/department'
 
 // 界面契约与数据接入分离；第三阶段由真实 API 提供这些只读模型。
 export const CLAIM_STATUS = {
-  PENDING: 'pending_signature', CLAIMED: 'claimed', RETURNED: 'returned', CANCELLED: 'cancelled',
+  PENDING: 'pending_signature', CLAIMED: 'claimed', RETURNED: 'returned', CANCELLED: 'cancelled', TRANSFERRED: 'transferred',
 } as const
 export type ClaimStatus = typeof CLAIM_STATUS[keyof typeof CLAIM_STATUS]
 export const SIGNATURE_STATUS = {
@@ -34,6 +34,8 @@ export interface ClaimEmployeeSummary extends ClaimEmployee {
 export interface ClaimRow {
   id: number
   claimNo: string
+  sourceTransferId?: number | null
+  previousClaimId?: number | null
   assetId: number
   assetNo: string
   assetName: string

@@ -69,6 +69,11 @@ export interface AssetItem {
   userName: string
   /** 只读持有人 ID（sys_user.id）；无人持有为 null，兼容旧响应缺省。 */
   readonly currentHolderId?: number | null
+  readonly activeClaimId?: number | null
+  readonly holdVersion?: number
+  readonly claimDate?: string | null
+  readonly transferable?: boolean
+  readonly transferBlockedReason?: string | null
   /** 资产状态 */
   status: AssetStatus
   /** 资产图片（base64 dataUrl，可多张逗号分隔） */
@@ -207,6 +212,10 @@ export interface AssetListQuery {
   assetName?: string
   assetType?: string
   brand?: string
+  brandId?: number
+  categoryId?: number
+  departmentId?: number
+  holdType?: 'owned' | 'borrowed'
   status?: AssetStatus | 'all'
   company?: string
   department?: string
@@ -356,6 +365,16 @@ export interface TransferRecord {
   assetId: number
   assetNo: string
   assetName: string
+  brandId?: number | null
+  brand?: string | null
+  brandBackfilled?: number
+  fromClaimId?: number | null
+  toClaimId?: number | null
+  cancellable: boolean
+  cancelBlockedReason?: string | null
+  cancelReason?: string | null
+  cancelledBy?: string | null
+  cancelledAt?: string | null
   fromUserId: number | null
   fromUserName: string
   fromUserEmpId: string | null
@@ -380,29 +399,62 @@ export interface TransferQuery {
   page?: number
   size?: number
   transferNo?: string
+  brandId?: number
+  fromDepartmentId?: number
+  toDepartmentId?: number
   assetNo?: string
   assetName?: string
   fromUserName?: string
   toUserName?: string
   fromDepartment?: string
   toDepartment?: string
-  status?: string
+  status?: TransferRecord['status']
   operatorName?: string
   startDate?: string
   endDate?: string
 }
 
 /** 资产调拨（调拨登记 → POST /eam/transfers） */
-export function transferAsset(data: {
+export interface TransferRegistration {
   assetId: number
-  toUserName: string
+  toUserId: number
+  toDepartmentId: number
+  expectedVersion: number
+  requestKey: string
+  toUserName?: string
   toUserEmpId?: string
-  toDepartment: string
   transferDate: string
   reason: string
   remark?: string
-}): Promise<void> {
-  return request.post<unknown, void>('/eam/transfers', data)
+}
+
+export function transferAsset(data: TransferRegistration): Promise<number> {
+  return request.post<unknown, number>('/eam/transfers', data)
+}
+
+export interface TransferDepartment { id: number; parentId?: number | null; name: string; status: number }
+export interface TransferCategory { id: number; parentId?: number | null; name: string; code: string; status: string }
+export interface TransferBrand { id: number; brandZh: string; brandEn?: string; categoryCode?: string }
+export interface TransferEmployee { id: number; name: string; empId: string; departmentId?: number; department?: string }
+export interface TransferOptions {
+  departments: TransferDepartment[]
+  categories: TransferCategory[]
+  brands: TransferBrand[]
+}
+export function fetchTransferOptions(): Promise<TransferOptions> {
+  return request.get<unknown, TransferOptions>('/eam/transfers/options')
+}
+export function fetchTransferEmployees(keyword?: string): Promise<TransferEmployee[]> {
+  return request.get<unknown, TransferEmployee[]>('/eam/transfers/employees', { params: { keyword } })
+}
+export function fetchTransferCandidates(params: AssetListQuery): Promise<PageResult<AssetItem>> {
+  return request.get<unknown, PageResult<AssetItem>>('/eam/transfers/candidates', { params })
+}
+export function fetchTransferAsset(id: number): Promise<AssetItem> {
+  return request.get<unknown, AssetItem>(`/eam/transfers/assets/${id}`)
+}
+export function cancelTransfer(id: number, reason: string): Promise<void> {
+  return request.post<unknown, void>(`/eam/transfers/${id}/cancel`, { reason })
 }
 
 /** 调拨记录分页查询 */

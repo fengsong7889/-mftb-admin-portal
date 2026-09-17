@@ -138,16 +138,13 @@ export async function returnClaim(claimId: number, returnDate: string, returnRea
 
 /** 个人领用列表 */
 export async function fetchMyClaims(query: ClaimQuery): Promise<ClaimPage<ClaimRow>> {
-  try {
-    const params = new URLSearchParams()
-    params.set('page', String(query.page))
-    params.set('size', String(query.size))
-    if (query.status) params.set('status', query.status)
-    return await request.get<unknown, ClaimPage<ClaimRow>>(`/eam/claims/my?${params}`)
-  } catch (err) {
-    if (isBackendUnavailable(err)) {
-      return { records: [], total: 0 }
-    }
-    throw err
-  }
+  return request.get<unknown, ClaimPage<ClaimRow>>('/eam/claims/my', { params: query })
+}
+
+export function fetchMyClaim(id: number): Promise<ClaimRow> {
+  return request.get<unknown, ClaimRow>(`/eam/claims/my/${id}`)
+}
+
+export function signMyClaim(claimId: number, signatureImage: string): Promise<void> {
+  return request.post<unknown, void>('/eam/claims/my/sign', { claimId, signatureImage })
 }

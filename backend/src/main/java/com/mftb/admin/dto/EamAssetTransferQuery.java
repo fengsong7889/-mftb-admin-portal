@@ -11,6 +11,9 @@ public class EamAssetTransferQuery {
     private int page = 1;
 
     private int size = 10;
+    private Long brandId;
+    private Long fromDepartmentId;
+    private Long toDepartmentId;
 
     /** 调拨单号（精确/前缀） */
     private String transferNo;

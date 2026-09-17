@@ -4,19 +4,20 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.EamAssetTransferSaveDTO;
 import com.mftb.admin.entity.EamAsset;
 import com.mftb.admin.entity.EamAssetTransfer;
+import com.mftb.admin.entity.EamClaim;
+import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.EamAssetTransferMapper;
+import com.mftb.admin.mapper.EamClaimMapper;
 import com.mftb.admin.mapper.SysUserMapper;
-import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.EamAssetService;
+import com.mftb.admin.service.EamTransferLookup;
+import com.mftb.admin.service.EamTransferRules;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -32,74 +33,130 @@ class EamAssetTransferServiceImplTest {
     @Mock private EamAssetTransferMapper transferMapper;
     @Mock private EamAssetMapper assetMapper;
     @Mock private SysUserMapper userMapper;
-    @Mock private DepartmentService departmentService;
+    @Mock private EamClaimMapper claimMapper;
+    @Mock private EamAssetService assetService;
+    @Mock private EamTransferLookup lookup;
+    @Mock private EamTransferRules rules;
     @Mock private BizSeqService bizSeqService;
     @Mock private OperatorResolver operatorResolver;
     @InjectMocks private EamAssetTransferServiceImpl service;
 
-    @ParameterizedTest
-    @ValueSource(strings = {"不存在或已刪除", "已停用", "同名部門"})
-    void rejectsInvalidDepartmentBeforeAnyWrite(String reason) {
-        when(departmentService.requireEnabledDepartmentName("用戶運營部"))
-                .thenThrow(new BusinessException(reason));
+    @Test
+    void rejectsMissingRequiredFields() {
+        // assetId null
+        EamAssetTransferSaveDTO noAsset = dto();
+        noAsset.setAssetId(null);
+        assertEquals("請選擇資產、接收人及調入部門",
+                assertThrows(BusinessException.class, () -> service.register(noAsset)).getMessage());
 
-        assertEquals(reason, assertThrows(BusinessException.class,
-                () -> service.register(dto("用戶運營部"))).getMessage());
-        verifyNoInteractions(transferMapper, assetMapper, userMapper, bizSeqService);
-    }
+        // toUserId null
+        EamAssetTransferSaveDTO noUser = dto();
+        noUser.setToUserId(null);
+        assertEquals("請選擇資產、接收人及調入部門",
+                assertThrows(BusinessException.class, () -> service.register(noUser)).getMessage());
 
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {" \t "})
-    void departmentRemainsRequired(String name) {
-        assertTrue(assertThrows(BusinessException.class,
-                () -> service.register(dto(name))).getMessage().contains("新歸屬部門不能為空"));
-        verifyNoInteractions(departmentService, transferMapper, assetMapper, bizSeqService);
+        // toDepartmentId null
+        EamAssetTransferSaveDTO noDept = dto();
+        noDept.setToDepartmentId(null);
+        assertEquals("請選擇資產、接收人及調入部門",
+                assertThrows(BusinessException.class, () -> service.register(noDept)).getMessage());
     }
 
     @Test
-    void storesCanonicalDepartmentAndHolderInAssetAndSnapshot() {
-        when(departmentService.requireEnabledDepartmentName("  用戶運營部  ")).thenReturn("用戶運營部");
-        EamAsset asset = new EamAsset();
-        asset.setId(2L);
-        asset.setStatus("in_use");
-        asset.setDepartment("原部門");
-        asset.setCurrentHolderId(22L);
-        asset.setUserName("原使用人");
-        when(assetMapper.selectOne(any())).thenReturn(asset);
-        SysUser recipient = new SysUser();
-        recipient.setId(20L);
-        recipient.setName("接收人");
-        recipient.setEmpId("MF00020");
-        when(userMapper.selectOne(any())).thenReturn(recipient);
-        when(bizSeqService.next(BizSeqService.RULE_EAM_TRANSFER)).thenReturn("DB202609170001");
-        when(transferMapper.insert(any(EamAssetTransfer.class))).thenAnswer(invocation -> {
-            invocation.getArgument(0, EamAssetTransfer.class).setId(11L);
-            return 1;
-        });
-
-        assertEquals(11L, service.register(dto("  用戶運營部  ")));
-
-        ArgumentCaptor<EamAssetTransfer> snapshot = ArgumentCaptor.forClass(EamAssetTransfer.class);
-        verify(transferMapper).insert(snapshot.capture());
-        assertEquals("用戶運營部", snapshot.getValue().getToDepartment());
-        assertEquals("原部門", snapshot.getValue().getFromDepartment());
-        assertEquals(22L, snapshot.getValue().getFromUserId());
-        assertEquals(20L, snapshot.getValue().getToUserId());
-        verify(assetMapper).updateById(asset);
-        assertEquals("用戶運營部", asset.getDepartment());
-        assertEquals(20L, asset.getCurrentHolderId());
-        assertEquals("接收人", asset.getUserName());
+    void rejectsInvalidRequestKey() {
+        EamAssetTransferSaveDTO dto = dto();
+        dto.setRequestKey("bad!");
+        assertEquals("請刷新頁面後重新提交",
+                assertThrows(BusinessException.class, () -> service.register(dto)).getMessage());
     }
 
-    private EamAssetTransferSaveDTO dto(String department) {
+    @Test
+    void rejectsReasonTooLong() {
+        EamAssetTransferSaveDTO dto = dto();
+        dto.setReason("x".repeat(501));
+        assertEquals("調撥原因最多 500 字元",
+                assertThrows(BusinessException.class, () -> service.register(dto)).getMessage());
+    }
+
+    @Test
+    void rejectsFutureTransferDate() {
+        when(operatorResolver.currentUser()).thenReturn(operator());
+        EamAssetTransferSaveDTO dto = dto();
+        dto.setTransferDate(LocalDate.now().plusDays(1).toString());
+        assertEquals("調撥日期不可晚於今日",
+                assertThrows(BusinessException.class, () -> service.register(dto)).getMessage());
+    }
+
+    @Test
+    void rejectsWhenOperatorMissing() {
+        when(operatorResolver.currentUser()).thenReturn(null);
+        assertEquals("請先登入",
+                assertThrows(BusinessException.class, () -> service.register(dto())).getMessage());
+    }
+
+    @Test
+    void rejectsWhenAssetNotFound() {
+        when(operatorResolver.currentUser()).thenReturn(operator());
+        when(assetMapper.selectById(2L)).thenReturn(null);
+        assertEquals("資產不存在",
+                assertThrows(BusinessException.class, () -> service.register(dto())).getMessage());
+    }
+
+    @Test
+    void rejectsWhenRulesBlocked() {
+        when(operatorResolver.currentUser()).thenReturn(operator());
+        EamAsset asset = asset();
+        when(assetMapper.selectById(2L)).thenReturn(asset);
+        when(assetMapper.selectOne(any())).thenReturn(asset);
+        EamClaim claim = claim();
+        when(claimMapper.selectForUpdate(1L)).thenReturn(claim);
+        when(rules.blocked(any(), any())).thenReturn("僅使用中資產可調撥");
+        assertEquals("僅使用中資產可調撥",
+                assertThrows(BusinessException.class, () -> service.register(dto())).getMessage());
+    }
+
+    private EamAssetTransferSaveDTO dto() {
         EamAssetTransferSaveDTO dto = new EamAssetTransferSaveDTO();
         dto.setAssetId(2L);
-        dto.setToUserName("接收人");
+        dto.setToUserId(20L);
         dto.setToUserEmpId("MF00020");
-        dto.setToDepartment(department);
+        dto.setToUserName("接收人");
+        dto.setToDepartmentId(10L);
         dto.setTransferDate(LocalDate.now().toString());
         dto.setReason("部門校驗測試");
+        dto.setExpectedVersion(1L);
+        dto.setRequestKey("test-request-key-1234567890");
         return dto;
+    }
+
+    private SysUser operator() {
+        SysUser u = new SysUser();
+        u.setId(1L);
+        u.setName("管理員");
+        u.setUsername("admin");
+        return u;
+    }
+
+    private EamAsset asset() {
+        EamAsset a = new EamAsset();
+        a.setId(2L);
+        a.setStatus("in_use");
+        a.setHoldType("owned");
+        a.setHoldVersion(1L);
+        a.setDepartment("原部門");
+        a.setCurrentHolderId(22L);
+        a.setUserName("原使用人");
+        a.setActiveClaimId(1L);
+        return a;
+    }
+
+    private EamClaim claim() {
+        EamClaim c = new EamClaim();
+        c.setId(1L);
+        c.setAssetId(2L);
+        c.setEmployeeId(22L);
+        c.setStatus("claimed");
+        c.setClaimDate(LocalDate.now().minusDays(10));
+        return c;
     }
 }

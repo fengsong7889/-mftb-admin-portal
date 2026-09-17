@@ -31,6 +31,21 @@ public class EamAssetTransfer {
     /** 资产名称快照 */
     private String assetName;
 
+    private Long brandId;
+    private String brand;
+    private Integer brandBackfilled;
+    private Long fromDepartmentId;
+    private Long toDepartmentId;
+    private Long fromClaimId;
+    private Long toClaimId;
+    private String fromUsageDate;
+    private Long appliedVersion;
+    private String requestKey;
+    private String requestHash;
+    private String cancelReason;
+    private String cancelledBy;
+    private LocalDateTime cancelledAt;
+
     /** 原使用人 ID（可能已离职为 null） */
     private Long fromUserId;
 

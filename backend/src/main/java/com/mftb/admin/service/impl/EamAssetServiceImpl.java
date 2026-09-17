@@ -41,6 +41,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     private final BizSeqService bizSeqService;
     private final JdbcTemplate jdbcTemplate;
     private final SysCompanyBrandService companyBrandService;
+    private final com.mftb.admin.service.EamTransferLookup transferLookup;
     private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped");
 
     @Override
@@ -255,6 +256,17 @@ public class EamAssetServiceImpl implements EamAssetService {
                 .eq(q.getOrderId() != null, EamAsset::getOrderId, q.getOrderId())
                 .eq(q.getBatchId() != null, EamAsset::getBatchId, q.getBatchId())
                 .like(hasText(q.getUpdatedBy()), EamAsset::getUpdatedBy, q.getUpdatedBy());
+        w.eq(q.getBrandId() != null, EamAsset::getBrandId, q.getBrandId());
+        if (q.getCategoryId() != null) w.in(EamAsset::getCategoryId, transferLookup.categoryIds(q.getCategoryId()));
+        if (q.getDepartmentId() != null) {
+            List<String> names = transferLookup.departmentNames(q.getDepartmentId());
+            if (names.isEmpty()) w.apply("1=0");
+            else w.in(EamAsset::getDepartment, names);
+        }
+        if (hasText(q.getHoldType())) {
+            if (!Set.of("owned", "borrowed").contains(q.getHoldType())) throw new BusinessException("無效的持有方式");
+            w.eq(EamAsset::getHoldType, q.getHoldType());
+        }
         if (hasText(q.getPurchaseDateStart())) w.ge(EamAsset::getPurchaseDate, date(q.getPurchaseDateStart()));
         if (hasText(q.getPurchaseDateEnd())) w.lt(EamAsset::getPurchaseDate, date(q.getPurchaseDateEnd()).plusDays(1).toString());
         if (hasText(q.getScrapDateStart())) w.ge(EamAsset::getScrapTime, date(q.getScrapDateStart()));

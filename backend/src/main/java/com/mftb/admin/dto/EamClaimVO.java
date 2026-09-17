@@ -10,6 +10,9 @@ public class EamClaimVO {
     private Long id;
     private String claimNo;
     private Long assetId;
+    private Long sourceTransferId;
+    private Long previousClaimId;
+    private String updatedBy;
     private String assetNo;
     private String assetName;
     private String assetType;

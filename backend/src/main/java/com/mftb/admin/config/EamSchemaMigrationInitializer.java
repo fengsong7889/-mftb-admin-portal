@@ -40,6 +40,33 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_EAM_HANDOVER_TABLES, this::createHandoverTables);
         versionTracker.applyOnce(V_EAM_TRANSFER_TABLE, this::createTransferTable);
         versionTracker.applyOnce(V_EAM_TRANSFER_FROM_EMP, this::addTransferFromUserEmpId);
+        versionTracker.applyOnce("eam:schema-v6-transfer-integrity", this::upgradeTransferIntegrity);
+    }
+
+    private void upgradeTransferIntegrity() {
+        alterSafe("biz_eam_asset", "ADD COLUMN hold_version BIGINT NOT NULL DEFAULT 0");
+        alterSafe("biz_eam_claim", "ADD COLUMN source_transfer_id BIGINT NULL");
+        alterSafe("biz_eam_claim", "ADD COLUMN previous_claim_id BIGINT NULL");
+        String[] columns = {
+                "brand_id BIGINT NULL", "brand VARCHAR(128) NULL", "brand_backfilled TINYINT NOT NULL DEFAULT 0",
+                "from_department_id BIGINT NULL", "to_department_id BIGINT NULL",
+                "from_claim_id BIGINT NULL", "to_claim_id BIGINT NULL", "from_usage_date VARCHAR(32) NULL",
+                "applied_version BIGINT NULL", "request_key VARCHAR(64) NULL", "request_hash VARCHAR(64) NULL",
+                "cancel_reason VARCHAR(500) NULL", "cancelled_by VARCHAR(128) NULL", "cancelled_at DATETIME NULL"
+        };
+        for (String column : columns) alterSafe("biz_eam_transfer", "ADD COLUMN " + column);
+        try {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_transfer ADD UNIQUE INDEX uk_transfer_request (operator_id, request_key)");
+        } catch (Exception e) {
+            if (!isDuplicateIndexError(e)) throw e;
+        }
+        addIndexSafe("biz_eam_transfer", "idx_transfer_asset", "asset_id,id");
+        addIndexSafe("biz_eam_transfer", "idx_transfer_brand", "brand_id");
+        addIndexSafe("biz_eam_claim", "idx_claim_transfer", "source_transfer_id");
+        // 旧单只能按当前台账补录，显式标记来源，不能冒充调拨时快照。
+        jdbcTemplate.update("UPDATE biz_eam_transfer t JOIN biz_eam_asset a ON a.id=t.asset_id AND a.deleted=0 "
+                + "SET t.brand_id=a.brand_id,t.brand=a.brand,t.brand_backfilled=1 "
+                + "WHERE t.request_key IS NULL AND t.brand_id IS NULL AND t.brand IS NULL");
     }
 
     private void fixClaimIdNullable() {

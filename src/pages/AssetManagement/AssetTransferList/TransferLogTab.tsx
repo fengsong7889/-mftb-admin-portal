@@ -4,19 +4,28 @@
  * 數據來源：後端調撥單 /eam/transfers（由資產調撥頁登記寫入，作廢單據 status='cancelled'）
  * 支持 10 項搜索條件：調撥單號 / 調撥日期 / 資產編號 / 資產名稱 / 原使用人 / 調入使用人 / 原歸屬部門 / 調入部門 / 狀態 / 經辦人
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, DatePicker } from 'antd'
+import { useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import dayjs, { type Dayjs } from 'dayjs'
+import { Button, Empty, Form, Input, Select, Table, Tag, Space, DatePicker, TreeSelect, Tooltip, message } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { fetchTransferList, type TransferRecord } from '../../../api/asset'
-import { EAM_DEPARTMENTS } from '../eamUtils'
+import { fetchTransferList, type TransferRecord, type TransferQuery, type TransferOptions } from '../../../api/asset'
+import { useAuth } from '../../../contexts/AuthContext'
+import { useTransferData } from '../AssetTransfer/useTransferData'
+import { TransferError } from '../AssetTransfer/TransferLayout'
+import { buildTransferTree, positiveId, updateQuery, TRANSFER_STATUS, TRANSFER_MENU } from '../AssetTransfer/transferUtils'
+import { exportToCSV } from '../../../utils/exportCSV'
 
 interface Props {
-  onViewAsset: (assetNo: string) => void
+  options?: TransferOptions
+  onViewAsset: (id: number) => void
   onViewDetail: (id: number) => void
+  onCancel: (id: number) => void
 }
+type FilterValues = Omit<TransferQuery, 'page' | 'size' | 'startDate' | 'endDate'> & { transferDate?: [Dayjs, Dayjs] }
 
 /** 格式化使用人展示：姓名(工号) */
 function formatUser(name: string | null | undefined, empId: string | null | undefined): string {
@@ -24,53 +33,63 @@ function formatUser(name: string | null | undefined, empId: string | null | unde
   return empId ? `${name}(${empId})` : name
 }
 
-export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
+export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, options }: Props) {
   const { t } = useTranslation()
-  const [form] = Form.useForm()
-  const [loading, setLoading] = useState(false)
-  const [dataSource, setDataSource] = useState<TransferRecord[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [size, setSize] = useState(10)
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [filters, setFilters] = useState<Record<string, string | undefined>>({})
-
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetchTransferList({ ...filters, page, size })
-      setDataSource(res.records || [])
-      setTotal(res.total || 0)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [filters, page, size, t])
-
-  useEffect(() => { loadData() }, [loadData])
-
-  const handleSearch = () => {
-    const v = form.getFieldsValue()
-    setFilters({
-      transferNo: v.transferNo?.trim() || undefined,
-      assetNo: v.assetNo?.trim() || undefined,
-      assetName: v.assetName?.trim() || undefined,
-      fromUserName: v.fromUserName?.trim() || undefined,
-      toUserName: v.toUserName?.trim() || undefined,
-      fromDepartment: v.fromDepartment || undefined,
-      toDepartment: v.toDepartment || undefined,
-      status: v.status || undefined,
-      operatorName: v.operatorName?.trim() || undefined,
-      startDate: v.transferDate?.[0]?.format('YYYY-MM-DD'),
-      endDate: v.transferDate?.[1]?.format('YYYY-MM-DD'),
-    })
-    setPage(1)
+  const { hasPermission } = useAuth()
+  const [form] = Form.useForm<FilterValues>()
+  const [params, setParams] = useSearchParams()
+  const query = useMemo<TransferQuery>(() => ({
+    transferNo: params.get('log.transferNo') || undefined,
+    assetNo: params.get('log.assetNo') || undefined, assetName: params.get('log.assetName') || undefined,
+    brandId: positiveId(params.get('log.brandId')),
+    fromUserName: params.get('log.fromUserName') || undefined, toUserName: params.get('log.toUserName') || undefined,
+    fromDepartmentId: positiveId(params.get('log.fromDepartmentId')), toDepartmentId: positiveId(params.get('log.toDepartmentId')),
+    status: params.get('log.status') === TRANSFER_STATUS.DONE ? TRANSFER_STATUS.DONE : params.get('log.status') === TRANSFER_STATUS.CANCELLED ? TRANSFER_STATUS.CANCELLED : undefined,
+    operatorName: params.get('log.operatorName') || undefined,
+    startDate: params.get('log.startDate') || undefined, endDate: params.get('log.endDate') || undefined,
+    page: positiveId(params.get('log.page')) || 1, size: positiveId(params.get('log.size')) || 10,
+  }), [params])
+  const fetcher = useCallback(() => fetchTransferList(query), [query])
+  const { data, loading, error, refresh } = useTransferData(fetcher)
+  const deptTree = useMemo(() => buildTransferTree(options?.departments || []), [options])
+  useEffect(() => {
+    form.setFieldsValue({ ...query, transferDate: query.startDate && query.endDate && dayjs(query.startDate).isValid() && dayjs(query.endDate).isValid()
+      ? [dayjs(query.startDate), dayjs(query.endDate)] : undefined })
+  }, [query, form])
+  const handleSearch = (v: FilterValues) => {
+    setParams(updateQuery(params, 'log', {
+      transferNo: v.transferNo?.trim(), assetNo: v.assetNo?.trim(), assetName: v.assetName?.trim(), brandId: v.brandId,
+      fromUserName: v.fromUserName?.trim(), toUserName: v.toUserName?.trim(),
+      fromDepartmentId: v.fromDepartmentId, toDepartmentId: v.toDepartmentId,
+      status: v.status, operatorName: v.operatorName?.trim(),
+      startDate: v.transferDate?.[0]?.format('YYYY-MM-DD'), endDate: v.transferDate?.[1]?.format('YYYY-MM-DD'), page: 1, size: query.size,
+    }), { replace: true })
+    refresh()
   }
-  const handleReset = () => { form.resetFields(); setFilters({}); setPage(1) }
+  const handleReset = () => { form.resetFields(); setParams(updateQuery(params, 'log', {}), { replace: true }); refresh() }
   const handleTableChange = (p: TablePaginationConfig) => {
-    setPage(p.current || 1)
-    setSize(p.pageSize || 10)
+    setParams(updateQuery(params, 'log', { ...query, page: p.pageSize !== query.size ? 1 : p.current || 1, size: p.pageSize || 10 }), { replace: true })
+  }
+
+  /* ----- 导出 ----- */
+  const handleExport = () => {
+    if (!data?.records?.length) { message.warning(t('common.noDataToExport')); return }
+    const cols = [
+      { title: t('asset.colTransferNo'), dataIndex: 'transferNo' },
+      { title: t('asset.colTransferDate'), dataIndex: 'transferDate' },
+      { title: t('asset.colAssetNo'), dataIndex: 'assetNo' },
+      { title: t('asset.colAssetName'), dataIndex: 'assetName' },
+      { title: t('transfer.brand'), dataIndex: 'brand' },
+      { title: t('asset.colFromUser'), dataIndex: 'fromUserName', render: (_: unknown, r: TransferRecord) => formatUser(r.fromUserName, r.fromUserEmpId) },
+      { title: t('asset.colTransferToUser'), dataIndex: 'toUserName', render: (_: unknown, r: TransferRecord) => formatUser(r.toUserName, r.toUserEmpId) },
+      { title: t('asset.colFromDept'), dataIndex: 'fromDepartment' },
+      { title: t('asset.colToDept'), dataIndex: 'toDepartment' },
+      { title: t('asset.colTransferReason'), dataIndex: 'reason' },
+      { title: t('asset.colStatus'), dataIndex: 'status' },
+      { title: t('asset.colOperator'), dataIndex: 'operatorName' },
+    ]
+    exportToCSV(`${t('asset.transferLogFileName')}_${new Date().toISOString().slice(0, 10)}`, cols, data.records)
+    message.success(t('common.exportSuccess'))
   }
 
   /* ----- 表格列定義 ----- */
@@ -88,15 +107,17 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
     { key: 'transferDate', title: t('asset.colTransferDate'), dataIndex: 'transferDate', width: 110 },
     {
       key: 'assetNo', title: t('asset.colAssetNo'), dataIndex: 'assetNo', width: 140,
-      render: (v: string) => (
+      render: (v: string, record) => (
         <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace', fontWeight: 600 }}
-          onClick={() => onViewAsset(v)}
+          onClick={() => onViewAsset(record.assetId)}
         >
           {v}
         </Button>
       ),
     },
     { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 190, ellipsis: true },
+    { key: 'brand', title: t('transfer.brand'), dataIndex: 'brand', width: 140,
+      render: (value: string | null, record) => <Tooltip title={record.brandBackfilled ? t('transfer.brandBackfilled') : undefined}>{value || '—'}{record.brandBackfilled ? ' *' : ''}</Tooltip> },
     {
       key: 'fromUserName', title: t('asset.colFromUser'), width: 150,
       render: (_: unknown, r) => formatUser(r.fromUserName, r.fromUserEmpId),
@@ -110,16 +131,19 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
     { key: 'reason', title: t('asset.colTransferReason'), dataIndex: 'reason', ellipsis: true },
     {
       key: 'status', title: t('asset.colStatus'), dataIndex: 'status', width: 100,
-      render: (v: TransferRecord['status']) => v === 'cancelled'
+      render: (v: TransferRecord['status']) => v === TRANSFER_STATUS.CANCELLED
         ? <Tag color="default">{t('asset.transferCancelled')}</Tag>
-        : <Tag color="success">{t('asset.transferDone')}</Tag>,
+        : v === TRANSFER_STATUS.DONE ? <Tag color="success">{t('asset.transferDone')}</Tag> : t('transfer.unknown'),
     },
     { key: 'operatorName', title: t('asset.colOperator'), dataIndex: 'operatorName', width: 120 },
     {
-      key: 'action', title: t('common.colAction'), width: 80, fixed: 'right',
-      render: (_: unknown, r) => (
+      key: 'action', title: t('common.colAction'), width: 160, fixed: 'right',
+      render: (_: unknown, r) => <Space size={0} split={<span className="action-split">|</span>}>
         <Button type="link" size="small" onClick={() => onViewDetail(r.id)}>{t('common.detail')}</Button>
-      ),
+        {hasPermission(`${TRANSFER_MENU}:edit`) && r.status === TRANSFER_STATUS.DONE && <Tooltip title={r.cancelBlockedReason}>
+          <span><Button type="link" danger size="small" disabled={!r.cancellable} onClick={() => onCancel(r.id)}>{t('transfer.cancelTransfer')}</Button></span>
+        </Tooltip>}
+      </Space>,
     },
   ]
 
@@ -129,6 +153,7 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
     { key: 'transferDate', title: t('asset.colTransferDate') },
     { key: 'assetNo', title: t('asset.colAssetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'brand', title: t('transfer.brand') },
     { key: 'fromUserName', title: t('asset.colFromUser') },
     { key: 'toUserName', title: t('asset.colTransferToUser') },
     { key: 'fromDepartment', title: t('asset.colFromDept') },
@@ -143,56 +168,54 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
     { key: 'transferNo', locked: 'head' }, { key: 'action', locked: 'tail' },
   ])
 
-  /* ----- 行選擇 ----- */
-  const rowSelection = {
-    selectedRowKeys,
-    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
-  }
-
-  const deptOptions = EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))
   const statusOptions = [
-    { label: t('asset.transferDone'), value: 'done' },
-    { label: t('asset.transferCancelled'), value: 'cancelled' },
+    { label: t('asset.transferDone'), value: TRANSFER_STATUS.DONE },
+    { label: t('asset.transferCancelled'), value: TRANSFER_STATUS.CANCELLED },
   ]
 
   return (
     <>
+      <TransferError error={error} retry={refresh} />
       {/* ====== 搜索區 ====== */}
       <div className="search-section">
-        <Form form={form} layout="inline">
+        <Form form={form} layout="inline" onFinish={handleSearch}>
           <Form.Item label={t('asset.searchTransferNo')} name="transferNo">
-            <Input placeholder={t('asset.searchTransferNoPh')} allowClear style={{ width: 170 }} />
+            <Input placeholder={t('asset.searchTransferNoPh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colTransferDate')} name="transferDate">
-            <DatePicker.RangePicker style={{ width: 240 }} />
+            <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetNo')} name="assetNo">
-            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: 150 }} />
+            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetName')} name="assetName">
-            <Input placeholder={t('asset.searchAssetNamePh')} allowClear style={{ width: 160 }} />
+            <Input placeholder={t('asset.searchAssetNamePh')} allowClear style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label={t('transfer.brand')} name="brandId">
+            <Select allowClear showSearch optionFilterProp="label" placeholder={t('common.all')} disabled={!options}
+              options={options?.brands.map(brand => ({ value: brand.id, label: brand.brandZh || brand.brandEn }))} />
           </Form.Item>
           <Form.Item label={t('asset.searchFromUserName')} name="fromUserName">
-            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: 140 }} />
+            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.searchToUserName')} name="toUserName">
-            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: 140 }} />
+            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label={t('asset.searchFromDept')} name="fromDepartment">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={deptOptions} />
+          <Form.Item label={t('asset.searchFromDept')} name="fromDepartmentId">
+            <TreeSelect placeholder={t('common.all')} allowClear showSearch treeNodeFilterProp="title" treeData={deptTree} disabled={!options} />
           </Form.Item>
-          <Form.Item label={t('asset.searchToDept')} name="toDepartment">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={deptOptions} />
+          <Form.Item label={t('asset.searchToDept')} name="toDepartmentId">
+            <TreeSelect placeholder={t('common.all')} allowClear showSearch treeNodeFilterProp="title" treeData={deptTree} disabled={!options} />
           </Form.Item>
           <Form.Item label={t('asset.colStatus')} name="status">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 120 }} options={statusOptions} />
+            <Select placeholder={t('common.all')} allowClear style={{ width: '100%' }} options={statusOptions} />
           </Form.Item>
           <Form.Item label={t('asset.searchOperator')} name="operatorName">
-            <Input placeholder={t('asset.searchOperatorPh')} allowClear style={{ width: 140 }} />
+            <Input placeholder={t('asset.searchOperatorPh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button type="primary" icon={<SearchOutlined />} htmlType="submit">{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
@@ -202,11 +225,7 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
       {/* ====== 操作區 ====== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Space>
-            <Button icon={<ExportOutlined />} disabled={selectedRowKeys.length === 0}>
-              {t('common.export')}
-            </Button>
-          </Space>
+          <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !data?.records?.length} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {configComponent}
@@ -216,16 +235,15 @@ export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
       {/* ====== 表格 ====== */}
       <Table<TransferRecord>
         columns={applyConfig(allColumns) as TableColumnsType<TransferRecord>}
-        dataSource={dataSource}
+        dataSource={data?.records || []}
         rowKey="id"
         loading={loading}
         size="middle"
         scroll={{ x: 1800 }}
-        rowSelection={rowSelection}
-        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} /> }}
         onChange={handleTableChange}
         pagination={{
-          current: page, pageSize: size, total,
+          current: query.page, pageSize: query.size, total: data?.total || 0,
           showSizeChanger: true, showQuickJumper: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,
         }}

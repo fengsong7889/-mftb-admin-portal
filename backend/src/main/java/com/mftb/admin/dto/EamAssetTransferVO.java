@@ -20,6 +20,18 @@ public class EamAssetTransferVO {
     private String assetNo;
 
     private String assetName;
+    private Long brandId;
+    private String brand;
+    private Integer brandBackfilled;
+    private Long fromClaimId;
+    private Long toClaimId;
+    private String createdBy;
+    private String updatedBy;
+    private String cancelReason;
+    private String cancelledBy;
+    private String cancelledAt;
+    private boolean cancellable;
+    private String cancelBlockedReason;
 
     private Long fromUserId;
 

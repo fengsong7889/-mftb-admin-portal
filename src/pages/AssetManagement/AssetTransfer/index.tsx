@@ -1,280 +1,138 @@
-/**
- * 资产转移独立页
- *
- * - 通过 URL ?id= 获取要转移的资产 ID
- * - 物资部直接将资产从当前使用人/部门转移到新使用人/部门
- * - 只能转移状态为「在用」(status='in_use') 的资产
- * - 顶部"返回"按钮，底部"取消+保存"按钮（符合全局规范）
- */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  Button, Form, Input, DatePicker, message, Row, Col, Tag, Alert, Spin, TreeSelect,
-} from 'antd'
-import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
+import { Alert, Button, DatePicker, Descriptions, Form, Input, Modal, Select, Spin, TreeSelect, message } from 'antd'
+import { AppstoreOutlined, SaveOutlined, SwapOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { transferAsset, fetchAssetDetail, type AssetItem } from '../../../api/asset'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { fetchTransferAsset, fetchTransferEmployees, fetchTransferOptions, transferAsset, type TransferRegistration } from '../../../api/asset'
+import { useAuth } from '../../../contexts/AuthContext'
+import { TransferError, TransferPageHeader, TransferSection } from './TransferLayout'
+import { useTransferData } from './useTransferData'
+import { buildTransferTree, ENABLED_DEPARTMENT, formatTransferUser, positiveId, resolveTransferFrom, TRANSFER_LIMITS, TRANSFER_MENU } from './transferUtils'
 
-const DEPT_STATUS_ENABLED = 1
-
-interface DeptTreeOption {
-  value: string
-  title: string
-  disabled?: boolean
-  children?: DeptTreeOption[]
-}
-
-/** 平铺部门列表构建 TreeSelect 树数据 */
-function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
-  const nodeMap = new Map<number, DeptTreeOption>()
-  list.forEach(dept => {
-    nodeMap.set(dept.id, {
-      value: dept.name,
-      title: dept.name,
-      disabled: dept.status !== DEPT_STATUS_ENABLED,
-      children: [],
-    })
-  })
-  const roots: DeptTreeOption[] = []
-  list.forEach(dept => {
-    const node = nodeMap.get(dept.id)!
-    const parent = dept.parentId ? nodeMap.get(dept.parentId) : undefined
-    if (parent) parent.children!.push(node)
-    else roots.push(node)
-  })
-  return roots
-}
-
-interface FormValues {
-  toUser: string
-  toEmpId: string
-  toDepartment: string
-  reason: string
-  transferDate: Dayjs
-  remark?: string
-}
+interface FormValues { toUserId: number; toDepartmentId: number; transferDate: Dayjs; reason: string; remark?: string }
 
 export default function AssetTransfer() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const assetId = searchParams.get('id') ? Number(searchParams.get('id')) : null
-
+  const { hasPermission } = useAuth()
+  const [params] = useSearchParams()
+  const id = positiveId(params.get('id'))
+  const from = resolveTransferFrom(params.get('from'))
+  const canEdit = hasPermission(`${TRANSFER_MENU}:edit`)
   const [form] = Form.useForm<FormValues>()
+  const fetchAsset = useCallback(() => id ? fetchTransferAsset(id) : Promise.reject(new Error(t('transfer.invalidId'))), [id, t])
+  const assetState = useTransferData(fetchAsset)
+  const optionsState = useTransferData(fetchTransferOptions)
+  const [keyword, setKeyword] = useState('')
+  const [search, setSearch] = useState('')
+  useEffect(() => { const timer = window.setTimeout(() => setSearch(keyword), 250); return () => window.clearTimeout(timer) }, [keyword])
+  const fetchEmployees = useCallback(() => canEdit ? fetchTransferEmployees(search) : Promise.resolve([]), [search, canEdit])
+  const employeesState = useTransferData(fetchEmployees)
   const [submitting, setSubmitting] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [asset, setAsset] = useState<AssetItem | null>(null)
-  const [departments, setDepartments] = useState<DepartmentItem[]>([])
-
-  /** 加载部门列表 */
-  const fetchDeptList = useCallback(async () => {
-    try {
-      const list = await fetchDepartments()
-      setDepartments(list)
-    } catch {
-      // 接口异常时部门列表置空
-    }
-  }, [])
-
-  useEffect(() => { fetchDeptList() }, [fetchDeptList])
-
-  /** 部门树数据 */
-  const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
-
-  useEffect(() => {
-    if (!assetId) {
-      message.error(t('asset.assetIdMissing'))
-      navigate('/asset-list')
-      return
-    }
-    setLoading(true)
-    fetchAssetDetail(assetId)
-      .then((data) => {
-        setAsset(data)
-        form.resetFields()
-      })
-      .catch((err: Error) => message.error(err.message))
-      .finally(() => setLoading(false))
-  }, [assetId, form, navigate, t])
-
-  /** 保存 */
+  const [confirming, setConfirming] = useState(false)
+  const submitLock = useRef(false)
+  const requestIdentity = useRef<{ payload: string; key: string }>()
+  const selectedId = Form.useWatch('toUserId', form)
+  const [selectedEmployee, setSelectedEmployee] = useState<import('../../../api/asset').TransferEmployee>()
+  const asset = assetState.data
+  const options = optionsState.data
+  const deptTree = useMemo(() => buildTransferTree(options?.departments || [], d => d.status !== ENABLED_DEPARTMENT), [options])
+  const handleBack = () => navigate(from, { replace: true })
+  const busy = submitting || confirming
   const handleSubmit = async () => {
-    if (!asset) return
-    try {
-      const v = await form.validateFields()
-      if (asset.status !== 'in_use') {
-        message.error(t('asset.notInUseCannotTransfer'))
-        return
-      }
-      setSubmitting(true)
-      const toUserFull = `${v.toUser}(${v.toEmpId})`
-      await transferAsset({
-        assetId: asset.id,
-        toUserName: toUserFull,
-        toUserEmpId: v.toEmpId,
-        toDepartment: v.toDepartment,
-        transferDate: v.transferDate.format('YYYY-MM-DD'),
-        reason: v.reason,
-        remark: v.remark,
-      })
-      message.success(t('asset.transferSuccess'))
-      navigate('/asset-list')
-    } catch (e: unknown) {
-      if (e instanceof Error) message.error(e.message)
-    } finally {
-      setSubmitting(false)
+    if (!asset?.transferable || !canEdit || submitLock.current || busy || asset.holdVersion === undefined) return
+    let values: FormValues
+    try { values = await form.validateFields() } catch { return }
+    const employee = selectedEmployee
+    if (!employee || employee.id !== values.toUserId) { form.setFields([{ name: 'toUserId', errors: [t('transfer.selectEmployee')] }]); return }
+    const department = options?.departments.find(d => d.id === values.toDepartmentId)
+    if (employee.id === asset.currentHolderId && department?.name === asset.department) {
+      form.setFields([{ name: 'toDepartmentId', errors: [t('transfer.noChange')] }]); return
     }
+    const input = { assetId: asset.id, toUserId: employee.id, toDepartmentId: values.toDepartmentId,
+      expectedVersion: asset.holdVersion, toUserName: employee.name, toUserEmpId: employee.empId,
+      transferDate: values.transferDate.format('YYYY-MM-DD'), reason: values.reason.trim(), remark: values.remark?.trim() }
+    const payload = JSON.stringify(input)
+    if (requestIdentity.current?.payload !== payload) requestIdentity.current = { payload, key: crypto.randomUUID() }
+    const registration: TransferRegistration = { ...input, requestKey: requestIdentity.current.key }
+    setConfirming(true)
+    Modal.confirm({
+      title: t('transfer.confirmTitle'), className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: <div className="confirm-info-card">
+        {[[t('asset.colAssetNo'), asset.assetNo], [t('asset.colFromUser'), asset.userName], [t('asset.colToUser'), formatTransferUser(employee.name, employee.empId)],
+          [t('asset.colToDepartment'), department?.name], [t('asset.colTransferDate'), input.transferDate], [t('asset.colTransferReason'), input.reason]].map(([label, value]) =>
+          <div className="confirm-info-row" key={label}><span>{label}：</span><b>{value || '—'}</b></div>)}
+        <p>{t('transfer.immediateTip')}</p>
+      </div>,
+      okText: t('common.confirm'), cancelText: t('common.cancel'),
+      afterClose: () => setConfirming(false),
+      onOk: async () => {
+        if (submitLock.current) return
+        submitLock.current = true
+        setSubmitting(true)
+        try {
+          await transferAsset(registration)
+          message.success(t('asset.transferSuccess'))
+          handleBack()
+        } finally { submitLock.current = false; setSubmitting(false) }
+      },
+    })
   }
 
-  /** 取消：返回列表 */
-  const handleCancel = () => {
-    navigate('/asset-list')
-  }
-
-  return (
-    <div className="content-area" style={{ padding: '20px 24px' }}>
-      {/* ====== 顶部标题栏 ====== */}
-      <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={handleCancel}>
-            {t('common.back')}
-          </Button>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>
-            {t('asset.transferTitle')}
-          </h2>
-        </div>
-      </div>
-
-      {/* ====== 资产信息 + 当前持有人 ====== */}
-      <Spin spinning={loading}>
-        {asset && (
-          <div style={{
-            background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          }}>
-            <Alert type="info" showIcon message={t('asset.modeDirectTip')} style={{ marginBottom: 16 }} />
-            <div style={{
-              background: '#FAFAFA', borderRadius: 8, padding: 16,
-              display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12,
-            }}>
-              <div><b>{t('asset.colAssetNo')}:</b> <span style={{ fontFamily: 'monospace' }}>{asset.assetNo}</span></div>
-              <div><b>{t('asset.colAssetName')}:</b> {asset.assetName}</div>
-              <div><b>{t('asset.colAssetType')}:</b> {asset.assetType}</div>
-              <div>
-                <b>{t('asset.colStatus')}:</b>{' '}
-                <Tag color="success">{t('asset.statusInUse')}</Tag>
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <b>{t('asset.fromLabel')}:</b>{' '}
-                <span style={{ color: '#E8720C', fontWeight: 600 }}>{asset.userName || '-'}</span>
-                {' / '}
-                {asset.department || '-'}
-              </div>
-            </div>
+  return <div className="content-area">
+    <TransferPageHeader title={t('asset.transferTitle')} onBack={handleBack} disabled={busy} />
+    {!canEdit && <Alert type="warning" showIcon message={t('guard.403Sub')} style={{ marginBottom: 16 }} />}
+    <TransferError error={assetState.error} retry={assetState.refresh} />
+    <TransferError error={optionsState.error} retry={optionsState.refresh} />
+    <TransferError error={employeesState.error} retry={employeesState.refresh} />
+    <Spin spinning={assetState.loading || optionsState.loading}>
+      {asset && <Form<FormValues> form={form} layout="vertical" initialValues={{ transferDate: dayjs() }} disabled={!canEdit || busy || !asset.transferable}>
+        <TransferSection title={t('asset.sectionAssetInfo')} icon={<AppstoreOutlined />}>
+          <Alert type={asset.transferable ? 'info' : 'warning'} showIcon message={asset.transferBlockedReason || t('transfer.immediateTip')} style={{ marginBottom: 16 }} />
+          <Descriptions column={3}>
+            <Descriptions.Item label={t('asset.colAssetNo')}>{asset.assetNo}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
+            <Descriptions.Item label={t('transfer.category')}>{asset.assetType || '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('transfer.brand')}>{asset.brand || '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colFromUser')}>{asset.userName || '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colFromDept')}>{asset.department || '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('transfer.claimDate')}>{asset.claimDate || '—'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colStatus')}>{t(({ idle: 'asset.statusIdle', in_use: 'asset.statusInUse', in_repair: 'asset.statusInRepair', scrapped: 'asset.statusScrapped' })[asset.status] || 'transfer.unknown')}</Descriptions.Item>
+          </Descriptions>
+        </TransferSection>
+        <TransferSection title={t('asset.sectionTransferInfo')} icon={<SwapOutlined />} tone="orange">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+            <Form.Item name="toUserId" label={t('asset.colToUser')} rules={[{ required: true, message: t('transfer.selectEmployee') }]}>
+              <Select showSearch allowClear filterOption={false} onSearch={setKeyword} loading={employeesState.loading} placeholder={t('transfer.selectEmployee')}
+                options={employeesState.data?.map(e => ({ value: e.id, label: formatTransferUser(e.name, e.empId) }))}
+                onChange={value => {
+                  const employee = employeesState.data?.find(e => e.id === value)
+                  setSelectedEmployee(employee)
+                  form.setFieldValue('toDepartmentId', options?.departments.some(d => d.id === employee?.departmentId && d.status === ENABLED_DEPARTMENT) ? employee?.departmentId : undefined)
+                }} />
+            </Form.Item>
+            <Form.Item label={t('asset.colUserEmpId')}><Input readOnly value={selectedId === selectedEmployee?.id ? selectedEmployee?.empId : ''} /></Form.Item>
+            <Form.Item name="toDepartmentId" label={t('asset.colToDepartment')} rules={[{ required: true, message: t('asset.departmentRequired') }]}>
+              <TreeSelect treeData={deptTree} showSearch treeNodeFilterProp="title" allowClear placeholder={t('asset.departmentPh')} disabled={!options || busy || !canEdit || !asset.transferable} />
+            </Form.Item>
+            <Form.Item name="transferDate" label={t('asset.colTransferDate')} rules={[{ required: true, message: t('asset.transferDateRequired') }]}>
+              <DatePicker style={{ width: '100%' }} disabledDate={date => date.isAfter(dayjs(), 'day') || (!!asset.claimDate && date.isBefore(dayjs(asset.claimDate), 'day'))} />
+            </Form.Item>
+            <Form.Item name="reason" label={t('asset.colTransferReason')} style={{ gridColumn: 'span 2' }} rules={[{ required: true, whitespace: true, message: t('asset.reasonRequired') }, { max: TRANSFER_LIMITS.REASON }]}>
+              <Input maxLength={TRANSFER_LIMITS.REASON} showCount placeholder={t('asset.transferReasonPh')} />
+            </Form.Item>
+            <Form.Item name="remark" label={t('asset.colRemark')} style={{ gridColumn: '1 / -1' }} rules={[{ max: TRANSFER_LIMITS.REMARK }]}>
+              <Input.TextArea rows={3} maxLength={TRANSFER_LIMITS.REMARK} showCount placeholder={t('asset.remarkPh')} />
+            </Form.Item>
           </div>
-        )}
-
-        {/* ====== 表单区 ====== */}
-        {asset && (
-          <div style={{
-            background: '#fff', borderRadius: 8, padding: '24px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          }}>
-            <Form<FormValues>
-              form={form}
-              layout="vertical"
-              initialValues={{ transferDate: dayjs() }}
-            >
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item
-                    label={t('asset.colToUser')}
-                    name="toUser"
-                    rules={[{ required: true, message: t('asset.userNameRequired') }]}
-                  >
-                    <Input placeholder={t('asset.userNamePh')} allowClear />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    label={t('asset.colUserEmpId')}
-                    name="toEmpId"
-                    rules={[{ required: true, message: t('asset.userEmpIdRequired') }]}
-                  >
-                    <Input placeholder={t('asset.userEmpIdPh')} allowClear />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    label={t('asset.colToDepartment')}
-                    name="toDepartment"
-                    rules={[{ required: true, message: t('asset.departmentRequired') }]}
-                  >
-                    <TreeSelect
-                      treeData={deptTreeData}
-                      placeholder={t('asset.departmentPh')}
-                      treeDefaultExpandAll
-                      showSearch
-                      treeNodeFilterProp="title"
-                      allowClear
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item
-                    label={t('asset.colTransferDate')}
-                    name="transferDate"
-                    rules={[{ required: true, message: t('asset.transferDateRequired') }]}
-                  >
-                    <DatePicker style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={16}>
-                  <Form.Item
-                    label={t('asset.colReason')}
-                    name="reason"
-                    rules={[{ required: true, message: t('asset.reasonRequired') }]}
-                  >
-                    <Input placeholder={t('asset.transferReasonPh')} allowClear />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Row gutter={16}>
-                <Col span={24}>
-                  <Form.Item label={t('asset.colRemark')} name="remark">
-                    <Input.TextArea rows={2} placeholder={t('asset.remarkPh')} maxLength={300} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Form>
-          </div>
-        )}
-      </Spin>
-
-      {/* ====== 底部操作栏（取消+保存，符合全局规范） ====== */}
-      <div className="form-footer">
-        <Button onClick={handleCancel}>{t('common.cancel')}</Button>
-        <Button
-          type="primary"
-          icon={<SaveOutlined />}
-          onClick={handleSubmit}
-          loading={submitting}
-          disabled={!asset || asset.status !== 'in_use'}
-        >
-          {t('common.save')}
-        </Button>
-      </div>
+        </TransferSection>
+      </Form>}
+    </Spin>
+    <div className="form-footer">
+      <Button onClick={handleBack} disabled={busy}>{t('common.cancel')}</Button>
+      {canEdit && <Button type="primary" icon={<SaveOutlined />} loading={submitting} disabled={!asset?.transferable || !options || busy} onClick={handleSubmit}>{t('common.save')}</Button>}
     </div>
-  )
+  </div>
 }

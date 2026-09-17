@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -57,6 +58,7 @@ public class EamReturnServiceImpl implements EamReturnService {
     @Transactional(rollbackFor = Exception.class)
     public long register(EamReturnDTO dto) {
         // 确定来源
+        if (dto.getClaimId() != null && dto.getBorrowId() != null) throw new BusinessException("只能指定一種歸還來源");
         EamClaim claim = null;
         EamBorrow borrow = null;
         String sourceType;
@@ -96,6 +98,13 @@ public class EamReturnServiceImpl implements EamReturnService {
         }
 
         String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
+        EamAsset holding = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, assetId).last("FOR UPDATE"));
+        if (holding == null || !"in_use".equals(holding.getStatus()) || !Objects.equals(holding.getCurrentHolderId(), employeeId)
+                || (claim != null && !Objects.equals(holding.getActiveClaimId(), claim.getId()))
+                || (borrow != null && (holding.getActiveClaimId() != null || !"borrowed".equals(holding.getHoldType()))))
+            throw new BusinessException("資產持有關係已變更，請刷新後從當前有效領用或借用辦理歸還");
+        LocalDate startDate = claim != null ? claim.getClaimDate() : borrow.getStartDate();
+        if (startDate != null && returnDate.isBefore(startDate)) throw new BusinessException("歸還日期不可早於領用或借用日期");
 
         // 生成归还编号
         String returnNo = bizSeqService.next(BizSeqService.RULE_EAM_RETURN);

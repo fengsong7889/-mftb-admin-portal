@@ -12,6 +12,11 @@ public class EamAssetVO extends EamAssetSaveDTO {
     /** 只读：当前持有人 ID（sys_user.id），无人持有时显式返回 null。 */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     private Long currentHolderId;
+    private Long activeClaimId;
+    private Long holdVersion;
+    private String claimDate;
+    private boolean transferable;
+    private String transferBlockedReason;
     private Long orderId;
     private Long batchId;
     private String purchaseType;

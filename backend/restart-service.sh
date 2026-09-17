@@ -40,12 +40,28 @@ PID_FILE=".backend.pid"
 
 # ── 环境变量（与 run-local.sh 保持一致）──
 setup_env() {
-    export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null) || true
+    # 优先使用已设置的 JAVA_HOME，其次尝试系统查找，最后回退到项目本地 JDK
+    if [ -z "$JAVA_HOME" ]; then
+        export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null) || true
+    fi
+    if [ -z "$JAVA_HOME" ]; then
+        # 回退：检查项目本地 JDK
+        local local_jdk="$SCRIPT_DIR/../.local/jdk-17.0.2.jdk/Contents/Home"
+        if [ -d "$local_jdk" ]; then
+            export JAVA_HOME="$local_jdk"
+        fi
+    fi
     if [ -z "$JAVA_HOME" ]; then
         echo -e "${RED}❌ 未找到 JDK 17，请确认已安装${NC}"
         exit 1
     fi
-    export PATH="$HOME/apache-maven-3.9.6/bin:$JAVA_HOME/bin:$PATH"
+    # Maven 路径：优先系统 PATH，其次项目本地
+    local local_mvn="$SCRIPT_DIR/../.local/apache-maven-3.9.6/bin"
+    if [ -d "$local_mvn" ]; then
+        export PATH="$local_mvn:$JAVA_HOME/bin:$PATH"
+    else
+        export PATH="$HOME/apache-maven-3.9.6/bin:$JAVA_HOME/bin:$PATH"
+    fi
 
     # 数据库连接（与 run-local.sh 一致，连接远程开发库）
     export DB_URL="${DB_URL:-jdbc:mysql://mysql3.sqlpub.com:3308/fengsong?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&socketTimeout=15000&connectTimeout=10000}"

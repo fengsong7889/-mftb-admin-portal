@@ -81,11 +81,11 @@ export default function AssetClaim() {
   }, [])
 
   /* ----- 员工详情查询 ----- */
-  const handleQueryDetail = useCallback(async (_empId: number, query: ClaimQuery) => {
+  const handleQueryDetail = useCallback(async (empId: number, query: ClaimQuery) => {
     setLoading(true)
     setError(undefined)
     try {
-      const data = await fetchClaimList(query)
+      const data = await fetchClaimList({ ...query, employeeId: empId })
       setDetailData(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
@@ -155,12 +155,17 @@ export default function AssetClaim() {
     return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : undefined
   }, [params])
 
+  /* ----- 稳定的 onQuery 回调（避免子组件 useEffect 因引用变化重复触发） ----- */
+  const onQueryDetail = useCallback((q: ClaimQuery) => {
+    if (employeeId != null) handleQueryDetail(employeeId, q)
+  }, [employeeId, handleQueryDetail])
+
   const recordId = useMemo(() => parseClaimId(params.get('id')), [params])
 
   /* ----- 自动加载 ----- */
   useEffect(() => {
     if (view === 'detail' && employeeId != null) {
-      handleQueryDetail(employeeId, { page: 1, size: 10, status: CLAIM_STATUS.CLAIMED })
+      // 注：列表数据由 EmployeeAssetDetail 子组件的 useEffect + onQueryDetail 首次触发，避免重复请求
       // 加载员工基本信息（供详情页头部展示）
       fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
         const emp = (res.records || []).find((e) => e.id === employeeId)
@@ -251,7 +256,7 @@ export default function AssetClaim() {
           onBack={goList}
           onAddClaim={() => goAdd(employeeId)}
           onView={(record) => goRecord(record.id)}
-          onQuery={(q) => handleQueryDetail(employeeId, q)}
+          onQuery={onQueryDetail}
         />
       )}
 

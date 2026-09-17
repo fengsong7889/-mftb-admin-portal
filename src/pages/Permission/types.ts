@@ -1342,7 +1342,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-detail': 'asset-list',
   '/asset-scrap': 'asset-scrap',
   '/asset-repair': 'asset-repair',
-  '/asset-transfer': 'asset-list',
+  '/asset-transfer-list': 'asset-transfer-list',
+  '/asset-transfer': 'asset-transfer-list',
+  '/asset-transfer/detail': 'asset-transfer-list',
+  '/asset-transfer/cancel': 'asset-transfer-list',
   '/asset-inventory': 'asset-inventory',
   // 領用管理（子路由歸屬 asset-claim 菜單）
   '/asset-claim': 'asset-claim',

@@ -1,6 +1,8 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.mftb.admin.service.EamReturnService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.*;
@@ -30,14 +32,14 @@ public class EamClaimServiceImpl implements EamClaimService {
 
     private final EamClaimMapper claimMapper;
     private final EamClaimEvidenceMapper evidenceMapper;
-    private final EamReturnMapper returnMapper;
+    private final EamReturnService returnService;
     private final EamClaimEventMapper eventMapper;
     private final EamAssetMapper assetMapper;
     private final SysUserMapper userMapper;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
-    private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled");
+    private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled", "transferred");
 
     /* ==================== 查询 ==================== */
 
@@ -53,15 +55,18 @@ public class EamClaimServiceImpl implements EamClaimService {
     @Override
     public EamClaimStatsVO stats(EamClaimQuery query) {
         EamClaimStatsVO stats = new EamClaimStatsVO();
-        // 有领用记录的不同员工数
-        stats.setEmployeeCount(claimMapper.selectCount(
-                statsWrapper(query).select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId)));
+        // 有领用记录的不同员工数（避免 selectCount + groupBy 导致 TooManyResultsException）
+        List<Long> distinctEmpIds = claimMapper.selectList(
+                statsWrapper(query).select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId))
+                .stream().map(EamClaim::getEmployeeId).toList();
+        stats.setEmployeeCount((long) distinctEmpIds.size());
         // 各状态统计
         stats.setClaimedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "claimed")));
         stats.setReturnedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "returned")));
         // 待签记录（含代办补签）
         stats.setPendingSignatureCount(claimMapper.selectCount(
-                statsWrapper(query).in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
+                statsWrapper(query).in(EamClaim::getStatus, "pending_signature", "claimed")
+                        .in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
         return stats;
     }
 
@@ -116,7 +121,7 @@ public class EamClaimServiceImpl implements EamClaimService {
                     "pending_signature".equals(c.getStatus()) && "pending".equals(c.getSignatureStatus())).count());
             // 代办领用落库为 status=claimed + signatureStatus=proxy_pending，故仅按 signatureStatus 判定
             vo.setProxyPendingCount(claims.stream().filter(c ->
-                    "proxy_pending".equals(c.getSignatureStatus())).count());
+                    "claimed".equals(c.getStatus()) && "proxy_pending".equals(c.getSignatureStatus())).count());
             vo.setLastClaimDate(claims.stream()
                     .map(c -> c.getClaimDate() != null ? c.getClaimDate().toString() : null)
                     .filter(Objects::nonNull)
@@ -160,6 +165,15 @@ public class EamClaimServiceImpl implements EamClaimService {
         if (current == null) throw new BusinessException("未登录");
         query.setEmployeeId(current.getId());
         return page(query);
+    }
+
+    @Override
+    public EamClaimVO myDetail(long id) {
+        SysUser current = operatorResolver.currentUser();
+        EamClaim claim = requireClaim(id);
+        if (current == null || !Objects.equals(current.getId(), claim.getEmployeeId()))
+            throw new BusinessException(403, "僅可查看本人領用");
+        return toVO(claim);
     }
 
     /* ==================== 登记 ==================== */
@@ -248,12 +262,25 @@ public class EamClaimServiceImpl implements EamClaimService {
     public void sign(EamSignDTO dto) {
         EamClaim claim = claimMapper.selectForUpdate(dto.getClaimId());
         if (claim == null) throw new BusinessException("領用記錄不存在");
-        if (!"pending_signature".equals(claim.getStatus())) {
-            throw new BusinessException("當前狀態不可簽署");
+        boolean supplementary = "claimed".equals(claim.getStatus()) && "proxy_pending".equals(claim.getSignatureStatus());
+        if (!"pending_signature".equals(claim.getStatus()) && !supplementary) throw new BusinessException("當前狀態不可簽署");
+        SysUser signer = operatorResolver.currentUser();
+        if (signer == null || !Objects.equals(signer.getId(), claim.getEmployeeId())) throw new BusinessException("僅領用人本人可簽署");
+        EamAsset lockedAsset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>()
+                .eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
+        if (lockedAsset == null) throw new BusinessException("資產不存在");
+        if (supplementary) {
+            if (!Objects.equals(lockedAsset.getActiveClaimId(), claim.getId())
+                    || !Objects.equals(lockedAsset.getCurrentHolderId(), claim.getEmployeeId())
+                    || !"in_use".equals(lockedAsset.getStatus())) throw new BusinessException("領用關係已變更，不可補簽");
+        } else if (lockedAsset.getActiveClaimId() != null || !"idle".equals(lockedAsset.getStatus())) {
+            throw new BusinessException("資產已被其他業務佔用，請刷新後重試");
         }
         if (!hasText(dto.getSignatureImage())) {
             throw new BusinessException("簽名圖片不能為空");
         }
+        if (!dto.getSignatureImage().startsWith("data:image/png;base64,") || dto.getSignatureImage().length() > 2_000_000)
+            throw new BusinessException("簽名必須為有效 PNG 圖片且小於 2MB");
 
         // 1. 保存签名凭证
         EamClaimEvidence evidence = new EamClaimEvidence();
@@ -313,6 +340,14 @@ public class EamClaimServiceImpl implements EamClaimService {
     public void cancel(long claimId, String reason) {
         EamClaim claim = claimMapper.selectForUpdate(claimId);
         if (claim == null) throw new BusinessException("領用記錄不存在");
+        if ("transferred".equals(claim.getStatus()) || claim.getSourceTransferId() != null)
+            throw new BusinessException("調撥關聯領用不可直接取消，請至調撥管理辦理");
+        boolean wasActive = "claimed".equals(claim.getStatus());
+        if (wasActive) {
+            EamAsset a = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
+            if (a == null || !Objects.equals(a.getActiveClaimId(), claimId)
+                    || !Objects.equals(a.getCurrentHolderId(), claim.getEmployeeId())) throw new BusinessException("領用關係已變更");
+        }
         if ("returned".equals(claim.getStatus())) throw new BusinessException("已歸還的領用不可取消");
         if ("cancelled".equals(claim.getStatus())) throw new BusinessException("領用已取消");
 
@@ -327,7 +362,7 @@ public class EamClaimServiceImpl implements EamClaimService {
         claimMapper.updateById(claim);
 
         // 如果是代办且已生效（claimed + proxy_pending），需要释放资产
-        if ("claimed".equals(claim.getStatus()) || "pending_signature".equals(claim.getStatus())) {
+        if (wasActive) {
             releaseAsset(claim.getAssetId());
         }
 
@@ -340,44 +375,7 @@ public class EamClaimServiceImpl implements EamClaimService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public long returnAsset(EamReturnDTO dto) {
-        EamClaim claim = claimMapper.selectForUpdate(dto.getClaimId());
-        if (claim == null) throw new BusinessException("領用記錄不存在");
-        if (!"claimed".equals(claim.getStatus())) throw new BusinessException("僅在用領用可歸還");
-
-        LocalDate returnDate = parseDate(dto.getReturnDate());
-        if (returnDate.isAfter(LocalDate.now())) throw new BusinessException("歸還日期不可晚於今日");
-
-        // 1. 生成归还编号
-        String returnNo = bizSeqService.next(BizSeqService.RULE_EAM_RETURN);
-
-        // 2. 创建归还记录
-        EamReturn ret = new EamReturn();
-        ret.setReturnNo(returnNo);
-        ret.setClaimId(claim.getId());
-        ret.setAssetId(claim.getAssetId());
-        ret.setEmployeeId(claim.getEmployeeId());
-        ret.setOperatorName(operatorResolver.currentOperatorName());
-        ret.setReturnDate(returnDate);
-        ret.setReturnReason(dto.getReturnReason());
-        ret.setConditionNote(dto.getConditionNote());
-        returnMapper.insert(ret);
-
-        // 3. 更新领用记录
-        claim.setStatus("returned");
-        claim.setReturnDate(returnDate);
-        claim.setReturnReason(dto.getReturnReason());
-        claim.setReturnId(ret.getId());
-        claim.setUpdatedBy(operatorResolver.currentOperatorName());
-        claimMapper.updateById(claim);
-
-        // 4. 释放资产
-        releaseAsset(claim.getAssetId());
-
-        // 5. 写事件
-        insertEvent(claim.getId(), "returned", operatorResolver.currentOperatorName(),
-                "歸還編號: " + returnNo);
-
-        return ret.getId();
+        return returnService.register(dto);
     }
 
     /* ==================== 内部方法 ==================== */
@@ -396,7 +394,8 @@ public class EamClaimServiceImpl implements EamClaimService {
             asset.setActiveClaimId(null);
             asset.setStatus("idle");
             asset.setUserName(null);
-            assetMapper.updateById(asset);
+            assetMapper.update(asset, new UpdateWrapper<EamAsset>().eq("id", asset.getId())
+                    .set("current_holder_id", null).set("active_claim_id", null).set("user_name", null));
         }
     }
 
@@ -466,8 +465,8 @@ public class EamClaimServiceImpl implements EamClaimService {
         w.eq(q.getEmployeeId() != null, EamClaim::getEmployeeId, q.getEmployeeId());
         // 注意：departmentId 不在 biz_eam_claim 表中，由 employeeSummary Java 層按員工部門過濾
         if (Boolean.TRUE.equals(q.getPendingSignature())) {
-            w.and(x -> x.eq(EamClaim::getStatus, "pending_signature")
-                    .or().in(EamClaim::getSignatureStatus, "pending", "proxy_pending"));
+            w.in(EamClaim::getStatus, "pending_signature", "claimed")
+                    .in(EamClaim::getSignatureStatus, "pending", "proxy_pending");
         }
         return w;
     }

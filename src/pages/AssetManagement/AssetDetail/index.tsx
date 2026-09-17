@@ -4,10 +4,10 @@
  * 样式基准：采购订单详情（PurchaseOrder/OrderDetail.tsx）——
  * DetailPageHeader + 无边框模块卡片 + Descriptions column=4 非 bordered + 最后更新 footer。
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Tag, Image, message, Spin, Descriptions,
+  Tag, Image, Spin, Descriptions,
 } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
@@ -15,10 +15,14 @@ import {
   UserOutlined, InboxOutlined,
 } from '@ant-design/icons'
 import {
-  fetchAssetDetail, parseAssetImages, type AssetItem, type AssetStatus,
+  fetchAssetDetail, fetchTransferAsset, parseAssetImages, type AssetStatus,
 } from '../../../api/asset'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
+import { useAuth } from '../../../contexts/AuthContext'
+import { useTransferData } from '../AssetTransfer/useTransferData'
+import { TransferError } from '../AssetTransfer/TransferLayout'
+import { positiveId, resolveTransferFrom } from '../AssetTransfer/transferUtils'
 
 const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   idle:      { key: 'asset.statusIdle',     color: 'default' },
@@ -51,33 +55,18 @@ export default function AssetDetail() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const id = searchParams.get('id') ? Number(searchParams.get('id')) : null
-
-  const [loading, setLoading] = useState(false)
-  const [asset, setAsset] = useState<AssetItem | null>(null)
-
-  const loadData = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    try {
-      const a = await fetchAssetDetail(id)
-      setAsset(a)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [id, t])
-
-  useEffect(() => { loadData() }, [loadData])
-
-  if (loading || !asset) {
-    return (
-      <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip={t('common.loading')} />
-      </div>
-    )
-  }
+  const id = positiveId(searchParams.get('id'))
+  const from = resolveTransferFrom(searchParams.get('from'), '/asset-list', '/asset-detail')
+  const transferContext = searchParams.get('context') === 'transfer'
+  const { hasPermission } = useAuth()
+  const fetcher = useCallback(() => id ? (transferContext ? fetchTransferAsset(id) : fetchAssetDetail(id))
+    : Promise.reject(new Error(t('transfer.invalidId'))), [id, transferContext, t])
+  const { data: asset, loading, error, refresh } = useTransferData(fetcher)
+  if (!asset) return <div className="content-area">
+    <DetailPageHeader title={t('asset.detailTitle')} onBack={() => navigate(from)} />
+    <TransferError error={error} retry={refresh} />
+    {loading && <div style={{ minHeight: 400, display: 'grid', placeItems: 'center' }}><Spin /></div>}
+  </div>
 
   const imageList = parseAssetImages(asset.images)
   const params = asset.params || {}
@@ -90,14 +79,14 @@ export default function AssetDetail() {
       <DetailPageHeader
         title={t('asset.detailTitle')}
         tags={
-          <Tag color={STATUS_META[asset.status].color} style={{
+          <Tag color={STATUS_META[asset.status]?.color} style={{
             fontSize: 12, padding: '2px 10px', borderRadius: 4,
             fontWeight: 500, margin: 0,
-          }}>{t(STATUS_META[asset.status].key)}</Tag>
+          }}>{t(STATUS_META[asset.status]?.key || 'transfer.unknown')}</Tag>
         }
         meta={<>{asset.assetNo} · {asset.assetName}</>}
-        onBack={() => navigate('/asset-list')}
-        onEdit={() => navigate(`/asset-add?id=${asset.id}`)}
+        onBack={() => navigate(from)}
+        onEdit={!transferContext && hasPermission('asset-list:edit') ? () => navigate(`/asset-add?id=${asset.id}`) : undefined}
         menuKey="asset-list"
       />
 
@@ -111,7 +100,7 @@ export default function AssetDetail() {
         <Descriptions column={4} size="middle">
           <Descriptions.Item label={t('asset.colAssetNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
           <Descriptions.Item label={t('asset.colAssetType')}>{asset.assetType || '-'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colBrand')}>{asset.brand || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('transfer.brand')}>{asset.brand || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
         </Descriptions>
 
@@ -198,12 +187,12 @@ export default function AssetDetail() {
         <Descriptions column={4} size="middle">
           <Descriptions.Item label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colClaimDate')}>{asset.usageDate || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('transfer.claimDate')}>{(transferContext ? asset.claimDate : asset.usageDate) || '—'}</Descriptions.Item>
         </Descriptions>
       </div>
       
       {/* ====== 模塊4：資產標籤（主標籤 + 次標籤，可綁定/解綁/列印） ====== */}
-      {id !== null && <AssetTagBindingSection assetId={id} asset={asset} />}
+      {id !== undefined && !transferContext && hasPermission('asset-list:view') && <AssetTagBindingSection assetId={id} asset={asset} />}
       
       {/* ====== 模块5：入库信息 ====== */}
       <div style={detailCardStyle}>

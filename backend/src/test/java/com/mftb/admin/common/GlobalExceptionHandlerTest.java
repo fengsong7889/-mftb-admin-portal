@@ -27,7 +27,7 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("SQL 异常: 不向前端泄露异常详情（回归测试）")
     void sqlExceptionMessageNotLeaked() {
-        String sensitive = "Table 'fengsong_test.biz_fin_detail' doesn't exist";
+        String sensitive = "Table 'fengsong.biz_fin_detail' doesn't exist";
         Result<Void> result = handler.handleException(new SQLException(sensitive));
 
         assertThat(result.getCode()).isEqualTo(ResultCode.ERROR.getCode());

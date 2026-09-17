@@ -27,7 +27,7 @@ mvn -version
 
 | 环境 | 数据库 | 地址 | 用途 |
 |------|--------|------|------|
-| 开发 | `fengsong_test` | mysql6.sqlpub.com:3311 | 本地开发、测试 |
+| 开发 | `fengsong` | mysql3.sqlpub.com:3308 | 本地开发、测试 |
 | 生产 | `fengsong` | Sealos 环境变量注入 | 线上运行 |
 
 > ⚠️ 开发库已内置于 `application.yml` 默认配置，无需额外设置。

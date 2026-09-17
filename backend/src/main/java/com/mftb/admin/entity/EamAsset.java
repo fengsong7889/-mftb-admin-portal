@@ -104,6 +104,10 @@ public class EamAsset {
     /** 当前活跃领用 ID（biz_eam_claim.id，归还/取消后清空） */
     private Long activeClaimId;
 
+    /** 所有台账实体更新均在数据库端递增，避免其他业务写入绕过调拨版本校验。 */
+    @TableField(update = "%s+1", updateStrategy = FieldStrategy.ALWAYS)
+    private Long holdVersion;
+
     /** 备注 */
     private String remark;
 

@@ -10,6 +10,7 @@ const STATUS_META: Record<ClaimStatus, { label: string; color: string }> = {
   claimed: { label: '在用', color: 'success' },
   returned: { label: '已归还', color: 'default' },
   cancelled: { label: '已取消', color: 'default' },
+  transferred: { label: 'transfer.transferred', color: 'orange' },
 }
 const SIGNATURE_META: Record<SignatureStatus, { label: string; color: string }> = {
   pending: { label: '待本人签署', color: 'processing' },
@@ -18,8 +19,9 @@ const SIGNATURE_META: Record<SignatureStatus, { label: string; color: string }> 
   not_required: { label: '已取消，无需签署', color: 'default' },
 }
 export function ClaimStatusTag({ status }: { status: ClaimStatus }) {
+  const { t } = useTranslation()
   const meta = STATUS_META[status]
-  return <Tag color={meta?.color}>{meta?.label ?? '未知状态'}</Tag>
+  return <Tag color={meta?.color}>{status === CLAIM_STATUS.TRANSFERRED ? t('transfer.transferred') : meta?.label ?? t('transfer.unknown')}</Tag>
 }
 export function SignatureStatusTag({ status }: { status: SignatureStatus }) {
   const meta = SIGNATURE_META[status]
@@ -27,8 +29,7 @@ export function SignatureStatusTag({ status }: { status: SignatureStatus }) {
 }
 export function canSignClaim(record: ClaimRow): boolean {
   return (record.status === CLAIM_STATUS.PENDING && record.signatureStatus === SIGNATURE_STATUS.PENDING)
-    || ([CLAIM_STATUS.CLAIMED, CLAIM_STATUS.RETURNED] as ClaimStatus[]).includes(record.status)
-      && record.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING
+    || (record.status === CLAIM_STATUS.CLAIMED && record.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING)
 }
 interface Props {
   data?: ClaimPage<ClaimRow>

@@ -15,7 +15,8 @@ export default function MenuPermissionGuard({ children }: { children: React.Reac
   const location = useLocation()
   const navigate = useNavigate()
 
-  const menuKey = ROUTE_MENU_KEY_MAP[location.pathname]
+  const isTransferAsset = location.pathname === '/asset-detail' && new URLSearchParams(location.search).get('context') === 'transfer'
+  const menuKey = isTransferAsset ? 'asset-transfer-list' : ROUTE_MENU_KEY_MAP[location.pathname]
   if (menuKey && !hasMenuPermission(menuKey)) {
     const fallbackPath = resolveFirstAccessiblePath(
       user?.role === 'admin',

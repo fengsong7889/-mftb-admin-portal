@@ -161,6 +161,7 @@ const AssetScrap = lazy(() => import('./pages/AssetManagement/AssetScrap'))
 const AssetRepair = lazy(() => import('./pages/AssetManagement/AssetRepair'))
 const AssetTransfer = lazy(() => import('./pages/AssetManagement/AssetTransfer'))
 const TransferDetail = lazy(() => import('./pages/AssetManagement/AssetTransfer/TransferDetail'))
+const TransferCancel = lazy(() => import('./pages/AssetManagement/AssetTransfer/TransferCancel'))
 const AssetInventory = lazy(() => import('./pages/AssetManagement/AssetInventory'))
 const AssetCompensation = lazy(() => import('./pages/AssetManagement/AssetCompensation'))
 const AssetDashboard = lazy(() => import('./pages/AssetManagement/AssetDashboard'))
@@ -181,6 +182,7 @@ const AssetBorrow = lazy(() => import('./pages/AssetManagement/AssetBorrow'))
 const AssetReturn = lazy(() => import('./pages/AssetManagement/AssetReturn'))
 // 員工個人資產入口
 const MyAssets = lazy(() => import('./pages/MyAssets'))
+const MyClaims = lazy(() => import('./pages/AssetManagement/AssetClaim/MyClaims'))
 // EAM 調撥交接
 const AssetTransferList = lazy(() => import('./pages/AssetManagement/AssetTransferList'))
 const AssetHandover = lazy(() => import('./pages/AssetManagement/AssetHandover'))
@@ -375,6 +377,7 @@ function AuthenticatedLayout() {
               <Route path="/asset-repair"     element={<AssetRepair />} />
               <Route path="/asset-transfer"   element={<AssetTransfer />} />
               <Route path="/asset-transfer/detail" element={<TransferDetail />} />
+              <Route path="/asset-transfer/cancel" element={<TransferCancel />} />
               <Route path="/asset-inventory"  element={<AssetInventory />} />
               <Route path="/asset-dashboard"  element={<AssetDashboard />} />
               {/* EAM 基礎數據 */}
@@ -411,6 +414,7 @@ function AuthenticatedLayout() {
               <Route path="/asset-compensation/review" element={<AssetCompensation />} />
               {/* 員工個人資產入口 */}
               <Route path="/my-assets"        element={<MyAssets />} />
+              <Route path="/my-claims"        element={<MyClaims />} />
               {/* EAM 調撥交接 */}
               <Route path="/asset-transfer-list" element={<AssetTransferList />} />
               <Route path="/asset-handover"        element={<AssetHandover />} />

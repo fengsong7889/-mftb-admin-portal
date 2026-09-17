@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import jakarta.validation.constraints.*;
 
 /**
  * 资产调拨登记请求 DTO
@@ -11,7 +12,17 @@ import lombok.Data;
 public class EamAssetTransferSaveDTO {
 
     /** 资产 ID */
+    @NotNull @Positive
     private Long assetId;
+
+    @NotNull @Positive
+    private Long toUserId;
+    @NotNull @Positive
+    private Long toDepartmentId;
+    @NotNull @PositiveOrZero
+    private Long expectedVersion;
+    @NotBlank @Pattern(regexp = "[a-zA-Z0-9-]{16,64}")
+    private String requestKey;
 
     /** 新使用人姓名（可含工号后缀，如 "张三(M001)"，后端解析） */
     private String toUserName;
@@ -23,11 +34,14 @@ public class EamAssetTransferSaveDTO {
     private String toDepartment;
 
     /** 调拨日期 yyyy-MM-dd */
+    @NotBlank
     private String transferDate;
 
     /** 调拨原因 */
+    @NotBlank @Size(max = 500)
     private String reason;
 
     /** 备注 */
+    @Size(max = 512)
     private String remark;
 }

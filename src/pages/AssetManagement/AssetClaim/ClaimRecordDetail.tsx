@@ -8,6 +8,7 @@ import { Alert, Button, Descriptions, Empty, Modal, Spin, Space } from 'antd'
 import { FileProtectOutlined, FileTextOutlined, StopOutlined, RollbackOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
+import { useTranslation } from 'react-i18next'
 import { ClaimStatusTag, SignatureStatusTag, canSignClaim } from './ClaimRecordTable'
 import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimRow } from './claimViewTypes'
 
@@ -30,12 +31,15 @@ interface Props {
 }
 
 export default function ClaimRecordDetail({ record, loading, error, onBack, onSign, onViewEvidence, onDownloadEvidence, onCancel, onReturn }: Props) {
+  const { t } = useTranslation()
 
   /** 构建 extra 按钮 */
   const buildExtra = () => {
     if (!record || error) return undefined
     const btns: React.ReactNode[] = []
-    if (onCancel && record.status !== CLAIM_STATUS.RETURNED && record.status !== CLAIM_STATUS.CANCELLED) {
+    if (onCancel && !record.sourceTransferId && record.status !== CLAIM_STATUS.TRANSFERRED
+      && record.status !== CLAIM_STATUS.RETURNED && record.status !== CLAIM_STATUS.CANCELLED
+      && record.signatureStatus !== SIGNATURE_STATUS.SIGNED) {
       btns.push(
         <Button key="cancel" danger icon={<StopOutlined />} onClick={() => {
           Modal.confirm({
@@ -73,6 +77,8 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
       extra={buildExtra()}
     />
     {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
+    {record?.sourceTransferId && <Alert type="info" showIcon message={t('transfer.successor')}
+      description={`${t('transfer.sourceTransfer')}: ${record.sourceTransferId} · ${t('transfer.previousClaim')}: ${record.previousClaimId || '—'}`} style={{ marginBottom: 16 }} />}
     <Spin spinning={loading}>
       {/* ====== 领用内容快照 ====== */}
       <div style={detailCardStyle}>

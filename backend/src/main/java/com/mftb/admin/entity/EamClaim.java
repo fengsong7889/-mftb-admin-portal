@@ -22,6 +22,10 @@ public class EamClaim {
     /** 资产 ID */
     private Long assetId;
 
+    /** 调拨承接来源，不覆盖原领用人的签署记录。 */
+    private Long sourceTransferId;
+    private Long previousClaimId;
+
     /** 领用人 ID（sys_user.id） */
     private Long employeeId;
 

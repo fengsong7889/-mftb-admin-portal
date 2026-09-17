@@ -12,6 +12,10 @@ public class EamAssetQuery {
     private String assetName;
     private String assetType;
     private String brand;
+    private Long brandId;
+    private Long categoryId;
+    private Long departmentId;
+    private String holdType;
     private String status;
     private String company;
     private String department;
