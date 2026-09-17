@@ -452,7 +452,7 @@ export default function RuleConfig() {
                         if (menu === '模型授權管理') return { label: '權控', color: '#722ED1' }
                         if (menu === '配額管理') return { label: '額度', color: '#52C41A' }
                         if (menu === 'AI智能中心') return { label: '對話', color: '#13C2C2' }
-                        if (menu === '物資管理(EAM)-採購訂單' || menu === '物資管理(EAM)-驗收入庫' || menu === '物資管理(EAM)-資產台賬') return { label: '物資', color: '#1890FF' }
+                        if (menu === '物資管理(EAM)-採購訂單' || menu === '物資管理(EAM)-驗收入庫' || menu === '物資管理(EAM)-資產台賬' || menu === '物資管理(EAM)-領用管理' || menu === '物資管理(EAM)-歸還管理' || menu === '物資管理(EAM)-借用管理' || menu === '物資管理(EAM)-賠付管理') return { label: '物資', color: '#1890FF' }
                         if (menu === '資產管理(EAM)-供應商管理') return { label: '供應商', color: '#1890FF' }
                         if (key.startsWith('ad_order_')) return { label: '訂單', color: '#1890FF' }
                         if (key.startsWith('config_pricing_')) return { label: '定價', color: '#E8720C' }

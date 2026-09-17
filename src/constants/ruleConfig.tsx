@@ -419,6 +419,10 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_location_floor', label: '樓層編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'DZ-001-01', remark: 'DZ + 父倉庫序號 +「-」+ 2位數字自增（掛倉庫下，如 DZ-001-01、DZ-001-02）', menu: '資產管理(EAM)-基礎配置' },
       { key: 'eam_location_room', label: '房間編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'XQ-001-01-01', remark: 'XQ + 父倉庫序號 + 父樓層序號 +「-」+ 2位數字自增（掛樓層下，如 XQ-001-01-01）', menu: '資產管理(EAM)-基礎配置' },
       { key: 'eam_supplier_code', label: '供應商編碼', type: 'table', value: 'CGSJ', defaultValue: 'CGSJ', dateFormat: '', min: 6, max: 6, unit: 'CGSJ000001', remark: '{prefix} + 6位數字自增（全局自增，如 CGSJ000001、CGSJ000002）', menu: '資產管理(EAM)-供應商管理' },
+      { key: 'eam_claim', label: '領用編號', type: 'table', value: 'LY', defaultValue: 'LY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'LY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-領用管理' },
+      { key: 'eam_return', label: '歸還編號', type: 'table', value: 'GH', defaultValue: 'GH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'GH202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-歸還管理' },
+      { key: 'eam_borrow', label: '借用編號', type: 'table', value: 'JY', defaultValue: 'JY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'JY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-借用管理' },
+      { key: 'eam_compensation', label: '賠付編號', type: 'table', value: 'PF', defaultValue: 'PF', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PF202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-賠付管理' },
     ],
   },
 ]
