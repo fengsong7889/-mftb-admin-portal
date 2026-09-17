@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio } from 'antd'
+import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio, Tabs } from 'antd'
 import {
   SettingOutlined,
   DownOutlined,
@@ -173,54 +173,44 @@ export default function RuleConfig() {
   const toggleCollapse = (key: string) =>
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
 
-  /* 編號生成表格：按菜單分組展開/收起 */
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
-  const toggleMenu = (menu: string) =>
-    setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }))
+  /* 編號生成規則：Tab 切換 + 搜索 */
+  const [activeRuleTab, setActiveRuleTab] = useState('__all__')
+  const [ruleSearchKw, setRuleSearchKw] = useState('')
 
-  /* 編號生成規則：樹形菜單節點 */
-  interface TreeNode {
-    name: string
-    displayName: string
-    children: { name: string; rules: RuleItem[] }[]
-    rules: RuleItem[]
-    totalRuleCount: number
+  /** 提取一級菜單名（去掉 '-' 後的子菜單部分） */
+  const getTopMenu = (menu?: string) => {
+    if (!menu) return '—'
+    const idx = menu.indexOf('-')
+    return idx === -1 ? menu : menu.substring(0, idx)
   }
 
-  const buildMenuTree = (rules: RuleItem[]): TreeNode[] => {
-    const parentOrder: string[] = []
-    const parentMap = new Map<string, { children: Map<string, RuleItem[]>; directRules: RuleItem[] }>()
-    const standaloneOrder: string[] = []
-    const standaloneMap = new Map<string, RuleItem[]>()
+  /** 搜索過濾規則 */
+  const filterRules = (rules: RuleItem[], kw: string) => {
+    if (!kw.trim()) return rules
+    const k = kw.trim().toLowerCase()
+    return rules.filter(r =>
+      r.label.toLowerCase().includes(k) ||
+      ((r.value as string) || '').toLowerCase().includes(k) ||
+      (r.remark || '').toLowerCase().includes(k)
+    )
+  }
 
-    rules.forEach(rule => {
-      const menu = rule.menu || '—'
-      const dashIdx = menu.indexOf('-')
-      if (dashIdx === -1) {
-        if (!standaloneMap.has(menu)) { standaloneMap.set(menu, []); standaloneOrder.push(menu) }
-        standaloneMap.get(menu)!.push(rule)
-      } else {
-        const parent = menu.substring(0, dashIdx)
-        const child = menu.substring(dashIdx + 1)
-        if (!parentMap.has(parent)) { parentMap.set(parent, { children: new Map(), directRules: [] }); parentOrder.push(parent) }
-        const pNode = parentMap.get(parent)!
-        if (!pNode.children.has(child)) pNode.children.set(child, [])
-        pNode.children.get(child)!.push(rule)
-      }
+  /** 構建 Tab 項 */
+  const buildRuleTabItems = (rules: RuleItem[]) => {
+    const menuOrder: string[] = []
+    const menuMap = new Map<string, RuleItem[]>()
+    rules.forEach(r => {
+      const m = getTopMenu(r.menu)
+      if (!menuMap.has(m)) { menuMap.set(m, []); menuOrder.push(m) }
+      menuMap.get(m)!.push(r)
     })
-
-    const tree: TreeNode[] = []
-    parentOrder.forEach(pName => {
-      const pNode = parentMap.get(pName)!
-      const childList: { name: string; rules: RuleItem[] }[] = []
-      pNode.children.forEach((cRules, cName) => childList.push({ name: cName, rules: cRules }))
-      tree.push({ name: pName, displayName: pName, children: childList, rules: pNode.directRules, totalRuleCount: pNode.directRules.length + childList.reduce((s, c) => s + c.rules.length, 0) })
+    const items: { key: string; label: React.ReactNode }[] = [
+      { key: '__all__', label: <span>全部 <b style={{ color: '#1890FF' }}>{rules.length}</b></span> },
+    ]
+    menuOrder.forEach(m => {
+      items.push({ key: m, label: <span>{m} <b style={{ color: '#8C8C8C' }}>{menuMap.get(m)!.length}</b></span> })
     })
-    standaloneOrder.forEach(sName => {
-      const sRules = standaloneMap.get(sName)!
-      tree.push({ name: sName, displayName: sName, children: [], rules: sRules, totalRuleCount: sRules.length })
-    })
-    return tree
+    return { items, menuMap }
   }
 
   /* 控件渲染（按分组编辑状态控制） */
@@ -508,10 +498,15 @@ export default function RuleConfig() {
                         return null
                       }
 
-                      const menuTree = buildMenuTree(group.rules)
+                      /* 構建 Tab 項 */
+                      const { items: tabItems, menuMap: menuRuleMap } = buildRuleTabItems(group.rules)
+                      const filteredSearch = filterRules(
+                        activeRuleTab === '__all__' ? group.rules : (menuRuleMap.get(activeRuleTab) || []),
+                        ruleSearchKw
+                      )
 
-                      /* 渲染單條編號規則行 */
-                      const renderRuleRow = (rule: RuleItem, depth: number, isLast: boolean, ruleIdx: number) => {
+                      /* 渲染單條編號規則行（扁平，無縮進） */
+                      const renderRuleRow = (rule: RuleItem, menuDisplay: string, isLast: boolean, ruleIdx: number) => {
                         const prefix = (rule.value as string) || '-'
                         const isSpecial = prefix === '-'
                         const dfValue = rule.dateFormat || 'NONE'
@@ -520,12 +515,9 @@ export default function RuleConfig() {
                           ? (rule.remark || '')
                           : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
                         const rowBorder = isLast ? '1px solid #d6e4ff' : '1px solid #f0f0f0'
-                        const indent = depth === 1 ? 44 : 60
                         return (
                           <tr key={rule.key} style={{ background: ruleIdx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                            <td style={{ padding: `8px 12px 8px ${indent}px`, borderBottom: rowBorder }}>
-                              <span style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#1890FF', marginRight: 8 }} />
-                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: '#595959', borderBottom: rowBorder, whiteSpace: 'nowrap' }}>{menuDisplay}</td>
                             <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
                               {(() => {
                                 const cat = getCategoryTag(rule.key, rule.menu)
@@ -561,109 +553,88 @@ export default function RuleConfig() {
                         )
                       }
 
+                      /* 分組小標題行（「全部」Tab 用） */
+                      const renderSectionHeader = (title: string, count: number) => (
+                        <tr key={`section-${title}`}>
+                          <td colSpan={7} style={{
+                            padding: '8px 12px', background: '#F0F5FF', borderBottom: '1px solid #d6e4ff',
+                            fontSize: 13, fontWeight: 600, color: '#1890FF',
+                          }}>
+                            {title} <Tag color="#1890FF" style={{ fontSize: 10, marginLeft: 4, borderRadius: 8 }}>{count} 項</Tag>
+                          </td>
+                        </tr>
+                      )
+
                       return (
-                        <div style={{ overflowX: 'auto' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                            <thead>
-                              <tr style={{ background: '#FAFAFA' }}>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>所屬菜單</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>業務類型</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>前綴</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>日期格式</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>自增序號</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>示例</th>
-                                <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0' }}>備註</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {menuTree.map(treeNode => {
-                                const rootKey = treeNode.name
-                                const isRootExpanded = expandedMenus[rootKey] ?? false
-                                const hasChildren = treeNode.children.length > 0
-
-                                return (
-                                  <React.Fragment key={`tree-${rootKey}`}>
-                                    {/* 一級菜單節點行 */}
-                                    <tr
-                                      onClick={() => toggleMenu(rootKey)}
-                                      style={{
-                                        background: isRootExpanded ? '#E6F4FF' : '#FAFAFA',
-                                        cursor: 'pointer', transition: 'background 0.2s',
-                                      }}
-                                      onMouseEnter={e => { if (!isRootExpanded) e.currentTarget.style.background = '#F0F5FF' }}
-                                      onMouseLeave={e => { if (!isRootExpanded) e.currentTarget.style.background = '#FAFAFA' }}
-                                    >
-                                      <td colSpan={7} style={{ padding: '10px 12px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                          <span style={{
-                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                            width: 20, height: 20, borderRadius: 4,
-                                            background: isRootExpanded ? '#1890FF' : '#E8E8E8', transition: 'all 0.2s',
-                                          }}>
-                                            {isRootExpanded
-                                              ? <UpOutlined style={{ fontSize: 10, color: '#fff' }} />
-                                              : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
-                                            }
-                                          </span>
-                                          <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{treeNode.displayName}</span>
-                                          <Tag color="#1890FF" style={{ fontSize: 11, marginLeft: 4, borderRadius: 10 }}>
-                                            {hasChildren ? `${treeNode.children.length} 個子菜單` : ''}{hasChildren && treeNode.rules.length > 0 ? ' · ' : ''}{treeNode.totalRuleCount} 項規則
-                                          </Tag>
-                                        </div>
-                                      </td>
-                                    </tr>
-
-                                    {/* 展開後：二級子菜單 + 直接規則 */}
-                                    {isRootExpanded && <>
-                                      {/* 二級子菜單（可再次展開） */}
-                                      {treeNode.children.map((child, cIdx) => {
-                                        const childKey = `${rootKey}|${child.name}`
-                                        const isChildExpanded = expandedMenus[childKey] ?? false
-                                        const isLastChild = cIdx === treeNode.children.length - 1 && treeNode.rules.length === 0
-                                        return (
-                                          <React.Fragment key={`child-${childKey}`}>
-                                            <tr
-                                              onClick={() => toggleMenu(childKey)}
-                                              style={{
-                                                background: isChildExpanded ? '#F0F7FF' : '#F5F7FA',
-                                                cursor: 'pointer', transition: 'background 0.2s',
-                                              }}
-                                              onMouseEnter={e => { if (!isChildExpanded) e.currentTarget.style.background = '#EDF2F7' }}
-                                              onMouseLeave={e => { if (!isChildExpanded) e.currentTarget.style.background = '#F5F7FA' }}
-                                            >
-                                              <td colSpan={7} style={{ padding: '8px 12px 8px 36px', borderBottom: isLastChild && !isChildExpanded ? '1px solid #d6e4ff' : '1px solid #f0f0f0' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                  <span style={{
-                                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                    width: 18, height: 18, borderRadius: 3,
-                                                    background: isChildExpanded ? '#40A9FF' : '#D9D9D9', transition: 'all 0.2s',
-                                                  }}>
-                                                    {isChildExpanded
-                                                      ? <UpOutlined style={{ fontSize: 9, color: '#fff' }} />
-                                                      : <DownOutlined style={{ fontSize: 9, color: '#8C8C8C' }} />
-                                                    }
-                                                  </span>
-                                                  <span style={{ fontSize: 13, fontWeight: 500, color: '#595959' }}>{child.name}</span>
-                                                  <Tag style={{ fontSize: 10, borderRadius: 8, marginLeft: 4 }}>{child.rules.length} 項</Tag>
-                                                </div>
-                                              </td>
-                                            </tr>
-                                            {isChildExpanded && child.rules.map((rule, rIdx) =>
-                                              renderRuleRow(rule, 2, rIdx === child.rules.length - 1 && isLastChild, rIdx)
-                                            )}
-                                          </React.Fragment>
-                                        )
-                                      })}
-                                      {/* 一級節點直屬規則 */}
-                                      {treeNode.rules.map((rule, rIdx) =>
-                                        renderRuleRow(rule, 1, rIdx === treeNode.rules.length - 1, rIdx)
-                                      )}
-                                    </>}
-                                  </React.Fragment>
-                                )
-                              })}
-                            </tbody>
-                          </table>
+                        <div>
+                          <div style={{ padding: '12px 24px 0' }}>
+                            <Tabs
+                              activeKey={activeRuleTab}
+                              onChange={(k) => { setActiveRuleTab(k); setRuleSearchKw('') }}
+                              items={tabItems}
+                              size="small"
+                              tabBarStyle={{ marginBottom: 0 }}
+                            />
+                          </div>
+                          <div style={{ padding: '0 24px 8px' }}>
+                            <Input.Search
+                              placeholder="搜索規則名稱 / 前綴 / 備註..."
+                              allowClear
+                              value={ruleSearchKw}
+                              onChange={e => setRuleSearchKw(e.target.value)}
+                              style={{ maxWidth: 320, marginBottom: 8 }}
+                            />
+                          </div>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                              <thead>
+                                <tr style={{ background: '#FAFAFA' }}>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>所屬菜單</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>業務類型</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>前綴</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>日期格式</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>自增序號</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>示例</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#595959', borderBottom: '1px solid #f0f0f0' }}>備註</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activeRuleTab === '__all__' ? (
+                                  /* 全部規則：按一級菜單分組，每組小標題 + 扁平規則行 */
+                                  (() => {
+                                    const sectionOrder: string[] = []
+                                    const sectionMap = new Map<string, RuleItem[]>()
+                                    filteredSearch.forEach(r => {
+                                      const top = getTopMenu(r.menu)
+                                      if (!sectionMap.has(top)) { sectionMap.set(top, []); sectionOrder.push(top) }
+                                      sectionMap.get(top)!.push(r)
+                                    })
+                                    return sectionOrder.map((sec, sIdx) => {
+                                      const secRules = sectionMap.get(sec)!
+                                      const hasSubMenus = secRules.some(r => (r.menu || '').includes('-'))
+                                      const rows: React.ReactNode[] = []
+                                      rows.push(renderSectionHeader(sec, secRules.length))
+                                      secRules.forEach((rule, rIdx) => {
+                                        const menu = rule.menu || '—'
+                                        const dashIdx = menu.indexOf('-')
+                                        const displayName = hasSubMenus ? (dashIdx !== -1 ? menu.substring(dashIdx + 1) : menu) : '—'
+                                        rows.push(renderRuleRow(rule, displayName, rIdx === secRules.length - 1, rIdx))
+                                      })
+                                      return <React.Fragment key={`sec-${sIdx}`}>{rows}</React.Fragment>
+                                    })
+                                  })()
+                                ) : (
+                                  /* 指定菜單：扁平展示，子菜單名作為「所屬菜單」 */
+                                  filteredSearch.map((rule, rIdx) => {
+                                    const menu = rule.menu || '—'
+                                    const dashIdx = menu.indexOf('-')
+                                    const displayName = dashIdx !== -1 ? menu.substring(dashIdx + 1) : '—'
+                                    return renderRuleRow(rule, displayName, rIdx === filteredSearch.length - 1, rIdx)
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       )
                     }
