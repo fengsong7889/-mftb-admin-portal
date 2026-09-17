@@ -1,6 +1,5 @@
 #!/bin/bash
 # EAM 借用/归还端到端 API 验证脚本
-# 参照 EAM_MODULE_TEST_REPORT.md §7.1-7.2
 
 BASE="http://localhost:8080"
 TOKEN=""
