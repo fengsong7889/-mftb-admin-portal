@@ -411,14 +411,14 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'ai_emp_role_quota', label: '員工額度-按角色', type: 'table', value: 'JSED', defaultValue: 'JSED', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'JSED20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '配額管理' },
       /* ── AI智能中心 ── */
       { key: 'ai_conversation', label: '對話編號', type: 'table', value: 'DH', defaultValue: 'DH', dateFormat: 'YYYYMMDD', min: 5, max: 5, unit: 'DH2026090700001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: 'AI智能中心' },
-      /* ── 資產管理（EAM）── */
-      { key: 'eam_category_l1', label: '資產分類編碼-一級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01', remark: '2位數字自增，同級最大序號+1（如 01、02、03）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_category_l2', label: '資產分類編碼-二級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01、01-02）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_category_l3', label: '資產分類編碼-三級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01-01、01-01-02）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_location_warehouse', label: '倉庫編碼', type: 'table', value: 'CK-', defaultValue: 'CK-', dateFormat: '', min: 3, max: 3, unit: 'CK-001', remark: '{prefix} + 3位數字自增（全局自增，如 CK-001、CK-002）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_location_floor', label: '樓層編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'DZ-001-01', remark: 'DZ + 父倉庫序號 +「-」+ 2位數字自增（掛倉庫下，如 DZ-001-01、DZ-001-02）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_location_room', label: '房間編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'XQ-001-01-01', remark: 'XQ + 父倉庫序號 + 父樓層序號 +「-」+ 2位數字自增（掛樓層下，如 XQ-001-01-01）', menu: '資產管理(EAM)-基礎配置' },
-      { key: 'eam_supplier_code', label: '供應商編碼', type: 'table', value: 'CGSJ', defaultValue: 'CGSJ', dateFormat: '', min: 6, max: 6, unit: 'CGSJ000001', remark: '{prefix} + 6位數字自增（全局自增，如 CGSJ000001、CGSJ000002）', menu: '資產管理(EAM)-供應商管理' },
+      /* ── 物資管理（EAM）── 基礎配置 / 供應商管理 ── */
+      { key: 'eam_category_l1', label: '資產分類編碼-一級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01', remark: '2位數字自增，同級最大序號+1（如 01、02、03）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_category_l2', label: '資產分類編碼-二級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01、01-02）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_category_l3', label: '資產分類編碼-三級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01-01、01-01-02）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_location_warehouse', label: '倉庫編碼', type: 'table', value: 'CK-', defaultValue: 'CK-', dateFormat: '', min: 3, max: 3, unit: 'CK-001', remark: '{prefix} + 3位數字自增（全局自增，如 CK-001、CK-002）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_location_floor', label: '樓層編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'DZ-001-01', remark: 'DZ + 父倉庫序號 +「-」+ 2位數字自增（掛倉庫下，如 DZ-001-01、DZ-001-02）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_location_room', label: '房間編碼', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: 'XQ-001-01-01', remark: 'XQ + 父倉庫序號 + 父樓層序號 +「-」+ 2位數字自增（掛樓層下，如 XQ-001-01-01）', menu: '物資管理(EAM)-基礎配置' },
+      { key: 'eam_supplier_code', label: '供應商編碼', type: 'table', value: 'CGSJ', defaultValue: 'CGSJ', dateFormat: '', min: 6, max: 6, unit: 'CGSJ000001', remark: '{prefix} + 6位數字自增（全局自增，如 CGSJ000001、CGSJ000002）', menu: '物資管理(EAM)-供應商管理' },
       { key: 'eam_claim', label: '領用編號', type: 'table', value: 'LY', defaultValue: 'LY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'LY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-領用管理' },
       { key: 'eam_return', label: '歸還編號', type: 'table', value: 'GH', defaultValue: 'GH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'GH202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-歸還管理' },
       { key: 'eam_borrow', label: '借用編號', type: 'table', value: 'JY', defaultValue: 'JY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'JY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-借用管理' },
