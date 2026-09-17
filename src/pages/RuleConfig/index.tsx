@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio, Tabs } from 'antd'
+import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio } from 'antd'
 import {
   SettingOutlined,
   DownOutlined,
@@ -8,6 +8,7 @@ import {
   SaveOutlined,
   CloseOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { useSystemRules, syncIdleTimeoutToBackend } from '../../hooks/useSystemRules'
 import { PAYMENT_AD_TYPES, derivePaymentMode, syncPaymentModeToBackend, fetchPaymentMode } from '../../hooks/usePaymentRule'
@@ -173,45 +174,16 @@ export default function RuleConfig() {
   const toggleCollapse = (key: string) =>
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
 
-  /* 編號生成規則：Tab 切換 + 搜索 */
-  const [activeRuleTab, setActiveRuleTab] = useState('__all__')
+  /* 編號生成規則：搜索（debounce 300ms） */
   const [ruleSearchKw, setRuleSearchKw] = useState('')
+  const [debouncedKw, setDebouncedKw] = useState('')
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
-  /** 提取一級菜單名（去掉 '-' 後的子菜單部分） */
-  const getTopMenu = (menu?: string) => {
-    if (!menu) return '—'
-    const idx = menu.indexOf('-')
-    return idx === -1 ? menu : menu.substring(0, idx)
-  }
-
-  /** 搜索過濾規則 */
-  const filterRules = (rules: RuleItem[], kw: string) => {
-    if (!kw.trim()) return rules
-    const k = kw.trim().toLowerCase()
-    return rules.filter(r =>
-      r.label.toLowerCase().includes(k) ||
-      ((r.value as string) || '').toLowerCase().includes(k) ||
-      (r.remark || '').toLowerCase().includes(k)
-    )
-  }
-
-  /** 構建 Tab 項 */
-  const buildRuleTabItems = (rules: RuleItem[]) => {
-    const menuOrder: string[] = []
-    const menuMap = new Map<string, RuleItem[]>()
-    rules.forEach(r => {
-      const m = getTopMenu(r.menu)
-      if (!menuMap.has(m)) { menuMap.set(m, []); menuOrder.push(m) }
-      menuMap.get(m)!.push(r)
-    })
-    const items: { key: string; label: React.ReactNode }[] = [
-      { key: '__all__', label: <span>全部 <b style={{ color: '#1890FF' }}>{rules.length}</b></span> },
-    ]
-    menuOrder.forEach(m => {
-      items.push({ key: m, label: <span>{m} <b style={{ color: '#8C8C8C' }}>{menuMap.get(m)!.length}</b></span> })
-    })
-    return { items, menuMap }
-  }
+  const handleSearchChange = useCallback((val: string) => {
+    setRuleSearchKw(val)
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => setDebouncedKw(val), 300)
+  }, [])
 
   /* 控件渲染（按分组编辑状态控制） */
   const renderControl = (rule: RuleItem, groupEditing: boolean) => {
@@ -498,94 +470,81 @@ export default function RuleConfig() {
                         return null
                       }
 
-                      /* 構建 Tab 項 */
-                      const { items: tabItems, menuMap: menuRuleMap } = buildRuleTabItems(group.rules)
-                      const filteredSearch = filterRules(
-                        activeRuleTab === '__all__' ? group.rules : (menuRuleMap.get(activeRuleTab) || []),
-                        ruleSearchKw
-                      )
+                      /* 構建一級菜單分組 Tab 數據 */
+                      const tabMenuOrder: string[] = []
+                      const tabMenuMap = new Map<string, RuleItem[]>()
+                      group.rules.forEach(r => {
+                        const menu = r.menu || '—'
+                        const top = menu.includes('-') ? menu.substring(0, menu.indexOf('-')) : menu
+                        if (!tabMenuMap.has(top)) { tabMenuMap.set(top, []); tabMenuOrder.push(top) }
+                        tabMenuMap.get(top)!.push(r)
+                      })
 
-                      /* 渲染單條編號規則行（扁平，無縮進） */
-                      const renderRuleRow = (rule: RuleItem, menuDisplay: string, isLast: boolean, ruleIdx: number) => {
-                        const prefix = (rule.value as string) || '-'
-                        const isSpecial = prefix === '-'
-                        const dfValue = rule.dateFormat || 'NONE'
-                        const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
-                        const remark = isSpecial
-                          ? (rule.remark || '')
-                          : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
-                        const rowBorder = isLast ? '1px solid #d6e4ff' : '1px solid #f0f0f0'
-                        return (
-                          <tr key={rule.key} style={{ background: ruleIdx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                            <td style={{ padding: '8px 12px', fontSize: 12, color: '#595959', borderBottom: rowBorder, whiteSpace: 'nowrap' }}>{menuDisplay}</td>
-                            <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
-                              {(() => {
-                                const cat = getCategoryTag(rule.key, rule.menu)
-                                return cat ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{
-                                      display: 'inline-block', fontSize: 10, lineHeight: '16px',
-                                      padding: '0 4px', borderRadius: 3,
-                                      background: `${cat.color}15`, color: cat.color,
-                                      fontWeight: 600, border: `1px solid ${cat.color}30`,
-                                    }}>{cat.label}</span>
-                                    {rule.label}
-                                  </span>
-                                ) : rule.label
-                              })()}
-                            </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                              <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
-                            </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                              <span style={{ fontSize: 12, color: '#595959' }}>
-                                {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYYYMM' || dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                              <span style={{ fontSize: 12, color: '#595959' }}>{isSpecial ? '—' : `${slValue} 位`}</span>
-                            </td>
-                            <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
-                              {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
-                            </td>
-                            <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
-                          </tr>
-                        )
-                      }
+                      /* 搜索過濾（debounce） */
+                      const allRules = group.rules
+                      const kw = debouncedKw.trim().toLowerCase()
+                      const filteredRules = kw
+                        ? allRules.filter(r =>
+                            r.label.toLowerCase().includes(kw) ||
+                            ((r.value as string) || '').toLowerCase().includes(kw) ||
+                            (r.remark || '').toLowerCase().includes(kw) ||
+                            (r.menu || '').toLowerCase().includes(kw)
+                          )
+                        : allRules
 
-                      /* 分組小標題行（「全部」Tab 用） */
-                      const renderSectionHeader = (title: string, count: number) => (
-                        <tr key={`section-${title}`}>
-                          <td colSpan={7} style={{
-                            padding: '8px 12px', background: '#F0F5FF', borderBottom: '1px solid #d6e4ff',
-                            fontSize: 13, fontWeight: 600, color: '#1890FF',
-                          }}>
-                            {title} <Tag color="#1890FF" style={{ fontSize: 10, marginLeft: 4, borderRadius: 8 }}>{count} 項</Tag>
-                          </td>
-                        </tr>
-                      )
+                      /* 按一級菜單分組展示（統一格式） */
+                      const sectionOrder: string[] = []
+                      const sectionMap = new Map<string, RuleItem[]>()
+                      filteredRules.forEach(r => {
+                        const menu = r.menu || '—'
+                        const top = menu.includes('-') ? menu.substring(0, menu.indexOf('-')) : menu
+                        if (!sectionMap.has(top)) { sectionMap.set(top, []); sectionOrder.push(top) }
+                        sectionMap.get(top)!.push(r)
+                      })
 
                       return (
                         <div>
-                          <div style={{ padding: '12px 24px 0' }}>
-                            <Tabs
-                              activeKey={activeRuleTab}
-                              onChange={(k) => { setActiveRuleTab(k); setRuleSearchKw('') }}
-                              items={tabItems}
-                              size="small"
-                              tabBarStyle={{ marginBottom: 0 }}
-                            />
+                          {/* 雙排標籤欄 */}
+                          <div style={{ padding: '12px 24px 0', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                            {['__all__', ...tabMenuOrder].map(tabKey => {
+                              const isActive = tabKey === '__all__'
+                              const label = tabKey === '__all__' ? '全部' : tabKey
+                              const count = tabKey === '__all__' ? allRules.length : (tabMenuMap.get(tabKey)?.length || 0)
+                              return (
+                                <div key={tabKey} style={{
+                                  padding: '4px 12px', borderRadius: 6, cursor: 'default',
+                                  fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
+                                  background: isActive ? '#E8720C' : '#F5F5F5',
+                                  color: isActive ? '#fff' : '#595959',
+                                  border: `1px solid ${isActive ? '#E8720C' : '#E8E8E8'}`,
+                                }}>
+                                  {label} <span style={{ fontSize: 10, opacity: 0.8 }}>{count}</span>
+                                </div>
+                              )
+                            })}
                           </div>
-                          <div style={{ padding: '0 24px 8px' }}>
-                            <Input.Search
-                              placeholder="搜索規則名稱 / 前綴 / 備註..."
-                              allowClear
-                              value={ruleSearchKw}
-                              onChange={e => setRuleSearchKw(e.target.value)}
-                              style={{ maxWidth: 320, marginBottom: 8 }}
-                            />
+                          {/* 搜索區（全局規範 .search-section） */}
+                          <div className="search-section" style={{ padding: '12px 24px 0' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px 12px', alignItems: 'start' }}>
+                              <div className="ant-form-item" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <div className="ant-form-item-label" style={{ padding: '0 0 4px', minHeight: 22, lineHeight: '22px' }}>
+                                  <label style={{ height: 22, lineHeight: '22px' }}>搜索規則</label>
+                                </div>
+                                <div style={{ position: 'relative', width: '100%' }}>
+                                  <SearchOutlined style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#BFBFBF', fontSize: 13, zIndex: 1 }} />
+                                  <Input
+                                    placeholder="按規則名稱、前綴或備註搜索"
+                                    allowClear
+                                    value={ruleSearchKw}
+                                    onChange={e => handleSearchChange(e.target.value)}
+                                    style={{ height: 32, borderRadius: 6, paddingLeft: 32 }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ overflowX: 'auto' }}>
+                          {/* 規則表格（統一展示所有規則） */}
+                          <div style={{ padding: '8px 24px 16px', overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                               <thead>
                                 <tr style={{ background: '#FAFAFA' }}>
@@ -599,39 +558,71 @@ export default function RuleConfig() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {activeRuleTab === '__all__' ? (
-                                  /* 全部規則：按一級菜單分組，每組小標題 + 扁平規則行 */
-                                  (() => {
-                                    const sectionOrder: string[] = []
-                                    const sectionMap = new Map<string, RuleItem[]>()
-                                    filteredSearch.forEach(r => {
-                                      const top = getTopMenu(r.menu)
-                                      if (!sectionMap.has(top)) { sectionMap.set(top, []); sectionOrder.push(top) }
-                                      sectionMap.get(top)!.push(r)
-                                    })
-                                    return sectionOrder.map((sec, sIdx) => {
-                                      const secRules = sectionMap.get(sec)!
-                                      const hasSubMenus = secRules.some(r => (r.menu || '').includes('-'))
-                                      const rows: React.ReactNode[] = []
-                                      rows.push(renderSectionHeader(sec, secRules.length))
-                                      secRules.forEach((rule, rIdx) => {
-                                        const menu = rule.menu || '—'
-                                        const dashIdx = menu.indexOf('-')
-                                        const displayName = hasSubMenus ? (dashIdx !== -1 ? menu.substring(dashIdx + 1) : menu) : '—'
-                                        rows.push(renderRuleRow(rule, displayName, rIdx === secRules.length - 1, rIdx))
-                                      })
-                                      return <React.Fragment key={`sec-${sIdx}`}>{rows}</React.Fragment>
-                                    })
-                                  })()
-                                ) : (
-                                  /* 指定菜單：扁平展示，子菜單名作為「所屬菜單」 */
-                                  filteredSearch.map((rule, rIdx) => {
+                                {sectionOrder.map((sec, sIdx) => {
+                                  const secRules = sectionMap.get(sec)!
+                                  const hasSubMenus = secRules.some(r => (r.menu || '').includes('-'))
+                                  const rows: React.ReactNode[] = []
+                                  rows.push(
+                                    <tr key={`section-${sec}`}>
+                                      <td colSpan={7} style={{
+                                        padding: '8px 12px', background: '#F0F5FF', borderBottom: '1px solid #d6e4ff',
+                                        fontSize: 13, fontWeight: 600, color: '#1890FF',
+                                      }}>
+                                        {sec} <Tag color="#1890FF" style={{ fontSize: 10, marginLeft: 4, borderRadius: 8 }}>{secRules.length} 項</Tag>
+                                      </td>
+                                    </tr>
+                                  )
+                                  secRules.forEach((rule, rIdx) => {
+                                    const prefix = (rule.value as string) || '-'
+                                    const isSpecial = prefix === '-'
+                                    const dfValue = rule.dateFormat || 'NONE'
+                                    const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
+                                    const remark = isSpecial
+                                      ? (rule.remark || '')
+                                      : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
                                     const menu = rule.menu || '—'
                                     const dashIdx = menu.indexOf('-')
-                                    const displayName = dashIdx !== -1 ? menu.substring(dashIdx + 1) : '—'
-                                    return renderRuleRow(rule, displayName, rIdx === filteredSearch.length - 1, rIdx)
+                                    const menuDisplay = hasSubMenus ? (dashIdx !== -1 ? menu.substring(dashIdx + 1) : menu) : '—'
+                                    const rowBorder = rIdx === secRules.length - 1 ? '1px solid #d6e4ff' : '1px solid #f0f0f0'
+                                    rows.push(
+                                      <tr key={rule.key} style={{ background: rIdx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                                        <td style={{ padding: '8px 12px', fontSize: 12, color: '#595959', borderBottom: rowBorder, whiteSpace: 'nowrap' }}>{menuDisplay}</td>
+                                        <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                                          {(() => {
+                                            const cat = getCategoryTag(rule.key, rule.menu)
+                                            return cat ? (
+                                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{
+                                                  display: 'inline-block', fontSize: 10, lineHeight: '16px',
+                                                  padding: '0 4px', borderRadius: 3,
+                                                  background: `${cat.color}15`, color: cat.color,
+                                                  fontWeight: 600, border: `1px solid ${cat.color}30`,
+                                                }}>{cat.label}</span>
+                                                {rule.label}
+                                              </span>
+                                            ) : rule.label
+                                          })()}
+                                        </td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                          <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
+                                        </td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                          <span style={{ fontSize: 12, color: '#595959' }}>
+                                            {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYYYMM' || dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
+                                          </span>
+                                        </td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                                          <span style={{ fontSize: 12, color: '#595959' }}>{isSpecial ? '—' : `${slValue} 位`}</span>
+                                        </td>
+                                        <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                                          {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
+                                        </td>
+                                        <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
+                                      </tr>
+                                    )
                                   })
-                                )}
+                                  return <React.Fragment key={`sec-${sIdx}`}>{rows}</React.Fragment>
+                                })}
                               </tbody>
                             </table>
                           </div>
