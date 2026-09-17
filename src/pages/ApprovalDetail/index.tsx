@@ -310,6 +310,10 @@ export default function ApprovalDetail() {
   /** 是否可撤銷：流程審批中 + 無已通過節點 + 當前用戶為申請人或管理員 */
   const canRevoke = isPending && !hasApprovedNode && isApplicant
 
+  /** 記錄已從後端成功載入詳情的 oa_purchase 流程號：防止 fallbackDetail（依賴異步 refReady）
+   *  身份變化觸發下方 effect 重跑時，用 draft 空數據覆蓋後端已載入的正確數據（刷新後詳情空白、無法審批）。 */
+  const oaLoadedFlowNoRef = useRef<string | null>(null)
+
   /** 加載審批詳情（AI 申請不走 biz_fin_approval，直接取本地記錄 + 後續 effect 拉後端 AI 詳情） */
   useEffect(() => {
     let cancelled = false
@@ -318,6 +322,9 @@ export default function ApprovalDetail() {
       // AI 申請存在於 biz_oa_request 表，不在 biz_fin_approval 中，跳過財務審批查詢避免「審批流程不存在」報錯
       // 採購申請同樣不在 biz_fin_approval 中，跳過避免降级到充值 mock 數據
       if (type === 'ai_access' || type === 'oa_purchase') {
+        // oa_purchase 完整詳情由後續 effect 從後端拉取；後端數據已載入則不再用 fallback 覆蓋，
+        // 避免 refReady 異步就緒後本 effect 重跑把 draft 空數據蓋回（刷新後詳情空白、無法審批）。
+        if (type === 'oa_purchase' && oaLoadedFlowNoRef.current === flowNo) return
         if (!cancelled) setData(fallbackDetail())
         return
       }
@@ -480,6 +487,7 @@ export default function ApprovalDetail() {
     fetchOaRequestDetail(flowNo)
       .then((oaVo: OaRequestVO) => {
         if (cancelled) return
+        oaLoadedFlowNoRef.current = flowNo // 標記該流程後端詳情已載入，上方 effect 不再用 fallback 覆蓋
         const fd = oaVo.formData || {}
         const applicantText = oaVo.applicant || '--'
         const purchaseItems = Array.isArray(fd.items)

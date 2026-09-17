@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
 import { useAuth } from '../../../contexts/AuthContext'
-import { parseClaimId, type ClaimPage, type ClaimQuery, type ClaimRegistration, type ClaimRow, type ClaimSummaryData } from './claimViewTypes'
+import { parseClaimId, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration, type ClaimRow, type ClaimSummaryData } from './claimViewTypes'
 import ClaimList from './ClaimList'
 import ClaimForm from './ClaimForm'
 import EmployeeAssetDetail from './EmployeeAssetDetail'
@@ -21,6 +21,8 @@ import ClaimRecordDetail from './ClaimRecordDetail'
 import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
+import { fetchAssetList, fetchAssetDetail } from '../../../api/asset'
+import { fetchEmployees } from '../../../api/employee'
 import './index.css'
 
 type View = 'list' | 'add' | 'detail' | 'record'
@@ -49,6 +51,12 @@ export default function AssetClaim() {
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
+  // 領用登記表單數據源：可領用閑置資產 / 在職員工
+  //（此前父組件未提供 onAssetQuery/onEmployeeQuery/assets/employees，導致 ClaimForm 三個下拉永久 disabled — BUG-01）
+  const [assetPage, setAssetPage] = useState<ClaimPage<ClaimAssetOption> | undefined>()
+  const [employeePage, setEmployeePage] = useState<ClaimPage<ClaimEmployee> | undefined>()
+  const [initialAsset, setInitialAsset] = useState<ClaimAssetOption | undefined>()
+  const [initialEmployee, setInitialEmployee] = useState<ClaimEmployee | undefined>()
 
   /* ----- 加载部门列表 ----- */
   useEffect(() => {
@@ -97,6 +105,38 @@ export default function AssetClaim() {
     }
   }, [])
 
+  /* ----- 可領用閑置資產查詢（供領用登記表單「資產編號」下拉；僅 status=idle） ----- */
+  const handleAssetQuery = useCallback(async (query: ClaimQuery) => {
+    try {
+      const res = await fetchAssetList({ page: query.page, size: query.size, keyword: query.keyword, status: 'idle' })
+      setAssetPage({
+        total: res.total,
+        records: (res.records || []).map((a) => ({
+          id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
+          brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
+        })),
+      })
+    } catch {
+      setAssetPage({ records: [], total: 0 })
+    }
+  }, [])
+
+  /* ----- 在職員工查詢（供領用登記表單「領用人」下拉） ----- */
+  const handleEmployeeQuery = useCallback(async (query: ClaimQuery) => {
+    try {
+      const res = await fetchEmployees({ page: query.page, size: query.size, keyword: query.keyword, employmentStatus: 'active' })
+      setEmployeePage({
+        total: res.total,
+        records: (res.records || []).map((e) => ({
+          employeeId: e.id, empNo: e.empId, empName: e.name,
+          departmentId: e.departmentId ?? undefined, department: e.department || '',
+        })),
+      })
+    } catch {
+      setEmployeePage({ records: [], total: 0 })
+    }
+  }, [])
+
   const goList = useCallback(() => navigate('/asset-claim'), [navigate])
   const goDetail = useCallback((employeeId: number) => navigate(`/asset-claim/detail?employeeId=${employeeId}`), [navigate])
   const goAdd = useCallback((fromEmployeeId?: number, fromAssetId?: number) => {
@@ -123,6 +163,25 @@ export default function AssetClaim() {
       handleQueryRecord(recordId)
     }
   }, [view, employeeId, recordId, handleQueryDetail, handleQueryRecord])
+
+  const assetIdParam = useMemo(() => parseClaimId(params.get('assetId')), [params])
+
+  /* ----- 領用登記深鏈預填：?assetId= 帶入資產、?employeeId= 帶入領用人 ----- */
+  useEffect(() => {
+    if (view !== 'add') return
+    if (assetIdParam != null) {
+      fetchAssetDetail(assetIdParam).then((a) => setInitialAsset({
+        id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
+        brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
+      })).catch(() => {})
+    }
+    if (employeeId != null) {
+      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
+        const e = (res.records || []).find((x) => x.id === employeeId)
+        if (e) setInitialEmployee({ employeeId: e.id, empNo: e.empId, empName: e.name, departmentId: e.departmentId ?? undefined, department: e.department || '' })
+      }).catch(() => {})
+    }
+  }, [view, assetIdParam, employeeId])
 
   /* ----- 登记提交 ----- */
   const handleSubmitClaim = useCallback(async (values: ClaimRegistration) => {
@@ -187,11 +246,18 @@ export default function AssetClaim() {
             else goList()
           }}
           employeeId={parseClaimId(params.get('employeeId'))}
-          assetId={parseClaimId(params.get('assetId'))}
+          assetId={assetIdParam}
+          initialAsset={initialAsset}
+          initialEmployee={initialEmployee}
+          assets={assetPage}
+          employees={employeePage}
+          departments={departments}
           operatorName={user?.name}
           canProxy={canProxy}
           loading={loading}
           error={error}
+          onAssetQuery={handleAssetQuery}
+          onEmployeeQuery={handleEmployeeQuery}
           onSubmit={handleSubmitClaim}
         />
       )}

@@ -6,16 +6,17 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Button, Descriptions, Table, Tag, Space, Spin, message, Progress,
+  Button, Descriptions, Table, Tag, Space, Spin, message, Progress, Modal, Select, Form,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchPurchaseOrderDetail, fetchAllParamTypes,
+  fetchPurchaseOrderDetail, fetchAllParamTypes, updatePurchaseOrderExec,
   type PurchaseOrder, type ExecStatus,
   type PurchaseOrderSupplierGroup, type ParamType,
 } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
+import { useAuth } from '../../../contexts/AuthContext'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
 import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
@@ -49,10 +50,16 @@ interface Props {
 export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewRequest }: Props) {
   const { t } = useTranslation()
   const { codeHint, labelMap } = useCompanyBrand()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [detail, setDetail] = useState<PurchaseOrder | null>(null)
   const [empDeptMap, setEmpDeptMap] = useState<Map<string, string>>(new Map())
   const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
+  // 狀態推進（開始採購需選擇採購經辦人）
+  const [empOptions, setEmpOptions] = useState<{ value: string; label: string }[]>([])
+  const [purchaserModalVisible, setPurchaserModalVisible] = useState(false)
+  const [selectedPurchaser, setSelectedPurchaser] = useState('')
+  const [purchaserConfirmLoading, setPurchaserConfirmLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -68,18 +75,55 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
   useEffect(() => { loadData() }, [loadData])
 
-  // 員工 → 部門映射
+  // 員工 → 部門映射 & 採購經辦人下拉選項
   useEffect(() => {
     fetchEmployees({ page: 1, size: 999, employmentStatus: 'active' })
       .then((res) => {
         const map = new Map<string, string>()
+        const opts: { value: string; label: string }[] = []
         ;(res.records || []).forEach((e) => {
           if (e.department) { map.set(e.name, e.department); map.set(e.empId, e.department) }
+          opts.push({ value: e.name, label: `${e.name}（${e.empId}）${e.department ? ' - ' + e.department : ''}` })
         })
         setEmpDeptMap(map)
+        setEmpOptions(opts)
       })
       .catch(() => {})
   }, [])
+
+  /** 開始採購：選擇採購經辦人 → 推進為「採購中」 */
+  const handleStartPurchase = () => {
+    setSelectedPurchaser(detail?.purchaser || user?.name || '')
+    setPurchaserModalVisible(true)
+  }
+  const handlePurchaserModalOk = async () => {
+    if (!selectedPurchaser) { message.warning(t('asset.warnSelectPurchaser')); return }
+    setPurchaserConfirmLoading(true)
+    try {
+      await updatePurchaseOrderExec(id, { execStatus: 'purchasing', purchaser: selectedPurchaser })
+      message.success(t('asset.startPurchaseSuccess'))
+      setPurchaserModalVisible(false)
+      loadData()
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+    } finally {
+      setPurchaserConfirmLoading(false)
+    }
+  }
+  /** 完成採購：推進為「已完成」，可進行驗收入庫 */
+  const handleCompletePurchase = () => {
+    Modal.confirm({
+      title: t('common.confirm'),
+      content: t('asset.confirmCompletePurchase'),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        await updatePurchaseOrderExec(id, { execStatus: 'completed' })
+        message.success(t('asset.completePurchaseSuccess'))
+        loadData()
+      },
+    })
+  }
 
   // 參數編碼 → 參數名稱映射
   useEffect(() => {
@@ -151,6 +195,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   const inboundMeta = INBOUND_META[detail.status]
 
   return (
+    <>
     <Spin spinning={loading}>
       {/* ====== 詳情頁頭部 ====== */}
       <DetailPageHeader
@@ -164,11 +209,27 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         meta={<>{detail.poNo} · {detail.supplier}</>}
         onBack={onBack}
         onEdit={detail.execStatus !== 'completed' && detail.status !== 'received' ? () => onEdit(detail.id) : undefined}
-        extra={detail.execStatus === 'completed' && detail.status !== 'received' ? (
-          <Button type="primary" onClick={() => onInbound(detail.id)}
-            style={{ backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
-            {t('asset.btnReceive')}
-          </Button>
+        extra={detail.status !== 'received' ? (
+          <Space>
+            {detail.execStatus === 'pending' && (
+              <Button type="primary" onClick={handleStartPurchase}
+                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                {t('asset.btnStartPurchase')}
+              </Button>
+            )}
+            {detail.execStatus === 'purchasing' && (
+              <Button type="primary" onClick={handleCompletePurchase}
+                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                {t('asset.btnCompletePurchase')}
+              </Button>
+            )}
+            {detail.execStatus === 'completed' && (
+              <Button type="primary" onClick={() => onInbound(detail.id)}
+                style={{ backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
+                {t('asset.btnReceive')}
+              </Button>
+            )}
+          </Space>
         ) : undefined}
       />
 
@@ -296,5 +357,37 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{detail.updatedAt || '-'}</span></span>
       </div>
     </Spin>
+
+      {/* ====== 開始採購 - 選擇經辦人彈窗 ====== */}
+      <Modal
+        title={t('asset.btnStartPurchase')}
+        open={purchaserModalVisible}
+        onOk={handlePurchaserModalOk}
+        onCancel={() => setPurchaserModalVisible(false)}
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        confirmLoading={purchaserConfirmLoading}
+        destroyOnHidden
+      >
+        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+          {t('asset.colPoNo')}：<span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail?.poNo}</span>
+        </div>
+        <Form layout="vertical">
+          <Form.Item label={t('asset.colPurchaser')} required>
+            <Select
+              showSearch
+              placeholder={t('asset.phSearchEmp')}
+              value={selectedPurchaser || undefined}
+              onChange={(v) => setSelectedPurchaser(v)}
+              filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              options={empOptions}
+              style={{ width: '100%' }}
+              allowClear
+              onClear={() => setSelectedPurchaser('')}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
   )
 }

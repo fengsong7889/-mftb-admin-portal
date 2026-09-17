@@ -59,8 +59,9 @@ public class EamClaimServiceImpl implements EamClaimService {
         // 各状态统计
         stats.setClaimedCount(claimMapper.selectCount(queryWrapper(query).eq(EamClaim::getStatus, "claimed")));
         stats.setReturnedCount(claimMapper.selectCount(queryWrapper(query).eq(EamClaim::getStatus, "returned")));
+        // 待签记录（含代办补签）= 标准待签(signatureStatus=pending) + 代办补签(claimed 但 signatureStatus=proxy_pending)
         stats.setPendingSignatureCount(claimMapper.selectCount(
-                queryWrapper(query).eq(EamClaim::getStatus, "pending_signature")));
+                queryWrapper(query).in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
         return stats;
     }
 
@@ -89,8 +90,9 @@ public class EamClaimServiceImpl implements EamClaimService {
             vo.setReturnedCount(claims.stream().filter(c -> "returned".equals(c.getStatus())).count());
             vo.setPendingCount(claims.stream().filter(c ->
                     "pending_signature".equals(c.getStatus()) && "pending".equals(c.getSignatureStatus())).count());
+            // 代办领用落库为 status=claimed + signatureStatus=proxy_pending，故仅按 signatureStatus 判定
             vo.setProxyPendingCount(claims.stream().filter(c ->
-                    "pending_signature".equals(c.getStatus()) && "proxy_pending".equals(c.getSignatureStatus())).count());
+                    "proxy_pending".equals(c.getSignatureStatus())).count());
             vo.setLastClaimDate(claims.stream()
                     .map(c -> c.getClaimDate() != null ? c.getClaimDate().toString() : null)
                     .filter(Objects::nonNull)
@@ -203,6 +205,8 @@ public class EamClaimServiceImpl implements EamClaimService {
             asset.setActiveClaimId(claim.getId());
             asset.setStatus("in_use");
             asset.setUserName(employee.getName() != null ? employee.getName() : employee.getUsername());
+            // 回写领用日期，供资产台账「領用日期」列展示（此前遗漏导致恒为空 — BUG-08）
+            asset.setUsageDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
             assetMapper.updateById(asset);
         }
 
@@ -267,6 +271,8 @@ public class EamClaimServiceImpl implements EamClaimService {
             asset.setStatus("in_use");
             asset.setUserName(employee != null && employee.getName() != null
                     ? employee.getName() : (employee != null ? employee.getUsername() : ""));
+            // 回写领用日期，供资产台账「領用日期」列展示（BUG-08）
+            asset.setUsageDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
             assetMapper.updateById(asset);
         }
 

@@ -248,6 +248,10 @@ export default function ModelList({
     setViewMode('products')
     setFilters({})
     setPage(1)
+    // 清空上一视图（品牌列表）残留的数据与分页总数，
+    // 避免产品视图加载前瞬间显示“共 N 条”陈旧计数（B1）
+    setProducts([])
+    setTotal(0)
   }
 
   const handleSearch = () => {
@@ -281,10 +285,9 @@ export default function ModelList({
         try {
           await deleteBrand(record.id)
           message.success(t('common.deleteSuccess'))
-          if (selectedCatId) {
-            const cat = categories.find(c => c.id === selectedCatId)
-            loadBrands(cat?.code)
-          }
+          // 无论是否选中分类都需刷新品牌列表（此前未选分类时删除后列表不刷新—B3）
+          const cat = selectedCatId ? categories.find(c => c.id === selectedCatId) : undefined
+          loadBrands(cat?.code)
         } catch (e: unknown) {
           message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
         }
@@ -359,7 +362,8 @@ export default function ModelList({
     },
     {
       title: t('common.colAction'), key: 'action', width: 160,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      // 阻止操作列点击冒泡到行 onClick（否则点详情/编辑/删除会误触发“进入产品视图”—B2）
+      onCell: () => ({ style: { whiteSpace: 'nowrap' }, onClick: (e) => e.stopPropagation() }),
       render: (_: unknown, record: AssetBrand) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetailBrand(record.id)}>{t('common.detail')}</Button>

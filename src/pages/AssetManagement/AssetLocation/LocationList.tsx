@@ -139,7 +139,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
 
   const handleDelete = (record: LocationRow) => {
     Modal.confirm({
-      title: t('asset.confirmDeleteTitle'),
+      title: t('common.confirmDelete'),
       content: `${record.name}（${record.code}）`,
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
@@ -147,7 +147,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
       onOk: async () => {
         try {
           await deleteLocation(record.id)
-          message.success(t('asset.deleteSuccess'))
+          message.success(t('common.deleteSuccess'))
           loadData()
         } catch (e: unknown) {
           message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))

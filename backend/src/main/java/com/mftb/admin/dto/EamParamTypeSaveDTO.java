@@ -28,4 +28,7 @@ public class EamParamTypeSaveDTO {
 
     /** 排序号 */
     private Integer sort;
+
+    /** 描述 */
+    private String description;
 }

@@ -9,12 +9,16 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamPurchaseOrder;
 import com.mftb.admin.entity.EamPurchaseOrderItem;
 import com.mftb.admin.entity.EamPurchaseRequest;
+import com.mftb.admin.entity.EamModel;
+import com.mftb.admin.entity.EamCategory;
 import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
 import com.mftb.admin.mapper.EamInboundBatchMapper;
 import com.mftb.admin.entity.EamInboundBatch;
 import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
+import com.mftb.admin.mapper.EamModelMapper;
+import com.mftb.admin.mapper.EamCategoryMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.util.BizSeqService;
@@ -42,6 +46,8 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     private final EamInboundBatchMapper inboundBatchMapper;
     private final EamPurchaseOrderItemMapper itemMapper;
     private final EamPurchaseRequestMapper requestMapper;
+    private final EamModelMapper modelMapper;
+    private final EamCategoryMapper categoryMapper;
     private final OaRequestMapper oaRequestMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
@@ -405,11 +411,40 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                 EamPurchaseOrderItem item = new EamPurchaseOrderItem();
                 item.setOrderId(order.getId());
                 item.setGroupId(null);
-                item.setModelId(ConvertUtils.toLong(it.get("modelId"), null));
-                item.setModelName(Objects.toString(it.get("modelName"), ""));
-                item.setCategoryName(Objects.toString(it.get("categoryName"), ""));
-                item.setCategoryCode("");
-                item.setBrandName(Objects.toString(it.get("brandName"), ""));
+                Long modelId = ConvertUtils.toLong(it.get("modelId"), null);
+                item.setModelId(modelId);
+
+                // formData 通常只携带 modelName/categoryName/brandName，缺 categoryCode/categoryId/brandId。
+                // 从型号(及分类)反查补全，否则下游验收入库建资产时这些字段为空 → 资产台账分类/品牌缺失。
+                String categoryCode = Objects.toString(it.get("categoryCode"), "");
+                String categoryName = Objects.toString(it.get("categoryName"), "");
+                String brandName = Objects.toString(it.get("brandName"), "");
+                String modelName = Objects.toString(it.get("modelName"), "");
+                Long brandId = ConvertUtils.toLong(it.get("brandId"), null);
+                if (modelId != null) {
+                    EamModel model = modelMapper.selectById(modelId);
+                    if (model != null) {
+                        if (categoryCode.isBlank()) categoryCode = Objects.toString(model.getCategoryCode(), "");
+                        if (brandId == null) brandId = model.getBrandId();
+                        if (brandName.isBlank()) brandName = Objects.toString(model.getBrandZh(), "");
+                        if (modelName.isBlank()) modelName = Objects.toString(model.getName(), "");
+                    }
+                }
+                Long categoryId = ConvertUtils.toLong(it.get("categoryId"), null);
+                if (categoryId == null && !categoryCode.isBlank()) {
+                    EamCategory cat = categoryMapper.selectOne(new LambdaQueryWrapper<EamCategory>()
+                            .eq(EamCategory::getCode, categoryCode).last("LIMIT 1"));
+                    if (cat != null) {
+                        categoryId = cat.getId();
+                        if (categoryName.isBlank()) categoryName = Objects.toString(cat.getName(), "");
+                    }
+                }
+                item.setModelName(modelName);
+                item.setCategoryName(categoryName);
+                item.setCategoryCode(categoryCode);
+                item.setCategoryId(categoryId);
+                item.setBrandName(brandName);
+                item.setBrandId(brandId);
                 // params JSON
                 Object paramsObj = it.get("params");
                 if (paramsObj != null) {

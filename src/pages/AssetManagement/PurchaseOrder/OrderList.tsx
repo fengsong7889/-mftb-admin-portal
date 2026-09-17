@@ -139,7 +139,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
 
   const handleDelete = (record: PurchaseOrder) => {
     Modal.confirm({
-      title: t('asset.confirmDeleteTitle'),
+      title: t('common.confirmDelete'),
       content: record.poNo,
       okText: t('common.confirm'),
       okButtonProps: { danger: true },
@@ -147,10 +147,10 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       onOk: async () => {
         try {
           await deletePurchaseOrder(record.id)
-          message.success(t('asset.deleteSuccess'))
+          message.success(t('common.deleteSuccess'))
           loadData()
         } catch (e: unknown) {
-          message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
+          message.error(e instanceof Error ? e.message : t('common.deleteFailed'))
         }
       },
     })
@@ -329,13 +329,24 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: t('common.colAction'), key: 'action', width: 200, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 240, fixed: 'right',
       render: (_: unknown, record: PurchaseOrder) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetail(record.id)}>
             {t('common.detail')}
           </Button>
-          {record.status !== 'received' && (
+          {/* 狀態推進：待處理 →「開始採購」(採購中) →「完成採購」(已完成，可驗收) */}
+          {record.execStatus === 'pending' && record.status !== 'received' && (
+            <Button type="link" size="small" onClick={() => handleStartPurchase(record)}>
+              {t('asset.btnStartPurchase')}
+            </Button>
+          )}
+          {record.execStatus === 'purchasing' && record.status !== 'received' && (
+            <Button type="link" size="small" onClick={() => handleCompletePurchase(record)}>
+              {t('asset.btnCompletePurchase')}
+            </Button>
+          )}
+          {record.execStatus !== 'completed' && record.status !== 'received' && (
             <Button type="link" size="small" onClick={() => onEdit(record.id)}>
               編輯
             </Button>
@@ -427,7 +438,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2370 }}
+        scroll={{ x: 2410 }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,

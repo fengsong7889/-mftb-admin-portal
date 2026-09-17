@@ -1900,6 +1900,8 @@
     "required": "Required",
     "enable": "Enable",
     "disable": "Disable",
+    "enableSuccess": "Enabled successfully",
+    "disableSuccess": "Disabled successfully",
     "close": "Close",
     "collapse": "Collapse",
     "confirmOperation": "Confirm Action",

@@ -64,7 +64,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
       </ClaimSection>
       <ClaimSection title="操作记录" icon={<EditOutlined />}>
         <Descriptions column={2} items={[
-          { key: 'updatedBy', label: '最后更新人', children: record?.updatedBy || '—' },
+          { key: 'updatedBy', label: '最后更新人', children: record?.updatedBy || record?.operator || '—' },
           { key: 'updatedAt', label: '最后更新时间', children: record?.updatedAt || '—' },
         ]} />
         {record && !error && (

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
 import { fetchCompanyBrandListSilent, type CompanyBrandItem } from '../api/companyBrand'
+import { useAuth } from './AuthContext'
 
 /** 公司品牌 Context 值 */
 interface CompanyBrandContextValue {
@@ -32,15 +33,26 @@ export function useCompanyBrand() {
 }
 
 export function CompanyBrandProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth()
   const [brands, setBrands] = useState<CompanyBrandItem[]>([])
   const [loaded, setLoaded] = useState(false)
 
+  // 依賴登錄態：登錄成功後（含 SPA 跳转、非整頁刷新）重新拉取公司品牌，
+  // 避免登錄前 401 被靜默緩存為空數組、導致採購/入庫/資產表單「所屬品牌」下拉為空。
   useEffect(() => {
+    if (!isAuthenticated) {
+      setBrands([])
+      setLoaded(false)
+      return
+    }
+    let alive = true
     fetchCompanyBrandListSilent().then((data) => {
+      if (!alive) return
       setBrands(data)
       setLoaded(true)
     })
-  }, [])
+    return () => { alive = false }
+  }, [isAuthenticated])
 
   const value = useMemo<CompanyBrandContextValue>(() => {
     const numericOptions = brands.map((b) => ({

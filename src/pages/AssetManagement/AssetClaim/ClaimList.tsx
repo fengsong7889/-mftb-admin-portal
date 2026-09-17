@@ -166,7 +166,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
         scroll={{ x: 1050 }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true, showQuickJumper: true,
-          showTotal: (count) => t('asset.totalItems', { count }),
+          showTotal: (count) => t('asset.totalItems', { total: count }),
         }}
         onChange={handleTableChange}
       />

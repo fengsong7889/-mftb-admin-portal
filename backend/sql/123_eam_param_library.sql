@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS biz_eam_param_type (
     value_type      VARCHAR(16)  NOT NULL DEFAULT 'select' COMMENT '值類型：select=下拉選擇, text=文本, number=數字',
     status          VARCHAR(16)  NOT NULL DEFAULT 'enabled' COMMENT 'enabled / disabled',
     sort            INT          NOT NULL DEFAULT 0 COMMENT '排序',
+    description     VARCHAR(500) DEFAULT NULL COMMENT '參數描述',
     updated_by      VARCHAR(64)  DEFAULT '' COMMENT '最後更新人',
     updated_at      DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_at      DATETIME     DEFAULT CURRENT_TIMESTAMP,

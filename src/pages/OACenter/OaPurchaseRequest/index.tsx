@@ -189,16 +189,24 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
     return () => { alive = false }
   }, [open])
 
+  // select 類型參數的 code 列表（穩定字符串）：paramTemplate 的 useMemo 依賴 paramValuesMap，
+  // 若直接以 paramTemplate 為依賴，本 effect 內 setParamValuesMap 會使 paramTemplate 產生新引用 →
+  // effect 再次觸發 → 無限循環請求。改為依賴值穩定的 code 字符串可斷環。
+  const selectParamKeys = useMemo(
+    () => paramTemplate.filter((p) => p.type === 'select').map((p) => p.key).join(','),
+    [paramTemplate],
+  )
+
   // 為 select 類型參數加載可選值
   useEffect(() => {
-    const selectParams = paramTemplate.filter((p) => p.type === 'select')
-    if (selectParams.length === 0) return
-    const alive = true
+    const keys = selectParamKeys ? selectParamKeys.split(',') : []
+    if (keys.length === 0) return
+    let alive = true
     Promise.all(
-      selectParams.map((p) =>
-        fetchParamValuesByType(p.key)
-          .then((vals) => ({ key: p.key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
-          .catch(() => ({ key: p.key, values: [] })),
+      keys.map((key) =>
+        fetchParamValuesByType(key)
+          .then((vals) => ({ key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
+          .catch(() => ({ key, values: [] })),
       ),
     ).then((results) => {
       if (!alive) return
@@ -206,7 +214,8 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
       results.forEach((r) => { map[r.key] = r.values })
       setParamValuesMap(map)
     })
-  }, [paramTemplate])
+    return () => { alive = false }
+  }, [selectParamKeys])
 
   useEffect(() => {
     if (open && editing) {

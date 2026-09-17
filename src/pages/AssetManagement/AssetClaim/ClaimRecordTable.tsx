@@ -63,6 +63,6 @@ export default function ClaimRecordTable({ data, query, loading, pageKey, onQuer
     <Table<ClaimRow> rowKey="id" columns={applyConfig(columns)} dataSource={data?.records ?? []} loading={loading} size="middle" scroll={{ x: 1400 }}
       locale={{ emptyText: <Empty description={t('common.noData')} /> }}
       pagination={{ current: query.page, pageSize: query.size, total: data?.total ?? 0, showQuickJumper: true, showSizeChanger: true,
-        showTotal: (count) => t('asset.totalItems', { count }), onChange: (page, size) => onQuery({ ...query, page: size === query.size ? page : 1, size }) }} />
+        showTotal: (count) => t('asset.totalItems', { total: count }), onChange: (page, size) => onQuery({ ...query, page: size === query.size ? page : 1, size }) }} />
   </>
 }

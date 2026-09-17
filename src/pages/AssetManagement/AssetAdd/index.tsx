@@ -199,6 +199,7 @@ export default function AssetAdd() {
           assetName: data.assetName,
           assetType: data.categoryCode || data.assetType,
           brand: data.brand,
+          companyBrand: data.companyBrand ?? undefined,
           purchaseValue: data.purchaseValue,
           purchaseDate: data.purchaseDate ? dayjs(data.purchaseDate) : undefined,
           usageDate: data.usageDate ? dayjs(data.usageDate) : undefined,
@@ -297,15 +298,20 @@ export default function AssetAdd() {
   }, [models, form, paramTypes])
 
   /* ----- 为 select 类型参数加载可选值 ----- */
+  // 依賴值穩定的 code 字符串（而非 paramFields 數組引用），避免引用變化重複觸發請求
+  const selectFieldKeys = useMemo(
+    () => paramFields.filter((f) => f.type === 'select').map((f) => f.key).join(','),
+    [paramFields],
+  )
   useEffect(() => {
-    const selectFields = paramFields.filter((f) => f.type === 'select')
-    if (selectFields.length === 0) return
-    const alive = true
+    const keys = selectFieldKeys ? selectFieldKeys.split(',') : []
+    if (keys.length === 0) return
+    let alive = true
     Promise.all(
-      selectFields.map((f) =>
-        fetchParamValuesByType(f.key)
-          .then((vals) => ({ key: f.key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
-          .catch(() => ({ key: f.key, values: [] })),
+      keys.map((key) =>
+        fetchParamValuesByType(key)
+          .then((vals) => ({ key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
+          .catch(() => ({ key, values: [] })),
       ),
     ).then((results) => {
       if (!alive) return
@@ -313,7 +319,8 @@ export default function AssetAdd() {
       results.forEach((r) => { map[r.key] = r.values })
       setParamValuesForSelect(map)
     })
-  }, [paramFields])
+    return () => { alive = false }
+  }, [selectFieldKeys])
 
   // 合并可选值到参数字段
   const paramFieldsWithOptions = useMemo(() => {

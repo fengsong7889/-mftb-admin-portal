@@ -553,6 +553,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         pt.setValueType(dto.getValueType() == null ? "select" : dto.getValueType());
         pt.setStatus(dto.getStatus() == null ? "enabled" : dto.getStatus());
         pt.setSort(dto.getSort() == null ? 0 : dto.getSort());
+        pt.setDescription(dto.getDescription());
         pt.setUpdatedBy(operatorResolver.currentOperatorName());
         pt.setCreatedAt(LocalDateTime.now());
         pt.setUpdatedAt(LocalDateTime.now());
@@ -571,6 +572,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         if (dto.getValueType() != null) pt.setValueType(dto.getValueType());
         if (dto.getStatus() != null) pt.setStatus(dto.getStatus());
         if (dto.getSort() != null) pt.setSort(dto.getSort());
+        if (dto.getDescription() != null) pt.setDescription(dto.getDescription());
         pt.setUpdatedBy(operatorResolver.currentOperatorName());
         pt.setUpdatedAt(LocalDateTime.now());
         paramTypeMapper.updateById(pt);
@@ -779,6 +781,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("valueType", pt.getValueType());
         map.put("status", pt.getStatus());
         map.put("sort", pt.getSort());
+        map.put("description", pt.getDescription());
         map.put("updatedBy", pt.getUpdatedBy());
         map.put("updatedAt", pt.getUpdatedAt() != null ? pt.getUpdatedAt().format(DT_FMT) : "");
         map.put("createdAt", pt.getCreatedAt() != null ? pt.getCreatedAt().format(DT_FMT) : "");

@@ -227,7 +227,7 @@ export default function AssetDetail() {
         <ModuleTitle
           icon={<InboxOutlined style={{ fontSize: 14, color: '#722ED1' }} />}
           iconBg="#f9f0ff"
-          title={t('asset.inboundInfo')}
+          title={t('asset.inboundInfoTitle')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
           <Field label={t('asset.inboundBatchNoLabel')}>{a.inboundBatchNo || '-'}</Field>

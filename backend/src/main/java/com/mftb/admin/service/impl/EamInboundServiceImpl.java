@@ -181,6 +181,28 @@ public class EamInboundServiceImpl implements EamInboundService {
         List<EamInboundBatchItem> batchItemsToInsert = new ArrayList<>();
         int sort = 0;
 
+        // 先插入批次（统计计数暂置 0，循环结束后回写），以便在明细循环内即时写入资产并取得 batchId。
+        // 关键：资产即时入库后，同事务内后续 generateAssetNo 的 SELECT MAX 能读到本批次已生成编号
+        //（read-your-writes），从而避免“同批次多件验收时资产编号重复 → 唯一键冲突 → 整事务回滚”的缺陷。
+        EamInboundBatch batch = new EamInboundBatch();
+        batch.setBatchNo(batchNo);
+        batch.setPoId(poId);
+        batch.setPoNo(order.getPoNo());
+        batch.setBrand(order.getBrand());
+        batch.setInboundDate(inboundDate);
+        batch.setOperator(operator);
+        batch.setTotalQty(0);
+        batch.setAcceptedQty(0);
+        batch.setPendingQty(0);
+        batch.setReturnQty(0);
+        batch.setExchangeQty(0);
+        batch.setConcessionQty(0);
+        batch.setGeneratedAssetCount(0);
+        batch.setPurchaseReason(order.getRemark());
+        batch.setRemark(Objects.toString(dto.getRemark(), ""));
+        batch.setUpdatedBy(operator);
+        batchMapper.insert(batch);
+
         for (EamInboundCreateDTO.InboundItem item : inboundItems) {
             long modelId = item.getModelId() == null ? -1L : item.getModelId();
             int qty = item.getQty() == null ? 0 : item.getQty();
@@ -257,6 +279,9 @@ public class EamInboundServiceImpl implements EamInboundService {
                     asset.setOrderId(poId);
                     asset.setRemark("採購訂單 " + order.getPoNo() + " 驗收入庫");
                     asset.setUpdatedBy(operator);
+                    // 即時入庫：保證同批次內後續 generateAssetNo 的 SELECT MAX 能讀到已生成編號（read-your-writes），避免重號
+                    asset.setBatchId(batch.getId());
+                    assetMapper.insert(asset);
                     assetsToInsert.add(asset);
                 }
             }
@@ -288,14 +313,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             batchItemsToInsert.add(batchItem);
         }
 
-        // 保存批次
-        EamInboundBatch batch = new EamInboundBatch();
-        batch.setBatchNo(batchNo);
-        batch.setPoId(poId);
-        batch.setPoNo(order.getPoNo());
-        batch.setBrand(order.getBrand());
-        batch.setInboundDate(inboundDate);
-        batch.setOperator(operator);
+        // 回寫批次統計（資產已在明細循環內即時入庫）
         batch.setTotalQty(totalQty);
         batch.setAcceptedQty(acceptedQty);
         batch.setPendingQty(totalQty - acceptedQty);
@@ -304,21 +322,12 @@ public class EamInboundServiceImpl implements EamInboundService {
         batch.setConcessionQty(concessionQty);
         // PR-2: 反規範化實際生成資產數
         batch.setGeneratedAssetCount(assetsToInsert.size());
-        batch.setPurchaseReason(order.getRemark());
-        batch.setRemark(Objects.toString(dto.getRemark(), ""));
-        batch.setUpdatedBy(operator);
-        batchMapper.insert(batch);
+        batchMapper.updateById(batch);
 
         // 保存明细
         for (EamInboundBatchItem item : batchItemsToInsert) {
             item.setBatchId(batch.getId());
             batchItemMapper.insert(item);
-        }
-
-        // 批量插入资产台账
-        for (EamAsset asset : assetsToInsert) {
-            asset.setBatchId(batch.getId());
-            assetMapper.insert(asset);
         }
 
         // ====== P0-4: 回写采购订单 ======

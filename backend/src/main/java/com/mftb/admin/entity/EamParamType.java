@@ -36,6 +36,9 @@ public class EamParamType {
     /** 排序 */
     private Integer sort;
 
+    /** 描述 */
+    private String description;
+
     /** 最后更新人 */
     private String updatedBy;
 

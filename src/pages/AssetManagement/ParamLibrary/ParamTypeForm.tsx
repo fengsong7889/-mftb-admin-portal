@@ -39,31 +39,40 @@ interface Props {
   onBack: () => void
 }
 
-/** 構建分類 ID → Code 映射 & 分組 TreeSelect 數據 */
-function buildGroupedTreeData(list: AssetCategory[]) {
-  const parentIds = new Set(list.filter(c => c.parentId === 0).map(c => c.id))
-  const leafCats = list.filter(c => !parentIds.has(c.id))
-  const groupMap = new Map<number, AssetCategory[]>()
-  leafCats.forEach(cat => {
-    let parentId = cat.parentId
-    while (parentId) {
-      const parent = list.find(c => c.id === parentId)
-      if (parent && parent.parentId === 0) {
-        const arr = groupMap.get(parent.id) ?? []
-        arr.push(cat)
-        groupMap.set(parent.id, arr)
-        break
-      }
-      parentId = parent?.parentId ?? 0
+/** 分類 TreeSelect 節點（value 為分類編碼 code，多級遞歸） */
+interface CategoryTreeNode {
+  title: string
+  value: string
+  children?: CategoryTreeNode[]
+}
+
+/**
+ * 構建分類 TreeSelect 數據（平鋪列表 → 多級樹，value 為 code）
+ * 對齊 AssetAdd.buildCategoryTree 約定：節點使用 { title, value, children }，
+ * TreeSelect 才能正確渲染層級、展開與回顯（此前誤用 Select 的 { label, options }
+ * 分組結構，導致只显示不可選的頂級節點、且 value 為 undefined）。
+ */
+function buildCategoryTreeData(list: AssetCategory[]): CategoryTreeNode[] {
+  const childrenMap = new Map<number, AssetCategory[]>()
+  const roots: AssetCategory[] = []
+  list.forEach((c) => {
+    if (c.parentId && c.parentId !== 0) {
+      const arr = childrenMap.get(c.parentId) ?? []
+      arr.push(c)
+      childrenMap.set(c.parentId, arr)
+    } else {
+      roots.push(c)
     }
   })
-  return Array.from(groupMap.entries()).map(([parentId, children]) => {
-    const parent = list.find(c => c.id === parentId)!
+  const buildNode = (cat: AssetCategory): CategoryTreeNode => {
+    const children = childrenMap.get(cat.id) ?? []
     return {
-      label: parent.name,
-      options: children.map(c => ({ label: c.name, value: c.code })),
+      title: `${cat.code} - ${cat.name}`,
+      value: cat.code,
+      children: children.length ? children.map(buildNode) : undefined,
     }
-  })
+  }
+  return roots.map(buildNode)
 }
 
 export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props) {
@@ -145,7 +154,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
   }, [loadData, t])
 
   /** 分類 TreeSelect 數據 */
-  const categoryTreeData = useMemo(() => buildGroupedTreeData(categories), [categories])
+  const categoryTreeData = useMemo(() => buildCategoryTreeData(categories), [categories])
 
   const handleSubmit = async () => {
     try {
@@ -165,7 +174,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
       setSubmitting(true)
       if (isEdit && id) {
         await updateParamType(id, payload)
-        message.success(t('asset.updateSuccess'))
+        message.success(t('common.updateSuccess'))
       } else {
         await createParamType(payload)
         message.success(t('asset.addSuccess'))
@@ -234,7 +243,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
   const handleDeleteValue = async (record: ParamValue) => {
     try {
       await deleteParamValue(record.id)
-      message.success(t('asset.deleteSuccess'))
+      message.success(t('common.deleteSuccess'))
       if (currentTypeCode) await loadParamValues(currentTypeCode)
     } catch {
       // 錯誤提示由請求層統一處理
@@ -342,8 +351,9 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
                   placeholder={t('asset.phSelectCategory')}
                   allowClear={!categoryDisabled}
                   disabled={categoryDisabled}
+                  showSearch
                   treeDefaultExpandAll
-                  treeNodeFilterProp="label"
+                  treeNodeFilterProp="title"
                   listHeight={240}
                   treeData={categoryTreeData}
                 />

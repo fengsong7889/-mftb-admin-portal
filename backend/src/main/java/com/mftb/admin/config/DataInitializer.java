@@ -756,6 +756,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             addColumnIfAbsent("biz_eam_inbound_batch_item", "followup_batch_id", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN followup_batch_id BIGINT DEFAULT NULL COMMENT '二次验收生成的批次ID'");
         });
 
+        // 參數類型補充 description 列：前端參數庫表單/列表已收集並展示描述，
+        // 但後端實體與建表 SQL 缺失該列，導致用戶填寫的描述被靜默丟棄（數據丟失）。
+        versionTracker.applyOnce("eam:param-type-description-v1", () -> {
+            addColumnIfAbsent("biz_eam_param_type", "description", "ALTER TABLE biz_eam_param_type ADD COLUMN description VARCHAR(500) DEFAULT NULL COMMENT '参数描述'");
+        });
+
         // 148: 资产编号规则重构——company_brand 列 + 分类编码迁移
         versionTracker.applyOnce("eam:asset-code-rule-v1", () -> {
             migrateAssetCodeRule();
