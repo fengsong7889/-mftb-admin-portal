@@ -3,6 +3,8 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.EamAssetTagBindDTO;
+import com.mftb.admin.dto.EamAssetTagSaveDTO;
 import com.mftb.admin.dto.EamBrandSaveDTO;
 import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
@@ -14,6 +16,8 @@ import com.mftb.admin.dto.EamSupplierContactSaveDTO;
 import com.mftb.admin.dto.EamSupplierContactVO;
 import com.mftb.admin.dto.EamSupplierSaveDTO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.entity.EamAssetTag;
+import com.mftb.admin.entity.EamAssetTagBinding;
 import com.mftb.admin.entity.EamBrand;
 import com.mftb.admin.entity.EamCategory;
 import com.mftb.admin.entity.EamCategoryAccessory;
@@ -23,6 +27,8 @@ import com.mftb.admin.entity.EamParamType;
 import com.mftb.admin.entity.EamParamValue;
 import com.mftb.admin.entity.EamSupplier;
 import com.mftb.admin.entity.EamSupplierContact;
+import com.mftb.admin.mapper.EamAssetTagBindingMapper;
+import com.mftb.admin.mapper.EamAssetTagMapper;
 import com.mftb.admin.mapper.EamBrandMapper;
 import com.mftb.admin.mapper.EamCategoryAccessoryMapper;
 import com.mftb.admin.mapper.EamCategoryMapper;
@@ -62,6 +68,8 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     private final EamCategoryAccessoryMapper categoryAccessoryMapper;
     private final EamSupplierMapper supplierMapper;
     private final EamSupplierContactMapper supplierContactMapper;
+    private final EamAssetTagMapper assetTagMapper;
+    private final EamAssetTagBindingMapper assetTagBindingMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
     private final JdbcTemplate jdbcTemplate;
@@ -1026,5 +1034,235 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         vo.setCreatedAt(c.getCreatedAt() != null ? c.getCreatedAt().format(DT_FMT) : "");
         vo.setUpdatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().format(DT_FMT) : "");
         return vo;
+    }
+
+    /* ==================== 资产标签模板 ==================== */
+
+    @Override
+    public List<Map<String, Object>> listAssetTags(String name, String status) {
+        LambdaQueryWrapper<EamAssetTag> wrapper = new LambdaQueryWrapper<>();
+        if (name != null && !name.isBlank()) wrapper.like(EamAssetTag::getName, name.trim());
+        if (status != null && !status.isBlank()) wrapper.eq(EamAssetTag::getStatus, status.trim());
+        wrapper.orderByAsc(EamAssetTag::getSort).orderByDesc(EamAssetTag::getCreatedAt);
+        List<EamAssetTag> tags = assetTagMapper.selectList(wrapper);
+
+        // 实时聚合 boundCount
+        Map<Long, Long> boundCountMap = assetTagBindingMapper.selectList(
+                new LambdaQueryWrapper<EamAssetTagBinding>().select(EamAssetTagBinding::getTagId))
+                .stream().collect(Collectors.groupingBy(EamAssetTagBinding::getTagId, Collectors.counting()));
+
+        return tags.stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", t.getId());
+            m.put("name", t.getName());
+            m.put("description", t.getDescription());
+            m.put("bgColor", t.getBgColor());
+            m.put("textColor", t.getTextColor());
+            m.put("displayFields", parseDisplayFields(t.getDisplayFields()));
+            m.put("status", t.getStatus());
+            m.put("sort", t.getSort());
+            m.put("boundCount", boundCountMap.getOrDefault(t.getId(), 0L));
+            m.put("updatedBy", t.getUpdatedBy());
+            m.put("updatedAt", t.getUpdatedAt() != null ? t.getUpdatedAt().format(DT_FMT) : "");
+            return m;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public long createAssetTag(EamAssetTagSaveDTO dto) {
+        if (dto.getName() == null || dto.getName().isBlank()) throw new BusinessException("標籤名稱不能為空");
+        EamAssetTag tag = new EamAssetTag();
+        tag.setName(dto.getName().trim());
+        tag.setDescription(Objects.toString(dto.getDescription(), ""));
+        tag.setBgColor(dto.getBgColor() != null ? dto.getBgColor() : "#1890FF");
+        tag.setTextColor(dto.getTextColor() != null ? dto.getTextColor() : "#FFFFFF");
+        tag.setDisplayFields(dto.getDisplayFields() != null ? String.join(",", dto.getDisplayFields()) : "");
+        tag.setStatus("enabled");
+        tag.setSort(dto.getSort() != null ? dto.getSort() : 0);
+        tag.setUpdatedBy(operatorResolver.currentOperatorName());
+        tag.setCreatedAt(LocalDateTime.now());
+        tag.setUpdatedAt(LocalDateTime.now());
+        tag.setDeleted(0);
+        assetTagMapper.insert(tag);
+        return tag.getId();
+    }
+
+    @Override
+    @Transactional
+    public void updateAssetTag(long id, EamAssetTagSaveDTO dto) {
+        EamAssetTag tag = assetTagMapper.selectById(id);
+        if (tag == null) throw new BusinessException("標籤模板不存在");
+        if (dto.getName() != null) tag.setName(dto.getName().trim());
+        if (dto.getDescription() != null) tag.setDescription(dto.getDescription());
+        if (dto.getBgColor() != null) tag.setBgColor(dto.getBgColor());
+        if (dto.getTextColor() != null) tag.setTextColor(dto.getTextColor());
+        if (dto.getDisplayFields() != null) tag.setDisplayFields(String.join(",", dto.getDisplayFields()));
+        if (dto.getSort() != null) tag.setSort(dto.getSort());
+        tag.setUpdatedBy(operatorResolver.currentOperatorName());
+        tag.setUpdatedAt(LocalDateTime.now());
+        assetTagMapper.updateById(tag);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAssetTag(long id) {
+        EamAssetTag tag = assetTagMapper.selectById(id);
+        if (tag == null) throw new BusinessException("標籤模板不存在");
+        assetTagMapper.deleteById(id);
+        // 同步清理绑定关系
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getTagId, id);
+        assetTagBindingMapper.delete(wrapper);
+    }
+
+    @Override
+    @Transactional
+    public void toggleAssetTagStatus(long id) {
+        EamAssetTag tag = assetTagMapper.selectById(id);
+        if (tag == null) throw new BusinessException("標籤模板不存在");
+        tag.setStatus("enabled".equals(tag.getStatus()) ? "disabled" : "enabled");
+        tag.setUpdatedBy(operatorResolver.currentOperatorName());
+        tag.setUpdatedAt(LocalDateTime.now());
+        assetTagMapper.updateById(tag);
+    }
+
+    /* ==================== 资产-标签绑定 ==================== */
+
+    @Override
+    public List<Map<String, Object>> listAssetTagBindings(long assetId) {
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getAssetId, assetId)
+                .orderByDesc(EamAssetTagBinding::getIsPrimary)
+                .orderByAsc(EamAssetTagBinding::getId);
+        List<EamAssetTagBinding> bindings = assetTagBindingMapper.selectList(wrapper);
+
+        // 批量查询模板
+        Set<Long> tagIds = bindings.stream().map(EamAssetTagBinding::getTagId).collect(Collectors.toSet());
+        Map<Long, EamAssetTag> tagMap = tagIds.isEmpty() ? Collections.emptyMap() :
+                assetTagMapper.selectBatchIds(tagIds).stream().collect(Collectors.toMap(EamAssetTag::getId, t -> t));
+
+        return bindings.stream().map(b -> {
+            EamAssetTag tag = tagMap.get(b.getTagId());
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("bindingId", b.getId());
+            m.put("isPrimary", b.getIsPrimary() != null && b.getIsPrimary() == 1);
+            m.put("createdBy", b.getCreatedBy());
+            m.put("createdAt", b.getCreatedAt() != null ? b.getCreatedAt().format(DT_FMT) : "");
+            if (tag != null) {
+                Map<String, Object> tagMap2 = new LinkedHashMap<>();
+                tagMap2.put("id", tag.getId());
+                tagMap2.put("name", tag.getName());
+                tagMap2.put("description", tag.getDescription());
+                tagMap2.put("bgColor", tag.getBgColor());
+                tagMap2.put("textColor", tag.getTextColor());
+                tagMap2.put("displayFields", parseDisplayFields(tag.getDisplayFields()));
+                tagMap2.put("status", tag.getStatus());
+                tagMap2.put("sort", tag.getSort());
+                tagMap2.put("updatedBy", tag.getUpdatedBy());
+                tagMap2.put("updatedAt", tag.getUpdatedAt() != null ? tag.getUpdatedAt().format(DT_FMT) : "");
+                m.put("tag", tagMap2);
+            }
+            return m;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void bindAssetTag(long assetId, EamAssetTagBindDTO dto) {
+        if (dto.getTagId() == null) throw new BusinessException("標籤ID不能為空");
+        // 检查是否已绑定
+        LambdaQueryWrapper<EamAssetTagBinding> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(EamAssetTagBinding::getAssetId, assetId).eq(EamAssetTagBinding::getTagId, dto.getTagId());
+        if (assetTagBindingMapper.selectCount(existWrapper) > 0) return; // 已绑定，幂等返回
+
+        // 检查标签是否存在且启用
+        EamAssetTag tag = assetTagMapper.selectById(dto.getTagId());
+        if (tag == null) throw new BusinessException("標籤模板不存在");
+        if (!"enabled".equals(tag.getStatus())) throw new BusinessException("標籤模板已停用，無法綁定");
+
+        // 决定 isPrimary
+        boolean shouldBePrimary;
+        if (dto.getIsPrimary() != null && dto.getIsPrimary()) {
+            shouldBePrimary = true;
+            // 清除该资产原主标签
+            clearPrimaryBinding(assetId);
+        } else {
+            // 未指定时，若该资产尚无主标签，则自动设为主标签
+            LambdaQueryWrapper<EamAssetTagBinding> primaryWrapper = new LambdaQueryWrapper<>();
+            primaryWrapper.eq(EamAssetTagBinding::getAssetId, assetId).eq(EamAssetTagBinding::getIsPrimary, 1);
+            shouldBePrimary = assetTagBindingMapper.selectCount(primaryWrapper) == 0;
+        }
+
+        EamAssetTagBinding binding = new EamAssetTagBinding();
+        binding.setAssetId(assetId);
+        binding.setTagId(dto.getTagId());
+        binding.setIsPrimary(shouldBePrimary ? 1 : 0);
+        binding.setCreatedBy(operatorResolver.currentOperatorName());
+        binding.setCreatedAt(LocalDateTime.now());
+        binding.setDeleted(0);
+        assetTagBindingMapper.insert(binding);
+    }
+
+    @Override
+    @Transactional
+    public void unbindAssetTag(long assetId, long tagId) {
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getAssetId, assetId).eq(EamAssetTagBinding::getTagId, tagId);
+        EamAssetTagBinding binding = assetTagBindingMapper.selectOne(wrapper);
+        if (binding == null) throw new BusinessException("綁定關係不存在");
+
+        boolean wasPrimary = binding.getIsPrimary() != null && binding.getIsPrimary() == 1;
+        assetTagBindingMapper.deleteById(binding.getId());
+
+        // 主标签被解绑后，自动递补最早绑定的次标签
+        if (wasPrimary) {
+            LambdaQueryWrapper<EamAssetTagBinding> restWrapper = new LambdaQueryWrapper<>();
+            restWrapper.eq(EamAssetTagBinding::getAssetId, assetId)
+                    .orderByAsc(EamAssetTagBinding::getId)
+                    .last("LIMIT 1");
+            EamAssetTagBinding next = assetTagBindingMapper.selectOne(restWrapper);
+            if (next != null) {
+                next.setIsPrimary(1);
+                assetTagBindingMapper.updateById(next);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void setPrimaryAssetTag(long assetId, long tagId) {
+        clearPrimaryBinding(assetId);
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getAssetId, assetId).eq(EamAssetTagBinding::getTagId, tagId);
+        EamAssetTagBinding binding = assetTagBindingMapper.selectOne(wrapper);
+        if (binding == null) throw new BusinessException("綁定關係不存在");
+        binding.setIsPrimary(1);
+        assetTagBindingMapper.updateById(binding);
+    }
+
+    @Override
+    public List<Long> listAssetIdsByTag(long tagId) {
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getTagId, tagId).select(EamAssetTagBinding::getAssetId);
+        return assetTagBindingMapper.selectList(wrapper).stream()
+                .map(EamAssetTagBinding::getAssetId).collect(Collectors.toList());
+    }
+
+    /** 清除指定资产的主标签标记 */
+    private void clearPrimaryBinding(long assetId) {
+        LambdaQueryWrapper<EamAssetTagBinding> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamAssetTagBinding::getAssetId, assetId).eq(EamAssetTagBinding::getIsPrimary, 1);
+        List<EamAssetTagBinding> primaries = assetTagBindingMapper.selectList(wrapper);
+        for (EamAssetTagBinding b : primaries) {
+            b.setIsPrimary(0);
+            assetTagBindingMapper.updateById(b);
+        }
+    }
+
+    /** 逗号分隔字符串 → List<String> */
+    private List<String> parseDisplayFields(String raw) {
+        if (raw == null || raw.isBlank()) return Collections.emptyList();
+        return Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 }

@@ -16,21 +16,6 @@ import {
   mockToggleCategoryStatus,
 } from './mock/eamCategoryMock'
 import {
-  mockFetchAssetTagList,
-  mockCreateAssetTag,
-  mockUpdateAssetTag,
-  mockDeleteAssetTag,
-  mockToggleAssetTagStatus,
-} from './mock/eamAssetTagMock'
-import {
-  mockFetchAssetTagBindings,
-  mockFetchAssetIdsByTag,
-  mockBindAssetTag,
-  mockUnbindAssetTag,
-  mockSetPrimaryAssetTag,
-  assembleBindings,
-} from './mock/eamAssetTagBindingMock'
-import {
   mockFetchSupplierList,
   mockCreateSupplier,
   mockUpdateSupplier,
@@ -1002,65 +987,29 @@ export async function deleteLocation(id: number): Promise<void> {
 
 /* ==================== API：資產標籤模板 ==================== */
 
-/**
- * 標籤模板後端端點尚未實現（前端先行策略）：
- * 後端對未知路徑返回 HTTP 200 + 業務碼 500（「系統繁忙」包裝 404）或 HTTP 5xx，
- * 兩者均視為後端不可用，靜默降級本地 mock；避免空列表與「錯誤 + 成功」雙通知。
- * 後端接口落地後，可移除 code 500 降級分支，僅保留 isBackendUnavailable。
- */
-function isTagBackendPending(e: unknown): boolean {
-  if (isBackendUnavailable(e)) return true
-  return (e as { code?: number } | null)?.code === 500
-}
-
 /** 標籤模板列表 */
 export async function fetchAssetTagList(): Promise<AssetTagTemplate[]> {
-  try {
-    return await request.get<unknown, AssetTagTemplate[]>('/eam/basic/asset-tags', { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockFetchAssetTagList()
-    throw e
-  }
+  return await request.get<unknown, AssetTagTemplate[]>('/eam/basic/asset-tags', { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 新增標籤模板 */
 export async function createAssetTag(data: Omit<AssetTagTemplate, 'id' | 'boundCount'>): Promise<number> {
-  try {
-    return await request.post<unknown, number>('/eam/basic/asset-tags', data, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockCreateAssetTag(data)
-    throw e
-  }
+  return await request.post<unknown, number>('/eam/basic/asset-tags', data, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 更新標籤模板 */
 export async function updateAssetTag(id: number, data: Partial<AssetTagTemplate>): Promise<void> {
-  try {
-    await request.put(`/eam/basic/asset-tags/${id}`, data, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockUpdateAssetTag(id, data)
-    throw e
-  }
+  await request.put(`/eam/basic/asset-tags/${id}`, data, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 刪除標籤模板 */
 export async function deleteAssetTag(id: number): Promise<void> {
-  try {
-    await request.delete(`/eam/basic/asset-tags/${id}`, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockDeleteAssetTag(id)
-    throw e
-  }
+  await request.delete(`/eam/basic/asset-tags/${id}`, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 切換標籤模板狀態 */
 export async function toggleAssetTagStatus(id: number): Promise<void> {
-  try {
-    await request.put(`/eam/basic/asset-tags/${id}/toggle`, undefined, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockToggleAssetTagStatus(id)
-    throw e
-  }
+  await request.put(`/eam/basic/asset-tags/${id}/toggle`, undefined, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 資產-標籤綁定項（含模板配置，渲染直接使用） */
@@ -1074,55 +1023,27 @@ export interface AssetTagBindingItem {
 
 /** 查詢資產已綁標籤（主標籤排前） */
 export async function fetchAssetTagBindings(assetId: number): Promise<AssetTagBindingItem[]> {
-  try {
-    return await request.get<unknown, AssetTagBindingItem[]>(`/eam/basic/assets/${assetId}/tags`, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) {
-      const records = await mockFetchAssetTagBindings(assetId)
-      return assembleBindings(records, await mockFetchAssetTagList())
-    }
-    throw e
-  }
+  return await request.get<unknown, AssetTagBindingItem[]>(`/eam/basic/assets/${assetId}/tags`, { headers: { [SILENT_HEADER]: '1' } })
 }
 
-/** 綁定標籤（主標籤策略由後端/mock 決定：顯式指定或無主標籤時自動設主） */
+/** 綁定標籤（主標籤策略由後端決定：顯式指定或無主標籤時自動設主） */
 export async function bindAssetTag(assetId: number, tagId: number, isPrimary?: boolean): Promise<void> {
-  try {
-    await request.post(`/eam/basic/assets/${assetId}/tags`, { tagId, isPrimary }, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockBindAssetTag(assetId, tagId, isPrimary)
-    throw e
-  }
+  await request.post(`/eam/basic/assets/${assetId}/tags`, { tagId, isPrimary }, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 解綁標籤 */
 export async function unbindAssetTag(assetId: number, tagId: number): Promise<void> {
-  try {
-    await request.delete(`/eam/basic/assets/${assetId}/tags/${tagId}`, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockUnbindAssetTag(assetId, tagId)
-    throw e
-  }
+  await request.delete(`/eam/basic/assets/${assetId}/tags/${tagId}`, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 設為主標籤（原主標籤自動降級） */
 export async function setPrimaryAssetTag(assetId: number, tagId: number): Promise<void> {
-  try {
-    await request.put(`/eam/basic/assets/${assetId}/tags/${tagId}/primary`, undefined, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockSetPrimaryAssetTag(assetId, tagId)
-    throw e
-  }
+  await request.put(`/eam/basic/assets/${assetId}/tags/${tagId}/primary`, undefined, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 按模板反查綁定的資產 ID 列表（批量列印「按模板」數據源） */
 export async function fetchAssetIdsByTag(tagId: number): Promise<number[]> {
-  try {
-    return await request.get<unknown, number[]>(`/eam/basic/asset-tags/${tagId}/asset-ids`, { headers: { [SILENT_HEADER]: '1' } })
-  } catch (e) {
-    if (isTagBackendPending(e)) return mockFetchAssetIdsByTag(tagId)
-    throw e
-  }
+  return await request.get<unknown, number[]>(`/eam/basic/asset-tags/${tagId}/asset-ids`, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /* ==================== 供應商管理 ==================== */

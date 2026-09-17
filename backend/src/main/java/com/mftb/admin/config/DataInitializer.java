@@ -94,6 +94,8 @@ public class DataInitializer implements CommandLineRunner {
         migrateCompanyBrandTable();
         // 150: 领用管理——签名、归还及事件闭环表自动创建
         migrateEamClaimTables();
+        // 154: 资产标签模板 + 绑定关系表自动创建
+        migrateEamAssetTagTables();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -918,6 +920,59 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "COMMENT '当前活跃领用 ID' AFTER current_holder_id");
 
         log.info("领用管理表 biz_eam_claim / biz_eam_claim_evidence / biz_eam_return / biz_eam_claim_event 就绪");
+    }
+
+    /**
+     * 154 脚本等效：资产标签模板 + 资产-标签绑定关系表自动创建（幂等）
+     */
+    private void migrateEamAssetTagTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_asset_tag ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "name VARCHAR(100) NOT NULL COMMENT '标签名称', "
+                        + "description VARCHAR(500) DEFAULT '' COMMENT '标签描述', "
+                        + "bg_color VARCHAR(16) NOT NULL DEFAULT '#1890FF' COMMENT '标签背景色', "
+                        + "text_color VARCHAR(16) NOT NULL DEFAULT '#FFFFFF' COMMENT '标签文字颜色', "
+                        + "display_fields VARCHAR(500) NOT NULL DEFAULT '' COMMENT '展示字段配置（逗号分隔的资产字段 key 列表）', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'enabled' COMMENT '状态：enabled/disabled', "
+                        + "sort INT NOT NULL DEFAULT 0 COMMENT '排序（升序）', "
+                        + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "KEY idx_tag_status (status), "
+                        + "KEY idx_tag_sort (sort)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产标签模板'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_asset_tag_binding ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "asset_id BIGINT NOT NULL COMMENT '关联资产ID', "
+                        + "tag_id BIGINT NOT NULL COMMENT '关联标签模板ID', "
+                        + "is_primary TINYINT NOT NULL DEFAULT 0 COMMENT '是否主标签：1=是，0=否', "
+                        + "created_by VARCHAR(64) DEFAULT '' COMMENT '创建人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "deleted TINYINT NOT NULL DEFAULT 0, "
+                        + "UNIQUE KEY uk_asset_tag (asset_id, tag_id), "
+                        + "KEY idx_binding_asset (asset_id), "
+                        + "KEY idx_binding_tag (tag_id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产-标签绑定关系'");
+        log.info("资产标签表 biz_eam_asset_tag + biz_eam_asset_tag_binding 就绪");
+
+        // 种子数据：预置 4 个常用标签模板（仅当表为空时插入，幂等）
+        Integer tagCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_eam_asset_tag WHERE deleted = 0", Integer.class);
+        if (tagCount != null && tagCount == 0) {
+            jdbcTemplate.batchUpdate(
+                    "INSERT INTO biz_eam_asset_tag (name, description, bg_color, text_color, display_fields, status, sort, updated_by) VALUES (?, ?, ?, ?, ?, 'enabled', ?, '系统管理员')",
+                    java.util.List.of(
+                            new Object[]{"IT設備標籤", "用於筆記本、桌上型電腦、伺服器等 IT 類資產", "#1890FF", "#FFFFFF", "assetNo,assetType,brand,status,userName", 1},
+                            new Object[]{"高價值資產", "原值超過 10,000 MOP 的資產", "#E8720C", "#FFFFFF", "assetNo,assetName,brand,company,source", 2},
+                            new Object[]{"待處置資產", "已報廢或待維修的資產", "#FF4D4F", "#FFFFFF", "assetNo,assetType,status,location,userName", 3},
+                            new Object[]{"辦公設備標籤", "印表機、投影儀等辦公設備", "#52C41A", "#FFFFFF", "assetNo,assetType,brand,location,department", 4}
+                    ));
+            log.info("已插入 4 条资产标签模板种子数据");
+        }
     }
 
     /**

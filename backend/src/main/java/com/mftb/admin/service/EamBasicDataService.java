@@ -1,5 +1,7 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.EamAssetTagBindDTO;
+import com.mftb.admin.dto.EamAssetTagSaveDTO;
 import com.mftb.admin.dto.EamBrandSaveDTO;
 import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
@@ -180,4 +182,38 @@ public interface EamBasicDataService {
 
     /** 精简版供应商下拉列表（仅 id/code/name，支持关键字过滤） */
     List<Map<String, Object>> listSuppliersDropdown(String keyword);
+
+    /* ==================== 资产标签模板 ==================== */
+
+    /** 标签模板列表（按 sort 升序，boundCount 实时聚合） */
+    List<Map<String, Object>> listAssetTags(String name, String status);
+
+    /** 新增标签模板，返回新记录 ID */
+    long createAssetTag(EamAssetTagSaveDTO dto);
+
+    /** 更新标签模板 */
+    void updateAssetTag(long id, EamAssetTagSaveDTO dto);
+
+    /** 删除标签模板（逻辑删除，同时清理绑定关系） */
+    void deleteAssetTag(long id);
+
+    /** 切换标签模板启用/停用状态 */
+    void toggleAssetTagStatus(long id);
+
+    /* ==================== 资产-标签绑定 ==================== */
+
+    /** 查询资产已绑标签（主标签排前，含模板完整信息） */
+    List<Map<String, Object>> listAssetTagBindings(long assetId);
+
+    /** 绑定标签到资产 */
+    void bindAssetTag(long assetId, EamAssetTagBindDTO dto);
+
+    /** 解绑标签 */
+    void unbindAssetTag(long assetId, long tagId);
+
+    /** 设为主标签（原主标签自动降级） */
+    void setPrimaryAssetTag(long assetId, long tagId);
+
+    /** 按模板反查绑定的资产 ID 列表 */
+    List<Long> listAssetIdsByTag(long tagId);
 }

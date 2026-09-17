@@ -2,6 +2,8 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.EamAssetTagBindDTO;
+import com.mftb.admin.dto.EamAssetTagSaveDTO;
 import com.mftb.admin.dto.EamBrandSaveDTO;
 import com.mftb.admin.dto.EamCategoryAccessorySaveDTO;
 import com.mftb.admin.dto.EamCategorySaveDTO;
@@ -424,5 +426,87 @@ public class EamBasicDataController {
     public Result<Void> toggleSupplierContact(@PathVariable Long contactId) {
         basicDataService.toggleSupplierContactStatus(contactId);
         return Result.success();
+    }
+
+    /* ==================== 资产标签模板 ==================== */
+
+    /** 标签模板列表（支持名称/状态过滤） */
+    @GetMapping("/asset-tags")
+    @RequirePermission(menu = "asset-tag")
+    public Result<List<Map<String, Object>>> listAssetTags(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String status) {
+        return Result.success(basicDataService.listAssetTags(name, status));
+    }
+
+    /** 新增标签模板 */
+    @PostMapping("/asset-tags")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Long> createAssetTag(@RequestBody EamAssetTagSaveDTO dto) {
+        return Result.success(basicDataService.createAssetTag(dto));
+    }
+
+    /** 更新标签模板 */
+    @PutMapping("/asset-tags/{id}")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Void> updateAssetTag(@PathVariable long id, @RequestBody EamAssetTagSaveDTO dto) {
+        basicDataService.updateAssetTag(id, dto);
+        return Result.success();
+    }
+
+    /** 删除标签模板（逻辑删除，同时清理绑定关系） */
+    @DeleteMapping("/asset-tags/{id}")
+    @RequirePermission(menu = "asset-tag", action = "delete")
+    public Result<Void> deleteAssetTag(@PathVariable long id) {
+        basicDataService.deleteAssetTag(id);
+        return Result.success();
+    }
+
+    /** 切换标签模板启用/停用状态 */
+    @PutMapping("/asset-tags/{id}/toggle")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Void> toggleAssetTagStatus(@PathVariable long id) {
+        basicDataService.toggleAssetTagStatus(id);
+        return Result.success();
+    }
+
+    /* ==================== 资产-标签绑定 ==================== */
+
+    /** 查询资产已绑标签（主标签排前，含模板完整信息） */
+    @GetMapping("/assets/{assetId}/tags")
+    @RequirePermission(menu = "asset-tag")
+    public Result<List<Map<String, Object>>> listAssetTagBindings(@PathVariable long assetId) {
+        return Result.success(basicDataService.listAssetTagBindings(assetId));
+    }
+
+    /** 绑定标签到资产 */
+    @PostMapping("/assets/{assetId}/tags")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Void> bindAssetTag(@PathVariable long assetId, @RequestBody EamAssetTagBindDTO dto) {
+        basicDataService.bindAssetTag(assetId, dto);
+        return Result.success();
+    }
+
+    /** 解绑标签 */
+    @DeleteMapping("/assets/{assetId}/tags/{tagId}")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Void> unbindAssetTag(@PathVariable long assetId, @PathVariable long tagId) {
+        basicDataService.unbindAssetTag(assetId, tagId);
+        return Result.success();
+    }
+
+    /** 设为主标签（原主标签自动降级） */
+    @PutMapping("/assets/{assetId}/tags/{tagId}/primary")
+    @RequirePermission(menu = "asset-tag", action = "edit")
+    public Result<Void> setPrimaryAssetTag(@PathVariable long assetId, @PathVariable long tagId) {
+        basicDataService.setPrimaryAssetTag(assetId, tagId);
+        return Result.success();
+    }
+
+    /** 按模板反查绑定的资产 ID 列表（批量打印「按模板」数据源） */
+    @GetMapping("/asset-tags/{tagId}/asset-ids")
+    @RequirePermission(menu = "asset-tag")
+    public Result<List<Long>> listAssetIdsByTag(@PathVariable long tagId) {
+        return Result.success(basicDataService.listAssetIdsByTag(tagId));
     }
 }
