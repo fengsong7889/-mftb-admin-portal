@@ -185,6 +185,9 @@ export default function RuleConfig() {
     debounceTimerRef.current = setTimeout(() => setDebouncedKw(val), 300)
   }, [])
 
+  /* 編號生成規則：活動標籤（點擊切換篩選） */
+  const [activeRuleTab, setActiveRuleTab] = useState('__all__')
+
   /* 控件渲染（按分组编辑状态控制） */
   const renderControl = (rule: RuleItem, groupEditing: boolean) => {
     switch (rule.type) {
@@ -480,11 +483,20 @@ export default function RuleConfig() {
                         tabMenuMap.get(top)!.push(r)
                       })
 
+                      /* 活動標籤篩選 */
+                      const tabFilteredRules = activeRuleTab === '__all__'
+                        ? group.rules
+                        : group.rules.filter(r => {
+                            const menu = r.menu || '—'
+                            const top = menu.includes('-') ? menu.substring(0, menu.indexOf('-')) : menu
+                            return top === activeRuleTab
+                          })
+
                       /* 搜索過濾（debounce） */
                       const allRules = group.rules
                       const kw = debouncedKw.trim().toLowerCase()
                       const filteredRules = kw
-                        ? allRules.filter(r =>
+                        ? tabFilteredRules.filter(r =>
                             r.label.toLowerCase().includes(kw) ||
                             ((r.value as string) || '').toLowerCase().includes(kw) ||
                             (r.remark || '').toLowerCase().includes(kw) ||
@@ -507,17 +519,17 @@ export default function RuleConfig() {
                           {/* 雙排標籤欄 */}
                           <div style={{ padding: '12px 24px 0', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                             {['__all__', ...tabMenuOrder].map(tabKey => {
-                              const isActive = tabKey === '__all__'
+                              const isActive = activeRuleTab === tabKey
                               const label = tabKey === '__all__' ? '全部' : tabKey
                               const count = tabKey === '__all__' ? allRules.length : (tabMenuMap.get(tabKey)?.length || 0)
                               return (
                                 <div key={tabKey} style={{
-                                  padding: '4px 12px', borderRadius: 6, cursor: 'default',
+                                  padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
                                   fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
                                   background: isActive ? '#E8720C' : '#F5F5F5',
                                   color: isActive ? '#fff' : '#595959',
                                   border: `1px solid ${isActive ? '#E8720C' : '#E8E8E8'}`,
-                                }}>
+                                }} onClick={() => setActiveRuleTab(tabKey)}>
                                   {label} <span style={{ fontSize: 10, opacity: 0.8 }}>{count}</span>
                                 </div>
                               )
@@ -560,18 +572,7 @@ export default function RuleConfig() {
                               <tbody>
                                 {sectionOrder.map((sec, sIdx) => {
                                   const secRules = sectionMap.get(sec)!
-                                  const hasSubMenus = secRules.some(r => (r.menu || '').includes('-'))
                                   const rows: React.ReactNode[] = []
-                                  rows.push(
-                                    <tr key={`section-${sec}`}>
-                                      <td colSpan={7} style={{
-                                        padding: '8px 12px', background: '#F0F5FF', borderBottom: '1px solid #d6e4ff',
-                                        fontSize: 13, fontWeight: 600, color: '#1890FF',
-                                      }}>
-                                        {sec} <Tag color="#1890FF" style={{ fontSize: 10, marginLeft: 4, borderRadius: 8 }}>{secRules.length} 項</Tag>
-                                      </td>
-                                    </tr>
-                                  )
                                   secRules.forEach((rule, rIdx) => {
                                     const prefix = (rule.value as string) || '-'
                                     const isSpecial = prefix === '-'
@@ -582,8 +583,8 @@ export default function RuleConfig() {
                                       : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
                                     const menu = rule.menu || '—'
                                     const dashIdx = menu.indexOf('-')
-                                    const menuDisplay = hasSubMenus ? (dashIdx !== -1 ? menu.substring(dashIdx + 1) : menu) : '—'
-                                    const rowBorder = rIdx === secRules.length - 1 ? '1px solid #d6e4ff' : '1px solid #f0f0f0'
+                                    const menuDisplay = dashIdx !== -1 ? menu.substring(dashIdx + 1) : (menu === '—' ? '—' : menu)
+                                    const rowBorder = '1px solid #f0f0f0'
                                     rows.push(
                                       <tr key={rule.key} style={{ background: rIdx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
                                         <td style={{ padding: '8px 12px', fontSize: 12, color: '#595959', borderBottom: rowBorder, whiteSpace: 'nowrap' }}>{menuDisplay}</td>
