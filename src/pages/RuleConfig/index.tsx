@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio } from 'antd'
 import {
   SettingOutlined,
@@ -177,6 +177,51 @@ export default function RuleConfig() {
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({})
   const toggleMenu = (menu: string) =>
     setExpandedMenus(prev => ({ ...prev, [menu]: !prev[menu] }))
+
+  /* 編號生成規則：樹形菜單節點 */
+  interface TreeNode {
+    name: string
+    displayName: string
+    children: { name: string; rules: RuleItem[] }[]
+    rules: RuleItem[]
+    totalRuleCount: number
+  }
+
+  const buildMenuTree = (rules: RuleItem[]): TreeNode[] => {
+    const parentOrder: string[] = []
+    const parentMap = new Map<string, { children: Map<string, RuleItem[]>; directRules: RuleItem[] }>()
+    const standaloneOrder: string[] = []
+    const standaloneMap = new Map<string, RuleItem[]>()
+
+    rules.forEach(rule => {
+      const menu = rule.menu || '—'
+      const dashIdx = menu.indexOf('-')
+      if (dashIdx === -1) {
+        if (!standaloneMap.has(menu)) { standaloneMap.set(menu, []); standaloneOrder.push(menu) }
+        standaloneMap.get(menu)!.push(rule)
+      } else {
+        const parent = menu.substring(0, dashIdx)
+        const child = menu.substring(dashIdx + 1)
+        if (!parentMap.has(parent)) { parentMap.set(parent, { children: new Map(), directRules: [] }); parentOrder.push(parent) }
+        const pNode = parentMap.get(parent)!
+        if (!pNode.children.has(child)) pNode.children.set(child, [])
+        pNode.children.get(child)!.push(rule)
+      }
+    })
+
+    const tree: TreeNode[] = []
+    parentOrder.forEach(pName => {
+      const pNode = parentMap.get(pName)!
+      const childList: { name: string; rules: RuleItem[] }[] = []
+      pNode.children.forEach((cRules, cName) => childList.push({ name: cName, rules: cRules }))
+      tree.push({ name: pName, displayName: pName, children: childList, rules: pNode.directRules, totalRuleCount: pNode.directRules.length + childList.reduce((s, c) => s + c.rules.length, 0) })
+    })
+    standaloneOrder.forEach(sName => {
+      const sRules = standaloneMap.get(sName)!
+      tree.push({ name: sName, displayName: sName, children: [], rules: sRules, totalRuleCount: sRules.length })
+    })
+    return tree
+  }
 
   /* 控件渲染（按分组编辑状态控制） */
   const renderControl = (rule: RuleItem, groupEditing: boolean) => {
@@ -463,14 +508,58 @@ export default function RuleConfig() {
                         return null
                       }
 
-                      /* 按 menu 字段分組，保持原始順序 */
-                      const menuGroupMap = new Map<string, RuleItem[]>()
-                      group.rules.forEach(rule => {
-                        const menu = rule.menu || '—'
-                        if (!menuGroupMap.has(menu)) menuGroupMap.set(menu, [])
-                        menuGroupMap.get(menu)!.push(rule)
-                      })
-                      const menuGroups = Array.from(menuGroupMap.entries())
+                      const menuTree = buildMenuTree(group.rules)
+
+                      /* 渲染單條編號規則行 */
+                      const renderRuleRow = (rule: RuleItem, depth: number, isLast: boolean, ruleIdx: number) => {
+                        const prefix = (rule.value as string) || '-'
+                        const isSpecial = prefix === '-'
+                        const dfValue = rule.dateFormat || 'NONE'
+                        const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
+                        const remark = isSpecial
+                          ? (rule.remark || '')
+                          : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
+                        const rowBorder = isLast ? '1px solid #d6e4ff' : '1px solid #f0f0f0'
+                        const indent = depth === 1 ? 44 : 60
+                        return (
+                          <tr key={rule.key} style={{ background: ruleIdx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                            <td style={{ padding: `8px 12px 8px ${indent}px`, borderBottom: rowBorder }}>
+                              <span style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#1890FF', marginRight: 8 }} />
+                            </td>
+                            <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                              {(() => {
+                                const cat = getCategoryTag(rule.key, rule.menu)
+                                return cat ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{
+                                      display: 'inline-block', fontSize: 10, lineHeight: '16px',
+                                      padding: '0 4px', borderRadius: 3,
+                                      background: `${cat.color}15`, color: cat.color,
+                                      fontWeight: 600, border: `1px solid ${cat.color}30`,
+                                    }}>{cat.label}</span>
+                                    {rule.label}
+                                  </span>
+                                ) : rule.label
+                              })()}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                              <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                              <span style={{ fontSize: 12, color: '#595959' }}>
+                                {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYYYMM' || dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
+                              <span style={{ fontSize: 12, color: '#595959' }}>{isSpecial ? '—' : `${slValue} 位`}</span>
+                            </td>
+                            <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
+                              {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
+                            </td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
+                          </tr>
+                        )
+                      }
 
                       return (
                         <div style={{ overflowX: 'auto' }}>
@@ -487,97 +576,90 @@ export default function RuleConfig() {
                               </tr>
                             </thead>
                             <tbody>
-                              {menuGroups.map(([menu, menuRules]) => {
-                                const isExpanded = expandedMenus[menu] ?? false
+                              {menuTree.map(treeNode => {
+                                const rootKey = treeNode.name
+                                const isRootExpanded = expandedMenus[rootKey] ?? false
+                                const hasChildren = treeNode.children.length > 0
+
                                 return (
-                                  <>
-                                    {/* 菜單分組行（可點擊展開/收起） */}
+                                  <React.Fragment key={`tree-${rootKey}`}>
+                                    {/* 一級菜單節點行 */}
                                     <tr
-                                      key={`menu-${menu}`}
-                                      onClick={() => toggleMenu(menu)}
+                                      onClick={() => toggleMenu(rootKey)}
                                       style={{
-                                        background: isExpanded ? '#E6F4FF' : '#FAFAFA',
-                                        cursor: 'pointer',
-                                        transition: 'background 0.2s',
+                                        background: isRootExpanded ? '#E6F4FF' : '#FAFAFA',
+                                        cursor: 'pointer', transition: 'background 0.2s',
                                       }}
-                                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#F0F5FF' }}
-                                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
+                                      onMouseEnter={e => { if (!isRootExpanded) e.currentTarget.style.background = '#F0F5FF' }}
+                                      onMouseLeave={e => { if (!isRootExpanded) e.currentTarget.style.background = '#FAFAFA' }}
                                     >
                                       <td colSpan={7} style={{ padding: '10px 12px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                           <span style={{
                                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                             width: 20, height: 20, borderRadius: 4,
-                                            background: isExpanded ? '#1890FF' : '#E8E8E8',
-                                            transition: 'all 0.2s',
+                                            background: isRootExpanded ? '#1890FF' : '#E8E8E8', transition: 'all 0.2s',
                                           }}>
-                                            {isExpanded
+                                            {isRootExpanded
                                               ? <UpOutlined style={{ fontSize: 10, color: '#fff' }} />
                                               : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
                                             }
                                           </span>
-                                          <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{menu}</span>
+                                          <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{treeNode.displayName}</span>
                                           <Tag color="#1890FF" style={{ fontSize: 11, marginLeft: 4, borderRadius: 10 }}>
-                                            {menuRules.length} 項規則
+                                            {hasChildren ? `${treeNode.children.length} 個子菜單` : ''}{hasChildren && treeNode.rules.length > 0 ? ' · ' : ''}{treeNode.totalRuleCount} 項規則
                                           </Tag>
                                         </div>
                                       </td>
                                     </tr>
-                                    {/* 展開後顯示該菜單下所有編號規則 */}
-                                    {isExpanded && menuRules.map((rule, idx) => {
-                                      const prefix = (rule.value as string) || '-'
-                                      const isSpecial = prefix === '-'
-                                      const dfValue = rule.dateFormat || 'NONE'
-                                      const slValue = (rule.min != null && rule.min > 0) ? rule.min : 4
-                                      const remark = isSpecial
-                                        ? (rule.remark || '')
-                                        : (rule.remark?.replace(/\{prefix\}/g, prefix).replace(/\{n\}/g, String(slValue)) || '')
-                                      const rowBorder = idx < menuRules.length - 1 ? '1px solid #f0f0f0' : '1px solid #d6e4ff'
-                                      return (
-                                        <tr key={rule.key} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                                          <td style={{ padding: '8px 12px 8px 44px', borderBottom: rowBorder }}>
-                                            <span style={{
-                                              display: 'inline-block', width: 4, height: 4,
-                                              borderRadius: '50%', background: '#1890FF', marginRight: 8,
-                                            }} />
-                                          </td>
-                                          <td style={{ padding: '8px 12px', fontWeight: 500, color: '#262626', whiteSpace: 'nowrap', borderBottom: rowBorder }}>
-                                            {(() => {
-                                              const cat = getCategoryTag(rule.key, rule.menu)
-                                              return cat ? (
-                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+
+                                    {/* 展開後：二級子菜單 + 直接規則 */}
+                                    {isRootExpanded && <>
+                                      {/* 二級子菜單（可再次展開） */}
+                                      {treeNode.children.map((child, cIdx) => {
+                                        const childKey = `${rootKey}|${child.name}`
+                                        const isChildExpanded = expandedMenus[childKey] ?? false
+                                        const isLastChild = cIdx === treeNode.children.length - 1 && treeNode.rules.length === 0
+                                        return (
+                                          <React.Fragment key={`child-${childKey}`}>
+                                            <tr
+                                              onClick={() => toggleMenu(childKey)}
+                                              style={{
+                                                background: isChildExpanded ? '#F0F7FF' : '#F5F7FA',
+                                                cursor: 'pointer', transition: 'background 0.2s',
+                                              }}
+                                              onMouseEnter={e => { if (!isChildExpanded) e.currentTarget.style.background = '#EDF2F7' }}
+                                              onMouseLeave={e => { if (!isChildExpanded) e.currentTarget.style.background = '#F5F7FA' }}
+                                            >
+                                              <td colSpan={7} style={{ padding: '8px 12px 8px 36px', borderBottom: isLastChild && !isChildExpanded ? '1px solid #d6e4ff' : '1px solid #f0f0f0' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                                   <span style={{
-                                                    display: 'inline-block', fontSize: 10, lineHeight: '16px',
-                                                    padding: '0 4px', borderRadius: 3,
-                                                    background: `${cat.color}15`, color: cat.color,
-                                                    fontWeight: 600, border: `1px solid ${cat.color}30`,
-                                                  }}>{cat.label}</span>
-                                                  {rule.label}
-                                                </span>
-                                              ) : rule.label
-                                            })()}
-                                          </td>
-                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                                            <span style={{ fontFamily: 'monospace', color: isSpecial ? '#bfbfbf' : '#E8720C', fontWeight: 600 }}>{prefix}</span>
-                                          </td>
-                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                                            <span style={{ fontSize: 12, color: '#595959' }}>
-                                              {dfValue === 'YYYYMMDD' ? '年月日' : dfValue === 'YYYYMM' || dfValue === 'YYMM' ? '年月' : isSpecial ? '—' : '无'}
-                                            </span>
-                                          </td>
-                                          <td style={{ padding: '8px 12px', textAlign: 'center', borderBottom: rowBorder }}>
-                                            <span style={{ fontSize: 12, color: '#595959' }}>
-                                              {isSpecial ? '—' : `${slValue} 位`}
-                                            </span>
-                                          </td>
-                                          <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
-                                            {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
-                                          </td>
-                                          <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
-                                        </tr>
-                                      )
-                                    })}
-                                  </>
+                                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                    width: 18, height: 18, borderRadius: 3,
+                                                    background: isChildExpanded ? '#40A9FF' : '#D9D9D9', transition: 'all 0.2s',
+                                                  }}>
+                                                    {isChildExpanded
+                                                      ? <UpOutlined style={{ fontSize: 9, color: '#fff' }} />
+                                                      : <DownOutlined style={{ fontSize: 9, color: '#8C8C8C' }} />
+                                                    }
+                                                  </span>
+                                                  <span style={{ fontSize: 13, fontWeight: 500, color: '#595959' }}>{child.name}</span>
+                                                  <Tag style={{ fontSize: 10, borderRadius: 8, marginLeft: 4 }}>{child.rules.length} 項</Tag>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                            {isChildExpanded && child.rules.map((rule, rIdx) =>
+                                              renderRuleRow(rule, 2, rIdx === child.rules.length - 1 && isLastChild, rIdx)
+                                            )}
+                                          </React.Fragment>
+                                        )
+                                      })}
+                                      {/* 一級節點直屬規則 */}
+                                      {treeNode.rules.map((rule, rIdx) =>
+                                        renderRuleRow(rule, 1, rIdx === treeNode.rules.length - 1, rIdx)
+                                      )}
+                                    </>}
+                                  </React.Fragment>
                                 )
                               })}
                             </tbody>
