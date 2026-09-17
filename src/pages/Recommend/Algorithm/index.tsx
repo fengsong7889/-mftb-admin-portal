@@ -145,7 +145,7 @@ export default function Algorithm() {
       })
       .catch(() => {})
     return () => { mounted = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   // 点击卡片 → 进入列表（同步 type/tab 到 URL，使小蜜蜂 PRD 切换到列表界面）

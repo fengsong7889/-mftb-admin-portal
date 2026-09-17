@@ -38,6 +38,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
   const [form] = Form.useForm<SearchFormValues>()
   const [loading, setLoading] = useState(false)
   const [locations, setLocations] = useState<LocationRow[]>([])
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 搜索条件
   const [searchName, setSearchName] = useState<string>()
@@ -310,6 +311,7 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
         columns={applyConfig(columns)}
         dataSource={tableData}
         rowKey="id"
+        rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
         scroll={{ x: 1320 }}
         pagination={{

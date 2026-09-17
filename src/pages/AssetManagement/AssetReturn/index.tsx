@@ -61,7 +61,7 @@ export default function AssetReturn() {
       const data = await fetchReturnList(query)
       setListData(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      setError(err instanceof Error ? err.message : '加載失敗')
     } finally {
       setLoading(false)
     }
@@ -75,7 +75,7 @@ export default function AssetReturn() {
       const data = await fetchReturnDetail(id)
       setDetail(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      setError(err instanceof Error ? err.message : '加載失敗')
     } finally {
       setLoading(false)
     }
@@ -91,7 +91,7 @@ export default function AssetReturn() {
   /* ----- 登记提交 ----- */
   const handleSubmit = useCallback(async (dto: ReturnRegisterDTO) => {
     const id = await registerReturn(dto)
-    message.success('归还登记成功')
+    message.success('歸還登記成功')
     navigate(`/asset-return/detail?id=${id}&result=1`)
   }, [navigate])
 
@@ -99,7 +99,7 @@ export default function AssetReturn() {
   const handleDispose = useCallback(async (dto: ReturnDispositionDTO) => {
     if (recordId == null) return
     await disposeReturn(recordId, dto)
-    message.success('处置登记成功')
+    message.success('處置登記成功')
     handleLoadDetail(recordId)
   }, [recordId, handleLoadDetail])
 
@@ -107,7 +107,7 @@ export default function AssetReturn() {
   const handleRecover = useCallback(async (_dto: { disposition: string; dispositionDate: string }) => {
     if (recordId == null) return
     await recoverReturn(recordId, {})
-    message.success('找回登记成功')
+    message.success('找回登記成功')
     handleLoadDetail(recordId)
   }, [recordId, handleLoadDetail])
 
@@ -172,7 +172,7 @@ export default function AssetReturn() {
       )}
 
       {['detail', 'dispose', 'recover'].includes(view) && recordId == null && (
-        <div className="claim-notice">缺少有效的归还记录 ID。<button onClick={back}>返回列表</button></div>
+        <div className="claim-notice">缺少有效的歸還記錄 ID。<button onClick={back}>返回列表</button></div>
       )}
     </div>
   )

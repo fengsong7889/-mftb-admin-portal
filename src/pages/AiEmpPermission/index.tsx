@@ -5,6 +5,7 @@ import type { DataNode } from 'antd/es/tree'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
   flattenDepts,
@@ -87,6 +88,7 @@ function buildDeptTreeData(): DataNode[] {
  */
 export default function AiEmpPermission() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   /* ── 數據 ── */
   const [data, setData] = useState<EmpPermissionSummary[]>([])
@@ -99,6 +101,7 @@ export default function AiEmpPermission() {
   const [queryQuotaStatus, setQueryQuotaStatus] = useState<QuotaStatus | undefined>(undefined)
   const [queryUpdatedBy, setQueryUpdatedBy] = useState('')
   const [queryUpdateTime, setQueryUpdateTime] = useState<[Dayjs, Dayjs] | null>(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [applied, setApplied] = useState({
     name: '', dept: undefined as number | undefined,
     source: undefined as PermissionSource | undefined,
@@ -364,7 +367,7 @@ export default function AiEmpPermission() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
@@ -374,7 +377,7 @@ export default function AiEmpPermission() {
       {/* ====== 操作按鈕區 ====== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} onClick={() => message.success('导出成功')}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {configComponent}
@@ -387,6 +390,7 @@ export default function AiEmpPermission() {
           rowKey="employeeId"
           columns={columns}
           dataSource={filtered}
+          rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
           loading={loading}
           pagination={false}
           scroll={{ x: 1500 }}

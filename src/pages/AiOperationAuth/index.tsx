@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Alert,
   Button,
@@ -33,6 +34,7 @@ const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
 export default function AiOperationAuth() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   /* ── 數據 ── */
   const [tools, setTools] = useState<ToolDefinition[]>([])
   const [loading, setLoading] = useState(false)
@@ -174,7 +176,7 @@ export default function AiOperationAuth() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>

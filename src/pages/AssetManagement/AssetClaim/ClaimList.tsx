@@ -36,6 +36,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
   const total = data?.total ?? 0
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [filters, setFilters] = useState<Pick<ClaimQuery, 'keyword' | 'departmentId'>>({})
   const deptTree = useMemo(() => buildDeptTree(departments), [departments])
 
@@ -147,7 +148,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
       {/* ====== 操作区 ====== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>导出当前页</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
           {canAdd && <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>{t('asset.claimAdd')}</Button>}
@@ -161,6 +162,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
         dataSource={error ? [] : dataSource}
         locale={{ emptyText: <Empty description={t('common.noData')} /> }}
         rowKey="employeeId"
+        rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
         size="middle"
         scroll={{ x: 1050 }}

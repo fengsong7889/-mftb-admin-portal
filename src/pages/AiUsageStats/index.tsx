@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button, DatePicker, Form, Select, Table } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -45,6 +46,7 @@ const CostCells = ({ costs }: { costs: CostEntry[] }) => {
 
 export default function AiUsageStats() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   /* ── 查詢條件（點「查詢」才生效） ── */
   const [dates, setDates] = useState<[Dayjs, Dayjs]>([dayjs().startOf('month'), dayjs()])

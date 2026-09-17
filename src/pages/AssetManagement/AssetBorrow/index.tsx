@@ -15,6 +15,9 @@ import {
   fetchBorrowList, fetchBorrowDetail, registerBorrow, renewBorrow,
   type BorrowRow, type BorrowQuery, type BorrowRegisterDTO,
 } from '../../../api/eamBorrow'
+import { fetchAssetList } from '../../../api/asset'
+import { fetchEmployees } from '../../../api/employee'
+import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '../AssetClaim/claimViewTypes'
 import BorrowList from './BorrowList'
 import BorrowForm from './BorrowForm'
 import BorrowDetail from './BorrowDetail'
@@ -51,6 +54,10 @@ export default function AssetBorrow() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
 
+  /* ----- 借用表單數據源：可借用閒置資產 / 在職員工 ----- */
+  const [assetPage, setAssetPage] = useState<ClaimPage<ClaimAssetOption>>()
+  const [employeePage, setEmployeePage] = useState<ClaimPage<ClaimEmployee>>()
+
   /* ----- 列表查询 ----- */
   const handleQuery = useCallback(async (query: BorrowQuery) => {
     setLoading(true)
@@ -86,10 +93,42 @@ export default function AssetBorrow() {
     }
   }, [view, recordId, handleLoadDetail])
 
+  /* ----- 可借用閒置資產查詢 ----- */
+  const handleAssetQuery = useCallback(async (query: ClaimQuery) => {
+    try {
+      const res = await fetchAssetList({ page: query.page, size: query.size, keyword: query.keyword, status: 'idle' })
+      setAssetPage({
+        total: res.total,
+        records: (res.records || []).map(a => ({
+          id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
+          brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
+        })),
+      })
+    } catch {
+      setAssetPage({ records: [], total: 0 })
+    }
+  }, [])
+
+  /* ----- 在職員工查詢 ----- */
+  const handleEmployeeQuery = useCallback(async (query: ClaimQuery) => {
+    try {
+      const res = await fetchEmployees({ page: query.page, size: query.size, keyword: query.keyword, employmentStatus: 'active' })
+      setEmployeePage({
+        total: res.total,
+        records: (res.records || []).map(e => ({
+          employeeId: e.id, empNo: e.empId, empName: e.name,
+          departmentId: e.departmentId ?? undefined, department: e.department || '',
+        })),
+      })
+    } catch {
+      setEmployeePage({ records: [], total: 0 })
+    }
+  }, [])
+
   /* ----- 登记提交 ----- */
   const handleSubmit = useCallback(async (dto: BorrowRegisterDTO) => {
     const id = await registerBorrow(dto)
-    message.success('借用登记成功')
+    message.success('借用登記成功')
     navigate(`/asset-borrow/detail?id=${id}`)
   }, [navigate])
 
@@ -121,6 +160,10 @@ export default function AssetBorrow() {
           operatorName={user?.name}
           canEdit={canEdit}
           loading={loading}
+          assets={assetPage}
+          employees={employeePage}
+          onAssetQuery={handleAssetQuery}
+          onEmployeeQuery={handleEmployeeQuery}
           onSubmit={handleSubmit}
           onBack={back}
         />

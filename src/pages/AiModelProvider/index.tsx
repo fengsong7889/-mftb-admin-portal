@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Input, Select, Space, Table, Switch, message } from 'antd'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
@@ -14,7 +15,8 @@ import {
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 export default function AiModelProvider() {
-  /* ── 數據 ── */
+  const { t } = useTranslation()
+  /* ─ 數據 ── */
   const [providers, setProviders] = useState<AiProvider[]>([])
   const [loading, setLoading] = useState(false)
   const [queryName, setQueryName] = useState('')
@@ -271,7 +273,7 @@ export default function AiModelProvider() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>

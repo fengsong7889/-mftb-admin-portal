@@ -8,9 +8,9 @@ import type { ReturnRow } from '../../../api/eamReturn'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
 
 const DISPOSITION_OPTIONS = [
-  { value: 'idle', label: '收回闲置（可再次使用）' },
-  { value: 'scrapped', label: '登记报废' },
-  { value: 'written_off', label: '遗失核销' },
+  { value: 'idle', label: '收回閒置（可再次使用）' },
+  { value: 'scrapped', label: '登記報廢' },
+  { value: 'written_off', label: '遺失核銷' },
 ]
 
 interface Props {
@@ -40,7 +40,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
   }
 
   if (!canEdit) {
-    return <Alert type="warning" showIcon message="无归还办理权限" />
+    return <Alert type="warning" showIcon message="無歸還辦理權限" />
   }
 
   const handleDispositionSubmit = async () => {
@@ -66,50 +66,50 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
 
   if (recover) {
     return <>
-      <ReturnHeader title={`遗失找回 · ${record.returnNo}`} onBack={onBack} />
+      <ReturnHeader title={`遺失找回 · ${record.returnNo}`} onBack={onBack} />
       <Spin spinning={loading}>
-        <ReturnSection title="归还记录">
+        <ReturnSection title="歸還記錄">
           <Descriptions column={2}>
-            <Descriptions.Item label="归还单号">{record.returnNo}</Descriptions.Item>
-            <Descriptions.Item label="资产">{record.assetName} ({record.assetNo})</Descriptions.Item>
+            <Descriptions.Item label="歸還單號">{record.returnNo}</Descriptions.Item>
+            <Descriptions.Item label="資產">{record.assetName} ({record.assetNo})</Descriptions.Item>
             <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
-            <Descriptions.Item label="验收状况">遗失</Descriptions.Item>
+            <Descriptions.Item label="驗收狀況">遺失</Descriptions.Item>
           </Descriptions>
         </ReturnSection>
         <ReturnSection title="找回信息">
-          <Alert className="claim-notice" showIcon type="info" message="登记找回事实，不改写原始归还记录。找回后资产恢复可使用状态。" />
+          <Alert className="claim-notice" showIcon type="info" message="登記找回事實，不改寫原始歸還記錄。找回後資產恢復可使用狀態。" />
           <Form<RecoverValues> form={recoverForm} layout="vertical" disabled={loading}>
-            <Form.Item name="note" label="找回说明" rules={[{ required: true, whitespace: true }]}>
-              <Input.TextArea rows={4} maxLength={500} placeholder="说明找回的时间、地点、状况等" />
+            <Form.Item name="note" label="找回說明" rules={[{ required: true, whitespace: true }]}>
+              <Input.TextArea rows={4} maxLength={500} placeholder="說明找回的時間、地點、狀況等" />
             </Form.Item>
           </Form>
         </ReturnSection>
       </Spin>
       <div className="form-footer">
         <Button onClick={onBack}>取消</Button>
-        <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleRecoverSubmit}>确认找回</Button>
+        <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleRecoverSubmit}>確認找回</Button>
       </div>
     </>
   }
 
   return <>
-    <ReturnHeader title={`处置登记 · ${record.returnNo}`} onBack={onBack} />
+    <ReturnHeader title={`處置登記 · ${record.returnNo}`} onBack={onBack} />
     <Spin spinning={loading}>
-      <ReturnSection title="归还记录">
+      <ReturnSection title="歸還記錄">
         <Descriptions column={2}>
-          <Descriptions.Item label="归还单号">{record.returnNo}</Descriptions.Item>
-          <Descriptions.Item label="资产">{record.assetName} ({record.assetNo})</Descriptions.Item>
+          <Descriptions.Item label="歸還單號">{record.returnNo}</Descriptions.Item>
+          <Descriptions.Item label="資產">{record.assetName} ({record.assetNo})</Descriptions.Item>
           <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
-          <Descriptions.Item label="验收状况">{record.assetCondition}</Descriptions.Item>
+          <Descriptions.Item label="驗收狀況">{record.assetCondition}</Descriptions.Item>
         </Descriptions>
       </ReturnSection>
-      <ReturnSection title="处置结果">
-        <Alert className="claim-notice" showIcon type="warning" message="登记实物处置结果。处置不影响已建立的责任赔付流程。" />
+      <ReturnSection title="處置結果">
+        <Alert className="claim-notice" showIcon type="warning" message="登記實物處置結果。處置不影響已建立的責任賠付流程。" />
         <Form<DispositionValues> form={dispositionForm} layout="vertical" disabled={loading} initialValues={{ date: dayjs() }}>
-          <Form.Item name="disposition" label="处置结果" rules={[{ required: true }]}>
+          <Form.Item name="disposition" label="處置結果" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid" options={DISPOSITION_OPTIONS} />
           </Form.Item>
-          <Form.Item name="date" label="处置日期" rules={[{ required: true }]}>
+          <Form.Item name="date" label="處置日期" rules={[{ required: true }]}>
             <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
           </Form.Item>
         </Form>
@@ -117,7 +117,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
     </Spin>
     <div className="form-footer">
       <Button onClick={onBack}>取消</Button>
-      <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleDispositionSubmit}>确认处置</Button>
+      <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleDispositionSubmit}>確認處置</Button>
     </div>
   </>
 }

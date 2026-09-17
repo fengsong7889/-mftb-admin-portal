@@ -57,6 +57,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 领用编号 (LY) + 归还编号 (GH) 规则种子 */
     private static final String V_INIT_EAM_CLAIM_RETURN_RULE = "seq:init-v10";
 
+    /** 增量版本: 借用编号 (JY) + 赔付编号 (PF) 规则种子 */
+    private static final String V_INIT_EAM_BORROW_COMP_RULE = "seq:init-v11";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -98,6 +101,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce(V_INIT_EAM_CLAIM_RETURN_RULE, () -> {
             seedEamClaimReturnRules();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_BORROW_COMP_RULE, () -> {
+            seedEamBorrowCompRules();
         });
     }
 
@@ -497,7 +503,7 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
         }
     }
 
-    /** 领用编号 (LY+YYYYMMDD+4位) + 归还编号 (GH+YYYYMMDD+4位) 规则种子 */
+    /** 领用编号 (LY+YYYYMMDD+4位) + 归还编号 (GH+YYYYMMDD+4位) + 借用编号 (JY+YYYYMMDD+4位) + 赔付编号 (PF+YYYYMMDD+4位) 规则种子 */
     private void seedEamClaimReturnRules() {
         int inserted = 0;
         inserted += jdbcTemplate.update(
@@ -525,7 +531,40 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
                 "GH", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
-            log.info("已写入/修正领用编号 + 归还编号规则种子数据");
+            log.info("已写入/修正领用 + 归还编号规则种子数据");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 借用编号 (JY+YYYYMMDD+4位) + 赔付编号 (PF+YYYYMMDD+4位) 规则种子 (v11) */
+    private void seedEamBorrowCompRules() {
+        int inserted = 0;
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_BORROW, "借用編號", "物資管理(EAM)-借用管理",
+                "JY", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_COMPENSATION, "賠付編號", "物資管理(EAM)-歸還管理",
+                "PF", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正借用 + 赔付编号规则种子数据");
             bizSeqService.refreshRules();
         }
     }

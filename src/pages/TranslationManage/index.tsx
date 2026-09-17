@@ -336,6 +336,7 @@ export default function TranslationManage() {
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [editingCell, setEditingCell] = useState<{ rowId: string; langCode: string } | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 新增字段弹窗
   const [addFieldOpen, setAddFieldOpen] = useState(false)
@@ -1035,6 +1036,7 @@ export default function TranslationManage() {
         columns={configuredColumns}
         dataSource={filteredData}
         rowKey="id"
+        rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
         scroll={{ x: 480 + languages.length * 180 + 220 }}
         pagination={{

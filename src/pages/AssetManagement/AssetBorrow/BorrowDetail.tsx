@@ -20,7 +20,7 @@ interface Props {
   onRefresh?: () => void
 }
 
-export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, onBack, onRefresh }: Props) {
+export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, onBack, onRefresh: _onRefresh }: Props) {
   const navigate = useNavigate()
 
   if (loading && !record) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>

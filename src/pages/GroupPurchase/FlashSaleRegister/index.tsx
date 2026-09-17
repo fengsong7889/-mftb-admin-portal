@@ -380,7 +380,7 @@ export default function FlashSaleRegister() {
           </Form.Item>
           <Form.Item className="search-actions">
             <Space>
-              <Button type="primary" icon={<SearchOutlined />} htmlType="submit">查詢</Button>
+              <Button type="primary" icon={<SearchOutlined />} htmlType="submit">{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </Space>
           </Form.Item>

@@ -297,7 +297,7 @@ export default function GoldenSignboardPricing() {
       })
       .catch(() => { /* 請求失敗保持空表單 */ })
       .finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [urlId, form])
 
   /* ── 編輯模式：自動同步算法庫最新的「標籤x場景」結構 ──

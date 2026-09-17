@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button, DatePicker, Form, Select, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
@@ -36,6 +37,7 @@ const employeeLabel = (row: { username: string; name?: string | null; empId?: st
   row.name ? `${row.name}（${row.empId || row.username}）` : row.username
 
 export default function AiEnergyDetail() {
+  const { t } = useTranslation()
   /* ── 從總覽「明細」帶入的查詢條件 ── */
   const [searchParams] = useSearchParams()
 

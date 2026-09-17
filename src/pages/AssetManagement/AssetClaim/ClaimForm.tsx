@@ -260,8 +260,6 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                     onChange={(id: number) => setEmployee(employeeOptions.find((item) => item.employeeId === id))}
                     options={employeeOptions.map((item) => ({ value: item.employeeId, label: `${item.empName}（${item.empNo}）` }))} />
                 </Form.Item>
-                <Pagination className="claim-selection-pagination" size="small" current={employeeQuery.page} pageSize={employeeQuery.size} total={employees?.total ?? 0} showSizeChanger={false} hideOnSinglePage
-                  onChange={(page) => setEmployeeQuery({ ...employeeQuery, page })} />
               </div>
               <Form.Item label={t('asset.colDepartment')}>
                 <TreeSelect disabled treeData={deptTree} value={employee?.departmentId} placeholder={employee?.department || '由员工组织信息带出'} />

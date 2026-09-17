@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Table, Tag, Button, Input, Select, DatePicker, Modal, Form, message, Switch, Space } from 'antd'
 import dayjs from 'dayjs'
 import {
@@ -13,6 +14,7 @@ import type { WorkflowDefinition } from './types'
 
 export default function WorkflowConfig() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { workflows, deleteWorkflow, toggleEnabled } = useWorkflowConfig()
 
   /* 搜索區表單 */
@@ -256,7 +258,7 @@ export default function WorkflowConfig() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>

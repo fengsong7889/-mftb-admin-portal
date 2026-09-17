@@ -2,11 +2,12 @@
  * 借用管理 — 列表页（接通真实 API）
  */
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Empty, Form, Input, Select, Space, Table, TreeSelect, Tag } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Empty, Form, Input, Select, Space, Table, TreeSelect, Tag, message } from 'antd'
+import { PlusOutlined, ReloadOutlined, SearchOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { exportToCSV } from '../../../utils/exportCSV'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import type { BorrowRow, BorrowQuery } from '../../../api/eamBorrow'
@@ -33,6 +34,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
   const [size, setSize] = useState(10)
   const [filters, setFilters] = useState<Filters>({})
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   const dataSource = data?.records ?? []
   const total = data?.total ?? 0
@@ -59,6 +61,24 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
   }
 
   const handleReset = () => { form.resetFields(); setFilters({}); setPage(1) }
+
+  /* ----- 导出 ----- */
+  const handleExport = () => {
+    const cols = [
+      { title: t('asset.colBorrowNo'), dataIndex: 'borrowNo' },
+      { title: '资产编号', dataIndex: 'assetNo' },
+      { title: '资产名称', dataIndex: 'assetName' },
+      { title: '借用人', dataIndex: 'holderName' },
+      { title: '借用部门', dataIndex: 'department' },
+      { title: '借出日期', dataIndex: 'startDate' },
+      { title: '到期日期', dataIndex: 'dueDate' },
+      { title: '续借次数', dataIndex: 'renewCount' },
+      { title: '借用用途', dataIndex: 'purpose' },
+      { title: '状态', dataIndex: 'status', render: (v: string) => STATUS_LABEL[v] || v },
+    ]
+    exportToCSV(`borrow_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
+    message.success(t('common.exportSuccess'))
+  }
 
   const handleTableChange = (p: { current?: number; pageSize?: number }) => {
     const nextSize = p.pageSize || 10
@@ -129,7 +149,9 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
 
     {/* ====== 操作区 ====== */}
     <div className="action-section">
-      <div className="action-section-left">借用记录 {total > 0 ? `共 ${total} 条` : ''}</div>
+      <div className="action-section-left">
+          <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>{t('common.export')}</Button>
+        </div>
       <div className="action-section-right">
         {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/asset-borrow/add')}>借用登记</Button>}
         {configComponent}
@@ -139,6 +161,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
     {/* ====== 表格 ====== */}
     <Table<BorrowRow>
       rowKey="id"
+      rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
       columns={applyConfig(allColumns) as typeof allColumns}
       dataSource={error ? [] : dataSource}
       locale={{ emptyText: <Empty description={t('common.noData')} /> }}

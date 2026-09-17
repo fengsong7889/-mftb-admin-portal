@@ -119,6 +119,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     updatedDateRange?: [string, string]
   }>({})
   const [activeTab, setActiveTab] = useState<'pending' | 'batches' | 'exceptions'>('pending')
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   /* ----- 待驗收訂單搜索（獨立 form 實例，避免與入庫批次搜索區字段互擾） ----- */
   const [poForm] = Form.useForm()
@@ -678,6 +679,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 columns={pendingColumns}
                 dataSource={pendingRows}
                 rowKey={(r) => `${r.orderId}_${r.groupId}`}
+                rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={poLoading}
                 size="middle"
                 scroll={{ x: 1560 }}
@@ -703,6 +705,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 columns={applyConfig(allColumns)}
                 dataSource={batchesData}
                 rowKey="id"
+                rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={loading}
                 size="middle"
                 scroll={{ x: 1800 }}
@@ -748,6 +751,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 columns={applyConfig(allColumns)}
                 dataSource={exceptionsData}
                 rowKey="id"
+                rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={loading}
                 size="middle"
                 scroll={{ x: 1800 }}
