@@ -67,6 +67,8 @@ export interface AssetItem {
   department: string
   /** 使用人 */
   userName: string
+  /** 只读持有人 ID（sys_user.id）；无人持有为 null，兼容旧响应缺省。 */
+  readonly currentHolderId?: number | null
   /** 资产状态 */
   status: AssetStatus
   /** 资产图片（base64 dataUrl，可多张逗号分隔） */
@@ -356,6 +358,7 @@ export interface TransferRecord {
   assetName: string
   fromUserId: number | null
   fromUserName: string
+  fromUserEmpId: string | null
   fromDepartment: string
   toUserId: number | null
   toUserName: string
@@ -366,6 +369,8 @@ export interface TransferRecord {
   status: 'done' | 'cancelled'
   operatorName: string
   remark: string | null
+  createdBy?: string
+  updatedBy?: string
   createdAt: string
   updatedAt: string
 }
@@ -374,8 +379,15 @@ export interface TransferRecord {
 export interface TransferQuery {
   page?: number
   size?: number
+  transferNo?: string
   assetNo?: string
-  keyword?: string
+  assetName?: string
+  fromUserName?: string
+  toUserName?: string
+  fromDepartment?: string
+  toDepartment?: string
+  status?: string
+  operatorName?: string
   startDate?: string
   endDate?: string
 }
@@ -396,6 +408,11 @@ export function transferAsset(data: {
 /** 调拨记录分页查询 */
 export function fetchTransferList(params?: TransferQuery): Promise<PageResult<TransferRecord>> {
   return request.get<unknown, PageResult<TransferRecord>>('/eam/transfers', { params })
+}
+
+/** 调拨详情 */
+export function fetchTransferDetail(id: number): Promise<TransferRecord> {
+  return request.get<unknown, TransferRecord>(`/eam/transfers/${id}`)
 }
 
 /** 资产归还 */

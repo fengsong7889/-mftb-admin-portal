@@ -1,19 +1,20 @@
 /**
  * 資產維修詳情頁
  *
- * 登記資產維修記錄：故障描述 / 維修內容 / 維修方 / 維修費用
- * 維修中的資產狀態變為「維修中」；維修完成時狀態變回「在用」
+ * 樣式基準：採購訂單詳情（PurchaseOrder/OrderDetail.tsx）——
+ * DetailPageHeader + 無邊框模塊卡片 + Descriptions column=4 非 bordered + 最後更新 footer。
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Form, Input, Select, Button, message, Row, Col, Card, Table, Modal, Tag, DatePicker, InputNumber,
+  Form, Input, Select, Button, message, Row, Col, Table, Modal, Tag, DatePicker, InputNumber, Spin, Descriptions,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  PlusOutlined, SaveOutlined, CheckCircleOutlined,
+  PlusOutlined, SaveOutlined, CheckCircleOutlined, AppstoreOutlined, ToolOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
+import DetailPageHeader from '../../../components/DetailPageHeader'
 import {
   fetchAssetDetail, fetchRepairList, repairAsset, finishRepair, type AssetItem, type AssetRepairRecord,
 } from '../../../api/asset'
@@ -40,6 +41,12 @@ interface FormValues {
 interface Props {
   assetId: number
   onBack: () => void
+}
+
+/** 详情卡片统一样式（无边框，对齐采购订单详情） */
+const detailCardStyle: React.CSSProperties = {
+  borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
 }
 
 export default function RepairDetail({ assetId, onBack }: Props) {
@@ -150,44 +157,78 @@ export default function RepairDetail({ assetId, onBack }: Props) {
     },
   ]
 
+  if (loading || !asset) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" />
+      </div>
+    )
+  }
+
   return (
     <>
-      <div style={{ background: '#fff', borderRadius: 8, padding: '16px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Button type="primary" onClick={onBack}>{t('common.back')}</Button>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('asset.repairTitle')}</h2>
-      </div>
-
-      {asset && (
-        <Card title={t('asset.sectionAssetInfo')} style={{ marginBottom: 16, borderRadius: 8 }} size="small">
-          <Row gutter={16}>
-            <Col span={6}><b>{t('asset.colAssetNo')}:</b> {asset.assetNo}</Col>
-            <Col span={6}><b>{t('asset.colAssetName')}:</b> {asset.assetName}</Col>
-            <Col span={6}><b>{t('asset.colAssetType')}:</b> {asset.assetType}</Col>
-            <Col span={6}><b>{t('asset.colBrand')}:</b> {asset.brand || '-'}</Col>
-            <Col span={12} style={{ marginTop: 8 }}><b>{t('asset.colDepartment')}:</b> {asset.department || '-'}</Col>
-            <Col span={12} style={{ marginTop: 8 }}><b>{t('asset.colUserName')}:</b> {asset.userName || '-'}</Col>
-          </Row>
-        </Card>
-      )}
-
-      <div className="action-section">
-        <div className="action-section-left" />
-        <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
+      {/* ====== 详情页头部 ====== */}
+      <DetailPageHeader
+        title={t('asset.repairTitle')}
+        meta={<>{asset.assetNo} · {asset.assetName}</>}
+        onBack={onBack}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}
+            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
             {t('asset.btnNewRepair')}
           </Button>
+        }
+      />
+
+      {/* ====== 资产信息 ====== */}
+      <div style={detailCardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionAssetInfo')}</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.colAssetNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colAssetType')}>{asset.assetType}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colBrand')}>{asset.brand || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colUserName')}>{asset.userName || '-'}</Descriptions.Item>
+        </Descriptions>
       </div>
 
-      <Table<AssetRepairRecord>
-        columns={columns}
-        dataSource={records}
-        rowKey="id"
-        loading={loading}
-        size="middle"
-        pagination={false}
-        scroll={{ x: 1200 }}
-      />
+      {/* ====== 维修记录 ====== */}
+      <div style={detailCardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.repairRecordsTitle', { defaultValue: '維修記錄' })}</span>
+          <Tag color="orange" style={{ fontSize: 11 }}>{records.length}</Tag>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <Table<AssetRepairRecord>
+          columns={columns}
+          dataSource={records}
+          rowKey="id"
+          loading={loading}
+          size="small"
+          pagination={false}
+          scroll={{ x: 1200 }}
+        />
+      </div>
+
+      {/* ====== 最後更新（詳情頁規範 footer） ====== */}
+      <div style={{
+        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        border: '1px solid #f0f0f0',
+        display: 'flex', justifyContent: 'flex-end', gap: 24,
+      }}>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{asset.applicant || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{asset.updatedAt || '-'}</span></span>
+      </div>
 
       {/* 维修登记弹窗 */}
       <Modal

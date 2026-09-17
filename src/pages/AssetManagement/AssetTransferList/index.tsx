@@ -17,6 +17,7 @@ export default function AssetTransferList() {
   const [activeTab, setActiveTab] = useState('log')
 
   const toAsset = (assetNo: string) => navigate(`/asset-list?assetNo=${encodeURIComponent(assetNo)}`)
+  const toDetail = (id: number) => navigate(`/asset-transfer/detail?id=${id}`)
 
   return (
     <div className="content-area">
@@ -28,7 +29,7 @@ export default function AssetTransferList() {
           {
             key: 'log',
             label: t('asset.tabTransferLog'),
-            children: <TransferLogTab onViewAsset={toAsset} />,
+            children: <TransferLogTab onViewAsset={toAsset} onViewDetail={toDetail} />,
           },
           {
             key: 'transferable',

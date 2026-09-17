@@ -12,6 +12,7 @@ import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.EamAssetTransferMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EamAssetTransferService;
+import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -37,6 +38,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
     private final EamAssetTransferMapper transferMapper;
     private final EamAssetMapper assetMapper;
     private final SysUserMapper userMapper;
+    private final DepartmentService departmentService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -65,6 +67,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         if (!hasText(dto.getReason())) throw new BusinessException("調撥原因不能為空");
 
         LocalDate transferDate = parseDate(dto.getTransferDate());
+        String toDepartment = departmentService.requireEnabledDepartmentName(dto.getToDepartment());
 
         // 2. 锁定资产并校验状态
         EamAsset asset = assetMapper.selectOne(
@@ -72,6 +75,13 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         if (asset == null) throw new BusinessException("資產不存在");
         if (!"in_use".equals(asset.getStatus()))
             throw new BusinessException("僅使用中資產可調撥，當前狀態：" + asset.getStatus());
+
+        // 2.1 查询原使用人工号
+        String fromUserEmpId = null;
+        if (asset.getCurrentHolderId() != null) {
+            SysUser fromUser = userMapper.selectById(asset.getCurrentHolderId());
+            if (fromUser != null) fromUserEmpId = fromUser.getEmpId();
+        }
 
         // 3. 解析新使用人（工号优先精确匹配，回退姓名/账号）
         SysUser toUser = resolveNewUser(dto.getToUserEmpId(), dto.getToUserName());
@@ -89,10 +99,11 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         transfer.setFromUserId(asset.getCurrentHolderId());
         transfer.setFromUserName(asset.getUserName() != null ? asset.getUserName() : "");
         transfer.setFromDepartment(asset.getDepartment() != null ? asset.getDepartment() : "");
+        transfer.setFromUserEmpId(fromUserEmpId);
         transfer.setToUserId(toUser.getId());
         transfer.setToUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
         transfer.setToUserEmpId(toUser.getEmpId() != null ? toUser.getEmpId() : "");
-        transfer.setToDepartment(dto.getToDepartment().trim());
+        transfer.setToDepartment(toDepartment);
         transfer.setTransferDate(transferDate);
         transfer.setReason(dto.getReason().trim());
         transfer.setStatus("done");
@@ -106,7 +117,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         // 6. 更新资产归属
         asset.setCurrentHolderId(toUser.getId());
         asset.setUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
-        asset.setDepartment(dto.getToDepartment().trim());
+        asset.setDepartment(toDepartment);
         asset.setUpdatedBy(operatorResolver.currentOperatorName());
         assetMapper.updateById(asset);
 
@@ -209,15 +220,32 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
 
     private LambdaQueryWrapper<EamAssetTransfer> queryWrapper(EamAssetTransferQuery q) {
         LambdaQueryWrapper<EamAssetTransfer> w = new LambdaQueryWrapper<>();
+        if (hasText(q.getTransferNo())) {
+            w.like(EamAssetTransfer::getTransferNo, q.getTransferNo().trim());
+        }
         if (hasText(q.getAssetNo())) {
             w.like(EamAssetTransfer::getAssetNo, q.getAssetNo().trim());
         }
-        if (hasText(q.getKeyword())) {
-            String kw = q.getKeyword().trim();
-            w.and(x -> x.like(EamAssetTransfer::getTransferNo, kw)
-                    .or().like(EamAssetTransfer::getAssetName, kw)
-                    .or().like(EamAssetTransfer::getFromUserName, kw)
-                    .or().like(EamAssetTransfer::getToUserName, kw));
+        if (hasText(q.getAssetName())) {
+            w.like(EamAssetTransfer::getAssetName, q.getAssetName().trim());
+        }
+        if (hasText(q.getFromUserName())) {
+            w.like(EamAssetTransfer::getFromUserName, q.getFromUserName().trim());
+        }
+        if (hasText(q.getToUserName())) {
+            w.like(EamAssetTransfer::getToUserName, q.getToUserName().trim());
+        }
+        if (hasText(q.getFromDepartment())) {
+            w.like(EamAssetTransfer::getFromDepartment, q.getFromDepartment().trim());
+        }
+        if (hasText(q.getToDepartment())) {
+            w.like(EamAssetTransfer::getToDepartment, q.getToDepartment().trim());
+        }
+        if (hasText(q.getStatus())) {
+            w.eq(EamAssetTransfer::getStatus, q.getStatus().trim());
+        }
+        if (hasText(q.getOperatorName())) {
+            w.like(EamAssetTransfer::getOperatorName, q.getOperatorName().trim());
         }
         LocalDate dateStart = parseDateOrNull(q.getStartDate());
         if (dateStart != null) w.ge(EamAssetTransfer::getTransferDate, dateStart);

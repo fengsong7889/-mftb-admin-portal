@@ -27,6 +27,8 @@ public class EamAssetTransferVO {
 
     private String fromDepartment;
 
+    private String fromUserEmpId;
+
     private Long toUserId;
 
     private String toUserName;

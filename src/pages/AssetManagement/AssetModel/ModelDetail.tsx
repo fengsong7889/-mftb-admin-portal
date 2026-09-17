@@ -1,9 +1,8 @@
 /**
  * 资产品牌/产品 详情页（只读模式）
  *
- * - type="brand"：资产品牌详情
- * - type="product"：产品详情（无参数，参数从参数库读取）
- * - 无底部操作栏（详情页全局规范）
+ * 样式基准：采购订单详情（PurchaseOrder/OrderDetail.tsx）——
+ * DetailPageHeader + 无边框模块卡片 + Descriptions column=4 非 bordered + 最后更新 footer。
  */
 import { useState, useEffect } from 'react'
 import {
@@ -24,12 +23,6 @@ interface Props {
   onEdit: (id: number) => void
 }
 
-/* ── 卡片统一样式 ── */
-const cardStyle: React.CSSProperties = {
-  border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
-  padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-}
-
 export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
   const { t } = useTranslation()
   const isBrand = type === 'brand'
@@ -37,7 +30,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
   const [brand, setBrand] = useState<AssetBrand | null>(null)
   const [model, setModel] = useState<AssetModel | null>(null)
   const [categories, setCategories] = useState<AssetCategory[]>([])
-  const [brands, setBrands] = useState<AssetBrand[]>([])
+  const [_brands, setBrands] = useState<AssetBrand[]>([])
 
   useEffect(() => {
     let alive = true
@@ -80,9 +73,9 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
         onEdit={() => onEdit(id)}
       />
 
-      {/* ====== 基本信息卡片 ====== */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      {/* ====== 基本信息卡片（无边框） ====== */}
+      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: isBrand ? '#fff7e6' : '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isBrand
               ? <ShopOutlined style={{ fontSize: 14, color: '#E8720C' }} />
@@ -93,7 +86,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         {isBrand && brand ? (
-          <Descriptions column={3} size="middle" bordered>
+          <Descriptions column={4} size="middle">
             <Descriptions.Item label={t('asset.belongCategory')}>
               <Tag color="blue">{categoryName(brand.categoryCode)}</Tag>
             </Descriptions.Item>
@@ -104,11 +97,9 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
                 <img src={brand.brandLogo} alt={brand.brandEn} style={{ width: 32, height: 32, objectFit: 'contain' }} />
               ) : '-'}
             </Descriptions.Item>
-            <Descriptions.Item label={t('asset.colUpdatedBy')}>{brand.updatedBy || '-'}</Descriptions.Item>
-            <Descriptions.Item label={t('asset.colUpdatedAt')}>{brand.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>
         ) : model ? (
-          <Descriptions column={3} size="middle" bordered>
+          <Descriptions column={4} size="middle">
             <Descriptions.Item label={t('asset.belongBrand')}>
               <Tag color="orange">{model.brandZh}</Tag>
             </Descriptions.Item>
@@ -117,10 +108,18 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
             </Descriptions.Item>
             <Descriptions.Item label={t('asset.productNameLabel')}>{model.name}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colUnit')}>{model.unit}</Descriptions.Item>
-            <Descriptions.Item label={t('asset.colUpdatedBy')}>{model.updatedBy || '-'}</Descriptions.Item>
-            <Descriptions.Item label={t('asset.colUpdatedAt')}>{model.updatedAt || '-'}</Descriptions.Item>
           </Descriptions>
         ) : null}
+      </div>
+
+      {/* ====== 最後更新（詳情頁規範 footer） ====== */}
+      <div style={{
+        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        border: '1px solid #f0f0f0',
+        display: 'flex', justifyContent: 'flex-end', gap: 24,
+      }}>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{(isBrand ? brand?.updatedBy : model?.updatedBy) || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{(isBrand ? brand?.updatedAt : model?.updatedAt) || '-'}</span></span>
       </div>
     </>
   )

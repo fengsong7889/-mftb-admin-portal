@@ -1,9 +1,8 @@
 /**
  * 資產分類詳情頁（只讀）
  *
- * - 使用 DetailPageHeader 組件（紫色漸變頂條 + 橙色返回 + 藍色標題 + 右側編輯按鈕）
- * - 卡片式佈局：基本信息
- * - 分類僅做層級歸類，參數配置由「資產品牌型號庫」負責
+ * 樣式基準：採購訂單詳情（PurchaseOrder/OrderDetail.tsx）——
+ * DetailPageHeader + 無邊框模塊卡片 + Descriptions column=4 非 bordered + 最後更新 footer。
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Spin, Descriptions, Tag } from 'antd'
@@ -47,22 +46,6 @@ export default function CategoryDetail({ id, onBack, onEdit }: Props) {
 
   useEffect(() => { loadData() }, [loadData])
 
-  /* ── 樣式 ── */
-  const cardStyle: React.CSSProperties = {
-    border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
-    padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-  }
-
-  const cardTitle = (icon: React.ReactNode, iconBg: string, title: string) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {icon}
-      </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
-      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-    </div>
-  )
-
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -89,28 +72,38 @@ export default function CategoryDetail({ id, onBack, onEdit }: Props) {
         onEdit={() => onEdit(id)}
       />
 
-      {/* ====== 基本信息 ====== */}
-      <div style={cardStyle}>
-        {cardTitle(
-          <FolderOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
-          '#E6F7FF',
-          t('asset.sectionBasic'),
-        )}
-        <Descriptions column={3} size="middle" bordered>
-          <Descriptions.Item label="分类编码">
+      {/* ====== 基本信息（無邊框卡片） ====== */}
+      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#E6F7FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FolderOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionBasic')}</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.categoryCodeLabel', { defaultValue: '分類編碼' })}>
             <span style={{ fontFamily: 'monospace' }}>{category.code}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="分类名称">{category.name}</Descriptions.Item>
-          <Descriptions.Item label="上级分类">{parentName}</Descriptions.Item>
-          <Descriptions.Item label="状态">
+          <Descriptions.Item label={t('asset.categoryNameLabel', { defaultValue: '分類名稱' })}>{category.name}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.parentCategoryLabel', { defaultValue: '上級分類' })}>{parentName}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colStatus')}>
             <Tag color={category.status === 'enabled' ? 'success' : 'default'}>
-              {category.status === 'enabled' ? '启用' : '禁用'}
+              {category.status === 'enabled' ? t('common.enable') : t('common.disable')}
             </Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="最后更新人">{category.updatedBy || '—'}</Descriptions.Item>
-          <Descriptions.Item label="最后更新时间">{category.updatedAt || '—'}</Descriptions.Item>
-          <Descriptions.Item label="备注" span={3}>{category.remark || '—'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colRemark', { defaultValue: '備註' })} span={4}>{category.remark || '—'}</Descriptions.Item>
         </Descriptions>
+      </div>
+
+      {/* ====== 最後更新（詳情頁規範 footer） ====== */}
+      <div style={{
+        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        border: '1px solid #f0f0f0',
+        display: 'flex', justifyContent: 'flex-end', gap: 24,
+      }}>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{category.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{category.updatedAt || '-'}</span></span>
       </div>
     </>
   )

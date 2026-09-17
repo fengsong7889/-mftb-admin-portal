@@ -5,11 +5,12 @@
  * - 支持按狀態、關鍵詞搜索
  * - 點擊資產編號跳轉資產詳情，點擊行跳轉維修詳情
  */
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Form, Input, Select, Table, Tag, message, Space } from 'antd'
-import type { TableColumnsType, TablePaginationConfig } from 'antd'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Button, Empty, Form, Input, Select, Table, Tag, message, Space } from 'antd'
+import type { TableColumnsType } from 'antd'
+import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { fetchRepairList, type AssetRepairRecord } from '../../../api/asset'
 
 interface Props {
@@ -23,6 +24,7 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<AssetRepairRecord[]>([])
   const [filters, setFilters] = useState<{ keyword?: string; status?: 'repairing' | 'done' }>({})
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -65,9 +67,9 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
     { label: t('asset.statusRepaired'), value: 'done' },
   ]
 
-  const columns: TableColumnsType<AssetRepairRecord> = [
+  const allColumns: TableColumnsType<AssetRepairRecord> = [
     {
-      title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
+      key: 'assetNo', title: t('asset.colAssetNo'), dataIndex: 'assetNo', width: 140, fixed: 'left',
       render: (v: string) => (
         <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace' }}
           onClick={(e) => { e.stopPropagation(); onViewAsset(v) }}
@@ -76,31 +78,63 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
         </Button>
       ),
     },
-    { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 180, ellipsis: true },
-    { title: t('asset.colRepairDate'), dataIndex: 'repairDate', key: 'repairDate', width: 120 },
-    { title: t('asset.colFaultDesc'), dataIndex: 'faultDesc', key: 'faultDesc', width: 200, ellipsis: true },
-    { title: t('asset.colRepairContent'), dataIndex: 'repairContent', key: 'repairContent', width: 200, ellipsis: true },
-    { title: t('asset.colRepairBy'), dataIndex: 'repairBy', key: 'repairBy', width: 140 },
+    { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 180, ellipsis: true },
+    { key: 'repairDate', title: t('asset.colRepairDate'), dataIndex: 'repairDate', width: 120 },
+    { key: 'faultDesc', title: t('asset.colFaultDesc'), dataIndex: 'faultDesc', width: 200, ellipsis: true },
+    { key: 'repairContent', title: t('asset.colRepairContent'), dataIndex: 'repairContent', width: 200, ellipsis: true },
+    { key: 'repairBy', title: t('asset.colRepairBy'), dataIndex: 'repairBy', width: 140 },
     {
-      title: t('asset.colCost'), dataIndex: 'cost', key: 'cost', width: 120, align: 'right',
+      key: 'cost', title: t('asset.colCost'), dataIndex: 'cost', width: 120, align: 'right',
       render: (v: number) => v ? `MOP ${v.toLocaleString()}` : '-',
     },
     {
-      title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 100,
+      key: 'status', title: t('asset.colStatus'), dataIndex: 'status', width: 100,
       render: (s: 'repairing' | 'done') => s === 'repairing'
         ? <Tag color="processing">{t('asset.statusRepairing')}</Tag>
         : <Tag color="success">{t('asset.statusRepaired')}</Tag>,
     },
     {
-      title: t('asset.colFinishDate'), dataIndex: 'finishDate', key: 'finishDate', width: 120,
+      key: 'finishDate', title: t('asset.colFinishDate'), dataIndex: 'finishDate', width: 120,
       render: (v: string | null) => v || '-',
     },
-    { title: t('asset.colApplicant'), dataIndex: 'applicant', key: 'applicant', width: 110 },
+    { key: 'applicant', title: t('asset.colApplicant'), dataIndex: 'applicant', width: 110 },
     {
-      title: t('asset.colCauseType'), dataIndex: 'causeType', key: 'causeType', width: 120,
+      key: 'causeType', title: t('asset.colCauseType'), dataIndex: 'causeType', width: 120,
       render: (v: string) => v ? <Tag>{t(`asset.cause${v.charAt(0).toUpperCase() + v.slice(1)}`)}</Tag> : '-',
     },
+    {
+      key: 'action', title: t('common.colAction'), width: 100, fixed: 'right',
+      render: (_: unknown, r: AssetRepairRecord) => (
+        <Button type="link" onClick={() => onViewDetail(r.assetId)}>{t('common.detail')}</Button>
+      ),
+    },
   ]
+
+  /* ----- 字段配置 ----- */
+  const columnMeta = useMemo(() => [
+    { key: 'assetNo', title: t('asset.colAssetNo') },
+    { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'repairDate', title: t('asset.colRepairDate') },
+    { key: 'faultDesc', title: t('asset.colFaultDesc') },
+    { key: 'repairContent', title: t('asset.colRepairContent') },
+    { key: 'repairBy', title: t('asset.colRepairBy') },
+    { key: 'cost', title: t('asset.colCost') },
+    { key: 'status', title: t('asset.colStatus') },
+    { key: 'finishDate', title: t('asset.colFinishDate') },
+    { key: 'applicant', title: t('asset.colApplicant') },
+    { key: 'causeType', title: t('asset.colCauseType') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { configComponent, applyConfig } = useColumnConfig('asset-repair', columnMeta, [
+    { key: 'assetNo', locked: 'head' }, { key: 'action', locked: 'tail' },
+  ])
+
+  /* ----- 行选择 ----- */
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
+  }
 
   return (
     <>
@@ -122,20 +156,37 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
         </Form>
       </div>
 
+      {/* ====== 操作區 ====== */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Space>
+            <Button icon={<ExportOutlined />} disabled={selectedRowKeys.length === 0}>
+              {t('common.export')}
+            </Button>
+          </Space>
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
+      </div>
+
       {/* ====== 表格 ====== */}
       <Table<AssetRepairRecord>
-        columns={columns}
+        columns={applyConfig(allColumns) as TableColumnsType<AssetRepairRecord>}
         dataSource={dataSource}
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 1600 }}
+        scroll={{ x: 1700 }}
+        rowSelection={rowSelection}
+        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
         onRow={(record) => ({
           onClick: () => onViewDetail(record.assetId),
           style: { cursor: 'pointer' },
         })}
         pagination={{
           showSizeChanger: true,
+          showQuickJumper: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,
         }}
       />

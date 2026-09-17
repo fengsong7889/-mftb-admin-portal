@@ -40,6 +40,9 @@ public class EamAssetTransfer {
     /** 原归属部门快照 */
     private String fromDepartment;
 
+    /** 原使用人工号 */
+    private String fromUserEmpId;
+
     /** 新使用人 ID */
     private Long toUserId;
 

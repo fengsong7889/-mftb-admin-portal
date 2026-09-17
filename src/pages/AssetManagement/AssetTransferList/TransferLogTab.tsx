@@ -2,20 +2,29 @@
  * 調撥記錄（只讀）
  *
  * 數據來源：後端調撥單 /eam/transfers（由資產調撥頁登記寫入，作廢單據 status='cancelled'）
- * 支持按資產編號 / 關鍵字 / 調撥時間過濾
+ * 支持 10 項搜索條件：調撥單號 / 調撥日期 / 資產編號 / 資產名稱 / 原使用人 / 調入使用人 / 原歸屬部門 / 調入部門 / 狀態 / 經辦人
  */
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Form, Input, Table, Tag, message, Space, DatePicker } from 'antd'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, DatePicker } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { fetchTransferList, type TransferRecord } from '../../../api/asset'
+import { EAM_DEPARTMENTS } from '../eamUtils'
 
 interface Props {
   onViewAsset: (assetNo: string) => void
+  onViewDetail: (id: number) => void
 }
 
-export default function TransferLogTab({ onViewAsset }: Props) {
+/** 格式化使用人展示：姓名(工号) */
+function formatUser(name: string | null | undefined, empId: string | null | undefined): string {
+  if (!name) return '-'
+  return empId ? `${name}(${empId})` : name
+}
+
+export default function TransferLogTab({ onViewAsset, onViewDetail }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -23,7 +32,8 @@ export default function TransferLogTab({ onViewAsset }: Props) {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<{ assetNo?: string; keyword?: string; startDate?: string; endDate?: string }>({})
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [filters, setFilters] = useState<Record<string, string | undefined>>({})
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -43,8 +53,15 @@ export default function TransferLogTab({ onViewAsset }: Props) {
   const handleSearch = () => {
     const v = form.getFieldsValue()
     setFilters({
-      assetNo: v.assetNo || undefined,
-      keyword: v.keyword || undefined,
+      transferNo: v.transferNo?.trim() || undefined,
+      assetNo: v.assetNo?.trim() || undefined,
+      assetName: v.assetName?.trim() || undefined,
+      fromUserName: v.fromUserName?.trim() || undefined,
+      toUserName: v.toUserName?.trim() || undefined,
+      fromDepartment: v.fromDepartment || undefined,
+      toDepartment: v.toDepartment || undefined,
+      status: v.status || undefined,
+      operatorName: v.operatorName?.trim() || undefined,
       startDate: v.transferDate?.[0]?.format('YYYY-MM-DD'),
       endDate: v.transferDate?.[1]?.format('YYYY-MM-DD'),
     })
@@ -56,14 +73,21 @@ export default function TransferLogTab({ onViewAsset }: Props) {
     setSize(p.pageSize || 10)
   }
 
-  const columns: TableColumnsType<TransferRecord> = [
+  /* ----- 表格列定義 ----- */
+  const allColumns: TableColumnsType<TransferRecord> = [
     {
-      title: t('asset.colTransferNo'), dataIndex: 'transferNo', key: 'transferNo', width: 170, fixed: 'left',
-      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+      key: 'transferNo', title: t('asset.colTransferNo'), dataIndex: 'transferNo', width: 170, fixed: 'left',
+      render: (v: string, r) => (
+        <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace', fontWeight: 600 }}
+          onClick={() => onViewDetail(r.id)}
+        >
+          {v}
+        </Button>
+      ),
     },
-    { title: t('asset.colTransferDate'), dataIndex: 'transferDate', key: 'transferDate', width: 110 },
+    { key: 'transferDate', title: t('asset.colTransferDate'), dataIndex: 'transferDate', width: 110 },
     {
-      title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
+      key: 'assetNo', title: t('asset.colAssetNo'), dataIndex: 'assetNo', width: 140,
       render: (v: string) => (
         <Button type="link" size="small" style={{ padding: 0, fontFamily: 'monospace', fontWeight: 600 }}
           onClick={() => onViewAsset(v)}
@@ -72,35 +96,63 @@ export default function TransferLogTab({ onViewAsset }: Props) {
         </Button>
       ),
     },
-    { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 190, ellipsis: true },
+    { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 190, ellipsis: true },
     {
-      title: t('asset.colNewUser'), key: 'userChange', width: 210,
-      render: (_: unknown, r) => (
-        <Space size={4}>
-          <span>{r.fromUserName || '-'}</span>
-          <span style={{ color: '#bfbfbf' }}>→</span>
-          <Tag color="blue">{r.toUserName || '-'}</Tag>
-        </Space>
-      ),
+      key: 'fromUserName', title: t('asset.colFromUser'), width: 150,
+      render: (_: unknown, r) => formatUser(r.fromUserName, r.fromUserEmpId),
     },
     {
-      title: t('asset.colToDept'), key: 'deptChange', width: 210,
-      render: (_: unknown, r) => (
-        <Space size={4}>
-          <span>{r.fromDepartment || '-'}</span>
-          <span style={{ color: '#bfbfbf' }}>→</span>
-          <Tag color="cyan">{r.toDepartment || '-'}</Tag>
-        </Space>
-      ),
+      key: 'toUserName', title: t('asset.colTransferToUser'), width: 150,
+      render: (_: unknown, r) => formatUser(r.toUserName, r.toUserEmpId),
     },
-    { title: t('asset.colTransferReason'), dataIndex: 'reason', key: 'reason', ellipsis: true },
+    { key: 'fromDepartment', title: t('asset.colFromDept'), dataIndex: 'fromDepartment', width: 120, ellipsis: true },
+    { key: 'toDepartment', title: t('asset.colToDept'), dataIndex: 'toDepartment', width: 120, ellipsis: true },
+    { key: 'reason', title: t('asset.colTransferReason'), dataIndex: 'reason', ellipsis: true },
     {
-      title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 100,
+      key: 'status', title: t('asset.colStatus'), dataIndex: 'status', width: 100,
       render: (v: TransferRecord['status']) => v === 'cancelled'
         ? <Tag color="default">{t('asset.transferCancelled')}</Tag>
         : <Tag color="success">{t('asset.transferDone')}</Tag>,
     },
-    { title: t('asset.colOperator'), dataIndex: 'operatorName', key: 'operatorName', width: 120 },
+    { key: 'operatorName', title: t('asset.colOperator'), dataIndex: 'operatorName', width: 120 },
+    {
+      key: 'action', title: t('common.colAction'), width: 80, fixed: 'right',
+      render: (_: unknown, r) => (
+        <Button type="link" size="small" onClick={() => onViewDetail(r.id)}>{t('common.detail')}</Button>
+      ),
+    },
+  ]
+
+  /* ----- 字段配置 ----- */
+  const columnMeta = useMemo(() => [
+    { key: 'transferNo', title: t('asset.colTransferNo') },
+    { key: 'transferDate', title: t('asset.colTransferDate') },
+    { key: 'assetNo', title: t('asset.colAssetNo') },
+    { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'fromUserName', title: t('asset.colFromUser') },
+    { key: 'toUserName', title: t('asset.colTransferToUser') },
+    { key: 'fromDepartment', title: t('asset.colFromDept') },
+    { key: 'toDepartment', title: t('asset.colToDept') },
+    { key: 'reason', title: t('asset.colTransferReason') },
+    { key: 'status', title: t('asset.colStatus') },
+    { key: 'operatorName', title: t('asset.colOperator') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
+
+  const { configComponent, applyConfig } = useColumnConfig('asset-transfer', columnMeta, [
+    { key: 'transferNo', locked: 'head' }, { key: 'action', locked: 'tail' },
+  ])
+
+  /* ----- 行選擇 ----- */
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys: React.Key[]) => setSelectedRowKeys(keys),
+  }
+
+  const deptOptions = EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))
+  const statusOptions = [
+    { label: t('asset.transferDone'), value: 'done' },
+    { label: t('asset.transferCancelled'), value: 'cancelled' },
   ]
 
   return (
@@ -108,14 +160,35 @@ export default function TransferLogTab({ onViewAsset }: Props) {
       {/* ====== 搜索區 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label={t('asset.searchAssetNo')} name="assetNo">
-            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: 180 }} />
+          <Form.Item label={t('asset.searchTransferNo')} name="transferNo">
+            <Input placeholder={t('asset.searchTransferNoPh')} allowClear style={{ width: 170 }} />
           </Form.Item>
-          <Form.Item label={t('asset.colOperateTime')} name="transferDate">
+          <Form.Item label={t('asset.colTransferDate')} name="transferDate">
             <DatePicker.RangePicker style={{ width: 240 }} />
           </Form.Item>
-          <Form.Item label={t('asset.searchKeyword')} name="keyword">
-            <Input placeholder={t('asset.searchKeywordPh')} allowClear style={{ width: 200 }} />
+          <Form.Item label={t('asset.colAssetNo')} name="assetNo">
+            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: 150 }} />
+          </Form.Item>
+          <Form.Item label={t('asset.colAssetName')} name="assetName">
+            <Input placeholder={t('asset.searchAssetNamePh')} allowClear style={{ width: 160 }} />
+          </Form.Item>
+          <Form.Item label={t('asset.searchFromUserName')} name="fromUserName">
+            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: 140 }} />
+          </Form.Item>
+          <Form.Item label={t('asset.searchToUserName')} name="toUserName">
+            <Input placeholder={t('asset.userNamePh')} allowClear style={{ width: 140 }} />
+          </Form.Item>
+          <Form.Item label={t('asset.searchFromDept')} name="fromDepartment">
+            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={deptOptions} />
+          </Form.Item>
+          <Form.Item label={t('asset.searchToDept')} name="toDepartment">
+            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={deptOptions} />
+          </Form.Item>
+          <Form.Item label={t('asset.colStatus')} name="status">
+            <Select placeholder={t('common.all')} allowClear style={{ width: 120 }} options={statusOptions} />
+          </Form.Item>
+          <Form.Item label={t('asset.searchOperator')} name="operatorName">
+            <Input placeholder={t('asset.searchOperatorPh')} allowClear style={{ width: 140 }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -126,19 +199,36 @@ export default function TransferLogTab({ onViewAsset }: Props) {
         </Form>
       </div>
 
+      {/* ====== 操作區 ====== */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Space>
+            <Button icon={<ExportOutlined />} disabled={selectedRowKeys.length === 0}>
+              {t('common.export')}
+            </Button>
+          </Space>
+        </div>
+        <div className="action-section-right">
+          {configComponent}
+        </div>
+      </div>
+
       {/* ====== 表格 ====== */}
       <Table<TransferRecord>
-        columns={columns}
+        columns={applyConfig(allColumns) as TableColumnsType<TransferRecord>}
         dataSource={dataSource}
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1800 }}
+        rowSelection={rowSelection}
+        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+        onChange={handleTableChange}
         pagination={{
-          current: page, pageSize: size, total, showSizeChanger: true,
+          current: page, pageSize: size, total,
+          showSizeChanger: true, showQuickJumper: true,
           showTotal: (tt) => `${t('common.total', { count: tt })}`,
         }}
-        onChange={handleTableChange}
       />
     </>
   )

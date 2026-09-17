@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -8,6 +9,9 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class EamAssetVO extends EamAssetSaveDTO {
     private Long id;
+    /** 只读：当前持有人 ID（sys_user.id），无人持有时显式返回 null。 */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private Long currentHolderId;
     private Long orderId;
     private Long batchId;
     private String purchaseType;

@@ -160,6 +160,7 @@ const AssetDetail = lazy(() => import('./pages/AssetManagement/AssetDetail'))
 const AssetScrap = lazy(() => import('./pages/AssetManagement/AssetScrap'))
 const AssetRepair = lazy(() => import('./pages/AssetManagement/AssetRepair'))
 const AssetTransfer = lazy(() => import('./pages/AssetManagement/AssetTransfer'))
+const TransferDetail = lazy(() => import('./pages/AssetManagement/AssetTransfer/TransferDetail'))
 const AssetInventory = lazy(() => import('./pages/AssetManagement/AssetInventory'))
 const AssetCompensation = lazy(() => import('./pages/AssetManagement/AssetCompensation'))
 const AssetDashboard = lazy(() => import('./pages/AssetManagement/AssetDashboard'))
@@ -373,6 +374,7 @@ function AuthenticatedLayout() {
               <Route path="/asset-scrap"      element={<AssetScrap />} />
               <Route path="/asset-repair"     element={<AssetRepair />} />
               <Route path="/asset-transfer"   element={<AssetTransfer />} />
+              <Route path="/asset-transfer/detail" element={<TransferDetail />} />
               <Route path="/asset-inventory"  element={<AssetInventory />} />
               <Route path="/asset-dashboard"  element={<AssetDashboard />} />
               {/* EAM 基礎數據 */}

@@ -8,6 +8,7 @@ import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamReturnService;
+import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -33,6 +34,7 @@ public class EamReturnServiceImpl implements EamReturnService {
     private final EamClaimEvidenceMapper evidenceMapper;
     private final SysUserMapper userMapper;
     private final EamLocationMapper locationMapper;
+    private final DepartmentService departmentService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -93,6 +95,8 @@ public class EamReturnServiceImpl implements EamReturnService {
             throw new BusinessException("資產狀況異常時必須填寫異常原因");
         }
 
+        String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
+
         // 生成归还编号
         String returnNo = bizSeqService.next(BizSeqService.RULE_EAM_RETURN);
 
@@ -149,7 +153,7 @@ public class EamReturnServiceImpl implements EamReturnService {
 
         // 释放资产（仅正常归还）：按接收管理部门/归还位置归位，实现归还即承接
         if ("completed".equals(ret.getReturnStatus())) {
-            releaseAsset(assetId, dto.getReceiveDepartment(), dto.getReceiveLocationId());
+            releaseAsset(assetId, receiveDepartment, dto.getReceiveLocationId());
         }
 
         return ret.getId();
@@ -165,6 +169,7 @@ public class EamReturnServiceImpl implements EamReturnService {
         }
 
         LocalDate dispositionDate = parseDate(dto.getDispositionDate());
+        String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
         ret.setDisposition(dto.getDisposition());
         ret.setDispositionDate(dispositionDate);
         ret.setReturnStatus("exception_closed");
@@ -196,7 +201,7 @@ public class EamReturnServiceImpl implements EamReturnService {
                     asset.setCurrentHolderId(null);
                     asset.setActiveClaimId(null);
                     asset.setUserName(null);
-                    applyReceiveLocation(asset, dto.getReceiveDepartment(), dto.getReceiveLocationId());
+                    applyReceiveLocation(asset, receiveDepartment, dto.getReceiveLocationId());
                 }
             }
             assetMapper.updateById(asset);
@@ -215,6 +220,7 @@ public class EamReturnServiceImpl implements EamReturnService {
             throw new BusinessException("已登記找回，不可重複操作");
         }
 
+        String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
         ret.setRecovered(1);
         ret.setRecoveredDate(LocalDate.now());
         ret.setRecoveredNote(dto.getRecoveredNote());
@@ -228,7 +234,7 @@ public class EamReturnServiceImpl implements EamReturnService {
             asset.setCurrentHolderId(null);
             asset.setUserName(null);
             asset.setActiveClaimId(null);
-            applyReceiveLocation(asset, dto.getReceiveDepartment(), dto.getReceiveLocationId());
+            applyReceiveLocation(asset, receiveDepartment, dto.getReceiveLocationId());
             // MyBatis-Plus updateById 默认 NOT_NULL 策略，null 字段需用 UpdateWrapper 显式清空
             assetMapper.update(asset, new UpdateWrapper<EamAsset>()
                     .eq("id", asset.getId())
@@ -345,6 +351,11 @@ public class EamReturnServiceImpl implements EamReturnService {
             w.le(EamReturn::getReturnDate, LocalDate.parse(q.getEndDate(), DateTimeFormatter.ISO_DATE));
         }
         return w;
+    }
+
+    /** 可选接收部门：未填写时保留资产原归属，提供时必须通过部门有效性校验。 */
+    private String resolveReceiveDepartment(String name) {
+        return hasText(name) ? departmentService.requireEnabledDepartmentName(name) : null;
     }
 
     private boolean hasText(String text) { return text != null && !text.isBlank(); }

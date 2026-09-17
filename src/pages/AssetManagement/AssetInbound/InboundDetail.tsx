@@ -6,11 +6,11 @@
  * - 遵循全局详情页规范：DetailPageHeader（紫色渐变顶条）+ 卡片布局 + 无底部操作栏
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Table, Tag, Row, Col, Spin, message, Modal, Button, Input, Space, Tooltip } from 'antd'
+import { Table, Tag, Row, Col, Spin, message, Modal, Button, Input, Space, Tooltip, Descriptions } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined, CheckCircleOutlined,
-  ExclamationCircleOutlined, SwapOutlined, RollbackOutlined, CameraOutlined,
+  ExclamationCircleOutlined, SwapOutlined, RollbackOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
@@ -203,8 +203,6 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     )
   }
 
-  const hasReject = (batch.returnQty || 0) + (batch.exchangeQty || 0) + (batch.concessionQty || 0) > 0
-
   return (
     <>
       {/* ====== 页面頭部 ====== */}
@@ -216,8 +214,8 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       />
 
       {/* ====== 批次信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
           </div>
@@ -225,49 +223,22 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
-        <Row gutter={24}>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colBatchNo')}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace', fontWeight: 600 }}>{batch.batchNo}</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colPoNo')}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace' }}>{batch.poNo}</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{batch.inboundDate}</div>
-          </Col>
-        </Row>
-        <Row gutter={24} style={{ marginTop: 16 }}>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colOperator')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{batch.operator || '-'}</div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
-            <div style={{ fontSize: 14 }}>
-              {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
-            </div>
-          </Col>
-          <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colCreatedAt')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{batch.createdAt}</div>
-          </Col>
-        </Row>
-        {batch.purchaseReason && (
-          <Row gutter={24} style={{ marginTop: 16 }}>
-            <Col span={24}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
-              <div style={{ fontSize: 14, color: '#262626' }}>{batch.purchaseReason}</div>
-            </Col>
-          </Row>
-        )}
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.colBatchNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{batch.batchNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.colPoNo')}><span style={{ fontFamily: 'monospace' }}>{batch.poNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.labelInboundDate')}>{batch.inboundDate}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colOperator')}>{batch.operator || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.orderBrand')}>
+            {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('asset.colCreatedAt')}>{batch.createdAt}</Descriptions.Item>
+          {batch.purchaseReason && <Descriptions.Item label={t('asset.orderReasonLabel')} span={4}>{batch.purchaseReason}</Descriptions.Item>}
+        </Descriptions>
       </div>
 
       {/* ====== 验收统计 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShoppingCartOutlined style={{ fontSize: 14, color: '#52c41a' }} />
           </div>
@@ -324,8 +295,8 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       </div>
 
       {/* ====== 入库明细 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <EnvironmentOutlined style={{ fontSize: 14, color: '#1890ff' }} />
           </div>
@@ -346,7 +317,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
       {/* ====== 備註 ====== */}
       {batch.remark && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.remarkTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />

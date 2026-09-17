@@ -30,6 +30,8 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
     private static final String V_EAM_HANDOVER_TABLES = "eam:schema-v3";
     /** v4: 调拨单建表（biz_eam_transfer） */
     private static final String V_EAM_TRANSFER_TABLE = "eam:schema-v4";
+    /** v5: 调拨单补充原使用人工号列 */
+    private static final String V_EAM_TRANSFER_FROM_EMP = "eam:schema-v5";
 
     @Override
     public void run(String... args) {
@@ -37,6 +39,7 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_EAM_RETURN_CLAIM_NULL, this::fixClaimIdNullable);
         versionTracker.applyOnce(V_EAM_HANDOVER_TABLES, this::createHandoverTables);
         versionTracker.applyOnce(V_EAM_TRANSFER_TABLE, this::createTransferTable);
+        versionTracker.applyOnce(V_EAM_TRANSFER_FROM_EMP, this::addTransferFromUserEmpId);
     }
 
     private void fixClaimIdNullable() {
@@ -132,6 +135,14 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 + "INDEX idx_status (status)"
                 + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产调拨单'");
         log.info("EAM 调拨单表结构创建完成");
+    }
+
+    /** v5: 调拨单补充原使用人工号列 */
+    private void addTransferFromUserEmpId() {
+        log.info("补充 biz_eam_transfer.from_user_emp_id 列 ...");
+        alterSafe("biz_eam_transfer",
+                "ADD COLUMN from_user_emp_id VARCHAR(50) DEFAULT NULL COMMENT '原使用人工号'");
+        log.info("biz_eam_transfer.from_user_emp_id 列已添加");
     }
 
     private void migrateEamSchema() {

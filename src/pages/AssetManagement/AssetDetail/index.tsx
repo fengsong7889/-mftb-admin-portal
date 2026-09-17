@@ -1,24 +1,18 @@
 /**
  * 资产详情页（只读模式）
  *
- * 分模块卡片布局（风格同员工详情页）：
- *  - 顶部：DetailPageHeader（渐变顶条 + 编辑按钮）
- *  - 主体：独立白色卡片分模块展示
- *    1. 资产信息 — 编码/分类/品牌/名称/参数/照片
- *    2. 租/购信息 — 采购形式/公司/价值/日期/存放位置
- *    3. 当前使用人 — 使用人/部门/领用日期
- *    4. 入库信息 — 批次号/入库时间/数量/验收人
- *    5. 操作记录 — 最后更新人/最后更新时间
+ * 样式基准：采购订单详情（PurchaseOrder/OrderDetail.tsx）——
+ * DetailPageHeader + 无边框模块卡片 + Descriptions column=4 非 bordered + 最后更新 footer。
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Tag, Image, message, Spin,
+  Tag, Image, message, Spin, Descriptions,
 } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
   AppstoreOutlined, DollarOutlined,
-  UserOutlined, InboxOutlined, EditOutlined,
+  UserOutlined, InboxOutlined,
 } from '@ant-design/icons'
 import {
   fetchAssetDetail, parseAssetImages, type AssetItem, type AssetStatus,
@@ -33,20 +27,16 @@ const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   scrapped:  { key: 'asset.statusScrapped', color: 'error' },
 }
 
-/* ---- 字段展示单元 ---- */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline' }}>
-      <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>{label}：</span>
-      <span style={{ fontSize: 14, color: '#262626' }}>{children}</span>
-    </div>
-  )
+/** 详情卡片统一样式（无边框，对齐采购订单详情） */
+const detailCardStyle: React.CSSProperties = {
+  borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
 }
 
-/* ---- 模块标题栏（同员工详情风格） ---- */
+/* ---- 模块标题栏 ---- */
 function ModuleTitle({ icon, iconBg, title, tag }: { icon: React.ReactNode; iconBg: string; title: string; tag?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
@@ -81,12 +71,6 @@ export default function AssetDetail() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  /* ----- 渲染状态 ----- */
-  const renderStatus = (s: AssetStatus) => {
-    const m = STATUS_META[s]
-    return <Tag color={m.color}>{t(m.key)}</Tag>
-  }
-
   if (loading || !asset) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -118,37 +102,35 @@ export default function AssetDetail() {
       />
 
       {/* ====== 模块1：资产信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+      <div style={detailCardStyle}>
         <ModuleTitle
           icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
           iconBg="#e6f7ff"
           title={t('asset.assetInfoTitle')}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.colAssetNo')}>
-            <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span>
-          </Field>
-          <Field label={t('asset.colAssetType')}>{asset.assetType || '-'}</Field>
-          <Field label={t('asset.colBrand')}>{asset.brand || '-'}</Field>
-          <Field label={t('asset.colAssetName')}>{asset.assetName}</Field>
-        </div>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.colAssetNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.colAssetType')}>{asset.assetType || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colBrand')}>{asset.brand || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
+        </Descriptions>
 
         {/* 参数信息 */}
         {paramEntries.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>{t('asset.paramInfoTitle')}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 12, columnGap: 24 }}>
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', margin: '16px 0 8px' }}>{t('asset.paramInfoTitle')}</div>
+            <Descriptions column={4} size="small">
               {paramEntries.map(([key, val]) => (
-                <Field key={key} label={key}>{val || '-'}</Field>
+                <Descriptions.Item key={key} label={key}>{val || '-'}</Descriptions.Item>
               ))}
-            </div>
-          </div>
+            </Descriptions>
+          </>
         )}
 
         {/* 资产照片 */}
         {imageList.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 8 }}>{t('asset.assetPhotoSection')}</div>
+          <>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', margin: '16px 0 8px' }}>{t('asset.assetPhotoSection')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               {imageList.map((src, i) => (
                 <Image
@@ -157,97 +139,95 @@ export default function AssetDetail() {
                 />
               ))}
             </div>
-          </div>
+          </>
         )}
       </div>
 
       {/* ====== 模块2：租/购信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+      <div style={detailCardStyle}>
         <ModuleTitle
           icon={<DollarOutlined style={{ fontSize: 14, color: '#E8720C' }} />}
           iconBg="#fff7e6"
           title={t('asset.rentPurchaseInfo')}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.purchaseForm')}>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.purchaseForm')}>
             <Tag color={asset.source === 'self' ? 'blue' : 'orange'}>
               {asset.source === 'self' ? t('asset.sourceSelf') : t('asset.sourceLease')}
             </Tag>
-          </Field>
-          {asset.source === 'self' && (
+          </Descriptions.Item>
+          {asset.source === 'self' ? (
             <>
-              <Field label={t('asset.colCompany')}>{asset.company || '-'}</Field>
-              <Field label={t('asset.colPurchaseValue')}>
+              <Descriptions.Item label={t('asset.colCompany')}>{asset.company || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.colPurchaseValue')}>
                 <span style={{ fontWeight: 600, color: '#E8720C' }}>
                   {asset.purchaseValue ? `MOP ${asset.purchaseValue.toLocaleString()}` : '-'}
                 </span>
-              </Field>
-              <Field label={t('asset.colPurchaseDate')}>{asset.purchaseDate || '-'}</Field>
+              </Descriptions.Item>
+              <Descriptions.Item label={t('asset.colPurchaseDate')}>{asset.purchaseDate || '-'}</Descriptions.Item>
             </>
-          )}
-          {asset.source === 'lease' && (
+          ) : (
             <>
-              <Field label={t('asset.leaseCompanyLabel')}>{asset.company || '-'}</Field>
-              <Field label={t('asset.leaseCompanyLabel2')}>{a.leaseCompany || '-'}</Field>
-              <Field label={t('asset.rentalCostLabel')}>
+              <Descriptions.Item label={t('asset.leaseCompanyLabel')}>{asset.company || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.leaseCompanyLabel2')}>{a.leaseCompany || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.rentalCostLabel')}>
                 <span style={{ fontWeight: 600, color: '#E8720C' }}>
                   {a.rentalCost ? `MOP ${a.rentalCost.toLocaleString()}` : '-'}
                 </span>
-              </Field>
-              <Field label={t('asset.rentalPeriodLabel')}>
-                {a.rentalPeriod && a.rentalPeriod[0]
-                  ? `${a.rentalPeriod[0]} ~ ${a.rentalPeriod[1]}`
-                  : '-'}
-              </Field>
+              </Descriptions.Item>
             </>
           )}
-          <Field label={t('asset.colLocation')}>{asset.location || '-'}</Field>
-        </div>
+          {asset.source === 'lease' && (
+            <Descriptions.Item label={t('asset.rentalPeriodLabel')}>
+              {a.rentalPeriod && a.rentalPeriod[0]
+                ? `${a.rentalPeriod[0]} ~ ${a.rentalPeriod[1]}`
+                : '-'}
+            </Descriptions.Item>
+          )}
+          <Descriptions.Item label={t('asset.colLocation')}>{asset.location || '-'}</Descriptions.Item>
+        </Descriptions>
       </div>
 
       {/* ====== 模块3：当前使用人 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+      <div style={detailCardStyle}>
         <ModuleTitle
           icon={<UserOutlined style={{ fontSize: 14, color: '#13C2C2' }} />}
           iconBg="#E6FFFB"
           title={t('asset.currentUserTitle')}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Field>
-          <Field label={t('asset.colDepartment')}>{asset.department || '-'}</Field>
-          <Field label={t('asset.colClaimDate')}>{asset.usageDate || '-'}</Field>
-        </div>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colClaimDate')}>{asset.usageDate || '-'}</Descriptions.Item>
+        </Descriptions>
       </div>
       
       {/* ====== 模塊4：資產標籤（主標籤 + 次標籤，可綁定/解綁/列印） ====== */}
       {id !== null && <AssetTagBindingSection assetId={id} asset={asset} />}
       
       {/* ====== 模块5：入库信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+      <div style={detailCardStyle}>
         <ModuleTitle
           icon={<InboxOutlined style={{ fontSize: 14, color: '#722ED1' }} />}
           iconBg="#f9f0ff"
           title={t('asset.inboundInfoTitle')}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.inboundBatchNoLabel')}>{a.inboundBatchNo || '-'}</Field>
-          <Field label={t('asset.inboundDateLabel')}>{a.inboundDate || '-'}</Field>
-          <Field label={t('asset.inboundQtyLabel')}>{a.inboundQty ?? '-'}</Field>
-          <Field label={t('asset.inspectorLabel')}>{a.inspector || '-'}</Field>
-        </div>
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.inboundBatchNoLabel')}>{a.inboundBatchNo || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.inboundDateLabel')}>{a.inboundDate || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.inboundQtyLabel')}>{a.inboundQty ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.inspectorLabel')}>{a.inspector || '-'}</Descriptions.Item>
+        </Descriptions>
       </div>
 
-      {/* ====== 模块6：操作记录 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
-        <ModuleTitle
-          icon={<EditOutlined style={{ fontSize: 14, color: '#595959' }} />}
-          iconBg="#f5f5f5"
-          title={t('asset.operationRecord')}
-        />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-          <Field label={t('asset.colUpdatedBy')}>{asset.applicant || '-'}</Field>
-          <Field label={t('asset.colUpdatedAt')}>{asset.updatedAt || '-'}</Field>
-        </div>
+      {/* ====== 最後更新（詳情頁規範 footer） ====== */}
+      <div style={{
+        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        border: '1px solid #f0f0f0',
+        display: 'flex', justifyContent: 'flex-end', gap: 24,
+      }}>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{asset.applicant || '-'}</span></span>
+        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{asset.updatedAt || '-'}</span></span>
       </div>
     </div>
   )

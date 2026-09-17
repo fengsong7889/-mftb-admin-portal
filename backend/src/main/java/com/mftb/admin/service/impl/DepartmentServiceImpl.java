@@ -41,6 +41,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DepartmentServiceImpl implements DepartmentService {
 
+    private static final int STATUS_ENABLED = 1;
+
     private final SysDepartmentMapper sysDepartmentMapper;
     private final SysDepartmentMenuMapper sysDepartmentMenuMapper;
     private final SysUserMapper sysUserMapper;
@@ -73,6 +75,28 @@ public class DepartmentServiceImpl implements DepartmentService {
                         countMap.getOrDefault(d.getId(), 0L),
                         permissionsMap.getOrDefault(d.getId(), List.of())))
                 .toList();
+    }
+
+    @Override
+    public String requireEnabledDepartmentName(String name) {
+        if (!StringUtils.hasText(name)) {
+            throw new BusinessException("部門名稱不能為空");
+        }
+        // MyBatis-Plus 的逻辑删除条件自动排除已删除部门，不接受模糊匹配或自由文本。
+        List<SysDepartment> departments = sysDepartmentMapper.selectList(
+                new LambdaQueryWrapper<SysDepartment>().eq(SysDepartment::getName, name.trim()));
+        if (departments.isEmpty()) {
+            throw new BusinessException("所選部門不存在或已刪除，請重新選擇");
+        }
+        List<SysDepartment> enabled = departments.stream()
+                .filter(dept -> Objects.equals(STATUS_ENABLED, dept.getStatus())).toList();
+        if (enabled.isEmpty()) {
+            throw new BusinessException("所選部門已停用，請重新選擇");
+        }
+        if (enabled.size() > 1) {
+            throw new BusinessException("存在同名部門，請聯繫管理員核對");
+        }
+        return enabled.get(0).getName();
     }
 
     @Override

@@ -14,6 +14,9 @@ public interface DepartmentService {
     /** 查询全部部门 (平铺列表, 前端自行构建树) */
     List<DepartmentVO> list();
 
+    /** 按名称校验唯一、启用且未删除的部门，返回库中的标准名称。 */
+    String requireEnabledDepartmentName(String name);
+
     /** 新增部门 */
     DepartmentVO create(DepartmentRequest request);
 
