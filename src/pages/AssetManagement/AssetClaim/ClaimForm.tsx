@@ -21,6 +21,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { DepartmentItem } from '../../../api/department'
+import { AssetSummary } from '../../../components/AssetParameters'
 import { buildDeptTree, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration } from './claimViewTypes'
 
 const { TextArea } = Input
@@ -212,34 +213,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
             {selected && (
               <div style={{ marginTop: 4 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colAssetNo')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetNo}</div>
-                  </div>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colAssetName')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetName}</div>
-                  </div>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colAssetType')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetType}</div>
-                  </div>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colBrand')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.brand || '—'}</div>
-                  </div>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colLocationName')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.location || '—'}</div>
-                  </div>
-                  <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>{t('asset.colPurchaseValue')}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
-                      {selected.purchaseValue != null ? `MOP ${selected.purchaseValue.toLocaleString()}` : '—'}
-                    </div>
-                  </div>
-                </div>
+                <AssetSummary asset={selected} />
               </div>
             )}
           </div>

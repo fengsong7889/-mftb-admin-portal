@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 /**
  * 领用记录视图 VO
@@ -15,6 +16,9 @@ public class EamClaimVO {
     private String updatedBy;
     private String assetNo;
     private String assetName;
+    /** 当前台账配置，只读；不是单据签署时的参数快照。 */
+    private Map<String, Object> params;
+    private String categoryCode;
     private String assetType;
     private String brand;
     private Integer companyBrand;

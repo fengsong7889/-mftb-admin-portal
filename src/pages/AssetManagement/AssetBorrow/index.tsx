@@ -99,10 +99,7 @@ export default function AssetBorrow() {
       const res = await fetchAssetList({ page: query.page, size: query.size, keyword: query.keyword, status: 'idle' })
       setAssetPage({
         total: res.total,
-        records: (res.records || []).map(a => ({
-          id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
-          brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
-        })),
+        records: res.records || [],
       })
     } catch {
       setAssetPage({ records: [], total: 0 })

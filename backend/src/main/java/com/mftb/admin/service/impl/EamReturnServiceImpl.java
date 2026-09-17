@@ -11,6 +11,7 @@ import com.mftb.admin.service.EamReturnService;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -325,6 +326,8 @@ public class EamReturnServiceImpl implements EamReturnService {
         if (asset != null) {
             vo.setAssetNo(asset.getAssetNo());
             vo.setAssetName(asset.getAssetName());
+            vo.setParams(JsonUtils.parseMap(asset.getParams()));
+            vo.setCategoryCode(asset.getCategoryCode());
         }
 
         // 员工信息

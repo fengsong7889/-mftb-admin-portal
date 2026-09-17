@@ -7,6 +7,8 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined, ExportOutlined } from '@a
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
@@ -28,6 +30,7 @@ interface Filters { keyword?: string; status?: string; department?: string }
 
 export default function BorrowList({ data, loading = false, error, onQuery, canEdit = false, canReturn = false }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const navigate = useNavigate()
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
@@ -89,6 +92,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
   const allColumns = [
     { key: 'borrowNo', title: t('asset.colBorrowNo'), dataIndex: 'borrowNo', width: 175, fixed: 'left' as const },
     { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_: unknown, b: BorrowRow) => <>{b.assetName}<div className="claim-muted">{b.assetNo}</div></> },
+    { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_: unknown, asset: BorrowRow) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'holderName', title: '借用人', dataIndex: 'holderName', width: 130 },
     { key: 'department', title: '借用部门', dataIndex: 'department', width: 120 },
     { key: 'startDate', title: '借出日期', dataIndex: 'startDate', width: 120 },

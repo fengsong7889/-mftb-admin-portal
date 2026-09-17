@@ -11,6 +11,7 @@ import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamClaimService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -423,6 +424,8 @@ public class EamClaimServiceImpl implements EamClaimService {
         if (asset != null) {
             vo.setAssetNo(asset.getAssetNo());
             vo.setAssetName(asset.getAssetName());
+            vo.setParams(JsonUtils.parseMap(asset.getParams()));
+            vo.setCategoryCode(asset.getCategoryCode());
             vo.setAssetType(asset.getAssetType());
             vo.setBrand(asset.getBrand());
             vo.setCompanyBrand(asset.getCompanyBrand());

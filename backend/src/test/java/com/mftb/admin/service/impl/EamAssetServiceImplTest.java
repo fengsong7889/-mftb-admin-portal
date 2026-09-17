@@ -89,6 +89,23 @@ class EamAssetServiceImplTest {
     }
 
     @Test
+    void listAndDetailExposeSameRealParameters() throws Exception {
+        EamAsset asset = asset(null);
+        asset.setParams("{\"memory\":\"16GB\",\"count\":0}");
+        asset.setCategoryCode("0101");
+        when(assetMapper.selectById(2L)).thenReturn(asset);
+        Page<EamAsset> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(asset));
+        when(assetMapper.selectPage(any(), any())).thenReturn(page);
+        mvc.perform(get("/api/eam/assets/2"))
+                .andExpect(jsonPath("$.data.params.memory").value("16GB"))
+                .andExpect(jsonPath("$.data.params.count").value("0"));
+        mvc.perform(get("/api/eam/assets"))
+                .andExpect(jsonPath("$.data.records[0].params.memory").value("16GB"))
+                .andExpect(jsonPath("$.data.records[0].categoryCode").value("0101"));
+    }
+
+    @Test
     void holderIdIsNotPartOfEditableDto() {
         assertNull(BeanUtils.getPropertyDescriptor(EamAssetSaveDTO.class, "currentHolderId"));
     }

@@ -17,6 +17,8 @@ import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
 import { buildTransferTree, positiveId, updateQuery, HOLD_TYPE, TRANSFER_MENU } from '../AssetTransfer/transferUtils'
 import { exportToCSV } from '../../../utils/exportCSV'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 
 type CandidateQuery = Pick<AssetListQuery, 'assetNo' | 'assetName' | 'categoryId' | 'brandId' | 'departmentId' | 'userName' | 'holdType' | 'page' | 'size'>
 
@@ -28,6 +30,7 @@ interface Props {
 
 export default function TransferableTab({ onTransfer, onDetail, options }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const { hasPermission } = useAuth()
   const [form] = Form.useForm<AssetListQuery>()
   const [params, setParams] = useSearchParams()
@@ -84,6 +87,7 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
+    { title: t('asset.paramInfoTitle'), key: 'params', width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 110 },
     { title: t('transfer.brand'), dataIndex: 'brand', key: 'brand', width: 120, render: (value?: string) => value || '—' },
     { title: t('asset.colUserName'), dataIndex: 'userName', key: 'userName', width: 130 },

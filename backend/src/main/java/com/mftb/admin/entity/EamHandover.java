@@ -37,6 +37,9 @@ public class EamHandover {
     /** 接收人部门 */
     private String toDepartment;
 
+    /** 接收人类型：employee=员工 / department=部门 */
+    private String receiverType;
+
     /** 交接日期 */
     private LocalDate handoverDate;
 

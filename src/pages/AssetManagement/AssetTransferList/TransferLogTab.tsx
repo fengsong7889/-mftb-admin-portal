@@ -12,6 +12,8 @@ import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { fetchTransferList, type TransferRecord, type TransferQuery, type TransferOptions } from '../../../api/asset'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useTransferData } from '../AssetTransfer/useTransferData'
@@ -35,6 +37,7 @@ function formatUser(name: string | null | undefined, empId: string | null | unde
 
 export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, options }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const { hasPermission } = useAuth()
   const [form] = Form.useForm<FilterValues>()
   const [params, setParams] = useSearchParams()
@@ -116,6 +119,7 @@ export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, op
       ),
     },
     { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 190, ellipsis: true },
+    { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'brand', title: t('transfer.brand'), dataIndex: 'brand', width: 140,
       render: (value: string | null, record) => <Tooltip title={record.brandBackfilled ? t('transfer.brandBackfilled') : undefined}>{value || '—'}{record.brandBackfilled ? ' *' : ''}</Tooltip> },
     {
@@ -153,6 +157,7 @@ export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, op
     { key: 'transferDate', title: t('asset.colTransferDate') },
     { key: 'assetNo', title: t('asset.colAssetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'params', title: t('asset.paramInfoTitle') },
     { key: 'brand', title: t('transfer.brand') },
     { key: 'fromUserName', title: t('asset.colFromUser') },
     { key: 'toUserName', title: t('asset.colTransferToUser') },

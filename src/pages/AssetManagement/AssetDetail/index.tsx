@@ -19,6 +19,7 @@ import {
 } from '../../../api/asset'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
+import AssetParameters from '../../../components/AssetParameters'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
@@ -69,8 +70,6 @@ export default function AssetDetail() {
   </div>
 
   const imageList = parseAssetImages(asset.images)
-  const params = asset.params || {}
-  const paramEntries = Object.entries(params)
   const a = asset
 
   return (
@@ -105,16 +104,7 @@ export default function AssetDetail() {
         </Descriptions>
 
         {/* 参数信息 */}
-        {paramEntries.length > 0 && (
-          <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', margin: '16px 0 8px' }}>{t('asset.paramInfoTitle')}</div>
-            <Descriptions column={4} size="small">
-              {paramEntries.map(([key, val]) => (
-                <Descriptions.Item key={key} label={key}>{val || '-'}</Descriptions.Item>
-              ))}
-            </Descriptions>
-          </>
-        )}
+        <AssetParameters asset={asset} />
 
         {/* 资产照片 */}
         {imageList.length > 0 && (

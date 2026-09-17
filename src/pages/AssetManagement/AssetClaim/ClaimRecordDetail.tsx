@@ -8,6 +8,7 @@ import { Alert, Button, Descriptions, Empty, Modal, Spin, Space } from 'antd'
 import { FileProtectOutlined, FileTextOutlined, StopOutlined, RollbackOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
+import AssetParameters from '../../../components/AssetParameters'
 import { useTranslation } from 'react-i18next'
 import { ClaimStatusTag, SignatureStatusTag, canSignClaim } from './ClaimRecordTable'
 import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimRow } from './claimViewTypes'
@@ -113,6 +114,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
             {record.cancelledReason && <Descriptions.Item label="取消原因" span={4}>{record.cancelledReason}</Descriptions.Item>}
           </Descriptions>
         ) : <Empty description="领用内容尚未加载" />}
+        {record && !error && <AssetParameters asset={record} current />}
       </div>
 
       {/* ====== 签收凭证 ====== */}

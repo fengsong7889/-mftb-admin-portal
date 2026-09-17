@@ -3,6 +3,7 @@ package com.mftb.admin.dto;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 交接记录视图 VO
@@ -17,6 +18,8 @@ public class EamHandoverVO {
     private Long toUserId;
     private String toUserName;
     private String toDepartment;
+    /** 接收人类型：employee / department */
+    private String receiverType;
     private String handoverDate;
     private Integer assetCount;
     private String reason;
@@ -38,8 +41,19 @@ public class EamHandoverVO {
         private Long assetId;
         private String assetNo;
         private String assetName;
+        /** 当前台账配置，只读。 */
+        private Map<String, Object> params;
+        private String categoryCode;
         private String assetType;
         private String oldDepartment;
         private String newDepartment;
+        /** 交接前使用人，取交接单快照。 */
+        private String fromUser;
+        /** 交接前部门，优先取资产明细快照。 */
+        private String fromDept;
+        /** 交接后使用人，取交接单快照。 */
+        private String toUser;
+        /** 交接后部门，优先取资产明细快照。 */
+        private String toDept;
     }
 }

@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 /**
  * 资产调拨单 VO
@@ -20,6 +21,9 @@ public class EamAssetTransferVO {
     private String assetNo;
 
     private String assetName;
+    /** 当前台账配置，只读；调拨前后归属仍使用原单据快照。 */
+    private Map<String, Object> params;
+    private String categoryCode;
     private Long brandId;
     private String brand;
     private Integer brandBackfilled;

@@ -1,0 +1,15 @@
+.asset-parameters { margin-top: 12px; min-width: 0; }
+.asset-parameters__heading { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; color: #595959; font-size: 13px; font-weight: 600; }
+.asset-parameters__hint { color: #8c8c8c; font-size: 12px; font-weight: 400; }
+.asset-parameters__list { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0; }
+.asset-parameters__item { display: flex; align-items: baseline; max-width: 100%; min-width: 0; line-height: 22px; font-size: 13px; }
+.asset-parameters__item dt { color: #8c8c8c; overflow-wrap: anywhere; }
+.asset-parameters__item dd { color: #262626; margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.asset-parameters--compact { margin-top: 0; }
+.asset-parameters--compact .asset-parameters__list { gap: 2px 16px; }
+.asset-summary .ant-descriptions-item { padding-bottom: 8px; }
+.asset-param-editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px 24px; }
+.asset-param-editor__item { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.asset-param-editor__label { width: 96px; flex-shrink: 0; text-align: right; font-size: 13px; color: #595959; overflow-wrap: anywhere; }
+.asset-param-editor__control { flex: 1; min-width: 0; }
+.asset-param-editor__control .ant-select { width: 100%; }

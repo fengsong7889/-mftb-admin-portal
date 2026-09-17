@@ -4,10 +4,11 @@
  * 后端接口: /api/eam/compensations/*
  */
 import request, { isBackendUnavailable } from './request'
+import type { AssetParameterSource } from '../utils/assetParams'
 
 /* ==================== 类型定义 ==================== */
 
-export interface CompensationRow {
+export interface CompensationRow extends AssetParameterSource {
   id: number
   compNo: string
   returnId: number

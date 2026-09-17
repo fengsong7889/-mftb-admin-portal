@@ -21,6 +21,10 @@ public class EamHandoverQuery {
     private String fromUserName;
     /** 目标使用人（接收人） */
     private String toUserName;
+    /** 交接前部门（按部门名称快照精确匹配） */
+    private String fromDepartment;
+    /** 交接后部门（按部门名称快照精确匹配） */
+    private String toDepartment;
     /** 交接时间起（yyyy-MM-dd） */
     private String handoverDateStart;
     /** 交接时间止（yyyy-MM-dd） */
@@ -29,4 +33,6 @@ public class EamHandoverQuery {
     private String reason;
     /** 经办人 */
     private String operatorName;
+    /** 接收人类型（employee/department） */
+    private String receiverType;
 }

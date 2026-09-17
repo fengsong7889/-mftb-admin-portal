@@ -4,10 +4,11 @@
  * 后端接口: /api/eam/returns/*
  */
 import request, { isBackendUnavailable } from './request'
+import type { AssetParameterSource } from '../utils/assetParams'
 
 /* ==================== 类型定义 ==================== */
 
-export interface ReturnRow {
+export interface ReturnRow extends AssetParameterSource {
   id: number
   returnNo: string
   sourceType: 'claim' | 'borrow'

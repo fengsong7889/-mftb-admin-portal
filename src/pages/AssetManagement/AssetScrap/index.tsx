@@ -14,6 +14,7 @@ import { ArrowLeftOutlined, SaveOutlined, AuditOutlined, ThunderboltOutlined, Ex
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import { fetchAssetDetail, scrapAsset, type AssetItem } from '../../../api/asset'
+import AssetParameters from '../../../components/AssetParameters'
 
 interface FormValues {
   scrapDate: Dayjs
@@ -105,7 +106,12 @@ export default function AssetScrap() {
       </Card>
 
       {asset && (
-        <Card title={t('asset.sectionAssetInfo')} style={{ marginBottom: 16, borderRadius: 8 }} size="small">
+        <div style={{ marginBottom: 16, borderRadius: 8, background: '#fff', padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'grid', placeItems: 'center' }}><AuditOutlined style={{ color: '#1890ff' }} /></div>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>{t('asset.sectionAssetInfo')}</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0' }} />
+          </div>
           <Row gutter={16}>
             <Col span={6}><b>{t('asset.colAssetNo')}:</b> {asset.assetNo}</Col>
             <Col span={6}><b>{t('asset.colAssetName')}:</b> {asset.assetName}</Col>
@@ -116,7 +122,8 @@ export default function AssetScrap() {
             <Col span={6} style={{ marginTop: 8 }}><b>{t('asset.colUserName')}:</b> {asset.userName || '-'}</Col>
             <Col span={6} style={{ marginTop: 8 }}><b>{t('asset.colUsageDate')}:</b> {asset.usageDate || '-'}</Col>
           </Row>
-        </Card>
+          <AssetParameters asset={asset} />
+        </div>
       )}
 
       <Card style={{ borderRadius: 8 }} bordered>

@@ -37,11 +37,13 @@ import {
   fetchCategoryList, fetchBrandList, fetchModelList, fetchLocationList,
   fetchAllParamTypes, fetchParamValuesByType,
   type AssetCategory, type AssetBrand, type AssetModel, type AssetLocation,
-  type ParamField, type ParamType,
+  type ParamType,
 } from '../../../api/eam'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
 import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { assetParameterFields } from '../../../utils/assetParams'
+import '../../../components/AssetParameters.css'
 
 const { TextArea } = Input
 
@@ -127,7 +129,6 @@ export default function AssetAdd() {
   /* ----- 级联状态 ----- */
   const [selectedCategoryCode, setSelectedCategoryCode] = useState<string>('')
   const [selectedBrandId, setSelectedBrandId] = useState<number | undefined>(undefined)
-  const [paramFields, setParamFields] = useState<ParamField[]>([])
   const [paramValues, setParamValues] = useState<Record<string, string>>({})
   const [paramTypes, setParamTypes] = useState<ParamType[]>([])
   const [paramValuesForSelect, setParamValuesForSelect] = useState<Record<string, string[]>>({})
@@ -164,13 +165,13 @@ export default function AssetAdd() {
   useEffect(() => {
     let alive = true
     Promise.all([
-      fetchCategoryList(),
-      fetchLocationList(),
-      fetchDepartments(),
-      fetchAllParamTypes(),
+      fetchCategoryList(undefined, false).catch(() => []),
+      fetchLocationList().catch(() => []),
+      fetchDepartments().catch(() => []),
+      fetchAllParamTypes().catch(() => []),
     ]).then(([catList, locList, deptList, ptList]) => {
       if (!alive) return
-      setCategories(catList.filter((c) => c.status === 'enabled'))
+      setCategories(catList)
       setCategoryTree(buildCategoryTree(catList.filter((c) => c.status === 'enabled')))
       setLocations(locList)
       setDeptTree(buildDeptTree(deptList))
@@ -191,7 +192,6 @@ export default function AssetAdd() {
         setSelectedModelId(data.modelId || undefined)
         setSelectedLocationId(data.locationId || undefined)
         setParamValues(data.params || {})
-        setParamFields(Object.keys(data.params || {}).map((key) => ({ key, label: key, type: 'text' })))
         fetchBrandList().then(setBrands).catch(() => setBrands([]))
         if (data.brandId) fetchModelList({ brandId: data.brandId, size: 1000 }).then((res) => setModels(res.records)).catch(() => setModels([]))
         form.setFieldsValue({
@@ -249,7 +249,6 @@ export default function AssetAdd() {
     setSelectedCategoryCode(code)
     setSelectedModelId(undefined)
     setSelectedBrandId(undefined)
-    setParamFields([])
     setParamValues({})
     setParamValuesForSelect({})
     form.setFieldsValue({ brand: undefined, assetName: undefined })
@@ -259,7 +258,7 @@ export default function AssetAdd() {
       .then((list) => setBrands(list.filter((b) => b.categoryCode.startsWith(code))))
       .catch(() => setBrands([]))
     setModels([])
-  }, [categories, form])
+  }, [form])
 
   /* ----- 资产品牌变更 → 加载型号 ----- */
   const handleBrandChange = useCallback((brandId: number | undefined) => {
@@ -280,22 +279,16 @@ export default function AssetAdd() {
     if (model) {
       form.setFieldsValue({ assetName: model.name })
       // 从参数库 API 加载参数模板（biz_eam_param_type 表）
-      const fields: ParamField[] = paramTypes
-        .filter((p) => p.categoryCode === model.categoryCode && p.status === 'enabled')
-        .sort((a, b) => a.sort - b.sort)
-        .map((p) => ({
-          key: p.code,
-          label: p.name,
-          type: (p.valueType === 'number' ? 'number' : p.valueType === 'select' ? 'select' : 'text') as ParamField['type'],
-          unit: p.unit || undefined,
-        }))
-      setParamFields(fields)
       setParamValues({})
     } else {
-      setParamFields([])
       setParamValues({})
     }
-  }, [models, form, paramTypes])
+  }, [models, form])
+
+  const paramFields = useMemo(() => assetParameterFields({
+    params: paramValues,
+    categoryCode: models.find(model => model.id === selectedModelId)?.categoryCode || selectedCategoryCode,
+  }, { categories, types: paramTypes }), [paramValues, models, selectedModelId, selectedCategoryCode, categories, paramTypes])
 
   /* ----- 为 select 类型参数加载可选值 ----- */
   // 依賴值穩定的 code 字符串（而非 paramFields 數組引用），避免引用變化重複觸發請求
@@ -326,7 +319,7 @@ export default function AssetAdd() {
   const paramFieldsWithOptions = useMemo(() => {
     return paramFields.map((f) => ({
       ...f,
-      options: f.type === 'select' ? (paramValuesForSelect[f.key] || []) : f.options,
+      options: f.type === 'select' ? (paramValuesForSelect[f.key] ?? f.options ?? []) : f.options,
     }))
   }, [paramFields, paramValuesForSelect])
 
@@ -463,12 +456,14 @@ export default function AssetAdd() {
   const renderParamFields = () => {
     if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>{t('asset.selectAssetNameFirst')}</span>
     return (
-      <Row gutter={[16, 16]}>
+      <div className="asset-param-editor">
         {paramFieldsWithOptions.map((field) => (
-          <Col span={8} key={field.key}>
-            <Form.Item label={field.label} style={{ marginBottom: 0 }}>
+          <div className="asset-param-editor__item" key={field.key}>
+            <label className="asset-param-editor__label" htmlFor={`asset-param-${field.key}`}>{field.label}{field.unit ? `（${field.unit}）` : ''}：</label>
+            <div className="asset-param-editor__control">
               {field.type === 'select' ? (
                 <Select
+                  id={`asset-param-${field.key}`}
                   placeholder={t('asset.paramSelectPh', { label: field.label })}
                   allowClear
                   options={(field.options || []).map((o) => ({ label: o, value: o }))}
@@ -477,16 +472,17 @@ export default function AssetAdd() {
                 />
               ) : (
                 <Input
+                  id={`asset-param-${field.key}`}
                   placeholder={t('asset.paramInputPh', { label: `${field.label}${field.unit ? `（${field.unit}）` : ''}` })}
                   allowClear
                   value={paramValues[field.key] || undefined}
                   onChange={(e) => setParamValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                 />
               )}
-            </Form.Item>
-          </Col>
+            </div>
+          </div>
         ))}
-      </Row>
+      </div>
     )
   }
 

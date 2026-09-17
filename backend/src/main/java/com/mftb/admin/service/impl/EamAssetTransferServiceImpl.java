@@ -259,7 +259,12 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         EamAssetTransferVO vo = new EamAssetTransferVO();
         BeanUtils.copyProperties(t, vo, "transferDate", "createdAt", "updatedAt", "cancelledAt");
         vo.setCancelledAt(DateTimeUtils.format(t.getCancelledAt()));
-        String blocked = cancelBlocked(t, assetMapper.selectById(t.getAssetId()),
+        EamAsset asset = assetMapper.selectById(t.getAssetId());
+        if (asset != null) {
+            vo.setParams(JsonUtils.parseMap(asset.getParams()));
+            vo.setCategoryCode(asset.getCategoryCode());
+        }
+        String blocked = cancelBlocked(t, asset,
                 t.getFromClaimId() == null ? null : claimMapper.selectById(t.getFromClaimId()),
                 t.getToClaimId() == null ? null : claimMapper.selectById(t.getToClaimId()));
         vo.setCancellable(blocked == null);

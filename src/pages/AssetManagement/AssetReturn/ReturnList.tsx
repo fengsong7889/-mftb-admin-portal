@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Dayjs } from 'dayjs'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { exportToCSV } from '../../../utils/exportCSV'
 import type { ReturnRow, ReturnQuery } from '../../../api/eamReturn'
 
@@ -32,6 +34,7 @@ interface Filters { keyword?: string; source?: string; status?: string; conditio
 
 export default function ReturnList({ data, loading = false, error, onQuery, canEdit = false }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const navigate = useNavigate()
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
@@ -96,6 +99,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       render: (v: string) => SOURCE_LABEL[v] || v,
     },
     { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_, r) => <>{r.assetName}<div className="claim-muted">{r.assetNo}</div></> },
+    { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'holder', title: '原持有人', dataIndex: 'empName', width: 130 },
     { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => v || r.empName },
     { key: 'date', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120 },

@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import AssetParameters from '../../../components/AssetParameters'
 import {
   fetchAssetDetail, fetchRepairList, repairAsset, finishRepair, type AssetItem, type AssetRepairRecord,
 } from '../../../api/asset'
@@ -197,6 +198,7 @@ export default function RepairDetail({ assetId, onBack }: Props) {
           <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colUserName')}>{asset.userName || '-'}</Descriptions.Item>
         </Descriptions>
+        <AssetParameters asset={asset} />
       </div>
 
       {/* ====== 维修记录 ====== */}

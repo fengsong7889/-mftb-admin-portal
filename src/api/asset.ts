@@ -9,6 +9,7 @@
  *  - 流程申请（走 OA 审批流，落库由审批通过触发）
  */
 import request from './request'
+import { normalizeAssetParams, type AssetParameterSource } from '../utils/assetParams'
 
 /* ==================== 枚举类型 ==================== */
 
@@ -266,7 +267,7 @@ function normalizeAsset(asset: AssetItem): AssetItem {
     brand: asset.brand || '', unit: asset.unit || '', company: asset.company || '',
     department: asset.department || '', userName: asset.userName || '', location: asset.location || '',
     purchaseDate: asset.purchaseDate || null, usageDate: asset.usageDate || null,
-    scrapTime: asset.scrapTime || null, params: asset.params || {},
+    scrapTime: asset.scrapTime || null, params: normalizeAssetParams(asset.params),
     applicant: asset.updatedBy || asset.applicant || '',
   }
 }
@@ -359,7 +360,7 @@ export function claimAsset(data: { assetId: number; userName: string; department
 /* ==================== 资产调拨（真实 API） ==================== */
 
 /** 调拨记录（对应后端 EamAssetTransferVO） */
-export interface TransferRecord {
+export interface TransferRecord extends AssetParameterSource {
   id: number
   transferNo: string
   assetId: number

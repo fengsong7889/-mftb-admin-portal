@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request from './request'
-import { fetchAssetList, parseAssetImages, type AssetItem } from './asset'
+import { fetchAssetList, fetchAssetDetail, updateAsset, parseAssetImages, type AssetItem } from './asset'
 
 vi.mock('./request', () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
@@ -63,6 +63,27 @@ describe('fetchAssetList 查询映射', () => {
     // applicant 回退到后端 updatedBy，保证列表「最后更新人」列有值
     expect(record.applicant).toBe('張三')
     expect(res.total).toBe(1)
+  })
+
+  it.each([{ memory: '16GB', count: 0 }, '{"memory":"16GB","count":0}'])('列表与详情保留相同的真实参数 %j', async params => {
+    vi.mocked(request.get).mockResolvedValueOnce({ records: [{ ...backendAsset, params }], total: 1 })
+      .mockResolvedValueOnce({ ...backendAsset, params })
+    const list = await fetchAssetList()
+    const detail = await fetchAssetDetail(1)
+    expect(list.records[0].params).toEqual({ memory: '16GB', count: '0' })
+    expect(detail.params).toEqual(list.records[0].params)
+    expect(request.get).toHaveBeenLastCalledWith('/eam/assets/1')
+  })
+
+  it('编辑保存透传原始参数 key 和真实值', async () => {
+    const params = { memory: '16GB', custom: '历史配置' }
+    await updateAsset(1, { params })
+    expect(request.put).toHaveBeenCalledWith('/eam/assets/1', { params })
+  })
+
+  it('台账请求失败不回退到本地 Mock 资产', async () => {
+    vi.mocked(request.get).mockRejectedValueOnce(new Error('offline'))
+    await expect(fetchAssetDetail(1)).rejects.toThrow('offline')
   })
 
   it('透传 orderId / batchId 以便按订单或批次溯源', async () => {

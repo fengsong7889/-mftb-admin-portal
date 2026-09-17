@@ -2,6 +2,8 @@ import { Button, Empty, Table, Tag, Tooltip } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import BrandTag from '../../../components/BrandTag'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatus, type SignatureStatus } from './claimViewTypes'
 
@@ -42,10 +44,12 @@ interface Props {
 }
 export default function ClaimRecordTable({ data, query, loading, pageKey, onQuery, onView, onSign }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const columns: TableColumnsType<ClaimRow> = [
     { key: 'claimNo', title: '领用编号', dataIndex: 'claimNo', width: 180 },
     { key: 'assetNo', title: t('asset.assetNo'), dataIndex: 'assetNo', width: 180 },
     { key: 'assetName', title: t('asset.assetNameLabel'), dataIndex: 'assetName', width: 180, ellipsis: true },
+    { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'companyBrand', title: '所属公司品牌', dataIndex: 'companyBrand', width: 120, render: (value?: number) => value ? <BrandTag value={value} /> : '—' },
     { key: 'brand', title: '资产品牌', dataIndex: 'brand', width: 110 },
     { key: 'status', title: '领用状态', dataIndex: 'status', width: 110, render: (value: ClaimStatus) => <ClaimStatusTag status={value} /> },

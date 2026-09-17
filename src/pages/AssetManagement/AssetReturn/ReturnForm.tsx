@@ -4,7 +4,14 @@
  * 支持从领用(claimId)、借用(borrowId)或资产(assetId)入口进入。
  * 正常归还支持「归还即承接」：指定接收管理部门与归还位置，后端释放占用时同步归位。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import AssetParameters from '../../../components/AssetParameters'
+import type { AssetParameterSource } from '../../../utils/assetParams'
+import { fetchAssetDetail } from '../../../api/asset'
+import { fetchClaimDetail } from '../../../api/eamClaim'
+import { fetchBorrowDetail } from '../../../api/eamBorrow'
+import { useTransferData } from '../AssetTransfer/useTransferData'
+import { TransferError } from '../AssetTransfer/TransferLayout'
 import { Alert, Button, DatePicker, Descriptions, Form, Input, Radio, Select, Spin, TreeSelect } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -72,6 +79,13 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
   const [form] = Form.useForm<Values>()
   const condition = Form.useWatch('condition', form) ?? 'normal'
   const hasSource = claimId != null || borrowId != null || assetId != null
+  const fetchSource = useCallback((): Promise<(AssetParameterSource & { assetNo: string; assetName: string }) | undefined> => {
+    if (claimId) return fetchClaimDetail(claimId)
+    if (borrowId) return fetchBorrowDetail(borrowId)
+    if (assetId) return fetchAssetDetail(assetId)
+    return Promise.resolve(undefined)
+  }, [claimId, borrowId, assetId])
+  const sourceState = useTransferData(fetchSource)
 
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [locations, setLocations] = useState<AssetLocation[]>([])
@@ -118,6 +132,16 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
             { key: 'source', label: '歸還來源', children: sourceLabel },
             { key: 'operator', label: '驗收操作人', children: operatorName || user?.name || '—' },
           ]} />
+          <TransferError error={sourceState.error} retry={sourceState.refresh} />
+          <Spin spinning={sourceState.loading}>
+            {sourceState.data && <>
+              <Descriptions column={2} items={[
+                { key: 'assetNo', label: '資產編號', children: sourceState.data.assetNo },
+                { key: 'assetName', label: '資產名稱', children: sourceState.data.assetName },
+              ]} />
+              <AssetParameters asset={sourceState.data} current />
+            </>}
+          </Spin>
           {!hasSource && <Alert className="claim-notice" showIcon type="info" message="未指定來源，請在列表中選擇領用/借用記錄進入歸還，或從資產台賬發起。" />}
         </ReturnSection>
 

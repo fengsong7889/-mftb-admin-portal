@@ -9,6 +9,7 @@ import { Alert, Button, DatePicker, Form, Input, Select, Spin, Pagination, Modal
 import { SaveOutlined, DatabaseOutlined, UserOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { ReturnHeader } from '../AssetReturn/ReturnLayout'
+import { AssetSummary } from '../../../components/AssetParameters'
 import type { BorrowRegisterDTO } from '../../../api/eamBorrow'
 import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '../AssetClaim/claimViewTypes'
 
@@ -146,20 +147,7 @@ export default function BorrowForm({
           {selected && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>資產編號</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetNo}</div>
-                </div>
-                <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>資產名稱</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetName}</div>
-                </div>
-                <div style={{ background: '#fafafa', borderRadius: 8, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>資產類型</div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{selected.assetType}</div>
-                </div>
-              </div>
+              <AssetSummary asset={selected} />
             </div>
           )}
         </div>

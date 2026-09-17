@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 /**
  * 归还记录视图 VO
@@ -16,6 +17,9 @@ public class EamReturnVO {
     private Long assetId;
     private String assetNo;
     private String assetName;
+    /** 当前台账配置，只读。 */
+    private Map<String, Object> params;
+    private String categoryCode;
     private Long employeeId;
     private String empName;
     private String operatorName;

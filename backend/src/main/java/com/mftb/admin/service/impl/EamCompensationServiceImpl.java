@@ -9,6 +9,7 @@ import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamCompensationService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +48,13 @@ public class EamCompensationServiceImpl implements EamCompensationService {
     @Override
     public EamCompensationVO detail(long id) {
         EamCompensation comp = requireCompensation(id);
-        return toVO(comp);
+        EamCompensationVO vo = toVO(comp);
+        EamAsset asset = assetMapper.selectById(comp.getAssetId());
+        if (asset != null) {
+            vo.setParams(JsonUtils.parseMap(asset.getParams()));
+            vo.setCategoryCode(asset.getCategoryCode());
+        }
+        return vo;
     }
 
     @Override

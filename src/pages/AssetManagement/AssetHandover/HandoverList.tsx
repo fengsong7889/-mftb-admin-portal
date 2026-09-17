@@ -7,14 +7,19 @@
  * - 展開行查看本次交接的資產明細（編號 + 名稱）
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker, TreeSelect, Alert } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { Dayjs } from 'dayjs'
-import { fetchHandoverList, cancelHandover, type HandoverRecord, type HandoverListParams } from '../../../api/eam'
-import { fetchAssetList, type AssetItem } from '../../../api/asset'
+import { fetchHandoverList, fetchHandoverDetail, cancelHandover, type HandoverRecord, type HandoverListParams, type HandoverItem } from '../../../api/eam'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
+import { useTransferData } from '../AssetTransfer/useTransferData'
+import { TransferError } from '../AssetTransfer/TransferLayout'
 import { fetchEmployees } from '../../../api/employee'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { buildDeptTree } from '../AssetClaim/claimViewTypes'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { REASON_META, type HandoverReason } from './handoverMeta'
@@ -25,9 +30,41 @@ interface Props {
   onViewDetail?: (id: number) => void
 }
 
+interface SearchValues {
+  handoverNo?: string
+  fromUserName?: string
+  fromDepartmentId?: number
+  toUserName?: string
+  toDepartmentId?: number
+  handoverDateRange?: [Dayjs, Dayjs] | null
+  reason?: HandoverReason
+  operatorName?: string
+  receiverType?: string
+}
+
+function HandoverAssets({ id, onViewAsset }: { id: number; onViewAsset: (assetNo: string) => void }) {
+  const { t } = useTranslation()
+  const catalog = useAssetParameterCatalog()
+  const fetcher = useCallback(() => fetchHandoverDetail(id), [id])
+  const { data, loading, error, refresh } = useTransferData(fetcher)
+  return <>
+    <TransferError error={error} retry={refresh} />
+    <p className="asset-parameters__hint">{t('asset.handoverSnapshotHint')} {t('asset.currentParamsHint')}</p>
+    <Table<HandoverItem> rowKey="assetId" size="small" scroll={{ x: 1260 }} pagination={false} loading={loading} dataSource={data?.items || []} columns={[
+      { key: 'assetNo', title: t('asset.colAssetNo'), render: (_, item) => <Button type="link" onClick={() => onViewAsset(item.assetNo)}>{item.assetNo}</Button> },
+      { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName' },
+      { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, item) => <AssetParameters asset={item} compact catalog={catalog} /> },
+      { key: 'fromUser', title: t('asset.handoverFromUser'), dataIndex: 'fromUser', width: 160, render: (v?: string) => v || '—' },
+      { key: 'fromDept', title: t('asset.handoverFromDept'), dataIndex: 'fromDept', width: 160, render: (v?: string) => v || '—' },
+      { key: 'toUser', title: t('asset.handoverToUser'), dataIndex: 'toUser', width: 160, render: (v?: string) => v || '—' },
+      { key: 'toDept', title: t('asset.handoverToDept'), dataIndex: 'toDept', width: 160, render: (v?: string) => v || '—' },
+    ]} />
+  </>
+}
+
 export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props) {
   const { t } = useTranslation()
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<SearchValues>()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<HandoverRecord[]>([])
   const [total, setTotal] = useState(0)
@@ -37,8 +74,16 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   /** 員工下拉選項（原使用人/目標使用人/經辦人，值為姓名，與後端存儲一致） */
   const [empOptions, setEmpOptions] = useState<{ value: string; label: string }[]>([])
-  /** 資產 ID → 資產信息映射（用於展開行顯示交接明細） */
-  const [assetMap, setAssetMap] = useState<Record<number, AssetItem>>({})
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [departmentsFailed, setDepartmentsFailed] = useState(false)
+  const deptTree = useMemo(() => buildDeptTree(departments), [departments])
+
+  useEffect(() => {
+    let alive = true
+    fetchDepartments().then(data => { if (alive) setDepartments(data) })
+      .catch(() => { if (alive) setDepartmentsFailed(true) })
+    return () => { alive = false }
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -54,20 +99,6 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
   }, [filters, page, size, t])
 
   useEffect(() => { loadData() }, [loadData])
-
-  // 一次性載入資產映射，避免展開行時逐條請求
-  useEffect(() => {
-    let alive = true
-    fetchAssetList({ page: 1, size: 9999 })
-      .then((res) => {
-        if (!alive) return
-        const map: Record<number, AssetItem> = {}
-        ;(res.records || []).forEach((a) => { map[a.id] = a })
-        setAssetMap(map)
-      })
-      .catch(() => { /* 展開行明細為輔助信息，失敗不阻塞列表 */ })
-    return () => { alive = false }
-  }, [])
 
   // 員工下拉選項一次性載入（在职狀態）
   useEffect(() => {
@@ -85,23 +116,19 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
   }, [])
 
   const handleSearch = () => {
-    const v = form.getFieldsValue() as {
-      handoverNo?: string
-      fromUserName?: string
-      toUserName?: string
-      handoverDateRange?: [Dayjs, Dayjs] | null
-      reason?: HandoverReason
-      operatorName?: string
-    }
+    const v = form.getFieldsValue()
     const range = v.handoverDateRange
     setFilters({
       handoverNo: v.handoverNo?.trim() || undefined,
-      fromUserName: v.fromUserName || undefined,
-      toUserName: v.toUserName || undefined,
+      fromUserName: v.fromUserName?.trim() || undefined,
+      fromDepartment: departments.find(d => d.id === v.fromDepartmentId)?.name,
+      toUserName: v.toUserName?.trim() || undefined,
+      toDepartment: departments.find(d => d.id === v.toDepartmentId)?.name,
       handoverDateStart: range?.[0]?.format('YYYY-MM-DD'),
       handoverDateEnd: range?.[1]?.format('YYYY-MM-DD'),
       reason: v.reason,
       operatorName: v.operatorName,
+      receiverType: v.receiverType || undefined,
     })
     setPage(1)
   }
@@ -115,10 +142,11 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
   const handleExport = () => {
     const cols = [
       { title: t('asset.colHandoverNo'), dataIndex: 'handoverNo' },
-      { title: t('asset.colFromUser'), dataIndex: 'fromUserName' },
-      { title: t('asset.colDepartment') + '(交出)', dataIndex: 'fromDepartment' },
-      { title: t('asset.colToUser'), dataIndex: 'toUserName' },
-      { title: t('asset.colDepartment') + '(接收)', dataIndex: 'toDepartment' },
+      { title: t('asset.handoverFromUser'), dataIndex: 'fromUserName' },
+      { title: t('asset.handoverFromDept'), dataIndex: 'fromDepartment' },
+      { title: t('asset.handoverToUser'), dataIndex: 'toUserName' },
+      { title: t('asset.handoverToDept'), dataIndex: 'toDepartment' },
+      { title: t('asset.receiverType'), dataIndex: 'receiverType' },
       { title: t('asset.colHandoverDate'), dataIndex: 'handoverDate' },
       { title: t('asset.colAssetCount'), dataIndex: 'assetCount' },
       { title: t('asset.colHandoverReason'), dataIndex: 'reason' },
@@ -139,8 +167,9 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>交接單號：</span><b>{record.handoverNo}</b></div>
-          <div className="confirm-info-row"><span>交出人：</span><b>{record.fromUserName}</b></div>
-          <div className="confirm-info-row"><span>接收人：</span><b>{record.toUserName}</b></div>
+          <div className="confirm-info-row"><span>{t('asset.handoverFromUser')}：</span><b>{record.fromUserName}</b></div>
+          <div className="confirm-info-row"><span>{t('asset.receiverType')}：</span><b>{t((record.receiverType || 'employee') === 'department' ? 'asset.receiverTypeDepartment' : 'asset.receiverTypeEmployee')}</b></div>
+          {(record.receiverType || 'employee') !== 'department' && <div className="confirm-info-row"><span>{t('asset.handoverToUser')}：</span><b>{record.toUserName}</b></div>}
           <div className="confirm-info-row"><span>資產數量：</span><b>{record.assetCount}</b></div>
         </div>
       ),
@@ -162,8 +191,11 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
   // 列配置元數據（顯隱/順序由用戶偏好控制）
   const columnMeta = useMemo(() => [
     { key: 'handoverNo', title: t('asset.colHandoverNo') },
-    { key: 'fromUser', title: t('asset.colFromUser') },
-    { key: 'toUser', title: t('asset.colToUser') },
+    { key: 'fromUser', title: t('asset.handoverFromUser') },
+    { key: 'fromDept', title: t('asset.handoverFromDept') },
+    { key: 'toUser', title: t('asset.handoverToUser') },
+    { key: 'toDept', title: t('asset.handoverToDept') },
+    { key: 'receiverType', title: t('asset.receiverType') },
     { key: 'handoverDate', title: t('asset.colHandoverDate') },
     { key: 'assetCount', title: t('asset.colAssetCount') },
     { key: 'reason', title: t('asset.colHandoverReason') },
@@ -183,24 +215,16 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
       title: t('asset.colHandoverNo'), dataIndex: 'handoverNo', key: 'handoverNo', width: 140, fixed: 'left',
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
+    { title: t('asset.handoverFromUser'), key: 'fromUser', dataIndex: 'fromUserName', width: 160, render: (v?: string) => v || '—' },
+    { title: t('asset.handoverFromDept'), key: 'fromDept', dataIndex: 'fromDepartment', width: 160, render: (v?: string) => v || '—' },
+    { title: t('asset.handoverToUser'), key: 'toUser', dataIndex: 'toUserName', width: 160, render: (v?: string) => v || '—' },
+    { title: t('asset.handoverToDept'), key: 'toDept', dataIndex: 'toDepartment', width: 160, render: (v?: string) => v || '—' },
     {
-      title: t('asset.colFromUser'), key: 'fromUser', width: 180,
-      render: (_: unknown, r) => (
-        <Space size={4}>
-          <span>{r.fromUserName}</span>
-          <span style={{ color: '#bfbfbf' }}>/</span>
-          <span style={{ color: '#8c8c8c' }}>{r.fromDepartment}</span>
-        </Space>
-      ),
-    },
-    {
-      title: t('asset.colToUser'), key: 'toUser', width: 180,
-      render: (_: unknown, r) => (
-        <Space size={4}>
-          <Tag color="blue">{r.toUserName}</Tag>
-          <span style={{ color: '#8c8c8c' }}>{r.toDepartment}</span>
-        </Space>
-      ),
+      title: t('asset.receiverType'), key: 'receiverType', dataIndex: 'receiverType', width: 100,
+      render: (v?: string) => {
+        const type = v || 'employee'
+        return <Tag color={type === 'department' ? 'purple' : 'blue'}>{t(type === 'department' ? 'asset.receiverTypeDepartment' : 'asset.receiverTypeEmployee')}</Tag>
+      },
     },
     { title: t('asset.colHandoverDate'), dataIndex: 'handoverDate', key: 'handoverDate', width: 120 },
     {
@@ -246,7 +270,8 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
     <>
       {/* ====== 搜索區（Grid 三列精確查詢） ====== */}
       <div className="search-section">
-        <Form
+        {departmentsFailed && <Alert type="warning" showIcon message={t('asset.handoverDepartmentsFailed')} style={{ marginBottom: 16 }} />}
+        <Form<SearchValues>
           form={form}
           layout="inline"
           style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px', alignItems: 'start' }}
@@ -254,25 +279,19 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
           <Form.Item label={t('asset.colHandoverNo')} name="handoverNo">
             <Input placeholder={t('asset.phHandoverNo')} allowClear />
           </Form.Item>
-          <Form.Item label={t('asset.colFromUser')} name="fromUserName">
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              filterOption={(input, option) => (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())}
-              options={empOptions}
-            />
+          <Form.Item label={t('asset.handoverFromUser')} name="fromUserName">
+            <Input placeholder={t('asset.handoverFromUserPh')} allowClear />
           </Form.Item>
-          <Form.Item label={t('asset.colToUser')} name="toUserName">
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              filterOption={(input, option) => (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())}
-              options={empOptions}
-            />
+          <Form.Item label={t('asset.handoverFromDept')} name="fromDepartmentId">
+            <TreeSelect treeData={deptTree} treeDefaultExpandAll treeNodeFilterProp="title" showSearch allowClear
+              disabled={departmentsFailed} placeholder={t('common.all')} />
+          </Form.Item>
+          <Form.Item label={t('asset.handoverToUser')} name="toUserName">
+            <Input placeholder={t('asset.handoverToUserPh')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('asset.handoverToDept')} name="toDepartmentId">
+            <TreeSelect treeData={deptTree} treeDefaultExpandAll treeNodeFilterProp="title" showSearch allowClear
+              disabled={departmentsFailed} placeholder={t('common.all')} />
           </Form.Item>
           <Form.Item label={t('asset.colHandoverDate')} name="handoverDateRange">
             <DatePicker.RangePicker style={{ width: '100%' }} allowClear />
@@ -295,6 +314,16 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
               optionFilterProp="label"
               filterOption={(input, option) => (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())}
               options={empOptions}
+            />
+          </Form.Item>
+          <Form.Item label={t('asset.receiverType')} name="receiverType">
+            <Select
+              placeholder={t('common.all')}
+              allowClear
+              options={[
+                { label: t('asset.receiverTypeEmployee'), value: 'employee' },
+                { label: t('asset.receiverTypeDepartment'), value: 'department' },
+              ]}
             />
           </Form.Item>
           <Form.Item>
@@ -328,27 +357,13 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 1640 }}
+        scroll={{ x: 1880 }}
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         expandable={{
           expandedRowRender: (record) => (
             <div style={{ padding: '4px 0' }}>
               <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.sectionAssetInfo')}</div>
-              <Space size={6} wrap>
-                {record.assetIds.map((id) => {
-                  const asset = assetMap[id]
-                  return (
-                    <Tag
-                      key={id}
-                      color="geekblue"
-                      style={{ cursor: asset ? 'pointer' : 'default', fontFamily: 'monospace' }}
-                      onClick={() => { if (asset) onViewAsset(asset.assetNo) }}
-                    >
-                      {asset ? `${asset.assetNo} ${asset.assetName}` : `#${id}`}
-                    </Tag>
-                  )
-                })}
-              </Space>
+              <HandoverAssets id={record.id} onViewAsset={onViewAsset} />
             </div>
           ),
         }}

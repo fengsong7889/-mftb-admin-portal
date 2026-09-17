@@ -9,6 +9,7 @@ import { FileTextOutlined, ProfileOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import AssetParameters from '../../../components/AssetParameters'
 import type { ReturnRow } from '../../../api/eamReturn'
 
 const SOURCE_LABEL: Record<string, string> = { claim: '領用歸還', borrow: '借用歸還', historical: '歷史資產歸還' }
@@ -127,6 +128,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
         {record.conditionNote && <Descriptions.Item label="狀況備註" span={4}>{record.conditionNote}</Descriptions.Item>}
         {record.exceptionReason && <Descriptions.Item label="異常原因" span={4}>{record.exceptionReason}</Descriptions.Item>}
       </Descriptions>
+      <AssetParameters asset={record} current />
     </div>
 
     {/* ====== 處理進度 ====== */}

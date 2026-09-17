@@ -6,6 +6,7 @@ import { SaveOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import type { ReturnRow } from '../../../api/eamReturn'
+import AssetParameters from '../../../components/AssetParameters'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
 
 const DISPOSITION_OPTIONS = [
@@ -77,6 +78,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
             <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
             <Descriptions.Item label="驗收狀況">遺失</Descriptions.Item>
           </Descriptions>
+          <AssetParameters asset={record} current />
         </ReturnSection>
         <ReturnSection title="找回信息">
           <Alert className="claim-notice" showIcon type="info" message="登記找回事實，不改寫原始歸還記錄。找回後資產恢復可使用狀態。" />
@@ -104,6 +106,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
           <Descriptions.Item label="原持有人">{record.empName}</Descriptions.Item>
           <Descriptions.Item label="驗收狀況">{record.assetCondition}</Descriptions.Item>
         </Descriptions>
+        <AssetParameters asset={record} current />
       </ReturnSection>
       <ReturnSection title="處置結果">
         <Alert className="claim-notice" showIcon type="warning" message="登記實物處置結果。處置不影響已建立的責任賠付流程。" />

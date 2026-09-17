@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import { fetchTransferAsset, fetchTransferEmployees, fetchTransferOptions, transferAsset, type TransferRegistration } from '../../../api/asset'
 import { useAuth } from '../../../contexts/AuthContext'
+import AssetParameters from '../../../components/AssetParameters'
 import { TransferError, TransferPageHeader, TransferSection } from './TransferLayout'
 import { useTransferData } from './useTransferData'
 import { buildTransferTree, ENABLED_DEPARTMENT, formatTransferUser, positiveId, resolveTransferFrom, TRANSFER_LIMITS, TRANSFER_MENU } from './transferUtils'
@@ -101,6 +102,7 @@ export default function AssetTransfer() {
             <Descriptions.Item label={t('transfer.claimDate')}>{asset.claimDate || '—'}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colStatus')}>{t(({ idle: 'asset.statusIdle', in_use: 'asset.statusInUse', in_repair: 'asset.statusInRepair', scrapped: 'asset.statusScrapped' })[asset.status] || 'transfer.unknown')}</Descriptions.Item>
           </Descriptions>
+          <AssetParameters asset={asset} />
         </TransferSection>
         <TransferSection title={t('asset.sectionTransferInfo')} icon={<SwapOutlined />} tone="orange">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>

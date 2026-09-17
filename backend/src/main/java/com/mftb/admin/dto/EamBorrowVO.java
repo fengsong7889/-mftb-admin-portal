@@ -1,6 +1,7 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 /**
  * 借用记录视图 VO
@@ -12,6 +13,9 @@ public class EamBorrowVO {
     private Long assetId;
     private String assetNo;
     private String assetName;
+    /** 当前台账配置，只读。 */
+    private Map<String, Object> params;
+    private String categoryCode;
     private Long holderId;
     private String holderName;
     private String department;

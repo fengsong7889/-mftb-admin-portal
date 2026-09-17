@@ -11,6 +11,7 @@ import { FileTextOutlined, SwapOutlined, EditOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import { fetchTransferDetail } from '../../../api/asset'
+import AssetParameters from '../../../components/AssetParameters'
 import { useTransferData } from './useTransferData'
 import { TransferError, TransferSection } from './TransferLayout'
 import { positiveId, resolveTransferFrom, TRANSFER_STATUS } from './transferUtils'
@@ -83,6 +84,7 @@ export default function TransferDetail() {
           <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName}</Descriptions.Item>
           <Descriptions.Item label={t('transfer.brand')}><Tooltip title={record.brandBackfilled ? t('transfer.brandBackfilled') : undefined}>{record.brand || '—'}{record.brandBackfilled ? ' *' : ''}</Tooltip></Descriptions.Item>
         </Descriptions>
+        <AssetParameters asset={record} current />
       </div>
 
       {/* ====== 調撥信息 ====== */}

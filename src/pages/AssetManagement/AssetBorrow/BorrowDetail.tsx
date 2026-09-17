@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import type { BorrowRow } from '../../../api/eamBorrow'
+import AssetParameters from '../../../components/AssetParameters'
 
 const STATUS_LABEL: Record<string, string> = { active: '借用中', overdue: '已逾期', returned: '已归还', cancelled: '已取消' }
 const STATUS_COLOR: Record<string, string> = { active: 'processing', overdue: 'error', returned: 'success', cancelled: 'default' }
@@ -97,6 +98,7 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
         <Descriptions.Item label="狀態"><Tag color={STATUS_COLOR[record.status]}>{STATUS_LABEL[record.status] || record.status}</Tag></Descriptions.Item>
         <Descriptions.Item label="操作人">{record.operatorName}</Descriptions.Item>
       </Descriptions>
+      <AssetParameters asset={record} current />
     </div>
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}

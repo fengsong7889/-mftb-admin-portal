@@ -9,6 +9,7 @@ import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamHandoverService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -57,7 +60,10 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         List<EamHandoverItem> items = handoverItemMapper.selectList(
                 new LambdaQueryWrapper<EamHandoverItem>().eq(EamHandoverItem::getHandoverId, id));
         vo.setAssetIds(items.stream().map(EamHandoverItem::getAssetId).toList());
-        List<EamHandoverVO.HandoverItemVO> itemVOs = items.stream().map(this::toItemVO).toList();
+        Map<Long, EamAsset> assets = items.isEmpty() ? Map.of() : assetMapper.selectBatchIds(vo.getAssetIds())
+                .stream().collect(Collectors.toMap(EamAsset::getId, asset -> asset));
+        List<EamHandoverVO.HandoverItemVO> itemVOs = items.stream()
+                .map(item -> toItemVO(item, handover, assets.get(item.getAssetId()))).toList();
         vo.setItems(itemVOs);
         return vo;
     }
@@ -67,8 +73,12 @@ public class EamHandoverServiceImpl implements EamHandoverService {
     public long register(EamHandoverSaveDTO dto) {
         // 1. 校验参数
         if (!hasText(dto.getFromUserName())) throw new BusinessException("交出人不能為空");
-        if (!hasText(dto.getToUserName())) throw new BusinessException("接收人不能為空");
-        if (dto.getFromUserName().trim().equals(dto.getToUserName().trim()))
+        String receiverType = hasText(dto.getReceiverType()) ? dto.getReceiverType().trim() : "employee";
+        boolean isDeptReceiver = "department".equals(receiverType);
+        if (!isDeptReceiver && !hasText(dto.getToUserName()))
+            throw new BusinessException("接收人不能為空");
+        if (!isDeptReceiver && hasText(dto.getToUserName())
+                && dto.getFromUserName().trim().equals(dto.getToUserName().trim()))
             throw new BusinessException("接收人不可與交出人相同");
         if (dto.getAssetIds() == null || dto.getAssetIds().isEmpty())
             throw new BusinessException("請至少選擇一件資產");
@@ -82,10 +92,17 @@ public class EamHandoverServiceImpl implements EamHandoverService {
                 : (fromUser != null ? fromUser.getDepartment() : "");
 
         // 3. 解析接收人
-        SysUser toUser = resolveUserByName(dto.getToUserName());
-        if (toUser == null) throw new BusinessException("接收人不存在：" + dto.getToUserName());
-        String toDepartment = hasText(dto.getToDepartment()) ? dto.getToDepartment()
-                : (toUser.getDepartment() != null ? toUser.getDepartment() : "");
+        SysUser toUser = null;
+        String toDepartment;
+        if (isDeptReceiver) {
+            // 部门接收：不需要解析用户，只使用部门
+            toDepartment = hasText(dto.getToDepartment()) ? dto.getToDepartment() : "";
+        } else {
+            toUser = resolveUserByName(dto.getToUserName());
+            if (toUser == null) throw new BusinessException("接收人不存在：" + dto.getToUserName());
+            toDepartment = hasText(dto.getToDepartment()) ? dto.getToDepartment()
+                    : (toUser.getDepartment() != null ? toUser.getDepartment() : "");
+        }
 
         // 4. 校验并锁定资产
         List<EamAsset> assets = new ArrayList<>();
@@ -107,9 +124,10 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         handover.setFromUserId(fromUserId);
         handover.setFromUserName(dto.getFromUserName().trim());
         handover.setFromDepartment(fromDepartment);
-        handover.setToUserId(toUser.getId());
-        handover.setToUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
+        handover.setToUserId(toUser != null ? toUser.getId() : null);
+        handover.setToUserName(toUser != null && toUser.getName() != null ? toUser.getName() : (toUser != null ? toUser.getUsername() : null));
         handover.setToDepartment(toDepartment);
+        handover.setReceiverType(receiverType);
         handover.setHandoverDate(handoverDate);
         handover.setAssetCount(dto.getAssetIds().size());
         handover.setReason(dto.getReason() != null ? dto.getReason() : "other");
@@ -133,16 +151,24 @@ public class EamHandoverServiceImpl implements EamHandoverService {
             item.setNewDepartment(toDepartment);
             handoverItemMapper.insert(item);
 
-            // 更新资产使用人/部门（状态保持 in_use）
-            asset.setCurrentHolderId(toUser.getId());
-            asset.setUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
-            asset.setDepartment(toDepartment);
+            // 更新资产使用人/部门
+            if (toUser != null) {
+                // 员工接收：设置持有人和部门
+                asset.setCurrentHolderId(toUser.getId());
+                asset.setUserName(toUser.getName() != null ? toUser.getName() : toUser.getUsername());
+                asset.setDepartment(toDepartment);
+            } else {
+                // 部门接收：释放持有人，仅更新部门
+                asset.setCurrentHolderId(null);
+                asset.setUserName(null);
+                asset.setDepartment(toDepartment);
+            }
             asset.setUpdatedBy(operatorResolver.currentOperatorName());
             assetMapper.updateById(asset);
         }
 
         log.info("交接登記成功: {} ({}件資產, {} → {})", handoverNo, assets.size(),
-                dto.getFromUserName(), dto.getToUserName());
+                dto.getFromUserName(), isDeptReceiver ? toDepartment : dto.getToUserName());
         return handover.getId();
     }
 
@@ -213,7 +239,7 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         return vo;
     }
 
-    private EamHandoverVO.HandoverItemVO toItemVO(EamHandoverItem item) {
+    private EamHandoverVO.HandoverItemVO toItemVO(EamHandoverItem item, EamHandover handover, EamAsset asset) {
         EamHandoverVO.HandoverItemVO vo = new EamHandoverVO.HandoverItemVO();
         vo.setAssetId(item.getAssetId());
         vo.setAssetNo(item.getAssetNo());
@@ -221,6 +247,15 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         vo.setAssetType(item.getAssetType());
         vo.setOldDepartment(item.getOldDepartment());
         vo.setNewDepartment(item.getNewDepartment());
+        // 人员和部门只取交接时快照；空字符串也是原值，不用当前台账或员工信息覆盖。
+        vo.setFromUser(handover.getFromUserName());
+        vo.setFromDept(item.getOldDepartment() != null ? item.getOldDepartment() : handover.getFromDepartment());
+        vo.setToUser(handover.getToUserName());
+        vo.setToDept(item.getNewDepartment() != null ? item.getNewDepartment() : handover.getToDepartment());
+        if (asset != null) {
+            vo.setParams(JsonUtils.parseMap(asset.getParams()));
+            vo.setCategoryCode(asset.getCategoryCode());
+        }
         return vo;
     }
 
@@ -245,6 +280,12 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         if (hasText(q.getToUserName())) {
             w.like(EamHandover::getToUserName, q.getToUserName().trim());
         }
+        if (hasText(q.getFromDepartment())) {
+            w.eq(EamHandover::getFromDepartment, q.getFromDepartment());
+        }
+        if (hasText(q.getToDepartment())) {
+            w.eq(EamHandover::getToDepartment, q.getToDepartment());
+        }
         LocalDate dateStart = parseDateOrNull(q.getHandoverDateStart());
         if (dateStart != null) {
             w.ge(EamHandover::getHandoverDate, dateStart);
@@ -258,6 +299,9 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         }
         if (hasText(q.getOperatorName())) {
             w.like(EamHandover::getOperatorName, q.getOperatorName().trim());
+        }
+        if (hasText(q.getReceiverType())) {
+            w.eq(EamHandover::getReceiverType, q.getReceiverType().trim());
         }
         return w;
     }

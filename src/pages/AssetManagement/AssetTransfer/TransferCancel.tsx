@@ -5,6 +5,7 @@ import { StopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { cancelTransfer, fetchTransferDetail } from '../../../api/asset'
 import { useAuth } from '../../../contexts/AuthContext'
+import AssetParameters from '../../../components/AssetParameters'
 import { TransferError, TransferPageHeader, TransferSection } from './TransferLayout'
 import { useTransferData } from './useTransferData'
 import { positiveId, resolveTransferFrom, TRANSFER_LIMITS, TRANSFER_MENU } from './transferUtils'
@@ -59,6 +60,7 @@ export default function TransferCancel() {
             <Descriptions.Item label={t('asset.colAssetNo')}>{record.assetNo}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName}</Descriptions.Item>
           </Descriptions>
+          <AssetParameters asset={record} current />
           <Form.Item name="reason" label={t('transfer.cancelReason')} rules={[{ required: true, whitespace: true, message: t('transfer.cancelReasonRequired') }, { max: TRANSFER_LIMITS.REASON }]}>
             <Input.TextArea rows={3} showCount maxLength={TRANSFER_LIMITS.REASON} />
           </Form.Item>

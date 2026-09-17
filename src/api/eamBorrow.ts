@@ -4,10 +4,11 @@
  * 后端接口: /api/eam/borrows/*
  */
 import request, { isBackendUnavailable } from './request'
+import type { AssetParameterSource } from '../utils/assetParams'
 
 /* ==================== 类型定义 ==================== */
 
-export interface BorrowRow {
+export interface BorrowRow extends AssetParameterSource {
   id: number
   borrowNo: string
   assetId: number

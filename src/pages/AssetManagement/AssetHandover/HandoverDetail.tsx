@@ -11,6 +11,8 @@ import type { TableColumnsType } from 'antd'
 import { FileTextOutlined, ProfileOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import type { HandoverItem, HandoverRecord } from '../../../api/eam'
 import { REASON_META, type HandoverReason } from './handoverMeta'
 
@@ -30,6 +32,7 @@ const STATUS_META: Record<HandoverRecord['status'], { key: string; color: 'succe
 
 export default function HandoverDetail({ record, loading = false, error, onBack, onViewAsset }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
 
   if (loading && !record) {
     return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -60,9 +63,12 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       ),
     },
     { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 180 },
+    { title: t('asset.paramInfoTitle'), key: 'params', width: 260, render: (_, item) => <AssetParameters asset={item} compact catalog={paramCatalog} /> },
     { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 140, render: (v: string | undefined) => v || '-' },
-    { title: t('asset.colFromDept'), dataIndex: 'oldDepartment', key: 'oldDepartment', width: 140, render: (v: string | undefined) => v || '-' },
-    { title: t('asset.colToDept'), dataIndex: 'newDepartment', key: 'newDepartment', width: 140, render: (v: string | undefined) => v || '-' },
+    { title: t('asset.handoverFromUser'), dataIndex: 'fromUser', key: 'fromUser', width: 140, render: (v: string | undefined) => v || '-' },
+    { title: t('asset.handoverFromDept'), dataIndex: 'fromDept', key: 'fromDept', width: 140, render: (v: string | undefined) => v || '-' },
+    { title: t('asset.handoverToUser'), dataIndex: 'toUser', key: 'toUser', width: 140, render: (v: string | undefined) => v || '-' },
+    { title: t('asset.handoverToDept'), dataIndex: 'toDept', key: 'toDept', width: 140, render: (v: string | undefined) => v || '-' },
   ]
 
   return (
@@ -90,9 +96,11 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
           { key: 'status', label: t('asset.colStatus'), children: <Tag color={statusMeta.color}>{t(statusMeta.key)}</Tag> },
           { key: 'date', label: t('asset.colHandoverDate'), children: record.handoverDate },
           { key: 'count', label: t('asset.colAssetCount'), children: <Tag color="geekblue">{record.assetCount}</Tag> },
-          { key: 'fromUser', label: t('asset.colFromUser'), children: `${record.fromUserName} / ${record.fromDepartment || '-'}` },
-          { key: 'toUser', label: t('asset.colToUser'), children: <Tag color="blue">{record.toUserName}</Tag> },
-          { key: 'toDept', label: t('asset.colToDepartment'), children: record.toDepartment || '-' },
+          { key: 'fromUser', label: t('asset.handoverFromUser'), children: record.fromUserName || '-' },
+          { key: 'fromDept', label: t('asset.handoverFromDept'), children: record.fromDepartment || '-' },
+          { key: 'receiverType', label: t('asset.receiverType'), children: <Tag color={(record.receiverType || 'employee') === 'department' ? 'purple' : 'blue'}>{t((record.receiverType || 'employee') === 'department' ? 'asset.receiverTypeDepartment' : 'asset.receiverTypeEmployee')}</Tag> },
+          { key: 'toUser', label: t('asset.handoverToUser'), children: (record.receiverType || 'employee') !== 'department' ? <Tag color="blue">{record.toUserName || '-'}</Tag> : '-' },
+          { key: 'toDept', label: t('asset.handoverToDept'), children: record.toDepartment || '-' },
           { key: 'reason', label: t('asset.colHandoverReason'), children: <Tag color={REASON_META[record.reason as HandoverReason]?.color || 'default'}>{t(REASON_META[record.reason as HandoverReason]?.key || 'asset.reasonOther')}</Tag> },
           { key: 'operator', label: t('asset.colOperator'), children: record.operatorName || '-' },
           { key: 'createdAt', label: t('asset.colCreatedAt'), children: record.createdAt || '—' },
@@ -110,6 +118,7 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
           <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{record.assetCount}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
+        <p className="asset-parameters__hint">{t('asset.currentParamsHint')}</p>
         <Table<HandoverItem>
           columns={itemColumns}
           dataSource={record.items || []}

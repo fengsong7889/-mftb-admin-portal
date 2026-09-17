@@ -6,6 +6,7 @@ import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import type { BorrowRow } from '../../../api/eamBorrow'
+import AssetParameters from '../../../components/AssetParameters'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 interface Values { dueDate: Dayjs; extendDays: number }
@@ -45,6 +46,7 @@ export default function BorrowRenew({ record, loading = false, canEdit = true, o
           { key: 'start', label: '借出日期', children: record.startDate },
           { key: 'old', label: '原到期日期', children: record.dueDate },
         ]} />
+        <AssetParameters asset={record} current />
         <Form<Values> form={form} layout="vertical" disabled={loading} initialValues={{ dueDate: dayjs(record.dueDate).add(7, 'day'), extendDays: 7 }} style={{ marginTop: 16 }}>
           <div className="return-grid">
             <Form.Item name="dueDate" label="新到期日期" rules={[{ required: true }, { validator: (_, d: Dayjs) => d && d.isAfter(record.dueDate, 'day') && !d.isBefore(dayjs(), 'day') ? Promise.resolve() : Promise.reject(new Error('须晚于原到期日且不早于今天')) }]}>

@@ -3,6 +3,7 @@ package com.mftb.admin.dto;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 赔付记录视图 VO
@@ -14,6 +15,9 @@ public class EamCompensationVO {
     private Long returnId;
     private Long assetId;
     private String assetName;
+    /** 当前台账配置，只读。 */
+    private Map<String, Object> params;
+    private String categoryCode;
     private String assetNo;
     private Long holderId;
     private String holderName;

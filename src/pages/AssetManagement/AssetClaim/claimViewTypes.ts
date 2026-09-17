@@ -1,4 +1,5 @@
 import type { AssetItem } from '../../../api/asset'
+import type { AssetParameterSource } from '../../../utils/assetParams'
 import type { DepartmentItem } from '../../../api/department'
 
 // 界面契约与数据接入分离；第三阶段由真实 API 提供这些只读模型。
@@ -31,7 +32,7 @@ export interface ClaimEmployeeSummary extends ClaimEmployee {
   proxyPendingCount: number
   lastClaimDate?: string
 }
-export interface ClaimRow {
+export interface ClaimRow extends AssetParameterSource {
   id: number
   claimNo: string
   sourceTransferId?: number | null
@@ -84,7 +85,7 @@ export interface ClaimRegistration {
   proxyReason?: string
 }
 export type ClaimAssetOption = Pick<AssetItem,
-  'id' | 'assetNo' | 'assetName' | 'assetType' | 'brand' | 'companyBrand' | 'location' | 'purchaseValue'>
+  'id' | 'assetNo' | 'assetName' | 'assetType' | 'brand' | 'companyBrand' | 'location' | 'purchaseValue' | 'params' | 'categoryCode' | 'categoryId'>
 
 export interface DepartmentNode { value: number; title: string; children: DepartmentNode[] }
 export function buildDeptTree(departments: DepartmentItem[]): DepartmentNode[] {

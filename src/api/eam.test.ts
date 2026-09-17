@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request, { isBackendUnavailable } from './request'
-import { approvePurchaseRequest, createPurchaseRequest, fetchPurchaseRequestDetail, fetchPurchaseOrderDetail, fetchPurchaseOrderList } from './eam'
+import { approvePurchaseRequest, createPurchaseRequest, fetchPurchaseRequestDetail, fetchPurchaseOrderDetail, fetchPurchaseOrderList, fetchHandoverDetail, fetchCategoryList } from './eam'
 
 vi.mock('./request', () => ({
   default: { get: vi.fn() },
@@ -19,6 +19,18 @@ const backendOrder = {
 }
 
 beforeEach(() => { vi.clearAllMocks() })
+
+describe('资产参数数据来源', () => {
+  it('交接详情失败不拿同 ID 的 Mock 单据代替真实参数', async () => {
+    vi.mocked(request.get).mockRejectedValueOnce(new Error('offline'))
+    await expect(fetchHandoverDetail(1)).rejects.toThrow('offline')
+  })
+
+  it('实物展示使用的参数分类字典禁用 Mock 回退', async () => {
+    vi.mocked(request.get).mockRejectedValueOnce(new Error('offline'))
+    await expect(fetchCategoryList(undefined, false)).rejects.toThrow('offline')
+  })
+})
 
 describe('采购订单接口映射', () => {
   it.each([1, 2, '1', '2'])('保留真实流程编号，并将品牌 %s 转为编辑框的数字枚举', async (brand) => {

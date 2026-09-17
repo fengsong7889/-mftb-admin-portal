@@ -5,24 +5,28 @@
  *          → 填接收人/部門/交接日期/原因 → 提交
  *          （批量逐件變更使用人 + 寫交接流水 + 生成交接記錄）
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   Button, Form, Input, Select, DatePicker, Table, Row, Col, Space, Spin,
-  message, Alert, Tag,
+  message, Alert, Tag, TreeSelect, Modal, Radio,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { fetchUserAssets, createHandover } from '../../../api/eam'
+import { fetchUserAssets, createHandover, type HandoverSaveData } from '../../../api/eam'
 import type { AssetItem } from '../../../api/asset'
-import { EAM_DEPARTMENTS } from '../eamUtils'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { buildDeptTree } from '../AssetClaim/claimViewTypes'
 
 type HandoverReason = 'resign' | 'transfer' | 'other'
 
 interface FormValues {
+  receiverType: 'employee' | 'department'
   toUser: string
-  toDepartment: string
+  toDepartment: number
   handoverDate: Dayjs
   reason: HandoverReason
   operator: string
@@ -41,6 +45,7 @@ const REASON_OPTIONS: { value: HandoverReason; key: string }[] = [
 
 export default function HandoverForm({ onBack }: Props) {
   const { t } = useTranslation()
+  const paramCatalog = useAssetParameterCatalog()
   const [form] = Form.useForm<FormValues>()
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -48,6 +53,16 @@ export default function HandoverForm({ onBack }: Props) {
   const [userAssets, setUserAssets] = useState<AssetItem[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [queried, setQueried] = useState(false)
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const deptTree = useMemo(() => buildDeptTree(departments), [departments])
+  const receiverType = Form.useWatch('receiverType', form) || 'employee'
+
+  useEffect(() => {
+    let alive = true
+    fetchDepartments().then(data => { if (alive) setDepartments(data) })
+      .catch(() => { /* 部门加载失败不阻塞表单 */ })
+    return () => { alive = false }
+  }, [])
 
   /** 查詢交出人名下資產 */
   const handleQuery = useCallback(async () => {
@@ -62,16 +77,12 @@ export default function HandoverForm({ onBack }: Props) {
       setUserAssets(list)
       setSelectedIds([])
       setQueried(true)
-      // 自動填入交出人所在部門（取首個資產的部門）
-      if (list.length > 0) {
-        form.setFieldsValue({ toDepartment: list[0].department })
-      }
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
       setLoading(false)
     }
-  }, [fromUser, form, t])
+  }, [fromUser, t])
 
   const selectedAssets = userAssets.filter((a) => selectedIds.includes(a.id))
   const fromDepartment = selectedAssets.length > 0 ? selectedAssets[0].department : (userAssets.length > 0 ? userAssets[0].department : '')
@@ -83,28 +94,55 @@ export default function HandoverForm({ onBack }: Props) {
         message.error(t('asset.handoverAssetRequired'))
         return
       }
-      if (v.toUser.trim() === fromUser.trim()) {
+      if (v.toUser?.trim() && v.toUser.trim() === fromUser.trim()) {
         message.error(t('asset.toUserRequired'))
         return
       }
-      setSubmitting(true)
-      const record = await createHandover({
-        fromUserName: fromUser.trim(),
-        fromDepartment,
-        toUserName: v.toUser.trim(),
-        toDepartment: v.toDepartment,
-        handoverDate: v.handoverDate.format('YYYY-MM-DD'),
-        assetIds: selectedIds,
-        reason: v.reason,
-        operatorName: v.operator.trim(),
-        remark: v.remark,
+      const toDeptName = departments.find(d => d.id === v.toDepartment)?.name ?? String(v.toDepartment)
+      const isDept = v.receiverType === 'department'
+      Modal.confirm({
+        title: '確認提交交接？',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: (
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>{t('asset.handoverFromUser')}：</span><b>{fromUser.trim()}</b></div>
+            <div className="confirm-info-row"><span>{t('asset.handoverFromDept')}：</span><b>{fromDepartment || '-'}</b></div>
+            <div className="confirm-info-row"><span>{t('asset.receiverType')}：</span><b>{isDept ? t('asset.receiverTypeDepartment') : t('asset.receiverTypeEmployee')}</b></div>
+            {!isDept && <div className="confirm-info-row"><span>{t('asset.handoverToUser')}：</span><b>{v.toUser?.trim()}</b></div>}
+            <div className="confirm-info-row"><span>{t('asset.handoverToDept')}：</span><b>{toDeptName}</b></div>
+            <div className="confirm-info-row"><span>資產數量：</span><b>{selectedIds.length}</b></div>
+          </div>
+        ),
+        okText: '確認提交',
+        cancelText: '取消',
+        onOk: async () => {
+          setSubmitting(true)
+          try {
+            const payload: HandoverSaveData = {
+              fromUserName: fromUser.trim(),
+              fromDepartment,
+              toUserName: isDept ? '' : v.toUser?.trim(),
+              toDepartment: toDeptName,
+              receiverType: v.receiverType || 'employee',
+              handoverDate: v.handoverDate.format('YYYY-MM-DD'),
+              assetIds: selectedIds,
+              reason: v.reason,
+              operatorName: v.operator.trim(),
+              remark: v.remark,
+            }
+            const record = await createHandover(payload)
+            message.success(t('asset.handoverSuccess', { count: record.assetCount }))
+            onBack()
+          } catch (e: unknown) {
+            if (e instanceof Error && e.message) message.error(e.message)
+          } finally {
+            setSubmitting(false)
+          }
+        },
       })
-      message.success(t('asset.handoverSuccess', { count: record.assetCount }))
-      onBack()
     } catch (e: unknown) {
       if (e instanceof Error && e.message) message.error(e.message)
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -114,6 +152,7 @@ export default function HandoverForm({ onBack }: Props) {
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
+    { title: t('asset.paramInfoTitle'), key: 'params', width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 110 },
     { title: t('asset.colDepartment'), dataIndex: 'department', key: 'department', width: 110 },
     { title: t('asset.colLocationName'), dataIndex: 'location', key: 'location', width: 170, ellipsis: true },
@@ -198,29 +237,46 @@ export default function HandoverForm({ onBack }: Props) {
           form={form}
           layout="vertical"
           initialValues={{
+            receiverType: 'employee',
             handoverDate: dayjs(),
             reason: 'resign',
             operator: t('asset.currentOperator'),
           }}
         >
           <Row gutter={16}>
-            <Col span={6}>
+            <Col span={12}>
               <Form.Item
-                label={t('asset.colToUser')} name="toUser"
-                rules={[{ required: true, message: t('asset.toUserRequired') }]}
+                label={t('asset.receiverType')} name="receiverType"
+                rules={[{ required: true }]}
               >
-                <Input placeholder={t('asset.userNamePh')} allowClear />
+                <Radio.Group onChange={() => form.setFieldsValue({ toUser: '' })}>
+                  <Radio.Button value="employee">{t('asset.receiverTypeEmployee')}</Radio.Button>
+                  <Radio.Button value="department">{t('asset.receiverTypeDepartment')}</Radio.Button>
+                </Radio.Group>
               </Form.Item>
             </Col>
+            {receiverType === 'employee' && (
+              <Col span={6}>
+                <Form.Item
+                  label={t('asset.handoverToUser')} name="toUser"
+                  rules={[{ required: true, message: t('asset.toUserRequired') }]}
+                >
+                  <Input placeholder={t('asset.userNamePh')} allowClear />
+                </Form.Item>
+              </Col>
+            )}
             <Col span={6}>
               <Form.Item
-                label={t('asset.colToDept')} name="toDepartment"
+                label={t('asset.handoverToDept')} name="toDepartment"
                 rules={[{ required: true, message: t('asset.departmentRequired') }]}
               >
-                <Select
-                  placeholder={t('asset.departmentRequired')}
+                <TreeSelect
+                  treeData={deptTree}
+                  treeDefaultExpandAll
+                  treeNodeFilterProp="title"
                   showSearch
-                  options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))}
+                  allowClear
+                  placeholder={t('asset.departmentRequired')}
                 />
               </Form.Item>
             </Col>
@@ -257,6 +313,10 @@ export default function HandoverForm({ onBack }: Props) {
             </Col>
           </Row>
         </Form>
+
+        {receiverType === 'department' && (
+          <Alert type="info" showIcon message={t('asset.receiverTypeHint')} style={{ marginTop: -8, marginBottom: 8 }} />
+        )}
 
         {/* ====== 已選資產預覽 ====== */}
         {selectedIds.length > 0 && (

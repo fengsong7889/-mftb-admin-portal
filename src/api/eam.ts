@@ -8,6 +8,7 @@
  * 台賬主數據與操作流水仍由 ./asset 承載，本文件僅擴展 EAM 專屬實體。
  */
 import request, { isBackendUnavailable, SILENT_HEADER } from './request'
+import type { AssetParameterSource } from '../utils/assetParams'
 import {
   mockFetchCategoryList,
   mockCreateCategory,
@@ -526,15 +527,20 @@ export interface ReturnRecord {
 /* ==================== 調撥 / 交接 ==================== */
 
 /** 交接資產明細（詳情頁返回） */
-export interface HandoverItem {
+export interface HandoverItem extends AssetParameterSource {
   assetId: number
   assetNo: string
   assetName: string
   assetType?: string
   /** 交接前部門 */
-  oldDepartment?: string
+  oldDepartment?: string | null
   /** 交接後部門 */
-  newDepartment?: string
+  newDepartment?: string | null
+  /** 交接时的人员与部门快照，不从当前台账回填。 */
+  fromUser?: string | null
+  fromDept?: string | null
+  toUser?: string | null
+  toDept?: string | null
 }
 
 /** 交接記錄（離職/調崗批量交接） */
@@ -547,6 +553,8 @@ export interface HandoverRecord {
   /** 接收人 */
   toUserName: string
   toDepartment: string
+  /** 接收人类型：employee=员工 / department=部门 */
+  receiverType?: 'employee' | 'department'
   handoverDate: string
   assetIds: number[]
   assetCount: number
@@ -560,6 +568,25 @@ export interface HandoverRecord {
   updatedBy?: string
   /** 交接資產明細（僅詳情接口返回） */
   items?: HandoverItem[]
+}
+
+/** 四个业务字段保持独立；明细快照由后端在交接时保存。 */
+export type HandoverSaveData = Pick<HandoverRecord,
+  'fromUserName' | 'fromDepartment' | 'toUserName' | 'toDepartment' | 'receiverType' |
+  'handoverDate' | 'assetIds' | 'reason' | 'operatorName' | 'remark'>
+
+/** 兼容旧接口，只回退到同一单据的快照，保留空值与原始明细字段。 */
+function normalizeHandoverRecord(record: HandoverRecord): HandoverRecord {
+  return {
+    ...record,
+    items: record.items?.map(item => ({
+      ...item,
+      fromUser: item.fromUser ?? record.fromUserName,
+      fromDept: item.fromDept ?? item.oldDepartment ?? record.fromDepartment,
+      toUser: item.toUser ?? record.toUserName,
+      toDept: item.toDept ?? item.newDepartment ?? record.toDepartment,
+    })),
+  }
 }
 
 /* ==================== 損壞賠付 ==================== */
@@ -880,7 +907,7 @@ let mockCompensations: CompensationRecord[] = [
 /* ==================== API：資產分類 ==================== */
 
 /** 分類列表（平鋪返回，頁面自行構樹） */
-export async function fetchCategoryList(params?: { keyword?: string; name?: string; code?: string; updatedBy?: string; updatedAtStart?: string; updatedAtEnd?: string }): Promise<AssetCategory[]> {
+export async function fetchCategoryList(params?: { keyword?: string; name?: string; code?: string; updatedBy?: string; updatedAtStart?: string; updatedAtEnd?: string }, allowMockFallback = true): Promise<AssetCategory[]> {
   try {
     const data = await request.get<unknown, AssetCategory[]>('/eam/basic/categories', { params, headers: { [SILENT_HEADER]: '1' } })
     return (data || []).map((c: any) => ({
@@ -888,7 +915,7 @@ export async function fetchCategoryList(params?: { keyword?: string; name?: stri
       paramTemplate: typeof c.paramTemplate === 'string' ? (() => { try { return JSON.parse(c.paramTemplate) } catch { return [] } })() : (c.paramTemplate || []),
     }))
   } catch (e) {
-    if (isBackendUnavailable(e)) return mockFetchCategoryList()
+    if (allowMockFallback && isBackendUnavailable(e)) return mockFetchCategoryList()
     throw e
   }
 }
@@ -2111,11 +2138,14 @@ export interface HandoverListParams {
   size?: number
   handoverNo?: string
   fromUserName?: string
+  fromDepartment?: string
   toUserName?: string
+  toDepartment?: string
   handoverDateStart?: string
   handoverDateEnd?: string
   reason?: string
   operatorName?: string
+  receiverType?: string
 }
 
 export async function fetchHandoverList(params?: HandoverListParams): Promise<PageResult<HandoverRecord>> {
@@ -2126,11 +2156,14 @@ export async function fetchHandoverList(params?: HandoverListParams): Promise<Pa
         size: params?.size,
         handoverNo: params?.handoverNo,
         fromUserName: params?.fromUserName,
+        fromDepartment: params?.fromDepartment,
         toUserName: params?.toUserName,
+        toDepartment: params?.toDepartment,
         handoverDateStart: params?.handoverDateStart,
         handoverDateEnd: params?.handoverDateEnd,
         reason: params?.reason,
         operatorName: params?.operatorName,
+        receiverType: params?.receiverType,
       },
     })
     return res
@@ -2143,10 +2176,13 @@ export async function fetchHandoverList(params?: HandoverListParams): Promise<Pa
       }
       if (params?.fromUserName) list = list.filter((h) => (h.fromUserName || '').includes(params.fromUserName!))
       if (params?.toUserName) list = list.filter((h) => (h.toUserName || '').includes(params.toUserName!))
+      if (params?.fromDepartment) list = list.filter((h) => h.fromDepartment === params.fromDepartment)
+      if (params?.toDepartment) list = list.filter((h) => h.toDepartment === params.toDepartment)
       if (params?.handoverDateStart) list = list.filter((h) => h.handoverDate >= params.handoverDateStart!)
       if (params?.handoverDateEnd) list = list.filter((h) => h.handoverDate <= params.handoverDateEnd!)
       if (params?.reason) list = list.filter((h) => h.reason === params.reason)
       if (params?.operatorName) list = list.filter((h) => (h.operatorName || '').includes(params.operatorName!))
+      if (params?.receiverType) list = list.filter((h) => (h.receiverType || 'employee') === params.receiverType)
       return delay(paginate(list, params?.page, params?.size))
     }
     throw e
@@ -2155,22 +2191,7 @@ export async function fetchHandoverList(params?: HandoverListParams): Promise<Pa
 
 /** 交接詳情（含資產明細 items） */
 export async function fetchHandoverDetail(id: number): Promise<HandoverRecord> {
-  try {
-    return await request.get<unknown, HandoverRecord>(`/eam/handovers/${id}`)
-  } catch (e) {
-    if (isBackendUnavailable(e)) {
-      const record = mockHandovers.find((h) => h.id === id)
-      if (!record) throw new Error('交接記錄不存在', { cause: e })
-      // mock 無獨立明細，由 assetIds 派生佔位明細
-      return delay({
-        ...record,
-        items: record.assetIds.map((assetId) => ({
-          assetId, assetNo: `#${assetId}`, assetName: '-',
-        })),
-      })
-    }
-    throw e
-  }
+  return normalizeHandoverRecord(await request.get<unknown, HandoverRecord>(`/eam/handovers/${id}`))
 }
 
 /** 查詢某使用人名下資產（交接頁勾選用） */
@@ -2194,23 +2215,14 @@ export async function cancelHandover(id: number, reason: string): Promise<void> 
 }
 
 /** 批量交接：逐件變更使用人/部門並寫交接流水 */
-export async function createHandover(data: {
-  fromUserName: string
-  fromDepartment: string
-  toUserName: string
-  toDepartment: string
-  handoverDate: string
-  assetIds: number[]
-  reason: 'resign' | 'transfer' | 'other'
-  operatorName: string
-  remark?: string
-}): Promise<HandoverRecord> {
+export async function createHandover(data: HandoverSaveData): Promise<HandoverRecord> {
   try {
     const id = await request.post<unknown, number>('/eam/handovers', {
       fromUserName: data.fromUserName,
       fromDepartment: data.fromDepartment,
       toUserName: data.toUserName,
       toDepartment: data.toDepartment,
+      receiverType: data.receiverType || 'employee',
       handoverDate: data.handoverDate,
       assetIds: data.assetIds,
       reason: data.reason,
@@ -2224,6 +2236,7 @@ export async function createHandover(data: {
       fromDepartment: data.fromDepartment,
       toUserName: data.toUserName,
       toDepartment: data.toDepartment,
+      receiverType: (data.receiverType || 'employee') as 'employee' | 'department',
       handoverDate: data.handoverDate,
       assetIds: data.assetIds,
       assetCount: data.assetIds.length,
@@ -2237,7 +2250,7 @@ export async function createHandover(data: {
     if (isBackendUnavailable(e)) {
       // Mock fallback
       if (!data.assetIds.length) throw new Error('請至少選擇一件資產', { cause: e })
-      if (data.fromUserName === data.toUserName) throw new Error('接收人不可與交出人相同', { cause: e })
+      if (data.receiverType !== 'department' && data.fromUserName === data.toUserName) throw new Error('接收人不可與交出人相同', { cause: e })
       const id = Math.max(0, ...mockHandovers.map((h) => h.id)) + 1
       const record: HandoverRecord = {
         id,
@@ -2246,6 +2259,7 @@ export async function createHandover(data: {
         fromDepartment: data.fromDepartment,
         toUserName: data.toUserName,
         toDepartment: data.toDepartment,
+        receiverType: (data.receiverType || 'employee') as 'employee' | 'department',
         handoverDate: data.handoverDate,
         assetIds: data.assetIds,
         assetCount: data.assetIds.length,

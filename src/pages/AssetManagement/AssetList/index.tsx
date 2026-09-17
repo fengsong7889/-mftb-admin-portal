@@ -29,7 +29,9 @@ import {
   fetchAssetList, fetchAssetStatusCounts, deleteAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
 } from '../../../api/asset'
-import { fetchCategoryList, fetchAssetTagList, bindAssetTag } from '../../../api/eam'
+import { fetchAssetTagList, bindAssetTag } from '../../../api/eam'
+import AssetParameters from '../../../components/AssetParameters'
+import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import type { AssetTagTemplate } from '../../../api/eam'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -83,26 +85,12 @@ export default function AssetList() {
   })
 
   /** 型号参数 key → 展示名映射（取全部分类参数模板的并集） */
-  const [paramLabelMap, setParamLabelMap] = useState<Record<string, string>>({})
+  const paramCatalog = useAssetParameterCatalog()
 
   // URL ?assetNo= 带入时回填搜索框（由验收入库页跳转）
   useEffect(() => {
     if (urlAssetNo) form.setFieldsValue({ assetNo: urlAssetNo })
   }, [urlAssetNo, form])
-
-  // 载入分类参数模板，用于展开行显示参数中文名
-  useEffect(() => {
-    let alive = true
-    fetchCategoryList()
-      .then((list) => {
-        if (!alive) return
-        const map: Record<string, string> = {}
-        list.forEach((c) => (c.paramTemplate || []).forEach((f) => { map[f.key] = f.label }))
-        setParamLabelMap(map)
-      })
-      .catch(() => { /* 参数模板仅用于展示，失败不阻塞台账 */ })
-    return () => { alive = false }
-  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -563,15 +551,7 @@ export default function AssetList() {
           expandedRowRender: (record) => (
             <div style={{ padding: '4px 0' }}>
               <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.colParams')}</div>
-              {record.params && Object.keys(record.params).length > 0 ? (
-                <Space size={6} wrap>
-                  {Object.entries(record.params).map(([k, v]) => (
-                    <Tag key={k} color="blue">{`${paramLabelMap[k] || k}：${v}`}</Tag>
-                  ))}
-                </Space>
-              ) : (
-                <span style={{ color: '#8c8c8c' }}>-</span>
-              )}
+              <AssetParameters asset={record} compact catalog={paramCatalog} />
             </div>
           ),
           rowExpandable: (record) => !!(record.params && Object.keys(record.params).length),

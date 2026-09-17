@@ -10,6 +10,7 @@ import { FileTextOutlined, ProfileOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import AssetParameters from '../../../components/AssetParameters'
 import type { CompensationRow } from '../../../api/eamCompensation'
 
 /* ----- 状态元数据 ----- */
@@ -141,6 +142,7 @@ export default function CompensationDetail({ record, loading = false, error, can
         <Descriptions.Item label="淨收款">{formatMoney(record.netPaid)}</Descriptions.Item>
         <Descriptions.Item label="異常說明" span={2}>{record.reason || record.waiveReason || '—'}</Descriptions.Item>
       </Descriptions>
+      <AssetParameters asset={record} current />
     </div>
 
     {/* ====== 收款/退款 & 找回复核记录 ====== */}

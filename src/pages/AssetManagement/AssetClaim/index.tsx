@@ -114,10 +114,7 @@ export default function AssetClaim() {
       const res = await fetchAssetList({ page: query.page, size: query.size, keyword: query.keyword, status: 'idle' })
       setAssetPage({
         total: res.total,
-        records: (res.records || []).map((a) => ({
-          id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
-          brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
-        })),
+        records: res.records || [],
       })
     } catch {
       setAssetPage({ records: [], total: 0 })
@@ -193,10 +190,7 @@ export default function AssetClaim() {
   useEffect(() => {
     if (view !== 'add') return
     if (assetIdParam != null) {
-      fetchAssetDetail(assetIdParam).then((a) => setInitialAsset({
-        id: a.id, assetNo: a.assetNo, assetName: a.assetName, assetType: a.assetType,
-        brand: a.brand, companyBrand: a.companyBrand, location: a.location, purchaseValue: a.purchaseValue,
-      })).catch(() => {})
+      fetchAssetDetail(assetIdParam).then(setInitialAsset).catch(() => {})
     }
     if (employeeId != null) {
       fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
