@@ -502,7 +502,7 @@ export default function RuleConfig() {
                             (r.remark || '').toLowerCase().includes(kw) ||
                             (r.menu || '').toLowerCase().includes(kw)
                           )
-                        : allRules
+                        : tabFilteredRules
 
                       /* 按一級菜單分組展示（統一格式） */
                       const sectionOrder: string[] = []
