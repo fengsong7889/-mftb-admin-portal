@@ -60,6 +60,41 @@ npm run secret-scan
 3. **环境变量**：Mock 认证凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`。
 4. **路径别名**：`@/` 映射到 `src/`，在 `tsconfig.json` 和 `vite.config.ts` 中同步配置。
 
+## 后端重启策略 ⚠️ 强制标准
+
+> **日常重启后端时禁止默认使用 `run-local.sh` 全量启动**（每次都会重新编译，耗时 2~3 分钟），应使用增量重启脚本按需选择方式。
+
+### 重启方式速查
+
+| 命令 | 场景 | 耗时 |
+|------|------|------|
+| `bash restart-service.sh --fast` | 未改代码，仅重启调试运行中服务 | ~20s |
+| `bash restart-service.sh --rebuild` | 改了 Java 代码 / pom.xml / 配置后重启 | ~60s |
+| `bash restart-service.sh`（无参数） | 不确定变更类型，自动检测并选择 | 视检测结果 |
+| `bash restart-service.sh --status` / `--stop` | 查看运行状态 / 仅停止服务 | 秒级 |
+| `bash run-local.sh`（全量） | 首次启动 / 需完整 Maven 生命周期的特殊场景 | 2~3 分钟 |
+
+### 决策树
+
+```text
+需要重启？
+├─ 否 → 无需操作
+└─ 是 → 检查变更类型
+    ├─ pom.xml / application.yml 变更 → --rebuild（必须重新编译）
+    ├─ Java 业务代码变更           → --rebuild
+    ├─ 未变更（仅重启）             → --fast
+    └─ 不确定 → bash restart-service.sh（自动检测），
+                或先 --fast 观察日志确认行为是否包含本次修改
+```
+
+### 通用约束
+
+1. **启动验证**：脚本会自动等待 HTTP 200（最多 90s）；启动后可用 `bash restart-service.sh --status` 复查，或 `tail -f backend/backend-service.log` 观察日志。
+2. **首次使用**：若 `backend/target/mftb-admin.jar` 不存在，脚本会自动编译，无需手动干预。
+3. **启动失败排查**：`--rebuild` 启动失败时查看 `backend/backend-service.log` 末尾 20 行（脚本会自动输出）；编译错误则直接运行 `mvn package -DskipTests` 看完整输出。
+4. **谨慎使用懒初始化**：`SPRING_LAZY_INIT=true` 可进一步缩短启动时间，但因本项目启动阶段有大量 `CommandLineRunner` 迁移逻辑依赖数据库就绪，仅作高级选项，默认不开启。
+5. **详细文档**：见 `backend/SERVICE-RESTART-GUIDE.md`。
+
 ## 项目结构
 
 ```
