@@ -53,8 +53,24 @@ public class EamClaimServiceImpl implements EamClaimService {
     @Override
     public EamClaimStatsVO stats(EamClaimQuery query) {
         EamClaimStatsVO stats = new EamClaimStatsVO();
-        LambdaQueryWrapper<EamClaim> base = queryWrapperNoKeyword(query);
-        // 关键字需同時匹配員工姓名 → 先解析出匹配的员工 ID 集合
+        // 有领用记录的不同员工数
+        stats.setEmployeeCount(claimMapper.selectCount(
+                statsWrapper(query).select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId)));
+        // 各状态统计
+        stats.setClaimedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "claimed")));
+        stats.setReturnedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "returned")));
+        // 待签记录（含代办补签）
+        stats.setPendingSignatureCount(claimMapper.selectCount(
+                statsWrapper(query).in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
+        return stats;
+    }
+
+    /**
+     * 统计用查询条件：基础过滤 + 关键字（同時匹配员工姓名/工号）。
+     * 每次调用返回全新 wrapper（mybatis-plus 3.5.7 的 Wrapper 不支持 copy()）。
+     */
+    private LambdaQueryWrapper<EamClaim> statsWrapper(EamClaimQuery query) {
+        LambdaQueryWrapper<EamClaim> wrapper = queryWrapperNoKeyword(query);
         if (hasText(query.getKeyword())) {
             String kw = query.getKeyword().trim();
             List<SysUser> matchedUsers = userMapper.selectList(
@@ -62,8 +78,7 @@ public class EamClaimServiceImpl implements EamClaimService {
                             .like(SysUser::getName, kw)
                             .or().like(SysUser::getEmpId, kw));
             List<Long> empIds = matchedUsers.stream().map(SysUser::getId).toList();
-            boolean opMatch = hasText(query.getKeyword()); // operatorName 也在 queryWrapper 中處理
-            base.and(x -> {
+            wrapper.and(x -> {
                 x.like(EamClaim::getClaimNo, kw)
                  .or().like(EamClaim::getOperatorName, kw);
                 if (!empIds.isEmpty()) {
@@ -71,17 +86,7 @@ public class EamClaimServiceImpl implements EamClaimService {
                 }
             });
         }
-        // 有领用记录的不同员工数
-        LambdaQueryWrapper<EamClaim> all = base.copy();
-        stats.setEmployeeCount(claimMapper.selectCount(
-                all.select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId)));
-        // 各状态统计
-        stats.setClaimedCount(claimMapper.selectCount(base.copy().eq(EamClaim::getStatus, "claimed")));
-        stats.setReturnedCount(claimMapper.selectCount(base.copy().eq(EamClaim::getStatus, "returned")));
-        // 待签记录（含代办补签）
-        stats.setPendingSignatureCount(claimMapper.selectCount(
-                base.copy().in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
-        return stats;
+        return wrapper;
     }
 
     @Override
