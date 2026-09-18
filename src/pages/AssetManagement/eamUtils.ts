@@ -1,7 +1,7 @@
 /**
  * 物資管理（EAM）前端公共工具與常量
  *
- * - buildTree：平鋪列表構建樹形結構（資產分類 / 存放位置）
+ * - buildTree：平鋪列表構建樹形結構（資產分類 / 存放仓库）
  * - toTreeSelectData：樹形結構轉 antd TreeSelect 數據
  * - 部門 / 公司 / 單位等下拉常量（與 api/asset.ts mock 數據保持一致）
  */

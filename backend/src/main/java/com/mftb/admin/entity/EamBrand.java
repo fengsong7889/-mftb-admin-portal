@@ -15,6 +15,9 @@ public class EamBrand {
     @TableId
     private Long id;
 
+    /** 品牌编码（AB 前缀，如 AB01） */
+    private String code;
+
     /** 所属分类编码 */
     private String categoryCode;
 

@@ -135,7 +135,7 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
               <Select placeholder="選擇耗材" showSearch optionFilterProp="label" options={itemOptions} />
             </Form.Item>
             <Form.Item label="入庫倉庫" name="locationId">
-              <Select placeholder="默認倉" allowClear options={locationOptions} />
+              <Select placeholder="請選擇入庫倉庫" allowClear options={locationOptions} />
             </Form.Item>
             <Form.Item label="入庫數量" name="qty" rules={[{ required: true, message: '請填寫入庫數量' }]}>
               <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="正整數" />

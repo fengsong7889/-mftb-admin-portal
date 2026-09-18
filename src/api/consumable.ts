@@ -31,6 +31,7 @@ export interface ConsumableCategory {
 /** 耗材品牌 */
 export interface ConsumableBrand {
   id: number
+  code?: string
   name: string
   nameEn?: string
   categoryType: 'ASSET' | 'CONSUMABLE' | 'BOTH'
@@ -126,6 +127,8 @@ export interface ConsumableStock {
   availableQty: number
   safetyStock: number
   alert: boolean
+  updatedBy?: string
+  updatedAt?: string
 }
 
 /** 出入库流水 */
@@ -278,7 +281,14 @@ export function deleteConsumableItem(id: number) {
 
 /* ==================== 库存 / 流水 / 入库 ==================== */
 
-export function fetchConsumableStock(params?: { itemId?: number; locationId?: number }) {
+export function fetchConsumableStock(params?: {
+  itemCode?: string
+  itemName?: string
+  locationId?: number
+  updatedBy?: string
+  updateTimeStart?: string
+  updateTimeEnd?: string
+}) {
   return request.get<unknown, ConsumableStock[]>('/eam/consumables/stock', { params })
 }
 
@@ -288,6 +298,39 @@ export function inboundConsumable(data: ConsumableInbound) {
 
 export function fetchConsumableTxns(params?: { itemId?: number; locationId?: number; limit?: number }) {
   return request.get<unknown, ConsumableTxn[]>('/eam/consumables/txns', { params })
+}
+
+/** 流水分页查询（独立菜单页用） */
+export function fetchConsumableTxnPage(params?: {
+  page?: number
+  size?: number
+  itemCode?: string
+  itemName?: string
+  txnType?: string
+  operator?: string
+  txnTimeStart?: string
+  txnTimeEnd?: string
+}) {
+  return request.get<unknown, PageResult<ConsumableTxn>>('/eam/consumables/txns/page', { params })
+}
+
+/** 流水统计聚合（指标卡用，与分页查询同过滤条件） */
+export interface ConsumableTxnStats {
+  total: number
+  inCount: number
+  outCount: number
+  netQty: number
+}
+
+export function fetchConsumableTxnStats(params?: {
+  itemCode?: string
+  itemName?: string
+  txnType?: string
+  operator?: string
+  txnTimeStart?: string
+  txnTimeEnd?: string
+}) {
+  return request.get<unknown, ConsumableTxnStats>('/eam/consumables/txns/stats', { params })
 }
 
 /* ==================== 预警 ==================== */
@@ -356,6 +399,10 @@ export function deleteConsumableCategory(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/basic/categories/${id}`)
 }
 
+export function toggleConsumableCategoryStatus(id: number) {
+  return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}/status`)
+}
+
 /** 耗材品牌列表 */
 export function fetchConsumableBrands(categoryType?: string, keyword?: string) {
   return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands', { params: { categoryType, keyword } })
@@ -376,6 +423,14 @@ export function updateConsumableBrand(id: number, data: Partial<ConsumableBrand>
 
 export function deleteConsumableBrand(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/basic/brands/${id}`)
+}
+
+export function fetchConsumableBrandDetail(id: number) {
+  return request.get<unknown, ConsumableBrand>(`/eam/consumables/basic/brands/${id}`)
+}
+
+export function toggleConsumableBrandStatus(id: number) {
+  return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}/status`)
 }
 
 /** 计量单位列表 */

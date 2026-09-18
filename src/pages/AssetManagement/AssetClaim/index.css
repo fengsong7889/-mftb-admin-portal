@@ -18,6 +18,11 @@
 .claim-module .claim-section-line { flex: 1; height: 1px; margin-left: 8px; background: #f0f0f0; }
 .claim-module .claim-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
 .claim-module .claim-form-grid .ant-form-item { margin-bottom: 0; }
+/* 领用用途输入内容较长，横跨两列；窄屏（单列）回退自适应避免溢出 */
+.claim-module .claim-form-grid .claim-reason-item { grid-column: span 2; }
+@media (max-width: 768px) {
+  .claim-module .claim-form-grid .claim-reason-item { grid-column: auto; }
+}
 .claim-module .claim-form-grid .ant-picker { width: 100%; }
 .claim-module .claim-asset-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
 .claim-module .claim-asset-summary dt { font-size: 12px; color: #8C8C8C; margin-bottom: 6px; }

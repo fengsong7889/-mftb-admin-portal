@@ -3,7 +3,7 @@
  *
  * 五大模块卡片布局：
  *  1. 资产信息 — 资产编码/资产分类/资产品牌/资产名称/资产照片/资产参数信息
- *  2. 租/购信息 — 采购形式(自购/租用)/价值/日期/存放位置
+ *  2. 租/购信息 — 采购形式(自购/租用)/价值/日期/存放仓库
  *  3. 当前使用人 — 使用人/所在部门/领用日期
  *  4. 备注信息
  *  5. 入库信息 — 批次号/入库时间/入库数量/验收人（验收入库跳转时自动带入）
@@ -139,7 +139,7 @@ export default function AssetAdd() {
   /* ----- 采购形式条件显示 ----- */
   const source = Form.useWatch('source', form)
 
-  /* ----- 存放位置（平铺选择） ----- */
+  /* ----- 存放仓库（平铺选择） ----- */
   const [selectedLocationId, setSelectedLocationId] = useState<number | undefined>(undefined)
 
   const locationTreeData = useMemo(() => {
@@ -671,7 +671,7 @@ export default function AssetAdd() {
               )}
             </Row>
 
-            {/* 存放位置 */}
+            {/* 存放仓库 */}
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.storageLocationSection')}</div>
               <Row gutter={16}>

@@ -8,6 +8,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,7 +29,7 @@ import java.util.Map;
 public class ConsumableSchemaInitializer implements CommandLineRunner {
 
     private static final String V_CONSUMABLE_SCHEMA = "consumable:schema-v1.0";
-    private static final String V_CONSUMABLE_REFACTOR = "consumable:refactor-v2.1";
+    private static final String V_CONSUMABLE_REFACTOR = "consumable:refactor-v2.2";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -40,6 +41,41 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
         // 每次启动均修正排序
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 4");
+        // 补种子：出入库流水菜单（v3，幂等）
+        seedStockTxnMenu();
+        // 排序修正：出入庫流水插入后，基础配置菜单顺延
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 7 WHERE menu_key = 'consumable-category' AND deleted = 0 AND sort_order != 7");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 8 WHERE menu_key = 'consumable-brand' AND deleted = 0 AND sort_order != 8");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 9 WHERE menu_key = 'consumable-unit' AND deleted = 0 AND sort_order != 9");
+    }
+
+    /** 幂等创建「出入库流水」菜单并授权 admin 角色 */
+    private void seedStockTxnMenu() {
+        Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
+        if (groupId == null) return;
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'consumable-stock-txn' AND deleted = 0", Integer.class);
+        if (exists == null || exists == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
+                            + "VALUES (?, 'consumable-stock-txn', '出入庫流水', '/consumable-stock-txn', 'ConsumableStockTxnList', 'SwapOutlined', 2, 6, '[\"view\"]', 1, 'system', 0)",
+                    groupId);
+            log.info("已创建菜单: 出入庫流水 (consumable-stock-txn)");
+        }
+        // admin 角色授权（INSERT IGNORE + 自愈）
+        Long adminRoleId = queryLong("SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1");
+        if (adminRoleId != null) {
+            String actionsJson = "[\"view\"]";
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                            + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = 'consumable-stock-txn' AND m.deleted = 0",
+                    adminRoleId, actionsJson);
+            jdbcTemplate.update(
+                    "UPDATE sys_role_menu rm JOIN sys_menu m ON rm.menu_id = m.id "
+                            + "SET rm.actions = ? WHERE rm.role_id = ? AND m.menu_key = 'consumable-stock-txn' AND m.deleted = 0 "
+                            + "AND (rm.actions IS NULL OR rm.actions = '')",
+                    actionsJson, adminRoleId);
+        }
     }
 
     private void migrate() {
@@ -56,6 +92,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         log.info("开始耗材管理二期迁移：分类/品牌/计量单位独立化 ...");
         createRefactorTables();
         seedRefactorMenus();
+        // 品牌编码列必须先于种子数据：seedRefactorData 的 INSERT 引用 code 列
+        addBrandCodeColumns();
         seedRefactorData();
         log.info("耗材管理二期迁移完成");
     }
@@ -396,22 +434,54 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
                     c[0], c[1], Integer.parseInt(c[2]));
         }
 
-        // 耗材品牌种子
+        // 耗材品牌种子（含 CB 编码）
         String[][] brands = {
-                {"得力", "Deli", "CONSUMABLE"}, {"晨光", "M&G", "CONSUMABLE"},
-                {"真彩", "Truecolor", "CONSUMABLE"}, {"廣博", "GuangBo", "CONSUMABLE"},
-                {"齊心", "Comix", "CONSUMABLE"}, {"惠普", "HP", "BOTH"},
-                {"佳能", "Canon", "BOTH"}, {"愛普生", "Epson", "BOTH"},
-                {"兄弟", "Brother", "BOTH"}, {"維達", "Vinda", "CONSUMABLE"},
-                {"清風", "Breeze", "CONSUMABLE"}, {"藍月亮", "BlueMoon", "CONSUMABLE"},
-                {"立白", "Liby", "CONSUMABLE"}, {"3M", "3M", "BOTH"}
+                {"CB01", "得力", "Deli", "CONSUMABLE"}, {"CB02", "晨光", "M&G", "CONSUMABLE"},
+                {"CB03", "真彩", "Truecolor", "CONSUMABLE"}, {"CB04", "廣博", "GuangBo", "CONSUMABLE"},
+                {"CB05", "齊心", "Comix", "CONSUMABLE"}, {"CB06", "惠普", "HP", "BOTH"},
+                {"CB07", "佳能", "Canon", "BOTH"}, {"CB08", "愛普生", "Epson", "BOTH"},
+                {"CB09", "兄弟", "Brother", "BOTH"}, {"CB10", "維達", "Vinda", "CONSUMABLE"},
+                {"CB11", "清風", "Breeze", "CONSUMABLE"}, {"CB12", "藍月亮", "BlueMoon", "CONSUMABLE"},
+                {"CB13", "立白", "Liby", "CONSUMABLE"}, {"CB14", "3M", "3M", "BOTH"}
         };
         for (String[] b : brands) {
             jdbcTemplate.update(
-                    "INSERT IGNORE INTO biz_consumable_brand (name, name_en, category_type, status, created_by, updated_by) VALUES (?, ?, ?, 'enabled', 'system', 'system')",
-                    b[0], b[1], b[2]);
+                    "INSERT IGNORE INTO biz_consumable_brand (code, name, name_en, category_type, status, created_by, updated_by) VALUES (?, ?, ?, ?, 'enabled', 'system', 'system')",
+                    b[0], b[1], b[2], b[3]);
         }
         log.info("耗材基础数据种子数据写入完成");
+    }
+
+    /** 为耗材品牌和资产品牌添加 code 列并填充存量数据 */
+    private void addBrandCodeColumns() {
+        // 耗材品牌加 code 列
+        addColumnIfNotExists("biz_consumable_brand", "code", "VARCHAR(32) DEFAULT NULL COMMENT '品牌编码（CB 前缀）'");
+        // 填充存量耗材品牌编码
+        List<Map<String, Object>> consumableBrands = jdbcTemplate.queryForList(
+                "SELECT id, code FROM biz_consumable_brand WHERE deleted = 0 ORDER BY id");
+        int cbSeq = 1;
+        for (Map<String, Object> row : consumableBrands) {
+            if (row.get("code") == null || ((String) row.get("code")).isBlank()) {
+                jdbcTemplate.update("UPDATE biz_consumable_brand SET code = ? WHERE id = ?",
+                        String.format("CB%02d", cbSeq), row.get("id"));
+            }
+            cbSeq++;
+        }
+
+        // 资产品牌加 code 列
+        addColumnIfNotExists("biz_eam_brand", "code", "VARCHAR(32) DEFAULT NULL COMMENT '品牌编码（AB 前缀）'");
+        // 填充存量资产品牌编码
+        List<Map<String, Object>> assetBrands = jdbcTemplate.queryForList(
+                "SELECT id, code FROM biz_eam_brand WHERE deleted = 0 ORDER BY id");
+        int abSeq = 1;
+        for (Map<String, Object> row : assetBrands) {
+            if (row.get("code") == null || ((String) row.get("code")).isBlank()) {
+                jdbcTemplate.update("UPDATE biz_eam_brand SET code = ? WHERE id = ?",
+                        String.format("AB%02d", abSeq), row.get("id"));
+            }
+            abSeq++;
+        }
+        log.info("品牌编码列添加完成（耗材品牌 CB + 资产品牌 AB）");
     }
 
     /** 安全添加列（兼容不支持 ADD COLUMN IF NOT EXISTS 的 MySQL 版本） */

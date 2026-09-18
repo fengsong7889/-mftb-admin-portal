@@ -174,10 +174,12 @@ function handleUnauthorized(customMessage?: string) {
   // 通知 AuthContext 清除 React 状态（isAuthenticated），路由守卫自动跳回登录页
   window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
   // 兜底: HashRouter 场景下直接跳转登录页
-  // 公開移動端頁面（#/m/...，掃碼查看資產標籤）除外：免登錄場景由頁面自身展示錯誤態，
-  // Phase B 後端提供免登錄只讀接口後不再觸發本分支。
-  const isPublicMobilePath = window.location.hash.startsWith('#/m/')
-  if (!isPublicMobilePath && window.location.hash !== '#/login') {
+  // 公開頁面除外（免登錄場景由頁面自身展示錯誤態，不強制跳登錄頁）：
+  // - #/m/... 掃碼查看資產標籤
+  // - #/asset-claim-sign 釘釘簽署頁（後端白名單接口，憑 HMAC 令牌校驗）
+  const hash = window.location.hash
+  const isPublicPath = hash.startsWith('#/m/') || hash.startsWith('#/asset-claim-sign')
+  if (!isPublicPath && hash !== '#/login') {
     window.location.hash = '#/login'
   }
 }

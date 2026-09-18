@@ -135,6 +135,17 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/page-prd-view': { fixed: '界面需求說明' },
   // 采购订单（?mode=add → 錄入採購訂單；?mode=edit → 編輯採購訂單；?id=X → 採購訂單詳情）
   '/purchase-order': { modeParam: 'mode', modeMap: { add: '錄入採購訂單', edit: '編輯採購訂單' }, detailFixed: '採購訂單詳情' },
+  // 資產管理（EAM）子页面 —— 与页面标题（H2 / DetailPageHeader）一致；页面标题含动态单号/员工名时取静态主体
+  '/asset-claim/add': { fixed: 'i18n:asset.claimTitle' },
+  '/asset-claim/detail': { fixed: '領用資產詳情' },
+  '/asset-claim/record': { fixed: '领用及签收凭证详情' },
+  '/asset-borrow/add': { fixed: '借用登記' },
+  '/asset-borrow/detail': { fixed: '借用詳情' },
+  '/asset-borrow/renew': { fixed: '續借' },
+  '/asset-return/add': { fixed: '歸還登記' },
+  '/asset-return/detail': { fixed: '歸還詳情' },
+  '/asset-return/dispose': { fixed: '處置登記' },
+  '/asset-return/recover': { fixed: '遺失找回' },
 }
 
 /** 静态 fallback：path → 名称（后端菜单不可用时降级） */
@@ -218,6 +229,25 @@ const FALLBACK_PATH_NAME: Record<string, string> = {
   '/algorithm-simulation': '算法沙盤',
   '/merchant-score-insight': '商戶評分',
   '/merchant-promotion-diagnose': '推廣診斷',
+  // 物資管理（EAM）—— 与侧边栏菜單名一致
+  '/asset-dashboard': '資產看板',
+  '/asset-list': '資產台賬',
+  '/asset-tag': '資產標籤',
+  '/asset-inbound': '驗收入庫',
+  '/asset-claim': '領用資產',
+  '/asset-borrow': '借用資產',
+  '/asset-return': '資產歸還',
+  '/asset-transfer-list': '資產調撥',
+  '/asset-handover': '資產交接',
+  '/asset-repair': '維修管理',
+  '/asset-compensation': '損壞賠付',
+  '/asset-scrap': '資產報廢',
+  '/asset-inventory': '資產盤點',
+  '/asset-flow': '變更歷史',
+  '/asset-supplier': '供應商管理',
+  '/asset-category': '資產分類庫',
+  '/asset-model': '資產品牌產品庫',
+  '/asset-location': '倉庫維護',
 }
 
 /** 标准化路径：去除 query string 和 hash */

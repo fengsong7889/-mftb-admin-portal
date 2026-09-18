@@ -131,7 +131,7 @@ export default function NotificationChannelForm() {
       </div>
 
       {/* ====== 表单内容 ====== */}
-      <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
+      <Form form={form} layout="vertical">
         {/* 基本信息 */}
         <div style={{
           borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
@@ -148,28 +148,32 @@ export default function NotificationChannelForm() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
-          <Form.Item label="平台類型" name="channel" rules={[{ required: true, message: '請選擇平台類型' }]}>
-            <Select placeholder="請選擇平台" options={PLATFORM_OPTIONS} disabled={isEditMode} />
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }}>
+            <Form.Item label="平台類型" name="channel" rules={[{ required: true, message: '請選擇平台類型' }]}>
+              <Select placeholder="請選擇平台" options={PLATFORM_OPTIONS} disabled={isEditMode} />
+            </Form.Item>
 
-          <Form.Item label="渠道名稱" name="name" rules={[{ required: true, message: '請輸入渠道名稱' }]}>
-            <Input placeholder="如：默認群、OA審批群" />
-          </Form.Item>
+            <Form.Item label="渠道名稱" name="name" rules={[{ required: true, message: '請輸入渠道名稱' }]}>
+              <Input placeholder="如：默認群、OA審批群" />
+            </Form.Item>
+          </div>
 
-          <Form.Item label="Webhook 地址" name="webhookUrl"
-            rules={[{ required: !isEditMode, message: '請輸入 Webhook 地址' }]}>
-            <Input placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
-            {isEditMode && (
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>留空表示不修改 Webhook 地址</span>
-            )}
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }}>
+            <Form.Item label="Webhook 地址" name="webhookUrl"
+              rules={[{ required: !isEditMode, message: '請輸入 Webhook 地址' }]}>
+              <Input placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
+              {isEditMode && (
+                <span style={{ fontSize: 12, color: '#8C8C8C' }}>留空表示不修改 Webhook 地址</span>
+              )}
+            </Form.Item>
 
-          <Form.Item label="加簽密鑰" name="secret">
-            <Input.Password placeholder="SEC...（留空表示不修改）" />
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              釘釘機器人安全設置中的加簽密鑰（SEC 開頭），如使用關鍵詞模式可留空
-            </span>
-          </Form.Item>
+            <Form.Item label="加簽密鑰" name="secret">
+              <Input.Password placeholder="SEC...（留空表示不修改）" />
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                釘釘機器人安全設置中的加簽密鑰（SEC 開頭），如使用關鍵詞模式可留空
+              </span>
+            </Form.Item>
+          </div>
         </div>
 
         {/* 通知配置 */}
@@ -188,33 +192,31 @@ export default function NotificationChannelForm() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
-          <Form.Item label="默認 @手機號" name="atMobiles">
-            <Input placeholder="13800138000,13900139000" />
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              多個手機號用逗號分隔，發送通知時自動 @這些人
-            </span>
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }}>
+            <Form.Item label="默認 @手機號" name="atMobiles">
+              <Input placeholder="13800138000,13900139000" />
+            </Form.Item>
 
-          <Form.Item label="綁定場景" name="scenarios">
-            <Select mode="tags" placeholder="選擇或輸入場景標識" options={SCENARIO_OPTIONS} />
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              可多選預設場景，也可輸入自定義場景標識。未綁定場景的渠道作為通用回退
-            </span>
-          </Form.Item>
+            <Form.Item label="綁定場景" name="scenarios">
+              <Select mode="tags" placeholder="選擇或輸入場景標識" options={SCENARIO_OPTIONS} />
+            </Form.Item>
+          </div>
 
-          <Form.Item label="設為默認渠道" name="isDefault" valuePropName="checked">
-            <Switch checkedChildren="是" unCheckedChildren="否" />
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
-              默認渠道作為未匹配場景時的回退通道
-            </span>
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }}>
+            <Form.Item label="設為默認渠道" name="isDefault" valuePropName="checked">
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                默認渠道作為未匹配場景時的回退通道
+              </span>
+            </Form.Item>
 
-          <Form.Item label="啟用通知" name="enabled" valuePropName="checked" initialValue={true}>
-            <Switch checkedChildren="開" unCheckedChildren="關" />
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
-              停用後該渠道不會接收任何通知
-            </span>
-          </Form.Item>
+            <Form.Item label="啟用通知" name="enabled" valuePropName="checked" initialValue={true}>
+              <Switch checkedChildren="開" unCheckedChildren="關" />
+              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                停用後該渠道不會接收任何通知
+              </span>
+            </Form.Item>
+          </div>
         </div>
 
         {/* 备注 */}

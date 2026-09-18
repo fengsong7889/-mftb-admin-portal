@@ -122,6 +122,15 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         categoryMapper.deleteById(id);
     }
 
+    @Override
+    public void toggleCategoryStatus(long id) {
+        ConsumableCategory entity = categoryMapper.selectById(id);
+        if (entity == null) throw new BusinessException("分類不存在");
+        entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
+        fillOperator(entity, false);
+        categoryMapper.updateById(entity);
+    }
+
     /* ==================== 品牌 ==================== */
 
     @Override
@@ -140,6 +149,7 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         return list.stream().map(b -> {
             ConsumableBrandVO vo = new ConsumableBrandVO();
             vo.setId(b.getId());
+            vo.setCode(b.getCode());
             vo.setName(b.getName());
             vo.setNameEn(b.getNameEn());
             vo.setCategoryType(b.getCategoryType());
@@ -161,6 +171,7 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         if (count > 0) throw new BusinessException("品牌名稱已存在：" + dto.getName());
 
         ConsumableBrand entity = new ConsumableBrand();
+        entity.setCode(dto.getCode());
         entity.setName(dto.getName().trim());
         entity.setNameEn(dto.getNameEn() != null ? dto.getNameEn().trim() : "");
         entity.setCategoryType(StringUtils.hasText(dto.getCategoryType()) ? dto.getCategoryType() : "CONSUMABLE");
@@ -176,6 +187,7 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
     public void updateBrand(long id, ConsumableBrandSaveDTO dto) {
         ConsumableBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
+        if (dto.getCode() != null) entity.setCode(dto.getCode());
         if (StringUtils.hasText(dto.getName())) {
             long count = brandMapper.selectCount(new LambdaQueryWrapper<ConsumableBrand>()
                     .eq(ConsumableBrand::getName, dto.getName()).ne(ConsumableBrand::getId, id));
@@ -196,6 +208,34 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         ConsumableBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
         brandMapper.deleteById(id);
+    }
+
+    @Override
+    public void toggleBrandStatus(long id) {
+        ConsumableBrand entity = brandMapper.selectById(id);
+        if (entity == null) throw new BusinessException("品牌不存在");
+        entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
+        fillOperatorBrand(entity, false);
+        brandMapper.updateById(entity);
+    }
+
+    @Override
+    public ConsumableBrandVO getBrandDetail(long id) {
+        ConsumableBrand entity = brandMapper.selectById(id);
+        if (entity == null) throw new BusinessException("品牌不存在");
+        ConsumableBrandVO vo = new ConsumableBrandVO();
+        vo.setId(entity.getId());
+        vo.setCode(entity.getCode());
+        vo.setName(entity.getName());
+        vo.setNameEn(entity.getNameEn());
+        vo.setCategoryType(entity.getCategoryType());
+        vo.setLogo(entity.getLogo());
+        vo.setStatus(entity.getStatus());
+        vo.setRemark(entity.getRemark());
+        vo.setCreatedBy(entity.getCreatedBy());
+        vo.setUpdatedBy(entity.getUpdatedBy());
+        vo.setUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().format(DT_FMT) : "");
+        return vo;
     }
 
     /* ==================== 计量单位 ==================== */

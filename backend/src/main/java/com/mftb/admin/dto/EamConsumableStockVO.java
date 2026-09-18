@@ -22,4 +22,8 @@ public class EamConsumableStockVO {
     private Integer safetyStock;
     /** 是否低于安全库存 */
     private Boolean alert;
+    /** 最后更新人（来自耗材主数据） */
+    private String updatedBy;
+    /** 最后更新时间（来自耗材主数据） */
+    private String updatedAt;
 }

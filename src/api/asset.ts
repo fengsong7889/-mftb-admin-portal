@@ -87,15 +87,15 @@ export interface AssetItem {
   scrapTime: string | null
   /** 关联品牌型号 ID（EAM 型号库） */
   modelId?: number | null
-  /** 关联存放位置 ID（EAM 位置树） */
+  /** 关联存放仓库 ID（EAM 位置树） */
   locationId?: number | null
-  /** 存放位置-省份 */
+  /** 存放仓库-省份 */
   province?: string
-  /** 存放位置-城市 */
+  /** 存放仓库-城市 */
   city?: string
-  /** 存放位置-区县 */
+  /** 存放仓库-区县 */
   district?: string
-  /** 存放位置-详细地址 */
+  /** 存放仓库-详细地址 */
   address?: string
   /** 持有方式：自有领用/借用（借用语义由 BorrowRecord 承载） */
   holdType?: 'owned' | 'borrowed'

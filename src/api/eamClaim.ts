@@ -12,6 +12,7 @@ import type {
   ClaimRegistration,
   ClaimRow,
   ClaimStatsData,
+  ClaimEmployee,
   ClaimEmployeeSummary,
   ClaimSummaryData,
 } from '../pages/AssetManagement/AssetClaim/claimViewTypes'
@@ -72,6 +73,23 @@ export async function fetchEmployeeSummary(query: ClaimQuery): Promise<ClaimSumm
         total: 0,
         stats: { employeeCount: 0, claimedCount: 0, returnedCount: 0, pendingSignatureCount: 0 },
       }
+    }
+    throw err
+  }
+}
+
+/** 可选领用人下拉（仅要求领用资产菜单权限；员工管理接口 /employees 对无权限用户返回 403，不可用于领用人选择） */
+export async function fetchClaimEmployeeOptions(keyword?: string, employeeId?: number): Promise<ClaimPage<ClaimEmployee>> {
+  try {
+    const params = new URLSearchParams()
+    if (keyword) params.set('keyword', keyword)
+    if (employeeId != null) params.set('employeeId', String(employeeId))
+    const qs = params.toString()
+    const list = await request.get<unknown, ClaimEmployee[]>(`/eam/claims/employee-options${qs ? `?${qs}` : ''}`)
+    return { records: list || [], total: list?.length ?? 0 }
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      return { records: [], total: 0 }
     }
     throw err
   }

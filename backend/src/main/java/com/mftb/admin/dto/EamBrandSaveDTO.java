@@ -8,6 +8,9 @@ import lombok.Data;
 @Data
 public class EamBrandSaveDTO {
 
+    /** 品牌编码（AB 前缀） */
+    private String code;
+
     /** 所属分类编码 */
     private String categoryCode;
 

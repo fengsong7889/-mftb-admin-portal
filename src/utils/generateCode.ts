@@ -1,10 +1,15 @@
 /**
- * 资产分类 & 仓库位置 编码自动生成工具
+ * 资产分类 & 仓库位置 & 耗材分类 编码自动生成工具
  *
  * 分类编码规则：分层递进，每层 2 位数字，用 - 分隔
  *   一级：01, 02, 03 ...
  *   二级：01-01, 01-02 ...
  *   三级：01-01-01, 01-01-02 ...
+ *
+ * 耗材分类编码规则：HC 前缀 + 分层递进
+ *   一级：HC01, HC02, HC03 ...
+ *   二级：HC01-01, HC01-02 ...
+ *   三级：HC01-01-01, HC01-01-02 ...
  *
  * 仓库编码规则：前缀 + 分层编号
  *   仓库(warehouse)：CK-001, CK-002 ...
@@ -57,6 +62,28 @@ export function generateCategoryCode(
   if (!parentId || !parentCode) {
     // 一级分类：2 位序号
     return getNextSeq(existingCodes, '', 2)
+  }
+  // 子分类：父编码 + '-' + 2 位序号
+  const prefix = `${parentCode}-`
+  return `${parentCode}-${getNextSeq(existingCodes, prefix, 2)}`
+}
+
+/**
+ * 生成耗材分类编码（HC 前缀）
+ *
+ * @param existingCodes 现有所有耗材分类编码
+ * @param parentId 上级分类 ID（0 或 undefined 表示一级）
+ * @param parentCode 上级分类编码（一级时为空）
+ * @returns 新的耗材分类编码，如 HC01、HC01-01
+ */
+export function generateConsumableCategoryCode(
+  existingCodes: string[],
+  parentId?: number,
+  parentCode?: string,
+): string {
+  if (!parentId || !parentCode) {
+    // 一级分类：HC + 2 位序号
+    return `HC${getNextSeq(existingCodes, 'HC', 2)}`
   }
   // 子分类：父编码 + '-' + 2 位序号
   const prefix = `${parentCode}-`

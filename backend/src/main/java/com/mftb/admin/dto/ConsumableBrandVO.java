@@ -8,6 +8,7 @@ import lombok.Data;
 @Data
 public class ConsumableBrandVO {
     private Long id;
+    private String code;
     private String name;
     private String nameEn;
     /** ASSET / CONSUMABLE / BOTH */

@@ -76,9 +76,8 @@ public class EamConsumableController {
     /* ===== 库存 ===== */
     @GetMapping("/stock")
     @RequirePermission(menu = "consumable-stock")
-    public Result<List<EamConsumableStockVO>> stockList(@RequestParam(required = false) Long itemId,
-                                                        @RequestParam(required = false) Long locationId) {
-        return Result.success(consumableService.stockList(itemId, locationId));
+    public Result<List<EamConsumableStockVO>> stockList(@ModelAttribute EamConsumableStockQuery query) {
+        return Result.success(consumableService.stockList(query));
     }
 
     /** 手工入库 / 期初建账 */
@@ -96,6 +95,20 @@ public class EamConsumableController {
                                                  @RequestParam(required = false) Long locationId,
                                                  @RequestParam(required = false) Integer limit) {
         return Result.success(consumableService.txns(itemId, locationId, limit));
+    }
+
+    /** 流水分页查询（独立菜单页用） */
+    @GetMapping("/txns/page")
+    @RequirePermission(menu = "consumable-stock-txn")
+    public Result<PageResult<EamConsumableTxnVO>> pageTxns(@ModelAttribute EamConsumableTxnQuery query) {
+        return Result.success(consumableService.pageTxns(query));
+    }
+
+    /** 流水统计聚合（独立菜单页指标卡用，与分页查询同过滤条件） */
+    @GetMapping("/txns/stats")
+    @RequirePermission(menu = "consumable-stock-txn")
+    public Result<EamConsumableTxnStatsVO> txnStats(@ModelAttribute EamConsumableTxnQuery query) {
+        return Result.success(consumableService.txnStats(query));
     }
 
     /* ===== 预警 ===== */

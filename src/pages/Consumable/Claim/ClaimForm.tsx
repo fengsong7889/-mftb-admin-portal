@@ -36,7 +36,7 @@ export default function ClaimForm({ onBack }: Props) {
 
   useEffect(() => {
     fetchConsumableItemOptions().then(setItems).catch((e: Error) => message.error(e.message))
-    fetchLocationList().then(setLocations).catch(() => { /* 仓库可空，用默认仓 */ })
+    fetchLocationList().then(setLocations).catch(() => { /* 仓库可空，降级为空列表 */ })
   }, [])
 
   const itemOptions = items.map(it => ({
@@ -159,7 +159,7 @@ export default function ClaimForm({ onBack }: Props) {
                       }}
                     </Form.Item>
                     <Form.Item {...field} name={[field.name, 'locationId']} style={{ marginBottom: 0 }}>
-                      <Select placeholder="出庫倉庫（默認倉）" allowClear options={locationOptions} />
+                      <Select placeholder="請選擇出庫倉庫" allowClear options={locationOptions} />
                     </Form.Item>
                     <Form.Item noStyle shouldUpdate={(prev, cur) => prev.items?.[field.name]?.itemId !== cur.items?.[field.name]?.itemId}>
                       {() => {

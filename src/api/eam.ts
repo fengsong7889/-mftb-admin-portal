@@ -76,6 +76,8 @@ export interface AssetCategory {
 /** 资产品牌庫（所属分类 → 资产品牌） */
 export interface AssetBrand {
   id: number
+  /** 品牌编码（AB 前缀） */
+  code?: string
   /** 所属分类编码 */
   categoryCode: string
   /** 资产品牌中文 */
@@ -111,7 +113,7 @@ export interface AssetModel {
   updatedAt?: string
 }
 
-/** 存放位置（按省-市-区-详细地址维度，无层级关系） */
+/** 存放仓库（按省-市-区-详细地址维度，无层级关系） */
 export interface AssetLocation {
   id: number
   code: string
@@ -1009,7 +1011,7 @@ export async function deleteModel(id: number): Promise<void> {
     await request.delete(`/eam/basic/models/${id}`)
 }
 
-/* ==================== API：存放位置 ==================== */
+/* ==================== API：存放仓库 ==================== */
 
 export async function fetchLocationList(params?: { name?: string; code?: string; province?: string; city?: string; district?: string; updatedBy?: string; keyword?: string }): Promise<AssetLocation[]> {
   return await request.get<unknown, AssetLocation[]>('/eam/basic/locations', { params, headers: { [SILENT_HEADER]: '1' } })

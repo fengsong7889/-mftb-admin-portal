@@ -136,6 +136,9 @@ public class SysUser {
     /** 籍贯 */
     private String nativePlace;
 
+    /** 钉钉用户ID（工作通知定向推送用） */
+    private String dingtalkUserId;
+
     // ── 通讯信息 ──
 
     /** 住址-国家 */

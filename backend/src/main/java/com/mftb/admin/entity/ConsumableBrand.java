@@ -15,6 +15,9 @@ public class ConsumableBrand {
     @TableId
     private Long id;
 
+    /** 品牌编码（CB 前缀，如 CB01） */
+    private String code;
+
     /** 品牌名称 */
     private String name;
 

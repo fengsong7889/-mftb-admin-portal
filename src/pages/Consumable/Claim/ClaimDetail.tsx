@@ -128,7 +128,7 @@ export default function ClaimDetail({ id, onBack }: Props) {
     { title: '耗材編碼', dataIndex: 'itemCode', key: 'itemCode', width: 120, render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span> },
     { title: '名稱', dataIndex: 'itemName', key: 'itemName', width: 160, ellipsis: true },
     { title: '規格型號', dataIndex: 'spec', key: 'spec', width: 140, ellipsis: true, render: (v: string) => v || '-' },
-    { title: '出庫倉庫', dataIndex: 'locationName', key: 'locationName', width: 130, render: (v: string) => v || '默認倉' },
+    { title: '出庫倉庫', dataIndex: 'locationName', key: 'locationName', width: 130, render: (v: string) => v || '-' },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 90, align: 'right', render: (v: number, r) => `${v} ${r.unit ?? ''}` },
     { title: '成本單價', dataIndex: 'unitCost', key: 'unitCost', width: 100, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
     { title: '小計', key: 'subtotal', width: 100, align: 'right', render: (_: unknown, r) => `¥${((r.unitCost ?? 0) * r.qty).toFixed(2)}` },

@@ -9,9 +9,13 @@ import {
   UserOutlined, IdcardOutlined, DeleteOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
 import { fetchEmployees, createEmployee, type EmployeeItem, type EmployeePayload,
-  fetchBasicInfo, savePersonalInfo, saveIdInfo, saveContactInfo,
+  fetchBasicInfo, savePersonalInfo, saveIdInfo, saveContactInfo, saveAccountInfo,
   fetchEmergencyContacts, createEmergencyContact, updateEmergencyContact, deleteEmergencyContact,
   fetchPositionRecords, createPositionRecord, updatePositionRecord, deletePositionRecord,
+  fetchSalaryIncomes, createSalaryIncome, updateSalaryIncome, deleteSalaryIncome,
+  fetchSalaryDeductions, createSalaryDeduction, updateSalaryDeduction, deleteSalaryDeduction,
+  fetchSalaryConfig, saveSalaryConfig,
+  type SalaryIncomeItem, type SalaryDeductionItem, type SalaryConfigItem,
 } from '../../../api/employee'
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
 import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
@@ -48,33 +52,7 @@ interface PositionRecord {
   updatedAt?: string
 }
 
-/** 费用信息 - 收入项 */
-interface SalaryIncomeItem {
-  id: number
-  name: string
-  amount: number
-  type: 'fixed' | 'variable'
-  remark?: string
-}
-
-/** 费用信息 - 扣除项 */
-interface SalaryDeductionItem {
-  id: number
-  name: string
-  rate: number
-  amount: number
-  remark?: string
-}
-
-/** 费用信息 - 薪资配置 */
-interface SalaryConfig {
-  salaryStructure: string
-  paymentMethod: string
-  payDay: number
-  bankName: string
-  bankAccount: string
-  taxCity: string
-}
+/** 費用信息 Tab 收入项/扣除项/薪资配置类型由 api/employee.ts 提供（SalaryIncomeItem / SalaryDeductionItem / SalaryConfigItem） */
 
 /** 基础信息 */
 interface BasicInfo {
@@ -93,6 +71,8 @@ interface BasicInfo {
   nativePlace: string
   mobile: string
   email: string
+  /** 钉钉用户ID（领用签署等工作通知定向推送用） */
+  dingtalkUserId?: string
   addressCountry?: string
   addressCity?: string
   addressDetail?: string
@@ -114,6 +94,11 @@ interface LoginAccount {
   loginPassword: string
   status: 'normal' | 'frozen'
 }
+
+/** 三方通讯账号字段配置：后续扩展（企微ID、QQ邮箱、公司邮箱等）在此追加即可，展示行与编辑表单均由本配置驱动 */
+const THIRD_PARTY_ACCOUNT_FIELDS = [
+  { key: 'dingtalkUserId', labelKey: 'employeeDetail.labelDingtalkUserId', hintKey: 'employeeDetail.dingtalkUserIdHint' },
+] as const
 
 /** 合同信息 */
 interface ContractRecord {
@@ -166,16 +151,6 @@ const MOCK_POSITION_RECORDS: PositionRecord[] = [
     workCountry: 'china', workCity: 'huizhou',
     workSystem: '标准工时制', sequence: 'P', positionLevel: 'P2', rank: 'R3',
   },
-]
-
-const MOCK_SALARY_INCOME: SalaryIncomeItem[] = [
-  { id: 1, name: '基本工资', amount: 8000, type: 'fixed' },
-  { id: 2, name: '岗位津贴', amount: 2000, type: 'fixed' },
-  { id: 3, name: '绩效奖金', amount: 3000, type: 'variable' },
-  { id: 4, name: '交通补贴', amount: 500, type: 'fixed' },
-  { id: 5, name: '餐饮补贴', amount: 800, type: 'fixed' },
-  { id: 6, name: '通讯补贴', amount: 200, type: 'fixed' },
-  { id: 7, name: '加班费', amount: 1500, type: 'variable' },
 ]
 
 /** 民族枚举（中国56个民族） */
@@ -251,20 +226,16 @@ const RELATIONSHIP_OPTIONS = [
   '连襟', '妯娌', '朋友', '同事', '其他',
 ].map(v => ({ value: v, label: v }))
 
+/** 任职公司枚举（新增表单 / 职务弹窗 / 合同弹窗共用） */
+const COMPANY_OPTIONS = [
+  { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
+  { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
+]
+
 /** 收入项 - 项目名称枚举 */
 const INCOME_NAME_OPTIONS = [
   '基本工资', '岗位津贴', '绩效奖金', '交通补贴',
   '餐饮补贴', '通讯补贴', '加班费',
-]
-
-const MOCK_SALARY_DEDUCTION: SalaryDeductionItem[] = [
-  { id: 1, name: '养老保险', rate: 8, amount: 640 },
-  { id: 2, name: '医疗保险', rate: 2, amount: 160 },
-  { id: 3, name: '失业保险', rate: 0.5, amount: 40 },
-  { id: 4, name: '工伤保险', rate: 0, amount: 0 },
-  { id: 5, name: '生育保险', rate: 0, amount: 0 },
-  { id: 6, name: '住房公积金', rate: 12, amount: 960 },
-  { id: 7, name: '个人所得税', rate: 0, amount: 350 },
 ]
 
 /** 扣除项 - 项目名称枚举 */
@@ -272,15 +243,6 @@ const DEDUCTION_NAME_OPTIONS = [
   '养老保险', '医疗保险', '失业保险', '工伤保险',
   '生育保险', '住房公积金', '个人所得税',
 ]
-
-const MOCK_SALARY_CONFIG: SalaryConfig = {
-  salaryStructure: '岗位工资制',
-  paymentMethod: '月结',
-  payDay: 15,
-  bankName: '中国工商银行',
-  bankAccount: '6222 **** **** 1234',
-  taxCity: '惠州市',
-}
 
 const MOCK_BASIC_INFO: BasicInfo = {
   gender: '男', nationality: '中国', ethnicity: '汉',
@@ -491,10 +453,10 @@ export default function EmployeeDetail() {
     }
   }, [posModalVisible])
 
-  /* ─ 费用信息 ── */
-  const [salaryIncome, setSalaryIncome] = useState<SalaryIncomeItem[]>(MOCK_SALARY_INCOME)
-  const [salaryDeduction, setSalaryDeduction] = useState<SalaryDeductionItem[]>(MOCK_SALARY_DEDUCTION)
-  const [salaryConfig, setSalaryConfig] = useState<SalaryConfig>(MOCK_SALARY_CONFIG)
+  /* ─ 費用信息（真实 API, 编辑模式加载数据） ── */
+  const [salaryIncome, setSalaryIncome] = useState<SalaryIncomeItem[]>([])
+  const [salaryDeduction, setSalaryDeduction] = useState<SalaryDeductionItem[]>([])
+  const [salaryConfig, setSalaryConfig] = useState<SalaryConfigItem>({})
   const [incomeModalVisible, setIncomeModalVisible] = useState(false)
   const [deductionModalVisible, setDeductionModalVisible] = useState(false)
   const [configModalVisible, setConfigModalVisible] = useState(false)
@@ -510,6 +472,7 @@ export default function EmployeeDetail() {
     idType: '', idNumber: '', idAddress: '', maritalStatus: '',
     politicalStatus: '', religion: '', householdType: '',
     householdLocation: '', nativePlace: '', mobile: '', email: '',
+        dingtalkUserId: '',
     addressCountry: '', addressCity: '', addressDetail: '',
     emergencyContacts: [],
   })
@@ -534,6 +497,10 @@ export default function EmployeeDetail() {
   const [loginAccount, setLoginAccount] = useState<LoginAccount>(MOCK_LOGIN_ACCOUNT)
   const [resetPwdModalVisible, setResetPwdModalVisible] = useState(false)
   const [resetPwdForm] = Form.useForm()
+
+  /* ── 三方通讯账号（钉钉用户ID等，后续扩展） ── */
+  const [thirdPartyModalVisible, setThirdPartyModalVisible] = useState(false)
+  const [thirdPartyForm] = Form.useForm()
 
   /* ── 角色展开/收起 ── */
   const [showAllRoles, setShowAllRoles] = useState(false)
@@ -560,7 +527,15 @@ export default function EmployeeDetail() {
       .then((result) => {
         if (cancelled) return
         const emp = result.records.find(e => e.id === Number(empId))
-        if (emp) setEmployee(emp)
+        if (emp) {
+          setEmployee(emp)
+          // 账号管理：登录账号与状态取员工真实数据（修复 mock 写死 MT00001 的显示错误）
+          setLoginAccount(prev => ({
+            ...prev,
+            loginAccount: emp.username,
+            status: emp.status === 0 ? 'frozen' : 'normal',
+          }))
+        }
         else message.error(t('employeeDetail.notFound'))
       })
       .catch(() => { if (!cancelled) message.error(t('employeeDetail.loadFailed')) })
@@ -578,6 +553,7 @@ export default function EmployeeDetail() {
       const p = res.personalInfo || {}
       const idI = res.idInfo || {}
       const c = res.contactInfo || {}
+      const a = res.accountInfo || {}
       setBasicInfo(prev => ({
         ...prev,
         nationality: (p.nationality as string) ?? '',
@@ -595,6 +571,7 @@ export default function EmployeeDetail() {
         addressCountry: (c.addressCountry as string) ?? '',
         addressCity: (c.addressCity as string) ?? '',
         addressDetail: (c.addressDetail as string) ?? '',
+        dingtalkUserId: (a.dingtalkUserId as string) ?? '',
       }))
     }).catch(() => { /* 静默 */ })
     // 紧急联系人
@@ -626,6 +603,12 @@ export default function EmployeeDetail() {
         updatedBy: r.updatedBy,
         updatedAt: r.updatedAt,
       })))
+    }).catch(() => { /* 静默 */ })
+    // 費用信息: 收入項 / 扣除項 / 薪資配置
+    fetchSalaryIncomes(numId).then(setSalaryIncome).catch(() => { /* 静默 */ })
+    fetchSalaryDeductions(numId).then(setSalaryDeduction).catch(() => { /* 静默 */ })
+    fetchSalaryConfig(numId).then(config => {
+      setSalaryConfig(prev => ({ ...prev, ...config }))
     }).catch(() => { /* 静默 */ })
   }, [empId, isEdit])
 
@@ -697,6 +680,7 @@ export default function EmployeeDetail() {
       departmentId: values.departmentId ?? null,
       positionId: values.positionId ?? null,
       rank: values.rank ?? null,
+      company: values.company?.trim() || null,
       functionRoleIds: values.functionRoleIds ?? [],
     }
     setCreating(true)
@@ -910,18 +894,34 @@ export default function EmployeeDetail() {
 
   const handleSaveIncome = async () => {
     const values = await incomeForm.validateFields()
-    if (editingIncome) {
-      setSalaryIncome(prev => prev.map(r => r.id === editingIncome.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.incomeUpdated'))
+    if (empId) {
+      if (editingIncome) {
+        const updated = await updateSalaryIncome(Number(empId), editingIncome.id, values)
+        setSalaryIncome(prev => prev.map(r => r.id === editingIncome.id ? { ...r, ...updated } : r))
+        message.success(t('employeeDetail.incomeUpdated'))
+      } else {
+        const created = await createSalaryIncome(Number(empId), values)
+        setSalaryIncome(prev => [...prev, created])
+        message.success(t('employeeDetail.incomeAdded'))
+      }
     } else {
-      setSalaryIncome(prev => [...prev, { ...values, id: Date.now() }])
-      message.success(t('employeeDetail.incomeAdded'))
+      // 无 empId 时仅本地更新
+      if (editingIncome) {
+        setSalaryIncome(prev => prev.map(r => r.id === editingIncome.id ? { ...r, ...values } : r))
+        message.success(t('employeeDetail.incomeUpdated'))
+      } else {
+        setSalaryIncome(prev => [...prev, { ...values, id: Date.now() }])
+        message.success(t('employeeDetail.incomeAdded'))
+      }
     }
     if (empId) markTabUpdated('salary', empId)
     setIncomeModalVisible(false)
   }
 
-  const handleDeleteIncome = (id: number) => {
+  const handleDeleteIncome = async (id: number) => {
+    if (empId) {
+      await deleteSalaryIncome(Number(empId), id)
+    }
     setSalaryIncome(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.incomeDeleted'))
     if (empId) markTabUpdated('salary', empId)
@@ -941,18 +941,34 @@ export default function EmployeeDetail() {
 
   const handleSaveDeduction = async () => {
     const values = await deductionForm.validateFields()
-    if (editingDeduction) {
-      setSalaryDeduction(prev => prev.map(r => r.id === editingDeduction.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.deductionUpdated'))
+    if (empId) {
+      if (editingDeduction) {
+        const updated = await updateSalaryDeduction(Number(empId), editingDeduction.id, values)
+        setSalaryDeduction(prev => prev.map(r => r.id === editingDeduction.id ? { ...r, ...updated } : r))
+        message.success(t('employeeDetail.deductionUpdated'))
+      } else {
+        const created = await createSalaryDeduction(Number(empId), values)
+        setSalaryDeduction(prev => [...prev, created])
+        message.success(t('employeeDetail.deductionAdded'))
+      }
     } else {
-      setSalaryDeduction(prev => [...prev, { ...values, id: Date.now() }])
-      message.success(t('employeeDetail.deductionAdded'))
+      // 无 empId 时仅本地更新
+      if (editingDeduction) {
+        setSalaryDeduction(prev => prev.map(r => r.id === editingDeduction.id ? { ...r, ...values } : r))
+        message.success(t('employeeDetail.deductionUpdated'))
+      } else {
+        setSalaryDeduction(prev => [...prev, { ...values, id: Date.now() }])
+        message.success(t('employeeDetail.deductionAdded'))
+      }
     }
     if (empId) markTabUpdated('salary', empId)
     setDeductionModalVisible(false)
   }
 
-  const handleDeleteDeduction = (id: number) => {
+  const handleDeleteDeduction = async (id: number) => {
+    if (empId) {
+      await deleteSalaryDeduction(Number(empId), id)
+    }
     setSalaryDeduction(prev => prev.filter(r => r.id !== id))
     message.success(t('employeeDetail.deductionDeleted'))
     if (empId) markTabUpdated('salary', empId)
@@ -965,7 +981,13 @@ export default function EmployeeDetail() {
 
   const handleSaveConfig = async () => {
     const values = await configForm.validateFields()
-    setSalaryConfig(values)
+    if (empId) {
+      const saved = await saveSalaryConfig(Number(empId), values)
+      setSalaryConfig(prev => ({ ...prev, ...saved }))
+    } else {
+      // 无 empId 时仅本地更新
+      setSalaryConfig(prev => ({ ...prev, ...values }))
+    }
     message.success(t('employeeDetail.configUpdated'))
     if (empId) markTabUpdated('salary', empId)
     setConfigModalVisible(false)
@@ -1187,6 +1209,25 @@ export default function EmployeeDetail() {
       message.success(next === 'frozen' ? t('employeeDetail.freezeSuccess') : t('employeeDetail.unfreezeSuccess'))
       return { ...prev, status: next }
     })
+  }
+
+  /* ── 三方通讯账号编辑（由 THIRD_PARTY_ACCOUNT_FIELDS 驱动） ── */
+  const handleEditThirdParty = () => {
+    thirdPartyForm.setFieldsValue(
+      Object.fromEntries(THIRD_PARTY_ACCOUNT_FIELDS.map(f => [f.key, basicInfo[f.key]])) as Record<string, string | undefined>
+    )
+    setThirdPartyModalVisible(true)
+  }
+
+  const handleSaveThirdParty = async () => {
+    const values = await thirdPartyForm.validateFields()
+    if (empId) {
+      await saveAccountInfo(Number(empId), values)
+    }
+    setBasicInfo(prev => ({ ...prev, ...values }))
+    message.success(t('employeeDetail.accountUpdated'))
+    if (empId) markTabUpdated('account', empId)
+    setThirdPartyModalVisible(false)
   }
 
   /* ═══════════════════════════════════════════
@@ -1702,13 +1743,43 @@ export default function EmployeeDetail() {
   function renderAccountTab() {
     return (
       <div>
-        <Table
-          columns={accountColumns}
-          dataSource={[loginAccount]}
-          rowKey="id"
-          pagination={false}
-          size="middle"
-        />
+        {/* 登錄账号 */}
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 14, color: '#1890ff' }}>🔑</span>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.loginAccountGroup')}</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <Table
+            columns={accountColumns}
+            dataSource={[loginAccount]}
+            rowKey="id"
+            pagination={false}
+            size="middle"
+          />
+        </div>
+
+        {/* 三方通讯账号（后续可扩展：企微ID、QQ邮箱、公司邮箱等） */}
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 14, color: '#fa8c16' }}>💬</span>
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.thirdPartyAccountGroup')}</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            <Button icon={<EditOutlined />} onClick={handleEditThirdParty}>{t('common.edit')}</Button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 16, columnGap: 24 }}>
+            {THIRD_PARTY_ACCOUNT_FIELDS.map(f => (
+              <div key={f.key} style={{ display: 'flex', alignItems: 'baseline' }}>
+                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t(f.labelKey)}：</span>
+                <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo[f.key] || '-'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         {renderTabUpdateBar('account')}
       </div>
     )
@@ -1973,6 +2044,9 @@ export default function EmployeeDetail() {
                   options={availableRankOptions}
                 />
               </Form.Item>
+              <Form.Item name="company" label={t('employeeDetail.colPosCompany')} extra={t('employee.companyExtra')}>
+                <Select placeholder={t('employee.companyPlaceholder')} allowClear options={COMPANY_OPTIONS} />
+              </Form.Item>
               <Form.Item name="functionRoleIds" label={t('employee.roleAuthLabel')} extra={t('employee.roleAuthExtra')}>
                 <Select
                   mode="multiple"
@@ -2091,10 +2165,7 @@ export default function EmployeeDetail() {
           {/* 1.5 任职公司 + 1.6 员工类别 + 1.8 工时制 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="company" label={t('employeeDetail.colPosCompany')}>
-              <Select placeholder={t('employeeDetail.colPosCompany')} allowClear options={[
-                { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
-                { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
-              ]} />
+              <Select placeholder={t('employeeDetail.colPosCompany')} allowClear options={COMPANY_OPTIONS} />
             </Form.Item>
             <Form.Item name="employeeCategory" label={t('employeeDetail.colEmployeeCategory')}>
               <Select placeholder={t('employeeDetail.colEmployeeCategory')} allowClear options={[
@@ -2459,6 +2530,26 @@ export default function EmployeeDetail() {
       </Modal>
 
       {/* ═══════════════════════════════════════════
+         彈窗：三方通訊賬號（由 THIRD_PARTY_ACCOUNT_FIELDS 驱动，後續擴展字段自動渲染）
+         ═══════════════════════════════════════════ */}
+      <Modal
+        title={t('employeeDetail.thirdPartyAccountGroup')}
+        open={thirdPartyModalVisible}
+        onOk={handleSaveThirdParty}
+        onCancel={() => setThirdPartyModalVisible(false)}
+        width={560}
+        destroyOnClose
+      >
+        <Form form={thirdPartyForm} layout="vertical">
+          {THIRD_PARTY_ACCOUNT_FIELDS.map(f => (
+            <Form.Item key={f.key} name={f.key} label={t(f.labelKey)} extra={t(f.hintKey)}>
+              <Input />
+            </Form.Item>
+          ))}
+        </Form>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════
          彈窗：緊急联繫人
          ═══════════════════════════════════════════ */}
       <Modal
@@ -2549,10 +2640,7 @@ export default function EmployeeDetail() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="company" label={t('employeeDetail.colCompany')} rules={[{ required: true }]}>
-              <Select placeholder={t('employeeDetail.colCompany')} allowClear options={[
-                { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
-                { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
-              ]} />
+              <Select placeholder={t('employeeDetail.colCompany')} allowClear options={COMPANY_OPTIONS} />
             </Form.Item>
             <Form.Item name="status" label={t('common.colStatus')}>
               <Select options={[

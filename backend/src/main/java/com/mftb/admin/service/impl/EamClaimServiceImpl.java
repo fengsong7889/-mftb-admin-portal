@@ -8,16 +8,20 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
+import com.mftb.admin.service.DingTalkAppService;
 import com.mftb.admin.service.EamClaimService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SignTokenUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,8 +41,11 @@ public class EamClaimServiceImpl implements EamClaimService {
     private final EamClaimEventMapper eventMapper;
     private final EamAssetMapper assetMapper;
     private final SysUserMapper userMapper;
+    private final EmpPositionRecordMapper empPositionRecordMapper;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final DingTalkAppService dingTalkAppService;
+    private final SysConfigMapper sysConfigMapper;
 
     private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled", "transferred");
 
@@ -177,6 +184,52 @@ public class EamClaimServiceImpl implements EamClaimService {
         return toVO(claim);
     }
 
+    /* ==================== 可选领用人下拉 ==================== */
+
+    @Override
+    public List<EamClaimEmployeeOptionVO> employeeOptions(String keyword, Long employeeId) {
+        // 深链预填：按 employeeId 精确回显（不套关键词与数量限制）
+        if (employeeId != null) {
+            SysUser user = userMapper.selectById(employeeId);
+            return user == null ? List.of() : List.of(toEmployeeOption(user));
+        }
+
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        if (hasText(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(SysUser::getName, kw)
+                    .or().like(SysUser::getUsername, kw)
+                    .or().like(SysUser::getEmpId, kw));
+        }
+        wrapper.orderByAsc(SysUser::getEmpId);
+        List<SysUser> users = userMapper.selectList(wrapper.last("LIMIT 50"));
+        if (users.isEmpty()) return List.of();
+
+        // 排除离职员工（与员工管理列表同口径：最新职务记录为「离职」）
+        List<Long> userIds = users.stream().map(SysUser::getId).toList();
+        Map<Long, String> latestOps = empPositionRecordMapper.selectList(
+                        new LambdaQueryWrapper<EmpPositionRecord>()
+                                .in(EmpPositionRecord::getUserId, userIds)
+                                .orderByDesc(EmpPositionRecord::getEffectiveDate)
+                                .orderByDesc(EmpPositionRecord::getEffectiveSeq))
+                .stream()
+                .collect(Collectors.toMap(EmpPositionRecord::getUserId, EmpPositionRecord::getOperation, (first, ignore) -> first));
+
+        return users.stream()
+                .filter(u -> !"离职".equals(latestOps.get(u.getId())))
+                .map(this::toEmployeeOption).toList();
+    }
+
+    private EamClaimEmployeeOptionVO toEmployeeOption(SysUser u) {
+        EamClaimEmployeeOptionVO vo = new EamClaimEmployeeOptionVO();
+        vo.setEmployeeId(u.getId());
+        vo.setEmpNo(u.getEmpId());
+        vo.setEmpName(hasText(u.getName()) ? u.getName() : u.getUsername());
+        vo.setDepartmentId(u.getDepartmentId());
+        vo.setDepartment(u.getDepartment());
+        return vo;
+    }
+
     /* ==================== 登记 ==================== */
 
     @Override
@@ -253,6 +306,11 @@ public class EamClaimServiceImpl implements EamClaimService {
         insertEvent(claim.getId(), "created", claim.getOperatorName(),
                 isProxy ? "管理員代辦領用" : "登記領用，等待簽署");
 
+        // 9. 标准模式：事务提交后向领用人发送钉钉工作通知（含签署链接）
+        if (!isProxy) {
+            sendSignatureNotifyAfterCommit(claim, employee, asset);
+        }
+
         return claim.getId();
     }
 
@@ -263,10 +321,60 @@ public class EamClaimServiceImpl implements EamClaimService {
     public void sign(EamSignDTO dto) {
         EamClaim claim = claimMapper.selectForUpdate(dto.getClaimId());
         if (claim == null) throw new BusinessException("領用記錄不存在");
-        boolean supplementary = "claimed".equals(claim.getStatus()) && "proxy_pending".equals(claim.getSignatureStatus());
-        if (!"pending_signature".equals(claim.getStatus()) && !supplementary) throw new BusinessException("當前狀態不可簽署");
         SysUser signer = operatorResolver.currentUser();
         if (signer == null || !Objects.equals(signer.getId(), claim.getEmployeeId())) throw new BusinessException("僅領用人本人可簽署");
+        doSign(claim, dto.getSignatureImage(), signer);
+    }
+
+    /* ==================== 钉钉签署页（令牌免登） ==================== */
+
+    @Override
+    public EamClaimVO signPageDetail(String token) {
+        long[] ids = requireValidToken(token);
+        EamClaim claim = requireClaim(ids[0]);
+        return toVO(claim);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void signByToken(EamSignPageDTO dto) {
+        if (dto == null || dto.getToken() == null || dto.getToken().isBlank())
+            throw new BusinessException("簽署令牌不能為空");
+        long[] ids = requireValidToken(dto.getToken());
+        EamClaim claim = claimMapper.selectForUpdate(ids[0]);
+        if (claim == null) throw new BusinessException("領用記錄不存在");
+        if (!Objects.equals(ids[1], claim.getEmployeeId())) throw new BusinessException("簽署人與領用人不一致");
+        SysUser signer = userMapper.selectById(claim.getEmployeeId());
+        doSign(claim, dto.getSignatureImage(), signer);
+    }
+
+    /** 校验令牌并返回 [claimId, employeeId] */
+    private long[] requireValidToken(String token) {
+        if (token == null || token.isBlank()) throw new BusinessException("簽署令牌不能為空");
+        String[] parts = token.split("\\.");
+        if (parts.length != 4) throw new BusinessException("無效的簽署鏈接");
+        long claimId;
+        long employeeId;
+        try {
+            claimId = Long.parseLong(parts[0]);
+            employeeId = Long.parseLong(parts[1]);
+        } catch (NumberFormatException e) {
+            throw new BusinessException("無效的簽署鏈接");
+        }
+        String secret = getConfigValue("dingtalk_sign_token_secret");
+        if (secret == null || secret.isBlank()) throw new BusinessException("服務端簽署配置缺失，請聯系管理員");
+        if (!SignTokenUtil.validate(token, claimId, employeeId, secret))
+            throw new BusinessException("簽署鏈接已失效或已被篡改，請聯系管理員重新發送");
+        return new long[]{claimId, employeeId};
+    }
+
+    /**
+     * 签署核心流程（sign / signByToken 共用）：
+     * 校验状态 → 保存签名凭证 → 更新领用 → 资产生效 → 写事件
+     */
+    private void doSign(EamClaim claim, String signatureImage, SysUser signer) {
+        boolean supplementary = "claimed".equals(claim.getStatus()) && "proxy_pending".equals(claim.getSignatureStatus());
+        if (!"pending_signature".equals(claim.getStatus()) && !supplementary) throw new BusinessException("當前狀態不可簽署");
         EamAsset lockedAsset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>()
                 .eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
         if (lockedAsset == null) throw new BusinessException("資產不存在");
@@ -277,21 +385,26 @@ public class EamClaimServiceImpl implements EamClaimService {
         } else if (lockedAsset.getActiveClaimId() != null || !"idle".equals(lockedAsset.getStatus())) {
             throw new BusinessException("資產已被其他業務佔用，請刷新後重試");
         }
-        if (!hasText(dto.getSignatureImage())) {
+        if (!hasText(signatureImage)) {
             throw new BusinessException("簽名圖片不能為空");
         }
-        if (!dto.getSignatureImage().startsWith("data:image/png;base64,") || dto.getSignatureImage().length() > 2_000_000)
+        if (!signatureImage.startsWith("data:image/png;base64,") || signatureImage.length() > 2_000_000)
             throw new BusinessException("簽名必須為有效 PNG 圖片且小於 2MB");
+
+        // 签署人：登录签署用当前登录人；令牌签署用领用人本人
+        String signerName = signer != null
+                ? (signer.getName() != null ? signer.getName() : signer.getUsername())
+                : operatorResolver.currentOperatorName();
 
         // 1. 保存签名凭证
         EamClaimEvidence evidence = new EamClaimEvidence();
         evidence.setClaimId(claim.getId());
         evidence.setEvidenceType("signature");
-        evidence.setStoragePath(dto.getSignatureImage());
+        evidence.setStoragePath(signatureImage);
         evidence.setContentType("image/png");
-        byte[] imageBytes = dto.getSignatureImage().getBytes(StandardCharsets.UTF_8);
+        byte[] imageBytes = signatureImage.getBytes(StandardCharsets.UTF_8);
         evidence.setFileSize(imageBytes.length);
-        evidence.setContentHash(sha256(dto.getSignatureImage()));
+        evidence.setContentHash(sha256(signatureImage));
         evidenceMapper.insert(evidence);
 
         // 2. 计算内容摘要
@@ -300,9 +413,8 @@ public class EamClaimServiceImpl implements EamClaimService {
                         + "|" + claim.getClaimDate() + "|" + evidence.getId());
 
         // 3. 更新领用记录
-        String sigStatus = claim.getProxyMode() == 1 ? "signed" : "signed";
-        claimMapper.updateSignature(claim.getId(), evidence.getId(), sigStatus, contentHash,
-                operatorResolver.currentOperatorName());
+        String sigStatus = "signed";
+        claimMapper.updateSignature(claim.getId(), evidence.getId(), sigStatus, contentHash, signerName);
 
         // 4. 状态推进到 claimed
         claim.setStatus("claimed");
@@ -310,7 +422,7 @@ public class EamClaimServiceImpl implements EamClaimService {
         claim.setSignedAt(LocalDateTime.now());
         claim.setContentHash(contentHash);
         claim.setSignatureEvidenceId(evidence.getId());
-        claim.setUpdatedBy(operatorResolver.currentOperatorName());
+        claim.setUpdatedBy(signerName);
         claimMapper.updateById(claim);
 
         // 5. 更新资产持有人
@@ -330,7 +442,7 @@ public class EamClaimServiceImpl implements EamClaimService {
 
         // 6. 写事件
         String eventType = claim.getProxyMode() == 1 ? "proxy_signed" : "signed";
-        insertEvent(claim.getId(), eventType, operatorResolver.currentOperatorName(),
+        insertEvent(claim.getId(), eventType, signerName,
                 claim.getProxyMode() == 1 ? "代辦補簽完成" : "員工簽署完成");
     }
 
@@ -407,6 +519,68 @@ public class EamClaimServiceImpl implements EamClaimService {
         event.setOperatorName(operatorName);
         event.setRemark(remark);
         eventMapper.insert(event);
+    }
+
+    /**
+     * 事务提交后向领用人发送钉钉工作通知（含免登签署链接）
+     * 未配置钉钉应用/领用人未绑定钉钉时仅记录日志，不影响领用主流程
+     */
+    private void sendSignatureNotifyAfterCommit(EamClaim claim, SysUser employee, EamAsset asset) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        doSendSignatureNotify(claim, employee, asset);
+                    } catch (Exception e) {
+                        log.warn("领用签署钉钉通知发送失败: claimNo={}, err={}", claim.getClaimNo(), e.getMessage());
+                    }
+                }
+            });
+        } else {
+            try { doSendSignatureNotify(claim, employee, asset); }
+            catch (Exception e) { log.warn("领用签署钉钉通知发送失败: {}", e.getMessage()); }
+        }
+    }
+
+    private void doSendSignatureNotify(EamClaim claim, SysUser employee, EamAsset asset) {
+        if (!dingTalkAppService.isConfigured()) {
+            log.info("钉钉企业应用未配置，跳过领用签署通知: claimNo={}", claim.getClaimNo());
+            return;
+        }
+        if (employee.getDingtalkUserId() == null || employee.getDingtalkUserId().isBlank()) {
+            log.info("领用人未绑定钉钉 userId，跳过签署通知: claimNo={}, empNo={}",
+                    claim.getClaimNo(), employee.getEmpId());
+            return;
+        }
+        String secret = getConfigValue("dingtalk_sign_token_secret");
+        if (secret == null || secret.isBlank()) {
+            log.warn("缺少 dingtalk_sign_token_secret 配置，无法生成签署链接");
+            return;
+        }
+        String token = SignTokenUtil.generate(claim.getId(), claim.getEmployeeId(), secret);
+        String baseUrl = getConfigValue("dingtalk_notify_base_url");
+        // 规范化站点地址（去尾部斜杠与 #），前端为 HashRouter：query 参数必须在 #/ 内才能被路由识别
+        String base = baseUrl != null ? baseUrl.trim() : "";
+        while (base.endsWith("/") || base.endsWith("#")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        String signUrl = base + "/#/asset-claim-sign?token=" + token;
+        String assetDesc = (asset != null ? asset.getAssetNo() + " / " + asset.getAssetName() : String.valueOf(claim.getAssetId()));
+        String content = "您有一笔资产领用待签署确认\n"
+                + "領用單號：" + claim.getClaimNo() + "\n"
+                + "資產：" + assetDesc + "\n"
+                + "領用日期：" + claim.getClaimDate() + "\n"
+                + "登記人：" + claim.getOperatorName() + "\n"
+                + "请点击链接完成手写签名：" + signUrl;
+        dingTalkAppService.sendWorkNotification(
+                List.of(employee.getDingtalkUserId()), "資產領用待簽署", content);
+    }
+
+    private String getConfigValue(String key) {
+        SysConfig config = sysConfigMapper.selectOne(
+                new LambdaQueryWrapper<SysConfig>().eq(SysConfig::getConfigKey, key));
+        return config != null ? config.getConfigValue() : null;
     }
 
     private EamClaimVO toVO(EamClaim claim) {

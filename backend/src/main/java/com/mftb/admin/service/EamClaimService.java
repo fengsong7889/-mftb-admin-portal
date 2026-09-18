@@ -19,6 +19,9 @@ public interface EamClaimService {
     /** 员工领用汇总列表 */
     PageResult<EamClaimEmployeeSummaryVO> employeeSummary(EamClaimQuery query);
 
+    /** 可选领用人下拉（仅要求领用资产菜单权限；支持选择本人登记，排除离职员工；employeeId 用于深链预填精确回显） */
+    List<EamClaimEmployeeOptionVO> employeeOptions(String keyword, Long employeeId);
+
     /** 领用详情 */
     EamClaimVO detail(long claimId);
 
@@ -40,4 +43,10 @@ public interface EamClaimService {
     /** 个人领用列表（当前登录用户） */
     PageResult<EamClaimVO> myClaims(EamClaimQuery query);
     EamClaimVO myDetail(long id);
+
+    /** 钉钉签署页：凭令牌读取待签署领用详情（免登录） */
+    EamClaimVO signPageDetail(String token);
+
+    /** 钉钉签署页：凭令牌提交签名（免登录） */
+    void signByToken(EamSignPageDTO dto);
 }

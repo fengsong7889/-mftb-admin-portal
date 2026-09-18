@@ -7,6 +7,7 @@ import lombok.Data;
  */
 @Data
 public class ConsumableBrandSaveDTO {
+    private String code;
     private String name;
     private String nameEn;
     /** ASSET / CONSUMABLE / BOTH */

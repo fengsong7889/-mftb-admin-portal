@@ -11,7 +11,14 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.PositionRecordRequest;
 import com.mftb.admin.dto.PositionRecordVO;
 import com.mftb.admin.dto.ResetPasswordRequest;
+import com.mftb.admin.dto.SalaryConfigRequest;
+import com.mftb.admin.dto.SalaryConfigVO;
+import com.mftb.admin.dto.SalaryDeductionRequest;
+import com.mftb.admin.dto.SalaryDeductionVO;
+import com.mftb.admin.dto.SalaryIncomeRequest;
+import com.mftb.admin.dto.SalaryIncomeVO;
 import com.mftb.admin.service.EmergencyContactService;
+import com.mftb.admin.service.EmployeeSalaryService;
 import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.service.PositionRecordService;
 import jakarta.validation.Valid;
@@ -40,6 +47,7 @@ public class EmployeeController {
     private final EmployeeService employeeService;
     private final EmergencyContactService emergencyContactService;
     private final PositionRecordService positionRecordService;
+    private final EmployeeSalaryService employeeSalaryService;
 
     /** 分页查询员工 */
     @GetMapping
@@ -92,7 +100,7 @@ public class EmployeeController {
 
     // ── 基础信息 ──
 
-    /** 获取基础信息（个人信息 + 证件信息 + 通讯信息） */
+    /** 获取基础信息（个人信息 + 证件信息 + 通讯信息 + 账号信息） */
     @GetMapping("/{id}/basic-info")
     @RequirePermission(menu = "employee-management")
     public Result<Map<String, Object>> getBasicInfo(@PathVariable Long id) {
@@ -119,6 +127,14 @@ public class EmployeeController {
     @PutMapping("/{id}/basic-info/contact")
     @RequirePermission(menu = "employee-management", action = "edit")
     public Result<Void> saveContactInfo(@PathVariable Long id, @RequestBody BasicInfoRequest request) {
+        employeeService.saveBasicInfo(id, request);
+        return Result.success();
+    }
+
+    /** 保存账号信息（钉钉用户ID等三方通讯/邮箱账号绑定） */
+    @PutMapping("/{id}/basic-info/account")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<Void> saveAccountInfo(@PathVariable Long id, @RequestBody BasicInfoRequest request) {
         employeeService.saveBasicInfo(id, request);
         return Result.success();
     }
@@ -189,5 +205,86 @@ public class EmployeeController {
     public Result<Void> deletePositionRecord(@PathVariable Long id, @PathVariable Long recordId) {
         positionRecordService.delete(id, recordId);
         return Result.success();
+    }
+
+    // ── 费用信息 ──
+
+    /** 收入项列表 */
+    @GetMapping("/{id}/salary/incomes")
+    @RequirePermission(menu = "employee-management")
+    public Result<List<SalaryIncomeVO>> listSalaryIncomes(@PathVariable Long id) {
+        return Result.success(employeeSalaryService.listIncomes(id));
+    }
+
+    /** 新增收入项 */
+    @PostMapping("/{id}/salary/incomes")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<SalaryIncomeVO> createSalaryIncome(@PathVariable Long id,
+                                                      @Valid @RequestBody SalaryIncomeRequest request) {
+        return Result.success("收入項已添加", employeeSalaryService.createIncome(id, request));
+    }
+
+    /** 编辑收入项 */
+    @PutMapping("/{id}/salary/incomes/{incomeId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<SalaryIncomeVO> updateSalaryIncome(@PathVariable Long id,
+                                                      @PathVariable Long incomeId,
+                                                      @Valid @RequestBody SalaryIncomeRequest request) {
+        return Result.success("收入項已更新", employeeSalaryService.updateIncome(id, incomeId, request));
+    }
+
+    /** 删除收入项 */
+    @DeleteMapping("/{id}/salary/incomes/{incomeId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<Void> deleteSalaryIncome(@PathVariable Long id, @PathVariable Long incomeId) {
+        employeeSalaryService.deleteIncome(id, incomeId);
+        return Result.success();
+    }
+
+    /** 扣除项列表 */
+    @GetMapping("/{id}/salary/deductions")
+    @RequirePermission(menu = "employee-management")
+    public Result<List<SalaryDeductionVO>> listSalaryDeductions(@PathVariable Long id) {
+        return Result.success(employeeSalaryService.listDeductions(id));
+    }
+
+    /** 新增扣除项 */
+    @PostMapping("/{id}/salary/deductions")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<SalaryDeductionVO> createSalaryDeduction(@PathVariable Long id,
+                                                            @Valid @RequestBody SalaryDeductionRequest request) {
+        return Result.success("扣除項已添加", employeeSalaryService.createDeduction(id, request));
+    }
+
+    /** 编辑扣除项 */
+    @PutMapping("/{id}/salary/deductions/{deductionId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<SalaryDeductionVO> updateSalaryDeduction(@PathVariable Long id,
+                                                            @PathVariable Long deductionId,
+                                                            @Valid @RequestBody SalaryDeductionRequest request) {
+        return Result.success("扣除項已更新", employeeSalaryService.updateDeduction(id, deductionId, request));
+    }
+
+    /** 删除扣除项 */
+    @DeleteMapping("/{id}/salary/deductions/{deductionId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<Void> deleteSalaryDeduction(@PathVariable Long id, @PathVariable Long deductionId) {
+        employeeSalaryService.deleteDeduction(id, deductionId);
+        return Result.success();
+    }
+
+    /** 获取薪资配置 */
+    @GetMapping("/{id}/salary/config")
+    @RequirePermission(menu = "employee-management")
+    public Result<SalaryConfigVO> getSalaryConfig(@PathVariable Long id) {
+        return Result.success(employeeSalaryService.getConfig(id));
+    }
+
+    /** 保存薪资配置（存在则更新，不存在则新建） */
+    @PutMapping("/{id}/salary/config")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<SalaryConfigVO> saveSalaryConfig(@PathVariable Long id,
+                                                    @Valid @RequestBody SalaryConfigRequest request) {
+        return Result.success("薪資配置已更新", employeeSalaryService.saveConfig(id, request));
     }
 }

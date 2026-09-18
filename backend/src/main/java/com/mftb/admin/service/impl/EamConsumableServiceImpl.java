@@ -159,10 +159,37 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     /* ==================== 库存 ==================== */
 
     @Override
-    public List<EamConsumableStockVO> stockList(Long itemId, Long locationId) {
+    public List<EamConsumableStockVO> stockList(EamConsumableStockQuery query) {
+        // 如果有耗材文本过滤条件，先从 item 表查出匹配的 ID 集合
+        boolean hasItemFilter = StringUtils.hasText(query.getItemCode())
+                || StringUtils.hasText(query.getItemName())
+                || StringUtils.hasText(query.getUpdatedBy())
+                || StringUtils.hasText(query.getUpdateTimeStart())
+                || StringUtils.hasText(query.getUpdateTimeEnd());
+        Set<Long> matchedItemIds = null;
+        if (hasItemFilter) {
+            LambdaQueryWrapper<EamConsumableItem> iw = new LambdaQueryWrapper<>();
+            if (StringUtils.hasText(query.getItemCode())) iw.like(EamConsumableItem::getItemCode, query.getItemCode().trim());
+            if (StringUtils.hasText(query.getItemName())) iw.like(EamConsumableItem::getName, query.getItemName().trim());
+            if (StringUtils.hasText(query.getUpdatedBy())) iw.like(EamConsumableItem::getUpdatedBy, query.getUpdatedBy().trim());
+            if (StringUtils.hasText(query.getUpdateTimeStart()) || StringUtils.hasText(query.getUpdateTimeEnd())) {
+                try {
+                    if (StringUtils.hasText(query.getUpdateTimeStart()))
+                        iw.ge(EamConsumableItem::getUpdatedAt, LocalDate.parse(query.getUpdateTimeStart().trim()).atStartOfDay());
+                    if (StringUtils.hasText(query.getUpdateTimeEnd()))
+                        iw.le(EamConsumableItem::getUpdatedAt, LocalDate.parse(query.getUpdateTimeEnd().trim()).atTime(23, 59, 59));
+                } catch (DateTimeParseException e) {
+                    throw new BusinessException("更新時間範圍格式錯誤，應為 yyyy-MM-dd");
+                }
+            }
+            matchedItemIds = itemMapper.selectList(iw.select(EamConsumableItem::getId))
+                    .stream().map(EamConsumableItem::getId).collect(Collectors.toSet());
+            if (matchedItemIds.isEmpty()) return List.of();
+        }
+
         LambdaQueryWrapper<EamConsumableStock> wrapper = new LambdaQueryWrapper<>();
-        if (itemId != null) wrapper.eq(EamConsumableStock::getItemId, itemId);
-        if (locationId != null) wrapper.eq(EamConsumableStock::getLocationId, locationId);
+        if (matchedItemIds != null) wrapper.in(EamConsumableStock::getItemId, matchedItemIds);
+        if (query.getLocationId() != null) wrapper.eq(EamConsumableStock::getLocationId, query.getLocationId());
         wrapper.orderByDesc(EamConsumableStock::getQty);
         List<EamConsumableStock> rows = stockMapper.selectList(wrapper);
         if (rows.isEmpty()) return List.of();
@@ -205,6 +232,58 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         int lim = (limit == null || limit <= 0) ? 50 : Math.min(limit, 200);
         wrapper.last("LIMIT " + lim);
         return txnMapper.selectList(wrapper).stream().map(this::toTxnVO).toList();
+    }
+
+    @Override
+    public PageResult<EamConsumableTxnVO> pageTxns(EamConsumableTxnQuery query) {
+        LambdaQueryWrapper<EamConsumableTxn> wrapper = buildTxnWrapper(query);
+        wrapper.orderByDesc(EamConsumableTxn::getId);
+        Page<EamConsumableTxn> page = txnMapper.selectPage(
+                new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
+                wrapper);
+        List<EamConsumableTxnVO> records = page.getRecords().stream().map(this::toTxnVO).toList();
+        return new PageResult<>(records, page.getTotal());
+    }
+
+    @Override
+    public EamConsumableTxnStatsVO txnStats(EamConsumableTxnQuery query) {
+        LambdaQueryWrapper<EamConsumableTxn> wrapper = buildTxnWrapper(query);
+        wrapper.select(EamConsumableTxn::getTxnType, EamConsumableTxn::getQty);
+        List<EamConsumableTxn> rows = txnMapper.selectList(wrapper);
+        long inCount = rows.stream()
+                .filter(t -> t.getTxnType() != null && t.getTxnType().startsWith("in"))
+                .count();
+        int netQty = rows.stream().mapToInt(t -> t.getQty() == null ? 0 : t.getQty()).sum();
+        EamConsumableTxnStatsVO vo = new EamConsumableTxnStatsVO();
+        vo.setTotal((long) rows.size());
+        vo.setInCount(inCount);
+        vo.setOutCount(rows.size() - inCount);
+        vo.setNetQty(netQty);
+        return vo;
+    }
+
+    /** 流水分页 / 统计共用过滤条件（不含排序与列选择） */
+    private LambdaQueryWrapper<EamConsumableTxn> buildTxnWrapper(EamConsumableTxnQuery query) {
+        LambdaQueryWrapper<EamConsumableTxn> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(query.getItemCode()))
+            wrapper.like(EamConsumableTxn::getItemCode, query.getItemCode().trim());
+        if (StringUtils.hasText(query.getItemName()))
+            wrapper.like(EamConsumableTxn::getItemName, query.getItemName().trim());
+        if (StringUtils.hasText(query.getTxnType()))
+            wrapper.eq(EamConsumableTxn::getTxnType, query.getTxnType().trim());
+        if (StringUtils.hasText(query.getOperator()))
+            wrapper.like(EamConsumableTxn::getOperator, query.getOperator().trim());
+        if (StringUtils.hasText(query.getTxnTimeStart()) || StringUtils.hasText(query.getTxnTimeEnd())) {
+            try {
+                if (StringUtils.hasText(query.getTxnTimeStart()))
+                    wrapper.ge(EamConsumableTxn::getCreatedAt, LocalDate.parse(query.getTxnTimeStart().trim()).atStartOfDay());
+                if (StringUtils.hasText(query.getTxnTimeEnd()))
+                    wrapper.le(EamConsumableTxn::getCreatedAt, LocalDate.parse(query.getTxnTimeEnd().trim()).atTime(23, 59, 59));
+            } catch (DateTimeParseException e) {
+                throw new BusinessException("操作時間範圍格式錯誤，應為 yyyy-MM-dd");
+            }
+        }
+        return wrapper;
     }
 
     /* ==================== 预警 ==================== */
@@ -368,6 +447,8 @@ public class EamConsumableServiceImpl implements EamConsumableService {
             vo.setCategoryName(item.getCategoryName());
             vo.setSafetyStock(nz(item.getSafetyStock()));
             vo.setAlert(nz(item.getSafetyStock()) > 0 && vo.getAvailableQty() < nz(item.getSafetyStock()));
+            vo.setUpdatedBy(item.getUpdatedBy());
+            vo.setUpdatedAt(dt(item.getUpdatedAt()));
         } else {
             vo.setSafetyStock(0);
             vo.setAlert(false);

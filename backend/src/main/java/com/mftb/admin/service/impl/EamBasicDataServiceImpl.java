@@ -237,6 +237,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Transactional
     public long createBrand(EamBrandSaveDTO dto) {
         EamBrand brand = new EamBrand();
+        brand.setCode(dto.getCode());
         brand.setCategoryCode(dto.getCategoryCode());
         brand.setBrandZh(dto.getBrandZh());
         brand.setBrandEn(Objects.toString(dto.getBrandEn(), ""));
@@ -254,6 +255,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     public void updateBrand(long id, EamBrandSaveDTO dto) {
         EamBrand brand = brandMapper.selectById(id);
         if (brand == null) throw new BusinessException("资产品牌不存在");
+        if (dto.getCode() != null) brand.setCode(dto.getCode());
         if (dto.getCategoryCode() != null) brand.setCategoryCode(dto.getCategoryCode());
         if (dto.getBrandZh() != null) brand.setBrandZh(dto.getBrandZh());
         if (dto.getBrandEn() != null) brand.setBrandEn(dto.getBrandEn());
@@ -469,6 +471,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     private Map<String, Object> brandToMap(EamBrand brand) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", brand.getId());
+        map.put("code", brand.getCode());
         map.put("categoryCode", brand.getCategoryCode());
         map.put("brandZh", brand.getBrandZh());
         map.put("brandEn", brand.getBrandEn());

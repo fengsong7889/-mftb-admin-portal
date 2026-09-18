@@ -18,11 +18,10 @@ import ClaimList from './ClaimList'
 import ClaimForm from './ClaimForm'
 import EmployeeAssetDetail from './EmployeeAssetDetail'
 import ClaimRecordDetail from './ClaimRecordDetail'
-import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
+import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats, fetchClaimEmployeeOptions, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchAssetList, fetchAssetDetail } from '../../../api/asset'
-import { fetchEmployees } from '../../../api/employee'
 import { CLAIM_STATUS, type ClaimStatsData } from './claimViewTypes'
 import './index.css'
 
@@ -121,17 +120,10 @@ export default function AssetClaim() {
     }
   }, [])
 
-  /* ----- 在職員工查詢（供領用登記表單「領用人」下拉） ----- */
+  /* ----- 在職員工查詢（供領用登記表單「領用人」下拉；走领用模块专用接口，免员工管理权限，支持选择本人登记） ----- */
   const handleEmployeeQuery = useCallback(async (query: ClaimQuery) => {
     try {
-      const res = await fetchEmployees({ page: query.page, size: query.size, keyword: query.keyword, employmentStatus: 'active' })
-      setEmployeePage({
-        total: res.total,
-        records: (res.records || []).map((e) => ({
-          employeeId: e.id, empNo: e.empId, empName: e.name,
-          departmentId: e.departmentId ?? undefined, department: e.department || '',
-        })),
-      })
+      setEmployeePage(await fetchClaimEmployeeOptions(query.keyword))
     } catch {
       setEmployeePage({ records: [], total: 0 })
     }
@@ -163,13 +155,10 @@ export default function AssetClaim() {
   useEffect(() => {
     if (view === 'detail' && employeeId != null) {
       // 注：列表数据由 EmployeeAssetDetail 子组件的 useEffect + onQueryDetail 首次触发，避免重复请求
-      // 加载员工基本信息（供详情页头部展示）
-      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
-        const emp = (res.records || []).find((e) => e.id === employeeId)
-        if (emp) setDetailEmployee({
-          employeeId: emp.id, empNo: emp.empId, empName: emp.name,
-          departmentId: emp.departmentId ?? undefined, department: emp.department || '',
-        })
+      // 加载员工基本信息（供详情页头部展示；走领用模块专用接口，免员工管理权限）
+      fetchClaimEmployeeOptions(undefined, employeeId).then((res) => {
+        const emp = res.records[0]
+        if (emp) setDetailEmployee(emp)
       }).catch(() => {})
       // 加载个人统计
       fetchClaimStats({ employeeId }).then(setDetailStats).catch(() => {})
@@ -193,9 +182,9 @@ export default function AssetClaim() {
       fetchAssetDetail(assetIdParam).then(setInitialAsset).catch(() => {})
     }
     if (employeeId != null) {
-      fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
-        const e = (res.records || []).find((x) => x.id === employeeId)
-        if (e) setInitialEmployee({ employeeId: e.id, empNo: e.empId, empName: e.name, departmentId: e.departmentId ?? undefined, department: e.department || '' })
+      fetchClaimEmployeeOptions(undefined, employeeId).then((res) => {
+        const e = res.records[0]
+        if (e) setInitialEmployee(e)
       }).catch(() => {})
     }
   }, [view, assetIdParam, employeeId])
@@ -273,6 +262,7 @@ export default function AssetClaim() {
           employees={employeePage}
           departments={departments}
           operatorName={user?.name}
+          operatorEmpNo={user?.empId}
           canProxy={canProxy}
           loading={loading}
           error={error}

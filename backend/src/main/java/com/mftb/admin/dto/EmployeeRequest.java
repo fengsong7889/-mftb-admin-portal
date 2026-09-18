@@ -33,6 +33,9 @@ public class EmployeeRequest {
     /** 职等 (R1~R5) */
     private String rank;
 
+    /** 任职公司 (新增时自动写入初始「入职」职务记录) */
+    private String company;
+
     /** 基础角色: admin/guest, 默认 guest（前端传入将被服务层覆盖，此处仅作入参校验） */
     @Pattern(regexp = "^(admin|guest)$", message = "角色只允許 admin 或 guest")
     private String role;

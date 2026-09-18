@@ -46,6 +46,7 @@ interface Props {
   employees?: ClaimPage<ClaimEmployee>
   departments?: DepartmentItem[]
   operatorName?: string
+  operatorEmpNo?: string
   canProxy?: boolean
   loading?: boolean
   error?: string
@@ -61,7 +62,7 @@ const CARD_STYLE: React.CSSProperties = {
   padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
 }
 
-export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee, initialAsset, assets, employees, departments = EMPTY_DEPARTMENTS, operatorName, canProxy = false, loading = false, error, onAssetQuery, onEmployeeQuery, onSubmit }: Props) {
+export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee, initialAsset, assets, employees, departments = EMPTY_DEPARTMENTS, operatorName, operatorEmpNo, canProxy = false, loading = false, error, onAssetQuery, onEmployeeQuery, onSubmit }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
   const [modal, contextHolder] = Modal.useModal()
@@ -244,8 +245,10 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
               ]}>
                 <DatePicker disabledDate={(date) => date.isAfter(dayjs(), 'day')} />
               </Form.Item>
-              <Form.Item label="领用用途" name="claimReason"><Input maxLength={200} placeholder="请输入领用用途" allowClear /></Form.Item>
-              <Form.Item label={t('asset.colOperator')}><Input value={operatorName ?? ''} readOnly placeholder="由服务端登录身份确认" /></Form.Item>
+              <Form.Item label={t('asset.colOperator')}>
+                <Input disabled value={operatorEmpNo ? `${operatorName}（${operatorEmpNo}）` : operatorName ?? ''} placeholder="由服务端登录身份确认" />
+              </Form.Item>
+              <Form.Item label="领用用途" name="claimReason" className="claim-reason-item"><Input maxLength={200} placeholder="请输入领用用途" allowClear /></Form.Item>
             </div>
             <Form.Item label="办理方式" name="mode" style={{ marginTop: 20 }}>
               <Radio.Group>

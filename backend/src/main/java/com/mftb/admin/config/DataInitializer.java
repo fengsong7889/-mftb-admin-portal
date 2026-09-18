@@ -96,6 +96,8 @@ public class DataInitializer implements CommandLineRunner {
         migrateEamClaimTables();
         // 154: 资产标签模板 + 绑定关系表自动创建
         migrateEamAssetTagTables();
+        // 164: 员工费用信息表自动创建 (收入项/扣除项/薪资配置, 每次启动幂等检查, 不受 V_SCHEMA 版本门控)
+        migrateEmployeeSalaryTables();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -406,6 +408,58 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "INDEX idx_user_seq (user_id, effective_seq)"
                         + ") COMMENT='员工职务记录'");
         log.info("员工详情页表结构就绪: emp_emergency_contact + emp_position_record");
+    }
+
+    /** 员工费用信息表自动创建: 收入项 / 扣除项 / 薪资配置（幂等, 164 脚本等效, 每次启动直接执行） */
+    private void migrateEmployeeSalaryTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS emp_salary_income ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL COMMENT '关联 sys_user.id', "
+                        + "name VARCHAR(50) NOT NULL COMMENT '项目名称', "
+                        + "amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '金额(元)', "
+                        + "type VARCHAR(10) NOT NULL DEFAULT 'fixed' COMMENT '类型(fixed=固定,variable=浮动)', "
+                        + "remark VARCHAR(200) DEFAULT NULL COMMENT '备注', "
+                        + "created_by VARCHAR(50) DEFAULT NULL, "
+                        + "updated_by VARCHAR(50) DEFAULT NULL, "
+                        + "deleted INT NOT NULL DEFAULT 0, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "INDEX idx_user_id (user_id)"
+                        + ") COMMENT='员工费用信息-收入项'");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS emp_salary_deduction ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL COMMENT '关联 sys_user.id', "
+                        + "name VARCHAR(50) NOT NULL COMMENT '项目名称', "
+                        + "rate DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT '费率(百分比)', "
+                        + "amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '金额(元)', "
+                        + "remark VARCHAR(200) DEFAULT NULL COMMENT '备注', "
+                        + "created_by VARCHAR(50) DEFAULT NULL, "
+                        + "updated_by VARCHAR(50) DEFAULT NULL, "
+                        + "deleted INT NOT NULL DEFAULT 0, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "INDEX idx_user_id (user_id)"
+                        + ") COMMENT='员工费用信息-扣除项'");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS emp_salary_config ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL COMMENT '关联 sys_user.id', "
+                        + "salary_structure VARCHAR(30) DEFAULT NULL COMMENT '薪资结构', "
+                        + "payment_method VARCHAR(20) DEFAULT NULL COMMENT '发薪方式', "
+                        + "pay_day INT DEFAULT NULL COMMENT '发薪日(1~31)', "
+                        + "bank_name VARCHAR(100) DEFAULT NULL COMMENT '开户银行', "
+                        + "bank_account VARCHAR(50) DEFAULT NULL COMMENT '银行账号', "
+                        + "tax_city VARCHAR(50) DEFAULT NULL COMMENT '纳税城市', "
+                        + "created_by VARCHAR(50) DEFAULT NULL, "
+                        + "updated_by VARCHAR(50) DEFAULT NULL, "
+                        + "deleted INT NOT NULL DEFAULT 0, "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "UNIQUE KEY uk_user_id (user_id)"
+                        + ") COMMENT='员工费用信息-薪资配置'");
+        log.info("员工费用信息表结构就绪: emp_salary_income + emp_salary_deduction + emp_salary_config");
     }
 
     /** EAM 基础数据表自动创建: 资产分类 / 资产品牌库 / 产品型号库 / 仓库位置 / 供应商（幂等） */

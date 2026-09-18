@@ -56,6 +56,8 @@ public class EmployeeVO {
     private String addressCountry;
     private String addressCity;
     private String addressDetail;
+    /** 钉钉用户ID（工作通知定向推送用，如领用签署通知） */
+    private String dingtalkUserId;
 
     private List<Long> functionRoleIds;
     private LocalDateTime createdAt;
@@ -98,6 +100,7 @@ public class EmployeeVO {
         vo.setAddressCountry(user.getAddressCountry());
         vo.setAddressCity(user.getAddressCity());
         vo.setAddressDetail(user.getAddressDetail());
+        vo.setDingtalkUserId(user.getDingtalkUserId());
         vo.setFunctionRoleIds(functionRoleIds);
         vo.setCreatedAt(user.getCreatedAt());
         vo.setUpdatedBy(user.getUpdatedBy());

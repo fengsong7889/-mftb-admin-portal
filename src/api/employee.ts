@@ -64,6 +64,8 @@ export interface EmployeePayload {
   positionId?: number | null
   /** 职等 (R1~R5) */
   rank?: string | null
+  /** 任职公司（新增时自动写入初始「入职」职务记录） */
+  company?: string | null
   role?: string
   functionRoleIds?: number[]
 }
@@ -128,11 +130,13 @@ export function deleteEmployee(id: number) {
 
 // ── 基础信息 ──
 
-/** 基础信息响应（个人信息 + 证件信息 + 通讯信息） */
+/** 基础信息响应（个人信息 + 证件信息 + 通讯信息 + 账号信息） */
 export interface BasicInfoResponse {
   personalInfo: Record<string, unknown>
   idInfo: Record<string, unknown>
   contactInfo: Record<string, unknown>
+  /** 账号信息（钉钉用户ID等三方通讯/邮箱账号绑定，后续可扩展企微ID、QQ邮箱等） */
+  accountInfo?: Record<string, unknown>
 }
 
 /** 获取员工基础信息 */
@@ -153,6 +157,11 @@ export function saveIdInfo(employeeId: number, data: Record<string, unknown>) {
 /** 保存通讯信息 */
 export function saveContactInfo(employeeId: number, data: Record<string, unknown>) {
   return request.put<unknown, void>(`/employees/${employeeId}/basic-info/contact`, data)
+}
+
+/** 保存账号信息（钉钉用户ID等三方通讯/邮箱账号绑定） */
+export function saveAccountInfo(employeeId: number, data: Record<string, unknown>) {
+  return request.put<unknown, void>(`/employees/${employeeId}/basic-info/account`, data)
 }
 
 // ── 紧急联系人 ──
@@ -266,4 +275,124 @@ export function updatePositionRecord(employeeId: number, recordId: number, data:
 /** 删除职务记录 */
 export function deletePositionRecord(employeeId: number, recordId: number) {
   return request.delete<unknown, void>(`/employees/${employeeId}/position-records/${recordId}`)
+}
+
+// ── 费用信息 ──
+
+/** 费用信息-收入项 */
+export interface SalaryIncomeItem {
+  id: number
+  userId?: number
+  name: string
+  amount: number
+  type: 'fixed' | 'variable'
+  remark?: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 费用信息-收入项请求 */
+export interface SalaryIncomePayload {
+  name: string
+  amount: number
+  type: 'fixed' | 'variable'
+  remark?: string
+}
+
+/** 费用信息-扣除项 */
+export interface SalaryDeductionItem {
+  id: number
+  userId?: number
+  name: string
+  rate: number
+  amount: number
+  remark?: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 费用信息-扣除项请求 */
+export interface SalaryDeductionPayload {
+  name: string
+  rate: number
+  amount: number
+  remark?: string
+}
+
+/** 费用信息-薪资配置 */
+export interface SalaryConfigItem {
+  id?: number
+  userId?: number
+  salaryStructure?: string
+  paymentMethod?: string
+  payDay?: number | null
+  bankName?: string
+  bankAccount?: string
+  taxCity?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+/** 费用信息-薪资配置请求 */
+export interface SalaryConfigPayload {
+  salaryStructure: string
+  paymentMethod: string
+  payDay: number
+  bankName?: string
+  bankAccount?: string
+  taxCity?: string
+}
+
+/** 获取费用信息-收入项列表 */
+export function fetchSalaryIncomes(employeeId: number) {
+  return request.get<unknown, SalaryIncomeItem[]>(`/employees/${employeeId}/salary/incomes`)
+}
+
+/** 新增费用信息-收入项 */
+export function createSalaryIncome(employeeId: number, data: SalaryIncomePayload) {
+  return request.post<unknown, SalaryIncomeItem>(`/employees/${employeeId}/salary/incomes`, data)
+}
+
+/** 编辑费用信息-收入项 */
+export function updateSalaryIncome(employeeId: number, incomeId: number, data: SalaryIncomePayload) {
+  return request.put<unknown, SalaryIncomeItem>(`/employees/${employeeId}/salary/incomes/${incomeId}`, data)
+}
+
+/** 删除费用信息-收入项 */
+export function deleteSalaryIncome(employeeId: number, incomeId: number) {
+  return request.delete<unknown, void>(`/employees/${employeeId}/salary/incomes/${incomeId}`)
+}
+
+/** 获取费用信息-扣除项列表 */
+export function fetchSalaryDeductions(employeeId: number) {
+  return request.get<unknown, SalaryDeductionItem[]>(`/employees/${employeeId}/salary/deductions`)
+}
+
+/** 新增费用信息-扣除项 */
+export function createSalaryDeduction(employeeId: number, data: SalaryDeductionPayload) {
+  return request.post<unknown, SalaryDeductionItem>(`/employees/${employeeId}/salary/deductions`, data)
+}
+
+/** 编辑费用信息-扣除项 */
+export function updateSalaryDeduction(employeeId: number, deductionId: number, data: SalaryDeductionPayload) {
+  return request.put<unknown, SalaryDeductionItem>(`/employees/${employeeId}/salary/deductions/${deductionId}`, data)
+}
+
+/** 删除费用信息-扣除项 */
+export function deleteSalaryDeduction(employeeId: number, deductionId: number) {
+  return request.delete<unknown, void>(`/employees/${employeeId}/salary/deductions/${deductionId}`)
+}
+
+/** 获取费用信息-薪资配置 */
+export function fetchSalaryConfig(employeeId: number) {
+  return request.get<unknown, SalaryConfigItem>(`/employees/${employeeId}/salary/config`)
+}
+
+/** 保存费用信息-薪资配置（存在则更新，不存在则新建） */
+export function saveSalaryConfig(employeeId: number, data: SalaryConfigPayload) {
+  return request.put<unknown, SalaryConfigItem>(`/employees/${employeeId}/salary/config`, data)
 }

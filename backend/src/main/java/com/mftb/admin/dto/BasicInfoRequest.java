@@ -30,6 +30,8 @@ public class BasicInfoRequest {
     // ── 通讯信息 ──
     private String mobile;
     private String email;
+    /** 钉钉用户ID（工作通知定向推送用，如领用签署通知） */
+    private String dingtalkUserId;
     private String addressCountry;
     private String addressCity;
     private String addressDetail;

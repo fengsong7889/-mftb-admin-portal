@@ -179,6 +179,8 @@ const ConsumableDashboard = lazy(() => import('./pages/Consumable/Dashboard'))
 const ConsumableItem = lazy(() => import('./pages/Consumable/Item'))
 const ConsumableClaim = lazy(() => import('./pages/Consumable/Claim'))
 const ConsumableStock = lazy(() => import('./pages/Consumable/Stock'))
+const ConsumableStockTxn = lazy(() => import('./pages/Consumable/Stock/StockTxnDetail'))
+const ConsumableStockTxnList = lazy(() => import('./pages/Consumable/Stock/StockTxnList'))
 const ConsumableAlert = lazy(() => import('./pages/Consumable/Alert'))
 const ConsumableCategory = lazy(() => import('./pages/Consumable/Category'))
 const ConsumableBrand = lazy(() => import('./pages/Consumable/Brand'))
@@ -200,6 +202,8 @@ const AssetHandover = lazy(() => import('./pages/AssetManagement/AssetHandover')
 const AssetFlow = lazy(() => import('./pages/AssetManagement/AssetFlow'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
 const AssetTagView = lazy(() => import('./pages/AssetTagView'))
+// 資產領用簽署頁（釘釘工作通知直達，令牌免登，不含後台佈局）
+const AssetClaimSign = lazy(() => import('./pages/AssetClaimSign'))
 // 審批流程配置
 const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
@@ -404,6 +408,8 @@ function AuthenticatedLayout() {
               <Route path="/consumable-item"      element={<ConsumableItem />} />
               <Route path="/consumable-claim"     element={<ConsumableClaim />} />
               <Route path="/consumable-stock"     element={<ConsumableStock />} />
+              <Route path="/consumable-stock/txn" element={<ConsumableStockTxn />} />
+              <Route path="/consumable-stock-txn" element={<ConsumableStockTxnList />} />
               <Route path="/consumable-alert"     element={<ConsumableAlert />} />
               <Route path="/consumable-category"  element={<ConsumableCategory />} />
               <Route path="/consumable-brand"     element={<ConsumableBrand />} />
@@ -469,15 +475,23 @@ function AppRoutes() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
 
-  // 公開移動端頁面（掃碼查看資產標籤）：無需登錄，不套後台佈局
+  // 公開頁面（免登錄，不套後台佈局）：
+  // - /m/... 掃碼查看資產標籤
+  // - /asset-claim-sign 釘釘通知直達的領用簽署頁（憑 HMAC 令牌校驗身份）
   const isPublicMobilePath = location.pathname.startsWith('/m/')
+  const isPublicSignPath = location.pathname.startsWith('/asset-claim-sign')
 
   return (
     <Routes>
-      {isPublicMobilePath ? (
-        <Route path="/m/asset-tag-view" element={
-          <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
-        } />
+      {isPublicMobilePath || isPublicSignPath ? (
+        <>
+          <Route path="/m/asset-tag-view" element={
+            <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
+          } />
+          <Route path="/asset-claim-sign" element={
+            <Suspense fallback={<PageLoading />}><AssetClaimSign /></Suspense>
+          } />
+        </>
       ) : isAuthenticated ? (
         <Route path="/*" element={<AuthenticatedLayout />} />
       ) : (

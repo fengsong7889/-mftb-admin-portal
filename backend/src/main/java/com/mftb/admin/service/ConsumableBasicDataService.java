@@ -17,6 +17,7 @@ public interface ConsumableBasicDataService {
     long createCategory(ConsumableCategorySaveDTO dto);
     void updateCategory(long id, ConsumableCategorySaveDTO dto);
     void deleteCategory(long id);
+    void toggleCategoryStatus(long id);
 
     /* ===== 品牌 ===== */
     /**
@@ -27,6 +28,8 @@ public interface ConsumableBasicDataService {
     long createBrand(ConsumableBrandSaveDTO dto);
     void updateBrand(long id, ConsumableBrandSaveDTO dto);
     void deleteBrand(long id);
+    void toggleBrandStatus(long id);
+    ConsumableBrandVO getBrandDetail(long id);
 
     /* ===== 计量单位 ===== */
     List<ConsumableUnitVO> listUnits(String keyword);

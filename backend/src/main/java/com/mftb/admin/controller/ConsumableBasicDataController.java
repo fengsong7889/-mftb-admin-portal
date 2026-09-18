@@ -57,6 +57,13 @@ public class ConsumableBasicDataController {
         return Result.success();
     }
 
+    @PutMapping("/categories/{id}/status")
+    @RequirePermission(menu = "consumable-category", action = "edit")
+    public Result<Void> toggleCategoryStatus(@PathVariable long id) {
+        basicDataService.toggleCategoryStatus(id);
+        return Result.success();
+    }
+
     /* ===== 品牌 ===== */
 
     @GetMapping("/brands")
@@ -95,6 +102,19 @@ public class ConsumableBasicDataController {
     @RequirePermission(menu = "consumable-brand", action = "delete")
     public Result<Void> deleteBrand(@PathVariable long id) {
         basicDataService.deleteBrand(id);
+        return Result.success();
+    }
+
+    @GetMapping("/brands/{id}")
+    @RequirePermission(menu = "consumable-brand")
+    public Result<ConsumableBrandVO> brandDetail(@PathVariable long id) {
+        return Result.success(basicDataService.getBrandDetail(id));
+    }
+
+    @PutMapping("/brands/{id}/status")
+    @RequirePermission(menu = "consumable-brand", action = "edit")
+    public Result<Void> toggleBrandStatus(@PathVariable long id) {
+        basicDataService.toggleBrandStatus(id);
         return Result.success();
     }
 

@@ -2,7 +2,7 @@
  * 驗收入庫獨立表單頁（採購訂單風格）
  *
  * - 展示採購訂單完整信息（經辦人、部門、供應商分組、明細等），方便驗收人核對
- * - 每條明細可逐行設置「已驗收數量」與「存放位置」，確認後提交
+ * - 每條明細可逐行設置「已驗收數量」與「存放仓库」，確認後提交
  * - 支持 URL ?poId= 帶入訂單（由採購訂單詳情/列表「驗收入庫」跳轉）
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -118,7 +118,7 @@ interface InboundItem extends PurchaseOrderItem {
   selected: boolean
   /** 本次驗收數量 */
   inboundQty: number
-  /** 存放位置 */
+  /** 存放仓库 */
   locationId?: number
   /** 是否已確認驗收 */
   confirmed: boolean

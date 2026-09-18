@@ -31,6 +31,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -148,6 +149,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setDeleted(0);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.insert(user);
+        // 自动写入初始职务记录: operation 固定「入职」, 任职信息映射自新增表单基础信息
+        insertInitialPositionRecord(user, request.getCompany());
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
     }
 
@@ -254,6 +257,29 @@ public class EmployeeServiceImpl implements EmployeeService {
         return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
+    /** 新增员工时自动写入初始职务记录: operation 固定「入职」, 任职信息映射自新增表单填写的基础信息 */
+    private void insertInitialPositionRecord(SysUser user, String company) {
+        EmpPositionRecord record = new EmpPositionRecord();
+        record.setUserId(user.getId());
+        record.setEffectiveDate(LocalDate.now());
+        record.setEffectiveSeq(0);
+        record.setOperation("入职");
+        record.setServiceDept(user.getDepartment());
+        record.setSequenceType(user.getSequence());
+        record.setPositionLevel(user.getJobLevel());
+        record.setRankCode(user.getRank());
+        record.setCompany(company);
+        record.setPositionName(user.getPosition());
+        // 与 DataInitializer 员工职务记录补录逻辑保持一致, 默认工作国家为中国
+        record.setWorkCountry("中国");
+        record.setCreatedBy(operatorResolver.currentOperatorName());
+        record.setUpdatedBy(operatorResolver.currentOperatorName());
+        record.setDeleted(0);
+        empPositionRecordMapper.insert(record);
+        log.info("新增员工自动写入初始职务记录: userId={}, operation=入职, serviceDept={}, company={}",
+                user.getId(), record.getServiceDept(), company);
+    }
+
     /** 设置员工所在部门: 校验部门存在并写入部门名称快照 */
     private void applyDepartment(SysUser user, Long departmentId) {
         if (departmentId == null) {
@@ -346,6 +372,10 @@ public class EmployeeServiceImpl implements EmployeeService {
         contact.put("addressCity", user.getAddressCity());
         contact.put("addressDetail", user.getAddressDetail());
         result.put("contactInfo", contact);
+        // 账号信息（三方通讯/邮箱等账号绑定，后续可扩展企微ID、QQ邮箱、公司邮箱等）
+        Map<String, Object> account = new HashMap<>();
+        account.put("dingtalkUserId", user.getDingtalkUserId());
+        result.put("accountInfo", account);
         return result;
     }
 
@@ -370,6 +400,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (request.getAddressCountry() != null) user.setAddressCountry(request.getAddressCountry());
         if (request.getAddressCity() != null) user.setAddressCity(request.getAddressCity());
         if (request.getAddressDetail() != null) user.setAddressDetail(request.getAddressDetail());
+        // 账号信息（三方通讯/邮箱等账号绑定）
+        if (request.getDingtalkUserId() != null) user.setDingtalkUserId(request.getDingtalkUserId());
 
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);

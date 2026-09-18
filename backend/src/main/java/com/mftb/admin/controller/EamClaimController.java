@@ -42,6 +42,14 @@ public class EamClaimController {
         return Result.success(claimService.employeeSummary(query));
     }
 
+    /** 可选领用人下拉（仅要求领用资产菜单权限，不要求员工管理权限，支持选择本人登记；employeeId 用于深链预填） */
+    @GetMapping("/employee-options")
+    @RequirePermission(menu = MENU)
+    public Result<List<EamClaimEmployeeOptionVO>> employeeOptions(@RequestParam(required = false) String keyword,
+                                                                  @RequestParam(required = false) Long employeeId) {
+        return Result.success(claimService.employeeOptions(keyword, employeeId));
+    }
+
     /** 领用详情 */
     @GetMapping("/{id}")
     @RequirePermission(menu = MENU)

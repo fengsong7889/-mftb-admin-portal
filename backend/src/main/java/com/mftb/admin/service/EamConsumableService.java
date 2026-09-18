@@ -20,12 +20,16 @@ public interface EamConsumableService {
     List<EamConsumableItemVO> itemOptions();
 
     /* ===== 库存 ===== */
-    List<EamConsumableStockVO> stockList(Long itemId, Long locationId);
+    List<EamConsumableStockVO> stockList(EamConsumableStockQuery query);
     /** 入库（手工/期初；采购验收分流亦复用） */
     void inbound(EamConsumableInboundDTO dto);
 
     /* ===== 流水 ===== */
     List<EamConsumableTxnVO> txns(Long itemId, Long locationId, Integer limit);
+    /** 流水分页查询（独立菜单页用） */
+    PageResult<EamConsumableTxnVO> pageTxns(EamConsumableTxnQuery query);
+    /** 流水统计聚合（独立菜单页指标卡用，与分页查询同过滤条件） */
+    EamConsumableTxnStatsVO txnStats(EamConsumableTxnQuery query);
 
     /* ===== 预警 ===== */
     List<EamConsumableItemVO> alerts();
