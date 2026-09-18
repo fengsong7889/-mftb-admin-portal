@@ -2,7 +2,7 @@
  * 通知渠道配置 API
  * 支持多平台、多场景、多渠道 CRUD 及测试
  */
-import request from './request'
+import request, { SILENT_HEADER } from './request'
 
 /** 通知渠道数据 */
 export interface ChannelItem {
@@ -86,4 +86,37 @@ export function toggleChannel(id: number, enabled: boolean): Promise<void> {
 /** 发送测试消息 */
 export function testChannel(id: number): Promise<string> {
   return request.post<unknown, string>(`/notification-channels/${id}/test`)
+}
+
+/** 企业内部应用读取契约：不包含任何密钥明文。 */
+export interface AppNotificationConfig {
+  appKey: string
+  agentId: string
+  baseUrl: string
+  appSecretConfigured: boolean
+  tokenSecretConfigured: boolean
+}
+
+/** AppSecret 留空/省略保留原值，更换 AppKey 时必须重新提供。 */
+export interface AppNotificationConfigPayload {
+  appKey: string
+  appSecret?: string
+  agentId: string
+  baseUrl: string
+}
+
+export function fetchAppConfig(signal?: AbortSignal): Promise<AppNotificationConfig> {
+  // 读取失败由页签内的错误态和重试按钮承接，卸载时的主动取消不应弹出全局错误。
+  return request.get<unknown, AppNotificationConfig>('/notification-channels/app-config', {
+    signal, headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+export function saveAppConfig(data: AppNotificationConfigPayload): Promise<void> {
+  return request.put('/notification-channels/app-config', data)
+}
+
+/** 只验证已保存的凭证，不发送通知、不返回 token。 */
+export function testAppConnection(): Promise<void> {
+  return request.post('/notification-channels/app-config/test')
 }

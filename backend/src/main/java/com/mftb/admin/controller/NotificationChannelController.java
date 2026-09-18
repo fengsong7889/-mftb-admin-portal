@@ -3,6 +3,11 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.SysNotificationChannelSaveDTO;
+import com.mftb.admin.dto.DingTalkAppConfigRequest;
+import com.mftb.admin.dto.DingTalkAppConfigVO;
+import com.mftb.admin.service.DingTalkAppService;
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import com.mftb.admin.service.NotificationChannelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +25,30 @@ import java.util.Map;
 public class NotificationChannelController {
 
     private final NotificationChannelService notificationChannelService;
+    private final DingTalkAppService dingTalkAppService;
+
+    @Operation(summary = "读取企业内部应用配置（不含密钥明文）")
+    @GetMapping("/app-config")
+    @RequirePermission(menu = "notification-config")
+    public Result<DingTalkAppConfigVO> getAppConfig() {
+        return Result.success(notificationChannelService.getAppConfig());
+    }
+
+    @Operation(summary = "保存企业内部应用配置，AppSecret 留空保留，不轮换签署密钥")
+    @PutMapping("/app-config")
+    @RequirePermission(menu = "notification-config", action = "edit")
+    public Result<Void> saveAppConfig(@Valid @RequestBody DingTalkAppConfigRequest request) {
+        notificationChannelService.saveAppConfig(request);
+        return Result.success();
+    }
+
+    @Operation(summary = "用已保存凭证测试连接，不发送通知，不返回 access_token")
+    @PostMapping("/app-config/test")
+    @RequirePermission(menu = "notification-config", action = "edit")
+    public Result<Void> testAppConnection() {
+        dingTalkAppService.testConnection();
+        return Result.success();
+    }
 
     /** 列出所有渠道（支持筛选：channel / name / enabled / updatedBy / updatedAfter / updatedBefore） */
     @GetMapping

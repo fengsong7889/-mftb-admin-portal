@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Form, Input, Select, Button, Tag, Table, Switch, Popconfirm, Space, message, DatePicker, Modal } from 'antd'
+import { Form, Input, Select, Button, Tag, Table, Switch, Popconfirm, Space, message, DatePicker, Modal, Tabs } from 'antd'
+import { useTranslation } from 'react-i18next'
+import EnterpriseAppConfig from './EnterpriseAppConfig'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { fetchChannels, toggleChannel, deleteChannel, testChannel } from '../../api/notificationChannel'
@@ -31,7 +33,7 @@ const STATUS_OPTIONS = [
  * 通知渠道配置列表页
  * 标准三段式布局：搜索区 + 操作区 + Table
  */
-export default function NotificationConfig() {
+function RobotChannels() {
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [dataSource, setDataSource] = useState<ChannelItem[]>([])
@@ -186,7 +188,7 @@ export default function NotificationConfig() {
   ]
 
   return (
-    <div className="content-area">
+    <div>
       {/* ====== 搜索区 ====== */}
       <div className="search-section notification-config-search">
         <Form form={form} layout="inline">
@@ -232,6 +234,18 @@ export default function NotificationConfig() {
         scroll={{ x: 1235 }}
         locale={{ emptyText: '暫無渠道配置，請點擊「新增渠道」添加' }}
       />
+    </div>
+  )
+}
+
+export default function NotificationConfig() {
+  const { t } = useTranslation()
+  return (
+    <div className="content-area notification-config">
+      <Tabs defaultActiveKey="robot" items={[
+        { key: 'robot', label: t('notificationApp.robotTab'), children: <RobotChannels /> },
+        { key: 'app', label: t('notificationApp.appTab'), children: <EnterpriseAppConfig /> },
+      ]} />
     </div>
   )
 }

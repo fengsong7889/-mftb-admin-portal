@@ -86,6 +86,8 @@ public abstract class SecurityTestBase {
     protected LoginLogService loginLogService;
     @MockBean(name = "employeeService")
     protected EmployeeService employeeService;
+    @MockBean(name = "employeeSalaryService")
+    protected EmployeeSalaryService employeeSalaryService;
     @MockBean(name = "emergencyContactService")
     protected EmergencyContactService emergencyContactService;
     @MockBean(name = "positionRecordService")

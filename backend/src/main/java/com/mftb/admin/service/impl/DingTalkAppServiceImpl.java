@@ -2,6 +2,11 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.entity.SysConfig;
+import com.mftb.admin.common.BusinessException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriComponentsBuilder;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import com.mftb.admin.mapper.SysConfigMapper;
 import com.mftb.admin.service.DingTalkAppService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +36,23 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
     /** access_token 缓存（钉钉有效期 2 小时，提前 5 分钟刷新） */
     private volatile String cachedAccessToken;
     private volatile long tokenExpireAt = 0;
+    private String cachedAppKey;
+    private String cachedAppSecret;
+
+    @Override
+    public synchronized void invalidateAccessToken() {
+        cachedAccessToken = null;
+        tokenExpireAt = 0;
+        cachedAppKey = null;
+        cachedAppSecret = null;
+    }
+
+    @Override
+    public void testConnection() {
+        if (!isConfigured()) throw new BusinessException(400, "請先保存完整的企業內部應用配置");
+        // 始终访问钉钉验证已保存凭证，不使用旧缓存，也不向客户端返回 token。
+        requestAccessToken(getConfig(APP_KEY), getConfig(APP_SECRET));
+    }
 
     /* ==================== 对外接口 ==================== */
 
@@ -43,18 +65,18 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
 
     @Override
     @Async
-    public boolean sendWorkNotification(List<String> userIds, String title, String content) {
+    public CompletableFuture<Boolean> sendWorkNotification(List<String> userIds, String title, String content) {
         if (userIds == null || userIds.isEmpty()) {
             log.warn("钉钉工作通知未发送：接收人列表为空");
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
         if (!isConfigured()) {
             log.warn("钉钉工作通知未发送：企业内部应用未配置（sys_config 缺少 dingtalk_app_key/app_secret/agent_id）");
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
         try {
             String token = getAccessToken();
-            if (token == null) return false;
+            if (token == null) return CompletableFuture.completedFuture(false);
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("agent_id", Long.parseLong(getConfig("dingtalk_agent_id")));
@@ -72,13 +94,13 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
                     body, Map.class);
             if (response != null && Integer.valueOf(0).equals(response.get("errcode"))) {
                 log.info("钉钉工作通知已发送: title={}, users={}", title, userIds.size());
-                return true;
+                return CompletableFuture.completedFuture(true);
             }
-            log.warn("钉钉工作通知发送失败: {}", response);
-            return false;
+            log.warn("钉钉工作通知发送失败: errcode={}", response != null ? response.get("errcode") : "empty");
+            return CompletableFuture.completedFuture(false);
         } catch (Exception e) {
-            log.error("钉钉工作通知发送异常: {}", e.getMessage(), e);
-            return false;
+            log.error("钉钉工作通知发送异常: {}", e.getClass().getSimpleName());
+            return CompletableFuture.completedFuture(false);
         }
     }
 
@@ -89,28 +111,55 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
      */
     private synchronized String getAccessToken() {
         long now = System.currentTimeMillis();
-        if (cachedAccessToken != null && now < tokenExpireAt) {
+        String appKey = getConfig(APP_KEY);
+        String appSecret = getConfig(APP_SECRET);
+        // 除本实例保存后失效外，也识别其他实例修改的凭证，避免沿用旧应用 token。
+        if (cachedAccessToken != null && now < tokenExpireAt
+                && Objects.equals(appKey, cachedAppKey) && Objects.equals(appSecret, cachedAppSecret)) {
             return cachedAccessToken;
         }
         try {
-            String url = "https://oapi.dingtalk.com/gettoken?appkey=" + getConfig("dingtalk_app_key")
-                    + "&appsecret=" + getConfig("dingtalk_app_secret");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
-            if (response != null && Integer.valueOf(0).equals(response.get("errcode"))) {
-                cachedAccessToken = String.valueOf(response.get("access_token"));
-                // expires_in 秒，提前 5 分钟刷新
-                Integer expiresIn = (Integer) response.get("expires_in");
-                tokenExpireAt = now + (expiresIn != null ? expiresIn : 7200) * 1000L - 5 * 60 * 1000L;
-                return cachedAccessToken;
-            }
-            log.error("获取钉钉 access_token 失败: {}", response);
-            return null;
-        } catch (Exception e) {
-            log.error("获取钉钉 access_token 异常: {}", e.getMessage(), e);
+            TokenGrant grant = requestAccessToken(appKey, appSecret);
+            cachedAccessToken = grant.token();
+            cachedAppKey = appKey;
+            cachedAppSecret = appSecret;
+            tokenExpireAt = now + Math.max(0, grant.expiresIn() - 300) * 1000L;
+            return cachedAccessToken;
+        } catch (BusinessException e) {
+            log.warn("获取钉钉 access_token 失败: {}", e.getMessage());
             return null;
         }
     }
+
+    private TokenGrant requestAccessToken(String appKey, String appSecret) {
+        if (!StringUtils.hasText(appKey) || !StringUtils.hasText(appSecret)) {
+            throw new BusinessException(400, "請先保存 AppKey 和 AppSecret");
+        }
+        try {
+            var uri = UriComponentsBuilder.fromHttpUrl("https://oapi.dingtalk.com/gettoken")
+                    .queryParam("appkey", "{key}").queryParam("appsecret", "{secret}")
+                    .encode().buildAndExpand(appKey, appSecret).toUri();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.getForObject(uri, Map.class);
+            if (response == null) throw new BusinessException(400, "釘釘返回空響應，請稍後重試");
+            if (!(response.get("errcode") instanceof Number code) || code.longValue() != 0) {
+                long errorCode = response.get("errcode") instanceof Number number ? number.longValue() : -1;
+                String hint = errorCode == 40096 ? "AppKey 或 AppSecret 不正確" : "請檢查應用憑證、權限及出口 IP 白名單";
+                throw new BusinessException(400, "釘釘連接失敗（錯誤碼 " + errorCode + "）：" + hint);
+            }
+            if (!(response.get("access_token") instanceof String token) || !StringUtils.hasText(token)) {
+                throw new BusinessException(400, "釘釘未返回有效 access_token，請稍後重試");
+            }
+            long expiresIn = response.get("expires_in") instanceof Number number ? number.longValue() : 7200;
+            return new TokenGrant(token, expiresIn);
+        } catch (RestClientException e) {
+            // HTTP 异常可能含带密钥的请求 URL，不能记录原异常或回传原文。
+            log.warn("钉钉连接异常: {}", e.getClass().getSimpleName());
+            throw new BusinessException(400, "無法連接釘釘服務，請檢查網絡後重試");
+        }
+    }
+
+    private record TokenGrant(String token, long expiresIn) { }
 
     private String getConfig(String key) {
         SysConfig config = sysConfigMapper.selectOne(

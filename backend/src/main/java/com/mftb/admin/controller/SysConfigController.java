@@ -2,6 +2,10 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.service.DingTalkAppService;
+import java.text.Normalizer;
+import java.util.Locale;
 import com.mftb.admin.dto.SysConfigUpdateDTO;
 import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +33,7 @@ public class SysConfigController {
     @GetMapping("/{key}")
     @RequirePermission(menu = "rule-config")
     public Result<Map<String, String>> get(@PathVariable String key) {
+        rejectAppConfigKey(key);
         String value = sysConfigService.getConfigValue(key);
         return Result.success(Map.of("key", key, "value", value != null ? value : ""));
     }
@@ -37,11 +42,21 @@ public class SysConfigController {
     @PutMapping("/{key}")
     @RequirePermission(menu = "rule-config", action = "edit")
     public Result<Void> update(@PathVariable String key, @RequestBody SysConfigUpdateDTO dto) {
+        rejectAppConfigKey(key);
         String value = dto.getValue();
         if (value == null || value.isBlank()) {
             return Result.error(400, "配置值不能為空");
         }
         sysConfigService.updateConfig(key, value);
         return Result.success();
+    }
+
+    private void rejectAppConfigKey(String key) {
+        // 与数据库不区分大小写/重音的排序规则对齐，防止通用入口绕过密钥脱敏和专属权限。
+        String normalized = Normalizer.normalize(key, Normalizer.Form.NFKD)
+                .replaceAll("\\p{M}", "").trim().toLowerCase(Locale.ROOT);
+        if (DingTalkAppService.APP_CONFIG_KEYS.contains(normalized)) {
+            throw new BusinessException(403, "企業內部應用配置請使用通知配置專用入口");
+        }
     }
 }

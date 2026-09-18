@@ -9,3 +9,58 @@
   justify-content: flex-end;
   gap: 16px;
 }
+
+.notification-config .ant-tabs-content-holder,
+.notification-config .ant-tabs-tabpane {
+  min-width: 0;
+}
+
+.notification-app__notice {
+  margin-bottom: 16px;
+}
+
+.notification-app__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 0 16px;
+}
+
+.notification-app__section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.notification-app__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1890FF;
+  background: #E6F7FF;
+}
+
+.notification-app__icon--security {
+  color: #722ED1;
+  background: #F9F0FF;
+}
+
+.notification-app__divider {
+  flex: 1;
+  height: 1px;
+  margin-left: 8px;
+  background: #f0f0f0;
+}
+
+.notification-app__hint {
+  color: #8C8C8C;
+  font-size: 12px;
+  margin: 8px 0 0;
+}
