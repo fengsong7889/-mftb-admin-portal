@@ -98,6 +98,10 @@ public class DataInitializer implements CommandLineRunner {
         migrateEamAssetTagTables();
         // 164: 员工费用信息表自动创建 (收入项/扣除项/薪资配置, 每次启动幂等检查, 不受 V_SCHEMA 版本门控)
         migrateEmployeeSalaryTables();
+        // 163: 钉钉企业内部应用——sys_user.dingtalk_user_id 补列 + 应用配置种子
+        //      (163 脚本等效, 每次启动幂等检查, 不受 V_SCHEMA 版本门控;
+        //       必须位于任何 sys_user 查询之前, 否则启动期 Runner 查询报 Unknown column 导致启动失败重启循环)
+        migrateDingTalkAppSignature();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -359,6 +363,30 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "ALTER TABLE sys_user ADD COLUMN address_city VARCHAR(50) DEFAULT NULL COMMENT '住址-城市'");
         addColumnIfAbsent("sys_user", "address_detail",
                 "ALTER TABLE sys_user ADD COLUMN address_detail VARCHAR(300) DEFAULT NULL COMMENT '住址-详细地址'");
+    }
+
+    /** 钉钉企业内部应用 (163 脚本等效): sys_user 补 dingtalk_user_id 列 + sys_config 应用配置种子, 幂等 */
+    private void migrateDingTalkAppSignature() {
+        // 1) sys_user 增加 dingtalk_user_id（员工与钉钉账号绑定, 领用签署等工作通知定向推送用）
+        addColumnIfAbsent("sys_user", "dingtalk_user_id",
+                "ALTER TABLE sys_user ADD COLUMN dingtalk_user_id VARCHAR(64) DEFAULT NULL "
+                        + "COMMENT '钉钉用户ID（工作通知定向推送用）' AFTER native_place");
+        // 2) sys_config 钉钉企业内部应用配置键（值留空, 管理员按需填写真实值）
+        jdbcTemplate.update("INSERT INTO sys_config (config_key, config_value, description, created_at, updated_at) "
+                + "SELECT k.ck, k.cv, k.cd, NOW(), NOW() FROM ( "
+                + "SELECT 'dingtalk_app_key' AS ck, '' AS cv, '钉钉企业内部应用 AppKey' AS cd UNION ALL "
+                + "SELECT 'dingtalk_app_secret', '', '钉钉企业内部应用 AppSecret' UNION ALL "
+                + "SELECT 'dingtalk_agent_id', '', '钉钉企业内部应用 AgentId（发送工作通知使用）' UNION ALL "
+                + "SELECT 'dingtalk_notify_base_url', '', '钉钉签署链接跳转的前端基础地址（如 https://admin.example.com）' "
+                + ") k WHERE NOT EXISTS (SELECT 1 FROM sys_config sc WHERE sc.config_key = k.ck)");
+        // 3) 钉钉签署令牌签名密钥（HMAC）, 仅首次插入时随机生成
+        Integer tokenSecretCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_config WHERE config_key = 'dingtalk_sign_token_secret'", Integer.class);
+        if (tokenSecretCount == null || tokenSecretCount == 0) {
+            jdbcTemplate.update("INSERT INTO sys_config (config_key, config_value, description, created_at, updated_at) "
+                    + "VALUES ('dingtalk_sign_token_secret', SHA2(CONCAT(RAND(), UUID(), NOW()), 256), "
+                    + "'领用签署链接令牌签名密钥（勿外泄）', NOW(), NOW())");
+        }
     }
 
     /** 员工详情页: 新建 emp_emergency_contact + emp_position_record 表 */
