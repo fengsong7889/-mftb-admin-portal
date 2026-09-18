@@ -394,6 +394,8 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_purchase_order', label: '採購訂單編號', type: 'table', value: 'DDCG', defaultValue: 'DDCG', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDCG202609140000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-採購訂單' },
       { key: 'eam_inbound_batch', label: '驗收入庫批次編號', type: 'table', value: 'IB', defaultValue: 'IB', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'IB202609160000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-驗收入庫' },
       { key: 'eam_asset', label: '資產編號', type: 'table', value: 'TB', defaultValue: 'TB', dateFormat: '', min: 4, max: 4, unit: 'TB-ZH-0101-0001', remark: '{品牌编碼}-{倉庫编碼}-{分類碼}-{n}位分類內自增序號', menu: '物資管理(EAM)-資產台賬' },
+      { key: 'eam_consumable_item', label: '耗材編碼', type: 'table', value: 'HC', defaultValue: 'HC', dateFormat: '', min: 6, max: 6, unit: 'HC000001', remark: '{prefix} + {n}位數字自增（全局自增）', menu: '物資管理(EAM)-耗材檔案' },
+      { key: 'eam_consumable_claim', label: '耗材領用單號', type: 'table', value: 'HCLY', defaultValue: 'HCLY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'HCLY202609180000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理(EAM)-耗材領用' },
       { key: 'workflow_config', label: '流程配置ID', type: 'table', value: 'LC', defaultValue: 'LC', dateFormat: '', min: 5, max: 5, unit: 'LC00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '審批中心' },
       /* ── 員工管理 ── */
       { key: 'employee_no', label: '工號', type: 'table', value: 'MF', defaultValue: 'MF', dateFormat: '', min: 5, max: 5, unit: 'MF00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '員工管理' },

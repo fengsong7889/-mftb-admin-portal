@@ -82,6 +82,9 @@ import {
   FileDoneOutlined, // 采购订单
   ImportOutlined, // 验收入库
   BellOutlined, // 通知渠道配置
+  GoldOutlined, // 耗材管理分组
+  ProfileOutlined, // 耗材档案
+  AlertOutlined, // 库存预警
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -274,6 +277,12 @@ const keyToPath: Record<string, string> = {
   // EAM 採購
   'purchase-order':      '/purchase-order',
   'purchase-request':    '/oa-purchase-request',
+  // 耗材管理（消耗品/MRO）
+  'consumable-dashboard': '/consumable-dashboard',
+  'consumable-item':      '/consumable-item',
+  'consumable-claim':     '/consumable-claim',
+  'consumable-stock':     '/consumable-stock',
+  'consumable-alert':     '/consumable-alert',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -708,6 +717,18 @@ const menuItems: MenuItem[] = [
           { key: 'asset-flow', icon: <HistoryOutlined />, label: '變更歷史' },
         ],
       },
+      {
+        key: 'consumable-ops',
+        icon: <GoldOutlined />,
+        label: '耗材管理',
+        children: [
+          { key: 'consumable-dashboard', icon: <DashboardOutlined />, label: '耗材看板' },
+          { key: 'consumable-item', icon: <ProfileOutlined />, label: '耗材檔案' },
+          { key: 'consumable-claim', icon: <UserAddOutlined />, label: '耗材領用' },
+          { key: 'consumable-stock', icon: <DatabaseOutlined />, label: '耗材庫存' },
+          { key: 'consumable-alert', icon: <AlertOutlined />, label: '庫存預警' },
+        ],
+      },
       { key: 'asset-supplier', icon: <ContactsOutlined />, label: '供應商管理' },
       {
         key: 'asset-basic',
@@ -940,6 +961,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-flow-ops':   <SwapOutlined />,
   'asset-maintenance': <ToolOutlined />,
   'asset-purchase':   <ShoppingCartOutlined />,
+  'consumable-ops':   <GoldOutlined />,
   'asset-list':       <AppstoreOutlined />,
   'asset-add':        <AppstoreAddOutlined />,
   'asset-claim':      <UserAddOutlined />,

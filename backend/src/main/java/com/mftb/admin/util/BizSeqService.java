@@ -115,6 +115,10 @@ public class BizSeqService {
     public static final String RULE_EAM_HANDOVER = "eam_handover";
     /** EAM 调拨编号 */
     public static final String RULE_EAM_TRANSFER = "eam_transfer";
+    /** EAM 耗材编码 */
+    public static final String RULE_EAM_CONSUMABLE_ITEM = "eam_consumable_item";
+    /** EAM 耗材领用单号 */
+    public static final String RULE_EAM_CONSUMABLE_CLAIM = "eam_consumable_claim";
 
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）

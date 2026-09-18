@@ -1743,6 +1743,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 1 WHERE menu_key = 'process-center' AND sort_order != 1");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'oa-requests' AND sort_order != 2");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'workflow-config' AND sort_order != 3");
+        // 耗材管理分组排序调整：从 sort=6 改为 sort=4（紧跟在资产维护与处置之后）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND sort_order != 4");
         // 修正 oa-requests 名称（曾与 process-center 重名为"流程中心"，应为"流程事项"）
         jdbcTemplate.update("UPDATE sys_menu SET name = '流程事項' WHERE menu_key = 'oa-requests' AND name != '流程事項'");
         // 图标统一（无条件覆盖，前端 Sidebar 图标颜色由 CSS nth-child 按位置着色，顺序正确后颜色自然对齐）

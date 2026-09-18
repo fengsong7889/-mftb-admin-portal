@@ -104,6 +104,9 @@ import {
   ShoppingCartOutlined,
   FileDoneOutlined,
   HistoryOutlined,
+  // 耗材管理菜单图标
+  GoldOutlined,
+  ProfileOutlined,
 } from '@ant-design/icons'
 
 /** 菜单可用图标注册表：图标名称 → 组件（数据库 icon 字段存储名称字符串） */
@@ -171,6 +174,8 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'TableOutlined': TableOutlined,
   'FormOutlined': FormOutlined,
   'AlertOutlined': AlertOutlined,
+  'GoldOutlined': GoldOutlined,
+  'ProfileOutlined': ProfileOutlined,
   'InfoCircleOutlined': InfoCircleOutlined,
   'QuestionCircleOutlined': QuestionCircleOutlined,
   'FilterOutlined': FilterOutlined,

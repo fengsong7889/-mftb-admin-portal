@@ -1217,6 +1217,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'asset-scrap',
   'asset-repair',
   'asset-inventory',
+  // 耗材管理（管理类菜单受控；耗材领用 consumable-claim 为全员自助，不受控）
+  'consumable-dashboard',
+  'consumable-item',
+  'consumable-stock',
+  'consumable-alert',
 ]
 
 /**
@@ -1371,6 +1376,12 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-compensation/payment': 'asset-compensation',
   '/asset-compensation/refund': 'asset-compensation',
   '/asset-compensation/review': 'asset-compensation',
+  // 耗材管理（领用为全员自助，其余为管理类受控路由）
+  '/consumable-dashboard': 'consumable-dashboard',
+  '/consumable-item': 'consumable-item',
+  '/consumable-claim': 'consumable-claim',
+  '/consumable-stock': 'consumable-stock',
+  '/consumable-alert': 'consumable-alert',
 }
 
 /**

@@ -173,6 +173,12 @@ const ParamLibrary = lazy(() => import('./pages/AssetManagement/ParamLibrary'))
 const AssetSupplier = lazy(() => import('./pages/AssetManagement/AssetSupplier'))
 const AssetTag = lazy(() => import('./pages/AssetManagement/AssetTag'))
 const AssetTagPrint = lazy(() => import('./pages/AssetManagement/AssetTagPrint'))
+// 耗材管理（消耗品/MRO）
+const ConsumableDashboard = lazy(() => import('./pages/Consumable/Dashboard'))
+const ConsumableItem = lazy(() => import('./pages/Consumable/Item'))
+const ConsumableClaim = lazy(() => import('./pages/Consumable/Claim'))
+const ConsumableStock = lazy(() => import('./pages/Consumable/Stock'))
+const ConsumableAlert = lazy(() => import('./pages/Consumable/Alert'))
 // EAM 採購入庫
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
 const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
@@ -388,6 +394,12 @@ function AuthenticatedLayout() {
               <Route path="/asset-supplier"   element={<AssetSupplier />} />
               <Route path="/asset-tag"      element={<AssetTag />} />
               <Route path="/asset-tag-print" element={<AssetTagPrint />} />
+              {/* 耗材管理（消耗品/MRO） */}
+              <Route path="/consumable-dashboard" element={<ConsumableDashboard />} />
+              <Route path="/consumable-item"      element={<ConsumableItem />} />
+              <Route path="/consumable-claim"     element={<ConsumableClaim />} />
+              <Route path="/consumable-stock"     element={<ConsumableStock />} />
+              <Route path="/consumable-alert"     element={<ConsumableAlert />} />
               {/* EAM 採購入庫 */}
               <Route path="/purchase-order"   element={<PurchaseOrder />} />
               <Route path="/asset-inbound"    element={<AssetInbound />} />
