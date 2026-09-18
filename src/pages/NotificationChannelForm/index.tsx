@@ -4,7 +4,6 @@ import { Form, Input, Select, Button, Switch, Space, message, Spin } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { getChannelDetail, createChannel, updateChannel } from '../../api/notificationChannel'
 import type { ChannelSaveDTO } from '../../api/notificationChannel'
-import './index.css'
 
 /** 预定义场景选项 */
 const SCENARIO_OPTIONS = [
