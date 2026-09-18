@@ -11,6 +11,9 @@ import type { TableColumnsType } from 'antd'
 import { ImportOutlined, SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import type { Dayjs } from 'dayjs'
+import { fetchConsumableStock, type ConsumableStock } from '@/api/consumable'
+import { type AssetLocation, fetchLocationList } from '@/api/eam'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 
 interface Props {
   onInbound: (itemId?: number) => void
