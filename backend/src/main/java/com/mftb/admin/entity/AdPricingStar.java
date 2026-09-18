@@ -28,7 +28,7 @@ public class AdPricingStar {
     /** 算法名称快照 */
     private String algoName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 业务频道 */

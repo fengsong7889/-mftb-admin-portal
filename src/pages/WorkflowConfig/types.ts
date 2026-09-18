@@ -166,7 +166,7 @@ export const AMOUNT_OPERATOR_OPTIONS: { label: string; value: ConditionOperator 
   { label: '≤', value: 'lte' },
 ]
 
-/** 所屬品牌選項 */
+/** 資產品牌選項 */
 export const CONDITION_BRAND_OPTIONS = [
   { label: '閃蜂', value: '1' },
   { label: 'mFood', value: '2' },
@@ -182,7 +182,7 @@ export const CONDITION_CHANNEL_OPTIONS = [
 /** 可作為條件的字段列表（通用） */
 export const CONDITION_FIELD_OPTIONS = [
   { label: '審批金額', value: 'amount' },
-  { label: '所屬品牌', value: 'brand' },
+  { label: '資產品牌', value: 'brand' },
   { label: '業務頻道', value: 'businessChannel' },
 ]
 
@@ -190,7 +190,7 @@ export const CONDITION_FIELD_OPTIONS = [
 export const GIFT_CONDITION_FIELD_OPTIONS = [
   { label: '廣告類型', value: 'adType' },
   { label: '贈送天數', value: 'giftDays' },
-  { label: '所屬品牌', value: 'brand' },
+  { label: '資產品牌', value: 'brand' },
   { label: '業務頻道', value: 'businessChannel' },
 ]
 

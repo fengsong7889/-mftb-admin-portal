@@ -22,7 +22,7 @@ public class FinDebtQuery extends FinPageQuery {
     /** 门店名称（模糊匹配） */
     private String storeName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 账单编号（模糊匹配） */

@@ -23,17 +23,15 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
- * 耗材领用服务实现（申请 → 审批 → 出库核销，无归还流程）
+ * 耗材领用服务实现（提交即领用：自动通过 + 直接出库扣减，无审批节点）
  * <p>
- * 库存占用生命周期：
+ * 简化后的库存生命周期：
  * <ul>
- *   <li>submit：lock（locked_qty +=），可用量即时下降，杜绝并发超领；写领用单 pending</li>
- *   <li>approve(pass)：pending → approved，保持占用</li>
- *   <li>approve(reject)：pending → rejected，releaseLock 释放占用</li>
- *   <li>issue：approved → issued，deductOnIssue（qty-=/locked_qty-=），写 out_claim 流水</li>
- *   <li>cancel：pending/approved → cancelled，releaseLock 释放占用</li>
+ *   <li>submit：逐项校验可用量 → lock 占用 → deductOnIssue 直接扣减 → 写 out_claim 流水；单据直接落为 issued</li>
+ *   <li>approve / issue：保留以兼容历史「待审批 / 已审批」单据的流转，新流程不再经过</li>
+ *   <li>cancel：仅历史 pending/approved 单可撤销并释放占用；issued 单不可撤销</li>
  * </ul>
- * 所有状态流转前 selectForUpdate 加行锁，防并发重复审批/出库。
+ * 所有状态流转前 selectForUpdate 加行锁，防并发重复出库。
  */
 @Slf4j
 @Service
@@ -120,8 +118,17 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         claim.setApplicantEmpId(nullToEmpty(current.getEmpId()));
         claim.setDepartment(nullToEmpty(current.getDepartment()));
         claim.setReason(dto.getReason().trim());
-        claim.setStatus("pending");
+        // 简化流程：提交即自动通过并出库，单据直接落为 issued
+        claim.setStatus("issued");
         String op = operatorResolver.currentOperatorName();
+        LocalDateTime now = LocalDateTime.now();
+        claim.setApproverId(current.getId());
+        claim.setApproverName(op);
+        claim.setApprovedAt(now);
+        claim.setApproveRemark("系統自動通過");
+        claim.setIssueOperatorId(current.getId());
+        claim.setIssueOperator(op);
+        claim.setIssuedAt(now);
         claim.setCreatedBy(op);
         claim.setUpdatedBy(op);
         claimMapper.insert(claim);
@@ -160,6 +167,9 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
             ci.setUnitCost(item.getRefPrice());
             claimItemMapper.insert(ci);
         }
+
+        // 直接出库核销：扣减库存 + 写出库流水
+        deductAllForIssue(claim);
         return claim.getId();
     }
 
@@ -201,7 +211,22 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         if (!"approved".equals(claim.getStatus())) throw new BusinessException("僅已審批單可出庫，當前狀態：" + claim.getStatus());
 
         SysUser op = operatorResolver.currentUser();
-        List<EamConsumableClaimItem> items = loadItems(claimId);
+        deductAllForIssue(claim);
+
+        claim.setStatus("issued");
+        claim.setIssueOperatorId(op != null ? op.getId() : null);
+        claim.setIssueOperator(operatorResolver.currentOperatorName());
+        claim.setIssuedAt(LocalDateTime.now());
+        claim.setUpdatedBy(operatorResolver.currentOperatorName());
+        claimMapper.updateById(claim);
+    }
+
+    /**
+     * 逐项扣减库存并写出库流水（submit 自动出库与 issue 共用）。
+     * 调用前明细已插入且库存已 lock 占用，此处 deductOnIssue 同时扣减 qty 与 locked_qty。
+     */
+    private void deductAllForIssue(EamConsumableClaim claim) {
+        List<EamConsumableClaimItem> items = loadItems(claim.getId());
         for (EamConsumableClaimItem ci : items) {
             EamConsumableStock before = stockMapper.selectForUpdate(ci.getItemId(), ci.getLocationId());
             int beforeQty = before == null ? 0 : nz(before.getQty());
@@ -212,13 +237,6 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
             writeTxn(ci, item, "out_claim", -ci.getQty(), beforeQty, afterQty,
                     "claim", claim.getId(), "領用出庫 " + claim.getClaimNo());
         }
-
-        claim.setStatus("issued");
-        claim.setIssueOperatorId(op != null ? op.getId() : null);
-        claim.setIssueOperator(operatorResolver.currentOperatorName());
-        claim.setIssuedAt(LocalDateTime.now());
-        claim.setUpdatedBy(operatorResolver.currentOperatorName());
-        claimMapper.updateById(claim);
     }
 
     /* ==================== 撤销 ==================== */

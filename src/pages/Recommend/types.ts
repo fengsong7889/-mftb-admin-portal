@@ -109,7 +109,7 @@ export interface WaterfallSlotConfig {
   /** 定價編號（按編號生成規則生成，如 DJWD20260812000） */
   pricingNo?: string
   promotionName?: string                // 广告名称
-  app: AppType                        // 所属品牌
+  app: AppType                        // 资产品牌
   channel: RecommendChannel           // 业务频道
   bizChannel?: string                 // 業務頻道（food/supermarket/groupBuy）
   slotPosition: number                // 展示位置(坑位序号)

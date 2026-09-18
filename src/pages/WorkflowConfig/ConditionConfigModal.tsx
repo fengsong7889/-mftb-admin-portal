@@ -47,7 +47,7 @@ export default function ConditionConfigModal({ open, nodeName, conditions, workf
 
   const fieldOptions = getConditionFieldOptions(workflowType)
   const numericLabel = fieldOptions.find(f => f.value === numericField)?.label || (gift ? '贈送天數' : '審批金額')
-  const brandLabel = fieldOptions.find(f => f.value === 'brand')?.label || '所屬品牌'
+  const brandLabel = fieldOptions.find(f => f.value === 'brand')?.label || '資產品牌'
   const channelLabel = fieldOptions.find(f => f.value === 'businessChannel')?.label || '業務頻道'
   const adTypeLabel = fieldOptions.find(f => f.value === 'adType')?.label || '廣告類型'
 

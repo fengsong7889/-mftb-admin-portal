@@ -46,9 +46,9 @@ public class DingTalkExternalHandler implements McpExternalHandler {
                 : Collections.emptyList();
 
         if ("text".equalsIgnoreCase(msgType)) {
-            dingTalkService.sendText(content, atMobiles, false);
+            dingTalkService.sendText("ai_assistant", content, atMobiles, false);
         } else {
-            dingTalkService.sendMarkdown("AI 助手通知", content, atMobiles, false);
+            dingTalkService.sendMarkdown("ai_assistant", "AI 助手通知", content, atMobiles, false);
         }
 
         log.info("[MCP Exec] dingtalk_sender 已發送: msgType={}, contentLen={}", msgType, content.length());

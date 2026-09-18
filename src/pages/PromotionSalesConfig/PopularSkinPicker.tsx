@@ -25,7 +25,7 @@ const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfoo
  * 人氣商家 - 購買廣告（皮膚售賣，店鋪推廣版）
  * 對應銷售定價「人氣商家」皮膚定價配置：業務配置多套皮膚（邊框 + 大圖 + 菜品展示佈局）並按天定價，
  * 選擇皮膚套件 + 購買時長完成下單，購買後 APP 瀑布流店鋪卡片按所選皮膚展示。
- * 與廣告銷售購買界面唯一區別：無需選擇門店（只選算法名稱 + 所屬品牌）。
+ * 與廣告銷售購買界面唯一區別：無需選擇門店（只選算法名稱 + 資產品牌）。
  */
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 */
@@ -193,7 +193,7 @@ export default function PopularSkinPicker() {
   const navigate = useNavigate()
   const DISH_LAYOUT_LABEL: Record<DishLayout, string> = { grid: t('layoutGrid'), carousel: t('layoutCarousel') }
 
-  // 查詢條件（算法名稱 / 所屬品牌；店鋪推廣入口無需選擇門店）
+  // 查詢條件（算法名稱 / 資產品牌；店鋪推廣入口無需選擇門店）
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)

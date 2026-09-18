@@ -111,16 +111,26 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
     })
   }
 
-  /** 啟用/停用 */
-  const handleToggleStatus = async (record: CategoryAccessory) => {
+  /** 啟用/停用（二次确认） */
+  const handleToggleStatus = (record: CategoryAccessory) => {
     const next = record.status === 0 ? 1 : 0
-    try {
-      await updateCategoryAccessoryStatus(record.id!, next)
-      message.success(next === 1 ? t('asset.enabledStatus') : t('asset.disabledStatus'))
-      loadList()
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.opFailed'))
-    }
+    const actionText = next === 1 ? t('asset.enabledStatus') : t('asset.disabledStatus')
+    Modal.confirm({
+      title: `${actionText}「${record.name}」？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await updateCategoryAccessoryStatus(record.id!, next)
+          message.success(next === 1 ? t('asset.enabledStatus') : t('asset.disabledStatus'))
+          loadList()
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : t('asset.opFailed'))
+        }
+      },
+    })
   }
 
   const columns: TableColumnsType<CategoryAccessory> = [

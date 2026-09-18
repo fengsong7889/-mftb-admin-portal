@@ -14,7 +14,7 @@ public class AdNewStoreInventoryVO {
     /** 算法名称 */
     private String algoName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 门店编码 */

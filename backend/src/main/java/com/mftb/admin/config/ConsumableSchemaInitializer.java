@@ -8,6 +8,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 /**
  * 耗材管理（消耗品/MRO）建表 + 菜单 + 编号规则初始化器
  * <p>
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Component;
 public class ConsumableSchemaInitializer implements CommandLineRunner {
 
     private static final String V_CONSUMABLE_SCHEMA = "consumable:schema-v1.0";
+    private static final String V_CONSUMABLE_REFACTOR = "consumable:refactor-v2.1";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -34,7 +37,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         versionTracker.applyOnce(V_CONSUMABLE_SCHEMA, this::migrate);
-        // 每次启动均修正排序（applyOnce 仅首次执行 migrate，后续启动需独立 UPDATE）
+        versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
+        // 每次启动均修正排序
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 4");
     }
 
@@ -43,6 +47,17 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         seedMenus();
         seedSeqRules();
         log.info("耗材管理（消耗品）初始化完成：建表 + 菜单 + 编号规则");
+    }
+
+    /**
+     * 二期迁移：耗材分类/品牌/计量单位独立化
+     */
+    private void migrateRefactor() {
+        log.info("开始耗材管理二期迁移：分类/品牌/计量单位独立化 ...");
+        createRefactorTables();
+        seedRefactorMenus();
+        seedRefactorData();
+        log.info("耗材管理二期迁移完成");
     }
 
     /* ==================== 1. 建表 ==================== */
@@ -181,16 +196,28 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         ensureMenu(groupId, "consumable-alert", "库存预警", "/consumable-alert", "ConsumableAlert", "AlertOutlined", 5, "[\"view\",\"edit\"]");
 
         // admin 角色授权（超管在权限层直通，此处为菜单可见性与非超管角色兜底）
+        // actions 必须写入：前端受控菜单要求 actions 非空，NULL/空授权会导致菜单整项隐藏
         Long adminRoleId = queryLong("SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1");
         if (adminRoleId != null) {
-            String[] keys = {"consumable-ops", "consumable-dashboard", "consumable-item",
-                    "consumable-claim", "consumable-stock", "consumable-alert"};
-            for (String mk : keys) {
+            Map<String, String> menuActions = Map.of(
+                    "consumable-ops", "[\"view\"]",
+                    "consumable-dashboard", "[\"view\"]",
+                    "consumable-item", actions,
+                    "consumable-claim", actions,
+                    "consumable-stock", "[\"view\",\"create\",\"edit\"]",
+                    "consumable-alert", "[\"view\",\"edit\"]");
+            menuActions.forEach((menuKey, menuActionsJson) -> {
                 jdbcTemplate.update(
-                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id) "
-                                + "SELECT ?, m.id FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0",
-                        adminRoleId, mk);
-            }
+                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                                + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0",
+                        adminRoleId, menuActionsJson, menuKey);
+                // 自愈历史数据：INSERT IGNORE 不会更新已有行，需补齐历史种子的 NULL/空 actions
+                jdbcTemplate.update(
+                        "UPDATE sys_role_menu rm JOIN sys_menu m ON rm.menu_id = m.id "
+                                + "SET rm.actions = ? WHERE rm.role_id = ? AND m.menu_key = ? AND m.deleted = 0 "
+                                + "AND (rm.actions IS NULL OR rm.actions = '')",
+                        menuActionsJson, adminRoleId, menuKey);
+            });
         }
         log.info("耗材管理菜单创建完成（1 分组 + 5 子菜单）");
     }
@@ -243,6 +270,171 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
             return jdbcTemplate.queryForObject(sql, Long.class);
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    /* ==================== 4. 二期迁移：建表 ==================== */
+
+    private void createRefactorTables() {
+        log.info("开始创建耗材基础数据表结构 ...");
+
+        // 耗材分类
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_consumable_category ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "code VARCHAR(64) NOT NULL COMMENT '分类编码', "
+                + "name VARCHAR(100) NOT NULL COMMENT '分类名称', "
+                + "parent_id BIGINT DEFAULT 0 COMMENT '父分类 ID', "
+                + "sort_order INT DEFAULT 0 COMMENT '排序', "
+                + "status VARCHAR(16) NOT NULL DEFAULT 'enabled', "
+                + "remark VARCHAR(500) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', "
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) DEFAULT '', "
+                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_code (code), KEY idx_parent (parent_id), KEY idx_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材分类'");
+
+        // 耗材品牌
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_consumable_brand ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "name VARCHAR(100) NOT NULL COMMENT '品牌名称', "
+                + "name_en VARCHAR(100) DEFAULT '' COMMENT '英文名', "
+                + "category_type VARCHAR(20) NOT NULL DEFAULT 'CONSUMABLE' COMMENT 'ASSET/CONSUMABLE/BOTH', "
+                + "logo VARCHAR(500) DEFAULT '' COMMENT 'Logo URL', "
+                + "status VARCHAR(16) NOT NULL DEFAULT 'enabled', "
+                + "remark VARCHAR(500) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', "
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) DEFAULT '', "
+                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_name (name), KEY idx_type (category_type), KEY idx_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材品牌'");
+
+        // 计量单位
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_consumable_unit ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "name VARCHAR(32) NOT NULL COMMENT '单位名称', "
+                + "abbr VARCHAR(16) DEFAULT '' COMMENT '缩写', "
+                + "sort_order INT DEFAULT 0 COMMENT '排序', "
+                + "status VARCHAR(16) NOT NULL DEFAULT 'enabled', "
+                + "created_by VARCHAR(64) DEFAULT '', "
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) DEFAULT '', "
+                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_name (name), KEY idx_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材计量单位字典'");
+
+        // 耗材主数据表增加新字段（兼容不支持 ADD COLUMN IF NOT EXISTS 的 MySQL 版本）
+        addColumnIfNotExists("biz_eam_consumable_item", "consumable_category_id",
+                "BIGINT DEFAULT NULL COMMENT '耗材分类 ID'");
+        addColumnIfNotExists("biz_eam_consumable_item", "brand_id",
+                "BIGINT DEFAULT NULL COMMENT '耗材品牌 ID'");
+        addIndexIfNotExists("biz_eam_consumable_item", "idx_consumable_category",
+                "consumable_category_id");
+        addIndexIfNotExists("biz_eam_consumable_item", "idx_brand", "brand_id");
+
+        log.info("耗材基础数据表结构创建完成（3 张新表 + 2 个新字段）");
+    }
+
+    /* ==================== 5. 二期迁移：菜单 ==================== */
+
+    private void seedRefactorMenus() {
+        Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
+        if (groupId == null) {
+            log.warn("未找到 consumable-ops 分组，跳过基础配置菜单创建");
+            return;
+        }
+        String actions = "[\"view\",\"create\",\"edit\",\"delete\"]";
+        ensureMenu(groupId, "consumable-category", "耗材分類管理", "/consumable-category", "ConsumableCategory", "AppstoreOutlined", 6, actions);
+        ensureMenu(groupId, "consumable-brand", "耗材品牌管理", "/consumable-brand", "ConsumableBrand", "TagOutlined", 7, actions);
+        ensureMenu(groupId, "consumable-unit", "計量單位管理", "/consumable-unit", "ConsumableUnit", "ColumnWidthOutlined", 8, actions);
+
+        // admin 角色授权
+        Long adminRoleId = queryLong("SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1");
+        if (adminRoleId != null) {
+            for (String menuKey : new String[]{"consumable-category", "consumable-brand", "consumable-unit"}) {
+                jdbcTemplate.update(
+                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                                + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0",
+                        adminRoleId, actions, menuKey);
+            }
+        }
+        log.info("耗材基础配置菜单创建完成（3 个新菜单）");
+    }
+
+    /* ==================== 6. 二期迁移：种子数据 ==================== */
+
+    private void seedRefactorData() {
+        // 计量单位种子
+        String[][] units = {
+                {"個", "pcs", "1"}, {"支", "pcs", "2"}, {"盒", "box", "3"},
+                {"包", "pack", "4"}, {"箱", "ctn", "5"}, {"瓶", "btl", "6"},
+                {"卷", "roll", "7"}, {"張", "sheet", "8"}, {"套", "set", "9"},
+                {"袋", "bag", "10"}
+        };
+        for (String[] u : units) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO biz_consumable_unit (name, abbr, sort_order, status, created_by, updated_by) VALUES (?, ?, ?, 'enabled', 'system', 'system')",
+                    u[0], u[1], Integer.parseInt(u[2]));
+        }
+
+        // 耗材分类种子
+        String[][] categories = {
+                {"HC01", "辦公文具", "1"}, {"HC02", "辦公設備耗材", "2"},
+                {"HC03", "清潔用品", "3"}, {"HC04", "勞保用品", "4"},
+                {"HC05", "水電物料", "5"}, {"HC06", "其他", "99"}
+        };
+        for (String[] c : categories) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO biz_consumable_category (code, name, parent_id, sort_order, status, created_by, updated_by) VALUES (?, ?, 0, ?, 'enabled', 'system', 'system')",
+                    c[0], c[1], Integer.parseInt(c[2]));
+        }
+
+        // 耗材品牌种子
+        String[][] brands = {
+                {"得力", "Deli", "CONSUMABLE"}, {"晨光", "M&G", "CONSUMABLE"},
+                {"真彩", "Truecolor", "CONSUMABLE"}, {"廣博", "GuangBo", "CONSUMABLE"},
+                {"齊心", "Comix", "CONSUMABLE"}, {"惠普", "HP", "BOTH"},
+                {"佳能", "Canon", "BOTH"}, {"愛普生", "Epson", "BOTH"},
+                {"兄弟", "Brother", "BOTH"}, {"維達", "Vinda", "CONSUMABLE"},
+                {"清風", "Breeze", "CONSUMABLE"}, {"藍月亮", "BlueMoon", "CONSUMABLE"},
+                {"立白", "Liby", "CONSUMABLE"}, {"3M", "3M", "BOTH"}
+        };
+        for (String[] b : brands) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO biz_consumable_brand (name, name_en, category_type, status, created_by, updated_by) VALUES (?, ?, ?, 'enabled', 'system', 'system')",
+                    b[0], b[1], b[2]);
+        }
+        log.info("耗材基础数据种子数据写入完成");
+    }
+
+    /** 安全添加列（兼容不支持 ADD COLUMN IF NOT EXISTS 的 MySQL 版本） */
+    private void addColumnIfNotExists(String table, String column, String definition) {
+        Integer cnt = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+        if (cnt != null && cnt == 0) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            log.info("已为 {} 表添加 {} 列", table, column);
+        }
+    }
+
+    /** 安全添加索引（兼容不支持 ADD KEY IF NOT EXISTS 的 MySQL 版本） */
+    private void addIndexIfNotExists(String table, String indexName, String columns) {
+        Integer cnt = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, indexName);
+        if (cnt != null && cnt == 0) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD INDEX " + indexName + " (" + columns + ")");
+            log.info("已为 {} 表添加索引 {}", table, indexName);
         }
     }
 }

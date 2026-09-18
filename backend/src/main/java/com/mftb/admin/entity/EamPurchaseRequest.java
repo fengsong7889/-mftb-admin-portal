@@ -43,7 +43,7 @@ public class EamPurchaseRequest {
     /** 预算金额 */
     private BigDecimal budget;
 
-    /** 所属品牌：1=闪蜂, 2=mFood */
+    /** 资产品牌：1=闪蜂, 2=mFood */
     private Integer brand;
 
     /** pending/approved/rejected */

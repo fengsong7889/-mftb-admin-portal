@@ -20,7 +20,7 @@ public class FinApprovalQuery extends FinPageQuery {
     /** 集团名称（模糊匹配） */
     private String groupName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 流程编号（模糊匹配） */

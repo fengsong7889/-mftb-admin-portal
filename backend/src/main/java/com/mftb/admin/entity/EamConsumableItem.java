@@ -31,6 +31,12 @@ public class EamConsumableItem {
     /** 分类名称快照 */
     private String categoryName;
 
+    /** 耗材分类 ID（biz_consumable_category，独立于资产分类） */
+    private Long consumableCategoryId;
+
+    /** 耗材品牌 ID（biz_consumable_brand） */
+    private Long brandId;
+
     /** 品牌 */
     private String brand;
 

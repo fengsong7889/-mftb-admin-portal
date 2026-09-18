@@ -19,7 +19,7 @@ public class EamModel {
     /** 所属分类编码 */
     private String categoryCode;
 
-    /** 所属品牌 ID */
+    /** 资产品牌 ID */
     private Long brandId;
 
     /** 品牌中文（冗余） */

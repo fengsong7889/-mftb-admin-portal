@@ -1,9 +1,9 @@
 /**
- * 耗材领用申请 独立表单页
+ * 耗材领用 独立表单页
  *
  * 遵循 form-page-style 规范：橙色渐变顶条 + 返回 + 模块卡片 + 底部操作栏
  * 明细为动态行（耗材 + 数量 + 出库仓库），提交前 custom-confirm-modal 二次确认
- * 提交后库存被占用（locked_qty），等待审批 → 出库核销
+ * 简化流程：提交即自动通过并直接扣减库存（无审批节点）
  */
 import { useState, useEffect } from 'react'
 import { Button, Form, Input, InputNumber, Select, Modal, message, Space } from 'antd'
@@ -62,7 +62,7 @@ export default function ClaimForm({ onBack }: Props) {
     setSubmitting(true)
     try {
       await submitConsumableClaim(payload)
-      message.success('領用申請已提交，等待審批')
+      message.success('領用成功，庫存已扣減')
       onBack()
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : '提交失敗')
@@ -81,17 +81,17 @@ export default function ClaimForm({ onBack }: Props) {
     const lines = (values.items || []).filter(l => l && l.itemId != null && (l.qty ?? 0) > 0)
     const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0)
     Modal.confirm({
-      title: '確認提交領用申請？',
+      title: '確認領用？',
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>明細數量：</span><b>{lines.length} 項 / 共 {totalQty}</b></div>
           <div className="confirm-info-row"><span>領用事由：</span><b>{values.reason}</b></div>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>提交後對應庫存將被佔用，審批通過並出庫後核銷。</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>提交後系統將自動通過並直接扣減庫存，無需審批。</div>
         </div>
       ),
-      okText: '確認提交',
+      okText: '確認領用',
       cancelText: '取消',
       onOk: () => doSubmit(values),
     })
@@ -107,7 +107,7 @@ export default function ClaimForm({ onBack }: Props) {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >返回</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>耗材領用申請</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>耗材領用</h2>
         </div>
       </div>
 
@@ -186,7 +186,7 @@ export default function ClaimForm({ onBack }: Props) {
       <div className="form-footer">
         <Space>
           <Button onClick={onBack}>取消</Button>
-          <Button type="primary" loading={submitting} onClick={handleSubmit}>提交申請</Button>
+          <Button type="primary" loading={submitting} onClick={handleSubmit}>確認領用</Button>
         </Space>
       </div>
     </>

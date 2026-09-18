@@ -37,7 +37,7 @@ public class StoreController {
     private final StoreService storeService;
     private final StoreDataConfigService storeDataConfigService;
 
-    /** 分页查询门店（集团ID/名称、门店ID/名称、所属品牌、业务频道、最后更新人、最后更新时间、创建时间） */
+    /** 分页查询门店（集团ID/名称、门店ID/名称、资产品牌、业务频道、最后更新人、最后更新时间、创建时间） */
     @GetMapping
     @RequirePermission(menu = "store-list")
     public Result<PageResult<StoreVO>> list(StoreQuery query) {

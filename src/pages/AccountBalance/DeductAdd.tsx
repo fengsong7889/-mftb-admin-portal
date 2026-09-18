@@ -173,7 +173,7 @@ export default function DeductAdd() {
       .catch(() => setRiskRow(null))
   }, [groupIdParam, brandParam])
 
-  // 加載門店選項（集團下且所屬品牌與集團一致）
+  // 加載門店選項（集團下且資產品牌與集團一致）
   useEffect(() => {
     if (!groupIdParam) return
     fetchStoresByGroupCode(groupIdParam, brandParam)

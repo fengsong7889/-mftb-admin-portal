@@ -255,7 +255,19 @@ export default function AiQuotaAuth() {
   ])
 
   const handlePolicyToggle = (row: QuotaPolicy) => {
-    setPolicies((prev) => prev.map((p) => (p.id === row.id ? { ...p, status: p.status === 1 ? 0 : 1 } : p)))
+    const newStatus = row.status === 1 ? 0 : 1
+    const actionText = newStatus === 1 ? t('aiQuotaAuth.enableText') : t('aiQuotaAuth.disableText')
+    Modal.confirm({
+      title: `${t('common.confirm')}${actionText}？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: () => {
+        setPolicies((prev) => prev.map((p) => (p.id === row.id ? { ...p, status: newStatus } : p)))
+        message.success(`${actionText}成功`)
+      },
+    })
   }
 
   const filteredPolicies = useMemo(() => policies.filter((p) => !policyQuery || p.name.toLowerCase().includes(policyQuery.toLowerCase())), [policies, policyQuery])

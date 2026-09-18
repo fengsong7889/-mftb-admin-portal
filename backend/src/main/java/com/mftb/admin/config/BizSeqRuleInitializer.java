@@ -533,7 +533,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_CLAIM, "領用編號", "物資管理(EAM)-領用管理",
+                BizSeqService.RULE_EAM_CLAIM, "領用編號", "物資管理(EAM)-領用資產",
                 "LY", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         inserted += jdbcTemplate.update(
@@ -545,7 +545,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_RETURN, "歸還編號", "物資管理(EAM)-領用管理",
+                BizSeqService.RULE_EAM_RETURN, "歸還編號", "物資管理(EAM)-資產歸還",
                 "GH", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -566,7 +566,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_BORROW, "借用編號", "物資管理(EAM)-借用管理",
+                BizSeqService.RULE_EAM_BORROW, "借用編號", "物資管理(EAM)-借用資產",
                 "JY", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         inserted += jdbcTemplate.update(
@@ -598,7 +598,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_HANDOVER, "交接編號", "物資管理(EAM)-交接管理",
+                BizSeqService.RULE_EAM_HANDOVER, "交接編號", "物資管理(EAM)-資產交接",
                 "JJ", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -618,7 +618,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_TRANSFER, "調撥單號", "物資管理(EAM)-調撥管理",
+                BizSeqService.RULE_EAM_TRANSFER, "調撥單號", "物資管理(EAM)-資產調撥",
                 "DB", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {

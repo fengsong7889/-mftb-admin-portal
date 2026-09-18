@@ -147,7 +147,7 @@ export default function MergeAdd() {
 
   const sourceGroupOptions = sourceBrand ? accounts.map(toGroupOption) : []
 
-  /** 存續集團選項：全品牌可選，value 用「集團ID|品牌」保證唯一，品牌在選中後由「所屬品牌」字段展示 */
+  /** 存續集團選項：全品牌可選，value 用「集團ID|品牌」保證唯一，品牌在選中後由「資產品牌」字段展示 */
   const toTargetOption = (a: FinAccount) => ({
     label: `${a.groupId} - ${a.groupName}${a.status !== 'normal' ? `（${t(accountStatusMap[a.status]?.labelKey || '') || a.status}）` : ''}`,
     value: `${a.groupId}|${a.brand}`,

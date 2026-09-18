@@ -892,7 +892,7 @@ export default function OaPurchaseRequest() {
             </Col>
           </Row>
 
-          {/* 第三行：申請部門 + 所屬品牌 + 流程狀態 */}
+          {/* 第三行：申請部門 + 資產品牌 + 流程狀態 */}
           <Row gutter={24}>
             <Col span={8}>
               <Form.Item
@@ -911,8 +911,8 @@ export default function OaPurchaseRequest() {
             </Col>
             <Col span={8}>
               <Form.Item
-                label="所屬品牌" name="brand"
-                rules={[{ required: true, message: '請選擇所屬品牌' }]}
+                label="資產品牌" name="brand"
+                rules={[{ required: true, message: '請選擇資產品牌' }]}
               >
                 <Select placeholder="請選擇品牌" options={numericOptions} />
               </Form.Item>

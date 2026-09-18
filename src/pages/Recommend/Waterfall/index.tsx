@@ -305,7 +305,7 @@ export default function Waterfall() {
       result = result.filter(item => item.bizChannel === values.bizChannel)
     }
     
-    // 所属品牌搜索
+    // 资产品牌搜索
     if (values.app !== undefined && values.app !== null) {
       result = result.filter(item => item.app === values.app)
     }

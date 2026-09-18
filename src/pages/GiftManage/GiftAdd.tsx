@@ -15,7 +15,7 @@ import BrandTag from '../../components/BrandTag'
 
 const { TextArea } = Input
 
-/** 所屬品牌只讀展示（受 Form 控制）：選擇門店後直接展示品牌標籤，無需單選 */
+/** 資產品牌只讀展示（受 Form 控制）：選擇門店後直接展示品牌標籤，無需單選 */
 function BrandDisplay({ value, placeholder }: { value?: string; placeholder?: string }) {
   if (!value) {
     return <span style={{ color: '#8C8C8C', fontSize: 13 }}>{placeholder}</span>
@@ -113,7 +113,7 @@ export default function GiftAdd() {
     }
   }, [selectedGroupId, isGiftMode, form])
 
-  /** 選擇門店後自動帶出所屬品牌（多品牌時需用戶手動選擇） */
+  /** 選擇門店後自動帶出資產品牌（多品牌時需用戶手動選擇） */
   const handleStoreChange = (storeId?: number) => {
     const store = stores.find(s => s.id === storeId)
     const brandStr = store?.brand || ''

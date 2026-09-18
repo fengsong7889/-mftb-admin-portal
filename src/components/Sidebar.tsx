@@ -28,6 +28,7 @@ import {
   ReadOutlined,
   HomeOutlined,
   ColumnHeightOutlined,
+  ColumnWidthOutlined, // 计量单位管理
   SettingOutlined,
   ControlOutlined,
   GlobalOutlined,
@@ -283,6 +284,9 @@ const keyToPath: Record<string, string> = {
   'consumable-claim':     '/consumable-claim',
   'consumable-stock':     '/consumable-stock',
   'consumable-alert':     '/consumable-alert',
+  'consumable-category':  '/consumable-category',
+  'consumable-brand':     '/consumable-brand',
+  'consumable-unit':      '/consumable-unit',
 }
 
 /** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
@@ -698,11 +702,11 @@ const menuItems: MenuItem[] = [
         label: '資產管理',
         children: [
           { key: 'asset-list', icon: <AppstoreOutlined />, label: '資產台賬' },
-          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用管理' },
-          { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用管理' },
-          { key: 'asset-return', icon: <RollbackOutlined />, label: '歸還管理' },
-          { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '調撥管理' },
-          { key: 'asset-handover', icon: <TeamOutlined />, label: '交接管理' },
+          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用資產' },
+          { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用資產' },
+          { key: 'asset-return', icon: <RollbackOutlined />, label: '資產歸還' },
+          { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '資產調撥' },
+          { key: 'asset-handover', icon: <TeamOutlined />, label: '資產交接' },
         ],
       },
       {
@@ -727,6 +731,9 @@ const menuItems: MenuItem[] = [
           { key: 'consumable-claim', icon: <UserAddOutlined />, label: '耗材領用' },
           { key: 'consumable-stock', icon: <DatabaseOutlined />, label: '耗材庫存' },
           { key: 'consumable-alert', icon: <AlertOutlined />, label: '庫存預警' },
+          { key: 'consumable-category', icon: <AppstoreOutlined />, label: '耗材分類管理' },
+          { key: 'consumable-brand', icon: <TagOutlined />, label: '耗材品牌管理' },
+          { key: 'consumable-unit', icon: <ColumnWidthOutlined />, label: '計量單位管理' },
         ],
       },
       { key: 'asset-supplier', icon: <ContactsOutlined />, label: '供應商管理' },

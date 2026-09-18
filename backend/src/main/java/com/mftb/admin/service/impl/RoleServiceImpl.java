@@ -186,6 +186,10 @@ public class RoleServiceImpl implements RoleService {
         }
         List<MenuPermissionDTO> result = new ArrayList<>();
         merged.forEach((menuKey, actions) -> {
+            // 空 actions（如种子遗漏 NULL）视为仅查看，与 PermissionServiceImpl 语义对齐，避免受控菜单整项隐藏
+            if (actions.isEmpty()) {
+                actions.add("view");
+            }
             MenuPermissionDTO dto = new MenuPermissionDTO();
             dto.setMenuKey(menuKey);
             dto.setActions(new ArrayList<>(actions));
@@ -274,9 +278,14 @@ public class RoleServiceImpl implements RoleService {
                 roleId);
         List<MenuPermissionDTO> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
+            List<String> actionList = new ArrayList<>(JsonUtils.parseStringList((String) row.get("actions")));
+            // 空 actions 视为仅查看（与 PermissionServiceImpl 语义对齐）
+            if (actionList.isEmpty()) {
+                actionList.add("view");
+            }
             MenuPermissionDTO dto = new MenuPermissionDTO();
             dto.setMenuKey((String) row.get("menu_key"));
-            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            dto.setActions(actionList);
             result.add(dto);
         }
         return result;
@@ -296,9 +305,14 @@ public class RoleServiceImpl implements RoleService {
                         + "WHERE rm.role_id IN (" + inClause + ") AND m.deleted = 0");
         for (Map<String, Object> row : rows) {
             Long roleId = ((Number) row.get("role_id")).longValue();
+            List<String> actionList = new ArrayList<>(JsonUtils.parseStringList((String) row.get("actions")));
+            // 空 actions 视为仅查看（与 PermissionServiceImpl 语义对齐）
+            if (actionList.isEmpty()) {
+                actionList.add("view");
+            }
             MenuPermissionDTO dto = new MenuPermissionDTO();
             dto.setMenuKey((String) row.get("menu_key"));
-            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            dto.setActions(actionList);
             result.computeIfAbsent(roleId, k -> new ArrayList<>()).add(dto);
         }
         return result;

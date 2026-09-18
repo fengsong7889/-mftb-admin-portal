@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { Table, Button, Input, Tag, Space, Tooltip, message, Modal, Form, Select, Switch, AutoComplete } from 'antd'
+import { Table, Button, Input, Tag, Space, message, Modal, Form, Select, Switch, AutoComplete } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Key } from 'react'
 import {
@@ -9,8 +9,6 @@ import {
   ExportOutlined,
   ExpandAltOutlined,
   ShrinkOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
@@ -528,12 +526,8 @@ export default function MenuConfig() {
           <Space size={0} split={<span className="action-split">|</span>}>
             <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('menuConfig.btnEdit')}</Button>
             <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>{t('menuConfig.btnSettings')}</Button>
-            <Tooltip title={t('menuConfig.tooltipMoveUp')}>
-              <Button type="link" size="small" icon={<ArrowUpOutlined />} onClick={() => handleMove(record.id, 'up')} />
-            </Tooltip>
-            <Tooltip title={t('menuConfig.tooltipMoveDown')}>
-              <Button type="link" size="small" icon={<ArrowDownOutlined />} onClick={() => handleMove(record.id, 'down')} />
-            </Tooltip>
+            <Button type="link" size="small" onClick={() => handleMove(record.id, 'up')}>{t('menuConfig.btnMoveUp')}</Button>
+            <Button type="link" size="small" onClick={() => handleMove(record.id, 'down')}>{t('menuConfig.btnMoveDown')}</Button>
           </Space>
         )
       },

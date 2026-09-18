@@ -5,18 +5,18 @@
  * readOnly=true 时为详情模式（禁用输入、隐藏保存）
  */
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Form, Input, InputNumber, Select, Spin, message, Space } from 'antd'
+import { Button, Form, Input, InputNumber, Select, Spin, message, Space, Switch } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemDetail, createConsumableItem, updateConsumableItem,
-  type ConsumableItemSave,
+  fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchConsumableUnitOptions,
+  type ConsumableItemSave, type ConsumableCategory, type ConsumableBrand, type ConsumableUnit,
 } from '../../../api/consumable'
-import { fetchCategoryList, type AssetCategory } from '../../../api/eam'
 
 interface FormValues {
   name: string
-  categoryId?: number
-  brand?: string
+  consumableCategoryId?: number
+  brandId?: number
   spec?: string
   unit: string
   refPrice?: number
@@ -33,23 +33,33 @@ interface Props {
   onBack: () => void
 }
 
-const UNIT_OPTIONS = ['個', '支', '盒', '包', '箱', '瓶', '卷', '張', '套', '袋'].map(u => ({ label: u, value: u }))
-
 export default function ItemForm({ id, readOnly, onBack }: Props) {
   const [form] = Form.useForm<FormValues>()
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState<AssetCategory[]>([])
+  const [categories, setCategories] = useState<ConsumableCategory[]>([])
+  const [brands, setBrands] = useState<ConsumableBrand[]>([])
+  const [units, setUnits] = useState<ConsumableUnit[]>([])
   const [detailMeta, setDetailMeta] = useState<{ updatedBy?: string; updatedAt?: string }>({})
 
   const categoryOptions = useMemo(
     () => categories.map(c => ({ label: c.name, value: c.id })),
     [categories],
   )
+  const brandOptions = useMemo(
+    () => brands.map(b => ({ label: b.nameEn ? `${b.name}（${b.nameEn}）` : b.name, value: b.id })),
+    [brands],
+  )
+  const unitOptions = useMemo(
+    () => units.map(u => ({ label: u.abbr ? `${u.name}（${u.abbr}）` : u.name, value: u.name })),
+    [units],
+  )
 
   useEffect(() => {
-    fetchCategoryList().then(setCategories).catch(() => { /* 忽略 */ })
+    fetchConsumableCategoryOptions().then(setCategories).catch(() => { /* 忽略 */ })
+    fetchConsumableBrandOptions().then(setBrands).catch(() => { /* 忽略 */ })
+    fetchConsumableUnitOptions().then(setUnits).catch(() => { /* 忽略 */ })
   }, [])
 
   useEffect(() => {
@@ -62,8 +72,8 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
           setDetailMeta({ updatedBy: it.updatedBy, updatedAt: it.updatedAt })
           form.setFieldsValue({
             name: it.name,
-            categoryId: it.categoryId ?? undefined,
-            brand: it.brand || undefined,
+            consumableCategoryId: it.consumableCategoryId ?? undefined,
+            brandId: it.brandId ?? undefined,
             spec: it.spec || undefined,
             unit: it.unit,
             refPrice: it.refPrice ?? 0,
@@ -87,8 +97,8 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
       const v = await form.validateFields()
       const payload: ConsumableItemSave = {
         name: v.name.trim(),
-        categoryId: v.categoryId ?? null,
-        brand: v.brand?.trim(),
+        consumableCategoryId: v.consumableCategoryId ?? null,
+        brandId: v.brandId ?? null,
         spec: v.spec?.trim(),
         unit: v.unit,
         refPrice: v.refPrice ?? 0,
@@ -150,17 +160,17 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             <Form.Item label="耗材名稱" name="name" rules={[{ required: true, message: '請填寫耗材名稱' }]}>
               <Input placeholder="如：A4打印紙 / 中性筆" allowClear />
             </Form.Item>
-            <Form.Item label="分類" name="categoryId">
+            <Form.Item label="耗材分類" name="consumableCategoryId">
               <Select placeholder="選擇分類" allowClear showSearch optionFilterProp="label" options={categoryOptions} />
             </Form.Item>
-            <Form.Item label="品牌" name="brand">
-              <Input placeholder="如：得力 / 晨光" allowClear />
+            <Form.Item label="耗材品牌" name="brandId">
+              <Select placeholder="選擇品牌" allowClear showSearch optionFilterProp="label" options={brandOptions} />
             </Form.Item>
             <Form.Item label="規格型號" name="spec">
               <Input placeholder="如：70g 500張/包" allowClear />
             </Form.Item>
             <Form.Item label="計量單位" name="unit" rules={[{ required: true, message: '請選擇單位' }]}>
-              <Select placeholder="選擇單位" options={UNIT_OPTIONS} showSearch />
+              <Select placeholder="選擇單位" options={unitOptions} showSearch optionFilterProp="label" />
             </Form.Item>
             <Form.Item label="參考單價（元）" name="refPrice">
               <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="0.00" />
@@ -188,8 +198,11 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             <Form.Item label="單次限領量" name="perClaimLimit">
               <InputNumber min={0} precision={0} style={{ width: '100%' }} placeholder="0=不限" />
             </Form.Item>
-            <Form.Item label="狀態" name="status">
-              <Select options={[{ label: '啟用', value: 'enabled' }, { label: '停用', value: 'disabled' }]} />
+            <Form.Item label="狀態" name="status" valuePropName="checked"
+              getValueFromEvent={(checked: boolean) => (checked ? 'enabled' : 'disabled')}
+              getValueProps={(value?: string) => ({ checked: value === 'enabled' })}
+            >
+              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
             </Form.Item>
           </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>

@@ -18,7 +18,7 @@ public class StoreRequest {
     @NotBlank(message = "門店名稱不能為空")
     private String storeName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 业务频道 */

@@ -19,7 +19,7 @@ public class FinReconcileQuery extends FinPageQuery {
     /** 集团名称（模糊匹配） */
     private String groupName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 统计日期-开始 */

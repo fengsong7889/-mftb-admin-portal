@@ -342,7 +342,7 @@ public class EamClaimServiceImpl implements EamClaimService {
         EamClaim claim = claimMapper.selectForUpdate(claimId);
         if (claim == null) throw new BusinessException("領用記錄不存在");
         if ("transferred".equals(claim.getStatus()) || claim.getSourceTransferId() != null)
-            throw new BusinessException("調撥關聯領用不可直接取消，請至調撥管理辦理");
+            throw new BusinessException("調撥關聯領用不可直接取消，請至資產調撥辦理");
         boolean wasActive = "claimed".equals(claim.getStatus());
         if (wasActive) {
             EamAsset a = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));

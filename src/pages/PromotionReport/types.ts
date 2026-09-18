@@ -19,7 +19,7 @@ export const REPORT_RECOMMEND_TYPE_COLOR: Partial<Record<ReportRecommendType, st
   [ReportRecommendType.TRAFFIC_AD]: 'purple',
 }
 
-/** 所属品牌枚举 */
+/** 资产品牌枚举 */
 export enum ReportApp {
   SHANFENG = 1,
   MFOOD = 2,
@@ -90,7 +90,7 @@ export interface OrderReportItem {
   orderNo: string                    // 訂單編號
   promotionName: string              // 推廣活動名稱
   recommendType: ReportRecommendType // 推薦類型
-  app: ReportApp                     // 所屬品牌
+  app: ReportApp                     // 資產品牌
   channel: ReportChannel             // 業務頻道
   region: ReportRegion               // 商圈
   promotionPeriod: string            // 推廣期間 (開始-結束)
@@ -172,7 +172,7 @@ export interface ReportQueryParams {
   orderNo?: string                   // 订单编号
   promotionName?: string             // 推广活动名称
   recommendType?: ReportRecommendType[] // 推荐类型
-  app?: ReportApp                    // 所属品牌
+  app?: ReportApp                    // 资产品牌
   channel?: ReportChannel            // 业务频道
   region?: ReportRegion              // 商圈
   adStatus?: ReportAdStatus          // 广告状态

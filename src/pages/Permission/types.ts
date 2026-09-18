@@ -1222,6 +1222,9 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'consumable-item',
   'consumable-stock',
   'consumable-alert',
+  'consumable-category',
+  'consumable-brand',
+  'consumable-unit',
 ]
 
 /**
@@ -1382,6 +1385,9 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/consumable-claim': 'consumable-claim',
   '/consumable-stock': 'consumable-stock',
   '/consumable-alert': 'consumable-alert',
+  '/consumable-category': 'consumable-category',
+  '/consumable-brand': 'consumable-brand',
+  '/consumable-unit': 'consumable-unit',
 }
 
 /**

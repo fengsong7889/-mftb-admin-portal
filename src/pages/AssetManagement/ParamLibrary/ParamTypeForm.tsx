@@ -250,16 +250,26 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     }
   }
 
-  /** 啟用/停用參數值 */
-  const handleToggleValueStatus = async (record: ParamValue) => {
+  /** 啟用/停用參數值（二次确认） */
+  const handleToggleValueStatus = (record: ParamValue) => {
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
-    try {
-      await updateParamValue(record.id, { status: newStatus })
-      message.success(newStatus === 'enabled' ? t('asset.enabledStatus') : t('asset.disabledStatus'))
-      if (currentTypeCode) await loadParamValues(currentTypeCode)
-    } catch {
-      // 錯誤提示由請求層統一處理
-    }
+    const actionText = newStatus === 'enabled' ? t('asset.enabledStatus') : t('asset.disabledStatus')
+    Modal.confirm({
+      title: `${actionText}「${record.value}」？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await updateParamValue(record.id, { status: newStatus })
+          message.success(newStatus === 'enabled' ? t('asset.enabledStatus') : t('asset.disabledStatus'))
+          if (currentTypeCode) await loadParamValues(currentTypeCode)
+        } catch {
+          // 錯誤提示由請求層統一處理
+        }
+      },
+    })
   }
 
   /** 參數值表格列 */
@@ -276,7 +286,6 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
           checked={status === 'enabled'}
           checkedChildren={t('asset.switchEnabled')}
           unCheckedChildren={t('asset.switchDisabled')}
-          size="small"
           onChange={() => handleToggleValueStatus(record)}
         />
       ),

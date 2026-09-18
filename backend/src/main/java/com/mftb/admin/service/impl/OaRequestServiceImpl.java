@@ -1062,7 +1062,7 @@ public class OaRequestServiceImpl implements OaRequestService {
                 @Override
                 public void afterCommit() {
                     try {
-                        dingTalkService.sendMarkdown(title, text, mobileList, atAll);
+                        dingTalkService.sendMarkdown("oa_approval", title, text, mobileList, atAll);
                     } catch (Exception e) {
                         log.warn("钉钉通知发送失败: {}", e.getMessage());
                     }
@@ -1071,7 +1071,7 @@ public class OaRequestServiceImpl implements OaRequestService {
         } else {
             // 无活跃事务时直接发送
             try {
-                dingTalkService.sendMarkdown(title, text, mobileList, atAll);
+                dingTalkService.sendMarkdown("oa_approval", title, text, mobileList, atAll);
             } catch (Exception e) {
                 log.warn("钉钉通知发送失败: {}", e.getMessage());
             }

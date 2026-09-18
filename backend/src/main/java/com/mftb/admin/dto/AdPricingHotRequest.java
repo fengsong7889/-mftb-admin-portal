@@ -20,7 +20,7 @@ public class AdPricingHotRequest {
     /** 人气名称（用户自定义命名，不再关联算法库） */
     private String algoName;
 
-    /** 所属品牌: flashBee / mFood */
+    /** 资产品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道 */

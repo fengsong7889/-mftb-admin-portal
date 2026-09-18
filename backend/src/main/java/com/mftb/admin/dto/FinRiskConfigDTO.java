@@ -16,7 +16,7 @@ public class FinRiskConfigDTO {
     /** 集团名称 */
     private String groupName;
 
-    /** 所属品牌: flashBee / mFood */
+    /** 资产品牌: flashBee / mFood */
     private String brand;
 
     /** 风控模式: repay=还款释放 monthly=每月比例释放 */

@@ -38,7 +38,7 @@ export interface AlgorithmRecord {
   type: AlgorithmType
   channel: RecommendChannel
   placementInterface?: PlacementInterface  // 投放界面
-  brand?: AppType  // 所属品牌
+  brand?: AppType  // 资产品牌
   status: ServiceStatus
   slotCount: number
   updatedBy?: string

@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -42,6 +44,8 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     private final EamConsumableClaimMapper claimMapper;
     private final EamCategoryMapper categoryMapper;
     private final EamLocationMapper locationMapper;
+    private final ConsumableCategoryMapper consumableCategoryMapper;
+    private final ConsumableBrandMapper consumableBrandMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -59,6 +63,21 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         }
         if (query.getCategoryId() != null) wrapper.eq(EamConsumableItem::getCategoryId, query.getCategoryId());
         if (StringUtils.hasText(query.getStatus())) wrapper.eq(EamConsumableItem::getStatus, query.getStatus());
+        if (StringUtils.hasText(query.getItemCode())) wrapper.like(EamConsumableItem::getItemCode, query.getItemCode().trim());
+        if (StringUtils.hasText(query.getName())) wrapper.like(EamConsumableItem::getName, query.getName().trim());
+        if (StringUtils.hasText(query.getBrand())) wrapper.like(EamConsumableItem::getBrand, query.getBrand().trim());
+        if (StringUtils.hasText(query.getUnit())) wrapper.eq(EamConsumableItem::getUnit, query.getUnit().trim());
+        if (StringUtils.hasText(query.getUpdatedBy())) wrapper.like(EamConsumableItem::getUpdatedBy, query.getUpdatedBy().trim());
+        if (StringUtils.hasText(query.getUpdateTimeStart()) || StringUtils.hasText(query.getUpdateTimeEnd())) {
+            try {
+                if (StringUtils.hasText(query.getUpdateTimeStart()))
+                    wrapper.ge(EamConsumableItem::getUpdatedAt, LocalDate.parse(query.getUpdateTimeStart().trim()).atStartOfDay());
+                if (StringUtils.hasText(query.getUpdateTimeEnd()))
+                    wrapper.le(EamConsumableItem::getUpdatedAt, LocalDate.parse(query.getUpdateTimeEnd().trim()).atTime(23, 59, 59));
+            } catch (DateTimeParseException e) {
+                throw new BusinessException("更新時間範圍格式錯誤，應為 yyyy-MM-dd");
+            }
+        }
         wrapper.orderByDesc(EamConsumableItem::getId);
 
         // 仅看预警：需先算可用库存再过滤，走内存分页（耗材品类量级小）
@@ -264,16 +283,30 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         item.setMaxStock(dto.getMaxStock() == null ? 0 : dto.getMaxStock());
         item.setPerClaimLimit(dto.getPerClaimLimit() == null ? 0 : dto.getPerClaimLimit());
         item.setRemark(nullToEmpty(dto.getRemark()));
-        // 分类快照
-        if (dto.getCategoryId() != null) {
-            EamCategory cat = categoryMapper.selectById(dto.getCategoryId());
-            item.setCategoryId(dto.getCategoryId());
-            item.setCategoryCode(cat != null ? cat.getCode() : "");
-            item.setCategoryName(cat != null ? cat.getName() : "");
+        // 耗材分类快照（独立于资产分类）
+        if (dto.getConsumableCategoryId() != null) {
+            ConsumableCategory cc = consumableCategoryMapper.selectById(dto.getConsumableCategoryId());
+            item.setConsumableCategoryId(dto.getConsumableCategoryId());
+            if (cc != null) {
+                // 同时更新旧的 categoryId/categoryCode/categoryName 以保持兼容
+                item.setCategoryId(dto.getConsumableCategoryId());
+                item.setCategoryCode(cc.getCode());
+                item.setCategoryName(cc.getName());
+            }
         } else {
+            item.setConsumableCategoryId(null);
             item.setCategoryId(null);
             item.setCategoryCode("");
             item.setCategoryName("");
+        }
+        // 耗材品牌快照
+        if (dto.getBrandId() != null) {
+            ConsumableBrand cb = consumableBrandMapper.selectById(dto.getBrandId());
+            item.setBrandId(dto.getBrandId());
+            item.setBrand(cb != null ? cb.getName() : nullToEmpty(dto.getBrand()));
+        } else {
+            item.setBrandId(null);
+            item.setBrand(nullToEmpty(dto.getBrand()));
         }
     }
 
@@ -285,6 +318,17 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         vo.setCategoryId(item.getCategoryId());
         vo.setCategoryCode(item.getCategoryCode());
         vo.setCategoryName(item.getCategoryName());
+        vo.setConsumableCategoryId(item.getConsumableCategoryId());
+        // 耗材分类名称（优先从新表查）
+        if (item.getConsumableCategoryId() != null) {
+            ConsumableCategory cc = consumableCategoryMapper.selectById(item.getConsumableCategoryId());
+            vo.setConsumableCategoryName(cc != null ? cc.getName() : item.getCategoryName());
+        }
+        vo.setBrandId(item.getBrandId());
+        if (item.getBrandId() != null) {
+            ConsumableBrand cb = consumableBrandMapper.selectById(item.getBrandId());
+            vo.setBrandName(cb != null ? cb.getName() : item.getBrand());
+        }
         vo.setBrand(item.getBrand());
         vo.setSpec(item.getSpec());
         vo.setUnit(item.getUnit());

@@ -34,7 +34,7 @@ export interface InventoryItem {
   id: number
   adId: string                      // 广告ID
   promotionName: string           // 广告名称
-  app: AppType                    // 所属品牌
+  app: AppType                    // 资产品牌
   channel: RecommendChannel       // 业务频道
   bizChannel?: string             // 業務頻道（food/supermarket/groupBuy）
   slotPosition: number            // 展示位置

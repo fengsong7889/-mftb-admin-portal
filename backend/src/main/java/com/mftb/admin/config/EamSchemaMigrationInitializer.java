@@ -323,8 +323,8 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
             log.warn("未找到 asset-management 菜单, 跳过子菜单创建");
         } else {
             String actions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
-            // 借用管理菜单（asset-return 已在 DataInitializer 中创建）
-            ensureMenu(assetMgmtId, "asset-borrow", "借用管理", "/asset-borrow",
+            // 借用菜單（asset-return 已在 DataInitializer 中创建）
+            ensureMenu(assetMgmtId, "asset-borrow", "借用資產", "/asset-borrow",
                     "AssetBorrow", "FieldTimeOutlined", 9, actions);
             // 损坏赔付菜单
             ensureMenu(assetMgmtId, "asset-compensation", "損壞賠付", "/asset-compensation",

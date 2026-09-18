@@ -247,7 +247,7 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "group_id BIGINT NOT NULL COMMENT '所属集团ID (关联 biz_merchant_group.id)', "
                         + "store_code VARCHAR(32) NOT NULL COMMENT '门店ID（系统自增，如 MD00001）', "
                         + "store_name VARCHAR(128) NOT NULL COMMENT '门店名称', "
-                        + "brand VARCHAR(64) NULL COMMENT '所属品牌: flashBee / mFood / flashBee,mFood', "
+                        + "brand VARCHAR(64) NULL COMMENT '资产品牌: flashBee / mFood / flashBee,mFood', "
                         + "biz_channel VARCHAR(128) NULL COMMENT '业务频道（可多选逗号分隔）', "
                         + "login_account VARCHAR(64) NULL COMMENT '登录主账号', "
                         + "region INT NULL COMMENT '所在区域/商圈', "

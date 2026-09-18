@@ -26,7 +26,7 @@ public class FinAccount {
     /** 集团名称快照 */
     private String groupName;
 
-    /** 所属品牌: flashBee / mFood */
+    /** 资产品牌: flashBee / mFood */
     private String brand;
 
     /** 虚拟账户余额 */

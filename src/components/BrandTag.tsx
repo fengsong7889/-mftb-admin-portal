@@ -3,7 +3,7 @@ import { isShanfeng, BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '../constant
 import { useCompanyBrand } from '../contexts/CompanyBrandContext'
 
 /**
- * 所屬品牌統一標籤組件
+ * 資產品牌統一標籤組件
  * 全局統一品牌展示樣式，標籤從後端動態加載
  *
  * 兼容多種數據表示：

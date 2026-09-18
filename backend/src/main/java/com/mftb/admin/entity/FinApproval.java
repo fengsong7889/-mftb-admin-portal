@@ -32,7 +32,7 @@ public class FinApproval {
     /** 申请集团名称 */
     private String groupName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 申请人: 姓名(工号) */

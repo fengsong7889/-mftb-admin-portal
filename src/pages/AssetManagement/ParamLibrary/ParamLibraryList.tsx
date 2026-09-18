@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Popconfirm, Select, Space, Switch, Table, Tree, message } from 'antd'
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tree, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { DatabaseOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -221,21 +221,31 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
     }
   }
 
-  /** 启用/停用参数类型 */
-  const handleToggleTypeStatus = async (record: ParamType) => {
+  /** 启用/停用参数类型（二次确认） */
+  const handleToggleTypeStatus = (record: ParamType) => {
     const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
-    try {
-      await updateParamType(record.id, { status: newStatus })
-      message.success(newStatus === 'enabled' ? t('asset.enabledLabel') : t('asset.disabledLabel'))
-      if (selectedCatId) {
-        const codes = collectDescendantCodes(categories, selectedCatId)
-        fetchParamTypesByCodes(codes)
-      } else {
-        fetchParamTypes()
-      }
-    } catch {
-      // 错误提示由请求层统一处理
-    }
+    const actionText = newStatus === 'enabled' ? t('asset.enabledStatus') : t('asset.disabledStatus')
+    Modal.confirm({
+      title: `${actionText}「${record.name}」？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await updateParamType(record.id, { status: newStatus })
+          message.success(newStatus === 'enabled' ? t('asset.enabledLabel') : t('asset.disabledLabel'))
+          if (selectedCatId) {
+            const codes = collectDescendantCodes(categories, selectedCatId)
+            fetchParamTypesByCodes(codes)
+          } else {
+            fetchParamTypes()
+          }
+        } catch {
+          // 错误提示由请求层统一处理
+        }
+      },
+    })
   }
 
   const typeColumns: TableColumnsType<ParamType> = [

@@ -268,9 +268,14 @@ public class DepartmentServiceImpl implements DepartmentService {
                 deptId);
         List<MenuPermissionDTO> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
+            List<String> actionList = new ArrayList<>(JsonUtils.parseStringList((String) row.get("actions")));
+            // 空 actions 视为仅查看（与 PermissionServiceImpl 语义对齐），避免受控菜单整项隐藏
+            if (actionList.isEmpty()) {
+                actionList.add("view");
+            }
             MenuPermissionDTO dto = new MenuPermissionDTO();
             dto.setMenuKey((String) row.get("menu_key"));
-            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            dto.setActions(actionList);
             result.add(dto);
         }
         return result;
@@ -290,9 +295,14 @@ public class DepartmentServiceImpl implements DepartmentService {
                         + "WHERE dm.dept_id IN (" + inClause + ") AND m.deleted = 0");
         for (Map<String, Object> row : rows) {
             Long deptId = ((Number) row.get("dept_id")).longValue();
+            List<String> actionList = new ArrayList<>(JsonUtils.parseStringList((String) row.get("actions")));
+            // 空 actions 视为仅查看（与 PermissionServiceImpl 语义对齐）
+            if (actionList.isEmpty()) {
+                actionList.add("view");
+            }
             MenuPermissionDTO dto = new MenuPermissionDTO();
             dto.setMenuKey((String) row.get("menu_key"));
-            dto.setActions(JsonUtils.parseStringList((String) row.get("actions")));
+            dto.setActions(actionList);
             result.computeIfAbsent(deptId, k -> new ArrayList<>()).add(dto);
         }
         return result;

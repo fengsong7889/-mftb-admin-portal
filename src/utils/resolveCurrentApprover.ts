@@ -115,7 +115,7 @@ function selectApproverFromCandidates(
  * @param employees - 所有啟用員工列表
  * @param departments - 所有部門列表
  * @param roles - 所有角色列表
- * @param brand - 所屬品牌（可選）
+ * @param brand - 資產品牌（可選）
  * @returns 候選審批人員工列表，無則返回空數組
  */
 export function resolveCurrentApproverCandidates(
@@ -236,7 +236,7 @@ export function resolveCurrentApprovers(
  * @param employees - 所有啟用員工列表
  * @param departments - 所有部門列表
  * @param roles - 所有角色列表
- * @param brand - 所屬品牌（可選）
+ * @param brand - 資產品牌（可選）
  * @returns 審批人顯示文本，如 '朱元璋(001)'，無則返回 null
  */
 export function resolveCurrentApprover(

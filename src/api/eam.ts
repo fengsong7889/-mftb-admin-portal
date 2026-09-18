@@ -264,7 +264,7 @@ export interface PurchaseRequest {
   applicant: string
   /** 預算金額 */
   budget: number
-  /** 所屬品牌：1=閃蜂, 2=mFood */
+  /** 資產品牌：1=閃蜂, 2=mFood */
   brand?: number
   items: PurchaseRequestItem[]
   /** 申請理由 */
@@ -343,7 +343,7 @@ export interface PurchaseOrder {
   poNo: string
   /** 關聯採購申請 ID（0 表示直接下單） */
   reqId: number
-  /** 所屬品牌：1=閃蜂, 2=mFood */
+  /** 資產品牌：1=閃蜂, 2=mFood */
   brand?: number
   supplier: string
   /** 訂單金額（預估） */
@@ -425,7 +425,7 @@ export interface InboundBatch {
   batchNo: string
   poId: number
   poNo: string
-  /** 所屬品牌：1=閃蜂, 2=mFood（創建批次時從採購訂單帶入） */
+  /** 資產品牌：1=閃蜂, 2=mFood（創建批次時從採購訂單帶入） */
   brand?: number
   inboundDate: string
   operator: string
@@ -1434,7 +1434,7 @@ export interface PurchaseOrderExecUpdate {
   trackingNo?: string
   purchaser?: string
   department?: string
-  /** 所屬品牌：1=閃蜂, 2=mFood */
+  /** 資產品牌：1=閃蜂, 2=mFood */
   brand?: number
   orderDate?: string
   contact?: string

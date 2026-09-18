@@ -301,7 +301,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   
   const navigate = useNavigate()
 
-  // 查詢條件（算法名稱 / 所屬品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
+  // 查詢條件（算法名稱 / 資產品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)

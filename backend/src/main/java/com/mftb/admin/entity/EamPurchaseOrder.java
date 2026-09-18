@@ -40,7 +40,7 @@ public class EamPurchaseOrder {
     /** 服务部门（持久化） */
     private String department;
 
-    /** 所属品牌：1=闪蜂, 2=mFood */
+    /** 资产品牌：1=闪蜂, 2=mFood */
     private Integer brand;
 
     /** 采购事由/备注 */

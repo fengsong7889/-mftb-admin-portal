@@ -101,7 +101,7 @@ function ConditionEditor({ conditions, workflowType, onChange }: ConditionEditor
 
       {/* 品牌 */}
       <div style={rowStyle}>
-        <div style={labelStyle}>所屬品牌</div>
+        <div style={labelStyle}>資產品牌</div>
         <Select mode="multiple" placeholder="全部" options={CONDITION_BRAND_OPTIONS}
           value={brandVal} onChange={v => v.length > 0 ? updateCondition('brand', 'in', v) : removeCondition('brand')}
           allowClear style={{ flex: 1 }} maxTagCount="responsive" />

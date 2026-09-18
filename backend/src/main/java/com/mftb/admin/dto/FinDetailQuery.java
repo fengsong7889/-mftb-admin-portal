@@ -20,7 +20,7 @@ public class FinDetailQuery extends FinPageQuery {
     /** 集团名称（模糊匹配） */
     private String groupName;
 
-    /** 所属品牌 */
+    /** 资产品牌 */
     private String brand;
 
     /** 门店ID（模糊匹配） */

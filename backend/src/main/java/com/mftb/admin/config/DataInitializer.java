@@ -130,10 +130,14 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:drop-ai-access-request-v1", this::dropAiAccessRequestTable);
         // v29: 「领用归还」改名为「领用管理」
         versionTracker.applyOnce("core:eam-rename-claim-v2", this::renameAssetClaimToManage);
+        // v39: 资产流转五个三级菜单统一改名（領用資產/借用資產/資產歸還/資產調撥/資產交接）
+        versionTracker.applyOnce("core:eam-rename-asset-flow-menus-v1", this::renameAssetFlowSubMenus);
         // v30: 钉钉通知种子数据（sys_config + mcp_tool）
         versionTracker.applyOnce("core:dingtalk-notification-v1", this::seedDingTalkNotification);
         // v31: 补充 ai_access 流程类型到 biz_oa_process 和 biz_workflow_config
         versionTracker.applyOnce("core:oa-ai-access-seed-v1", this::seedAiAccessProcessType);
+        // v33: 通知渠道多场景配置改造（新建 sys_notification_channel 表 + 迁移旧 sys_config 数据）
+        versionTracker.applyOnce("core:notification-channel-refactor-v1", this::migrateNotificationChannel);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
         migrateDeptCodeToBM();
@@ -515,7 +519,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "applicant_emp_id VARCHAR(32) DEFAULT '' COMMENT '申请人工号', "
                         + "reason VARCHAR(500) NOT NULL DEFAULT '' COMMENT '采购事由', "
                         + "budget DECIMAL(14,2) DEFAULT 0 COMMENT '预算金额', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
                         + "status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected', "
                         + "order_id BIGINT DEFAULT NULL COMMENT '审批通过后生成的采购订单ID', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
@@ -527,7 +531,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购申请'");
         // 144 脚本等效：已有表补 brand 列
         addColumnIfAbsent("biz_eam_purchase_request", "brand",
-                "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER budget");
+                "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood' AFTER budget");
 
         // 8. 供应商（编码系统自动生成: CGSJ + 6位全局自增，规则见 sys_biz_seq_rule.eam_supplier_code）
         jdbcTemplate.execute(
@@ -578,7 +582,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "delivery_date VARCHAR(32) DEFAULT '' COMMENT '预计交货日期', "
                         + "purchaser VARCHAR(64) DEFAULT '' COMMENT '采购经办人', "
                         + "department VARCHAR(100) DEFAULT '' COMMENT '服务部门', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
                         + "remark VARCHAR(500) DEFAULT '' COMMENT '采购事由/备注', "
                         + "tracking_no VARCHAR(64) DEFAULT '' COMMENT '快递单号', "
                         + "contact VARCHAR(64) DEFAULT '' COMMENT '供应商联络人', "
@@ -604,7 +608,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         addColumnIfAbsent("biz_eam_purchase_order", "contact_phone",
                 "ALTER TABLE biz_eam_purchase_order ADD COLUMN contact_phone VARCHAR(64) DEFAULT NULL COMMENT '供应商联络人电话' AFTER contact");
         addColumnIfAbsent("biz_eam_purchase_order", "brand",
-                "ALTER TABLE biz_eam_purchase_order ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER department");
+                "ALTER TABLE biz_eam_purchase_order ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood' AFTER department");
 
         // 3. 采购订单明细
         jdbcTemplate.execute(
@@ -637,7 +641,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "batch_no VARCHAR(32) NOT NULL COMMENT '批次编号', "
                         + "po_id BIGINT NOT NULL COMMENT '关联采购订单ID', "
                         + "po_no VARCHAR(32) NOT NULL COMMENT '采购订单号', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
                         + "inbound_date VARCHAR(32) NOT NULL COMMENT '验收日期', "
                         + "operator VARCHAR(64) NOT NULL DEFAULT '' COMMENT '操作人', "
                         + "total_qty INT NOT NULL DEFAULT 0 COMMENT '入库总数', "
@@ -739,7 +743,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             addColumnIfAbsent("biz_eam_asset", "scrap_time", "ALTER TABLE biz_eam_asset ADD COLUMN scrap_time VARCHAR(32) DEFAULT NULL COMMENT '报废日期'");
             addColumnIfAbsent("biz_eam_asset", "rental_cost", "ALTER TABLE biz_eam_asset ADD COLUMN rental_cost DECIMAL(14,2) DEFAULT NULL COMMENT '租赁费用'");
             addColumnIfAbsent("biz_eam_asset", "rental_period", "ALTER TABLE biz_eam_asset ADD COLUMN rental_period JSON DEFAULT NULL COMMENT '租赁起止日期'");
-            addColumnIfAbsent("biz_eam_inbound_batch", "brand", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌'");
+            addColumnIfAbsent("biz_eam_inbound_batch", "brand", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "disposition", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN disposition VARCHAR(16) DEFAULT NULL COMMENT '验收处置'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "reject_reason", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN reject_reason VARCHAR(500) DEFAULT NULL COMMENT '不通过原因'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "photos", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN photos JSON DEFAULT NULL COMMENT '验收照片'");
@@ -2082,11 +2086,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
         // 三级菜单 → 资产管理
         menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
-        menus.put("asset-claim",        new String[]{"領用管理",         "asset-flow-ops",     "2"});
-        menus.put("asset-borrow",       new String[]{"借用管理",         "asset-flow-ops",     "3"});
-        menus.put("asset-return",       new String[]{"歸還管理",         "asset-flow-ops",     "4"});
-        menus.put("asset-transfer-list",new String[]{"調撥管理",         "asset-flow-ops",     "5"});
-        menus.put("asset-handover",     new String[]{"交接管理",         "asset-flow-ops",     "6"});
+        menus.put("asset-claim",        new String[]{"領用資產",         "asset-flow-ops",     "2"});
+        menus.put("asset-borrow",       new String[]{"借用資產",         "asset-flow-ops",     "3"});
+        menus.put("asset-return",       new String[]{"資產歸還",         "asset-flow-ops",     "4"});
+        menus.put("asset-transfer-list",new String[]{"資產調撥",         "asset-flow-ops",     "5"});
+        menus.put("asset-handover",     new String[]{"資產交接",         "asset-flow-ops",     "6"});
         // 三级菜单 → 维护与处置
         menus.put("asset-repair",       new String[]{"維修管理",         "asset-maintenance",  "1"});
         menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-maintenance",  "2"});
@@ -2235,7 +2239,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         String[][] children = {
                 {"asset-list",      "資產台賬",   "AppstoreOutlined",    "1"},
                 {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
-                {"asset-claim",     "領用管理",   "UserAddOutlined",     "3"},
+                {"asset-claim",     "領用資產",   "UserAddOutlined",     "3"},
                 {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
                 {"asset-return",    "資產歸還",   "RollbackOutlined",    "5"},
                 {"asset-scrap",     "資產報廢",   "DeleteOutlined",      "6"},
@@ -2816,8 +2820,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 return;
             }
             String[][] menusToRestore = {
-                {"asset-claim",  "領用管理", "UserAddOutlined",  "9"},
-                {"asset-return", "歸還管理", "RollbackOutlined", "11"},
+                {"asset-claim",  "領用資產", "UserAddOutlined",  "9"},
+                {"asset-return", "資產歸還", "RollbackOutlined", "11"},
             };
             int restored = 0;
             for (String[] menu : menusToRestore) {
@@ -2918,6 +2922,30 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     /**
+     * v39: 资产流转五个三级菜单统一改名（已存在的数据库行需显式修正，seedSystemMenus 不覆盖已有名称）
+     * 領用管理→領用資產、借用管理→借用資產、歸還管理→資產歸還、調撥管理→資產調撥、交接管理→資產交接
+     */
+    private void renameAssetFlowSubMenus() {
+        String[][] renames = {
+                {"asset-claim",         "領用資產"},
+                {"asset-borrow",        "借用資產"},
+                {"asset-return",        "資產歸還"},
+                {"asset-transfer-list", "資產調撥"},
+                {"asset-handover",      "資產交接"},
+        };
+        try {
+            for (String[] r : renames) {
+                jdbcTemplate.update(
+                        "UPDATE sys_menu SET name = ?, updated_by = 'system' WHERE menu_key = ? AND deleted = 0 AND name != ?",
+                        r[1], r[0], r[1]);
+            }
+            log.info("已統一資產流轉菜單名稱（領用資產/借用資產/資產歸還/資產調撥/資產交接）");
+        } catch (Exception e) {
+            log.warn("資產流轉菜單改名失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
      * 清理 merchant-order-manage 占位菜单（每次启动执行）。
      * 前端 keyToPath 有定义但种子数据遗漏，resolveMenuId 会自动创建 parent_id=NULL 的占位记录，
      * 导致菜单树出现孤儿节点。此方法确保占位记录被彻底清除。
@@ -2964,6 +2992,73 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                             + "1, 0, 'external', 'remote-http', 104, 0)");
         }
         log.info("钉钉通知种子数据已初始化");
+    }
+
+    /**
+     * v33: 通知渠道多场景配置改造
+     * 1. 幂等建表 sys_notification_channel
+     * 2. 从 sys_config 迁移旧钉钉配置到新表（仅当新表无数据且旧配置有 webhook 时）
+     */
+    private void migrateNotificationChannel() {
+        try {
+            // 1. 幂等建表
+            jdbcTemplate.execute(
+                    "CREATE TABLE IF NOT EXISTS sys_notification_channel ("
+                            + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                            + "name VARCHAR(100) NOT NULL COMMENT '渠道名称', "
+                            + "channel VARCHAR(20) NOT NULL COMMENT '平台类型', "
+                            + "webhook_url VARCHAR(500) NOT NULL COMMENT 'Webhook 地址', "
+                            + "secret VARCHAR(200) DEFAULT '' COMMENT '加签密钥', "
+                            + "at_mobiles VARCHAR(500) DEFAULT '' COMMENT '默认@手机号', "
+                            + "enabled TINYINT DEFAULT 1 COMMENT '是否启用', "
+                            + "is_default TINYINT DEFAULT 1 COMMENT '是否默认渠道', "
+                            + "scenarios VARCHAR(500) DEFAULT '' COMMENT '绑定场景', "
+                            + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
+                            + "created_by VARCHAR(50) DEFAULT '', "
+                            + "updated_by VARCHAR(50) DEFAULT '', "
+                            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                            + "deleted TINYINT DEFAULT 0, "
+                            + "INDEX idx_channel (channel, deleted), "
+                            + "INDEX idx_scenario (scenarios(100), deleted)"
+                            + ") COMMENT='通知渠道配置表（支持多场景）'"
+            );
+
+            // 2. 迁移旧数据
+            Integer existingCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_notification_channel WHERE deleted = 0", Integer.class);
+            if (existingCount != null && existingCount > 0) {
+                log.info("sys_notification_channel 表已有数据（{}条），跳过迁移", existingCount);
+                return;
+            }
+
+            String webhook = jdbcTemplate.queryForObject(
+                    "SELECT config_value FROM sys_config WHERE config_key = 'dingtalk_webhook_url'", String.class);
+            if (webhook == null || webhook.isBlank()) {
+                log.info("旧钉钉 Webhook 未配置，跳过迁移");
+                return;
+            }
+
+            String secret = jdbcTemplate.queryForObject(
+                    "SELECT config_value FROM sys_config WHERE config_key = 'dingtalk_secret'", String.class);
+            String atMobiles = jdbcTemplate.queryForObject(
+                    "SELECT config_value FROM sys_config WHERE config_key = 'dingtalk_at_mobiles'", String.class);
+            String enabled = jdbcTemplate.queryForObject(
+                    "SELECT config_value FROM sys_config WHERE config_key = 'dingtalk_enabled'", String.class);
+
+            jdbcTemplate.update(
+                    "INSERT INTO sys_notification_channel (name, channel, webhook_url, secret, at_mobiles, enabled, is_default, scenarios, created_by, updated_by) "
+                            + "VALUES (?, 'dingtalk', ?, ?, ?, ?, 1, '', 'system', 'system')",
+                    "默認釘釘群",
+                    webhook,
+                    secret != null ? secret : "",
+                    atMobiles != null ? atMobiles : "",
+                    "true".equalsIgnoreCase(enabled) ? 1 : 0
+            );
+            log.info("已从 sys_config 迁移钉钉配置到 sys_notification_channel 表");
+        } catch (Exception e) {
+            log.warn("通知渠道迁移失败: {}", e.getMessage());
+        }
     }
 
     /** 删除 ai_access_request 表（AI 申请已统一写入 biz_oa_request） */

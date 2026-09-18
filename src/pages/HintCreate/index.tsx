@@ -44,7 +44,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
     { label: t('dict.channel.supermarketChannel'), value: 'supermarket' },
   ]
 
-  /** 所属品牌 */
+  /** 资产品牌 */
   const brandOptions = [
     { label: BRAND_MFOOD_LABEL, value: 'mFood' },
     { label: BRAND_SHANFENG_LABEL, value: 'flashBee' },
@@ -264,7 +264,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
             <Select options={searchChannelOptions} placeholder={t('common.placeholderSelect')} />
           </Form.Item>
 
-          {/* 所属品牌 */}
+          {/* 资产品牌 */}
           <Form.Item
             label={t('hintCreate.brandLabel')}
             name="brand"

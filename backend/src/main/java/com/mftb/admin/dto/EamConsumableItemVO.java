@@ -15,6 +15,10 @@ public class EamConsumableItemVO {
     private Long categoryId;
     private String categoryCode;
     private String categoryName;
+    private Long consumableCategoryId;
+    private String consumableCategoryName;
+    private Long brandId;
+    private String brandName;
     private String brand;
     private String spec;
     private String unit;

@@ -2,140 +2,86 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
-import com.mftb.admin.service.DingTalkService;
-import com.mftb.admin.service.SysConfigService;
+import com.mftb.admin.dto.SysNotificationChannelSaveDTO;
+import com.mftb.admin.service.NotificationChannelService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 通知渠道配置接口
- * 通用设计：通过 {channel} 路径变量区分不同渠道，后续扩展企微/飞书只需增加分支
+ * 支持多平台、多场景、多渠道 CRUD 及测试
  */
 @RestController
 @RequestMapping("/api/notification-channels")
 @RequiredArgsConstructor
 public class NotificationChannelController {
 
-    /** 当前支持的渠道列表 */
-    private static final Set<String> SUPPORTED_CHANNELS = Set.of("dingtalk", "wecom", "feishu");
+    private final NotificationChannelService notificationChannelService;
 
-    /** 各渠道的 sys_config key 前缀 */
-    private static final Map<String, String[]> CHANNEL_CONFIG_KEYS = Map.of(
-            "dingtalk", new String[]{
-                    "dingtalk_webhook_url", "dingtalk_secret", "dingtalk_enabled", "dingtalk_at_mobiles"
-            }
-    );
-
-    /** 需要脱敏的 key（返回时只显示前 6 位 + ****） */
-    private static final Set<String> SENSITIVE_KEYS = Set.of("dingtalk_secret");
-
-    private final SysConfigService sysConfigService;
-    private final DingTalkService dingTalkService;
-
-    /**
-     * 读取指定渠道的配置（secret 脱敏返回）
-     */
-    @GetMapping("/{channel}/config")
+    /** 列出所有渠道（支持筛选：channel / name / enabled / updatedBy / updatedAfter / updatedBefore） */
+    @GetMapping
     @RequirePermission(menu = "notification-config")
-    public Result<Map<String, Object>> getConfig(@PathVariable String channel) {
-        validateChannel(channel);
-
-        String[] keys = CHANNEL_CONFIG_KEYS.get(channel);
-        if (keys == null) {
-            return Result.success(Map.of("channel", channel, "configured", false));
-        }
-
-        Map<String, Object> config = new LinkedHashMap<>();
-        config.put("channel", channel);
-        for (String key : keys) {
-            String value = sysConfigService.getConfigValue(key);
-            if (SENSITIVE_KEYS.contains(key) && value != null && value.length() > 6) {
-                value = value.substring(0, 6) + "****";
-            }
-            // 将 dingtalk_xxx 转为驼峰字段名
-            String fieldName = keyToField(key, channel);
-            config.put(fieldName, value != null ? value : "");
-        }
-        return Result.success(config);
+    public Result<List<Map<String, Object>>> list(
+            @RequestParam(required = false) String channel,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Integer enabled,
+            @RequestParam(required = false) String updatedBy,
+            @RequestParam(required = false) String updatedAfter,
+            @RequestParam(required = false) String updatedBefore) {
+        return Result.success(notificationChannelService.listFiltered(channel, name, enabled, updatedBy, updatedAfter, updatedBefore));
     }
 
-    /**
-     * 更新指定渠道的配置
-     */
-    @PutMapping("/{channel}/config")
+    /** 按 ID 查详情 */
+    @GetMapping("/{id}")
+    @RequirePermission(menu = "notification-config")
+    public Result<Map<String, Object>> detail(@PathVariable Long id) {
+        return Result.success(notificationChannelService.getDetail(id));
+    }
+
+    /** 新增渠道 */
+    @PostMapping
     @RequirePermission(menu = "notification-config", action = "edit")
-    public Result<Void> updateConfig(@PathVariable String channel, @RequestBody Map<String, String> body) {
-        validateChannel(channel);
+    public Result<Long> create(@RequestBody SysNotificationChannelSaveDTO dto) {
+        Long id = notificationChannelService.create(dto);
+        return Result.success("渠道已創建", id);
+    }
 
-        String[] keys = CHANNEL_CONFIG_KEYS.get(channel);
-        if (keys == null) {
-            return Result.error(400, "渠道 " + channel + " 尚未支持");
-        }
+    /** 更新渠道 */
+    @PutMapping("/{id}")
+    @RequirePermission(menu = "notification-config", action = "edit")
+    public Result<Void> update(@PathVariable Long id, @RequestBody SysNotificationChannelSaveDTO dto) {
+        notificationChannelService.update(id, dto);
+        return Result.<Void>success("渠道已更新", null);
+    }
 
-        for (String key : keys) {
-            String fieldName = keyToField(key, channel);
-            String value = body.get(fieldName);
-            if (value != null) {
-                // 脱敏值不回写（包含 **** 说明前端未修改）
-                if (SENSITIVE_KEYS.contains(key) && value.contains("****")) {
-                    continue;
-                }
-                sysConfigService.updateConfig(key, value);
-            }
+    /** 删除渠道 */
+    @DeleteMapping("/{id}")
+    @RequirePermission(menu = "notification-config", action = "edit")
+    public Result<Void> delete(@PathVariable Long id) {
+        notificationChannelService.delete(id);
+        return Result.<Void>success("渠道已刪除", null);
+    }
+
+    /** 启停切换 */
+    @PatchMapping("/{id}/toggle")
+    @RequirePermission(menu = "notification-config", action = "edit")
+    public Result<Void> toggle(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+        Boolean enabled = body.get("enabled");
+        if (enabled == null) {
+            return Result.error(400, "enabled 参数不能为空");
         }
+        notificationChannelService.toggleEnabled(id, enabled);
         return Result.success();
     }
 
-    /**
-     * 发送测试消息（支持携带当前表单配置，无需先保存）
-     */
-    @PostMapping("/{channel}/test")
+    /** 发送测试消息 */
+    @PostMapping("/{id}/test")
     @RequirePermission(menu = "notification-config", action = "edit")
-    public Result<String> test(@PathVariable String channel, @RequestBody(required = false) Map<String, String> body) {
-        validateChannel(channel);
-
-        if ("dingtalk".equals(channel)) {
-            // 优先使用前端传入的表单值，未传则回退到数据库配置
-            String webhook = body != null ? body.get("webhookUrl") : null;
-            String secret = body != null ? body.get("secret") : null;
-            String result = dingTalkService.sendTestMessage(webhook, secret);
-            return Result.success(result);
-        }
-
-        return Result.error(400, "渠道 " + channel + " 尚未支持测试");
-    }
-
-    /* ==================== 内部方法 ==================== */
-
-    private void validateChannel(String channel) {
-        if (!SUPPORTED_CHANNELS.contains(channel)) {
-            throw new IllegalArgumentException("不支持的通知渠道: " + channel);
-        }
-    }
-
-    /**
-     * 将 sys_config key 转为前端字段名
-     * 例: dingtalk_webhook_url → webhookUrl, dingtalk_enabled → enabled
-     */
-    private String keyToField(String key, String channel) {
-        String prefix = channel + "_";
-        String remainder = key.startsWith(prefix) ? key.substring(prefix.length()) : key;
-        // 下划线转驼峰
-        StringBuilder sb = new StringBuilder();
-        boolean nextUpper = false;
-        for (char c : remainder.toCharArray()) {
-            if (c == '_') {
-                nextUpper = true;
-            } else {
-                sb.append(nextUpper ? Character.toUpperCase(c) : c);
-                nextUpper = false;
-            }
-        }
-        return sb.toString();
+    public Result<String> test(@PathVariable Long id) {
+        String result = notificationChannelService.sendTest(id);
+        return Result.success(result);
     }
 }
-

@@ -118,7 +118,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
   }
 
   if (!canEdit) {
-    return <Alert type="warning" showIcon message="無歸還辦理權限" description="請聯繫管理員分配歸還管理權限。" />
+    return <Alert type="warning" showIcon message="無歸還辦理權限" description="請聯繫管理員分配資產歸還權限。" />
   }
 
   const sourceLabel = claimId ? `領用單 #${claimId}` : borrowId ? `借用單 #${borrowId}` : assetId ? `資產 #${assetId}` : '直接登記'

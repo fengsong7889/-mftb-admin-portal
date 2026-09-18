@@ -84,7 +84,7 @@ export interface StoreQueryParams {
   groupKeyword?: string
   /** 门店ID/名称 */
   keyword?: string
-  /** 所属品牌 */
+  /** 资产品牌 */
   brand?: string
   /** 业务频道 */
   bizChannel?: string

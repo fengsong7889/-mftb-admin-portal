@@ -35,7 +35,7 @@ public class AdOrder {
     /** 算法ID快照 */
     private String algoCode;
 
-    /** 所属品牌: flashBee / mFood */
+    /** 资产品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道快照 */

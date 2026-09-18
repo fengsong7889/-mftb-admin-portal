@@ -1,15 +1,15 @@
 /**
  * 耗材领用列表（状态 Tab + 表格）
  *
- * Tab：全部 / 待审批 / 待出库 / 已完成 / 我的领用
- * 行操作：详情；待出库可「出库」，待审批/待出库可「撤销」（本人或管理员，服务层校验）
+ * 简化流程：提交即自动通过并出库，新单直接为已出库（无审批/出库节点）
+ * Tab：全部 / 已出库 / 我的领用；行操作：详情；历史 pending/approved 单可撤销（本人或管理员）
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Table, Tabs, Modal, message, Space, Tag, Input, Form } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import {
-  fetchConsumableClaims, fetchMyConsumableClaims, issueConsumableClaim, cancelConsumableClaim,
+  fetchConsumableClaims, fetchMyConsumableClaims, cancelConsumableClaim,
   type ConsumableClaim,
 } from '../../../api/consumable'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -20,11 +20,11 @@ interface Props {
   onDetail: (id: number) => void
 }
 
-type TabKey = 'all' | 'pending' | 'approved' | 'issued' | 'mine'
+type TabKey = 'all' | 'issued' | 'mine'
 
 export default function ClaimList({ onAdd, onDetail }: Props) {
   const { hasPermission } = useAuth()
-  // canViewAll: 可看全量领用单（管理视图）；canManage: 可审批/出库。admin 两者皆 true
+  // canViewAll: 可看全量领用单（管理视图）；canManage: 可撤销历史单。admin 两者皆 true
   const canViewAll = hasPermission('consumable-claim:view')
   const canManage = hasPermission('consumable-claim:edit')
   const [tab, setTab] = useState<TabKey>(canViewAll ? 'all' : 'mine')
@@ -40,7 +40,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
     setLoading(true)
     try {
       const statusMap: Record<TabKey, string | undefined> = {
-        all: undefined, pending: 'pending', approved: 'approved', issued: 'issued', mine: undefined,
+        all: undefined, issued: 'issued', mine: undefined,
       }
       const res = tab === 'mine'
         ? await fetchMyConsumableClaims({ page, size })
@@ -59,34 +59,6 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
   const handleExport = () => {
     if (rows.length === 0) { message.warning('暫無數據可導出'); return }
     message.success('導出成功')
-  }
-
-  const handleIssue = (record: ConsumableClaim) => {
-    Modal.confirm({
-      title: '確認出庫核銷？',
-      className: 'custom-confirm-modal',
-      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
-      content: (
-        <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>領用單號：</span><b>{record.claimNo}</b></div>
-          <div className="confirm-info-row"><span>申請人：</span><b>{record.applicantName}</b></div>
-          <div className="confirm-info-row"><span>品類數：</span><b>{record.totalKinds}</b></div>
-          <div className="confirm-info-row"><span>總數量：</span><b>{record.totalQty}</b></div>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>出庫後將扣減庫存且不可撤銷，耗材領用無歸還流程。</div>
-        </div>
-      ),
-      okText: '確認出庫',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await issueConsumableClaim(record.id)
-          message.success('出庫成功')
-          loadData()
-        } catch (e: unknown) {
-          message.error(e instanceof Error ? e.message : '出庫失敗')
-        }
-      },
-    })
   }
 
   const handleCancel = (record: ConsumableClaim) => {
@@ -133,9 +105,6 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
       render: (_: unknown, record: ConsumableClaim) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetail(record.id)}>詳情</Button>
-          {canManage && record.status === 'approved' && (
-            <Button type="link" size="small" onClick={() => handleIssue(record)}>出庫</Button>
-          )}
           {(canManage || tab === 'mine') && (record.status === 'pending' || record.status === 'approved') && (
             <Button type="link" size="small" danger onClick={() => handleCancel(record)}>撤銷</Button>
           )}
@@ -166,7 +135,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>領用申請</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>耗材領用</Button>
         </div>
       </div>
 
@@ -176,8 +145,6 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
         items={[
           ...(canViewAll ? [
             { key: 'all', label: '全部' },
-            { key: 'pending', label: '待審批' },
-            { key: 'approved', label: '待出庫' },
             { key: 'issued', label: '已出庫' },
           ] : []),
           { key: 'mine', label: '我的領用' },

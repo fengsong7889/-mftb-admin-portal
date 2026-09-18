@@ -5,10 +5,54 @@
  *   耗材档案(item) → 库存(stock) → 出入库流水(txn) → 领用(claim：申请→审批→出库核销，无归还)
  *   → 库存预警(alert) → 看板(dashboard)
  *
- * 复用 eam.ts 的分类(fetchCategoryList)、仓库(fetchLocationList) 基础数据。
+ * 分类/品牌/计量单位使用耗材域独立基础数据（见文件末尾「基础数据 API」），
+ * 仅仓库位置(fetchLocationList)仍复用 eam.ts。
  */
 import request from './request'
 import type { PageResult } from './asset'
+
+/* ==================== 基础数据类型 ==================== */
+
+/** 耗材分类 */
+export interface ConsumableCategory {
+  id: number
+  code: string
+  name: string
+  parentId: number
+  parentName?: string
+  sortOrder: number
+  status: 'enabled' | 'disabled'
+  remark?: string
+  createdBy?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+/** 耗材品牌 */
+export interface ConsumableBrand {
+  id: number
+  name: string
+  nameEn?: string
+  categoryType: 'ASSET' | 'CONSUMABLE' | 'BOTH'
+  logo?: string
+  status: 'enabled' | 'disabled'
+  remark?: string
+  createdBy?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+/** 计量单位 */
+export interface ConsumableUnit {
+  id: number
+  name: string
+  abbr?: string
+  sortOrder: number
+  status: 'enabled' | 'disabled'
+  createdBy?: string
+  updatedBy?: string
+  updatedAt?: string
+}
 
 /* ==================== 类型 ==================== */
 
@@ -20,6 +64,10 @@ export interface ConsumableItem {
   categoryId?: number | null
   categoryCode?: string
   categoryName?: string
+  consumableCategoryId?: number | null
+  consumableCategoryName?: string
+  brandId?: number | null
+  brandName?: string
   brand?: string
   spec?: string
   unit: string
@@ -48,6 +96,8 @@ export interface ConsumableItemSave {
   id?: number
   name: string
   categoryId?: number | null
+  consumableCategoryId?: number | null
+  brandId?: number | null
   brand?: string
   spec?: string
   unit: string
@@ -177,7 +227,26 @@ export function fetchConsumableDashboard() {
 /* ==================== 主数据 ==================== */
 
 export function fetchConsumableItems(params?: {
-  page?: number; size?: number; keyword?: string; categoryId?: number; status?: string; alertOnly?: boolean
+  page?: number; size?: number
+  /** 关键字（编码/名称/规格/品牌，保留兼容） */
+  keyword?: string
+  /** 耗材编码（模糊） */
+  itemCode?: string
+  /** 耗材名称（模糊） */
+  name?: string
+  categoryId?: number
+  /** 品牌（模糊） */
+  brand?: string
+  /** 计量单位 */
+  unit?: string
+  status?: string
+  /** 最后更新人（模糊） */
+  updatedBy?: string
+  /** 更新时间范围起（yyyy-MM-dd） */
+  updateTimeStart?: string
+  /** 更新时间范围止（yyyy-MM-dd） */
+  updateTimeEnd?: string
+  alertOnly?: boolean
 }) {
   return request.get<unknown, PageResult<ConsumableItem>>('/eam/consumables/items', { params })
 }
@@ -261,4 +330,72 @@ export function issueConsumableClaim(id: number) {
 
 export function cancelConsumableClaim(id: number, reason?: string) {
   return request.post<unknown, void>(`/eam/consumables/claims/${id}/cancel`, { reason })
+}
+
+/* ==================== 基础数据 API（分类 / 品牌 / 计量单位） ==================== */
+
+/** 耗材分类列表 */
+export function fetchConsumableCategories(keyword?: string) {
+  return request.get<unknown, ConsumableCategory[]>('/eam/consumables/basic/categories', { params: { keyword } })
+}
+
+/** 耗材分类下拉选项 */
+export function fetchConsumableCategoryOptions() {
+  return request.get<unknown, ConsumableCategory[]>('/eam/consumables/basic/categories/options')
+}
+
+export function createConsumableCategory(data: Partial<ConsumableCategory>) {
+  return request.post<unknown, number>('/eam/consumables/basic/categories', data)
+}
+
+export function updateConsumableCategory(id: number, data: Partial<ConsumableCategory>) {
+  return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}`, data)
+}
+
+export function deleteConsumableCategory(id: number) {
+  return request.delete<unknown, void>(`/eam/consumables/basic/categories/${id}`)
+}
+
+/** 耗材品牌列表 */
+export function fetchConsumableBrands(categoryType?: string, keyword?: string) {
+  return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands', { params: { categoryType, keyword } })
+}
+
+/** 耗材品牌下拉选项（只返回 CONSUMABLE + BOTH） */
+export function fetchConsumableBrandOptions() {
+  return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands/options')
+}
+
+export function createConsumableBrand(data: Partial<ConsumableBrand>) {
+  return request.post<unknown, number>('/eam/consumables/basic/brands', data)
+}
+
+export function updateConsumableBrand(id: number, data: Partial<ConsumableBrand>) {
+  return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}`, data)
+}
+
+export function deleteConsumableBrand(id: number) {
+  return request.delete<unknown, void>(`/eam/consumables/basic/brands/${id}`)
+}
+
+/** 计量单位列表 */
+export function fetchConsumableUnits(keyword?: string) {
+  return request.get<unknown, ConsumableUnit[]>('/eam/consumables/basic/units', { params: { keyword } })
+}
+
+/** 计量单位下拉选项 */
+export function fetchConsumableUnitOptions() {
+  return request.get<unknown, ConsumableUnit[]>('/eam/consumables/basic/units/options')
+}
+
+export function createConsumableUnit(data: Partial<ConsumableUnit>) {
+  return request.post<unknown, number>('/eam/consumables/basic/units', data)
+}
+
+export function updateConsumableUnit(id: number, data: Partial<ConsumableUnit>) {
+  return request.put<unknown, void>(`/eam/consumables/basic/units/${id}`, data)
+}
+
+export function deleteConsumableUnit(id: number) {
+  return request.delete<unknown, void>(`/eam/consumables/basic/units/${id}`)
 }

@@ -194,7 +194,7 @@ cd backend && mvn test -B      # 单元测试
 
 # 前端 UI/UX 设计规范（强制）
 
-版本：1.0
+版本：1.1
 状态：强制
 适用范围：所有新建/修改的前端页面、组件、交互、提醒、样式。
 基准来源：`.qoder/rules/form-page-style.md`、`src/styles/components.css`、`src/styles/global.css`、`src/hooks/useColumnConfig.tsx`、`src/api/request.ts`。
@@ -420,6 +420,82 @@ Modal.confirm({
 - **数字加载动画**（必须）：数值使用 `useCountUp` Hook + `AnimatedNumber` 组件（`requestAnimationFrame` 实现，时长 `1200ms`，缓动 `1 - Math.pow(2, -10 * progress)`，`toLocaleString()` 千分位）；日期/百分比等非计数字段可不做计数动画；切换查询对象时通过网格容器 `key` 重新触发动画
 - **布局**：`display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px`
 - **禁止**：不得再使用旧式静态统计卡（无 hover/无计数动画、`#E3F2FD`/`#FFF3E0` 深色文字方案）新建数据指标卡；既有页面遇修改时顺带对齐此标准
+
+### B.8 状态开关（Switch）规范 ⚠️ 强制标准
+
+> 适用范围：所有列表页中用于切换“启用/停用”状态的 Switch 组件。
+> 参考实现：`src/pages/MenuConfig/index.tsx`、`src/pages/AiModelList/index.tsx`。
+
+- **文案固定**（必须）：`checkedChildren="啟用"`、`unCheckedChildren="停用"`，**禁止**使用默认值或"開/關""已启"等其他文案
+- **尺寸统一**：列表页状态 Switch 使用默认尺寸（**禁止** `size="small"`）；仅在表单内嵌、弹窗条件配置等非列表场景允许 `size="small"`
+- **二次确认**（必须）：Switch `onChange` 触发时**禁止直接调用 API**，必须先弹出 `Modal.confirm` 二次确认框，提示内容：`確定要[啟用/停用]該配置嗎？`，用户点击"確認"后才执行 API 更新并刷新列表
+- **确认弹窗样式**：必须使用 `className: 'custom-confirm-modal'` + `icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>`
+- **禁用态无动效**：`disabled` 状态的 Switch 不应有 hover 效果
+
+```tsx
+// ✅ 正确示例：列表页状态 Switch
+<Switch
+  checked={record.status === 'enabled'}
+  checkedChildren="啟用"
+  unCheckedChildren="停用"
+  onChange={() => handleToggleStatus(record)}
+/>
+
+// ✅ 正确示例：handleToggleStatus 带二次确认
+const handleToggleStatus = (record: SomeRecord) => {
+  const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
+  const actionText = newStatus === 'enabled' ? '啟用' : '停用'
+  Modal.confirm({
+    title: `確定要${actionText}該配置嗎？`,
+    className: 'custom-confirm-modal',
+    icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+    okText: '確認',
+    cancelText: '取消',
+    onOk: async () => {
+      await updateApi(record.id, newStatus)
+      message.success(`${actionText}成功`)
+      loadData()
+    },
+  })
+}
+
+// ❌ 错误：缺少 checkedChildren/unCheckedChildren
+<Switch checked={record.enabled === 1} onChange={...} />
+
+// ❌ 错误：直接使用 size="small" 在列表页
+<Switch size="small" checkedChildren="啟用" ... />
+
+// ❌ 错误：直接调用 API，无二次确认
+const handleToggle = async (id, enabled) => { await toggleApi(id, enabled) }
+```
+
+### B.9 操作列按钮规范 ⚠️ 强制标准
+
+> 适用范围：所有列表页表格底部的操作列（Action Column）。
+> 参考实现：`src/pages/NotificationConfig/index.tsx`、`src/pages/Consumable/Item/ItemList.tsx`。
+
+- **禁止图标**：操作列按钮**严禁**使用 Icon 组件（如 `<EditOutlined />`、`<DeleteOutlined />`、`<ArrowUpOutlined />` 等），仅保留纯文本
+- **分隔符**：多个操作按钮之间必须使用竖线 `|` 分隔，通过 `Space` 组件的 `split` 属性实现：`split={<span className="action-split">|</span>}`
+- **按钮类型**：统一使用 `type="link"` + `size="small"`，危险操作加 `danger` 属性
+- **按钮顺序**：详情 → 編輯 → 其他操作 → 刪除（刪除始终放最后）
+
+```tsx
+// ✅ 正确示例
+<Space size={0} split={<span className="action-split">|</span>}>
+  <Button type="link" size="small" onClick={() => onView(record.id)}>詳情</Button>
+  <Button type="link" size="small" onClick={() => onEdit(record.id)}>編輯</Button>
+  <Button type="link" size="small" danger onClick={() => handleDelete(record)}>刪除</Button>
+</Space>
+
+// ❌ 错误：使用图标
+<Button type="link" size="small" icon={<EditOutlined />} onClick={...} />
+
+// ❌ 错误：无分隔符
+<Space>
+  <Button type="link">編輯</Button>
+  <Button type="link" danger>刪除</Button>
+</Space>
+```
 
 ---
 

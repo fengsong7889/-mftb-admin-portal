@@ -12,6 +12,8 @@ public class EamConsumableItemSaveDTO {
     private Long id;
     private String name;
     private Long categoryId;
+    private Long consumableCategoryId;
+    private Long brandId;
     private String brand;
     private String spec;
     private String unit;

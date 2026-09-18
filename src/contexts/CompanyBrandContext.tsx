@@ -38,7 +38,7 @@ export function CompanyBrandProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false)
 
   // 依賴登錄態：登錄成功後（含 SPA 跳转、非整頁刷新）重新拉取公司品牌，
-  // 避免登錄前 401 被靜默緩存為空數組、導致採購/入庫/資產表單「所屬品牌」下拉為空。
+  // 避免登錄前 401 被靜默緩存為空數組、導致採購/入庫/資產表單「資產品牌」下拉為空。
   useEffect(() => {
     if (!isAuthenticated) {
       setBrands([])

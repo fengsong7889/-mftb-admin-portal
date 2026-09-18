@@ -1,375 +1,237 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Switch, Input, Tag, Modal, message, Spin } from 'antd'
-import {
-  BellOutlined,
-  SettingOutlined,
-  SendOutlined,
-  EyeOutlined,
-  EyeInvisibleOutlined,
-  CheckCircleFilled,
-  CloseCircleFilled,
-  MessageOutlined,
-  RocketOutlined,
-} from '@ant-design/icons'
-import { getChannelConfig, updateChannelConfig, testChannel } from '../../api/notificationChannel'
-import type { ChannelConfig } from '../../api/notificationChannel'
+import { useNavigate } from 'react-router-dom'
+import { Form, Input, Select, Button, Tag, Table, Switch, Popconfirm, Space, message, DatePicker, Modal } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
+import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
+import { fetchChannels, toggleChannel, deleteChannel, testChannel } from '../../api/notificationChannel'
+import type { ChannelItem, ChannelQuery } from '../../api/notificationChannel'
+import { toDateRangeParams } from '../../utils/dateRange'
 import './index.css'
 
-/** 渠道定义 */
-interface ChannelMeta {
-  key: string
-  name: string
-  icon: React.ReactNode
-  color: string
-  bgColor: string
-  description: string
-  available: boolean
+/** 预定义场景 */
+const PRESET_SCENARIOS: Record<string, string> = {
+  general: '通用通知',
+  oa_approval: 'OA審批通知',
+  ai_assistant: 'AI助手通知',
 }
 
-const CHANNELS: ChannelMeta[] = [
-  {
-    key: 'dingtalk',
-    name: '钉钉',
-    icon: <BellOutlined style={{ fontSize: 32 }} />,
-    color: '#0089FF',
-    bgColor: '#E6F4FF',
-    description: '通过钉钉自定义机器人 Webhook 向群聊推送通知，支持审批提醒、到期提醒等场景',
-    available: true,
-  },
-  {
-    key: 'wecom',
-    name: '企业微信',
-    icon: <MessageOutlined style={{ fontSize: 32 }} />,
-    color: '#07C160',
-    bgColor: '#F6FFED',
-    description: '通过企业微信应用或群机器人推送消息，适用于企业内部通知与审批提醒',
-    available: false,
-  },
-  {
-    key: 'feishu',
-    name: '飞书',
-    icon: <RocketOutlined style={{ fontSize: 32 }} />,
-    color: '#3370FF',
-    bgColor: '#F0F5FF',
-    description: '通过飞书自定义机器人 Webhook 推送消息，支持富文本和交互卡片',
-    available: false,
-  },
+/** 场景标签颜色 */
+const SCENARIO_COLORS: Record<string, string> = {
+  general: 'default',
+  oa_approval: 'processing',
+  ai_assistant: 'purple',
+}
+
+const STATUS_OPTIONS = [
+  { label: '已啟用', value: 1 },
+  { label: '已停用', value: 0 },
 ]
 
 /**
- * 通知渠道配置页
- *
- * 以卡片形式展示各通知渠道（钉钉/企微/飞书）的接入状态，
- * 支持配置 Webhook URL / Secret、启用开关、发送测试消息。
- * 当前仅钉钉渠道已接入，企微/飞书为预留位（available=false）。
+ * 通知渠道配置列表页
+ * 标准三段式布局：搜索区 + 操作区 + Table
  */
 export default function NotificationConfig() {
-  const [channelConfigs, setChannelConfigs] = useState<Record<string, ChannelConfig>>({})
+  const navigate = useNavigate()
+  const [form] = Form.useForm()
+  const [dataSource, setDataSource] = useState<ChannelItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [activeChannel, setActiveChannel] = useState<ChannelMeta | null>(null)
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [showSecret, setShowSecret] = useState(false)
 
-  /** 加载所有渠道配置 */
-  useEffect(() => {
+  /** 加载数据 */
+  const loadData = useCallback(async () => {
     setLoading(true)
-    Promise.all(
-      CHANNELS.map(ch =>
-        getChannelConfig(ch.key).catch(() => ({ channel: ch.key }))
-      )
-    ).then(configs => {
-      const map: Record<string, ChannelConfig> = {}
-      configs.forEach(c => { map[c.channel] = c })
-      setChannelConfigs(map)
-    }).finally(() => setLoading(false))
-  }, [])
-
-  /** 打开配置抽屉 */
-  const handleOpenDrawer = useCallback(async (channel: ChannelMeta) => {
-    setActiveChannel(channel)
-    setDrawerOpen(true)
-    setShowSecret(false)
     try {
-      const config = await getChannelConfig(channel.key)
-      setForm({
-        webhookUrl: config.webhookUrl || '',
-        secret: config.secret || '',
-        enabled: config.enabled || 'false',
-        atMobiles: config.atMobiles || '',
-      })
+      const values = form.getFieldsValue()
+      const params: ChannelQuery = {}
+      if (values.channel) params.channel = values.channel
+      if (values.name) params.name = values.name
+      if (values.enabled !== undefined && values.enabled !== null) params.enabled = values.enabled
+      if (values.updatedBy) params.updatedBy = values.updatedBy
+      const dateRange = toDateRangeParams(values.updatedDateRange)
+      if (dateRange.from) params.updatedAfter = dateRange.from
+      if (dateRange.to) params.updatedBefore = dateRange.to
+      const data = await fetchChannels(params)
+      setDataSource(data)
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }, [form])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  /** 搜索 */
+  const handleSearch = () => loadData()
+
+  /** 重置 */
+  const handleReset = () => {
+    form.resetFields()
+    setTimeout(() => loadData(), 0)
+  }
+
+  /** 启停切换（二次确认） */
+  const handleToggle = (id: number, enabled: boolean) => {
+    const actionText = enabled ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確定要${actionText}該配置嗎？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await toggleChannel(id, enabled)
+          message.success(enabled ? '已啟用' : '已停用')
+          await loadData()
+        } catch {
+          message.error('操作失敗')
+        }
+      },
+    })
+  }
+
+  /** 删除 */
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteChannel(id)
+      message.success('渠道已刪除')
+      await loadData()
     } catch {
-      setForm({ webhookUrl: '', secret: '', enabled: 'false', atMobiles: '' })
+      message.error('刪除失敗')
     }
-  }, [])
+  }
 
-  /** 保存配置 */
-  const handleSave = useCallback(async () => {
-    if (!activeChannel) return
-    if (!form.webhookUrl?.trim()) {
-      message.warning('请填写 Webhook 地址')
-      return
-    }
-    setSaving(true)
+  /** 测试 */
+  const [testingId, setTestingId] = useState<number | null>(null)
+  const handleTest = async (id: number) => {
+    setTestingId(id)
     try {
-      await updateChannelConfig(activeChannel.key, form)
-      message.success('配置已保存')
-      // 刷新列表并关闭弹窗
-      const config = await getChannelConfig(activeChannel.key)
-      setChannelConfigs(prev => ({ ...prev, [activeChannel.key]: config }))
-      setDrawerOpen(false)
-    } catch {
-      message.error('保存失败')
-    } finally {
-      setSaving(false)
-    }
-  }, [activeChannel, form])
-
-  /** 发送测试消息（携带当前表单值，无需先保存） */
-  const handleTest = useCallback(async () => {
-    if (!activeChannel) return
-    if (!form.webhookUrl?.trim()) {
-      message.warning('请先填写 Webhook 地址')
-      return
-    }
-    setTesting(true)
-    try {
-      const result = await testChannel(activeChannel.key, form as Record<string, string>)
+      const result = await testChannel(id)
       message.success(result)
     } catch {
-      message.error('测试消息发送失败')
+      message.error('測試消息發送失敗')
     } finally {
-      setTesting(false)
+      setTestingId(null)
     }
-  }, [activeChannel, form])
-
-  /** 判断渠道是否已配置 */
-  const isConfigured = (ch: ChannelMeta) => {
-    const config = channelConfigs[ch.key]
-    return config?.webhookUrl && config.webhookUrl.length > 0
   }
 
-  /** 判断渠道是否已启用 */
-  const isEnabled = (ch: ChannelMeta) => {
-    const config = channelConfigs[ch.key]
-    return config?.enabled === 'true'
-  }
+  /** 场景标识 → 显示名 */
+  const scenarioLabel = (val: string) => PRESET_SCENARIOS[val] || val
+
+  /** 表格列 */
+  const columns: ColumnsType<ChannelItem> = [
+    {
+      title: '渠道名稱', dataIndex: 'name', key: 'name', width: 150,
+      render: (text: string, record: ChannelItem) => (
+        <span style={{ fontWeight: record.isDefault === 1 ? 600 : 400 }}>
+          {text}
+          {record.isDefault === 1 && <Tag color="gold" style={{ marginLeft: 6, fontSize: 11 }}>默認</Tag>}
+        </span>
+      ),
+    },
+    {
+      title: 'Webhook', dataIndex: 'webhookUrl', key: 'webhookUrl', width: 240,
+      ellipsis: true,
+      render: (text: string) => (
+        <span style={{ color: '#8C8C8C', fontSize: 12, fontFamily: 'monospace' }}>{text || '—'}</span>
+      ),
+    },
+    {
+      title: '綁定場景', dataIndex: 'scenarios', key: 'scenarios', width: 180,
+      render: (text: string) => {
+        if (!text) return <Tag>通用</Tag>
+        return text.split(',').filter(Boolean).map(s => (
+          <Tag key={s} color={SCENARIO_COLORS[s] || 'default'}>{scenarioLabel(s)}</Tag>
+        ))
+      },
+    },
+    {
+      title: '@手機號', dataIndex: 'atMobiles', key: 'atMobiles', width: 140,
+      ellipsis: true,
+      render: (text: string) => text || <span style={{ color: '#D9D9D9' }}>—</span>,
+    },
+    {
+      title: '狀態', dataIndex: 'enabled', key: 'enabled', width: 80,
+      render: (_: unknown, record: ChannelItem) => (
+        <Switch
+          checked={record.enabled === 1}
+          checkedChildren="啟用"
+          unCheckedChildren="停用"
+          onChange={checked => handleToggle(record.id, checked)}
+        />
+      ),
+    },
+    {
+      title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
+      render: (text: string) => text || <span style={{ color: '#D9D9D9' }}>—</span>,
+    },
+    {
+      title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 165,
+      render: (text: string) => text || <span style={{ color: '#D9D9D9' }}>—</span>,
+    },
+    {
+      title: '操作', key: 'action', width: 160, fixed: 'right' as const,
+      render: (_: unknown, record: ChannelItem) => (
+        <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" size="small" onClick={() => navigate(`/notification-channel-form?id=${record.id}`)}>編輯</Button>
+          <Button type="link" size="small" loading={testingId === record.id}
+            disabled={record.enabled !== 1} onClick={() => handleTest(record.id)}>測試</Button>
+          {record.isDefault !== 1 && (
+            <Popconfirm title="確認刪除該渠道？" onConfirm={() => handleDelete(record.id)}
+              okText="確認" cancelText="取消">
+              <Button type="link" size="small" danger>刪除</Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    },
+  ]
 
   return (
     <div className="content-area">
-      {/* 页面头部 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3,
-          background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%',
-          animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 8,
-              background: 'linear-gradient(135deg, #E8720C, #F59432)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
-            }}>
-              <BellOutlined style={{ fontSize: 18, color: '#fff' }} />
+      {/* ====== 搜索区 ====== */}
+      <div className="search-section notification-config-search">
+        <Form form={form} layout="inline">
+          <Form.Item label="渠道名稱" name="name">
+            <Input placeholder="請輸入渠道名稱" allowClear onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item label="狀態" name="enabled">
+            <Select placeholder="全部" allowClear options={STATUS_OPTIONS} />
+          </Form.Item>
+          <Form.Item label="最後更新人" name="updatedBy">
+            <Input placeholder="請輸入更新人" allowClear onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item label="最後更新時間" name="updatedDateRange">
+            <DatePicker.RangePicker />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions" style={{ justifyContent: 'flex-end' }}>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                通知渠道配置
-              </h2>
-              <span style={{ fontSize: 14, color: '#595959' }}>管理系统各通知渠道的接入配置</span>
-            </div>
-          </div>
+          </Form.Item>
+        </Form>
+      </div>
+
+      {/* ====== 操作区 ====== */}
+      <div className="action-section">
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />}
+            onClick={() => navigate('/notification-channel-form')}>
+            新增渠道
+          </Button>
         </div>
       </div>
 
-      {/* 卡片网格 */}
-      <Spin spinning={loading}>
-        <div className="notification-channel-grid">
-          {CHANNELS.map(ch => {
-            const configured = isConfigured(ch)
-            const enabled = isEnabled(ch)
-            return (
-              <div
-                key={ch.key}
-                className={`notification-channel-card ${!ch.available ? 'card-disabled' : ''}`}
-              >
-                {/* 平台图标 */}
-                <div className="channel-card-icon" style={{ background: ch.bgColor, color: ch.color }}>
-                  {ch.icon}
-                </div>
-
-                {/* 平台名称 + 状态 */}
-                <div className="channel-card-header">
-                  <span className="channel-card-name">{ch.name}</span>
-                  {ch.available ? (
-                    configured && enabled ? (
-                      <Tag icon={<CheckCircleFilled />} color="success">已接入</Tag>
-                    ) : configured ? (
-                      <Tag color="warning">已配置</Tag>
-                    ) : (
-                      <Tag icon={<CloseCircleFilled />} color="default">未接入</Tag>
-                    )
-                  ) : (
-                    <Tag color="default">即将上线</Tag>
-                  )}
-                </div>
-
-                {/* 简介 */}
-                <div className="channel-card-desc">{ch.description}</div>
-
-                {/* 操作区 */}
-                <div className="channel-card-actions">
-                  {ch.available ? (
-                    <>
-                      <Button
-                        size="small"
-                        icon={<SettingOutlined />}
-                        onClick={() => handleOpenDrawer(ch)}
-                      >
-                        配置
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<SendOutlined />}
-                        disabled={!configured || !enabled}
-                        onClick={async () => {
-                          setTesting(true)
-                          try {
-                            const result = await testChannel(ch.key)
-                            message.success(result)
-                          } catch {
-                            message.error('测试消息发送失败')
-                          } finally {
-                            setTesting(false)
-                          }
-                        }}
-                        loading={testing}
-                      >
-                        测试
-                      </Button>
-                      <Switch
-                        size="small"
-                        checked={enabled}
-                        disabled={!configured}
-                        onChange={async (checked) => {
-                          try {
-                            await updateChannelConfig(ch.key, { enabled: String(checked) })
-                            const config = await getChannelConfig(ch.key)
-                            setChannelConfigs(prev => ({ ...prev, [ch.key]: config }))
-                            message.success(checked ? '已启用' : '已停用')
-                          } catch {
-                            message.error('操作失败')
-                          }
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <Button size="small" disabled>即将上线</Button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </Spin>
-
-      {/* 配置弹窗 */}
-      <Modal
-        title={
-          activeChannel ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: activeChannel.color, fontSize: 18 }}>{activeChannel.icon}</span>
-              <span>{activeChannel.name} 配置</span>
-            </div>
-          ) : '渠道配置'
-        }
-        width={520}
-        open={drawerOpen}
-        onCancel={() => setDrawerOpen(false)}
-        onOk={handleSave}
-        confirmLoading={saving}
-        okText="保存"
-        cancelText="取消"
-        okButtonProps={{ style: { backgroundColor: '#E8720C', borderColor: '#E8720C' } }}
-      >
-        <div className="drawer-form">
-          <div className="drawer-form-item">
-            <label>Webhook 地址 <span className="required">*</span></label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Input
-                style={{ flex: 1 }}
-                placeholder="https://oapi.dingtalk.com/robot/send?access_token=..."
-                value={form.webhookUrl || ''}
-                onChange={e => setForm(prev => ({ ...prev, webhookUrl: e.target.value }))}
-              />
-              <Button
-                icon={<SendOutlined />}
-                onClick={handleTest}
-                loading={testing}
-                disabled={!form.webhookUrl}
-              >
-                测试
-              </Button>
-            </div>
-          </div>
-          <div className="drawer-form-item">
-            <label>
-              加签密钥
-              <Button
-                type="link"
-                size="small"
-                icon={showSecret ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-                onClick={() => setShowSecret(!showSecret)}
-                style={{ marginLeft: 8, padding: 0, fontSize: 12 }}
-              >
-                {showSecret ? '隐藏' : '显示'}
-              </Button>
-            </label>
-            <Input.Password
-              placeholder="SEC..."
-              value={form.secret || ''}
-              visibilityToggle={showSecret}
-              onChange={e => setForm(prev => ({ ...prev, secret: e.target.value }))}
-            />
-            <span className="drawer-form-hint">钉钉机器人安全设置中的加签密钥（SEC 开头），如使用关键词模式可留空</span>
-          </div>
-          <div className="drawer-form-item">
-            <label>默认 @手机号</label>
-            <Input
-              placeholder="13800138000,13900139000"
-              value={form.atMobiles || ''}
-              onChange={e => setForm(prev => ({ ...prev, atMobiles: e.target.value }))}
-            />
-            <span className="drawer-form-hint">多个手机号用逗号分隔，发送通知时自动 @这些人</span>
-          </div>
-          <div className="drawer-form-item">
-            <label>启用通知</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Switch
-                checked={form.enabled === 'true'}
-                onChange={checked => setForm(prev => ({ ...prev, enabled: String(checked) }))}
-                checkedChildren="开"
-                unCheckedChildren="关"
-              />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
-                {form.enabled === 'true' ? '已启用，系统将自动推送通知到钉钉群' : '未启用，通知不会推送到钉钉'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </Modal>
+      {/* ====== 表格 ====== */}
+      <Table
+        columns={columns}
+        dataSource={dataSource}
+        rowKey="id"
+        loading={loading}
+        pagination={false}
+        size="middle"
+        scroll={{ x: 1235 }}
+        locale={{ emptyText: '暫無渠道配置，請點擊「新增渠道」添加' }}
+      />
     </div>
   )
 }

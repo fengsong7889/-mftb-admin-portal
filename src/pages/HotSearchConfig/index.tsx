@@ -709,7 +709,7 @@ export default function HotSearchConfig() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
 
-          {/* ===== 行1：搜索入口 + 所属品牌 + 展示终端（置顶） ===== */}
+          {/* ===== 行1：搜索入口 + 资产品牌 + 展示终端（置顶） ===== */}
           <div style={{ display: 'flex', gap: 16 }}>
             <Form.Item label={t('hotSearchConfig.searchEntryLabel')} name="searchEntry" rules={[{ required: true }]} style={{ flex: 1 }}>
               <Select options={searchEntryOptions} disabled={!!editingRecord} onChange={(v) => {

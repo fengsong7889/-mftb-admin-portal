@@ -28,7 +28,7 @@ public class BizStore {
     /** 门店名称 */
     private String storeName;
 
-    /** 所属品牌: flashBee / mFood / flashBee,mFood */
+    /** 资产品牌: flashBee / mFood / flashBee,mFood */
     private String brand;
 
     /** 业务频道 */

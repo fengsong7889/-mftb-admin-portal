@@ -65,8 +65,8 @@ export default function ConsumableDashboardPage() {
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#262626' }}>耗材看板</h2>
           {data && (
             <>
-              <Tag color="processing" style={{ fontSize: 12 }}>待審批領用 {data.pendingApproveCount}</Tag>
               <Tag color="orange" style={{ fontSize: 12 }}>本月領用 {data.monthClaimCount}</Tag>
+              <Tag color="processing" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => navigate('/consumable-claim')}>領用記錄 →</Tag>
             </>
           )}
         </Space>

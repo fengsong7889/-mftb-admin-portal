@@ -189,7 +189,7 @@ const FLAG_OPTIONS = [
 /** Mock 翻译数据 */
 const MOCK_DATA: TranslationField[] = [
   // 公共字段
-  { id: '1', fieldKey: 'brand', category: 'common', description: '所属品牌', translations: { 'zh-TW': '品牌', en: 'Brand', ja: 'ブランド', ko: '브랜드', ru: 'Бренд' } },
+  { id: '1', fieldKey: 'brand', category: 'common', description: '资产品牌', translations: { 'zh-TW': '品牌', en: 'Brand', ja: 'ブランド', ko: '브랜드', ru: 'Бренд' } },
   { id: '2', fieldKey: 'channel', category: 'common', description: '业务频道', translations: { 'zh-TW': '業務頻道', en: 'Business Channel', ja: 'ビジネスチャンネル', ko: '비즈니스 채널', ru: 'Бизнес-канал' } },
   { id: '3', fieldKey: 'storeName', category: 'common', description: '门店名称', translations: { 'zh-TW': '門店名稱', en: 'Store Name', ja: '店舗名', ko: '매장명', ru: 'Название магазина' } },
   { id: '4', fieldKey: 'groupName', category: 'common', description: '集团名称', translations: { 'zh-TW': '集團名稱', en: 'Group Name', ja: 'グループ名', ko: '그룹명', ru: 'Название группы' } },
