@@ -125,6 +125,8 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
   const handleDelete = (record: ConsumableItem) => {
     Modal.confirm({
       title: '確認刪除',
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: `${record.name}（${record.itemCode}）`,
       okText: '確認',
       okButtonProps: { danger: true },

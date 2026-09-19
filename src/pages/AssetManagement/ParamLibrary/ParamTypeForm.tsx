@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Switch,
-  Table, Tabs, TreeSelect, message,
+  Table, Tabs, TreeSelect, message, Row, Col,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -351,69 +351,81 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
               t('asset.basicInfoTitle'),
               t('asset.basicInfoSubtitle'),
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <Form.Item
-                label={t('asset.labelCategory')} name="categoryCode"
-                rules={[{ required: true, message: t('asset.warnSelectCategory') }]}
-              >
-                <TreeSelect
-                  placeholder={t('asset.phSelectCategory')}
-                  allowClear={!categoryDisabled}
-                  disabled={categoryDisabled}
-                  showSearch
-                  treeDefaultExpandAll
-                  treeNodeFilterProp="title"
-                  listHeight={240}
-                  treeData={categoryTreeData}
-                />
-              </Form.Item>
-              <Form.Item
-                label={t('asset.labelParamCode')} name="code"
-                rules={[
-                  { required: true, message: t('asset.warnInputParamCode') },
-                  { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: t('asset.patternParamCode') },
-                ]}
-              >
-                <Input
-                  placeholder={t('asset.phParamCode')}
-                  disabled={isEdit}
-                  style={{ fontFamily: 'monospace' }}
-                />
-              </Form.Item>
-              <Form.Item
-                label={t('asset.labelParamName')} name="name"
-                rules={[{ required: true, message: t('asset.warnInputParamName') }]}
-              >
-                <Input placeholder={t('asset.phParamName')} allowClear />
-              </Form.Item>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-              <Form.Item label={t('asset.labelUnit')} name="unit">
-                <Input placeholder={t('asset.phUnit')} allowClear />
-              </Form.Item>
-              <Form.Item
-                label={
-                  <span>
-                    {t('asset.labelValueType')}
-                    {watchedValueType && watchedValueType !== 'select' && (
-                      <span style={{ fontSize: 12, color: '#fa8c16', marginLeft: 6, fontWeight: 400 }}>
-                        {t('asset.valueTypeHint')}
-                      </span>
-                    )}
-                  </span>
-                }
-                name="valueType"
-              >
-                <Select options={[
-                  { value: 'select', label: t('asset.valueTypeSelect') },
-                  { value: 'text', label: t('asset.valueTypeText') },
-                  { value: 'number', label: t('asset.valueTypeNumber') },
-                ]} />
-              </Form.Item>
-              <Form.Item label={t('asset.labelSort')} name="sort">
-                <InputNumber style={{ width: '100%' }} placeholder={t('asset.phSort')} min={0} />
-              </Form.Item>
-            </div>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label={t('asset.labelCategory')} name="categoryCode"
+                  rules={[{ required: true, message: t('asset.warnSelectCategory') }]}
+                >
+                  <TreeSelect
+                    placeholder={t('asset.phSelectCategory')}
+                    allowClear={!categoryDisabled}
+                    disabled={categoryDisabled}
+                    showSearch
+                    treeDefaultExpandAll
+                    treeNodeFilterProp="title"
+                    listHeight={240}
+                    treeData={categoryTreeData}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label={t('asset.labelParamCode')} name="code"
+                  rules={[
+                    { required: true, message: t('asset.warnInputParamCode') },
+                    { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: t('asset.patternParamCode') },
+                  ]}
+                >
+                  <Input
+                    placeholder={t('asset.phParamCode')}
+                    disabled={isEdit}
+                    style={{ fontFamily: 'monospace' }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label={t('asset.labelParamName')} name="name"
+                  rules={[{ required: true, message: t('asset.warnInputParamName') }]}
+                >
+                  <Input placeholder={t('asset.phParamName')} allowClear />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={t('asset.labelUnit')} name="unit">
+                  <Input placeholder={t('asset.phUnit')} allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label={
+                    <span>
+                      {t('asset.labelValueType')}
+                      {watchedValueType && watchedValueType !== 'select' && (
+                        <span style={{ fontSize: 12, color: '#fa8c16', marginLeft: 6, fontWeight: 400 }}>
+                          {t('asset.valueTypeHint')}
+                        </span>
+                      )}
+                    </span>
+                  }
+                  name="valueType"
+                >
+                  <Select options={[
+                    { value: 'select', label: t('asset.valueTypeSelect') },
+                    { value: 'text', label: t('asset.valueTypeText') },
+                    { value: 'number', label: t('asset.valueTypeNumber') },
+                  ]} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={t('asset.labelSort')} name="sort">
+                  <InputNumber style={{ width: '100%' }} placeholder={t('asset.phSort')} min={0} />
+                </Form.Item>
+              </Col>
+            </Row>
             <Form.Item label={t('asset.labelDescription')} name="description" style={{ marginBottom: 0 }}>
               <Input.TextArea rows={3} placeholder={t('asset.phDescription')} maxLength={300} showCount />
             </Form.Item>

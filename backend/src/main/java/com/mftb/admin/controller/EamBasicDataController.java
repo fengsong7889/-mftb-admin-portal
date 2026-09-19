@@ -34,17 +34,18 @@ public class EamBasicDataController {
 
     /* ==================== 资产分类 ==================== */
 
-    /** 分类列表（平铺返回，页面自行构树） */
+    /** 分类列表（平铺返回，页面自行构树；bizType: ASSET/CONSUMABLE/ALL） */
     @GetMapping("/categories")
     @RequirePermission(menu = "asset-category")
     public Result<List<Map<String, Object>>> listCategories(
+            @RequestParam(required = false) String bizType,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) String updatedAtStart,
             @RequestParam(required = false) String updatedAtEnd) {
-        return Result.success(basicDataService.listCategories(keyword, name, code, updatedBy, updatedAtStart, updatedAtEnd));
+        return Result.success(basicDataService.listCategories(bizType, keyword, name, code, updatedBy, updatedAtStart, updatedAtEnd));
     }
 
     /** 新增分类 */
@@ -80,16 +81,17 @@ public class EamBasicDataController {
 
     /* ==================== 资产品牌库 ==================== */
 
-    /** 资产品牌列表 */
+    /** 品牌列表（bizType: ASSET/CONSUMABLE/ALL） */
     @GetMapping("/brands")
     @RequirePermission(menu = "asset-model")
     public Result<List<Map<String, Object>>> listBrands(
+            @RequestParam(required = false) String bizType,
             @RequestParam(required = false) String categoryCode,
             @RequestParam(required = false) String brandZh,
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) String updatedAtStart,
             @RequestParam(required = false) String updatedAtEnd) {
-        return Result.success(basicDataService.listBrands(categoryCode, brandZh, updatedBy, updatedAtStart, updatedAtEnd));
+        return Result.success(basicDataService.listBrands(bizType, categoryCode, brandZh, updatedBy, updatedAtStart, updatedAtEnd));
     }
 
     /** 新增资产品牌 */

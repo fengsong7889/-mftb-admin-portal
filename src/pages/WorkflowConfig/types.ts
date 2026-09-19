@@ -231,6 +231,7 @@ export const APPROVAL_TYPE_OPTIONS = [
   { label: '贈送', value: 'gift' },
   { label: 'AI申請', value: 'ai_access' },
   { label: '採購申請', value: 'oa_purchase' },
+  { label: '耗材領用', value: 'consumable_claim' },
 ]
 
 /** 品牌選項（用於審批人按品牌配置） */

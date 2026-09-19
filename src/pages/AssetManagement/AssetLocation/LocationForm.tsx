@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useMemo } from 'react'
 import {
-  Button, Form, Input, Select, Spin, message, Space,
+  Button, Form, Input, Select, Spin, message, Space, Row, Col,
 } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -160,68 +160,81 @@ export default function LocationForm({ id, onBack }: Props) {
         </div>
 
         <Form<FormValues> form={form} layout="vertical">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item
-              label={t('asset.codeLabel')}
-              name="code"
-              rules={[{ required: true, message: t('asset.codeRequired') }]}
-            >
-              <Input
-                placeholder={t('asset.codePh')}
-                style={{ fontFamily: 'monospace' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label={t('asset.colWarehouseName')} name="name"
-              rules={[{ required: true, message: t('asset.nameRequired') }]}
-            >
-              <Input placeholder={t('asset.warehouseNamePh')} allowClear />
-            </Form.Item>
-            <div /> {/* 占位空行 */}
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.codeLabel')}
+                name="code"
+                rules={[{ required: true, message: t('asset.codeRequired') }]}
+              >
+                <Input
+                  placeholder={t('asset.codePh')}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.colWarehouseName')} name="name"
+                rules={[{ required: true, message: t('asset.nameRequired') }]}
+              >
+                <Input placeholder={t('asset.warehouseNamePh')} allowClear />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            <Form.Item
-              label={t('asset.colProvince')} name="province"
-              rules={[{ required: true, message: t('asset.provinceRequired') }]}
-            >
-              <Select
-                placeholder={t('asset.locProvincePh')}
-                allowClear
-                showSearch
-                options={provinceOptions}
-                onChange={handleProvinceChange}
-              />
-            </Form.Item>
-            <Form.Item
-              label={t('asset.colCity')} name="city"
-              rules={[{ required: true, message: t('asset.cityRequired') }]}
-            >
-              <Select
-                placeholder={selectedProvince ? t('asset.locCityPh') : t('asset.locCitySelectFirst')}
-                allowClear
-                showSearch
-                disabled={!selectedProvince}
-                options={cityOptions}
-                onChange={handleCityChange}
-              />
-            </Form.Item>
-            <Form.Item
-              label={t('asset.colDistrict')} name="district"
-              rules={[{ required: true, message: t('asset.districtRequired') }]}
-            >
-              <Select
-                placeholder={selectedCity ? t('asset.locDistrictPh') : t('asset.locDistrictSelectFirst')}
-                allowClear
-                showSearch
-                disabled={!selectedCity}
-                options={districtOptions}
-              />
-            </Form.Item>
-            <Form.Item label={t('asset.addressLabel')} name="address">
-              <Input placeholder={t('asset.addressPh')} allowClear />
-            </Form.Item>
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.colProvince')} name="province"
+                rules={[{ required: true, message: t('asset.provinceRequired') }]}
+              >
+                <Select
+                  placeholder={t('asset.locProvincePh')}
+                  allowClear
+                  showSearch
+                  options={provinceOptions}
+                  onChange={handleProvinceChange}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.colCity')} name="city"
+                rules={[{ required: true, message: t('asset.cityRequired') }]}
+              >
+                <Select
+                  placeholder={selectedProvince ? t('asset.locCityPh') : t('asset.locCitySelectFirst')}
+                  allowClear
+                  showSearch
+                  disabled={!selectedProvince}
+                  options={cityOptions}
+                  onChange={handleCityChange}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.colDistrict')} name="district"
+                rules={[{ required: true, message: t('asset.districtRequired') }]}
+              >
+                <Select
+                  placeholder={selectedCity ? t('asset.locDistrictPh') : t('asset.locDistrictSelectFirst')}
+                  allowClear
+                  showSearch
+                  disabled={!selectedCity}
+                  options={districtOptions}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label={t('asset.addressLabel')} name="address">
+                <Input placeholder={t('asset.addressPh')} allowClear />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item label={t('asset.remarkLabel')} name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea

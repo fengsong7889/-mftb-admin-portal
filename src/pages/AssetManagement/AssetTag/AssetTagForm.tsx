@@ -173,17 +173,17 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           {renderCardTitle('📋', '#e6f7ff', t('common.basicInfo'))}
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('assetTag.nameLabel')} name="name" rules={[{ required: true, message: t('assetTag.nameRequired') }]}>
                 <Input placeholder={t('assetTag.namePh')} maxLength={30} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('assetTag.sortLabel')} name="sort" initialValue={0}>
                 <InputNumber min={0} max={9999} precision={0} style={{ width: '100%' }} placeholder={t('assetTag.sortPh')} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('assetTag.descLabel')} name="description">
                 <Input placeholder={t('assetTag.descPh')} maxLength={200} />
               </Form.Item>

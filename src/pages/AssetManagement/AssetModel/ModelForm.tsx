@@ -24,6 +24,7 @@ interface BrandFormValues {
   brandZh: string
   brandEn: string
   brandLogo?: string
+  bizType?: 'ASSET' | 'CONSUMABLE'
 }
 
 interface ProductFormValues {
@@ -38,6 +39,8 @@ interface Props {
   categoryCode?: string
   brandId?: number
   type: 'brand' | 'product'
+  /** 新增品牌模式默认业务类型（方案二：统一品牌产品库） */
+  bizType?: string
   onBack: () => void
 }
 
@@ -52,11 +55,12 @@ const cardTitleStyle: React.CSSProperties = {
   fontSize: 15, fontWeight: 600, color: '#262626',
 }
 
-export default function ModelForm({ id, categoryCode: initialCategoryCode, brandId: initialBrandId, type, onBack }: Props) {
+export default function ModelForm({ id, categoryCode: initialCategoryCode, brandId: initialBrandId, type, bizType: initialBizType, onBack }: Props) {
   const { t } = useTranslation()
   const isBrand = type === 'brand'
   const [brandForm] = Form.useForm<BrandFormValues>()
   const [productForm] = Form.useForm<ProductFormValues>()
+  const brandBizType = Form.useWatch('bizType', brandForm)
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -66,7 +70,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
   useEffect(() => {
     let alive = true
     setLoading(true)
-    Promise.all([fetchCategoryList(), fetchBrandList()])
+    Promise.all([fetchCategoryList(), fetchBrandList({ bizType: 'ALL' })])
       .then(async ([cats, brs]) => {
         if (!alive) return
         setCategories(cats)
@@ -79,6 +83,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                 categoryCode: brand.categoryCode,
                 brandZh: brand.brandZh,
                 brandEn: brand.brandEn,
+                bizType: brand.bizType || 'ASSET',
               })
             }
           } else {
@@ -94,6 +99,9 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
         } else {
           if (isBrand && initialCategoryCode) {
             brandForm.setFieldsValue({ categoryCode: initialCategoryCode })
+          }
+          if (isBrand) {
+            brandForm.setFieldsValue({ bizType: initialBizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET' })
           }
           if (!isBrand && initialBrandId) {
             const brand = brs.find(b => b.id === initialBrandId)
@@ -128,10 +136,11 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
       if (isBrand) {
         const v = await brandForm.validateFields()
         const payload = {
-          categoryCode: v.categoryCode,
+          categoryCode: v.categoryCode || '',
           brandZh: v.brandZh.trim(),
           brandEn: v.brandEn.trim(),
           brandLogo: v.brandLogo?.trim(),
+          bizType: v.bizType || 'ASSET',
         }
         setSubmitting(true)
         if (isEdit && id) {
@@ -226,10 +235,10 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
           {isBrand ? (
             <Form<BrandFormValues> form={brandForm} layout="vertical">
               <Row gutter={16}>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.belongCategory')} name="categoryCode"
-                    rules={[{ required: true, message: t('asset.belongCategoryPh') }]}
+                    rules={[{ required: brandBizType !== 'CONSUMABLE', message: t('asset.belongCategoryPh') }]}
                   >
                     <Select
                       placeholder={t('asset.categorySelectPh')}
@@ -240,7 +249,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.brandZhLabel')} name="brandZh"
                     rules={[{ required: true, message: t('asset.brandZhRequired') }]}
@@ -248,7 +257,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     <Input placeholder={t('asset.brandZhPh')} allowClear />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.brandEnLabel')} name="brandEn"
                     rules={[{ required: true, message: t('asset.brandEnRequired') }]}
@@ -256,12 +265,20 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     <Input placeholder={t('asset.brandEnPh')} allowClear />
                   </Form.Item>
                 </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item label={t('asset.colBizType')} name="bizType" rules={[{ required: true }]}>
+                    <Select disabled={isEdit}>
+                      <Select.Option value="ASSET">{t('asset.bizTypeAsset')}</Select.Option>
+                      <Select.Option value="CONSUMABLE">{t('asset.bizTypeConsumable')}</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
               </Row>
             </Form>
           ) : (
             <Form<ProductFormValues> form={productForm} layout="vertical">
               <Row gutter={16}>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.belongBrand')} name="brandId"
                     rules={[{ required: true, message: t('asset.belongBrandRequired') }]}
@@ -276,12 +293,12 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item label={t('asset.belongCategory')} name="categoryCode">
                     <Select placeholder={t('asset.autoInherit')} disabled options={categoryOptions} />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.productNameLabel')} name="name"
                     rules={[{ required: true, message: t('asset.productNameRequired') }]}
@@ -291,7 +308,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                 </Col>
               </Row>
               <Row gutter={16}>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.colUnit')} name="unit"
                     rules={[{ required: true, message: t('asset.unitRequired') }]}

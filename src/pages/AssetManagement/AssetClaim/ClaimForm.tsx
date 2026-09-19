@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Button, Form, Input, Select, DatePicker, Spin, Modal, Pagination, Radio, TreeSelect,
-  Alert,
+  Alert, Row, Col,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, DatabaseOutlined,
@@ -187,8 +187,8 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
             )}
 
             <Alert type="info" showIcon className="claim-notice" message="仅可选择未被预留的闲置资产；登记后须本人签署才完成领用。" />
-            <div className="claim-form-grid">
-              <div>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   label={t('asset.colAssetNo')} name="assetId"
                   rules={[{ required: true, message: t('asset.assetRequired') }]}
@@ -207,8 +207,8 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                 </Form.Item>
                 <Pagination className="claim-selection-pagination" size="small" current={assetQuery.page} pageSize={assetQuery.size} total={assets?.total ?? 0} showSizeChanger={false} hideOnSinglePage
                   onChange={(page) => setAssetQuery({ ...assetQuery, page })} />
-              </div>
-            </div>
+              </Col>
+            </Row>
 
             {/* 所選資產信息展示 */}
             {selected && (
@@ -227,29 +227,37 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
               '領用信息',
             )}
 
-            <div className="claim-form-grid">
-              <div>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.colClaimant')} name="employeeId" rules={[{ required: true, message: t('asset.claimantRequired') }]}>
                   <Select showSearch filterOption={false} placeholder="搜索姓名 / 工号" disabled={!onEmployeeQuery || submitting}
                     onSearch={(keyword) => setEmployeeQuery({ ...employeeQuery, keyword: keyword.trim() || undefined, page: 1 })}
                     onChange={(id: number) => setEmployee(employeeOptions.find((item) => item.employeeId === id))}
                     options={employeeOptions.map((item) => ({ value: item.employeeId, label: `${item.empName}（${item.empNo}）` }))} />
                 </Form.Item>
-              </div>
-              <Form.Item label={t('asset.colDepartment')}>
-                <TreeSelect disabled treeData={deptTree} value={employee?.departmentId} placeholder={employee?.department || '由员工组织信息带出'} />
-              </Form.Item>
-              <Form.Item label={t('asset.colClaimDate')} name="claimDate" rules={[
-                { required: true, message: t('asset.claimDateRequired') },
-                { validator: (_, date: Dayjs) => !date || !date.isAfter(dayjs(), 'day') ? Promise.resolve() : Promise.reject(new Error('领用日期不能在未来')) },
-              ]}>
-                <DatePicker disabledDate={(date) => date.isAfter(dayjs(), 'day')} />
-              </Form.Item>
-              <Form.Item label={t('asset.colOperator')}>
-                <Input disabled value={operatorEmpNo ? `${operatorName}（${operatorEmpNo}）` : operatorName ?? ''} placeholder="由服务端登录身份确认" />
-              </Form.Item>
-              <Form.Item label="领用用途" name="claimReason" className="claim-reason-item"><Input maxLength={200} placeholder="请输入领用用途" allowClear /></Form.Item>
-            </div>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={t('asset.colDepartment')}>
+                  <TreeSelect disabled treeData={deptTree} value={employee?.departmentId} placeholder={employee?.department || '由员工组织信息带出'} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={t('asset.colClaimDate')} name="claimDate" rules={[
+                  { required: true, message: t('asset.claimDateRequired') },
+                  { validator: (_, date: Dayjs) => !date || !date.isAfter(dayjs(), 'day') ? Promise.resolve() : Promise.reject(new Error('领用日期不能在未来')) },
+                ]}>
+                  <DatePicker style={{ width: '100%' }} disabledDate={(date) => date.isAfter(dayjs(), 'day')} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label={t('asset.colOperator')}>
+                  <Input disabled value={operatorEmpNo ? `${operatorName}（${operatorEmpNo}）` : operatorName ?? ''} placeholder="由服务端登录身份确认" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item label="领用用途" name="claimReason"><Input maxLength={200} placeholder="请输入领用用途" allowClear /></Form.Item>
+              </Col>
+            </Row>
             <Form.Item label="办理方式" name="mode" style={{ marginTop: 20 }}>
               <Radio.Group>
                 <Radio value="standard">登记并发送待签</Radio>

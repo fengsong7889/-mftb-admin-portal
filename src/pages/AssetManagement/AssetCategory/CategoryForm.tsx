@@ -8,7 +8,7 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Button, Form, Input, TreeSelect, Space, Spin, message, Select, InputNumber,
+  Button, Form, Input, TreeSelect, Space, Spin, message, Select, InputNumber, Row, Col,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, FolderOutlined,
@@ -27,15 +27,18 @@ interface FormValues {
   parentId?: number
   status: 'enabled' | 'disabled'
   remark?: string
+  bizType?: 'ASSET' | 'CONSUMABLE'
 }
 
 interface Props {
   id?: number
   parentId?: number
+  /** 新增模式默认业务类型（方案二：统一分类库） */
+  bizType?: string
   onBack: () => void
 }
 
-export default function CategoryForm({ id, parentId, onBack }: Props) {
+export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
   const isEdit = id != null
@@ -46,13 +49,9 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
   const [idToCode, setIdToCode] = useState<Map<number, string>>(new Map())
 
   const loadOptions = useCallback(async () => {
-    const list = await fetchCategoryList()
-    const tree = buildTree(list)
-    setTreeData(toTreeSelectData(tree, isEdit && id ? [id] : [], 3))
-    setExistingCodes(list.map(c => c.code))
-    setIdToCode(new Map(list.map((c: AssetCategory) => [c.id, c.code])))
+    const list = await fetchCategoryList({ bizType: 'ALL' })
     return list
-  }, [id, isEdit])
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -69,24 +68,33 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
               parentId: cur.parentId || undefined,
               status: cur.status || 'enabled',
               remark: cur.remark,
+              bizType: cur.bizType || 'ASSET',
             })
           }
+          setTreeData(toTreeSelectData(buildTree(list), isEdit && id ? [id] : [], 3))
+          setExistingCodes(list.map(c => c.code))
+          setIdToCode(new Map(list.map((c: AssetCategory) => [c.id, c.code])))
         } else {
-          form.setFieldsValue({ parentId: parentId || undefined, status: 'enabled' })
-          // 新增模式：自动生成编码
-          const parentCat = parentId ? list.find((c: AssetCategory) => c.id === parentId) : undefined
+          // 新增模式：上级分类/编码生成仅限同业务类型范围
+          const type: 'ASSET' | 'CONSUMABLE' = bizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET'
+          const scoped = list.filter(c => (c.bizType || 'ASSET') === type)
+          form.setFieldsValue({ parentId: parentId || undefined, status: 'enabled', bizType: type })
+          const parentCat = parentId ? scoped.find((c: AssetCategory) => c.id === parentId) : undefined
           const autoCode = generateCategoryCode(
-            list.map((c: AssetCategory) => c.code),
+            scoped.map((c: AssetCategory) => c.code),
             parentId,
             parentCat?.code,
           )
           form.setFieldsValue({ code: autoCode })
+          setTreeData(toTreeSelectData(buildTree(scoped), [], 3))
+          setExistingCodes(scoped.map(c => c.code))
+          setIdToCode(new Map(scoped.map((c: AssetCategory) => [c.id, c.code])))
         }
       })
       .catch((e: Error) => message.error(e.message))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [form, id, isEdit, loadOptions, parentId])
+  }, [form, id, isEdit, loadOptions, parentId, bizType])
 
   /** 上级分类变更时重新生成编码 */
   const handleParentChange = (newParentId?: number) => {
@@ -107,6 +115,7 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
         sort: 1,
         remark: v.remark,
         paramTemplate: [],
+        bizType: v.bizType || 'ASSET',
       }
       setSubmitting(true)
       if (isEdit && id) {
@@ -178,41 +187,57 @@ export default function CategoryForm({ id, parentId, onBack }: Props) {
         {/* ====== 基本信息 ====== */}
         <div style={cardShellStyle}>
           {cardTitle(<FolderOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#E6F7FF', t('asset.sectionBasic'))}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item
-              label="分类编码" name="code"
-              rules={[{ required: true, message: '请输入分类编码' }]}
-            >
-              <Input
-                placeholder="系统自动生成"
-                disabled={!isEdit}
-                style={{ fontFamily: 'monospace' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label="分类名称" name="name"
-              rules={[{ required: true, message: '请输入分类名称' }]}
-            >
-              <Input placeholder="请输入分类名称" allowClear />
-            </Form.Item>
-            <Form.Item label="状态" name="status">
-              <Select>
-                <Select.Option value="enabled">启用</Select.Option>
-                <Select.Option value="disabled">禁用</Select.Option>
-              </Select>
-            </Form.Item>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label="上级分类" name="parentId" style={{ marginBottom: 0 }}>
-              <TreeSelect
-                treeData={treeData}
-                placeholder="请选择上级分类"
-                allowClear
-                treeDefaultExpandAll
-                onChange={handleParentChange}
-              />
-            </Form.Item>
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label="分类编码" name="code"
+                rules={[{ required: true, message: '请输入分类编码' }]}
+              >
+                <Input
+                  placeholder="系统自动生成"
+                  disabled={!isEdit}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label="分类名称" name="name"
+                rules={[{ required: true, message: '请输入分类名称' }]}
+              >
+                <Input placeholder="请输入分类名称" allowClear />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="状态" name="status">
+                <Select>
+                  <Select.Option value="enabled">启用</Select.Option>
+                  <Select.Option value="disabled">禁用</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="业务类型" name="bizType" rules={[{ required: true }]}>
+                <Select disabled={isEdit}>
+                  <Select.Option value="ASSET">资产</Select.Option>
+                  <Select.Option value="CONSUMABLE">耗材</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="上级分类" name="parentId" style={{ marginBottom: 0 }}>
+                <TreeSelect
+                  treeData={treeData}
+                  placeholder="请选择上级分类"
+                  allowClear
+                  treeDefaultExpandAll
+                  onChange={handleParentChange}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
           <Form.Item label={t('asset.colRemark')} name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea
               placeholder={t('asset.remarkPh')}

@@ -24,8 +24,8 @@ public interface EamBasicDataService {
 
     /* ==================== 资产分类 ==================== */
 
-    /** 分类列表（平铺返回，页面自行构树） */
-    List<Map<String, Object>> listCategories(String keyword, String name, String code,
+    /** 分类列表（平铺返回，页面自行构树；bizType: ASSET/CONSUMABLE，ALL 或空=默认 ASSET） */
+    List<Map<String, Object>> listCategories(String bizType, String keyword, String name, String code,
                                               String updatedBy, String updatedAtStart, String updatedAtEnd);
 
     /** 新增分类 */
@@ -42,8 +42,8 @@ public interface EamBasicDataService {
 
     /* ==================== 资产品牌库 ==================== */
 
-    /** 资产品牌列表 */
-    List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
+    /** 品牌列表（bizType: ASSET/CONSUMABLE，ALL 或空=默认 ASSET） */
+    List<Map<String, Object>> listBrands(String bizType, String categoryCode, String brandZh,
                                           String updatedBy, String updatedAtStart, String updatedAtEnd);
 
     /** 新增资产品牌 */

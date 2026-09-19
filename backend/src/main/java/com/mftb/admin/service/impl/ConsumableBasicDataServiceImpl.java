@@ -9,6 +9,7 @@ import com.mftb.admin.service.ConsumableBasicDataService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -30,27 +31,32 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    private final ConsumableCategoryMapper categoryMapper;
-    private final ConsumableBrandMapper brandMapper;
+    /** 业务类型：耗材 */
+    private static final String BIZ_CONSUMABLE = "CONSUMABLE";
+
+    private final EamCategoryMapper categoryMapper;
+    private final EamBrandMapper brandMapper;
     private final ConsumableUnitMapper unitMapper;
     private final OperatorResolver operatorResolver;
+    private final JdbcTemplate jdbcTemplate;
 
-    /* ==================== 分类 ==================== */
+    /* ==================== 分类（统一分类库 biz_type=CONSUMABLE） ==================== */
 
     @Override
     public List<ConsumableCategoryVO> listCategories(String keyword) {
-        LambdaQueryWrapper<ConsumableCategory> wrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<EamCategory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamCategory::getBizType, BIZ_CONSUMABLE);
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
-            wrapper.and(w -> w.like(ConsumableCategory::getCode, kw)
-                    .or().like(ConsumableCategory::getName, kw));
+            wrapper.and(w -> w.like(EamCategory::getCode, kw)
+                    .or().like(EamCategory::getName, kw));
         }
-        wrapper.orderByAsc(ConsumableCategory::getSortOrder).orderByAsc(ConsumableCategory::getId);
-        List<ConsumableCategory> list = categoryMapper.selectList(wrapper);
+        wrapper.orderByAsc(EamCategory::getSort).orderByAsc(EamCategory::getId);
+        List<EamCategory> list = categoryMapper.selectList(wrapper);
 
         // 构建 parentName 映射
         Map<Long, String> nameMap = list.stream()
-                .collect(Collectors.toMap(ConsumableCategory::getId, ConsumableCategory::getName, (a, b) -> a));
+                .collect(Collectors.toMap(EamCategory::getId, EamCategory::getName, (a, b) -> a));
 
         return list.stream().map(c -> {
             ConsumableCategoryVO vo = new ConsumableCategoryVO();
@@ -60,10 +66,10 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
             vo.setParentId(c.getParentId());
             vo.setParentName(c.getParentId() != null && c.getParentId() > 0
                     ? nameMap.getOrDefault(c.getParentId(), "") : "");
-            vo.setSortOrder(c.getSortOrder());
+            vo.setSortOrder(c.getSort());
             vo.setStatus(c.getStatus());
             vo.setRemark(c.getRemark());
-            vo.setCreatedBy(c.getCreatedBy());
+            vo.setCreatedBy("");
             vo.setUpdatedBy(c.getUpdatedBy());
             vo.setUpdatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().format(DT_FMT) : "");
             return vo;
@@ -74,89 +80,88 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
     public long createCategory(ConsumableCategorySaveDTO dto) {
         if (!StringUtils.hasText(dto.getCode())) throw new BusinessException("分類編碼不能為空");
         if (!StringUtils.hasText(dto.getName())) throw new BusinessException("分類名稱不能為空");
-        // 编码唯一校验
-        long count = categoryMapper.selectCount(new LambdaQueryWrapper<ConsumableCategory>()
-                .eq(ConsumableCategory::getCode, dto.getCode()));
+        // 编码唯一校验（统一表全局唯一）
+        long count = categoryMapper.selectCount(new LambdaQueryWrapper<EamCategory>()
+                .eq(EamCategory::getCode, dto.getCode()));
         if (count > 0) throw new BusinessException("分類編碼已存在：" + dto.getCode());
 
-        ConsumableCategory entity = new ConsumableCategory();
+        EamCategory entity = new EamCategory();
         entity.setCode(dto.getCode().trim());
         entity.setName(dto.getName().trim());
         entity.setParentId(dto.getParentId() != null ? dto.getParentId() : 0L);
-        entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
+        entity.setBizType(BIZ_CONSUMABLE);
+        entity.setSort(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
         entity.setStatus(StringUtils.hasText(dto.getStatus()) ? dto.getStatus() : "enabled");
         entity.setRemark(dto.getRemark() != null ? dto.getRemark() : "");
-        fillOperator(entity, true);
+        fillOperatorCategory(entity);
         categoryMapper.insert(entity);
         return entity.getId();
     }
 
     @Override
     public void updateCategory(long id, ConsumableCategorySaveDTO dto) {
-        ConsumableCategory entity = categoryMapper.selectById(id);
+        EamCategory entity = categoryMapper.selectById(id);
         if (entity == null) throw new BusinessException("分類不存在");
         if (StringUtils.hasText(dto.getCode())) {
             // 编码唯一校验（排除自身）
-            long count = categoryMapper.selectCount(new LambdaQueryWrapper<ConsumableCategory>()
-                    .eq(ConsumableCategory::getCode, dto.getCode()).ne(ConsumableCategory::getId, id));
+            long count = categoryMapper.selectCount(new LambdaQueryWrapper<EamCategory>()
+                    .eq(EamCategory::getCode, dto.getCode()).ne(EamCategory::getId, id));
             if (count > 0) throw new BusinessException("分類編碼已存在：" + dto.getCode());
             entity.setCode(dto.getCode().trim());
         }
         if (StringUtils.hasText(dto.getName())) entity.setName(dto.getName().trim());
         if (dto.getParentId() != null) entity.setParentId(dto.getParentId());
-        if (dto.getSortOrder() != null) entity.setSortOrder(dto.getSortOrder());
+        if (dto.getSortOrder() != null) entity.setSort(dto.getSortOrder());
         if (StringUtils.hasText(dto.getStatus())) entity.setStatus(dto.getStatus());
         if (dto.getRemark() != null) entity.setRemark(dto.getRemark());
-        fillOperator(entity, false);
+        fillOperatorCategory(entity);
         categoryMapper.updateById(entity);
     }
 
     @Override
     public void deleteCategory(long id) {
-        ConsumableCategory entity = categoryMapper.selectById(id);
+        EamCategory entity = categoryMapper.selectById(id);
         if (entity == null) throw new BusinessException("分類不存在");
         // 检查是否有子分类
-        long childCount = categoryMapper.selectCount(new LambdaQueryWrapper<ConsumableCategory>()
-                .eq(ConsumableCategory::getParentId, id));
+        long childCount = categoryMapper.selectCount(new LambdaQueryWrapper<EamCategory>()
+                .eq(EamCategory::getParentId, id));
         if (childCount > 0) throw new BusinessException("該分類下存在子分類，請先刪除子分類");
         categoryMapper.deleteById(id);
     }
 
     @Override
     public void toggleCategoryStatus(long id) {
-        ConsumableCategory entity = categoryMapper.selectById(id);
+        EamCategory entity = categoryMapper.selectById(id);
         if (entity == null) throw new BusinessException("分類不存在");
         entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
-        fillOperator(entity, false);
+        fillOperatorCategory(entity);
         categoryMapper.updateById(entity);
     }
 
-    /* ==================== 品牌 ==================== */
+    /* ==================== 品牌（统一品牌产品库 biz_type=CONSUMABLE） ==================== */
 
     @Override
     public List<ConsumableBrandVO> listBrands(String categoryType, String keyword) {
-        LambdaQueryWrapper<ConsumableBrand> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(categoryType)) {
-            wrapper.eq(ConsumableBrand::getCategoryType, categoryType.trim());
-        }
+        LambdaQueryWrapper<EamBrand> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(EamBrand::getBizType, StringUtils.hasText(categoryType) ? categoryType.trim() : BIZ_CONSUMABLE);
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
-            wrapper.like(ConsumableBrand::getName, kw)
-                    .or().like(ConsumableBrand::getNameEn, kw);
+            wrapper.and(w -> w.like(EamBrand::getBrandZh, kw)
+                    .or().like(EamBrand::getBrandEn, kw));
         }
-        wrapper.orderByAsc(ConsumableBrand::getName);
-        List<ConsumableBrand> list = brandMapper.selectList(wrapper);
+        wrapper.orderByAsc(EamBrand::getBrandZh);
+        List<EamBrand> list = brandMapper.selectList(wrapper);
         return list.stream().map(b -> {
             ConsumableBrandVO vo = new ConsumableBrandVO();
             vo.setId(b.getId());
             vo.setCode(b.getCode());
-            vo.setName(b.getName());
-            vo.setNameEn(b.getNameEn());
-            vo.setCategoryType(b.getCategoryType());
-            vo.setLogo(b.getLogo());
+            vo.setName(b.getBrandZh());
+            vo.setNameEn(b.getBrandEn());
+            vo.setCategoryType(b.getBizType());
+            vo.setLogo(b.getBrandLogo());
             vo.setStatus(b.getStatus());
             vo.setRemark(b.getRemark());
-            vo.setCreatedBy(b.getCreatedBy());
+            vo.setCreatedBy("");
             vo.setUpdatedBy(b.getUpdatedBy());
             vo.setUpdatedAt(b.getUpdatedAt() != null ? b.getUpdatedAt().format(DT_FMT) : "");
             return vo;
@@ -166,73 +171,77 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
     @Override
     public long createBrand(ConsumableBrandSaveDTO dto) {
         if (!StringUtils.hasText(dto.getName())) throw new BusinessException("品牌名稱不能為空");
-        long count = brandMapper.selectCount(new LambdaQueryWrapper<ConsumableBrand>()
-                .eq(ConsumableBrand::getName, dto.getName()));
+        String bizType = StringUtils.hasText(dto.getCategoryType()) ? dto.getCategoryType() : BIZ_CONSUMABLE;
+        long count = brandMapper.selectCount(new LambdaQueryWrapper<EamBrand>()
+                .eq(EamBrand::getBrandZh, dto.getName()).eq(EamBrand::getBizType, bizType));
         if (count > 0) throw new BusinessException("品牌名稱已存在：" + dto.getName());
 
-        ConsumableBrand entity = new ConsumableBrand();
-        entity.setCode(dto.getCode());
-        entity.setName(dto.getName().trim());
-        entity.setNameEn(dto.getNameEn() != null ? dto.getNameEn().trim() : "");
-        entity.setCategoryType(StringUtils.hasText(dto.getCategoryType()) ? dto.getCategoryType() : "CONSUMABLE");
-        entity.setLogo(dto.getLogo() != null ? dto.getLogo() : "");
+        EamBrand entity = new EamBrand();
+        // 后端自动生成 CB 编码
+        entity.setCode(generateNextBrandCode());
+        entity.setCategoryCode("");
+        entity.setBrandZh(dto.getName().trim());
+        entity.setBrandEn(dto.getNameEn() != null ? dto.getNameEn().trim() : "");
+        entity.setBrandLogo(dto.getLogo() != null ? dto.getLogo() : "");
+        entity.setBizType(bizType);
         entity.setStatus(StringUtils.hasText(dto.getStatus()) ? dto.getStatus() : "enabled");
         entity.setRemark(dto.getRemark() != null ? dto.getRemark() : "");
-        fillOperatorBrand(entity, true);
+        fillOperatorBrand(entity);
         brandMapper.insert(entity);
         return entity.getId();
     }
 
     @Override
     public void updateBrand(long id, ConsumableBrandSaveDTO dto) {
-        ConsumableBrand entity = brandMapper.selectById(id);
+        EamBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
         if (dto.getCode() != null) entity.setCode(dto.getCode());
         if (StringUtils.hasText(dto.getName())) {
-            long count = brandMapper.selectCount(new LambdaQueryWrapper<ConsumableBrand>()
-                    .eq(ConsumableBrand::getName, dto.getName()).ne(ConsumableBrand::getId, id));
+            long count = brandMapper.selectCount(new LambdaQueryWrapper<EamBrand>()
+                    .eq(EamBrand::getBrandZh, dto.getName()).eq(EamBrand::getBizType, entity.getBizType())
+                    .ne(EamBrand::getId, id));
             if (count > 0) throw new BusinessException("品牌名稱已存在：" + dto.getName());
-            entity.setName(dto.getName().trim());
+            entity.setBrandZh(dto.getName().trim());
         }
-        if (dto.getNameEn() != null) entity.setNameEn(dto.getNameEn().trim());
-        if (StringUtils.hasText(dto.getCategoryType())) entity.setCategoryType(dto.getCategoryType());
-        if (dto.getLogo() != null) entity.setLogo(dto.getLogo());
+        if (dto.getNameEn() != null) entity.setBrandEn(dto.getNameEn().trim());
+        if (StringUtils.hasText(dto.getCategoryType())) entity.setBizType(dto.getCategoryType());
+        if (dto.getLogo() != null) entity.setBrandLogo(dto.getLogo());
         if (StringUtils.hasText(dto.getStatus())) entity.setStatus(dto.getStatus());
         if (dto.getRemark() != null) entity.setRemark(dto.getRemark());
-        fillOperatorBrand(entity, false);
+        fillOperatorBrand(entity);
         brandMapper.updateById(entity);
     }
 
     @Override
     public void deleteBrand(long id) {
-        ConsumableBrand entity = brandMapper.selectById(id);
+        EamBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
         brandMapper.deleteById(id);
     }
 
     @Override
     public void toggleBrandStatus(long id) {
-        ConsumableBrand entity = brandMapper.selectById(id);
+        EamBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
         entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
-        fillOperatorBrand(entity, false);
+        fillOperatorBrand(entity);
         brandMapper.updateById(entity);
     }
 
     @Override
     public ConsumableBrandVO getBrandDetail(long id) {
-        ConsumableBrand entity = brandMapper.selectById(id);
+        EamBrand entity = brandMapper.selectById(id);
         if (entity == null) throw new BusinessException("品牌不存在");
         ConsumableBrandVO vo = new ConsumableBrandVO();
         vo.setId(entity.getId());
         vo.setCode(entity.getCode());
-        vo.setName(entity.getName());
-        vo.setNameEn(entity.getNameEn());
-        vo.setCategoryType(entity.getCategoryType());
-        vo.setLogo(entity.getLogo());
+        vo.setName(entity.getBrandZh());
+        vo.setNameEn(entity.getBrandEn());
+        vo.setCategoryType(entity.getBizType());
+        vo.setLogo(entity.getBrandLogo());
         vo.setStatus(entity.getStatus());
         vo.setRemark(entity.getRemark());
-        vo.setCreatedBy(entity.getCreatedBy());
+        vo.setCreatedBy("");
         vo.setUpdatedBy(entity.getUpdatedBy());
         vo.setUpdatedAt(entity.getUpdatedAt() != null ? entity.getUpdatedAt().format(DT_FMT) : "");
         return vo;
@@ -305,25 +314,24 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         unitMapper.deleteById(id);
     }
 
+    @Override
+    public void toggleUnitStatus(long id) {
+        ConsumableUnit entity = unitMapper.selectById(id);
+        if (entity == null) throw new BusinessException("單位不存在");
+        entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
+        fillOperatorUnit(entity, false);
+        unitMapper.updateById(entity);
+    }
+
     /* ==================== 工具方法 ==================== */
 
-    private void fillOperator(ConsumableCategory entity, boolean isNew) {
-        String opName = operatorResolver.currentOperatorName();
-        if (isNew) {
-            entity.setCreatedBy(opName);
-            entity.setCreatedAt(LocalDateTime.now());
-        }
-        entity.setUpdatedBy(opName);
+    private void fillOperatorCategory(EamCategory entity) {
+        entity.setUpdatedBy(operatorResolver.currentOperatorName());
         entity.setUpdatedAt(LocalDateTime.now());
     }
 
-    private void fillOperatorBrand(ConsumableBrand entity, boolean isNew) {
-        String opName = operatorResolver.currentOperatorName();
-        if (isNew) {
-            entity.setCreatedBy(opName);
-            entity.setCreatedAt(LocalDateTime.now());
-        }
-        entity.setUpdatedBy(opName);
+    private void fillOperatorBrand(EamBrand entity) {
+        entity.setUpdatedBy(operatorResolver.currentOperatorName());
         entity.setUpdatedAt(LocalDateTime.now());
     }
 
@@ -335,5 +343,24 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         }
         entity.setUpdatedBy(opName);
         entity.setUpdatedAt(LocalDateTime.now());
+    }
+
+    /**
+     * 生成下一个耗材品牌编码（CB + 2位全局序号）
+     * <p>查询当前最大 CB 编码序号 +1，如已有 CB09 → 返回 CB10</p>
+     */
+    private String generateNextBrandCode() {
+        String maxCode = jdbcTemplate.queryForObject(
+                "SELECT MAX(code) FROM biz_eam_brand WHERE code LIKE 'CB%' AND deleted = 0",
+                String.class);
+        int nextSeq = 1;
+        if (maxCode != null && maxCode.length() > 2) {
+            try {
+                nextSeq = Integer.parseInt(maxCode.substring(2)) + 1;
+            } catch (NumberFormatException ignored) {
+                // 存量数据格式异常，兜底从 1 开始
+            }
+        }
+        return String.format("CB%02d", nextSeq);
     }
 }

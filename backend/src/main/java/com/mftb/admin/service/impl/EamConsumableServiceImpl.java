@@ -66,6 +66,7 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         if (StringUtils.hasText(query.getItemCode())) wrapper.like(EamConsumableItem::getItemCode, query.getItemCode().trim());
         if (StringUtils.hasText(query.getName())) wrapper.like(EamConsumableItem::getName, query.getName().trim());
         if (StringUtils.hasText(query.getBrand())) wrapper.like(EamConsumableItem::getBrand, query.getBrand().trim());
+        if (query.getBrandId() != null) wrapper.eq(EamConsumableItem::getBrandId, query.getBrandId());
         if (StringUtils.hasText(query.getUnit())) wrapper.eq(EamConsumableItem::getUnit, query.getUnit().trim());
         if (StringUtils.hasText(query.getUpdatedBy())) wrapper.like(EamConsumableItem::getUpdatedBy, query.getUpdatedBy().trim());
         if (StringUtils.hasText(query.getUpdateTimeStart()) || StringUtils.hasText(query.getUpdateTimeEnd())) {
@@ -289,9 +290,16 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     /* ==================== 预警 ==================== */
 
     @Override
-    public List<EamConsumableItemVO> alerts() {
-        return itemMapper.selectList(new LambdaQueryWrapper<EamConsumableItem>()
-                        .eq(EamConsumableItem::getStatus, "enabled"))
+    public List<EamConsumableItemVO> alerts(String itemCode, String name, Long categoryId) {
+        LambdaQueryWrapper<EamConsumableItem> wrapper = new LambdaQueryWrapper<EamConsumableItem>()
+                .eq(EamConsumableItem::getStatus, "enabled");
+        if (StringUtils.hasText(itemCode))
+            wrapper.like(EamConsumableItem::getItemCode, itemCode.trim());
+        if (StringUtils.hasText(name))
+            wrapper.like(EamConsumableItem::getName, name.trim());
+        if (categoryId != null)
+            wrapper.eq(EamConsumableItem::getCategoryId, categoryId);
+        return itemMapper.selectList(wrapper)
                 .stream().map(this::toItemVO)
                 .filter(vo -> Boolean.TRUE.equals(vo.getAlert()))
                 .sorted(Comparator.comparingInt(

@@ -9,6 +9,8 @@ import java.util.List;
  */
 @Data
 public class EamConsumableClaimSaveDTO {
+    /** 领用人 ID（管理员代领时指定，为空则取当前登录人） */
+    private Long applicantId;
     /** 领用事由 */
     private String reason;
     /** 备注 */

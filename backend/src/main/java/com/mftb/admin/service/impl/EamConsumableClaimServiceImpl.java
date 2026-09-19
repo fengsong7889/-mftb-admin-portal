@@ -47,6 +47,7 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
     private final EamConsumableItemMapper itemMapper;
     private final EamConsumableTxnMapper txnMapper;
     private final EamLocationMapper locationMapper;
+    private final SysUserMapper userMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -110,13 +111,20 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         if (dto.getItems() == null || dto.getItems().isEmpty()) throw new BusinessException("請至少選擇一項耗材");
         if (!StringUtils.hasText(dto.getReason())) throw new BusinessException("請填寫領用事由");
 
+        // 确定领用人：如果指定了 applicantId 则查找对应员工，否则使用当前登录人
+        SysUser applicant = current;
+        if (dto.getApplicantId() != null && !dto.getApplicantId().equals(current.getId())) {
+            applicant = userMapper.selectById(dto.getApplicantId());
+            if (applicant == null) throw new BusinessException("領用人不存在");
+        }
+
         String claimNo = bizSeqService.next(BizSeqService.RULE_EAM_CONSUMABLE_CLAIM);
         EamConsumableClaim claim = new EamConsumableClaim();
         claim.setClaimNo(claimNo);
-        claim.setApplicantId(current.getId());
-        claim.setApplicantName(StringUtils.hasText(current.getName()) ? current.getName() : current.getUsername());
-        claim.setApplicantEmpId(nullToEmpty(current.getEmpId()));
-        claim.setDepartment(nullToEmpty(current.getDepartment()));
+        claim.setApplicantId(applicant.getId());
+        claim.setApplicantName(StringUtils.hasText(applicant.getName()) ? applicant.getName() : applicant.getUsername());
+        claim.setApplicantEmpId(nullToEmpty(applicant.getEmpId()));
+        claim.setDepartment(nullToEmpty(applicant.getDepartment()));
         claim.setReason(dto.getReason().trim());
         // 简化流程：提交即自动通过并出库，单据直接落为 issued
         claim.setStatus("issued");

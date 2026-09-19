@@ -520,12 +520,12 @@ export default function AssetAdd() {
             )}
 
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.assetNoLabel')} name="assetNo" rules={[{ required: true, message: t('asset.assetCodeRequired') }]}>
                   <Input placeholder={t('asset.assetNoPh')} allowClear disabled={!!editingAsset?.batchId} style={{ fontFamily: 'monospace' }} />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.assetTypeLabel')} name="assetType" rules={[{ required: true, message: t('asset.assetTypeRequired') }]}>
                   <TreeSelect
                     placeholder={t('asset.assetTypeSelectPh')}
@@ -538,7 +538,7 @@ export default function AssetAdd() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.assetBrandLabel')} name="brand">
                   <Select
                     placeholder={t('asset.selectBrandFirstPh')}
@@ -554,7 +554,7 @@ export default function AssetAdd() {
             </Row>
 
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.assetNameLabel')} name="assetName">
                   <Select
                     placeholder={t('asset.selectBrandFirstAssetPh')}
@@ -567,7 +567,7 @@ export default function AssetAdd() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.companyBrandLabel')} name="companyBrand">
                   <Select
                     placeholder={t('asset.selectCompanyBrandPh')}
@@ -601,7 +601,7 @@ export default function AssetAdd() {
             )}
 
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.sourceLabel')} name="source" initialValue="self" rules={[{ required: true, message: t('asset.sourceSelectPh') }]}>
                   <Select>
                     <Select.Option value="self">{t('asset.sourceSelfOption')}</Select.Option>
@@ -612,14 +612,14 @@ export default function AssetAdd() {
               {/* 自购 → 购买公司 + 购买时价值 */}
               {source === 'self' && (
                 <>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.purchaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.companyRequired') }]} initialValue="澳觅科技">
                       <Select placeholder={t('asset.selectCompanyPh')}>
                         {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
                       </Select>
                     </Form.Item>
                   </Col>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.purchaseValueLabel')} name="purchaseValue">
                       <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
                     </Form.Item>
@@ -629,14 +629,14 @@ export default function AssetAdd() {
               {/* 租用 → 租用公司 + 租借公司 */}
               {source === 'lease' && (
                 <>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.leaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.leaseCompanyRequired') }]}>
                       <Select placeholder={t('asset.selectCompanyPh')}>
                         {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
                       </Select>
                     </Form.Item>
                   </Col>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.rentalCompanyLabel')} name="leaseCompany">
                       <Input placeholder={t('asset.rentalCompanyPh')} allowClear />
                     </Form.Item>
@@ -648,7 +648,7 @@ export default function AssetAdd() {
             <Row gutter={16}>
               {/* 自购 → 购买日期 */}
               {source === 'self' && (
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item label={t('asset.purchaseDateLabel')} name="purchaseDate">
                     <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} />
                   </Form.Item>
@@ -657,12 +657,12 @@ export default function AssetAdd() {
               {/* 租用 → 租金 + 租用周期 */}
               {source === 'lease' && (
                 <>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.rentalCostLabel')} name="rentalCost">
                       <InputNumber min={0} step={100} precision={2} placeholder="MOP" style={{ width: '100%' }} addonAfter="MOP" />
                     </Form.Item>
                   </Col>
-                  <Col span={8}>
+                  <Col xs={24} sm={12} md={8}>
                     <Form.Item label={t('asset.rentalPeriodLabel')} name="rentalPeriod">
                       <DatePicker.RangePicker style={{ width: '100%' }} placeholder={[t('asset.startDatePh'), t('asset.endDatePh')]} />
                     </Form.Item>
@@ -675,7 +675,7 @@ export default function AssetAdd() {
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.storageLocationSection')}</div>
               <Row gutter={16}>
-                <Col span={8}>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item label={t('asset.warehouseLocationLabel')} style={{ marginBottom: 0 }}>
                     <TreeSelect
                       placeholder={t('asset.selectWarehousePh')}
@@ -702,12 +702,12 @@ export default function AssetAdd() {
             )}
 
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.currentUserLabel')} name="userName">
                   <Input placeholder={t('asset.currentUserPh')} allowClear />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.departmentLabel')} name="department">
                   <TreeSelect
                     placeholder={t('asset.selectDeptPh')}
@@ -719,7 +719,7 @@ export default function AssetAdd() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.usageDateLabel')} name="usageDate">
                   <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} />
                 </Form.Item>
@@ -750,22 +750,22 @@ export default function AssetAdd() {
             )}
 
             <Row gutter={16}>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item label={t('asset.inboundBatchNoLabel')} name="inboundBatchNo">
                   <Input placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item label={t('asset.inboundDateLabel')} name="inboundDate">
                   <DatePicker style={{ width: '100%' }} placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item label={t('asset.inboundQtyLabel')} name="inboundQty" initialValue={1}>
                   <InputNumber min={1} max={1} style={{ width: '100%' }} disabled />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item label={t('asset.inspectorLabel')} name="inspector">
                   <Input placeholder={t('asset.autoGenFromInbound')} disabled />
                 </Form.Item>

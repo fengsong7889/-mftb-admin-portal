@@ -480,17 +480,26 @@ export function scrapAsset(data: { assetId: number; reason: string; scrapDate: s
 
 /** 资产维修 */
 export function repairAsset(data: Omit<AssetRepairRecord, 'id'>): Promise<number> {
-  return unavailableAssetOperation('资产维修')
+  return request.post<unknown, number>('/eam/repairs', {
+    assetId: data.assetId,
+    repairDate: data.repairDate,
+    faultDesc: data.faultDesc,
+    repairContent: data.repairContent,
+    repairBy: data.repairBy,
+    cost: data.cost,
+    applicant: data.applicant,
+    causeType: data.causeType,
+  })
 }
 
 /** 维修记录列表（按资产ID过滤） */
 export function fetchRepairList(params?: { assetId?: number; status?: 'repairing' | 'done' }): Promise<AssetRepairRecord[]> {
-  return unavailableAssetOperation('维修记录查询')
+  return request.get<unknown, AssetRepairRecord[]>('/eam/repairs', { params })
 }
 
 /** 维修完成 */
 export function finishRepair(id: number, finishDate: string): Promise<void> {
-  return unavailableAssetOperation('维修完成')
+  return request.post<unknown, void>(`/eam/repairs/${id}/finish`, { finishDate })
 }
 
 /** 资产盘点列表 */

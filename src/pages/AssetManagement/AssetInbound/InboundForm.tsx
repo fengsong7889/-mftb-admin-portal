@@ -781,16 +781,16 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
-        <Row gutter={24}>
-          <Col span={6}>
+        <Row gutter={16}>
+          <Col xs={24} sm={12} md={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colPurchaser')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{order.purchaser || '-'}</div>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} md={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderDept')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{purchaserDept || '-'}</div>
           </Col>
-          <Col span={6}>
+          <Col xs={24} sm={12} md={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {order.brand ? <BrandTag value={order.brand} /> : <span style={{ color: '#bfbfbf', fontSize: 14 }}>-</span>}
@@ -798,13 +798,13 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               {order.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF' }}>{t('asset.brandCodeMf')}</span>}
             </div>
           </Col>
-          <Col span={6}>
+        </Row>
+        <Row gutter={16}>
+          <Col xs={24} sm={12} md={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
           </Col>
-        </Row>
-        <Row gutter={24} style={{ marginTop: 12 }}>
-          <Col span={24}>
+          <Col xs={24} sm={12} md={16}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
             <div style={{ fontSize: 14, color: '#262626' }}>{order.remark || '-'}</div>
           </Col>
@@ -866,23 +866,25 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
             {/* 供應商信息（只讀）+ 驗收日期 */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col span={5}>
+              <Col xs={24} sm={12} md={8}>
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierName')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.supplier || '-'}</div>
               </Col>
-              <Col span={5}>
+              <Col xs={24} sm={12} md={8}>
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierContact')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.contact || '-'}</div>
               </Col>
-              <Col span={5}>
+              <Col xs={24} sm={12} md={8}>
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelOrderDate')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.orderDate || '-'}</div>
               </Col>
-              <Col span={5}>
+            </Row>
+            <Row gutter={16} style={{ marginBottom: 16 }}>
+              <Col xs={24} sm={12} md={8}>
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelDeliveryMethod')}</div>
                 <div style={{ fontSize: 14, color: '#262626' }}>{group.deliveryMethod && DELIVERY_METHOD_LABEL[group.deliveryMethod] ? t(`asset.${DELIVERY_METHOD_LABEL[group.deliveryMethod]}`) : '-'}</div>
               </Col>
-              <Col span={4}>
+              <Col xs={24} sm={12} md={8}>
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
                 <DatePicker
                   value={group.inboundDate}

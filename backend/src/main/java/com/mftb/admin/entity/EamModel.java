@@ -31,6 +31,9 @@ public class EamModel {
     /** 品牌 LOGO（冗余） */
     private String brandLogo;
 
+    /** 产品编码（品牌编码-3位序号，如 AB01-001） */
+    private String code;
+
     /** 产品型号编码 */
     private String modelNo;
 

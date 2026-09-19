@@ -4,11 +4,11 @@
  * 替代前端硬编码的 UNIT_OPTIONS，支持后台动态管理
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Button, Form, Input, Table, Modal, message, Space, Tag } from 'antd'
+import { Button, Form, Input, Table, Modal, message, Space, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  fetchConsumableUnits, createConsumableUnit, updateConsumableUnit, deleteConsumableUnit,
+  fetchConsumableUnits, createConsumableUnit, updateConsumableUnit, deleteConsumableUnit, toggleConsumableUnitStatus,
   type ConsumableUnit,
 } from '../../../api/consumable'
 
@@ -39,6 +39,8 @@ export default function ConsumableUnit() {
   const handleDelete = (record: ConsumableUnit) => {
     Modal.confirm({
       title: '確認刪除',
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: `${record.name}`,
       okText: '確認',
       okButtonProps: { danger: true },
@@ -50,6 +52,27 @@ export default function ConsumableUnit() {
           loadData()
         } catch (e: unknown) {
           message.error(e instanceof Error ? e.message : '刪除失敗')
+        }
+      },
+    })
+  }
+
+  const handleToggleStatus = (record: ConsumableUnit) => {
+    const next = record.status === 'enabled' ? 'disabled' : 'enabled'
+    const actionText = next === 'enabled' ? '啟用' : '停用'
+    Modal.confirm({
+      title: `確定要${actionText}該單位嗎？`,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await toggleConsumableUnitStatus(record.id)
+          message.success(`${actionText}成功`)
+          loadData()
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : '操作失敗')
         }
       },
     })
@@ -94,8 +117,15 @@ export default function ConsumableUnit() {
     { title: '單位名稱', dataIndex: 'name', key: 'name', width: 120 },
     { title: '縮寫', dataIndex: 'abbr', key: 'abbr', width: 100, render: (v: string) => v || '-' },
     { title: '排序', dataIndex: 'sortOrder', key: 'sortOrder', width: 80, align: 'right' },
-    { title: '狀態', dataIndex: 'status', key: 'status', width: 80,
-      render: (v: string) => <Tag color={v === 'enabled' ? 'green' : 'default'}>{v === 'enabled' ? '啟用' : '停用'}</Tag> },
+    { title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      render: (v: string, record: ConsumableUnit) => (
+        <Switch
+          checked={v === 'enabled'}
+          checkedChildren="啟用"
+          unCheckedChildren="停用"
+          onChange={() => handleToggleStatus(record)}
+        />
+      ) },
     { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 100, ellipsis: true, render: (v: string) => v || '-' },
     { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 165, render: (v: string) => v || '-' },
     { title: '操作', key: 'action', width: 120, fixed: 'right' as const,
@@ -117,7 +147,7 @@ export default function ConsumableUnit() {
               style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px' }}
             >返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{editId ? '編輯計量單位' : '新增計量單位'}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#262626' }}>{editId ? '編輯計量單位' : '新增計量單位'}</h2>
           </div>
         </div>
         <Form form={form} layout="vertical">
@@ -132,8 +162,11 @@ export default function ConsumableUnit() {
               <Form.Item label="排序" name="sortOrder">
                 <Input type="number" placeholder="0" />
               </Form.Item>
-              <Form.Item label="狀態" name="status">
-                <Tag color="green">啟用</Tag>
+              <Form.Item label="狀態" name="status" valuePropName="checked"
+                getValueFromEvent={(checked: boolean) => (checked ? 'enabled' : 'disabled')}
+                getValueProps={(value?: string) => ({ checked: value === 'enabled' })}
+              >
+                <Switch checkedChildren="啟用" unCheckedChildren="停用" />
               </Form.Item>
             </div>
           </div>

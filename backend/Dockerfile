@@ -8,6 +8,7 @@ RUN mvn dependency:go-offline -B
 
 # 复制源码并构建
 COPY backend/src src
+COPY backend/sql/165_notification_apps_and_scenarios.sql sql/165_notification_apps_and_scenarios.sql
 RUN mvn package -DskipTests -B && \
     mv target/mftb-admin.jar app.jar
 

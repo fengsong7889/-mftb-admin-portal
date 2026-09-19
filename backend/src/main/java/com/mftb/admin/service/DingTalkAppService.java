@@ -3,7 +3,7 @@ package com.mftb.admin.service;
 /**
  * 钉钉企业内部应用服务
  * 负责获取 access_token、按 userId 定向发送工作通知
- * 配置读取 sys_config：dingtalk_app_key / dingtalk_app_secret / dingtalk_agent_id
+ * 通过独立应用记录和场景路由发送，旧 sys_config 凭据仅用于迁移
  */
 public interface DingTalkAppService {
 
@@ -14,16 +14,8 @@ public interface DingTalkAppService {
     String SIGN_SECRET = "dingtalk_sign_token_secret";
     java.util.List<String> APP_CONFIG_KEYS = java.util.List.of(APP_KEY, APP_SECRET, AGENT_ID, BASE_URL, SIGN_SECRET);
 
-    /** 保存事务提交后失效 token 缓存 */
-    void invalidateAccessToken();
-
-    /** 使用已保存凭证重新获取 token；仅校验连接，不发送消息、不返回 token */
-    void testConnection();
-
-    /**
-     * 是否已配置企业内部应用（app_key/app_secret/agent_id 均非空）
-     */
-    boolean isConfigured();
+    /** 使用指定应用已保存的凭证校验连接，不发送消息、不返回 token。 */
+    void testConnection(long appId);
 
     /**
      * 发送工作通知（异步）
@@ -33,5 +25,6 @@ public interface DingTalkAppService {
      * @param content 通知正文（纯文本）
      * @return 是否成功提交发送
      */
-    java.util.concurrent.CompletableFuture<Boolean> sendWorkNotification(java.util.List<String> userIds, String title, String content);
+    java.util.concurrent.CompletableFuture<Boolean> sendWorkNotification(String scenario, long appId,
+            java.util.List<String> userIds, String title, String content);
 }

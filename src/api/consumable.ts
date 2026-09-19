@@ -194,6 +194,8 @@ export interface ConsumableClaim {
 
 /** 领用提交参数 */
 export interface ConsumableClaimSave {
+  /** 领用人 ID（管理员代领时指定，为空则取当前登录人） */
+  applicantId?: number
   reason: string
   remark?: string
   items: { itemId: number; qty: number; locationId?: number }[]
@@ -240,6 +242,8 @@ export function fetchConsumableItems(params?: {
   categoryId?: number
   /** 品牌（模糊） */
   brand?: string
+  /** 品牌 ID（精确，用于品牌页两级视图） */
+  brandId?: number
   /** 计量单位 */
   unit?: string
   status?: string
@@ -335,8 +339,12 @@ export function fetchConsumableTxnStats(params?: {
 
 /* ==================== 预警 ==================== */
 
-export function fetchConsumableAlerts() {
-  return request.get<unknown, ConsumableItem[]>('/eam/consumables/alerts')
+export function fetchConsumableAlerts(params?: {
+  itemCode?: string
+  name?: string
+  categoryId?: number
+}) {
+  return request.get<unknown, ConsumableItem[]>('/eam/consumables/alerts', { params })
 }
 
 /* ==================== 领用 ==================== */
@@ -453,4 +461,8 @@ export function updateConsumableUnit(id: number, data: Partial<ConsumableUnit>) 
 
 export function deleteConsumableUnit(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/basic/units/${id}`)
+}
+
+export function toggleConsumableUnitStatus(id: number) {
+  return request.put<unknown, void>(`/eam/consumables/basic/units/${id}/status`)
 }

@@ -20,6 +20,7 @@ import {
   ShoppingCartOutlined,
   DownOutlined,
   RightOutlined,
+  InboxOutlined,
 } from '@ant-design/icons'
 import './index.css'
 
@@ -123,6 +124,14 @@ const PROCESS_CATALOG: ProcessCategory[] = [
         description: 'processCenter.procProcurementDesc',
         icon: <ShoppingCartOutlined />,
         route: '/oa-purchase-request',
+        enabled: true,
+      },
+      {
+        key: 'consumable_claim',
+        name: 'processCenter.procConsumableClaim',
+        description: 'processCenter.procConsumableClaimDesc',
+        icon: <InboxOutlined />,
+        route: '/consumable-claim',
         enabled: true,
       },
     ],

@@ -1,13 +1,12 @@
 package com.mftb.admin.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.mftb.admin.entity.SysConfig;
+import com.mftb.admin.service.NotificationAppService;
+import com.mftb.admin.service.NotificationAppService.Credentials;
 import com.mftb.admin.common.BusinessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import com.mftb.admin.mapper.SysConfigMapper;
 import com.mftb.admin.service.DingTalkAppService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,56 +29,38 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DingTalkAppServiceImpl implements DingTalkAppService {
 
-    private final SysConfigMapper sysConfigMapper;
+    private final NotificationAppService appService;
     private final RestTemplate restTemplate;
 
-    /** access_token 缓存（钉钉有效期 2 小时，提前 5 分钟刷新） */
-    private volatile String cachedAccessToken;
-    private volatile long tokenExpireAt = 0;
-    private String cachedAppKey;
-    private String cachedAppSecret;
+    /** 按应用隔离缓存；凭据变更和跨实例更新在读取时自动识别。 */
+    private final Map<Long, CachedToken> tokens = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Override
-    public synchronized void invalidateAccessToken() {
-        cachedAccessToken = null;
-        tokenExpireAt = 0;
-        cachedAppKey = null;
-        cachedAppSecret = null;
-    }
-
-    @Override
-    public void testConnection() {
-        if (!isConfigured()) throw new BusinessException(400, "請先保存完整的企業內部應用配置");
+    public void testConnection(long appId) {
+        Credentials app = appService.credentials(appId, false);
         // 始终访问钉钉验证已保存凭证，不使用旧缓存，也不向客户端返回 token。
-        requestAccessToken(getConfig(APP_KEY), getConfig(APP_SECRET));
+        requestAccessToken(app.getAppKey(), app.getAppSecret());
     }
 
     /* ==================== 对外接口 ==================== */
 
     @Override
-    public boolean isConfigured() {
-        return StringUtils.hasText(getConfig("dingtalk_app_key"))
-                && StringUtils.hasText(getConfig("dingtalk_app_secret"))
-                && StringUtils.hasText(getConfig("dingtalk_agent_id"));
-    }
-
-    @Override
     @Async
-    public CompletableFuture<Boolean> sendWorkNotification(List<String> userIds, String title, String content) {
+    public CompletableFuture<Boolean> sendWorkNotification(String scenario, long appId, List<String> userIds, String title, String content) {
         if (userIds == null || userIds.isEmpty()) {
             log.warn("钉钉工作通知未发送：接收人列表为空");
             return CompletableFuture.completedFuture(false);
         }
-        if (!isConfigured()) {
-            log.warn("钉钉工作通知未发送：企业内部应用未配置（sys_config 缺少 dingtalk_app_key/app_secret/agent_id）");
-            return CompletableFuture.completedFuture(false);
-        }
         try {
-            String token = getAccessToken();
+            Credentials app = appService.resolve(scenario);
+            // 排队期间停用或改绑时不发送，且不回退到任何默认应用。
+            if (app == null || app.getId() != appId) return CompletableFuture.completedFuture(false);
+            appService.requireComplete(app);
+            String token = getAccessToken(app);
             if (token == null) return CompletableFuture.completedFuture(false);
 
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("agent_id", Long.parseLong(getConfig("dingtalk_agent_id")));
+            body.put("agent_id", Long.parseLong(app.getAgentId()));
             body.put("userid_list", String.join(",", userIds));
             Map<String, Object> msg = new LinkedHashMap<>();
             msg.put("msgtype", "text");
@@ -109,22 +90,17 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
     /**
      * 获取 access_token（带内存缓存，过期前 5 分钟自动刷新）
      */
-    private synchronized String getAccessToken() {
+    private synchronized String getAccessToken(Credentials app) {
         long now = System.currentTimeMillis();
-        String appKey = getConfig(APP_KEY);
-        String appSecret = getConfig(APP_SECRET);
-        // 除本实例保存后失效外，也识别其他实例修改的凭证，避免沿用旧应用 token。
-        if (cachedAccessToken != null && now < tokenExpireAt
-                && Objects.equals(appKey, cachedAppKey) && Objects.equals(appSecret, cachedAppSecret)) {
-            return cachedAccessToken;
-        }
+        tokens.entrySet().removeIf(entry -> entry.getValue().expiresAt <= now);
+        CachedToken cached = tokens.get(app.getId());
+        if (cached != null && Objects.equals(app.getAppKey(), cached.appKey)
+                && Objects.equals(app.getAppSecret(), cached.appSecret)) return cached.token;
         try {
-            TokenGrant grant = requestAccessToken(appKey, appSecret);
-            cachedAccessToken = grant.token();
-            cachedAppKey = appKey;
-            cachedAppSecret = appSecret;
-            tokenExpireAt = now + Math.max(0, grant.expiresIn() - 300) * 1000L;
-            return cachedAccessToken;
+            TokenGrant grant = requestAccessToken(app.getAppKey(), app.getAppSecret());
+            tokens.put(app.getId(), new CachedToken(app.getAppKey(), app.getAppSecret(), grant.token(),
+                    now + Math.max(0, grant.expiresIn() - 300) * 1000L));
+            return grant.token();
         } catch (BusinessException e) {
             log.warn("获取钉钉 access_token 失败: {}", e.getMessage());
             return null;
@@ -161,9 +137,11 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
 
     private record TokenGrant(String token, long expiresIn) { }
 
-    private String getConfig(String key) {
-        SysConfig config = sysConfigMapper.selectOne(
-                new LambdaQueryWrapper<SysConfig>().eq(SysConfig::getConfigKey, key));
-        return config != null ? config.getConfigValue() : null;
+    @RequiredArgsConstructor
+    private static final class CachedToken {
+        private final String appKey;
+        private final String appSecret;
+        private final String token;
+        private final long expiresAt;
     }
 }

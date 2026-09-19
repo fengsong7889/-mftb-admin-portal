@@ -8,7 +8,7 @@
  */
 import { useState, useEffect } from 'react'
 import {
-  Button, Form, Input, Spin, message, Space, Switch, Modal,
+  Button, Form, Input, Spin, message, Space, Switch, Modal, Row, Col,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, ContactsOutlined, PlusOutlined, DeleteOutlined,
@@ -171,35 +171,42 @@ export default function SupplierForm({ id, onBack }: Props) {
         </div>
 
         <Form<FormValues> form={form} layout="vertical">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item
-              label={t('asset.codeLabel')}
-              name="code"
-              extra={t('asset.codeAutoGenHint')}
-            >
-              <Input
-                disabled
-                placeholder={isEdit ? '' : t('asset.autoGenAfterSave')}
-                style={{ fontFamily: 'monospace', color: '#595959' }}
-              />
-            </Form.Item>
-            <Form.Item
-              label={t('asset.supplierNameLabel')} name="name"
-              rules={[{ required: true, message: t('asset.supplierNamePh') }]}
-            >
-              <Input placeholder={t('asset.supplierNamePh')} allowClear />
-            </Form.Item>
-            <div /> {/* 占位空行 */}
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.codeLabel')}
+                name="code"
+                extra={t('asset.codeAutoGenHint')}
+              >
+                <Input
+                  disabled
+                  placeholder={isEdit ? '' : t('asset.autoGenAfterSave')}
+                  style={{ fontFamily: 'monospace', color: '#595959' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label={t('asset.supplierNameLabel')} name="name"
+                rules={[{ required: true, message: t('asset.supplierNamePh') }]}
+              >
+                <Input placeholder={t('asset.supplierNamePh')} allowClear />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label={t('asset.bankNameLabel')} name="bankName">
-              <Input placeholder={t('asset.bankNamePh')} allowClear />
-            </Form.Item>
-            <Form.Item label={t('asset.bankAccountLabel')} name="bankAccount">
-              <Input placeholder={t('asset.bankAccountPh')} allowClear style={{ fontFamily: 'monospace' }} />
-            </Form.Item>
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label={t('asset.bankNameLabel')} name="bankName">
+                <Input placeholder={t('asset.bankNamePh')} allowClear />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label={t('asset.bankAccountLabel')} name="bankAccount">
+                <Input placeholder={t('asset.bankAccountPh')} allowClear style={{ fontFamily: 'monospace' }} />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item label={t('asset.colRemark')} name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea

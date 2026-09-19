@@ -19,6 +19,8 @@ public class EamConsumableItemQuery {
     private Long categoryId;
     /** 品牌（模糊） */
     private String brand;
+    /** 品牌 ID（精确，用于品牌页两级视图） */
+    private Long brandId;
     /** 计量单位（精确） */
     private String unit;
     /** 状态：enabled/disabled */

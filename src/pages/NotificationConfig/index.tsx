@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Form, Input, Select, Button, Tag, Table, Switch, Popconfirm, Space, message, DatePicker, Modal, Tabs } from 'antd'
 import { useTranslation } from 'react-i18next'
-import EnterpriseAppConfig from './EnterpriseAppConfig'
+import EnterpriseAppList from './EnterpriseAppList'
+import NotificationScenarioList from './NotificationScenarioList'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { fetchChannels, toggleChannel, deleteChannel, testChannel } from '../../api/notificationChannel'
@@ -240,11 +241,14 @@ function RobotChannels() {
 
 export default function NotificationConfig() {
   const { t } = useTranslation()
+  const [params, setParams] = useSearchParams()
+  const activeTab = ['app', 'scenarios'].includes(params.get('tab') || '') ? params.get('tab')! : 'robot'
   return (
     <div className="content-area notification-config">
-      <Tabs defaultActiveKey="robot" items={[
+      <Tabs activeKey={activeTab} onChange={tab => setParams({ tab })} destroyOnHidden items={[
         { key: 'robot', label: t('notificationApp.robotTab'), children: <RobotChannels /> },
-        { key: 'app', label: t('notificationApp.appTab'), children: <EnterpriseAppConfig /> },
+        { key: 'app', label: t('notificationApp.appTab'), children: <EnterpriseAppList /> },
+        { key: 'scenarios', label: t('notificationApp.scenarioTab'), children: <NotificationScenarioList /> },
       ]} />
     </div>
   )

@@ -114,7 +114,10 @@ public class EamConsumableController {
     /* ===== 预警 ===== */
     @GetMapping("/alerts")
     @RequirePermission(menu = "consumable-alert")
-    public Result<List<EamConsumableItemVO>> alerts() {
-        return Result.success(consumableService.alerts());
+    public Result<List<EamConsumableItemVO>> alerts(
+            @RequestParam(required = false) String itemCode,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Long categoryId) {
+        return Result.success(consumableService.alerts(itemCode, name, categoryId));
     }
 }

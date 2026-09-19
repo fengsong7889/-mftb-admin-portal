@@ -36,4 +36,5 @@ public interface ConsumableBasicDataService {
     long createUnit(ConsumableUnitSaveDTO dto);
     void updateUnit(long id, ConsumableUnitSaveDTO dto);
     void deleteUnit(long id);
+    void toggleUnitStatus(long id);
 }

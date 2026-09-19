@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, DatePicker, Descriptions, Form, Input, Modal, Select, Spin, TreeSelect, message } from 'antd'
+import { Alert, Button, DatePicker, Descriptions, Form, Input, Modal, Select, Spin, TreeSelect, message, Row, Col } from 'antd'
 import { AppstoreOutlined, SaveOutlined, SwapOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -105,30 +105,46 @@ export default function AssetTransfer() {
           <AssetParameters asset={asset} />
         </TransferSection>
         <TransferSection title={t('asset.sectionTransferInfo')} icon={<SwapOutlined />} tone="orange">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
-            <Form.Item name="toUserId" label={t('asset.colToUser')} rules={[{ required: true, message: t('transfer.selectEmployee') }]}>
-              <Select showSearch allowClear filterOption={false} onSearch={setKeyword} loading={employeesState.loading} placeholder={t('transfer.selectEmployee')}
-                options={employeesState.data?.map(e => ({ value: e.id, label: formatTransferUser(e.name, e.empId) }))}
-                onChange={value => {
-                  const employee = employeesState.data?.find(e => e.id === value)
-                  setSelectedEmployee(employee)
-                  form.setFieldValue('toDepartmentId', options?.departments.some(d => d.id === employee?.departmentId && d.status === ENABLED_DEPARTMENT) ? employee?.departmentId : undefined)
-                }} />
-            </Form.Item>
-            <Form.Item label={t('asset.colUserEmpId')}><Input readOnly value={selectedId === selectedEmployee?.id ? selectedEmployee?.empId : ''} /></Form.Item>
-            <Form.Item name="toDepartmentId" label={t('asset.colToDepartment')} rules={[{ required: true, message: t('asset.departmentRequired') }]}>
-              <TreeSelect treeData={deptTree} showSearch treeNodeFilterProp="title" allowClear placeholder={t('asset.departmentPh')} disabled={!options || busy || !canEdit || !asset.transferable} />
-            </Form.Item>
-            <Form.Item name="transferDate" label={t('asset.colTransferDate')} rules={[{ required: true, message: t('asset.transferDateRequired') }]}>
-              <DatePicker style={{ width: '100%' }} disabledDate={date => date.isAfter(dayjs(), 'day') || (!!asset.claimDate && date.isBefore(dayjs(asset.claimDate), 'day'))} />
-            </Form.Item>
-            <Form.Item name="reason" label={t('asset.colTransferReason')} style={{ gridColumn: 'span 2' }} rules={[{ required: true, whitespace: true, message: t('asset.reasonRequired') }, { max: TRANSFER_LIMITS.REASON }]}>
-              <Input maxLength={TRANSFER_LIMITS.REASON} showCount placeholder={t('asset.transferReasonPh')} />
-            </Form.Item>
-            <Form.Item name="remark" label={t('asset.colRemark')} style={{ gridColumn: '1 / -1' }} rules={[{ max: TRANSFER_LIMITS.REMARK }]}>
-              <Input.TextArea rows={3} maxLength={TRANSFER_LIMITS.REMARK} showCount placeholder={t('asset.remarkPh')} />
-            </Form.Item>
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="toUserId" label={t('asset.colToUser')} rules={[{ required: true, message: t('transfer.selectEmployee') }]}>
+                <Select showSearch allowClear filterOption={false} onSearch={setKeyword} loading={employeesState.loading} placeholder={t('transfer.selectEmployee')}
+                  options={employeesState.data?.map(e => ({ value: e.id, label: formatTransferUser(e.name, e.empId) }))}
+                  onChange={value => {
+                    const employee = employeesState.data?.find(e => e.id === value)
+                    setSelectedEmployee(employee)
+                    form.setFieldValue('toDepartmentId', options?.departments.some(d => d.id === employee?.departmentId && d.status === ENABLED_DEPARTMENT) ? employee?.departmentId : undefined)
+                  }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label={t('asset.colUserEmpId')}><Input readOnly value={selectedId === selectedEmployee?.id ? selectedEmployee?.empId : ''} /></Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="toDepartmentId" label={t('asset.colToDepartment')} rules={[{ required: true, message: t('asset.departmentRequired') }]}>
+                <TreeSelect treeData={deptTree} showSearch treeNodeFilterProp="title" allowClear placeholder={t('asset.departmentPh')} disabled={!options || busy || !canEdit || !asset.transferable} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="transferDate" label={t('asset.colTransferDate')} rules={[{ required: true, message: t('asset.transferDateRequired') }]}>
+                <DatePicker style={{ width: '100%' }} disabledDate={date => date.isAfter(dayjs(), 'day') || (!!asset.claimDate && date.isBefore(dayjs(asset.claimDate), 'day'))} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={16}>
+              <Form.Item name="reason" label={t('asset.colTransferReason')} rules={[{ required: true, whitespace: true, message: t('asset.reasonRequired') }, { max: TRANSFER_LIMITS.REASON }]}>
+                <Input maxLength={TRANSFER_LIMITS.REASON} showCount placeholder={t('asset.transferReasonPh')} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="remark" label={t('asset.colRemark')} rules={[{ max: TRANSFER_LIMITS.REMARK }]}>
+                <Input.TextArea rows={3} maxLength={TRANSFER_LIMITS.REMARK} showCount placeholder={t('asset.remarkPh')} />
+              </Form.Item>
+            </Col>
+          </Row>
         </TransferSection>
       </Form>}
     </Spin>

@@ -964,6 +964,8 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-management': <InboxOutlined />,
   'asset-supplier':   <ContactsOutlined />, // 供應商管理
   'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
+  'eam-master-data':  <DatabaseOutlined />, // 基礎配置（替代 asset-basic）
+  'eam-procurement':  <ShoppingCartOutlined />, // 採購與供應
   'asset-category':   <TagsOutlined />,      // 資產分類庫
   'asset-model':      <BarcodeOutlined />,   // 資產品牌產品庫
   'asset-location':   <EnvironmentOutlined />, // 倉庫維護

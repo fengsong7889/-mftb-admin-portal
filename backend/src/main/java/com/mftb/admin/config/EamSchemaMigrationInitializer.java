@@ -6,6 +6,11 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
 /**
  * EAM 归还/借用/赔付表结构迁移初始化器
  * <p>
@@ -41,6 +46,10 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_EAM_TRANSFER_TABLE, this::createTransferTable);
         versionTracker.applyOnce(V_EAM_TRANSFER_FROM_EMP, this::addTransferFromUserEmpId);
         versionTracker.applyOnce("eam:schema-v6-transfer-integrity", this::upgradeTransferIntegrity);
+        versionTracker.applyOnce("eam:schema-v7-model-code", this::addModelCodeColumn);
+        versionTracker.applyOnce("eam:schema-v8-merge-category-brand", this::mergeCategoryBrandTables);
+        versionTracker.applyOnce("eam:schema-v9-rename-master-data", this::renameMasterDataMenu);
+        versionTracker.applyOnce("eam:schema-v10-repair-table", this::createRepairTable);
     }
 
     private void upgradeTransferIntegrity() {
@@ -411,5 +420,239 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
             cur = cur.getCause();
         }
         return false;
+    }
+
+    /**
+     * v7: biz_eam_model 新增 code 列（产品编码）+ 存量数据回填
+     * <p>编码规则：{品牌编码}-{3位品牌内序号}，如 AB01-001</p>
+     */
+    private void addModelCodeColumn() {
+        log.info("开始为 biz_eam_model 添加 code 列 ...");
+        alterSafe("biz_eam_model",
+                "ADD COLUMN code VARCHAR(32) DEFAULT NULL COMMENT '产品编码（品牌编码-3位序号）' AFTER brand_logo");
+        addIndexSafe("biz_eam_model", "idx_model_code", "code");
+
+        // 存量回填：按品牌分组生成 {brand_code}-{3位序号}
+        try {
+            jdbcTemplate.update(
+                    "UPDATE biz_eam_model m "
+                    + "INNER JOIN biz_eam_brand b ON m.brand_id = b.id AND b.deleted = 0 "
+                    + "SET m.code = CONCAT(b.code, '-', LPAD("
+                    + "    ROW_NUMBER() OVER (PARTITION BY m.brand_id ORDER BY m.id),"
+                    + "    3, '0'"
+                    + ")) "
+                    + "WHERE m.deleted = 0 AND (m.code IS NULL OR m.code = '')");
+            log.info("biz_eam_model.code 存量数据回填完成");
+        } catch (Exception e) {
+            log.warn("biz_eam_model.code 存量回填异常（可能 MySQL 版本不支持窗口函数）: {}", e.getMessage());
+            // 兆底：Java 层逐品牌回填
+            backfillProductCodesInJava();
+        }
+    }
+
+    /** Java 层兆底回填产品编码（当 MySQL 不支持窗口函数时使用） */
+    private void backfillProductCodesInJava() {
+        List<Map<String, Object>> brands = jdbcTemplate.queryForList(
+                "SELECT id, code FROM biz_eam_brand WHERE deleted = 0 AND code IS NOT NULL AND code != ''");
+        for (Map<String, Object> brand : brands) {
+            String brandCode = (String) brand.get("code");
+            Long brandId = ((Number) brand.get("id")).longValue();
+            List<Map<String, Object>> models = jdbcTemplate.queryForList(
+                    "SELECT id FROM biz_eam_model WHERE brand_id = ? AND deleted = 0 AND (code IS NULL OR code = '') ORDER BY id",
+                    brandId);
+            int seq = 1;
+            for (Map<String, Object> model : models) {
+                String code = brandCode + "-" + String.format("%03d", seq);
+                jdbcTemplate.update("UPDATE biz_eam_model SET code = ? WHERE id = ?",
+                        code, ((Number) model.get("id")).longValue());
+                seq++;
+            }
+        }
+        log.info("biz_eam_model.code Java 兆底回填完成");
+    }
+
+    /* ==================== v8: 方案二 分类/品牌表统一 ==================== */
+
+    /**
+     * 方案二：耗材分类/品牌表并入资产分类/品牌表（biz_type 区分），并重組基础数据菜单
+     * <p>对应 SQL 草稿: backend/sql/94_merge_category_brand_tables.sql（本方法为其 MySQL 兼容实现）
+     */
+    private void mergeCategoryBrandTables() {
+        log.info("开始方案二迁移：分类/品牌表统一（biz_type）...");
+        // 1. biz_type 列 + 存量回填
+        alterSafe("biz_eam_category",
+                "ADD COLUMN biz_type VARCHAR(20) NOT NULL DEFAULT 'ASSET' COMMENT '业务类型：ASSET-资产, CONSUMABLE-耗材'");
+        jdbcTemplate.update("UPDATE biz_eam_category SET biz_type = 'ASSET' WHERE biz_type IS NULL OR biz_type = ''");
+        alterSafe("biz_eam_brand",
+                "ADD COLUMN biz_type VARCHAR(20) NOT NULL DEFAULT 'ASSET' COMMENT '业务类型：ASSET-资产, CONSUMABLE-耗材'");
+        jdbcTemplate.update("UPDATE biz_eam_brand SET biz_type = 'ASSET' WHERE biz_type IS NULL OR biz_type = ''");
+        // 品牌表补状态/备注列（耗材品牌原有字段，统一后保留）
+        alterSafe("biz_eam_brand", "ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'enabled' COMMENT 'enabled/disabled'");
+        alterSafe("biz_eam_brand", "ADD COLUMN remark VARCHAR(500) NOT NULL DEFAULT ''");
+
+        // 2. 迁移耗材分类（含父子关系与耗材档案引用重映射），完成后删除旧表
+        if (tableExists("biz_consumable_category")) {
+            migrateConsumableCategories();
+            jdbcTemplate.execute("DROP TABLE biz_consumable_category");
+            log.info("biz_consumable_category 数据已迁移至 biz_eam_category，旧表已删除");
+        }
+        // 3. 迁移耗材品牌
+        if (tableExists("biz_consumable_brand")) {
+            migrateConsumableBrands();
+            jdbcTemplate.execute("DROP TABLE biz_consumable_brand");
+            log.info("biz_consumable_brand 数据已迁移至 biz_eam_brand，旧表已删除");
+        }
+        // 4. 基础数据菜单重组
+        restructureMasterDataMenus();
+        log.info("方案二迁移完成");
+    }
+
+    /** 耗材分类 → 统一分类表（biz_type=CONSUMABLE），重映射父子关系与耗材档案 category_id */
+    private void migrateConsumableCategories() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, code, name, parent_id, sort_order, status, remark, updated_by, created_at, updated_at "
+                        + "FROM biz_consumable_category WHERE deleted = 0 ORDER BY id");
+        Map<Long, Long> idMap = new HashMap<>();
+        for (Map<String, Object> r : rows) {
+            Long oldId = ((Number) r.get("id")).longValue();
+            String code = (String) r.get("code");
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_eam_category WHERE code = ? AND deleted = 0", Integer.class, code);
+            if (exists != null && exists > 0) {
+                idMap.put(oldId, jdbcTemplate.queryForObject(
+                        "SELECT id FROM biz_eam_category WHERE code = ? AND deleted = 0 LIMIT 1", Long.class, code));
+                continue;
+            }
+            jdbcTemplate.update(
+                    "INSERT INTO biz_eam_category (code, name, parent_id, biz_type, status, sort, remark, updated_by, created_at, updated_at, deleted) "
+                            + "VALUES (?, ?, 0, 'CONSUMABLE', ?, ?, ?, ?, ?, ?, 0)",
+                    code,
+                    Objects.toString(r.get("name"), ""),
+                    Objects.toString(r.get("status"), "enabled"),
+                    r.get("sort_order") == null ? 0 : ((Number) r.get("sort_order")).intValue(),
+                    Objects.toString(r.get("remark"), ""),
+                    Objects.toString(r.get("updated_by"), "system"),
+                    r.get("created_at"),
+                    r.get("updated_at"));
+            idMap.put(oldId, jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class));
+        }
+        // 父子关系重映射（旧 parent_id → 新 id）
+        for (Map<String, Object> r : rows) {
+            Long oldId = ((Number) r.get("id")).longValue();
+            long parentId = r.get("parent_id") == null ? 0L : ((Number) r.get("parent_id")).longValue();
+            long newParent = parentId == 0L ? 0L : idMap.getOrDefault(parentId, 0L);
+            jdbcTemplate.update("UPDATE biz_eam_category SET parent_id = ? WHERE id = ?",
+                    newParent, idMap.get(oldId));
+        }
+        // 耗材档案分类引用重映射
+        idMap.forEach((oldId, newId) -> jdbcTemplate.update(
+                "UPDATE biz_eam_consumable_item SET category_id = ? WHERE category_id = ?", newId, oldId));
+        log.info("耗材分类迁移完成：{} 条", rows.size());
+    }
+
+    /** 耗材品牌 → 统一品牌表（biz_type 取 category_type），重映射耗材档案 brand_id */
+    private void migrateConsumableBrands() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, code, name, name_en, category_type, logo, status, remark, updated_by, created_at, updated_at "
+                        + "FROM biz_consumable_brand WHERE deleted = 0 ORDER BY id");
+        Map<Long, Long> idMap = new HashMap<>();
+        for (Map<String, Object> r : rows) {
+            Long oldId = ((Number) r.get("id")).longValue();
+            String code = (String) r.get("code");
+            Integer exists = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_eam_brand WHERE code = ? AND deleted = 0", Integer.class, code);
+            if (exists != null && exists > 0) {
+                idMap.put(oldId, jdbcTemplate.queryForObject(
+                        "SELECT id FROM biz_eam_brand WHERE code = ? AND deleted = 0 LIMIT 1", Long.class, code));
+                continue;
+            }
+            String bizType = "ASSET".equals(r.get("category_type")) ? "ASSET" : "CONSUMABLE";
+            jdbcTemplate.update(
+                    "INSERT INTO biz_eam_brand (code, category_code, brand_zh, brand_en, brand_logo, biz_type, status, remark, updated_by, created_at, updated_at, deleted) "
+                            + "VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+                    code,
+                    Objects.toString(r.get("name"), ""),
+                    Objects.toString(r.get("name_en"), ""),
+                    Objects.toString(r.get("logo"), ""),
+                    bizType,
+                    Objects.toString(r.get("status"), "enabled"),
+                    Objects.toString(r.get("remark"), ""),
+                    Objects.toString(r.get("updated_by"), "system"),
+                    r.get("created_at"),
+                    r.get("updated_at"));
+            idMap.put(oldId, jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class));
+        }
+        // 耗材档案品牌引用重映射
+        idMap.forEach((oldId, newId) -> jdbcTemplate.update(
+                "UPDATE biz_eam_consumable_item SET brand_id = ? WHERE brand_id = ?", newId, oldId));
+        log.info("耗材品牌迁移完成：{} 条", rows.size());
+    }
+
+    /** 基础数据菜单重组：耗材基础配置菜单下线、基础配置扁平化、分类库/品牌产品库改名 */
+    private void restructureMasterDataMenus() {
+        Long masterId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE menu_key = 'eam-master-data' AND deleted = 0 LIMIT 1", Long.class);
+        if (masterId == null) return;
+        // 耗材分类/品牌/计量单位菜单下线（功能并入分类库/品牌产品库）
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
+                + "WHERE menu_key IN ('consumable-category', 'consumable-brand', 'consumable-unit') AND deleted = 0");
+        // 扁平化：5 个基础配置叶子菜单直挂基础数据，停用 asset-basic 子分组
+        String[] leafKeys = {"asset-category", "asset-model", "asset-location", "param-library", "asset-tag"};
+        int sort = 1;
+        for (String key : leafKeys) {
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = ?, sort_order = ? WHERE menu_key = ? AND deleted = 0",
+                    masterId, sort++, key);
+        }
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key = 'asset-basic' AND deleted = 0");
+        // 改名（统一库命名）
+        jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', name_en = 'Basic Configuration' WHERE menu_key = 'eam-master-data' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET name = '分類庫', name_en = 'Category Library' WHERE menu_key = 'asset-category' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET name = '品牌產品庫', name_en = 'Brand Product Library' WHERE menu_key = 'asset-model' AND deleted = 0");
+        log.info("基础数据菜单重组完成");
+    }
+
+    /** v10: 资产维修记录表 */
+    private void createRepairTable() {
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `biz_eam_repair` ("
+                + "`id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键', "
+                + "`asset_id` BIGINT NOT NULL COMMENT '资产 ID', "
+                + "`asset_no` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '资产编号（快照）', "
+                + "`asset_name` VARCHAR(128) NOT NULL DEFAULT '' COMMENT '资产名称（快照）', "
+                + "`repair_date` VARCHAR(20) NOT NULL DEFAULT '' COMMENT '维修日期', "
+                + "`fault_desc` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '故障描述', "
+                + "`repair_content` VARCHAR(500) NOT NULL DEFAULT '' COMMENT '维修内容', "
+                + "`repair_by` VARCHAR(100) NOT NULL DEFAULT '' COMMENT '维修方', "
+                + "`cost` DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '维修费用（MOP）', "
+                + "`finish_date` VARCHAR(20) NULL DEFAULT NULL COMMENT '完成日期', "
+                + "`status` VARCHAR(16) NOT NULL DEFAULT 'repairing' COMMENT '状态：repairing/done', "
+                + "`applicant` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '申请人/部门', "
+                + "`cause_type` VARCHAR(20) NULL DEFAULT NULL COMMENT '损坏原因', "
+                + "`created_by` VARCHAR(64) NULL DEFAULT NULL COMMENT '创建人', "
+                + "`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                + "`updated_by` VARCHAR(64) NULL DEFAULT NULL COMMENT '最后更新人', "
+                + "`updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "`deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                + "PRIMARY KEY (`id`), "
+                + "KEY `idx_asset_id` (`asset_id`), "
+                + "KEY `idx_status` (`status`), "
+                + "KEY `idx_repair_date` (`repair_date`)) "
+                + "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产维修记录表'");
+        log.info("维修记录表创建完成");
+    }
+
+    /** v9: 基础数据分组改名：資產基礎配置 → 基礎配置 */
+    private void renameMasterDataMenu() {
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET name = '基礎配置', name_en = 'Basic Configuration' "
+                + "WHERE menu_key = 'eam-master-data' AND deleted = 0");
+        log.info("菜单改名完成：eam-master-data → 基礎配置");
+    }
+
+    /** 表是否存在（information_schema 检查） */
+    private boolean tableExists(String table) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+                Integer.class, table);
+        return count != null && count > 0;
     }
 }

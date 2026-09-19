@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Form, Input, Spin, Tag, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Spin, Tag, Modal, message } from 'antd'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import NotificationFormHeader, { notificationCardStyle as cardStyle } from './NotificationFormHeader'
+import './index.css'
 import { ApiOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
 import { fetchAppConfig, saveAppConfig, testAppConnection } from '../../api/notificationChannel'
 import type { AppNotificationConfig, AppNotificationConfigPayload } from '../../api/notificationChannel'
 
-const cardStyle = {
-  borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
-  border: '1px solid #e8eaed', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-}
-
-/** 单例应用配置与群机器人隔离；密钥只在编辑期间存在，不回填、不持久化到浏览器。 */
+/** 独立应用表单；密钥只在编辑期间存在，不回填、不持久化到浏览器。 */
 export default function EnterpriseAppConfig() {
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
-  const canEdit = hasPermission('notification-config:edit')
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const rawId = params.get('id')
+  const id = rawId === null ? undefined : Number(rawId)
+  const invalidId = id !== undefined && (!Number.isSafeInteger(id) || id <= 0)
+  const isDetailMode = params.get('mode') === 'detail'
+  const canEdit = hasPermission('notification-config:edit') && !isDetailMode
+  const isNew = id === undefined
   const [form] = Form.useForm<AppNotificationConfigPayload>()
   const [config, setConfig] = useState<AppNotificationConfig | null>(null)
   const [loading, setLoading] = useState(true)
@@ -27,10 +32,14 @@ export default function EnterpriseAppConfig() {
   const fetchConfig = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     try {
-      const data = await fetchAppConfig(signal)
+      if (invalidId || (isNew && isDetailMode)) throw new Error('invalid app id')
+      const data: AppNotificationConfig = id === undefined
+        ? { id: 0, name: '', platform: 'dingtalk', enabled: true, remark: '', updatedBy: '', updatedAt: '', scenarios: [],
+          appKey: '', agentId: '', baseUrl: '', appSecretConfigured: false, tokenSecretConfigured: false }
+        : await fetchAppConfig(id, signal)
       if (signal?.aborted) return
       setConfig(data)
-      form.setFieldsValue({ appKey: data.appKey, agentId: data.agentId, baseUrl: data.baseUrl, appSecret: '' })
+      form.setFieldsValue({ name: data.name, remark: data.remark, appKey: data.appKey, agentId: data.agentId, baseUrl: data.baseUrl, appSecret: '' })
       setDirty(false)
     } catch {
       // 读取失败用页内错误态承接并禁止写入，避免把未知配置覆盖为空。
@@ -38,7 +47,7 @@ export default function EnterpriseAppConfig() {
     } finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }, [form])
+  }, [form, id, invalidId, isNew, isDetailMode])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -53,12 +62,14 @@ export default function EnterpriseAppConfig() {
     try {
       const values = await form.validateFields()
       await saveAppConfig({
+        name: values.name.trim(), remark: values.remark?.trim() || '',
         appKey: values.appKey.trim(), agentId: values.agentId.trim(), baseUrl: values.baseUrl.trim(),
         ...(values.appSecret?.trim() ? { appSecret: values.appSecret.trim() } : {}),
-      })
+      }, id)
       form.setFieldValue('appSecret', '')
+      setDirty(false)
       message.success(t('notificationApp.saved'))
-      await fetchConfig()
+      navigate('/notification-config?tab=app')
     } catch {
       // 字段校验显示在表单内，接口失败由统一拦截器提示；保留未保存输入。
     } finally {
@@ -68,11 +79,11 @@ export default function EnterpriseAppConfig() {
   }
 
   const handleTest = async () => {
-    if (busy.current || !canEdit || dirty || !config?.appSecretConfigured) return
+    if (busy.current || !canEdit || dirty || !config?.appSecretConfigured || id === undefined) return
     busy.current = true
     setTesting(true)
     try {
-      await testAppConnection()
+      await testAppConnection(id)
       message.success(t('notificationApp.testSuccess'))
     } catch {
       // 不把连接失败显示为成功，也不重复弹出接口错误。
@@ -82,14 +93,18 @@ export default function EnterpriseAppConfig() {
     }
   }
 
-  const handleCancel = () => {
-    if (!config || busy.current) return
-    form.resetFields()
-    form.setFieldsValue({ appKey: config.appKey, agentId: config.agentId, baseUrl: config.baseUrl, appSecret: '' })
-    setDirty(false)
+  const handleBack = () => {
+    if (busy.current) return
+    const back = () => navigate('/notification-config?tab=app')
+    if (!dirty) { back(); return }
+    Modal.confirm({ title: t('notificationApp.discard'), className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('notificationApp.confirm'), cancelText: t('notificationApp.cancel'), onOk: back })
   }
 
   return (
+    <div className="content-area notification-config">
+    <NotificationFormHeader title={t(isDetailMode ? 'notificationApp.detailTitle' : isNew ? 'notificationApp.addTitle' : 'notificationApp.editTitle')} onBack={handleBack} />
     <Spin spinning={loading}>
       {!loading && !config ? (
         <Empty description={t('notificationApp.loadFailed')} image={Empty.PRESENTED_IMAGE_SIMPLE}>
@@ -110,6 +125,11 @@ export default function EnterpriseAppConfig() {
               </div>
               {/* 此处校验只负责输入体验，后端 DTO 和服务层必须重新校验。 */}
               <div className="notification-app__fields">
+                <Form.Item name="name" label={t('notificationApp.name')} rules={[{ required: true, whitespace: true, max: 100,
+                  message: t('notificationApp.nameRequired') }]}>
+                  <Input maxLength={100} placeholder={t('notificationApp.nameRequired')} />
+                </Form.Item>
+                <Form.Item label={t('notificationApp.platform')}><Input value="釘釘" disabled /></Form.Item>
                 <Form.Item name="appKey" label="AppKey" rules={[
                   { required: true, whitespace: true, message: t('notificationApp.appKeyRequired') },
                   { max: 100, pattern: /^[A-Za-z0-9_-]+$/, message: t('notificationApp.appKeyInvalid') },
@@ -157,6 +177,9 @@ export default function EnterpriseAppConfig() {
                   ]}>
                   <Input maxLength={500} placeholder="https://admin.example.com" />
                 </Form.Item>
+                <Form.Item name="remark" label={t('notificationApp.remark')}>
+                  <Input.TextArea rows={2} maxLength={500} showCount />
+                </Form.Item>
               </div>
             </div>
             <div style={cardStyle}>
@@ -174,11 +197,11 @@ export default function EnterpriseAppConfig() {
             </div>
           </Form>
           {canEdit && <div className="form-footer">
-            <Button disabled={!dirty || loading || saving || testing} onClick={handleCancel}>{t('notificationApp.cancel')}</Button>
-            <Button icon={<ApiOutlined />} loading={testing} onClick={handleTest}
+            <Button disabled={saving || testing} onClick={handleBack}>{t('notificationApp.cancel')}</Button>
+            {!isNew && <Button icon={<ApiOutlined />} loading={testing} onClick={handleTest}
               disabled={loading || saving || dirty || !config?.appKey || !config.agentId || !config.appSecretConfigured}>
               {t('notificationApp.test')}
-            </Button>
+            </Button>}
             <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}
               disabled={loading || testing || !config}>
               {t('notificationApp.save')}
@@ -187,5 +210,6 @@ export default function EnterpriseAppConfig() {
         </>
       )}
     </Spin>
+    </div>
   )
 }

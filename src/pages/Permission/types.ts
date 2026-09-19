@@ -1320,6 +1320,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
   '/rule-config': 'rule-config',
+  '/notification-config': 'notification-config',
+  '/notification-channel-form': 'notification-config',
+  '/notification-app-form': 'notification-config',
+  '/notification-scenario-form': 'notification-config',
   '/version-history': 'version-history',
   // OA中心
   '/oa-requests': 'oa-requests',

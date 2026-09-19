@@ -45,6 +45,7 @@ public class EamClaimServiceImpl implements EamClaimService {
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final DingTalkAppService dingTalkAppService;
+    private final com.mftb.admin.service.NotificationAppService notificationAppService;
     private final SysConfigMapper sysConfigMapper;
 
     private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled", "transferred");
@@ -544,8 +545,9 @@ public class EamClaimServiceImpl implements EamClaimService {
     }
 
     private void doSendSignatureNotify(EamClaim claim, SysUser employee, EamAsset asset) {
-        if (!dingTalkAppService.isConfigured()) {
-            log.info("钉钉企业应用未配置，跳过领用签署通知: claimNo={}", claim.getClaimNo());
+        var app = notificationAppService.resolve(com.mftb.admin.service.NotificationAppService.CLAIM_SIGN);
+        if (app == null) {
+            log.info("领用通知场景未绑定应用或已停用，跳过签署通知: claimNo={}", claim.getClaimNo());
             return;
         }
         if (employee.getDingtalkUserId() == null || employee.getDingtalkUserId().isBlank()) {
@@ -559,7 +561,7 @@ public class EamClaimServiceImpl implements EamClaimService {
             return;
         }
         String token = SignTokenUtil.generate(claim.getId(), claim.getEmployeeId(), secret);
-        String baseUrl = getConfigValue("dingtalk_notify_base_url");
+        String baseUrl = app.getBaseUrl();
         // 规范化站点地址（去尾部斜杠与 #），前端为 HashRouter：query 参数必须在 #/ 内才能被路由识别
         String base = baseUrl != null ? baseUrl.trim() : "";
         while (base.endsWith("/") || base.endsWith("#")) {
@@ -573,7 +575,7 @@ public class EamClaimServiceImpl implements EamClaimService {
                 + "領用日期：" + claim.getClaimDate() + "\n"
                 + "登記人：" + claim.getOperatorName() + "\n"
                 + "请点击链接完成手写签名：" + signUrl;
-        dingTalkAppService.sendWorkNotification(
+        dingTalkAppService.sendWorkNotification(com.mftb.admin.service.NotificationAppService.CLAIM_SIGN, app.getId(),
                 List.of(employee.getDingtalkUserId()), "資產領用待簽署", content);
     }
 

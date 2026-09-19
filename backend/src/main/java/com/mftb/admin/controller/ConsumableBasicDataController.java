@@ -152,4 +152,11 @@ public class ConsumableBasicDataController {
         basicDataService.deleteUnit(id);
         return Result.success();
     }
+
+    @PutMapping("/units/{id}/status")
+    @RequirePermission(menu = "consumable-unit", action = "edit")
+    public Result<Void> toggleUnitStatus(@PathVariable long id) {
+        basicDataService.toggleUnitStatus(id);
+        return Result.success();
+    }
 }

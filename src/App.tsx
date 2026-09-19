@@ -108,6 +108,8 @@ const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
 const NotificationConfig = lazy(() => import('./pages/NotificationConfig'))
 const NotificationChannelForm = lazy(() => import('./pages/NotificationChannelForm'))
+const NotificationAppForm = lazy(() => import('./pages/NotificationConfig/EnterpriseAppConfig'))
+const NotificationScenarioForm = lazy(() => import('./pages/NotificationConfig/NotificationScenarioForm'))
 const VersionHistoryPage = lazy(() => import('./pages/VersionHistory'))
 const VersionHistoryDetailPage = lazy(() => import('./pages/VersionHistory/VersionHistoryDetail'))
 const VersionHistoryFormPage = lazy(() => import('./pages/VersionHistory/VersionHistoryForm'))
@@ -182,8 +184,6 @@ const ConsumableStock = lazy(() => import('./pages/Consumable/Stock'))
 const ConsumableStockTxn = lazy(() => import('./pages/Consumable/Stock/StockTxnDetail'))
 const ConsumableStockTxnList = lazy(() => import('./pages/Consumable/Stock/StockTxnList'))
 const ConsumableAlert = lazy(() => import('./pages/Consumable/Alert'))
-const ConsumableCategory = lazy(() => import('./pages/Consumable/Category'))
-const ConsumableBrand = lazy(() => import('./pages/Consumable/Brand'))
 const ConsumableUnit = lazy(() => import('./pages/Consumable/Unit'))
 // EAM 採購入庫
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
@@ -339,6 +339,8 @@ function AuthenticatedLayout() {
               <Route path="/rule-config" element={<RuleConfig />} />
               <Route path="/notification-config" element={<NotificationConfig />} />
               <Route path="/notification-channel-form" element={<NotificationChannelForm />} />
+              <Route path="/notification-app-form" element={<NotificationAppForm />} />
+              <Route path="/notification-scenario-form" element={<NotificationScenarioForm />} />
               <Route path="/version-history" element={<VersionHistoryPage />} />
               <Route path="/version-history-add" element={<VersionHistoryFormPage />} />
               <Route path="/version-history-edit/:id" element={<VersionHistoryFormPage />} />
@@ -403,7 +405,7 @@ function AuthenticatedLayout() {
               <Route path="/asset-supplier"   element={<AssetSupplier />} />
               <Route path="/asset-tag"      element={<AssetTag />} />
               <Route path="/asset-tag-print" element={<AssetTagPrint />} />
-              {/* 耗材管理（消耗品/MRO） */}
+              {/* 耗材管理（消耗品/MRO）；方案二：分類/品牌已并入分類庫/品牌產品庫 */}
               <Route path="/consumable-dashboard" element={<ConsumableDashboard />} />
               <Route path="/consumable-item"      element={<ConsumableItem />} />
               <Route path="/consumable-claim"     element={<ConsumableClaim />} />
@@ -411,8 +413,6 @@ function AuthenticatedLayout() {
               <Route path="/consumable-stock/txn" element={<ConsumableStockTxn />} />
               <Route path="/consumable-stock-txn" element={<ConsumableStockTxnList />} />
               <Route path="/consumable-alert"     element={<ConsumableAlert />} />
-              <Route path="/consumable-category"  element={<ConsumableCategory />} />
-              <Route path="/consumable-brand"     element={<ConsumableBrand />} />
               <Route path="/consumable-unit"      element={<ConsumableUnit />} />
               {/* EAM 採購入庫 */}
               <Route path="/purchase-order"   element={<PurchaseOrder />} />

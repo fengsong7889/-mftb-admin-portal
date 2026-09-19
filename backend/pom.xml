@@ -150,6 +150,14 @@
 
     <build>
         <finalName>mftb-admin</finalName>
+        <resources>
+            <resource><directory>src/main/resources</directory></resource>
+            <resource>
+                <directory>sql</directory>
+                <targetPath>db/migrations</targetPath>
+                <includes><include>165_notification_apps_and_scenarios.sql</include></includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

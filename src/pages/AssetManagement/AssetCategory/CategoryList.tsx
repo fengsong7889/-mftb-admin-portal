@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tree, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Tree, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ExportOutlined, FolderOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -60,7 +60,7 @@ function collectDescendantIds(list: AssetCategory[], rootId: number): Set<number
 }
 
 interface CategoryListProps {
-  onAdd: (parentId?: number) => void
+  onAdd: (parentId?: number, bizType?: string) => void
   onEdit: (id: number) => void
   onView: (id: number) => void
 }
@@ -85,6 +85,9 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   // 全选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
+  // 业务类型 Tab（方案二：统一分类库）
+  const [bizTab, setBizTab] = useState<string>('ASSET')
+
   // 批量导入弹窗
   const [importVisible, setImportVisible] = useState(false)
 
@@ -92,14 +95,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetchCategoryList()
+      const data = await fetchCategoryList({ bizType: bizTab })
       setCategories(data)
     } catch {
       // 错误提示由请求层统一处理
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [bizTab])
 
   useEffect(() => {
     fetchData()
@@ -250,6 +253,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
         remark: row.remark || '',
         paramTemplate: [],
         sort: 0,
+        bizType: bizTab === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET',
       })
       successCount++
     }
@@ -261,6 +265,16 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const columns: TableColumnsType<AssetCategory> = [
     { title: t('asset.colCatCode'), dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     { title: t('asset.colCatName'), dataIndex: 'name', key: 'name', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
+    {
+      title: t('asset.colBizType'),
+      dataIndex: 'bizType',
+      key: 'bizType',
+      width: 90,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string) => (
+        <Tag color={v === 'CONSUMABLE' ? 'gold' : 'blue'}>{v === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}</Tag>
+      ),
+    },
     {
       title: t('asset.colParentCat'),
       dataIndex: 'parentId',
@@ -353,6 +367,16 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
 
         {/* 右侧主区 */}
         <div className="cat-main">
+          {/* 业务类型 Tab（方案二：统一分类库） */}
+          <Tabs
+            activeKey={bizTab}
+            onChange={(key) => { setBizTab(key); setSelectedCatId(undefined) }}
+            items={[
+              { key: 'ASSET', label: t('asset.bizTypeAsset') },
+              { key: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
+              { key: 'ALL', label: t('asset.bizTypeTabAll') },
+            ]}
+          />
           {/* 搜索区 */}
           <div className="search-section">
             <Form form={searchForm} layout="inline">
@@ -390,7 +414,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
               <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImportClick}>{t('asset.batchImportCat')}</Button>
             </div>
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId)}>{t('asset.addCatBtn')}</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId, bizTab === 'ALL' ? undefined : bizTab)}>{t('asset.addCatBtn')}</Button>
               {configComponent}
             </div>
           </div>

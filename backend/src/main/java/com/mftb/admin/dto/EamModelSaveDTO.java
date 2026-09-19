@@ -25,6 +25,9 @@ public class EamModelSaveDTO {
     /** 品牌 Logo 快照 */
     private String brandLogo;
 
+    /** 产品编码（后端自动生成，前端可传空） */
+    private String code;
+
     /** 型号编号 */
     private String modelNo;
 

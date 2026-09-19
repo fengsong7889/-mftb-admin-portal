@@ -111,9 +111,10 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     /* ==================== 资产分类 ==================== */
 
     @Override
-    public List<Map<String, Object>> listCategories(String keyword, String name, String code,
+    public List<Map<String, Object>> listCategories(String bizType, String keyword, String name, String code,
                                                      String updatedBy, String updatedAtStart, String updatedAtEnd) {
         LambdaQueryWrapper<EamCategory> wrapper = new LambdaQueryWrapper<>();
+        applyBizTypeFilter(wrapper, bizType);
         if (keyword != null && !keyword.isBlank()) {
             wrapper.and(w -> w.like(EamCategory::getCode, keyword.trim())
                     .or().like(EamCategory::getName, keyword.trim()));
@@ -149,6 +150,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         cat.setParamTemplate(dto.getParamTemplate());
         cat.setSort(dto.getSort() == null ? 0 : dto.getSort());
         cat.setRemark(Objects.toString(dto.getRemark(), ""));
+        cat.setBizType(normalizeBizType(dto.getBizType()));
         cat.setUpdatedBy(operatorResolver.currentOperatorName());
         cat.setCreatedAt(LocalDateTime.now());
         cat.setUpdatedAt(LocalDateTime.now());
@@ -177,6 +179,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         if (dto.getParamTemplate() != null) cat.setParamTemplate(dto.getParamTemplate());
         if (dto.getSort() != null) cat.setSort(dto.getSort());
         if (dto.getRemark() != null) cat.setRemark(dto.getRemark());
+        if (dto.getBizType() != null && !dto.getBizType().isBlank()) cat.setBizType(normalizeBizType(dto.getBizType()));
         cat.setUpdatedBy(operatorResolver.currentOperatorName());
         cat.setUpdatedAt(LocalDateTime.now());
         categoryMapper.updateById(cat);
@@ -215,9 +218,10 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     /* ==================== 资产品牌库 ==================== */
 
     @Override
-    public List<Map<String, Object>> listBrands(String categoryCode, String brandZh,
+    public List<Map<String, Object>> listBrands(String bizType, String categoryCode, String brandZh,
                                                  String updatedBy, String updatedAtStart, String updatedAtEnd) {
         LambdaQueryWrapper<EamBrand> wrapper = new LambdaQueryWrapper<>();
+        applyBrandBizTypeFilter(wrapper, bizType);
         if (categoryCode != null && !categoryCode.isBlank()) wrapper.eq(EamBrand::getCategoryCode, categoryCode);
         if (brandZh != null && !brandZh.isBlank()) {
             wrapper.and(w -> w.like(EamBrand::getBrandZh, brandZh.trim())
@@ -237,11 +241,20 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Transactional
     public long createBrand(EamBrandSaveDTO dto) {
         EamBrand brand = new EamBrand();
-        brand.setCode(dto.getCode());
+        brand.setBizType(normalizeBizType(dto.getBizType()));
+        // 编码自动生成：前端未传 code 时，按业务类型取 AB/CB 前缀最大序号 +1
+        String code = dto.getCode();
+        if (code == null || code.isBlank()) {
+            code = "CONSUMABLE".equals(brand.getBizType())
+                    ? generateNextBrandCode("CB") : generateNextBrandCode("AB");
+        }
+        brand.setCode(code);
         brand.setCategoryCode(dto.getCategoryCode());
         brand.setBrandZh(dto.getBrandZh());
         brand.setBrandEn(Objects.toString(dto.getBrandEn(), ""));
         brand.setBrandLogo(Objects.toString(dto.getBrandLogo(), ""));
+        brand.setStatus(dto.getStatus() == null || dto.getStatus().isBlank() ? "enabled" : dto.getStatus());
+        brand.setRemark(Objects.toString(dto.getRemark(), ""));
         brand.setUpdatedBy(operatorResolver.currentOperatorName());
         brand.setCreatedAt(LocalDateTime.now());
         brand.setUpdatedAt(LocalDateTime.now());
@@ -260,6 +273,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         if (dto.getBrandZh() != null) brand.setBrandZh(dto.getBrandZh());
         if (dto.getBrandEn() != null) brand.setBrandEn(dto.getBrandEn());
         if (dto.getBrandLogo() != null) brand.setBrandLogo(dto.getBrandLogo());
+        if (dto.getBizType() != null && !dto.getBizType().isBlank()) brand.setBizType(normalizeBizType(dto.getBizType()));
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) brand.setStatus(dto.getStatus());
+        if (dto.getRemark() != null) brand.setRemark(dto.getRemark());
         brand.setUpdatedBy(operatorResolver.currentOperatorName());
         brand.setUpdatedAt(LocalDateTime.now());
         brandMapper.updateById(brand);
@@ -320,6 +336,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         model.setBrandZh(Objects.toString(dto.getBrandZh(), ""));
         model.setBrandEn(Objects.toString(dto.getBrandEn(), ""));
         model.setBrandLogo(Objects.toString(dto.getBrandLogo(), ""));
+        // 产品编码自动生成：{品牌编码}-{3位品牌内序号}
+        String productCode = generateNextProductCode(dto.getBrandId());
+        model.setCode(productCode);
         model.setModelNo(Objects.toString(dto.getModelNo(), ""));
         model.setName(dto.getName());
         model.setUnit(dto.getUnit() == null ? "台" : dto.getUnit());
@@ -452,6 +471,23 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     /* ==================== 实体 → Map 转换 ==================== */
 
+    /** 业务类型过滤：ALL=不过滤，空/非法值默认 ASSET（保持存量行为） */
+    private void applyBizTypeFilter(LambdaQueryWrapper<EamCategory> wrapper, String bizType) {
+        boolean all = bizType != null && "ALL".equalsIgnoreCase(bizType.trim());
+        wrapper.eq(!all, EamCategory::getBizType, normalizeBizType(bizType));
+    }
+
+    private void applyBrandBizTypeFilter(LambdaQueryWrapper<EamBrand> wrapper, String bizType) {
+        boolean all = bizType != null && "ALL".equalsIgnoreCase(bizType.trim());
+        wrapper.eq(!all, EamBrand::getBizType, normalizeBizType(bizType));
+    }
+
+    /** 归一化业务类型：空/非法值默认 ASSET */
+    private String normalizeBizType(String bizType) {
+        if (bizType == null || bizType.isBlank()) return "ASSET";
+        return "CONSUMABLE".equalsIgnoreCase(bizType) ? "CONSUMABLE" : "ASSET";
+    }
+
     private Map<String, Object> categoryToMap(EamCategory cat) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", cat.getId());
@@ -462,6 +498,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("paramTemplate", cat.getParamTemplate());
         map.put("sort", cat.getSort());
         map.put("remark", cat.getRemark());
+        map.put("bizType", cat.getBizType());
         map.put("updatedBy", cat.getUpdatedBy());
         map.put("updatedAt", cat.getUpdatedAt() != null ? cat.getUpdatedAt().format(DT_FMT) : "");
         map.put("createdAt", cat.getCreatedAt() != null ? cat.getCreatedAt().format(DT_FMT) : "");
@@ -476,6 +513,9 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("brandZh", brand.getBrandZh());
         map.put("brandEn", brand.getBrandEn());
         map.put("brandLogo", brand.getBrandLogo());
+        map.put("bizType", brand.getBizType());
+        map.put("status", brand.getStatus());
+        map.put("remark", brand.getRemark());
         map.put("createdAt", brand.getCreatedAt() != null ? brand.getCreatedAt().format(DT_FMT) : "");
         map.put("updatedBy", brand.getUpdatedBy());
         map.put("updatedAt", brand.getUpdatedAt() != null ? brand.getUpdatedAt().format(DT_FMT) : "");
@@ -485,6 +525,7 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     private Map<String, Object> modelToMap(EamModel model) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", model.getId());
+        map.put("code", model.getCode());
         map.put("categoryCode", model.getCategoryCode());
         map.put("brandId", model.getBrandId());
         map.put("brandZh", model.getBrandZh());
@@ -498,6 +539,52 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
         map.put("updatedBy", model.getUpdatedBy());
         map.put("updatedAt", model.getUpdatedAt() != null ? model.getUpdatedAt().format(DT_FMT) : "");
         return map;
+    }
+
+    /**
+     * 生成下一个资产品牌编码（AB + 2位全局序号）
+     * <p>查询当前最大 AB 编码序号 +1，如已有 AB09 → 返回 AB10</p>
+     */
+    private String generateNextBrandCode(String prefix) {
+        String maxCode = jdbcTemplate.queryForObject(
+                "SELECT MAX(code) FROM biz_eam_brand WHERE code LIKE ? AND deleted = 0",
+                String.class, prefix + "%");
+        int nextSeq = 1;
+        if (maxCode != null && maxCode.length() > prefix.length()) {
+            try {
+                nextSeq = Integer.parseInt(maxCode.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 存量数据格式异常，兜底从 1 开始
+            }
+        }
+        return String.format(prefix + "%02d", nextSeq);
+    }
+
+    /**
+     * 生成下一个产品编码（{品牌编码}-{3位品牌内序号}）
+     * <p>查询指定品牌下最大产品编码序号 +1，如 AB01-003 → 返回 AB01-004</p>
+     */
+    private String generateNextProductCode(Long brandId) {
+        if (brandId == null) throw new BusinessException("品牌ID不能为空");
+        EamBrand brand = brandMapper.selectById(brandId);
+        if (brand == null) throw new BusinessException("资产品牌不存在");
+        String brandCode = brand.getCode();
+        if (brandCode == null || brandCode.isBlank()) {
+            throw new BusinessException("资产品牌编码未生成，请先确认品牌编码");
+        }
+        String prefix = brandCode + "-";
+        String maxCode = jdbcTemplate.queryForObject(
+                "SELECT MAX(code) FROM biz_eam_model WHERE code LIKE ? AND deleted = 0",
+                String.class, prefix + "%");
+        int nextSeq = 1;
+        if (maxCode != null && maxCode.length() > prefix.length()) {
+            try {
+                nextSeq = Integer.parseInt(maxCode.substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+                // 兜底
+            }
+        }
+        return prefix + String.format("%03d", nextSeq);
     }
 
     private Map<String, Object> locationToMap(EamLocation loc) {

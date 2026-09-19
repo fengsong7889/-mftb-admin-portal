@@ -6,7 +6,7 @@
  * - 新增：选中分类时新增资产品牌；选中资产品牌时新增产品
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tooltip, DatePicker, Tree } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tooltip, DatePicker, Tree, Tabs } from 'antd'
 import type { TableColumnsType, TablePaginationConfig, TreeDataNode } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, FolderOutlined, ShopOutlined, AppstoreOutlined } from '@ant-design/icons'
@@ -19,7 +19,7 @@ import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import '../AssetCategory/index.css'
 
 interface Props {
-  onAddBrand: (categoryCode: string) => void
+  onAddBrand: (categoryCode: string, bizType?: string) => void
   onAddProduct: (categoryCode: string, brandId: number) => void
   onEditBrand: (id: number) => void
   onEditProduct: (id: number) => void
@@ -110,6 +110,8 @@ export default function ModelList({
   const [selectedCatId, setSelectedCatId] = useState<number>()
   const [selectedBrandId, setSelectedBrandId] = useState<number>()
   const [viewMode, setViewMode] = useState<'brands' | 'products'>('brands')
+  // 业务类型 Tab（方案二：统一品牌产品库）
+  const [bizTab, setBizTab] = useState<string>('ASSET')
 
   // 分页
   const [total, setTotal] = useState(0)
@@ -132,7 +134,7 @@ export default function ModelList({
   const loadBrands = useCallback(async (catCode?: string) => {
     setLoading(true)
     try {
-      const params: BrandQuery = { ...brandFilters }
+      const params: BrandQuery = { ...brandFilters, bizType: bizTab }
       if (catCode) params.categoryCode = catCode
       const list = await fetchBrandList(params)
       setBrands(list)
@@ -142,7 +144,7 @@ export default function ModelList({
     } finally {
       setLoading(false)
     }
-  }, [brandFilters, t])
+  }, [brandFilters, bizTab, t])
 
   const loadProducts = useCallback(async (brandId?: number, categoryCode?: string) => {
     setLoading(true)
@@ -172,6 +174,13 @@ export default function ModelList({
       setExpandedKeys(treeData.map(node => node.key))
     }
   }, [treeData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 切换业务类型 Tab 重新加载品牌 */
+  useEffect(() => {
+    setSelectedBrandId(undefined)
+    setViewMode('brands')
+    loadBrands()
+  }, [bizTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 树节点渲染 */
   const renderTreeTitle = (node: TreeDataNode) => {
@@ -336,6 +345,11 @@ export default function ModelList({
   /* ── 资产品牌表格列  */
   const brandColumns: TableColumnsType<AssetBrand> = [
     {
+      title: '编码', dataIndex: 'code', key: 'code', width: 100,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: '#595959' }}>{v}</span> : '-',
+    },
+    {
       title: t('asset.colAssetBrand'), key: 'brand', width: 200,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (_: unknown, r: AssetBrand) => (
@@ -343,6 +357,13 @@ export default function ModelList({
           <span style={{ fontWeight: 600 }}>{r.brandZh}</span>
           {r.brandEn && <span style={{ color: '#8C8C8C', fontSize: 12 }}>{r.brandEn}</span>}
         </Space>
+      ),
+    },
+    {
+      title: t('asset.colBizType'), dataIndex: 'bizType', key: 'bizType', width: 90,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string) => (
+        <Tag color={v === 'CONSUMABLE' ? 'gold' : 'blue'}>{v === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}</Tag>
       ),
     },
     {
@@ -376,6 +397,11 @@ export default function ModelList({
 
   /* ── 产品表格列 ─ */
   const productColumns: TableColumnsType<AssetModel> = [
+    {
+      title: '编码', dataIndex: 'code', key: 'code', width: 130,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: '#595959' }}>{v}</span> : '-',
+    },
     {
       title: '产品名称', dataIndex: 'name', key: 'name', width: 220, ellipsis: true,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
@@ -452,6 +478,16 @@ export default function ModelList({
 
         {/* 右侧主区 */}
         <div className="cat-main">
+          {/* 业务类型 Tab（方案二：统一品牌产品库） */}
+          <Tabs
+            activeKey={bizTab}
+            onChange={(key) => setBizTab(key)}
+            items={[
+              { key: 'ASSET', label: t('asset.bizTypeAsset') },
+              { key: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
+              { key: 'ALL', label: t('asset.bizTypeTabAll') },
+            ]}
+          />
           {/* 面包屑导航 */}
           <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8C8C8C' }}>
             <FolderOutlined style={{ color: '#E8720C' }} />
@@ -528,7 +564,7 @@ export default function ModelList({
             <div className="action-section-right">
               {viewMode === 'brands' && (
                 <>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(selectedCategory?.code || '')}>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(bizTab === 'CONSUMABLE' ? '' : (selectedCategory?.code || ''), bizTab === 'ALL' ? undefined : bizTab)}>
                     {t('asset.addBrand')}
                   </Button>
                   <Tooltip title={selectedCategory ? t('asset.accessoryConfigTip') : t('asset.selectCategoryFirst')}>

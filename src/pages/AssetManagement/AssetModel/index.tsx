@@ -14,7 +14,7 @@ type View =
   | { mode: 'accessoryConfig'; categoryCode: string; categoryName: string }
   | { mode: 'brandDetail'; id: number }
   | { mode: 'productDetail'; id: number }
-  | { mode: 'brandForm'; id?: number; categoryCode?: string }
+  | { mode: 'brandForm'; id?: number; categoryCode?: string; bizType?: string }
   | { mode: 'productForm'; id?: number; categoryCode?: string; brandId?: number }
 
 export default function AssetModel() {
@@ -24,7 +24,7 @@ export default function AssetModel() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <ModelList
-          onAddBrand={(categoryCode) => setView({ mode: 'brandForm', categoryCode })}
+          onAddBrand={(categoryCode, bizType) => setView({ mode: 'brandForm', categoryCode, bizType })}
           onAddProduct={(categoryCode, brandId) => setView({ mode: 'productForm', categoryCode, brandId })}
           onEditBrand={(id) => setView({ mode: 'brandForm', id })}
           onEditProduct={(id) => setView({ mode: 'productForm', id })}
@@ -57,9 +57,10 @@ export default function AssetModel() {
         />
       ) : view.mode === 'brandForm' ? (
         <ModelForm
-          key={view.id ?? 'new-brand'}
+          key={view.id ?? `new-brand-${view.bizType ?? 'ASSET'}`}
           id={view.id}
           categoryCode={view.categoryCode}
+          bizType={view.bizType}
           type="brand"
           onBack={() => setView({ mode: 'list' })}
         />

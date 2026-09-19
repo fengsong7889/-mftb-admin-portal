@@ -69,6 +69,8 @@ export interface AssetCategory {
   paramTemplate: ParamField[]
   sort: number
   remark?: string
+  /** 业务类型：ASSET-资产, CONSUMABLE-耗材 */
+  bizType?: 'ASSET' | 'CONSUMABLE'
   updatedBy?: string
   updatedAt?: string
 }
@@ -86,6 +88,11 @@ export interface AssetBrand {
   brandEn: string
   /** 资产品牌LOGO URL */
   brandLogo?: string
+  /** 业务类型：ASSET-资产, CONSUMABLE-耗材 */
+  bizType?: 'ASSET' | 'CONSUMABLE'
+  /** 状态：enabled / disabled */
+  status?: 'enabled' | 'disabled'
+  remark?: string
   createdAt: string
   updatedBy?: string
   updatedAt?: string
@@ -94,6 +101,8 @@ export interface AssetBrand {
 /** 产品庫（资产品牌 → 产品） */
 export interface AssetModel {
   id: number
+  /** 产品编码（品牌编码-3位序号，如 AB01-001） */
+  code?: string
   /** 所属分类编码 */
   categoryCode: string
   /** 所属资产品牌ID */
@@ -908,8 +917,8 @@ let mockCompensations: CompensationRecord[] = [
 
 /* ==================== API：資產分類 ==================== */
 
-/** 分類列表（平鋪返回，頁面自行構樹） */
-export async function fetchCategoryList(params?: { keyword?: string; name?: string; code?: string; updatedBy?: string; updatedAtStart?: string; updatedAtEnd?: string }, allowMockFallback = true): Promise<AssetCategory[]> {
+/** 分類列表（平鋪返回，頁面自行構樹；bizType: ASSET/CONSUMABLE/ALL） */
+export async function fetchCategoryList(params?: { bizType?: string; keyword?: string; name?: string; code?: string; updatedBy?: string; updatedAtStart?: string; updatedAtEnd?: string }, allowMockFallback = true): Promise<AssetCategory[]> {
   try {
     const data = await request.get<unknown, AssetCategory[]>('/eam/basic/categories', { params, headers: { [SILENT_HEADER]: '1' } })
     return (data || []).map((c: any) => ({
@@ -966,6 +975,7 @@ export async function toggleCategoryStatus(id: number): Promise<void> {
 /* ==================== API：资产品牌庫 ==================== */
 
 export interface BrandQuery {
+  bizType?: string
   categoryCode?: string
   brandZh?: string
   updatedBy?: string

@@ -244,7 +244,7 @@ export default function HandoverForm({ onBack }: Props) {
           }}
         >
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 label={t('asset.receiverType')} name="receiverType"
                 rules={[{ required: true }]}
@@ -255,8 +255,10 @@ export default function HandoverForm({ onBack }: Props) {
                 </Radio.Group>
               </Form.Item>
             </Col>
+          </Row>
+          <Row gutter={16}>
             {receiverType === 'employee' && (
-              <Col span={6}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   label={t('asset.handoverToUser')} name="toUser"
                   rules={[{ required: true, message: t('asset.toUserRequired') }]}
@@ -265,7 +267,7 @@ export default function HandoverForm({ onBack }: Props) {
                 </Form.Item>
               </Col>
             )}
-            <Col span={6}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 label={t('asset.handoverToDept')} name="toDepartment"
                 rules={[{ required: true, message: t('asset.departmentRequired') }]}
@@ -280,7 +282,7 @@ export default function HandoverForm({ onBack }: Props) {
                 />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 label={t('asset.colHandoverDate')} name="handoverDate"
                 rules={[{ required: true, message: t('asset.handoverDateRequired') }]}
@@ -288,7 +290,9 @@ export default function HandoverForm({ onBack }: Props) {
                 <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={6}>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 label={t('asset.colHandoverReason')} name="reason"
                 rules={[{ required: true }]}
@@ -298,7 +302,7 @@ export default function HandoverForm({ onBack }: Props) {
                 />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item
                 label={t('asset.colOperator')} name="operator"
                 rules={[{ required: true, message: t('asset.operatorRequired') }]}
@@ -306,7 +310,9 @@ export default function HandoverForm({ onBack }: Props) {
                 <Input placeholder={t('asset.operatorRequired')} allowClear />
               </Form.Item>
             </Col>
-            <Col span={18}>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24}>
               <Form.Item label={t('asset.colRemark')} name="remark">
                 <Input.TextArea rows={1} placeholder={t('asset.remarkPh')} maxLength={200} />
               </Form.Item>

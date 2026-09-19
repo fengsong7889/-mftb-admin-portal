@@ -87,6 +87,9 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
         </div>
         {isBrand && brand ? (
           <Descriptions column={4} size="middle">
+            <Descriptions.Item label="编码">
+              <span style={{ fontFamily: 'monospace', color: '#595959' }}>{brand.code || '-'}</span>
+            </Descriptions.Item>
             <Descriptions.Item label={t('asset.belongCategory')}>
               <Tag color="blue">{categoryName(brand.categoryCode)}</Tag>
             </Descriptions.Item>
@@ -100,6 +103,9 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
           </Descriptions>
         ) : model ? (
           <Descriptions column={4} size="middle">
+            <Descriptions.Item label="编码">
+              <span style={{ fontFamily: 'monospace', color: '#595959' }}>{model.code || '-'}</span>
+            </Descriptions.Item>
             <Descriptions.Item label={t('asset.belongBrand')}>
               <Tag color="orange">{model.brandZh}</Tag>
             </Descriptions.Item>

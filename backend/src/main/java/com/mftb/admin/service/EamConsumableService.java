@@ -32,7 +32,7 @@ public interface EamConsumableService {
     EamConsumableTxnStatsVO txnStats(EamConsumableTxnQuery query);
 
     /* ===== 预警 ===== */
-    List<EamConsumableItemVO> alerts();
+    List<EamConsumableItemVO> alerts(String itemCode, String name, Long categoryId);
 
     /* ===== 看板 ===== */
     EamConsumableDashboardVO dashboard();

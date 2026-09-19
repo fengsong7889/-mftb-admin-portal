@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 资产分类实体（树形，含参数模板）
+ * 资产/耗材分类库（统一）
  */
 @Data
 @TableName("biz_eam_category")
@@ -23,6 +23,9 @@ public class EamCategory {
 
     /** 父级 ID，0 为顶级 */
     private Long parentId;
+
+    /** 业务类型：ASSET-资产, CONSUMABLE-耗材 */
+    private String bizType;
 
     /** 状态：enabled / disabled */
     private String status;

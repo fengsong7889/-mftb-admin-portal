@@ -1,8 +1,6 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.SysNotificationChannelSaveDTO;
-import com.mftb.admin.dto.DingTalkAppConfigRequest;
-import com.mftb.admin.dto.DingTalkAppConfigVO;
 import com.mftb.admin.entity.SysNotificationChannel;
 
 import java.util.List;
@@ -13,12 +11,6 @@ import java.util.Map;
  * 支持多平台、多场景、多渠道的 CRUD 与场景路由
  */
 public interface NotificationChannelService {
-
-    /** 企业内部应用配置（密钥只返回配置状态） */
-    DingTalkAppConfigVO getAppConfig();
-
-    /** 原子保存配置，留空保留密钥，不轮换已有签署密钥 */
-    void saveAppConfig(DingTalkAppConfigRequest request);
 
     /** 按平台列出所有渠道 */
     List<Map<String, Object>> listByChannel(String platform);

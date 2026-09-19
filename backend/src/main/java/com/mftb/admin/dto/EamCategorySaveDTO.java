@@ -30,4 +30,7 @@ public class EamCategorySaveDTO {
 
     /** 备注 */
     private String remark;
+
+    /** 业务类型：ASSET-资产, CONSUMABLE-耗材（空默认 ASSET） */
+    private String bizType;
 }

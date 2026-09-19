@@ -4,15 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.SysNotificationChannelSaveDTO;
-import com.mftb.admin.dto.DingTalkAppConfigRequest;
-import com.mftb.admin.dto.DingTalkAppConfigVO;
-import com.mftb.admin.service.DingTalkAppService;
-import jakarta.validation.Validator;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import java.net.URI;
-import java.security.SecureRandom;
 import com.mftb.admin.entity.SysNotificationChannel;
 import com.mftb.admin.mapper.SysNotificationChannelMapper;
 import com.mftb.admin.service.NotificationChannelService;
@@ -32,8 +23,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.mftb.admin.service.DingTalkAppService.*;
-
 /**
  * 通知渠道配置服务实现
  */
@@ -47,93 +36,6 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
     private final SysNotificationChannelMapper mapper;
     private final OperatorResolver operatorResolver;
     private final RestTemplate restTemplate;
-    private final JdbcTemplate jdbcTemplate;
-    private final DingTalkAppService dingTalkAppService;
-    private final Validator validator;
-
-    @Override
-    public DingTalkAppConfigVO getAppConfig() {
-        Map<String, String> config = readAppConfig();
-        return new DingTalkAppConfigVO(config.getOrDefault(APP_KEY, ""), config.getOrDefault(AGENT_ID, ""),
-                config.getOrDefault(BASE_URL, ""), StringUtils.hasText(config.get(APP_SECRET)),
-                StringUtils.hasText(config.get(SIGN_SECRET)));
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void saveAppConfig(DingTalkAppConfigRequest request) {
-        var violations = validator.validate(request);
-        if (!violations.isEmpty()) throw new BusinessException(400, violations.iterator().next().getMessage());
-        try {
-            if (Long.parseLong(request.getAgentId()) <= 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            throw new BusinessException(400, "AgentId 超出有效正整數範圍");
-        }
-        String baseUrl = normalizeBaseUrl(request.getBaseUrl());
-        String secret = request.getAppSecret();
-        if (StringUtils.hasText(secret) && (secret.chars().anyMatch(Character::isWhitespace)
-                || secret.contains("*") || secret.contains("•"))) {
-            throw new BusinessException(400, "請輸入完整 AppSecret，不能包含空白或遮罩字元");
-        }
-        // 固定先锁住 AppKey 行，首次创建和并发保存均按同一顺序串行，避免混合两套凭证。
-        jdbcTemplate.update("INSERT INTO sys_config (config_key, config_value) VALUES (?, '') "
-                + "ON DUPLICATE KEY UPDATE config_key = VALUES(config_key)", APP_KEY);
-        Map<String, String> current = readAppConfig();
-        if (!StringUtils.hasText(secret) && (!StringUtils.hasText(current.get(APP_SECRET))
-                || !request.getAppKey().equals(current.get(APP_KEY)))) {
-            throw new BusinessException(400, "首次配置或更換 AppKey 時必須填寫 AppSecret");
-        }
-        writeAppConfig(APP_KEY, request.getAppKey());
-        if (StringUtils.hasText(secret)) writeAppConfig(APP_SECRET, secret);
-        writeAppConfig(AGENT_ID, request.getAgentId());
-        writeAppConfig(BASE_URL, baseUrl);
-        // 仅在缺失时生成。覆盖已有密钥会使已发出的签署链接失效。
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        jdbcTemplate.update("INSERT INTO sys_config (config_key, config_value) VALUES (?, ?) "
-                        + "ON DUPLICATE KEY UPDATE config_value = CASE WHEN config_value IS NULL OR TRIM(config_value) = '' "
-                        + "THEN VALUES(config_value) ELSE config_value END", SIGN_SECRET, Base64.getUrlEncoder().withoutPadding().encodeToString(bytes));
-        String operator = operatorResolver.currentOperatorName();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                dingTalkAppService.invalidateAccessToken();
-                log.info("企业内部应用配置已保存: operator={}", operator);
-            }
-        });
-    }
-
-    private Map<String, String> readAppConfig() {
-        return jdbcTemplate.query("SELECT config_key, config_value FROM sys_config WHERE config_key IN (?, ?, ?, ?, ?)",
-                rs -> {
-                    Map<String, String> config = new HashMap<>();
-                    while (rs.next()) config.put(rs.getString(1), Objects.toString(rs.getString(2), ""));
-                    return config;
-                }, APP_CONFIG_KEYS.toArray());
-    }
-
-    private void writeAppConfig(String key, String value) {
-        // 不使用会把配置值写入日志的通用更新方法。
-        jdbcTemplate.update("INSERT INTO sys_config (config_key, config_value) VALUES (?, ?) "
-                + "ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()", key, value);
-    }
-
-    private String normalizeBaseUrl(String value) {
-        String normalized = value.trim();
-        try {
-            URI uri = URI.create(normalized);
-            if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    || uri.getHost() == null || uri.getUserInfo() != null || uri.getQuery() != null
-                    || uri.getFragment() != null || uri.getPort() == 0 || uri.getPort() > 65535) {
-                throw new IllegalArgumentException();
-            }
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(400, "請填寫有效的 HTTP(S) 站點地址，不含帳密、查詢參數或 # 路由");
-        }
-        while (normalized.endsWith("/")) normalized = normalized.substring(0, normalized.length() - 1);
-        return normalized;
-    }
-
     @Override
     public List<Map<String, Object>> listByChannel(String platform) {
         LambdaQueryWrapper<SysNotificationChannel> wrapper = new LambdaQueryWrapper<>();

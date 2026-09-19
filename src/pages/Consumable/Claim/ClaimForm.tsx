@@ -3,15 +3,18 @@
  *
  * 遵循 form-page-style 规范：橙色渐变顶条 + 返回 + 模块卡片 + 底部操作栏
  * 明细为动态行（耗材 + 数量 + 出库仓库），提交前 custom-confirm-modal 二次确认
- * 简化流程：提交即自动通过并直接扣减库存（无审批节点）
+ * 支持管理员/物资部代员工领用（选择领用人），也支持员工自己领用
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button, Form, Input, InputNumber, Select, Modal, message, Space } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemOptions, submitConsumableClaim, type ConsumableItem,
 } from '../../../api/consumable'
 import { fetchLocationList, type AssetLocation } from '../../../api/eam'
+import { fetchEmployeeOptions } from '../../../api/employee'
+import type { OptionItem } from '../../../api/types'
+import { useAuth } from '../../../contexts/AuthContext'
 
 interface LineForm {
   itemId?: number
@@ -19,6 +22,7 @@ interface LineForm {
   locationId?: number
 }
 interface FormValues {
+  applicantId?: number
   reason: string
   remark?: string
   items: LineForm[]
@@ -29,15 +33,32 @@ interface Props {
 }
 
 export default function ClaimForm({ onBack }: Props) {
+  const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
   const [items, setItems] = useState<ConsumableItem[]>([])
   const [locations, setLocations] = useState<AssetLocation[]>([])
+  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [employeeLoading, setEmployeeLoading] = useState(false)
 
   useEffect(() => {
     fetchConsumableItemOptions().then(setItems).catch((e: Error) => message.error(e.message))
     fetchLocationList().then(setLocations).catch(() => { /* 仓库可空，降级为空列表 */ })
-  }, [])
+    // 加载员工选项（用于领用人选择）
+    setEmployeeLoading(true)
+    fetchEmployeeOptions('').then((opts) => {
+      setEmployeeOptions(opts)
+      // 默认选中当前登录人
+      if (user?.empId) {
+        const currentEmp = opts.find(o => {
+          // OptionItem.value 是员工 ID（数字字符串），需要通过 empId 匹配
+          // 这里我们直接用 name 匹配
+          return o.label.includes(user.name)
+        })
+        if (currentEmp) form.setFieldsValue({ applicantId: Number(currentEmp.value) })
+      }
+    }).catch(() => { /* 忽略 */ }).finally(() => setEmployeeLoading(false))
+  }, [form, user?.empId, user?.name])
 
   const itemOptions = items.map(it => ({
     label: `${it.name}${it.spec ? ' / ' + it.spec : ''}（可用 ${it.availableQty} ${it.unit}）`,
@@ -49,6 +70,7 @@ export default function ClaimForm({ onBack }: Props) {
 
   const doSubmit = async (values: FormValues) => {
     const payload = {
+      applicantId: values.applicantId ?? undefined,
       reason: values.reason.trim(),
       remark: values.remark,
       items: values.items
@@ -80,12 +102,14 @@ export default function ClaimForm({ onBack }: Props) {
     }
     const lines = (values.items || []).filter(l => l && l.itemId != null && (l.qty ?? 0) > 0)
     const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0)
+    const applicantName = employeeOptions.find(o => Number(o.value) === values.applicantId)?.label ?? '当前登录人'
     Modal.confirm({
       title: '確認領用？',
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: (
         <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>領用人：</span><b>{applicantName}</b></div>
           <div className="confirm-info-row"><span>明細數量：</span><b>{lines.length} 項 / 共 {totalQty}</b></div>
           <div className="confirm-info-row"><span>領用事由：</span><b>{values.reason}</b></div>
           <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>提交後系統將自動通過並直接扣減庫存，無需審批。</div>
@@ -107,7 +131,7 @@ export default function ClaimForm({ onBack }: Props) {
             style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >返回</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>耗材領用</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#262626' }}>耗材領用</h2>
         </div>
       </div>
 
@@ -121,9 +145,20 @@ export default function ClaimForm({ onBack }: Props) {
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>领用信息</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <Form.Item label="領用事由" name="reason" rules={[{ required: true, message: '請填寫領用事由' }]}>
-            <Input.TextArea placeholder="如：日常辦公消耗補充" maxLength={200} showCount rows={2} />
-          </Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+            <Form.Item label="領用人" name="applicantId" rules={[{ required: true, message: '請選擇領用人' }]}>
+              <Select
+                placeholder="請選擇領用人"
+                showSearch
+                optionFilterProp="label"
+                loading={employeeLoading}
+                options={employeeOptions}
+              />
+            </Form.Item>
+            <Form.Item label="領用事由" name="reason" rules={[{ required: true, message: '請填寫領用事由' }]} style={{ marginBottom: 0 }}>
+              <Input placeholder="如：日常辦公消耗補充" maxLength={200} />
+            </Form.Item>
+          </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
             <Input placeholder="選填" allowClear maxLength={200} />
           </Form.Item>

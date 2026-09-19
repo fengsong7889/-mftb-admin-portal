@@ -21,8 +21,14 @@
 
 .notification-app__fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 0 16px;
+}
+@media (max-width: 992px) {
+  .notification-app__fields { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 576px) {
+  .notification-app__fields { grid-template-columns: 1fr; }
 }
 
 .notification-app__section-title {

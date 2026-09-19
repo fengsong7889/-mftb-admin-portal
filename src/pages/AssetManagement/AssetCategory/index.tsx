@@ -11,7 +11,7 @@ import CategoryDetail from './CategoryDetail'
 
 type View =
   | { mode: 'list' }
-  | { mode: 'form'; id?: number; parentId?: number }
+  | { mode: 'form'; id?: number; parentId?: number; bizType?: string }
   | { mode: 'detail'; id: number }
 
 export default function AssetCategory() {
@@ -21,7 +21,7 @@ export default function AssetCategory() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <CategoryList
-          onAdd={(parentId) => setView({ mode: 'form', parentId })}
+          onAdd={(parentId, bizType) => setView({ mode: 'form', parentId, bizType })}
           onEdit={(id) => setView({ mode: 'form', id })}
           onView={(id) => setView({ mode: 'detail', id })}
         />
@@ -34,9 +34,10 @@ export default function AssetCategory() {
         />
       ) : (
         <CategoryForm
-          key={view.id ?? `new-${view.parentId ?? 0}`}
+          key={view.id ?? `new-${view.parentId ?? 0}-${view.bizType ?? 'ASSET'}`}
           id={view.id}
           parentId={view.parentId}
+          bizType={view.bizType}
           onBack={() => setView({ mode: 'list' })}
         />
       )}

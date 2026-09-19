@@ -5,7 +5,7 @@
  * 替代原始 InputNumber 手輸 ID；部門由所選員工自動帶出。
  */
 import { useState, useEffect, useRef } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Select, Spin, Pagination, Modal, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Select, Spin, Pagination, Modal, message, Row, Col } from 'antd'
 import { SaveOutlined, DatabaseOutlined, UserOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { ReturnHeader } from '../AssetReturn/ReturnLayout'
@@ -129,8 +129,8 @@ export default function BorrowForm({
           {renderCardTitle(<DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', '資產選擇')}
           <Alert type="info" showIcon style={{ marginBottom: 16, borderRadius: 8 }}
             message="僅可選擇閒置狀態的資產；借用後資產將標記為使用中。" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
-            <div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="assetId" label="可借用資產" rules={[{ required: true, message: '請選擇可借用的資產' }]}>
                 <Select placeholder="搜索資產編號 / 名稱" showSearch filterOption={false}
                   disabled={!onAssetQuery || submitting}
@@ -142,8 +142,8 @@ export default function BorrowForm({
                 current={assetQuery.page} pageSize={assetQuery.size} total={assets?.total ?? 0}
                 showSizeChanger={false} hideOnSinglePage
                 onChange={(page) => setAssetQuery({ ...assetQuery, page })} />
-            </div>
-          </div>
+            </Col>
+          </Row>
           {selected && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
@@ -155,8 +155,8 @@ export default function BorrowForm({
         {/* ====== 模塊2：借用人與期限 ====== */}
         <div style={CARD_STYLE}>
           {renderCardTitle(<UserOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#fff7e6', '借用人信息')}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item name="holderId" label="借用人" rules={[{ required: true, message: '請選擇借用人' }]}>
                 <Select placeholder="搜索姓名 / 工號" showSearch filterOption={false}
                   disabled={!onEmployeeQuery || submitting}
@@ -168,30 +168,38 @@ export default function BorrowForm({
                   }}
                   options={employeeOptions.map(e => ({ value: e.employeeId, label: `${e.empName}（${e.empNo}）` }))} />
               </Form.Item>
-            </div>
-            <Form.Item name="department" label="借用部門" rules={[{ required: true, message: '請選擇借用人後自動帶出部門' }]}>
-              <Input placeholder="由借用人組織信息帶出" readOnly />
-            </Form.Item>
-            <Form.Item name="purpose" label="借用用途" rules={[{ required: true, whitespace: true, message: '請填寫借用用途' }]}>
-              <Input maxLength={100} placeholder="請輸入借用用途" />
-            </Form.Item>
-          </div>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="department" label="借用部門" rules={[{ required: true, message: '請選擇借用人後自動帶出部門' }]}>
+                <Input placeholder="由借用人組織信息帶出" readOnly />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="purpose" label="借用用途" rules={[{ required: true, whitespace: true, message: '請填寫借用用途' }]}>
+                <Input maxLength={100} placeholder="請輸入借用用途" />
+              </Form.Item>
+            </Col>
+          </Row>
         </div>
 
         {/* ====== 模塊3：借用期限 ====== */}
         <div style={CARD_STYLE}>
           {renderCardTitle(<SaveOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#f9f0ff', '借用期限')}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            <Form.Item name="startDate" label="借出日期" rules={[{ required: true, message: '請選擇借出日期' }]}>
-              <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="dueDate" label="到期日期" rules={[{ required: true, message: '請選擇到期日期' }, { validator: (_, d: Dayjs) => {
-              const start = form.getFieldValue('startDate')
-              return d && start && d.isAfter(start, 'day') ? Promise.resolve() : Promise.reject(new Error('到期日期須晚於借出日期'))
-            } }]}>
-              <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
-          </div>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="startDate" label="借出日期" rules={[{ required: true, message: '請選擇借出日期' }]}>
+                <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item name="dueDate" label="到期日期" rules={[{ required: true, message: '請選擇到期日期' }, { validator: (_, d: Dayjs) => {
+                const start = form.getFieldValue('startDate')
+                return d && start && d.isAfter(start, 'day') ? Promise.resolve() : Promise.reject(new Error('到期日期須晚於借出日期'))
+              } }]}>
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
         </div>
 
       </Form>

@@ -142,17 +142,17 @@ export default function CompensationForm({ returnId, assetId, damageType, onBack
           <Form.Item name="assetId" hidden><Input /></Form.Item>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('asset.colDamageType')} name="damageType" rules={[{ required: true }]}>
                 <Select options={DAMAGE_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('asset.colCauseType')} name="causeType" rules={[{ required: true, message: t('asset.causeTypeRequired') }]}>
                 <Select options={CAUSE_OPTIONS.map((o) => ({ ...o, label: t(o.label) }))} placeholder={t('asset.causeTypePh')} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('asset.colOperator')} name="operator" rules={[{ required: true, message: t('asset.operatorRequired') }]}>
                 <Input placeholder={t('asset.userNamePh')} allowClear />
               </Form.Item>
@@ -160,12 +160,12 @@ export default function CompensationForm({ returnId, assetId, damageType, onBack
           </Row>
 
           <Row gutter={16}>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('asset.colResponsiblePerson')} name="responsiblePerson">
                 <Input placeholder={t('asset.responsiblePersonPh')} allowClear />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label={t('asset.colResponsibleDept')} name="responsibleDept">
                 <Select placeholder={t('common.pleaseSelect')} allowClear options={EAM_DEPARTMENTS.map((d) => ({ label: d, value: d }))} />
               </Form.Item>
