@@ -85,13 +85,13 @@ public class EamBasicDataController {
     @GetMapping("/brands")
     @RequirePermission(menu = "asset-model")
     public Result<List<Map<String, Object>>> listBrands(
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String bizType,
             @RequestParam(required = false) String categoryCode,
-            @RequestParam(required = false) String brandZh,
             @RequestParam(required = false) String updatedBy,
             @RequestParam(required = false) String updatedAtStart,
             @RequestParam(required = false) String updatedAtEnd) {
-        return Result.success(basicDataService.listBrands(bizType, categoryCode, brandZh, updatedBy, updatedAtStart, updatedAtEnd));
+        return Result.success(basicDataService.listBrands(keyword, bizType, categoryCode, updatedBy, updatedAtStart, updatedAtEnd));
     }
 
     /** 新增资产品牌 */

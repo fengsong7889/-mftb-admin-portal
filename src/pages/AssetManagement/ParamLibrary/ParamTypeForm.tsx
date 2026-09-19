@@ -94,13 +94,14 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
   const [addValueForm] = Form.useForm<{ value: string; sort: number }>()
   const [editValueForm] = Form.useForm<{ value: string; sort: number }>()
   const [currentTypeCode, setCurrentTypeCode] = useState<string>()
+  const [currentCategoryCode, setCurrentCategoryCode] = useState<string>()
 
   /** 監聽值類型變化，非下拉選擇時提示用戶 */
   const watchedValueType = Form.useWatch('valueType', form)
 
   /** 加載分類數據 & 回填表單 */
   const loadData = useCallback(async () => {
-    const list = await fetchCategoryList()
+    const list = await fetchCategoryList({ bizType: 'ALL' })
     setCategories(list)
     if (isEdit && id) {
       const result = await fetchParamTypeList({ size: 9999 })
@@ -118,6 +119,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         })
         setCategoryDisabled(true)
         setCurrentTypeCode(cur.code)
+        setCurrentCategoryCode(cur.categoryCode)
         // 加載參數值
         await loadParamValues(cur.code)
       }
@@ -197,13 +199,18 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         message.warning(t('asset.warnParamTypeCodeMissing'))
         return
       }
+      // 前端校驗唯一性
+      const trimmedValue = v.value.trim()
+      if (paramValues.some(pv => pv.value === trimmedValue)) {
+        message.warning(`參數值「${trimmedValue}」已存在，請勿重複添加`)
+        return
+      }
       await createParamValue({
         paramTypeCode: currentTypeCode,
-        value: v.value.trim(),
+        categoryCode: currentCategoryCode || '',
+        value: trimmedValue,
         sort: v.sort ?? 0,
         status: 'enabled',
-        updatedBy: '',
-        updatedAt: '',
       })
       message.success(t('asset.addSuccess'))
       setAddValueModalOpen(false)
@@ -225,8 +232,14 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     try {
       const v = await editValueForm.validateFields()
       if (!editingValue) return
+      // 前端校驗唯一性（排除自身）
+      const trimmedValue = v.value.trim()
+      if (trimmedValue !== editingValue.value && paramValues.some(pv => pv.value === trimmedValue)) {
+        message.warning(`參數值「${trimmedValue}」已存在，請勿重複`)
+        return
+      }
       await updateParamValue(editingValue.id, {
-        value: v.value.trim(),
+        value: trimmedValue,
         sort: v.sort ?? 0,
       })
       message.success(t('asset.updateSuccess'))

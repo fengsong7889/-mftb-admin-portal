@@ -92,7 +92,7 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
   /** 加载分类数据 */
   const fetchCategories = useCallback(async () => {
     try {
-      const data = await fetchCategoryList()
+      const data = await fetchCategoryList({ bizType: 'ALL' })
       setCategories(data)
     } catch {
       // 错误提示由请求层统一处理

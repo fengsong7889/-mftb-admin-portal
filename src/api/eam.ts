@@ -147,6 +147,8 @@ export interface ParamValue {
   id: number
   /** 所屬參數類型編碼 */
   paramTypeCode: string
+  /** 所屬分類編碼 */
+  categoryCode?: string
   /** 可選值（如 A17 Pro / 16GB / 256GB） */
   value: string
   /** 排序 */
@@ -721,9 +723,9 @@ export async function toggleCategoryStatus(id: number): Promise<void> {
 /* ==================== API：资产品牌庫 ==================== */
 
 export interface BrandQuery {
+  keyword?: string
   bizType?: string
   categoryCode?: string
-  brandZh?: string
   updatedBy?: string
   updatedAtStart?: string
   updatedAtEnd?: string

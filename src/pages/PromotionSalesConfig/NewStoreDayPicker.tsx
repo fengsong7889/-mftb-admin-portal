@@ -25,28 +25,7 @@ function AnimatedNumber({ value, suffix }: { value: number; suffix?: string }) {
   return <>{animated.toLocaleString()}{suffix && <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 2 }}>{suffix}</span>}</>
 }
 
-/** Mock数据 - 店铺列表（含BD信息） */
-const MOCK_STORES = [
-  { id: '10001', name: '威尼斯人酒店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10002', name: '皇朝廣場店', bd: 'bd-002', bdName: '李娜' },
-  { id: '10003', name: '黑馬仕美食街', bd: 'bd-003', bdName: '王強' },
-  { id: '10004', name: '新葡京旗艦店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10005', name: '官也街老店', bd: 'bd-004', bdName: '劉敏' },
-]
-
-/** 店铺下拉选项（展示ID） */
-const STORE_OPTIONS = MOCK_STORES.map(s => ({
-  label: `${s.name}（ID：${s.id}）`,
-  value: s.id,
-}))
-
-/** BD选项 */
-const BD_OPTIONS = [
-  { label: '張偉', value: 'bd-001' },
-  { label: '李娜', value: 'bd-002' },
-  { label: '王強', value: 'bd-003' },
-  { label: '劉敏', value: 'bd-004' },
-]
+// TODO: 對接門店列表 API 與 BD 數據
 
 /** 後端品牌名 → UI 品牌值 映射 */
 const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
@@ -59,13 +38,7 @@ interface GiftDaysRecord {
   expireDate: string     // 贈送有效期止
 }
 
-/** Mock数据 - 各门店新店廣告贈送天數（10003 无赠送记录） */
-const MOCK_GIFT_DAYS: Record<string, GiftDaysRecord> = {
-  '10001': { totalDays: 30, usedDays: 12, expireDate: dayjs().add(90, 'day').format('YYYY-MM-DD') },
-  '10002': { totalDays: 15, usedDays: 15, expireDate: dayjs().add(30, 'day').format('YYYY-MM-DD') },
-  '10004': { totalDays: 60, usedDays: 20, expireDate: dayjs().add(150, 'day').format('YYYY-MM-DD') },
-  '10005': { totalDays: 10, usedDays: 0, expireDate: dayjs().add(45, 'day').format('YYYY-MM-DD') },
-}
+// TODO: 對接贈送天數 API
 
 export default function NewStoreDayPicker() {
   const { t } = useTranslation('adSales')
@@ -117,20 +90,13 @@ export default function NewStoreDayPicker() {
   const [lastSubmitDays, setLastSubmitDays] = useState(0)
 
   // 当前查询门店的赠送天数信息
-  const giftInfo = useMemo(() => {
+  const giftInfo = useMemo((): { totalDays: number; usedDays: number; remainingDays: number; expireDate: string } | null => {
     if (!queriedStoreId) return null
-    const record = MOCK_GIFT_DAYS[queriedStoreId]
-    if (!record) return null
-    const usedDays = record.usedDays + (extraUsedDays[queriedStoreId] || 0)
-    return {
-      totalDays: record.totalDays,
-      usedDays,
-      remainingDays: Math.max(0, record.totalDays - usedDays),
-      expireDate: record.expireDate,
-    }
+    // TODO: 從 API 獲取門店贈送天數記錄
+    return null
   }, [queriedStoreId, extraUsedDays])
 
-  const queriedStore = MOCK_STORES.find(s => s.id === queriedStoreId)
+  const queriedStore = undefined as { id: string; name: string } | undefined // TODO: 從 API 獲取
 
   // 品牌变更处理：清空已选算法
   const handleBrandChange = (value: string | null) => {
@@ -147,8 +113,6 @@ export default function NewStoreDayPicker() {
   // 门店名称变更处理：自动带出BD
   const handleStoreChange = (value: string | null) => {
     setSearchStoreName(value)
-    const store = MOCK_STORES.find(s => s.id === value)
-    setSearchBD(store ? store.bd : null)
   }
 
   // 查询：必须选择算法名称、品牌、门店名称
@@ -298,12 +262,12 @@ export default function NewStoreDayPicker() {
               options={algorithmOptions} disabled={!searchBrand} />
           </Form.Item>
           <Form.Item label={t('storeNameLabel')}>
-            <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={STORE_OPTIONS} />
+            <Select placeholder={t('storeSearchHint')} value={searchStoreName} onChange={handleStoreChange} allowClear showSearch optionFilterProp="label" options={[] as Array<{ label: string; value: string }>} />
           </Form.Item>
           <Form.Item label={t('bdLabel')}>
             <Select placeholder={t('bdAutoHint')} value={searchBD} onChange={(v) => setSearchBD(v)} allowClear showSearch
               filterOption={(input, option) => { const keyword = input.toLowerCase(); const label = (option?.label ?? '').toString().toLowerCase(); return label.includes(keyword) }}
-              options={BD_OPTIONS} />
+              options={[] as Array<{ label: string; value: string }>} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

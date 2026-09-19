@@ -10,7 +10,7 @@ import ModelDetail from './ModelDetail'
 import AccessoryConfig from './AccessoryConfig'
 
 type View =
-  | { mode: 'list' }
+  | { mode: 'list'; initialSelectedBrandId?: number }
   | { mode: 'accessoryConfig'; categoryCode: string; categoryName: string }
   | { mode: 'brandDetail'; id: number }
   | { mode: 'productDetail'; id: number }
@@ -24,6 +24,8 @@ export default function AssetModel() {
     <div className="content-area">
       {view.mode === 'list' ? (
         <ModelList
+          key={view.initialSelectedBrandId ? `restore-brand-${view.initialSelectedBrandId}` : 'list'}
+          initialSelectedBrandId={view.initialSelectedBrandId}
           onAddBrand={(categoryCode, bizType) => setView({ mode: 'brandForm', categoryCode, bizType })}
           onAddProduct={(categoryCode, brandId) => setView({ mode: 'productForm', categoryCode, brandId })}
           onEditBrand={(id) => setView({ mode: 'brandForm', id })}
@@ -66,12 +68,12 @@ export default function AssetModel() {
         />
       ) : (
         <ModelForm
-          key={view.id ?? 'new-product'}
+          key={view.id ?? `new-product-${view.brandId ?? ''}`}
           id={view.id}
           categoryCode={view.categoryCode}
           brandId={view.brandId}
           type="product"
-          onBack={() => setView({ mode: 'list' })}
+          onBack={() => setView(view.brandId ? { mode: 'list', initialSelectedBrandId: view.brandId } : { mode: 'list' })}
         />
       )}
     </div>

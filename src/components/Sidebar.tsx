@@ -5,9 +5,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
-import { fetchMenuTree } from '../api/menu'
+import { useMenu } from '../contexts/MenuContext'
 import type { MenuVO } from '../api/menu'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
+import { keyToPath, pathToKey } from '../constants/menuDataSource'
 import type { OfflineMenuNode } from '../constants/offlineMenus'
 import { translateMenuName } from '../i18n/menuNameEn'
 import { renderMenuIcon } from './MenuIcon'
@@ -93,12 +94,11 @@ const { Sider } = Layout
 
 type MenuItem = Required<MenuProps>['items'][number]
 
-/** 菜单 key → 路由路径 映射 */
-const keyToPath: Record<string, string> = {
-  // 首頁
-  'home': '/',
-  // 商戶集團管理
-  'merchant-group-list': '/merchant-group-list',
+// [keyToPath 已迁移至 constants/menuDataSource.ts]
+// [旧数据已删除，以下为占位注释]
+const _OLD_KEY_TO_PATH_REMOVED = {
+  _removed: true,
+  /*
   'store-list': '/store-list',
   // 财务管理 - 推广金管理
   'account-balance': '/account-balance',
@@ -257,15 +257,12 @@ const keyToPath: Record<string, string> = {
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
   'consumable-alert':     '/consumable-alert',
+  */
 }
 
-/** 路由路径 → 菜单 key 映射（用于高亮 & MenuTabs 名称统一） */
-export const pathToKey: Record<string, string> = {}
-Object.entries(keyToPath).forEach(([key, path]) => {
-  // 去除 hash 片段，确保 pathToKey 的 key 是纯路径
-  const cleanPath = path.split('#')[0]
-  pathToKey[cleanPath] = key
-})
+/** pathToKey 从 menuDataSource 导入（见上方 import），此处 re-export 保持外部消费者兼容 */
+export { pathToKey } from '../constants/menuDataSource'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 
 /**
  * 离线菜单（前端唯一保留的本地菜单定义, 见 src/constants/offlineMenus.ts）
@@ -448,9 +445,9 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
   'eam-master-data':  <DatabaseOutlined />, // 基礎配置（替代 asset-basic）
   'eam-procurement':  <ShoppingCartOutlined />, // 採購與供應
-  'asset-category':   <TagsOutlined />,      // 資產分類庫
-  'asset-model':      <BarcodeOutlined />,   // 資產品牌產品庫
-  'asset-location':   <EnvironmentOutlined />, // 倉庫維護
+  'asset-category':   <TagsOutlined />,      // 分類庫
+  'asset-model':      <BarcodeOutlined />,   // 品牌產品庫
+  'asset-location':   <EnvironmentOutlined />, // 倉庫管理
   'asset-dashboard':  <DashboardOutlined />,
   'asset-inbound':    <ImportOutlined />,
   'asset-handover':   <TeamOutlined />,
@@ -538,28 +535,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const location = useLocation()
   const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
-  const [menuTree, setMenuTree] = useState<MenuVO[] | null>(null)
-  /** 菜单接口是否已返回（区分“加载中”与“后端不可用”, 避免加载瞬间闪离线提示） */
-  const [menuLoaded, setMenuLoaded] = useState(false)
+  const { menuTree, status: menuStatus } = useMenu()
   const [openKeys, setOpenKeys] = useState<string[]>([])
-
-  /** 加载后端菜单树（名称/层级/排序/图标与数据库实时同步）；失败时仅保留离线菜单 */
-  useEffect(() => {
-    let cancelled = false
-    fetchMenuTree().then((tree) => {
-      if (!cancelled) {
-        setMenuTree(tree.length > 0 ? tree : null)
-        setMenuLoaded(true)
-      }
-    }).catch(() => {
-      // 菜单接口异常（鉴权失败/服务异常）同样降级为离线菜单, 不能留未处理的 Promise rejection
-      if (!cancelled) {
-        setMenuTree(null)
-        setMenuLoaded(true)
-      }
-    })
-    return () => { cancelled = true }
-  }, [])
 
   /** 按當前登錄人權限過濾後的可見菜單：
    *  后端菜单树可用 → 以 DB 为唯一真值（名称/层级/排序/图标）, 仅补挂 DB 完全缺失的离线菜单；
@@ -628,7 +605,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           </span>
         )}
       </div>
-      {menuLoaded && menuTree === null && (
+      {menuStatus !== 'loading' && menuTree === null && (
         <div className="sidebar-offline-tip" title={t('sidebar.offlineMenuTip')}>
           {collapsed ? '!' : t('sidebar.offlineMenuTip')}
         </div>

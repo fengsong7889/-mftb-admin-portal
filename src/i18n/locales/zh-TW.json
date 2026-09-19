@@ -1414,7 +1414,7 @@
     "accessoryPh": "選擇或輸入配件名稱",
     "accessoryManual": "手動輸入配件",
     "accessoryQuickSelect": "快速選擇配件（{{count}}）",
-    "accessoryTip": "可在資產品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加",
+    "accessoryTip": "可在品牌產品庫按分類配置常用配件（同分類產品共用），驗收時一鍵帶入；也可直接手動添加",
     "accessorySelectTitle": "快速選擇配件",
     "accessorySelectTip": "請勾選需要添加的配件（已存在於清單中的配件會自動跳過）",
     "accessoryEmpty": "該分類尚未配置配件",

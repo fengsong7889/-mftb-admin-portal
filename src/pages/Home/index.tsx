@@ -4,7 +4,7 @@ import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchMenuTree } from '../../api/menu'
+import { useMenu } from '../../contexts/MenuContext'
 import type { MenuVO } from '../../api/menu'
 import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
@@ -156,7 +156,8 @@ export default function Home() {
   const favoritesLoadedRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [backendMenuTree, setBackendMenuTree] = useState<MenuVO[]>([])
+  const { menuTree } = useMenu()
+  const backendMenuTree = menuTree ?? []
   const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -501,16 +502,7 @@ export default function Home() {
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 加载后端菜单树（菜单快捷入口的唯一真值源；名称不在前端维护副本） */
-  useEffect(() => {
-    let cancelled = false
-    fetchMenuTree().then((tree) => {
-      if (!cancelled) setBackendMenuTree(tree)
-    }).catch(() => {
-      // 静默失败：后端不可用时首页快捷入口为空, 由侧边栏离线提示统一说明
-    })
-    return () => { cancelled = true }
-  }, [])
+  // 后端菜单树已从 MenuContext 共享获取，无需单独 fetch
 
   /** 初始加載我的用量數據（用於資訊條與開通態判定） */
   useEffect(() => {

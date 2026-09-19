@@ -7,7 +7,7 @@ import {
   OrderedListOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlgorithmType, Region, RecommendChannel, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
+import { AlgorithmType, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
 import { useCardOrder } from '../../hooks/useCardOrder'
 import DateTimeGrid from '../AdSales/DateTimeGrid'
 import DayPicker from '../AdSales/DayPicker'
@@ -19,7 +19,6 @@ import {
   type InventoryItem,
   type RecommendTypeConfig,
   RECOMMEND_TYPE_CONFIGS,
-  generateMockInventory,
 } from './types'
 
 // 各 Tab 展示的卡片默认类型顺序
@@ -37,30 +36,8 @@ const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
 ]
 
 // 根据URL参数计算初始状态
-const getInitialState = (searchParams: URLSearchParams) => {
-  const typeParam = searchParams.get('type')
-  if (typeParam) {
-    const config = RECOMMEND_TYPE_CONFIGS.find(c => c.name === typeParam)
-    if (config && config.enabled) {
-      // 生成库存数据
-      const allData: InventoryItem[] = []
-      Object.values(Region).forEach(region => {
-        if (typeof region === 'number') {
-          allData.push(...generateMockInventory(region, config.type, undefined))
-        }
-      })
-      const filtered = allData.filter(item =>
-        item.channel === RecommendChannel.HOME ||
-        item.channel === RecommendChannel.DELIVERY ||
-        item.channel === RecommendChannel.SUPERMARKET
-      )
-      return {
-        step: 1,
-        algorithmType: config.type,
-        inventory: filtered.length > 0 ? filtered[0] : null,
-      }
-    }
-  }
+const getInitialState = (_searchParams: URLSearchParams) => {
+  // TODO: 对接库存 API，当前无库存数据
   return { step: 0, algorithmType: null, inventory: null }
 }
 
@@ -93,28 +70,8 @@ export default function PromotionSalesConfig() {
       return
     }
     setSelectedAlgorithmType(config.type)
-    // 自动生成第一条库存数据并直接进入日期选择
-    const allData: InventoryItem[] = []
-    Object.values(Region).forEach(region => {
-      if (typeof region === 'number') {
-        allData.push(...generateMockInventory(region, config.type, selectedApp || undefined))
-      }
-    })
-    let filtered = allData
-    if (selectedApp !== null && selectedApp !== undefined) {
-      filtered = allData.filter(item => item.app === selectedApp)
-    }
-    if (selectedTab === 'groupBuy') {
-      filtered = filtered.filter(item => item.channel === RecommendChannel.HOME || item.channel === RecommendChannel.GROUP_BUY)
-    } else {
-      filtered = filtered.filter(item => item.channel === RecommendChannel.HOME || item.channel === RecommendChannel.DELIVERY || item.channel === RecommendChannel.SUPERMARKET)
-    }
-    if (filtered.length > 0) {
-      setSelectedInventory(filtered[0])
-      setCurrentStep(1)
-    } else {
-      message.info(t('noInventory'))
-    }
+    // TODO: 对接库存 API，当前无库存数据
+    message.info(t('noInventory'))
   }
 
   // 返回卡片页

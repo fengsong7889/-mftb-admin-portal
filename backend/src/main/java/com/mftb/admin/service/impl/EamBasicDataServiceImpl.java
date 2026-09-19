@@ -218,14 +218,22 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     /* ==================== 资产品牌库 ==================== */
 
     @Override
-    public List<Map<String, Object>> listBrands(String bizType, String categoryCode, String brandZh,
+    public List<Map<String, Object>> listBrands(String keyword, String bizType, String categoryCode,
                                                  String updatedBy, String updatedAtStart, String updatedAtEnd) {
         LambdaQueryWrapper<EamBrand> wrapper = new LambdaQueryWrapper<>();
         applyBrandBizTypeFilter(wrapper, bizType);
-        if (categoryCode != null && !categoryCode.isBlank()) wrapper.eq(EamBrand::getCategoryCode, categoryCode);
-        if (brandZh != null && !brandZh.isBlank()) {
-            wrapper.and(w -> w.like(EamBrand::getBrandZh, brandZh.trim())
-                    .or().like(EamBrand::getBrandEn, brandZh.trim().toLowerCase()));
+        if (keyword != null && !keyword.isBlank()) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(EamBrand::getCode, kw)
+                    .or().like(EamBrand::getBrandZh, kw)
+                    .or().like(EamBrand::getBrandEn, kw.toLowerCase()));
+        }
+        if (categoryCode != null && !categoryCode.isBlank()) {
+            if (categoryCode.contains(",")) {
+                wrapper.in(EamBrand::getCategoryCode, Arrays.asList(categoryCode.split(",")));
+            } else {
+                wrapper.eq(EamBrand::getCategoryCode, categoryCode);
+            }
         }
         if (updatedBy != null && !updatedBy.isBlank()) wrapper.like(EamBrand::getUpdatedBy, updatedBy.trim());
         if (updatedAtStart != null && !updatedAtStart.isBlank()) wrapper.ge(EamBrand::getUpdatedAt, updatedAtStart);
@@ -718,6 +726,16 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     @Override
     @Transactional
     public long createParamValue(EamParamValueSaveDTO dto) {
+        // 校驗同一參數類型下值是否唯一
+        LambdaQueryWrapper<EamParamValue> checkWrapper = new LambdaQueryWrapper<>();
+        checkWrapper.eq(EamParamValue::getParamTypeCode, dto.getParamTypeCode());
+        checkWrapper.eq(EamParamValue::getValue, dto.getValue());
+        checkWrapper.eq(EamParamValue::getDeleted, 0);
+        Long count = paramValueMapper.selectCount(checkWrapper);
+        if (count != null && count > 0) {
+            throw new BusinessException("參數值「" + dto.getValue() + "」已存在，請勿重複添加");
+        }
+
         EamParamValue pv = new EamParamValue();
         pv.setParamTypeCode(dto.getParamTypeCode());
         pv.setCategoryCode(dto.getCategoryCode());
@@ -737,6 +755,18 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
     public void updateParamValue(long id, EamParamValueSaveDTO dto) {
         EamParamValue pv = paramValueMapper.selectById(id);
         if (pv == null) throw new BusinessException("參數值不存在");
+        // 校驗同一參數類型下值是否唯一（排除自身）
+        if (dto.getValue() != null && !dto.getValue().equals(pv.getValue())) {
+            LambdaQueryWrapper<EamParamValue> checkWrapper = new LambdaQueryWrapper<>();
+            checkWrapper.eq(EamParamValue::getParamTypeCode, pv.getParamTypeCode());
+            checkWrapper.eq(EamParamValue::getValue, dto.getValue());
+            checkWrapper.ne(EamParamValue::getId, id);
+            checkWrapper.eq(EamParamValue::getDeleted, 0);
+            Long count = paramValueMapper.selectCount(checkWrapper);
+            if (count != null && count > 0) {
+                throw new BusinessException("參數值「" + dto.getValue() + "」已存在，請勿重複");
+            }
+        }
         if (dto.getValue() != null) pv.setValue(dto.getValue());
         if (dto.getSort() != null) pv.setSort(dto.getSort());
         if (dto.getStatus() != null) pv.setStatus(dto.getStatus());

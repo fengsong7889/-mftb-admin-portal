@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import BrandTag from '../../components/BrandTag'
 import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import { fetchFinWriteoffReconcile } from '../../api/finance'
-import type { FinReconcileQuery, FinReconcileResult, FinReconcileSummary } from '../../api/finance'
+import type { FinReconcileQuery, FinReconcileSummary } from '../../api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -48,83 +48,9 @@ interface ReconcileRecord {
   endActual: number
 }
 
-/** 保留兩位小數 */
-const r2 = (n: number) => Math.round(n * 100) / 100
-
 /** 格式化金額（千分位 + 兩位小數） */
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-/** Mock 集團（期初餘額為週期首日期初） */
-const mockGroups = [
-  { groupId: '100001', groupName: '廣州酒家', brand: 'mFood', initVirtual: 355645.01, initActual: 155645.01 },
-  { groupId: '100002', groupName: '海底撈', brand: 'flashBee', initVirtual: 208000.00, initActual: 96000.00 },
-  { groupId: '100003', groupName: '星巴克', brand: 'mFood', initVirtual: 132500.50, initActual: 60200.50 },
-]
-
-const mockDates = ['2026-02-25', '2026-02-26', '2026-02-27', '2026-02-28']
-
-/**
- * 生成勾稽自洽的 Mock 日報數據：
- * - 同一集團相鄰日期首尾相接（今日期初 = 昨日期末）
- * - 實收充值總額 = 銀行收款 + 營業額支付
- * - 交易淨額 = 充值 - 消費 - 扣款 + 轉入 - 轉出
- */
-const mockData: ReconcileRecord[] = (() => {
-  const rows: ReconcileRecord[] = []
-  mockGroups.forEach((g, gi) => {
-    let startVirtual = g.initVirtual
-    let startActual = g.initActual
-    mockDates.forEach((date, di) => {
-      const bankReceipt = r2((gi + 1) * 2000 + di * 500)
-      const revenuePayment = r2((gi + 1) * 800 + di * 100 + 0.21)
-      const actualRecharge = r2(bankReceipt + revenuePayment)
-      const virtualRecharge = r2(actualRecharge * 1.2)
-      const consumeTotal = r2((gi + 1) * 1500 + di * 300)
-      const deductVirtual = r2((gi + 1) * 600 + di * 200)
-      // 營業額支付部分當日經門店營業額扣回（影響實收賬戶）
-      const deductActual = revenuePayment
-      const virtualTransferIn = gi === 1 && di === 2 ? 24000 : 0
-      const virtualTransferOut = gi === 0 && di === 2 ? 24000 : 0
-      const actualTransferIn = 0
-      const actualTransferOut = 0
-      const virtualNet = r2(virtualRecharge - consumeTotal - deductVirtual + virtualTransferIn - virtualTransferOut)
-      const actualNet = r2(actualRecharge - deductActual + actualTransferIn - actualTransferOut)
-      const endVirtual = r2(startVirtual + virtualNet)
-      const endActual = r2(startActual + actualNet)
-      rows.push({
-        key: `${g.groupId}_${date}`,
-        index: 0,
-        date,
-        groupId: g.groupId,
-        groupName: g.groupName,
-        brand: g.brand,
-        initVirtual: startVirtual,
-        initActual: startActual,
-        virtualRecharge,
-        actualRecharge,
-        bankReceipt,
-        revenuePayment,
-        consumeTotal,
-        deductVirtual,
-        deductActual,
-        virtualTransferIn,
-        actualTransferIn,
-        virtualTransferOut,
-        actualTransferOut,
-        virtualNet,
-        actualNet,
-        endVirtual,
-        endActual,
-      })
-      startVirtual = endVirtual
-      startActual = endActual
-    })
-  })
-  // 按日期倒序、集團正序展示
-  return rows
-    .sort((a, b) => b.date.localeCompare(a.date) || a.groupId.localeCompare(b.groupId))
-    .map((r, i) => ({ ...r, index: i + 1 }))
-})()
 
 /* ---- 數字加載動畫（遵循數據指標統計卡標準，支持兩位小數） ---- */
 import { useCountUp } from '../../hooks/useCountUp'
@@ -196,14 +122,6 @@ function pickValue(v?: string) {
   return !v || v === 'all' ? undefined : v
 }
 
-/** 彙總指標字段（除期初/期末外均為區間合計） */
-const SUMMARY_SUM_KEYS = [
-  'virtualRecharge', 'actualRecharge', 'bankReceipt', 'revenuePayment',
-  'consumeTotal', 'deductVirtual', 'deductActual',
-  'virtualTransferIn', 'actualTransferIn', 'virtualTransferOut', 'actualTransferOut',
-  'virtualNet', 'actualNet',
-] as const
-
 /** 空彙總（加載中 / 無數據） */
 const emptySummary: FinReconcileSummary = {
   initVirtual: 0, initActual: 0, endVirtual: 0, endActual: 0,
@@ -211,36 +129,6 @@ const emptySummary: FinReconcileSummary = {
   consumeTotal: 0, deductVirtual: 0, deductActual: 0,
   virtualTransferIn: 0, actualTransferIn: 0, virtualTransferOut: 0, actualTransferOut: 0,
   virtualNet: 0, actualNet: 0,
-}
-
-/**
- * 後端不可用時的降級查詢：演示日報本地篩選分頁 + 彙總
- * 期初取各集團區間首日期初、期末取各集團區間末日期末，保證勾稽成立
- */
-function _mockFetchReconcile(query: FinReconcileQuery): FinReconcileResult {
-  const filtered = mockData.filter(r => {
-    if (query.groupId && !r.groupId.includes(query.groupId)) return false
-    if (query.groupName && !r.groupName.includes(query.groupName)) return false
-    if (query.brand && r.brand !== query.brand) return false
-    if (query.startDate && r.date < query.startDate) return false
-    if (query.endDate && r.date > query.endDate) return false
-    return true
-  })
-  const summary = { ...emptySummary }
-  SUMMARY_SUM_KEYS.forEach(k => {
-    summary[k] = r2(filtered.reduce((acc, r) => acc + r[k], 0))
-  })
-  const groupIds = [...new Set(filtered.map(r => r.groupId))]
-  groupIds.forEach(id => {
-    const rows = filtered.filter(r => r.groupId === id).sort((a, b) => a.date.localeCompare(b.date))
-    summary.initVirtual = r2(summary.initVirtual + rows[0].initVirtual)
-    summary.initActual = r2(summary.initActual + rows[0].initActual)
-    summary.endVirtual = r2(summary.endVirtual + rows[rows.length - 1].endVirtual)
-    summary.endActual = r2(summary.endActual + rows[rows.length - 1].endActual)
-  })
-  const page = query.page || 1
-  const size = query.size || 10
-  return { records: filtered.slice((page - 1) * size, page * size), total: filtered.length, summary }
 }
 
 export default function WriteoffReconcile() {
@@ -267,7 +155,7 @@ export default function WriteoffReconcile() {
     endDate: filters.period?.[1]?.format('YYYY-MM-DD'),
   }), [filters, pagination])
 
-  /** 加載對賬日報（後端不可用時降級到演示數據） */
+  /** 加載對賬日報 */
   const loadReconcile = useCallback(async () => {
     const query = buildQuery()
     setLoading(true)

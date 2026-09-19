@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, Tree, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tree, message } from 'antd'
 import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ExportOutlined, FolderOutlined, ImportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 /** 树节点 */
 interface CatTreeNode extends TreeDataNode {
   key: number
+  bizType?: string
   children?: CatTreeNode[]
 }
 
@@ -20,7 +21,7 @@ interface CatTreeNode extends TreeDataNode {
 function buildTreeData(list: AssetCategory[]): CatTreeNode[] {
   const nodeMap = new Map<number, CatTreeNode>()
   list.forEach(cat => {
-    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, children: [] } as CatTreeNode)
+    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, bizType: cat.bizType || 'ASSET', children: [] } as CatTreeNode)
   })
   const roots: CatTreeNode[] = []
   list.forEach(cat => {
@@ -76,17 +77,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const [expandedKeys, setExpandedKeys] = useState<number[]>([])
 
   // 搜索条件
-  const [searchCode, setSearchCode] = useState<string>()
-  const [searchName, setSearchName] = useState<string>()
+  const [searchKeyword, setSearchKeyword] = useState<string>()
+  const [searchBizType, setSearchBizType] = useState<string>('ALL')
   const [searchStatus, setSearchStatus] = useState<string>()
   const [searchUpdatedBy, setSearchUpdatedBy] = useState<string>()
   const [searchUpdatedAt, setSearchUpdatedAt] = useState<string>()
 
   // 全选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-
-  // 业务类型 Tab（方案二：统一分类库）
-  const [bizTab, setBizTab] = useState<string>('ASSET')
 
   // 批量导入弹窗
   const [importVisible, setImportVisible] = useState(false)
@@ -95,14 +93,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetchCategoryList({ bizType: bizTab })
+      const data = await fetchCategoryList({ bizType: searchBizType })
       setCategories(data)
     } catch {
       // 错误提示由请求层统一处理
     } finally {
       setLoading(false)
     }
-  }, [bizTab])
+  }, [searchBizType])
 
   useEffect(() => {
     fetchData()
@@ -118,9 +116,10 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
     }
   }, [treeData]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 树节点渲染：层级图标 + 名称 */
+  /** 树节点渲染：层级图标 + 名称 + 一级分类业务类型标签 */
   const renderTreeTitle = (node: TreeDataNode) => {
     const name = String(node.title)
+    const catNode = node as CatTreeNode
     // 判断层级
     let level = 0
     let parentId = categories.find(c => c.id === node.key)?.parentId
@@ -135,6 +134,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       <span className="cat-tree-node" title={name}>
         {icon}
         <span className="cat-tree-node-name">{name}</span>
+        {level === 0 && catNode.bizType && (
+          <Tag
+            color={catNode.bizType === 'CONSUMABLE' ? 'gold' : 'blue'}
+            style={{ marginLeft: 6, fontSize: 11, lineHeight: '18px', padding: '0 4px' }}
+          >
+            {catNode.bizType === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}
+          </Tag>
+        )}
       </span>
     )
   }
@@ -146,11 +153,14 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       const scope = collectDescendantIds(categories, selectedCatId)
       list = list.filter(cat => scope.has(cat.id))
     }
-    if (searchCode) {
-      list = list.filter(cat => cat.code.toLowerCase().includes(searchCode.toLowerCase()))
+    if (searchKeyword) {
+      const kw = searchKeyword.toLowerCase()
+      list = list.filter(cat =>
+        cat.code.toLowerCase().includes(kw) || cat.name.toLowerCase().includes(kw),
+      )
     }
-    if (searchName) {
-      list = list.filter(cat => cat.name.toLowerCase().includes(searchName.toLowerCase()))
+    if (searchBizType && searchBizType !== 'ALL') {
+      list = list.filter(cat => (cat.bizType || 'ASSET') === searchBizType)
     }
     if (searchStatus) {
       list = list.filter(cat => cat.status === searchStatus)
@@ -162,13 +172,13 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       list = list.filter(cat => (cat.updatedAt ?? '').startsWith(searchUpdatedAt))
     }
     return list
-  }, [categories, selectedCatId, searchCode, searchName, searchStatus, searchUpdatedBy, searchUpdatedAt])
+  }, [categories, selectedCatId, searchKeyword, searchBizType, searchStatus, searchUpdatedBy, searchUpdatedAt])
 
   /** 查询 */
   const handleSearch = () => {
     const values = searchForm.getFieldsValue()
-    setSearchCode(values.code?.trim() || undefined)
-    setSearchName(values.name?.trim() || undefined)
+    setSearchKeyword(values.keyword?.trim() || undefined)
+    setSearchBizType(values.bizType || 'ALL')
     setSearchStatus(values.status || undefined)
     setSearchUpdatedBy(values.updatedBy?.trim() || undefined)
     setSearchUpdatedAt(values.updatedAt?.format('YYYY-MM-DD') || undefined)
@@ -177,8 +187,8 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
   /** 重置 */
   const handleReset = () => {
     searchForm.resetFields()
-    setSearchCode(undefined)
-    setSearchName(undefined)
+    setSearchKeyword(undefined)
+    setSearchBizType('ALL')
     setSearchStatus(undefined)
     setSearchUpdatedBy(undefined)
     setSearchUpdatedAt(undefined)
@@ -253,7 +263,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
         remark: row.remark || '',
         paramTemplate: [],
         sort: 0,
-        bizType: bizTab === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET',
+        bizType: searchBizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET',
       })
       successCount++
     }
@@ -266,16 +276,6 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
     { title: t('asset.colCatCode'), dataIndex: 'code', key: 'code', width: 120, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     { title: t('asset.colCatName'), dataIndex: 'name', key: 'name', width: 160, onCell: () => ({ style: { whiteSpace: 'nowrap' } }) },
     {
-      title: t('asset.colBizType'),
-      dataIndex: 'bizType',
-      key: 'bizType',
-      width: 90,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: string) => (
-        <Tag color={v === 'CONSUMABLE' ? 'gold' : 'blue'}>{v === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}</Tag>
-      ),
-    },
-    {
       title: t('asset.colParentCat'),
       dataIndex: 'parentId',
       key: 'parentId',
@@ -286,6 +286,16 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
         const parent = categories.find(c => c.id === parentId)
         return parent ? parent.name : '-'
       },
+    },
+    {
+      title: t('asset.colBizType'),
+      dataIndex: 'bizType',
+      key: 'bizType',
+      width: 90,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string) => (
+        <Tag color={v === 'CONSUMABLE' ? 'gold' : 'blue'}>{v === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}</Tag>
+      ),
     },
     {
       title: t('asset.colStatus'),
@@ -367,24 +377,18 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
 
         {/* 右侧主区 */}
         <div className="cat-main">
-          {/* 业务类型 Tab（方案二：统一分类库） */}
-          <Tabs
-            activeKey={bizTab}
-            onChange={(key) => { setBizTab(key); setSelectedCatId(undefined) }}
-            items={[
-              { key: 'ASSET', label: t('asset.bizTypeAsset') },
-              { key: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
-              { key: 'ALL', label: t('asset.bizTypeTabAll') },
-            ]}
-          />
           {/* 搜索区 */}
           <div className="search-section">
-            <Form form={searchForm} layout="inline">
-              <Form.Item label={t('asset.catCodeLabel')} name="code">
-                <Input placeholder={t('asset.catCodePh')} allowClear onPressEnter={handleSearch} />
+            <Form form={searchForm} layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
+              <Form.Item label="分类编码/名称" name="keyword">
+                <Input placeholder="输入编码或名称搜索" allowClear onPressEnter={handleSearch} />
               </Form.Item>
-              <Form.Item label={t('asset.catNameLabel')} name="name">
-                <Input placeholder={t('asset.catNamePh')} allowClear onPressEnter={handleSearch} />
+              <Form.Item label={t('asset.colBizType')} name="bizType">
+                <Select placeholder={t('asset.bizTypeTabAll')} allowClear options={[
+                  { value: 'ASSET', label: t('asset.bizTypeAsset') },
+                  { value: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
+                  { value: 'ALL', label: t('asset.bizTypeTabAll') },
+                ]} />
               </Form.Item>
               <Form.Item label={t('asset.colStatus')} name="status">
                 <Select placeholder={t('asset.catStatusPh')} allowClear options={[
@@ -414,7 +418,7 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
               <Button className="btn-import" icon={<ImportOutlined />} onClick={handleImportClick}>{t('asset.batchImportCat')}</Button>
             </div>
             <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId, bizTab === 'ALL' ? undefined : bizTab)}>{t('asset.addCatBtn')}</Button>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd(selectedCatId, searchBizType === 'ALL' ? undefined : searchBizType)}>{t('asset.addCatBtn')}</Button>
               {configComponent}
             </div>
           </div>

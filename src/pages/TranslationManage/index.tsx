@@ -27,8 +27,6 @@ import {
 } from '@ant-design/icons'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
-  TRANSLATION_DATA_KEY,
-  TRANSLATION_LANGS_KEY,
   LANG_INFO,
   langNamesOf,
   langSysName,
@@ -186,94 +184,6 @@ const FLAG_OPTIONS = [
   { value: '🌐', label: '🌐 全球（无国旗）' },
 ]
 
-/** Mock 翻译数据 */
-const MOCK_DATA: TranslationField[] = [
-  // 公共字段
-  { id: '1', fieldKey: 'brand', category: 'common', description: '资产品牌', translations: { 'zh-TW': '品牌', en: 'Brand', ja: 'ブランド', ko: '브랜드', ru: 'Бренд' } },
-  { id: '2', fieldKey: 'channel', category: 'common', description: '业务频道', translations: { 'zh-TW': '業務頻道', en: 'Business Channel', ja: 'ビジネスチャンネル', ko: '비즈니스 채널', ru: 'Бизнес-канал' } },
-  { id: '3', fieldKey: 'storeName', category: 'common', description: '门店名称', translations: { 'zh-TW': '門店名稱', en: 'Store Name', ja: '店舗名', ko: '매장명', ru: 'Название магазина' } },
-  { id: '4', fieldKey: 'groupName', category: 'common', description: '集团名称', translations: { 'zh-TW': '集團名稱', en: 'Group Name', ja: 'グループ名', ko: '그룹명', ru: 'Название группы' } },
-  { id: '5', fieldKey: 'region', category: 'common', description: '所属区域', translations: { 'zh-TW': '所屬區域', en: 'Region', ja: 'エリア', ko: '지역', ru: 'Регион' } },
-  { id: '6', fieldKey: 'deviceType', category: 'common', description: '设备类型', translations: { 'zh-TW': '設備類型', en: 'Device Type', ja: 'デバイスタイプ', ko: '기기 유형', ru: 'Тип устройства' } },
-  { id: '7', fieldKey: 'displayPort', category: 'common', description: '展示端口', translations: { 'zh-TW': '展示端口', en: 'Display Port', ja: '表示ポート', ko: '표시 포트', ru: 'Порт отображения' } },
-  { id: '8', fieldKey: 'remark', category: 'common', description: '备注', translations: { 'zh-TW': '備註', en: 'Remark', ja: '備考', ko: '비고', ru: 'Примечание' } },
-  // 状态值
-  { id: '10', fieldKey: 'status.active', category: 'status', description: '广告状态-上线', translations: { 'zh-TW': '上線', en: 'Online', ja: 'オンライン', ko: '온라인', ru: 'Онлайн' } },
-  { id: '11', fieldKey: 'status.paused', category: 'status', description: '广告状态-暂停', translations: { 'zh-TW': '暫停', en: 'Paused', ja: '一時停止', ko: '일시중지', ru: 'Приостановлено' } },
-  { id: '12', fieldKey: 'status.offline', category: 'status', description: '广告状态-下线', translations: { 'zh-TW': '下線', en: 'Offline', ja: 'オフライン', ko: '오프라인', ru: 'Офлайн' } },
-  { id: '13', fieldKey: 'status.enabled', category: 'status', description: '服务状态-可用', translations: { 'zh-TW': '可用', en: 'Enabled', ja: '利用可能', ko: '사용 가능', ru: 'Доступно' } },
-  { id: '14', fieldKey: 'status.disabled', category: 'status', description: '服务状态-停用', translations: { 'zh-TW': '停用', en: 'Disabled', ja: '無効', ko: '비활성', ru: 'Отключено' } },
-  { id: '15', fieldKey: 'status.approved', category: 'status', description: '审批状态-已审批', translations: { 'zh-TW': '已審批', en: 'Approved', ja: '承認済み', ko: '승인됨', ru: 'Одобрено' } },
-  { id: '16', fieldKey: 'status.rejected', category: 'status', description: '审批状态-驳回', translations: { 'zh-TW': '駁回', en: 'Rejected', ja: '却下', ko: '거부됨', ru: 'Отклонено' } },
-  { id: '17', fieldKey: 'status.pending', category: 'status', description: '审批状态-未审批', translations: { 'zh-TW': '未審批', en: 'Pending', ja: '未承認', ko: '대기 중', ru: 'Ожидается' } },
-  // 操作按钮
-  { id: '20', fieldKey: 'action.edit', category: 'action', description: '编辑', translations: { 'zh-TW': '編輯', en: 'Edit', ja: '編集', ko: '편집', ru: 'Изменить' } },
-  { id: '21', fieldKey: 'action.delete', category: 'action', description: '删除', translations: { 'zh-TW': '刪除', en: 'Delete', ja: '削除', ko: '삭제', ru: 'Удалить' } },
-  { id: '22', fieldKey: 'action.export', category: 'action', description: '导出', translations: { 'zh-TW': '導出', en: 'Export', ja: 'エクスポート', ko: '내보내기', ru: 'Экспорт' } },
-  { id: '23', fieldKey: 'action.save', category: 'action', description: '保存', translations: { 'zh-TW': '保存', en: 'Save', ja: '保存', ko: '저장', ru: 'Сохранить' } },
-  { id: '24', fieldKey: 'action.cancel', category: 'action', description: '取消', translations: { 'zh-TW': '取消', en: 'Cancel', ja: 'キャンセル', ko: '취소', ru: 'Отмена' } },
-  { id: '25', fieldKey: 'action.add', category: 'action', description: '新增', translations: { 'zh-TW': '新增', en: 'Add', ja: '追加', ko: '추가', ru: 'Добавить' } },
-  { id: '26', fieldKey: 'action.reset', category: 'action', description: '重置', translations: { 'zh-TW': '重置', en: 'Reset', ja: 'リセット', ko: '초기화', ru: 'Сброс' } },
-  { id: '27', fieldKey: 'action.search', category: 'action', description: '查询', translations: { 'zh-TW': '查詢', en: 'Search', ja: '検索', ko: '검색', ru: 'Поиск' } },
-  // 菜单名称
-  { id: '30', fieldKey: 'menu.home', category: 'menu', description: '首页', translations: { 'zh-TW': '首頁', en: 'Home', ja: 'ホーム', ko: '홈', ru: 'Главная' } },
-  { id: '31', fieldKey: 'menu.merchantGroup', category: 'menu', description: '商户集团管理', translations: { 'zh-TW': '商戶集團管理', en: 'Merchant Group', ja: '加盟店グループ', ko: '가맹점 그룹', ru: 'Группа мерчантов' } },
-  { id: '32', fieldKey: 'menu.storeList', category: 'menu', description: '门店管理', translations: { 'zh-TW': '門店管理', en: 'Store Management', ja: '店舗管理', ko: '매장 관리', ru: 'Управление магазинами' } },
-  { id: '33', fieldKey: 'menu.adSales', category: 'menu', description: '广告销售', translations: { 'zh-TW': '廣告銷售', en: 'Ad Sales', ja: '広告販売', ko: '광고 판매', ru: 'Продажа рекламы' } },
-  { id: '34', fieldKey: 'menu.finance', category: 'menu', description: '财务管理', translations: { 'zh-TW': '財務管理', en: 'Finance', ja: '財務管理', ko: '재무 관리', ru: 'Финансы' } },
-  { id: '35', fieldKey: 'menu.search', category: 'menu', description: '搜索管理', translations: { 'zh-TW': '搜索管理', en: 'Search Management', ja: '検索管理', ko: '검색 관리', ru: 'Управление поиском' } },
-  { id: '36', fieldKey: 'menu.systemConfig', category: 'menu', description: '系统配置', translations: { 'zh-TW': '系統配置', en: 'System Settings', ja: 'システム設定', ko: '시스템 설정', ru: 'Настройки системы' } },
-  { id: '37', fieldKey: 'menu.translation', category: 'menu', description: '翻译管理', translations: { 'zh-TW': '翻譯管理', en: 'Translation', ja: '翻訳管理', ko: '번역 관리', ru: 'Переводы' } },
-  // 业务术语
-  { id: '40', fieldKey: 'biz.waterfall', category: 'biz', description: '瀑布流策略', translations: { 'zh-TW': '瀑布流策略', en: 'Waterfall Strategy', ja: 'ウォーターフォール戦略', ko: '워터폴 전략', ru: 'Каскадная стратегия' } },
-  { id: '41', fieldKey: 'biz.cpc', category: 'biz', description: '点击成本', translations: { 'zh-TW': '點擊成本', en: 'CPC (Cost Per Click)', ja: 'クリック単価', ko: '클릭당 비용', ru: 'Цена за клик' } },
-  { id: '42', fieldKey: 'biz.roi', category: 'biz', description: '投资回报率', translations: { 'zh-TW': '投資回報率', en: 'ROI', ja: '投資対効果', ko: '투자 수익률', ru: 'ROI' } },
-  { id: '43', fieldKey: 'biz.impression', category: 'biz', description: '曝光', translations: { 'zh-TW': '曝光', en: 'Impression', ja: 'インプレッション', ko: '노출', ru: 'Показ' } },
-  { id: '44', fieldKey: 'biz.click', category: 'biz', description: '点击', translations: { 'zh-TW': '點擊', en: 'Click', ja: 'クリック', ko: '클릭', ru: 'Клик' } },
-  { id: '45', fieldKey: 'biz.conversion', category: 'biz', description: '转化', translations: { 'zh-TW': '轉化', en: 'Conversion', ja: 'コンバージョン', ko: '전환', ru: 'Конверсия' } },
-  // 缺少部分翻译的示例
-  { id: '50', fieldKey: 'biz.bd', category: 'biz', description: '商务拓展', translations: { 'zh-TW': '商務拓展', en: 'BD (Business Development)', ja: '', ko: '', ru: '' } },
-  { id: '51', fieldKey: 'biz.hotMerchant', category: 'biz', description: '人气商家', translations: { 'zh-TW': '人氣商家', en: 'Popular Merchant', ja: '人気店舗', ko: '', ru: '' } },
-  { id: '52', fieldKey: 'biz.newStore', category: 'biz', description: '新店推广', translations: { 'zh-TW': '新店推廣', en: 'New Store Promotion', ja: '', ko: '', ru: '' } },
-]
-
-/**
- * 模拟：其它模块自动推送的新增字段（正式版由后端自动收集写入）
- * 推送时系统已自动机翻填充，空缺的语言需人工补填
- */
-const SYNC_INCOMING_FIELDS: Omit<TranslationField, 'id'>[] = [
-  {
-    fieldKey: 'field_sync_member_points',
-    category: 'biz',
-    description: '會員積分',
-    source: 'sync',
-    translations: { 'zh-TW': '會員積分', en: 'Member Points', ja: '会員ポイント', ko: '', ru: '' },
-  },
-  {
-    fieldKey: 'field_sync_delivery_discount',
-    category: 'biz',
-    description: '配送費減免',
-    source: 'sync',
-    translations: { 'zh-TW': '配送費減免', en: 'Delivery Fee Discount', ja: '', ko: '', ru: '' },
-  },
-  {
-    fieldKey: 'field_sync_gift_card',
-    category: 'biz',
-    description: '禮金卡',
-    source: 'sync',
-    translations: { 'zh-TW': '禮金卡', en: 'Gift Card', ja: 'ギフトカード', ko: '기프트 카드', ru: '' },
-  },
-  {
-    fieldKey: 'field_sync_store_rating',
-    category: 'biz',
-    description: '店鋪評分',
-    source: 'sync',
-    translations: { 'zh-TW': '店鋪評分', en: 'Store Rating', ja: '店舗評価', ko: '', ru: '' },
-  },
-]
-
-/* ---- Mock 机翻词库已废弃，正式版已对接后端 MyMemory 免费翻译 API ---- */
-
 /* ---- 后端 VO ↔ 前端模型映射 ---- */
 function voToField(vo: TranslationVO): TranslationField {
   return {
@@ -365,7 +275,7 @@ export default function TranslationManage() {
     if (list) setLanguages(list.map(voToLang))
   }, [])
 
-  /* 初始化：优先后端真实数据，失败降级 localStorage / Mock */
+  /* 初始化：从后端加载数据 */
   useEffect(() => {
     setLoading(true)
     ;(async () => {
@@ -373,43 +283,26 @@ export default function TranslationManage() {
         const [fields, langs] = await Promise.all([fetchTranslations(), fetchLanguages()])
         if (fields && langs) {
           setData(fields.map(voToField))
-          // 语言列表以后端数据库为唯一来源，不再合并前端语言代码库
-          // 确保删除操作能持久生效，用户可通过「新增语言」按钮按需添加
           setLanguages(langs.map(voToLang))
           setBackendMode(true)
           return
         }
       } catch {
-        /* 降级本地 */
+        /* 后端不可用，显示空状态 */
       }
-      const saved = localStorage.getItem(TRANSLATION_DATA_KEY)
-      setData(saved ? JSON.parse(saved) : MOCK_DATA)
-      const savedLangs = localStorage.getItem(TRANSLATION_LANGS_KEY)
-      if (savedLangs) {
-        // 补齐各系统语言显示名（旧数据兼容，保证列标题跟随全局语言）
-        const parsed = JSON.parse(savedLangs) as Language[]
-        const merged = parsed.map(l => ({
-          ...l,
-          // 繁中默认国旗统一为中国国旗（旧数据修正）
-          flag: l.code === 'zh-TW' ? (LANG_INFO['zh-TW']?.flag || l.flag) : l.flag,
-          names: l.names && Object.keys(l.names).length > 0 ? l.names : langNamesOf(l.code),
-        }))
-        // 离线模式以 localStorage 为唯一来源，不再合并语言代码库
-        setLanguages(merged)
-      }
+      setData([])
+      setLanguages([])
       setBackendMode(false)
     })().finally(() => setLoading(false))
   }, [])
 
-  /* 持久化到 localStorage */
-  const persistData = useCallback((newData: TranslationField[]) => {
+  /* 数据更新 */
+  const updateData = useCallback((newData: TranslationField[]) => {
     setData(newData)
-    localStorage.setItem(TRANSLATION_DATA_KEY, JSON.stringify(newData))
   }, [])
 
-  const persistLanguages = useCallback((newLangs: Language[]) => {
+  const updateLanguages = useCallback((newLangs: Language[]) => {
     setLanguages(newLangs)
-    localStorage.setItem(TRANSLATION_LANGS_KEY, JSON.stringify(newLangs))
   }, [])
 
   /* 过滤数据 */
@@ -489,7 +382,7 @@ export default function TranslationManage() {
         }
         return item
       })
-      persistData(newData)
+      updateData(newData)
     }
     setEditingCell(null)
     setEditValue('')
@@ -507,7 +400,7 @@ export default function TranslationManage() {
       await deleteTranslationApi(Number(id))
       await reloadFields()
     } else {
-      persistData(data.filter(item => item.id !== id))
+      updateData(data.filter(item => item.id !== id))
     }
     message.success(t('translationManage:msgDeleted'))
   }
@@ -576,7 +469,7 @@ export default function TranslationManage() {
         }
         return item
       })
-      persistData(newData)
+      updateData(newData)
       setEditFieldOpen(false)
       setEditingRecord(null)
       editFieldForm.resetFields()
@@ -630,7 +523,7 @@ export default function TranslationManage() {
       languages.forEach(l => {
         newField.translations[l.code] = values[`lang_${l.code}`] || ''
       })
-      persistData([...data, newField])
+      updateData([...data, newField])
       setAddFieldOpen(false)
       addFieldForm.resetFields()
       message.success(t('translationManage:msgFieldAdded'))
@@ -662,7 +555,7 @@ export default function TranslationManage() {
           .catch(() => { /* 全局拦截器已提示 */ })
         return
       }
-      persistLanguages([...languages, newLang])
+      updateLanguages([...languages, newLang])
       setAddLangOpen(false)
       addLangForm.resetFields()
       message.success(t('translationManage:msgLangAdded'))
@@ -678,44 +571,20 @@ export default function TranslationManage() {
       return
     }
     const newLangs = languages.filter(l => l.code !== code)
-    persistLanguages(newLangs)
+    updateLanguages(newLangs)
     // 同时清除数据中该语言的翻译
     const newData = data.map(item => {
       const t = { ...item.translations }
       delete t[code]
       return { ...item, translations: t }
     })
-    persistData(newData)
+    updateData(newData)
     message.success(t('translationManage:msgLangRemoved'))
   }
 
-  /* 同步未翻译字段：模拟其它模块新增字段自动推送（已预先机翻，空缺待人工补填） */
+  /* 同步未翻译字段：已废弃，后端自动收集写入 */
   const handleSyncFields = async () => {
-    const incoming = SYNC_INCOMING_FIELDS.filter(
-      f => !data.some(d => d.fieldKey === f.fieldKey || d.description.trim() === f.description.trim())
-    )
-    if (incoming.length === 0) {
-      message.info(t('translationManage:msgSyncComplete'))
-      return
-    }
-    const newFields: TranslationField[] = incoming.map(f => ({
-      ...f,
-      id: `sync_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    }))
-    if (backendMode) {
-      // 逐条写入后端（模拟各模块新增字段自动推送）
-      await Promise.all(newFields.map(f => createTranslation({
-        fieldKey: f.fieldKey,
-        fieldName: f.description,
-        category: f.category,
-        translations: f.translations,
-        source: 'sync',
-      }).catch(() => null)))
-      await reloadFields()
-    } else {
-      persistData([...newFields, ...data])
-    }
-    message.success(t('translationManage:msgSyncCount', { count: incoming.length }))
+    message.info(t('translationManage:msgSyncComplete'))
   }
 
   /* 机翻单行：调用后端 MyMemory API 填充该字段所有空缺翻译 */

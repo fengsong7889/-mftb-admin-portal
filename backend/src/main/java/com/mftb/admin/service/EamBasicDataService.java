@@ -43,7 +43,7 @@ public interface EamBasicDataService {
     /* ==================== 资产品牌库 ==================== */
 
     /** 品牌列表（bizType: ASSET/CONSUMABLE，ALL 或空=默认 ASSET） */
-    List<Map<String, Object>> listBrands(String bizType, String categoryCode, String brandZh,
+    List<Map<String, Object>> listBrands(String keyword, String bizType, String categoryCode,
                                           String updatedBy, String updatedAtStart, String updatedAtEnd);
 
     /** 新增资产品牌 */

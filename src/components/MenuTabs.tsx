@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CloseOutlined, HomeOutlined } from '@ant-design/icons'
-import { fetchMenuTree } from '../api/menu'
 import type { MenuVO } from '../api/menu'
 import { translateMenuName } from '../i18n/menuNameEn'
 import { OFFLINE_MENU_LABELS } from '../constants/offlineMenus'
 import { pathToKey } from './Sidebar'
+import { isPathBackendConnected } from '../constants/menuDataSource'
+import { useMenu } from '../contexts/MenuContext'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import './MenuTabs.css'
@@ -280,22 +281,13 @@ export default function MenuTabs() {
   const location = useLocation()
   const navigate = useNavigate()
   const { i18n: i18nInstance, t } = useTranslation()
+  const { menuTree, status: menuStatus } = useMenu()
   const [tabs, setTabs] = useState<MenuTab[]>([HOME_TAB])
-  const [pathNameMap, setPathNameMap] = useState<Record<string, { key: string; name: string; nameEn?: string | null }>>({})
-  const [keyNameMap, setKeyNameMap] = useState<Record<string, { name: string; nameEn?: string | null }>>({})
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  /** 加载后端菜单树，构建 path → name 及 menuKey → name 映射 */
-  useEffect(() => {
-    let cancelled = false
-    fetchMenuTree().then((tree) => {
-      if (!cancelled && tree.length > 0) {
-        setPathNameMap(buildPathMap(tree))
-        setKeyNameMap(buildKeyNameMap(tree))
-      }
-    }).catch(() => { /* 静默，使用 fallback */ })
-    return () => { cancelled = true }
-  }, [])
+  /** 从共享菜单 Context 构建 path → name 及 menuKey → name 映射 */
+  const pathNameMap = useMemo(() => menuTree ? buildPathMap(menuTree) : {}, [menuTree])
+  const keyNameMap = useMemo(() => menuTree ? buildKeyNameMap(menuTree) : {}, [menuTree])
 
   /** 从 localStorage 恢复历史标签 */
   useEffect(() => {
@@ -318,6 +310,17 @@ export default function MenuTabs() {
       localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(tabs))
     } catch { /* 忽略存储错误 */ }
   }, [tabs])
+
+  /** 离线时过滤已接入后端的标签：保留首页 + 原型页面，移除后端菜单标签 */
+  useEffect(() => {
+    if (menuStatus !== 'offline') return
+    setTabs((prev) => {
+      const filtered = prev.filter(
+        (tab) => tab.path === '/' || !isPathBackendConnected(tab.path),
+      )
+      return filtered.length === prev.length ? prev : filtered
+    })
+  }, [menuStatus])
 
   /** 获取路径对应的菜单名称（子页面优先用与页面标题一致的完整标题，菜单页与侧边栏一致） */
   const getMenuName = useCallback((pathname: string): string => {

@@ -170,7 +170,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   // 驗收確認彈窗（通過項：拍照憑證 + 配件清單）
   const [passModal, setPassModal] = useState<{ groupId: string; rowKey: string } | null>(null)
   const [passAccessories, setPassAccessories] = useState<{ name: string; qty: number }[]>([])
-  /** 分類配件配置（资产品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
+  /** 分類配件配置（品牌產品庫按分類維護，key 為 categoryCode；取代寫死枚舉） */
   const [categoryAccessories, setCategoryAccessories] = useState<Map<string, { name: string; defaultQty: number }[]>>(new Map())
 
   // 配件選擇彈窗（快速選擇配件：勾選後批量添加）
@@ -1052,7 +1052,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               )}
             </div>
 
-            {/* 配件清單（分類級配置，资产品牌產品庫維護） */}
+            {/* 配件清單（分類級配置，品牌產品庫維護） */}
             <div>
               <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
                 <AppstoreOutlined style={{ marginRight: 4 }} />

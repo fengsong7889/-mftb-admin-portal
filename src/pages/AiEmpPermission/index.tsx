@@ -18,10 +18,7 @@ import {
   type PermissionSource,
   type QuotaStatus,
 } from '../../api/empPermission'
-import {
-  flattenDepts,
-  MOCK_DEPT_TREE,
-} from '../../api/mock/aiEmpPermissionMock'
+import { fetchDepartments, type DepartmentItem } from '../../api/department'
 
 /* ══════════ 展示常量 ══════════ */
 
@@ -65,15 +62,14 @@ function groupQuotas(grants: EmpQuotaGrant[]): QuotaGroup[] {
 /* ══════════ 部門樹 ══════════ */
 
 /** 構建 TreeSelect 用的樹形數據 */
-function buildDeptTreeData(): DataNode[] {
-  const flat = flattenDepts(MOCK_DEPT_TREE)
+function buildDeptTreeData(depts: DepartmentItem[]): DataNode[] {
   const nodeMap = new Map<number, DataNode>()
-  flat.forEach((f) => nodeMap.set(f.id, { key: f.id, title: f.name, children: [] }))
+  depts.forEach((d) => nodeMap.set(d.id, { key: d.id, title: d.name, children: [] }))
   const roots: DataNode[] = []
-  flat.forEach((f) => {
-    const node = nodeMap.get(f.id)!
-    if (f.parentId != null) {
-      const parent = nodeMap.get(f.parentId)
+  depts.forEach((d) => {
+    const node = nodeMap.get(d.id)!
+    if (d.parentId != null) {
+      const parent = nodeMap.get(d.parentId)
       if (parent) parent.children!.push(node)
     } else {
       roots.push(node)
@@ -95,6 +91,7 @@ export default function AiEmpPermission() {
   /* ── 數據 ── */
   const [data, setData] = useState<EmpPermissionSummary[]>([])
   const [loading, setLoading] = useState(false)
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
 
   /* ── 搜索 ── */
   const [queryName, setQueryName] = useState('')
@@ -127,6 +124,10 @@ export default function AiEmpPermission() {
 
   useEffect(() => { reload() }, [reload])
 
+  useEffect(() => {
+    fetchDepartments().then(setDepartments).catch(() => {})
+  }, [])
+
   const handleSearch = () => setApplied({
     name: queryName.trim(), dept: queryDept,
     source: querySource, quotaStatus: queryQuotaStatus,
@@ -139,7 +140,7 @@ export default function AiEmpPermission() {
   }
 
   /** 部門樹形選項 */
-  const deptTreeData = useMemo(() => buildDeptTreeData(), [])
+  const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
 
   /** 過濾邏輯 */
   const filtered = useMemo(() => data.filter((row) => {

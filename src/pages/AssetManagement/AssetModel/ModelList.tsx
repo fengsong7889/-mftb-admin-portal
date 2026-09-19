@@ -5,8 +5,8 @@
  * - 右侧：选中分类 → 显示资产品牌列表；选中资产品牌 → 显示产品列表
  * - 新增：选中分类时新增资产品牌；选中资产品牌时新增产品
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tooltip, DatePicker, Tree, Tabs } from 'antd'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tooltip, DatePicker, Tree } from 'antd'
 import type { TableColumnsType, TablePaginationConfig, TreeDataNode } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, FolderOutlined, ShopOutlined, AppstoreOutlined } from '@ant-design/icons'
@@ -26,6 +26,8 @@ interface Props {
   onDetailBrand: (id: number) => void
   onDetailProduct: (id: number) => void
   onAccessoryConfig: (categoryCode: string, categoryName: string) => void
+  /** 初始化时自动选中某品牌进入产品视图（从产品表单返回时恢复） */
+  initialSelectedBrandId?: number
 }
 
 interface SearchFormValues {
@@ -40,6 +42,7 @@ interface CatTreeNode extends TreeDataNode {
   key: number
   title: string
   value: number
+  bizType?: string
   children?: CatTreeNode[]
 }
 
@@ -47,7 +50,7 @@ interface CatTreeNode extends TreeDataNode {
 function buildTreeData(list: AssetCategory[]): CatTreeNode[] {
   const nodeMap = new Map<number, CatTreeNode>()
   list.forEach(cat => {
-    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, children: [] } as CatTreeNode)
+    nodeMap.set(cat.id, { key: cat.id, title: `${cat.code}-${cat.name}`, value: cat.id, bizType: cat.bizType || 'ASSET', children: [] } as CatTreeNode)
   })
   const roots: CatTreeNode[] = []
   list.forEach(cat => {
@@ -93,10 +96,11 @@ export default function ModelList({
   onEditBrand, onEditProduct,
   onDetailBrand, onDetailProduct,
   onAccessoryConfig,
+  initialSelectedBrandId,
 }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<SearchFormValues>()
-  const [brandForm] = Form.useForm<{ brandZh?: string; updatedBy?: string; updatedAtRange?: [Dayjs, Dayjs] }>()
+  const [brandForm] = Form.useForm<{ keyword?: string; bizType?: string; updatedBy?: string; updatedAtRange?: [Dayjs, Dayjs] }>()
   const [loading, setLoading] = useState(false)
 
   // 数据源
@@ -110,8 +114,8 @@ export default function ModelList({
   const [selectedCatId, setSelectedCatId] = useState<number>()
   const [selectedBrandId, setSelectedBrandId] = useState<number>()
   const [viewMode, setViewMode] = useState<'brands' | 'products'>('brands')
-  // 业务类型 Tab（方案二：统一品牌产品库）
-  const [bizTab, setBizTab] = useState<string>('ASSET')
+  // 业务类型搜索条件
+  const [searchBizType, setSearchBizType] = useState<string>('ALL')
 
   // 分页
   const [total, setTotal] = useState(0)
@@ -134,7 +138,7 @@ export default function ModelList({
   const loadBrands = useCallback(async (catCode?: string) => {
     setLoading(true)
     try {
-      const params: BrandQuery = { ...brandFilters, bizType: bizTab }
+      const params: BrandQuery = { ...brandFilters, bizType: searchBizType }
       if (catCode) params.categoryCode = catCode
       const list = await fetchBrandList(params)
       setBrands(list)
@@ -144,7 +148,17 @@ export default function ModelList({
     } finally {
       setLoading(false)
     }
-  }, [brandFilters, bizTab, t])
+  }, [brandFilters, searchBizType, t])
+
+  /** 加载某分类及其所有子类的品牌 */
+  const loadBrandsForCat = useCallback((catId?: number) => {
+    if (catId) {
+      const codes = Array.from(collectDescendantCodes(categories, catId)).join(',')
+      loadBrands(codes)
+    } else {
+      loadBrands()
+    }
+  }, [categories, loadBrands])
 
   const loadProducts = useCallback(async (brandId?: number, categoryCode?: string) => {
     setLoading(true)
@@ -160,7 +174,7 @@ export default function ModelList({
   }, [filters, page, size, t])
 
   useEffect(() => {
-    fetchCategoryList().then((list) => {
+    fetchCategoryList({ bizType: 'ALL' }).then((list) => {
       setCategories(list)
       setTreeData(buildTreeData(list))
     }).catch(() => undefined)
@@ -175,12 +189,25 @@ export default function ModelList({
     }
   }, [treeData]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 切换业务类型 Tab 重新加载品牌 */
+  /** 从产品表单返回时，恢复品牌选中状态并进入产品视图（每轮挂载仅执行一次） */
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (initialSelectedBrandId && brands.length > 0 && !restoredRef.current) {
+      const brand = brands.find(b => b.id === initialSelectedBrandId)
+      if (brand) {
+        restoredRef.current = true
+        setSelectedBrandId(brand.id)
+        setViewMode('products')
+      }
+    }
+  }, [initialSelectedBrandId, brands])
+
+  /** 切换业务类型重新加载品牌 */
   useEffect(() => {
     setSelectedBrandId(undefined)
     setViewMode('brands')
     loadBrands()
-  }, [bizTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchBizType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 树节点渲染 */
   const renderTreeTitle = (node: TreeDataNode) => {
@@ -194,10 +221,16 @@ export default function ModelList({
     const icon = level === 0
       ? <FolderOutlined className="cat-tree-node-icon cat-tree-node-icon-root" />
       : <FolderOutlined className="cat-tree-node-icon cat-tree-node-icon-branch" />
+    const bizType = (node as CatTreeNode).bizType || 'ASSET'
     return (
       <span className="cat-tree-node" title={name}>
         {icon}
         <span className="cat-tree-node-name">{name}</span>
+        {level === 0 && (
+          <Tag color={bizType === 'CONSUMABLE' ? 'gold' : 'blue'} style={{ marginLeft: 6, fontSize: 11, lineHeight: '18px', padding: '0 4px' }}>
+            {bizType === 'CONSUMABLE' ? '耗材' : '资产'}
+          </Tag>
+        )}
       </span>
     )
   }
@@ -211,10 +244,7 @@ export default function ModelList({
     form.resetFields()
     setPage(1)
     if (key) {
-      const cat = categories.find(c => c.id === key)
-      if (cat) {
-        loadBrands(cat.code)
-      }
+      loadBrandsForCat(key)
     } else {
       loadBrands()
     }
@@ -224,17 +254,17 @@ export default function ModelList({
   const handleBrandSearch = () => {
     const v = brandForm.getFieldsValue()
     const next: BrandQuery = {}
-    if (v.brandZh) next.brandZh = v.brandZh
+    if (v.keyword) next.keyword = v.keyword
     if (v.updatedBy) next.updatedBy = v.updatedBy
     if (v.updatedAtRange) {
       next.updatedAtStart = v.updatedAtRange[0].format('YYYY-MM-DD 00:00:00')
       next.updatedAtEnd = v.updatedAtRange[1].format('YYYY-MM-DD 23:59:59')
     }
     setBrandFilters(next)
+    setSearchBizType(v.bizType || 'ALL')
     setPage(1)
     if (selectedCatId) {
-      const cat = categories.find(c => c.id === selectedCatId)
-      loadBrands(cat?.code)
+      loadBrandsForCat(selectedCatId)
     } else {
       loadBrands()
     }
@@ -242,10 +272,10 @@ export default function ModelList({
   const handleBrandReset = () => {
     brandForm.resetFields()
     setBrandFilters({})
+    setSearchBizType('ALL')
     setPage(1)
     if (selectedCatId) {
-      const cat = categories.find(c => c.id === selectedCatId)
-      loadBrands(cat?.code)
+      loadBrandsForCat(selectedCatId)
     } else {
       loadBrands()
     }
@@ -295,8 +325,7 @@ export default function ModelList({
           await deleteBrand(record.id)
           message.success(t('common.deleteSuccess'))
           // 无论是否选中分类都需刷新品牌列表（此前未选分类时删除后列表不刷新—B3）
-          const cat = selectedCatId ? categories.find(c => c.id === selectedCatId) : undefined
-          loadBrands(cat?.code)
+          loadBrandsForCat(selectedCatId)
         } catch (e: unknown) {
           message.error(e instanceof Error ? e.message : t('asset.deleteFailed'))
         }
@@ -345,7 +374,7 @@ export default function ModelList({
   /* ── 资产品牌表格列  */
   const brandColumns: TableColumnsType<AssetBrand> = [
     {
-      title: '编码', dataIndex: 'code', key: 'code', width: 100,
+      title: '品牌编码', dataIndex: 'code', key: 'code', width: 100,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: '#595959' }}>{v}</span> : '-',
     },
@@ -360,16 +389,16 @@ export default function ModelList({
       ),
     },
     {
+      title: '所属分类', dataIndex: 'categoryCode', key: 'categoryCode', width: 140,
+      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
+      render: (v: string) => <Tag color="blue">{categoryName(v)}</Tag>,
+    },
+    {
       title: t('asset.colBizType'), dataIndex: 'bizType', key: 'bizType', width: 90,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
       render: (v: string) => (
         <Tag color={v === 'CONSUMABLE' ? 'gold' : 'blue'}>{v === 'CONSUMABLE' ? t('asset.bizTypeConsumable') : t('asset.bizTypeAsset')}</Tag>
       ),
-    },
-    {
-      title: '所属分类', dataIndex: 'categoryCode', key: 'categoryCode', width: 140,
-      onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: string) => <Tag color="blue">{categoryName(v)}</Tag>,
     },
     {
       title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
@@ -478,16 +507,6 @@ export default function ModelList({
 
         {/* 右侧主区 */}
         <div className="cat-main">
-          {/* 业务类型 Tab（方案二：统一品牌产品库） */}
-          <Tabs
-            activeKey={bizTab}
-            onChange={(key) => setBizTab(key)}
-            items={[
-              { key: 'ASSET', label: t('asset.bizTypeAsset') },
-              { key: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
-              { key: 'ALL', label: t('asset.bizTypeTabAll') },
-            ]}
-          />
           {/* 面包屑导航 */}
           <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8C8C8C' }}>
             <FolderOutlined style={{ color: '#E8720C' }} />
@@ -504,9 +523,16 @@ export default function ModelList({
           {/* 搜索区（资产品牌视图） */}
           {viewMode === 'brands' && (
             <div className="search-section">
-              <Form form={brandForm} layout="inline">
-                <Form.Item label={t('asset.brandNameLabel')} name="brandZh">
-                  <Input placeholder={t('asset.brandNamePh')} allowClear onPressEnter={handleBrandSearch} />
+              <Form form={brandForm} layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
+                <Form.Item label="品牌编码/名称" name="keyword">
+                  <Input placeholder="输入编码或名称搜索" allowClear onPressEnter={handleBrandSearch} />
+                </Form.Item>
+                <Form.Item label={t('asset.colBizType')} name="bizType">
+                  <Select placeholder={t('asset.bizTypeTabAll')} allowClear options={[
+                    { value: 'ASSET', label: t('asset.bizTypeAsset') },
+                    { value: 'CONSUMABLE', label: t('asset.bizTypeConsumable') },
+                    { value: 'ALL', label: t('asset.bizTypeTabAll') },
+                  ]} />
                 </Form.Item>
                 <Form.Item label={t('asset.colUpdatedBy')} name="updatedBy">
                   <Input placeholder={t('asset.updatedByPh')} allowClear onPressEnter={handleBrandSearch} />
@@ -527,7 +553,7 @@ export default function ModelList({
           {/* 搜索区（产品视图） */}
           {viewMode === 'products' && (
             <div className="search-section">
-              <Form form={form} layout="inline">
+              <Form form={form} layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 12px' }}>
                 <Form.Item label={t('asset.colProductName')} name="name">
                   <Input placeholder={t('asset.productNamePh')} allowClear onPressEnter={handleSearch} />
                 </Form.Item>
@@ -555,24 +581,26 @@ export default function ModelList({
                   type="link"
                   size="small"
                   icon={<ShopOutlined />}
-                  onClick={() => { setSelectedBrandId(undefined); setViewMode('brands'); if (selectedCatId) { const cat = categories.find(c => c.id === selectedCatId); loadBrands(cat?.code) } }}
+                  onClick={() => { setSelectedBrandId(undefined); setViewMode('brands'); loadBrandsForCat(selectedCatId) }}
                 >
                   {t('asset.returnToBrandList')}
                 </Button>
+              )}
+              {viewMode === 'brands' && (
+                <Tooltip title={selectedCategory ? t('asset.accessoryConfigTip') : t('asset.selectCategoryFirst')}>
+                  <Button icon={<AppstoreOutlined />} disabled={!selectedCategory}
+                    onClick={() => selectedCategory && onAccessoryConfig(selectedCategory.code, selectedCategory.name)}>
+                    {t('asset.accessoryConfig')}
+                  </Button>
+                </Tooltip>
               )}
             </div>
             <div className="action-section-right">
               {viewMode === 'brands' && (
                 <>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(bizTab === 'CONSUMABLE' ? '' : (selectedCategory?.code || ''), bizTab === 'ALL' ? undefined : bizTab)}>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => onAddBrand(searchBizType === 'CONSUMABLE' ? '' : (selectedCategory?.code || ''), searchBizType === 'ALL' ? undefined : searchBizType)}>
                     {t('asset.addBrand')}
                   </Button>
-                  <Tooltip title={selectedCategory ? t('asset.accessoryConfigTip') : t('asset.selectCategoryFirst')}>
-                    <Button icon={<AppstoreOutlined />} disabled={!selectedCategory}
-                      onClick={() => selectedCategory && onAccessoryConfig(selectedCategory.code, selectedCategory.name)}>
-                      {t('asset.accessoryConfig')}
-                    </Button>
-                  </Tooltip>
                   {brandConfigComponent}
                 </>
               )}

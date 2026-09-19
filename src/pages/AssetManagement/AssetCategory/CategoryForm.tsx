@@ -6,9 +6,9 @@
  * - 分類僅做層級歸類，參數配置由「資產品牌型號庫」負責
  * - 底部「取消 + 保存」（全局表單規範）
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
-  Button, Form, Input, TreeSelect, Space, Spin, message, Select, InputNumber, Row, Col,
+  Button, Form, Input, TreeSelect, Space, Spin, message, Select, InputNumber, Row, Col, Switch,
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, FolderOutlined,
@@ -44,14 +44,24 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
   const isEdit = id != null
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [treeData, setTreeData] = useState<ReturnType<typeof toTreeSelectData>>([])
   const [existingCodes, setExistingCodes] = useState<string[]>([])
   const [idToCode, setIdToCode] = useState<Map<number, string>>(new Map())
+
+  const [allCategories, setAllCategories] = useState<AssetCategory[]>([])
+  const [formBizType, setFormBizType] = useState<'ASSET' | 'CONSUMABLE'>(
+    bizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET',
+  )
 
   const loadOptions = useCallback(async () => {
     const list = await fetchCategoryList({ bizType: 'ALL' })
     return list
   }, [])
+
+  /** 根據當前表單業務類型過濾 TreeSelect 數據 */
+  const filteredTreeData = useMemo(() => {
+    const scoped = allCategories.filter(c => (c.bizType || 'ASSET') === formBizType)
+    return toTreeSelectData(buildTree(scoped), isEdit && id ? [id] : [], 3)
+  }, [allCategories, formBizType, isEdit, id])
 
   useEffect(() => {
     let alive = true
@@ -59,24 +69,27 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
     loadOptions()
       .then((list) => {
         if (!alive) return
+        setAllCategories(list)
         if (isEdit && id) {
           const cur = list.find((c: AssetCategory) => c.id === id)
           if (cur) {
+            const bt = (cur.bizType || 'ASSET') as 'ASSET' | 'CONSUMABLE'
+            setFormBizType(bt)
             form.setFieldsValue({
               code: cur.code,
               name: cur.name,
               parentId: cur.parentId || undefined,
               status: cur.status || 'enabled',
               remark: cur.remark,
-              bizType: cur.bizType || 'ASSET',
+              bizType: bt,
             })
           }
-          setTreeData(toTreeSelectData(buildTree(list), isEdit && id ? [id] : [], 3))
           setExistingCodes(list.map(c => c.code))
           setIdToCode(new Map(list.map((c: AssetCategory) => [c.id, c.code])))
         } else {
-          // 新增模式：上级分类/编码生成仅限同业务类型范围
+          // 新增模式
           const type: 'ASSET' | 'CONSUMABLE' = bizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET'
+          setFormBizType(type)
           const scoped = list.filter(c => (c.bizType || 'ASSET') === type)
           form.setFieldsValue({ parentId: parentId || undefined, status: 'enabled', bizType: type })
           const parentCat = parentId ? scoped.find((c: AssetCategory) => c.id === parentId) : undefined
@@ -86,7 +99,6 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
             parentCat?.code,
           )
           form.setFieldsValue({ code: autoCode })
-          setTreeData(toTreeSelectData(buildTree(scoped), [], 3))
           setExistingCodes(scoped.map(c => c.code))
           setIdToCode(new Map(scoped.map((c: AssetCategory) => [c.id, c.code])))
         }
@@ -95,6 +107,20 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [form, id, isEdit, loadOptions, parentId, bizType])
+
+  /** 業務類型切換時，重置上級分類並重新生成編碼 */
+  const handleBizTypeChange = (newBizType: string) => {
+    const type = newBizType as 'ASSET' | 'CONSUMABLE'
+    setFormBizType(type)
+    form.setFieldsValue({ parentId: undefined })
+    if (!isEdit) {
+      const scoped = allCategories.filter(c => (c.bizType || 'ASSET') === type)
+      const autoCode = generateCategoryCode(scoped.map((c: AssetCategory) => c.code), undefined, undefined)
+      form.setFieldsValue({ code: autoCode, bizType: type })
+      setExistingCodes(scoped.map(c => c.code))
+      setIdToCode(new Map(scoped.map((c: AssetCategory) => [c.id, c.code])))
+    }
+  }
 
   /** 上级分类变更时重新生成编码 */
   const handleParentChange = (newParentId?: number) => {
@@ -209,16 +235,8 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item label="状态" name="status">
-                <Select>
-                  <Select.Option value="enabled">启用</Select.Option>
-                  <Select.Option value="disabled">禁用</Select.Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
               <Form.Item label="业务类型" name="bizType" rules={[{ required: true }]}>
-                <Select disabled={isEdit}>
+                <Select disabled={isEdit} onChange={handleBizTypeChange}>
                   <Select.Option value="ASSET">资产</Select.Option>
                   <Select.Option value="CONSUMABLE">耗材</Select.Option>
                 </Select>
@@ -227,13 +245,21 @@ export default function CategoryForm({ id, parentId, bizType, onBack }: Props) {
           </Row>
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item label="上级分类" name="parentId" style={{ marginBottom: 0 }}>
+              <Form.Item label="上级分类" name="parentId">
                 <TreeSelect
-                  treeData={treeData}
+                  treeData={filteredTreeData}
                   placeholder="请选择上级分类"
                   allowClear
                   treeDefaultExpandAll
                   onChange={handleParentChange}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item label="状态" name="status" style={{ marginBottom: 0 }}>
+                <Switch
+                  checkedChildren="啟用"
+                  unCheckedChildren="停用"
                 />
               </Form.Item>
             </Col>

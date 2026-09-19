@@ -4,6 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-d
 import { useTranslation } from 'react-i18next'
 import { ensureLanguageBundle, getSavedLanguage } from './i18n'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { MenuProvider } from './contexts/MenuContext'
 import { CompanyBrandProvider } from './contexts/CompanyBrandContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
@@ -518,9 +519,11 @@ function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <CompanyBrandProvider>
-          <AppRoutes />
-        </CompanyBrandProvider>
+        <MenuProvider>
+          <CompanyBrandProvider>
+            <AppRoutes />
+          </CompanyBrandProvider>
+        </MenuProvider>
       </AuthProvider>
     </HashRouter>
   )

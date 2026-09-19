@@ -79,29 +79,6 @@ function genPopularPromoData(regionName: string, purchaseDays: string[]): PromoR
   })
 }
 
-/** 金字招牌推广数据：按标签×场景×日期生成，每条记录携带 labelName + scenario */
-function genSignboardPromoData(
-  labelDates: { label: string; scenario?: string | null; dates: string[] }[],
-): PromoRecord[] {
-  const records: PromoRecord[] = []
-  let idx = 0
-  labelDates.forEach(ld => {
-    ld.dates.forEach(date => {
-      const imp = 600 + idx * 150 + Math.floor(Math.random() * 400)
-      const clk = 50 + idx * 10 + Math.floor(Math.random() * 30)
-      records.push({
-        date, region: '', // 商圈由渲染层根据 scenario 动态计算
-        waterfallName: '', position: 0,
-        labelName: ld.label, scenario: ld.scenario,
-        impressions: imp, clicks: clk,
-        clickRate: +((clk / imp) * 100).toFixed(1),
-      })
-      idx++
-    })
-  })
-  return records
-}
-
 /** 后端订单详情 → 详情页 OrderItem（明细折扣还原为定价配置的时段折扣口径） */
 export function toDetailOrder(
   vo: AdOrderDetail,
@@ -152,32 +129,9 @@ export function toDetailOrder(
   })
   const regions = vo.regions && vo.regions.length > 0 ? vo.regions : Array.from(new Set(vo.items.map(i => i.region).filter(Boolean)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
-  // 生成推广数据：推广中/已推广/已退款（推广后退款）的订单才有推广数据
-  // 人气商家已退款均为「未推广即退款」，不产生推广数据
+  // TODO: 对接推广效果统计 API，当前不再生成 mock 推广数据
   const mappedStatus = mapAdStatus(vo.status)
-  const hasPromoData = mappedStatus === OrderStatus.PROMOTING
-    || mappedStatus === OrderStatus.PROMOTED
-    || (mappedStatus === OrderStatus.REFUNDED && vo.algoType !== AlgorithmType.POPULAR_MERCHANT_KA)
-  let promoData: PromoRecord[] | undefined
-  if (hasPromoData && slotPrices.length > 0) {
-    const primaryRegion = regions[0] ?? 1
-    const regionName = REGION_LABEL_KEY[primaryRegion] ? i18n.t(REGION_LABEL_KEY[primaryRegion]) : '未知'
-    if (vo.algoType === AlgorithmType.NEW_STORE_AD) {
-      const pDays = vo.purchaseDays && vo.purchaseDays.length > 0 ? vo.purchaseDays : slotPrices.map(s => s.date)
-      promoData = genNewStorePromoData(regionName, pDays)
-    } else if (vo.algoType === AlgorithmType.HOT_REVIVE_AD) {
-      promoData = genRevivePromoData(regionName, slotPrices)
-    } else if (vo.algoType === AlgorithmType.POPULAR_MERCHANT_KA) {
-      const pDays = vo.purchaseDays && vo.purchaseDays.length > 0 ? vo.purchaseDays : slotPrices.map(s => s.date)
-      promoData = genPopularPromoData(regionName, pDays)
-    } else if (vo.algoType === AlgorithmType.GOLDEN_SIGNBOARD) {
-      // 金字招牌：按标签×场景×日期生成推广数据
-      const ld = vo.labelDates && vo.labelDates.length > 0 ? vo.labelDates : []
-      promoData = genSignboardPromoData(ld)
-    } else {
-      promoData = genInvincibleStarPromoData(regionName, slotPrices)
-    }
-  }
+  void mappedStatus // 未来对接推广 API 时使用
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -211,7 +165,7 @@ export function toDetailOrder(
     labelDates: vo.labelDates?.map(ld => ({ label: ld.label, scenario: ld.scenario, dates: ld.dates })),
     giftDays: vo.giftDays ?? 0,
     giftAmount: vo.giftAmount ?? 0,
-    promoData,
+    promoData: undefined,
     source: 'api',
   }
 }

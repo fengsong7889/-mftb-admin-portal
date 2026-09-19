@@ -145,6 +145,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:eam-rename-claim-v2", this::renameAssetClaimToManage);
         // v39: 资产流转五个三级菜单统一改名（領用資產/借用資產/資產歸還/資產調撥/資產交接）
         versionTracker.applyOnce("core:eam-rename-asset-flow-menus-v1", this::renameAssetFlowSubMenus);
+        // v40: 基础配置子菜单重命名（分類庫/品牌產品庫/倉庫管理）
+        versionTracker.applyOnce("core:eam-rename-basic-config-menus-v1", this::renameBasicConfigMenus);
         // v30: 钉钉通知种子数据（sys_config + mcp_tool）
         versionTracker.applyOnce("core:dingtalk-notification-v1", this::seedDingTalkNotification);
         // v31: 补充 ai_access 流程类型到 biz_oa_process 和 biz_workflow_config
@@ -1058,21 +1060,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "KEY idx_binding_tag (tag_id)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产-标签绑定关系'");
         log.info("资产标签表 biz_eam_asset_tag + biz_eam_asset_tag_binding 就绪");
-
-        // 种子数据：预置 4 个常用标签模板（仅当表为空时插入，幂等）
-        Integer tagCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM biz_eam_asset_tag WHERE deleted = 0", Integer.class);
-        if (tagCount != null && tagCount == 0) {
-            jdbcTemplate.batchUpdate(
-                    "INSERT INTO biz_eam_asset_tag (name, description, bg_color, text_color, display_fields, status, sort, updated_by) VALUES (?, ?, ?, ?, ?, 'enabled', ?, '系统管理员')",
-                    java.util.List.of(
-                            new Object[]{"IT設備標籤", "用於筆記本、桌上型電腦、伺服器等 IT 類資產", "#1890FF", "#FFFFFF", "assetNo,assetType,brand,status,userName", 1},
-                            new Object[]{"高價值資產", "原值超過 10,000 MOP 的資產", "#E8720C", "#FFFFFF", "assetNo,assetName,brand,company,source", 2},
-                            new Object[]{"待處置資產", "已報廢或待維修的資產", "#FF4D4F", "#FFFFFF", "assetNo,assetType,status,location,userName", 3},
-                            new Object[]{"辦公設備標籤", "印表機、投影儀等辦公設備", "#52C41A", "#FFFFFF", "assetNo,assetType,brand,location,department", 4}
-                    ));
-            log.info("已插入 4 条资产标签模板种子数据");
-        }
+        // 种子数据已移除，用户需手动创建标签模板
     }
 
     /**
@@ -1831,7 +1819,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("asset-basic", "Basic Configuration"),
                 Map.entry("asset-category", "Category Library"),
                 Map.entry("asset-model", "Brand Product Library"),
-                Map.entry("asset-location", "Warehouse Maintenance"),
+                Map.entry("asset-location", "Warehouse Management"),
                 Map.entry("param-library", "Product Parameter Library"),
                 Map.entry("asset-tag", "Asset Tag"),
                 Map.entry("asset-supplier", "Supplier Management"),
@@ -1946,16 +1934,19 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v35: 强制修正基础配置子菜单名称与图标（125_rename_basic_menus.sql 可能未执行或数据库被重置）
         // 基础设置 → 基础配置（图标改为 ControlOutlined，避免与系统配置重复）
         jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎配置'");
-        // 资产分类 → 资产分类库
-        jdbcTemplate.update("UPDATE sys_menu SET name = '資產分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '資產分類庫'");
-        // 资产型号 → 所属品牌产品库
-        jdbcTemplate.update("UPDATE sys_menu SET name = '資產品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '資產品牌產品庫'");
+        // 资产分类 → 分类库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '分類庫'");
+        // 资产型号 → 品牌产品库
+        jdbcTemplate.update("UPDATE sys_menu SET name = '品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '品牌產品庫'");
+        // 仓库维护 → 仓库管理
+        jdbcTemplate.update("UPDATE sys_menu SET name = '倉庫管理', icon = 'EnvironmentOutlined' WHERE menu_key = 'asset-location' AND deleted = 0 AND name != '倉庫管理'");
         // 参数库 → 产品参数库
         jdbcTemplate.update("UPDATE sys_menu SET name = '產品參數庫', icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND deleted = 0 AND name != '產品參數庫'");
         // 同步英文名称
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Basic Configuration'     WHERE menu_key = 'asset-basic'  AND (name_en IS NULL OR name_en != 'Basic Configuration')");
-        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Asset Category Library'   WHERE menu_key = 'asset-category' AND (name_en IS NULL OR name_en != 'Asset Category Library')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Category Library'        WHERE menu_key = 'asset-category' AND (name_en IS NULL OR name_en != 'Category Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Brand Product Library'    WHERE menu_key = 'asset-model'    AND (name_en IS NULL OR name_en != 'Brand Product Library')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Warehouse Management'     WHERE menu_key = 'asset-location' AND (name_en IS NULL OR name_en != 'Warehouse Management')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Product Parameter Library' WHERE menu_key = 'param-library'  AND (name_en IS NULL OR name_en != 'Product Parameter Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Asset Tag'                WHERE menu_key = 'asset-tag'     AND (name_en IS NULL OR name_en != 'Asset Tag')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Suppliers'                WHERE menu_key = 'asset-supplier' AND (name_en IS NULL OR name_en != 'Suppliers')");
@@ -2251,9 +2242,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-inventory",    new String[]{"資產盤點",         "asset-maintenance",  "4"});
         menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
         // 三级菜单 → 基础配置
-        menus.put("asset-category",     new String[]{"資產分類庫",       "asset-basic",        "1"});
-        menus.put("asset-model",        new String[]{"資產品牌產品庫",       "asset-basic",        "2"});
-        menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
+        menus.put("asset-category",     new String[]{"分類庫",           "asset-basic",        "1"});
+        menus.put("asset-model",        new String[]{"品牌產品庫",         "asset-basic",        "2"});
+        menus.put("asset-location",     new String[]{"倉庫管理",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         menus.put("asset-tag",         new String[]{"資產標籤",         "asset-basic",        "5"});
         // 二级直达菜单：供應商管理（耗材管理/维护与处置之后, 基礎配置之前）
@@ -3321,6 +3312,28 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             log.info("已將「領用歸還」改名為「領用管理」 (id={})", menuId);
         } catch (Exception e) {
             log.warn("改名領用管理菜單失敗: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * v40: 基础配置子菜单重命名
+     * 資產分類庫→分類庫、資產品牌產品庫→品牌產品庫、倉庫維護→倉庫管理
+     */
+    private void renameBasicConfigMenus() {
+        String[][] renames = {
+                {"asset-category", "分類庫",          "Category Library"},
+                {"asset-model",    "品牌產品庫",        "Brand Product Library"},
+                {"asset-location", "倉庫管理",        "Warehouse Management"},
+        };
+        try {
+            for (String[] r : renames) {
+                jdbcTemplate.update(
+                        "UPDATE sys_menu SET name = ?, name_en = ?, updated_by = 'system' WHERE menu_key = ? AND deleted = 0 AND name != ?",
+                        r[1], r[2], r[0], r[1]);
+            }
+            log.info("已重命名基礎配置子菜單（分類庫/品牌產品庫/倉庫管理）");
+        } catch (Exception e) {
+            log.warn("基礎配置子菜單重命名失敗: {}", e.getMessage());
         }
     }
 

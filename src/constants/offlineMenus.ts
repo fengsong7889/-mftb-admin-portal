@@ -70,6 +70,27 @@ export const OFFLINE_MENUS: OfflineMenuNode[] = [
       },
     ],
   },
+  // ── 流量沙盤（纯前端 mock，未接入后端业务 API） ──
+  {
+    key: 'traffic-sandbox',
+    label: '流量沙盤',
+    children: [
+      { key: 'waterfall-simulation', label: '瀑布流模擬' },
+      { key: 'algorithm-simulation', label: '算法模擬' },
+      { key: 'merchant-score-insight', label: '商家分數洞察' },
+      { key: 'merchant-promotion-diagnose', label: '推廣診斷' },
+    ],
+  },
+  // ── 推廣報表（纯前端 mock，未接入后端业务 API） ──
+  {
+    key: 'promotion-report-group',
+    label: '推廣報表',
+    children: [
+      { key: 'promotion-report-overview', label: '報表總覽' },
+      { key: 'promotion-report-order', label: '訂單報表' },
+      { key: 'promotion-report-compare', label: '對比分析' },
+    ],
+  },
 ]
 
 /** 递归扁平化离线菜单 key 集合（供侧边栏补挂判定与 CI 一致性校验使用） */

@@ -23,23 +23,6 @@ interface HotSearchItem {
   style: { borderColor: string; bgColor: string; fontColor: string }
 }
 
-// ============================
-// Mock 數據
-// ============================
-
-const MOCK_DATA: HotSearchItem[] = [
-  { word: '🔥 限時火鍋優惠', rank: 1, type: '活動推廣', source: '商業配置', status: 'active', style: { borderColor: '#E8720C', bgColor: '#FFF7ED', fontColor: '#333' } },
-  { word: '🆕 美味漢堡', rank: 2, type: '商家推廣', source: '商業配置', status: 'active', style: { borderColor: '#1890FF', bgColor: '#E6F7FF', fontColor: '#333' } },
-  { word: '漢堡包', rank: 3, type: '熱搜詞庫', source: '熱搜詞庫', status: 'active', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-  { word: '🧋 珍珠奶茶', rank: 4, type: '運營推廣', source: '運營配置', status: 'active', style: { borderColor: '#52C41A', bgColor: '#F6FFED', fontColor: '#333' } },
-  { word: '炸雞', rank: 5, type: '熱搜詞庫', source: '熱搜詞庫', status: 'active', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-  { word: '🎁 下午茶限時折扣', rank: 6, type: '活動推廣', source: '商業配置', status: 'active', style: { borderColor: '#722ED1', bgColor: '#F9F0FF', fontColor: '#333' } },
-  { word: '壽司', rank: 7, type: '商家推廣', source: '商業配置', status: 'active', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-  { word: '⭐ 咖喱魚蛋', rank: 8, type: '運營推廣', source: '運營配置', status: 'active', style: { borderColor: '#FAAD14', bgColor: '#FFFBE6', fontColor: '#333' } },
-  { word: '水蟹粥', rank: 9, type: '熱搜詞庫', source: '熱搜詞庫', status: 'active', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-  { word: '葡撻', rank: 10, type: '熱搜詞庫', source: '熱搜詞庫', status: 'active', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-]
-
 const typeColorMap: Record<string, string> = {
   '活動推廣': 'orange',
   '商家推廣': 'blue',
@@ -83,7 +66,8 @@ export default function HotSearchVerify() {
   ]
 
   const handleSearch = () => {
-    setResults(MOCK_DATA)
+    // TODO: 對接熱搜驗證查詢 API
+    setResults([])
     setSearched(true)
   }
 

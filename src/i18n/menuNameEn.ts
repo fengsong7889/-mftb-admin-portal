@@ -144,7 +144,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-list':       'Asset Ledger',
   'asset-category':   'Category Library',
   'asset-model':      'Brand Product Library',
-  'asset-location':   'Asset Location',
+  'asset-location':   'Warehouse Management',
   'param-library':    'Product Parameter Library',
   'asset-tag':        'Asset Tag',
   'asset-supplier':   'Suppliers',

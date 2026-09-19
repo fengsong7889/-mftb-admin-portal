@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
+import type { MenuVO } from '../api/menu'
 
 /**
  * 侧边栏菜单真值来源回归测试。
@@ -11,9 +12,16 @@ import { cleanup } from '@testing-library/react'
  * - 前端只保留「完全未接入后端 API 的离线菜单」(src/constants/offlineMenus.ts)，
  *   后端树可用时它只能补挂 DB 完全缺失的项，且绝不覆盖 DB 名称；
  * - 后端不可用时只渲染离线菜单并显示提示条。
+ *
+ * 注：菜单获取已统一由 MenuContext 管理，测试通过 mock useMenu 控制状态。
  */
-vi.mock('../api/menu', () => ({
-  fetchMenuTree: vi.fn(),
+
+/** 可控的菜单 Context mock */
+let mockMenuTree: MenuVO[] | null = null
+let mockMenuStatus: 'loading' | 'online' | 'offline' | 'error' = 'online'
+
+vi.mock('../contexts/MenuContext', () => ({
+  useMenu: () => ({ menuTree: mockMenuTree, status: mockMenuStatus, refresh: vi.fn() }),
 }))
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -25,11 +33,11 @@ vi.mock('../i18n/menuNameEn', () => ({
   translateMenuName: (_menuKey: string, zhName: string) => zhName,
 }))
 
-import { fetchMenuTree } from '../api/menu'
 import Sidebar from './Sidebar'
 
-const mockTree = (menus: unknown[]) => {
-  vi.mocked(fetchMenuTree).mockResolvedValue(menus as never)
+const setMenuState = (tree: MenuVO[] | null, status: 'loading' | 'online' | 'offline' | 'error') => {
+  mockMenuTree = tree
+  mockMenuStatus = status
 }
 
 const renderSidebar = () => render(
@@ -40,19 +48,20 @@ const renderSidebar = () => render(
 
 afterEach(() => {
   cleanup()
-  vi.clearAllMocks()
+  mockMenuTree = null
+  mockMenuStatus = 'online'
 })
 
 describe('Sidebar 菜单真值来源', () => {
   it('后端菜单树可用时：名称以 DB 为准，本地离线快照不得覆盖 DB 名称', async () => {
-    mockTree([{
+    setMenuState([{
       menuKey: 'search',
       name: '搜索管理（DB名）',
       type: 1,
       status: 1,
       sort: 5,
       children: [{ menuKey: 'word-segmentation', name: '分詞詞庫', type: 2, status: 1, sort: 1 }],
-    }])
+    } as unknown as MenuVO], 'online')
 
     renderSidebar()
 
@@ -63,7 +72,7 @@ describe('Sidebar 菜单真值来源', () => {
   })
 
   it('后端菜单树可用时：已对接后端的菜单不来自本地副本（DB 缺失的顶级菜单不显示）', async () => {
-    mockTree([{ menuKey: 'search', name: '搜索管理', type: 1, status: 1, sort: 5 }])
+    setMenuState([{ menuKey: 'search', name: '搜索管理', type: 1, status: 1, sort: 5 } as unknown as MenuVO], 'online')
 
     renderSidebar()
 
@@ -74,12 +83,15 @@ describe('Sidebar 菜单真值来源', () => {
   })
 
   it('后端菜单树不可用时：只渲染离线菜单，并显示离线提示条', async () => {
-    mockTree([])
+    setMenuState(null, 'offline')
 
     const { container } = renderSidebar()
 
     // 离线清单内的顶级菜单（搜索管理：完全未接后端 API）照常展示
     await waitFor(() => expect(screen.getByText('搜索管理')).toBeInTheDocument())
+    // 流量沙盤和推廣報表（新增的离线菜单）也应展示
+    await waitFor(() => expect(screen.getByText('流量沙盤')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('推廣報表')).toBeInTheDocument())
     // 已对接后端的模块不展示
     expect(screen.queryByText('商戶集團管理')).not.toBeInTheDocument()
     expect(screen.queryByText('團購管理')).not.toBeInTheDocument()

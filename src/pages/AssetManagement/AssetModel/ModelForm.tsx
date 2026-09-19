@@ -6,10 +6,11 @@
  * - 无参数配置（参数从参数库读取）
  * - 底部「取消 + 保存」（全局表单规范）
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
-  Button, Form, Input, Select, Row, Col, Space, Spin, message,
+  Button, Form, Input, Select, TreeSelect, Row, Col, Space, Spin, message,
 } from 'antd'
+import type { TreeDataNode } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, ShopOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
@@ -69,7 +70,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
   useEffect(() => {
     let alive = true
     setLoading(true)
-    Promise.all([fetchCategoryList(), fetchBrandList({ bizType: 'ALL' })])
+    Promise.all([fetchCategoryList({ bizType: 'ALL' }), fetchBrandList({ bizType: 'ALL' })])
       .then(async ([cats, brs]) => {
         if (!alive) return
         setCategories(cats)
@@ -96,11 +97,17 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             })
           }
         } else {
-          if (isBrand && initialCategoryCode) {
-            brandForm.setFieldsValue({ categoryCode: initialCategoryCode })
-          }
           if (isBrand) {
-            brandForm.setFieldsValue({ bizType: initialBizType === 'CONSUMABLE' ? 'CONSUMABLE' : 'ASSET' })
+            // 新增模式：若帶入了 categoryCode，則 bizType 跟隨該分類的業務類型；否則默認 ASSET
+            if (initialCategoryCode) {
+              const cat = cats.find(c => c.code === initialCategoryCode)
+              brandForm.setFieldsValue({
+                bizType: cat?.bizType || 'ASSET',
+                categoryCode: initialCategoryCode,
+              })
+            } else {
+              brandForm.setFieldsValue({ bizType: 'ASSET' })
+            }
           }
           if (!isBrand && initialBrandId) {
             const brand = brs.find(b => b.id === initialBrandId)
@@ -180,6 +187,28 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
 
   const categoryName = (code: string) => categories.find(c => c.code === code)?.name || code
   const categoryOptions = categories.map(c => ({ label: `${c.name}(${c.code})`, value: c.code }))
+
+  /** 根据当前业务类型过滤分类并构建树结构 */
+  const categoryTreeData = useMemo<TreeDataNode[]>(() => {
+    interface TreeNode extends TreeDataNode { children: TreeNode[] }
+    const filtered = categories.filter(c => (c.bizType || 'ASSET') === brandBizType)
+    const nodeMap = new Map<number, TreeNode>()
+    filtered.forEach(cat => {
+      nodeMap.set(cat.id, { title: `${cat.name}(${cat.code})`, value: cat.code, key: cat.id, children: [] } as TreeNode)
+    })
+    const roots: TreeNode[] = []
+    filtered.forEach(cat => {
+      const node = nodeMap.get(cat.id)!
+      const parent = cat.parentId ? nodeMap.get(cat.parentId) : undefined
+      if (parent) {
+        parent.children.push(node)
+      } else {
+        roots.push(node)
+      }
+    })
+    return roots
+  }, [categories, brandBizType])
+
   const brandOptions = brands.map(b => ({
     label: `${b.brandZh}（${b.brandEn}）`,
     value: b.id,
@@ -235,16 +264,25 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
             <Form<BrandFormValues> form={brandForm} layout="vertical">
               <Row gutter={16}>
                 <Col xs={24} sm={12} md={8}>
+                  <Form.Item label={t('asset.colBizType')} name="bizType" rules={[{ required: true }]}>
+                    <Select disabled={isEdit} onChange={() => brandForm.setFieldsValue({ categoryCode: undefined })}>
+                      <Select.Option value="ASSET">{t('asset.bizTypeAsset')}</Select.Option>
+                      <Select.Option value="CONSUMABLE">{t('asset.bizTypeConsumable')}</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
                   <Form.Item
                     label={t('asset.belongCategory')} name="categoryCode"
-                    rules={[{ required: brandBizType !== 'CONSUMABLE', message: t('asset.belongCategoryPh') }]}
+                    rules={[{ required: true, message: t('asset.belongCategoryPh') }]}
                   >
-                    <Select
+                    <TreeSelect
                       placeholder={t('asset.categorySelectPh')}
                       showSearch
-                      optionFilterProp="label"
+                      treeDefaultExpandAll
+                      allowClear
+                      treeData={categoryTreeData}
                       onChange={handleBrandCategoryChange}
-                      options={categoryOptions}
                     />
                   </Form.Item>
                 </Col>
@@ -262,14 +300,6 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     rules={[{ required: true, message: t('asset.brandEnRequired') }]}
                   >
                     <Input placeholder={t('asset.brandEnPh')} allowClear />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={8}>
-                  <Form.Item label={t('asset.colBizType')} name="bizType" rules={[{ required: true }]}>
-                    <Select disabled={isEdit}>
-                      <Select.Option value="ASSET">{t('asset.bizTypeAsset')}</Select.Option>
-                      <Select.Option value="CONSUMABLE">{t('asset.bizTypeConsumable')}</Select.Option>
-                    </Select>
                   </Form.Item>
                 </Col>
               </Row>

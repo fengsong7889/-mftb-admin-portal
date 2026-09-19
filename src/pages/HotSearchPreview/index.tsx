@@ -4,34 +4,12 @@ import { Button, Card, Select, Tag, Empty, Form } from 'antd'
 import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
 import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
 
-/** 模擬預覽數據 */
+/** 預覽數據項 */
 interface HotSearchItem {
   word: string
   rank: number
   type: string
   style: { borderColor: string; bgColor: string; fontColor: string }
-}
-
-const previewData: Record<string, HotSearchItem[]> = {
-  'home-mFood-app-macau-lunch': [
-    { word: '🔥 限時火鍋優惠', rank: 1, type: 'activity', style: { borderColor: '#E8720C', bgColor: '#FFF7ED', fontColor: '#333' } },
-    { word: '🆕 美味漢堡', rank: 2, type: 'merchant', style: { borderColor: '#1890FF', bgColor: '#E6F7FF', fontColor: '#333' } },
-    { word: '漢堡包', rank: 3, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '🧋 珍珠奶茶', rank: 4, type: 'operation', style: { borderColor: '#52C41A', bgColor: '#F6FFED', fontColor: '#333' } },
-    { word: '炸雞', rank: 5, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '🎁 下午茶限時折扣', rank: 6, type: 'activity', style: { borderColor: '#722ED1', bgColor: '#F9F0FF', fontColor: '#333' } },
-    { word: '壽司', rank: 7, type: 'merchant', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '⭐ 咖喱魚蛋', rank: 8, type: 'operation', style: { borderColor: '#FAAD14', bgColor: '#FFFBE6', fontColor: '#333' } },
-    { word: '水蟹粥', rank: 9, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '葡撻', rank: 10, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-  ],
-  'home-flashBee-app-macau-dinner': [
-    { word: '🎉 新鮮水果送到家', rank: 1, type: 'activity', style: { borderColor: '#E8720C', bgColor: '#FFF7ED', fontColor: '#333' } },
-    { word: '珍珠奶茶', rank: 2, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '炸雞', rank: 3, type: 'hotSearchLib', style: { borderColor: '#F0F0F0', bgColor: '#FAFAFA', fontColor: '#333' } },
-    { word: '壽司', rank: 4, type: 'merchant', style: { borderColor: '#1890FF', bgColor: '#E6F7FF', fontColor: '#333' } },
-    { word: '🍕 披薩', rank: 5, type: 'operation', style: { borderColor: '#52C41A', bgColor: '#F6FFED', fontColor: '#333' } },
-  ],
 }
 
 export default function HotSearchPreview() {
@@ -41,7 +19,7 @@ export default function HotSearchPreview() {
   const [terminal, setTerminal] = useState('app')
   const [region, setRegion] = useState('macau')
   const [timeSlot, setTimeSlot] = useState('lunch')
-  const [previewItems, setPreviewItems] = useState<HotSearchItem[]>(previewData['home-mFood-app-macau-lunch'] || [])
+  const [previewItems, setPreviewItems] = useState<HotSearchItem[]>([])
 
   const searchPageOptions = [
     { label: t('dict.channel.home'), value: 'home' },
@@ -79,8 +57,8 @@ export default function HotSearchPreview() {
   }
 
   const handlePreview = () => {
-    const key = `${searchPage}-${brand}-${terminal}-${region}-${timeSlot}`
-    setPreviewItems(previewData[key] || [])
+    // TODO: 對接熱搜預覽查詢 API
+    setPreviewItems([])
   }
 
   return (

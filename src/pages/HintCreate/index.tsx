@@ -13,11 +13,6 @@ interface CrowdRecord {
   crowdCount: number
 }
 
-const mockCrowdData: CrowdRecord[] = [
-  { key: '1', crowdName: '麥當勞忠愛粉', crowdCount: 18921 },
-  { key: '2', crowdName: '螺螄粉忠愛粉', crowdCount: 28912 },
-]
-
 interface HintCreateModalProps {
   open: boolean
   onCancel: () => void
@@ -487,7 +482,7 @@ export default function HintCreateModal({ open, onCancel, onSuccess }: HintCreat
                   </div>
                   <Table
                     columns={crowdColumns}
-                    dataSource={mockCrowdData}
+                    dataSource={[]}
                     pagination={false}
                     size="small"
                     bordered
