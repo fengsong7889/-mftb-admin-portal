@@ -590,9 +590,14 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
 
     /** 基础数据菜单重组：耗材基础配置菜单下线、基础配置扁平化、分类库/品牌产品库改名 */
     private void restructureMasterDataMenus() {
-        Long masterId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_menu WHERE menu_key = 'eam-master-data' AND deleted = 0 LIMIT 1", Long.class);
-        if (masterId == null) return;
+        Long masterId;
+        try {
+            masterId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM sys_menu WHERE menu_key = 'eam-master-data' AND deleted = 0 LIMIT 1", Long.class);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            log.info("eam-master-data 菜单不存在，跳过菜单重组（可能 167 脚本尚未执行）");
+            return;
+        }
         // 耗材分类/品牌/计量单位菜单下线（功能并入分类库/品牌产品库）
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
                 + "WHERE menu_key IN ('consumable-category', 'consumable-brand', 'consumable-unit') AND deleted = 0");
