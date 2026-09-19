@@ -42,5 +42,10 @@ Thumbs.db
 # Screenshots (optional - uncomment to exclude)
 # *.png
 
+# Ad-hoc verification screenshots dropped into docs/ by test sessions
+# NOTE: never ignore *.png globally - docs/ also holds curated documentation figures
+docs/test_*.png
+docs/verify_*.png
+
 # Dev-only login bypass scripts (security risk if deployed)
 quick-login-hack.js
