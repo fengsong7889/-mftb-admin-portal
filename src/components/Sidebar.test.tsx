@@ -80,6 +80,36 @@ describe('Sidebar 菜单真值来源', () => {
     // 「商戶集團管理」「團購管理」等已对接后端的菜单在 DB 未返回时不得由本地副本冒出
     expect(screen.queryByText('商戶集團管理')).not.toBeInTheDocument()
     expect(screen.queryByText('團購管理')).not.toBeInTheDocument()
+    expect(screen.queryByText('流量沙盤')).not.toBeInTheDocument()
+    expect(screen.queryByText('實驗沙盤')).not.toBeInTheDocument()
+  })
+
+  it('后端返回实验沙盘时：仍展示目录和四个子菜单，名称使用 DB 值', async () => {
+    const children: MenuVO[] = [
+      { id: 2, parentId: 1, menuKey: 'waterfall-simulation', name: '瀑布流推演', type: 2, status: 1, sort: 1 },
+      { id: 3, parentId: 1, menuKey: 'algorithm-simulation', name: '算法推演', type: 2, status: 1, sort: 2 },
+      { id: 4, parentId: 1, menuKey: 'merchant-score-insight', name: '商家評分透視', type: 2, status: 1, sort: 3 },
+      { id: 5, parentId: 1, menuKey: 'merchant-promotion-diagnose', name: '商家推廣診斷', type: 2, status: 1, sort: 4 },
+    ]
+    setMenuState([{
+      id: 1,
+      parentId: null,
+      menuKey: 'traffic-sandbox',
+      name: '實驗沙盤',
+      type: 1,
+      status: 1,
+      sort: 1,
+      children,
+    }], 'online')
+
+    const { container } = renderSidebar()
+
+    fireEvent.click(await screen.findByText('實驗沙盤'))
+    for (const child of children) {
+      expect(await screen.findByText(child.name)).toBeInTheDocument()
+    }
+    expect(screen.queryByText('流量沙盤')).not.toBeInTheDocument()
+    expect(container.querySelector('.sidebar-offline-tip')).not.toBeInTheDocument()
   })
 
   it('后端菜单树不可用时：只渲染离线菜单，并显示离线提示条', async () => {
@@ -89,9 +119,11 @@ describe('Sidebar 菜单真值来源', () => {
 
     // 离线清单内的顶级菜单（搜索管理：完全未接后端 API）照常展示
     await waitFor(() => expect(screen.getByText('搜索管理')).toBeInTheDocument())
-    // 流量沙盤和推廣報表（新增的离线菜单）也应展示
-    await waitFor(() => expect(screen.getByText('流量沙盤')).toBeInTheDocument())
+    // 推廣報表仍在离线清单内；实验沙盘已依赖后端，不再离线展示
     await waitFor(() => expect(screen.getByText('推廣報表')).toBeInTheDocument())
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2)
+    expect(screen.queryByText('流量沙盤')).not.toBeInTheDocument()
+    expect(screen.queryByText('實驗沙盤')).not.toBeInTheDocument()
     // 已对接后端的模块不展示
     expect(screen.queryByText('商戶集團管理')).not.toBeInTheDocument()
     expect(screen.queryByText('團購管理')).not.toBeInTheDocument()
