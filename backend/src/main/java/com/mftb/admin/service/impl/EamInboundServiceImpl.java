@@ -428,6 +428,49 @@ public class EamInboundServiceImpl implements EamInboundService {
         return itemToMap(batchItemMapper.selectById(itemId));
     }
 
+    @Override
+    public List<Map<String, Object>> getInspectionRecords(long poId, String groupId) {
+        // 查询该订单的所有批次，按创建时间倒序
+        List<EamInboundBatch> batches = batchMapper.selectList(
+                new LambdaQueryWrapper<EamInboundBatch>()
+                        .eq(EamInboundBatch::getPoId, poId)
+                        .orderByDesc(EamInboundBatch::getCreatedAt));
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (EamInboundBatch batch : batches) {
+            // 查询批次明细
+            LambdaQueryWrapper<EamInboundBatchItem> itemWrapper = new LambdaQueryWrapper<EamInboundBatchItem>()
+                    .eq(EamInboundBatchItem::getBatchId, batch.getId());
+            if (groupId != null && !groupId.isBlank()) {
+                itemWrapper.eq(EamInboundBatchItem::getGroupId, groupId);
+            }
+            List<EamInboundBatchItem> items = batchItemMapper.selectList(itemWrapper);
+
+            if (items.isEmpty()) continue;
+
+            // 构建批次级记录
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("batchId", batch.getId());
+            record.put("batchNo", batch.getBatchNo());
+            record.put("inboundDate", batch.getInboundDate());
+            record.put("createdAt", DateTimeUtils.format(batch.getCreatedAt()));
+            record.put("operator", batch.getOperator());
+            record.put("totalQty", batch.getTotalQty());
+            record.put("acceptedQty", batch.getAcceptedQty());
+            record.put("returnQty", batch.getReturnQty());
+            record.put("exchangeQty", batch.getExchangeQty());
+            record.put("concessionQty", batch.getConcessionQty());
+            record.put("remark", batch.getRemark());
+
+            // 添加明细列表
+            List<Map<String, Object>> itemMaps = items.stream().map(this::itemToMap).toList();
+            record.put("items", itemMaps);
+
+            records.add(record);
+        }
+        return records;
+    }
+
     /* ==================== 內部方法 ==================== */
 
     /**

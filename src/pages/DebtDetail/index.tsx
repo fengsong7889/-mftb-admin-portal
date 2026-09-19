@@ -490,7 +490,7 @@ export default function DebtDetail() {
         </div>
         <Form form={addForm} layout="vertical" requiredMark={false}>
           <Form.Item label={t('debtDetail.repayDateLabel')} name="date" rules={[{ required: true, message: t('debtDetail.selectRepayDate') }]}>
-            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} placeholder={t('debtDetail.selectRepayDate')} />
+            <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} placeholder={t('debtDetail.selectRepayDate')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
           </Form.Item>
           <Form.Item label={t('debtDetail.repayChannelLabel')} name="channel" rules={[{ required: true, message: t('debtDetail.selectRepayChannel') }]}>
             <Select placeholder={t('debtDetail.selectRepayChannel')} options={repayChannelOptions} />

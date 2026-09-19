@@ -9,9 +9,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Button, Form, Input, InputNumber, DatePicker, Row, Col, Table, Tag, Space, Spin, Select, message, Modal,
-  Checkbox, Dropdown, Tooltip, TreeSelect,
+  Checkbox, Tooltip, TreeSelect,
 } from 'antd'
-import type { TableColumnsType, MenuProps } from 'antd'
+import type { TableColumnsType } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, ShoppingCartOutlined, PlusOutlined, DeleteOutlined,
   SplitCellsOutlined,
@@ -245,7 +245,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
 
   return (
     <Modal
-      title={t('asset.editItemTitle')}
+      title={editing ? t('asset.editItemTitle') : t('asset.addAssetTitle')}
       open={open}
       onOk={handleOk}
       onCancel={onCancel}
@@ -357,6 +357,10 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const [selectedItemKeys, setSelectedItemKeys] = useState<Set<string>>(new Set())
   const [splitModalOpen, setSplitModalOpen] = useState(false)
   const [splitModalGroupId, setSplitModalGroupId] = useState('')
+  const [moveModalOpen, setMoveModalOpen] = useState(false)
+  const [moveModalGroupId, setMoveModalGroupId] = useState('')
+  const [moveModalRowKey, setMoveModalRowKey] = useState('')
+  const [moveModalTargetId, setMoveModalTargetId] = useState('')
 
   // 物资编辑状态
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -414,6 +418,20 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   useEffect(() => {
     fetchSuppliersDropdown().then(setSupplierOptions).catch(() => {})
   }, [])
+
+  // 供应商下拉加载完成后，为缺少 supplierId 的分组按名称回填
+  useEffect(() => {
+    if (supplierOptions.length === 0 || supplierGroups.length === 0) return
+    let changed = false
+    const next = supplierGroups.map((g) => {
+      if (g.supplierId) return g
+      const matched = supplierOptions.find((s) => s.name === g.supplier)
+      if (matched) { changed = true; return { ...g, supplierId: matched.id } }
+      return g
+    })
+    if (changed) setSupplierGroups(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierOptions])
 
   const handleSupplierSearch = (keyword: string) => {
     setSupplierLoading(true)
@@ -509,6 +527,28 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       cancelText: t('common.cancel'),
       onOk: () => setSupplierGroups((prev) => prev.filter((g) => g.id !== groupId)),
     })
+  }
+
+  /** 移动物资到目标分组（组件级） */
+  const handleMoveToGroup = () => {
+    if (!moveModalTargetId || !moveModalRowKey) return
+    const targetGroup = supplierGroups.find((g) => g.id === moveModalTargetId)
+    if (!targetGroup) return
+    const targetNum = supplierGroups.findIndex((g) => g.id === moveModalTargetId) + 1
+    setSupplierGroups((prev) => {
+      const src = prev.find((g) => g.id === moveModalGroupId)
+      const item = src?.items.find((it) => it.key === moveModalRowKey)
+      if (!item) return prev
+      return prev.map((g) => {
+        if (g.id === moveModalGroupId) return { ...g, items: g.items.filter((it) => it.key !== moveModalRowKey) }
+        if (g.id === moveModalTargetId) return { ...g, items: [...g.items, item] }
+        return g
+      })
+    })
+    setSelectedItemKeys((prev) => { const next = new Set(prev); next.delete(moveModalRowKey); return next })
+    message.success(`已移動至分組 ${targetNum}`)
+    setMoveModalOpen(false)
+    setMoveModalTargetId('')
   }
 
   const updateGroup = (groupId: string, patch: Partial<PurchaseOrderSupplierGroup>) => {
@@ -658,30 +698,64 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
     setEditModalOpen(true)
   }
 
-  // 编辑确认回调
+  // 打开新增弹窗（仅手动创建的订单允许）
+  const handleOpenAddModal = async (groupId: string) => {
+    if (order?.reqId) {
+      message.warning('採購申請流程生成的訂單不允許新增物資')
+      return
+    }
+    setEditingItemGroupId(groupId)
+    setEditingItem(null)
+    if (editCategories.length === 0) await loadEditBaseData()
+    setEditModalOpen(true)
+  }
+
+  // 编辑/新增确认回调
   const handleEditOk = (row: EditItemRow) => {
     setSupplierGroups((prev) => prev.map((g) => {
       if (g.id !== editingItemGroupId) return g
-      return {
-        ...g,
-        items: g.items.map((it) => {
-          if (it.key !== row.key) return it
-          return {
-            ...it,
-            categoryId: row.categoryId,
-            categoryName: row.categoryName,
-            categoryCode: row.categoryCode,
-            brandId: row.brandId,
-            brandName: row.brandName,
-            modelId: row.modelId,
-            modelName: row.modelName,
-            params: row.params,
-            purchaseType: row.purchaseType,
-            qty: row.qty,
-            price: row.price,
-            confirmedPrice: row.confirmedPrice,
-          }
-        }),
+      if (editingItem) {
+        // 编辑模式：更新现有项
+        return {
+          ...g,
+          items: g.items.map((it) => {
+            if (it.key !== row.key) return it
+            return {
+              ...it,
+              categoryId: row.categoryId,
+              categoryName: row.categoryName,
+              categoryCode: row.categoryCode,
+              brandId: row.brandId,
+              brandName: row.brandName,
+              modelId: row.modelId,
+              modelName: row.modelName,
+              params: row.params,
+              purchaseType: row.purchaseType,
+              qty: row.qty,
+              price: row.price,
+              confirmedPrice: row.confirmedPrice,
+            }
+          }),
+        }
+      } else {
+        // 新增模式：添加新项
+        const newItem: PurchaseOrderItem = {
+          key: `item_${Date.now()}`,
+          categoryId: row.categoryId,
+          categoryName: row.categoryName,
+          categoryCode: row.categoryCode,
+          brandId: row.brandId,
+          brandName: row.brandName,
+          modelId: row.modelId,
+          modelName: row.modelName,
+          params: row.params,
+          purchaseType: row.purchaseType,
+          qty: row.qty,
+          price: row.price,
+          confirmedPrice: row.confirmedPrice,
+          receivedQty: 0,
+        }
+        return { ...g, items: [...g.items, newItem] }
       }
     }))
     setEditModalOpen(false)
@@ -772,30 +846,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
       title: t('asset.colAction'), key: 'actions', width: 150, fixed: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => {
         const rowKey = r.key || r.modelId?.toString() || ''
-        const otherGroups = supplierGroups.filter((g) => g.id !== groupId)
         const onlyOneGroup = supplierGroups.length <= 1
-
-        const moveMenuItems: MenuProps['items'] = otherGroups.map((g, idx) => ({
-          key: g.id,
-          label: `${t('asset.groupLabel')} ${idx + 1}${g.supplier ? ` - ${g.supplier}` : ''}（${g.items.length} ${t('asset.countUnit')}）`,
-        }))
-
-        const handleMove = (info: { key: string }) => {
-          const targetGroup = supplierGroups.find((g) => g.id === info.key)
-          if (!targetGroup || !rowKey) return
-          setSupplierGroups((prev) => {
-            const src = prev.find((g) => g.id === groupId)
-            const item = src?.items.find((it) => it.key === rowKey)
-            if (!item) return prev
-            return prev.map((g) => {
-              if (g.id === groupId) return { ...g, items: g.items.filter((it) => it.key !== rowKey) }
-              if (g.id === info.key) return { ...g, items: [...g.items, item] }
-              return g
-            })
-          })
-          setSelectedItemKeys((prev) => { const next = new Set(prev); next.delete(rowKey); return next })
-          message.success(t('asset.movedToTarget', { target: targetGroup.supplier || t('asset.groupLabel') }))
-        }
 
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
@@ -814,9 +865,12 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                 <Button type="link" size="small" disabled>{t('asset.moveBtn')}</Button>
               </Tooltip>
             ) : (
-              <Dropdown menu={{ items: moveMenuItems, onClick: handleMove }} trigger={['click']}>
-                <Button type="link" size="small">{t('asset.moveBtn')}</Button>
-              </Dropdown>
+              <Button type="link" size="small" onClick={() => {
+                setMoveModalGroupId(groupId)
+                setMoveModalRowKey(rowKey)
+                setMoveModalTargetId('')
+                setMoveModalOpen(true)
+              }}>{t('asset.moveBtn')}</Button>
             )}
             <Button type="link" size="small" danger onClick={() => handleRemoveItem(groupId, rowKey)}>
               {t('common.delete')}
@@ -830,8 +884,6 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
   const handleSubmit = async () => {
     try {
       const v = await form.validateFields()
-      const emptyGroups = supplierGroups.filter((g) => !g.supplier.trim())
-      if (emptyGroups.length > 0) { message.warning(t('asset.warnFillGroupNames')); return }
       setSubmitting(true)
 
       // 統一提交姓名（下拉選的是工號，與「開始採購」及自動建單口徑一致）
@@ -928,7 +980,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   notFoundContent={empLoading ? <Spin size="small" /> : t('common.noData')}
                   options={employees.map((e) => ({
                     value: e.empId,
-                    label: `${e.name}（${e.empId}）${e.department ? ` · ${e.department}` : ''}`,
+                    label: `${e.name}（${e.empId}）`,
                   }))}
                   allowClear
                 />
@@ -1008,7 +1060,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
               {/* 供应商信息 */}
               <Row gutter={16} style={{ marginBottom: 16 }}>
                 <Col span={6}>
-                  <Form.Item label={t('asset.labelSupplierName')} required style={{ marginBottom: 0 }}>
+                  <Form.Item label={t('asset.labelSupplierName')} style={{ marginBottom: 0 }}>
                     <Select
                       showSearch
                       placeholder={t('asset.phSearchSupplier')}
@@ -1063,6 +1115,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   <Form.Item label={t('asset.labelOrderDate')} style={{ marginBottom: 0 }}>
                     <DatePicker value={group.orderDate ? dayjs(group.orderDate) : null}
                       onChange={(d: Dayjs | null) => updateGroup(group.id, { orderDate: d?.format('YYYY-MM-DD') || '' })}
+                      disabledDate={(d: Dayjs) => d.isAfter(dayjs(), 'day')}
                       style={{ width: '100%' }} placeholder={t('asset.phSelectOrderDate')} />
                   </Form.Item>
                 </Col>
@@ -1070,7 +1123,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
               {/* 收货方式 + 条件字段（并排展示） */}
               <Row gutter={16} style={{ marginBottom: 16 }}>
-                <Col span={8}>
+                <Col span={6}>
                   <Form.Item label={t('asset.labelDeliveryMethod')} required style={{ marginBottom: 0 }}>
                     <Select value={group.deliveryMethod}
                       onChange={(v: DeliveryMethod) => updateGroup(group.id, { deliveryMethod: v })}
@@ -1083,7 +1136,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={6}>
                   {showReceiveDate(dm) && (
                     <Form.Item label={t('asset.labelExpectedDate')} style={{ marginBottom: 0 }}>
                       <DatePicker
@@ -1094,7 +1147,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                     </Form.Item>
                   )}
                 </Col>
-                <Col span={8}>
+                <Col span={6}>
                   {showTrackingNo(dm) && (
                     <Form.Item label={t('asset.labelTrackingNo')} style={{ marginBottom: 0 }}>
                       <Input value={group.trackingNo}
@@ -1137,6 +1190,22 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                 <div style={{ textAlign: 'center', color: '#bfbfbf', padding: '24px 0', fontSize: 13 }}>
                   {t('asset.noItems')}
                 </div>
+              )}
+              {/* 新增物资按钮（仅手动创建的订单显示） */}
+              {!order?.reqId && (
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() => handleOpenAddModal(group.id)}
+                  style={{
+                    marginTop: 12,
+                    borderColor: '#E8720C',
+                    color: '#E8720C',
+                    fontWeight: 500,
+                  }}
+                >
+                  {t('asset.addAssetBtn')}
+                </Button>
               )}
             </div>
           )
@@ -1194,6 +1263,66 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         onOk={handleEditOk}
         onCancel={() => { setEditModalOpen(false); setEditingItem(null) }}
       />
+
+      {/* ====== 移动物资弹窗 ====== */}
+      <Modal
+        title="选择目标分组"
+        open={moveModalOpen}
+        onCancel={() => { setMoveModalOpen(false); setMoveModalTargetId('') }}
+        okText="确定"
+        cancelText="取消"
+        onOk={handleMoveToGroup}
+        okButtonProps={{ disabled: !moveModalTargetId }}
+        width={420}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'center', padding: '8px 0' }}>
+          {supplierGroups.map((g, idx) => {
+            const num = idx + 1
+            const isSource = g.id === moveModalGroupId
+            const isSelected = g.id === moveModalTargetId
+            return (
+              <div
+                key={g.id}
+                onClick={() => !isSource && setMoveModalTargetId(g.id)}
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: `2px solid ${isSelected ? '#E8720C' : isSource ? '#e8eaed' : '#d9d9d9'}`,
+                  background: isSelected ? 'linear-gradient(135deg, #FFF7F0, #FFE7D1)' : isSource ? '#fafafa' : '#fff',
+                  color: isSelected ? '#E8720C' : isSource ? '#bfbfbf' : '#262626',
+                  fontSize: 20,
+                  fontWeight: 700,
+                  cursor: isSource ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  opacity: isSource ? 0.4 : 1,
+                  boxShadow: isSelected ? '0 4px 12px rgba(232,114,12,0.25)' : '0 2px 6px rgba(0,0,0,0.06)',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSource && !isSelected) {
+                    e.currentTarget.style.borderColor = '#E8720C'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = isSource ? '#e8eaed' : '#d9d9d9'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = isSource ? 'none' : '0 2px 6px rgba(0,0,0,0.06)'
+                  }
+                }}
+              >
+                {num}
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, color: '#8C8C8C' }}>灰色圆圈为当前分组，不可选择</div>
+      </Modal>
 
       {/* ====== 底部操作栏 ====== */}
       <div className="form-footer">

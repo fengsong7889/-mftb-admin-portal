@@ -60,7 +60,7 @@ export default function CompensationPayment({ record, loading = false, canEdit =
               <InputNumber min={1} step={10000} addonAfter="分" style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="date" label="业务日期" rules={[{ required: true }]}>
-              <DatePicker />
+              <DatePicker disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
             </Form.Item>
           </div>
           <Form.Item name="reason" label="收款说明" rules={[{ required: true, whitespace: true }]}>

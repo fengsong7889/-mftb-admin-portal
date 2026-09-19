@@ -6,14 +6,14 @@
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Form, Input, Select, Table, Modal, message, Space, Tabs, DatePicker, Tag } from 'antd'
+import { Button, Form, Input, Select, Table, Modal, message, Space, Tabs, DatePicker, Tag, Tooltip, Popover } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import dayjs from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
 import {
-  fetchPurchaseOrderList, deletePurchaseOrder,
+  fetchPurchaseOrderList, fetchPurchaseOrderDetail, deletePurchaseOrder,
   updatePurchaseOrderExec,
   type PurchaseOrder, type ExecStatus,
 } from '../../../api/eam'
@@ -179,7 +179,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         setEmpOptions(
           (res.records || []).map((e: EmployeeItem) => ({
             value: e.name,
-            label: `${e.name}（${e.empId}）${e.department ? ' - ' + e.department : ''}`,
+            label: `${e.name}（${e.empId}）`,
           })),
         )
       } catch {
@@ -217,7 +217,62 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     }
   }
 
-  const handleCompletePurchase = (record: PurchaseOrder) => {
+  const handleCompletePurchase = async (record: PurchaseOrder) => {
+    /* 拉取完整訂單詳情以校驗必填字段 */
+    let order: PurchaseOrder
+    try {
+      order = await fetchPurchaseOrderDetail(record.id)
+    } catch {
+      message.error(t('asset.queryFailed'))
+      return
+    }
+
+    const groups = order.supplierGroups && order.supplierGroups.length > 0
+      ? order.supplierGroups
+      : [{ orderDate: order.orderDate, deliveryMethod: undefined as string | undefined, items: order.items || [] }]
+
+    /* 收集所有校驗錯誤 */
+    const errors: string[] = []
+    /* 1. 校驗下單日期 */
+    const missingDate = groups.find((g) => !g.orderDate)
+    if (missingDate) {
+      errors.push('請填寫所有供應商分組的「下單日期」')
+    }
+    /* 2. 校驗收貨方式 */
+    const missingDm = groups.find((g) => !g.deliveryMethod)
+    if (missingDm) {
+      errors.push('請選擇所有供應商分組的「收貨方式」')
+    }
+    /* 3. 校驗成交金額 > 0 */
+    const totalConfirmed = order.confirmedAmount != null && order.confirmedAmount > 0
+      ? order.confirmedAmount
+      : groups.reduce((sum, g) => sum + (g.items || []).reduce((s, it) => s + ((it.confirmedPrice ?? 0) * (it.qty ?? 0)), 0), 0)
+    if (!totalConfirmed || totalConfirmed <= 0) {
+      errors.push('成交金額必須大於 0，請在編輯頁填寫成交單價')
+    }
+
+    /* 有錯誤時彈出提示框 */
+    if (errors.length > 0) {
+      Modal.confirm({
+        title: '無法完成採購',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ marginBottom: 12, color: '#595959' }}>以下信息尚未完善：</div>
+            <ul style={{ margin: 0, paddingLeft: 20, color: '#262626' }}>
+              {errors.map((err, idx) => <li key={idx} style={{ marginBottom: 4 }}>{err}</li>)}
+            </ul>
+          </div>
+        ),
+        okText: '前往完善',
+        cancelText: '取消',
+        onOk: () => onEdit(record.id),
+        onCancel: () => {},
+      })
+      return
+    }
+
     Modal.confirm({
       title: t('common.confirm'),
       content: t('asset.confirmCompletePurchase'),
@@ -265,7 +320,47 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: t('asset.colReqNo'), dataIndex: 'reqId', key: 'reqId', width: 130,
       render: (v: number, r: PurchaseOrder) => (v > 0 ? (r.reqNo || '-') : '-'),
     },
-    { title: t('asset.colSupplier'), dataIndex: 'supplier', key: 'supplier', width: 160, ellipsis: true },
+    {
+      title: t('asset.colSupplier'), key: 'supplier', width: 200,
+      render: (_: unknown, r: PurchaseOrder) => {
+        // 优先从 supplierGroups 获取所有供应商
+        const suppliers = r.supplierGroups?.map((g) => g.supplier).filter(Boolean) || []
+        // 兼容旧数据：如果没有 supplierGroups，使用单个 supplier 字段
+        if (suppliers.length === 0 && r.supplier) {
+          suppliers.push(r.supplier)
+        }
+        // 无供应商
+        if (suppliers.length === 0) {
+          return <span style={{ color: '#bfbfbf' }}>无供应商</span>
+        }
+        // 单个供应商
+        if (suppliers.length === 1) {
+          return <span>{suppliers[0]}</span>
+        }
+        // 多个供应商：显示第一个 + +N 徽章
+        const rest = suppliers.slice(1)
+        return (
+          <Space size={4}>
+            <span>{suppliers[0]}</span>
+            <Popover
+              content={
+                <div style={{ maxWidth: 240 }}>
+                  {suppliers.map((s, i) => (
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+              }
+              title="所有供应商"
+              trigger="click"
+            >
+              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>+{rest.length}</Tag>
+            </Popover>
+          </Space>
+        )
+      },
+    },
     {
       title: t('asset.colConfirmedAmount'), dataIndex: 'confirmedAmount', key: 'confirmedAmount', width: 130, align: 'right',
       render: (v: number | undefined, r: PurchaseOrder) => {
@@ -283,9 +378,12 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: '服務部門', key: 'department', width: 120,
       render: (_: unknown, r: PurchaseOrder) => {
         const dept = r.department || empDeptMap.get(r.purchaser || '') || ''
-        return dept ? (
-          <span style={{ whiteSpace: 'nowrap' }}>{dept}</span>
-        ) : <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!dept) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Tooltip title={dept}>
+            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dept}</span>
+          </Tooltip>
+        )
       },
     },
     {

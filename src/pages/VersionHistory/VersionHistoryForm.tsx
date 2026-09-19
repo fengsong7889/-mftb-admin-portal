@@ -181,7 +181,7 @@ export default function VersionHistoryForm() {
             name="releaseDate"
             rules={[{ required: true, message: t('common.required') }]}
           >
-            <DatePicker style={{ width: '100%' }} />
+            <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
           </Form.Item>
         </div>
 

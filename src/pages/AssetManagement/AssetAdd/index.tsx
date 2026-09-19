@@ -650,7 +650,7 @@ export default function AssetAdd() {
               {source === 'self' && (
                 <Col xs={24} sm={12} md={8}>
                   <Form.Item label={t('asset.purchaseDateLabel')} name="purchaseDate">
-                    <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} />
+                    <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
                   </Form.Item>
                 </Col>
               )}
@@ -721,7 +721,7 @@ export default function AssetAdd() {
               </Col>
               <Col xs={24} sm={12} md={8}>
                 <Form.Item label={t('asset.usageDateLabel')} name="usageDate">
-                  <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} />
+                  <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
                 </Form.Item>
               </Col>
             </Row>

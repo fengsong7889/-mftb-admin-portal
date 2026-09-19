@@ -83,7 +83,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         const opts: { value: string; label: string }[] = []
         ;(res.records || []).forEach((e) => {
           if (e.department) { map.set(e.name, e.department); map.set(e.empId, e.department) }
-          opts.push({ value: e.name, label: `${e.name}（${e.empId}）${e.department ? ' - ' + e.department : ''}` })
+          opts.push({ value: e.name, label: `${e.name}（${e.empId}）` })
         })
         setEmpDeptMap(map)
         setEmpOptions(opts)
@@ -112,6 +112,54 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
   }
   /** 完成採購：推進為「已完成」，可進行驗收入庫 */
   const handleCompletePurchase = () => {
+    if (!detail) return
+
+    const groups = detail.supplierGroups && detail.supplierGroups.length > 0
+      ? detail.supplierGroups
+      : [{ orderDate: detail.orderDate, deliveryMethod: undefined as string | undefined, items: detail.items || [] }]
+
+    /* 收集所有校驗錯誤 */
+    const errors: string[] = []
+    /* 1. 校驗下單日期 */
+    const missingDate = groups.find((g) => !g.orderDate)
+    if (missingDate) {
+      errors.push('請填寫所有供應商分組的「下單日期」')
+    }
+    /* 2. 校驗收貨方式 */
+    const missingDm = groups.find((g) => !g.deliveryMethod)
+    if (missingDm) {
+      errors.push('請選擇所有供應商分組的「收貨方式」')
+    }
+    /* 3. 校驗成交金額 > 0 */
+    const totalConfirmed = detail.confirmedAmount != null && detail.confirmedAmount > 0
+      ? detail.confirmedAmount
+      : groups.reduce((sum, g) => sum + (g.items || []).reduce((s, it) => s + ((it.confirmedPrice ?? 0) * (it.qty ?? 0)), 0), 0)
+    if (!totalConfirmed || totalConfirmed <= 0) {
+      errors.push('成交金額必須大於 0，請在編輯頁填寫成交單價')
+    }
+
+    /* 有錯誤時彈出提示框 */
+    if (errors.length > 0) {
+      Modal.confirm({
+        title: '無法完成採購',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ marginBottom: 12, color: '#595959' }}>以下信息尚未完善：</div>
+            <ul style={{ margin: 0, paddingLeft: 20, color: '#262626' }}>
+              {errors.map((err, idx) => <li key={idx} style={{ marginBottom: 4 }}>{err}</li>)}
+            </ul>
+          </div>
+        ),
+        okText: '前往完善',
+        cancelText: '取消',
+        onOk: () => onEdit(detail.id),
+        onCancel: () => {},
+      })
+      return
+    }
+
     Modal.confirm({
       title: t('common.confirm'),
       content: t('asset.confirmCompletePurchase'),

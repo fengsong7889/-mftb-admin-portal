@@ -61,6 +61,15 @@ public class EamInboundController {
                 batchId, itemId, body.get("trackingNo"), body.get("expectedDate")));
     }
 
+    /** 查询指定订单/分组的验收记录时间线 */
+    @GetMapping("/records")
+    @RequirePermission(menu = MENU)
+    public Result<java.util.List<Map<String, Object>>> inspectionRecords(
+            @RequestParam long poId,
+            @RequestParam(required = false) String groupId) {
+        return Result.success(inboundService.getInspectionRecords(poId, groupId));
+    }
+
     /** 上传验收照片，返回 Base64 Data URL */
     @PostMapping("/photo/upload")
     @RequirePermission(menu = MENU, action = "edit")

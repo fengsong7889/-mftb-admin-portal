@@ -1052,6 +1052,20 @@ public class EamBasicDataServiceImpl implements EamBasicDataService, Initializin
 
     @Override
     public Long createSupplierContact(Long supplierId, EamSupplierContactSaveDTO dto) {
+        // 去重：同供应商下已存在同名联系人时更新电话，避免采购单重复保存累积重复记录
+        EamSupplierContact existing = supplierContactMapper.selectOne(
+                new LambdaQueryWrapper<EamSupplierContact>()
+                        .eq(EamSupplierContact::getSupplierId, supplierId)
+                        .eq(EamSupplierContact::getContactName, dto.getContactName())
+                        .last("LIMIT 1"));
+        if (existing != null) {
+            existing.setContactPhone(dto.getContactPhone());
+            existing.setStatus(dto.getStatus() != null ? dto.getStatus() : existing.getStatus());
+            if (dto.getContactPhone() != null && !dto.getContactPhone().isBlank()) {
+                supplierContactMapper.updateById(existing);
+            }
+            return existing.getId();
+        }
         EamSupplierContact c = new EamSupplierContact();
         c.setSupplierId(supplierId);
         c.setContactName(dto.getContactName());

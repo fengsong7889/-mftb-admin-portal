@@ -313,7 +313,7 @@ export default function RepairDetail({ assetId, onBack }: Props) {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label={t('asset.colRepairDate')} name="repairDate" rules={[{ required: true, message: t('asset.repairDateRequired') }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -362,7 +362,7 @@ export default function RepairDetail({ assetId, onBack }: Props) {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item label={t('asset.colRepairDate')} name="repairDate" rules={[{ required: true, message: t('asset.repairDateRequired') }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
               </Form.Item>
             </Col>
             <Col span={12}>

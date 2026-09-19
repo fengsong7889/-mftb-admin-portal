@@ -146,7 +146,7 @@ export default function ScrapForm({ assetId, onBack }: Props) {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item label={t('asset.colScrapDate')} name="scrapDate" rules={[{ required: true, message: '請選擇報廢日期' }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
               </Form.Item>
             </Col>
             <Col span={8}>

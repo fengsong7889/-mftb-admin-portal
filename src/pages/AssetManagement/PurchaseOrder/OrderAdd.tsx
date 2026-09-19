@@ -631,8 +631,6 @@ export default function OrderAdd() {
     try {
       const v = await form.validateFields()
       if (!selectedEmp) { message.warning(t('asset.warnSelectPurchaser')); return }
-      const emptyGroups = supplierGroups.filter((g) => !g.supplier.trim())
-      if (emptyGroups.length > 0) { message.warning(t('asset.warnFillGroupNames')); return }
       const emptyItems = supplierGroups.filter((g) => g.items.length === 0)
       if (emptyItems.length > 0) { message.warning(t('asset.warnEmptyGroupItems')); return }
       setSubmitting(true)
@@ -733,7 +731,7 @@ export default function OrderAdd() {
                   notFoundContent={empLoading ? <Spin size="small" /> : t('common.noData')}
                   options={employees.map((e) => ({
                     value: e.empId,
-                    label: `${e.name}（${e.empId}）${e.department ? ` · ${e.department}` : ''}`,
+                    label: `${e.name}（${e.empId}）`,
                   }))}
                   allowClear
                 />
@@ -795,7 +793,7 @@ export default function OrderAdd() {
             {/* 供应商信息 */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={6}>
-                <Form.Item label={t('asset.labelSupplierName')} required>
+                <Form.Item label={t('asset.labelSupplierName')}>
                   <Select
                     showSearch
                     placeholder={t('asset.phSearchSupplier')}
@@ -850,6 +848,7 @@ export default function OrderAdd() {
                 <Form.Item label={t('asset.labelOrderDate')}>
                   <DatePicker value={group.orderDate ? dayjs(group.orderDate) : undefined}
                     onChange={(d) => updateGroup(group.id, { orderDate: d || undefined })}
+                    disabledDate={(d) => d.isAfter(dayjs(), 'day')}
                     style={{ width: '100%' }} placeholder={t('asset.phSelectOrderDate')} />
                 </Form.Item>
               </Col>
@@ -857,7 +856,7 @@ export default function OrderAdd() {
 
             {/* 收貨方式 + 條件字段（並排展示） */}
             <Row gutter={16} style={{ marginBottom: 16 }}>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item label={t('asset.labelDeliveryMethod')} required>
                   <Select value={group.deliveryMethod}
                     onChange={(v: DeliveryMethod) => updateGroup(group.id, { deliveryMethod: v })}
@@ -870,7 +869,7 @@ export default function OrderAdd() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 {showReceiveDate(group.deliveryMethod) && (
                   <Form.Item label={t('asset.labelExpectedDate')}>
                     <DatePicker
@@ -881,7 +880,7 @@ export default function OrderAdd() {
                   </Form.Item>
                 )}
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 {showTrackingNo(group.deliveryMethod) && (
                   <Form.Item label={t('asset.labelTrackingNo')}>
                     <Input value={group.trackingNo}
@@ -903,7 +902,16 @@ export default function OrderAdd() {
               locale={{ emptyText: t('asset.emptyTextWithHint') }}
               style={{ marginBottom: 12 }}
             />
-            <Button type="dashed" icon={<PlusOutlined />} onClick={() => handleOpenAddModal(group.id)}>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenAddModal(group.id)}
+              style={{
+                borderColor: '#E8720C',
+                color: '#E8720C',
+                fontWeight: 500,
+              }}
+            >
               {t('asset.addAssetBtn')}
             </Button>
           </div>

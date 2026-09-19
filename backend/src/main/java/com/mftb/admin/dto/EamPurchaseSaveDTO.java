@@ -57,6 +57,9 @@ public class EamPurchaseSaveDTO {
         /** 分组供应商 */
         private String supplier;
 
+        /** 供应商 ID（下拉选择时传入，用于回显） */
+        private Long supplierId;
+
         /** 联系人 */
         private String contact;
 

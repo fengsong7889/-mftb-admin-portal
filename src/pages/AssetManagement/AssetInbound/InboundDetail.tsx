@@ -44,6 +44,9 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   const [locations, setLocations] = useState<AssetLocation[]>([])
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewImage, setPreviewImage] = useState('')
+  const [previewPhotos, setPreviewPhotos] = useState<{ name: string; dataUrl: string }[]>([])
+  const [previewIndex, setPreviewIndex] = useState(0)
+  const [previewRotate, setPreviewRotate] = useState(0)
 
   // PR-3: 換貨二次發貨登記彈窗
   const [exchangeModal, setExchangeModal] = useState<InboundBatchItem | null>(null)
@@ -133,23 +136,28 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       },
     },
     {
-      title: t('asset.colPhotos'), key: 'photos', width: 120,
+      title: t('asset.colPhotos'), key: 'photos', width: 140,
       render: (_: unknown, r: InboundBatchItem) => {
         const photos = r.photos || []
         if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
         return (
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            {photos.slice(0, 3).map((p, idx) => (
+          <Space size={4}>
+            {photos.slice(0, 3).map((p, i) => (
               <img
-                key={idx} src={p.dataUrl} alt={p.name}
-                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #d9d9d9', cursor: 'pointer' }}
-                onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
+                key={i} src={p.dataUrl} alt={p.name}
+                onClick={() => { setPreviewPhotos(photos); setPreviewIndex(i); setPreviewImage(p.dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
+                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: '1px solid #f0f0f0' }}
               />
             ))}
             {photos.length > 3 && (
-              <span style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '32px' }}>+{photos.length - 3}</span>
+              <span
+                onClick={() => { setPreviewPhotos(photos); setPreviewIndex(0); setPreviewImage(photos[0].dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 20, padding: '0 6px', background: '#E8720C', color: '#fff', fontSize: 11, fontWeight: 600, borderRadius: 10, cursor: 'pointer' }}
+              >
+                +{photos.length - 3}
+              </span>
             )}
-          </div>
+          </Space>
         )
       },
     },
@@ -340,10 +348,69 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       <Modal
         open={previewVisible}
         footer={null}
-        onCancel={() => setPreviewVisible(false)}
+        onCancel={() => { setPreviewVisible(false); setPreviewRotate(0) }}
         centered
+        width={720}
+        title={<span style={{ fontSize: 15, fontWeight: 600 }}>照片預覽 ({previewIndex + 1} / {previewPhotos.length})</span>}
       >
-        <img alt="preview" style={{ width: '100%' }} src={previewImage} />
+        {/* 图片区域 */}
+        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 8, padding: 24 }}>
+          <img
+            alt="preview"
+            src={previewImage}
+            style={{ maxWidth: '100%', maxHeight: 520, objectFit: 'contain', transform: `rotate(${previewRotate}deg)`, transition: 'transform 0.3s ease' }}
+          />
+        </div>
+        {/* 工具栏 */}
+        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Button
+            onClick={() => { const idx = previewIndex - 1; if (idx >= 0) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
+            disabled={previewIndex === 0}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: '#fff', border: '1px solid #d9d9d9' }}
+          >
+            ‹
+          </Button>
+          <Button
+            onClick={() => setPreviewRotate((prev) => prev - 90)}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: '#fff', border: '1px solid #d9d9d9' }}
+          >
+            ↺ 逆時針
+          </Button>
+          <Button
+            onClick={() => setPreviewRotate((prev) => prev + 90)}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: '#fff', border: '1px solid #d9d9d9' }}
+          >
+            ↻ 順時針
+          </Button>
+          <Button
+            onClick={() => { const idx = previewIndex + 1; if (idx < previewPhotos.length) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
+            disabled={previewIndex === previewPhotos.length - 1}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: '#fff', border: '1px solid #d9d9d9' }}
+          >
+            ›
+          </Button>
+        </div>
+        {/* 底部缩略图导航 */}
+        {previewPhotos.length > 1 && (
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingBottom: 8 }}>
+            {previewPhotos.map((p, i) => (
+              <img
+                key={i}
+                src={p.dataUrl}
+                alt={p.name}
+                onClick={() => { setPreviewIndex(i); setPreviewImage(p.dataUrl); setPreviewRotate(0) }}
+                style={{
+                  width: 56, height: 56, objectFit: 'cover', borderRadius: 6,
+                  border: i === previewIndex ? '2px solid #E8720C' : '1px solid #f0f0f0',
+                  opacity: i === previewIndex ? 1 : 0.6,
+                  boxShadow: i === previewIndex ? '0 2px 8px rgba(232,114,12,0.25)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </Modal>
 
       {/* ====== 換貨二次發貨登記（PR-3） ====== */}

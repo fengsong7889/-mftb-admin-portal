@@ -287,7 +287,7 @@ export default function HandoverForm({ onBack }: Props) {
                 label={t('asset.colHandoverDate')} name="handoverDate"
                 rules={[{ required: true, message: t('asset.handoverDateRequired') }]}
               >
-                <DatePicker style={{ width: '100%' }} />
+                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
               </Form.Item>
             </Col>
           </Row>

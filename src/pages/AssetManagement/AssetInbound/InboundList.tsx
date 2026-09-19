@@ -1,23 +1,20 @@
 /**
- * 驗收入庫（三 Tab 視圖）
+ * 驗收入庫（兩 Tab 視圖）
  *
- * - 待驗收訂單（默認，操作導向）：自動同步「採購完成且有待驗收明細」的訂單；
- *   重展示決策字段：本次可驗、驗收進度、異常預警（換貨在途 / 滯後未驗 徽標）
- * - 入庫批次（審計導向）：僅展示 normal / partial 狀態的正常入庫記錄；
- *   重展示結果字段：入庫資產數、處置匯總（通過 / 讓步 / 退貨 / 換貨 合併一列）
- * - 異常批次（審計導向）：僅展示 exception（退貨終結）/ exchange_pending（換貨在途）的批次
+ * - 待驗收訂單（默認，操作導向）：訂單級聚合，展開顯示供應商分組摘要，點擊詳情查看驗收記錄時間線
+ * - 入庫批次（審計導向）：僅展示 normal / partial 狀態的正常入庫記錄
  *
  * 批次狀態由前端派生（deriveBatchStatus），不改後端表結構。
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, Tooltip, DatePicker, Tabs, message, Space, Alert } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, Tooltip, DatePicker, Tabs, message, Space, Alert, Drawer, Spin } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
-  SearchOutlined, ReloadOutlined, ExportOutlined, InfoCircleOutlined,
+  SearchOutlined, ReloadOutlined, ExportOutlined, InfoCircleOutlined, FileTextOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { fetchInboundList, fetchPurchaseOrderList, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup } from '../../../api/eam'
+import { fetchInboundList, fetchPurchaseOrderList, fetchInspectionRecords, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup, type InspectionRecord } from '../../../api/eam'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import BrandTag from '../../../components/BrandTag'
@@ -73,28 +70,32 @@ function resolveAssetCount(b: InboundBatch): number {
   return b.generatedAssetCount ?? b.acceptedQty ?? 0
 }
 
-/** 待驗收列表行：採購訂單 × 供應商分組（各供應商到貨時間不同，按分組獨立一行展示與驗收） */
-interface PendingRow {
-  orderId: number
-  poNo: string
+/** 待驗收列表行：供應商分組摘要（展開後顯示） */
+interface SupplierGroupSummary {
   groupId: string
   supplier: string
-  deliveryMethod?: PurchaseOrderSupplierGroup['deliveryMethod']
-  trackingNo?: string
-  /** 分組總件數（分組內明細 qty 求和） */
-  groupTotalQty: number
-  /** 分組已驗收件數（分組內明細 receivedQty 求和） */
-  groupReceivedQty: number
-  /** 分組待驗收件數 = 總件數 - 已驗收件數（單分組訂單再扣除訂單級退貨） */
-  groupPendingQty: number
-  /** 訂單級換貨在途匯總（與「換貨在途」徽標同口徑） */
-  orderExchangeQty: number
-  /** 訂單級退貨匯總（終態，不計入待驗收） */
-  orderReturnQty: number
-  /** 該訂單下的換貨在途件數（PR-2 後端補分組級字段後可精確化） */
-  exchangePendingQty: number
-  /** 距 order.updatedAt 的天數（>7 天顯示滯後預警） */
+  totalQty: number
+  receivedQty: number
+  pendingQty: number
+  returnQty: number
+  exchangeQty: number
+  status: 'pending' | 'exchange_pending' | 'returned' | 'partial'
+  recordCount: number
+}
+
+/** 待驗收訂單行：訂單級聚合 */
+interface PendingOrderRow {
+  orderId: number
+  poNo: string
+  brand?: number
+  suppliers: string[]
+  totalQty: number
+  receivedQty: number
+  pendingQty: number
+  returnQty: number
+  exchangeQty: number
   overdueDays: number
+  groups: SupplierGroupSummary[]
   order: PurchaseOrder
 }
 
@@ -118,8 +119,26 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     updatedBy?: string
     updatedDateRange?: [string, string]
   }>({})
-  const [activeTab, setActiveTab] = useState<'pending' | 'batches' | 'exceptions'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'batches'>('pending')
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  /* ----- 驗收記錄抽屜 ----- */
+  const [recordsDrawer, setRecordsDrawer] = useState<{ open: boolean; poId: number; groupId?: string; title: string }>({ open: false, poId: 0, title: '' })
+  const [inspectionRecords, setInspectionRecords] = useState<InspectionRecord[]>([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
+
+  const handleOpenRecords = useCallback(async (order: PendingOrderRow, groupId?: string) => {
+    setRecordsDrawer({ open: true, poId: order.orderId, groupId, title: `${order.poNo}${groupId ? ' - ' + (order.groups.find((g) => g.groupId === groupId)?.supplier || '') : ''}` })
+    setRecordsLoading(true)
+    try {
+      const records = await fetchInspectionRecords(order.orderId, groupId)
+      setInspectionRecords(records)
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+    } finally {
+      setRecordsLoading(false)
+    }
+  }, [t])
 
   /* ----- 待驗收訂單搜索（獨立 form 實例，避免與入庫批次搜索區字段互擾） ----- */
   const [poForm] = Form.useForm()
@@ -211,14 +230,6 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     }),
     [allBatches]
   )
-  /** 異常批次 Tab 數據源（僅 exception / exchange_pending） */
-  const exceptionsData = useMemo(
-    () => allBatches.filter((b) => {
-      const s = deriveBatchStatus(b)
-      return s === 'exception' || s === 'exchange_pending'
-    }),
-    [allBatches]
-  )
 
   const handleSearch = () => {
     const v = form.getFieldsValue()
@@ -263,8 +274,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
 
   /* ----- 導出（Tab 感知） ----- */
   const handleExport = () => {
-    const isExceptionTab = activeTab === 'exceptions'
-    const data = isExceptionTab ? exceptionsData : batchesData
+    const data = batchesData
     const cols = [
       { title: t('asset.colBatchNo'), dataIndex: 'batchNo' },
       { title: t('asset.colPoNo'), dataIndex: 'poNo' },
@@ -282,7 +292,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy' },
       { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    const prefix = t(isExceptionTab ? 'asset.exportPrefixException' : 'asset.exportPrefixBatch')
+    const prefix = t('asset.exportPrefixBatch')
     exportToCSV(`${t('asset.inboundTitle')}_${prefix}_${new Date().toISOString().slice(0, 10)}`, cols, data)
     message.success(t('common.exportSuccess'))
   }
@@ -295,7 +305,17 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     },
     {
       title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 140,
-      render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{v}</span>,
+    },
+    {
+      title: '供應商', key: 'supplier', width: 140, ellipsis: true,
+      render: (_: unknown, r: InboundBatch) => {
+        // 从 remark 中提取供应商名称：格式为"采购订单 XXX 验收入库（供应商：YYY）"
+        const remark = r.remark || ''
+        const match = remark.match(/供应商[：:]\s*([^）)]+)/)
+        const supplier = match ? match[1].trim() : ''
+        return supplier ? <span>{supplier}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
     },
     {
       title: t('asset.orderBrand'), dataIndex: 'brand', key: 'brand', width: 100,
@@ -342,31 +362,22 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     },
     { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 130 },
     {
-      title: t('asset.colRemark'), key: 'remark', width: 60, align: 'center',
-      render: (_: unknown, r: InboundBatch) => (r.purchaseReason || r.remark)
-        ? (
-          <Tooltip title={(
-            <div style={{ maxWidth: 280 }}>
-              {r.purchaseReason && <div style={{ marginBottom: 4 }}>{t('asset.purchaseReasonLabel')}{r.purchaseReason}</div>}
-              {r.remark && <div>{t('asset.remarkLabel')}{r.remark}</div>}
-            </div>
-          )}>
-            <InfoCircleOutlined style={{ color: '#8C8C8C', cursor: 'pointer' }} />
-          </Tooltip>
-        )
-        : <span style={{ color: '#bfbfbf' }}>-</span>,
+      title: t('asset.colRemark'), key: 'remark', width: 200, ellipsis: true,
+      render: (_: unknown, r: InboundBatch) => {
+        const text = r.purchaseReason || r.remark || ''
+        return text ? <span style={{ color: '#595959' }}>{text}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+      },
     },
     {
       title: t('asset.colAction'), key: 'action', width: 180, fixed: 'right',
-      render: (_: unknown, record: InboundBatch) => (
-        <span style={{ display: 'flex', gap: 4 }}>
-          {activeTab === 'exceptions' && deriveBatchStatus(record) === 'exchange_pending' && (
-            <Button type="link" size="small" style={{ color: '#1890FF' }} onClick={() => setActiveTab('pending')}>{t('asset.goAccept')}</Button>
-          )}
-          <Button type="link" size="small" onClick={() => onDetail(record.id)}>{t('common.detail')}</Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
-        </span>
-      ),
+      render: (_: unknown, record: InboundBatch) => {
+        return (
+          <span style={{ display: 'flex', gap: 4 }}>
+            <Button type="link" size="small" onClick={() => onDetail(record.id)}>{t('common.detail')}</Button>
+            <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
+          </span>
+        )
+      },
     },
   ]
 
@@ -374,6 +385,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const columnMeta = useMemo(() => [
     { key: 'batchNo', title: t('asset.colBatchNo') },
     { key: 'poNo', title: t('asset.colPoNo') },
+    { key: 'supplier', title: '供應商' },
     { key: 'brand', title: t('asset.orderBrand') },
     { key: 'batchStatus', title: t('asset.colBatchStatus') },
     { key: 'generatedAssetCount', title: t('asset.colGeneratedCount') },
@@ -394,63 +406,81 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     message.info(t('asset.deleteWip'))
   }
 
-  /* ----- 待驗收行展開：訂單 × 供應商分組（分組級統計優先用後端摘要，mock 走明細計算） ----- */
-  const pendingRows = useMemo<PendingRow[]>(() => {
+  /* ----- 待驗收訂單聚合：訂單級 + 供應商分組摘要 ----- */
+  const pendingRows = useMemo<PendingOrderRow[]>(() => {
     const kw = (poFilters.supplier || '').trim().toLowerCase()
-    const rows: PendingRow[] = []
+    const rows: PendingOrderRow[] = []
     const today = dayjs()
     pendingOrders.forEach((o) => {
-      // 兼容舊數據：無分組時以訂單級供應商構造默認分組
       const groups: PurchaseOrderSupplierGroup[] = (o.supplierGroups && o.supplierGroups.length > 0)
         ? o.supplierGroups
         : [{ id: 'default', supplier: o.supplier || '', items: o.items || [] }]
-      // 換貨在途 / 退貨改由分組級計算（PR-2 後端提供明細 returnedQty/exchangedQty）
       const overdueDays = o.updatedAt ? Math.max(0, today.diff(dayjs(o.updatedAt), 'day')) : 0
+      const orderGroups: SupplierGroupSummary[] = []
+      let orderTotal = 0, orderReceived = 0, orderPending = 0, orderReturn = 0, orderExchange = 0
+      const supplierSet = new Set<string>()
       groups.forEach((g) => {
-        // 供應商過濾兜底：分組內供應商在此二次匹配
         if (kw && !(g.supplier || '').toLowerCase().includes(kw)) return
         const items = g.items || []
         const gTotal = g.totalQty ?? items.reduce((s, it) => s + (it.qty || 0), 0)
         const gReceived = g.receivedQty ?? items.reduce((s, it) => s + (it.receivedQty || 0), 0)
-        // 分組級退貨（終態）：優先取後端分組摘要，回退明細求和
         const gReturned = g.returnedQty ?? items.reduce((s, it) => s + (it.returnedQty || 0), 0)
-        // 分組級換貨在途：明細求和；摘要無明細時回退訂單級
         const gExchanged = items.length > 0
           ? items.reduce((s, it) => s + (it.exchangedQty || 0), 0)
           : (o.exchangeQty || 0)
-        // 退貨為終態：從待驗收扣除；換貨在途不扣（到貨後重新驗收）
-        const netPending = Math.max(0, gTotal - gReceived - gReturned)
-        rows.push({
-          orderId: o.id,
-          poNo: o.poNo,
+        const gPending = Math.max(0, gTotal - gReceived - gReturned)
+        if (gPending === 0 && gExchanged === 0) return
+        let status: SupplierGroupSummary['status'] = 'pending'
+        if (gReturned > 0 && gPending === 0 && gExchanged === 0) status = 'returned'
+        else if (gExchanged > 0 && gPending === 0) status = 'exchange_pending'
+        else if (gPending > 0 && (gReturned > 0 || gExchanged > 0)) status = 'partial'
+        orderGroups.push({
           groupId: g.id,
           supplier: g.supplier || '',
-          deliveryMethod: g.deliveryMethod,
-          trackingNo: g.trackingNo,
-          groupTotalQty: gTotal,
-          groupReceivedQty: gReceived,
-          groupPendingQty: netPending,
-          orderExchangeQty: gExchanged,
-          orderReturnQty: gReturned,
-          exchangePendingQty: gExchanged,
-          overdueDays,
-          order: o,
+          totalQty: gTotal,
+          receivedQty: gReceived,
+          pendingQty: gPending,
+          returnQty: gReturned,
+          exchangeQty: gExchanged,
+          status,
+          recordCount: 0,
         })
+        orderTotal += gTotal
+        orderReceived += gReceived
+        orderPending += gPending
+        orderReturn += gReturned
+        orderExchange += gExchanged
+        if (g.supplier) supplierSet.add(g.supplier)
+      })
+      if (orderGroups.length === 0) return
+      rows.push({
+        orderId: o.id,
+        poNo: o.poNo,
+        brand: o.brand,
+        suppliers: Array.from(supplierSet),
+        totalQty: orderTotal,
+        receivedQty: orderReceived,
+        pendingQty: orderPending,
+        returnQty: orderReturn,
+        exchangeQty: orderExchange,
+        overdueDays,
+        groups: orderGroups,
+        order: o,
       })
     })
     return rows
   }, [pendingOrders, poFilters.supplier])
 
-  /* ----- 待驗收訂單表格列（操作導向：強調本次可驗 + 異常預警） ----- */
-  const pendingColumns: TableColumnsType<PendingRow> = [
+  /* ----- 待驗收訂單表格列（訂單級聚合） ----- */
+  const pendingColumns: TableColumnsType<PendingOrderRow> = [
     {
-      title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 240, fixed: 'left',
-      render: (v: string, r: PendingRow) => (
+      title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 200, fixed: 'left',
+      render: (v: string, r: PendingOrderRow) => (
         <Space size={4} wrap>
           <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>
-          {r.exchangePendingQty > 0 && (
+          {r.exchangeQty > 0 && (
             <Tooltip title={t('asset.tipExchangePending')}>
-              <Tag color="processing" style={{ margin: 0 }}>{t('asset.batchExchangePending')} {r.exchangePendingQty}</Tag>
+              <Tag color="processing" style={{ margin: 0 }}>{t('asset.batchExchangePending')} {r.exchangeQty}</Tag>
             </Tooltip>
           )}
           {r.overdueDays > 7 && (
@@ -463,97 +493,120 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     },
     {
       title: t('asset.orderBrand'), key: 'brand', width: 100,
-      render: (_: unknown, r: PendingRow) => r.order.brand
-        ? <BrandTag value={r.order.brand} />
+      render: (_: unknown, r: PendingOrderRow) => r.brand
+        ? <BrandTag value={r.brand} />
         : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: t('asset.colSupplier'), dataIndex: 'supplier', key: 'supplier', width: 180, ellipsis: true,
-      render: (v: string) => v || t('asset.supplierTbd'),
+      title: t('asset.colSupplier'), key: 'suppliers', width: 180, ellipsis: true,
+      render: (_: unknown, r: PendingOrderRow) => r.suppliers.length > 0 ? r.suppliers.join('、') : t('asset.supplierTbd'),
     },
     {
       title: t('asset.colPurchaser'), key: 'purchaser', width: 110,
-      render: (_: unknown, r: PendingRow) => r.order.purchaser || '-',
+      render: (_: unknown, r: PendingOrderRow) => r.order.purchaser || '-',
     },
     {
-      title: t('asset.colGroupTotalQty'), dataIndex: 'groupTotalQty', key: 'groupTotalQty', width: 80, align: 'right',
-      render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
+      title: t('asset.colGroupTotalQty'), key: 'totalQty', width: 80, align: 'right',
+      render: (_: unknown, r: PendingOrderRow) => <span style={{ fontWeight: 600 }}>{r.totalQty}</span>,
     },
     {
-      title: t('asset.colGroupReceivedQty'), dataIndex: 'groupReceivedQty', key: 'groupReceivedQty', width: 80, align: 'right',
-      render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 600 }}>{v}</span>,
+      title: t('asset.colGroupReceivedQty'), key: 'receivedQty', width: 80, align: 'right',
+      render: (_: unknown, r: PendingOrderRow) => <span style={{ color: r.receivedQty > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 600 }}>{r.receivedQty}</span>,
     },
     {
-      title: t('asset.colGroupPendingQty'), dataIndex: 'groupPendingQty', key: 'groupPendingQty', width: 80, align: 'right',
-      sorter: (a, b) => a.groupPendingQty - b.groupPendingQty,
+      title: t('asset.colGroupPendingQty'), key: 'pendingQty', width: 80, align: 'right',
+      sorter: (a, b) => a.pendingQty - b.pendingQty,
       defaultSortOrder: 'descend',
-      render: (v: number) => (
-        <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 700, fontSize: 15 }}>{v}</span>
+      render: (_: unknown, r: PendingOrderRow) => (
+        <span style={{ color: r.pendingQty > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 700, fontSize: 15 }}>{r.pendingQty}</span>
       ),
     },
     {
-      title: t('asset.colExchangeQty'), dataIndex: 'orderExchangeQty', key: 'orderExchangeQty', width: 70, align: 'right',
-      render: (v: number) => (
+      title: t('asset.colExchangeQty'), key: 'exchangeQty', width: 70, align: 'right',
+      render: (_: unknown, r: PendingOrderRow) => (
         <Tooltip title={t('asset.tipOrderExchange')}>
-          <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C', fontWeight: v > 0 ? 600 : 400 }}>{v}</span>
+          <span style={{ color: r.exchangeQty > 0 ? '#FA8C16' : '#8C8C8C', fontWeight: r.exchangeQty > 0 ? 600 : 400 }}>{r.exchangeQty}</span>
         </Tooltip>
       ),
     },
     {
-      title: t('asset.colReturnQty'), dataIndex: 'orderReturnQty', key: 'orderReturnQty', width: 70, align: 'right',
-      render: (v: number) => (
+      title: t('asset.colReturnQty'), key: 'returnQty', width: 70, align: 'right',
+      render: (_: unknown, r: PendingOrderRow) => (
         <Tooltip title={t('asset.tipOrderReturn')}>
-          <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: v > 0 ? 600 : 400 }}>{v}</span>
+          <span style={{ color: r.returnQty > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: r.returnQty > 0 ? 600 : 400 }}>{r.returnQty}</span>
         </Tooltip>
       ),
-    },
-    {
-      title: t('asset.colLogistics'), key: 'logistics', width: 160,
-      render: (_: unknown, r: PendingRow) => {
-        const methodKey = r.deliveryMethod ? DELIVERY_METHOD_LABEL[r.deliveryMethod] : ''
-        // 快遞方式：直接顯示快遞單號（未對接物流平台，不判斷發貨狀態）
-        if (r.deliveryMethod === 'express') {
-          return r.trackingNo
-            ? (
-              <Tooltip title={`${t('asset.deliveryExpress')} · ${r.trackingNo}`}>
-                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{r.trackingNo}</span>
-              </Tooltip>
-            )
-            : <span style={{ color: '#bfbfbf' }}>{t('asset.expressNoTracking')}</span>
-        }
-        // 自取 / 供應商送貨上門 / 未知
-        return <span style={{ color: methodKey ? '#595959' : '#bfbfbf' }}>{(methodKey && t(`asset.${methodKey}`)) || '-'}</span>
-      },
     },
     {
       title: t('asset.colInboundStatus'), key: 'status', width: 100,
-      render: (_: unknown, r: PendingRow) => {
+      render: (_: unknown, r: PendingOrderRow) => {
         const meta = INBOUND_STATUS_META[r.order.status] || INBOUND_STATUS_META.pending
         return <Tag color={meta.color} style={{ margin: 0 }}>{t(`asset.${meta.labelKey}`)}</Tag>
       },
     },
     {
-      title: t('asset.colCompletedAt'), key: 'updatedAt', width: 110,
-      sorter: (a, b) => (a.order.updatedAt || '').localeCompare(b.order.updatedAt || ''),
-      render: (_: unknown, r: PendingRow) => {
-        if (!r.order.updatedAt) return '-'
-        const diff = r.overdueDays
+      title: t('asset.colAction'), key: 'action', width: 120, fixed: 'right',
+      render: (_: unknown, r: PendingOrderRow) => {
+        const hasPending = r.groups.some((g) => g.status === 'pending' || g.status === 'partial')
         return (
-          <Tooltip title={r.order.updatedAt}>
-            <span style={{ color: diff > 7 ? '#FF4D4F' : '#8C8C8C' }}>
-              {diff === 0 ? t('asset.today') : t('asset.daysAgo', { count: diff })}
-            </span>
-          </Tooltip>
+          <Space size={0} split={<span className="action-split">|</span>}>
+            {hasPending && (
+              <Button type="link" size="small" onClick={() => {
+                const g = r.groups.find((x) => x.status === 'pending' || x.status === 'partial')
+                if (g) onAdd(r.orderId, g.groupId)
+              }}>{t('asset.acceptBtn')}</Button>
+            )}
+            <Button type="link" size="small" onClick={() => handleOpenRecords(r)}>{t('common.detail')}</Button>
+          </Space>
         )
       },
     },
-    {
-      title: t('asset.colAction'), key: 'action', width: 90, fixed: 'right',
-      render: (_: unknown, r: PendingRow) => (
-        <Button type="link" size="small" onClick={() => onAdd(r.orderId, r.groupId)}>{t('asset.acceptBtn')}</Button>
-      ),
-    },
   ]
+
+  /* ----- 分組摘要展開行 ----- */
+  const pendingExpandable = {
+    expandedRowRender: (record: PendingOrderRow) => (
+      <Table<SupplierGroupSummary>
+        columns={[
+          { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 180 },
+          { title: '總數', dataIndex: 'totalQty', key: 'totalQty', width: 80, align: 'right', render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span> },
+          { title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C' }}>{v}</span> },
+          { title: '待驗收', dataIndex: 'pendingQty', key: 'pendingQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 600 }}>{v}</span> },
+          { title: '換貨', dataIndex: 'exchangeQty', key: 'exchangeQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C' }}>{v}</span> },
+          { title: '退貨', dataIndex: 'returnQty', key: 'returnQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C' }}>{v}</span> },
+          {
+            title: '狀態', key: 'status', width: 100,
+            render: (_: unknown, g: SupplierGroupSummary) => {
+              const meta: Record<string, { label: string; color: string }> = {
+                pending: { label: '待驗收', color: 'processing' },
+                exchange_pending: { label: '換貨在途', color: 'warning' },
+                returned: { label: '退貨終結', color: 'default' },
+                partial: { label: '部分驗收', color: 'warning' },
+              }
+              const m = meta[g.status] || meta.pending
+              return <Tag color={m.color} style={{ margin: 0 }}>{m.label}</Tag>
+            },
+          },
+          {
+            title: '操作', key: 'action', width: 120,
+            render: (_: unknown, g: SupplierGroupSummary) => (
+              <Space size={0} split={<span className="action-split">|</span>}>
+                {(g.status === 'pending' || g.status === 'partial') && (
+                  <Button type="link" size="small" onClick={() => onAdd(record.orderId, g.groupId)}>{t('asset.acceptBtn')}</Button>
+                )}
+                <Button type="link" size="small" onClick={() => handleOpenRecords(record, g.groupId)}>{t('common.detail')}</Button>
+              </Space>
+            ),
+          },
+        ]}
+        dataSource={record.groups}
+        rowKey="groupId"
+        pagination={false}
+        size="small"
+      />
+    ),
+    rowExpandable: (record: PendingOrderRow) => record.groups.length > 1,
+  }
 
   /* ----- 入庫批次 / 異常批次 共用搜索區 ----- */
   const batchSearchSection = (
@@ -627,9 +680,10 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   }
 
   return (
+    <>
     <Tabs
       activeKey={activeTab}
-      onChange={(k) => setActiveTab(k as 'pending' | 'batches' | 'exceptions')}
+      onChange={(k) => setActiveTab(k as 'pending' | 'batches')}
       items={[
         {
           key: 'pending',
@@ -675,14 +729,15 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
                 {t('asset.pendingHint')}
               </div>
-              <Table<PendingRow>
+              <Table<PendingOrderRow>
                 columns={pendingColumns}
                 dataSource={pendingRows}
-                rowKey={(r) => `${r.orderId}_${r.groupId}`}
+                rowKey="orderId"
                 rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={poLoading}
                 size="middle"
                 scroll={{ x: 1560 }}
+                expandable={pendingExpandable}
                 pagination={{
                   current: poPage, pageSize: poSize, total: pendingRows.length,
                   showSizeChanger: true, showQuickJumper: true,
@@ -720,53 +775,61 @@ export default function InboundList({ onAdd, onDetail }: Props) {
             </>
           ),
         },
-        {
-          key: 'exceptions',
-          label: (
-            <span>
-              {t('asset.tabExceptions')}
-              {exceptionsData.length > 0 && (
-                <span style={{
-                  marginLeft: 6, padding: '0 6px', borderRadius: 10,
-                  background: '#FFF7E6', color: '#FA8C16', fontSize: 12, fontWeight: 600,
-                }}>
-                  {exceptionsData.length}
-                </span>
-              )}
-            </span>
-          ),
-          destroyOnHidden: true,
-          children: (
-            <>
-              <Alert
-                type="warning"
-                showIcon
-                style={{ marginBottom: 12 }}
-                message={t('asset.alertMsg')}
-                description={t('asset.alertDesc')}
-              />
-              {batchSearchSection}
-              {batchActionSection}
-              <Table<InboundBatch>
-                columns={applyConfig(allColumns)}
-                dataSource={exceptionsData}
-                rowKey="id"
-                rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
-                loading={loading}
-                size="middle"
-                scroll={{ x: 1800 }}
-                expandable={batchExpandable}
-                pagination={{
-                  current: page, pageSize: size, total: exceptionsData.length,
-                  showSizeChanger: true, showQuickJumper: true,
-                  showTotal: (tt) => t('common.total', { count: tt }),
-                }}
-                onChange={handleTableChange}
-              />
-            </>
-          ),
-        },
       ]}
     />
+
+    {/* ====== 驗收記錄抽屜 ====== */}
+    <Drawer
+      open={recordsDrawer.open}
+      onClose={() => setRecordsDrawer({ ...recordsDrawer, open: false })}
+      title={<span style={{ fontSize: 15, fontWeight: 600 }}><FileTextOutlined style={{ marginRight: 8, color: '#E8720C' }} />{recordsDrawer.title} - 驗收記錄</span>}
+      width={720}
+      destroyOnClose
+    >
+      {recordsLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Spin size="large" />
+        </div>
+      ) : inspectionRecords.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 60, color: '#8C8C8C' }}>暫無驗收記錄</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {inspectionRecords.map((record) => (
+            <div key={record.batchId} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16, background: '#fafafa' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 14 }}>{record.batchNo}</span>
+                  <span style={{ marginLeft: 12, color: '#8C8C8C', fontSize: 13 }}>{record.inboundDate} · {record.operator}</span>
+                </div>
+                <Button type="link" size="small" onClick={() => onDetail(record.batchId)}>{t('common.detail')}</Button>
+              </div>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+                <span>總數：<b>{record.totalQty}</b></span>
+                {record.acceptedQty > 0 && <span style={{ color: '#52C41A' }}>通過：<b>{record.acceptedQty}</b></span>}
+                {record.returnQty > 0 && <span style={{ color: '#FF4D4F' }}>退貨：<b>{record.returnQty}</b></span>}
+                {record.exchangeQty > 0 && <span style={{ color: '#FA8C16' }}>換貨：<b>{record.exchangeQty}</b></span>}
+                {record.concessionQty > 0 && <span style={{ color: '#1890FF' }}>讓步：<b>{record.concessionQty}</b></span>}
+              </div>
+              {record.items.length > 0 && (
+                <div style={{ fontSize: 13, color: '#595959' }}>
+                  {record.items.map((item, idx) => (
+                    <div key={idx} style={{ padding: '4px 0', borderBottom: idx < record.items.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <span style={{ fontWeight: 500 }}>{item.modelName}</span> × {item.qty}
+                      {item.disposition && item.disposition !== 'pass' && (
+                        <Tag color={item.disposition === 'return' ? 'error' : item.disposition === 'exchange' ? 'warning' : 'processing'} style={{ marginLeft: 8, fontSize: 11 }}>
+                          {item.disposition === 'return' ? '退貨' : item.disposition === 'exchange' ? '換貨' : '讓步'}
+                        </Tag>
+                      )}
+                      {item.rejectReason && <span style={{ marginLeft: 8, color: '#8C8C8C' }}>原因：{item.rejectReason}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+    </>
   )
 }

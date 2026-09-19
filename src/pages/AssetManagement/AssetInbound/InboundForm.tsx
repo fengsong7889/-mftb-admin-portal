@@ -68,7 +68,11 @@ interface LocationTreeNode {
 function buildLocationTree(list: AssetLocation[]): LocationTreeNode[] {
   const nodeMap = new Map<number, LocationTreeNode>()
   list.forEach((loc) => {
-    nodeMap.set(loc.id, { title: loc.name, value: loc.id, key: loc.id, children: [] })
+    // 拼接完整地址：城市 + 区县 + 详细地址
+    const addressParts = [loc.city, loc.district, loc.address].filter(Boolean)
+    const fullAddress = addressParts.length > 0 ? `(${addressParts.join('')})` : ''
+    const title = `${loc.name}${fullAddress}`
+    nodeMap.set(loc.id, { title, value: loc.id, key: loc.id, children: [] })
   })
   const roots: LocationTreeNode[] = []
   list.forEach((loc) => {
@@ -180,6 +184,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   // 照片預覽
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewImage, setPreviewImage] = useState('')
+  const [previewPhotos, setPreviewPhotos] = useState<{ name: string; dataUrl: string }[]>([])
+  const [previewIndex, setPreviewIndex] = useState(0)
+  const [previewRotate, setPreviewRotate] = useState(0)
   const [uploading, setUploading] = useState(false)
 
   /** 更新分組驗收日期 */
@@ -437,6 +444,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
   const handleRejectConfirm = () => {
     if (!rejectModal) return
     if (!rejectReason.trim()) { message.warning(t('asset.warnRejectReason')); return }
+    if (rejectPhotos.length === 0) { message.warning(t('asset.warnPhotoRequired')); return }
     updateGroupItem(rejectModal.groupId, rejectModal.rowKey, {
       rejectStatus: rejectType,
       rejectReason: rejectReason.trim(),
@@ -518,7 +526,6 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           style={{ width: '100%' }}
           min={0}
           max={Math.max(0, r.qty - r.receivedQty - (r.histReturnQty || 0))}
-          size="small"
           disabled={!r.selected || r.confirmed || !!r.rejectStatus || isFullyAccepted(r)}
         />
       ),
@@ -530,7 +537,6 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           value={r.locationId}
           onChange={(v: number) => updateGroupItem(groupId, r.key!, { locationId: v })}
           style={{ width: '100%' }}
-          size="small"
           treeData={locationTree}
           treeDefaultExpandAll
           placeholder={t('asset.phSelectLocation')}
@@ -890,7 +896,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   value={group.inboundDate}
                   onChange={(d) => updateGroupDate(group.id, d || dayjs())}
                   style={{ width: '100%' }}
-                  size="small"
+                  disabledDate={(d) => d.isAfter(dayjs(), 'day')}
                 />
               </Col>
             </Row>
@@ -947,6 +953,59 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 {
                   title: t('asset.colRejectReason'), dataIndex: 'rejectReason', key: 'rejectReason', ellipsis: true,
                   render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
+                },
+                {
+                  title: '現場照片', key: 'photos', width: 140,
+                  render: (_: unknown, r: typeof rejectedItems[0]) => {
+                    const photos = r.photos || []
+                    if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+                    return (
+                      <Space size={4}>
+                        {photos.slice(0, 3).map((p, i) => (
+                          <img
+                            key={i}
+                            src={p.dataUrl}
+                            alt={p.name}
+                            onClick={() => {
+                              setPreviewPhotos(photos)
+                              setPreviewIndex(i)
+                              setPreviewImage(p.dataUrl)
+                              setPreviewRotate(0)
+                              setPreviewVisible(true)
+                            }}
+                            style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: '1px solid #f0f0f0' }}
+                          />
+                        ))}
+                        {photos.length > 3 && (
+                          <span
+                            onClick={() => {
+                              setPreviewPhotos(photos)
+                              setPreviewIndex(3)
+                              setPreviewImage(photos[3].dataUrl)
+                              setPreviewRotate(0)
+                              setPreviewVisible(true)
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minWidth: 24,
+                              height: 20,
+                              padding: '0 6px',
+                              background: '#E8720C',
+                              color: '#fff',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            +{photos.length - 3}
+                          </span>
+                        )}
+                      </Space>
+                    )
+                  },
                 },
                 {
                   title: t('asset.colAction'), key: 'action', width: 80, align: 'center',
@@ -1236,14 +1295,147 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         )}
       </Modal>
 
-      {/* ====== 照片預覽 ====== */}
+      {/* ====== 照片預覽（支持左右切換 + 旋轉） ====== */}
       <Modal
         open={previewVisible}
         footer={null}
-        onCancel={() => setPreviewVisible(false)}
+        onCancel={() => { setPreviewVisible(false); setPreviewRotate(0) }}
         centered
+        width={720}
+        title={<span style={{ fontSize: 15, fontWeight: 600 }}>照片預覽 ({previewIndex + 1} / {previewPhotos.length})</span>}
       >
-        <img alt="preview" style={{ width: '100%' }} src={previewImage} />
+        {/* 圖片區域 */}
+        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 8, padding: 24 }}>
+          <img
+            alt="preview"
+            src={previewImage}
+            style={{
+              maxWidth: '100%',
+              maxHeight: 520,
+              objectFit: 'contain',
+              transform: `rotate(${previewRotate}deg)`,
+              transition: 'transform 0.3s ease',
+            }}
+          />
+        </div>
+
+        {/* 工具欄：所有按鈕並排展示 */}
+        <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          {/* 上一張 */}
+          <Button
+            onClick={() => {
+              if (previewIndex > 0) {
+                const idx = previewIndex - 1
+                setPreviewIndex(idx)
+                setPreviewImage(previewPhotos[idx].dataUrl)
+                setPreviewRotate(0)
+              }
+            }}
+            disabled={previewIndex === 0}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              fontSize: 18,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #d9d9d9',
+              background: '#fff',
+            }}
+          >
+            ‹
+          </Button>
+
+          {/* 逆時針旋轉 */}
+          <Button
+            onClick={() => setPreviewRotate((prev) => prev - 90)}
+            style={{
+              height: 40,
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              border: '1px solid #d9d9d9',
+              background: '#fff',
+              padding: '0 16px',
+            }}
+          >
+            ↺ 逆時針
+          </Button>
+
+          {/* 順時針旋轉 */}
+          <Button
+            onClick={() => setPreviewRotate((prev) => prev + 90)}
+            style={{
+              height: 40,
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 500,
+              border: '1px solid #d9d9d9',
+              background: '#fff',
+              padding: '0 16px',
+            }}
+          >
+            ↻ 順時針
+          </Button>
+
+          {/* 下一張 */}
+          <Button
+            onClick={() => {
+              if (previewIndex < previewPhotos.length - 1) {
+                const idx = previewIndex + 1
+                setPreviewIndex(idx)
+                setPreviewImage(previewPhotos[idx].dataUrl)
+                setPreviewRotate(0)
+              }
+            }}
+            disabled={previewIndex === previewPhotos.length - 1}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              fontSize: 18,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #d9d9d9',
+              background: '#fff',
+            }}
+          >
+            ›
+          </Button>
+        </div>
+
+        {/* 底部縮略圖導航 */}
+        {previewPhotos.length > 1 && (
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingBottom: 8 }}>
+            {previewPhotos.map((p, i) => (
+              <img
+                key={i}
+                src={p.dataUrl}
+                alt={p.name}
+                onClick={() => {
+                  setPreviewIndex(i)
+                  setPreviewImage(p.dataUrl)
+                  setPreviewRotate(0)
+                }}
+                style={{
+                  width: 56,
+                  height: 56,
+                  objectFit: 'cover',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  border: i === previewIndex ? '2px solid #E8720C' : '1px solid #f0f0f0',
+                  opacity: i === previewIndex ? 1 : 0.6,
+                  transition: 'all 0.2s',
+                  boxShadow: i === previewIndex ? '0 2px 8px rgba(232,114,12,0.25)' : 'none',
+                }}
+              />
+            ))}
+          </div>
+        )}
       </Modal>
     </Spin>
   )

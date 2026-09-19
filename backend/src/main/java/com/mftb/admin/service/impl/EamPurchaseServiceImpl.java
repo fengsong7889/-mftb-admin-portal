@@ -283,15 +283,36 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
             throw new BusinessException("訂單已有驗收記錄，不可重建採購明細或修改執行信息");
         }
 
-        // 執行狀態設為「已完成」時，所有明細的成交單價必須填寫（groups 聲明見下方供應商分組更新段）
-        if ("completed".equals(dto.getExecStatus()) && dto.getSupplierGroups() != null) {
-            for (EamPurchaseSaveDTO.SupplierGroup group : dto.getSupplierGroups()) {
-                if (group.getItems() == null) continue;
-                for (EamPurchaseSaveDTO.SupplierItem item : group.getItems()) {
-                    if (item.getConfirmedPrice() == null || item.getConfirmedPrice().compareTo(BigDecimal.ZERO) <= 0) {
-                        throw new BusinessException("執行狀態為「已完成」時，所有物資明細的成交單價必須填寫且大於零：" + item.getModelName());
+        // 執行狀態設為「已完成」時，校驗必填字段：下單日期、收貨方式、成交金額
+        if ("completed".equals(dto.getExecStatus())) {
+            // 從數據庫讀取已有的 supplierGroups JSON 進行校驗
+            String groupsJson = order.getSupplierGroups();
+            if (groupsJson != null && !groupsJson.isBlank()) {
+                List<Map<String, Object>> groups = JsonUtils.parseMapList(groupsJson);
+                for (int i = 0; i < groups.size(); i++) {
+                    Map<String, Object> group = groups.get(i);
+                    String groupLabel = "供應商分組" + (i + 1);
+                    // 校驗下單日期
+                    Object orderDateVal = group.get("orderDate");
+                    if (orderDateVal == null || String.valueOf(orderDateVal).isBlank()) {
+                        throw new BusinessException("請填寫「" + groupLabel + "」的下單日期");
+                    }
+                    // 校驗收貨方式
+                    Object dmVal = group.get("deliveryMethod");
+                    if (dmVal == null || String.valueOf(dmVal).isBlank()) {
+                        throw new BusinessException("請選擇「" + groupLabel + "」的收貨方式");
                     }
                 }
+            } else {
+                // 兼容舊數據：無 supplierGroups 時校驗頂層 orderDate
+                if (order.getOrderDate() == null || order.getOrderDate().isBlank()) {
+                    throw new BusinessException("請填寫下單日期");
+                }
+            }
+            // 校驗成交金額 > 0
+            BigDecimal confirmed = order.getConfirmedAmount();
+            if (confirmed == null || confirmed.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("成交金額必須大於 0，請先在編輯頁填寫成交單價");
             }
         }
 

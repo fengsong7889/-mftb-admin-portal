@@ -1129,6 +1129,29 @@ export async function uploadInboundPhoto(file: File): Promise<{ name: string; da
   return request.post<unknown, { name: string; dataUrl: string }>('/eam/inbound/photo/upload', formData, { headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 驗收記錄類型（用於抽屜時間線展示） */
+export interface InspectionRecord {
+  batchId: number
+  batchNo: string
+  inboundDate: string
+  createdAt: string
+  operator: string
+  totalQty: number
+  acceptedQty: number
+  returnQty: number
+  exchangeQty: number
+  concessionQty: number
+  remark?: string
+  items: InboundBatchItem[]
+}
+
+/** 查詢指定訂單/分組的驗收記錄時間線 */
+export function fetchInspectionRecords(poId: number, groupId?: string): Promise<InspectionRecord[]> {
+  const params: Record<string, unknown> = { poId }
+  if (groupId) params.groupId = groupId
+  return request.get<unknown, InspectionRecord[]>('/eam/inbound/records', { params })
+}
+
 /**
  * 創建入庫批次：按型號+數量批量生成資產寫入台賬，並回寫訂單已驗收數量與狀態
  */
