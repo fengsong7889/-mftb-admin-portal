@@ -19,4 +19,10 @@ public interface EamRepairService {
 
     /** 完成维修 */
     void finish(long id, String finishDate);
+
+    /** 更新维修记录（仅允许维修中状态） */
+    void update(long id, EamRepairSaveDTO dto);
+
+    /** 删除维修记录（仅允许维修中状态，删除后恢复资产状态） */
+    void delete(long id);
 }

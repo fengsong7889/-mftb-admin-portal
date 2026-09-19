@@ -74,12 +74,16 @@ public class DataInitializer implements CommandLineRunner {
     // v30: 「集团人事」更名为「集团人事(HR)」；「物资管理」更名为「资产管理(EAM)」
     //      seedSystemMenus 对已存在菜单不再覆盖 sort_order / name（占位除外），
     //      但 parent_id 始终与种子结构保持一致，防止前端 bug 或数据库异常导致层级错乱
-        // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/资产品牌产品库/产品参数库）
+        // v32: 「员工AI权额管理」调整；基础配置子菜单统一「XX库」命名（资产分类库/所属品牌产品库/产品参数库）
     // v35: 强制修正基础配置子菜单名称与图标（数据库重置/旧脚本未执行时自动恢复）
     // v36: 新增「资产标签」菜单（基础配置下第 5 个三级菜单）
     // v37: 新增「供應商管理」二级直达菜单（asset-management 下）
     // v38: 供應商管理与基礎配置菜单排序互换（supplier=5, basic=6）
-    private static final String V_MENU_SEED = "core:menu-seed-v38";
+    // v39: 新增「多語言管理」一级菜单（i18n-center）及 5 个子菜单；修复 '%ai%' 误删 i18n-* 菜单
+    // v40: 菜单真值统一——菜单默认名/层级/排序以「当前数据库实际展示」为基准反向对齐种子：
+    //      物資管理(原種子「資產管理(EAM)」)/資產運營(原「資產管理」)/採購執行(原「採購訂單」)，
+    //      AI 与耗材菜单名转繁体，清理重复空目录（eam-master-data/eam-procurement）与 sort 冲突
+    private static final String V_MENU_SEED = "core:menu-seed-v40";
 
     @Override
     public void run(String... args) {
@@ -96,12 +100,16 @@ public class DataInitializer implements CommandLineRunner {
         migrateEamClaimTables();
         // 154: 资产标签模板 + 绑定关系表自动创建
         migrateEamAssetTagTables();
+        // 158: 交接单增加 receiver_type 列（每次启动幂等检查, 不受 V_SCHEMA 版本门控）
+        migrateEamHandoverReceiverType();
         // 164: 员工费用信息表自动创建 (收入项/扣除项/薪资配置, 每次启动幂等检查, 不受 V_SCHEMA 版本门控)
         migrateEmployeeSalaryTables();
         // 163: 钉钉企业内部应用——sys_user.dingtalk_user_id 补列 + 应用配置种子
         //      (163 脚本等效, 每次启动幂等检查, 不受 V_SCHEMA 版本门控;
         //       必须位于任何 sys_user 查询之前, 否则启动期 Runner 查询报 Unknown column 导致启动失败重启循环)
         migrateDingTalkAppSignature();
+        // 机翻引擎配置表 + 种子数据（每次启动幂等检查, 不受 V_SCHEMA 版本门控）
+        migrateMtEngineTable();
         // 迁移旧表数据到统一 OA 表
         versionTracker.applyOnce("core:oa-data-migrate-v1", this::migrateOaData);
         // 修复已迁移数据的空字段（从 biz_fin_approval 重新同步）
@@ -110,7 +118,6 @@ public class DataInitializer implements CommandLineRunner {
         versionTracker.applyOnce("core:oa-data-migrate-v5", this::fixAiAccessOaData);
         versionTracker.applyOnce(V_MENU_SEED, () -> {
             seedSystemMenus();
-            seedMenuEnglishNames();
             adjustAiCenterMenus();
         });
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
@@ -151,6 +158,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         ensureDeptAdSalesPermission();
         ensureAssetManagementMenu();
         fixAssetMenuGrouping();
+        // v40: 菜单真值自愈（每次启动幂等）——名称正名/繁体化、空目录清理、sort 唯一化、
+        //      icon 与 name_en 回填。必须晚于种子化与各分组初始化器, 否则会被其默认值覆盖
+        reconcileMenuMasterData();
+        // 英文名称仅补空, 开销为若干条 UPDATE, 每次启动执行以保证新增菜单不缺英文名
+        seedMenuEnglishNames();
         // v32: 广告格子占用计数器建表+自愈式回填 (防并发超卖, 与订单明细同事务维护)
         ensureAdCellQuota();
         // 同步产品版本号到 sys_config (每次启动保持与代码一致)
@@ -490,7 +502,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         log.info("员工费用信息表结构就绪: emp_salary_income + emp_salary_deduction + emp_salary_config");
     }
 
-    /** EAM 基础数据表自动创建: 资产分类 / 资产品牌库 / 产品型号库 / 仓库位置 / 供应商（幂等） */
+    /** EAM 基础数据表自动创建: 资产分类 / 所属品牌库 / 产品型号库 / 仓库位置 / 供应商（幂等） */
     private void migrateEamBasicTables() {
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS biz_eam_category ("
@@ -515,24 +527,24 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "CREATE TABLE IF NOT EXISTS biz_eam_brand ("
                         + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
                         + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
-                        + "brand_zh VARCHAR(100) NOT NULL COMMENT '资产品牌中文', "
-                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '资产品牌英文', "
-                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '资产品牌LOGO URL', "
+                        + "brand_zh VARCHAR(100) NOT NULL COMMENT '所属品牌中文', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '所属品牌英文', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '所属品牌LOGO URL', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
                         + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
                         + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
                         + "deleted TINYINT NOT NULL DEFAULT 0, "
                         + "KEY idx_category_code (category_code)"
-                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产品牌库'");
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='所属品牌库'");
 
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS biz_eam_model ("
                         + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
                         + "category_code VARCHAR(64) NOT NULL COMMENT '所属分类编码', "
-                        + "brand_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属资产品牌ID', "
-                        + "brand_zh VARCHAR(100) DEFAULT '' COMMENT '资产品牌中文(冗余)', "
-                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '资产品牌英文(冗余)', "
-                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '资产品牌LOGO(冗余)', "
+                        + "brand_id BIGINT NOT NULL DEFAULT 0 COMMENT '所属所属品牌ID', "
+                        + "brand_zh VARCHAR(100) DEFAULT '' COMMENT '所属品牌中文(冗余)', "
+                        + "brand_en VARCHAR(100) DEFAULT '' COMMENT '所属品牌英文(冗余)', "
+                        + "brand_logo VARCHAR(500) DEFAULT '' COMMENT '所属品牌LOGO(冗余)', "
                         + "model_no VARCHAR(100) DEFAULT '' COMMENT '产品型号编码', "
                         + "name VARCHAR(200) NOT NULL COMMENT '产品名称', "
                         + "unit VARCHAR(32) NOT NULL DEFAULT '台' COMMENT '计量单位', "
@@ -601,7 +613,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "applicant_emp_id VARCHAR(32) DEFAULT '' COMMENT '申请人工号', "
                         + "reason VARCHAR(500) NOT NULL DEFAULT '' COMMENT '采购事由', "
                         + "budget DECIMAL(14,2) DEFAULT 0 COMMENT '预算金额', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
                         + "status VARCHAR(16) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected', "
                         + "order_id BIGINT DEFAULT NULL COMMENT '审批通过后生成的采购订单ID', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
@@ -613,7 +625,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采购申请'");
         // 144 脚本等效：已有表补 brand 列
         addColumnIfAbsent("biz_eam_purchase_request", "brand",
-                "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood' AFTER budget");
+                "ALTER TABLE biz_eam_purchase_request ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER budget");
 
         // 8. 供应商（编码系统自动生成: CGSJ + 6位全局自增，规则见 sys_biz_seq_rule.eam_supplier_code）
         jdbcTemplate.execute(
@@ -664,7 +676,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "delivery_date VARCHAR(32) DEFAULT '' COMMENT '预计交货日期', "
                         + "purchaser VARCHAR(64) DEFAULT '' COMMENT '采购经办人', "
                         + "department VARCHAR(100) DEFAULT '' COMMENT '服务部门', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
                         + "remark VARCHAR(500) DEFAULT '' COMMENT '采购事由/备注', "
                         + "tracking_no VARCHAR(64) DEFAULT '' COMMENT '快递单号', "
                         + "contact VARCHAR(64) DEFAULT '' COMMENT '供应商联络人', "
@@ -690,7 +702,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         addColumnIfAbsent("biz_eam_purchase_order", "contact_phone",
                 "ALTER TABLE biz_eam_purchase_order ADD COLUMN contact_phone VARCHAR(64) DEFAULT NULL COMMENT '供应商联络人电话' AFTER contact");
         addColumnIfAbsent("biz_eam_purchase_order", "brand",
-                "ALTER TABLE biz_eam_purchase_order ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood' AFTER department");
+                "ALTER TABLE biz_eam_purchase_order ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood' AFTER department");
 
         // 3. 采购订单明细
         jdbcTemplate.execute(
@@ -723,7 +735,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "batch_no VARCHAR(32) NOT NULL COMMENT '批次编号', "
                         + "po_id BIGINT NOT NULL COMMENT '关联采购订单ID', "
                         + "po_no VARCHAR(32) NOT NULL COMMENT '采购订单号', "
-                        + "brand TINYINT DEFAULT NULL COMMENT '资产品牌：1=闪蜂,2=mFood', "
+                        + "brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂,2=mFood', "
                         + "inbound_date VARCHAR(32) NOT NULL COMMENT '验收日期', "
                         + "operator VARCHAR(64) NOT NULL DEFAULT '' COMMENT '操作人', "
                         + "total_qty INT NOT NULL DEFAULT 0 COMMENT '入库总数', "
@@ -788,7 +800,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "hold_type VARCHAR(16) DEFAULT '' COMMENT 'owned/borrowed', "
                         + "order_id BIGINT DEFAULT NULL COMMENT '关联采购订单ID', "
                         + "batch_id BIGINT DEFAULT NULL COMMENT '关联入库批次ID', "
-                        + "company_brand TINYINT DEFAULT NULL COMMENT '公司品牌：1=闪蜂(TB), 2=mFood(MF)', "
+                        + "company_brand TINYINT DEFAULT NULL COMMENT '所属品牌：1=闪蜂(TB), 2=mFood(MF)', "
                         + "remark VARCHAR(500) DEFAULT '' COMMENT '备注', "
                         + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
                         + "updated_by VARCHAR(64) DEFAULT '' COMMENT '最后更新人', "
@@ -825,7 +837,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             addColumnIfAbsent("biz_eam_asset", "scrap_time", "ALTER TABLE biz_eam_asset ADD COLUMN scrap_time VARCHAR(32) DEFAULT NULL COMMENT '报废日期'");
             addColumnIfAbsent("biz_eam_asset", "rental_cost", "ALTER TABLE biz_eam_asset ADD COLUMN rental_cost DECIMAL(14,2) DEFAULT NULL COMMENT '租赁费用'");
             addColumnIfAbsent("biz_eam_asset", "rental_period", "ALTER TABLE biz_eam_asset ADD COLUMN rental_period JSON DEFAULT NULL COMMENT '租赁起止日期'");
-            addColumnIfAbsent("biz_eam_inbound_batch", "brand", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '资产品牌'");
+            addColumnIfAbsent("biz_eam_inbound_batch", "brand", "ALTER TABLE biz_eam_inbound_batch ADD COLUMN brand TINYINT DEFAULT NULL COMMENT '所属品牌'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "disposition", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN disposition VARCHAR(16) DEFAULT NULL COMMENT '验收处置'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "reject_reason", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN reject_reason VARCHAR(500) DEFAULT NULL COMMENT '不通过原因'");
             addColumnIfAbsent("biz_eam_inbound_batch_item", "photos", "ALTER TABLE biz_eam_inbound_batch_item ADD COLUMN photos JSON DEFAULT NULL COMMENT '验收照片'");
@@ -1071,7 +1083,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 1. 补 company_brand 列
         addColumnIfAbsent("biz_eam_asset", "company_brand",
                 "ALTER TABLE biz_eam_asset ADD COLUMN company_brand TINYINT DEFAULT NULL "
-                        + "COMMENT '公司品牌：1=闪蜂(TB), 2=mFood(MF)' AFTER batch_id");
+                        + "COMMENT '所属品牌：1=闪蜂(TB), 2=mFood(MF)' AFTER batch_id");
 
         // 2. 分类编码迁移（仅当旧码仍存在时执行，幂等）
         //    旧 L1: 10001→01, 10002→02, 10003→03, 10004→04
@@ -1611,6 +1623,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         }
     }
 
+    /**
+     * 158: 交接单增加「接收人类型」字段（employee=员工 / department=部门）, 幂等
+     */
+    private void migrateEamHandoverReceiverType() {
+        addColumnIfAbsent("biz_eam_handover", "receiver_type",
+                "ALTER TABLE biz_eam_handover ADD COLUMN receiver_type VARCHAR(20) NOT NULL DEFAULT 'employee' "
+                        + "COMMENT '接收人类型：employee=员工 / department=部门' AFTER to_department");
+    }
+
     /** 系统菜单配置表: 不存在则创建, 存在则补充新列并确保 menu_key 唯一 */
     private void migrateMenuTable() {
         Integer count = jdbcTemplate.queryForObject(
@@ -1757,7 +1778,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("process-center", "Process Center"),
                 Map.entry("system-config", "System Config"),
                 Map.entry("menu-config", "Menu Config"),
-                Map.entry("translation-manage", "Translation Config"),
+                Map.entry("i18n-center", "i18n Management"),
+                Map.entry("translation-manage", "Translation Workbench"),
+                Map.entry("i18n-language", "Language Config"),
+                Map.entry("i18n-import-export", "Import & Export"),
+                Map.entry("i18n-mt-engine", "MT Engine"),
+                Map.entry("i18n-dashboard", "Translation Dashboard"),
                 Map.entry("rule-config", "Rule Config"),
                 Map.entry("workflow-config", "Workflow Config"),
                 Map.entry("version-history", "Version History"),
@@ -1773,7 +1799,50 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("ai-mcp-service", "MCP Services"),
                 Map.entry("ai-access-request", "AI Access Application"),
                 Map.entry("ai-conversation-audit", "Conversation Audit"),
-                Map.entry("ai-emp-permission", "Employee AI Quota Overview"));
+                Map.entry("ai-emp-permission", "Employee AI Quota Overview"),
+                // AI 智能中心拆分后的二级/三级菜单
+                Map.entry("ai-models", "Model Management"),
+                Map.entry("ai-model-provider", "Model Provider"),
+                Map.entry("ai-model-list", "Model Access"),
+                Map.entry("ai-auth-manage", "Model Access Control"),
+                Map.entry("ai-dept-model-auth", "Dept Model Access"),
+                Map.entry("ai-emp-model-auth", "Employee Model Access"),
+                Map.entry("ai-quota-manage", "Quota Management"),
+                Map.entry("ai-dept-quota", "Department Quota"),
+                Map.entry("ai-emp-quota", "Employee Quota"),
+                // 物資管理 (EAM)
+                Map.entry("asset-dashboard", "Asset Dashboard"),
+                Map.entry("asset-purchase", "Procurement & Inbound"),
+                Map.entry("purchase-order", "Purchase Execution"),
+                Map.entry("asset-inbound", "Asset Inbound"),
+                Map.entry("asset-flow-ops", "Asset Operations"),
+                Map.entry("asset-list", "Asset Ledger"),
+                Map.entry("asset-claim", "Asset Claim"),
+                Map.entry("asset-borrow", "Asset Borrow"),
+                Map.entry("asset-return", "Asset Return"),
+                Map.entry("asset-transfer-list", "Asset Transfer"),
+                Map.entry("asset-handover", "Asset Handover"),
+                Map.entry("asset-maintenance", "Maintenance & Disposal"),
+                Map.entry("asset-repair", "Asset Repair"),
+                Map.entry("asset-compensation", "Damage Compensation"),
+                Map.entry("asset-scrap", "Asset Scrap"),
+                Map.entry("asset-inventory", "Asset Inventory"),
+                Map.entry("asset-flow", "Asset Change History"),
+                Map.entry("asset-basic", "Basic Configuration"),
+                Map.entry("asset-category", "Category Library"),
+                Map.entry("asset-model", "Brand Product Library"),
+                Map.entry("asset-location", "Warehouse Maintenance"),
+                Map.entry("param-library", "Product Parameter Library"),
+                Map.entry("asset-tag", "Asset Tag"),
+                Map.entry("asset-supplier", "Supplier Management"),
+                // 耗材管理（消耗品/MRO）
+                Map.entry("consumable-ops", "Consumables"),
+                Map.entry("consumable-dashboard", "Consumable Dashboard"),
+                Map.entry("consumable-item", "Consumable Items"),
+                Map.entry("consumable-claim", "Consumable Claim"),
+                Map.entry("consumable-stock", "Consumable Stock"),
+                Map.entry("consumable-stock-txn", "Stock Transactions"),
+                Map.entry("consumable-alert", "Stock Alerts"));
         for (Map.Entry<String, String> entry : enNames.entrySet()) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
@@ -1879,7 +1948,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎配置'");
         // 资产分类 → 资产分类库
         jdbcTemplate.update("UPDATE sys_menu SET name = '資產分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '資產分類庫'");
-        // 资产型号 → 资产品牌产品库
+        // 资产型号 → 所属品牌产品库
         jdbcTemplate.update("UPDATE sys_menu SET name = '資產品牌產品庫', icon = 'BarcodeOutlined' WHERE menu_key = 'asset-model' AND deleted = 0 AND name != '資產品牌產品庫'");
         // 参数库 → 产品参数库
         jdbcTemplate.update("UPDATE sys_menu SET name = '產品參數庫', icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND deleted = 0 AND name != '產品參數庫'");
@@ -2046,10 +2115,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = 'merchant-order-manage'");
 
         // 清理旧的 AI 菜单占位数据（为新的层级结构做准备）
+        // 注意：必须用 'ai-%' 前缀匹配，不能用 '%ai%'，否则会误删 i18n-center / i18n-* 菜单
         log.info("开始清理旧的 AI 菜单占位数据...");
-        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE '%ai%')");
-        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE '%ai%')");
-        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key LIKE '%ai%' OR menu_key = 'ai-assistant'");
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE 'ai-%')");
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE 'ai-%')");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key LIKE 'ai-%'");
 
         // key -> [name, parentKey|null, sort]
         Map<String, String[]> menus = new LinkedHashMap<>();
@@ -2063,10 +2133,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
         menus.put("hr",                  new String[]{"集團人事(HR)",      null,  "9"});
-        menus.put("asset-management",    new String[]{"資產管理(EAM)",     null,  "10"});
+        menus.put("asset-management",    new String[]{"物資管理",          null,  "10"});
         menus.put("oa-center",           new String[]{"OA中心",            null,  "11"});
         menus.put("permission",          new String[]{"權限管理",          null,  "12"});
         menus.put("system-config",       new String[]{"系統配置",          null,  "13"});
+        menus.put("i18n-center",         new String[]{"多語言管理",          null,  "14"});
         // ── 商户集团管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -2127,7 +2198,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
         // ── 智能中心 (AI)：拆分二级菜单（模型管理、授权与配额） ──
         menus.put("ai-models",            new String[]{"模型管理",      "ai-assistant",    "1"});
-        menus.put("ai-model-provider",    new String[]{"供应商管理",    "ai-models",       "1"});
+        menus.put("ai-model-provider",    new String[]{"模型供應商",    "ai-models",       "1"});
         menus.put("ai-model-list",        new String[]{"模型接入",      "ai-models",       "2"});
         // AI 授权与配额：模型授权管理 / 配额管理 升级二级菜单（直挂智能中心）
         menus.put("ai-auth-manage",       new String[]{"模型授权管理", "ai-assistant",    "2"});
@@ -2160,11 +2231,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
         // 二级分组
         menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
-        menus.put("asset-flow-ops",    new String[]{"資產管理",         "asset-management",   "3"});
-        menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "4"});
-        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "6"});
+        menus.put("asset-flow-ops",    new String[]{"資產運營",         "asset-management",   "3"});
+        menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "5"});
+        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "7"});
         // 三级菜单 → 采购入库
-        menus.put("purchase-order",     new String[]{"採購訂單",         "asset-purchase",     "1"});
+        menus.put("purchase-order",     new String[]{"採購執行",         "asset-purchase",     "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
         // 三级菜单 → 资产管理
         menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
@@ -2185,8 +2256,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-location",     new String[]{"倉庫維護",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         menus.put("asset-tag",         new String[]{"資產標籤",         "asset-basic",        "5"});
-        // 二级直达菜单：供應商管理（基礎配置分组之前）
-        menus.put("asset-supplier",     new String[]{"供應商管理",       "asset-management",   "5"});
+        // 二级直达菜单：供應商管理（耗材管理/维护与处置之后, 基礎配置之前）
+        menus.put("asset-supplier",     new String[]{"供應商管理",       "asset-management",   "6"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
         menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
@@ -2197,10 +2268,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("data-permission",     new String[]{"數據授權",         "permission",         "3"});
         // ── 系统配置 ──
         menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
-        menus.put("translation-manage",  new String[]{"多語言配置",         "system-config",      "2"});
-        menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "3"});
-        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "4"});
-        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "5"});
+        menus.put("translation-manage",  new String[]{"翻譯工作台",         "i18n-center",        "1"});
+        // ── 多语言管理（i18n-center 子菜单）──
+        menus.put("i18n-language",       new String[]{"語言管理",           "i18n-center",        "2"});
+        menus.put("i18n-import-export",  new String[]{"導入導出",           "i18n-center",        "3"});
+        menus.put("i18n-mt-engine",      new String[]{"機翻引擎",           "i18n-center",        "4"});
+        menus.put("i18n-dashboard",      new String[]{"翻譯統計",           "i18n-center",        "5"});
+        menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "2"});
+        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "3"});
+        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "4"});
 
         int created = 0;
         int updated = 0;
@@ -2274,6 +2350,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         if (created > 0) {
             log.info("已种子化 {} 个系统菜单到 sys_menu", created);
         }
+        // v39: 强制修正 translation-manage 菜单名（原「多語言配置」→「翻譯工作台」，因种子不覆盖非占位名称）
+        jdbcTemplate.update("UPDATE sys_menu SET name = '翻譯工作台' WHERE menu_key = 'translation-manage' AND deleted = 0 AND name = '多語言配置'");
         // 确保 admin 角色持有全部种子菜单权限（幂等）；并回填历史授权中缺失的 actions——
         // actions 为空会导致「功能角色登录（非 sys_user.role=admin）」的用户 hasMenuPermission 判定失败，菜单不可见/不可进
         ensureAdminMenuGrants(menus);
@@ -2314,7 +2392,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 一级菜单：物资管理
         jdbcTemplate.update(
                 "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, actions, status, updated_by, deleted) "
-                        + "VALUES (NULL, 'asset-management', '資產管理(EAM)', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
+                        + "VALUES (NULL, 'asset-management', '物資管理', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
         Long parentId = queryMenuIdByKey("asset-management");
         if (parentId == null) return;
         // 二级子菜单
@@ -2393,7 +2471,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             // 使用 ON DUPLICATE KEY UPDATE 兼容已存在但 deleted=1 的旧记录
             jdbcTemplate.update(
                     "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, icon, status, deleted, updated_by) "
-                            + "VALUES (?, 'purchase-order', '採購訂單', 2, 1, 'FileDoneOutlined', 1, 0, 'system') "
+                            + "VALUES (?, 'purchase-order', '採購執行', 2, 1, 'FileDoneOutlined', 1, 0, 'system') "
                             + "ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), deleted = 0, sort_order = 1, updated_by = 'system'",
                     purchaseId);
             // 给 admin 角色授权
@@ -2446,6 +2524,249 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         }
     }
 
+    /**
+     * v40: 菜单真值自愈（每次启动幂等执行）。
+     * <p>
+     * 菜单名称的唯一真值源是 sys_menu（用户可在「菜單配置」页改名），因此本方法所有改名
+     * 都带「仅当当前名仍为旧默认名」条件，绝不覆盖人工自定义名；层级/排序/icon/name_en 属于
+     * 代码侧默认值，缺失或冲突时回填，用于修复历史多初始化器互相覆盖留下的脏数据。
+     */
+    private void reconcileMenuMasterData() {
+        // 1. 正名 / 繁体统一（仅修正仍是旧默认名的记录）
+        renameMenuIfLegacy("asset-management", "物資管理", "資產管理(EAM)");
+        renameMenuIfLegacy("asset-flow-ops", "資產運營", "資產管理", "資產流轉");
+        renameMenuIfLegacy("purchase-order", "採購執行", "採購訂單");
+        renameMenuIfLegacy("consumable-item", "耗材檔案", "耗材档案");
+        renameMenuIfLegacy("consumable-stock", "耗材庫存", "耗材库存");
+        renameMenuIfLegacy("consumable-claim", "耗材領用", "耗材领用");
+        renameMenuIfLegacy("consumable-alert", "庫存預警", "库存预警");
+        renameMenuIfLegacy("ai-auth-manage", "模型授權管理", "模型授权管理");
+        renameMenuIfLegacy("ai-conversation-audit", "對話審計", "对话审计");
+        renameMenuIfLegacy("ai-dept-model-auth", "部門模型權控", "部门模型权控");
+        renameMenuIfLegacy("ai-emp-model-auth", "員工模型權控", "员工模型权控");
+        renameMenuIfLegacy("ai-dept-quota", "部門額度", "部门额度");
+        renameMenuIfLegacy("ai-emp-quota", "員工額度", "员工额度");
+        renameMenuIfLegacy("ai-quota-manage", "配額管理", "配额管理");
+        // AI 模型接入的上游供应商, 与物資管理的實物供應商重名, 改为「模型供應商」区分
+        renameMenuIfLegacy("ai-model-provider", "模型供應商", "供应商管理", "供應商管理");
+        renameMenuIfLegacy("asset-supplier", "供應商管理", "供应商管理");
+        // 同步英文名（仅当前值仍为旧默认名时, 不覆盖人工自定义）
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Model Provider' WHERE menu_key = 'ai-model-provider' "
+                + "AND deleted = 0 AND name_en = 'Provider Management'");
+    
+        // 2. 层级自愈：基礎配置五个叶子始终挂 asset-basic
+        //    （167 菜单重组脚本曾引入 eam-master-data 分组，与种子 asset-basic 同名并存）
+        Long basicId = queryMenuIdByKey("asset-basic");
+        if (basicId != null) {
+            applyMenuSort("asset-basic", "asset-category", "asset-model", "asset-location", "param-library", "asset-tag");
+        }
+    
+        // 3. 清理重组遗留的空目录（仅在无未删除子节点时软删, 不会误删有内容的节点）
+        removeEmptyDirectoryMenu("eam-master-data");
+        removeEmptyDirectoryMenu("eam-procurement");
+    
+        // 4. 停用残留：订单管理入口已统一至广告类型卡片「查看订单」(v28)，从菜单树移除
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
+                + "WHERE menu_key = 'promotion-order-manage' AND deleted = 0 AND status = 0");
+    
+        // 5. 同父排序唯一化（历史 sort 冲突导致菜单顺序不稳定）
+        applyMenuSort("asset-management", "asset-dashboard", "asset-purchase", "asset-flow-ops",
+                "consumable-ops", "asset-maintenance", "asset-supplier", "asset-basic");
+        applyMenuSort("system-config", "menu-config", "rule-config", "version-history", "notification-config");
+        applyMenuSort("i18n-center", "translation-manage", "i18n-language", "i18n-import-export",
+                "i18n-mt-engine", "i18n-dashboard");
+        applyMenuSort("promotion_tool", "promotion-sales-config", "promotion-report-group");
+        applyMenuSort("merchant_promotion", "promotion-dashboard", "promotion-algorithm", "promotion-slot-config",
+                "promotion-waterfall", "gift-manage", "ad-sales", "promotion-word-library", "traffic-sandbox");
+    
+        // 6. 图标回填：DB 未配置 icon 时取代码默认值（「菜單配置」页自定义过的不覆盖）
+        MENU_ICON_DEFAULTS.forEach((menuKey, icon) -> jdbcTemplate.update(
+                "UPDATE sys_menu SET icon = ? WHERE menu_key = ? AND deleted = 0 AND (icon IS NULL OR icon = '')",
+                icon, menuKey));
+    }
+    
+    /** 菜单改名：仅当当前名为旧默认名时才改, 保留用户在「菜單配置」页的自定义名 */
+    private void renameMenuIfLegacy(String menuKey, String newName, String... legacyNames) {
+        List<String> legacy = new ArrayList<>();
+        for (String old : legacyNames) {
+            if (!old.equals(newName)) legacy.add(old);
+        }
+        if (legacy.isEmpty()) {
+            return;
+        }
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < legacy.size(); i++) {
+            if (i > 0) {
+                placeholders.append(", ");
+            }
+            placeholders.append('?');
+        }
+        List<Object> args = new ArrayList<>();
+        args.add(newName);
+        args.add(menuKey);
+        args.addAll(legacy);
+        int affected = jdbcTemplate.update(
+                "UPDATE sys_menu SET name = ?, updated_by = 'system' "
+                        + "WHERE menu_key = ? AND deleted = 0 AND name IN (" + placeholders + ")",
+                args.toArray());
+        if (affected > 0) {
+            log.info("菜单正名: {} → 「{}」", menuKey, newName);
+        }
+    }
+    
+    /** 按给定顺序重写子菜单 sort_order（仅修正不一致的行, 幂等） */
+    private void applyMenuSort(String parentKey, String... childKeysInOrder) {
+        Long parentId = queryMenuIdByKey(parentKey);
+        if (parentId == null) {
+            return;
+        }
+        for (int i = 0; i < childKeysInOrder.length; i++) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
+                            + "WHERE menu_key = ? AND deleted = 0 AND parent_id = ? AND sort_order != ?",
+                    i + 1, childKeysInOrder[i], parentId, i + 1);
+        }
+    }
+    
+    /** 软删除无子节点的空目录菜单（目录点开无任何内容, 属于重组残留） */
+    private void removeEmptyDirectoryMenu(String menuKey) {
+        Long id = queryMenuIdByKey(menuKey);
+        if (id == null) {
+            return;
+        }
+        Integer children = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE parent_id = ? AND deleted = 0", Integer.class, id);
+        if (children != null && children > 0) {
+            return;
+        }
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", id);
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE id = ?", id);
+        log.info("已清理空目录菜单: {}", menuKey);
+    }
+    
+    /**
+     * 菜单默认图标（menu_key → antd 图标组件名）。
+     * <p>
+     * 与前端 src/components/Sidebar.tsx 的 keyToIcon 同源, 由 scripts/check-menu-consistency.mjs
+     * 在 CI 校验两端不漂移; 前端 keyToIcon 仅作为 DB icon 缺失时的兜底。
+     */
+    private static final Map<String, String> MENU_ICON_DEFAULTS = Map.ofEntries(
+            Map.entry("account-balance", "AccountBookOutlined"),
+            Map.entry("ad-sales", "ShoppingFilled"),
+            Map.entry("ai-access-request", "KeyOutlined"),
+            Map.entry("ai-auth-manage", "SafetyCertificateOutlined"),
+            Map.entry("ai-conversation-audit", "AuditOutlined"),
+            Map.entry("ai-dept-model-auth", "ApartmentOutlined"),
+            Map.entry("ai-dept-quota", "AccountBookOutlined"),
+            Map.entry("ai-emp-model-auth", "TeamOutlined"),
+            Map.entry("ai-emp-permission", "UnlockOutlined"),
+            Map.entry("ai-emp-quota", "MoneyCollectOutlined"),
+            Map.entry("ai-energy-billing", "ThunderboltOutlined"),
+            Map.entry("ai-mcp-service", "BlockOutlined"),
+            Map.entry("ai-model-list", "AppstoreOutlined"),
+            Map.entry("ai-model-provider", "CloudServerOutlined"),
+            Map.entry("ai-models", "DesktopOutlined"),
+            Map.entry("ai-operation-auth", "ToolOutlined"),
+            Map.entry("ai-quota-manage", "DollarOutlined"),
+            Map.entry("ai_energy_detail", "FileSearchOutlined"),
+            Map.entry("ai_usage_stats", "LineChartOutlined"),
+            Map.entry("algorithm-simulation", "DeploymentUnitOutlined"),
+            Map.entry("approval", "CheckCircleOutlined"),
+            Map.entry("approval-center", "AuditOutlined"),
+            Map.entry("asset-basic", "ControlOutlined"),
+            Map.entry("asset-dashboard", "DashboardOutlined"),
+            Map.entry("asset-flow-ops", "SwapOutlined"),
+            Map.entry("asset-inbound", "ImportOutlined"),
+            Map.entry("asset-maintenance", "ToolOutlined"),
+            Map.entry("asset-management", "InboxOutlined"),
+            Map.entry("asset-purchase", "ShoppingCartOutlined"),
+            Map.entry("batch-query", "SearchOutlined"),
+            Map.entry("channel-strategy", "ThunderboltOutlined"),
+            Map.entry("consume-risk", "SafetyCertificateOutlined"),
+            Map.entry("consumable-alert", "AlertOutlined"),
+            Map.entry("consumable-claim", "UserAddOutlined"),
+            Map.entry("consumable-dashboard", "DashboardOutlined"),
+            Map.entry("consumable-item", "ProfileOutlined"),
+            Map.entry("consumable-ops", "GoldOutlined"),
+            Map.entry("consumable-stock", "DatabaseOutlined"),
+            Map.entry("data-permission", "DatabaseOutlined"),
+            Map.entry("debt-reconcile", "CheckCircleOutlined"),
+            Map.entry("detail-query", "FileSearchOutlined"),
+            Map.entry("employee-management", "UserOutlined"),
+            Map.entry("finance", "MoneyCollectOutlined"),
+            Map.entry("flash-sale-price", "MoneyCollectOutlined"),
+            Map.entry("flash-sale-register", "FileTextOutlined"),
+            Map.entry("flash-sale-stats", "BarChartOutlined"),
+            Map.entry("function-permission", "AppstoreOutlined"),
+            Map.entry("gift-consume-detail", "FileTextOutlined"),
+            Map.entry("gift-detail", "RedEnvelopeOutlined"),
+            Map.entry("gift-manage", "GiftOutlined"),
+            Map.entry("global-config", "GlobalOutlined"),
+            Map.entry("group-purchase-dashboard", "DashboardOutlined"),
+            Map.entry("hint-config", "FontSizeOutlined"),
+            Map.entry("hint-report", "LineChartOutlined"),
+            Map.entry("hint-verify", "FontSizeOutlined"),
+            Map.entry("home", "HomeOutlined"),
+            Map.entry("hot-search-config", "FireOutlined"),
+            Map.entry("hot-search-library", "FireOutlined"),
+            Map.entry("hot-search-report", "LineChartOutlined"),
+            Map.entry("hot-search-verify", "FireOutlined"),
+            Map.entry("hr", "TeamOutlined"),
+            Map.entry("i18n-center", "TranslationOutlined"),
+            Map.entry("i18n-dashboard", "DashboardOutlined"),
+            Map.entry("i18n-import-export", "ImportOutlined"),
+            Map.entry("i18n-language", "GlobalOutlined"),
+            Map.entry("i18n-mt-engine", "ToolOutlined"),
+            Map.entry("login-log", "ScheduleOutlined"),
+            Map.entry("menu-config", "MenuOutlined"),
+            Map.entry("merchant-group-list", "ShopOutlined"),
+            Map.entry("merchant-promotion-diagnose", "MedicineBoxOutlined"),
+            Map.entry("merchant-reconcile", "AuditOutlined"),
+            Map.entry("merchant-score-insight", "TrophyOutlined"),
+            Map.entry("merchant_group", "ShopOutlined"),
+            Map.entry("merchant_promotion", "CrownOutlined"),
+            Map.entry("notification-config", "BellOutlined"),
+            Map.entry("organization-management", "ApartmentOutlined"),
+            Map.entry("permission", "LockOutlined"),
+            Map.entry("position-management", "IdcardOutlined"),
+            Map.entry("promotion", "WalletOutlined"),
+            Map.entry("promotion-algorithm", "AppstoreOutlined"),
+            Map.entry("promotion-dashboard", "PieChartOutlined"),
+            Map.entry("promotion-report-compare", "PieChartOutlined"),
+            Map.entry("promotion-report-group", "BarChartOutlined"),
+            Map.entry("promotion-report-order", "LineChartOutlined"),
+            Map.entry("promotion-report-overview", "DashboardOutlined"),
+            Map.entry("promotion-sales-config", "ShoppingFilled"),
+            Map.entry("promotion-slot-config", "ColumnHeightOutlined"),
+            Map.entry("promotion-waterfall", "WalletOutlined"),
+            Map.entry("promotion-word-library", "ReadOutlined"),
+            Map.entry("promotion_tool", "ThunderboltOutlined"),
+            Map.entry("purchase-order", "FileDoneOutlined"),
+            Map.entry("report", "BarChartOutlined"),
+            Map.entry("role-management", "SolutionOutlined"),
+            Map.entry("rule-config", "SwapOutlined"),
+            Map.entry("search", "SearchOutlined"),
+            Map.entry("search-config-new", "SettingOutlined"),
+            Map.entry("search-guide", "AimOutlined"),
+            Map.entry("search-library", "ReadOutlined"),
+            Map.entry("search-verify", "SearchOutlined"),
+            Map.entry("search-verify-group", "SafetyCertificateOutlined"),
+            Map.entry("search-weight-config", "ColumnHeightOutlined"),
+            Map.entry("stop-words", "StopOutlined"),
+            Map.entry("store-list", "ShopOutlined"),
+            Map.entry("synonym-config", "SwapOutlined"),
+            Map.entry("system-config", "SettingOutlined"),
+            Map.entry("traffic-sandbox", "ExperimentOutlined"),
+            Map.entry("translation-manage", "TranslationOutlined"),
+            Map.entry("version-history", "HistoryOutlined"),
+            Map.entry("waterfall-simulation", "NodeIndexOutlined"),
+            Map.entry("word-segmentation", "ScissorOutlined"),
+            Map.entry("writeoff-reconcile", "AuditOutlined"),
+            Map.entry("asset-handover", "TeamOutlined"),
+            Map.entry("asset-list", "AppstoreOutlined"),
+            Map.entry("param-library", "DatabaseOutlined")
+    );
+    
     /**
      * 确保 admin 角色持有全部种子菜单权限（幂等）。
      * 使用 ON DUPLICATE KEY UPDATE + CASE 仅回填 actions 为空的旧授权，
@@ -3322,6 +3643,66 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             }
         }
         log.info("旧资产编号迁移完成: 共更新 {} 条", updated);
+    }
+
+    /* ──────────────────────────────────────────────────────────
+     *  机翻引擎配置表 (sys_mt_engine) — 幂等建表 + 种子数据
+     * ────────────────────────────────────────────────────────── */
+    private void migrateMtEngineTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS sys_mt_engine ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "engine_key VARCHAR(32) NOT NULL UNIQUE COMMENT '引擎标识: mymemory/deepl/openai', "
+                        + "engine_name VARCHAR(64) NOT NULL COMMENT '引擎显示名称', "
+                        + "api_url VARCHAR(256) COMMENT 'API 地址', "
+                        + "api_key VARCHAR(512) COMMENT 'API Key（加密存储）', "
+                        + "daily_limit INT DEFAULT 50000 COMMENT '每日字符额度', "
+                        + "timeout_ms INT DEFAULT 10000 COMMENT '请求超时（毫秒）', "
+                        + "status TINYINT DEFAULT 1 COMMENT '状态: 1=启用 0=停用', "
+                        + "config_json TEXT COMMENT '引擎特有配置（JSON）', "
+                        + "sort_order INT DEFAULT 0 COMMENT '排序号', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='机翻引擎配置表'");
+
+        // 种子数据: MyMemory（默认启用）
+        Long myMemoryCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_mt_engine WHERE engine_key = 'mymemory'", Long.class);
+        if (myMemoryCount != null && myMemoryCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_mt_engine (engine_key, engine_name, api_url, daily_limit, timeout_ms, status, config_json, sort_order) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "mymemory", "MyMemory 免費翻譯",
+                    "https://api.mymemory.translated.net/get",
+                    50000, 10000, 1, "{}", 1);
+            log.info("已種子化 MyMemory 引擎配置");
+        }
+
+        // 种子数据: DeepL（默认停用）
+        Long deeplCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_mt_engine WHERE engine_key = 'deepl'", Long.class);
+        if (deeplCount != null && deeplCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_mt_engine (engine_key, engine_name, api_url, daily_limit, timeout_ms, status, config_json, sort_order) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "deepl", "DeepL API",
+                    "https://api-free.deepl.com/v2/translate",
+                    500000, 10000, 0, "{}", 2);
+            log.info("已種子化 DeepL 引擎配置");
+        }
+
+        // 种子数据: OpenAI（默认停用）
+        Long openaiCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_mt_engine WHERE engine_key = 'openai'", Long.class);
+        if (openaiCount != null && openaiCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_mt_engine (engine_key, engine_name, api_url, daily_limit, timeout_ms, status, config_json, sort_order) "
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "openai", "OpenAI GPT",
+                    "https://api.openai.com/v1/chat/completions",
+                    1000000, 30000, 0, "{\"model\":\"gpt-4o-mini\"}", 3);
+            log.info("已種子化 OpenAI 引擎配置");
+        }
     }
 
 }

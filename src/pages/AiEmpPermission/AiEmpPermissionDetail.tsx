@@ -10,11 +10,13 @@ import {
   QUOTA_STATUS_LABEL,
   QUOTA_STATUS_COLOR,
   calcQuotaStatus,
+  fetchEmpPermissionDetail,
+  saveEmpPermission,
+  fetchAdjustLogs,
   type EmpPermissionSummary,
   type EmpModelPermission,
   type EmpQuotaGrant,
-} from '../../api/mock/aiEmpPermissionMock'
-import { fetchEmpPermissionDetail, saveEmpPermission, fetchAdjustLogs } from '../../api/empPermission'
+} from '../../api/empPermission'
 
 /* ══════════ 展示常量 ══════════ */
 

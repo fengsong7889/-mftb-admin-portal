@@ -24,7 +24,7 @@ import { useCountUp } from '../../hooks/useCountUp'
 import AnimatedNumber from '../../components/AnimatedNumber'
 import { OrderStatus, AppType, RecommendChannel, RecommendType, MEAL_SLOT_LABEL, RECOMMEND_TYPE_ICON, ORDER_CHANNEL_TO_TRAFFIC_BIZ, getStageIndex, getStageTime, parseCancelFeeTiers, parseDiscountTiers, parseDayDiscountTiers } from './orderUtils'
 import type { OrderItem, SlotPriceItem, PromoRecord } from './orderUtils'
-import { mockOrders, newStoreOrders, popularOrders, toDetailOrder, REFUNDED_BEFORE_PROMO_IDS, TERMINAL_STATUSES } from './mockOrderData'
+import { toDetailOrder, REFUNDED_BEFORE_PROMO_IDS, TERMINAL_STATUSES } from './mockOrderData'
 
 /* ---- 动画百分比组件 ---- */
 function AnimatedPercent({ values, suffix = '%' }: { values: number[]; suffix?: string }) {
@@ -184,12 +184,6 @@ export default function OrderDetail() {
 
   useEffect(() => {
     if (!orderId) return
-    const local = [...mockOrders, ...newStoreOrders, ...popularOrders].find(o => o.id === orderId)
-    if (local) {
-      setOrder(local)
-      setApiLoading(false)
-      return
-    }
     // 真實訂單：id 即訂單號，從後端加載（區分加載中 / 訂單不存在 / 臨時失敗）
     let cancelled = false
     setApiLoading(true)

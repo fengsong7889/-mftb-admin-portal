@@ -28,7 +28,7 @@ public class FinRiskConfig {
     /** 集团名称快照 */
     private String groupName;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 状态: enabled=启用 disabled=停用（停用后不限制消费） */

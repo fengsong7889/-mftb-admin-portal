@@ -95,7 +95,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
             <Descriptions.Item label="领用编号"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.claimNo}</span></Descriptions.Item>
             <Descriptions.Item label="资产编号">{record.assetNo}</Descriptions.Item>
             <Descriptions.Item label="资产名称">{record.assetName}</Descriptions.Item>
-            <Descriptions.Item label="所属公司品牌">{record.companyBrand ? <BrandTag value={record.companyBrand} /> : '—'}</Descriptions.Item>
+            <Descriptions.Item label="所屬品牌">{record.companyBrand ? <BrandTag value={record.companyBrand} /> : '—'}</Descriptions.Item>
             <Descriptions.Item label="资产品牌">{record.brand || '—'}</Descriptions.Item>
             <Descriptions.Item label="资产分类">{record.assetType || '—'}</Descriptions.Item>
             <Descriptions.Item label="领用人">{record.empName}（{record.empNo}）</Descriptions.Item>

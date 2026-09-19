@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.EamRepairSaveDTO;
 import com.mftb.admin.dto.EamRepairVO;
@@ -103,6 +104,52 @@ public class EamRepairServiceImpl implements EamRepairService {
         }
 
         log.info("完成维修记录：{}，资产 {} 状态恢复为闲置", repair.getAssetNo(), repair.getAssetNo());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void update(long id, EamRepairSaveDTO dto) {
+        EamRepair repair = repairMapper.selectById(id);
+        if (repair == null) throw new BusinessException("维修记录不存在");
+        if (!"repairing".equals(repair.getStatus())) throw new BusinessException("仅允许编辑维修中的记录");
+
+        if (StringUtils.hasText(dto.getFaultDesc())) repair.setFaultDesc(dto.getFaultDesc());
+        if (StringUtils.hasText(dto.getRepairContent())) repair.setRepairContent(dto.getRepairContent());
+        if (StringUtils.hasText(dto.getRepairBy())) repair.setRepairBy(dto.getRepairBy());
+        if (dto.getCost() != null) repair.setCost(dto.getCost());
+        if (StringUtils.hasText(dto.getRepairDate())) repair.setRepairDate(dto.getRepairDate());
+        if (StringUtils.hasText(dto.getApplicant())) repair.setApplicant(dto.getApplicant());
+        if (StringUtils.hasText(dto.getCauseType())) repair.setCauseType(dto.getCauseType());
+        repair.setUpdatedBy(operatorResolver.currentOperatorName());
+        repairMapper.updateById(repair);
+
+        log.info("更新维修记录：{} (id={})", repair.getAssetNo(), id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(long id) {
+        EamRepair repair = repairMapper.selectById(id);
+        if (repair == null) throw new BusinessException("维修记录不存在");
+        if (!"repairing".equals(repair.getStatus())) throw new BusinessException("仅允许删除维修中的记录");
+
+        repairMapper.deleteById(id);
+
+        // 检查该资产是否还有其他维修中的记录，没有则恢复资产状态为闲置
+        Long remainingCount = repairMapper.selectCount(
+                new LambdaQueryWrapper<EamRepair>()
+                        .eq(EamRepair::getAssetId, repair.getAssetId())
+                        .eq(EamRepair::getStatus, "repairing"));
+        if (remainingCount == 0) {
+            EamAsset asset = assetMapper.selectById(repair.getAssetId());
+            if (asset != null && "in_repair".equals(asset.getStatus())) {
+                asset.setStatus("idle");
+                asset.setUpdatedBy(operatorResolver.currentOperatorName());
+                assetMapper.updateById(asset);
+            }
+        }
+
+        log.info("删除维修记录：{} (id={})", repair.getAssetNo(), id);
     }
 
     private EamRepairVO toVO(EamRepair repair) {

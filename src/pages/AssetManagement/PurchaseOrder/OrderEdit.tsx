@@ -957,7 +957,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           <Row gutter={24}>
             <Col span={8}>
               <Form.Item label={t('asset.orderBrand')} name="brand" rules={[{ required: true, message: t('asset.warnSelectOrderBrand') }]}>
-                <Select placeholder={t('asset.phSelectBrand')} options={numericOptions} />
+                <Select placeholder={t('asset.phSelectCompanyBrand')} options={numericOptions} />
               </Form.Item>
               {watchedBrand && codeHint[watchedBrand] && (
                 <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>

@@ -211,7 +211,7 @@ export default function NotificationChannelForm() {
             </Form.Item>
 
             <Form.Item label="啟用通知" name="enabled" valuePropName="checked" initialValue={true}>
-              <Switch checkedChildren="開" unCheckedChildren="關" />
+              <Switch checkedChildren="啟用" unCheckedChildren="停用" />
               <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
                 停用後該渠道不會接收任何通知
               </span>

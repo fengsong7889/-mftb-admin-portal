@@ -18,7 +18,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker, Tooltip,
+  Button, Form, Input, Select, Table, Tag, Modal, message, Space, Tabs, DatePicker, Tooltip, TreeSelect,
 } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
@@ -26,10 +26,10 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
-  fetchAssetList, fetchAssetStatusCounts, deleteAsset,
+  fetchAssetList, fetchAssetStatusCounts, deleteAsset, updateAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
 } from '../../../api/asset'
-import { fetchAssetTagList, bindAssetTag } from '../../../api/eam'
+import { fetchAssetTagList, bindAssetTag, fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand } from '../../../api/eam'
 import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import type { AssetTagTemplate } from '../../../api/eam'
@@ -86,6 +86,29 @@ export default function AssetList() {
 
   /** 型号参数 key → 展示名映射（取全部分类参数模板的并集） */
   const paramCatalog = useAssetParameterCatalog()
+
+  /* ----- 分类树 & 品牌列表（搜索区用） ----- */
+  const [categories, setCategories] = useState<AssetCategory[]>([])
+  const [brands, setBrands] = useState<AssetBrand[]>([])
+
+  useEffect(() => {
+    fetchCategoryList({ bizType: 'ASSET' }).then(setCategories).catch(() => setCategories([]))
+    fetchBrandList({ bizType: 'ASSET' }).then(setBrands).catch(() => setBrands([]))
+  }, [])
+
+  /** 构建树结构（parentId=0 为根） */
+  const categoryTreeData = useMemo(() => {
+    function buildTree(parentId: number): { title: string; key: string; value: string; children?: ReturnType<typeof buildTree> }[] {
+      return categories
+        .filter(c => c.parentId === parentId && c.status === 'enabled')
+        .sort((a, b) => a.sort - b.sort)
+        .map(c => {
+          const children = buildTree(c.id)
+          return { title: `${c.code} - ${c.name}`, key: c.code, value: c.code, children: children.length ? children : undefined }
+        })
+    }
+    return buildTree(0)
+  }, [categories])
 
   // URL ?assetNo= 带入时回填搜索框（由验收入库页跳转）
   useEffect(() => {
@@ -164,7 +187,29 @@ export default function AssetList() {
     navigate(`/asset-add?id=${record.id}`)
   }
   const handleScrap = (record: AssetItem) => {
-    navigate(`/asset-scrap?id=${record.id}`)
+    Modal.confirm({
+      title: '確定要報廢該資產嗎？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>資產編號：</span><b>{record.assetNo}</b></div>
+          <div className="confirm-info-row"><span>資產名稱：</span><b>{record.assetName}</b></div>
+          <div className="confirm-info-row"><span>當前狀態：</span><b>{t(STATUS_META[record.status].key)}</b></div>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF2F0', borderRadius: 6, border: '1px solid #FFCCC7', fontSize: 13, color: '#FF4D4F' }}>
+            ⚠️ 報廢後資產狀態將變更為「已報廢」，此操作不可恢復，請謹慎操作。
+          </div>
+        </div>
+      ),
+      okText: '確認報廢',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        await updateAsset(record.id, { ...record, status: 'scrapped', scrapTime: new Date().toISOString().slice(0, 10) } as never)
+        message.success('資產已報廢')
+        loadData()
+      },
+    })
   }
   const handleRepair = (record: AssetItem) => {
     navigate(`/asset-repair?id=${record.id}`)
@@ -422,18 +467,9 @@ export default function AssetList() {
 
   const columns = applyConfig(allColumns)
 
-  /* ----- 资产类型选项 ----- */
-  const assetTypeOptions = [
-    { label: t('common.all'), value: '' },
-    { label: t('asset.assetTypeElectronic'), value: '电子设备' },
-    { label: t('asset.assetTypeFurniture'), value: '办公家具' },
-    { label: t('asset.assetTypeEquipment'), value: '办公设备' },
-    { label: t('asset.assetTypeVehicle'), value: '交通工具' },
-    { label: t('asset.assetTypeOther'), value: '其他' },
-  ]
+  /* ----- 资产类型选项（已用 TreeSelect 替代，保留给导出等场景） ----- */
   const companyOptions = [
     { label: t('common.all'), value: '' },
-    { label: '澳觅科技', value: '澳觅科技' },
     { label: '闪蜂', value: '闪蜂' },
     { label: 'mFood', value: 'mFood' },
   ]
@@ -459,10 +495,24 @@ export default function AssetList() {
             <Input placeholder={t('asset.assetNoPh')} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colAssetType')} name="assetType">
-            <Select placeholder={t('common.all')} allowClear options={assetTypeOptions} />
+            <TreeSelect
+              placeholder={t('common.all')}
+              allowClear
+              showSearch
+              treeDefaultExpandAll
+              treeNodeFilterProp="title"
+              treeData={categoryTreeData}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item label={t('asset.colBrand')} name="brand">
-            <Input placeholder={t('asset.colBrand')} allowClear />
+            <Select
+              placeholder={t('asset.colBrand')}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={brands.map(b => ({ label: b.brandZh, value: b.brandZh }))}
+            />
           </Form.Item>
           <Form.Item label={t('asset.colCompany')} name="company">
             <Select placeholder={t('common.all')} allowClear options={companyOptions} />

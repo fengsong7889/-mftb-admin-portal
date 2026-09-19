@@ -7,6 +7,8 @@ export interface MenuVO {
   parentName?: string | null
   menuKey: string
   name: string
+  /** 英文菜单名（sys_menu.name_en）：非中文语言下的首选真值, 未配置时回退前端静态映射 */
+  nameEn?: string | null
   path?: string
   component?: string
   icon?: string
@@ -25,6 +27,7 @@ export interface MenuPayload {
   parentId?: number | null
   menuKey: string
   name: string
+  nameEn?: string
   path?: string
   component?: string
   icon?: string

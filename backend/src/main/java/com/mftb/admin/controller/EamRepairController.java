@@ -54,4 +54,20 @@ public class EamRepairController {
         repairService.finish(id, body.get("finishDate"));
         return Result.success();
     }
+
+    /** 更新维修记录（仅允许维修中状态） */
+    @PutMapping("/{id}")
+    @RequirePermission(menu = MENU, action = "edit")
+    public Result<Void> update(@PathVariable long id, @RequestBody EamRepairSaveDTO dto) {
+        repairService.update(id, dto);
+        return Result.success();
+    }
+
+    /** 删除维修记录（仅允许维修中状态） */
+    @DeleteMapping("/{id}")
+    @RequirePermission(menu = MENU, action = "edit")
+    public Result<Void> delete(@PathVariable long id) {
+        repairService.delete(id);
+        return Result.success();
+    }
 }

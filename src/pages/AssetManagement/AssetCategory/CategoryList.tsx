@@ -296,8 +296,8 @@ export default function CategoryList({ onAdd, onEdit, onView }: CategoryListProp
       render: (status: string, record: AssetCategory) => (
         <Switch
           checked={status === 'enabled'}
-          checkedChildren={t('asset.statusEnabled')}
-          unCheckedChildren={t('asset.statusDisabled')}
+          checkedChildren="啟用"
+          unCheckedChildren="停用"
           onChange={() => handleToggleStatus(record)}
         />
       ),

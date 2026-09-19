@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import request, { isBackendUnavailable } from './request'
-import { approvePurchaseRequest, createPurchaseRequest, fetchPurchaseRequestDetail, fetchPurchaseOrderDetail, fetchPurchaseOrderList, fetchHandoverDetail, fetchCategoryList } from './eam'
+import request from './request'
+import {
+  createPurchaseRequest, fetchPurchaseRequestDetail, approvePurchaseRequest,
+  fetchPurchaseOrderDetail, fetchPurchaseOrderList, fetchHandoverDetail, fetchCategoryList,
+} from './eam'
 
 vi.mock('./request', () => ({
   default: { get: vi.fn() },
@@ -28,7 +31,7 @@ describe('资产参数数据来源', () => {
 
   it('实物展示使用的参数分类字典禁用 Mock 回退', async () => {
     vi.mocked(request.get).mockRejectedValueOnce(new Error('offline'))
-    await expect(fetchCategoryList(undefined, false)).rejects.toThrow('offline')
+    await expect(fetchCategoryList()).rejects.toThrow('offline')
   })
 })
 
@@ -69,24 +72,18 @@ describe('采购订单接口映射', () => {
     expect(request.get).toHaveBeenCalledTimes(1)
   })
 
-  it('仅在进入 Mock 数据分支时补充 Mock 申请编号', async () => {
-    const requestId = await createPurchaseRequest({
+  it('旧版采购写操作尚未接入真实 API，直接拒绝', async () => {
+    await expect(createPurchaseRequest({
       title: '测试采购申请', department: '测试部门', applicant: '测试申请人',
       budget: 0, reason: '测试', items: [], brand: 1,
-    })
-    const purchaseRequest = await fetchPurchaseRequestDetail(requestId)
-    const orderId = await approvePurchaseRequest(requestId, true, '测试审批人')
-    vi.mocked(isBackendUnavailable).mockReturnValueOnce(true).mockReturnValueOnce(true)
-    vi.mocked(request.get).mockRejectedValueOnce(new Error('后端不可用'))
-      .mockRejectedValueOnce(new Error('后端不可用'))
+    })).rejects.toThrow('尚未接入真实 API')
+    await expect(fetchPurchaseRequestDetail(1)).rejects.toThrow('尚未接入真实 API')
+    await expect(approvePurchaseRequest(1, true, '审批人')).rejects.toThrow('尚未接入真实 API')
+  })
 
-    const list = await fetchPurchaseOrderList()
-    expect(orderId).toBeDefined()
-    const detail = await fetchPurchaseOrderDetail(orderId!)
-    const linkedOrder = list.records.find((order) => order.id === orderId)
-
-    expect(linkedOrder?.reqNo).toBe(purchaseRequest.reqNo)
-    expect(detail.reqNo).toBe(purchaseRequest.reqNo)
-    expect(detail.brand).toBe(1)
+  it('真实接口失败时不生成模拟采购单据', async () => {
+    vi.mocked(request.get).mockRejectedValue(new Error('后端不可用'))
+    await expect(fetchPurchaseOrderList()).rejects.toThrow('后端不可用')
+    await expect(fetchPurchaseOrderDetail(30)).rejects.toThrow('后端不可用')
   })
 })

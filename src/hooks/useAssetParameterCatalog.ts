@@ -7,7 +7,7 @@ const EMPTY_CATALOG: AssetParameterCatalog = { categories: [], types: [] }
 let pending: Promise<AssetParameterCatalog> | undefined
 function fetchCatalog() {
   if (!pending) {
-    pending = Promise.allSettled([fetchCategoryList(undefined, false), fetchAllParamTypes()]).then(([categories, types]) => ({
+    pending = Promise.allSettled([fetchCategoryList(), fetchAllParamTypes()]).then(([categories, types]) => ({
       categories: categories.status === 'fulfilled' ? categories.value : [],
       types: types.status === 'fulfilled' ? types.value : [],
     })).finally(() => { pending = undefined })

@@ -13,6 +13,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .sidebar-logo {
   height: 64px;
@@ -62,12 +64,27 @@
 .logo-icon-inline {
   font-size: 20px;
 }
+/* 后端不可用时的离线菜单提示条（深色侧边栏内的弱提醒, 折叠时仅显示一个感叹号） */
+.sidebar-offline-tip {
+  margin: 0 8px 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(232, 114, 12, 0.45);
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .sidebar-menu {
   border-right: none;
   flex: 1 1 auto;
+  min-height: 0;
+  height: calc(100vh - 64px);
   overflow-y: auto;
   overflow-x: hidden;
   background: #001529;
+  padding-bottom: 24px;
 }
 /* 菜单项 hover 高亮效果 */
 .sidebar-menu .ant-menu-item,

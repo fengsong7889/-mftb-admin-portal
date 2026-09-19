@@ -1,11 +1,5 @@
 /** 权限管理模块类型定义 */
 
-/** 功能权限模块 */
-export interface PermissionModule {
-  key: string
-  name: string
-  children?: PermissionModule[]
-}
 
 /** 功能操作枚举 */
 export const PERMISSION_ACTIONS = [
@@ -366,6 +360,24 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
+  ],
+  // 多语言管理（i18n-center 独立模块）
+  'i18n-language': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'i18n-import-export': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'i18n-mt-engine': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'i18n-dashboard': [
+    { key: 'view', label: '查看' },
   ],
   // 規則配置
   'rule-config': [
@@ -881,244 +893,11 @@ export const merchantOptions = [
   { id: 'G10029', name: '墨尔本美食公司', address: '墨尔本', country: 'australia' },
 ]
 
-/** 菜单权限映射（用于生成权限树） */
-export const menuPermissionTree: PermissionModule[] = [
-  {
-    key: 'home',
-    name: '首頁',
-  },
-  {
-    key: 'merchant_group',
-    name: '商戶集團管理',
-    children: [
-      { key: 'merchant-group-list', name: '集團管理' },
-      { key: 'store-list', name: '門店管理' },
-    ],
-  },
-  {
-    key: 'merchant_promotion',
-    name: '商家推廣工具',
-    children: [
-      { key: 'promotion-dashboard', name: '數據看板' },
-      { key: 'promotion-algorithm', name: '算法庫' },
-      { key: 'promotion-slot-config', name: '瀑布流策略' },
-      { key: 'promotion-waterfall', name: '銷售定價' },
-      {
-        key: 'gift-manage',
-        name: '贈送管理',
-        children: [
-          { key: 'gift-detail', name: '推廣贈送' },
-          { key: 'gift-consume-detail', name: '消費明細' },
-        ],
-      },
-      { key: 'ad-sales', name: '廣告銷售' },
-      { key: 'promotion-word-library', name: '詞庫管理' },
-      {
-        key: 'traffic-sandbox',
-        name: '實驗沙盤',
-        children: [
-          { key: 'waterfall-simulation', name: '瀑布流推演' },
-          { key: 'algorithm-simulation', name: '算法推演' },
-          { key: 'merchant-score-insight', name: '商家評分透視' },
-          { key: 'merchant-promotion-diagnose', name: '商家推廣診斷' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'promotion-tool',
-    name: '推廣通',
-    children: [
-      { key: 'promotion-sales-config', name: '店鋪推廣' },
-      {
-        key: 'promotion-report-group',
-        name: '報表分析',
-        children: [
-          { key: 'promotion-report-overview', name: '數據概覽' },
-          { key: 'promotion-report-order', name: '訂單效果報表' },
-          { key: 'promotion-report-compare', name: '推薦類型對比' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'search',
-    name: '搜索管理',
-    children: [
-      {
-        key: 'search-config-new',
-        name: '搜索配置',
-        children: [
-          { key: 'global-config', name: '全局配置' },
-          { key: 'channel-strategy', name: '維度策略' },
-        ],
-      },
-      {
-        key: 'search-guide',
-        name: '搜索引導',
-        children: [
-          { key: 'hint-config', name: '底紋配置' },
-          { key: 'hot-search-config', name: '熱搜配置' },
-          { key: 'search-weight-config', name: '權重干預' },
-        ],
-      },
-      {
-        key: 'search-library',
-        name: '搜索詞庫',
-        children: [
-          { key: 'word-segmentation', name: '分詞詞庫' },
-          { key: 'synonym-config', name: '同義詞庫' },
-          { key: 'hot-search-library', name: '熱搜詞庫' },
-          { key: 'stop-words', name: '停用詞庫' },
-        ],
-      },
-      {
-        key: 'search-verify-group',
-        name: '效果校驗',
-        children: [
-          { key: 'search-verify', name: '搜索校驗' },
-          { key: 'hint-verify', name: '底紋校驗' },
-          { key: 'hot-search-verify', name: '熱搜校驗' },
-        ],
-      },
-      {
-        key: 'report',
-        name: '報表統計',
-        children: [
-          { key: 'hint-report', name: '底紋報表' },
-          { key: 'hot-search-report', name: '熱搜報表' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'finance',
-    name: '財務管理',
-    children: [
-      {
-        key: 'promotion',
-        name: '推廣金管理',
-        children: [
-          { key: 'account-balance', name: '賬戶餘額' },
-          { key: 'consume-risk', name: '消費風控' },
-          { key: 'batch-query', name: '批次查詢' },
-          { key: 'detail-query', name: '明細查詢' },
-        ],
-      },
-      {
-        key: 'merchant-reconcile',
-        name: '商戶通對賬',
-        children: [
-          { key: 'writeoff-reconcile', name: '充消對賬' },
-          { key: 'debt-reconcile', name: '欠款對賬' },
-        ],
-      },
-      {
-        key: 'approval',
-        name: '審批管理',
-        children: [
-          { key: 'approval-center', name: '審批中心' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'group-purchase',
-    name: '團購管理',
-    children: [
-      { key: 'group-purchase-dashboard', name: '秒殺數據總覽' },
-      { key: 'flash-sale-register', name: '秒殺商品登記' },
-      { key: 'flash-sale-stats', name: '秒殺商品統計' },
-      { key: 'flash-sale-price', name: '澳覓秒殺價' },
-    ],
-  },
-  {
-    key: 'hr',
-    name: '集團人事(HR)',
-    children: [
-      { key: 'employee-management', name: '員工管理' },
-      { key: 'organization-management', name: '組織管理' },
-      { key: 'position-management', name: '職位管理' },
-      { key: 'login-log', name: '員工動態' },
-    ],
-  },
-  {
-    key: 'oa-center',
-    name: 'OA中心',
-    children: [
-      { key: 'oa-requests', name: '流程事項' },
-      { key: 'workflow-config', name: '流程配置' },
-    ],
-  },
-  {
-    key: 'permission',
-    name: '權限管理',
-    children: [
-      { key: 'role-management', name: '角色管理' },
-      { key: 'function-permission', name: '功能授權' },
-      { key: 'data-permission', name: '數據授權' },
-    ],
-  },
-  {
-    key: 'system-config',
-    name: '系統配置',
-    children: [
-      { key: 'menu-config', name: '菜單配置' },
-      { key: 'translation-manage', name: '多語言配置' },
-      { key: 'rule-config', name: '規則配置' },
-      { key: 'version-history', name: '版本管理' },
-    ],
-  },
-  {
-    key: 'ai-assistant',
-    name: '智能中心(AI)',
-    children: [
-      {
-        key: 'ai-models',
-        name: '模型管理',
-        children: [
-          { key: 'ai-model-provider', name: '供應商管理' },
-          { key: 'ai-model-list', name: '模型接入' },
-        ],
-      },
-      {
-        key: 'ai-auth-manage',
-        name: '模型授權管理',
-        children: [
-          { key: 'ai-dept-model-auth', name: '部門模型權控' },
-          {
-            key: 'ai-emp-model-auth',
-            name: '員工模型權控',
-            children: [
-              { key: 'ai-pos-auth', name: '按職位授權' },
-              { key: 'ai-role-auth', name: '角色授權' },
-            ],
-          },
-        ],
-      },
-      {
-        key: 'ai-quota-manage',
-        name: '配額管理',
-        children: [
-          { key: 'ai-dept-quota', name: '部門額度' },
-          { key: 'ai-emp-quota', name: '員工額度' },
-        ],
-      },
-      { key: 'ai-emp-permission', name: '員工AI權額管理' },
-      { key: 'ai-operation-auth', name: 'AI 权控管理' },
-      {
-        key: 'ai-energy-billing',
-        name: '能耗與賬單',
-        children: [
-          { key: 'ai_usage_stats', name: '能耗統計' },
-          { key: 'ai_energy_detail', name: '能耗明細' },
-        ],
-      },
-      { key: 'ai-access-request', name: 'AI 使用申請' },
-      { key: 'ai-mcp-service', name: 'MCP 服務' },
-    ],
-  },
-]
+/**
+ * 授权/展示用的菜单树不在前端维护静态副本：
+ * 唯一真值源为后端 sys_menu（/api/menus/tree）, 由「菜單配置」页管理,
+ * 需要菜单树的页面（功能授权、侧边栏、标签页）统一从接口构建。
+ */
 
 /**
  * 已接入權限校驗的受控菜單 key（叶子菜单）
@@ -1193,6 +972,10 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 系統配置
   'menu-config',
   'translation-manage',
+  'i18n-language',
+  'i18n-import-export',
+  'i18n-mt-engine',
+  'i18n-dashboard',
   'rule-config',
   // OA中心
   'oa-requests',
@@ -1203,7 +986,6 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ai-dept-model-auth',
   'ai-emp-model-auth',
   'ai-pos-auth',
-  'ai-role-auth',
   'ai-dept-quota',
   'ai-emp-quota',
   'ai-emp-permission',
@@ -1218,13 +1000,12 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'asset-repair',
   'asset-inventory',
   // 耗材管理（管理类菜单受控；耗材领用 consumable-claim 为全员自助，不受控）
+  // 注：consumable-category / consumable-brand / consumable-unit 菜单已下线（功能并入分类库/品牌产品库，
+  //     计量单位已改为产品/耗材表单上的文本属性），不再受控
   'consumable-dashboard',
   'consumable-item',
   'consumable-stock',
   'consumable-alert',
-  'consumable-category',
-  'consumable-brand',
-  'consumable-unit',
 ]
 
 /**
@@ -1319,6 +1100,11 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 系統配置
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
+  '/i18n-center/workbench': 'translation-manage',
+  '/i18n-center/language': 'i18n-language',
+  '/i18n-center/import-export': 'i18n-import-export',
+  '/i18n-center/mt-engine': 'i18n-mt-engine',
+  '/i18n-center/dashboard': 'i18n-dashboard',
   '/rule-config': 'rule-config',
   '/notification-config': 'notification-config',
   '/notification-channel-form': 'notification-config',
@@ -1334,7 +1120,6 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ai-dept-model-auth': 'ai-dept-model-auth',
   '/ai-emp-model-auth': 'ai-emp-model-auth',
   '/ai-pos-auth': 'ai-pos-auth',
-  '/ai-role-auth': 'ai-role-auth',
   '/ai-dept-quota': 'ai-dept-quota',
   '/ai-dept-quota-edit': 'ai-dept-quota',
   '/ai-dept-quota-detail': 'ai-dept-quota',
@@ -1389,9 +1174,6 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/consumable-claim': 'consumable-claim',
   '/consumable-stock': 'consumable-stock',
   '/consumable-alert': 'consumable-alert',
-  '/consumable-category': 'consumable-category',
-  '/consumable-brand': 'consumable-brand',
-  '/consumable-unit': 'consumable-unit',
 }
 
 /**

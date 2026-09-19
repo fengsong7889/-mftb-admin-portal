@@ -1,16 +1,104 @@
 /**
  * 員工AI權額管理 API
  * 對應後端 AiEmpPermissionController（/api/ai/emp-permission）
- *
- * 後端可用時走真實 API；後端不可用時降級到本地 Mock 數據。
  */
-import request, { isBackendUnavailable } from './request'
-import {
-  fetchMockEmpPermissions,
-  type EmpPermissionSummary,
-  type EmpModelPermission,
-  type EmpQuotaGrant,
-} from '../api/mock/aiEmpPermissionMock'
+import request from './request'
+
+/* ══════════ 共用类型定义（原在 mock 文件，现统一在此导出） ══════════ */
+
+/** 授權來源 */
+export type PermissionSource = 'department' | 'position' | 'role' | 'approval'
+
+/** 授權來源標籤 */
+export const SOURCE_LABEL: Record<PermissionSource, string> = {
+  department: '部門配置',
+  position: '職位配置',
+  role: '角色配置',
+  approval: '審批授予',
+}
+
+/** 授權來源 Tag 顏色 */
+export const SOURCE_TAG_COLOR: Record<PermissionSource, string> = {
+  department: 'blue',
+  position: 'purple',
+  role: 'cyan',
+  approval: 'orange',
+}
+
+/** 額度狀態 */
+export type QuotaStatus = 'normal' | 'exhausted' | 'frozen'
+
+/** 額度狀態標籤 */
+export const QUOTA_STATUS_LABEL: Record<QuotaStatus, string> = {
+  normal: '正常',
+  exhausted: '已用完',
+  frozen: '凍結',
+}
+
+/** 額度狀態 Tag 顏色 */
+export const QUOTA_STATUS_COLOR: Record<QuotaStatus, string> = {
+  normal: 'success',
+  exhausted: 'error',
+  frozen: 'default',
+}
+
+/** 模型權限項 */
+export interface EmpModelPermission {
+  modelId: number
+  modelName: string
+  source: PermissionSource
+  sourceDesc: string
+  visionSupport: boolean
+  functionCalling: boolean
+  jsonMode: boolean
+  streaming: boolean
+  thinkingMode: boolean
+  status: number
+  grantedAt: string
+}
+
+/** 額度記錄項 */
+export interface EmpQuotaGrant {
+  id: number
+  source: PermissionSource
+  sourceDesc: string
+  quotaType: 'token' | 'request'
+  quotaValue: number
+  quotaPeriod: 'daily' | 'monthly'
+  usedValue: number
+  effectiveType: 'permanent' | 'temporary'
+  effectiveAt: string
+  expireAt: string | null
+  overLimitAction: 'reject' | 'approve' | 'downgrade' | null
+  status: number
+  createdAt: string
+}
+
+/** 員工權限聚合記錄 */
+export interface EmpPermissionSummary {
+  employeeId: number
+  employeeName: string
+  empId: string
+  department: string
+  deptId: number
+  position: string
+  jobLevel: string
+  modelCount: number
+  modelPermissions: EmpModelPermission[]
+  quotaGrants: EmpQuotaGrant[]
+  lastUpdatedBy: string
+  lastUpdatedAt: string
+}
+
+/** 根據額度記錄計算員工額度狀態 */
+export function calcQuotaStatus(grants: EmpQuotaGrant[]): QuotaStatus {
+  if (!grants.length) return 'frozen'
+  const active = grants.filter((g) => g.status === 1)
+  if (!active.length) return 'frozen'
+  const allExhausted = active.every((g) => g.usedValue >= g.quotaValue)
+  if (allExhausted) return 'exhausted'
+  return 'normal'
+}
 
 /* ══════════ 後端 VO 類型（與 AiEmpPermissionDTO 同構） ══════════ */
 
@@ -176,43 +264,21 @@ function toDetailData(detail: DetailVO): { summary: EmpPermissionSummary; models
 
 /* ══════════ API 函數 ══════════ */
 
-/** 列表：查詢員工權額概要（後端優先，不可用時降級 Mock） */
+/** 列表：查詢員工權額概要 */
 export async function fetchEmpPermissionList(params?: {
   queryName?: string; queryDept?: string; queryUpdatedBy?: string
   queryUpdateTimeStart?: string; queryUpdateTimeEnd?: string
 }): Promise<EmpPermissionSummary[]> {
-  try {
-    const data = await request.get<EmpPermissionSummaryVO[]>('/ai/emp-permission/list', { params }) as unknown as EmpPermissionSummaryVO[]
-    return data.map(toSummary)
-  } catch (error) {
-    if (isBackendUnavailable(error)) {
-      return fetchMockEmpPermissions()
-    }
-    throw error
-  }
+  const data = await request.get<EmpPermissionSummaryVO[]>('/ai/emp-permission/list', { params }) as unknown as EmpPermissionSummaryVO[]
+  return data.map(toSummary)
 }
 
 /** 詳情：查詢員工權額明細 */
 export async function fetchEmpPermissionDetail(empId: number): Promise<{
   summary: EmpPermissionSummary; models: EmpModelPermission[]; quotas: EmpQuotaGrant[]
 }> {
-  try {
-    const data = await request.get<DetailVO>(`/ai/emp-permission/${empId}`) as unknown as DetailVO
-    return toDetailData(data)
-  } catch (error) {
-    if (isBackendUnavailable(error)) {
-      // 降級 Mock
-      const list = await fetchMockEmpPermissions()
-      const found = list.find((r) => r.employeeId === empId)
-      if (found) {
-        return { summary: found, models: found.modelPermissions, quotas: found.quotaGrants }
-      }
-      const err = new Error('員工不存在')
-      ;(err as Error & { cause?: unknown }).cause = error
-      throw err
-    }
-    throw error
-  }
+  const data = await request.get<DetailVO>(`/ai/emp-permission/${empId}`) as unknown as DetailVO
+  return toDetailData(data)
 }
 
 /** 保存編輯 */
@@ -222,13 +288,6 @@ export async function saveEmpPermission(empId: number, req: SaveReq): Promise<bo
 
 /** 查詢調整日誌 */
 export async function fetchAdjustLogs(empId: number): Promise<AdjustLogVO[]> {
-  try {
-    const data = await request.get<AdjustLogVO[]>(`/ai/emp-permission/${empId}/adjust-log`) as unknown as AdjustLogVO[]
-    return data
-  } catch (error) {
-    if (isBackendUnavailable(error)) {
-      return []
-    }
-    throw error
-  }
+  const data = await request.get<AdjustLogVO[]>(`/ai/emp-permission/${empId}/adjust-log`) as unknown as AdjustLogVO[]
+  return data
 }

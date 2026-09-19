@@ -30,6 +30,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
 
     private static final String V_CONSUMABLE_SCHEMA = "consumable:schema-v1.0";
     private static final String V_CONSUMABLE_REFACTOR = "consumable:refactor-v2.2";
+    /** 计量单位字典表废弃清理（一次性） */
+    private static final String V_DROP_UNIT_TABLE = "consumable:drop-unit-table-v1";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -39,11 +41,47 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     public void run(String... args) {
         versionTracker.applyOnce(V_CONSUMABLE_SCHEMA, this::migrate);
         versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
-        // 每次启动均修正排序（v167 菜单重组后，耗材管理 sort=3）
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 3");
+        // 每次启动均修正排序（v167 菜单重组后，耗材管理在「物資管理」下排第 4, 与 asset-flow-ops=3 不冲突）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 4");
         // 补种子：出入库流水菜单（v3，幂等）
         seedStockTxnMenu();
+        // v40: 耗材领用菜单每次启动幂等补种（不受 applyOnce 门控）：
+        //      167 菜单重组曾把它误删成「暗页面」（路由/控制器仍在但菜单消失）, 门控后不再补种会重现该缺陷
+        ensureClaimMenuEveryStartup();
+        // 计量单位字典表废弃：存量库（含生产）一次性 DROP，单位已改为产品/耗材上的文本属性
+        versionTracker.applyOnce(V_DROP_UNIT_TABLE, this::dropLegacyUnitTable);
         // 方案二：耗材分类/品牌/计量单位三个基础配置菜单已下线（并入分类库/品牌产品库），不再补种
+    }
+
+    /** 删除已废弃的耗材计量单位字典表（幂等，表不存在时不报错） */
+    private void dropLegacyUnitTable() {
+        jdbcTemplate.execute("DROP TABLE IF EXISTS biz_consumable_unit");
+        log.info("已删除废弃的计量单位字典表 biz_consumable_unit（单位改为产品/耗材文本属性）");
+    }
+
+    /** 每次启动确保「耗材領用」菜单存在并挂回耗材管理分组（仅修补缺失, 不覆盖人工改名） */
+    private void ensureClaimMenuEveryStartup() {
+        Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
+        if (groupId == null) {
+            return;
+        }
+        ensureMenu(groupId, "consumable-claim", "耗材領用", "/consumable-claim", "ConsumableClaim",
+                "UserAddOutlined", 3, "[\"view\",\"create\",\"edit\",\"delete\"]");
+        // 英文名称：本初始化器晚于 DataInitializer.seedMenuEnglishNames 执行, 新建的菜单需自行补 name_en
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Consumable Claim' "
+                + "WHERE menu_key = 'consumable-claim' AND deleted = 0 AND (name_en IS NULL OR name_en = '')");
+        Long adminRoleId = queryLong("SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1");
+        Long menuId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-claim' AND deleted = 0 LIMIT 1");
+        if (adminRoleId != null && menuId != null) {
+            String actions = "[\"view\",\"create\",\"edit\",\"delete\"]";
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                    adminRoleId, menuId, actions);
+            jdbcTemplate.update(
+                    "UPDATE sys_role_menu SET actions = ? WHERE role_id = ? AND menu_id = ? "
+                            + "AND (actions IS NULL OR actions = '')",
+                    actions, adminRoleId, menuId);
+        }
     }
 
     /** 幂等创建「出入库流水」菜单并授权 admin 角色 */
@@ -218,16 +256,16 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
             return;
         }
         String actions = "[\"view\",\"create\",\"edit\",\"delete\"]";
-        // 耗材管理分组（二级，挂在资产管理下，sort=4）
+        // 耗材管理分组（二级，挂在物資管理下，sort=4）
         ensureMenu(assetMgmtId, "consumable-ops", "耗材管理", "", "", "GoldOutlined", 4, "[\"view\"]");
         Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
         if (groupId == null) return;
         // 5 个子菜单
         ensureMenu(groupId, "consumable-dashboard", "耗材看板", "/consumable-dashboard", "ConsumableDashboard", "DashboardOutlined", 1, "[\"view\"]");
-        ensureMenu(groupId, "consumable-item", "耗材档案", "/consumable-item", "ConsumableItem", "ProfileOutlined", 2, actions);
-        ensureMenu(groupId, "consumable-claim", "耗材领用", "/consumable-claim", "ConsumableClaim", "UserAddOutlined", 3, actions);
-        ensureMenu(groupId, "consumable-stock", "耗材库存", "/consumable-stock", "ConsumableStock", "DatabaseOutlined", 4, "[\"view\",\"create\",\"edit\"]");
-        ensureMenu(groupId, "consumable-alert", "库存预警", "/consumable-alert", "ConsumableAlert", "AlertOutlined", 5, "[\"view\",\"edit\"]");
+        ensureMenu(groupId, "consumable-item", "耗材檔案", "/consumable-item", "ConsumableItem", "ProfileOutlined", 2, actions);
+        ensureMenu(groupId, "consumable-claim", "耗材領用", "/consumable-claim", "ConsumableClaim", "UserAddOutlined", 3, actions);
+        ensureMenu(groupId, "consumable-stock", "耗材庫存", "/consumable-stock", "ConsumableStock", "DatabaseOutlined", 4, "[\"view\",\"create\",\"edit\"]");
+        ensureMenu(groupId, "consumable-alert", "庫存預警", "/consumable-alert", "ConsumableAlert", "AlertOutlined", 5, "[\"view\",\"edit\"]");
 
         // admin 角色授权（超管在权限层直通，此处为菜单可见性与非超管角色兜底）
         // actions 必须写入：前端受控菜单要求 actions 非空，NULL/空授权会导致菜单整项隐藏
@@ -284,11 +322,11 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         int affected = 0;
         // 耗材编码：HC + 6 位全局自增（无日期维度）
         affected += seedRule(BizSeqService.RULE_EAM_CONSUMABLE_ITEM, "耗材編碼",
-                "物資管理(EAM)-耗材檔案", "HC", "", 6, 1,
+                "物資管理-耗材檔案", "HC", "", 6, 1,
                 "{prefix} + {n}位數字自增（全局自增，如 HC000001）");
         // 耗材领用单号：HCLY + YYYYMMDD + 4 位自增
         affected += seedRule(BizSeqService.RULE_EAM_CONSUMABLE_CLAIM, "耗材領用單號",
-                "物資管理(EAM)-耗材領用", "HCLY", "YYYYMMDD", 4, 0,
+                "物資管理-耗材領用", "HCLY", "YYYYMMDD", 4, 0,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (affected > 0) {
             bizSeqService.refreshRules();
@@ -322,22 +360,7 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         log.info("开始创建耗材基础数据表结构 ...");
 
         // 方案二：耗材分类/品牌表已并入统一分类库/品牌产品库（biz_eam_category / biz_eam_brand），不再建旧表
-
-        // 计量单位
-        jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS biz_consumable_unit ("
-                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-                + "name VARCHAR(32) NOT NULL COMMENT '单位名称', "
-                + "abbr VARCHAR(16) DEFAULT '' COMMENT '缩写', "
-                + "sort_order INT DEFAULT 0 COMMENT '排序', "
-                + "status VARCHAR(16) NOT NULL DEFAULT 'enabled', "
-                + "created_by VARCHAR(64) DEFAULT '', "
-                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
-                + "updated_by VARCHAR(64) DEFAULT '', "
-                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
-                + "deleted TINYINT NOT NULL DEFAULT 0, "
-                + "UNIQUE KEY uk_name (name), KEY idx_status (status)"
-                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材计量单位字典'");
+        // 计量单位不再建字典表：单位作为产品/耗材记录（biz_eam_model.unit / biz_eam_consumable_item.unit）的文本属性直存
 
         // 耗材主数据表增加新字段（兼容不支持 ADD COLUMN IF NOT EXISTS 的 MySQL 版本）
         addColumnIfNotExists("biz_eam_consumable_item", "consumable_category_id",
@@ -348,24 +371,13 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
                 "consumable_category_id");
         addIndexIfNotExists("biz_eam_consumable_item", "idx_brand", "brand_id");
 
-        log.info("耗材基础数据表结构创建完成（计量单位表 + 耗材主数据 2 个新字段）");
+        log.info("耗材主数据字段补齐完成（计量单位字典已废弃，不再建表）");
     }
 
     /* ==================== 6. 二期迁移：种子数据 ==================== */
 
     private void seedRefactorData() {
-        // 计量单位种子
-        String[][] units = {
-                {"個", "pcs", "1"}, {"支", "pcs", "2"}, {"盒", "box", "3"},
-                {"包", "pack", "4"}, {"箱", "ctn", "5"}, {"瓶", "btl", "6"},
-                {"卷", "roll", "7"}, {"張", "sheet", "8"}, {"套", "set", "9"},
-                {"袋", "bag", "10"}
-        };
-        for (String[] u : units) {
-            jdbcTemplate.update(
-                    "INSERT IGNORE INTO biz_consumable_unit (name, abbr, sort_order, status, created_by, updated_by) VALUES (?, ?, ?, 'enabled', 'system', 'system')",
-                    u[0], u[1], Integer.parseInt(u[2]));
-        }
+        // 计量单位字典已废弃（表已删除），不再灌 10 条系统种子；单位在建产品/耗材档案时直接输入
 
         // 方案二：耗材分类/品牌种子写入统一表（biz_type=CONSUMABLE）
         seedUnifiedConsumableBasic();
@@ -412,11 +424,11 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         }
     }
 
-    /** 为资产品牌添加 code 列并填充存量数据（耗材品牌已并入统一表，编码随迁移带出） */
+    /** 为所属品牌添加 code 列并填充存量数据（耗材品牌已并入统一表，编码随迁移带出） */
     private void addBrandCodeColumns() {
-        // 资产品牌加 code 列
+        // 所属品牌加 code 列
         addColumnIfNotExists("biz_eam_brand", "code", "VARCHAR(32) DEFAULT NULL COMMENT '品牌编码（AB 前缀）'");
-        // 填充存量资产品牌编码
+        // 填充存量所属品牌编码
         List<Map<String, Object>> assetBrands = jdbcTemplate.queryForList(
                 "SELECT id, code FROM biz_eam_brand WHERE deleted = 0 ORDER BY id");
         int abSeq = 1;
@@ -427,7 +439,7 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
             }
             abSeq++;
         }
-        log.info("品牌编码列添加完成（资产品牌 AB）");
+        log.info("品牌编码列添加完成（所属品牌 AB）");
     }
 
     /** 安全添加列（兼容不支持 ADD COLUMN IF NOT EXISTS 的 MySQL 版本） */

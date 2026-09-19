@@ -234,7 +234,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
   /* ----- 字段配置 ----- */
   const columnMeta = useMemo(() => [
     { key: 'poNo', title: t('asset.colPoNo') },
-    { key: 'brand', title: '資產品牌' },
+    { key: 'brand', title: t('asset.orderBrand') },
     { key: 'reqId', title: t('asset.colReqNo') },
     { key: 'supplier', title: t('asset.colSupplier') },
     { key: 'confirmedAmount', title: t('asset.colConfirmedAmount') },
@@ -258,7 +258,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '資產品牌', dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('asset.orderBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {

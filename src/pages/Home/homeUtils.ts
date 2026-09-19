@@ -1,5 +1,4 @@
 import { pinyin } from 'pinyin-pro'
-import type { MenuVO } from '../../api/menu'
 import type { QuotaSource } from '../../api/aiMyCenter'
 
 /* ── 类型定义 ── */
@@ -81,11 +80,3 @@ export const getGreeting = (hour: number, t: (key: string) => string) => {
 
 /** 将 AI 回复中的字面 \n 转为真正换行（CSS white-space: pre-wrap 负责渲染） */
 export const formatAiText = (text: string) => text.replace(/\\n/g, '\n')
-
-/** 递归收集菜单 key → 名称映射 */
-export const collectMenuNames = (menus: MenuVO[], map: Record<string, string>) => {
-  menus.forEach((m) => {
-    map[m.menuKey] = m.name
-    if (m.children?.length) collectMenuNames(m.children, map)
-  })
-}

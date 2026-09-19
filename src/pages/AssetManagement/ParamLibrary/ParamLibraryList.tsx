@@ -270,8 +270,8 @@ export default function ParamLibraryList({ onAddType, onEditType }: ParamLibrary
       render: (status: string, record: ParamType) => (
         <Switch
           checked={status === 'enabled'}
-          checkedChildren={t('asset.enabledStatus')}
-          unCheckedChildren={t('asset.disabledStatus')}
+          checkedChildren={t('asset.switchEnabled')}
+          unCheckedChildren={t('asset.switchDisabled')}
           onChange={() => handleToggleTypeStatus(record)}
         />
       ),

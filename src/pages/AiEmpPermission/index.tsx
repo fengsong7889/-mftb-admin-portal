@@ -8,18 +8,20 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
-  flattenDepts,
-  MOCK_DEPT_TREE,
   SOURCE_TAG_COLOR,
   QUOTA_STATUS_LABEL,
   QUOTA_STATUS_COLOR,
   calcQuotaStatus,
+  fetchEmpPermissionList,
   type EmpPermissionSummary,
   type EmpQuotaGrant,
   type PermissionSource,
   type QuotaStatus,
+} from '../../api/empPermission'
+import {
+  flattenDepts,
+  MOCK_DEPT_TREE,
 } from '../../api/mock/aiEmpPermissionMock'
-import { fetchEmpPermissionList } from '../../api/empPermission'
 
 /* ══════════ 展示常量 ══════════ */
 

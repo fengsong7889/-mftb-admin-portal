@@ -30,7 +30,7 @@ public class AdPricingTraffic {
     /** 算法名称快照 */
     private String algoName;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道: 1=美食外卖 2=超市百货 3=团购到店 */

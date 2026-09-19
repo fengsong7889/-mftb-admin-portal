@@ -69,6 +69,16 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 修正赔付编号规则触发菜单归属（歸還管理 → 賠付管理），重跑借用+赔付种子幂等修正 */
     private static final String V_INIT_EAM_COMP_MENU_FIX = "seq:init-v14";
 
+    /** 增量版本: 盘点任务编号 (PD) 规则种子 */
+    private static final String V_INIT_EAM_INVENTORY_RULE = "seq:init-v15";
+
+    /**
+     * 增量版本: 物资管理归属菜单文案统一。
+     * 一级菜单已统一为「物資管理」, 编号规则的 biz_menu 由「物資管理(EAM)-XX」改为「物資管理-XX」,
+     * 并对齐本轮改名的子菜单（採購訂單 → 採購執行、賠付管理 → 損壞賠付）。
+     */
+    private static final String V_INIT_EAM_MENU_LABEL_UNIFY = "seq:init-v16";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -123,6 +133,34 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         versionTracker.applyOnce(V_INIT_EAM_COMP_MENU_FIX, () -> {
             seedEamBorrowCompRules();
         });
+        versionTracker.applyOnce(V_INIT_EAM_INVENTORY_RULE, () -> {
+            seedEamInventoryRule();
+        });
+        versionTracker.applyOnce(V_INIT_EAM_MENU_LABEL_UNIFY, this::normalizeEamRuleBizMenu);
+    }
+
+    /**
+     * 存量修正：把编号规则的「所属菜单」文案统一为「物資管理-<菜单名>」。
+     * <p>
+     * 直接基于 DB 做前缀替换（而非重跑种子）：部分规则（如資產分類編碼/倉庫編碼）
+     * 由人工写入 sys_biz_seq_rule、无对应种子方法, 只有 REPLACE 能一并修正。
+     * 两步替换幂等：先替换带分隔符的旧前缀, 再兜底处理无分隔符的裸前缀。
+     */
+    private void normalizeEamRuleBizMenu() {
+        int withSuffix = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET biz_menu = REPLACE(biz_menu, '物資管理(EAM)-', '物資管理-') "
+                        + "WHERE biz_menu LIKE '物資管理(EAM)-%'");
+        int bare = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET biz_menu = '物資管理' WHERE biz_menu = '物資管理(EAM)'");
+        int renamed = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET biz_menu = REPLACE(biz_menu, '物資管理-採購訂單', '物資管理-採購執行') "
+                        + "WHERE biz_menu LIKE '物資管理-採購訂單%'");
+        int compensation = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET biz_menu = REPLACE(biz_menu, '物資管理-賠付管理', '物資管理-損壞賠付') "
+                        + "WHERE biz_menu LIKE '物資管理-賠付管理%'");
+        log.info("编号规则归属菜单文案统一: 前缀 {} 条 / 裸前缀 {} 条 / 採購執行 {} 条 / 損壞賠付 {} 条",
+                withSuffix, bare, renamed, compensation);
+        bizSeqService.refreshRules();
     }
 
     /** 编号生成规则配置表 */
@@ -195,7 +233,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 {"employee_no", "工號", "員工管理", "MF", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
                 {"dept_code", "部門編碼", "組織管理", "BM", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
                 {"position_id", "職位ID", "職位管理", "ZW", "", "5", "1", "{prefix} + {n}位自增序號（全局自增）"},
-                {"eam_purchase_order", "採購訂單編號", "物資管理(EAM)-採購訂單", "DDCG", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"eam_purchase_order", "採購訂單編號", "物資管理-採購執行", "DDCG", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
         };
         int inserted = 0;
         for (String[] r : rules) {
@@ -455,7 +493,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_PURCHASE_ORDER, "採購訂單編號", "物資管理(EAM)-採購訂單",
+                BizSeqService.RULE_EAM_PURCHASE_ORDER, "採購訂單編號", "物資管理-採購執行",
                 "DDCG", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (affected > 0) {
@@ -477,7 +515,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_INBOUND_BATCH, "驗收入庫批次編號", "物資管理(EAM)-驗收入庫",
+                BizSeqService.RULE_EAM_INBOUND_BATCH, "驗收入庫批次編號", "物資管理-驗收入庫",
                 "IB", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         // 资产编号: {品牌编碼}-{倉庫编碼}-{分類碼}-{4位分類內自增序號} (示例: TB-ZH-0101-0001)
@@ -492,7 +530,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_ASSET, "資產編號", "物資管理(EAM)-資產台賬",
+                BizSeqService.RULE_EAM_ASSET, "資產編號", "物資管理-資產台賬",
                 "TB", "", 4, 0, 1,
                 "{品牌编碼}-{倉庫编碼}-{分類碼}-{n}位分類內自增序號");
         if (inserted > 0) {
@@ -512,7 +550,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_SUPPLIER_CODE, "供應商編碼", "物資管理(EAM)-供應商管理",
+                BizSeqService.RULE_EAM_SUPPLIER_CODE, "供應商編碼", "物資管理-供應商管理",
                 "CGSJ", "", 6, 1, 1,
                 "{prefix} + {n}位數字自增（全局自增，如 CGSJ000001、CGSJ000002）");
         if (affected > 0) {
@@ -533,7 +571,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_CLAIM, "領用編號", "物資管理(EAM)-領用資產",
+                BizSeqService.RULE_EAM_CLAIM, "領用編號", "物資管理-領用資產",
                 "LY", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         inserted += jdbcTemplate.update(
@@ -545,7 +583,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_RETURN, "歸還編號", "物資管理(EAM)-資產歸還",
+                BizSeqService.RULE_EAM_RETURN, "歸還編號", "物資管理-資產歸還",
                 "GH", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -566,7 +604,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_BORROW, "借用編號", "物資管理(EAM)-借用資產",
+                BizSeqService.RULE_EAM_BORROW, "借用編號", "物資管理-借用資產",
                 "JY", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         inserted += jdbcTemplate.update(
@@ -578,7 +616,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_COMPENSATION, "賠付編號", "物資管理(EAM)-賠付管理",
+                BizSeqService.RULE_EAM_COMPENSATION, "賠付編號", "物資管理-損壞賠付",
                 "PF", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -598,7 +636,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_HANDOVER, "交接編號", "物資管理(EAM)-資產交接",
+                BizSeqService.RULE_EAM_HANDOVER, "交接編號", "物資管理-資產交接",
                 "JJ", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
@@ -618,11 +656,31 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
                         + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
                         + "remark = VALUES(remark), status = VALUES(status)",
-                BizSeqService.RULE_EAM_TRANSFER, "調撥單號", "物資管理(EAM)-資產調撥",
+                BizSeqService.RULE_EAM_TRANSFER, "調撥單號", "物資管理-資產調撥",
                 "DB", "YYYYMMDD", 4, 0, 1,
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
             log.info("已写入/修正调拨单号规则种子数据 (DB + YYYYMMDD + 4位)");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 盘点任务编号 (PD+YYYYMMDD+4位) 规则种子 (v15) */
+    private void seedEamInventoryRule() {
+        int inserted = jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_INVENTORY, "盤點任務編號", "物資管理-資產盤點",
+                "PD", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正盘点任务编号规则种子数据 (PD + YYYYMMDD + 4位)");
             bizSeqService.refreshRules();
         }
     }

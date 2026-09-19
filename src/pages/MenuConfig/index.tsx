@@ -21,6 +21,7 @@ interface MenuItem {
   id: string
   parentId: string
   name: string           // 中文名称
+  nameEn: string         // 英文名称（非中文语言下菜单展示的真值）
   menuKey: string        // 后台英文 Key
   path: string           // 路由路径
   icon: string           // 图标名称
@@ -48,6 +49,7 @@ const voToItem = (vo: MenuVO): MenuItem => ({
   id: String(vo.id),
   parentId: vo.parentId != null ? String(vo.parentId) : '0',
   name: vo.name,
+  nameEn: vo.nameEn || '',
   menuKey: vo.menuKey,
   path: vo.path || '',
   icon: vo.icon || '',
@@ -62,6 +64,7 @@ const itemToPayload = (item: MenuItem, parentId?: string): MenuPayload => ({
   parentId: parentId != null ? Number(parentId) : (item.parentId !== '0' ? Number(item.parentId) : null),
   menuKey: item.menuKey,
   name: item.name,
+  nameEn: item.nameEn || undefined,
   path: item.path || undefined,
   icon: item.icon || undefined,
   type: TYPE_TO_NUM[item.type] ?? 2,
@@ -324,6 +327,7 @@ export default function MenuConfig() {
     setEditing(record)
     modalForm.setFieldsValue({
       name: record.name,
+      nameEn: record.nameEn,
       menuKey: record.menuKey,
       path: record.path,
       parentId: record.parentId,
@@ -344,6 +348,7 @@ export default function MenuConfig() {
         parentId: values.parentId === '0' || values.parentId === 0 ? null : Number(values.parentId),
         menuKey: values.menuKey,
         name: values.name,
+        nameEn: values.nameEn || undefined,
         path: values.path || undefined,
         icon: values.icon || undefined,
         type: TYPE_TO_NUM[values.type] ?? 2,
@@ -501,8 +506,8 @@ export default function MenuConfig() {
       render: (_: unknown, record: MenuItem) => (
         <Switch
           checked={record.status === 'enabled'}
-          checkedChildren={t('common.enable')}
-          unCheckedChildren={t('common.disable')}
+          checkedChildren="啟用"
+          unCheckedChildren="停用"
           onChange={() => handleToggleStatus(record)}
         />
       ),
@@ -650,6 +655,9 @@ export default function MenuConfig() {
           <Form.Item name="name" label={t('menuConfig.menuName')} rules={[{ required: true, message: t('menuConfig.menuNameRequired') }]}>
             <Input placeholder={t('menuConfig.menuNamePlaceholder')} allowClear maxLength={50} />
           </Form.Item>
+          <Form.Item name="nameEn" label={t('menuConfig.menuNameEn')}>
+            <Input placeholder={t('menuConfig.menuNameEnPlaceholder')} allowClear maxLength={100} />
+          </Form.Item>
           <Form.Item name="menuKey" label={t('menuConfig.menuKey')} rules={[{ required: true, message: t('menuConfig.menuKeyRequired') }]}>
             <Input placeholder={t('menuConfig.menuKeyPlaceholder')} allowClear maxLength={100} disabled={!!editing} />
           </Form.Item>
@@ -696,7 +704,7 @@ export default function MenuConfig() {
             getValueFromEvent={(checked: boolean) => checked ? 'enabled' : 'disabled'}
             getValueProps={(value: string) => ({ checked: value === 'enabled' })}
           >
-            <Switch checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} />
+            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>

@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * 耗材基础数据接口（分类 / 品牌 / 计量单位）
+ * 耗材基础数据接口（分类 / 品牌）
  * <p>
- * 与资产域基础数据（biz_eam_category / biz_eam_brand）物理隔离，
- * 耗材档案从本接口获取分类、品牌、单位下拉数据源。
+ * 分类与品牌已并入资产域统一表（biz_eam_category / biz_eam_brand，用 biz_type 区分），
+ * 计量单位不再是独立字典（旧 biz_consumable_unit 已废弃），单位由表单作为文本属性直存。
  */
 @RestController
 @RequestMapping("/api/eam/consumables/basic")
@@ -115,48 +115,6 @@ public class ConsumableBasicDataController {
     @RequirePermission(menu = "consumable-brand", action = "edit")
     public Result<Void> toggleBrandStatus(@PathVariable long id) {
         basicDataService.toggleBrandStatus(id);
-        return Result.success();
-    }
-
-    /* ===== 计量单位 ===== */
-
-    @GetMapping("/units")
-    @RequirePermission(menu = "consumable-unit")
-    public Result<List<ConsumableUnitVO>> listUnits(
-            @RequestParam(required = false) String keyword) {
-        return Result.success(basicDataService.listUnits(keyword));
-    }
-
-    /** 单位下拉选项（耗材档案表单用，登录即可） */
-    @GetMapping("/units/options")
-    public Result<List<ConsumableUnitVO>> unitOptions() {
-        return Result.success(basicDataService.listUnits(null));
-    }
-
-    @PostMapping("/units")
-    @RequirePermission(menu = "consumable-unit", action = "create")
-    public Result<Long> createUnit(@RequestBody ConsumableUnitSaveDTO dto) {
-        return Result.success(basicDataService.createUnit(dto));
-    }
-
-    @PutMapping("/units/{id}")
-    @RequirePermission(menu = "consumable-unit", action = "edit")
-    public Result<Void> updateUnit(@PathVariable long id, @RequestBody ConsumableUnitSaveDTO dto) {
-        basicDataService.updateUnit(id, dto);
-        return Result.success();
-    }
-
-    @DeleteMapping("/units/{id}")
-    @RequirePermission(menu = "consumable-unit", action = "delete")
-    public Result<Void> deleteUnit(@PathVariable long id) {
-        basicDataService.deleteUnit(id);
-        return Result.success();
-    }
-
-    @PutMapping("/units/{id}/status")
-    @RequirePermission(menu = "consumable-unit", action = "edit")
-    public Result<Void> toggleUnitStatus(@PathVariable long id) {
-        basicDataService.toggleUnitStatus(id);
         return Result.success();
     }
 }

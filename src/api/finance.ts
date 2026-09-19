@@ -1,36 +1,18 @@
-import request, { SILENT_HEADER, isBackendUnavailable } from './request'
+import request, { SILENT_HEADER } from './request'
 
 /**
- * 財務管理接口封裝（推廣金賬戶 / 審批中心 / 批次 / 明細 / 充消對賬 / 欠款對賬）
+ * 財務管理接口封装（推廣金賬戶 / 審批中心 / 批次 / 明細 / 充消對賬 / 欠款對賬）
  *
  * 字段命名與前端表格 dataIndex 完全一致（groupId/storeId 等），後端 VO 已做好映射。
- * 所有請求均為靜默請求：後端不可用時由調用方通過 withFinanceFallback 降級到本地
- * localStorage / 演示數據（見 src/utils/approvalStore.ts 與各頁面既有 Mock）。
  */
 
-/** 靜默請求頭：後端不可用時降級到本地 Mock，不彈全局錯誤提示 */
+/** 靜默請求頭：不彈全局錯誤提示，由調用方自行處理 */
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
 /** 財務模塊統一分頁結果 */
 export interface FinPageResult<T> {
   records: T[]
   total: number
-}
-
-/**
- * 後端不可用時降級到本地 Mock 的統一包裝
- * 業務錯誤（如餘額不足、無審批權限）不觸發降級，由調用方按需提示。
- */
-export async function withFinanceFallback<T>(
-  call: () => Promise<T>,
-  fallback: () => T | Promise<T>,
-): Promise<T> {
-  try {
-    return await call()
-  } catch (err) {
-    if (isBackendUnavailable(err)) return await fallback()
-    throw err
-  }
 }
 
 /* ==================== 推廣金賬戶 ==================== */

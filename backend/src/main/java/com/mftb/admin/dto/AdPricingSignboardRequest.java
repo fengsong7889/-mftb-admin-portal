@@ -21,7 +21,7 @@ public class AdPricingSignboardRequest {
     /** 算法名称（前端传入快照） */
     private String algoName;
 
-    /** 资产品牌 */
+    /** 所属品牌 */
     private String brand;
 
     /** 业务频道 */

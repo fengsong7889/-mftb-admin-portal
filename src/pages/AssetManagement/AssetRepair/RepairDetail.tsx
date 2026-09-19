@@ -6,18 +6,18 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Form, Input, Select, Button, message, Row, Col, Table, Modal, Tag, DatePicker, InputNumber, Spin, Descriptions,
+  Form, Input, Select, Button, message, Row, Col, Table, Modal, Tag, DatePicker, InputNumber, Spin, Descriptions, Space,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  PlusOutlined, SaveOutlined, CheckCircleOutlined, AppstoreOutlined, ToolOutlined,
+  PlusOutlined, SaveOutlined, AppstoreOutlined, ToolOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AssetParameters from '../../../components/AssetParameters'
 import {
-  fetchAssetDetail, fetchRepairList, repairAsset, finishRepair, type AssetItem, type AssetRepairRecord,
+  fetchAssetDetail, fetchRepairList, repairAsset, finishRepair, updateRepair, deleteRepair, type AssetItem, type AssetRepairRecord,
 } from '../../../api/asset'
 
 const REPAIR_BY_OPTIONS = [
@@ -57,8 +57,12 @@ export default function RepairDetail({ assetId, onBack }: Props) {
   const [records, setRecords] = useState<AssetRepairRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<AssetRepairRecord | null>(null)
   const [form] = Form.useForm<FormValues>()
+  const [editForm] = Form.useForm<FormValues>()
   const [submitting, setSubmitting] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -125,6 +129,64 @@ export default function RepairDetail({ assetId, onBack }: Props) {
     })
   }
 
+  const handleEditRecord = (record: AssetRepairRecord) => {
+    setEditingRecord(record)
+    editForm.setFieldsValue({
+      repairDate: dayjs(record.repairDate),
+      faultDesc: record.faultDesc,
+      repairContent: record.repairContent,
+      repairBy: record.repairBy,
+      cost: record.cost,
+      applicant: record.applicant,
+      causeType: record.causeType,
+    })
+    setEditModalOpen(true)
+  }
+
+  const handleEditSubmit = async () => {
+    if (!editingRecord) return
+    try {
+      const v = await editForm.validateFields()
+      setEditSubmitting(true)
+      await updateRepair(editingRecord.id, {
+        repairDate: v.repairDate.format('YYYY-MM-DD'),
+        faultDesc: v.faultDesc,
+        repairContent: v.repairContent,
+        repairBy: v.repairBy,
+        cost: v.cost,
+        applicant: v.applicant,
+        causeType: v.causeType,
+      })
+      message.success(t('asset.repairUpdated', '維修記錄已更新'))
+      setEditModalOpen(false)
+      editForm.resetFields()
+      loadData()
+    } catch (e: unknown) {
+      if (e instanceof Error) message.error(e.message)
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const handleDeleteRecord = (record: AssetRepairRecord) => {
+    Modal.confirm({
+      title: t('asset.confirmDeleteRepair', '確認刪除此維修記錄？'),
+      content: `${record.repairDate} - ${record.faultDesc}`,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteRepair(record.id)
+          message.success(t('asset.repairDeleted', '維修記錄已刪除'))
+          loadData()
+        } catch (e: unknown) {
+          if (e instanceof Error) message.error(e.message)
+        }
+      },
+    })
+  }
+
   const columns: TableColumnsType<AssetRepairRecord> = [
     { title: t('asset.colRepairDate'), dataIndex: 'repairDate', key: 'repairDate', width: 120 },
     { title: t('asset.colFaultDesc'), dataIndex: 'faultDesc', key: 'faultDesc', width: 200, ellipsis: true },
@@ -149,12 +211,18 @@ export default function RepairDetail({ assetId, onBack }: Props) {
       render: (v: string) => v ? <Tag>{t(`asset.cause${v.charAt(0).toUpperCase() + v.slice(1)}`)}</Tag> : '-',
     },
     {
-      title: t('common.colAction'), key: 'action', width: 100, fixed: 'right',
-      render: (_: unknown, record) => record.status === 'repairing' ? (
-        <Button type="link" size="small" icon={<CheckCircleOutlined />} onClick={() => handleFinishRepair(record)}>
-          {t('asset.btnFinishRepair')}
-        </Button>
-      ) : null,
+      title: t('common.colAction'), key: 'action', width: 200, fixed: 'right',
+      render: (_: unknown, record) => (
+        <Space size={0} split={<span className="action-split">|</span>}>
+          {record.status === 'repairing' && (
+            <>
+              <Button type="link" size="small" onClick={() => handleEditRecord(record)}>{t('common.edit')}</Button>
+              <Button type="link" size="small" danger onClick={() => handleDeleteRecord(record)}>{t('common.delete')}</Button>
+              <Button type="link" size="small" onClick={() => handleFinishRepair(record)}>{t('asset.btnFinishRepair')}</Button>
+            </>
+          )}
+        </Space>
+      ),
     },
   ]
 
@@ -277,6 +345,55 @@ export default function RepairDetail({ assetId, onBack }: Props) {
           <div style={{ textAlign: 'right', borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
             <Button onClick={() => setModalOpen(false)} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
             <Button type="primary" icon={<SaveOutlined />} onClick={handleSubmit} loading={submitting}>{t('common.save')}</Button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* 编辑维修记录弹窗 */}
+      <Modal
+        title={t('asset.modalEditRepair', '編輯維修記錄')}
+        open={editModalOpen}
+        onCancel={() => { setEditModalOpen(false); editForm.resetFields() }}
+        footer={null}
+        width={640}
+        destroyOnClose
+      >
+        <Form<FormValues> form={editForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label={t('asset.colRepairDate')} name="repairDate" rules={[{ required: true, message: t('asset.repairDateRequired') }]}>
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label={t('asset.colRepairBy')} name="repairBy" rules={[{ required: true, message: t('asset.repairByRequired') }]}>
+                <Select placeholder={t('asset.repairByPh')}>
+                  {REPAIR_BY_OPTIONS.map((o) => <Select.Option key={o.value} value={o.value}>{t(`asset.${o.labelKey}`)}</Select.Option>)}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item label={t('asset.colFaultDesc')} name="faultDesc" rules={[{ required: true, message: t('asset.faultDescRequired') }]}>
+            <Input.TextArea rows={2} placeholder={t('asset.faultDescPh')} maxLength={300} showCount />
+          </Form.Item>
+          <Form.Item label={t('asset.colRepairContent')} name="repairContent" rules={[{ required: true, message: t('asset.repairContentRequired') }]}>
+            <Input.TextArea rows={2} placeholder={t('asset.repairContentPh')} maxLength={300} showCount />
+          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label={t('asset.colCost')} name="cost">
+                <InputNumber min={0} step={50} addonAfter="MOP" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label={t('asset.colApplicant')} name="applicant" rules={[{ required: true, message: t('asset.applicantRequired') }]}>
+                <Input placeholder={t('asset.userNamePh')} allowClear />
+              </Form.Item>
+            </Col>
+          </Row>
+          <div style={{ textAlign: 'right', borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
+            <Button onClick={() => { setEditModalOpen(false); editForm.resetFields() }} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
+            <Button type="primary" onClick={handleEditSubmit} loading={editSubmitting}>{t('common.save')}</Button>
           </div>
         </Form>
       </Modal>

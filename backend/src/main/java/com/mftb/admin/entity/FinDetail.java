@@ -29,7 +29,7 @@ public class FinDetail {
     /** 集团名称 */
     private String groupName;
 
-    /** 资产品牌 */
+    /** 所属品牌 */
     private String brand;
 
     /** 门店ID（集团维度记 --） */

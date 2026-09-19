@@ -50,7 +50,7 @@ export default function ClaimRecordTable({ data, query, loading, pageKey, onQuer
     { key: 'assetNo', title: t('asset.assetNo'), dataIndex: 'assetNo', width: 180 },
     { key: 'assetName', title: t('asset.assetNameLabel'), dataIndex: 'assetName', width: 180, ellipsis: true },
     { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
-    { key: 'companyBrand', title: '所属公司品牌', dataIndex: 'companyBrand', width: 120, render: (value?: number) => value ? <BrandTag value={value} /> : '—' },
+    { key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 120, render: (value?: number) => value ? <BrandTag value={value} /> : '—' },
     { key: 'brand', title: '资产品牌', dataIndex: 'brand', width: 110 },
     { key: 'status', title: '领用状态', dataIndex: 'status', width: 110, render: (value: ClaimStatus) => <ClaimStatusTag status={value} /> },
     { key: 'signatureStatus', title: '签收状态', dataIndex: 'signatureStatus', width: 150, render: (value: SignatureStatus, row) => <Tooltip title={row.proxyReason}><span><SignatureStatusTag status={value} /></span></Tooltip> },

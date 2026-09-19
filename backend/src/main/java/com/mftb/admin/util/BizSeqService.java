@@ -119,6 +119,8 @@ public class BizSeqService {
     public static final String RULE_EAM_CONSUMABLE_ITEM = "eam_consumable_item";
     /** EAM 耗材领用单号 */
     public static final String RULE_EAM_CONSUMABLE_CLAIM = "eam_consumable_claim";
+    /** EAM 盘点任务编号 */
+    public static final String RULE_EAM_INVENTORY = "eam_inventory";
 
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）

@@ -105,6 +105,12 @@ const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice')
 // 系統配置
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
+// 多语言管理（i18n-center 独立模块）
+const I18nWorkbench = lazy(() => import('./pages/I18nCenter/Workbench'))
+const I18nLanguageConfig = lazy(() => import('./pages/I18nCenter/LanguageConfig'))
+const I18nImportExport = lazy(() => import('./pages/I18nCenter/ImportExport'))
+const I18nMtEngineConfig = lazy(() => import('./pages/I18nCenter/MtEngineConfig'))
+const I18nDashboard = lazy(() => import('./pages/I18nCenter/Dashboard'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
 const NotificationConfig = lazy(() => import('./pages/NotificationConfig'))
 const NotificationChannelForm = lazy(() => import('./pages/NotificationChannelForm'))
@@ -184,7 +190,6 @@ const ConsumableStock = lazy(() => import('./pages/Consumable/Stock'))
 const ConsumableStockTxn = lazy(() => import('./pages/Consumable/Stock/StockTxnDetail'))
 const ConsumableStockTxnList = lazy(() => import('./pages/Consumable/Stock/StockTxnList'))
 const ConsumableAlert = lazy(() => import('./pages/Consumable/Alert'))
-const ConsumableUnit = lazy(() => import('./pages/Consumable/Unit'))
 // EAM 採購入庫
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
 const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
@@ -336,6 +341,12 @@ function AuthenticatedLayout() {
               {/* 系統配置 */}
               <Route path="/menu-config" element={<MenuConfig />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
+              {/* 多语言管理（i18n-center 独立模块） */}
+              <Route path="/i18n-center/workbench" element={<I18nWorkbench />} />
+              <Route path="/i18n-center/language" element={<I18nLanguageConfig />} />
+              <Route path="/i18n-center/import-export" element={<I18nImportExport />} />
+              <Route path="/i18n-center/mt-engine" element={<I18nMtEngineConfig />} />
+              <Route path="/i18n-center/dashboard" element={<I18nDashboard />} />
               <Route path="/rule-config" element={<RuleConfig />} />
               <Route path="/notification-config" element={<NotificationConfig />} />
               <Route path="/notification-channel-form" element={<NotificationChannelForm />} />
@@ -413,7 +424,6 @@ function AuthenticatedLayout() {
               <Route path="/consumable-stock/txn" element={<ConsumableStockTxn />} />
               <Route path="/consumable-stock-txn" element={<ConsumableStockTxnList />} />
               <Route path="/consumable-alert"     element={<ConsumableAlert />} />
-              <Route path="/consumable-unit"      element={<ConsumableUnit />} />
               {/* EAM 採購入庫 */}
               <Route path="/purchase-order"   element={<PurchaseOrder />} />
               <Route path="/asset-inbound"    element={<AssetInbound />} />

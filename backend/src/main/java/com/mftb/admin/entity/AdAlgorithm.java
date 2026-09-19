@@ -28,7 +28,7 @@ public class AdAlgorithm {
     /** 算法类型: 1=无敌星星 2=新店广告 3=盘活复苏 ... */
     private Integer algoType;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道: 1=大首页 2=外卖频道 3=超市百货 4=团购到店 */

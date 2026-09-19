@@ -1,37 +1,17 @@
-import request, { SILENT_HEADER, isBackendUnavailable } from './request'
+import request, { SILENT_HEADER } from './request'
 
 /**
- * 推廣廣告（無敵星星）接口封裝
+ * 推廣廣告（無敵星星）接口封装
  * 算法庫 / 銷售定價 / 廣告銷售（庫存+下單） / 訂單查詢+退款
- *
- * 沿用 finance.ts 的靜默請求模式：後端不可用時由調用方通過
- * withAdFallback 降級到本地 Mock / 演示數據，不彈全局錯誤提示。
- * 業務錯誤（餘額不足、格子已售罄等）不觸發降級，由調用方按需提示。
  */
 
-/** 靜默請求頭：後端不可用時降級到本地 Mock，不彈全局錯誤提示 */
+/** 靜默請求頭：不彈全局錯誤提示，由調用方自行處理 */
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
 /** 推廣廣告統一分頁結果 */
 export interface AdPageResult<T> {
   records: T[]
   total: number
-}
-
-/**
- * 後端不可用時降級到本地 Mock 的統一包裝
- * 業務錯誤（如餘額不足、格子已售罄）不觸發降級，由調用方按需提示。
- */
-export async function withAdFallback<T>(
-  call: () => Promise<T>,
-  fallback: () => T | Promise<T>,
-): Promise<T> {
-  try {
-    return await call()
-  } catch (err) {
-    if (isBackendUnavailable(err)) return await fallback()
-    throw err
-  }
 }
 
 /* ==================== 品牌映射 ==================== */

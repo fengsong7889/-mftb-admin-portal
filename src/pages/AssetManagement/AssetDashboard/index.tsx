@@ -7,7 +7,7 @@
  *  - 圖表：類型分布（餅圖）、部門分布（柱圖）、月度入庫趨勢（柱圖）
  */
 import { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Spin, Badge } from 'antd'
+import { Card, Row, Col, Statistic, Spin, Badge, Result, Button } from 'antd'
 import {
   InboxOutlined, CheckCircleOutlined, PauseCircleOutlined, ToolOutlined,
   DeleteOutlined, DollarOutlined, PieChartOutlined, WarningOutlined,
@@ -19,19 +19,27 @@ import { fetchEamDashboard, type EamDashboard } from '../../../api/eam'
 
 export default function AssetDashboard() {
   const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [data, setData] = useState<EamDashboard | null>(null)
+  const [retry, setRetry] = useState(0)
 
   useEffect(() => {
+    let active = true
     setLoading(true)
+    setData(null)
     fetchEamDashboard()
-      .then(setData)
-      .catch(() => { /* dashboard load failure is non-critical */ })
-      .finally(() => setLoading(false))
-  }, [])
+      .then(value => { if (active) setData(value) })
+      .catch(() => { if (active) setData(null) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [retry])
 
-  if (loading || !data) {
+  if (loading) {
     return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
+  }
+
+  if (!data) {
+    return <Result status="warning" title="資產看板載入失敗" extra={<Button onClick={() => setRetry(value => value + 1)}>重試</Button>} />
   }
 
   /* ----- 圖表數據 ----- */
@@ -39,7 +47,7 @@ export default function AssetDashboard() {
     type: d.type,
     count: d.count,
   }))
-  const deptColData = data.departmentDistribution
+  const deptColData = [...data.departmentDistribution]
     .sort((a, b) => b.count - a.count)
     .map((d) => ({ department: d.department, count: d.count }))
   const monthlyData = data.monthlyInbound.map((d) => ({
@@ -59,11 +67,11 @@ export default function AssetDashboard() {
   ]
 
   const alertItems = [
-    { label: t('asset.dashBorrowing'), value: data.borrowingCount, icon: <BellOutlined />, color: data.borrowingCount > 0 ? '#1890ff' : '#d9d9d9' },
-    { label: t('asset.dashOverdue'), value: data.overdueCount, icon: <WarningOutlined />, color: data.overdueCount > 0 ? '#ff4d4f' : '#d9d9d9' },
-    { label: t('asset.dashPendingComp'), value: data.pendingCompCount, icon: <AlertOutlined />, color: data.pendingCompCount > 0 ? '#faad14' : '#d9d9d9' },
-    { label: t('asset.dashPendingReq'), value: data.pendingReqCount, icon: <FileTextOutlined />, color: data.pendingReqCount > 0 ? '#722ed1' : '#d9d9d9' },
-    { label: t('asset.dashPendingOrder'), value: data.pendingOrderCount, icon: <ShoppingCartOutlined />, color: data.pendingOrderCount > 0 ? '#13c2c2' : '#d9d9d9' },
+    { label: t('asset.dashBorrowing'), value: data.borrowingCount, icon: <BellOutlined />, color: (data.borrowingCount ?? 0) > 0 ? '#1890ff' : '#d9d9d9' },
+    { label: t('asset.dashOverdue'), value: data.overdueCount, icon: <WarningOutlined />, color: (data.overdueCount ?? 0) > 0 ? '#ff4d4f' : '#d9d9d9' },
+    { label: t('asset.dashPendingComp'), value: data.pendingCompCount, icon: <AlertOutlined />, color: (data.pendingCompCount ?? 0) > 0 ? '#faad14' : '#d9d9d9' },
+    { label: t('asset.dashPendingReq'), value: data.pendingReqCount, icon: <FileTextOutlined />, color: (data.pendingReqCount ?? 0) > 0 ? '#722ed1' : '#d9d9d9' },
+    { label: t('asset.dashPendingOrder'), value: data.pendingOrderCount, icon: <ShoppingCartOutlined />, color: (data.pendingOrderCount ?? 0) > 0 ? '#13c2c2' : '#d9d9d9' },
   ]
 
   return (
@@ -117,7 +125,7 @@ export default function AssetDashboard() {
           {alertItems.map((a) => (
             <Col key={a.label} xs={12} sm={8} md={4} lg={4} xl={4} flex={1}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Badge count={a.value} overflowCount={99} style={{ backgroundColor: a.color }}>
+                <Badge count={a.value ?? '—' as unknown as number} overflowCount={99} style={{ backgroundColor: a.color }}>
                   <span style={{ fontSize: 20, color: a.color, padding: 4 }}>{a.icon}</span>
                 </Badge>
                 <span style={{ fontSize: 13, color: '#595959' }}>{a.label}</span>

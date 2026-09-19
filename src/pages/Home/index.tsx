@@ -12,7 +12,7 @@ import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
-import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, chineseNameToPinyinEnglish, getGreeting, formatAiText, collectMenuNames, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, chineseNameToPinyinEnglish, getGreeting, formatAiText, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import type { AiBlockReason } from './homeUtils'
 import {
   SearchOutlined,
@@ -68,31 +68,35 @@ const GROUP_NAME_EN: Record<string, string> = {
   '推广通': 'Promotion Pass',
 }
 
-/** 所有可用菜单 */
-const allMenus = [
-  { key: 'account-balance', label: '賬戶餘額', icon: <AccountBookOutlined />, path: '/account-balance', group: '推廣金管理' },
-  { key: 'batch-query', label: '批次查詢', icon: <SearchOutlined />, path: '/batch-query', group: '推廣金管理' },
-  { key: 'detail-query', label: '明細查詢', icon: <FileSearchOutlined />, path: '/detail-query', group: '推廣金管理' },
-  { key: 'writeoff-reconcile', label: '充消對賬', icon: <AuditOutlined />, path: '/writeoff-reconcile', group: '商戶通對賬' },
-  { key: 'debt-reconcile', label: '欠款對賬', icon: <CheckCircleOutlined />, path: '/debt-reconcile', group: '商戶通對賬' },
-  { key: 'approval-center', label: '審批中心', icon: <AuditOutlined />, path: '/approval-center', group: '審批管理' },
-  { key: 'search-config', label: '搜索配置', icon: <SearchOutlined />, path: '/search-config', group: '搜索配置' },
-  { key: 'hint-config', label: '底紋配置', icon: <FontSizeOutlined />, path: '/hint-config', group: '搜索引导' },
-  { key: 'hot-search-config', label: '熱搜配置', icon: <FireOutlined />, path: '/hot-search-config', group: '搜索引导' },
-  { key: 'word-segmentation', label: '分詞管理', icon: <DatabaseOutlined />, path: '/word-segmentation', group: '搜索词库' },
-  { key: 'synonym-config', label: '同義詞配置', icon: <SwapOutlined />, path: '/synonym-config', group: '搜索词库' },
-  { key: 'hot-search-library', label: '熱搜詞庫', icon: <FireOutlined />, path: '/hot-search-library', group: '搜索词库' },
-  { key: 'hint-report', label: '底紋報表', icon: <LineChartOutlined />, path: '/hint-report', group: '報表統計' },
-  { key: 'hot-search-report', label: '熱搜報表', icon: <LineChartOutlined />, path: '/hot-search-report', group: '報表統計' },
-  { key: 'promotion-dashboard', label: '數據看板', icon: <LineChartOutlined />, path: '/promotion-dashboard', group: '商家推广工具' },
-  { key: 'promotion-algorithm', label: '算法庫', icon: <DatabaseOutlined />, path: '/promotion-algorithm', group: '商家推广工具' },
-  { key: 'promotion-slot-config', label: '瀑布流策略', icon: <SwapOutlined />, path: '/promotion-slot-config', group: '商家推广工具' },
-  { key: 'promotion-waterfall', label: '銷售定價', icon: <WalletOutlined />, path: '/promotion-waterfall', group: '商家推广工具' },
-  { key: 'promotion-sales-config', label: '店鋪推廣', icon: <ShoppingOutlined />, path: '/promotion-sales-config', group: '推广通' },
-  { key: 'promotion-report-overview', label: '數據概覽', icon: <LineChartOutlined />, path: '/promotion-report-overview', group: '推广通' },
-  { key: 'promotion-report-order', label: '訂單效果報表', icon: <LineChartOutlined />, path: '/promotion-report-order', group: '推广通' },
-  { key: 'promotion-report-compare', label: '推薦類型對比', icon: <LineChartOutlined />, path: '/promotion-report-compare', group: '推广通' },
-]
+/**
+ * 快捷入口图标映射（menuKey → 图标）
+ *
+ * 菜单名称/路径/分组的唯一真值源是后端菜单树（sys_menu）, 本页不再维护菜单名副本；
+ * 后端 icon 字段缺失时（旧数据/新建菜单）按本表兜底展示图标。
+ */
+const MENU_ICON_BY_KEY: Record<string, React.ReactNode> = {
+  'account-balance': <AccountBookOutlined />,
+  'batch-query': <SearchOutlined />,
+  'detail-query': <FileSearchOutlined />,
+  'writeoff-reconcile': <AuditOutlined />,
+  'debt-reconcile': <CheckCircleOutlined />,
+  'approval-center': <AuditOutlined />,
+  'hint-config': <FontSizeOutlined />,
+  'hot-search-config': <FireOutlined />,
+  'word-segmentation': <DatabaseOutlined />,
+  'synonym-config': <SwapOutlined />,
+  'hot-search-library': <FireOutlined />,
+  'hint-report': <LineChartOutlined />,
+  'hot-search-report': <LineChartOutlined />,
+  'promotion-dashboard': <LineChartOutlined />,
+  'promotion-algorithm': <DatabaseOutlined />,
+  'promotion-slot-config': <SwapOutlined />,
+  'promotion-waterfall': <WalletOutlined />,
+  'promotion-sales-config': <ShoppingOutlined />,
+  'promotion-report-overview': <LineChartOutlined />,
+  'promotion-report-order': <LineChartOutlined />,
+  'promotion-report-compare': <LineChartOutlined />,
+}
 
 
 
@@ -152,7 +156,6 @@ export default function Home() {
   const favoritesLoadedRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [menuNameMap, setMenuNameMap] = useState<Record<string, string>>({})
   const [backendMenuTree, setBackendMenuTree] = useState<MenuVO[]>([])
   const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -498,16 +501,13 @@ export default function Home() {
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 加载后端菜单树（名称映射 + 扁平化搜索列表） */
+  /** 加载后端菜单树（菜单快捷入口的唯一真值源；名称不在前端维护副本） */
   useEffect(() => {
     let cancelled = false
     fetchMenuTree().then((tree) => {
-      if (!cancelled) {
-        const map: Record<string, string> = {}
-        collectMenuNames(tree, map)
-        setMenuNameMap(map)
-        setBackendMenuTree(tree)
-      }
+      if (!cancelled) setBackendMenuTree(tree)
+    }).catch(() => {
+      // 静默失败：后端不可用时首页快捷入口为空, 由侧边栏离线提示统一说明
     })
     return () => { cancelled = true }
   }, [])
@@ -556,20 +556,11 @@ export default function Home() {
   }, [])
 
   const menuList = useMemo(() => {
-    // 从后端菜单树扁平化得到的菜单
-    const backendMenus = flattenBackendMenus(backendMenuTree)
-    const backendKeys = new Set(backendMenus.map((m) => m.key))
-    // 静态 allMenus 中不在后端的项（兜底）
-    const staticOnly = allMenus.filter((m) => !backendKeys.has(m.key))
-    // 合并：后端菜单优先（名称来自后端），静态菜单兜底
-    const merged = [
-      ...backendMenus.map((bm) => {
-        const staticItem = allMenus.find((s) => s.key === bm.key)
-        return staticItem ? { ...bm, icon: staticItem.icon } : bm
-      }),
-      ...staticOnly,
-    ]
-    return merged
+    // 菜单项完全来自后端菜单树（DB 为唯一真值）, 仅图标允许本地映射兜底
+    return flattenBackendMenus(backendMenuTree).map((bm) => {
+      const fallbackIcon = MENU_ICON_BY_KEY[bm.key]
+      return fallbackIcon ? { ...bm, icon: fallbackIcon } : bm
+    })
   }, [backendMenuTree, flattenBackendMenus])
 
   /** 时钟 */

@@ -43,17 +43,10 @@ export interface ConsumableBrand {
   updatedAt?: string
 }
 
-/** 计量单位 */
-export interface ConsumableUnit {
-  id: number
-  name: string
-  abbr?: string
-  sortOrder: number
-  status: 'enabled' | 'disabled'
-  createdBy?: string
-  updatedBy?: string
-  updatedAt?: string
-}
+/**
+ * 计量单位：不再是独立字典（biz_consumable_unit 已废弃），
+ * 单位作为耗材档案/产品型号记录上的文本属性（unit 字段）由表单直接录入
+ */
 
 /* ==================== 类型 ==================== */
 
@@ -439,30 +432,4 @@ export function fetchConsumableBrandDetail(id: number) {
 
 export function toggleConsumableBrandStatus(id: number) {
   return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}/status`)
-}
-
-/** 计量单位列表 */
-export function fetchConsumableUnits(keyword?: string) {
-  return request.get<unknown, ConsumableUnit[]>('/eam/consumables/basic/units', { params: { keyword } })
-}
-
-/** 计量单位下拉选项 */
-export function fetchConsumableUnitOptions() {
-  return request.get<unknown, ConsumableUnit[]>('/eam/consumables/basic/units/options')
-}
-
-export function createConsumableUnit(data: Partial<ConsumableUnit>) {
-  return request.post<unknown, number>('/eam/consumables/basic/units', data)
-}
-
-export function updateConsumableUnit(id: number, data: Partial<ConsumableUnit>) {
-  return request.put<unknown, void>(`/eam/consumables/basic/units/${id}`, data)
-}
-
-export function deleteConsumableUnit(id: number) {
-  return request.delete<unknown, void>(`/eam/consumables/basic/units/${id}`)
-}
-
-export function toggleConsumableUnitStatus(id: number) {
-  return request.put<unknown, void>(`/eam/consumables/basic/units/${id}/status`)
 }

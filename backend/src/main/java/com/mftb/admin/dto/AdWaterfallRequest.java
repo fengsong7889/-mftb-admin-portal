@@ -18,7 +18,7 @@ public class AdWaterfallRequest {
     @NotBlank(message = "瀑布流名稱不能為空")
     private String strategyName;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 自然流量兜底算法编码（未配置坑位统一读取该算法数据） */

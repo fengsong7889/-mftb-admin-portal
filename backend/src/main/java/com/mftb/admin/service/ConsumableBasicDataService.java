@@ -5,10 +5,9 @@ import com.mftb.admin.dto.*;
 import java.util.List;
 
 /**
- * 耗材基础数据服务接口（分类 / 品牌 / 计量单位）
+ * 耗材基础数据服务接口（分类 / 品牌）
  * <p>
- * 与资产域基础数据（biz_eam_category / biz_eam_brand）物理隔离，
- * 耗材档案从本服务获取分类、品牌、单位下拉数据源。
+ * 计量单位不再是独立字典（旧 biz_consumable_unit 已废弃），单位作为产品/耗材记录上的文本属性直存。
  */
 public interface ConsumableBasicDataService {
 
@@ -30,11 +29,4 @@ public interface ConsumableBasicDataService {
     void deleteBrand(long id);
     void toggleBrandStatus(long id);
     ConsumableBrandVO getBrandDetail(long id);
-
-    /* ===== 计量单位 ===== */
-    List<ConsumableUnitVO> listUnits(String keyword);
-    long createUnit(ConsumableUnitSaveDTO dto);
-    void updateUnit(long id, ConsumableUnitSaveDTO dto);
-    void deleteUnit(long id);
-    void toggleUnitStatus(long id);
 }

@@ -16,7 +16,7 @@ public class FinAccountQuery extends FinPageQuery {
     /** 集团名称（模糊匹配） */
     private String groupName;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 账户状态: normal / frozen / mergeFrozen / cancelled */

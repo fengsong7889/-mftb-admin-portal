@@ -1,24 +1,4 @@
-import request, { SILENT_HEADER, isBackendUnavailable } from './request'
-import {
-  mockPeriods,
-  mockFetchRegisters,
-  mockImportRegisters,
-  mockFetchStats,
-  mockImportStats,
-  mockFetchOverview,
-  mockImportSummary,
-} from './mock/flashSaleMock'
-
-const SILENT = { headers: { [SILENT_HEADER]: '1' } }
-
-/**
- * 业务层服务端异常（HTTP 200 + code 500，如后端未完整重启导致新表缺失）
- * 也视为后端不可用，GET 类接口降级到 mock，保证一期演示体验
- */
-const isServerSideFailure = (err: unknown): boolean =>
-  err instanceof Error && (err.message.includes('数据库操作异常') || err.message.includes('系统繁忙'))
-
-const shouldFallback = (err: unknown): boolean => isBackendUnavailable(err) || isServerSideFailure(err)
+import request from './request'
 
 /* ─────────────── 类型定义 ─────────────── */
 
@@ -197,12 +177,7 @@ export interface FlashSalePageResult<T> {
 
 /** 期数下拉 */
 export async function fetchFlashSalePeriods(): Promise<FlashSalePeriod[]> {
-  try {
-    return await request.get<unknown, FlashSalePeriod[]>('/flash-sale/periods', SILENT)
-  } catch (err) {
-    if (shouldFallback(err)) return mockPeriods
-    throw err
-  }
+  return request.get<unknown, FlashSalePeriod[]>('/flash-sale/periods')
 }
 
 /** 登记分页列表 */
@@ -210,62 +185,32 @@ export async function fetchFlashSaleRegisters(params: {
   periodNo?: number; subsidyType?: string; productType?: string; bd?: string; keyword?: string
   page?: number; size?: number
 }): Promise<FlashSalePageResult<FlashSaleRegisterVO>> {
-  try {
-    return await request.get<unknown, FlashSalePageResult<FlashSaleRegisterVO>>('/flash-sale/registers', { params, ...SILENT })
-  } catch (err) {
-    if (shouldFallback(err)) return mockFetchRegisters(params)
-    throw err
-  }
+  return request.get<unknown, FlashSalePageResult<FlashSaleRegisterVO>>('/flash-sale/registers', { params })
 }
 
 /** 登记导入 */
 export async function importFlashSaleRegisters(periodNo: number, rows: FlashSaleRegisterRow[]): Promise<FlashSaleImportResult> {
-  try {
-    return await request.post<unknown, FlashSaleImportResult>('/flash-sale/registers/import', { periodNo, rows }, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockImportRegisters(rows)
-    throw err
-  }
+  return request.post<unknown, FlashSaleImportResult>('/flash-sale/registers/import', { periodNo, rows })
 }
 
 /** 统计分页列表 */
 export async function fetchFlashSaleStats(params: {
   periodNo?: number; subsidyType?: string; bd?: string; keyword?: string; page?: number; size?: number
 }): Promise<FlashSalePageResult<FlashSaleStatsVO>> {
-  try {
-    return await request.get<unknown, FlashSalePageResult<FlashSaleStatsVO>>('/flash-sale/stats', { params, ...SILENT })
-  } catch (err) {
-    if (shouldFallback(err)) return mockFetchStats(params)
-    throw err
-  }
+  return request.get<unknown, FlashSalePageResult<FlashSaleStatsVO>>('/flash-sale/stats', { params })
 }
 
 /** 统计导入 */
 export async function importFlashSaleStats(periodNo: number, rows: FlashSaleStatsRow[]): Promise<FlashSaleImportResult> {
-  try {
-    return await request.post<unknown, FlashSaleImportResult>('/flash-sale/stats/import', { periodNo, rows }, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockImportStats(rows)
-    throw err
-  }
+  return request.post<unknown, FlashSaleImportResult>('/flash-sale/stats/import', { periodNo, rows })
 }
 
 /** 每日汇总导入 */
 export async function importFlashSaleSummary(periodNo: number, rows: FlashSaleSummaryRow[]): Promise<FlashSaleImportResult> {
-  try {
-    return await request.post<unknown, FlashSaleImportResult>('/flash-sale/summary/import', { periodNo, rows }, SILENT)
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockImportSummary(rows)
-    throw err
-  }
+  return request.post<unknown, FlashSaleImportResult>('/flash-sale/summary/import', { periodNo, rows })
 }
 
 /** 数据总览 */
 export async function fetchFlashSaleOverview(periodNo?: number): Promise<FlashSaleOverviewVO> {
-  try {
-    return await request.get<unknown, FlashSaleOverviewVO>('/flash-sale/overview', { params: { periodNo }, ...SILENT })
-  } catch (err) {
-    if (shouldFallback(err)) return mockFetchOverview(periodNo)
-    throw err
-  }
+  return request.get<unknown, FlashSaleOverviewVO>('/flash-sale/overview', { params: { periodNo } })
 }

@@ -1,10 +1,10 @@
 import i18n from 'i18next'
 
 /**
- * 菜单 key → 英文名称 映射表（方案 A）
+ * 菜单 key → 英文名称 兼容兜底映射表
  *
- * 切換英文時，菜單名稱優先取此映射；未覆蓋的菜單（如菜單配置頁後續新增）回退顯示中文。
- * 修改翻譯統一改這裡，與 src/i18n/locales/en.json 互不干擾。
+ * 英文名称的真值源已收敛为后端 sys_menu.name_en（菜单树接口 nameEn 字段, 「菜單配置」页可编辑）,
+ * 本表仅在 DB 未配置 name_en 时兜底, 新增菜单不应再往这里添加, 请补齐 DB name_en。
  */
 export const MENU_NAME_EN: Record<string, string> = {
   // 首頁
@@ -30,8 +30,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'algorithm-simulation': 'Algorithm Simulation',
   'merchant-score-insight': 'Merchant Score Insight',
   'merchant-promotion-diagnose': 'Promotion Diagnosis',
-  // 推广通
-  'promotion-tool': 'Promotion Pass',
+  // 推广通（后端 menu_key：promotion_tool）
   'promotion_tool': 'Promotion Pass',
   'promotion-sales-config': 'Store Promotion',
   'promotion-report-group': 'Report Analysis',
@@ -91,7 +90,13 @@ export const MENU_NAME_EN: Record<string, string> = {
   // 系統配置
   'system-config': 'System Config',
   'menu-config': 'Menu Config',
-  'translation-manage': 'Translation Config',
+  'translation-manage': 'Translation Workbench',
+  // 多语言管理（i18n-center 独立模块）
+  'i18n-center': 'i18n Management',
+  'i18n-language': 'Language Config',
+  'i18n-import-export': 'Import & Export',
+  'i18n-mt-engine': 'MT Engine',
+  'i18n-dashboard': 'Translation Dashboard',
   'rule-config': 'Rule Config',
   'workflow-config': 'Workflow Config',
   'version-history': 'Version History',
@@ -103,7 +108,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai_energy_detail': 'Energy Detail',
   // 智能中心 (AI) - 拆分后的新菜单 key
   'ai-models': 'Model Management',
-  'ai-model-provider': 'Provider Management',
+  'ai-model-provider': 'Model Provider',
   'ai-model-list': 'Model Access',
   'ai-auth-quota': 'Authorization & Quota',
   'ai-auth': 'Model Authorization',
@@ -160,37 +165,42 @@ export const MENU_NAME_EN: Record<string, string> = {
 
 /**
  * 根據當前語言翻譯菜單名稱：
- * - 中文（zh-TW/zh-CN）：原樣返回
- * - 英文：優先取靜態映射表 MENU_NAME_EN，再取 i18next 資源
- * - 其它語言（ja/ko/ru 等）：取 i18next 資源（後端 bundle 注入的動態翻譯）
+ * - 中文（zh-TW/zh-CN）：原樣返回 DB 名稱
+ * - 英文：優先 DB name_en → 再取静态映射表 MENU_NAME_EN → 再取 i18next 資源
+ * - 其它語言（ja/ko/ru 等）：取 i18next 資源（後端 bundle 注入的動態翻譯）, 再回退 DB name_en
  * - 最終回退中文（數據庫菜單名）
  */
-export function translateMenuName(menuKey: string, zhName: string): string {
+export function translateMenuName(menuKey: string, zhName: string, dbNameEn?: string | null): string {
   // 中文模式直接返回
   if (i18n.language?.startsWith('zh')) return zhName
 
-  // 1. 英文靜態映射表（最高優先，僅英文使用）
+  // 1. 后端 name_en 为真值源（菜单配置页改名后实时生效）
+  if (dbNameEn && dbNameEn.trim()) {
+    return dbNameEn
+  }
+
+  // 2. 英文静态映射表（仅 DB 未配置 name_en 时兜底）
   if (i18n.language?.startsWith('en')) {
     const staticEn = MENU_NAME_EN[menuKey]
     if (staticEn) return staticEn
   }
 
-  // 2. i18next 資源（後端 bundle 注入的動態翻譯，key 格式 menu.${menuKey}）
+  // 3. i18next 資源（後端 bundle 注入的動態翻譯，key 格式 menu.${menuKey}）
   const bundleKey = `menu.${menuKey}`
   const bundleVal = i18n.t(bundleKey)
   // i18next 找不到 key 時返回 key 本身，需排除這種情況
   if (bundleVal && bundleVal !== bundleKey) return bundleVal
 
-  // 3. 嘗試直接用 menuKey 查找（兼容不同 key 格式）
+  // 4. 嘗試直接用 menuKey 查找（兼容不同 key 格式）
   const directVal = i18n.t(menuKey)
   if (directVal && directVal !== menuKey) return directVal
 
-  // 4. 英文模式可再回退 MENU_NAME_EN（上面已處理，此处兜底）
+  // 5. 英文模式回退静态映射表
   if (i18n.language?.startsWith('en')) {
     const fallback = MENU_NAME_EN[menuKey]
     if (fallback) return fallback
   }
 
-  // 5. 回退中文
+  // 6. 回退中文
   return zhName
 }

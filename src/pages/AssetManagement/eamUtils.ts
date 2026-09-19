@@ -89,8 +89,7 @@ export const EAM_DEPARTMENTS = [
 /** 所屬公司選項 */
 export const EAM_COMPANIES = ['澳觅科技', '闪蜂', 'mFood']
 
-/** 計量單位選項 */
-export const EAM_UNITS = ['台', '套', '件', '把', '张', '辆', '个']
+/** 計量單位：不建字典表也不硬编码，由产品型号/耗材档案表单直接录入文本（如：台/箱/套） */
 
 /** 兩個日期（YYYY-MM-DD）相差天數：to - from */
 export function daysBetween(from: string, to: string): number {

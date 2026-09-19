@@ -6,7 +6,10 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import type { DataNode } from 'antd/es/tree'
 import type { MenuPermission } from '../types'
-import { menuPermissionTree, getMenuActions } from '../types'
+import { getMenuActions } from '../types'
+import { fetchMenuTree } from '../../../api/menu'
+import type { MenuVO } from '../../../api/menu'
+import { translateMenuName } from '../../../i18n/menuNameEn'
 import { fetchRoles, updateRolePermissions } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments, updateDepartmentPermissions } from '../../../api/department'
@@ -26,8 +29,26 @@ type TargetType = typeof TARGET_TYPE[keyof typeof TARGET_TYPE]
 /** 角色/部门状态：启用 */
 const STATUS_ENABLED = 1
 
+/**
+ * 授权菜单树节点（结构/名称均来自后端 sys_menu，不再维护前端静态副本）
+ */
+interface PermNode {
+  key: string
+  name: string
+  children?: PermNode[]
+}
+
+/** 后端菜单树 → 授权树节点（仅保留启用项，名称与左侧菜单完全一致） */
+const toPermNodes = (menus: MenuVO[]): PermNode[] =>
+  menus
+    .filter(m => m.status === 1)
+    .map(m => {
+      const children = m.children?.length ? toPermNodes(m.children) : undefined
+      return { key: m.menuKey, name: translateMenuName(m.menuKey, m.name, m.nameEn), ...(children ? { children } : {}) }
+    })
+
 /** 将权限树转换为 Tree 组件数据 */
-const convertToTreeData = (modules: typeof menuPermissionTree): DataNode[] => {
+const convertToTreeData = (modules: PermNode[]): DataNode[] => {
   return modules.map(module => ({
     title: module.name,
     key: module.key,
@@ -36,9 +57,9 @@ const convertToTreeData = (modules: typeof menuPermissionTree): DataNode[] => {
 }
 
 /** 获取所有菜单key（包括父节点） */
-const getAllMenuKeys = (modules: typeof menuPermissionTree): string[] => {
+const getAllMenuKeys = (modules: PermNode[]): string[] => {
   const keys: string[] = []
-  const traverse = (items: typeof menuPermissionTree) => {
+  const traverse = (items: PermNode[]) => {
     items.forEach(item => {
       keys.push(item.key)
       if (item.children) {
@@ -50,12 +71,10 @@ const getAllMenuKeys = (modules: typeof menuPermissionTree): string[] => {
   return keys
 }
 
-const ALL_MENU_KEYS = getAllMenuKeys(menuPermissionTree)
-
 /** 获取所有非叶子节点（父节点）的 key */
-const getParentKeys = (modules: typeof menuPermissionTree): Set<string> => {
+const getParentKeys = (modules: PermNode[]): Set<string> => {
   const parentKeys = new Set<string>()
-  const traverse = (items: typeof menuPermissionTree) => {
+  const traverse = (items: PermNode[]) => {
     items.forEach(item => {
       if (item.children && item.children.length > 0) {
         parentKeys.add(item.key)
@@ -67,12 +86,10 @@ const getParentKeys = (modules: typeof menuPermissionTree): Set<string> => {
   return parentKeys
 }
 
-const PARENT_KEYS = getParentKeys(menuPermissionTree)
-
 /** 获取叶子节点key */
-const getLeafKeys = (modules: typeof menuPermissionTree): string[] => {
+const getLeafKeys = (modules: PermNode[]): string[] => {
   const keys: string[] = []
-  const traverse = (items: typeof menuPermissionTree) => {
+  const traverse = (items: PermNode[]) => {
     items.forEach(item => {
       if (!item.children || item.children.length === 0) {
         keys.push(item.key)
@@ -85,12 +102,10 @@ const getLeafKeys = (modules: typeof menuPermissionTree): string[] => {
   return keys
 }
 
-const LEAF_KEYS = getLeafKeys(menuPermissionTree)
-
 /** 菜单key → 菜单名称 映射（用于列表展示授权功能） */
-const MENU_NAME_MAP: Record<string, string> = (() => {
+const buildMenuNameMap = (modules: PermNode[]): Record<string, string> => {
   const map: Record<string, string> = {}
-  const traverse = (items: typeof menuPermissionTree) => {
+  const traverse = (items: PermNode[]) => {
     items.forEach(item => {
       map[item.key] = item.name
       if (item.children) {
@@ -98,9 +113,9 @@ const MENU_NAME_MAP: Record<string, string> = (() => {
       }
     })
   }
-  traverse(menuPermissionTree)
+  traverse(modules)
   return map
-})()
+}
 
 /** 某菜单的默认操作（该菜单支持的全部操作） */
 const defaultActionsOf = (menuKey: string): string[] => getMenuActions(menuKey).map(a => a.key)
@@ -166,6 +181,26 @@ export default function FunctionPermission() {
   // 授权详情弹窗
   const [detailRecord, setDetailRecord] = useState<RoleItem | DepartmentItem | null>(null)
 
+  /** 授权菜单树：结构/名称来自后端 sys_menu（与左侧菜单同一个真值源） */
+  const [permMenuTree, setPermMenuTree] = useState<PermNode[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchMenuTree().then(tree => {
+      if (!cancelled) setPermMenuTree(toPermNodes(tree))
+    }).catch(() => {
+      // 菜单接口异常时保持空树，由页面加载失败提示引导重试
+      if (!cancelled) setPermMenuTree([])
+    })
+    return () => { cancelled = true }
+  }, [i18n.language])
+
+  const treeData = useMemo(() => convertToTreeData(permMenuTree), [permMenuTree])
+  const allMenuKeys = useMemo(() => getAllMenuKeys(permMenuTree), [permMenuTree])
+  const parentKeys = useMemo(() => getParentKeys(permMenuTree), [permMenuTree])
+  const leafKeys = useMemo(() => getLeafKeys(permMenuTree), [permMenuTree])
+  const menuNameMap = useMemo(() => buildMenuNameMap(permMenuTree), [permMenuTree])
+
   /** 加载角色与部门列表 */
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -217,13 +252,13 @@ export default function FunctionPermission() {
       map[p.menuKey] = p.actions
     })
     setActionsMap(map)
-    setSelectedMenuKey(LEAF_KEYS.find(key => menuKeys.includes(key)) ?? null)
+    setSelectedMenuKey(leafKeys.find(key => menuKeys.includes(key)) ?? null)
     setModalVisible(true)
   }
 
   /** 全选/取消全选 */
   const handleCheckAll = (checked: boolean) => {
-    setCheckedKeys(checked ? ALL_MENU_KEYS : [])
+    setCheckedKeys(checked ? allMenuKeys : [])
     if (!checked) {
       setSelectedMenuKey(null)
     }
@@ -251,7 +286,7 @@ export default function FunctionPermission() {
     }
     const permissions: MenuPermission[] = []
     checkedKeys.forEach(menuKey => {
-      if (!LEAF_KEYS.includes(menuKey)) return
+      if (!leafKeys.includes(menuKey)) return
       const actions = actionsMap[menuKey] ?? defaultActionsOf(menuKey)
       if (actions.length > 0) {
         permissions.push({ menuKey, actions })
@@ -300,7 +335,7 @@ export default function FunctionPermission() {
       dataIndex: 'menuKey',
       key: 'menuKey',
       width: 200,
-      render: (menuKey: string) => MENU_NAME_MAP[menuKey] ?? menuKey,
+      render: (menuKey: string) => menuNameMap[menuKey] ?? menuKey,
     },
     {
       title: t('functionPermission.colActions'),
@@ -513,15 +548,15 @@ export default function FunctionPermission() {
               onCheck={(keys) => {
                 // 過濾掉父節點 key，只保留葉子節點
                 const rawKeys = Array.isArray(keys) ? keys : keys.checked
-                const leafOnly = (rawKeys as string[]).filter(key => !PARENT_KEYS.has(key))
+                const leafOnly = (rawKeys as string[]).filter(key => !parentKeys.has(key))
                 setCheckedKeys(leafOnly)
               }}
               onSelect={(keys) => {
-                if (keys.length > 0 && LEAF_KEYS.includes(keys[0] as string)) {
+                if (keys.length > 0 && leafKeys.includes(keys[0] as string)) {
                   setSelectedMenuKey(keys[0] as string)
                 }
               }}
-              treeData={convertToTreeData(menuPermissionTree)}
+              treeData={treeData}
               className="permission-tree"
             />
           </div>

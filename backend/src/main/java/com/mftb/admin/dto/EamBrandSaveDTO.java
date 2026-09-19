@@ -3,7 +3,7 @@ package com.mftb.admin.dto;
 import lombok.Data;
 
 /**
- * 资产品牌新增/更新请求（更新时字段为 null 表示不修改）
+ * 所属品牌新增/更新请求（更新时字段为 null 表示不修改）
  */
 @Data
 public class EamBrandSaveDTO {

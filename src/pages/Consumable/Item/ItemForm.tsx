@@ -9,8 +9,8 @@ import { Button, Form, Input, InputNumber, Select, Spin, message, Space, Switch 
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemDetail, createConsumableItem, updateConsumableItem,
-  fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchConsumableUnitOptions,
-  type ConsumableItemSave, type ConsumableCategory, type ConsumableBrand, type ConsumableUnit,
+  fetchConsumableCategoryOptions, fetchConsumableBrandOptions,
+  type ConsumableItemSave, type ConsumableCategory, type ConsumableBrand,
 } from '../../../api/consumable'
 
 interface FormValues {
@@ -40,7 +40,6 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<ConsumableCategory[]>([])
   const [brands, setBrands] = useState<ConsumableBrand[]>([])
-  const [units, setUnits] = useState<ConsumableUnit[]>([])
   const [detailMeta, setDetailMeta] = useState<{ updatedBy?: string; updatedAt?: string }>({})
 
   const categoryOptions = useMemo(
@@ -51,15 +50,10 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
     () => brands.map(b => ({ label: b.nameEn ? `${b.name}（${b.nameEn}）` : b.name, value: b.id })),
     [brands],
   )
-  const unitOptions = useMemo(
-    () => units.map(u => ({ label: u.abbr ? `${u.name}（${u.abbr}）` : u.name, value: u.name })),
-    [units],
-  )
 
   useEffect(() => {
     fetchConsumableCategoryOptions().then(setCategories).catch(() => { /* 忽略 */ })
     fetchConsumableBrandOptions().then(setBrands).catch(() => { /* 忽略 */ })
-    fetchConsumableUnitOptions().then(setUnits).catch(() => { /* 忽略 */ })
   }, [])
 
   useEffect(() => {
@@ -87,7 +81,7 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
         .catch((e: Error) => message.error(e.message))
         .finally(() => { if (alive) setLoading(false) })
     } else {
-      form.setFieldsValue({ unit: '個', refPrice: 0, safetyStock: 0, maxStock: 0, perClaimLimit: 0, status: 'enabled' })
+      form.setFieldsValue({ refPrice: 0, safetyStock: 0, maxStock: 0, perClaimLimit: 0, status: 'enabled' })
     }
     return () => { alive = false }
   }, [form, id, isEdit])
@@ -169,8 +163,9 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             <Form.Item label="規格型號" name="spec">
               <Input placeholder="如：70g 500張/包" allowClear />
             </Form.Item>
-            <Form.Item label="計量單位" name="unit" rules={[{ required: true, message: '請選擇單位' }]}>
-              <Select placeholder="選擇單位" options={unitOptions} showSearch optionFilterProp="label" />
+            <Form.Item label="計量單位" name="unit" rules={[{ required: true, message: '請輸入單位' }]}>
+              {/* 计量单位不再是字典表，直接录入文本（如：包/盒/瓶） */}
+              <Input placeholder="輸入單位，如 包/盒/瓶" maxLength={16} allowClear />
             </Form.Item>
             <Form.Item label="參考單價（元）" name="refPrice">
               <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="0.00" />

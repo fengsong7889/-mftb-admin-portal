@@ -35,7 +35,7 @@ public class FinBatch {
     /** 集团名称 */
     private String groupName;
 
-    /** 资产品牌 */
+    /** 所属品牌 */
     private String brand;
 
     /** 交易时间（审批通过时间） */

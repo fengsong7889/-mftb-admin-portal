@@ -28,6 +28,8 @@ jobs:
         run: npm run lint
       - name: Type Check
         run: npm run typecheck
+      - name: Menu Consistency
+        run: npm run check:menu
       - name: Secret Scan
         run: npm run secret-scan
       - name: Test

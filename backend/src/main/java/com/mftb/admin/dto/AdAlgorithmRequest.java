@@ -20,7 +20,7 @@ public class AdAlgorithmRequest {
     @NotNull(message = "算法類型不能為空")
     private Integer algoType;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道: 1=大首页 2=外卖频道 3=超市百货 4=团购到店 */

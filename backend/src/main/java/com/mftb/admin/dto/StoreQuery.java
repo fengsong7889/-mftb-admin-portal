@@ -19,7 +19,7 @@ public class StoreQuery extends AuditPageQuery {
     /** 门店ID/名称（模糊匹配） */
     private String keyword;
 
-    /** 资产品牌 */
+    /** 所属品牌 */
     private String brand;
 
     /** 业务频道 */

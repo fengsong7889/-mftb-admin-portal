@@ -76,4 +76,4 @@ UPDATE biz_eam_asset SET category_code = '0301' WHERE category_code = '10003001'
 -- ── 3. biz_eam_asset 新增 company_brand 列 ──────────────────────
 
 ALTER TABLE biz_eam_asset
-    ADD COLUMN company_brand TINYINT DEFAULT NULL COMMENT '公司品牌：1=閃蜂(TB), 2=mFood(MF)' AFTER batch_id;
+    ADD COLUMN company_brand TINYINT DEFAULT NULL COMMENT '所屬品牌：1=閃蜂(TB), 2=mFood(MF)' AFTER batch_id;

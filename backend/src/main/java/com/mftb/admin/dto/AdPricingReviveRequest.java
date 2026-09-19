@@ -17,7 +17,7 @@ public class AdPricingReviveRequest {
     @NotNull(message = "關聯算法不能為空")
     private Long algoId;
 
-    /** 资产品牌: flashBee / mFood */
+    /** 所属品牌: flashBee / mFood */
     private String brand;
 
     /** 业务频道 */

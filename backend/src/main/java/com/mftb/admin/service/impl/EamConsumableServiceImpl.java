@@ -67,7 +67,8 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         if (StringUtils.hasText(query.getName())) wrapper.like(EamConsumableItem::getName, query.getName().trim());
         if (StringUtils.hasText(query.getBrand())) wrapper.like(EamConsumableItem::getBrand, query.getBrand().trim());
         if (query.getBrandId() != null) wrapper.eq(EamConsumableItem::getBrandId, query.getBrandId());
-        if (StringUtils.hasText(query.getUnit())) wrapper.eq(EamConsumableItem::getUnit, query.getUnit().trim());
+        // 单位不再是字典下拉（已废弃 biz_consumable_unit），改为自由文本，因此用模糊匹配
+        if (StringUtils.hasText(query.getUnit())) wrapper.like(EamConsumableItem::getUnit, query.getUnit().trim());
         if (StringUtils.hasText(query.getUpdatedBy())) wrapper.like(EamConsumableItem::getUpdatedBy, query.getUpdatedBy().trim());
         if (StringUtils.hasText(query.getUpdateTimeStart()) || StringUtils.hasText(query.getUpdateTimeEnd())) {
             try {

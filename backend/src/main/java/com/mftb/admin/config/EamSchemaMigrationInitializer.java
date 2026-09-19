@@ -50,6 +50,7 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v8-merge-category-brand", this::mergeCategoryBrandTables);
         versionTracker.applyOnce("eam:schema-v9-rename-master-data", this::renameMasterDataMenu);
         versionTracker.applyOnce("eam:schema-v10-repair-table", this::createRepairTable);
+        versionTracker.applyOnce("eam:schema-v11-inventory-tables", this::createInventoryTables);
     }
 
     private void upgradeTransferIntegrity() {
@@ -588,32 +589,45 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         log.info("耗材品牌迁移完成：{} 条", rows.size());
     }
 
-    /** 基础数据菜单重组：耗材基础配置菜单下线、基础配置扁平化、分类库/品牌产品库改名 */
+    /**
+     * 基础数据菜单重组：耗材分类/品牌/计量单位菜单下线（功能并入分类库/品牌产品库）。
+     * <p>
+     * v40: 基础配置分组的唯一 key 收敛为种子的 asset-basic。历史上本方法把五个叶子挂到
+     * 167 脚本引入的 eam-master-data 并停用 asset-basic，而 DataInitializer 种子又会重建
+     * asset-basic，导致「物資管理」下出现两个同名「基礎配置」（一个空、一个有子菜单）。
+     * 现统一挂回 asset-basic，并把 eam-master-data 已有子节点迁移过去。
+     */
     private void restructureMasterDataMenus() {
-        Long masterId;
-        try {
-            masterId = jdbcTemplate.queryForObject(
-                    "SELECT id FROM sys_menu WHERE menu_key = 'eam-master-data' AND deleted = 0 LIMIT 1", Long.class);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            log.info("eam-master-data 菜单不存在，跳过菜单重组（可能 167 脚本尚未执行）");
-            return;
-        }
         // 耗材分类/品牌/计量单位菜单下线（功能并入分类库/品牌产品库）
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
                 + "WHERE menu_key IN ('consumable-category', 'consumable-brand', 'consumable-unit') AND deleted = 0");
-        // 扁平化：5 个基础配置叶子菜单直挂基础数据，停用 asset-basic 子分组
+        Long basicId;
+        try {
+            basicId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM sys_menu WHERE menu_key = 'asset-basic' AND deleted = 0 LIMIT 1", Long.class);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            basicId = null;
+        }
+        if (basicId == null) {
+            log.info("asset-basic 菜单尚未种子化，跳过基础数据叶子挂载（由 DataInitializer.reconcileMenuMasterData 兜底）");
+            return;
+        }
+        // 先吸收 eam-master-data 的历史子节点，再停用该重复分组
+        jdbcTemplate.update("UPDATE sys_menu SET parent_id = ? WHERE parent_id = "
+                + "(SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'eam-master-data' AND deleted = 0) t) AND deleted = 0",
+                basicId);
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
+                + "WHERE menu_key = 'eam-master-data' AND deleted = 0 "
+                + "AND id NOT IN (SELECT parent_id FROM (SELECT DISTINCT parent_id FROM sys_menu "
+                + "WHERE deleted = 0 AND parent_id IS NOT NULL) p)");
+        // 5 个基础配置叶子菜单固定挂在 asset-basic 下
         String[] leafKeys = {"asset-category", "asset-model", "asset-location", "param-library", "asset-tag"};
         int sort = 1;
         for (String key : leafKeys) {
             jdbcTemplate.update("UPDATE sys_menu SET parent_id = ?, sort_order = ? WHERE menu_key = ? AND deleted = 0",
-                    masterId, sort++, key);
+                    basicId, sort++, key);
         }
-        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE menu_key = 'asset-basic' AND deleted = 0");
-        // 改名（统一库命名）
-        jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', name_en = 'Basic Configuration' WHERE menu_key = 'eam-master-data' AND deleted = 0");
-        jdbcTemplate.update("UPDATE sys_menu SET name = '分類庫', name_en = 'Category Library' WHERE menu_key = 'asset-category' AND deleted = 0");
-        jdbcTemplate.update("UPDATE sys_menu SET name = '品牌產品庫', name_en = 'Brand Product Library' WHERE menu_key = 'asset-model' AND deleted = 0");
-        log.info("基础数据菜单重组完成");
+        log.info("基础数据菜单重组完成（统一挂 asset-basic）");
     }
 
     /** v10: 资产维修记录表 */
@@ -659,5 +673,56 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
                 Integer.class, table);
         return count != null && count > 0;
+    }
+
+    /** v11: 资产盘点任务表 + 盘点明细表 */
+    private void createInventoryTables() {
+        log.info("开始创建 EAM 资产盘点表结构 ...");
+
+        // ───────────── biz_eam_inventory_task 盘点任务主表 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `biz_eam_inventory_task` ("
+                + "`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
+                + "`task_no` VARCHAR(64) NOT NULL COMMENT '盘点任务编号（PD+YYYYMMDD+4位）', "
+                + "`task_name` VARCHAR(200) NOT NULL COMMENT '盘点任务名称', "
+                + "`inventory_date` VARCHAR(20) NOT NULL COMMENT '盘点日期', "
+                + "`operator` VARCHAR(128) NOT NULL COMMENT '盘点人', "
+                + "`expected_count` INT NOT NULL DEFAULT 0 COMMENT '应盘数量', "
+                + "`actual_count` INT NOT NULL DEFAULT 0 COMMENT '实盘数量', "
+                + "`diff_count` INT NOT NULL DEFAULT 0 COMMENT '差异数（实盘-应盘）', "
+                + "`status` VARCHAR(32) NOT NULL DEFAULT 'in_progress' COMMENT '状态：in_progress/completed/cancelled', "
+                + "`remark` VARCHAR(500) NULL DEFAULT '' COMMENT '备注', "
+                + "`created_by` VARCHAR(128) NULL DEFAULT NULL COMMENT '创建人', "
+                + "`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                + "`updated_by` VARCHAR(128) NULL DEFAULT NULL COMMENT '最后更新人', "
+                + "`updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "`deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                + "UNIQUE KEY `uk_task_no` (`task_no`), "
+                + "KEY `idx_status` (`status`), "
+                + "KEY `idx_inventory_date` (`inventory_date`)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产盘点任务表'");
+
+        // ───────────── biz_eam_inventory_item 盘点明细表 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS `biz_eam_inventory_item` ("
+                + "`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
+                + "`task_id` BIGINT NOT NULL COMMENT '关联盘点任务 ID', "
+                + "`asset_id` BIGINT NOT NULL COMMENT '资产 ID', "
+                + "`asset_no` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '资产编号（快照）', "
+                + "`asset_name` VARCHAR(256) NOT NULL DEFAULT '' COMMENT '资产名称（快照）', "
+                + "`asset_type` VARCHAR(128) NULL DEFAULT NULL COMMENT '资产分类（快照）', "
+                + "`location` VARCHAR(200) NULL DEFAULT NULL COMMENT '存放位置（快照）', "
+                + "`status` VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '盘点状态：pending/normal/lost/damaged', "
+                + "`remark` VARCHAR(500) NULL DEFAULT '' COMMENT '备注', "
+                + "`created_by` VARCHAR(128) NULL DEFAULT NULL COMMENT '创建人', "
+                + "`created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                + "`updated_by` VARCHAR(128) NULL DEFAULT NULL COMMENT '最后更新人', "
+                + "`updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "KEY `idx_task_id` (`task_id`), "
+                + "KEY `idx_asset_id` (`asset_id`), "
+                + "KEY `idx_status` (`status`)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产盘点明细表'");
+
+        log.info("EAM 资产盘点表结构创建完成");
     }
 }

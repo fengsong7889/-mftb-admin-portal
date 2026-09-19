@@ -36,7 +36,6 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
 
     private final EamCategoryMapper categoryMapper;
     private final EamBrandMapper brandMapper;
-    private final ConsumableUnitMapper unitMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
 
@@ -247,82 +246,6 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
         return vo;
     }
 
-    /* ==================== 计量单位 ==================== */
-
-    @Override
-    public List<ConsumableUnitVO> listUnits(String keyword) {
-        LambdaQueryWrapper<ConsumableUnit> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(keyword)) {
-            String kw = keyword.trim();
-            wrapper.and(w -> w.like(ConsumableUnit::getName, kw)
-                    .or().like(ConsumableUnit::getAbbr, kw));
-        }
-        wrapper.orderByAsc(ConsumableUnit::getSortOrder).orderByAsc(ConsumableUnit::getId);
-        List<ConsumableUnit> list = unitMapper.selectList(wrapper);
-        return list.stream().map(u -> {
-            ConsumableUnitVO vo = new ConsumableUnitVO();
-            vo.setId(u.getId());
-            vo.setName(u.getName());
-            vo.setAbbr(u.getAbbr());
-            vo.setSortOrder(u.getSortOrder());
-            vo.setStatus(u.getStatus());
-            vo.setCreatedBy(u.getCreatedBy());
-            vo.setUpdatedBy(u.getUpdatedBy());
-            vo.setUpdatedAt(u.getUpdatedAt() != null ? u.getUpdatedAt().format(DT_FMT) : "");
-            return vo;
-        }).collect(Collectors.toList());
-    }
-
-    @Override
-    public long createUnit(ConsumableUnitSaveDTO dto) {
-        if (!StringUtils.hasText(dto.getName())) throw new BusinessException("單位名稱不能為空");
-        long count = unitMapper.selectCount(new LambdaQueryWrapper<ConsumableUnit>()
-                .eq(ConsumableUnit::getName, dto.getName()));
-        if (count > 0) throw new BusinessException("單位名稱已存在：" + dto.getName());
-
-        ConsumableUnit entity = new ConsumableUnit();
-        entity.setName(dto.getName().trim());
-        entity.setAbbr(dto.getAbbr() != null ? dto.getAbbr().trim() : "");
-        entity.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
-        entity.setStatus(StringUtils.hasText(dto.getStatus()) ? dto.getStatus() : "enabled");
-        fillOperatorUnit(entity, true);
-        unitMapper.insert(entity);
-        return entity.getId();
-    }
-
-    @Override
-    public void updateUnit(long id, ConsumableUnitSaveDTO dto) {
-        ConsumableUnit entity = unitMapper.selectById(id);
-        if (entity == null) throw new BusinessException("單位不存在");
-        if (StringUtils.hasText(dto.getName())) {
-            long count = unitMapper.selectCount(new LambdaQueryWrapper<ConsumableUnit>()
-                    .eq(ConsumableUnit::getName, dto.getName()).ne(ConsumableUnit::getId, id));
-            if (count > 0) throw new BusinessException("單位名稱已存在：" + dto.getName());
-            entity.setName(dto.getName().trim());
-        }
-        if (dto.getAbbr() != null) entity.setAbbr(dto.getAbbr().trim());
-        if (dto.getSortOrder() != null) entity.setSortOrder(dto.getSortOrder());
-        if (StringUtils.hasText(dto.getStatus())) entity.setStatus(dto.getStatus());
-        fillOperatorUnit(entity, false);
-        unitMapper.updateById(entity);
-    }
-
-    @Override
-    public void deleteUnit(long id) {
-        ConsumableUnit entity = unitMapper.selectById(id);
-        if (entity == null) throw new BusinessException("單位不存在");
-        unitMapper.deleteById(id);
-    }
-
-    @Override
-    public void toggleUnitStatus(long id) {
-        ConsumableUnit entity = unitMapper.selectById(id);
-        if (entity == null) throw new BusinessException("單位不存在");
-        entity.setStatus("enabled".equals(entity.getStatus()) ? "disabled" : "enabled");
-        fillOperatorUnit(entity, false);
-        unitMapper.updateById(entity);
-    }
-
     /* ==================== 工具方法 ==================== */
 
     private void fillOperatorCategory(EamCategory entity) {
@@ -332,16 +255,6 @@ public class ConsumableBasicDataServiceImpl implements ConsumableBasicDataServic
 
     private void fillOperatorBrand(EamBrand entity) {
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
-        entity.setUpdatedAt(LocalDateTime.now());
-    }
-
-    private void fillOperatorUnit(ConsumableUnit entity, boolean isNew) {
-        String opName = operatorResolver.currentOperatorName();
-        if (isNew) {
-            entity.setCreatedBy(opName);
-            entity.setCreatedAt(LocalDateTime.now());
-        }
-        entity.setUpdatedBy(opName);
         entity.setUpdatedAt(LocalDateTime.now());
     }
 

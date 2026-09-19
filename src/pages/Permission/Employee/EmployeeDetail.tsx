@@ -8,7 +8,7 @@ import {
   ArrowLeftOutlined, PlusOutlined, EditOutlined, SaveOutlined,
   UserOutlined, IdcardOutlined, DeleteOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
-import { fetchEmployees, createEmployee, type EmployeeItem, type EmployeePayload,
+import { fetchEmployees, createEmployee, resetEmployeePassword, updateEmployeeStatus, type EmployeeItem, type EmployeePayload,
   fetchBasicInfo, savePersonalInfo, saveIdInfo, saveContactInfo, saveAccountInfo,
   fetchEmergencyContacts, createEmergencyContact, updateEmergencyContact, deleteEmergencyContact,
   fetchPositionRecords, createPositionRecord, updatePositionRecord, deletePositionRecord,
@@ -125,34 +125,6 @@ interface RewardPunishRecord {
   remark?: string
 }
 
-/* ═══════════════════════════════════════════
-   Mock 数据（后端 API 就绪后替换）
-   ═══════════════════════════════════════════ */
-
-const MOCK_POSITION_RECORDS: PositionRecord[] = [
-  {
-    id: 1, effectiveDate: '2024-03-27', effectiveSeq: 2,
-    operation: '重新入职', reason: '退场后重新进场',
-    serviceDept: 'FTIC（履约与纺织品创新中心）/全球仓储营运部', position: '防损员',
-    workCountry: 'china', workCity: 'huizhou', officeAddress: '仲恺新宜园区安防组',
-    company: '珠海闪蜂科技有限公司', contractLocation: 'huizhou',
-    employeeCategory: '正式员工', mentor: '张三',
-    workSystem: '标准工时制', sequence: 'P', positionLevel: 'P2', rank: 'R3',
-    directSuperior: '李四',
-  },
-  {
-    id: 2, effectiveDate: '2024-01-29', effectiveSeq: 1,
-    operation: '离职', reason: '主动离职-交通原因',
-  },
-  {
-    id: 3, effectiveDate: '2022-02-02', effectiveSeq: 0,
-    operation: '重新入职', reason: '离职后入职',
-    serviceDept: 'FTIC', position: '防损员',
-    workCountry: 'china', workCity: 'huizhou',
-    workSystem: '标准工时制', sequence: 'P', positionLevel: 'P2', rank: 'R3',
-  },
-]
-
 /** 民族枚举（中国56个民族） */
 const ETHNICITY_OPTIONS = [
   '汉', '蒙古', '回', '藏', '维吾尔', '苗', '彝', '壮', '布依', '朝鲜',
@@ -244,52 +216,9 @@ const DEDUCTION_NAME_OPTIONS = [
   '生育保险', '住房公积金', '个人所得税',
 ]
 
-const MOCK_BASIC_INFO: BasicInfo = {
-  gender: '男', nationality: '中国', ethnicity: '汉',
-  birthDate: '1996-11-11', idType: '身份证',
-  idNumber: '110121199611111210', idAddress: '中国',
-  maritalStatus: '未婚', politicalStatus: '群众',
-  religion: '佛教', householdType: '外地非农业户口',
-  householdLocation: '惠州', nativePlace: '广州',
-  mobile: '18899898912', email: 'xiaomi@qq.com',
-  addressCountry: '中国', addressCity: '惠州市', addressDetail: '广东省肇庆市四会市碧桂园翡翠郡',
-  emergencyContacts: [
-    { id: 1, name: '小红', phone: '13989181423', relation: '父母' },
-  ],
-}
 
-const MOCK_LOGIN_ACCOUNT: LoginAccount = {
-  id: 1,
-  loginAccount: 'MT00001',
-  loginPassword: '••••••••',
-  status: 'normal',
-}
 
-const MOCK_CONTRACTS: ContractRecord[] = [
-  {
-    id: 1, contractNo: 'HT-2024-001', contractType: '劳动合同',
-    startDate: '2024-03-27', endDate: '2027-03-26', signDate: '2024-03-27',
-    company: '珠海闪蜂科技有限公司', status: '生效中',
-  },
-  {
-    id: 2, contractNo: 'HT-2022-003', contractType: '劳动合同',
-    startDate: '2022-02-02', endDate: '2024-01-29', signDate: '2022-02-02',
-    company: '珠海麦峰科技有限公司', status: '已终止',
-  },
-]
 
-const MOCK_REWARDS_PUNISH: RewardPunishRecord[] = [
-  {
-    id: 1, type: 'reward', title: '年度优秀员工',
-    date: '2024-12-31', reason: '年度绩效评定为A',
-    level: '公司级', issuer: '人力资源部',
-  },
-  {
-    id: 2, type: 'punish', title: '迟到警告',
-    date: '2024-06-15', reason: '月累计迟到3次',
-    level: '部门级', issuer: '部门主管',
-  },
-]
 
 /* ═══════════════════════════════════════════
    主组件
@@ -494,7 +423,7 @@ export default function EmployeeDetail() {
   }, [watchContactCountry])
 
   /* ── 账号管理 ── */
-  const [loginAccount, setLoginAccount] = useState<LoginAccount>(MOCK_LOGIN_ACCOUNT)
+  const [loginAccount, setLoginAccount] = useState<LoginAccount | null>(null)
   const [resetPwdModalVisible, setResetPwdModalVisible] = useState(false)
   const [resetPwdForm] = Form.useForm()
 
@@ -506,13 +435,13 @@ export default function EmployeeDetail() {
   const [showAllRoles, setShowAllRoles] = useState(false)
 
   /* ── 合同信息 ─ */
-  const [contracts, setContracts] = useState<ContractRecord[]>(MOCK_CONTRACTS)
+  const [contracts, setContracts] = useState<ContractRecord[]>([])
   const [contractModalVisible, setContractModalVisible] = useState(false)
   const [editingContract, setEditingContract] = useState<ContractRecord | null>(null)
   const [contractForm] = Form.useForm()
 
   /* ── 奖惩信息 ── */
-  const [rewardsPunish, setRewardsPunish] = useState<RewardPunishRecord[]>(MOCK_REWARDS_PUNISH)
+  const [rewardsPunish, setRewardsPunish] = useState<RewardPunishRecord[]>([])
   const [rpModalVisible, setRpModalVisible] = useState(false)
   const [editingRp, setEditingRp] = useState<RewardPunishRecord | null>(null)
   const [rpForm] = Form.useForm()
@@ -530,11 +459,12 @@ export default function EmployeeDetail() {
         if (emp) {
           setEmployee(emp)
           // 账号管理：登录账号与状态取员工真实数据（修复 mock 写死 MT00001 的显示错误）
-          setLoginAccount(prev => ({
-            ...prev,
+          setLoginAccount({
+            id: emp.id,
             loginAccount: emp.username,
+            loginPassword: '••••••••',
             status: emp.status === 0 ? 'frozen' : 'normal',
-          }))
+          })
         }
         else message.error(t('employeeDetail.notFound'))
       })
@@ -1167,7 +1097,7 @@ export default function EmployeeDetail() {
             <Popconfirm
               title={t('employeeDetail.freezeConfirmTitle')}
               description={t('employeeDetail.freezeConfirmDesc')}
-              onConfirm={() => handleToggleFreeze(record.id)}
+              onConfirm={() => handleToggleFreeze()}
               okText={t('common.confirm')}
               cancelText={t('common.cancel')}
             >
@@ -1177,7 +1107,7 @@ export default function EmployeeDetail() {
             <Popconfirm
               title={t('employeeDetail.unfreezeConfirmTitle')}
               description={t('employeeDetail.unfreezeConfirmDesc')}
-              onConfirm={() => handleToggleFreeze(record.id)}
+              onConfirm={() => handleToggleFreeze()}
               okText={t('common.confirm')}
               cancelText={t('common.cancel')}
             >
@@ -1195,20 +1125,21 @@ export default function EmployeeDetail() {
       message.error(t('employeeDetail.passwordMismatch'))
       return
     }
-    setLoginAccount(prev => ({ ...prev, loginPassword: '••••••••' }))
+    if (!empId) return
+    await resetEmployeePassword(Number(empId), values.newPassword)
     message.success(t('employeeDetail.passwordResetSuccess'))
     setResetPwdModalVisible(false)
     resetPwdForm.resetFields()
   }
 
   /** 冻结 / 解冻切换 */
-  const handleToggleFreeze = (accountId: number) => {
-    setLoginAccount(prev => {
-      if (prev.id !== accountId) return prev
-      const next = prev.status === 'normal' ? 'frozen' : 'normal'
-      message.success(next === 'frozen' ? t('employeeDetail.freezeSuccess') : t('employeeDetail.unfreezeSuccess'))
-      return { ...prev, status: next }
-    })
+  const handleToggleFreeze = async () => {
+    if (!empId || !loginAccount) return
+    const next = loginAccount.status === 'normal' ? 'frozen' : 'normal'
+    const newStatus = next === 'frozen' ? 0 : 1
+    await updateEmployeeStatus(Number(empId), newStatus)
+    setLoginAccount(prev => prev ? { ...prev, status: next } : prev)
+    message.success(next === 'frozen' ? t('employeeDetail.freezeSuccess') : t('employeeDetail.unfreezeSuccess'))
   }
 
   /* ── 三方通讯账号编辑（由 THIRD_PARTY_ACCOUNT_FIELDS 驱动） ── */
@@ -1249,7 +1180,7 @@ export default function EmployeeDetail() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEditContract(record)}>{t('common.edit')}</Button>
-          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteContract(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteContract()} okText={t('common.confirm')} cancelText={t('common.cancel')}>
             <Button type="link" size="small" danger>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
@@ -1270,22 +1201,12 @@ export default function EmployeeDetail() {
   }
 
   const handleSaveContract = async () => {
-    const values = await contractForm.validateFields()
-    if (editingContract) {
-      setContracts(prev => prev.map(r => r.id === editingContract.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.contractUpdated'))
-    } else {
-      setContracts(prev => [...prev, { ...values, id: Date.now() }])
-      message.success(t('employeeDetail.contractAdded'))
-    }
-    if (empId) markTabUpdated('contract', empId)
+    message.warning('合同管理尚未接入後端 API')
     setContractModalVisible(false)
   }
 
-  const handleDeleteContract = (id: number) => {
-    setContracts(prev => prev.filter(r => r.id !== id))
-    message.success(t('employeeDetail.contractDeleted'))
-    if (empId) markTabUpdated('contract', empId)
+  const handleDeleteContract = () => {
+    message.warning('合同管理尚未接入後端 API')
   }
 
   /* ═══════════════════════════════════════════
@@ -1306,7 +1227,7 @@ export default function EmployeeDetail() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEditRp(record)}>{t('common.edit')}</Button>
-          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteRp(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteRp()} okText={t('common.confirm')} cancelText={t('common.cancel')}>
             <Button type="link" size="small" danger>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
@@ -1328,22 +1249,12 @@ export default function EmployeeDetail() {
   }
 
   const handleSaveRp = async () => {
-    const values = await rpForm.validateFields()
-    if (editingRp) {
-      setRewardsPunish(prev => prev.map(r => r.id === editingRp.id ? { ...r, ...values } : r))
-      message.success(t('employeeDetail.rpUpdated'))
-    } else {
-      setRewardsPunish(prev => [...prev, { ...values, id: Date.now() }])
-      message.success(t('employeeDetail.rpAdded'))
-    }
-    if (empId) markTabUpdated('reward', empId)
+    message.warning('獎懲管理尚未接入後端 API')
     setRpModalVisible(false)
   }
 
-  const handleDeleteRp = (id: number) => {
-    setRewardsPunish(prev => prev.filter(r => r.id !== id))
-    message.success(t('employeeDetail.rpDeleted'))
-    if (empId) markTabUpdated('reward', empId)
+  const handleDeleteRp = () => {
+    message.warning('獎懲管理尚未接入後端 API')
   }
 
   /* ═══════════════════════════════════════════
@@ -1754,7 +1665,7 @@ export default function EmployeeDetail() {
           </div>
           <Table
             columns={accountColumns}
-            dataSource={[loginAccount]}
+            dataSource={loginAccount ? [loginAccount] : []}
             rowKey="id"
             pagination={false}
             size="middle"

@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
-import { Modal } from 'antd'
+import { Modal, message } from 'antd'
+import i18n from 'i18next'
 import { useNavigate } from 'react-router-dom'
 import type { Role, MenuPermission } from '../pages/Permission/types'
 import { STORAGE_KEYS, CONTROLLED_MENU_KEYS, resolveFirstAccessiblePath } from '../pages/Permission/types'
 import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLICT_EVENT, FORCE_LOGOUT_EVENT, ACCOUNT_DISABLED_EVENT, resetUnauthorizedGuard } from '../api'
 import { updateAvatarApi } from '../api/auth'
+import { isBackendUnavailable } from '../api/request'
 import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
 export interface UserInfo {
@@ -230,7 +232,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return refreshed
         })
       })
-      .catch(() => {})
+      .catch((err) => {
+        // 后端不可用时不再静默保留旧登录态：给出一次性明确提示，
+        // 避免“幽灵会话”（旧 token 进得系统但菜单/数据全部失效）被误认为正常状态
+        if (isBackendUnavailable(err)) {
+          message.warning(i18n.t('login.backendUnavailable'), 6)
+        }
+      })
   }, [])
 
   /**

@@ -30,7 +30,7 @@ public class EamPurchaseSaveDTO {
     /** 服务部门 */
     private String department;
 
-    /** 资产品牌：1=闪蜂, 2=mFood */
+    /** 所属品牌：1=闪蜂, 2=mFood */
     private Integer brand;
 
     /** 执行状态 */

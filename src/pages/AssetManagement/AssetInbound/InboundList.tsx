@@ -268,7 +268,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     const cols = [
       { title: t('asset.colBatchNo'), dataIndex: 'batchNo' },
       { title: t('asset.colPoNo'), dataIndex: 'poNo' },
-      { title: t('asset.colBrand'), dataIndex: 'brand', render: (v: number | undefined) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '') },
+      { title: t('asset.orderBrand'), dataIndex: 'brand', render: (v: number | undefined) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '') },
       { title: t('asset.colBatchStatus'), dataIndex: 'id', render: (_: unknown, r: InboundBatch) => t(`asset.${BATCH_STATUS_META[deriveBatchStatus(r)].labelKey}`) },
       { title: t('asset.colGeneratedCount'), dataIndex: 'id', render: (_: unknown, r: InboundBatch) => String(resolveAssetCount(r)) },
       { title: t('asset.colTotalQty'), dataIndex: 'totalQty' },
@@ -298,7 +298,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span>,
     },
     {
-      title: t('asset.colBrand'), dataIndex: 'brand', key: 'brand', width: 100,
+      title: t('asset.orderBrand'), dataIndex: 'brand', key: 'brand', width: 100,
       render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
@@ -374,7 +374,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const columnMeta = useMemo(() => [
     { key: 'batchNo', title: t('asset.colBatchNo') },
     { key: 'poNo', title: t('asset.colPoNo') },
-    { key: 'brand', title: t('asset.colBrand') },
+    { key: 'brand', title: t('asset.orderBrand') },
     { key: 'batchStatus', title: t('asset.colBatchStatus') },
     { key: 'generatedAssetCount', title: t('asset.colGeneratedCount') },
     { key: 'totalQty', title: t('asset.colTotalQty') },
@@ -462,7 +462,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       ),
     },
     {
-      title: t('asset.colBrand'), key: 'brand', width: 100,
+      title: t('asset.orderBrand'), key: 'brand', width: 100,
       render: (_: unknown, r: PendingRow) => r.order.brand
         ? <BrandTag value={r.order.brand} />
         : <span style={{ color: '#bfbfbf' }}>-</span>,

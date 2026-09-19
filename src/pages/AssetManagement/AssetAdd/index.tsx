@@ -165,7 +165,7 @@ export default function AssetAdd() {
   useEffect(() => {
     let alive = true
     Promise.all([
-      fetchCategoryList(undefined, false).catch(() => []),
+      fetchCategoryList().catch(() => []),
       fetchLocationList().catch(() => []),
       fetchDepartments().catch(() => []),
       fetchAllParamTypes().catch(() => []),

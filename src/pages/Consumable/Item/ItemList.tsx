@@ -11,8 +11,8 @@ import type { Dayjs } from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItems, deleteConsumableItem, toggleConsumableItemStatus,
-  fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchConsumableUnitOptions,
-  type ConsumableItem, type ConsumableCategory, type ConsumableBrand, type ConsumableUnit,
+  fetchConsumableCategoryOptions, fetchConsumableBrandOptions,
+  type ConsumableItem, type ConsumableCategory, type ConsumableBrand,
 } from '../../../api/consumable'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
@@ -44,7 +44,6 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
   const [size, setSize] = useState(10)
   const [categories, setCategories] = useState<ConsumableCategory[]>([])
   const [brands, setBrands] = useState<ConsumableBrand[]>([])
-  const [units, setUnits] = useState<ConsumableUnit[]>([])
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   // 搜索条件
@@ -79,7 +78,6 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
   useEffect(() => {
     fetchConsumableCategoryOptions().then(setCategories).catch(() => { /* 忽略：分类仅用于筛选下拉 */ })
     fetchConsumableBrandOptions().then(setBrands).catch(() => { /* 忽略 */ })
-    fetchConsumableUnitOptions().then(setUnits).catch(() => { /* 忽略 */ })
   }, [])
 
   const categoryOptions = useMemo(
@@ -90,10 +88,6 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     () => brands.map(b => ({ label: b.name, value: b.name })),
     [brands],
   )
-  const unitOptions = useMemo(
-    () => units.map(u => ({ label: u.abbr ? `${u.name}（${u.abbr}）` : u.name, value: u.name })),
-    [units],
-  )
 
   const handleSearch = () => {
     const v = form.getFieldsValue()
@@ -102,7 +96,7 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     setQName(v.name?.trim() || undefined)
     setQCategory(v.categoryId)
     setQBrand(v.brand?.trim() || undefined)
-    setQUnit(v.unit)
+    setQUnit(v.unit?.trim() || undefined)
     setQStatus(v.status)
     setQUpdatedBy(v.updatedBy?.trim() || undefined)
     setQTimeStart(v.updatedAtRange?.[0]?.format('YYYY-MM-DD'))
@@ -243,7 +237,8 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
             <Select placeholder="全部品牌" allowClear showSearch optionFilterProp="label" options={brandOptions} />
           </Form.Item>
           <Form.Item label="單位" name="unit">
-            <Select placeholder="全部單位" allowClear showSearch optionFilterProp="label" options={unitOptions} />
+            {/* 单位已不再是字典表，改为文本模糊匹配 */}
+            <Input placeholder="全部單位" allowClear />
           </Form.Item>
           <Form.Item label="狀態" name="status">
             <Select placeholder="全部" allowClear

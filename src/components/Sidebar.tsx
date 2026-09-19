@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Layout, Menu, message, Modal, Input } from 'antd'
+import { Layout, Menu, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,8 @@ import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchMenuTree } from '../api/menu'
 import type { MenuVO } from '../api/menu'
+import { OFFLINE_MENUS } from '../constants/offlineMenus'
+import type { OfflineMenuNode } from '../constants/offlineMenus'
 import { translateMenuName } from '../i18n/menuNameEn'
 import { renderMenuIcon } from './MenuIcon'
 import type { ReactNode } from 'react'
@@ -28,7 +30,6 @@ import {
   ReadOutlined,
   HomeOutlined,
   ColumnHeightOutlined,
-  ColumnWidthOutlined, // 计量单位管理
   SettingOutlined,
   ControlOutlined,
   GlobalOutlined,
@@ -54,7 +55,6 @@ import {
   SolutionOutlined,
   ScheduleOutlined,
   MenuOutlined,
-  BranchesOutlined,
   HistoryOutlined,
   ExperimentOutlined,
   NodeIndexOutlined,
@@ -86,6 +86,7 @@ import {
   GoldOutlined, // 耗材管理分组
   ProfileOutlined, // 耗材档案
   AlertOutlined, // 库存预警
+  TranslationOutlined, // 多语言管理
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -148,40 +149,6 @@ const keyToPath: Record<string, string> = {
   'algorithm-simulation': '/algorithm-simulation',
   'merchant-score-insight': '/merchant-score-insight',
   'merchant-promotion-diagnose': '/merchant-promotion-diagnose',
-  // 系統設置
-  // 注意:以下菜单项暂未实现对应页面
-  // 'menu-management': '/menu-management',
-  // 'system-template': '/system-template',
-  // 'layout-settings': '/layout-settings',
-  // 'basic-settings': '/basic-settings',
-  // 用戶管理
-  'user-feedback': '/user-feedback',
-  'user-list': '/user-list',
-  'user-avatar': '/user-avatar',
-  'user-frozen': '/user-frozen',
-  'device-frozen': '/device-frozen',
-  'user-location-special': '/user-location-special',
-  'user-location-blacklist': '/user-location-blacklist',
-  'whitelist': '/whitelist',
-  // 運營投放管理
-  'delivery-list': '/delivery-list',
-  // 商戶集團管理
-  'merchant-onboarding': '/merchant-onboarding',
-  'merchant-feedback': '/merchant-feedback',
-  'group-list': '/group-list',
-  'group-permission': '/group-permission',
-  'store-basic-info': '/store-basic-info',
-  'contract-management': '/contract-management',
-  'group-brand-library': '/group-brand-library',
-  // 到家業務(外賣)
-  'product-tags': '/product-tags',
-  'product-params': '/product-params',
-  'store-management': '/store-management',
-  'store-categories': '/store-categories',
-  'product-platform-categories': '/product-platform-categories',
-  // 到店業務(團購)
-  'group-buy-store': '/group-buy-store',
-  'group-buy-product': '/group-buy-product',
   // 商家推广工具
   'promotion-dashboard': '/promotion-dashboard',
   'promotion-algorithm': '/promotion-algorithm',
@@ -207,7 +174,12 @@ const keyToPath: Record<string, string> = {
   // 'promotion-tool': '/promotion-tool',
   // 系统配置
   'menu-config': '/menu-config',
-  'translation-manage': '/translation-manage',
+  'translation-manage': '/i18n-center/workbench',
+  // 多语言管理（i18n-center 独立模块）
+  'i18n-language': '/i18n-center/language',
+  'i18n-import-export': '/i18n-center/import-export',
+  'i18n-mt-engine': '/i18n-center/mt-engine',
+  'i18n-dashboard': '/i18n-center/dashboard',
   'rule-config': '/rule-config',
   'notification-config': '/notification-config',
   'workflow-config': '/workflow-config',
@@ -285,27 +257,7 @@ const keyToPath: Record<string, string> = {
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
   'consumable-alert':     '/consumable-alert',
-  'consumable-category':  '/consumable-category',
-  'consumable-brand':     '/consumable-brand',
-  'consumable-unit':      '/consumable-unit',
 }
-
-/** 暂无对应页面的菜单 key 集合，点击时弹出密码验证弹窗 */
-const noPageKeys = new Set([
-  // 用戶管理
-  'user-feedback', 'user-list', 'user-avatar', 'user-frozen', 'device-frozen',
-  'user-location-special', 'user-location-blacklist', 'whitelist',
-  // 運營投放管理
-  'delivery-list',
-  // 商戶集團管理
-  'merchant-onboarding', 'merchant-feedback', 'group-list', 'group-permission',
-  'store-basic-info', 'contract-management', 'group-brand-library',
-  // 到家業務(外賣)
-  'product-tags', 'product-params', 'store-management', 'store-categories',
-  'product-platform-categories',
-  // 到店業務(團購)
-  'group-buy-store', 'group-buy-product',
-])
 
 /** 路由路径 → 菜单 key 映射（用于高亮 & MenuTabs 名称统一） */
 export const pathToKey: Record<string, string> = {}
@@ -315,527 +267,53 @@ Object.entries(keyToPath).forEach(([key, path]) => {
   pathToKey[cleanPath] = key
 })
 
-const menuItems: MenuItem[] = [
-  {
-    key: 'home',
-    icon: <HomeOutlined />,
-    label: '首頁',
-  },
-  {
-    key: 'merchant_group',
-    icon: <ShopOutlined />,
-    label: '商戶集團管理',
-    children: [
-      {
-        key: 'merchant-group-list',
-        icon: <ShopOutlined />,
-        label: '集團管理',
-      },
-      {
-        key: 'store-list',
-        icon: <ShopOutlined />,
-        label: '門店管理',
-      },
-    ],
-  },
-  {
-    key: 'merchant_promotion',
-    icon: <CrownOutlined />,
-    label: '商家推广工具',
-    children: [
-      {
-        key: 'promotion-dashboard',
-        icon: <PieChartOutlined />,
-        label: '數據看板',
-      },
-      {
-        key: 'promotion-algorithm',
-        icon: <AppstoreOutlined />,
-        label: '算法库',
-      },
-      {
-        key: 'promotion-slot-config',
-        icon: <ColumnHeightOutlined />,
-        label: '瀑布流策略',
-      },
-      {
-        key: 'promotion-waterfall',
-        icon: <WalletOutlined />,
-        label: '銷售定價',
-      },
-      {
-        key: 'gift-manage',
-        icon: <GiftOutlined />,
-        label: '贈送管理',
-        children: [
-          {
-            key: 'gift-detail',
-            icon: <RedEnvelopeOutlined />,
-            label: '推廣贈送',
-          },
-          {
-            key: 'gift-consume-detail',
-            icon: <FileTextOutlined />,
-            label: '消費明細',
-          },
-        ],
-      },
-      {
-        key: 'ad-sales',
-        icon: <ShoppingFilled />,
-        label: '廣告銷售',
-      },
-      {
-        key: 'promotion-word-library',
-        icon: <ReadOutlined />,
-        label: '詞庫管理',
-      },
-      {
-        key: 'traffic-sandbox',
-        icon: <ExperimentOutlined />,
-        label: '實驗沙盤',
-        children: [
-          {
-            key: 'waterfall-simulation',
-            icon: <NodeIndexOutlined />,
-            label: '瀑布流推演',
-          },
-          {
-            key: 'algorithm-simulation',
-            icon: <DeploymentUnitOutlined />,
-            label: '算法推演',
-          },
-          {
-            key: 'merchant-score-insight',
-            icon: <TrophyOutlined />,
-            label: '商家評分透視',
-          },
-          {
-            key: 'merchant-promotion-diagnose',
-            icon: <MedicineBoxOutlined />,
-            label: '商家推廣診斷',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'promotion-tool',
-    icon: <ThunderboltOutlined />,
-    label: '推广通',
-    children: [
-      {
-        key: 'promotion-sales-config',
-        icon: <ShoppingFilled />,
-        label: '店鋪推廣',
-      },
-      {
-        key: 'promotion-report-group',
-        icon: <BarChartOutlined />,
-        label: '報表分析',
-        children: [
-          {
-            key: 'promotion-report-overview',
-            icon: <DashboardOutlined />,
-            label: '數據概覽',
-          },
-          {
-            key: 'promotion-report-order',
-            icon: <LineChartOutlined />,
-            label: '訂單效果報表',
-          },
-          {
-            key: 'promotion-report-compare',
-            icon: <PieChartOutlined />,
-            label: '推薦類型對比',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'search',
-    icon: <SearchOutlined />,
-    label: '搜索管理',
-    children: [
-      {
-        key: 'search-config-new',
-        icon: <SettingOutlined />,
-        label: '搜索配置',
-        children: [
-          {
-            key: 'global-config',
-            icon: <GlobalOutlined />,
-            label: '全局配置',
-          },
-          {
-            key: 'channel-strategy',
-            icon: <ThunderboltOutlined />,
-            label: '維度策略',
-          },
-        ],
-      },
-      {
-        key: 'search-guide',
-        icon: <AimOutlined />,
-        label: '搜索引導',
-        children: [
-          {
-            key: 'hint-config',
-            icon: <FontSizeOutlined />,
-            label: '底紋配置',
-          },
-          {
-            key: 'hot-search-config',
-            icon: <FireOutlined />,
-            label: '熱搜配置',
-          },
-          {
-            key: 'search-weight-config',
-            icon: <ColumnHeightOutlined />,
-            label: '權重干預',
-          },
-        ],
-      },
-      {
-        key: 'search-library',
-        icon: <ReadOutlined />,
-        label: '搜索詞庫',
-        children: [
-          {
-            key: 'word-segmentation',
-            icon: <ScissorOutlined />,
-            label: '分詞詞庫',
-          },
-          {
-            key: 'synonym-config',
-            icon: <SwapOutlined />,
-            label: '同義詞庫',
-          },
-          {
-            key: 'hot-search-library',
-            icon: <FireOutlined />,
-            label: '熱搜詞庫',
-          },
-          {
-            key: 'stop-words',
-            icon: <StopOutlined />,
-            label: '停用詞庫',
-          },
-        ],
-      },
-      {
-        key: 'search-verify-group',
-        icon: <SafetyCertificateOutlined />,
-        label: '效果校驗',
-        children: [
-          {
-            key: 'search-verify',
-            icon: <SearchOutlined />,
-            label: '搜索校驗',
-          },
-          {
-            key: 'hint-verify',
-            icon: <FontSizeOutlined />,
-            label: '底紋校驗',
-          },
-          {
-            key: 'hot-search-verify',
-            icon: <FireOutlined />,
-            label: '熱搜校驗',
-          },
-        ],
-      },
-      {
-        key: 'report',
-        icon: <BarChartOutlined />,
-        label: '報表統計',
-        children: [
-          {
-            key: 'hint-report',
-            icon: <LineChartOutlined />,
-            label: '底紋報表',
-          },
-          {
-            key: 'hot-search-report',
-            icon: <LineChartOutlined />,
-            label: '熱搜報表',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'finance',
-    icon: <MoneyCollectOutlined />,
-    label: '財務管理',
-    children: [
-      {
-        key: 'promotion',
-        icon: <WalletOutlined />,
-        label: '推廣金管理',
-        children: [
-          {
-            key: 'account-balance',
-            icon: <AccountBookOutlined />,
-            label: '賬戶餘額',
-          },
-          {
-            key: 'consume-risk',
-            icon: <SafetyCertificateOutlined />,
-            label: '消費風控',
-          },
-          {
-            key: 'batch-query',
-            icon: <SearchOutlined />,
-            label: '批次查詢',
-          },
-          {
-            key: 'detail-query',
-            icon: <FileSearchOutlined />,
-            label: '明細查詢',
-          },
-        ],
-      },
-      {
-        key: 'merchant-reconcile',
-        icon: <AuditOutlined />,
-        label: '商戶通對賬',
-        children: [
-          {
-            key: 'writeoff-reconcile',
-            icon: <AuditOutlined />,
-            label: '充消對賬',
-          },
-          {
-            key: 'debt-reconcile',
-            icon: <CheckCircleOutlined />,
-            label: '欠款對賬',
-          },
-        ],
-      },
-      {
-        key: 'approval',
-        icon: <CheckCircleOutlined />,
-        label: '審批管理',
-        children: [
-          {
-            key: 'approval-center',
-            icon: <AuditOutlined />,
-            label: '審批中心',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'group-purchase',
-    icon: <ShoppingFilled />,
-    label: '團購管理',
-    children: [
-      {
-        key: 'group-purchase-dashboard',
-        icon: <DashboardOutlined />,
-        label: '秒殺數據總覽',
-      },
-      {
-        key: 'flash-sale-register',
-        icon: <FileTextOutlined />,
-        label: '秒殺商品登記',
-      },
-      {
-        key: 'flash-sale-stats',
-        icon: <BarChartOutlined />,
-        label: '秒殺商品統計',
-      },
-      {
-        key: 'flash-sale-price',
-        icon: <MoneyCollectOutlined />,
-        label: '澳覓秒殺價',
-      },
-    ],
-  },
-  {
-    key: 'hr',
-    icon: <TeamOutlined />,
-    label: '集團人事(HR)',
-    children: [
-      {
-        key: 'employee-management',
-        icon: <UserOutlined />,
-        label: '員工管理',
-      },
-      {
-        key: 'organization-management',
-        icon: <ApartmentOutlined />,
-        label: '組織管理',
-      },
-      {
-        key: 'position-management',
-        icon: <IdcardOutlined />,
-        label: '職位管理',
-      },
-      {
-        key: 'login-log',
-        icon: <ScheduleOutlined />,
-        label: '員工動態',
-      },
-    ],
-  },
-  {
-    key: 'asset-management',
-    icon: <InboxOutlined />,
-    label: '資產管理(EAM)',
-    children: [
-      { key: 'asset-dashboard', icon: <DashboardOutlined />, label: '資產看板' },
-      {
-        key: 'asset-purchase',
-        icon: <ShoppingCartOutlined />,
-        label: '採購入庫',
-        children: [
-          { key: 'purchase-order', icon: <FileDoneOutlined />, label: '採購執行' },
-          { key: 'asset-inbound', icon: <ImportOutlined />, label: '驗收入庫' },
-        ],
-      },
-      {
-        key: 'asset-flow-ops',
-        icon: <SwapOutlined />,
-        label: '資產管理',
-        children: [
-          { key: 'asset-list', icon: <AppstoreOutlined />, label: '資產台賬' },
-          { key: 'asset-claim', icon: <UserAddOutlined />, label: '領用資產' },
-          { key: 'asset-borrow', icon: <ScheduleOutlined />, label: '借用資產' },
-          { key: 'asset-return', icon: <RollbackOutlined />, label: '資產歸還' },
-          { key: 'asset-transfer-list', icon: <SwapOutlined />, label: '資產調撥' },
-          { key: 'asset-handover', icon: <TeamOutlined />, label: '資產交接' },
-        ],
-      },
-      {
-        key: 'asset-maintenance',
-        icon: <ToolOutlined />,
-        label: '維護與處置',
-        children: [
-          { key: 'asset-repair', icon: <ToolOutlined />, label: '維修管理' },
-          { key: 'asset-compensation', icon: <DollarOutlined />, label: '損壞賠付' },
-          { key: 'asset-scrap', icon: <DeleteOutlined />, label: '資產報廢' },
-          { key: 'asset-inventory', icon: <AuditOutlined />, label: '資產盤點' },
-          { key: 'asset-flow', icon: <HistoryOutlined />, label: '變更歷史' },
-        ],
-      },
-      {
-        key: 'consumable-ops',
-        icon: <GoldOutlined />,
-        label: '耗材管理',
-        children: [
-          { key: 'consumable-dashboard', icon: <DashboardOutlined />, label: '耗材看板' },
-          { key: 'consumable-item', icon: <ProfileOutlined />, label: '耗材檔案' },
-          { key: 'consumable-claim', icon: <UserAddOutlined />, label: '耗材領用' },
-          { key: 'consumable-stock', icon: <DatabaseOutlined />, label: '耗材庫存' },
-          { key: 'consumable-stock-txn', icon: <SwapOutlined />, label: '出入庫流水' },
-          { key: 'consumable-alert', icon: <AlertOutlined />, label: '庫存預警' },
-          { key: 'consumable-category', icon: <AppstoreOutlined />, label: '耗材分類管理' },
-          { key: 'consumable-brand', icon: <TagOutlined />, label: '耗材品牌管理' },
-          { key: 'consumable-unit', icon: <ColumnWidthOutlined />, label: '計量單位管理' },
-        ],
-      },
-      { key: 'asset-supplier', icon: <ContactsOutlined />, label: '供應商管理' },
-      {
-        key: 'asset-basic',
-        icon: <ControlOutlined />,
-        label: '基礎配置',
-        children: [
-          { key: 'asset-category', icon: <TagsOutlined />, label: '資產分類庫' },
-          { key: 'asset-model', icon: <BarcodeOutlined />, label: '資產品牌產品庫' },
-          { key: 'asset-location', icon: <EnvironmentOutlined />, label: '倉庫維護' },
-          { key: 'param-library', icon: <DatabaseOutlined />, label: '產品參數庫' },
-          { key: 'asset-tag', icon: <TagOutlined />, label: '資產標籤' },
-        ],
-      },
-    ],
-  },
-  {
-    key: 'oa-center',
-    icon: <SolutionOutlined />,
-    label: 'OA中心',
-    children: [
-      {
-        key: 'process-center',
-        icon: <AppstoreOutlined />,
-        label: '流程中心',
-      },
-      {
-        key: 'oa-requests',
-        icon: <FileTextOutlined />,
-        label: '流程事項',
-      },
-      {
-        key: 'workflow-config',
-        icon: <BranchesOutlined />,
-        label: '流程配置',
-      },
-      {
-        key: 'purchase-request',
-        icon: <ShoppingCartOutlined />,
-        label: '採購申請',
-      },
-    ],
-  },
-  {
-    key: 'permission',
-    icon: <LockOutlined />,
-    label: '權限管理',
-    children: [
-      {
-        key: 'role-management',
-        icon: <SolutionOutlined />,
-        label: '角色管理',
-      },
-      {
-        key: 'function-permission',
-        icon: <AppstoreOutlined />,
-        label: '功能授權',
-      },
-      {
-        key: 'data-permission',
-        icon: <DatabaseOutlined />,
-        label: '數據授權',
-      },
-    ],
-  },
-  {
-    key: 'system-config',
-    icon: <SettingOutlined />,
-    label: '系統配置',
-    children: [
-      {
-        key: 'menu-config',
-        icon: <MenuOutlined />,
-        label: '菜單配置',
-      },
-      {
-        key: 'translation-manage',
-        icon: <GlobalOutlined />,
-        label: '多語言配置',
-      },
-      {
-        key: 'rule-config',
-        icon: <SwapOutlined />,
-        label: '規則配置',
-      },
-      {
-        key: 'version-history',
-        icon: <HistoryOutlined />,
-        label: '版本管理',
-      },
-      {
-        key: 'notification-config',
-        icon: <BellOutlined />,
-        label: '通知渠道配置',
-      },
-    ],
-  },
+/**
+ * 离线菜单（前端唯一保留的本地菜单定义, 见 src/constants/offlineMenus.ts）
+ *
+ * 菜单名称/层级/排序/图标的唯一真值源是后端 sys_menu, 因此这里不再维护整棵静态菜单树：
+ * - 已对接真实后端的菜单：完全由后端菜单树提供, 后端不可用时不展示（避免本地副本与服务器不一致）；
+ * - 仍依赖 mock 的菜单：保留在 OFFLINE_MENUS, 后端不可用时照常展示, 可用时仅补挂 DB 中缺失的项。
+ */
+const buildOfflineMenuItem = (node: OfflineMenuNode, excludeKeys?: Set<string>): MenuItem | null => {
+  // 补挂时跳过 DB 已有的后代，否则同一 menuKey 会在不同层级重复出现（antd Menu duplicate key）
+  if (excludeKeys?.has(node.key)) return null
+  const children = (node.children ?? [])
+    .map((child) => buildOfflineMenuItem(child, excludeKeys))
+    .filter((child): child is MenuItem => child !== null)
+  return {
+    key: node.key,
+    icon: keyToIcon[node.key],
+    label: translateMenuName(node.key, node.label),
+    ...(children.length > 0 ? { children } : {}),
+  } as MenuItem
+}
 
-]
+/** 收集后端菜单树全部 key（含停用项）：停用的菜单不得被本地副本"复活" */
+const collectMenuTreeKeys = (menus: MenuVO[], acc = new Set<string>()): Set<string> => {
+  for (const m of menus) {
+    acc.add(m.menuKey)
+    if (m.children?.length) collectMenuTreeKeys(m.children, acc)
+  }
+  return acc
+}
+
+/** 把离线菜单补挂进后端菜单树：DB 已有的 key 一律以 DB 为准, 仅追加 DB 中完全缺失的子项 */
+const attachOfflineMenus = (items: MenuItem[], dbKeys: Set<string>): MenuItem[] =>
+  items.map((item) => {
+    const key = String((item as { key?: string }).key ?? '')
+    const withChildren = item as MenuItem & { children?: MenuItem[] }
+    const offlineNode = OFFLINE_MENUS.find((n) => n.key === key)
+    if (!offlineNode?.children?.length) return withChildren
+    const children = withChildren.children
+      ? attachOfflineMenus(withChildren.children, dbKeys)
+      : []
+    const existing = new Set(children.map((c) => String((c as { key?: string }).key ?? '')))
+    const missing = offlineNode.children
+      .filter((c) => !existing.has(c.key) && !dbKeys.has(c.key))
+      .map((c) => buildOfflineMenuItem(c, dbKeys))
+      .filter((c): c is MenuItem => c !== null)
+    return { ...withChildren, children: [...children, ...missing] } as MenuItem
+  })
 
 interface SidebarProps {
   collapsed: boolean
@@ -863,8 +341,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'algorithm-simulation': <DeploymentUnitOutlined />,
   'merchant-score-insight': <TrophyOutlined />,
   'merchant-promotion-diagnose': <MedicineBoxOutlined />,
-  'promotion-tool': <ThunderboltOutlined />,
-  // 兼容后端种子数据中的下划线命名（推廣通顶级菜单）
+  // 推廣通顶级菜单（后端 menu_key 为下划线命名 promotion_tool）
   'promotion_tool': <ThunderboltOutlined />,
   'promotion-sales-config': <ShoppingFilled />,
   'promotion-report-group': <BarChartOutlined />,
@@ -923,7 +400,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'data-permission': <DatabaseOutlined />,
   'system-config': <SettingOutlined />,
   'menu-config': <MenuOutlined />,
-  'translation-manage': <GlobalOutlined />,
+  'translation-manage': <TranslationOutlined />,
+  'i18n-center': <TranslationOutlined />,
+  'i18n-language': <GlobalOutlined />,
+  'i18n-import-export': <ImportOutlined />,
+  'i18n-mt-engine': <ToolOutlined />,
+  'i18n-dashboard': <DashboardOutlined />,
   'rule-config': <SwapOutlined />,
   'workflow-config': <ApartmentOutlined />,
   'version-history': <HistoryOutlined />,
@@ -969,10 +451,20 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-category':   <TagsOutlined />,      // 資產分類庫
   'asset-model':      <BarcodeOutlined />,   // 資產品牌產品庫
   'asset-location':   <EnvironmentOutlined />, // 倉庫維護
+  'asset-dashboard':  <DashboardOutlined />,
+  'asset-inbound':    <ImportOutlined />,
+  'asset-handover':   <TeamOutlined />,
+  'asset-compensation': <DollarOutlined />,
   'asset-flow-ops':   <SwapOutlined />,
   'asset-maintenance': <ToolOutlined />,
   'asset-purchase':   <ShoppingCartOutlined />,
   'consumable-ops':   <GoldOutlined />,
+  'consumable-dashboard': <DashboardOutlined />,
+  'consumable-item':  <ProfileOutlined />,
+  'consumable-claim': <UserAddOutlined />,
+  'consumable-stock': <DatabaseOutlined />,
+  'consumable-stock-txn': <SwapOutlined />,
+  'consumable-alert': <AlertOutlined />,
   'asset-list':       <AppstoreOutlined />,
   'asset-add':        <AppstoreAddOutlined />,
   'asset-claim':      <UserAddOutlined />,
@@ -1002,29 +494,10 @@ const buildMenuItemsFromVO = (menus: MenuVO[]): MenuItem[] => {
       return {
         key: m.menuKey,
         icon: renderMenuIcon(m.icon) ?? keyToIcon[m.menuKey],
-        label: m.name,
+        label: translateMenuName(m.menuKey, m.name, m.nameEn),
         ...(children && children.length > 0 ? { children } : {}),
       } as MenuItem
     })
-}
-
-/** 遞歸翻譯菜單 label：英文模式按 menuKey 查映射表，未覆蓋回退中文 */
-const translateMenuItems = (items: MenuItem[]): MenuItem[] => {
-  return items
-    .map((item) => {
-      if (!item) return null
-      const withChildren = item as MenuItem & { children?: MenuItem[] }
-      // divider / 分組等無 label 項直接透傳
-      if (!('label' in item)) return item
-      return {
-        ...item,
-        label: translateMenuName(String(item.key), String(item.label)),
-        ...(withChildren.children && withChildren.children.length > 0
-          ? { children: translateMenuItems(withChildren.children) }
-          : {}),
-      } as MenuItem
-    })
-    .filter((item): item is MenuItem => item !== null)
 }
 
 /** 按菜單權限遞歸過濾菜單：受控叶子菜單無授權則隱藏；父菜單子項全部隱藏時一併隱藏 */
@@ -1065,27 +538,39 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const location = useLocation()
   const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
-  const [pwdModalOpen, setPwdModalOpen] = useState(false)
-  const [pwdValue, setPwdValue] = useState('')
-  const [_pendingKey, setPendingKey] = useState<string>('')
   const [menuTree, setMenuTree] = useState<MenuVO[] | null>(null)
+  /** 菜单接口是否已返回（区分“加载中”与“后端不可用”, 避免加载瞬间闪离线提示） */
+  const [menuLoaded, setMenuLoaded] = useState(false)
   const [openKeys, setOpenKeys] = useState<string[]>([])
 
-  /** 加载后端菜单树（名称/层级/排序与数据库实时同步）；加载失败时降级使用内置菜单 */
+  /** 加载后端菜单树（名称/层级/排序/图标与数据库实时同步）；失败时仅保留离线菜单 */
   useEffect(() => {
     let cancelled = false
     fetchMenuTree().then((tree) => {
       if (!cancelled) {
         setMenuTree(tree.length > 0 ? tree : null)
+        setMenuLoaded(true)
+      }
+    }).catch(() => {
+      // 菜单接口异常（鉴权失败/服务异常）同样降级为离线菜单, 不能留未处理的 Promise rejection
+      if (!cancelled) {
+        setMenuTree(null)
+        setMenuLoaded(true)
       }
     })
     return () => { cancelled = true }
   }, [])
 
-  /** 按當前登錄人權限過濾後的可見菜單（优先后端菜单树，降级内置菜单），語言變化時重算菜單名稱 */
+  /** 按當前登錄人權限過濾後的可見菜單：
+   *  后端菜单树可用 → 以 DB 为唯一真值（名称/层级/排序/图标）, 仅补挂 DB 完全缺失的离线菜单；
+   *  后端菜单树不可用 → 只展示离线清单（仍依赖 mock 的模块）；語言變化時重算菜單名稱 */
   const visibleMenuItems = useMemo(() => {
-    const items = menuTree ? buildMenuItemsFromVO(menuTree) : menuItems
-    return filterMenusByPermission(translateMenuItems(items), hasMenuPermission)
+    const items = menuTree
+      ? attachOfflineMenus(buildMenuItemsFromVO(menuTree), collectMenuTreeKeys(menuTree))
+      : OFFLINE_MENUS
+        .map((node) => buildOfflineMenuItem(node))
+        .filter((item): item is MenuItem => item !== null)
+    return filterMenusByPermission(items, hasMenuPermission)
   }, [menuTree, hasMenuPermission, i18nInstance.language])
 
   const selectedKey = location.pathname === '/' ? 'home'
@@ -1112,34 +597,12 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   }, [selectedKey, visibleMenuItems])
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (noPageKeys.has(key)) {
-      setPendingKey(key)
-      setPwdValue('')
-      setPwdModalOpen(true)
-      return
-    }
     const path = keyToPath[key]
     if (path) {
       navigate(path)
     } else {
       message.info(t('sidebar.underDevelopment'))
     }
-  }
-
-  const handlePwdOk = () => {
-    if (pwdValue === '9510') {
-      message.success(t('sidebar.pwdSuccess'))
-      setPwdModalOpen(false)
-      setPwdValue('')
-      // 验证通过后可在此处添加跳转逻辑
-    } else {
-      message.error(t('sidebar.pwdError'))
-    }
-  }
-
-  const handlePwdCancel = () => {
-    setPwdModalOpen(false)
-    setPwdValue('')
   }
 
   return (
@@ -1165,6 +628,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           </span>
         )}
       </div>
+      {menuLoaded && menuTree === null && (
+        <div className="sidebar-offline-tip" title={t('sidebar.offlineMenuTip')}>
+          {collapsed ? '!' : t('sidebar.offlineMenuTip')}
+        </div>
+      )}
       <Menu
         mode="inline"
         theme="dark"
@@ -1176,27 +644,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         inlineCollapsed={collapsed}
         className="sidebar-menu"
       />
-      <Modal
-        title={t('sidebar.secureTitle')}
-        open={pwdModalOpen}
-        onOk={handlePwdOk}
-        onCancel={handlePwdCancel}
-        okText={t('common.confirm')}
-        cancelText={t('common.cancel')}
-        afterOpenChange={(open) => {
-          if (open) {
-            const input = document.querySelector<HTMLInputElement>('.ant-modal input[type="password"]')
-            input?.focus()
-          }
-        }}
-      >
-        <Input.Password
-          placeholder={t('sidebar.securePlaceholder')}
-          value={pwdValue}
-          onChange={(e) => setPwdValue(e.target.value)}
-          onPressEnter={handlePwdOk}
-        />
-      </Modal>
     </Sider>
   )
 }

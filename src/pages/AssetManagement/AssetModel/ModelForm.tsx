@@ -17,7 +17,6 @@ import {
   createBrand, updateBrand,
   type AssetCategory, type AssetBrand,
 } from '../../../api/eam'
-import { EAM_UNITS } from '../eamUtils'
 
 interface BrandFormValues {
   categoryCode: string
@@ -313,7 +312,8 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
                     label={t('asset.colUnit')} name="unit"
                     rules={[{ required: true, message: t('asset.unitRequired') }]}
                   >
-                    <Select placeholder={t('asset.unitPh')} options={EAM_UNITS.map((u) => ({ label: u, value: u }))} />
+                    {/* 计量单位不再是字典表，直接录入文本（如：台/箱/套） */}
+                    <Input placeholder={t('asset.unitPh')} maxLength={16} allowClear />
                   </Form.Item>
                 </Col>
               </Row>
