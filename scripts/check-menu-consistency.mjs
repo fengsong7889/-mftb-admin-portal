@@ -41,10 +41,11 @@ function extractStringMap(source, declRegex, label) {
 
 // ────────── 前端：路由映射 / 离线清单 ──────────
 const sidebar = read('src/components/Sidebar.tsx')
+const menuDataSource = read('src/constants/menuDataSource.ts')
 const keyToPath = extractStringMap(
-  sidebar,
-  /const keyToPath: Record<string, string> = \{([\s\S]*?)\n\}/,
-  'Sidebar.keyToPath',
+  menuDataSource,
+  /export const keyToPath: Record<string, string> = \{([\s\S]*?)\n\}/,
+  'menuDataSource.keyToPath',
 )
 
 const offlineSrc = read('src/constants/offlineMenus.ts')

@@ -70,17 +70,6 @@ export const OFFLINE_MENUS: OfflineMenuNode[] = [
       },
     ],
   },
-  // ── 流量沙盤（纯前端 mock，未接入后端业务 API） ──
-  {
-    key: 'traffic-sandbox',
-    label: '流量沙盤',
-    children: [
-      { key: 'waterfall-simulation', label: '瀑布流模擬' },
-      { key: 'algorithm-simulation', label: '算法模擬' },
-      { key: 'merchant-score-insight', label: '商家分數洞察' },
-      { key: 'merchant-promotion-diagnose', label: '推廣診斷' },
-    ],
-  },
   // ── 推廣報表（纯前端 mock，未接入后端业务 API） ──
   {
     key: 'promotion-report-group',
