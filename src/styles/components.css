@@ -2691,6 +2691,11 @@
   color: #262626 !important;
   border: 1px solid #e8e8e8;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  border-radius: 6px !important;
+  max-width: 480px !important;
+  line-height: 1.5 !important;
 }
 .ant-tooltip .ant-tooltip-arrow::before {
   background: #ffffff !important;

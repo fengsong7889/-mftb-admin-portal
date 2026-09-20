@@ -37,6 +37,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     private final EamModelMapper modelMapper;
     private final EamCategoryMapper categoryMapper;
     private final EamBrandMapper brandMapper;
+    private final EamPurchaseOrderMapper purchaseOrderMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
     private final JdbcTemplate jdbcTemplate;
@@ -55,9 +56,13 @@ public class EamAssetServiceImpl implements EamAssetService {
         List<Long> locationIds = page.getRecords().stream().map(EamAsset::getLocationId).filter(Objects::nonNull).distinct().toList();
         Map<Long, EamLocation> locations = locationIds.isEmpty() ? Map.of() : locationMapper.selectBatchIds(locationIds)
                 .stream().collect(Collectors.toMap(EamLocation::getId, l -> l));
+        List<Long> orderIds = page.getRecords().stream().map(EamAsset::getOrderId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, EamPurchaseOrder> orders = orderIds.isEmpty() ? Map.of() : purchaseOrderMapper.selectBatchIds(orderIds)
+                .stream().collect(Collectors.toMap(EamPurchaseOrder::getId, o -> o));
         return new PageResult<>(page.getRecords().stream().map(a -> toVO(a,
                 a.getBatchId() == null ? null : batches.get(a.getBatchId()),
-                a.getLocationId() == null ? null : locations.get(a.getLocationId())
+                a.getLocationId() == null ? null : locations.get(a.getLocationId()),
+                a.getOrderId() == null ? null : orders.get(a.getOrderId())
         )).toList(), page.getTotal());
     }
 
@@ -77,7 +82,8 @@ public class EamAssetServiceImpl implements EamAssetService {
     public EamAssetVO detail(long id) {
         EamAsset asset = requireAsset(id);
         EamLocation location = asset.getLocationId() == null ? null : locationMapper.selectById(asset.getLocationId());
-        return toVO(asset, asset.getBatchId() == null ? null : batchMapper.selectById(asset.getBatchId()), location);
+        EamPurchaseOrder order = asset.getOrderId() == null ? null : purchaseOrderMapper.selectById(asset.getOrderId());
+        return toVO(asset, asset.getBatchId() == null ? null : batchMapper.selectById(asset.getBatchId()), location, order);
     }
 
     @Override
@@ -210,7 +216,7 @@ public class EamAssetServiceImpl implements EamAssetService {
         validateDate(asset.getScrapTime());
     }
 
-    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location) {
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location, EamPurchaseOrder order) {
         EamAssetVO vo = new EamAssetVO();
         BeanUtils.copyProperties(asset, vo, "params", "rentalPeriod", "createdAt", "updatedAt");
         Map<String, String> params = new LinkedHashMap<>();
@@ -221,6 +227,24 @@ public class EamAssetServiceImpl implements EamAssetService {
         vo.setApplicant(Objects.toString(asset.getUpdatedBy(), ""));
         vo.setCreatedAt(DateTimeUtils.format(asset.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(asset.getUpdatedAt()));
+        // 品牌為空時從型號回退解析
+        if ((vo.getBrand() == null || vo.getBrand().isBlank()) && asset.getModelId() != null) {
+            EamModel model = modelMapper.selectById(asset.getModelId());
+            if (model != null && model.getBrandZh() != null && !model.getBrandZh().isBlank()) {
+                vo.setBrand(model.getBrandZh());
+            }
+        }
+        // 品牌仍為空時，從品牌表通過 brandId 回退解析
+        if ((vo.getBrand() == null || vo.getBrand().isBlank()) && asset.getBrandId() != null) {
+            var brandEntity = brandMapper.selectById(asset.getBrandId());
+            if (brandEntity != null && brandEntity.getBrandZh() != null && !brandEntity.getBrandZh().isBlank()) {
+                vo.setBrand(brandEntity.getBrandZh());
+            }
+        }
+        // 下單日期從採購訂單獲取
+        if (order != null) {
+            vo.setOrderDate(order.getOrderDate());
+        }
         if (batch != null) {
             vo.setInboundBatchNo(batch.getBatchNo());
             vo.setInboundDate(asset.getPurchaseDate());
@@ -236,8 +260,12 @@ public class EamAssetServiceImpl implements EamAssetService {
         return vo;
     }
 
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location) {
+        return toVO(asset, batch, location, null);
+    }
+
     private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch) {
-        return toVO(asset, batch, null);
+        return toVO(asset, batch, null, null);
     }
 
     private LambdaQueryWrapper<EamAsset> queryWrapper(EamAssetQuery q) {

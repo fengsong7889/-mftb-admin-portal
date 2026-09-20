@@ -51,6 +51,8 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v9-rename-master-data", this::renameMasterDataMenu);
         versionTracker.applyOnce("eam:schema-v10-repair-table", this::createRepairTable);
         versionTracker.applyOnce("eam:schema-v11-inventory-tables", this::createInventoryTables);
+        versionTracker.applyOnce("eam:schema-v12-inbound-allocation", this::addInboundAllocationColumns);
+        versionTracker.applyOnce("eam:schema-v13-inbound-department", this::addInboundBatchDepartmentColumns);
     }
 
     private void upgradeTransferIntegrity() {
@@ -724,5 +726,35 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产盘点明细表'");
 
         log.info("EAM 资产盘点表结构创建完成");
+    }
+
+    /**
+     * v12: 验收入库多结果分配模型
+     * <p>为批次明细添加 client_line_id / source_exchange_item_id；
+     * 为批次添加 contract_version / request_key。</p>
+     */
+    private void addInboundAllocationColumns() {
+        log.info("开始为验收入库表添加多结果分配列 ...");
+        alterSafe("biz_eam_inbound_batch_item", "ADD COLUMN client_line_id VARCHAR(64) NULL COMMENT '前端稳定ID'");
+        alterSafe("biz_eam_inbound_batch_item", "ADD COLUMN source_exchange_item_id BIGINT NULL COMMENT '来源换货明细ID'");
+        alterSafe("biz_eam_inbound_batch", "ADD COLUMN contract_version INT NULL DEFAULT NULL COMMENT '契约版本'");
+        alterSafe("biz_eam_inbound_batch", "ADD COLUMN request_key VARCHAR(64) NULL COMMENT '幂等请求键'");
+        addIndexSafe("biz_eam_inbound_batch_item", "idx_batch_item_client_line", "client_line_id");
+        addIndexSafe("biz_eam_inbound_batch_item", "idx_batch_item_source_exchange", "source_exchange_item_id");
+        // 幂等唯一索引（po_id + request_key）
+        try {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_inbound_batch ADD UNIQUE INDEX uk_batch_request_key (po_id, request_key)");
+        } catch (Exception e) {
+            if (!isDuplicateIndexError(e)) throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
+        }
+        log.info("验收入库多结果分配列添加完成");
+    }
+
+    /** v13: 验收入库批次添加管理部门字段 */
+    private void addInboundBatchDepartmentColumns() {
+        log.info("开始为验收入库批次添加管理部门列 ...");
+        alterSafe("biz_eam_inbound_batch", "ADD COLUMN department_id BIGINT NULL COMMENT '管理部門ID' AFTER operator");
+        alterSafe("biz_eam_inbound_batch", "ADD COLUMN department_name VARCHAR(128) NULL COMMENT '管理部門名稱' AFTER department_id");
+        log.info("验收入库批次管理部门列添加完成");
     }
 }

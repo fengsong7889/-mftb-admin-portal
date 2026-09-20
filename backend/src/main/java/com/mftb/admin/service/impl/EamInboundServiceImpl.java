@@ -70,9 +70,38 @@ public class EamInboundServiceImpl implements EamInboundService {
         Page<EamInboundBatch> result = batchMapper.selectPage(pageObj,
                 new LambdaQueryWrapper<EamInboundBatch>().orderByDesc(EamInboundBatch::getCreatedAt));
 
-        List<Map<String, Object>> records = result.getRecords().stream()
-                .map(this::batchToMap)
-                .collect(Collectors.toList());
+        List<EamInboundBatch> batches = result.getRecords();
+        if (batches.isEmpty()) {
+            return new PageResult<>(java.util.Collections.emptyList(), result.getTotal());
+        }
+
+        // 批量加载明细（用于匹配供应商）
+        List<Long> batchIds = batches.stream().map(EamInboundBatch::getId).toList();
+        List<EamInboundBatchItem> allItems = batchItemMapper.selectList(
+                new LambdaQueryWrapper<EamInboundBatchItem>().in(EamInboundBatchItem::getBatchId, batchIds));
+        Map<Long, List<EamInboundBatchItem>> itemsByBatch = allItems.stream()
+                .collect(Collectors.groupingBy(EamInboundBatchItem::getBatchId));
+
+        // 批量加载采购订单（用于解析供应商名称）
+        List<Long> poIds = batches.stream().map(EamInboundBatch::getPoId).distinct().toList();
+        List<EamPurchaseOrder> orders = orderMapper.selectBatchIds(poIds);
+        Map<Long, EamPurchaseOrder> orderMap = orders.stream()
+                .collect(Collectors.toMap(EamPurchaseOrder::getId, o -> o));
+
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (EamInboundBatch b : batches) {
+            Map<String, Object> m = batchToMap(b);
+            List<EamInboundBatchItem> items = itemsByBatch.getOrDefault(b.getId(), java.util.Collections.emptyList());
+            EamPurchaseOrder order = orderMap.get(b.getPoId());
+            // 返回供应商列表（支持多供应商）
+            List<String> supplierNames = resolveSupplierNamesFromOrder(order, items);
+            m.put("suppliers", supplierNames);
+            m.put("supplier", supplierNames.isEmpty() ? "" : supplierNames.get(0));
+            // 采购形式：从订单明细取第一个有值的 purchaseType
+            String purchaseType = resolvePurchaseType(order, items);
+            m.put("purchaseType", purchaseType);
+            records.add(m);
+        }
         return new PageResult<>(records, result.getTotal());
     }
 
@@ -94,7 +123,37 @@ public class EamInboundServiceImpl implements EamInboundService {
                 it -> it.getSortOrder() == null ? 0 : it.getSortOrder()));
 
         List<Map<String, Object>> itemMaps = items.stream().map(this::itemToMap).toList();
+
+        // 批量加载仓库地址，补充到明细中
+        Set<Long> locIds = items.stream()
+                .map(EamInboundBatchItem::getLocationId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, EamLocation> locMap = new HashMap<>();
+        for (Long locId : locIds) {
+            EamLocation loc = locationMapper.selectById(locId);
+            if (loc != null) locMap.put(locId, loc);
+        }
+        for (int i = 0; i < itemMaps.size(); i++) {
+            Long locId = items.get(i).getLocationId();
+            if (locId != null) {
+                EamLocation loc = locMap.get(locId);
+                if (loc != null && loc.getAddress() != null && !loc.getAddress().isBlank()) {
+                    itemMaps.get(i).put("locationAddress", loc.getAddress());
+                }
+            }
+        }
+
         map.put("items", itemMaps);
+
+        // 从采购订单的 supplierGroups 中匹配供应商名称
+        EamPurchaseOrder order = orderMapper.selectById(batch.getPoId());
+        List<String> supplierNames = resolveSupplierNamesFromOrder(order, items);
+        map.put("suppliers", supplierNames);
+        map.put("supplier", supplierNames.isEmpty() ? "" : supplierNames.get(0));
+        // 采购形式
+        String purchaseType = resolvePurchaseType(order, items);
+        map.put("purchaseType", purchaseType);
 
         return map;
     }
@@ -131,10 +190,14 @@ public class EamInboundServiceImpl implements EamInboundService {
         Map<Long, Integer> receivedInBatch = new HashMap<>();
         Map<Long, Integer> returnedInBatch = new HashMap<>();
         Map<Long, Integer> exchangedInBatch = new HashMap<>();
+        Map<Long, Integer> concessionInBatch = new HashMap<>();
         Map<Long, EamLocation> locations = new HashMap<>();
         Map<Long, EamModel> models = new HashMap<>();
 
         // 校验入库数量不超过订单剩余未验收数量
+        // 容量公式：Q = P + C + R + N → 可处理量 N = Q - receivedQty - returnedQty
+        // 注意：exchangedQty（换货在途）不扣减剩余数量，因为换货商品会重新返回验收
+        // pass 和 concession 均计入 receivedQty（均生成资产入库）
         for (EamInboundCreateDTO.InboundItem item : inboundItems) {
             if (item == null || item.getQty() == null || item.getQty() <= 0) {
                 throw new BusinessException("驗收數量必須為正整數");
@@ -153,7 +216,8 @@ public class EamInboundServiceImpl implements EamInboundService {
                     - Objects.requireNonNullElse(orderItem.getReceivedQty(), 0)
                     - Objects.requireNonNullElse(orderItem.getReturnedQty(), 0);
             if (submitted > remaining) throw new BusinessException(orderItem.getModelName() + " 驗收總數超出訂單剩餘數量");
-            if (PASS.equals(disposition)) {
+            // pass 和 concession 均需位置校验（均生成资产入库）
+            if (PASS.equals(disposition) || "concession".equals(disposition)) {
                 if (item.getLocationId() == null || item.getLocationId() <= 0) throw new BusinessException("請選擇存放位置");
                 EamLocation location = locations.computeIfAbsent(item.getLocationId(), locationMapper::selectById);
                 if (location == null) throw new BusinessException("存放位置不存在");
@@ -161,7 +225,11 @@ public class EamInboundServiceImpl implements EamInboundService {
                 EamModel model = models.computeIfAbsent(item.getModelId(), modelMapper::selectById);
                 if (model == null) throw new BusinessException("資產型號不存在");
                 receivedInBatch.merge(orderItem.getId(), item.getQty(), Integer::sum);
+                if ("concession".equals(disposition)) {
+                    concessionInBatch.merge(orderItem.getId(), item.getQty(), Integer::sum);
+                }
             } else {
+                // return/exchange 不需要位置
                 item.setLocationId(null);
                 item.setLocationName(null);
             }
@@ -192,6 +260,11 @@ public class EamInboundServiceImpl implements EamInboundService {
         batch.setBrand(order.getBrand());
         batch.setInboundDate(inboundDate);
         batch.setOperator(operator);
+        // 从第一个明细获取管理部门（同批次统一）
+        if (!inboundItems.isEmpty() && inboundItems.get(0).getDepartmentId() != null) {
+            batch.setDepartmentId(inboundItems.get(0).getDepartmentId());
+            batch.setDepartmentName(Objects.toString(inboundItems.get(0).getDepartmentName(), ""));
+        }
         batch.setTotalQty(0);
         batch.setAcceptedQty(0);
         batch.setPendingQty(0);
@@ -201,6 +274,8 @@ public class EamInboundServiceImpl implements EamInboundService {
         batch.setGeneratedAssetCount(0);
         batch.setPurchaseReason(order.getRemark());
         batch.setRemark(Objects.toString(dto.getRemark(), ""));
+        batch.setContractVersion(dto.getContractVersion());
+        batch.setRequestKey(dto.getRequestKey());
         batch.setUpdatedBy(operator);
         batchMapper.insert(batch);
 
@@ -226,7 +301,8 @@ public class EamInboundServiceImpl implements EamInboundService {
             } else if ("exchange".equals(disposition)) {
                 accepted = 0; exc = qty;
             } else if ("concession".equals(disposition)) {
-                accepted = 0; conc = qty;
+                // 让步接收：计入 accepted 以便生成资产（与 pass 一致）
+                accepted = qty; conc = qty;
             }
 
             totalQty += qty;
@@ -238,7 +314,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             if (ret > 0) returnedInBatch.merge(orderItem.getId(), ret, Integer::sum);
             if (exc > 0) exchangedInBatch.merge(orderItem.getId(), exc, Integer::sum);
 
-            // 仅验收通过的生成资产编号
+            // pass 和 concession 均生成资产编号
             List<String> assetNos = new ArrayList<>();
             if (accepted > 0) {
                 for (int i = 0; i < accepted; i++) {
@@ -256,7 +332,15 @@ public class EamInboundServiceImpl implements EamInboundService {
                         asset.setAssetType(orderItem.getCategoryName());
                         asset.setCategoryId(orderItem.getCategoryId());
                         asset.setCategoryCode(orderItem.getCategoryCode());
-                        asset.setBrand(orderItem.getBrandName());
+                        // 品牌優先取明細 brandName，為空時從型號回退解析
+                        String brandName = orderItem.getBrandName();
+                        if (brandName == null || brandName.isBlank()) {
+                            EamModel model = models.get(modelId);
+                            if (model != null && model.getBrandZh() != null && !model.getBrandZh().isBlank()) {
+                                brandName = model.getBrandZh();
+                            }
+                        }
+                        asset.setBrand(brandName);
                         asset.setBrandId(orderItem.getBrandId());
                         asset.setParams(orderItem.getParams());
                         asset.setPurchaseType(orderItem.getPurchaseType());
@@ -265,14 +349,17 @@ public class EamInboundServiceImpl implements EamInboundService {
                         asset.setPurchaseValue(price != null ? price : BigDecimal.ZERO);
                     }
                     asset.setUnit(models.get(modelId).getUnit());
-                    asset.setPurchaseDate(item.getInboundDate());
+                    asset.setPurchaseDate(order.getOrderDate());
                     // 驗收照片同步寫入資產主圖（images：Data URL 逗號分隔）
                     String images = extractPhotoDataUrls(item.getPhotos());
                     if (!images.isEmpty()) {
                         asset.setImages(images);
                     }
                     asset.setSource("lease".equals(orderItem.getPurchaseType()) ? "lease" : "self");
-                    asset.setDepartment(Objects.toString(order.getDepartment(), ""));
+                    asset.setDepartment(
+                            batch.getDepartmentName() != null && !batch.getDepartmentName().isBlank()
+                                    ? batch.getDepartmentName()
+                                    : Objects.toString(order.getDepartment(), ""));
                     asset.setLocation(locationName);
                     asset.setLocationId(locationId);
                     asset.setStatus("idle");
@@ -310,6 +397,8 @@ public class EamInboundServiceImpl implements EamInboundService {
                 batchItem.setAccessories(JsonUtils.toJson(item.getAccessories()));
             }
             batchItem.setAssetNos(JsonUtils.toJson(assetNos));
+            batchItem.setClientLineId(item.getClientLineId());
+            batchItem.setSourceExchangeItemId(item.getSourceExchangeItemId());
             batchItem.setSortOrder(sort++);
             batchItemsToInsert.add(batchItem);
         }
@@ -366,9 +455,11 @@ public class EamInboundServiceImpl implements EamInboundService {
                 new LambdaQueryWrapper<EamPurchaseOrderItem>()
                         .eq(EamPurchaseOrderItem::getOrderId, poId));
 
+        // Q = P + C + R + E + N → 结清条件：receivedQty + returnedQty + exchangedQty >= qty
         boolean allReceived = !updatedItems.isEmpty() && updatedItems.stream()
                 .allMatch(it -> (it.getReceivedQty() != null ? it.getReceivedQty() : 0)
-                        + (it.getReturnedQty() != null ? it.getReturnedQty() : 0) >= it.getQty());
+                        + (it.getReturnedQty() != null ? it.getReturnedQty() : 0)
+                        + (it.getExchangedQty() != null ? it.getExchangedQty() : 0) >= it.getQty());
         boolean anyReceived = updatedItems.stream()
                 .anyMatch(it -> (it.getReceivedQty() != null ? it.getReceivedQty() : 0) > 0);
 
@@ -461,6 +552,7 @@ public class EamInboundServiceImpl implements EamInboundService {
             record.put("exchangeQty", batch.getExchangeQty());
             record.put("concessionQty", batch.getConcessionQty());
             record.put("remark", batch.getRemark());
+            record.put("supplier", resolveSupplierName(poId, items));
 
             // 添加明细列表
             List<Map<String, Object>> itemMaps = items.stream().map(this::itemToMap).toList();
@@ -472,6 +564,137 @@ public class EamInboundServiceImpl implements EamInboundService {
     }
 
     /* ==================== 內部方法 ==================== */
+
+    /**
+     * 从采购订单的 supplierGroups 中匹配供应商名称
+     * 通过批次明细的 groupId 查找对应供应商
+     */
+    private String resolveSupplierName(Long poId, List<EamInboundBatchItem> items) {
+        if (poId == null) return "";
+        EamPurchaseOrder order = orderMapper.selectById(poId);
+        if (order == null || order.getSupplierGroups() == null) return "";
+
+        Map<String, String> groupIdToSupplier = new HashMap<>();
+        try {
+            List<Map> groups = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .readValue(order.getSupplierGroups(), new com.fasterxml.jackson.core.type.TypeReference<List<Map>>() {});
+            for (Map g : groups) {
+                Object id = g.get("id");
+                Object supplier = g.get("supplier");
+                if (id != null && supplier != null) {
+                    groupIdToSupplier.put(String.valueOf(id), String.valueOf(supplier));
+                }
+            }
+        } catch (Exception e) {
+            return "";
+        }
+
+        // 从明细中获取 groupId，查找供应商名称
+        for (EamInboundBatchItem item : items) {
+            if (item.getGroupId() != null && !item.getGroupId().isBlank()) {
+                String name = groupIdToSupplier.getOrDefault(item.getGroupId(), "");
+                if (!name.isEmpty()) return name;
+            }
+        }
+        // 如果只有一个分组且未匹配到，使用订单级供应商
+        if (groupIdToSupplier.size() == 1) {
+            return groupIdToSupplier.values().iterator().next();
+        }
+        return "";
+    }
+
+    /**
+     * 从采购订单对象解析供应商名称（避免重复查询）
+     */
+    private String resolveSupplierNameFromOrder(EamPurchaseOrder order, List<EamInboundBatchItem> items) {
+        if (order == null || order.getSupplierGroups() == null) return "";
+
+        Map<String, String> groupIdToSupplier = new HashMap<>();
+        try {
+            List<Map> groups = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .readValue(order.getSupplierGroups(), new com.fasterxml.jackson.core.type.TypeReference<List<Map>>() {});
+            for (Map g : groups) {
+                Object id = g.get("id");
+                Object supplier = g.get("supplier");
+                if (id != null && supplier != null) {
+                    groupIdToSupplier.put(String.valueOf(id), String.valueOf(supplier));
+                }
+            }
+        } catch (Exception e) {
+            return "";
+        }
+
+        for (EamInboundBatchItem item : items) {
+            if (item.getGroupId() != null && !item.getGroupId().isBlank()) {
+                String name = groupIdToSupplier.getOrDefault(item.getGroupId(), "");
+                if (!name.isEmpty()) return name;
+            }
+        }
+        if (groupIdToSupplier.size() == 1) {
+            return groupIdToSupplier.values().iterator().next();
+        }
+        return "";
+    }
+
+    /**
+     * 从采购订单对象解析所有供应商名称（返回列表）
+     */
+    private List<String> resolveSupplierNamesFromOrder(EamPurchaseOrder order, List<EamInboundBatchItem> items) {
+        if (order == null || order.getSupplierGroups() == null) return java.util.Collections.emptyList();
+
+        Map<String, String> groupIdToSupplier = new HashMap<>();
+        try {
+            List<Map> groups = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .readValue(order.getSupplierGroups(), new com.fasterxml.jackson.core.type.TypeReference<List<Map>>() {});
+            for (Map g : groups) {
+                Object id = g.get("id");
+                Object supplier = g.get("supplier");
+                if (id != null && supplier != null) {
+                    groupIdToSupplier.put(String.valueOf(id), String.valueOf(supplier));
+                }
+            }
+        } catch (Exception e) {
+            return java.util.Collections.emptyList();
+        }
+
+        // 收集批次明细中所有不同的供应商
+        java.util.LinkedHashSet<String> suppliers = new java.util.LinkedHashSet<>();
+        for (EamInboundBatchItem item : items) {
+            if (item.getGroupId() != null && !item.getGroupId().isBlank()) {
+                String name = groupIdToSupplier.getOrDefault(item.getGroupId(), "");
+                if (!name.isEmpty()) suppliers.add(name);
+            }
+        }
+        // 如果没有匹配到但只有一个分组，使用该分组供应商
+        if (suppliers.isEmpty() && groupIdToSupplier.size() == 1) {
+            suppliers.add(groupIdToSupplier.values().iterator().next());
+        }
+        return new ArrayList<>(suppliers);
+    }
+
+    /**
+     * 从订单明细解析采购形式（purchase/lease）
+     * 取第一个有值的 purchaseType
+     */
+    private String resolvePurchaseType(EamPurchaseOrder order, List<EamInboundBatchItem> items) {
+        if (order == null) return "";
+        List<EamPurchaseOrderItem> orderItems = orderItemMapper.selectList(
+                new LambdaQueryWrapper<EamPurchaseOrderItem>()
+                        .eq(EamPurchaseOrderItem::getOrderId, order.getId())
+                        .isNotNull(EamPurchaseOrderItem::getPurchaseType));
+        if (orderItems.isEmpty()) return "";
+        // 通过批次明细的 orderItemId 匹配
+        Set<Long> orderItemIds = items.stream()
+                .map(EamInboundBatchItem::getOrderItemId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        for (EamPurchaseOrderItem oi : orderItems) {
+            if (orderItemIds.isEmpty() || orderItemIds.contains(oi.getId())) {
+                return oi.getPurchaseType();
+            }
+        }
+        return orderItems.get(0).getPurchaseType();
+    }
 
     /**
      * 提取验收照片 Data URL（逗号分隔），用于写入资产主图 images
@@ -540,6 +763,9 @@ public class EamInboundServiceImpl implements EamInboundService {
         m.put("exchangeExpectedDate", it.getExchangeExpectedDate());
         m.put("exchangeStatus", it.getExchangeStatus());
         m.put("followupBatchId", it.getFollowupBatchId());
+        // v2: 多结果分配模型字段
+        m.put("clientLineId", it.getClientLineId());
+        m.put("sourceExchangeItemId", it.getSourceExchangeItemId());
         return m;
     }
 
@@ -552,6 +778,8 @@ public class EamInboundServiceImpl implements EamInboundService {
         m.put("brand", b.getBrand());
         m.put("inboundDate", b.getInboundDate());
         m.put("operator", b.getOperator());
+        m.put("departmentId", b.getDepartmentId());
+        m.put("departmentName", b.getDepartmentName());
         m.put("totalQty", b.getTotalQty());
         m.put("acceptedQty", b.getAcceptedQty());
         m.put("generatedAssetCount", b.getGeneratedAssetCount() != null ? b.getGeneratedAssetCount() : b.getAcceptedQty());
@@ -561,6 +789,8 @@ public class EamInboundServiceImpl implements EamInboundService {
         m.put("concessionQty", b.getConcessionQty());
         m.put("purchaseReason", b.getPurchaseReason());
         m.put("remark", b.getRemark());
+        m.put("contractVersion", b.getContractVersion());
+        m.put("requestKey", b.getRequestKey());
         m.put("createdAt", DateTimeUtils.format(b.getCreatedAt()));
         m.put("updatedBy", b.getUpdatedBy());
         m.put("updatedAt", DateTimeUtils.format(b.getUpdatedAt()));

@@ -7,7 +7,7 @@
  * 批次狀態由前端派生（deriveBatchStatus），不改後端表結構。
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, Tooltip, DatePicker, Tabs, message, Space, Alert, Drawer, Spin } from 'antd'
+import { Button, Form, Input, Select, Table, Tag, Tooltip, DatePicker, Tabs, message, Space, Alert, Drawer, Spin, Popover } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, ExportOutlined, InfoCircleOutlined, FileTextOutlined,
@@ -15,6 +15,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { fetchInboundList, fetchPurchaseOrderList, fetchInspectionRecords, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup, type InspectionRecord } from '../../../api/eam'
+import { fetchEmployeeOptions } from '../../../api/employee'
+import type { OptionItem } from '../../../api/types'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import BrandTag from '../../../components/BrandTag'
@@ -110,6 +112,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const [loading, setLoading] = useState(false)
   /** 全量批次（搜索過濾後）；batchesData / exceptionsData 在此基礎上按 batchStatus 派生 */
   const [allBatches, setAllBatches] = useState<InboundBatch[]>([])
+  /** 後端返回的總記錄數（用於分頁展示真實 total） */
+  const [batchTotal, setBatchTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
   const [filters, setFilters] = useState<{
@@ -121,6 +125,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   }>({})
   const [activeTab, setActiveTab] = useState<'pending' | 'batches'>('pending')
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  /* ----- 待驗收訂單受控展開狀態 ----- */
+  const [pendingExpandedRowKeys, setPendingExpandedRowKeys] = useState<React.Key[]>([])
 
   /* ----- 驗收記錄抽屜 ----- */
   const [recordsDrawer, setRecordsDrawer] = useState<{ open: boolean; poId: number; groupId?: string; title: string }>({ open: false, poId: 0, title: '' })
@@ -152,6 +158,19 @@ export default function InboundList({ onAdd, onDetail }: Props) {
   const [poPage, setPoPage] = useState(1)
   const [poSize, setPoSize] = useState(10)
 
+  /* ----- 員工搜索下拉（採購經辦人） ----- */
+  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
+  const [employeeSearchLoading, setEmployeeSearchLoading] = useState(false)
+  const handleEmployeeSearch = useCallback(async (keyword: string) => {
+    setEmployeeSearchLoading(true)
+    try {
+      const options = await fetchEmployeeOptions(keyword)
+      setEmployeeOptions(options)
+    } finally {
+      setEmployeeSearchLoading(false)
+    }
+  }, [])
+
   /* ----- 待驗收訂單（自動同步採購完成的訂單） ----- */
   const [poLoading, setPoLoading] = useState(false)
   const [pendingOrders, setPendingOrders] = useState<PurchaseOrder[]>([])
@@ -161,11 +180,13 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     try {
       const [updatedAtStart, updatedAtEnd] = poFilters.updatedAtRange || []
       // 搜索條件優先走服務端過濾（execStatus 固定 completed；status 為後端待接入參數）
+      // 取足夠數據以覆蓋分頁需求；後端支持分頁後改為服务端分頁
       const res = await fetchPurchaseOrderList({
-        size: 200,
+        size: 500,
         execStatus: 'completed',
         poNo: poFilters.poNo,
-        supplier: poFilters.supplier,
+        // __none__ 為前端特殊值（無供應商），不傳給後端
+        supplier: poFilters.supplier && poFilters.supplier !== '__none__' ? poFilters.supplier : undefined,
         purchaser: poFilters.purchaser,
         status: poFilters.status,
         updatedAtStart,
@@ -194,7 +215,9 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     setLoading(true)
     try {
       /* 前端本地過濾 */
-      let list = [...(await fetchInboundList({ page, size })).records || []]
+      const res = await fetchInboundList({ page, size })
+      let list = [...(res.records || [])]
+      setBatchTotal(res.total || 0)
       if (filters.batchNo) {
         list = list.filter((b) => b.batchNo.toLowerCase().includes(filters.batchNo!.toLowerCase()))
       }
@@ -308,13 +331,35 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       render: (v: string) => <span style={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{v}</span>,
     },
     {
-      title: '供應商', key: 'supplier', width: 140, ellipsis: true,
+      title: '供應商', key: 'supplier', width: 200, ellipsis: true,
       render: (_: unknown, r: InboundBatch) => {
-        // 从 remark 中提取供应商名称：格式为"采购订单 XXX 验收入库（供应商：YYY）"
-        const remark = r.remark || ''
-        const match = remark.match(/供应商[：:]\s*([^）)]+)/)
-        const supplier = match ? match[1].trim() : ''
-        return supplier ? <span>{supplier}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+        const suppliers = r.suppliers && r.suppliers.length > 0 ? r.suppliers : (r.supplier ? [r.supplier] : [])
+        if (suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+        if (suppliers.length === 1) return <span>{suppliers[0]}</span>
+        // 多供應商：顯示第一個 + +N 標記
+        const rest = suppliers.slice(1)
+        return (
+          <Space size={4}>
+            <span>{suppliers[0]}</span>
+            <Popover
+              content={
+                <div style={{ maxWidth: 240 }}>
+                  {suppliers.map((s, i) => (
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+              }
+              title="所有供應商"
+              trigger="click"
+            >
+              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>
+                +{rest.length}
+              </Tag>
+            </Popover>
+          </Space>
+        )
       },
     },
     {
@@ -360,22 +405,23 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       sorter: (a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''),
       defaultSortOrder: 'descend',
     },
-    { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 130 },
     {
       title: t('asset.colRemark'), key: 'remark', width: 200, ellipsis: true,
       render: (_: unknown, r: InboundBatch) => {
         const text = r.purchaseReason || r.remark || ''
-        return text ? <span style={{ color: '#595959' }}>{text}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!text) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return (
+          <Tooltip title={text} placement="topLeft">
+            <span style={{ color: '#595959' }}>{text}</span>
+          </Tooltip>
+        )
       },
     },
     {
-      title: t('asset.colAction'), key: 'action', width: 180, fixed: 'right',
+      title: t('asset.colAction'), key: 'action', width: 100, fixed: 'right',
       render: (_: unknown, record: InboundBatch) => {
         return (
-          <span style={{ display: 'flex', gap: 4 }}>
-            <Button type="link" size="small" onClick={() => onDetail(record.id)}>{t('common.detail')}</Button>
-            <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
-          </span>
+          <Button type="link" size="small" onClick={() => onDetail(record.id)}>{t('common.detail')}</Button>
         )
       },
     },
@@ -394,40 +440,41 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     { key: 'inboundDate', title: t('asset.colInboundDate') },
     { key: 'operator', title: t('asset.colOperator') },
     { key: 'createdAt', title: t('asset.colCreatedAt') },
-    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
     { key: 'remark', title: t('asset.colRemark') },
     { key: 'action', title: t('asset.colAction') },
   ], [t])
 
   const { applyConfig, configComponent } = useColumnConfig('asset-inbound', columnMeta)
 
-  /* ----- 刪除操作（mock） ----- */
-  const handleDelete = (_record: InboundBatch) => {
-    message.info(t('asset.deleteWip'))
-  }
-
   /* ----- 待驗收訂單聚合：訂單級 + 供應商分組摘要 ----- */
   const pendingRows = useMemo<PendingOrderRow[]>(() => {
-    const kw = (poFilters.supplier || '').trim().toLowerCase()
+    const supplierFilter = poFilters.supplier
     const rows: PendingOrderRow[] = []
     const today = dayjs()
     pendingOrders.forEach((o) => {
       const groups: PurchaseOrderSupplierGroup[] = (o.supplierGroups && o.supplierGroups.length > 0)
         ? o.supplierGroups
-        : [{ id: 'default', supplier: o.supplier || '', items: o.items || [] }]
+        : [{ id: 'default', supplier: (o.supplier && o.supplier !== '待定供應商') ? o.supplier : '', items: o.items || [] }]
       const overdueDays = o.updatedAt ? Math.max(0, today.diff(dayjs(o.updatedAt), 'day')) : 0
       const orderGroups: SupplierGroupSummary[] = []
       let orderTotal = 0, orderReceived = 0, orderPending = 0, orderReturn = 0, orderExchange = 0
       const supplierSet = new Set<string>()
       groups.forEach((g) => {
-        if (kw && !(g.supplier || '').toLowerCase().includes(kw)) return
+        // 供應商篩選：精確匹配或「無供應商」
+        if (supplierFilter) {
+          if (supplierFilter === '__none__') {
+            if (g.supplier) return // 篩選無供應商時跳過有供應商的
+          } else {
+            if ((g.supplier || '') !== supplierFilter) return
+          }
+        }
         const items = g.items || []
         const gTotal = g.totalQty ?? items.reduce((s, it) => s + (it.qty || 0), 0)
         const gReceived = g.receivedQty ?? items.reduce((s, it) => s + (it.receivedQty || 0), 0)
         const gReturned = g.returnedQty ?? items.reduce((s, it) => s + (it.returnedQty || 0), 0)
         const gExchanged = items.length > 0
           ? items.reduce((s, it) => s + (it.exchangedQty || 0), 0)
-          : (o.exchangeQty || 0)
+          : (g.exchangeQty || 0) // 從分組自身字段取，不用訂單級總量避免多分組重複計算
         const gPending = Math.max(0, gTotal - gReceived - gReturned)
         if (gPending === 0 && gExchanged === 0) return
         let status: SupplierGroupSummary['status'] = 'pending'
@@ -436,7 +483,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         else if (gPending > 0 && (gReturned > 0 || gExchanged > 0)) status = 'partial'
         orderGroups.push({
           groupId: g.id,
-          supplier: g.supplier || '',
+          supplier: (g.supplier && g.supplier !== '待定供應商') ? g.supplier : '',
           totalQty: gTotal,
           receivedQty: gReceived,
           pendingQty: gPending,
@@ -450,7 +497,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         orderPending += gPending
         orderReturn += gReturned
         orderExchange += gExchanged
-        if (g.supplier) supplierSet.add(g.supplier)
+        if (g.supplier && g.supplier !== '待定供應商') supplierSet.add(g.supplier)
       })
       if (orderGroups.length === 0) return
       rows.push({
@@ -471,8 +518,64 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     return rows
   }, [pendingOrders, poFilters.supplier])
 
+  /* ----- 供應商下拉選項（從待驗收訂單中提取） ----- */
+  const supplierOptions = useMemo(() => {
+    const set = new Set<string>()
+    pendingOrders.forEach((o) => {
+      const groups = (o.supplierGroups && o.supplierGroups.length > 0)
+        ? o.supplierGroups
+        : [{ supplier: o.supplier || '' }]
+      groups.forEach((g) => { if (g.supplier && g.supplier !== '待定供應商') set.add(g.supplier) })
+    })
+    return [
+      { value: '__none__', label: '無供應商' },
+      ...Array.from(set).sort().map((s) => ({ value: s, label: s })),
+    ]
+  }, [pendingOrders])
+
   /* ----- 待驗收訂單表格列（訂單級聚合） ----- */
   const pendingColumns: TableColumnsType<PendingOrderRow> = [
+    {
+      title: '',
+      key: 'expand',
+      width: 40,
+      fixed: 'left',
+      render: (_: unknown, record: PendingOrderRow) => {
+        const isExpanded = pendingExpandedRowKeys.includes(record.orderId)
+        const hasGroups = record.groups.length > 0
+        return (
+          <span
+            onClick={(e) => {
+              e.stopPropagation()
+              setPendingExpandedRowKeys(prev =>
+                prev.includes(record.orderId)
+                  ? prev.filter(k => k !== record.orderId)
+                  : [...prev, record.orderId]
+              )
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 24,
+              height: 24,
+              borderRadius: 4,
+              border: '1px solid #d9d9d9',
+              background: isExpanded ? '#E8720C' : '#fff',
+              color: isExpanded ? '#fff' : '#595959',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: hasGroups ? 'pointer' : 'default',
+              opacity: hasGroups ? 1 : 0.4,
+              transition: 'all 0.2s',
+              userSelect: 'none',
+            }}
+          >
+            {isExpanded ? '−' : '+'}
+          </span>
+        )
+      },
+    },
     {
       title: t('asset.colPoNo'), dataIndex: 'poNo', key: 'poNo', width: 200, fixed: 'left',
       render: (v: string, r: PendingOrderRow) => (
@@ -498,8 +601,45 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         : <span style={{ color: '#bfbfbf' }}>-</span>,
     },
     {
-      title: t('asset.colSupplier'), key: 'suppliers', width: 180, ellipsis: true,
-      render: (_: unknown, r: PendingOrderRow) => r.suppliers.length > 0 ? r.suppliers.join('、') : t('asset.supplierTbd'),
+      title: t('asset.colSupplier'), key: 'suppliers', width: 200, ellipsis: true,
+      render: (_: unknown, r: PendingOrderRow) => {
+        if (r.suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+        if (r.suppliers.length === 1) return <span>{r.suppliers[0]}</span>
+        const rest = r.suppliers.slice(1)
+        const isExpanded = pendingExpandedRowKeys.includes(r.orderId)
+        return (
+          <Space size={4}>
+            <span>{r.suppliers[0]}</span>
+            <Popover
+              content={
+                <div style={{ maxWidth: 240 }}>
+                  {r.suppliers.map((s, i) => (
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < r.suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+              }
+              title="所有供應商"
+              trigger="click"
+            >
+              <Tag
+                style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: isExpanded ? '#fff' : '#E8720C', background: isExpanded ? '#E8720C' : undefined, fontWeight: 500 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPendingExpandedRowKeys(prev =>
+                    prev.includes(r.orderId)
+                      ? prev.filter(k => k !== r.orderId)
+                      : [...prev, r.orderId]
+                  )
+                }}
+              >
+                +{rest.length}
+              </Tag>
+            </Popover>
+          </Space>
+        )
+      },
     },
     {
       title: t('asset.colPurchaser'), key: 'purchaser', width: 110,
@@ -551,12 +691,9 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
             {hasPending && (
-              <Button type="link" size="small" onClick={() => {
-                const g = r.groups.find((x) => x.status === 'pending' || x.status === 'partial')
-                if (g) onAdd(r.orderId, g.groupId)
-              }}>{t('asset.acceptBtn')}</Button>
+              <Button type="link" size="small" onClick={() => onAdd(r.orderId, '')}>{t('asset.acceptBtn')}</Button>
             )}
-            <Button type="link" size="small" onClick={() => handleOpenRecords(r)}>{t('common.detail')}</Button>
+            <Button type="link" size="small" onClick={() => handleOpenRecords(r)}>{t('asset.acceptRecordBtn')}</Button>
           </Space>
         )
       },
@@ -565,47 +702,69 @@ export default function InboundList({ onAdd, onDetail }: Props) {
 
   /* ----- 分組摘要展開行 ----- */
   const pendingExpandable = {
-    expandedRowRender: (record: PendingOrderRow) => (
-      <Table<SupplierGroupSummary>
-        columns={[
-          { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 180 },
-          { title: '總數', dataIndex: 'totalQty', key: 'totalQty', width: 80, align: 'right', render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span> },
-          { title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C' }}>{v}</span> },
-          { title: '待驗收', dataIndex: 'pendingQty', key: 'pendingQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 600 }}>{v}</span> },
-          { title: '換貨', dataIndex: 'exchangeQty', key: 'exchangeQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C' }}>{v}</span> },
-          { title: '退貨', dataIndex: 'returnQty', key: 'returnQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C' }}>{v}</span> },
-          {
-            title: '狀態', key: 'status', width: 100,
-            render: (_: unknown, g: SupplierGroupSummary) => {
-              const meta: Record<string, { label: string; color: string }> = {
-                pending: { label: '待驗收', color: 'processing' },
-                exchange_pending: { label: '換貨在途', color: 'warning' },
-                returned: { label: '退貨終結', color: 'default' },
-                partial: { label: '部分驗收', color: 'warning' },
-              }
-              const m = meta[g.status] || meta.pending
-              return <Tag color={m.color} style={{ margin: 0 }}>{m.label}</Tag>
-            },
-          },
-          {
-            title: '操作', key: 'action', width: 120,
-            render: (_: unknown, g: SupplierGroupSummary) => (
-              <Space size={0} split={<span className="action-split">|</span>}>
-                {(g.status === 'pending' || g.status === 'partial') && (
-                  <Button type="link" size="small" onClick={() => onAdd(record.orderId, g.groupId)}>{t('asset.acceptBtn')}</Button>
-                )}
-                <Button type="link" size="small" onClick={() => handleOpenRecords(record, g.groupId)}>{t('common.detail')}</Button>
-              </Space>
-            ),
-          },
-        ]}
-        dataSource={record.groups}
-        rowKey="groupId"
-        pagination={false}
-        size="small"
-      />
-    ),
-    rowExpandable: (record: PendingOrderRow) => record.groups.length > 1,
+    expandedRowKeys: pendingExpandedRowKeys,
+    onExpand: (expanded: boolean, record: PendingOrderRow) => {
+      setPendingExpandedRowKeys(prev =>
+        expanded
+          ? [...prev, record.orderId]
+          : prev.filter(k => k !== record.orderId)
+      )
+    },
+    expandedRowRender: (record: PendingOrderRow) => {
+      if (record.groups.length === 0) {
+        return (
+          <div style={{ padding: '24px', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 6, margin: '4px 0' }}>
+            <InfoCircleOutlined style={{ fontSize: 16, marginBottom: 8, display: 'block', color: '#D9D9D9' }} />
+            無供應商
+          </div>
+        )
+      }
+      return (
+        <div style={{ background: '#FAFAFA', borderRadius: 8, padding: '12px 16px', border: '1px solid #f0f0f0' }}>
+          <Table<SupplierGroupSummary>
+            columns={[
+              { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 160, render: (v: string) => v || <span style={{ color: '#bfbfbf' }}>無供應商</span> },
+              { title: '完成採購時間', key: 'completedAt', width: 170, render: () => <span style={{ color: '#595959' }}>{record.order.updatedAt || '-'}</span> },
+              { title: '總數', dataIndex: 'totalQty', key: 'totalQty', width: 80, align: 'right', render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span> },
+              { title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C' }}>{v}</span> },
+              { title: '待驗收', dataIndex: 'pendingQty', key: 'pendingQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 600 }}>{v}</span> },
+              { title: '換貨', dataIndex: 'exchangeQty', key: 'exchangeQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C' }}>{v}</span> },
+              { title: '退貨', dataIndex: 'returnQty', key: 'returnQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C' }}>{v}</span> },
+              {
+                title: '狀態', key: 'status', width: 100,
+                render: (_: unknown, g: SupplierGroupSummary) => {
+                  const meta: Record<string, { label: string; color: string }> = {
+                    pending: { label: '待驗收', color: 'processing' },
+                    exchange_pending: { label: '換貨在途', color: 'warning' },
+                    returned: { label: '退貨終結', color: 'default' },
+                    partial: { label: '部分驗收', color: 'warning' },
+                  }
+                  const m = meta[g.status] || meta.pending
+                  return <Tag color={m.color} style={{ margin: 0 }}>{m.label}</Tag>
+                },
+              },
+              {
+                title: '操作', key: 'action', width: 120,
+                render: (_: unknown, g: SupplierGroupSummary) => (
+                  <Space size={0} split={<span className="action-split">|</span>}>
+                    {(g.status === 'pending' || g.status === 'partial') && (
+                      <Button type="link" size="small" onClick={() => onAdd(record.orderId, g.groupId)}>{t('asset.acceptBtn')}</Button>
+                    )}
+                    <Button type="link" size="small" onClick={() => handleOpenRecords(record, g.groupId)}>{t('asset.acceptRecordBtn')}</Button>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={record.groups}
+            rowKey="groupId"
+            pagination={false}
+            size="small"
+            style={{ background: '#fff', borderRadius: 6 }}
+          />
+        </div>
+      )
+    },
+    rowExpandable: () => true,
   }
 
   /* ----- 入庫批次 / 異常批次 共用搜索區 ----- */
@@ -649,36 +808,6 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     </div>
   )
 
-  /* ----- 入庫批次 / 異常批次 共用展開行（顯示生成的資產編號） ----- */
-  const batchExpandable = {
-    expandedRowRender: (record: InboundBatch) => {
-      const assetNos = (record.items || []).flatMap((it) => it.assetNos || [])
-      return (
-        <div style={{ padding: '4px 0' }}>
-          <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.colGeneratedNos')}</div>
-          {assetNos.length > 0 ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {assetNos.map((no) => (
-                <span
-                  key={no}
-                  style={{
-                    padding: '2px 8px', borderRadius: 4,
-                    background: '#f0f5ff', border: '1px solid #adc6ff',
-                    fontFamily: 'monospace', fontSize: 12,
-                  }}
-                >
-                  {no}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('asset.noGeneratedAssets')}</span>
-          )}
-        </div>
-      )
-    },
-  }
-
   return (
     <>
     <Tabs
@@ -698,7 +827,16 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                     <Input placeholder={t('asset.phPurchaseOrderNo')} allowClear onPressEnter={handlePoSearch} />
                   </Form.Item>
                   <Form.Item label={t('asset.colSupplier')} name="supplier">
-                    <Input placeholder={t('asset.phSupplier')} allowClear onPressEnter={handlePoSearch} />
+                    <Select
+                      placeholder="全部供應商"
+                      allowClear
+                      showSearch
+                      style={{ width: 160 }}
+                      options={supplierOptions}
+                      filterOption={(input, option) =>
+                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                      }
+                    />
                   </Form.Item>
                   <Form.Item label={t('asset.colInboundStatus')} name="status">
                     <Select
@@ -712,7 +850,16 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                     />
                   </Form.Item>
                   <Form.Item label={t('asset.colPurchaser')} name="purchaser">
-                    <Input placeholder={t('asset.phPurchaser')} allowClear onPressEnter={handlePoSearch} />
+                    <Select
+                      placeholder="搜索經辦人"
+                      allowClear
+                      showSearch
+                      style={{ width: 180 }}
+                      options={employeeOptions}
+                      filterOption={false}
+                      onSearch={handleEmployeeSearch}
+                      notFoundContent={employeeSearchLoading ? '搜索中...' : '暫無數據'}
+                    />
                   </Form.Item>
                   <Form.Item label={t('asset.labelCompletedTime')} name="updatedAtRange">
                     <RangePicker style={{ width: '100%' }} />
@@ -736,7 +883,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={poLoading}
                 size="middle"
-                scroll={{ x: 1560 }}
+                scroll={{ x: 1350 }}
                 expandable={pendingExpandable}
                 pagination={{
                   current: poPage, pageSize: poSize, total: pendingRows.length,
@@ -763,10 +910,9 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
                 loading={loading}
                 size="middle"
-                scroll={{ x: 1800 }}
-                expandable={batchExpandable}
+                scroll={{ x: 1650 }}
                 pagination={{
-                  current: page, pageSize: size, total: batchesData.length,
+                  current: page, pageSize: size, total: batchTotal,
                   showSizeChanger: true, showQuickJumper: true,
                   showTotal: (tt) => t('common.total', { count: tt }),
                 }}
@@ -799,6 +945,9 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div>
                   <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 14 }}>{record.batchNo}</span>
+                  {record.supplier && (
+                    <Tag color="blue" style={{ marginLeft: 8, margin: '0 0 0 8px', fontSize: 12 }}>{record.supplier}</Tag>
+                  )}
                   <span style={{ marginLeft: 12, color: '#8C8C8C', fontSize: 13 }}>{record.inboundDate} · {record.operator}</span>
                 </div>
                 <Button type="link" size="small" onClick={() => onDetail(record.batchId)}>{t('common.detail')}</Button>

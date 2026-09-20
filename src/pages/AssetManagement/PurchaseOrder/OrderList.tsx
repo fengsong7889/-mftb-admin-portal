@@ -324,14 +324,14 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: t('asset.colSupplier'), key: 'supplier', width: 200,
       render: (_: unknown, r: PurchaseOrder) => {
         // 优先从 supplierGroups 获取所有供应商
-        const suppliers = r.supplierGroups?.map((g) => g.supplier).filter(Boolean) || []
+        const suppliers = r.supplierGroups?.map((g) => g.supplier).filter((s) => s && s !== '待定供應商') || []
         // 兼容旧数据：如果没有 supplierGroups，使用单个 supplier 字段
-        if (suppliers.length === 0 && r.supplier) {
+        if (suppliers.length === 0 && r.supplier && r.supplier !== '待定供應商') {
           suppliers.push(r.supplier)
         }
-        // 无供应商
+        // 無供應商
         if (suppliers.length === 0) {
-          return <span style={{ color: '#bfbfbf' }}>无供应商</span>
+          return <span style={{ color: '#bfbfbf' }}>無供應商</span>
         }
         // 单个供应商
         if (suppliers.length === 1) {
@@ -352,7 +352,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
                   ))}
                 </div>
               }
-              title="所有供应商"
+              title="所有供應商"
               trigger="click"
             >
               <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>+{rest.length}</Tag>

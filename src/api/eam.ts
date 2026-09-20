@@ -313,6 +313,8 @@ export interface PurchaseOrderSupplierGroup {
   pendingQty?: number
   /** 分組級累計退貨（終態，PR-2） */
   returnedQty?: number
+  /** 分組級累計換貨在途數量（PR-2） */
+  exchangeQty?: number
 }
 
 /** 採購執行狀態 */
@@ -375,6 +377,8 @@ export interface InboundBatchItem {
   groupId?: string
   inboundDate?: string
   locationName?: string | null
+  /** 倉庫地址（詳情頁展示用） */
+  locationAddress?: string | null
   modelId: number
   modelName: string
   qty: number
@@ -389,6 +393,10 @@ export interface InboundBatchItem {
   accessories?: { name: string; qty: number }[]
   /** 入庫後生成的資產編號 */
   assetNos: string[]
+  /** 前端生成的穩定行 ID（提交時傳入，返回時用於幂等對照） */
+  clientLineId?: string
+  /** 來源換貨明細 ID（換貨重驗時關聯原換貨批次明細） */
+  sourceExchangeItemId?: number
   /** 換貨二次發貨物流單號（PR-3） */
   exchangeTrackingNo?: string
   /** 換貨預計到貨日（PR-3） */
@@ -410,6 +418,10 @@ export interface InboundBatch {
   brand?: number
   inboundDate: string
   operator: string
+  /** 管理部門 ID */
+  departmentId?: number
+  /** 管理部門名稱 */
+  departmentName?: string
   items: InboundBatchItem[]
   /** 入庫總數 */
   totalQty: number
@@ -426,6 +438,16 @@ export interface InboundBatch {
   /** 採購事由 */
   purchaseReason?: string
   remark?: string
+  /** 供應商名稱（從採購訂單 supplierGroups 匹配，第一個） */
+  supplier?: string
+  /** 供應商列表（支持多供應商） */
+  suppliers?: string[]
+  /** 採購形式：purchase=購買 / lease=租賃 */
+  purchaseType?: 'purchase' | 'lease'
+  /** 契約版本（v2 支持多結果、讓步、來源鏈） */
+  contractVersion?: number
+  /** 幂等請求鍵（同鍵同內容返回原批次） */
+  requestKey?: string
   createdAt: string
   /** 最後更新人 */
   updatedBy?: string
@@ -1142,6 +1164,7 @@ export interface InspectionRecord {
   exchangeQty: number
   concessionQty: number
   remark?: string
+  supplier?: string
   items: InboundBatchItem[]
 }
 
@@ -1165,6 +1188,9 @@ export interface InboundCreateData {
     inboundDate?: string
     qty: number
     locationId: number
+    locationName?: string
+    departmentId?: number
+    departmentName?: string
     /** 驗收處置方式：缺省視為 pass；不通過項不生成資產 */
     disposition?: 'pass' | 'return' | 'exchange' | 'concession'
     rejectReason?: string
@@ -1172,8 +1198,16 @@ export interface InboundCreateData {
     photos?: { name: string; dataUrl: string }[]
     /** 配件清單 [{name, qty}]，隨驗收記錄保存 */
     accessories?: { name: string; qty: number }[]
+    /** 前端穩定 ID（幂等鍵，提交後返回用於對照） */
+    clientLineId?: string
+    /** 來源換貨明細 ID（換貨重驗時填寫，普通驗收為空） */
+    sourceExchangeItemId?: number
   }[]
   remark?: string
+  /** 契約版本（v2 支持多結果明細、讓步接收、換貨來源鏈） */
+  contractVersion?: number
+  /** 幂等請求鍵（同鍵同內容返回原批次，同鍵不同內容返回衝突） */
+  requestKey?: string
 }
 
 export function createInboundBatch(data: InboundCreateData): Promise<InboundBatch> {
@@ -1191,28 +1225,45 @@ export function registerExchangeShipment(
     `/eam/inbound/${batchId}/items/${itemId}/exchange-shipment`, data)
 }
 
-/** 保存驗收入庫草稿（不創建資產，僅暫存當前驗收狀態；groupId 傳入時按供應商分組隔離） */
-export function saveInboundDraft(data: {
+/** 驗收入庫草稿數據結構（對應後端草稿表） */
+export interface InboundDraft {
   poId: number
   groupId?: string
   inboundDate: string
   operator: string
-  items: { orderItemId?: number; modelId: number; inboundDate?: string; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
+  items: {
+    orderItemId?: number
+    modelId: number
+    inboundDate?: string
+    qty: number
+    locationId: number
+    status: 'pass' | 'return' | 'exchange' | 'concession'
+    reason?: string
+    photos?: { name: string; dataUrl: string }[]
+    accessories?: { name: string; qty: number }[]
+    clientLineId?: string
+    sourceExchangeItemId?: number
+  }[]
   remark?: string
-}): Promise<void> {
-  return Promise.reject(new Error('此旧版功能尚未接入真实 API，请使用已接入的业务入口'))
+  savedAt: string
+  /** 草稿版本號（防止多標籤頁互相覆蓋） */
+  draftVersion?: number
+  /** 提交時的訂單驗收版本（恢復時校驗衝突） */
+  inspectionRevision?: number
+}
+
+/** 保存驗收入庫草稿（不創建資產，僅暫存當前驗收狀態；groupId 傳入時按供應商分組隔離） */
+export function saveInboundDraft(data: Omit<InboundDraft, 'savedAt'>): Promise<void> {
+  // TODO: 後端草稿表就緒後接入真實 API；靜默失敗避免彈「系統繁忙」
+  return request.post('/eam/inbound/draft', data, { headers: { [SILENT_HEADER]: '1' } })
 }
 
 /** 讀取驗收入庫草稿（groupId 傳入時優先讀分組級草稿，缺失時回退訂單級舊草稿） */
-export function loadInboundDraft(poId: number, groupId?: string): Promise<{
-  poId: number
-  inboundDate: string
-  operator: string
-  items: { orderItemId?: number; modelId: number; inboundDate?: string; qty: number; locationId: number; status: 'pass' | 'return' | 'exchange' | 'concession'; reason?: string; accessories?: { name: string; qty: number }[] }[]
-  remark?: string
-  savedAt: string
-} | null> {
-  return Promise.resolve(null)
+export function loadInboundDraft(poId: number, groupId?: string): Promise<InboundDraft | null> {
+  // TODO: 後端草稿表就緒後接入真實 API；靜默失敗避免彈「系統繁忙」
+  return request.get(`/eam/inbound/draft/${poId}`, { params: { groupId }, headers: { [SILENT_HEADER]: '1' } })
+    .then((res: unknown) => res as InboundDraft | null)
+    .catch(() => null as InboundDraft | null)
 }
 
 /** 刪除驗收入庫草稿（groupId 傳入時僅清該分組與訂單級舊草稿；未傳時清該訂單全部草稿） */

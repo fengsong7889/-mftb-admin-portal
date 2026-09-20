@@ -29,10 +29,10 @@ import {
   fetchAssetList, fetchAssetStatusCounts, deleteAsset, updateAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
 } from '../../../api/asset'
-import { fetchAssetTagList, bindAssetTag, fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand } from '../../../api/eam'
-import AssetParameters from '../../../components/AssetParameters'
-import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
-import type { AssetTagTemplate } from '../../../api/eam'
+import { fetchAssetTagList, bindAssetTag, fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand, type AssetTagTemplate } from '../../../api/eam'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { fetchEmployeeOptions } from '../../../api/employee'
+import type { OptionItem } from '../../../api/types'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
@@ -54,6 +54,25 @@ const SOURCE_META: Record<AssetSource, { key: string; color: string }> = {
 const HOLD_META: Record<NonNullable<AssetItem['holdType']>, { key: string; color: string }> = {
   owned:    { key: 'asset.holdOwned',    color: 'geekblue' },
   borrowed: { key: 'asset.holdBorrowed', color: 'volcano' },
+}
+
+/* ==================== 部門樹形數據構建 ==================== */
+function buildDeptTree(depts: DepartmentItem[]): { title: string; value: string; children?: { title: string; value: string }[] }[] {
+  const childrenMap = new Map<number, DepartmentItem[]>()
+  const roots: DepartmentItem[] = []
+  depts.forEach((d) => {
+    if (d.parentId && d.parentId !== 0) {
+      if (!childrenMap.has(d.parentId)) childrenMap.set(d.parentId, [])
+      childrenMap.get(d.parentId)!.push(d)
+    } else {
+      roots.push(d)
+    }
+  })
+  return roots.map((r) => ({
+    title: r.name,
+    value: r.name,
+    children: (childrenMap.get(r.id) || []).map((c) => ({ title: c.name, value: c.name })),
+  }))
 }
 
 /* ==================== 主组件 ==================== */
@@ -84,16 +103,21 @@ export default function AssetList() {
     all: 0, in_use: 0, idle: 0, in_repair: 0, scrapped: 0,
   })
 
-  /** 型号参数 key → 展示名映射（取全部分类参数模板的并集） */
-  const paramCatalog = useAssetParameterCatalog()
-
   /* ----- 分类树 & 品牌列表（搜索区用） ----- */
   const [categories, setCategories] = useState<AssetCategory[]>([])
   const [brands, setBrands] = useState<AssetBrand[]>([])
 
+  /* ----- 部門樹（搜索區用） ----- */
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+
+  /* ----- 員工搜索下拉（最後更新人） ----- */
+  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
+  const [employeeSearchLoading, setEmployeeSearchLoading] = useState(false)
+
   useEffect(() => {
     fetchCategoryList({ bizType: 'ASSET' }).then(setCategories).catch(() => setCategories([]))
     fetchBrandList({ bizType: 'ASSET' }).then(setBrands).catch(() => setBrands([]))
+    fetchDepartments().then(setDepartments).catch(() => setDepartments([]))
   }, [])
 
   /** 构建树结构（parentId=0 为根） */
@@ -109,6 +133,20 @@ export default function AssetList() {
     }
     return buildTree(0)
   }, [categories])
+
+  /** 部門樹數據 */
+  const deptTreeData = useMemo(() => buildDeptTree(departments), [departments])
+
+  /** 員工搜索 */
+  const handleEmployeeSearch = useCallback(async (keyword: string) => {
+    setEmployeeSearchLoading(true)
+    try {
+      const options = await fetchEmployeeOptions(keyword)
+      setEmployeeOptions(options)
+    } finally {
+      setEmployeeSearchLoading(false)
+    }
+  }, [])
 
   // URL ?assetNo= 带入时回填搜索框（由验收入库页跳转）
   useEffect(() => {
@@ -243,6 +281,7 @@ export default function AssetList() {
       { title: t('asset.assetNo'),     dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'),   dataIndex: 'assetName' },
       { title: t('asset.colAssetType'),   dataIndex: 'assetType' },
+      { title: t('asset.purchaseType'),   dataIndex: 'purchaseType' },
       { title: t('asset.colBrand'),       dataIndex: 'brand' },
       { title: t('asset.colCompany'),     dataIndex: 'company' },
       { title: t('asset.colLocation'),    dataIndex: 'location' },
@@ -251,7 +290,7 @@ export default function AssetList() {
       { title: t('asset.colClaimDate'), dataIndex: 'usageDate' },
       { title: t('asset.sourceLabel'),      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
-      { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
+      { title: t('asset.colOrderDate'),  dataIndex: 'orderDate' },
       { title: t('asset.colUsageDate'),     dataIndex: 'usageDate' },
       { title: t('asset.colStatus'),      dataIndex: 'status' },
     ]
@@ -313,6 +352,7 @@ export default function AssetList() {
     { key: 'assetNo', title: t('asset.assetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
     { key: 'assetType', title: t('asset.colAssetType') },
+    { key: 'purchaseType', title: t('asset.purchaseType') },
     { key: 'brand', title: t('asset.colBrand') },
     { key: 'company', title: t('asset.colCompany') },
     { key: 'location', title: t('asset.colLocationName') },
@@ -323,7 +363,7 @@ export default function AssetList() {
     { key: 'source', title: t('asset.sourceLabel') },
     { key: 'quantity', title: t('asset.colQuantity') },
     { key: 'purchaseValue', title: t('asset.colPurchaseValue') },
-    { key: 'purchaseDate', title: t('asset.colPurchaseDate') },
+    { key: 'orderDate', title: t('asset.colOrderDate') },
     { key: 'status', title: t('asset.colStatus') },
     { key: 'scrapTime', title: t('asset.colScrapTime') },
     { key: 'updatedBy', title: t('asset.colUpdatedBy') },
@@ -332,14 +372,16 @@ export default function AssetList() {
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
-  const { configComponent, applyConfig } = useColumnConfig('asset-list-v2', columnMeta)
+  const { configComponent, applyConfig } = useColumnConfig('asset-list-v2', columnMeta, [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
 
   /* ----- 列定义 ----- */
   const allColumns: TableColumnsType<AssetItem> = [
     {
       title: t('asset.assetNo'),
-      dataIndex: 'assetNo', key: 'assetNo', width: 140, fixed: 'left',
-      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
+      dataIndex: 'assetNo', key: 'assetNo', width: 180, fixed: 'left',
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600, whiteSpace: 'nowrap' }}>{v}</span>,
     },
     {
       title: t('asset.colAssetName'),
@@ -347,15 +389,24 @@ export default function AssetList() {
     },
     {
       title: t('asset.colAssetType'),
-      dataIndex: 'assetType', key: 'assetType', width: 100,
+      dataIndex: 'assetType', key: 'assetType', width: 100, ellipsis: true,
+    },
+    {
+      title: t('asset.purchaseType'),
+      dataIndex: 'purchaseType', key: 'purchaseType', width: 90,
+      render: (v: string) => {
+        if (!v) return <span style={{ color: '#bfbfbf' }}>-</span>
+        return <Tag color={v === 'purchase' ? 'blue' : 'green'}>{v === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
+      },
     },
     {
       title: t('asset.colBrand'),
-      dataIndex: 'brand', key: 'brand', width: 100,
+      dataIndex: 'brand', key: 'brand', width: 100, ellipsis: true,
+      render: (v: string) => v || <span style={{ color: '#8C8C8C' }}>-</span>,
     },
     {
       title: t('asset.colCompany'),
-      dataIndex: 'company', key: 'company', width: 100,
+      dataIndex: 'company', key: 'company', width: 100, ellipsis: true,
     },
     {
       title: t('asset.colLocationName'),
@@ -373,12 +424,12 @@ export default function AssetList() {
     },
     {
       title: t('asset.colCurrentUserName'),
-      dataIndex: 'userName', key: 'userName', width: 120,
+      dataIndex: 'userName', key: 'userName', width: 120, ellipsis: true,
       render: (v: string) => v || '-',
     },
     {
       title: t('asset.colDepartment'),
-      dataIndex: 'department', key: 'department', width: 120,
+      dataIndex: 'department', key: 'department', width: 120, ellipsis: true,
     },
     {
       title: t('asset.colClaimDate'),
@@ -400,8 +451,9 @@ export default function AssetList() {
       render: (v: number) => v ? `MOP ${v.toLocaleString()}` : '-',
     },
     {
-      title: t('asset.colPurchaseDate'),
-      dataIndex: 'purchaseDate', key: 'purchaseDate', width: 110,
+      title: t('asset.colOrderDate'),
+      dataIndex: 'orderDate', key: 'orderDate', width: 110,
+      render: (v: string | null) => v || '-',
     },
     {
       title: t('asset.colStatus'),
@@ -415,7 +467,7 @@ export default function AssetList() {
     },
     {
       title: t('asset.colUpdatedBy'),
-      dataIndex: 'applicant', key: 'updatedBy', width: 120,
+      dataIndex: 'applicant', key: 'updatedBy', width: 120, ellipsis: true,
     },
     {
       title: t('asset.colUpdatedAt'),
@@ -518,7 +570,15 @@ export default function AssetList() {
             <Select placeholder={t('common.all')} allowClear options={companyOptions} />
           </Form.Item>
           <Form.Item label={t('asset.colDepartment')} name="department">
-            <Input placeholder={t('asset.departmentPh')} allowClear />
+            <TreeSelect
+              placeholder={t('common.all')}
+              allowClear
+              showSearch
+              treeDefaultExpandAll
+              treeNodeFilterProp="title"
+              treeData={deptTreeData}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item label={t('asset.sourceLabel')} name="source">
             <Select placeholder={t('common.all')} allowClear options={sourceOptions} />
@@ -533,7 +593,16 @@ export default function AssetList() {
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.searchUpdatedBy')} name="updatedBy">
-            <Input placeholder={t('asset.searchUpdatedBy')} allowClear />
+            <Select
+              placeholder={t('asset.searchUpdatedBy')}
+              allowClear
+              showSearch
+              filterOption={false}
+              onSearch={handleEmployeeSearch}
+              notFoundContent={employeeSearchLoading ? '搜索中...' : '暫無數據'}
+              options={employeeOptions}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
           <Form.Item label={t('asset.searchUpdatedAt')} name="updatedAt">
             <DatePicker.RangePicker style={{ width: '100%' }} />
@@ -591,29 +660,11 @@ export default function AssetList() {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2250 }}
+        scroll={{ x: 2290 }}
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,
           columnWidth: 40,
-        }}
-        expandable={{
-          expandedRowRender: (record) => (
-            <div style={{ padding: '4px 0' }}>
-              <div style={{ marginBottom: 8, fontWeight: 600 }}>{t('asset.colParams')}</div>
-              <AssetParameters asset={record} compact catalog={paramCatalog} />
-            </div>
-          ),
-          rowExpandable: (record) => !!(record.params && Object.keys(record.params).length),
-          expandIcon: ({ expanded, onExpand, record }) =>
-            (record.params && Object.keys(record.params).length > 0) ? (
-              <span
-                onClick={(e) => onExpand(record, e)}
-                style={{ cursor: 'pointer', marginRight: 8 }}
-              >
-                {expanded ? '−' : '+'}
-              </span>
-            ) : null,
         }}
         pagination={{
           current: page, pageSize: size, total, showSizeChanger: true, showTotal: (t2) => `${t('common.total', { count: t2 })}`,

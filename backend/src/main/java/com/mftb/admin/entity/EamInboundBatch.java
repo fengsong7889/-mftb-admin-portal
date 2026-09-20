@@ -33,6 +33,12 @@ public class EamInboundBatch {
     /** 操作人 */
     private String operator;
 
+    /** 管理部門 ID (sys_dept.id) */
+    private Long departmentId;
+
+    /** 管理部門名稱快照 */
+    private String departmentName;
+
     /** 入库总数 */
     private Integer totalQty;
 
@@ -59,6 +65,12 @@ public class EamInboundBatch {
 
     /** 备注 */
     private String remark;
+
+    /** 契约版本（v2=多结果分配模型） */
+    private Integer contractVersion;
+
+    /** 幂等请求键 */
+    private String requestKey;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

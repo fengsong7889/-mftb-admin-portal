@@ -19,6 +19,12 @@ public class EamInboundCreateDTO {
     /** 备注 */
     private String remark;
 
+    /** 契约版本（v2 支持多结果明细、让步接收、换货来源链） */
+    private Integer contractVersion;
+
+    /** 幂等请求键（同键同内容返回原批次，同键不同内容返回冲突） */
+    private String requestKey;
+
     /** 入库明细 */
     private List<InboundItem> items;
 
@@ -41,11 +47,17 @@ public class EamInboundCreateDTO {
         /** 入库数量 */
         private Integer qty;
 
-        /** 存放位置ID (eam_location.id) */
+        /** 存放位置 ID (eam_location.id) */
         private Long locationId;
-
-        /** 存放位置名称快照 */
+        
+        /** 存放位置名稱快照 */
         private String locationName;
+        
+        /** 管理部門 ID (sys_dept.id) */
+        private Long departmentId;
+        
+        /** 管理部門名稱快照 */
+        private String departmentName;
 
         /** 验收处置: pass(通过)/return(退货)/exchange(换货)/concession(让步接收) */
         private String disposition;
@@ -58,5 +70,11 @@ public class EamInboundCreateDTO {
 
         /** 配件清单(JSON数组原样透传 [{name,qty}]) */
         private Object accessories;
+
+        /** 前端生成的稳定行 ID（幂等键，草稿恢复对照） */
+        private String clientLineId;
+
+        /** 来源换货明细 ID（换货重验时关联原换货批次明细） */
+        private Long sourceExchangeItemId;
     }
 }

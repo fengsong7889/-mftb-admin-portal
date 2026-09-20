@@ -16,8 +16,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -265,31 +263,46 @@ class EamInboundServiceImplTest {
                 .getParamNameValuePairs().containsValue("received"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"exchange", "concession"})
-    void nonAcceptedDispositionDoesNotCreateAssetsOrFinishOrder(String disposition) {
+    @Test
+    void exchangeDoesNotCreateAssetsOrFinishOrder() {
         when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
         when(orderItemMapper.selectList(any())).thenReturn(List.of(item(10L, MODEL_ID, 2, 0)));
 
-        Map<String, Object> result = service.createBatch(dto(List.of(dtoItem(10L, 2, disposition, false))));
+        Map<String, Object> result = service.createBatch(dto(List.of(dtoItem(10L, 2, "exchange", false))));
 
         assertEquals(0, result.get("generatedAssetCount"));
         verify(assetMapper, never()).insert(any(EamAsset.class));
         ArgumentCaptor<EamInboundBatch> batch = ArgumentCaptor.forClass(EamInboundBatch.class);
         verify(batchMapper).insert(batch.capture());
         assertEquals(0, batch.getValue().getAcceptedQty());
-        assertEquals(0, batch.getValue().getReturnQty());
+        assertEquals(2, batch.getValue().getExchangeQty());
         assertEquals(2, batch.getValue().getPendingQty());
-        assertEquals("exchange".equals(disposition) ? 2 : 0, batch.getValue().getExchangeQty());
-        assertEquals("concession".equals(disposition) ? 2 : 0, batch.getValue().getConcessionQty());
         ArgumentCaptor<EamInboundBatchItem> row = ArgumentCaptor.forClass(EamInboundBatchItem.class);
         verify(batchItemMapper).insert(row.capture());
-        assertEquals("exchange".equals(disposition) ? "pending" : null, row.getValue().getExchangeStatus());
+        assertEquals("pending", row.getValue().getExchangeStatus());
         assertNull(row.getValue().getLocationId());
-        ArgumentCaptor<Wrapper<EamPurchaseOrder>> update = orderUpdateCaptor();
-        verify(orderMapper).update(isNull(), update.capture());
-        assertTrue(((LambdaUpdateWrapper<EamPurchaseOrder>) update.getValue())
-                .getParamNameValuePairs().containsValue("pending"));
+    }
+
+    @Test
+    void concessionGeneratesAssetsLikePass() {
+        when(orderMapper.selectForUpdate(PO_ID)).thenReturn(order("completed", "pending"));
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(item(10L, MODEL_ID, 2, 0)));
+        when(assetService.generateAssetNo(any(), any(), any()))
+                .thenReturn("TB-ZH-EC-0001", "TB-ZH-EC-0002");
+        when(orderItemMapper.update(isNull(), any())).thenReturn(1);
+
+        Map<String, Object> result = service.createBatch(dto(List.of(dtoItem(10L, 2, "concession", true))));
+
+        assertEquals(2, result.get("generatedAssetCount"));
+        verify(assetMapper, times(2)).insert(any(EamAsset.class));
+        ArgumentCaptor<EamInboundBatch> batch = ArgumentCaptor.forClass(EamInboundBatch.class);
+        verify(batchMapper).insert(batch.capture());
+        assertEquals(2, batch.getValue().getAcceptedQty());
+        assertEquals(2, batch.getValue().getConcessionQty());
+        assertEquals(0, batch.getValue().getPendingQty());
+        ArgumentCaptor<EamInboundBatchItem> row = ArgumentCaptor.forClass(EamInboundBatchItem.class);
+        verify(batchItemMapper).insert(row.capture());
+        assertEquals(LOCATION_ID, row.getValue().getLocationId());
     }
 
     @Test

@@ -28,6 +28,8 @@ public class EamAssetVO extends EamAssetSaveDTO {
     private String inboundDate;
     private Integer inboundQty;
     private String inspector;
+    /** 下單日期（來自採購訂單 order_date） */
+    private String orderDate;
     /** 存放位置-省份 */
     private String province;
     /** 存放位置-城市 */

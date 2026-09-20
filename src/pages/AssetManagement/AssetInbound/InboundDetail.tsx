@@ -6,13 +6,13 @@
  * - 遵循全局详情页规范：DetailPageHeader（紫色渐变顶条）+ 卡片布局 + 无底部操作栏
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Table, Tag, Row, Col, Spin, message, Modal, Button, Input, Space, Tooltip, Descriptions } from 'antd'
+import { Table, Tag, Spin, message, Modal, Button, Input, Space, Tooltip, Popover, Descriptions, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined, CheckCircleOutlined,
-  ExclamationCircleOutlined, SwapOutlined, RollbackOutlined,
+  ShoppingCartOutlined, FileTextOutlined, EnvironmentOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
 import { fetchInboundDetail, fetchLocationList, registerExchangeShipment, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
@@ -51,7 +51,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
   // PR-3: 換貨二次發貨登記彈窗
   const [exchangeModal, setExchangeModal] = useState<InboundBatchItem | null>(null)
   const [exchangeTrackingNo, setExchangeTrackingNo] = useState('')
-  const [exchangeExpectedDate, setExchangeExpectedDate] = useState('')
+  const [exchangeExpectedDate, setExchangeExpectedDate] = useState<dayjs.Dayjs | null>(null)
   const [exchangeSubmitting, setExchangeSubmitting] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -87,12 +87,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     try {
       await registerExchangeShipment(batchId, exchangeModal.id, {
         trackingNo: exchangeTrackingNo.trim(),
-        expectedDate: exchangeExpectedDate.trim() || undefined,
+        expectedDate: exchangeExpectedDate ? exchangeExpectedDate.format('YYYY-MM-DD') : undefined,
       })
       message.success(t('asset.exchangeRegistered'))
       setExchangeModal(null)
       setExchangeTrackingNo('')
-      setExchangeExpectedDate('')
+      setExchangeExpectedDate(null)
       loadData()
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.registerFailed'))
@@ -193,7 +193,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
             )}
             {r.exchangeStatus !== 'shipped' && (
               <Button type="link" size="small" style={{ fontSize: 12, padding: '0 2px' }}
-                onClick={() => { setExchangeModal(r); setExchangeTrackingNo(''); setExchangeExpectedDate('') }}>
+                onClick={() => { setExchangeModal(r); setExchangeTrackingNo(''); setExchangeExpectedDate(null) }}>
                 {t('asset.registerShipmentBtn')}
               </Button>
             )}
@@ -231,7 +231,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
-        <Descriptions column={4} size="middle">
+        <Descriptions column={3} size="middle">
           <Descriptions.Item label={t('asset.colBatchNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{batch.batchNo}</span></Descriptions.Item>
           <Descriptions.Item label={t('asset.colPoNo')}><span style={{ fontFamily: 'monospace' }}>{batch.poNo}</span></Descriptions.Item>
           <Descriptions.Item label={t('asset.labelInboundDate')}>{batch.inboundDate}</Descriptions.Item>
@@ -239,8 +239,56 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Descriptions.Item label={t('asset.orderBrand')}>
             {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
           </Descriptions.Item>
+          <Descriptions.Item label={t('asset.colSupplier')}>
+            {(() => {
+              const suppliers = batch.suppliers && batch.suppliers.length > 0 ? batch.suppliers : (batch.supplier ? [batch.supplier] : [])
+              if (suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+              if (suppliers.length === 1) return <span style={{ fontWeight: 500 }}>{suppliers[0]}</span>
+              // 多供應商：顯示第一個 + +N 標記
+              const rest = suppliers.slice(1)
+              return (
+                <Space size={4}>
+                  <span style={{ fontWeight: 500 }}>{suppliers[0]}</span>
+                  <Popover
+                    content={
+                      <div style={{ maxWidth: 240 }}>
+                        {suppliers.map((s, i) => (
+                          <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                    }
+                    title="所有供應商"
+                    trigger="click"
+                  >
+                    <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>
+                      +{rest.length}
+                    </Tag>
+                  </Popover>
+                </Space>
+              )
+            })()}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('asset.purchaseType')}>
+            {batch.purchaseType
+              ? <Tag color={batch.purchaseType === 'purchase' ? 'blue' : 'green'}>{batch.purchaseType === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
+              : <span style={{ color: '#bfbfbf' }}>-</span>}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('asset.storageLocationSection')}>
+            {(() => {
+              const item = batch.items?.find((it) => it.locationName)
+              if (!item?.locationName) return <span style={{ color: '#bfbfbf' }}>-</span>
+              const addr = item.locationAddress
+              const text = addr ? `${item.locationName}(${addr})` : item.locationName
+              return <span style={{ fontWeight: 500 }}>{text}</span>
+            })()}
+          </Descriptions.Item>
+          <Descriptions.Item label={t('asset.mgmtDeptLabel')}>
+            {batch.departmentName ? <span style={{ fontWeight: 500 }}>{batch.departmentName}</span> : <span style={{ color: '#bfbfbf' }}>-</span>}
+          </Descriptions.Item>
           <Descriptions.Item label={t('asset.colCreatedAt')}>{batch.createdAt}</Descriptions.Item>
-          {batch.purchaseReason && <Descriptions.Item label={t('asset.orderReasonLabel')} span={4}>{batch.purchaseReason}</Descriptions.Item>}
+          {batch.purchaseReason && <Descriptions.Item label={t('asset.orderReasonLabel')}>{batch.purchaseReason}</Descriptions.Item>}
         </Descriptions>
       </div>
 
@@ -254,52 +302,32 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
-        <Row gutter={16}>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('asset.statTotal')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#262626' }}>{batch.totalQty}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          {[
+            { label: t('asset.statTotal'), value: batch.totalQty, color: '#262626', bg: '#FAFAFA', border: '#f0f0f0' },
+            { label: t('asset.colReceived'), value: batch.acceptedQty, color: '#52C41A', bg: '#F6FFED', border: '#b7eb8f22' },
+            { label: t('asset.rejectReturn'), value: batch.returnQty, color: '#FF4D4F', bg: '#FFF2F0', border: '#ffccc722' },
+            { label: t('asset.rejectExchange'), value: batch.exchangeQty, color: '#FAAD14', bg: '#FFFBEB', border: '#ffe58f22' },
+          ].map((card, i) => (
+            <div key={i} className="stat-metric-card" style={{
+              textAlign: 'center', padding: 16, borderRadius: 12,
+              background: card.bg, border: `1px solid ${card.border}`,
+              position: 'relative', overflow: 'hidden', cursor: 'default',
+              transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{card.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>{card.value}</div>
             </div>
-          </Col>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f22' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 4 }} />{t('asset.colReceived')}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>{batch.acceptedQty}</div>
-            </div>
-          </Col>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: batch.pendingQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('asset.statPending')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: batch.pendingQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.pendingQty}</div>
-            </div>
-          </Col>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: batch.returnQty > 0 ? '#fff2f0' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <RollbackOutlined style={{ color: '#FF4D4F', marginRight: 4 }} />{t('asset.rejectReturn')}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: batch.returnQty > 0 ? '#FF4D4F' : '#8C8C8C' }}>{batch.returnQty}</div>
-            </div>
-          </Col>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: batch.exchangeQty > 0 ? '#fffbe6' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <SwapOutlined style={{ color: '#FAAD14', marginRight: 4 }} />{t('asset.rejectExchange')}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: batch.exchangeQty > 0 ? '#FAAD14' : '#8C8C8C' }}>{batch.exchangeQty}</div>
-            </div>
-          </Col>
-          <Col span={4}>
-            <div style={{ textAlign: 'center', padding: '12px 0', background: batch.concessionQty > 0 ? '#e6f7ff' : '#FAFAFA', borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>
-                <ExclamationCircleOutlined style={{ color: '#1890FF', marginRight: 4 }} />{t('asset.rejectConcession')}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: batch.concessionQty > 0 ? '#1890FF' : '#8C8C8C' }}>{batch.concessionQty}</div>
-            </div>
-          </Col>
-        </Row>
+          ))}
+        </div>
+        {/* 讓步接收單獨展示（與通過量合並計入已入庫） */}
+        {batch.concessionQty > 0 && (
+          <div style={{ marginTop: 12, padding: '8px 16px', background: '#E6F7FF', borderRadius: 8, border: '1px solid #91d5ff22', textAlign: 'center' }}>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.rejectConcession')}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: '#1890FF', marginLeft: 8 }}>{batch.concessionQty}</span>
+            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>({t('asset.concessionIncludedInReceived')})</span>
+          </div>
+        )}
       </div>
 
       {/* ====== 入库明细 ====== */}
@@ -316,7 +344,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         <Table<InboundBatchItem>
           columns={itemColumns}
           dataSource={batch.items}
-          rowKey={(r) => r.modelId?.toString() || Math.random().toString()}
+          rowKey={(r, idx) => r.clientLineId || r.id?.toString() || `${r.modelId}_${r.disposition || 'pass'}_${idx}`}
           size="small"
           pagination={false}
           scroll={{ x: 1320 }}
@@ -436,7 +464,13 @@ export default function InboundDetail({ batchId, onBack }: Props) {
             </div>
             <div>
               <div style={{ fontSize: 13, marginBottom: 6 }}>{t('asset.expectedArrivalLabel')}</div>
-              <Input value={exchangeExpectedDate} onChange={(e) => setExchangeExpectedDate(e.target.value)} placeholder={t('asset.phOptionalDate')} allowClear />
+              <DatePicker
+                value={exchangeExpectedDate}
+                onChange={(d) => setExchangeExpectedDate(d)}
+                placeholder={t('asset.phOptionalDate')}
+                style={{ width: '100%' }}
+                disabledDate={(d) => d.isBefore(dayjs(), 'day')}
+              />
             </div>
           </div>
         )}

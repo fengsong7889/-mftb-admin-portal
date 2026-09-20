@@ -109,6 +109,8 @@ export interface AssetItem {
   /** 公司品牌 ID（sys_company_brand.id，从后端动态加载） */
   companyBrand?: number | null
   purchaseType?: 'purchase' | 'lease'
+  /** 下单日期（来自采购订单 orderDate） */
+  orderDate?: string | null
   updatedBy?: string
   inboundBatchNo?: string | null
   inboundDate?: string | null

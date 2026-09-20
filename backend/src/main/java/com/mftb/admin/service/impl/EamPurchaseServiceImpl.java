@@ -197,7 +197,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         // 解析 supplierGroups JSON
         if (order.getSupplierGroups() != null && !order.getSupplierGroups().isBlank()) {
             List<Map<String, Object>> groups = JsonUtils.parseMapList(order.getSupplierGroups());
-            // 为每个 group 填充 items
+            // 为每个 group 填充 items，并用实际明细重新计算 totalQty（避免 JSON 中存量值与实际不一致）
             for (Map<String, Object> group : groups) {
                 String gid = String.valueOf(group.get("id"));
                 List<Map<String, Object>> groupItems = items.stream()
@@ -205,6 +205,11 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
                         .map(this::itemToMap)
                         .collect(Collectors.toList());
                 group.put("items", groupItems);
+                // 用实际明细的 qty 总和覆盖 JSON 中的 totalQty
+                int actualTotal = groupItems.stream()
+                        .mapToInt(it -> ((Number) it.getOrDefault("qty", 0)).intValue())
+                        .sum();
+                group.put("totalQty", actualTotal);
             }
             map.put("supplierGroups", groups);
         }
@@ -407,7 +412,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
 
         EamPurchaseOrder order = new EamPurchaseOrder();
         order.setReqId(req.getId());
-        order.setSupplier("待定供應商");
+        order.setSupplier("");
         order.setAmount(req.getBudget() != null ? req.getBudget() : BigDecimal.ZERO);
         order.setDeliveryDate(LocalDate.now().plusDays(14).toString());
         order.setPurchaser(req.getApplicant());

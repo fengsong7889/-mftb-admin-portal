@@ -63,6 +63,12 @@ public class EamInboundBatchItem {
     /** 配件清单 JSON 数组 [{name,qty}] */
     private String accessories;
 
+    /** 前端生成的稳定行 ID（幂等键，草稿恢复对照） */
+    private String clientLineId;
+
+    /** 来源换货明细 ID（换货重验时关联原换货批次明细） */
+    private Long sourceExchangeItemId;
+
     /** 排序 */
     private Integer sortOrder;
 }
