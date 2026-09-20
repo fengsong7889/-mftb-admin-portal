@@ -59,6 +59,8 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v17-clear-orphan-asset-user", this::clearOrphanAssetUserData);
         versionTracker.applyOnce("eam:schema-v18-evidence-storage-path", this::fixEvidenceStoragePath);
         versionTracker.applyOnce("eam:schema-v19-evidence-storage-mediumtext", this::upgradeEvidenceStorageToMediumText);
+        versionTracker.applyOnce("eam:schema-v20-claim-accessories", this::addClaimAccessoriesColumn);
+        versionTracker.applyOnce("eam:schema-v21-return-operator-id", this::addReturnOperatorIdColumn);
     }
 
     private void upgradeTransferIntegrity() {
@@ -857,5 +859,35 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("biz_eam_claim_evidence.storage_path 升级 MEDIUMTEXT 失败: {}", e.getMessage());
         }
+    }
+
+    /** v20: 领用记录新增配件快照列（领用时从资产复制，支持删减） */
+    private void addClaimAccessoriesColumn() {
+        log.info("开始为领用记录表添加 accessories 列 ...");
+        // MySQL 不支持 IF NOT EXISTS，先检查列是否存在
+        Integer colExists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_claim' AND COLUMN_NAME = 'accessories'",
+            Integer.class
+        );
+        if (colExists != null && colExists == 0) {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_claim ADD COLUMN accessories TEXT DEFAULT NULL COMMENT '领用配件快照 JSON（领用时从资产复制，支持删减）'");
+            log.info("领用记录表 accessories 列添加完成");
+        } else {
+            log.info("领用记录表 accessories 列已存在，跳过");
+        }
+    }
+
+    /** v21: 归还记录表新增 operator_id 列 + 历史数据回填 */
+    private void addReturnOperatorIdColumn() {
+        log.info("开始为归还记录表添加 operator_id 列 ...");
+        alterSafe("biz_eam_return",
+                "ADD COLUMN operator_id BIGINT NULL COMMENT '操作人 ID（归还接收人）' AFTER operator_name");
+        // 回填历史数据：按 operator_name 匹配 sys_user.name
+        int rows = jdbcTemplate.update(
+                "UPDATE biz_eam_return r "
+                + "INNER JOIN sys_user u ON u.name = r.operator_name AND u.deleted = 0 "
+                + "SET r.operator_id = u.id "
+                + "WHERE r.operator_id IS NULL AND r.deleted = 0");
+        log.info("归还记录表 operator_id 列添加完成，历史数据回填 {} 条", rows);
     }
 }

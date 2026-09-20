@@ -44,4 +44,16 @@ public class EamClaimVO {
     private String contentHash;
     /** 签名凭证 Data URL（签署后才有） */
     private String signatureImageUrl;
+
+    /** 购买时价值（资产台账 purchaseValue） */
+    private java.math.BigDecimal purchaseValue;
+
+    /** 管理部门（资产台账 adminDepartment） */
+    private String adminDepartment;
+
+    /** 归还验收状况：normal/damaged/lost（仅已归还时有值） */
+    private String assetCondition;
+
+    /** 领用配件快照 [{name, qty}] */
+    private java.util.List<java.util.Map<String, Object>> accessories;
 }

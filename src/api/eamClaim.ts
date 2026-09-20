@@ -129,6 +129,7 @@ export async function registerClaim(registration: ClaimRegistration): Promise<nu
     remark: registration.remark,
     mode: registration.mode,
     proxyReason: registration.proxyReason,
+    accessories: registration.accessories,
   })
 }
 

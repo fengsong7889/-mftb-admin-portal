@@ -13,6 +13,9 @@ public interface EamReturnService {
     /** 详情 */
     EamReturnVO detail(long id);
 
+    /** 按领用 ID 查最新归还记录（领用详情归还信息模块；无记录返回 null） */
+    EamReturnVO byClaim(long claimId);
+
     /** 登记归还（从领用或借用） */
     long register(EamReturnDTO dto);
 

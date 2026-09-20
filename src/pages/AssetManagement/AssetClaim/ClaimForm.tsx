@@ -16,8 +16,9 @@ import {
 } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, DatabaseOutlined,
-  UserOutlined,
+  UserOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
+import { Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import type { DepartmentItem } from '../../../api/department'
@@ -72,6 +73,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
   const mounted = useRef(true)
   const [selected, setSelected] = useState(initialAsset)
   const [employee, setEmployee] = useState(initialEmployee)
+  const [claimAccessories, setClaimAccessories] = useState<{ name: string; qty: number }[]>([])
   const [assetQuery, setAssetQuery] = useState<ClaimQuery>({ page: 1, size: 200 })
   const [employeeQuery, setEmployeeQuery] = useState<ClaimQuery>({ page: 1, size: 10 })
   const mode = Form.useWatch('mode', form) ?? 'standard'
@@ -90,6 +92,14 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
   useEffect(() => {
     if (initialEmployee) { setEmployee(initialEmployee); form.setFieldValue('employeeId', initialEmployee.employeeId) }
   }, [initialEmployee, form])
+  // 当所选资产变化时，同步配件清单（从资产复制）
+  useEffect(() => {
+    if (selected?.accessories?.length) {
+      setClaimAccessories(selected.accessories.map(a => ({ name: a.name, qty: a.qty })))
+    } else {
+      setClaimAccessories([])
+    }
+  }, [selected?.id, selected?.accessories])
 
   const handleSubmit = async () => {
     if (!onSubmit || busy.current) return
@@ -105,6 +115,8 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
         assetId: v.assetId, employeeId: v.employeeId, claimDate: v.claimDate.format('YYYY-MM-DD'),
         claimReason: v.claimReason?.trim(), remark: v.remark?.trim(), mode: v.mode,
         proxyReason: v.mode === 'proxy' ? v.proxyReason?.trim() : undefined,
+        // 始终携带快照（含空数组）：NULL 仅留给历史旧数据，删光配件时需存 "[]" 以免详情页回退展示资产配件
+        accessories: JSON.stringify(claimAccessories),
       }
       const confirmed = await modal.confirm({
         title: v.mode === 'proxy' ? '确认代办领用？' : '确认登记并发送待签？',
@@ -212,7 +224,35 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
             {selected && (
               <div style={{ marginTop: 4 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
-                <AssetSummary asset={selected} />
+                <AssetSummary asset={selected} hideAccessories />
+                {/* 配件清单（可删除） */}
+                {claimAccessories.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>配件清单</span>
+                      <Tag color="orange" style={{ fontSize: 11 }}>{claimAccessories.length} 项</Tag>
+                      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {claimAccessories.map((acc, idx) => (
+                        <Tag
+                          key={idx}
+                          color="orange"
+                          closable
+                          onClose={(e) => {
+                            e.preventDefault()
+                            setClaimAccessories(prev => prev.filter((_, i) => i !== idx))
+                          }}
+                          style={{ fontSize: 13, padding: '4px 12px', borderRadius: 4 }}
+                        >
+                          {acc.name} × {acc.qty}
+                        </Tag>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>点击 × 可移除不需要的配件，归还时仅展示领用的配件。</div>
+                  </div>
+                )}
               </div>
             )}
           </div>

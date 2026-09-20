@@ -3,8 +3,8 @@
  *
  * 接通真实后端 API，使用 ReturnRow 类型。
  */
-import { useState, useEffect, useMemo } from 'react'
-import { Button, DatePicker, Empty, Form, Input, Select, Table, Tag, message, type TableColumnsType } from 'antd'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Button, DatePicker, Empty, Form, Input, Select, Table, Tag, TreeSelect, message, type TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -14,9 +14,13 @@ import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { exportToCSV } from '../../../utils/exportCSV'
 import type { ReturnRow, ReturnQuery } from '../../../api/eamReturn'
+import { fetchClaimEmployeeOptions } from '../../../api/eamClaim'
+import type { ClaimEmployee, DepartmentNode } from '../AssetClaim/claimViewTypes'
+import { buildDeptTree } from '../AssetClaim/claimViewTypes'
+import { fetchDepartments } from '../../../api/department'
 
 /* ----- 状态元数据 ----- */
-const SOURCE_LABEL: Record<string, string> = { claim: '領用歸還', borrow: '借用歸還', historical: '歷史資產歸還' }
+const SOURCE_LABEL: Record<string, string> = { claim: '領用歸還', borrow: '借用歸還' }
 const STATUS_LABEL: Record<string, string> = { completed: '正常完成', exception_pending: '異常處理中', exception_closed: '異常已結束' }
 const STATUS_COLOR: Record<string, string> = { completed: 'success', exception_pending: 'processing', exception_closed: 'default' }
 const CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '損壞', lost: '遺失' }
@@ -30,7 +34,17 @@ interface Props {
   canEdit?: boolean
 }
 
-interface Filters { keyword?: string; source?: string; status?: string; condition?: string; dates?: [Dayjs, Dayjs] }
+interface Filters {
+  returnNo?: string
+  assetKeyword?: string
+  source?: string
+  empName?: string
+  actualReturneeName?: string
+  departmentId?: number
+  condition?: string
+  status?: string
+  dates?: [Dayjs, Dayjs]
+}
 
 export default function ReturnList({ data, loading = false, error, onQuery, canEdit = false }: Props) {
   const { t } = useTranslation()
@@ -39,8 +53,26 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<Pick<ReturnQuery, 'keyword' | 'sourceType' | 'returnStatus' | 'assetCondition' | 'startDate' | 'endDate'>>({})
+  const [filters, setFilters] = useState<Pick<ReturnQuery, 'returnNo' | 'assetKeyword' | 'empName' | 'actualReturneeName' | 'departmentId' | 'sourceType' | 'returnStatus' | 'assetCondition' | 'startDate' | 'endDate'>>({})
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  /* ----- 部门树数据 ----- */
+  const [deptTree, setDeptTree] = useState<DepartmentNode[]>([])
+  useEffect(() => {
+    fetchDepartments().then(list => setDeptTree(buildDeptTree(list))).catch(() => {})
+  }, [])
+
+  /* ----- 员工下拉搜索 ----- */
+  const [empOptions, setEmpOptions] = useState<ClaimEmployee[]>([])
+  const [returneeOptions, setReturneeOptions] = useState<ClaimEmployee[]>([])
+  const handleSearchEmp = useCallback(async (kw: string) => {
+    if (!kw || kw.trim().length < 1) { setEmpOptions([]); return }
+    try { const res = await fetchClaimEmployeeOptions(kw.trim()); setEmpOptions(res.records || []) } catch { setEmpOptions([]) }
+  }, [])
+  const handleSearchReturnee = useCallback(async (kw: string) => {
+    if (!kw || kw.trim().length < 1) { setReturneeOptions([]); return }
+    try { const res = await fetchClaimEmployeeOptions(kw.trim()); setReturneeOptions(res.records || []) } catch { setReturneeOptions([]) }
+  }, [])
 
   const dataSource = data?.records ?? []
   const total = data?.total ?? 0
@@ -53,7 +85,11 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const handleSearch = () => {
     const v = form.getFieldsValue()
     setFilters({
-      keyword: v.keyword?.trim() || undefined,
+      returnNo: v.returnNo?.trim() || undefined,
+      assetKeyword: v.assetKeyword?.trim() || undefined,
+      empName: v.empName || undefined,
+      actualReturneeName: v.actualReturneeName || undefined,
+      departmentId: v.departmentId || undefined,
       sourceType: v.source || undefined,
       returnStatus: v.status || undefined,
       assetCondition: v.condition || undefined,
@@ -69,14 +105,15 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const handleExport = () => {
     const cols = [
       { title: t('asset.colReturnNo'), dataIndex: 'returnNo' },
-      { title: '归还来源', dataIndex: 'sourceType', render: (v: string) => SOURCE_LABEL[v] || v },
-      { title: '资产编号', dataIndex: 'assetNo' },
-      { title: '资产名称', dataIndex: 'assetName' },
-      { title: '原持有人', dataIndex: 'empName' },
-      { title: '实际归还人', dataIndex: 'actualReturneeName' },
+      { title: '歸還來源', dataIndex: 'sourceType', render: (v: string) => SOURCE_LABEL[v] || v },
+      { title: '資產編號', dataIndex: 'assetNo' },
+      { title: '資產名稱', dataIndex: 'assetName' },
+      { title: '領用人', dataIndex: 'empName' },
+      { title: '領用時部門', dataIndex: 'department' },
+      { title: '實際歸還人', dataIndex: 'actualReturneeName' },
       { title: t('asset.colReturnDate'), dataIndex: 'returnDate' },
-      { title: '验收状况', dataIndex: 'assetCondition', render: (v: string) => CONDITION_LABEL[v] || v },
-      { title: '处理状态', dataIndex: 'returnStatus', render: (v: string) => STATUS_LABEL[v] || v },
+      { title: '驗收狀況', dataIndex: 'assetCondition', render: (v: string) => CONDITION_LABEL[v] || v },
+      { title: '處理狀態', dataIndex: 'returnStatus', render: (v: string) => STATUS_LABEL[v] || v },
     ]
     exportToCSV(`return_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
     message.success(t('common.exportSuccess'))
@@ -95,13 +132,21 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       render: (v: string, r) => <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>{v}</Button>,
     },
     {
-      key: 'source', title: '歸還來源', dataIndex: 'sourceType', width: 140,
+      key: 'source', title: '歸還來源', dataIndex: 'sourceType', width: 120,
       render: (v: string) => SOURCE_LABEL[v] || v,
     },
-    { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_, r) => <>{r.assetName}<div className="claim-muted">{r.assetNo}</div></> },
-    { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
-    { key: 'holder', title: '原持有人', dataIndex: 'empName', width: 130 },
-    { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => v || r.empName },
+    { key: 'assetNo', title: '資產編號', dataIndex: 'assetNo', width: 160 },
+    { key: 'assetName', title: '資產名稱', dataIndex: 'assetName', width: 160, ellipsis: true },
+    { key: 'empName', title: '領用人', dataIndex: 'empName', width: 140, render: (v: string, r) => {
+      const name = v || '—'
+      return r.empNo ? `${name}（${r.empNo}）` : name
+    }},
+    { key: 'department', title: '領用時部門', dataIndex: 'department', width: 120, render: (v: string) => v || '—' },
+    { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => {
+      const name = v || r.empName || '—'
+      const no = r.actualReturneeNo
+      return no ? `${name}（${no}）` : name
+    }},
     { key: 'date', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120 },
     {
       key: 'condition', title: '驗收狀況', dataIndex: 'assetCondition', width: 100,
@@ -112,12 +157,9 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       render: (v: string) => <Tag color={STATUS_COLOR[v] || 'default'}>{STATUS_LABEL[v] || v}</Tag>,
     },
     {
-      key: 'action', title: t('common.colAction'), width: 150, fixed: 'right',
+      key: 'action', title: t('common.colAction'), width: 90, fixed: 'right',
       render: (_, r) => (
-        <>
-          <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>詳情</Button>
-          {r.compensationId && <><span className="action-split">|</span><Button type="link" onClick={() => navigate(`/asset-compensation/detail?id=${r.compensationId}`)}>賠付</Button></>}
-        </>
+        <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>詳情</Button>
       ),
     },
   ]
@@ -126,8 +168,10 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const columnMeta = useMemo(() => [
     { key: 'returnNo', title: t('asset.colReturnNo') },
     { key: 'source', title: '歸還來源' },
-    { key: 'asset', title: t('asset.colAssetName') },
-    { key: 'holder', title: '原持有人' },
+    { key: 'assetNo', title: '資產編號' },
+    { key: 'assetName', title: '資產名稱' },
+    { key: 'empName', title: '領用人' },
+    { key: 'department', title: '領用時部門' },
     { key: 'actualReturnee', title: '實際歸還人' },
     { key: 'date', title: t('asset.colReturnDate') },
     { key: 'condition', title: '驗收狀況' },
@@ -144,17 +188,46 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       {/* ====== 搜索区 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline" onFinish={handleSearch}>
-          <Form.Item label={t('asset.searchKeyword')} name="keyword">
-            <Input allowClear placeholder="單號 / 資產 / 原持有人 / 歸還人" />
+          <Form.Item label="歸還單號" name="returnNo">
+            <Input allowClear placeholder="輸入歸還單號" />
+          </Form.Item>
+          <Form.Item label="資產編號/名稱" name="assetKeyword">
+            <Input allowClear placeholder="輸入資產編號或名稱" />
           </Form.Item>
           <Form.Item label="歸還來源" name="source">
             <Select allowClear placeholder="全部來源" options={Object.entries(SOURCE_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
-          <Form.Item label="處理狀態" name="status">
-            <Select allowClear placeholder="全部狀態" options={Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          <Form.Item label="領用人" name="empName">
+            <Select
+              allowClear showSearch placeholder="搜索領用人姓名或工號"
+              optionFilterProp="label" optionLabelProp="label"
+              filterOption={false} onSearch={handleSearchEmp}
+              notFoundContent="請輸入關鍵字搜索"
+              options={empOptions.map(e => ({ value: e.empName, label: `${e.empName}${e.empNo ? `（${e.empNo}）` : ''}` }))}
+            />
+          </Form.Item>
+          <Form.Item label="實際歸還人" name="actualReturneeName">
+            <Select
+              allowClear showSearch placeholder="搜索實際歸還人姓名或工號"
+              optionFilterProp="label" optionLabelProp="label"
+              filterOption={false} onSearch={handleSearchReturnee}
+              notFoundContent="請輸入關鍵字搜索"
+              options={returneeOptions.map(e => ({ value: e.empName, label: `${e.empName}${e.empNo ? `（${e.empNo}）` : ''}` }))}
+            />
+          </Form.Item>
+          <Form.Item label="領用時部門" name="departmentId">
+            <TreeSelect
+              allowClear treeData={deptTree}
+              placeholder="選擇部門"
+              treeDefaultExpandAll
+              showSearch treeNodeFilterProp="title"
+            />
           </Form.Item>
           <Form.Item label="驗收狀況" name="condition">
             <Select allowClear placeholder="全部狀況" options={Object.entries(CONDITION_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          </Form.Item>
+          <Form.Item label="處理狀態" name="status">
+            <Select allowClear placeholder="全部狀態" options={Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
           <Form.Item label="歸還日期" name="dates">
             <DatePicker.RangePicker />
@@ -174,13 +247,13 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
           <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>{t('common.export')}</Button>
         </div>
         <div className="action-section-right">
-          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/asset-return/add')}>{t('asset.btnNewReturn')}</Button>}
           {configComponent}
         </div>
       </div>
 
       {/* ====== 表格 ====== */}
       <Table<ReturnRow>
+        className="nowrap-table"
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         size="middle"

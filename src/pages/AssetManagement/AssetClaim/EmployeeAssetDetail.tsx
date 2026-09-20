@@ -27,6 +27,8 @@ interface Props {
   loading?: boolean
   error?: string
   canAdd?: boolean
+  /** 初始激活的标签（从 URL tab 参数恢复） */
+  initialTab?: ClaimStatus
   onBack: () => void
   onAddClaim: () => void
   onView: (record: ClaimRow) => void
@@ -42,10 +44,10 @@ const STATUS_TABS: { key: ClaimStatus; label: string }[] = [
   { key: CLAIM_STATUS.TRANSFERRED, label: 'transfer.transferred' },
 ]
 
-export default function EmployeeAssetDetail({ employeeId, employee, stats, data, loading, error, canAdd, onBack, onAddClaim, onView, onQuery }: Props) {
+export default function EmployeeAssetDetail({ employeeId, employee, stats, data, loading, error, canAdd, initialTab, onBack, onAddClaim, onView, onQuery }: Props) {
   const { t } = useTranslation()
   const statusTabs = STATUS_TABS.map(tab => tab.key === CLAIM_STATUS.TRANSFERRED ? { ...tab, label: t(tab.label) } : tab)
-  const [query, setQuery] = useState<ClaimQuery>({ page: 1, size: 10, status: CLAIM_STATUS.CLAIMED })
+  const [query, setQuery] = useState<ClaimQuery>({ page: 1, size: 10, status: initialTab ?? CLAIM_STATUS.CLAIMED })
   const empName = employee?.empName ?? '员工信息待加载'
   const empNo = employee?.empNo ?? '—'
   const department = employee?.department ?? '—'

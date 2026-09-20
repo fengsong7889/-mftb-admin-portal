@@ -7,6 +7,9 @@ import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalo
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatus, type SignatureStatus } from './claimViewTypes'
 
+const RETURN_CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '損壞', lost: '遺失' }
+const RETURN_CONDITION_COLOR: Record<string, string> = { normal: 'success', damaged: 'warning', lost: 'error' }
+
 const STATUS_META: Record<ClaimStatus, { label: string; color: string }> = {
   pending_signature: { label: '待签领用', color: 'processing' },
   claimed: { label: '在用', color: 'success' },
@@ -56,6 +59,7 @@ export default function ClaimRecordTable({ data, query, loading, pageKey, onQuer
     { key: 'signatureStatus', title: '签收状态', dataIndex: 'signatureStatus', width: 150, render: (value: SignatureStatus, row) => <Tooltip title={row.proxyReason}><span><SignatureStatusTag status={value} /></span></Tooltip> },
     { key: 'claimDate', title: t('asset.colClaimDate'), dataIndex: 'claimDate', width: 120 },
     { key: 'returnDate', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120, render: (value?: string) => value || '—' },
+    { key: 'assetCondition', title: '资产验收', dataIndex: 'assetCondition', width: 110, render: (value?: string) => value ? <Tag color={RETURN_CONDITION_COLOR[value]}>{RETURN_CONDITION_LABEL[value] ?? value}</Tag> : '—' },
     { key: 'operator', title: t('asset.colOperator'), dataIndex: 'operator', width: 110 },
     { key: 'action', title: t('asset.colAction'), fixed: 'right', width: onSign ? 160 : 90, render: (_, row) => <>
       <Button type="link" size="small" onClick={() => onView(row)}>{t('common.detail')}</Button>

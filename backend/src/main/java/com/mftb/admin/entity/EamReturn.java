@@ -31,6 +31,9 @@ public class EamReturn {
     /** 操作人姓名 */
     private String operatorName;
 
+    /** 操作人 ID（归还接收人） */
+    private Long operatorId;
+
     /** 归还日期 */
     private LocalDate returnDate;
 

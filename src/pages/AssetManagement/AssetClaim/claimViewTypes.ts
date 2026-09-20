@@ -51,6 +51,7 @@ export interface ClaimRow extends AssetParameterSource {
   claimReason?: string
   remark?: string
   operator: string
+  operatorEmpNo?: string
   status: ClaimStatus
   signatureStatus: SignatureStatus
   proxyReason?: string
@@ -63,8 +64,16 @@ export interface ClaimRow extends AssetParameterSource {
   updatedBy?: string
   updatedAt?: string
   contentHash?: string
+  /** 购买时价值（来自资产台账） */
+  purchaseValue?: number | null
+  /** 管理部门（来自资产台账） */
+  adminDepartment?: string
+  /** 归还验收状况：normal/damaged/lost（仅已归还时有值） */
+  assetCondition?: 'normal' | 'damaged' | 'lost'
   /** 签名凭证 Data URL（签署后才有） */
   signatureImageUrl?: string
+  /** 领用配件快照 [{name, qty}] */
+  accessories?: { name: string; qty: number }[]
 }
 export interface ClaimPage<T> { records: T[]; total: number }
 export interface ClaimSummaryData extends ClaimPage<ClaimEmployeeSummary> { stats: ClaimStatsData }
@@ -85,9 +94,11 @@ export interface ClaimRegistration {
   remark?: string
   mode: 'standard' | 'proxy'
   proxyReason?: string
+  /** 领用配件快照 JSON */
+  accessories?: string
 }
 export type ClaimAssetOption = Pick<AssetItem,
-  'id' | 'assetNo' | 'assetName' | 'assetType' | 'brand' | 'companyBrand' | 'location' | 'purchaseValue' | 'params' | 'categoryCode' | 'categoryId'>
+  'id' | 'assetNo' | 'assetName' | 'assetType' | 'brand' | 'companyBrand' | 'location' | 'purchaseValue' | 'params' | 'categoryCode' | 'categoryId' | 'accessories'>
 
 export interface DepartmentNode { value: number; title: string; children: DepartmentNode[] }
 export function buildDeptTree(departments: DepartmentItem[]): DepartmentNode[] {

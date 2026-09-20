@@ -22,7 +22,14 @@ public class EamReturnVO {
     private String categoryCode;
     private Long employeeId;
     private String empName;
+    /** 领用人工号 */
+    private String empNo;
+    /** 领用时部门 */
+    private String department;
     private String operatorName;
+    private Long operatorId;
+    /** 归还接收人工号 */
+    private String operatorNo;
     private String returnDate;
     private String returnReason;
     private String conditionNote;
@@ -36,6 +43,8 @@ public class EamReturnVO {
     private String recoveredNote;
     private Long actualReturneeId;
     private String actualReturneeName;
+    /** 实际归还人工号 */
+    private String actualReturneeNo;
     private Long compensationId;
     private String createdAt;
     private String updatedAt;

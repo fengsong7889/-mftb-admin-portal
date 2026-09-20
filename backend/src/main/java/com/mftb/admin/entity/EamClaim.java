@@ -77,6 +77,9 @@ public class EamClaim {
     /** 领用内容 SHA-256 摘要 */
     private String contentHash;
 
+    /** 领用配件快照 JSON（领用时从资产复制，支持删减） */
+    private String accessories;
+
     /** 创建人 */
     private String createdBy;
 

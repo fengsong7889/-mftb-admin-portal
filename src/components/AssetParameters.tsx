@@ -1,4 +1,5 @@
-import { Descriptions } from 'antd'
+import { Descriptions, Tag } from 'antd'
+import { AppstoreOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { AssetItem } from '../api/asset'
 import { useAssetParameterCatalog } from '../hooks/useAssetParameterCatalog'
@@ -33,8 +34,9 @@ export default function AssetParameters({ asset, compact = false, current = fals
 }
 
 type SummaryAsset = Pick<AssetItem, 'assetNo' | 'assetName'> & Partial<AssetItem>
-export function AssetSummary({ asset }: { asset: SummaryAsset }) {
+export function AssetSummary({ asset, hideAccessories = false }: { asset: SummaryAsset; hideAccessories?: boolean }) {
   const { t } = useTranslation()
+  const accessories = asset.accessories ?? []
   return <div className="asset-summary">
     <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small" items={[
       { key: 'no', label: t('asset.colAssetNo'), children: asset.assetNo },
@@ -45,5 +47,27 @@ export function AssetSummary({ asset }: { asset: SummaryAsset }) {
       { key: 'value', label: t('asset.colPurchaseValue'), children: asset.purchaseValue != null ? `MOP ${asset.purchaseValue.toLocaleString()}` : '—' },
     ]} />
     <AssetParameters asset={asset} />
+    {/* 配件清单 */}
+    {!hideAccessories ? (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('asset.accessoryListTitleDetail')}</span>
+          {accessories.length > 0 && <Tag color="orange" style={{ fontSize: 11 }}>{t('asset.accessoryCount', { count: accessories.length })}</Tag>}
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        {accessories.length > 0 ? (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {accessories.map((acc, idx) => (
+              <Tag key={idx} color="orange" style={{ fontSize: 13, padding: '4px 12px', borderRadius: 4 }}>
+                {acc.name} × {acc.qty}
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoriesEmpty')}</span>
+        )}
+      </div>
+    ) : null}
   </div>
 }

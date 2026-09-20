@@ -22,7 +22,7 @@ import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchAssetList, fetchAssetDetail } from '../../../api/asset'
-import { CLAIM_STATUS, type ClaimStatsData } from './claimViewTypes'
+import { CLAIM_STATUS, type ClaimStatsData, type ClaimStatus } from './claimViewTypes'
 import './index.css'
 
 type View = 'list' | 'add' | 'detail' | 'record'
@@ -137,7 +137,12 @@ export default function AssetClaim() {
     if (fromAssetId) sp.set('assetId', String(fromAssetId))
     navigate(`/asset-claim/add?${sp.toString()}`)
   }, [navigate])
-  const goRecord = useCallback((id: number) => navigate(`/asset-claim/record?id=${id}`), [navigate])
+  const goRecord = useCallback((id: number, tab?: ClaimStatus) => {
+    const sp = new URLSearchParams()
+    sp.set('id', String(id))
+    if (tab) sp.set('tab', tab)
+    navigate(`/asset-claim/record?${sp.toString()}`)
+  }, [navigate])
 
   const employeeId = useMemo(() => {
     const raw = params.get('employeeId')
@@ -150,6 +155,11 @@ export default function AssetClaim() {
   }, [employeeId, handleQueryDetail])
 
   const recordId = useMemo(() => parseClaimId(params.get('id')), [params])
+  const recordTab = useMemo(() => {
+    const raw = params.get('tab')
+    const validTabs = Object.values(CLAIM_STATUS) as string[]
+    return raw && validTabs.includes(raw) ? raw as ClaimStatus : undefined
+  }, [params])
 
   /* ----- 自动加载 ----- */
   useEffect(() => {
@@ -278,9 +288,14 @@ export default function AssetClaim() {
           loading={loading}
           error={error}
           canAdd={canAdd}
+          initialTab={(() => {
+            const raw = params.get('tab')
+            const validTabs = Object.values(CLAIM_STATUS) as string[]
+            return raw && validTabs.includes(raw) ? raw as ClaimStatus : undefined
+          })()}
           onBack={goList}
           onAddClaim={() => goAdd(employeeId)}
-          onView={(record) => goRecord(record.id)}
+          onView={(record) => goRecord(record.id, record.status)}
           onQuery={onQueryDetail}
         />
       )}
@@ -321,7 +336,12 @@ export default function AssetClaim() {
           error={error}
           onBack={() => {
             const fromEmp = recordData?.employeeId
-            if (fromEmp) goDetail(fromEmp)
+            if (fromEmp) {
+              const sp = new URLSearchParams()
+              sp.set('employeeId', String(fromEmp))
+              if (recordTab) sp.set('tab', recordTab)
+              navigate(`/asset-claim/detail?${sp.toString()}`)
+            }
             else goList()
           }}
           onCancel={handleCancelClaim}

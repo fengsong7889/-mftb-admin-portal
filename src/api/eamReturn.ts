@@ -20,7 +20,11 @@ export interface ReturnRow extends AssetParameterSource {
   assetName: string
   employeeId: number
   empName: string
+  empNo?: string
+  department?: string
   operatorName: string
+  operatorId?: number
+  operatorNo?: string
   returnDate: string
   returnReason?: string
   conditionNote?: string
@@ -34,6 +38,7 @@ export interface ReturnRow extends AssetParameterSource {
   recoveredNote?: string
   actualReturneeId?: number
   actualReturneeName?: string
+  actualReturneeNo?: string
   compensationId?: number
   createdAt: string
   updatedAt: string
@@ -44,11 +49,16 @@ export interface ReturnQuery {
   page: number
   size: number
   keyword?: string
+  returnNo?: string
+  assetKeyword?: string
+  empName?: string
+  actualReturneeName?: string
   sourceType?: string
   returnStatus?: string
   assetCondition?: string
   startDate?: string
   endDate?: string
+  departmentId?: number
 }
 
 export interface ReturnPage<T> {
@@ -68,7 +78,7 @@ export interface ReturnRegisterDTO {
   actualReturneeName?: string
   evidenceDataUrl?: string
   evidenceFileName?: string
-  /** 接收管理部门（正常归还归位用，空则保持原归属部门） */
+  /** 接收部门（正常归还归位用，空则保持原归属部门） */
   receiveDepartment?: string
   /** 归还位置 ID（空则保持原位置） */
   receiveLocationId?: number
@@ -94,11 +104,16 @@ export async function fetchReturnList(query: ReturnQuery): Promise<ReturnPage<Re
     params.set('page', String(query.page))
     params.set('size', String(query.size))
     if (query.keyword) params.set('keyword', query.keyword)
+    if (query.returnNo) params.set('returnNo', query.returnNo)
+    if (query.assetKeyword) params.set('assetKeyword', query.assetKeyword)
+    if (query.empName) params.set('empName', query.empName)
+    if (query.actualReturneeName) params.set('actualReturneeName', query.actualReturneeName)
     if (query.sourceType) params.set('sourceType', query.sourceType)
     if (query.returnStatus) params.set('returnStatus', query.returnStatus)
     if (query.assetCondition) params.set('assetCondition', query.assetCondition)
     if (query.startDate) params.set('startDate', query.startDate)
     if (query.endDate) params.set('endDate', query.endDate)
+    if (query.departmentId) params.set('departmentId', String(query.departmentId))
     return await request.get<unknown, ReturnPage<ReturnRow>>(`/eam/returns?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {
@@ -111,6 +126,16 @@ export async function fetchReturnList(query: ReturnQuery): Promise<ReturnPage<Re
 /** 详情 */
 export async function fetchReturnDetail(id: number): Promise<ReturnRow> {
   return request.get<unknown, ReturnRow>(`/eam/returns/${id}`)
+}
+
+/** 按领用 ID 查最新归还记录（领用详情「归还信息」模块；无归还记录返回 null） */
+export async function fetchReturnByClaim(claimId: number): Promise<ReturnRow | null> {
+  try {
+    return await request.get<unknown, ReturnRow | null>(`/eam/returns/by-claim/${claimId}`)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
 }
 
 /** 登记归还 */

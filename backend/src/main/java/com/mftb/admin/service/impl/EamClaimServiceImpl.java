@@ -277,6 +277,7 @@ public class EamClaimServiceImpl implements EamClaimService {
         claim.setRemark(dto.getRemark());
         claim.setProxyMode(isProxy ? 1 : 0);
         claim.setProxyReason(isProxy ? dto.getProxyReason() : null);
+        claim.setAccessories(dto.getAccessories());
         claim.setCreatedBy(operatorResolver.currentOperatorName());
         claim.setUpdatedBy(operatorResolver.currentOperatorName());
 
@@ -636,6 +637,8 @@ public class EamClaimServiceImpl implements EamClaimService {
             vo.setAssetType(asset.getAssetType());
             vo.setBrand(asset.getBrand());
             vo.setCompanyBrand(asset.getCompanyBrand());
+            vo.setPurchaseValue(asset.getPurchaseValue());
+            vo.setAdminDepartment(asset.getAdminDepartment());
         }
 
         // 员工信息
@@ -653,6 +656,18 @@ public class EamClaimServiceImpl implements EamClaimService {
                 vo.setSignatureImageUrl(evidence.getStoragePath());
             }
         }
+
+        // 归还验收状况（仅已归还时查询）
+        if ("returned".equals(claim.getStatus()) && claim.getId() != null) {
+            EamReturnVO retVO = returnService.byClaim(claim.getId());
+            if (retVO != null) vo.setAssetCondition(retVO.getAssetCondition());
+        }
+
+        // 领用配件快照（历史记录无快照时回退读取资产当前配件清单）
+        vo.setAccessories(claim.getAccessories() != null
+                ? JsonUtils.parseMapList(claim.getAccessories())
+                : (asset != null && asset.getAccessories() != null
+                        ? JsonUtils.parseMapList(asset.getAccessories()) : List.of()));
 
         return vo;
     }

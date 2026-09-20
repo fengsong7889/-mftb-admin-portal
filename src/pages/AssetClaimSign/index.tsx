@@ -9,8 +9,8 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, Modal, Result, Spin, message } from 'antd'
-import { EditOutlined, FileDoneOutlined, SafetyOutlined } from '@ant-design/icons'
+import { Button, Modal, Result, Spin, Tag, message } from 'antd'
+import { AppstoreOutlined, EditOutlined, FileDoneOutlined, SafetyOutlined } from '@ant-design/icons'
 import { fetchSignPageDetail, submitSignPageSign, type SignPageClaimDetail } from '../../api/signPage'
 
 /** 頁面狀態機 */
@@ -257,11 +257,13 @@ export default function AssetClaimSign() {
       { label: '資產編碼', value: claim?.assetNo },
       { label: '资产品牌', value: claim?.brand },
       { label: '資產名稱', value: claim?.assetName },
+      { label: '購買時價值', value: claim?.purchaseValue != null ? `MOP ${Number(claim.purchaseValue).toLocaleString()}` : undefined },
       { label: '領用人', value: claim?.empName ? `${claim.empName}（${claim.empNo || '—'}）` : claim?.empNo },
       { label: '所屬部門', value: claim?.department },
       { label: '領用日期', value: claim?.claimDate },
       { label: '領用原因', value: claim?.claimReason },
     ].filter(r => r.value)
+    const signedAccessories = claim?.accessories ?? []
 
     return (
       <MobileShell>
@@ -314,6 +316,24 @@ export default function AssetClaimSign() {
                 </span>
               </div>
             ))}
+
+            {/* 領用配件 */}
+            {signedAccessories.length > 0 && (
+              <div style={{ paddingTop: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>領用配件</span>
+                  <Tag color="orange" style={{ fontSize: 11 }}>{signedAccessories.length} 項</Tag>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {signedAccessories.map((acc, idx) => (
+                    <Tag key={idx} color="orange" style={{ fontSize: 13, padding: '4px 12px', borderRadius: 4 }}>
+                      {acc.name} × {acc.qty}
+                    </Tag>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 重新簽署按鈕 */}
@@ -362,11 +382,13 @@ export default function AssetClaimSign() {
     { label: '資產編碼', value: claim?.assetNo },
     { label: '资产品牌', value: claim?.brand },
     { label: '資產名稱', value: claim?.assetName },
+    { label: '購買時價值', value: claim?.purchaseValue != null ? `MOP ${Number(claim.purchaseValue).toLocaleString()}` : undefined },
     { label: '領用人', value: claim?.empName ? `${claim.empName}（${claim.empNo || '—'}）` : claim?.empNo },
     { label: '所屬部門', value: claim?.department },
     { label: '領用日期', value: claim?.claimDate },
     { label: '領用原因', value: claim?.claimReason },
   ].filter(r => r.value)
+  const readyAccessories = claim?.accessories ?? []
 
   return (
     <MobileShell>
@@ -394,6 +416,24 @@ export default function AssetClaimSign() {
               </span>
             </div>
           ))}
+
+          {/* 領用配件 */}
+          {readyAccessories.length > 0 && (
+            <div style={{ paddingTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>領用配件</span>
+                <Tag color="orange" style={{ fontSize: 11 }}>{readyAccessories.length} 項</Tag>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {readyAccessories.map((acc, idx) => (
+                  <Tag key={idx} color="orange" style={{ fontSize: 13, padding: '4px 12px', borderRadius: 4 }}>
+                    {acc.name} × {acc.qty}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 簽名按鈕 */}

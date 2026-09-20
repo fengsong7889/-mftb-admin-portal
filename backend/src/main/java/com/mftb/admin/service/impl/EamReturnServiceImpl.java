@@ -56,6 +56,15 @@ public class EamReturnServiceImpl implements EamReturnService {
     }
 
     @Override
+    public EamReturnVO byClaim(long claimId) {
+        EamReturn ret = returnMapper.selectOne(new LambdaQueryWrapper<EamReturn>()
+                .eq(EamReturn::getClaimId, claimId)
+                .orderByDesc(EamReturn::getId)
+                .last("LIMIT 1"));
+        return ret != null ? toVO(ret) : null;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public long register(EamReturnDTO dto) {
         // 确定来源
@@ -119,6 +128,10 @@ public class EamReturnServiceImpl implements EamReturnService {
         ret.setAssetId(assetId);
         ret.setEmployeeId(employeeId);
         ret.setOperatorName(operatorResolver.currentOperatorName());
+        SysUser currentOperator = operatorResolver.currentUser();
+        if (currentOperator != null) {
+            ret.setOperatorId(currentOperator.getId());
+        }
         ret.setReturnDate(returnDate);
         ret.setReturnReason(dto.getReturnReason());
         ret.setConditionNote(dto.getConditionNote());
@@ -334,6 +347,24 @@ public class EamReturnServiceImpl implements EamReturnService {
         SysUser employee = userMapper.selectById(ret.getEmployeeId());
         if (employee != null) {
             vo.setEmpName(employee.getName() != null ? employee.getName() : employee.getUsername());
+            vo.setEmpNo(employee.getEmpId());
+            vo.setDepartment(employee.getDepartment());
+        }
+
+        // 实际归还人工号
+        if (ret.getActualReturneeId() != null) {
+            SysUser returnee = userMapper.selectById(ret.getActualReturneeId());
+            if (returnee != null) {
+                vo.setActualReturneeNo(returnee.getEmpId());
+            }
+        }
+
+        // 归还接收人工号
+        if (ret.getOperatorId() != null) {
+            SysUser operator = userMapper.selectById(ret.getOperatorId());
+            if (operator != null) {
+                vo.setOperatorNo(operator.getEmpId());
+            }
         }
 
         // 凭证
@@ -352,6 +383,52 @@ public class EamReturnServiceImpl implements EamReturnService {
         if (hasText(q.getKeyword())) {
             w.and(x -> x.like(EamReturn::getReturnNo, q.getKeyword().trim())
                     .or().like(EamReturn::getOperatorName, q.getKeyword().trim()));
+        }
+        if (hasText(q.getReturnNo())) {
+            w.like(EamReturn::getReturnNo, q.getReturnNo().trim());
+        }
+        if (hasText(q.getAssetKeyword())) {
+            String kw = q.getAssetKeyword().trim();
+            List<Long> assetIds = assetMapper.selectList(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .like(EamAsset::getAssetNo, kw)
+                            .or().like(EamAsset::getAssetName, kw)
+                            .select(EamAsset::getId)
+            ).stream().map(EamAsset::getId).toList();
+            if (assetIds.isEmpty()) {
+                w.eq(EamReturn::getId, -1L);
+            } else {
+                w.in(EamReturn::getAssetId, assetIds);
+            }
+        }
+        if (hasText(q.getEmpName())) {
+            String kw = q.getEmpName().trim();
+            List<Long> empIds = userMapper.selectList(
+                    new LambdaQueryWrapper<SysUser>()
+                            .like(SysUser::getName, kw)
+                            .or().like(SysUser::getUsername, kw)
+                            .select(SysUser::getId)
+            ).stream().map(SysUser::getId).toList();
+            if (empIds.isEmpty()) {
+                w.eq(EamReturn::getId, -1L);
+            } else {
+                w.in(EamReturn::getEmployeeId, empIds);
+            }
+        }
+        if (hasText(q.getActualReturneeName())) {
+            w.like(EamReturn::getActualReturneeName, q.getActualReturneeName().trim());
+        }
+        if (q.getDepartmentId() != null) {
+            List<Long> empIds = userMapper.selectList(
+                    new LambdaQueryWrapper<SysUser>()
+                            .eq(SysUser::getDepartmentId, q.getDepartmentId())
+                            .select(SysUser::getId)
+            ).stream().map(SysUser::getId).toList();
+            if (empIds.isEmpty()) {
+                w.eq(EamReturn::getId, -1L);
+            } else {
+                w.in(EamReturn::getEmployeeId, empIds);
+            }
         }
         w.eq(hasText(q.getSourceType()), EamReturn::getSourceType, q.getSourceType());
         w.eq(hasText(q.getReturnStatus()), EamReturn::getReturnStatus, q.getReturnStatus());

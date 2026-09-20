@@ -43,6 +43,10 @@ export interface SignPageClaimDetail {
   signedAt?: string
   /** 签名凭证 Data URL（已签署时有值） */
   signatureImageUrl?: string
+  /** 领用配件快照 [{name, qty}] */
+  accessories?: { name: string; qty: number }[]
+  /** 购买时价值 */
+  purchaseValue?: number | null
   createdAt?: string
   updatedAt?: string
 }

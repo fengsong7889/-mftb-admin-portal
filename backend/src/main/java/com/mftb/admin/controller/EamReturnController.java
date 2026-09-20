@@ -32,6 +32,13 @@ public class EamReturnController {
         return Result.success(returnService.detail(id));
     }
 
+    /** 按领用 ID 查最新归还记录（领用详情「归还信息」模块；权限跟随领用菜单） */
+    @GetMapping("/by-claim/{claimId}")
+    @RequirePermission(menu = "asset-claim")
+    public Result<EamReturnVO> byClaim(@PathVariable long claimId) {
+        return Result.success(returnService.byClaim(claimId));
+    }
+
     /** 登记归还 */
     @PostMapping
     @RequirePermission(menu = MENU, action = "edit")

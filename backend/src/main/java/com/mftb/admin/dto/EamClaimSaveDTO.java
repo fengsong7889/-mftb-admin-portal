@@ -21,4 +21,6 @@ public class EamClaimSaveDTO {
     private String mode;
     /** 代办原因（mode=proxy 必填） */
     private String proxyReason;
+    /** 领用配件快照 JSON（领用时从资产复制，支持删减） */
+    private String accessories;
 }
