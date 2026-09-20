@@ -63,6 +63,8 @@ export interface ClaimRow extends AssetParameterSource {
   updatedBy?: string
   updatedAt?: string
   contentHash?: string
+  /** 签名凭证 Data URL（签署后才有） */
+  signatureImageUrl?: string
 }
 export interface ClaimPage<T> { records: T[]; total: number }
 export interface ClaimSummaryData extends ClaimPage<ClaimEmployeeSummary> { stats: ClaimStatsData }

@@ -63,10 +63,11 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
             body.put("agent_id", Long.parseLong(app.getAgentId()));
             body.put("userid_list", String.join(",", userIds));
             Map<String, Object> msg = new LinkedHashMap<>();
-            msg.put("msgtype", "text");
-            Map<String, String> text = new LinkedHashMap<>();
-            text.put("content", title + "\n" + content);
-            msg.put("text", text);
+            msg.put("msgtype", "markdown");
+            Map<String, String> markdown = new LinkedHashMap<>();
+            markdown.put("title", title);
+            markdown.put("text", content);
+            msg.put("markdown", markdown);
             body.put("msg", msg);
 
             @SuppressWarnings("unchecked")

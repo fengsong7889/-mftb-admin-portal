@@ -120,7 +120,7 @@ public class EamInventoryServiceImpl implements EamInventoryService {
             item.setTaskId(task.getId());
             item.setAssetId(asset.getId());
             item.setAssetNo(asset.getAssetNo());
-            item.setAssetName(asset.getAssetName());
+            item.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             item.setAssetType(asset.getAssetType());
             item.setLocation(asset.getLocation());
             item.setStatus("pending");

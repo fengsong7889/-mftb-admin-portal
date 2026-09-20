@@ -78,7 +78,7 @@ public class EamCompensationServiceImpl implements EamCompensationService {
         comp.setCompNo(compNo);
         comp.setReturnId(returnId);
         comp.setAssetId(ret.getAssetId());
-        comp.setAssetName(asset.getAssetName());
+        comp.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
         comp.setAssetNo(asset.getAssetNo());
         comp.setHolderId(ret.getEmployeeId());
 

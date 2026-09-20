@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
+import java.util.Map;
+
 /** 台账响应包含只读来源信息，前端无需拼接或伪造入库信息。 */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -38,4 +41,7 @@ public class EamAssetVO extends EamAssetSaveDTO {
     private String district;
     /** 存放位置-详细地址 */
     private String address;
+    /** 配件清单 [{name, qty}] */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private List<Map<String, Object>> accessories;
 }

@@ -8,7 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import AssetParameters from '../../../components/AssetParameters'
 import type { AssetParameterSource } from '../../../utils/assetParams'
 import { fetchAssetDetail } from '../../../api/asset'
-import { fetchClaimDetail } from '../../../api/eamClaim'
+import { fetchClaimDetail, fetchClaimEmployeeOptions } from '../../../api/eamClaim'
+import type { ClaimEmployee } from '../../../pages/AssetManagement/AssetClaim/claimViewTypes'
 import { fetchBorrowDetail } from '../../../api/eamBorrow'
 import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
@@ -58,7 +59,7 @@ interface Values {
   condition: 'normal' | 'damaged' | 'lost'
   reason: string
   conditionNote?: string
-  actualReturneeName?: string
+  actualReturnee?: { value: number; label: string } | null
   receiveDepartment?: string
   receiveLocationId?: number
 }
@@ -89,6 +90,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
 
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [locations, setLocations] = useState<AssetLocation[]>([])
+  const [employeeOptions, setEmployeeOptions] = useState<ClaimEmployee[]>([])
 
   useEffect(() => {
     fetchDepartments().then(setDepartments).catch(() => { /* 接口异常时置空 */ })
@@ -97,9 +99,30 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
 
   const deptTreeData = useMemo(() => buildDeptTreeData(departments), [departments])
 
+  /** 实际归还人下拉搜索 */
+  const handleSearchEmployee = useCallback(async (keyword: string) => {
+    if (!keyword || keyword.trim().length < 1) { setEmployeeOptions([]); return }
+    try {
+      const res = await fetchClaimEmployeeOptions(keyword.trim())
+      setEmployeeOptions(res.records || [])
+    } catch { setEmployeeOptions([]) }
+  }, [])
+
+  /** 来源数据加载后回填默认值 */
+  useEffect(() => {
+    if (!sourceState.data) return
+    const d = sourceState.data as any
+    const empId = d.employeeId ?? d.holderId ?? d.currentHolderId
+    const empName = d.empName ?? d.holderName ?? d.userName
+    if (empId != null && empName) {
+      form.setFieldsValue({ actualReturnee: { value: empId, label: empName } })
+    }
+  }, [sourceState.data, form])
+
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
+      const returnee = values.actualReturnee as { value: number; label: string } | null | undefined
       const dto: ReturnRegisterDTO = {
         claimId,
         borrowId,
@@ -107,7 +130,8 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         assetCondition: values.condition,
         returnReason: values.reason,
         conditionNote: values.conditionNote,
-        actualReturneeName: values.actualReturneeName || user?.name,
+        actualReturneeId: returnee?.value,
+        actualReturneeName: returnee?.label || user?.name,
         receiveDepartment: values.receiveDepartment,
         receiveLocationId: values.receiveLocationId,
       }
@@ -134,13 +158,20 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
           ]} />
           <TransferError error={sourceState.error} retry={sourceState.refresh} />
           <Spin spinning={sourceState.loading}>
-            {sourceState.data && <>
-              <Descriptions column={2} items={[
-                { key: 'assetNo', label: '資產編號', children: sourceState.data.assetNo },
-                { key: 'assetName', label: '資產名稱', children: sourceState.data.assetName },
-              ]} />
-              <AssetParameters asset={sourceState.data} current />
-            </>}
+            {sourceState.data && (() => {
+              const d = sourceState.data as any
+              return (
+                <Descriptions column={3} items={[
+                  { key: 'assetNo', label: '資產編號', children: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{d.assetNo}</span> },
+                  { key: 'assetName', label: '資產名稱', children: d.assetName },
+                  { key: 'orderNo', label: claimId ? '領用單號' : borrowId ? '借用單號' : '—', children: claimId ? `#${claimId}` : borrowId ? `#${borrowId}` : '—' },
+                  { key: 'empName', label: claimId ? '領用人' : borrowId ? '借用人' : '使用人', children: d.empName || d.holderName || d.userName || '—' },
+                  { key: 'claimDate', label: claimId ? '領用日期' : borrowId ? '借用日期' : '—', children: d.claimDate || d.startDate || d.claimDate || '—' },
+                  { key: 'department', label: '部門', children: d.department || '—' },
+                ]} />
+              )
+            })()}
+            {sourceState.data && <AssetParameters asset={sourceState.data} current />}
           </Spin>
           {!hasSource && <Alert className="claim-notice" showIcon type="info" message="未指定來源，請在列表中選擇領用/借用記錄進入歸還，或從資產台賬發起。" />}
         </ReturnSection>
@@ -150,8 +181,22 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
             <Form.Item name="date" label="業務歸還日期" rules={[{ required: true }]}>
               <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="actualReturneeName" label="實際歸還人（如代辦）">
-              <Input allowClear placeholder="默認當前操作人" />
+            <Form.Item name="actualReturnee" label="實際歸還人（如代辦）">
+              <Select
+                allowClear
+                showSearch
+                placeholder="搜索員工姓名或工號"
+                optionFilterProp="label"
+                optionLabelProp="label"
+                filterOption={false}
+                onSearch={handleSearchEmployee}
+                notFoundContent="請輸入關鍵字搜索"
+                style={{ width: '100%' }}
+                options={employeeOptions.map(e => ({
+                  value: e.employeeId,
+                  label: `${e.empName}${e.empNo ? `（${e.empNo}）` : ''}`,
+                }))}
+              />
             </Form.Item>
           </div>
         </ReturnSection>
@@ -179,7 +224,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         {condition === 'normal' && (
           <ReturnSection title="接收管理">
             <Alert className="claim-notice" showIcon type="info"
-              message="指定接收部門與歸還位置後，資產歸還時同步歸位；不填則保持原歸屬部門與原位置。" />
+              message="指定接收部門與存放倉庫後，資產歸還時同步歸位；不填則保持原歸屬部門與原位置。" />
             <div className="return-grid">
               <Form.Item name="receiveDepartment" label="接收管理部門">
                 <TreeSelect
@@ -192,9 +237,9 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
                   style={{ width: '100%' }}
                 />
               </Form.Item>
-              <Form.Item name="receiveLocationId" label="歸還位置">
+              <Form.Item name="receiveLocationId" label="存放倉庫">
                 <Select
-                  placeholder="選擇歸還位置（可選）"
+                  placeholder="選擇存放倉庫（可選）"
                   allowClear
                   showSearch
                   optionFilterProp="label"

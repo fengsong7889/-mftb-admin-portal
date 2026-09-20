@@ -47,9 +47,9 @@ class EamClaimNotificationTest {
         ReflectionTestUtils.invokeMethod(service, "doSendSignatureNotify", claim, employee, null);
         var content = ArgumentCaptor.forClass(String.class);
         verify(dingTalkAppService).sendWorkNotification(eq(CLAIM_SIGN), eq(7L), eq(List.of("employee-in-dingtalk")),
-                eq("資產領用待簽署"), content.capture());
+                eq("资产领用待签署"), content.capture());
         assertTrue(content.getValue().contains("https://new.example.com/portal/#/asset-claim-sign?token="));
-        String token = content.getValue().split("token=")[1];
+        String token = content.getValue().split("token=")[1].split("[)\\s]")[0];
         assertTrue(SignTokenUtil.validate(token, 10, 20, "existing-signing-secret"));
     }
 

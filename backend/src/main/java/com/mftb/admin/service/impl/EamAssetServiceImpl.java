@@ -59,10 +59,24 @@ public class EamAssetServiceImpl implements EamAssetService {
         List<Long> orderIds = page.getRecords().stream().map(EamAsset::getOrderId).filter(Objects::nonNull).distinct().toList();
         Map<Long, EamPurchaseOrder> orders = orderIds.isEmpty() ? Map.of() : purchaseOrderMapper.selectBatchIds(orderIds)
                 .stream().collect(Collectors.toMap(EamPurchaseOrder::getId, o -> o));
+
+        // 批量加載型號 & 品牌，用於品牌名稱回退解析（避免 N+1 逐條查詢）
+        List<Long> modelIds = page.getRecords().stream()
+                .filter(a -> (a.getBrand() == null || a.getBrand().isBlank()) && a.getModelId() != null)
+                .map(EamAsset::getModelId).distinct().toList();
+        Map<Long, EamModel> modelMap = modelIds.isEmpty() ? Map.of() : modelMapper.selectBatchIds(modelIds)
+                .stream().collect(Collectors.toMap(EamModel::getId, m -> m));
+        List<Long> brandIds = page.getRecords().stream()
+                .filter(a -> (a.getBrand() == null || a.getBrand().isBlank()) && a.getBrandId() != null)
+                .map(EamAsset::getBrandId).distinct().toList();
+        Map<Long, EamBrand> brandMap = brandIds.isEmpty() ? Map.of() : brandMapper.selectBatchIds(brandIds)
+                .stream().collect(Collectors.toMap(EamBrand::getId, b -> b));
+
         return new PageResult<>(page.getRecords().stream().map(a -> toVO(a,
                 a.getBatchId() == null ? null : batches.get(a.getBatchId()),
                 a.getLocationId() == null ? null : locations.get(a.getLocationId()),
-                a.getOrderId() == null ? null : orders.get(a.getOrderId())
+                a.getOrderId() == null ? null : orders.get(a.getOrderId()),
+                modelMap, brandMap
         )).toList(), page.getTotal());
     }
 
@@ -158,13 +172,14 @@ public class EamAssetServiceImpl implements EamAssetService {
     private void apply(EamAssetSaveDTO dto, EamAsset asset) {
         if (dto.getQuantity() != null && dto.getQuantity() != 1) throw new BusinessException("資產台賬採用一物一碼，數量必須為 1");
         BeanWrapper source = new BeanWrapperImpl(dto);
-        List<String> ignored = new ArrayList<>(List.of("params", "rentalPeriod"));
+        List<String> ignored = new ArrayList<>(List.of("params", "rentalPeriod", "accessories"));
         Arrays.stream(source.getPropertyDescriptors()).forEach(p -> {
             if (source.getPropertyValue(p.getName()) == null) ignored.add(p.getName());
         });
         // 仅复制 DTO 白名单中的非空字段，部分更新不会清空来源及未提交的值。
         BeanUtils.copyProperties(dto, asset, ignored.toArray(String[]::new));
         if (dto.getParams() != null) asset.setParams(JsonUtils.toJson(dto.getParams()));
+        if (dto.getAccessories() != null) asset.setAccessories(JsonUtils.toJson(dto.getAccessories()));
         if (dto.getRentalPeriod() != null) {
             if (!dto.getRentalPeriod().isEmpty() && dto.getRentalPeriod().size() != 2) throw new BusinessException("租賃期間需包含起止日期");
             dto.getRentalPeriod().forEach(this::validateDate);
@@ -196,7 +211,10 @@ public class EamAssetServiceImpl implements EamAssetService {
         if (dto.getLocationId() != null) {
             EamLocation location = locationMapper.selectById(dto.getLocationId());
             if (location == null) throw new BusinessException("存放位置不存在");
-            asset.setLocation(location.getName());
+            String addrParts = Arrays.stream(new String[]{location.getCity(), location.getDistrict(), location.getAddress()})
+                    .filter(s -> s != null && !s.isBlank())
+                    .collect(Collectors.joining());
+            asset.setLocation(addrParts.isEmpty() ? location.getName() : location.getName() + "\uFF08" + addrParts + "\uFF09");
         }
         asset.setPurchaseType("lease".equals(asset.getSource()) ? "lease" : "purchase");
         if (asset.getAssetNo() != null) asset.setAssetNo(asset.getAssetNo().trim());
@@ -217,30 +235,48 @@ public class EamAssetServiceImpl implements EamAssetService {
     }
 
     private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location, EamPurchaseOrder order) {
+        return toVO(asset, batch, location, order, Map.of(), Map.of());
+    }
+
+    /**
+     * 帶預加載型號/品牌映射的 toVO，列表頁使用批量加載避免 N+1。
+     * 若 modelMap/brandMap 為空，則回退到逐條查詢。
+     */
+    private EamAssetVO toVO(EamAsset asset, EamInboundBatch batch, EamLocation location, EamPurchaseOrder order,
+                            Map<Long, EamModel> modelMap, Map<Long, EamBrand> brandMap) {
         EamAssetVO vo = new EamAssetVO();
-        BeanUtils.copyProperties(asset, vo, "params", "rentalPeriod", "createdAt", "updatedAt");
+        BeanUtils.copyProperties(asset, vo, "params", "rentalPeriod", "accessories", "createdAt", "updatedAt");
         Map<String, String> params = new LinkedHashMap<>();
         JsonUtils.parseMap(asset.getParams()).forEach((key, value) -> params.put(key, Objects.toString(value, "")));
         vo.setParams(params);
         vo.setRentalPeriod(JsonUtils.parseStringList(asset.getRentalPeriod()));
+        vo.setAccessories(asset.getAccessories() != null ? JsonUtils.parseMapList(asset.getAccessories()) : List.of());
         vo.setQuantity(1);
         vo.setApplicant(Objects.toString(asset.getUpdatedBy(), ""));
         vo.setCreatedAt(DateTimeUtils.format(asset.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(asset.getUpdatedAt()));
-        // 品牌為空時從型號回退解析
+        // 品牌為空時從型號回退解析（優先使用預加載映射，否則逐條查詢）
         if ((vo.getBrand() == null || vo.getBrand().isBlank()) && asset.getModelId() != null) {
-            EamModel model = modelMapper.selectById(asset.getModelId());
+            EamModel model = modelMap.get(asset.getModelId());
+            if (model == null && modelMap.isEmpty()) {
+                model = modelMapper.selectById(asset.getModelId());
+            }
             if (model != null && model.getBrandZh() != null && !model.getBrandZh().isBlank()) {
                 vo.setBrand(model.getBrandZh());
             }
         }
         // 品牌仍為空時，從品牌表通過 brandId 回退解析
         if ((vo.getBrand() == null || vo.getBrand().isBlank()) && asset.getBrandId() != null) {
-            var brandEntity = brandMapper.selectById(asset.getBrandId());
+            EamBrand brandEntity = brandMap.get(asset.getBrandId());
+            if (brandEntity == null && brandMap.isEmpty()) {
+                brandEntity = brandMapper.selectById(asset.getBrandId());
+            }
             if (brandEntity != null && brandEntity.getBrandZh() != null && !brandEntity.getBrandZh().isBlank()) {
                 vo.setBrand(brandEntity.getBrandZh());
             }
         }
+        // 资产名称去掉品牌前缀（品牌已单独展示）
+        vo.setAssetName(stripBrandPrefix(vo.getAssetName(), vo.getBrand()));
         // 下單日期從採購訂單獲取
         if (order != null) {
             vo.setOrderDate(order.getOrderDate());
@@ -351,5 +387,18 @@ public class EamAssetServiceImpl implements EamAssetService {
                         + "FROM biz_eam_asset WHERE asset_no LIKE ? AND deleted = 0",
                 Integer.class, offset + 1, likePattern);
         return max == null ? 0 : max;
+    }
+
+    /**
+     * 剥离资产名称中的品牌前缀（品牌已单独展示，避免重复）。
+     * 例："华为 华为003" → "华为003"
+     */
+    public static String stripBrandPrefix(String assetName, String brand) {
+        if (assetName == null) return null;
+        if (brand == null || brand.isEmpty()) return assetName;
+        if (assetName.startsWith(brand)) {
+            return assetName.substring(brand.length()).trim();
+        }
+        return assetName;
     }
 }

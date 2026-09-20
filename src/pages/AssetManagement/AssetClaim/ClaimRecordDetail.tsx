@@ -4,8 +4,8 @@
  * 样式基准：采购订单详情（PurchaseOrder/OrderDetail.tsx）——
  * DetailPageHeader + 无边框模块卡片 + Descriptions column=4 非 bordered + 最后更新 footer。
  */
-import { Alert, Button, Descriptions, Empty, Modal, Spin, Space } from 'antd'
-import { FileProtectOutlined, FileTextOutlined, StopOutlined, RollbackOutlined } from '@ant-design/icons'
+import { Alert, Button, Descriptions, Empty, Modal, Spin, Space, message } from 'antd'
+import { FileProtectOutlined, FileTextOutlined, StopOutlined, RollbackOutlined, NotificationOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
 import AssetParameters from '../../../components/AssetParameters'
@@ -28,10 +28,11 @@ interface Props {
   onViewEvidence?: () => void
   onDownloadEvidence?: () => void
   onCancel?: (claimId: number, reason: string) => Promise<void>
-  onReturn?: (claimId: number, returnDate: string, returnReason?: string, conditionNote?: string) => Promise<void>
+  onGoReturn?: (claimId: number) => void
+  onResendSignNotify?: (claimId: number) => Promise<void>
 }
 
-export default function ClaimRecordDetail({ record, loading, error, onBack, onSign, onViewEvidence, onDownloadEvidence, onCancel, onReturn }: Props) {
+export default function ClaimRecordDetail({ record, loading, error, onBack, onSign, onViewEvidence, onDownloadEvidence, onCancel, onGoReturn, onResendSignNotify }: Props) {
   const { t } = useTranslation()
 
   /** 构建 extra 按钮 */
@@ -40,6 +41,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
     const btns: React.ReactNode[] = []
     if (onCancel && !record.sourceTransferId && record.status !== CLAIM_STATUS.TRANSFERRED
       && record.status !== CLAIM_STATUS.RETURNED && record.status !== CLAIM_STATUS.CANCELLED
+      && record.status !== CLAIM_STATUS.CLAIMED
       && record.signatureStatus !== SIGNATURE_STATUS.SIGNED) {
       btns.push(
         <Button key="cancel" danger icon={<StopOutlined />} onClick={() => {
@@ -54,17 +56,9 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
         }}>取消领用</Button>
       )
     }
-    if (onReturn && record.status === CLAIM_STATUS.CLAIMED) {
+    if (onGoReturn && record.status === CLAIM_STATUS.CLAIMED) {
       btns.push(
-        <Button key="return" type="primary" icon={<RollbackOutlined />} onClick={() => {
-          Modal.confirm({
-            title: '确认归还资产？',
-            content: `确认将资产「${record.assetName}（${record.assetNo}）」归还？`,
-            okText: '确认归还',
-            cancelText: '返回',
-            onOk: () => onReturn(record.id, new Date().toISOString().slice(0, 10), '正常归还'),
-          })
-        }}>归还资产</Button>
+        <Button key="return" type="primary" icon={<RollbackOutlined />} onClick={() => onGoReturn(record.id)}>归还资产</Button>
       )
     }
     return btns.length > 0 ? <Space>{btns}</Space> : undefined
@@ -100,7 +94,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
             <Descriptions.Item label="资产分类">{record.assetType || '—'}</Descriptions.Item>
             <Descriptions.Item label="领用人">{record.empName}（{record.empNo}）</Descriptions.Item>
             <Descriptions.Item label="领用时部门">{record.department}</Descriptions.Item>
-            <Descriptions.Item label="业务领用日期">{record.claimDate}</Descriptions.Item>
+            <Descriptions.Item label="领用日期">{record.claimDate}</Descriptions.Item>
             <Descriptions.Item label="实际登记时间">{record.createdAt || '—'}</Descriptions.Item>
             <Descriptions.Item label="登记操作人">{record.operator}</Descriptions.Item>
             <Descriptions.Item label="领用状态"><ClaimStatusTag status={record.status} /></Descriptions.Item>
@@ -135,6 +129,38 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
           <Button disabled={!record || !!error || record.signatureStatus !== SIGNATURE_STATUS.SIGNED || !onViewEvidence} onClick={onViewEvidence}>查看签收凭证</Button>
           <Button disabled={!record || !!error || record.signatureStatus !== SIGNATURE_STATUS.SIGNED || !onDownloadEvidence} onClick={onDownloadEvidence}>下载凭证包</Button>
           {record && !error && onSign && canSignClaim(record) && <Button type="primary" onClick={onSign}>{record.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING ? '补签历史领用' : '前往本人签署'}</Button>}
+          {record && !error && onResendSignNotify && (
+            <Button icon={<NotificationOutlined />} onClick={() => {
+              const isSigned = record.signatureStatus === SIGNATURE_STATUS.SIGNED
+              Modal.confirm({
+                title: '重新推送签署通知？',
+                className: 'custom-confirm-modal',
+                icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+                content: (
+                  <div className="confirm-info-card">
+                    <div className="confirm-info-row"><span>领用编号：</span><b>{record.claimNo}</b></div>
+                    <div className="confirm-info-row"><span>领用人：</span><b>{record.empName}（{record.empNo}）</b></div>
+                    <div className="confirm-info-row"><span>资产：</span><b>{record.assetNo} / {record.assetName}</b></div>
+                    <div style={{ marginTop: 8, fontSize: 12, color: isSigned ? '#FA8C16' : '#8C8C8C' }}>
+                      {isSigned
+                        ? '当前已签署，重新推送后签收状态将回退为「待本人签署」，原签名凭证将被删除，需员工重新签字提交。'
+                        : '将向领用人重新发送钉钉签署通知，无论当前是否已签署。'}
+                    </div>
+                  </div>
+                ),
+                okText: '确认推送',
+                cancelText: '取消',
+                onOk: async () => {
+                  try {
+                    await onResendSignNotify(record.id)
+                    message.success('签署通知已重新推送')
+                  } catch {
+                    /* API 层已处理错误提示 */
+                  }
+                },
+              })
+            }}>重新推送签署通知</Button>
+          )}
         </Space>
       </div>
     </Spin>

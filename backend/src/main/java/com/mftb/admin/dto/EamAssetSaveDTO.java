@@ -28,6 +28,7 @@ public class EamAssetSaveDTO {
     private String location;
     private Long locationId;
     private String department;
+    private String adminDepartment;
     private String userName;
     private String status;
     private String holdType;
@@ -38,4 +39,6 @@ public class EamAssetSaveDTO {
     private String remark;
     /** 所属品牌：1=闪蜂(TB), 2=mFood(MF) */
     private Integer companyBrand;
+    /** 配件清单 [{name, qty}] */
+    private List<Map<String, Object>> accessories;
 }

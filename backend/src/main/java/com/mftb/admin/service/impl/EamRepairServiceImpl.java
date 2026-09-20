@@ -68,7 +68,7 @@ public class EamRepairServiceImpl implements EamRepairService {
         EamRepair repair = new EamRepair();
         BeanUtils.copyProperties(dto, repair);
         repair.setAssetNo(asset.getAssetNo());
-        repair.setAssetName(asset.getAssetName());
+        repair.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
         repair.setStatus("repairing");
         repair.setCreatedBy(operatorResolver.currentOperatorName());
         repair.setUpdatedBy(operatorResolver.currentOperatorName());

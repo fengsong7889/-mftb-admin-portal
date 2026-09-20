@@ -971,7 +971,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                         + "claim_id BIGINT NOT NULL COMMENT '关联领用 ID', "
                         + "evidence_type VARCHAR(20) NOT NULL DEFAULT 'signature' COMMENT '凭证类型', "
                         + "file_name VARCHAR(255) NULL COMMENT '原始文件名', "
-                        + "storage_path VARCHAR(500) NOT NULL COMMENT '存储路径或 Data URL', "
+                        + "storage_path MEDIUMTEXT NOT NULL COMMENT '存储路径或 Data URL', "
                         + "content_type VARCHAR(64) NULL COMMENT 'MIME 类型', "
                         + "file_size INT NULL COMMENT '文件大小', "
                         + "content_hash VARCHAR(64) NULL COMMENT '文件 SHA-256', "

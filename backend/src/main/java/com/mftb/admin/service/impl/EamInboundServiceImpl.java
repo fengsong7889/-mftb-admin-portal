@@ -221,7 +221,10 @@ public class EamInboundServiceImpl implements EamInboundService {
                 if (item.getLocationId() == null || item.getLocationId() <= 0) throw new BusinessException("請選擇存放位置");
                 EamLocation location = locations.computeIfAbsent(item.getLocationId(), locationMapper::selectById);
                 if (location == null) throw new BusinessException("存放位置不存在");
-                item.setLocationName(location.getName());
+                String addrParts = Arrays.stream(new String[]{location.getCity(), location.getDistrict(), location.getAddress()})
+                        .filter(s -> s != null && !s.isBlank())
+                        .collect(Collectors.joining());
+                item.setLocationName(addrParts.isEmpty() ? location.getName() : location.getName() + "\uFF08" + addrParts + "\uFF09");
                 EamModel model = models.computeIfAbsent(item.getModelId(), modelMapper::selectById);
                 if (model == null) throw new BusinessException("資產型號不存在");
                 receivedInBatch.merge(orderItem.getId(), item.getQty(), Integer::sum);
@@ -356,7 +359,12 @@ public class EamInboundServiceImpl implements EamInboundService {
                         asset.setImages(images);
                     }
                     asset.setSource("lease".equals(orderItem.getPurchaseType()) ? "lease" : "self");
-                    asset.setDepartment(
+                    // 从采购订单所属品牌映射购买公司
+                    Integer poBrand = order.getBrand();
+                    if (poBrand != null) {
+                        asset.setCompany(poBrand == 1 ? "珠海闪蜂科技有限公司" : "珠海麦峰科技有限公司");
+                    }
+                    asset.setAdminDepartment(
                             batch.getDepartmentName() != null && !batch.getDepartmentName().isBlank()
                                     ? batch.getDepartmentName()
                                     : Objects.toString(order.getDepartment(), ""));
@@ -367,6 +375,10 @@ public class EamInboundServiceImpl implements EamInboundService {
                     asset.setOrderId(poId);
                     asset.setRemark("採購訂單 " + order.getPoNo() + " 驗收入庫");
                     asset.setUpdatedBy(operator);
+                    // 配件清單從驗收明細複製到資產
+                    if (item.getAccessories() != null) {
+                        asset.setAccessories(JsonUtils.toJson(item.getAccessories()));
+                    }
                     // 即時入庫：保證同批次內後續 generateAssetNo 的 SELECT MAX 能讀到已生成編號（read-your-writes），避免重號
                     asset.setBatchId(batch.getId());
                     assetMapper.insert(asset);

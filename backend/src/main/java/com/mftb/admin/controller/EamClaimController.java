@@ -111,4 +111,12 @@ public class EamClaimController {
     public Result<PageResult<EamClaimVO>> myClaims(@ModelAttribute EamClaimQuery query) {
         return Result.success(claimService.myClaims(query));
     }
+
+    /** 重新推送签署通知（管理员手动触发，不限签署状态） */
+    @PostMapping("/{id}/resend-sign-notify")
+    @RequirePermission(menu = MENU, action = "edit")
+    public Result<Void> resendSignNotify(@PathVariable long id) {
+        claimService.resendSignNotification(id);
+        return Result.success();
+    }
 }

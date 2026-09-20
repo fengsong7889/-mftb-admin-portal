@@ -34,6 +34,7 @@ import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 import { fetchEmployeeOptions } from '../../../api/employee'
 import type { OptionItem } from '../../../api/types'
 import { exportToCSV } from '../../../utils/exportCSV'
+import BrandTag from '../../../components/BrandTag'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 
 /* ==================== 枚举映射 ==================== */
@@ -283,6 +284,7 @@ export default function AssetList() {
       { title: t('asset.colAssetType'),   dataIndex: 'assetType' },
       { title: t('asset.purchaseType'),   dataIndex: 'purchaseType' },
       { title: t('asset.colBrand'),       dataIndex: 'brand' },
+      { title: t('asset.colCompanyBrand'), dataIndex: 'companyBrand', render: (v: number | null | undefined) => (v === 1 ? '闪蜂' : v === 2 ? 'mFood' : '') },
       { title: t('asset.colCompany'),     dataIndex: 'company' },
       { title: t('asset.colLocation'),    dataIndex: 'location' },
       { title: t('asset.colCurrentUserName'), dataIndex: 'userName' },
@@ -290,7 +292,7 @@ export default function AssetList() {
       { title: t('asset.colClaimDate'), dataIndex: 'usageDate' },
       { title: t('asset.sourceLabel'),      dataIndex: 'source' },
       { title: t('asset.colPurchaseValue'), dataIndex: 'purchaseValue' },
-      { title: t('asset.colOrderDate'),  dataIndex: 'orderDate' },
+      { title: t('asset.colPurchaseDate'),  dataIndex: 'purchaseDate' },
       { title: t('asset.colUsageDate'),     dataIndex: 'usageDate' },
       { title: t('asset.colStatus'),      dataIndex: 'status' },
     ]
@@ -354,6 +356,7 @@ export default function AssetList() {
     { key: 'assetType', title: t('asset.colAssetType') },
     { key: 'purchaseType', title: t('asset.purchaseType') },
     { key: 'brand', title: t('asset.colBrand') },
+    { key: 'companyBrand', title: t('asset.colCompanyBrand') },
     { key: 'company', title: t('asset.colCompany') },
     { key: 'location', title: t('asset.colLocationName') },
     { key: 'holdType', title: t('asset.colHoldType') },
@@ -386,10 +389,20 @@ export default function AssetList() {
     {
       title: t('asset.colAssetName'),
       dataIndex: 'assetName', key: 'assetName', width: 180, ellipsis: true,
+      render: (v: string) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+        </Tooltip>
+      ),
     },
     {
       title: t('asset.colAssetType'),
       dataIndex: 'assetType', key: 'assetType', width: 100, ellipsis: true,
+      render: (v: string) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+        </Tooltip>
+      ),
     },
     {
       title: t('asset.purchaseType'),
@@ -402,11 +415,29 @@ export default function AssetList() {
     {
       title: t('asset.colBrand'),
       dataIndex: 'brand', key: 'brand', width: 100, ellipsis: true,
-      render: (v: string) => v || <span style={{ color: '#8C8C8C' }}>-</span>,
+      render: (v: string) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {v || <span style={{ color: '#8C8C8C' }}>-</span>}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: t('asset.colCompanyBrand'),
+      dataIndex: 'companyBrand', key: 'companyBrand', width: 110,
+      render: (v: number | null | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#8C8C8C' }}>-</span>,
     },
     {
       title: t('asset.colCompany'),
-      dataIndex: 'company', key: 'company', width: 100, ellipsis: true,
+      dataIndex: 'company', key: 'company', width: 120, ellipsis: true,
+      render: (v: string) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {v || '-'}
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: t('asset.colLocationName'),
@@ -423,18 +454,47 @@ export default function AssetList() {
       },
     },
     {
+      title: t('asset.colHoldType'),
+      dataIndex: 'holdType', key: 'holdType', width: 100,
+      render: (v: NonNullable<AssetItem['holdType']>, record: AssetItem) => {
+        // 闲置资产无使用人，持有方式不展示
+        if (record.status === 'idle') return '-'
+        return renderHoldType(v)
+      },
+    },
+    {
       title: t('asset.colCurrentUserName'),
       dataIndex: 'userName', key: 'userName', width: 120, ellipsis: true,
-      render: (v: string) => v || '-',
+      render: (v: string, record: AssetItem) => {
+        // 闲置资产无使用人
+        if (record.status === 'idle') return '-'
+        return (
+          <Tooltip title={v || undefined}>
+            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+          </Tooltip>
+        )
+      },
     },
     {
       title: t('asset.colDepartment'),
       dataIndex: 'department', key: 'department', width: 120, ellipsis: true,
+      render: (v: string, record: AssetItem) => {
+        // 闲置资产无部门归属展示
+        if (record.status === 'idle') return '-'
+        return (
+          <Tooltip title={v || undefined}>
+            <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+          </Tooltip>
+        )
+      },
     },
     {
       title: t('asset.colClaimDate'),
       dataIndex: 'usageDate', key: 'usageDate', width: 110,
-      render: (v: string | null) => v || '-',
+      render: (v: string | null, record: AssetItem) => {
+        if (record.status === 'idle') return '-'
+        return v || '-'
+      },
     },
     {
       title: t('asset.sourceLabel'),
@@ -451,8 +511,8 @@ export default function AssetList() {
       render: (v: number) => v ? `MOP ${v.toLocaleString()}` : '-',
     },
     {
-      title: t('asset.colOrderDate'),
-      dataIndex: 'orderDate', key: 'orderDate', width: 110,
+      title: t('asset.colPurchaseDate'),
+      dataIndex: 'purchaseDate', key: 'purchaseDate', width: 110,
       render: (v: string | null) => v || '-',
     },
     {
@@ -468,6 +528,11 @@ export default function AssetList() {
     {
       title: t('asset.colUpdatedBy'),
       dataIndex: 'applicant', key: 'updatedBy', width: 120, ellipsis: true,
+      render: (v: string) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+        </Tooltip>
+      ),
     },
     {
       title: t('asset.colUpdatedAt'),
@@ -476,6 +541,11 @@ export default function AssetList() {
     {
       title: t('asset.colRemark'),
       dataIndex: 'remark', key: 'remark', width: 140, ellipsis: true,
+      render: (v: string | null) => (
+        <Tooltip title={v || undefined}>
+          <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v || '-'}</span>
+        </Tooltip>
+      ),
     },
     {
       title: t('common.colAction'),
@@ -660,7 +730,7 @@ export default function AssetList() {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 2290 }}
+        scroll={{ x: 2490 }}
         rowSelection={{
           selectedRowKeys,
           onChange: setSelectedRowKeys,

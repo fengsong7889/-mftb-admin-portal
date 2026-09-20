@@ -300,6 +300,8 @@ public class EamClaimServiceImpl implements EamClaimService {
             asset.setUserName(employee.getName() != null ? employee.getName() : employee.getUsername());
             // 回写领用日期，供资产台账「領用日期」列展示（此前遗漏导致恒为空 — BUG-08）
             asset.setUsageDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
+            // 同步员工所在部门到资产台账（此前遗漏 — 领用后资产台账部门未更新）
+            asset.setDepartment(employee.getDepartment());
             assetMapper.updateById(asset);
         }
 
@@ -307,10 +309,8 @@ public class EamClaimServiceImpl implements EamClaimService {
         insertEvent(claim.getId(), "created", claim.getOperatorName(),
                 isProxy ? "管理員代辦領用" : "登記領用，等待簽署");
 
-        // 9. 标准模式：事务提交后向领用人发送钉钉工作通知（含签署链接）
-        if (!isProxy) {
-            sendSignatureNotifyAfterCommit(claim, employee, asset);
-        }
+        // 9. 标准/代办模式均向领用人发送钉钉工作通知（含签署链接）
+        sendSignatureNotifyAfterCommit(claim, employee, asset);
 
         return claim.getId();
     }
@@ -375,7 +375,8 @@ public class EamClaimServiceImpl implements EamClaimService {
      */
     private void doSign(EamClaim claim, String signatureImage, SysUser signer) {
         boolean supplementary = "claimed".equals(claim.getStatus()) && "proxy_pending".equals(claim.getSignatureStatus());
-        if (!"pending_signature".equals(claim.getStatus()) && !supplementary) throw new BusinessException("當前狀態不可簽署");
+        boolean reSign = "claimed".equals(claim.getStatus()) && "signed".equals(claim.getSignatureStatus());
+        if (!"pending_signature".equals(claim.getStatus()) && !supplementary && !reSign) throw new BusinessException("當前狀態不可簽署");
         EamAsset lockedAsset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>()
                 .eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
         if (lockedAsset == null) throw new BusinessException("資產不存在");
@@ -383,8 +384,12 @@ public class EamClaimServiceImpl implements EamClaimService {
             if (!Objects.equals(lockedAsset.getActiveClaimId(), claim.getId())
                     || !Objects.equals(lockedAsset.getCurrentHolderId(), claim.getEmployeeId())
                     || !"in_use".equals(lockedAsset.getStatus())) throw new BusinessException("領用關係已變更，不可補簽");
-        } else if (lockedAsset.getActiveClaimId() != null || !"idle".equals(lockedAsset.getStatus())) {
-            throw new BusinessException("資產已被其他業務佔用，請刷新後重試");
+        } else if (!reSign) {
+            if (lockedAsset.getActiveClaimId() != null && !Objects.equals(lockedAsset.getActiveClaimId(), claim.getId())) {
+                throw new BusinessException("資產已被其它員工領用，無法領用");
+            } else if (lockedAsset.getActiveClaimId() != null || !"idle".equals(lockedAsset.getStatus())) {
+                throw new BusinessException("資產已被其它業務佔用，請刷新後重試");
+            }
         }
         if (!hasText(signatureImage)) {
             throw new BusinessException("簽名圖片不能為空");
@@ -413,11 +418,11 @@ public class EamClaimServiceImpl implements EamClaimService {
                 claim.getClaimNo() + "|" + claim.getAssetId() + "|" + claim.getEmployeeId()
                         + "|" + claim.getClaimDate() + "|" + evidence.getId());
 
-        // 3. 更新领用记录
+        // 3. 更新领用记录（重新签署时更新签名凭证 ID 和内容摘要）
         String sigStatus = "signed";
         claimMapper.updateSignature(claim.getId(), evidence.getId(), sigStatus, contentHash, signerName);
 
-        // 4. 状态推进到 claimed
+        // 4. 状态推进到 claimed（重新签署时状态不变，仅更新签名相关字段）
         claim.setStatus("claimed");
         claim.setSignatureStatus(sigStatus);
         claim.setSignedAt(LocalDateTime.now());
@@ -426,25 +431,41 @@ public class EamClaimServiceImpl implements EamClaimService {
         claim.setUpdatedBy(signerName);
         claimMapper.updateById(claim);
 
-        // 5. 更新资产持有人
-        EamAsset asset = assetMapper.selectOne(
-                new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
-        if (asset != null) {
-            SysUser employee = userMapper.selectById(claim.getEmployeeId());
-            asset.setCurrentHolderId(claim.getEmployeeId());
-            asset.setActiveClaimId(claim.getId());
-            asset.setStatus("in_use");
-            asset.setUserName(employee != null && employee.getName() != null
-                    ? employee.getName() : (employee != null ? employee.getUsername() : ""));
-            // 回写领用日期，供资产台账「領用日期」列展示（BUG-08）
-            asset.setUsageDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
-            assetMapper.updateById(asset);
+        // 5. 更新资产持有人（重新签署时资产已在用，跳过状态变更）
+        if (!reSign) {
+            EamAsset asset = assetMapper.selectOne(
+                    new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
+            if (asset != null) {
+                SysUser employee = userMapper.selectById(claim.getEmployeeId());
+                asset.setCurrentHolderId(claim.getEmployeeId());
+                asset.setActiveClaimId(claim.getId());
+                asset.setStatus("in_use");
+                asset.setUserName(employee != null && employee.getName() != null
+                        ? employee.getName() : (employee != null ? employee.getUsername() : ""));
+                // 回写领用日期，供资产台账「領用日期」列展示（BUG-08）
+                asset.setUsageDate(claim.getClaimDate() != null ? claim.getClaimDate().toString() : null);
+                // 同步员工所在部门到资产台账（此前遗漏 — 签署后资产台账部门未更新）
+                if (employee != null) {
+                    asset.setDepartment(employee.getDepartment());
+                }
+                assetMapper.updateById(asset);
+            }
         }
 
         // 6. 写事件
-        String eventType = claim.getProxyMode() == 1 ? "proxy_signed" : "signed";
-        insertEvent(claim.getId(), eventType, signerName,
-                claim.getProxyMode() == 1 ? "代辦補簽完成" : "員工簽署完成");
+        String eventType;
+        String eventDesc;
+        if (reSign) {
+            eventType = "re_signed";
+            eventDesc = "員工重新簽署（覆蓋原簽名）";
+        } else if (claim.getProxyMode() == 1) {
+            eventType = "proxy_signed";
+            eventDesc = "代辦補簽完成";
+        } else {
+            eventType = "signed";
+            eventDesc = "員工簽署完成";
+        }
+        insertEvent(claim.getId(), eventType, signerName, eventDesc);
     }
 
     /* ==================== 取消 ==================== */
@@ -568,15 +589,18 @@ public class EamClaimServiceImpl implements EamClaimService {
             base = base.substring(0, base.length() - 1);
         }
         String signUrl = base + "/#/asset-claim-sign?token=" + token;
-        String assetDesc = (asset != null ? asset.getAssetNo() + " / " + asset.getAssetName() : String.valueOf(claim.getAssetId()));
-        String content = "您有一笔资产领用待签署确认\n"
-                + "領用單號：" + claim.getClaimNo() + "\n"
-                + "資產：" + assetDesc + "\n"
-                + "領用日期：" + claim.getClaimDate() + "\n"
-                + "登記人：" + claim.getOperatorName() + "\n"
-                + "请点击链接完成手写签名：" + signUrl;
+        String assetNo = asset != null ? asset.getAssetNo() : String.valueOf(claim.getAssetId());
+        String brand = asset != null && asset.getBrand() != null ? asset.getBrand() : "";
+        String assetName = asset != null ? EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()) : "";
+        String content = "资产领用待签署<br><br>"
+                + "领用单号：**" + claim.getClaimNo() + "**<br>"
+                + "资产编号：**" + assetNo + "**<br>"
+                + "资产品牌：**" + brand + "**<br>"
+                + "资产名称：**" + assetName + "**<br>"
+                + "领用日期：**" + claim.getClaimDate() + "**<br><br>"
+                + "请完成签收，签字链接：[点击签署](" + signUrl + ")";
         dingTalkAppService.sendWorkNotification(com.mftb.admin.service.NotificationAppService.CLAIM_SIGN, app.getId(),
-                List.of(employee.getDingtalkUserId()), "資產領用待簽署", content);
+                List.of(employee.getDingtalkUserId()), "资产领用待签署", content);
     }
 
     private String getConfigValue(String key) {
@@ -595,11 +619,18 @@ public class EamClaimServiceImpl implements EamClaimService {
         vo.setUpdatedAt(DateTimeUtils.format(claim.getUpdatedAt()));
         vo.setOperator(claim.getOperatorName());
 
+        // 经办人工号
+        if (claim.getOperatorId() != null) {
+            SysUser operatorUser = userMapper.selectById(claim.getOperatorId());
+            if (operatorUser != null) vo.setOperatorEmpNo(operatorUser.getEmpId());
+        }
+
         // 资产信息
         EamAsset asset = assetMapper.selectById(claim.getAssetId());
         if (asset != null) {
             vo.setAssetNo(asset.getAssetNo());
-            vo.setAssetName(asset.getAssetName());
+            // 资产名称去掉品牌前缀（品牌已单独展示）
+            vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
             vo.setAssetType(asset.getAssetType());
@@ -665,6 +696,63 @@ public class EamClaimServiceImpl implements EamClaimService {
         if (!hasText(value)) throw new BusinessException("日期不能為空");
         try { return LocalDate.parse(value); }
         catch (RuntimeException e) { throw new BusinessException("日期格式應為 yyyy-MM-dd"); }
+    }
+
+    /* ==================== 重新推送签署通知 ==================== */
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resendSignNotification(long claimId) {
+        EamClaim claim = claimMapper.selectForUpdate(claimId);
+        if (claim == null) throw new BusinessException("領用記錄不存在");
+        SysUser employee = userMapper.selectById(claim.getEmployeeId());
+        if (employee == null) throw new BusinessException("領用人不存在");
+
+        String operatorName = operatorResolver.currentOperatorName();
+        boolean wasSigned = "signed".equals(claim.getSignatureStatus());
+
+        // 已签署的记录：回退状态、删除旧凭证，等待员工重新签字
+        if (wasSigned) {
+            // 删除旧签名凭证
+            if (claim.getSignatureEvidenceId() != null) {
+                evidenceMapper.deleteById(claim.getSignatureEvidenceId());
+            }
+            // 回退领用状态（updateById 无法设置 null，必须用 UpdateWrapper 显式 set null）
+            claim.setStatus("pending_signature");
+            claim.setSignatureStatus("pending");
+            claim.setUpdatedBy(operatorName);
+            claimMapper.update(claim, new UpdateWrapper<EamClaim>()
+                    .eq("id", claim.getId())
+                    .set("signature_evidence_id", null)
+                    .set("signed_at", null)
+                    .set("content_hash", null));
+
+            // 资产回退为闲置（按 ID 查找，不依赖 activeClaimId 匹配）
+            EamAsset asset = assetMapper.selectOne(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .eq(EamAsset::getId, claim.getAssetId())
+                            .last("FOR UPDATE"));
+            if (asset != null) {
+                // 如果资产已被其它领用占用（activeClaimId 指向其它记录），不强制回退
+                if (asset.getActiveClaimId() != null && !Objects.equals(asset.getActiveClaimId(), claim.getId())) {
+                    log.warn("重新推送签署通知时，资产 {} 已被其它领用 {} 占用，跳过资产回退", asset.getId(), asset.getActiveClaimId());
+                } else {
+                    asset.setStatus("idle");
+                    asset.setUpdatedBy(operatorName);
+                    assetMapper.update(asset, new UpdateWrapper<EamAsset>().eq("id", asset.getId())
+                            .set("current_holder_id", null).set("active_claim_id", null)
+                            .set("user_name", null).set("department", null).set("usage_date", null));
+                }
+            }
+
+            insertEvent(claimId, "resend_sign_notify_reset", operatorName,
+                    "管理員重新推送簽署通知，已簽署狀態回退為待本人簽署，原簽名憑證已刪除");
+        } else {
+            insertEvent(claimId, "resend_sign_notify", operatorName, "管理員手動重新推送簽署通知");
+        }
+
+        EamAsset assetForNotify = assetMapper.selectById(claim.getAssetId());
+        doSendSignatureNotify(claim, employee, assetForNotify);
     }
 
     private String sha256(String input) {

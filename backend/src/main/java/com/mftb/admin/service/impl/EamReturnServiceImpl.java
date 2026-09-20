@@ -325,7 +325,7 @@ public class EamReturnServiceImpl implements EamReturnService {
         EamAsset asset = assetMapper.selectById(ret.getAssetId());
         if (asset != null) {
             vo.setAssetNo(asset.getAssetNo());
-            vo.setAssetName(asset.getAssetName());
+            vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
         }

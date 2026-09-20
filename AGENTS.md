@@ -192,6 +192,89 @@ cd backend && mvn test -B      # 单元测试
 | @ant-design/charts | ^2.6.7 | 图表组件库 |
 | @xyflow/react | ^12.11.1 | 流程图组件库（React Flow v12） |
 
+### 后端 SQL 规范 ⚠️ 强制标准
+
+> 本项目数据库为 **MySQL 8.x**，所有 SQL 脚本和 Java 内嵌 SQL 必须遵守以下约束。
+
+#### 1. MySQL 方言约束（禁止 PostgreSQL 语法）
+
+| 场景 | ✅ MySQL 正确写法 | ❌ 禁止写法（PostgreSQL 专有） |
+|------|------------------|-------------------------------|
+| 加列前检查存在 | 先查 `INFORMATION_SCHEMA.COLUMNS`，不存在再 `ADD COLUMN` | `ADD COLUMN IF NOT EXISTS ...` |
+| 加表前检查存在 | `CREATE TABLE IF NOT EXISTS ...`（MySQL 支持） | — |
+| 字符串拼接 | `CONCAT(a, b)` | `a \|\| b` |
+| 布尔值 | `1` / `0` | `TRUE` / `FALSE` 作为字面量（MySQL 虽兼容但语义为整数） |
+| UPSERT | `INSERT ... ON DUPLICATE KEY UPDATE ...` | `INSERT ... ON CONFLICT ... DO UPDATE`（PostgreSQL） |
+| JSON 字段 | `JSON_EXTRACT()` / `->>` 操作符 | `jsonb` 类型或 `@>` 操作符 |
+| 自增主键 | `BIGINT AUTO_INCREMENT` | `BIGSERIAL` / `IDENTITY` |
+| LIMIT 语法 | `SELECT ... LIMIT n` | `SELECT ... FETCH FIRST n ROWS ONLY` |
+
+**加列标准模板**（Java 迁移代码中必须遵循）：
+
+```java
+// ✅ 正确：先查 INFORMATION_SCHEMA，再决定是否加列
+Integer colExists = jdbcTemplate.queryForObject(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+    + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '表名' AND COLUMN_NAME = '列名'",
+    Integer.class
+);
+if (colExists != null && colExists == 0) {
+    jdbcTemplate.execute("ALTER TABLE 表名 ADD COLUMN 列名 VARCHAR(255) DEFAULT NULL COMMENT '说明'");
+}
+```
+
+```sql
+-- ✅ SQL 脚本中可直接 ALTER（脚本本身是一次性参考文档）
+ALTER TABLE 表名 ADD COLUMN 列名 VARCHAR(255) DEFAULT NULL COMMENT '说明';
+```
+
+#### 2. SQL 迁移文件管理
+
+| 规则 | 说明 |
+|------|------|
+| 存放位置 | `backend/sql/` 目录 |
+| 命名格式 | `{序号}_{简短描述}.sql`，如 `174_eam_asset_accessories.sql` |
+| 序号递增 | 查看现有最大序号，新文件 +1（避免冲突） |
+| 文件头注释 | 必须包含用途说明，如 `-- 174: 资产台账新增配件清单字段` |
+| 幂等性 | SQL 脚本为**一次性参考文档**，实际幂等保证由 Java 迁移代码负责 |
+| 禁止破坏性操作 | 生产环境禁止 `DROP TABLE` / `DROP COLUMN` / `TRUNCATE`，仅允许 `ADD` / `MODIFY` / `UPDATE` |
+
+#### 3. Java 迁移代码规范
+
+- **迁移入口**：`EamSchemaMigrationInitializer`（实现 `CommandLineRunner`，启动时自动执行）
+- **幂等保证**：通过 `SchemaVersionTracker.applyOnce(versionKey, callback)` 注册，每个 `versionKey` 只执行一次
+- **versionKey 命名**：`eam:schema-v{N}-{描述}`，如 `eam:schema-v16-asset-accessories`
+- **编号递增**：查看 `EamSchemaMigrationInitializer` 中已注册的最大 v 编号，新迁移 +1
+- **日志输出**：迁移开始和结束必须打印 `log.info()`，便于排查启动日志
+- **事务注意**：`applyOnce` 内部无事务包装，多步操作需自行保证幂等性
+
+```java
+// ✅ 正确：注册新迁移
+@Override
+public void run(String... args) {
+    // ... 已有迁移 ...
+    versionTracker.applyOnce("eam:schema-v{N}-描述", this::migrationMethod);
+}
+
+private void migrationMethod() {
+    log.info("开始执行 XXX 迁移 ...");
+    // 1. 检查列/表是否存在
+    // 2. 执行 DDL
+    // 3. 执行数据回填（如有）
+    log.info("XXX 迁移完成");
+}
+```
+
+#### 4. 常见踩坑记录
+
+| 问题 | 原因 | 正确做法 |
+|------|------|----------|
+| `ADD COLUMN IF NOT EXISTS` 报语法错误 | MySQL 不支持此语法（PostgreSQL 专有） | 先查 `INFORMATION_SCHEMA.COLUMNS` 再 `ADD COLUMN` |
+| `UPDATE ... JOIN ... LIMIT` 报错 | MySQL 多表 UPDATE 不支持 LIMIT | 用子查询替代，或分步执行 |
+| `ALTER TABLE` 后列未生效 | 连接池缓存旧 schema | 迁移后无需特殊处理，新连接自动生效 |
+| 迁移重复执行报错 | 未使用 `applyOnce` 保护 | 所有迁移必须注册 `versionKey` |
+| JSON 字段查询返回 null | 字段值为字符串 `"null"` 而非 JSON null | 查询时加 `IS NOT NULL AND != 'null'` 条件 |
+
 # 前端 UI/UX 设计规范（强制）
 
 版本：1.1

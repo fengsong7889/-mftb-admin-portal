@@ -66,6 +66,8 @@ export interface AssetItem {
   location: string
   /** 所在部门 */
   department: string
+  /** 管理部门（租购信息） */
+  adminDepartment?: string
   /** 使用人 */
   userName: string
   /** 只读持有人 ID（sys_user.id）；无人持有为 null，兼容旧响应缺省。 */
@@ -123,6 +125,8 @@ export interface AssetItem {
   createdAt: string
   /** 更新时间 */
   updatedAt: string
+  /** 配件清单 [{name, qty}] */
+  accessories?: { name: string; qty: number }[]
 }
 
 /** 资产操作动态 */
@@ -328,7 +332,7 @@ function normalizeAsset(asset: AssetItem): AssetItem {
   return {
     ...asset,
     brand: asset.brand || '', unit: asset.unit || '', company: asset.company || '',
-    department: asset.department || '', userName: asset.userName || '', location: asset.location || '',
+    department: asset.department || '', adminDepartment: asset.adminDepartment || '', userName: asset.userName || '', location: asset.location || '',
     purchaseDate: asset.purchaseDate || null, usageDate: asset.usageDate || null,
     scrapTime: asset.scrapTime || null, params: normalizeAssetParams(asset.params),
     applicant: asset.updatedBy || asset.applicant || '',
@@ -339,8 +343,8 @@ function normalizeAsset(asset: AssetItem): AssetItem {
 export type AssetSaveData = Partial<Pick<AssetItem,
   'assetNo' | 'assetName' | 'assetType' | 'categoryId' | 'categoryCode' | 'brand' | 'brandId' |
   'modelId' | 'params' | 'images' | 'unit' | 'quantity' | 'purchaseValue' | 'purchaseDate' |
-  'usageDate' | 'source' | 'company' | 'location' | 'locationId' | 'department' | 'userName' |
-  'status' | 'holdType' | 'scrapTime' | 'leaseCompany' | 'rentalCost' | 'rentalPeriod' | 'remark' | 'companyBrand'>>
+  'usageDate' | 'source' | 'company' | 'location' | 'locationId' | 'department' | 'adminDepartment' | 'userName' |
+  'status' | 'holdType' | 'scrapTime' | 'leaseCompany' | 'rentalCost' | 'rentalPeriod' | 'remark' | 'companyBrand' | 'accessories'>>
 
 /** 支持历史逗号拼接与 JSON 数组；保留 Data URL 自带的 base64 逗号。 */
 export function parseAssetImages(images?: string | null): string[] {

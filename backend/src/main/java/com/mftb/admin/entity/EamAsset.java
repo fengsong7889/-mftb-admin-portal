@@ -80,6 +80,9 @@ public class EamAsset {
     /** 归属部门 */
     private String department;
 
+    /** 管理部门 */
+    private String adminDepartment;
+
     /** 使用人 */
     private String userName;
 
@@ -107,6 +110,9 @@ public class EamAsset {
     /** 所有台账实体更新均在数据库端递增，避免其他业务写入绕过调拨版本校验。 */
     @TableField(update = "%s+1", updateStrategy = FieldStrategy.ALWAYS)
     private Long holdVersion;
+
+    /** 配件清单 JSON 数组 [{name,qty}] */
+    private String accessories;
 
     /** 备注 */
     private String remark;

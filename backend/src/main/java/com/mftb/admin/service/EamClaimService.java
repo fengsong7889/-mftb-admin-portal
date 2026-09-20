@@ -49,4 +49,7 @@ public interface EamClaimService {
 
     /** 钉钉签署页：凭令牌提交签名（免登录） */
     void signByToken(EamSignPageDTO dto);
+
+    /** 重新推送签署通知（管理员手动触发，不限签署状态） */
+    void resendSignNotification(long claimId);
 }

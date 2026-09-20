@@ -4,7 +4,7 @@
  * 五大模块卡片布局：
  *  1. 资产信息 — 资产编码/资产分类/资产品牌/资产名称/资产照片/资产参数信息
  *  2. 租/购信息 — 采购形式(自购/租用)/价值/日期/存放仓库
- *  3. 当前使用人 — 使用人/所在部门/领用日期
+ *  3. 当前使用人 — 仅编辑模式展示（字段只读），新增模式隐藏；提示前往领用资产菜单操作
  *  4. 备注信息
  *  5. 入库信息 — 批次号/入库时间/入库数量/验收人（验收入库跳转时自动带入）
  *
@@ -16,16 +16,17 @@
  *  - ?id= 编辑模式
  *  - ?inboundBatchNo=&inboundDate=&inboundQty=&inspector= 从验收入库带入
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Button, Form, Input, InputNumber, Select, DatePicker, Row, Col,
-  Upload, message, Spin, Tag, TreeSelect,
+  Upload, message, Spin, Tag, TreeSelect, Modal, Checkbox, AutoComplete, Alert,
 } from 'antd'
 import type { UploadFile } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined,
   PictureOutlined, FileImageOutlined,
+  PlusOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -35,11 +36,13 @@ import {
 } from '../../../api/asset'
 import {
   fetchCategoryList, fetchBrandList, fetchModelList, fetchLocationList,
-  fetchAllParamTypes, fetchParamValuesByType,
+  fetchAllParamTypes, fetchParamValuesByType, fetchCategoryAccessories,
   type AssetCategory, type AssetBrand, type AssetModel, type AssetLocation,
-  type ParamType,
+  type ParamType, type CategoryAccessory,
 } from '../../../api/eam'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import { fetchEmployeeOptions, fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import type { OptionItem } from '../../../api/types'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
 import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import { assetParameterFields } from '../../../utils/assetParams'
@@ -47,7 +50,7 @@ import '../../../components/AssetParameters.css'
 
 const { TextArea } = Input
 
-const COMPANY_OPTIONS = ['澳觅科技', '闪蜂', 'mFood']
+const COMPANY_OPTIONS = ['珠海闪蜂科技有限公司', '珠海麦峰科技有限公司']
 
 type AssetFormValues = Omit<AssetSaveData, 'purchaseDate' | 'usageDate' | 'rentalPeriod'> & {
   purchaseDate?: Dayjs
@@ -133,6 +136,35 @@ export default function AssetAdd() {
   const [paramTypes, setParamTypes] = useState<ParamType[]>([])
   const [paramValuesForSelect, setParamValuesForSelect] = useState<Record<string, string[]>>({})
 
+  /* ----- 配件清单状态 ----- */
+  const [accessories, setAccessories] = useState<{ name: string; qty: number }[]>([])
+  const [categoryAccessories, setCategoryAccessories] = useState<CategoryAccessory[]>([])
+  const [accessorySelectOpen, setAccessorySelectOpen] = useState(false)
+  const [selectedAccessoryNames, setSelectedAccessoryNames] = useState<Set<string>>(new Set())
+
+  /* ----- 员工搜索（当前使用人） ----- */
+  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
+  const employeeDataRef = useRef<Map<string, { name: string; department: string }>>(new Map())
+
+  const handleEmployeeSearch = useCallback(async (keyword: string) => {
+    const opts = await fetchEmployeeOptions(keyword)
+    setEmployeeOptions(opts)
+    // 缓存原始员工数据用于选择后自动填充部门
+    if (keyword) {
+      const res = await fetchEmployees({ page: 1, size: 50, keyword, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
+      ;(res.records || []).forEach((e: EmployeeItem) => {
+        employeeDataRef.current.set(e.empId, { name: e.name, department: e.department || '' })
+      })
+    }
+  }, [])
+
+  const handleUserSelect = useCallback((empId: string) => {
+    const emp = employeeDataRef.current.get(empId)
+    if (emp) {
+      form.setFieldsValue({ userName: emp.name, department: emp.department || undefined })
+    }
+  }, [form])
+
   /* ----- 图片 ----- */
   const [imageFiles, setImageFiles] = useState<UploadFile[]>([])
 
@@ -145,7 +177,7 @@ export default function AssetAdd() {
   const locationTreeData = useMemo(() => {
     const nodeMap = new Map<number, { title: string; value: number; children?: { title: string; value: number }[] }>()
     locations.forEach(loc => {
-      nodeMap.set(loc.id, { title: `${loc.name}（${loc.code}）`, value: loc.id, children: [] })
+      nodeMap.set(loc.id, { title: `${loc.name}（${[loc.city, loc.district, loc.address].filter(Boolean).join('')}）`, value: loc.id, children: [] })
     })
     const roots: { title: string; value: number; children?: { title: string; value: number }[] }[] = []
     locations.forEach(loc => {
@@ -206,6 +238,7 @@ export default function AssetAdd() {
           source: data.source,
           company: data.company,
           department: data.department,
+          adminDepartment: data.adminDepartment || undefined,
           userName: data.userName,
           remark: data.remark || undefined,
           // 租用专属字段（如有）
@@ -226,6 +259,10 @@ export default function AssetAdd() {
             uid: String(i), name: `image-${i}`, url,
           })))
         }
+        // 回填配件清单
+        if (data.accessories && data.accessories.length > 0) {
+          setAccessories(data.accessories)
+        }
       })
       .catch((err: Error) => message.error(err.message))
       .finally(() => setLoading(false))
@@ -244,13 +281,14 @@ export default function AssetAdd() {
     }
   }, [searchParams, isEdit, form])
 
-  /* ----- 分类变更 → 加载资产品牌 ----- */
+  /* ----- 分类变更 → 加载资产品牌 + 配件配置 ----- */
   const handleCategoryChange = useCallback((code: string) => {
     setSelectedCategoryCode(code)
     setSelectedModelId(undefined)
     setSelectedBrandId(undefined)
     setParamValues({})
     setParamValuesForSelect({})
+    setCategoryAccessories([])
     form.setFieldsValue({ brand: undefined, assetName: undefined })
     if (!code) { setBrands([]); setModels([]); return }
     // 资产品牌前缀匹配：选择一级分类时加载其下所有子分类的资产品牌
@@ -258,6 +296,10 @@ export default function AssetAdd() {
       .then((list) => setBrands(list.filter((b) => b.categoryCode.startsWith(code))))
       .catch(() => setBrands([]))
     setModels([])
+    // 加载分类配件配置
+    fetchCategoryAccessories(code, true)
+      .then((list) => setCategoryAccessories(list))
+      .catch(() => setCategoryAccessories([]))
   }, [form])
 
   /* ----- 资产品牌变更 → 加载型号 ----- */
@@ -345,8 +387,8 @@ export default function AssetAdd() {
     try {
       const v = await form.validateFields()
 
-      // 校验资产编码
-      if (!v.assetNo?.trim()) { message.error(t('asset.assetCodeRequired')); return }
+      // 校验资产编码（编辑模式必填，新增模式由后端自动生成）
+      if (isEdit && !v.assetNo?.trim()) { message.error(t('asset.assetCodeRequired')); return }
 
       // 拼接位置信息
       const loc = locations.find((l) => l.id === selectedLocationId)
@@ -355,7 +397,7 @@ export default function AssetAdd() {
       setSubmitting(true)
       const category = categories.find((c) => c.code === selectedCategoryCode)
       const payload: AssetSaveData = {
-        assetNo: v.assetNo.trim(),
+        assetNo: isEdit ? (v.assetNo?.trim() ?? '') : '',
         assetName: v.assetName || '',
         assetType: category?.name || editingAsset?.assetType || v.assetType || '',
         categoryCode: selectedCategoryCode || undefined,
@@ -365,6 +407,7 @@ export default function AssetAdd() {
         unit: models.find((m) => m.id === selectedModelId)?.unit || editingAsset?.unit || '',
         quantity: 1,
         brand: v.brand || '',
+        companyBrand: v.companyBrand ?? null,
         purchaseValue: v.purchaseValue || 0,
         purchaseDate: v.purchaseDate ? v.purchaseDate.format('YYYY-MM-DD') : '',
         usageDate: v.usageDate ? v.usageDate.format('YYYY-MM-DD') : '',
@@ -379,11 +422,13 @@ export default function AssetAdd() {
         locationId: selectedLocationId,
         location: locationParts || editingAsset?.location || '',
         department: v.department || '',
+        adminDepartment: v.adminDepartment || '',
         userName: v.userName || '',
         status: editingAsset?.status || 'idle',
         images: JSON.stringify(imageFiles.filter((f) => f.url).map((f) => f.url)),
         remark: v.remark || '',
         params: paramValues,
+        accessories: accessories.length > 0 ? accessories : undefined,
       }
       if (isEdit && editingId) {
         await updateAsset(editingId, payload)
@@ -521,8 +566,15 @@ export default function AssetAdd() {
 
             <Row gutter={16}>
               <Col xs={24} sm={12} md={8}>
-                <Form.Item label={t('asset.assetNoLabel')} name="assetNo" rules={[{ required: true, message: t('asset.assetCodeRequired') }]}>
-                  <Input placeholder={t('asset.assetNoPh')} allowClear disabled={!!editingAsset?.batchId} style={{ fontFamily: 'monospace' }} />
+                <Form.Item
+                  label={t('asset.assetNoLabel')}
+                  name="assetNo"
+                  rules={isEdit ? [{ required: true, message: t('asset.assetCodeRequired') }] : []}
+                >
+                  {isEdit
+                    ? <Input placeholder={t('asset.assetNoPh')} allowClear disabled style={{ fontFamily: 'monospace' }} />
+                    : <Input placeholder={t('asset.assetNoAutoGen')} disabled style={{ fontFamily: 'monospace', color: '#8C8C8C' }} />
+                  }
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={8}>
@@ -590,6 +642,107 @@ export default function AssetAdd() {
               {renderImageUpload()}
               <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>{t('asset.photoUploadHint')}</div>
             </div>
+
+            {/* 配件清单 */}
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>
+                <AppstoreOutlined style={{ marginRight: 4 }} />
+                {t('asset.accessoryListTitleAdd')}
+              </div>
+              {accessories.length > 0 ? (
+                <>
+                  {/* 表头 */}
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr 140px 100px',
+                    gap: 12, padding: '8px 12px', background: '#fafafa',
+                    borderRadius: '6px 6px 0 0', border: '1px solid #f0f0f0', borderBottom: 'none',
+                    fontSize: 13, fontWeight: 600, color: '#262626',
+                  }}>
+                    <span>{t('asset.accessoryNameCol')}</span>
+                    <span>{t('asset.accessoryQtyCol')}</span>
+                    <span style={{ textAlign: 'center' }}>{t('common:action')}</span>
+                  </div>
+                  {/* 数据行 */}
+                  {accessories.map((acc, idx) => (
+                    <div key={idx} style={{
+                      display: 'grid', gridTemplateColumns: '1fr 140px 100px',
+                      gap: 12, padding: '8px 12px',
+                      border: '1px solid #f0f0f0', borderTop: 'none',
+                      alignItems: 'center',
+                    }}>
+                      <AutoComplete
+                        value={acc.name}
+                        options={categoryAccessories.map((a) => ({ value: a.name }))}
+                        placeholder={t('asset.accessoryPh')}
+                        style={{ width: '100%' }}
+                        filterOption={(input, option) => String(option?.value ?? '').includes(input)}
+                        onChange={(v: string) => setAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, name: v } : a)))}
+                      />
+                      <InputNumber
+                        min={1} precision={0} value={acc.qty}
+                        style={{ width: '100%' }}
+                        addonAfter={t('asset.unitPiece')}
+                        onChange={(v) => setAccessories((prev) => prev.map((a, i) => (i === idx ? { ...a, qty: v || 1 } : a)))}
+                      />
+                      <div style={{ textAlign: 'center' }}>
+                        <Button type="link" size="small" danger
+                          onClick={() => setAccessories((prev) => prev.filter((_, i) => i !== idx))}>
+                          {t('common:delete')}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* 底部操作行 */}
+                  <div style={{
+                    display: 'flex', gap: 16, padding: '10px 12px',
+                    border: '1px solid #f0f0f0', borderTop: 'none',
+                    borderRadius: '0 0 6px 6px',
+                  }}>
+                    <Button type="link" size="small" icon={<PlusOutlined />}
+                      style={{ color: '#E8720C', padding: 0 }}
+                      onClick={() => setAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
+                      {t('asset.accessoryManual')}
+                    </Button>
+                    {categoryAccessories.length > 0 && (
+                      <Button type="link" size="small" icon={<AppstoreOutlined />}
+                        style={{ color: '#E8720C', padding: 0 }}
+                        onClick={() => {
+                          const existing = new Set(accessories.map((a) => a.name))
+                          setSelectedAccessoryNames(existing)
+                          setAccessorySelectOpen(true)
+                        }}>
+                        {t('asset.accessoryQuickSelect', { count: categoryAccessories.length })}
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  padding: '20px', textAlign: 'center',
+                  background: '#fafafa', borderRadius: 8,
+                  border: '1px dashed #d9d9d9',
+                }}>
+                  <div style={{ marginBottom: 12 }}>
+                    <Button type="link" size="small" icon={<PlusOutlined />}
+                      style={{ color: '#E8720C' }}
+                      onClick={() => setAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
+                      {t('asset.accessoryManual')}
+                    </Button>
+                    {categoryAccessories.length > 0 && (
+                      <Button type="link" size="small" icon={<AppstoreOutlined />}
+                        style={{ color: '#E8720C', marginLeft: 16 }}
+                        onClick={() => {
+                          setSelectedAccessoryNames(new Set())
+                          setAccessorySelectOpen(true)
+                        }}>
+                        {t('asset.accessoryQuickSelect', { count: categoryAccessories.length })}
+                      </Button>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoryTipAdd')}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ====== 模块2：租/购信息 ====== */}
@@ -613,7 +766,7 @@ export default function AssetAdd() {
               {source === 'self' && (
                 <>
                   <Col xs={24} sm={12} md={8}>
-                    <Form.Item label={t('asset.purchaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.companyRequired') }]} initialValue="澳觅科技">
+                    <Form.Item label={t('asset.purchaseCompanyLabel')} name="company" rules={[{ required: true, message: t('asset.companyRequired') }]}>
                       <Select placeholder={t('asset.selectCompanyPh')}>
                         {COMPANY_OPTIONS.map((o) => <Select.Option key={o} value={o}>{o}</Select.Option>)}
                       </Select>
@@ -626,7 +779,7 @@ export default function AssetAdd() {
                   </Col>
                 </>
               )}
-              {/* 租用 → 租用公司 + 租借公司 */}
+              {/* 租用 → 承租公司 + 出租公司 */}
               {source === 'lease' && (
                 <>
                   <Col xs={24} sm={12} md={8}>
@@ -646,13 +799,41 @@ export default function AssetAdd() {
             </Row>
 
             <Row gutter={16}>
-              {/* 自购 → 购买日期 */}
+              {/* 自购 → 购买日期 + 存放仓库 + 管理部门 */}
               {source === 'self' && (
-                <Col xs={24} sm={12} md={8}>
-                  <Form.Item label={t('asset.purchaseDateLabel')} name="purchaseDate">
-                    <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
-                  </Form.Item>
-                </Col>
+                <>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item label={t('asset.purchaseDateLabel')} name="purchaseDate">
+                      <DatePicker style={{ width: '100%' }} placeholder={t('asset.purchaseDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item label={t('asset.warehouseLocationLabel')}>
+                      <TreeSelect
+                        placeholder={t('asset.selectWarehousePh')}
+                        allowClear
+                        showSearch
+                        treeNodeFilterProp="title"
+                        treeData={locationTreeData}
+                        treeDefaultExpandAll
+                        value={selectedLocationId}
+                        onChange={handleLocationChange}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item label={t('asset.adminDeptLabel')} name="adminDepartment">
+                      <TreeSelect
+                        placeholder={t('asset.selectDeptPh')}
+                        allowClear
+                        showSearch
+                        treeDefaultExpandAll
+                        treeNodeFilterProp="title"
+                        treeData={deptTree}
+                      />
+                    </Form.Item>
+                  </Col>
+                </>
               )}
               {/* 租用 → 租金 + 租用周期 */}
               {source === 'lease' && (
@@ -667,16 +848,27 @@ export default function AssetAdd() {
                       <DatePicker.RangePicker style={{ width: '100%' }} placeholder={[t('asset.startDatePh'), t('asset.endDatePh')]} />
                     </Form.Item>
                   </Col>
+                  <Col xs={24} sm={12} md={8}>
+                    <Form.Item label={t('asset.adminDeptLabel')} name="adminDepartment">
+                      <TreeSelect
+                        placeholder={t('asset.selectDeptPh')}
+                        allowClear
+                        showSearch
+                        treeDefaultExpandAll
+                        treeNodeFilterProp="title"
+                        treeData={deptTree}
+                      />
+                    </Form.Item>
+                  </Col>
                 </>
               )}
             </Row>
 
-            {/* 存放仓库 */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.storageLocationSection')}</div>
+            {/* 租用 → 存放仓库 */}
+            {source === 'lease' && (
               <Row gutter={16}>
                 <Col xs={24} sm={12} md={8}>
-                  <Form.Item label={t('asset.warehouseLocationLabel')} style={{ marginBottom: 0 }}>
+                  <Form.Item label={t('asset.warehouseLocationLabel')}>
                     <TreeSelect
                       placeholder={t('asset.selectWarehousePh')}
                       allowClear
@@ -690,42 +882,67 @@ export default function AssetAdd() {
                   </Form.Item>
                 </Col>
               </Row>
-            </div>
-          </div>
-
-          {/* ====== 模块3：当前使用人 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-            {renderCardTitle(
-              <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
-              '#E6FFFB',
-              t('asset.currentUserTitle'),
             )}
-
-            <Row gutter={16}>
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item label={t('asset.currentUserLabel')} name="userName">
-                  <Input placeholder={t('asset.currentUserPh')} allowClear />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item label={t('asset.departmentLabel')} name="department">
-                  <TreeSelect
-                    placeholder={t('asset.selectDeptPh')}
-                    allowClear
-                    showSearch
-                    treeDefaultExpandAll
-                    treeNodeFilterProp="title"
-                    treeData={deptTree}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item label={t('asset.usageDateLabel')} name="usageDate">
-                  <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
-                </Form.Item>
-              </Col>
-            </Row>
           </div>
+
+          {/* ====== 模块3：当前使用人（仅编辑模式展示，字段只读；新增模式隐藏） ====== */}
+          {isEdit && (
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              {renderCardTitle(
+                <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
+                '#E6FFFB',
+                t('asset.currentUserTitle'),
+              )}
+
+              <Alert
+                type="info"
+                showIcon
+                message={t('asset.currentUserEditHint')}
+                action={
+                  <Button size="small" type="primary" onClick={() => navigate('/asset-claim/add')}>
+                    {t('asset.goClaimAsset')}
+                  </Button>
+                }
+                style={{ marginBottom: 16 }}
+              />
+
+              <Row gutter={16}>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item label={t('asset.currentUserLabel')} name="userName">
+                    <Select
+                      placeholder={t('asset.currentUserPh')}
+                      allowClear
+                      showSearch
+                      filterOption={false}
+                      onSearch={handleEmployeeSearch}
+                      onChange={handleUserSelect}
+                      options={employeeOptions}
+                      notFoundContent={null}
+                      disabled
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item label={t('asset.departmentLabel')} name="department">
+                    <TreeSelect
+                      placeholder={t('asset.selectDeptPh')}
+                      allowClear
+                      showSearch
+                      treeDefaultExpandAll
+                      treeNodeFilterProp="title"
+                      treeData={deptTree}
+                      disabled
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item label={t('asset.usageDateLabel')} name="usageDate">
+                    <DatePicker style={{ width: '100%' }} placeholder={t('asset.usageDatePh')} disabledDate={(d) => d.isAfter(dayjs(), 'day')} disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </div>
+          )}
 
           {/* ====== 模块4：备注信息 ====== */}
           <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
@@ -788,6 +1005,68 @@ export default function AssetAdd() {
           {t('common.save')}
         </Button>
       </div>
+
+      {/* ====== 配件选择弹窗（快速选择配件） ====== */}
+      <Modal
+        title={t('asset.accessorySelectTitle')}
+        open={accessorySelectOpen}
+        onOk={() => {
+          const existing = new Set(accessories.map((a) => a.name))
+          const additions = categoryAccessories
+            .filter((a) => selectedAccessoryNames.has(a.name) && !existing.has(a.name))
+            .map((a) => ({ name: a.name, qty: a.defaultQty || 1 }))
+          setAccessories((prev) => [...prev, ...additions])
+          setAccessorySelectOpen(false)
+        }}
+        onCancel={() => setAccessorySelectOpen(false)}
+        okText={t('asset.accessorySelectOk')}
+        cancelText={t('common.cancel')}
+        width={480}
+        destroyOnClose
+      >
+        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+          {t('asset.accessorySelectTip')}
+        </div>
+        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+          {categoryAccessories.length === 0 ? (
+            <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
+          ) : (
+            categoryAccessories.map((acc) => {
+              const checked = selectedAccessoryNames.has(acc.name)
+              const alreadyAdded = accessories.some((a) => a.name === acc.name)
+              return (
+                <div key={acc.name} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 4px', borderBottom: '1px solid #f5f5f5',
+                }}>
+                  <Checkbox
+                    checked={checked}
+                    onChange={(e) => {
+                      setSelectedAccessoryNames((prev) => {
+                        const next = new Set(prev)
+                        if (e.target.checked) next.add(acc.name)
+                        else next.delete(acc.name)
+                        return next
+                      })
+                    }}
+                  >
+                    <span style={{ fontSize: 13, color: '#262626' }}>{acc.name}</span>
+                    {alreadyAdded && (
+                      <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>{t('asset.tagAdded')}</Tag>
+                    )}
+                  </Checkbox>
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
+                </div>
+              )
+            })
+          )}
+        </div>
+        {selectedAccessoryNames.size > 0 && (
+          <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', textAlign: 'right' }}>
+            {t('asset.selectedCount', { count: selectedAccessoryNames.size })}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

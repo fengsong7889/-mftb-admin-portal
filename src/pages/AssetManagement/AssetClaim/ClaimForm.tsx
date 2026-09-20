@@ -11,7 +11,7 @@
  */
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
-  Button, Form, Input, Select, DatePicker, Spin, Modal, Pagination, Radio, TreeSelect,
+  Button, Form, Input, Select, DatePicker, Spin, Modal, Radio, TreeSelect,
   Alert, Row, Col,
 } from 'antd'
 import {
@@ -72,7 +72,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
   const mounted = useRef(true)
   const [selected, setSelected] = useState(initialAsset)
   const [employee, setEmployee] = useState(initialEmployee)
-  const [assetQuery, setAssetQuery] = useState<ClaimQuery>({ page: 1, size: 10 })
+  const [assetQuery, setAssetQuery] = useState<ClaimQuery>({ page: 1, size: 200 })
   const [employeeQuery, setEmployeeQuery] = useState<ClaimQuery>({ page: 1, size: 10 })
   const mode = Form.useWatch('mode', form) ?? 'standard'
   const deptTree = useMemo(() => buildDeptTree(departments), [departments])
@@ -205,8 +205,6 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                     }))}
                   />
                 </Form.Item>
-                <Pagination className="claim-selection-pagination" size="small" current={assetQuery.page} pageSize={assetQuery.size} total={assets?.total ?? 0} showSizeChanger={false} hideOnSinglePage
-                  onChange={(page) => setAssetQuery({ ...assetQuery, page })} />
               </Col>
             </Row>
 

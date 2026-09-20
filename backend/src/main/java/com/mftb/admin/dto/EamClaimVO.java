@@ -30,6 +30,7 @@ public class EamClaimVO {
     private String claimReason;
     private String remark;
     private String operator;
+    private String operatorEmpNo;
     private String status;
     private String signatureStatus;
     private Integer proxyMode;

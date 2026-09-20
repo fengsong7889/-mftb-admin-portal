@@ -53,6 +53,12 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v11-inventory-tables", this::createInventoryTables);
         versionTracker.applyOnce("eam:schema-v12-inbound-allocation", this::addInboundAllocationColumns);
         versionTracker.applyOnce("eam:schema-v13-inbound-department", this::addInboundBatchDepartmentColumns);
+        versionTracker.applyOnce("eam:schema-v14-asset-admin-dept", this::addAssetAdminDepartmentColumn);
+        versionTracker.applyOnce("eam:schema-v15-asset-location-address", this::fixAssetLocationFullAddress);
+        versionTracker.applyOnce("eam:schema-v16-asset-accessories", this::addAssetAccessoriesColumn);
+        versionTracker.applyOnce("eam:schema-v17-clear-orphan-asset-user", this::clearOrphanAssetUserData);
+        versionTracker.applyOnce("eam:schema-v18-evidence-storage-path", this::fixEvidenceStoragePath);
+        versionTracker.applyOnce("eam:schema-v19-evidence-storage-mediumtext", this::upgradeEvidenceStorageToMediumText);
     }
 
     private void upgradeTransferIntegrity() {
@@ -756,5 +762,100 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         alterSafe("biz_eam_inbound_batch", "ADD COLUMN department_id BIGINT NULL COMMENT '管理部門ID' AFTER operator");
         alterSafe("biz_eam_inbound_batch", "ADD COLUMN department_name VARCHAR(128) NULL COMMENT '管理部門名稱' AFTER department_id");
         log.info("验收入库批次管理部门列添加完成");
+    }
+
+    /** v14: 资产台账新增管理部门字段 + 历史数据修复 */
+    private void addAssetAdminDepartmentColumn() {
+        log.info("开始为资产台账添加 admin_department 列 ...");
+        alterSafe("biz_eam_asset", "ADD COLUMN admin_department VARCHAR(100) DEFAULT NULL COMMENT '管理部门' AFTER department");
+        // 修复历史数据：验收入库同步的 department 实为管理部门，迁移到 admin_department
+        int rows = jdbcTemplate.update(
+                "UPDATE biz_eam_asset SET admin_department = department, department = NULL "
+                + "WHERE batch_id IS NOT NULL AND department IS NOT NULL AND department != ''");
+        log.info("资产台账 admin_department 列添加完成，历史数据修复 {} 条", rows);
+        // 修复历史数据：从采购订单所属品牌映射购买公司（brand: 1=闪蜂, 2=mFood）
+        int companyRows = jdbcTemplate.update(
+                "UPDATE biz_eam_asset a INNER JOIN biz_eam_purchase_order o ON a.order_id = o.id AND o.deleted = 0 "
+                + "SET a.company = CASE o.brand WHEN 1 THEN '珠海闪蜂科技有限公司' WHEN 2 THEN '珠海麦峰科技有限公司' ELSE a.company END "
+                + "WHERE a.batch_id IS NOT NULL AND (a.company IS NULL OR a.company = '') AND o.brand IS NOT NULL");
+        log.info("资产台账 company 字段从采购订单品牌映射修复 {} 条", companyRows);
+    }
+
+    /** v15: 修复已有资产的 location 字段，补充完整地址（城市+区县+详细地址） */
+    private void fixAssetLocationFullAddress() {
+        log.info("开始修复资产台账 location 字段完整地址 ...");
+        int rows = jdbcTemplate.update(
+                "UPDATE biz_eam_asset a "
+                + "INNER JOIN biz_eam_location loc ON a.location_id = loc.id "
+                + "SET a.location = CONCAT(loc.name, '（', CONCAT_WS('', IFNULL(loc.city,''), IFNULL(loc.district,''), IFNULL(loc.address,'')), '）') "
+                + "WHERE a.location_id IS NOT NULL AND a.deleted = 0 "
+                + "AND (loc.city IS NOT NULL OR loc.district IS NOT NULL OR loc.address IS NOT NULL) "
+                + "AND a.location NOT LIKE '%（%）'");
+        log.info("资产台账 location 完整地址修复 {} 条", rows);
+    }
+
+    /** v16: 资产台账新增配件清单列 + 从入库批次明细回填已有数据 */
+    private void addAssetAccessoriesColumn() {
+        log.info("开始为资产台账添加 accessories 列 ...");
+        // MySQL 不支持 IF NOT EXISTS，先检查列是否存在
+        Integer colExists = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_asset' AND COLUMN_NAME = 'accessories'",
+            Integer.class
+        );
+        if (colExists != null && colExists == 0) {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_asset ADD COLUMN accessories TEXT DEFAULT NULL COMMENT '配件清单 JSON 数组 [{name,qty}]'");
+            log.info("资产台账 accessories 列添加完成");
+        } else {
+            log.info("资产台账 accessories 列已存在，跳过");
+        }
+        // 从入库批次明细回填已有资产的配件清单
+        log.info("开始从入库批次明细回填已有资产配件清单 ...");
+        int rows = jdbcTemplate.update(
+            "UPDATE biz_eam_asset a "
+            + "INNER JOIN biz_eam_inbound_batch b ON a.batch_id = b.id "
+            + "INNER JOIN biz_eam_inbound_batch_item bi ON b.id = bi.batch_id "
+            + "  AND bi.id = (SELECT bi2.id FROM biz_eam_inbound_batch_item bi2 "
+            + "    WHERE bi2.batch_id = b.id AND bi2.accessories IS NOT NULL "
+            + "    AND bi2.accessories != '' AND bi2.accessories != '[]' "
+            + "    ORDER BY bi2.sort_order ASC, bi2.id ASC LIMIT 1) "
+            + "SET a.accessories = bi.accessories "
+            + "WHERE a.accessories IS NULL AND a.batch_id IS NOT NULL AND a.deleted = 0"
+        );
+        log.info("资产台账配件清单回填 {} 条", rows);
+    }
+
+    /** v17: 清空无领用记录但手动填写了使用人信息的资产数据（对应 SQL: 175_clear_orphan_asset_user.sql） */
+    private void clearOrphanAssetUserData() {
+        log.info("开始清空无领用记录的孤立资产使用人数据 ...");
+        int rows = jdbcTemplate.update(
+            "UPDATE biz_eam_asset "
+            + "SET user_name = NULL, department = NULL, usage_date = NULL, "
+            + "current_holder_id = NULL, active_claim_id = NULL, status = 'idle', "
+            + "updated_by = 'system', updated_at = NOW() "
+            + "WHERE asset_no = 'XX-M-01-01-0001' AND deleted = 0 AND active_claim_id IS NULL"
+        );
+        log.info("孤立资产使用人数据清空完成，影响 {} 条", rows);
+    }
+
+    /** v18: 修复签署页提交时 signature image 过长导致 storage_path 字段溢出 */
+    private void fixEvidenceStoragePath() {
+        log.info("开始修复 biz_eam_claim_evidence.storage_path 字段类型 ...");
+        try {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_claim_evidence MODIFY COLUMN storage_path TEXT NOT NULL COMMENT '存储路径或 Data URL (base64)'");
+            log.info("biz_eam_claim_evidence.storage_path 字段类型修复完成");
+        } catch (Exception e) {
+            log.warn("biz_eam_claim_evidence.storage_path 字段修复失败: {}", e.getMessage());
+        }
+    }
+
+    /** v19: 手机高分屏全屏签名 base64 PNG 可超 64KB，TEXT 仍不够，升级为 MEDIUMTEXT */
+    private void upgradeEvidenceStorageToMediumText() {
+        log.info("开始升级 biz_eam_claim_evidence.storage_path 为 MEDIUMTEXT ...");
+        try {
+            jdbcTemplate.execute("ALTER TABLE biz_eam_claim_evidence MODIFY COLUMN storage_path MEDIUMTEXT NOT NULL COMMENT '存储路径或 Data URL (base64)'");
+            log.info("biz_eam_claim_evidence.storage_path 已升级为 MEDIUMTEXT");
+        } catch (Exception e) {
+            log.warn("biz_eam_claim_evidence.storage_path 升级 MEDIUMTEXT 失败: {}", e.getMessage());
+        }
     }
 }

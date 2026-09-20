@@ -160,7 +160,7 @@ public class EamBorrowServiceImpl implements EamBorrowService {
         EamAsset asset = assetMapper.selectById(borrow.getAssetId());
         if (asset != null) {
             vo.setAssetNo(asset.getAssetNo());
-            vo.setAssetName(asset.getAssetName());
+            vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
         }

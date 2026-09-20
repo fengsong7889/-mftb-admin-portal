@@ -152,6 +152,11 @@ export async function returnClaim(claimId: number, returnDate: string, returnRea
   })
 }
 
+/** 重新推送签署通知（管理员手动触发，不限签署状态） */
+export async function resendClaimSignNotification(claimId: number): Promise<void> {
+  await request.post<unknown, void>(`/eam/claims/${claimId}/resend-sign-notify`)
+}
+
 /* ==================== 个人端 ==================== */
 
 /** 个人领用列表 */

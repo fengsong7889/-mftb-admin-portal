@@ -13,11 +13,13 @@ import { useTranslation } from 'react-i18next'
 import {
   AppstoreOutlined, DollarOutlined,
   UserOutlined, InboxOutlined,
+  ToolOutlined,
 } from '@ant-design/icons'
 import {
-  fetchAssetDetail, fetchTransferAsset, parseAssetImages, type AssetStatus,
+  fetchAssetDetail, fetchTransferAsset, parseAssetImages, type AssetStatus, type AssetItem,
 } from '../../../api/asset'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import BrandTag from '../../../components/BrandTag'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
 import AssetParameters from '../../../components/AssetParameters'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -32,10 +34,20 @@ const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   scrapped:  { key: 'asset.statusScrapped', color: 'error' },
 }
 
+const HOLD_META: Record<NonNullable<AssetItem['holdType']>, { key: string; color: string }> = {
+  owned:    { key: 'asset.holdOwned',    color: 'geekblue' },
+  borrowed: { key: 'asset.holdBorrowed', color: 'volcano' },
+}
+
 /** 详情卡片统一样式（无边框，对齐采购订单详情） */
 const detailCardStyle: React.CSSProperties = {
   borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+}
+
+/** 仓库位置：后端已存储为「仓库名（城市区县详细地址）」格式 */
+function formatWarehouseLocation(asset: AssetItem): string {
+  return asset.location || '-'
 }
 
 /* ---- 模块标题栏 ---- */
@@ -101,6 +113,7 @@ export default function AssetDetail() {
           <Descriptions.Item label={t('asset.colAssetType')}>{asset.assetType || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('transfer.brand')}>{asset.brand || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colAssetName')}>{asset.assetName}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colCompanyBrand')}>{asset.companyBrand ? <BrandTag value={asset.companyBrand} /> : '-'}</Descriptions.Item>
         </Descriptions>
 
         {/* 参数信息 */}
@@ -137,13 +150,15 @@ export default function AssetDetail() {
           </Descriptions.Item>
           {asset.source === 'self' ? (
             <>
-              <Descriptions.Item label={t('asset.colCompany')}>{asset.company || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.purchaseCompanyLabel')}>{asset.company || '-'}</Descriptions.Item>
               <Descriptions.Item label={t('asset.colPurchaseValue')}>
                 <span style={{ fontWeight: 600, color: '#E8720C' }}>
                   {asset.purchaseValue ? `MOP ${asset.purchaseValue.toLocaleString()}` : '-'}
                 </span>
               </Descriptions.Item>
               <Descriptions.Item label={t('asset.colPurchaseDate')}>{asset.purchaseDate || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.warehouseLocationLabel')}>{formatWarehouseLocation(asset)}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.adminDeptLabel')}>{asset.adminDepartment || '-'}</Descriptions.Item>
             </>
           ) : (
             <>
@@ -154,32 +169,53 @@ export default function AssetDetail() {
                   {a.rentalCost ? `MOP ${a.rentalCost.toLocaleString()}` : '-'}
                 </span>
               </Descriptions.Item>
+              <Descriptions.Item label={t('asset.rentalPeriodLabel')}>
+                {a.rentalPeriod && a.rentalPeriod[0]
+                  ? `${a.rentalPeriod[0]} ~ ${a.rentalPeriod[1]}`
+                  : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('asset.warehouseLocationLabel')}>{formatWarehouseLocation(asset)}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.adminDeptLabel')}>{asset.adminDepartment || '-'}</Descriptions.Item>
             </>
           )}
-          {asset.source === 'lease' && (
-            <Descriptions.Item label={t('asset.rentalPeriodLabel')}>
-              {a.rentalPeriod && a.rentalPeriod[0]
-                ? `${a.rentalPeriod[0]} ~ ${a.rentalPeriod[1]}`
-                : '-'}
-            </Descriptions.Item>
-          )}
-          <Descriptions.Item label={t('asset.colLocation')}>{asset.location || '-'}</Descriptions.Item>
         </Descriptions>
       </div>
 
-      {/* ====== 模块3：当前使用人 ====== */}
-      <div style={detailCardStyle}>
-        <ModuleTitle
-          icon={<UserOutlined style={{ fontSize: 14, color: '#13C2C2' }} />}
-          iconBg="#E6FFFB"
-          title={t('asset.currentUserTitle')}
-        />
-        <Descriptions column={4} size="middle">
-          <Descriptions.Item label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Descriptions.Item>
-          <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
-          <Descriptions.Item label={t('transfer.claimDate')}>{(transferContext ? asset.claimDate : asset.usageDate) || '—'}</Descriptions.Item>
-        </Descriptions>
-      </div>
+      {/* ====== 模块3：当前使用人（闲置资产无使用人，不展示） ====== */}
+      {asset.status !== 'idle' && (
+        <div style={detailCardStyle}>
+          <ModuleTitle
+            icon={<UserOutlined style={{ fontSize: 14, color: '#13C2C2' }} />}
+            iconBg="#E6FFFB"
+            title={t('asset.currentUserTitle')}
+          />
+          <Descriptions column={4} size="middle">
+            <Descriptions.Item label={t('asset.currentUserLabel')}>{asset.userName || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colDepartment')}>{asset.department || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colHoldType')}>{asset.holdType ? <Tag color={HOLD_META[asset.holdType]?.color}>{t(HOLD_META[asset.holdType]?.key)}</Tag> : '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('transfer.claimDate')}>{(transferContext ? asset.claimDate : asset.usageDate) || '—'}</Descriptions.Item>
+          </Descriptions>
+        </div>
+      )}
+
+      {/* ====== 模块3.5：配件清单 ====== */}
+      {asset.accessories && asset.accessories.length > 0 && (
+        <div style={detailCardStyle}>
+          <ModuleTitle
+            icon={<ToolOutlined style={{ fontSize: 14, color: '#FA8C16' }} />}
+            iconBg="#FFF7E6"
+            title={t('asset.accessoryListTitleDetail')}
+            tag={t('asset.accessoryCount', { count: asset.accessories.length })}
+          />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {asset.accessories.map((acc, idx) => (
+              <Tag key={idx} color="orange" style={{ fontSize: 13, padding: '4px 12px', borderRadius: 4 }}>
+                {acc.name} × {acc.qty}
+              </Tag>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* ====== 模塊4：資產標籤（主標籤 + 次標籤，可綁定/解綁/列印） ====== */}
       {id !== undefined && !transferContext && hasPermission('asset-list:view') && <AssetTagBindingSection assetId={id} asset={asset} />}

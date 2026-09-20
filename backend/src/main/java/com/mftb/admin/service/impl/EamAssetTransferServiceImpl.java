@@ -140,7 +140,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         String actor = operatorResolver.currentOperatorName();
         EamAssetTransfer transfer = new EamAssetTransfer();
         transfer.setTransferNo(bizSeqService.next(BizSeqService.RULE_EAM_TRANSFER));
-        transfer.setAssetId(asset.getId()); transfer.setAssetNo(asset.getAssetNo()); transfer.setAssetName(asset.getAssetName());
+        transfer.setAssetId(asset.getId()); transfer.setAssetNo(asset.getAssetNo()); transfer.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
         transfer.setBrandId(asset.getBrandId()); transfer.setBrand(asset.getBrand()); transfer.setBrandBackfilled(0);
         transfer.setFromUserId(asset.getCurrentHolderId()); transfer.setFromUserName(asset.getUserName());
         transfer.setFromUserEmpId(fromUser.getEmpId()); transfer.setFromDepartment(Objects.toString(asset.getDepartment(), ""));

@@ -11,14 +11,14 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { message } from 'antd'
+import { Modal, message } from 'antd'
 import { useAuth } from '../../../contexts/AuthContext'
 import { parseClaimId, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration, type ClaimRow, type ClaimSummaryData } from './claimViewTypes'
 import ClaimList from './ClaimList'
 import ClaimForm from './ClaimForm'
 import EmployeeAssetDetail from './EmployeeAssetDetail'
 import ClaimRecordDetail from './ClaimRecordDetail'
-import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats, fetchClaimEmployeeOptions, registerClaim, cancelClaim, returnClaim } from '../../../api/eamClaim'
+import { fetchEmployeeSummary, fetchClaimList, fetchClaimDetail, fetchClaimStats, fetchClaimEmployeeOptions, registerClaim, cancelClaim, resendClaimSignNotification } from '../../../api/eamClaim'
 import { fetchDepartments } from '../../../api/department'
 import type { DepartmentItem } from '../../../api/department'
 import { fetchAssetList, fetchAssetDetail } from '../../../api/asset'
@@ -204,12 +204,54 @@ export default function AssetClaim() {
     if (view === 'record') handleQueryRecord(claimId)
   }, [view, handleQueryRecord])
 
-  /* ----- 归还 ----- */
-  const handleReturnClaim = useCallback(async (claimId: number, returnDate: string, returnReason?: string, conditionNote?: string) => {
-    await returnClaim(claimId, returnDate, returnReason, conditionNote)
-    message.success('归还成功')
+  /* ----- 归还（跳转归还登记表单页） ----- */
+  const goReturn = useCallback((claimId: number) => {
+    navigate(`/asset-return/add?claimId=${claimId}`)
+  }, [navigate])
+
+  /* ----- 重新推送签署通知 ----- */
+  const handleResendSignNotify = useCallback(async (claimId: number) => {
+    await resendClaimSignNotification(claimId)
+    // 刷新记录详情以更新事件流水
     if (view === 'record') handleQueryRecord(claimId)
   }, [view, handleQueryRecord])
+
+  /* ----- 查看签收凭证 ----- */
+  const handleViewEvidence = useCallback(() => {
+    if (!recordData?.signatureImageUrl) {
+      message.warning('暂无签收凭证')
+      return
+    }
+    Modal.info({
+      title: '签收凭证',
+      width: 600,
+      content: (
+        <div style={{ textAlign: 'center' }}>
+          <img
+            src={recordData.signatureImageUrl}
+            alt="签收凭证"
+            style={{ maxWidth: '100%', maxHeight: '70vh', border: '1px solid #f0f0f0', borderRadius: 8 }}
+          />
+        </div>
+      ),
+      okText: '关闭',
+    })
+  }, [recordData])
+
+  /* ----- 下载签收凭证 ----- */
+  const handleDownloadEvidence = useCallback(() => {
+    if (!recordData?.signatureImageUrl) {
+      message.warning('暂无签收凭证')
+      return
+    }
+    const link = document.createElement('a')
+    link.href = recordData.signatureImageUrl
+    link.download = `签收凭证_${recordData.claimNo}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    message.success('凭证已下载')
+  }, [recordData])
 
   return (
     <div className="content-area claim-module">
@@ -283,7 +325,10 @@ export default function AssetClaim() {
             else goList()
           }}
           onCancel={handleCancelClaim}
-          onReturn={handleReturnClaim}
+          onGoReturn={goReturn}
+          onResendSignNotify={handleResendSignNotify}
+          onViewEvidence={handleViewEvidence}
+          onDownloadEvidence={handleDownloadEvidence}
         />
       )}
 

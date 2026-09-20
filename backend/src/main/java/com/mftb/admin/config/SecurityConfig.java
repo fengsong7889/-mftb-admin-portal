@@ -47,7 +47,7 @@ public class SecurityConfig {
     }
 
     /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入 */
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io}")
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io,http://192.168.31.88:3000,http://192.168.31.88:3001,http://192.168.31.88:3002,http://192.168.31.88:3003,http://192.168.31.88:3004,http://192.168.31.88:3005,http://192.168.31.88:3006,http://192.168.31.88:3007,http://192.168.31.88:3008,http://192.168.31.88:3009,http://192.168.31.88:3010,http://192.168.31.88:5173,http://192.168.6.174:3000,http://192.168.6.174:3001,http://192.168.6.174:3002,http://192.168.6.174:3003,http://192.168.6.174:3004,http://192.168.6.174:3005,http://192.168.6.174:3006,http://192.168.6.174:3007,http://192.168.6.174:3008,http://192.168.6.174:3009,http://192.168.6.174:3010,http://192.168.6.174:5173}")
     private String allowedOrigins;
 
     /** 白名单: 无需认证即可访问 */
@@ -105,14 +105,16 @@ public class SecurityConfig {
     private static final String DEFAULT_CORS_ORIGINS =
             "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,"
                     + "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,"
-                    + "https://fengsong7889.github.io";
+                    + "https://fengsong7889.github.io,"
+                    + "http://192.168.31.88:3000,http://192.168.31.88:3001,http://192.168.31.88:3002,http://192.168.31.88:3003,http://192.168.31.88:3004,http://192.168.31.88:3005,http://192.168.31.88:3006,http://192.168.31.88:3007,http://192.168.31.88:3008,http://192.168.31.88:3009,http://192.168.31.88:3010,http://192.168.31.88:5173,"
+                    + "http://192.168.6.174:3000,http://192.168.6.174:3001,http://192.168.6.174:3002,http://192.168.6.174:3003,http://192.168.6.174:3004,http://192.168.6.174:3005,http://192.168.6.174:3006,http://192.168.6.174:3007,http://192.168.6.174:3008,http://192.168.6.174:3009,http://192.168.6.174:3010,http://192.168.6.174:5173";
 
     /** CORS 跨域配置 */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         // 环境变量设置为空字符串时，@Value 占位符不会回退默认值（变量已存在）,
-        // 解析结果为空列表会导致所有带 Origin 头的请求被拒为 403 Invalid CORS request,
+        // 解析结果为空列表导致所有带 Origin 头的请求被拒为 403 Invalid CORS request,
         // 因此此处对空值显式回退默认白名单
         List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)

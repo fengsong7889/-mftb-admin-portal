@@ -145,7 +145,7 @@ public class EamHandoverServiceImpl implements EamHandoverService {
             item.setHandoverId(handover.getId());
             item.setAssetId(asset.getId());
             item.setAssetNo(asset.getAssetNo());
-            item.setAssetName(asset.getAssetName());
+            item.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             item.setAssetType(asset.getAssetType());
             item.setOldDepartment(asset.getDepartment());
             item.setNewDepartment(toDepartment);
@@ -243,7 +243,7 @@ public class EamHandoverServiceImpl implements EamHandoverService {
         EamHandoverVO.HandoverItemVO vo = new EamHandoverVO.HandoverItemVO();
         vo.setAssetId(item.getAssetId());
         vo.setAssetNo(item.getAssetNo());
-        vo.setAssetName(item.getAssetName());
+        vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(item.getAssetName(), asset != null ? asset.getBrand() : null));
         vo.setAssetType(item.getAssetType());
         vo.setOldDepartment(item.getOldDepartment());
         vo.setNewDepartment(item.getNewDepartment());

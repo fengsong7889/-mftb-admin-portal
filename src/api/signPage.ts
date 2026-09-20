@@ -33,6 +33,8 @@ export interface SignPageClaimDetail {
   remark?: string
   /** 登记人（经办人） */
   operator?: string
+  /** 登记人工号 */
+  operatorEmpNo?: string
   /** 领用状态：pending_signature / claimed / ... */
   status: string
   /** 签名状态 */
