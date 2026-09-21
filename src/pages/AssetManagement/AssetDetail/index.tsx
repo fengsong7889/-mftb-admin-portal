@@ -32,6 +32,9 @@ const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   in_use:    { key: 'asset.statusInUse',    color: 'success' },
   in_repair: { key: 'asset.statusInRepair', color: 'processing' },
   scrapped:  { key: 'asset.statusScrapped', color: 'error' },
+  lost:      { key: 'asset.statusLost',     color: 'warning' },
+  pending_inspection: { key: 'asset.statusPendingInspection', color: 'blue' },
+  written_off: { key: 'asset.statusWrittenOff', color: 'default' },
 }
 
 const HOLD_META: Record<NonNullable<AssetItem['holdType']>, { key: string; color: string }> = {

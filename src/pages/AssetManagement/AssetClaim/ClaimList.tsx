@@ -1,9 +1,9 @@
 /**
- * 领用管理 — 员工维度汇总列表
+ * 領用管理 — 員工維度匯總列表
  *
- * 搜索条件：员工姓名/工号、部门
- * 列表字段：员工工号、员工姓名、所在部门、在用资产(件)、已归还(件)、最近领用日期、操作
- * 点击「管理」→ 进入员工资产详情页
+ * 搜索條件：員工姓名/工號、部門
+ * 列表字段：員工工號、員工姓名、所在部門、在用資產(件)、已歸還(件)、最近領用日期、操作
+ * 點擊「管理」→ 進入員工資產詳情頁
  */
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -57,7 +57,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
     setSize(nextSize)
   }
 
-  /* ----- 导出 ----- */
+  /* ----- 導出 ----- */
   const handleExport = () => {
     const cols = [
       { title: t('asset.colEmpNo'), dataIndex: 'empNo' },
@@ -65,15 +65,15 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
       { title: t('asset.colDepartment'), dataIndex: 'department' },
       { title: t('asset.colClaimedCount'), dataIndex: 'claimedCount' },
       { title: t('asset.colReturnedCount'), dataIndex: 'returnedCount' },
-      { title: '待签领用', dataIndex: 'pendingCount' },
-      { title: '代办未签', dataIndex: 'proxyPendingCount' },
+      { title: '待簽領用', dataIndex: 'pendingCount' },
+      { title: '代辦未簽', dataIndex: 'proxyPendingCount' },
       { title: t('asset.colLastClaimDate'), dataIndex: 'lastClaimDate' },
     ]
     exportToCSV(`${t('asset.claimFileName')}_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
     message.success(t('asset.claimExportSuccess'))
   }
 
-  /* ----- 表格列定义 ----- */
+  /* ----- 表格列定義 ----- */
   const allColumns: TableColumnsType<ClaimEmployeeSummary> = [
     {
       title: t('asset.colEmpNo'), dataIndex: 'empNo', key: 'empNo', width: 120,
@@ -93,8 +93,8 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
         <span style={{ color: v > 0 ? '#8c8c8c' : '#bfbfbf' }}>{v} {t('asset.unitItem')}</span>
       ),
     },
-    { title: '待签领用', dataIndex: 'pendingCount', key: 'pendingCount', width: 110, align: 'center' },
-    { title: '代办未签', dataIndex: 'proxyPendingCount', key: 'proxyPendingCount', width: 110, align: 'center', render: (v: number) => <span style={{ color: v ? '#E8720C' : '#8C8C8C' }}>{v}</span> },
+    { title: '待簽領用', dataIndex: 'pendingCount', key: 'pendingCount', width: 110, align: 'center' },
+    { title: '代辦未簽', dataIndex: 'proxyPendingCount', key: 'proxyPendingCount', width: 110, align: 'center', render: (v: number) => <span style={{ color: v ? '#E8720C' : '#8C8C8C' }}>{v}</span> },
     { title: t('asset.colLastClaimDate'), dataIndex: 'lastClaimDate', key: 'lastClaimDate', width: 140, render: (v?: string) => v || '—' },
     {
       title: t('asset.colAction'), key: 'action', width: 100, fixed: 'right',
@@ -113,8 +113,8 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
     { key: 'department', title: t('asset.colDepartment') },
     { key: 'claimedCount', title: t('asset.colClaimedCount') },
     { key: 'returnedCount', title: t('asset.colReturnedCount') },
-    { key: 'pendingCount', title: '待签领用' },
-    { key: 'proxyPendingCount', title: '代办未签' },
+    { key: 'pendingCount', title: '待簽領用' },
+    { key: 'proxyPendingCount', title: '代辦未簽' },
     { key: 'lastClaimDate', title: t('asset.colLastClaimDate') },
     { key: 'action', title: t('asset.colAction') },
   ], [t])
@@ -125,7 +125,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
     <>
       <ClaimStats data={error ? undefined : data?.stats} scopeKey={JSON.stringify(filters)} />
       {error && <Alert type="error" showIcon message={error} className="claim-notice" />}
-      {/* ====== 搜索区 ====== */}
+      {/* ====== 搜索區 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline" onFinish={handleSearch}>
           <Form.Item label={t('asset.empLabel')} name="keyword">
@@ -145,7 +145,7 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
         </Form>
       </div>
 
-      {/* ====== 操作区 ====== */}
+      {/* ====== 操作區 ====== */}
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} disabled={loading || !!error || !dataSource.length} onClick={handleExport}>{t('common.export')}</Button>

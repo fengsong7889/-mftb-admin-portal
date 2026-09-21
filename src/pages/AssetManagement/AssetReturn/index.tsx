@@ -97,9 +97,8 @@ export default function AssetReturn() {
     if (recordId == null) return
     await disposeReturn(recordId, dto)
     const msgs = ['處置登記成功']
-    if (dto.needCompensation) msgs.push('已自動創建賠付記錄')
     if (dto.disposition === 'scrapped' || dto.disposition === 'written_off') msgs.push('已自動創建報廢記錄')
-    if (dto.disposition === 'apply_repair') msgs.push('已自動創建維修記錄')
+    if (dto.disposition === 'apply_repair') msgs.push('已自動創建維修記錄並流入維修管理菜單')
     message.success(msgs.join('，'))
     handleLoadDetail(recordId)
   }, [recordId, handleLoadDetail])

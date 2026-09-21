@@ -1,13 +1,13 @@
 /**
- * 领用管理（物资管理 - 领用管理）
+ * 領用管理（物資管理 - 領用管理）
  *
- * URL 深链：
- *   /asset-claim                          → 员工维度汇总列表
- *   /asset-claim/add?employeeId=...&assetId=... → 领用登记（查询参数仅预填）
- *   /asset-claim/detail?employeeId=...    → 员工资产详情
- *   /asset-claim/record?id=...            → 只读领用及凭证详情
+ * URL 深鏈：
+ *   /asset-claim                          → 員工維度匯總列表
+ *   /asset-claim/add?employeeId=...&assetId=... → 領用登記（查詢參數僅預填）
+ *   /asset-claim/detail?employeeId=...    → 員工資產詳情
+ *   /asset-claim/record?id=...            → 只讀領用及憑證詳情
  *
- * 阶段三：已接通真实后端 API。
+ * 階段三：已接通真實後端 API。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -44,7 +44,7 @@ export default function AssetClaim() {
   const canAdd = hasPermission('asset-claim:edit') || user?.role === 'admin'
   const canProxy = user?.role === 'admin' || (user?.functionRoleCodes?.includes('admin') ?? false)
 
-  /* ----- 数据状态 ----- */
+  /* ----- 數據狀態 ----- */
   const [summaryData, setSummaryData] = useState<ClaimSummaryData | undefined>()
   const [detailData, setDetailData] = useState<ClaimPage<ClaimRow> | undefined>()
   const [detailEmployee, setDetailEmployee] = useState<ClaimEmployee | undefined>()
@@ -60,12 +60,12 @@ export default function AssetClaim() {
   const [initialAsset, setInitialAsset] = useState<ClaimAssetOption | undefined>()
   const [initialEmployee, setInitialEmployee] = useState<ClaimEmployee | undefined>()
 
-  /* ----- 加载部门列表 ----- */
+  /* ----- 加載部門列表 ----- */
   useEffect(() => {
     fetchDepartments().then(setDepartments).catch(() => {})
   }, [])
 
-  /* ----- 汇总列表查询 ----- */
+  /* ----- 匯總列表查詢 ----- */
   const handleQuerySummary = useCallback(async (query: ClaimQuery) => {
     setLoading(true)
     setError(undefined)
@@ -73,13 +73,13 @@ export default function AssetClaim() {
       const data = await fetchEmployeeSummary(query)
       setSummaryData(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      setError(err instanceof Error ? err.message : '加載失敗')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  /* ----- 员工详情查询 ----- */
+  /* ----- 員工詳情查詢 ----- */
   const handleQueryDetail = useCallback(async (empId: number, query: ClaimQuery) => {
     setLoading(true)
     setError(undefined)
@@ -87,13 +87,13 @@ export default function AssetClaim() {
       const data = await fetchClaimList({ ...query, employeeId: empId })
       setDetailData(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      setError(err instanceof Error ? err.message : '加載失敗')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  /* ----- 领用记录详情查询 ----- */
+  /* ----- 領用記錄詳情查詢 ----- */
   const handleQueryRecord = useCallback(async (claimId: number) => {
     setLoading(true)
     setError(undefined)
@@ -101,7 +101,7 @@ export default function AssetClaim() {
       const data = await fetchClaimDetail(claimId)
       setRecordData(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败')
+      setError(err instanceof Error ? err.message : '加載失敗')
     } finally {
       setLoading(false)
     }
@@ -120,7 +120,7 @@ export default function AssetClaim() {
     }
   }, [])
 
-  /* ----- 在職員工查詢（供領用登記表單「領用人」下拉；走领用模块专用接口，免员工管理权限，支持选择本人登记） ----- */
+  /* ----- 在職員工查詢（供領用登記表單「領用人」下拉；走領用模塊專用接口，免員工管理權限，支持選擇本人登記） ----- */
   const handleEmployeeQuery = useCallback(async (query: ClaimQuery) => {
     try {
       setEmployeePage(await fetchClaimEmployeeOptions(query.keyword))
@@ -149,7 +149,7 @@ export default function AssetClaim() {
     return raw && /^[1-9]\d*$/.test(raw) ? Number(raw) : undefined
   }, [params])
 
-  /* ----- 稳定的 onQuery 回调（避免子组件 useEffect 因引用变化重复触发） ----- */
+  /* ----- 穩定的 onQuery 回調（避免子組件 useEffect 因引用變化重複觸發） ----- */
   const onQueryDetail = useCallback((q: ClaimQuery) => {
     if (employeeId != null) handleQueryDetail(employeeId, q)
   }, [employeeId, handleQueryDetail])
@@ -164,19 +164,19 @@ export default function AssetClaim() {
   /* ----- 自动加载 ----- */
   useEffect(() => {
     if (view === 'detail' && employeeId != null) {
-      // 注：列表数据由 EmployeeAssetDetail 子组件的 useEffect + onQueryDetail 首次触发，避免重复请求
-      // 加载员工基本信息（供详情页头部展示；走领用模块专用接口，免员工管理权限）
+      // 註：列表數據由 EmployeeAssetDetail 子組件的 useEffect + onQueryDetail 首次觸發，避免重複請求
+      // 加載員工基本信息（供詳情頁頭部展示；走領用模塊專用接口，免員工管理權限）
       fetchClaimEmployeeOptions(undefined, employeeId).then((res) => {
         const emp = res.records[0]
         if (emp) setDetailEmployee(emp)
       }).catch(() => {})
-      // 加载个人统计
+      // 加載個人統計
       fetchClaimStats({ employeeId }).then(setDetailStats).catch(() => {})
     }
     if (view === 'record' && recordId != null) {
       handleQueryRecord(recordId)
     }
-    // 离开 detail 视图时清理缓存
+    // 離開 detail 視圖時清理緩存
     if (view !== 'detail') {
       setDetailEmployee(undefined)
       setDetailStats(undefined)
@@ -202,65 +202,65 @@ export default function AssetClaim() {
   /* ----- 登记提交 ----- */
   const handleSubmitClaim = useCallback(async (values: ClaimRegistration) => {
     const claimId = await registerClaim(values)
-    message.success('领用登记成功')
-    // 代办模式直接到详情，标准模式到记录详情
+    message.success('領用登記成功')
+    // 代辦模式直接到詳情，標準模式到記錄詳情
     goRecord(claimId)
   }, [goRecord])
 
-  /* ----- 取消领用 ----- */
+  /* ----- 取消領用 ----- */
   const handleCancelClaim = useCallback(async (claimId: number, reason: string) => {
     await cancelClaim(claimId, reason)
-    message.success('已取消领用')
+    message.success('已取消領用')
     if (view === 'record') handleQueryRecord(claimId)
   }, [view, handleQueryRecord])
 
-  /* ----- 归还（跳转归还登记表单页） ----- */
+  /* ----- 歸還（跳轉歸還登記表單頁） ----- */
   const goReturn = useCallback((claimId: number) => {
     navigate(`/asset-return/add?claimId=${claimId}`)
   }, [navigate])
 
-  /* ----- 重新推送签署通知 ----- */
+  /* ----- 重新推送簽署通知 ----- */
   const handleResendSignNotify = useCallback(async (claimId: number) => {
     await resendClaimSignNotification(claimId)
-    // 刷新记录详情以更新事件流水
+    // 刷新記錄詳情以更新事件流水
     if (view === 'record') handleQueryRecord(claimId)
   }, [view, handleQueryRecord])
 
-  /* ----- 查看签收凭证 ----- */
+  /* ----- 查看簽收憑證 ----- */
   const handleViewEvidence = useCallback(() => {
     if (!recordData?.signatureImageUrl) {
-      message.warning('暂无签收凭证')
+      message.warning('暫無簽收憑證')
       return
     }
     Modal.info({
-      title: '签收凭证',
+      title: '簽收憑證',
       width: 600,
       content: (
         <div style={{ textAlign: 'center' }}>
           <img
             src={recordData.signatureImageUrl}
-            alt="签收凭证"
+            alt="簽收憑證"
             style={{ maxWidth: '100%', maxHeight: '70vh', border: '1px solid #f0f0f0', borderRadius: 8 }}
           />
         </div>
       ),
-      okText: '关闭',
+      okText: '關閉',
     })
   }, [recordData])
 
-  /* ----- 下载签收凭证 ----- */
+  /* ----- 下載簽收憑證 ----- */
   const handleDownloadEvidence = useCallback(() => {
     if (!recordData?.signatureImageUrl) {
-      message.warning('暂无签收凭证')
+      message.warning('暫無簽收憑證')
       return
     }
     const link = document.createElement('a')
     link.href = recordData.signatureImageUrl
-    link.download = `签收凭证_${recordData.claimNo}.png`
+    link.download = `簽收憑證_${recordData.claimNo}.png`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    message.success('凭证已下载')
+    message.success('憑證已下載')
   }, [recordData])
 
   return (
@@ -301,7 +301,7 @@ export default function AssetClaim() {
       )}
 
       {view === 'detail' && employeeId == null && (
-        <div className="claim-notice">缺少有效的 employeeId 参数。<button onClick={goList}>返回汇总列表</button></div>
+        <div className="claim-notice">缺少有效的 employeeId 參數。<button onClick={goList}>返回匯總列表</button></div>
       )}
 
       {view === 'add' && (
@@ -353,7 +353,7 @@ export default function AssetClaim() {
       )}
 
       {view === 'record' && recordId == null && (
-        <div className="claim-notice">缺少有效的领用记录 ID。<button onClick={goList}>返回汇总列表</button></div>
+        <div className="claim-notice">缺少有效的領用記錄 ID。<button onClick={goList}>返回匯總列表</button></div>
       )}
     </div>
   )

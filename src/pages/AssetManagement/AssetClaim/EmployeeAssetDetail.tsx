@@ -1,13 +1,13 @@
 /**
- * 员工资产管理详情页
+ * 員工資產管理詳情頁
  *
- * 从领用管理列表点击「管理」进入，展示某位员工的领用资产全貌：
- *  - 顶部：DetailPageHeader（紫色渐变顶条 + 返回按钮 + 员工姓名）
- *  - 员工信息卡：姓名 / 工号 / 部门 / 在用资产数 / 已归还数
- *  - Tab 1「在用资产」：该员工当前持有的资产列表，支持「详情」跳转资产台账，支持「继续领用」
- *  - Tab 2「已归还资产」：历史记录，仅查看
+ * 從領用管理列表點擊「管理」進入，展示某位員工的領用資產全貌：
+ *  - 頂部：DetailPageHeader（紫色漸變頂條 + 返回按鈕 + 員工姓名）
+ *  - 員工信息卡：姓名 / 工號 / 部門 / 在用資產數 / 已歸還數
+ *  - Tab 1「在用資產」：該員工當前持有的資產列表，支持「詳情」跳轉資產台賬，支持「繼續領用」
+ *  - Tab 2「已歸還資產」：歷史記錄，僅查看
  *
- * 注意：此页面仅做领用操作，归还操作统一在「归还管理」菜单处理
+ * 注意：此頁面僅做領用操作，歸還操作統一在「歸還管理」菜單處理
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +27,7 @@ interface Props {
   loading?: boolean
   error?: string
   canAdd?: boolean
-  /** 初始激活的标签（从 URL tab 参数恢复） */
+  /** 初始激活的標籤（從 URL tab 參數恢復） */
   initialTab?: ClaimStatus
   onBack: () => void
   onAddClaim: () => void
@@ -35,11 +35,11 @@ interface Props {
   onQuery?: (query: ClaimQuery) => void
 }
 
-/* ---- 状态标签 ---- */
+/* ---- 狀態標籤 ---- */
 const STATUS_TABS: { key: ClaimStatus; label: string }[] = [
-  { key: CLAIM_STATUS.PENDING, label: '待签领用' },
-  { key: CLAIM_STATUS.CLAIMED, label: '在用资产' },
-  { key: CLAIM_STATUS.RETURNED, label: '已归还资产' },
+  { key: CLAIM_STATUS.PENDING, label: '待簽領用' },
+  { key: CLAIM_STATUS.CLAIMED, label: '在用資產' },
+  { key: CLAIM_STATUS.RETURNED, label: '已歸還資產' },
   { key: CLAIM_STATUS.CANCELLED, label: '已取消' },
   { key: CLAIM_STATUS.TRANSFERRED, label: 'transfer.transferred' },
 ]
@@ -48,13 +48,13 @@ export default function EmployeeAssetDetail({ employeeId, employee, stats, data,
   const { t } = useTranslation()
   const statusTabs = STATUS_TABS.map(tab => tab.key === CLAIM_STATUS.TRANSFERRED ? { ...tab, label: t(tab.label) } : tab)
   const [query, setQuery] = useState<ClaimQuery>({ page: 1, size: 10, status: initialTab ?? CLAIM_STATUS.CLAIMED })
-  const empName = employee?.empName ?? '员工信息待加载'
+  const empName = employee?.empName ?? '員工信息待加載'
   const empNo = employee?.empNo ?? '—'
   const department = employee?.department ?? '—'
 
   useEffect(() => { onQuery?.(query) }, [query, onQuery])
 
-  /* ----- 员工信息卡 ----- */
+  /* ----- 員工信息卡 ----- */
   const renderInfoCard = () => (
     <div style={{
       background: '#fff', borderRadius: 12, padding: '20px 24px', marginBottom: 16,

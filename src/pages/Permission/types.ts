@@ -626,6 +626,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '送修' },
     { key: 'edit', label: '完修' },
   ],
+  'asset-loss': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '報失' },
+    { key: 'edit', label: '找回/驗收' },
+  ],
   'asset-inventory': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '發起' },
@@ -998,6 +1003,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'asset-list',
   'asset-scrap',
   'asset-repair',
+  'asset-loss',
   'asset-inventory',
   // 耗材管理（管理类菜单受控；耗材领用 consumable-claim 为全员自助，不受控）
   // 注：consumable-category / consumable-brand / consumable-unit 菜单已下线（功能并入分类库/品牌产品库，
@@ -1139,6 +1145,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-detail': 'asset-list',
   '/asset-scrap': 'asset-scrap',
   '/asset-repair': 'asset-repair',
+  '/asset-loss': 'asset-loss',
   '/asset-transfer-list': 'asset-transfer-list',
   '/asset-transfer': 'asset-transfer-list',
   '/asset-transfer/detail': 'asset-transfer-list',

@@ -2,12 +2,17 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.EamClaimEmployeeOptionVO;
 import com.mftb.admin.dto.EamRepairSaveDTO;
 import com.mftb.admin.dto.EamRepairVO;
+import com.mftb.admin.service.EamBasicDataService;
+import com.mftb.admin.service.EamClaimService;
 import com.mftb.admin.service.EamRepairService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +28,40 @@ public class EamRepairController {
 
     private static final String MENU = "asset-repair";
     private final EamRepairService repairService;
+    private final EamClaimService claimService;
+    private final EamBasicDataService basicDataService;
+
+    /** 维修方下拉选项：内置"自修" + 启用状态的供应商列表，仅需维修菜单权限。 */
+    @GetMapping("/repairer-options")
+    @RequirePermission(menu = MENU)
+    public Result<List<Map<String, String>>> repairerOptions(
+            @RequestParam(name = "keyword", required = false) String keyword) {
+        List<Map<String, String>> options = new ArrayList<>();
+        // 内置"自修"选项，始终排在最前
+        Map<String, String> selfRepair = new LinkedHashMap<>();
+        selfRepair.put("value", "自修");
+        selfRepair.put("label", "自修");
+        options.add(selfRepair);
+        // 从供应商管理读取启用的供应商，复用基础数据服务
+        List<Map<String, Object>> suppliers = basicDataService.listSuppliersDropdown(keyword);
+        for (Map<String, Object> s : suppliers) {
+            Map<String, String> opt = new LinkedHashMap<>();
+            String name = String.valueOf(s.get("name"));
+            String code = String.valueOf(s.get("code"));
+            opt.put("value", name);
+            opt.put("label", code + " - " + name);
+            options.add(opt);
+        }
+        return Result.success(options);
+    }
+
+    /** 维修申请人搜索，仅需维修菜单权限，复用在职员工精简选项。 */
+    @GetMapping("/applicant-options")
+    @RequirePermission(menu = MENU)
+    public Result<List<EamClaimEmployeeOptionVO>> applicantOptions(
+            @RequestParam(name = "keyword", required = false) String keyword) {
+        return Result.success(claimService.employeeOptions(keyword, null));
+    }
 
     /** 维修记录列表 */
     @GetMapping

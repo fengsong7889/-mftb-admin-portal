@@ -100,7 +100,7 @@ export default function AssetTransfer() {
             <Descriptions.Item label={t('asset.colFromUser')}>{asset.userName || '—'}</Descriptions.Item>
             <Descriptions.Item label={t('asset.colFromDept')}>{asset.department || '—'}</Descriptions.Item>
             <Descriptions.Item label={t('transfer.claimDate')}>{asset.claimDate || '—'}</Descriptions.Item>
-            <Descriptions.Item label={t('asset.colStatus')}>{t(({ idle: 'asset.statusIdle', in_use: 'asset.statusInUse', in_repair: 'asset.statusInRepair', scrapped: 'asset.statusScrapped' })[asset.status] || 'transfer.unknown')}</Descriptions.Item>
+            <Descriptions.Item label={t('asset.colStatus')}>{t(({ idle: 'asset.statusIdle', in_use: 'asset.statusInUse', in_repair: 'asset.statusInRepair', scrapped: 'asset.statusScrapped', lost: 'asset.statusLost', pending_inspection: 'asset.statusPendingInspection', written_off: 'asset.statusWrittenOff' })[asset.status] || 'transfer.unknown')}</Descriptions.Item>
           </Descriptions>
           <AssetParameters asset={asset} />
         </TransferSection>

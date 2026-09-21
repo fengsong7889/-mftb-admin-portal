@@ -44,6 +44,9 @@ const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   in_use:    { key: 'asset.statusInUse',     color: 'success' },
   in_repair: { key: 'asset.statusInRepair',  color: 'processing' },
   scrapped:  { key: 'asset.statusScrapped',  color: 'error' },
+  lost:      { key: 'asset.statusLost',      color: 'warning' },
+  pending_inspection: { key: 'asset.statusPendingInspection', color: 'blue' },
+  written_off: { key: 'asset.statusWrittenOff', color: 'default' },
 }
 
 const SOURCE_META: Record<AssetSource, { key: string; color: string }> = {
@@ -101,7 +104,7 @@ export default function AssetList() {
   const [tagTemplates, setTagTemplates] = useState<AssetTagTemplate[]>([])
   /** 各状态统计（受非状态过滤条件影响，用于 Tab 徽标） */
   const [stats, setStats] = useState<Record<AssetStatus | 'all', number>>({
-    all: 0, in_use: 0, idle: 0, in_repair: 0, scrapped: 0,
+    all: 0, in_use: 0, idle: 0, in_repair: 0, scrapped: 0, lost: 0, pending_inspection: 0, written_off: 0,
   })
 
   /* ----- 分类树 & 品牌列表（搜索区用） ----- */

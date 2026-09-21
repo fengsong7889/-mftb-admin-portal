@@ -157,6 +157,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'asset-transfer-list': 'Asset Transfer',
   'asset-handover':   'Asset Handover',
   'asset-repair':     'Asset Repair',
+  'asset-loss':       'Lost Asset',
   'asset-compensation': 'Damage Compensation',
   'asset-scrap':      'Asset Scrap',
   'asset-flow':       'Asset Flow',

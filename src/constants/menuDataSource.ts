@@ -157,6 +157,7 @@ export const keyToPath: Record<string, string> = {
   'asset-transfer-list': '/asset-transfer-list',
   'asset-handover':      '/asset-handover',
   'asset-repair':        '/asset-repair',
+  'asset-loss':          '/asset-loss',
   'asset-compensation':  '/asset-compensation',
   'asset-scrap':         '/asset-scrap',
   'asset-flow':          '/asset-flow',
@@ -239,7 +240,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'asset-dashboard', 'asset-supplier', 'asset-list', 'asset-category', 'asset-model',
   'asset-location', 'param-library', 'asset-tag', 'asset-inbound',
   'asset-claim', 'asset-borrow', 'asset-return', 'asset-transfer-list',
-  'asset-handover', 'asset-repair', 'asset-compensation', 'asset-scrap',
+  'asset-handover', 'asset-repair', 'asset-loss', 'asset-compensation', 'asset-scrap',
   'asset-flow', 'asset-inventory',
   // EAM 採購
   'purchase-order', 'purchase-request',

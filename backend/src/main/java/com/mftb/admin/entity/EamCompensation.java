@@ -21,6 +21,9 @@ public class EamCompensation {
     /** 关联归还记录 ID */
     private Long returnId;
 
+    /** 关联遗失单 ID（遗失类型赔付时关联） */
+    private Long lossId;
+
     /** 资产 ID */
     private Long assetId;
 

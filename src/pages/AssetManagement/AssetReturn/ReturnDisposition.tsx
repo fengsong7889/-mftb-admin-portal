@@ -5,6 +5,7 @@ import { Alert, Button, DatePicker, Descriptions, Form, Input, Radio, Spin } fro
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import type { ReturnRow } from '../../../api/eamReturn'
 import AssetParameters from '../../../components/AssetParameters'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
@@ -35,6 +36,7 @@ interface RecoverValues {
 
 export default function ReturnDisposition({ record, loading = false, canEdit = false, recover = false, onSubmit, onBack }: Props) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [dispositionForm] = Form.useForm<DispositionValues>()
   const [recoverForm] = Form.useForm<RecoverValues>()
 
@@ -69,7 +71,7 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
 
   if (recover) {
     return <>
-      <ReturnHeader title={`遺失找回 · ${record.returnNo}`} onBack={onBack} />
+      <ReturnHeader title={`遺失資產 · ${record.returnNo}`} onBack={onBack} />
       <Spin spinning={loading}>
         <ReturnSection title="歸還記錄">
           <Descriptions column={2}>
@@ -81,17 +83,13 @@ export default function ReturnDisposition({ record, loading = false, canEdit = f
           <AssetParameters asset={record} current />
         </ReturnSection>
         <ReturnSection title="找回信息">
-          <Alert className="claim-notice" showIcon type="info" message="登記找回事實，不改寫原始歸還記錄。找回後資產恢復可使用狀態。" />
-          <Form<RecoverValues> form={recoverForm} layout="vertical" disabled={loading}>
-            <Form.Item name="note" label="找回說明" rules={[{ required: true, whitespace: true }]}>
-              <Input.TextArea rows={4} maxLength={500} placeholder="說明找回的時間、地點、狀況等" />
-            </Form.Item>
-          </Form>
+          <Alert className="claim-notice" showIcon type="info" message={
+            <span>遺失資產功能已遷移至「遺失資產」模塊。請前往 <a onClick={() => navigate('/asset-loss')}>遺失資產</a> 菜單進行找回、驗收等操作。</span>
+          } />
         </ReturnSection>
       </Spin>
       <div className="form-footer">
-        <Button onClick={onBack}>取消</Button>
-        <Button type="primary" icon={<SaveOutlined />} loading={loading} onClick={handleRecoverSubmit}>確認找回</Button>
+        <Button onClick={onBack}>返回</Button>
       </div>
     </>
   }

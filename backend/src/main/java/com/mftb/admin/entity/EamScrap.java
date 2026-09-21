@@ -59,6 +59,9 @@ public class EamScrap {
     /** 关联归还记录 ID */
     private Long returnId;
 
+    /** 关联遗失单 ID（遗失核销时关联） */
+    private Long lossId;
+
     /** 状态：pending/approved/rejected/cancelled */
     private String status;
 

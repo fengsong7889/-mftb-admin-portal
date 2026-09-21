@@ -1,10 +1,23 @@
 package com.mftb.admin.security.permission;
 
 import com.mftb.admin.controller.*;
+import com.mftb.admin.dto.EamClaimEmployeeOptionVO;
 import com.mftb.admin.security.SecurityTestBase;
+import com.mftb.admin.service.EamBasicDataService;
+import com.mftb.admin.service.EamClaimService;
+import com.mftb.admin.service.EamRepairService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,10 +42,92 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         LlmUsageController.class,
         NotificationController.class,
         IconfontController.class,
-        CardOrderController.class
+        CardOrderController.class,
+        EamRepairController.class
 })
 @DisplayName("R-24: 无权限注解 API 审计")
 class UnprotectedApiAuditTest extends SecurityTestBase {
+
+    @MockBean
+    private EamRepairService repairService;
+    @MockBean
+    private EamClaimService claimService;
+    @MockBean
+    private EamBasicDataService basicDataService;
+
+    @Test
+    @DisplayName("维修申请人搜索：仅维修查看权限即可搜索，不依赖领用或员工管理权限")
+    void repairApplicantOptionsRequireOnlyRepairPermission() throws Exception {
+        denyAllPermissions(viewerUser);
+        grantPermission(viewerUser, "asset-repair", "view");
+        EamClaimEmployeeOptionVO employee = new EamClaimEmployeeOptionVO();
+        employee.setEmployeeId(3L);
+        employee.setEmpName("测试员工");
+        employee.setEmpNo("MF00003");
+        when(claimService.employeeOptions("MF00003", null)).thenReturn(List.of(employee));
+
+        mockMvc.perform(authGet("/api/eam/repairs/applicant-options?keyword=MF00003", viewerUser))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].empName").value("测试员工"))
+                .andExpect(jsonPath("$.data[0].empNo").value("MF00003"));
+        verify(claimService).employeeOptions("MF00003", null);
+        verifyNoInteractions(repairService);
+    }
+
+    @Test
+    @DisplayName("维修申请人搜索：无维修菜单权限时拒绝访问")
+    void repairApplicantOptionsBlockedWithoutRepairPermission() throws Exception {
+        denyAllPermissions(guestUser);
+        mockMvc.perform(authGet("/api/eam/repairs/applicant-options", guestUser))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(403));
+        verifyNoInteractions(claimService);
+    }
+
+    @Test
+    @DisplayName("维修申请人搜索：未登录时拒绝访问")
+    void repairApplicantOptionsBlockedWithoutLogin() throws Exception {
+        mockMvc.perform(get("/api/eam/repairs/applicant-options"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(claimService);
+    }
+
+    @Test
+    @DisplayName("维修方下拉：仅维修查看权限即可访问，返回内置自修 + 供应商")
+    void repairerOptionsRequireOnlyRepairPermission() throws Exception {
+        denyAllPermissions(viewerUser);
+        grantPermission(viewerUser, "asset-repair", "view");
+        Map<String, Object> supplier = Map.of("id", 1L, "code", "CGSJ000001", "name", "测试供应商");
+        when(basicDataService.listSuppliersDropdown(any())).thenReturn(List.of(supplier));
+
+        mockMvc.perform(authGet("/api/eam/repairs/repairer-options", viewerUser))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].value").value("自修"))
+                .andExpect(jsonPath("$.data[1].value").value("测试供应商"))
+                .andExpect(jsonPath("$.data[1].label").value("CGSJ000001 - 测试供应商"));
+        verify(basicDataService).listSuppliersDropdown(null);
+        verifyNoInteractions(repairService);
+    }
+
+    @Test
+    @DisplayName("维修方下拉：无维修菜单权限时拒绝访问")
+    void repairerOptionsBlockedWithoutRepairPermission() throws Exception {
+        denyAllPermissions(guestUser);
+        mockMvc.perform(authGet("/api/eam/repairs/repairer-options", guestUser))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(403));
+        verifyNoInteractions(basicDataService);
+    }
+
+    @Test
+    @DisplayName("维修方下拉：未登录时拒绝访问")
+    void repairerOptionsBlockedWithoutLogin() throws Exception {
+        mockMvc.perform(get("/api/eam/repairs/repairer-options"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(basicDataService);
+    }
 
     // ── MCP 工具执行（已修复: 需要 ai-mcp-service 权限） ──
 

@@ -15,6 +15,8 @@ interface RemoteSearchSelectProps {
   debounceMs?: number
   /** 透传至 Select 的样式（弹窗等非搜索区场景需自行控制宽度） */
   style?: React.CSSProperties
+  /** 选项选中回调（用于选择后联动操作，如自动填充部门） */
+  onSelect?: (value: string) => void
 }
 
 /**
@@ -28,6 +30,7 @@ export default function RemoteSearchSelect({
   initialOptions,
   debounceMs = 300,
   style,
+  onSelect,
 }: RemoteSearchSelectProps) {
   const [options, setOptions] = useState<OptionItem[]>(initialOptions ?? [])
   const [loading, setLoading] = useState(false)
@@ -93,6 +96,7 @@ export default function RemoteSearchSelect({
       loading={loading}
       onSearch={handleSearch}
       onOpenChange={handleOpenChange}
+      onSelect={onSelect}
       notFoundContent={loading ? <Spin size="small" /> : undefined}
     />
   )

@@ -32,6 +32,7 @@ public class EamCompensationServiceImpl implements EamCompensationService {
     private final EamReturnMapper returnMapper;
     private final EamClaimEvidenceMapper evidenceMapper;
     private final EamAssetMapper assetMapper;
+    private final EamLossMapper lossMapper;
     private final SysUserMapper userMapper;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
@@ -191,8 +192,9 @@ public class EamCompensationServiceImpl implements EamCompensationService {
     public void addPayment(EamCompensationPaymentDTO dto) {
         EamCompensation comp = compensationMapper.selectForUpdate(dto.getCompensationId());
         if (comp == null) throw new BusinessException("賠付記錄不存在");
-        if (!"confirmed".equals(comp.getStatus()) && !"partially_paid".equals(comp.getStatus())) {
-            throw new BusinessException("當前狀態不可收款");
+        if (!"confirmed".equals(comp.getStatus()) && !"partially_paid".equals(comp.getStatus())
+                && !"refund_pending".equals(comp.getStatus())) {
+            throw new BusinessException("當前狀態不可收款或退款");
         }
         if (dto.getAmount() == null || dto.getAmount() <= 0) throw new BusinessException("金額必須大於0");
 
@@ -274,6 +276,39 @@ public class EamCompensationServiceImpl implements EamCompensationService {
             newStatus = "partially_paid";
         }
         compensationMapper.updateAfterReview(comp.getId(), dto.getNewAmount(), newStatus, operatorResolver.currentOperatorName());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markLossRecoveryReview(long lossId) {
+        // 查找关联的遗失类型赔付记录
+        EamCompensation comp = compensationMapper.selectOne(
+                new LambdaQueryWrapper<EamCompensation>()
+                        .eq(EamCompensation::getLossId, lossId)
+                        .eq(EamCompensation::getDamageType, "loss"));
+        if (comp == null) {
+            // 也尝试通过 return_id 查找
+            EamLoss loss = lossMapper.selectById(lossId);
+            if (loss != null && loss.getReturnId() != null) {
+                comp = compensationMapper.selectOne(
+                        new LambdaQueryWrapper<EamCompensation>()
+                                .eq(EamCompensation::getReturnId, loss.getReturnId())
+                                .eq(EamCompensation::getDamageType, "loss"));
+            }
+        }
+        if (comp == null) {
+            log.info("遗失单 {} 无关联赔付记录，跳过复核标记", lossId);
+            return;
+        }
+        // 已结清或已免赔的不标记
+        if ("paid".equals(comp.getStatus()) || "waived".equals(comp.getStatus())) {
+            log.info("赔付记录 {} 已结清或免赔，跳过复核标记", comp.getId());
+            return;
+        }
+        comp.setReviewRequired(1);
+        comp.setUpdatedBy(operatorResolver.currentOperatorName());
+        compensationMapper.updateById(comp);
+        log.info("标记赔付记录 {} 需要找回复核，关联遗失单 {}", comp.getId(), lossId);
     }
 
     private EamCompensation requireCompensation(long id) {

@@ -8,7 +8,7 @@
  * 样式基准：采购订单详情 — DetailPageHeader + 无边框模块卡片 + Descriptions column=4 + footer。
  */
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, DatePicker, Descriptions, Empty, Form, Radio, Result, Space, Spin, Steps, Switch, Tag } from 'antd'
+import { Alert, Button, DatePicker, Descriptions, Empty, Form, Modal, Radio, Result, Space, Spin, Steps, Tag } from 'antd'
 import {
   FileTextOutlined, ProfileOutlined, InboxOutlined,
   FileProtectOutlined, RollbackOutlined, AppstoreOutlined,
@@ -102,9 +102,6 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
   const dispositionRef = useRef<HTMLDivElement>(null)
   const recoverRef = useRef<HTMLDivElement>(null)
 
-  /** 監聽處置結果，控制賠付定責開關的可見性 */
-  const watchedDisposition = Form.useWatch('disposition', dispositionForm)
-
   /** editMode 時自動滾動到對應模塊 */
   useEffect(() => {
     if (!editMode || !record) return
@@ -162,16 +159,45 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
   const isClaim = !!record.claimId
   const isBorrow = !!record.borrowId
 
-  /** 處置提交 */
+  /** 處置提交（含申請維修二次確認） */
   const handleDispositionSubmit = async () => {
     try {
       const values = await dispositionForm.validateFields()
-      setSubmitting(true)
-      await onDispose?.({
+      const dto: ReturnDispositionDTO = {
         disposition: values.disposition,
         dispositionDate: values.date.format('YYYY-MM-DD'),
-        needCompensation: values.needCompensation ?? false,
-      })
+      }
+
+      // 申請維修時彈出二次確認
+      if (values.disposition === 'apply_repair') {
+        Modal.confirm({
+          title: '確認申請維修？',
+          className: 'custom-confirm-modal',
+          icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+          content: (
+            <div className="confirm-info-card">
+              <div className="confirm-info-row"><span>資產編號：</span><b>{record.assetNo}</b></div>
+              <div className="confirm-info-row"><span>資產名稱：</span><b>{record.assetName}</b></div>
+              <div className="confirm-info-row"><span>異常說明：</span><b>{record.exceptionReason || '—'}</b></div>
+              <div className="confirm-info-row"><span>處置日期：</span><b>{values.date.format('YYYY-MM-DD')}</b></div>
+            </div>
+          ),
+          okText: '確認申請維修',
+          cancelText: '取消',
+          onOk: async () => {
+            setSubmitting(true)
+            try {
+              await onDispose?.(dto)
+            } finally {
+              setSubmitting(false)
+            }
+          },
+        })
+        return
+      }
+
+      setSubmitting(true)
+      await onDispose?.(dto)
     } catch { /* validation */ } finally {
       setSubmitting(false)
     }
@@ -357,9 +383,11 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
           <Descriptions.Item label="歸還日期">{record.returnDate}</Descriptions.Item>
           <Descriptions.Item label="實際歸還人">
             {(() => {
-              const name = record.actualReturneeName || record.empName || '—'
+              const rawName = record.actualReturneeName || record.empName || '—'
+              // actualReturneeName 可能已含工号（如「冯松（MF00002）」），避免重复拼接
               const no = record.actualReturneeNo
-              return no ? `${name}（${no}）` : name
+              if (no && rawName.includes(no)) return rawName
+              return no ? `${rawName}（${no}）` : rawName
             })()}
           </Descriptions.Item>
           <Descriptions.Item label="操作人">
@@ -371,6 +399,11 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
           </Descriptions.Item>
           <Descriptions.Item label="驗收狀況">
             <Tag color={CONDITION_COLOR[record.assetCondition]}>{CONDITION_LABEL[record.assetCondition] || record.assetCondition}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="處理結果">
+            {record.disposition
+              ? <Tag color="processing">{ALL_DISPOSITION_OPTIONS.find(o => o.value === record.disposition)?.label || record.disposition}</Tag>
+              : '—'}
           </Descriptions.Item>
           <Descriptions.Item label={record.assetCondition === 'normal' ? '歸還說明' : '異常說明'} span={4}>
             {record.assetCondition === 'normal' ? (record.returnReason || '—') : (record.exceptionReason || '—')}
@@ -398,19 +431,13 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
                 ? '請選擇處置方式。選擇報廢將自動創建報廢記錄；選擇申請維修將自動創建維修記錄並流入維修管理菜單。'
                 : '請選擇處置方式。選擇報廢或遺失核銷將自動創建報廢記錄。'
             } style={{ marginBottom: 16 }} />
-            <Form form={dispositionForm} layout="vertical" disabled={submitting} initialValues={{ date: dayjs(), needCompensation: false }}>
+            <Form form={dispositionForm} layout="vertical" disabled={submitting} initialValues={{ date: dayjs() }}>
               <Form.Item name="disposition" label="處置結果" rules={[{ required: true, message: '請選擇處置結果' }]}>
                 <Radio.Group optionType="button" buttonStyle="solid" options={dispositionOptions} />
               </Form.Item>
               <Form.Item name="date" label="處置日期" rules={[{ required: true, message: '請選擇處置日期' }]}>
                 <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
               </Form.Item>
-              {watchedDisposition !== 'apply_repair' && (
-                <Form.Item name="needCompensation" label="是否需要鑑定賠付定責" valuePropName="checked"
-                  tooltip="選擇「是」將自動創建賠付記錄，可在「損壞賠付」菜單中後續定責、收款">
-                  <Switch checkedChildren="是" unCheckedChildren="否" />
-                </Form.Item>
-              )}
             </Form>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <Button onClick={onBack}>取消</Button>
@@ -431,45 +458,26 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       </div>
       )}
 
-      {/* ====== 模块 7：遗失找回 ====== */}
+      {/* ====== 模块 7：遗失找回（已迁移至遗失找回模块） ====== */}
       {canRecover && (
         <div style={detailCardStyle} ref={recoverRef}>
           <SectionTitle
             icon={<SearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
             iconBg="#e6f7ff"
-            title="遺失找回"
+            title="遺失資產"
             tag={record.recovered === 1
               ? <Tag color="success">已找回</Tag>
-              : editMode
-                ? <Tag color="processing">編輯中</Tag>
-                : <Tag>未找回</Tag>}
+              : <Tag>未找回</Tag>}
           />
-          {editMode && !record.recovered ? (
-            <>
-              <Alert className="claim-notice" showIcon type="info" message="登記找回事實，不改寫原始歸還記錄。找回後資產恢復可使用狀態。" style={{ marginBottom: 16 }} />
-              <Form form={recoverForm} layout="vertical" disabled={submitting}>
-                <Form.Item name="note" label="找回說明" rules={[{ required: true, whitespace: true, message: '請填寫找回說明' }]}>
-                  <Radio.Group optionType="button" buttonStyle="solid" options={[
-                    { value: '已尋回，資產恢復可使用', label: '已尋回，資產恢復可使用' },
-                    { value: '部分尋回，需進一步確認', label: '部分尋回，需進一步確認' },
-                  ]} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }} />
-                </Form.Item>
-              </Form>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-                <Button onClick={onBack}>取消</Button>
-                <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleRecoverSubmit}
-                  style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', boxShadow: '0 2px 4px rgba(232,114,12,0.25)' }}>
-                  確認找回
-                </Button>
-              </div>
-            </>
-          ) : record.recovered === 1 ? (
+          {record.recovered === 1 ? (
             <Descriptions column={4} size="middle">
               <Descriptions.Item label="找回日期">{record.recoveredDate || '—'}</Descriptions.Item>
               <Descriptions.Item label="找回說明">{record.recoveredNote || '—'}</Descriptions.Item>
             </Descriptions>
           ) : (
-            <Empty description="尚未登記找回" />
+            <Alert className="claim-notice" showIcon type="info" message={
+              <span>遺失資產功能已遷移至「遺失資產」模塊。請前往 <a onClick={() => navigate('/asset-loss')}>遺失資產</a> 菜單進行找回、驗收等操作。</span>
+            } />
           )}
         </div>
       )}

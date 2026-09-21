@@ -27,5 +27,5 @@ export function ClaimSection({ title, icon, children }: { title: string; icon?: 
 }
 
 export function ClaimConnectionNotice() {
-  return <Alert type="info" showIcon className="claim-notice" message="界面验收阶段 · 真实领用服务待接通" description="当前不读取模拟领用记录，也不提交业务数据。统计中的 — 表示尚未加载；界面确认后接通员工签署、资产预留和正常归还。" />
+  return <Alert type="info" showIcon className="claim-notice" message="界面驗收階段 · 真實領用服務待接通" description="當前不讀取模擬領用記錄，也不提交業務數據。統計中的 — 表示尚未加載；界面確認後接通員工簽署、資產預留和正常歸還。" />
 }

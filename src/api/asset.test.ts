@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import request from './request'
-import { fetchAssetList, fetchAssetDetail, updateAsset, parseAssetImages, type AssetItem } from './asset'
+import { fetchAssetList, fetchAssetDetail, updateAsset, parseAssetImages, fetchRepairApplicantOptions, repairAsset, updateRepair, type AssetItem } from './asset'
 
 vi.mock('./request', () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
@@ -26,6 +26,44 @@ describe('parseAssetImages', () => {
 
   it.each([null, undefined, '', '[]'])('空输入返回空数组（%s）', (v) => {
     expect(parseAssetImages(v as string | null | undefined)).toEqual([])
+  })
+})
+
+describe('维修申请人选项与保存', () => {
+  it.each([' MF00002 ', ' 测试员工 '])('通过维修菜单接口搜索姓名或工号：%s', async keyword => {
+    const employees = [{ employeeId: 2, empName: '测试员工', empNo: 'MF00002' }]
+    vi.mocked(request.get).mockResolvedValueOnce(employees)
+    await expect(fetchRepairApplicantOptions(keyword)).resolves.toEqual(employees)
+    expect(request.get).toHaveBeenCalledWith('/eam/repairs/applicant-options', {
+      params: { keyword: keyword.trim() },
+    })
+  })
+
+  it('首次展开加载默认选项，空白关键字不作为筛选条件', async () => {
+    vi.mocked(request.get).mockResolvedValueOnce([])
+    await expect(fetchRepairApplicantOptions('  ')).resolves.toEqual([])
+    expect(request.get).toHaveBeenCalledWith('/eam/repairs/applicant-options', {
+      params: { keyword: undefined },
+    })
+  })
+
+  it('搜索失败向上抛出，不伪造员工选项', async () => {
+    vi.mocked(request.get).mockRejectedValueOnce(new Error('forbidden'))
+    await expect(fetchRepairApplicantOptions('MF00002')).rejects.toThrow('forbidden')
+  })
+
+  it('新增和编辑均保留申请人姓名及工号快照，编辑锁定具体记录', async () => {
+    const applicant = '测试员工（MF00002）'
+    const record = {
+      assetId: 1, assetNo: 'FA0001', assetName: '电脑', repairDate: '2026-09-21',
+      faultDesc: '屏幕损坏', repairContent: '更换屏幕', repairBy: '自修', cost: 200,
+      applicant, finishDate: null, status: 'repairing' as const,
+    }
+    vi.mocked(request.post).mockResolvedValueOnce(123)
+    await expect(repairAsset(record)).resolves.toBe(123)
+    expect(request.post).toHaveBeenCalledWith('/eam/repairs', expect.objectContaining({ applicant, cost: 200 }))
+    await updateRepair(123, { applicant, cost: 300 })
+    expect(request.put).toHaveBeenCalledWith('/eam/repairs/123', { applicant, cost: 300 })
   })
 })
 

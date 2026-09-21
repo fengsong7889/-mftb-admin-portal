@@ -30,4 +30,12 @@ public interface EamCompensationService {
 
     /** 找回复核 */
     void review(EamCompensationReviewDTO dto);
+
+    /**
+     * 标记遗失类型赔付记录需要找回复核（由遗失模块在登记找回时调用）。
+     * 仅对 damageType=loss 且未结清的记录生效。
+     *
+     * @param lossId 遗失单 ID
+     */
+    void markLossRecoveryReview(long lossId);
 }

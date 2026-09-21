@@ -2,7 +2,7 @@ import type { AssetItem } from '../../../api/asset'
 import type { AssetParameterSource } from '../../../utils/assetParams'
 import type { DepartmentItem } from '../../../api/department'
 
-// 界面契约与数据接入分离；第三阶段由真实 API 提供这些只读模型。
+// 界面契約與數據接入分離；第三階段由真實 API 提供這些只讀模型。
 export const CLAIM_STATUS = {
   PENDING: 'pending_signature', CLAIMED: 'claimed', RETURNED: 'returned', CANCELLED: 'cancelled', TRANSFERRED: 'transferred',
 } as const
@@ -64,15 +64,15 @@ export interface ClaimRow extends AssetParameterSource {
   updatedBy?: string
   updatedAt?: string
   contentHash?: string
-  /** 购买时价值（来自资产台账） */
+  /** 購買時價值（來自資產台賬） */
   purchaseValue?: number | null
-  /** 管理部门（来自资产台账） */
+  /** 管理部門（來自資產台賬） */
   adminDepartment?: string
-  /** 归还验收状况：normal/damaged/lost（仅已归还时有值） */
+  /** 歸還驗收狀況：normal/damaged/lost（僅已歸還時有值） */
   assetCondition?: 'normal' | 'damaged' | 'lost'
-  /** 签名凭证 Data URL（签署后才有） */
+  /** 簽名憑證 Data URL（簽署後才有） */
   signatureImageUrl?: string
-  /** 领用配件快照 [{name, qty}] */
+  /** 領用配件快照 [{name, qty}] */
   accessories?: { name: string; qty: number }[]
 }
 export interface ClaimPage<T> { records: T[]; total: number }
@@ -94,7 +94,7 @@ export interface ClaimRegistration {
   remark?: string
   mode: 'standard' | 'proxy'
   proxyReason?: string
-  /** 领用配件快照 JSON */
+  /** 領用配件快照 JSON */
   accessories?: string
 }
 export type ClaimAssetOption = Pick<AssetItem,

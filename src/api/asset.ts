@@ -14,7 +14,7 @@ import { normalizeAssetParams, type AssetParameterSource } from '../utils/assetP
 /* ==================== 枚举类型 ==================== */
 
 /** 资产状态 */
-export type AssetStatus = 'idle' | 'in_use' | 'in_repair' | 'scrapped'
+export type AssetStatus = 'idle' | 'in_use' | 'in_repair' | 'scrapped' | 'lost' | 'pending_inspection' | 'written_off'
 
 /** 自购/租用 */
 export type AssetSource = 'self' | 'lease'
@@ -619,6 +619,32 @@ export function createScrapRecord(data: Omit<ScrapRecord, 'id' | 'createdAt' | '
 /** 删除报废记录（仅允许待审批状态） */
 export function deleteScrapRecord(id: number): Promise<void> {
   return request.delete<unknown, void>(`/eam/scraps/${id}`)
+}
+
+export interface RepairApplicantOption {
+  employeeId: number
+  empName: string
+  empNo?: string | null
+}
+
+/** 维修方下拉选项（内置"自修" + 供应商管理中的启用供应商） */
+export interface RepairerOption {
+  value: string
+  label: string
+}
+
+/** 维修申请人搜索：使用维修菜单权限，不依赖员工管理权限。 */
+export function fetchRepairApplicantOptions(keyword: string): Promise<RepairApplicantOption[]> {
+  return request.get<unknown, RepairApplicantOption[]>('/eam/repairs/applicant-options', {
+    params: { keyword: keyword.trim() || undefined },
+  })
+}
+
+/** 维修方下拉搜索：内置"自修" + 供应商管理启用供应商，仅需维修菜单权限。 */
+export function fetchRepairerOptions(keyword: string): Promise<RepairerOption[]> {
+  return request.get<unknown, RepairerOption[]>('/eam/repairs/repairer-options', {
+    params: { keyword: keyword.trim() || undefined },
+  })
 }
 
 /** 资产维修 */

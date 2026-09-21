@@ -1813,6 +1813,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("asset-transfer-list", "Transfer Asset"),
                 Map.entry("asset-handover", "Handover Asset"),
                 Map.entry("asset-repair", "Asset Repair"),
+                Map.entry("asset-loss", "Lost Asset"),
                 Map.entry("asset-compensation", "Damage Compensation"),
                 Map.entry("asset-scrap", "Scrap Asset"),
                 Map.entry("asset-inventory", "Inventory Asset"),
@@ -1918,6 +1919,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SwapOutlined'      WHERE menu_key = 'asset-transfer-list' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'TeamOutlined'      WHERE menu_key = 'asset-handover'   AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ToolOutlined'      WHERE menu_key = 'asset-repair'    AND (icon IS NULL OR icon = '')");
+                jdbcTemplate.update("UPDATE sys_menu SET icon = 'SearchOutlined'     WHERE menu_key = 'asset-loss'      AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'DollarOutlined'    WHERE menu_key = 'asset-compensation' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'DeleteOutlined'    WHERE menu_key = 'asset-scrap'     AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'HistoryOutlined'   WHERE menu_key = 'asset-flow'      AND (icon IS NULL OR icon = '')");
@@ -2239,10 +2241,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-transfer-list",new String[]{"調撥資產",         "asset-flow-ops",     "5"});
         menus.put("asset-handover",     new String[]{"交接資產",         "asset-flow-ops",     "6"});
         menus.put("asset-repair",       new String[]{"維修管理",         "asset-flow-ops",     "7"});
-        menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-flow-ops",     "8"});
-        menus.put("asset-scrap",        new String[]{"報廢資產",         "asset-flow-ops",     "9"});
-        menus.put("asset-inventory",    new String[]{"盤點資產",         "asset-flow-ops",     "10"});
-        menus.put("asset-flow",         new String[]{"變更歷史",         "asset-flow-ops",     "11"});
+        menus.put("asset-loss",        new String[]{"遺失資產",         "asset-flow-ops",     "8"});
+        menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-flow-ops",     "9"});
+        menus.put("asset-scrap",        new String[]{"報廢資產",         "asset-flow-ops",     "10"});
+        menus.put("asset-inventory",    new String[]{"盤點資產",         "asset-flow-ops",     "11"});
+        menus.put("asset-flow",         new String[]{"變更歷史",         "asset-flow-ops",     "12"});
         // 三级菜单 → 基础数据
         menus.put("asset-category",     new String[]{"分類庫",           "asset-basic",        "1"});
         menus.put("asset-model",        new String[]{"品牌產品庫",       "asset-basic",        "2"});

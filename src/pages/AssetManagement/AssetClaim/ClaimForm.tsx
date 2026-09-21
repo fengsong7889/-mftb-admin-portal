@@ -92,7 +92,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
   useEffect(() => {
     if (initialEmployee) { setEmployee(initialEmployee); form.setFieldValue('employeeId', initialEmployee.employeeId) }
   }, [initialEmployee, form])
-  // 当所选资产变化时，同步配件清单（从资产复制）
+  // 當所選資產變化時，同步配件清單（從資產複製）
   useEffect(() => {
     if (selected?.accessories?.length) {
       setClaimAccessories(selected.accessories.map(a => ({ name: a.name, qty: a.qty })))
@@ -108,26 +108,26 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
     try {
       const v = await form.validateFields()
       if (!selected || !employee || (v.mode === 'proxy' && !canProxy)) {
-        setSubmitError('请等待资产和员工信息加载完成，并确认当前操作权限。')
+        setSubmitError('請等待資產和員工信息加載完成，並確認當前操作權限。')
         return
       }
       const payload: ClaimRegistration = {
         assetId: v.assetId, employeeId: v.employeeId, claimDate: v.claimDate.format('YYYY-MM-DD'),
         claimReason: v.claimReason?.trim(), remark: v.remark?.trim(), mode: v.mode,
         proxyReason: v.mode === 'proxy' ? v.proxyReason?.trim() : undefined,
-        // 始终携带快照（含空数组）：NULL 仅留给历史旧数据，删光配件时需存 "[]" 以免详情页回退展示资产配件
+        // 始終攜帶快照（含空數組）：NULL 僅留給歷史舊數據，刪光配件時需存 "[]" 以免詳情頁回退展示資產配件
         accessories: JSON.stringify(claimAccessories),
       }
       const confirmed = await modal.confirm({
-        title: v.mode === 'proxy' ? '确认代办领用？' : '确认登记并发送待签？',
+        title: v.mode === 'proxy' ? '確認代辦領用？' : '確認登記並發送待簽？',
         className: 'custom-confirm-modal',
         icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         content: <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>领用人：</span><b>{employee.empName}（{employee.empNo}）</b></div>
-          <div className="confirm-info-row"><span>资产：</span><b>{selected.assetNo} / {selected.assetName}</b></div>
-          <div className="confirm-info-row"><span>领用日期：</span><b>{payload.claimDate}</b></div>
-          <div className="confirm-info-row"><span>处理结果：</span><b>{v.mode === 'proxy' ? '立即在用，保留代办未签标识' : '预留资产，等待员工本人签署'}</b></div>
-          {v.mode === 'proxy' && <div className="confirm-info-row"><span>代办原因：</span><b>{payload.proxyReason}</b></div>}
+          <div className="confirm-info-row"><span>領用人：</span><b>{employee.empName}（{employee.empNo}）</b></div>
+          <div className="confirm-info-row"><span>資產：</span><b>{selected.assetNo} / {selected.assetName}</b></div>
+          <div className="confirm-info-row"><span>領用日期：</span><b>{payload.claimDate}</b></div>
+          <div className="confirm-info-row"><span>處理結果：</span><b>{v.mode === 'proxy' ? '立即在用，保留代辦未簽標識' : '預留資產，等待員工本人簽署'}</b></div>
+          {v.mode === 'proxy' && <div className="confirm-info-row"><span>代辦原因：</span><b>{payload.proxyReason}</b></div>}
         </div>,
         okText: t('common.confirm'), cancelText: t('common.cancel'),
       })

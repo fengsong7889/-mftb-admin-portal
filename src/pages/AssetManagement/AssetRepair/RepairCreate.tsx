@@ -3,7 +3,7 @@
  *
  * 页面结构（自上而下）：
  * 1. 资产信息模块 —— 未选择资产时提供「选择资产」入口；选择后带出台账数据
- *    （领用编号/资产编号/名称/所属品牌/资产品牌/分类/购买时价值/管理部门 + 参数信息 + 领用配件）
+ *    （领用编号/资产编号/名称/所属品牌/资产品牌/分类/购买时价值/管理部门 + 参数信息 + 资产配件）
  * 2. 当前使用人模块 —— 仅资产非闲置（有人使用）时展示：当前使用人/所在部门/持有方式/领用日期
  * 3. 维修记录模块 —— 选择资产后才显示，填写维修登记表单
  *
@@ -20,22 +20,20 @@ import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AssetParameters from '../../../components/AssetParameters'
+import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
+import type { OptionItem } from '../../../api/types'
 import { useAuth } from '../../../contexts/AuthContext'
 import { fetchClaimDetail } from '../../../api/eamClaim'
 import type { ClaimRow } from '../AssetClaim/claimViewTypes'
 import {
-  fetchAssetDetail, fetchAssetList, repairAsset,
+  fetchAssetDetail, fetchAssetList, repairAsset, fetchRepairerOptions,
   type AssetItem, type AssetStatus,
 } from '../../../api/asset'
 
-const REPAIR_BY_OPTIONS = [
-  { value: 'HP 授权维修点', labelKey: 'repairByHp' },
-  { value: 'Dell 售后', labelKey: 'repairByDell' },
-  { value: '联想服务中心', labelKey: 'repairByLenovo' },
-  { value: 'Apple Store', labelKey: 'repairByApple' },
-  { value: '自修', labelKey: 'repairBySelf' },
-  { value: '其他第三方', labelKey: 'repairByOther' },
-]
+async function fetchRepairerOptionsForSelect(keyword: string): Promise<OptionItem[]> {
+  const options = await fetchRepairerOptions(keyword)
+  return options.map(o => ({ value: o.value, label: o.label }))
+}
 
 const CAUSE_OPTIONS = [
   { value: 'human', labelKey: 'causeHuman' },
@@ -47,6 +45,7 @@ const CAUSE_OPTIONS = [
 /** 资产状态 → 标签颜色 */
 const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {
   idle: 'default', in_use: 'success', in_repair: 'processing', scrapped: 'error',
+  lost: 'warning', pending_inspection: 'blue', written_off: 'default',
 }
 
 /** 模块卡片统一样式（无边框阴影，对齐 EAM 详情页规范） */
@@ -263,7 +262,7 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
                   <div style={{ marginTop: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('asset.claimedAccessoriesTitle', '領用配件')}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('asset.repairAccessoriesTitle', '資產配件')}</span>
                       {accessories.length > 0 && <Tag color="orange" style={{ fontSize: 11 }}>{t('asset.accessoryCount', { count: accessories.length })}</Tag>}
                       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                     </div>
@@ -284,7 +283,7 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
                       <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoriesEmpty')}</span>
                     )}
                     <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
-                      {t('asset.accessoryRemoveTip', '點擊 × 可移除不需要的配件，歸還時僅展示領用的配件。')}
+                      {t('asset.repairAccessoryRemoveTip', '點擊 × 可移除不需要维修的配件，歸還時僅展示维修的配件。')}
                     </div>
                   </div>
                 )
@@ -334,9 +333,11 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
                   <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
                 </Form.Item>
                 <Form.Item label={t('asset.colRepairBy')} name="repairBy" rules={[{ required: true, message: t('asset.repairByRequired') }]}>
-                  <Select placeholder={t('asset.repairByPh')} allowClear>
-                    {REPAIR_BY_OPTIONS.map((o) => <Select.Option key={o.value} value={o.value}>{t(`asset.${o.labelKey}`)}</Select.Option>)}
-                  </Select>
+                  <RemoteSearchSelect
+                    placeholder={t('asset.repairerPh', '请搜索供应商名称或编码')}
+                    fetchOptions={fetchRepairerOptionsForSelect}
+                    style={{ width: '100%' }}
+                  />
                 </Form.Item>
                 <Form.Item label={t('asset.colCost')} name="cost">
                   <InputNumber min={0} step={50} addonAfter="MOP" style={{ width: '100%' }} />

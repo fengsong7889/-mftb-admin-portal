@@ -63,6 +63,9 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v21-return-operator-id", this::addReturnOperatorIdColumn);
         versionTracker.applyOnce("eam:schema-v22-scrap-table", this::createScrapTable);
         versionTracker.applyOnce("eam:schema-v23-repair-return-link", this::addRepairReturnLinkColumns);
+        versionTracker.applyOnce("eam:schema-v24-loss-tables", this::createLossTables);
+        versionTracker.applyOnce("eam:schema-v25-loss-menu", this::createLossMenu);
+        versionTracker.applyOnce("eam:schema-v26-loss-menu-rename", this::renameLossMenu);
     }
 
     private void upgradeTransferIntegrity() {
@@ -951,5 +954,154 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                     "ALTER TABLE biz_eam_return ADD COLUMN repair_id BIGINT NULL COMMENT '关联维修记录 ID' AFTER compensation_id");
         }
         log.info("v23 迁移完成：维修-归还关联列添加完成");
+    }
+
+    /** v24: 遗失找回模块建表（biz_eam_loss + biz_eam_loss_event）+ 赔付/报废表加 loss_id */
+    private void createLossTables() {
+        log.info("开始执行 v24 迁移：遗失找回模块表结构 ...");
+
+        // ───────────── biz_eam_loss 遗失单主表 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_loss ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "loss_no VARCHAR(32) NOT NULL COMMENT '遗失编号（YS+YYYYMMDD+4位）', "
+                + "source_type VARCHAR(16) NOT NULL COMMENT '来源类型：claim/borrow/return/direct', "
+                + "source_id BIGINT NOT NULL DEFAULT 0 COMMENT '来源 ID', "
+                + "return_id BIGINT NULL COMMENT '关联归还记录 ID', "
+                + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                + "asset_no VARCHAR(64) NOT NULL COMMENT '资产编号（快照）', "
+                + "asset_name VARCHAR(200) NOT NULL COMMENT '资产名称（快照）', "
+                + "asset_type VARCHAR(100) NULL COMMENT '资产分类（快照）', "
+                + "brand VARCHAR(100) NULL COMMENT '品牌（快照）', "
+                + "original_holder_id BIGINT NULL COMMENT '原持有人 ID（快照）', "
+                + "original_holder_name VARCHAR(64) NULL COMMENT '原持有人姓名（快照）', "
+                + "original_department VARCHAR(128) NULL COMMENT '原归属部门（快照）', "
+                + "last_known_location VARCHAR(200) NULL COMMENT '最后已知位置', "
+                + "loss_date DATE NOT NULL COMMENT '遗失日期', "
+                + "loss_reason VARCHAR(500) NOT NULL COMMENT '报失原因', "
+                + "reporter_id BIGINT NULL COMMENT '报失登记人 ID', "
+                + "reporter_name VARCHAR(64) NULL COMMENT '报失登记人姓名', "
+                + "status VARCHAR(20) NOT NULL DEFAULT 'searching' COMMENT '状态：searching/found_pending/recovered/written_off', "
+                + "recovered_date DATE NULL COMMENT '找回日期', "
+                + "recovered_location VARCHAR(200) NULL COMMENT '找回地点', "
+                + "recovered_by_id BIGINT NULL COMMENT '找回登记人 ID', "
+                + "recovered_by_name VARCHAR(64) NULL COMMENT '找回登记人姓名', "
+                + "recovered_note VARCHAR(500) NULL COMMENT '找回说明', "
+                + "inspection_result VARCHAR(20) NULL COMMENT '验收结果：normal/damaged/scrapped', "
+                + "inspection_date DATE NULL COMMENT '验收日期', "
+                + "inspection_note VARCHAR(500) NULL COMMENT '验收说明', "
+                + "write_off_date DATE NULL COMMENT '核销日期', "
+                + "write_off_reason VARCHAR(500) NULL COMMENT '核销原因', "
+                + "write_off_evidence_id BIGINT NULL COMMENT '核销凭证 ID', "
+                + "compensation_id BIGINT NULL COMMENT '关联赔付记录 ID', "
+                + "repair_id BIGINT NULL COMMENT '关联维修记录 ID', "
+                + "scrap_id BIGINT NULL COMMENT '关联报废记录 ID', "
+                + "version BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号', "
+                + "request_key VARCHAR(64) NULL COMMENT '幂等请求键', "
+                + "from_migration TINYINT NOT NULL DEFAULT 0 COMMENT '是否历史回填', "
+                + "created_by VARCHAR(64) NULL, "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) NULL, "
+                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_loss_no (loss_no), "
+                + "KEY idx_asset_id (asset_id), "
+                + "KEY idx_status (status), "
+                + "KEY idx_source (source_type, source_id), "
+                + "KEY idx_return_id (return_id), "
+                + "KEY idx_compensation_id (compensation_id), "
+                + "KEY idx_loss_date (loss_date)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产遗失单'");
+
+        // ───────────── biz_eam_loss_event 遗失事件日志表 ─────────────
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_loss_event ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "loss_id BIGINT NOT NULL COMMENT '关联遗失单 ID', "
+                + "event_type VARCHAR(32) NOT NULL COMMENT '事件类型', "
+                + "event_desc VARCHAR(500) NOT NULL COMMENT '事件描述', "
+                + "before_value TEXT NULL COMMENT '变更前值（JSON）', "
+                + "after_value TEXT NULL COMMENT '变更后值（JSON）', "
+                + "change_reason VARCHAR(500) NULL COMMENT '变更原因', "
+                + "operator_id BIGINT NULL COMMENT '操作人 ID', "
+                + "operator_name VARCHAR(64) NULL COMMENT '操作人姓名', "
+                + "evidence_id BIGINT NULL COMMENT '关联凭证 ID', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "KEY idx_loss_id (loss_id), "
+                + "KEY idx_event_type (event_type), "
+                + "KEY idx_created_at (created_at)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产遗失事件日志'");
+
+        // ───────────── biz_eam_compensation 增加 loss_id ─────────────
+        alterSafe("biz_eam_compensation",
+                "ADD COLUMN loss_id BIGINT NULL COMMENT '关联遗失单 ID' AFTER return_id");
+        addIndexSafe("biz_eam_compensation", "idx_loss_id", "loss_id");
+
+        // ───────────── biz_eam_scrap 增加 loss_id ─────────────
+        alterSafe("biz_eam_scrap",
+                "ADD COLUMN loss_id BIGINT NULL COMMENT '关联遗失单 ID（遗失核销时有值）' AFTER return_id");
+        addIndexSafe("biz_eam_scrap", "idx_loss_id", "loss_id");
+
+        log.info("v24 迁移完成：遗失找回模块表结构创建完成");
+    }
+
+    /** v25: 遗失找回菜单 + 编号规则 */
+    private void createLossMenu() {
+        log.info("开始执行 v25 迁移：遗失找回菜单及编号规则 ...");
+
+        // 插入遗失找回菜单（asset-flow-ops 的子菜单）
+        Long parentId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE menu_key = 'asset-flow-ops' AND deleted = 0 LIMIT 1", Long.class);
+        if (parentId != null) {
+            Long existing = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'asset-loss' AND deleted = 0", Long.class);
+            if (existing != null && existing == 0) {
+                jdbcTemplate.update(
+                        "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
+                        + "VALUES (?, 'asset-loss', '遺失資產', '/asset-loss', '', 'SearchOutlined', 2, 8, '[\"view\",\"create\",\"edit\"]', 1, 'system', 0)",
+                        parentId);
+                log.info("遗失找回菜单已创建 parentId={}", parentId);
+
+                // 默认给管理员角色授权
+                Long adminRoleId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_role WHERE code = 'admin' AND deleted = 0 LIMIT 1", Long.class);
+                Long menuId = jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_menu WHERE menu_key = 'asset-loss' AND deleted = 0 LIMIT 1", Long.class);
+                if (adminRoleId != null && menuId != null) {
+                    jdbcTemplate.update(
+                            "INSERT IGNORE INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)",
+                            adminRoleId, menuId);
+                }
+            }
+        }
+
+        // 调整后续菜单排序
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 9  WHERE menu_key = 'asset-compensation' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 10 WHERE menu_key = 'asset-scrap' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 11 WHERE menu_key = 'asset-inventory' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 12 WHERE menu_key = 'asset-flow' AND deleted = 0");
+
+        // 插入编号规则
+        Long ruleExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = 'eam_loss'", Long.class);
+        if (ruleExists != null && ruleExists == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_biz_seq_rule (rule_key, rule_name, prefix, date_format, seq_length, seq_start, status) "
+                    + "VALUES ('eam_loss', '遺失編號', 'YS', 'YYYYMMDD', 4, 1, 1)");
+            log.info("遗失编号规则已创建");
+        }
+
+        // 新增资产状态扩列（lost / pending_inspection / written_off 已在 v24 建表时处理，此处确保旧环境兼容）
+        // 资产状态为 VARCHAR，无需 ALTER ENUM，直接允许新值写入
+
+        log.info("v25 迁移完成：遗失找回菜单及编号规则创建完成");
+    }
+
+    /** v26: 菜单名称「遺失找回」→「遺失資產」 */
+    private void renameLossMenu() {
+        log.info("开始执行 v26 迁移：菜单名称 遺失找回 → 遺失資產 ...");
+        jdbcTemplate.update("UPDATE sys_menu SET name = '遺失資產' WHERE menu_key = 'asset-loss' AND deleted = 0");
+        log.info("v26 迁移完成：菜单名称已更新为 遺失資產");
     }
 }

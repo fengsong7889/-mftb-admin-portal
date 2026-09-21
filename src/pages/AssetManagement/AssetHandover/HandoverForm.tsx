@@ -1,17 +1,17 @@
 /**
  * 交接登記獨立表單頁
  *
- * 業務閉環：輸入交出人姓名 → 查詢名下資產 → 勾選待交接資產
+ * 業務閉環：選擇交接人 → 查詢名下資產 → 勾選待交接資產
  *          → 填接收人/部門/交接日期/原因 → 提交
  *          （批量逐件變更使用人 + 寫交接流水 + 生成交接記錄）
  */
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   Button, Form, Input, Select, DatePicker, Table, Row, Col, Space, Spin,
   message, Alert, Tag, TreeSelect, Modal, Radio,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import { fetchUserAssets, createHandover, type HandoverSaveData } from '../../../api/eam'
@@ -20,6 +20,19 @@ import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 import { buildDeptTree } from '../AssetClaim/claimViewTypes'
+import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
+import { fetchEmployeeOptions, fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import type { OptionItem } from '../../../api/types'
+
+/** 仅返回「姓名(工号)」格式的选项，不含部门/职位/职级 */
+async function fetchSimpleNameOptions(keyword: string): Promise<OptionItem[]> {
+  const opts = await fetchEmployeeOptions(keyword)
+  return opts.map(o => {
+    const namePart = o.label.split('(')[0]?.trim() ?? o.label
+    const empIdPart = o.label.match(/\(([^)]+)\)/)?.[1] ?? ''
+    return { value: o.value, label: empIdPart ? `${namePart}(${empIdPart})` : namePart }
+  })
+}
 
 type HandoverReason = 'resign' | 'transfer' | 'other'
 
@@ -50,12 +63,17 @@ export default function HandoverForm({ onBack }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [fromUser, setFromUser] = useState('')
+  const [fromUserDept, setFromUserDept] = useState('')
   const [userAssets, setUserAssets] = useState<AssetItem[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [queried, setQueried] = useState(false)
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const deptTree = useMemo(() => buildDeptTree(departments), [departments])
   const receiverType = Form.useWatch('receiverType', form) || 'employee'
+
+  /* ----- 员工数据缓存 ----- */
+  const employeeDataRef = useRef<Map<string, { name: string; department: string }>>(new Map())
+  const fromUserEmpDataRef = useRef<Map<string, { name: string; department: string }>>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -64,25 +82,63 @@ export default function HandoverForm({ onBack }: Props) {
     return () => { alive = false }
   }, [])
 
-  /** 查詢交出人名下資產 */
-  const handleQuery = useCallback(async () => {
-    const name = fromUser.trim()
-    if (!name) {
-      message.error(t('asset.fromUserRequired'))
-      return
+  /** 交接人搜索（仅姓名+工号） */
+  const handleFromUserSearch = useCallback(async (keyword: string) => {
+    const opts = await fetchSimpleNameOptions(keyword)
+    if (keyword) {
+      const res = await fetchEmployees({ page: 1, size: 50, keyword, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
+      ;(res.records || []).forEach((e: EmployeeItem) => {
+        fromUserEmpDataRef.current.set(e.empId, { name: e.name, department: e.department || '' })
+      })
     }
-    setLoading(true)
-    try {
-      const list = await fetchUserAssets(name)
-      setUserAssets(list)
-      setSelectedIds([])
-      setQueried(true)
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setLoading(false)
+    return opts
+  }, [])
+
+  /** 交接人选择 → 自动带入部门 + 查询名下资产 */
+  const handleFromUserSelect = useCallback(async (empId: string) => {
+    const emp = fromUserEmpDataRef.current.get(empId)
+    if (emp) {
+      setFromUser(emp.name)
+      setFromUserDept(emp.department)
+      setLoading(true)
+      try {
+        const list = await fetchUserAssets(emp.name)
+        setUserAssets(list)
+        setSelectedIds([])
+        setQueried(true)
+      } catch (e: unknown) {
+        message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [fromUser, t])
+  }, [t])
+
+  /** 接收人搜索 */
+  const handleEmployeeSearch = useCallback(async (keyword: string) => {
+    const opts = await fetchEmployeeOptions(keyword)
+    if (keyword) {
+      const res = await fetchEmployees({ page: 1, size: 50, keyword, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
+      ;(res.records || []).forEach((e: EmployeeItem) => {
+        employeeDataRef.current.set(e.empId, { name: e.name, department: e.department || '' })
+      })
+    }
+    return opts
+  }, [])
+
+  /** 接收人选择 → 自动带入部门 */
+  const handleUserSelect = useCallback((empId: string) => {
+    const emp = employeeDataRef.current.get(empId)
+    if (emp) {
+      const dept = departments.find(d => d.name === emp.department)
+      form.setFieldsValue({ toDepartment: dept?.id })
+    }
+  }, [form, departments])
+
+  /** 经办人搜索（仅姓名+工号） */
+  const handleOperatorSearch = useCallback(async (keyword: string) => {
+    return await fetchSimpleNameOptions(keyword)
+  }, [])
 
   const selectedAssets = userAssets.filter((a) => selectedIds.includes(a.id))
   const fromDepartment = selectedAssets.length > 0 ? selectedAssets[0].department : (userAssets.length > 0 ? userAssets[0].department : '')
@@ -100,6 +156,10 @@ export default function HandoverForm({ onBack }: Props) {
       }
       const toDeptName = departments.find(d => d.id === v.toDepartment)?.name ?? String(v.toDepartment)
       const isDept = v.receiverType === 'department'
+      // 通过 empId 查找接收人姓名
+      const toUserName = isDept ? '' : (employeeDataRef.current.get(v.toUser)?.name ?? v.toUser?.trim())
+      // 通过 empId 查找经办人姓名
+      const operatorName = employeeDataRef.current.get(v.operator)?.name ?? v.operator?.trim()
       Modal.confirm({
         title: '確認提交交接？',
         className: 'custom-confirm-modal',
@@ -109,8 +169,8 @@ export default function HandoverForm({ onBack }: Props) {
             <div className="confirm-info-row"><span>{t('asset.handoverFromUser')}：</span><b>{fromUser.trim()}</b></div>
             <div className="confirm-info-row"><span>{t('asset.handoverFromDept')}：</span><b>{fromDepartment || '-'}</b></div>
             <div className="confirm-info-row"><span>{t('asset.receiverType')}：</span><b>{isDept ? t('asset.receiverTypeDepartment') : t('asset.receiverTypeEmployee')}</b></div>
-            {!isDept && <div className="confirm-info-row"><span>{t('asset.handoverToUser')}：</span><b>{v.toUser?.trim()}</b></div>}
-            <div className="confirm-info-row"><span>{t('asset.handoverToDept')}：</span><b>{toDeptName}</b></div>
+            {!isDept && <div className="confirm-info-row"><span>{t('asset.handoverToUser')}：</span><b>{toUserName}</b></div>}
+            <div className="confirm-info-row"><span>{isDept ? t('asset.receiverDept') : t('asset.handoverToDept')}：</span><b>{toDeptName}</b></div>
             <div className="confirm-info-row"><span>資產數量：</span><b>{selectedIds.length}</b></div>
           </div>
         ),
@@ -122,13 +182,13 @@ export default function HandoverForm({ onBack }: Props) {
             const payload: HandoverSaveData = {
               fromUserName: fromUser.trim(),
               fromDepartment,
-              toUserName: isDept ? '' : v.toUser?.trim(),
+              toUserName,
               toDepartment: toDeptName,
               receiverType: v.receiverType || 'employee',
               handoverDate: v.handoverDate.format('YYYY-MM-DD'),
               assetIds: selectedIds,
               reason: v.reason,
-              operatorName: v.operator.trim(),
+              operatorName,
               remark: v.remark,
             }
             const record = await createHandover(payload)
@@ -182,23 +242,37 @@ export default function HandoverForm({ onBack }: Props) {
         </div>
       </div>
 
-      {/* ====== 交出人查詢 ====== */}
+      {/* ====== 交接人查詢 ====== */}
       <div style={{
         background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionFromUser')}</h3>
-        <Space>
-          <Input
-            placeholder={t('asset.fromUserRequired')}
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <RemoteSearchSelect
+            placeholder={t('asset.handoverFromUserPh')}
+            fetchOptions={handleFromUserSearch}
             value={fromUser}
-            onChange={(e) => setFromUser(e.target.value)}
-            style={{ width: 200 }}
-            allowClear
+            onChange={(val) => {
+              setFromUser(val || '')
+              if (!val) {
+                setFromUserDept('')
+                setUserAssets([])
+                setSelectedIds([])
+                setQueried(false)
+              }
+            }}
+            onSelect={handleFromUserSelect}
+            style={{ width: 280 }}
           />
-          <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={handleQuery}>
-            {t('asset.btnQueryAssets')}
-          </Button>
+          {fromUserDept && (
+            <Input
+              placeholder={t('asset.colDepartment')}
+              value={fromUserDept}
+              readOnly
+              style={{ width: 280, color: '#8C8C8C' }}
+            />
+          )}
         </Space>
 
         {/* ====== 名下資產列表 ====== */}
@@ -227,12 +301,12 @@ export default function HandoverForm({ onBack }: Props) {
         )}
       </div>
 
-      {/* ====== 交接信息表單 ====== */}
+      {/* ====== 接收資產表單 ====== */}
       <div style={{
         background: '#fff', borderRadius: 8, padding: 24, marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionBasic')}</h3>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.handoverFormSection')}</h3>
         <Form<FormValues>
           form={form}
           layout="vertical"
@@ -243,6 +317,7 @@ export default function HandoverForm({ onBack }: Props) {
             operator: t('asset.currentOperator'),
           }}
         >
+          {/* 接收人类型 */}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
               <Form.Item
@@ -256,65 +331,132 @@ export default function HandoverForm({ onBack }: Props) {
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
-            {receiverType === 'employee' && (
-              <Col xs={24} sm={12} md={8}>
-                <Form.Item
-                  label={t('asset.handoverToUser')} name="toUser"
-                  rules={[{ required: true, message: t('asset.toUserRequired') }]}
-                >
-                  <Input placeholder={t('asset.userNamePh')} allowClear />
-                </Form.Item>
-              </Col>
-            )}
-            <Col xs={24} sm={12} md={8}>
-              <Form.Item
-                label={t('asset.handoverToDept')} name="toDepartment"
-                rules={[{ required: true, message: t('asset.departmentRequired') }]}
-              >
-                <TreeSelect
-                  treeData={deptTree}
-                  treeDefaultExpandAll
-                  treeNodeFilterProp="title"
-                  showSearch
-                  allowClear
-                  placeholder={t('asset.departmentRequired')}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Form.Item
-                label={t('asset.colHandoverDate')} name="handoverDate"
-                rules={[{ required: true, message: t('asset.handoverDateRequired') }]}
-              >
-                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col xs={24} sm={12} md={8}>
-              <Form.Item
-                label={t('asset.colHandoverReason')} name="reason"
-                rules={[{ required: true }]}
-              >
-                <Select
-                  options={REASON_OPTIONS.map((o) => ({ label: t(o.key), value: o.value }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Form.Item
-                label={t('asset.colOperator')} name="operator"
-                rules={[{ required: true, message: t('asset.operatorRequired') }]}
-              >
-                <Input placeholder={t('asset.operatorRequired')} allowClear />
-              </Form.Item>
-            </Col>
-          </Row>
+
+          {receiverType === 'employee' ? (
+            <>
+              {/* 员工模式：接收人 / 接收人部门 / 交接日期 */}
+              <Row gutter={16}>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.handoverToUser')} name="toUser"
+                    rules={[{ required: true, message: t('asset.toUserRequired') }]}
+                  >
+                    <RemoteSearchSelect
+                      placeholder={t('asset.handoverToUserPh')}
+                      fetchOptions={handleEmployeeSearch}
+                      onSelect={handleUserSelect}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.handoverToDept')} name="toDepartment"
+                    rules={[{ required: true, message: t('asset.departmentRequired') }]}
+                  >
+                    <TreeSelect
+                      treeData={deptTree}
+                      treeDefaultExpandAll
+                      treeNodeFilterProp="title"
+                      showSearch
+                      allowClear
+                      placeholder={t('asset.departmentRequired')}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colHandoverDate')} name="handoverDate"
+                    rules={[{ required: true, message: t('asset.handoverDateRequired') }]}
+                  >
+                    <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {/* 交接原因 / 经办人 */}
+              <Row gutter={16}>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colHandoverReason')} name="reason"
+                    rules={[{ required: true }]}
+                  >
+                    <Select
+                      options={REASON_OPTIONS.map((o) => ({ label: t(o.key), value: o.value }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colOperator')} name="operator"
+                    rules={[{ required: true, message: t('asset.operatorRequired') }]}
+                  >
+                    <RemoteSearchSelect
+                      placeholder={t('asset.operatorRequired')}
+                      fetchOptions={handleOperatorSearch}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          ) : (
+            <>
+              {/* 部门模式：接收部门 / 交接日期 / 交接原因 */}
+              <Row gutter={16}>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.receiverDept')} name="toDepartment"
+                    rules={[{ required: true, message: t('asset.departmentRequired') }]}
+                  >
+                    <TreeSelect
+                      treeData={deptTree}
+                      treeDefaultExpandAll
+                      treeNodeFilterProp="title"
+                      showSearch
+                      allowClear
+                      placeholder={t('asset.departmentRequired')}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colHandoverDate')} name="handoverDate"
+                    rules={[{ required: true, message: t('asset.handoverDateRequired') }]}
+                  >
+                    <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colHandoverReason')} name="reason"
+                    rules={[{ required: true }]}
+                  >
+                    <Select
+                      options={REASON_OPTIONS.map((o) => ({ label: t(o.key), value: o.value }))}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {/* 经办人 */}
+              <Row gutter={16}>
+                <Col xs={24} sm={12} md={8}>
+                  <Form.Item
+                    label={t('asset.colOperator')} name="operator"
+                    rules={[{ required: true, message: t('asset.operatorRequired') }]}
+                  >
+                    <RemoteSearchSelect
+                      placeholder={t('asset.operatorRequired')}
+                      fetchOptions={handleOperatorSearch}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          {/* 备注（独立一行，500字限制，高度调高） */}
           <Row gutter={16}>
             <Col xs={24}>
               <Form.Item label={t('asset.colRemark')} name="remark">
-                <Input.TextArea rows={1} placeholder={t('asset.remarkPh')} maxLength={200} />
+                <Input.TextArea rows={4} placeholder={t('asset.remarkPh')} maxLength={500} showCount />
               </Form.Item>
             </Col>
           </Row>

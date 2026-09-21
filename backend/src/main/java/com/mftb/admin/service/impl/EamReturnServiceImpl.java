@@ -10,6 +10,7 @@ import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamReturnService;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.EamCompensationService;
+import com.mftb.admin.service.EamLossService;
 import com.mftb.admin.service.EamRepairService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
@@ -43,6 +44,7 @@ public class EamReturnServiceImpl implements EamReturnService {
     private final DepartmentService departmentService;
     private final EamCompensationService compensationService;
     private final EamRepairService repairService;
+    private final EamLossService lossService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -180,9 +182,20 @@ public class EamReturnServiceImpl implements EamReturnService {
             borrowMapper.updateById(borrow);
         }
 
-        // 释放资产（仅正常归还）：按接收管理部门/归还位置归位，实现归还即承接
+        // 更新资产状态（仅正常归还）：按接收管理部门/归还位置归位，实现归还即承接
         if ("completed".equals(ret.getReturnStatus())) {
             releaseAsset(assetId, receiveDepartment, dto.getReceiveLocationId());
+        }
+
+        // 遗失状况：自动生成遗失单，资产状态由遗失模块统一管理
+        if ("lost".equals(condition)) {
+            try {
+                long lossId = lossService.createFromReturn(ret.getId());
+                log.info("归还验收遗失自动建立遗失单 lossId={}, returnId={}", lossId, ret.getId());
+            } catch (Exception e) {
+                log.error("归还验收遗失自动建立遗失单失败 returnId={}: {}", ret.getId(), e.getMessage());
+                throw new BusinessException("歸還登記成功但建立遺失單失敗：" + e.getMessage());
+            }
         }
 
         return ret.getId();
@@ -219,9 +232,9 @@ public class EamReturnServiceImpl implements EamReturnService {
 
         returnMapper.updateById(ret);
 
-        // 更新资产状态
+        // 更新资产状态（遗失资产由遗失模块管理，此处跳过）
         EamAsset asset = assetMapper.selectById(ret.getAssetId());
-        if (asset != null) {
+        if (asset != null && !"lost".equals(ret.getAssetCondition())) {
             switch (dto.getDisposition()) {
                 case "scrapped" -> asset.setStatus("scrapped");
                 case "written_off" -> asset.setStatus("scrapped"); // 注销也标记为报废
@@ -275,6 +288,11 @@ public class EamReturnServiceImpl implements EamReturnService {
         }
         if (ret.getRecovered() == 1) {
             throw new BusinessException("已登記找回，不可重複操作");
+        }
+
+        // 遗失资产已迁入遗失找回模块，引导使用新接口
+        if ("lost".equals(ret.getAssetCondition())) {
+            throw new BusinessException("遺失資產找回請前往「遺失找回」模塊操作");
         }
 
         String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());

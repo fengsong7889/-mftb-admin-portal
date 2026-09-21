@@ -6,7 +6,7 @@
  * - 點擊資產編號跳轉資產詳情，點擊行跳轉維修詳情
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker, InputNumber, Row, Col } from 'antd'
+import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -14,7 +14,7 @@ import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { exportToCSV } from '../../../utils/exportCSV'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
-  fetchRepairList, updateRepair, deleteRepair,
+  fetchRepairList, deleteRepair,
   fetchAssetList,
   type AssetRepairRecord, type AssetItem,
 } from '../../../api/asset'
@@ -46,10 +46,6 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
   const [dataSource, setDataSource] = useState<AssetRepairRecord[]>([])
   const [filters, setFilters] = useState<RepairFilters>({})
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [editModalOpen, setEditModalOpen] = useState(false)
-  const [editingRecord, setEditingRecord] = useState<AssetRepairRecord | null>(null)
-  const [editForm] = Form.useForm()
-  const [editSubmitting, setEditSubmitting] = useState(false)
   const [brands, setBrands] = useState<AssetBrand[]>([])
 
   /* ----- 資產下拉搜索（編號/名稱） ----- */
@@ -157,54 +153,6 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
     message.success(t('common.exportSuccess'))
   }
 
-  const REPAIR_BY_OPTIONS = [
-    { value: 'HP 授权维修点', labelKey: 'repairByHp' },
-    { value: 'Dell 售后', labelKey: 'repairByDell' },
-    { value: '联想服务中心', labelKey: 'repairByLenovo' },
-    { value: 'Apple Store', labelKey: 'repairByApple' },
-    { value: '自修', labelKey: 'repairBySelf' },
-    { value: '其他第三方', labelKey: 'repairByOther' },
-  ]
-
-  const handleEdit = (record: AssetRepairRecord) => {
-    setEditingRecord(record)
-    editForm.setFieldsValue({
-      repairDate: dayjs(record.repairDate),
-      faultDesc: record.faultDesc,
-      repairContent: record.repairContent,
-      repairBy: record.repairBy,
-      cost: record.cost,
-      applicant: record.applicant,
-      causeType: record.causeType,
-    })
-    setEditModalOpen(true)
-  }
-
-  const handleEditSubmit = async () => {
-    if (!editingRecord) return
-    try {
-      const v = await editForm.validateFields()
-      setEditSubmitting(true)
-      await updateRepair(editingRecord.id, {
-        repairDate: v.repairDate.format('YYYY-MM-DD'),
-        faultDesc: v.faultDesc,
-        repairContent: v.repairContent,
-        repairBy: v.repairBy,
-        cost: v.cost,
-        applicant: v.applicant,
-        causeType: v.causeType,
-      })
-      message.success(t('asset.repairUpdated', '維修記錄已更新'))
-      setEditModalOpen(false)
-      editForm.resetFields()
-      loadData()
-    } catch (e: unknown) {
-      if (e instanceof Error) message.error(e.message)
-    } finally {
-      setEditSubmitting(false)
-    }
-  }
-
   const handleDelete = (record: AssetRepairRecord) => {
     Modal.confirm({
       title: t('asset.confirmDeleteRepair', '確認刪除此維修記錄？'),
@@ -278,10 +226,9 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
       key: 'action', title: t('common.colAction'), width: 140, fixed: 'right',
       render: (_: unknown, r: AssetRepairRecord) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); onViewDetail(r.assetId) }}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); onViewDetail(r.assetId) }}>{t('asset.repairRecordsTitle')}</Button>
           {r.status === 'repairing' && (
             <>
-              <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); handleEdit(r) }}>{t('common.edit')}</Button>
               <Button type="link" size="small" danger onClick={(e) => { e.stopPropagation(); handleDelete(r) }}>{t('common.delete')}</Button>
             </>
           )}
@@ -412,54 +359,6 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
         }}
       />
 
-      {/* ====== 編輯維修記錄彈窗 ====== */}
-      <Modal
-        title={t('asset.modalEditRepair', '編輯維修記錄')}
-        open={editModalOpen}
-        onCancel={() => { setEditModalOpen(false); editForm.resetFields() }}
-        footer={null}
-        width={640}
-        destroyOnClose
-      >
-        <Form form={editForm} layout="vertical">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label={t('asset.colRepairDate')} name="repairDate" rules={[{ required: true, message: t('asset.repairDateRequired') }]}>
-                <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label={t('asset.colRepairBy')} name="repairBy" rules={[{ required: true, message: t('asset.repairByRequired') }]}>
-                <Select placeholder={t('asset.repairByPh')}>
-                  {REPAIR_BY_OPTIONS.map((o) => <Select.Option key={o.value} value={o.value}>{t(`asset.${o.labelKey}`)}</Select.Option>)}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label={t('asset.colFaultDesc')} name="faultDesc" rules={[{ required: true, message: t('asset.faultDescRequired') }]}>
-            <Input.TextArea rows={2} placeholder={t('asset.faultDescPh')} maxLength={300} showCount />
-          </Form.Item>
-          <Form.Item label={t('asset.colRepairContent')} name="repairContent" rules={[{ required: true, message: t('asset.repairContentRequired') }]}>
-            <Input.TextArea rows={2} placeholder={t('asset.repairContentPh')} maxLength={300} showCount />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label={t('asset.colCost')} name="cost">
-                <InputNumber min={0} step={50} addonAfter="MOP" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label={t('asset.colApplicant')} name="applicant" rules={[{ required: true, message: t('asset.applicantRequired') }]}>
-                <Input placeholder={t('asset.userNamePh')} allowClear />
-              </Form.Item>
-            </Col>
-          </Row>
-          <div style={{ textAlign: 'right', borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8 }}>
-            <Button onClick={() => { setEditModalOpen(false); editForm.resetFields() }} style={{ marginRight: 8 }}>{t('common.cancel')}</Button>
-            <Button type="primary" onClick={handleEditSubmit} loading={editSubmitting}>{t('common.save')}</Button>
-          </div>
-        </Form>
-      </Modal>
     </>
   )
 }

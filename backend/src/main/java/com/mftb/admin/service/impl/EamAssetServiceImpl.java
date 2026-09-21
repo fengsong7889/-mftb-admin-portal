@@ -43,7 +43,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     private final JdbcTemplate jdbcTemplate;
     private final SysCompanyBrandService companyBrandService;
     private final com.mftb.admin.service.EamTransferLookup transferLookup;
-    private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped");
+    private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped", "lost", "pending_inspection", "written_off");
 
     @Override
     public PageResult<EamAssetVO> page(EamAssetQuery query) {

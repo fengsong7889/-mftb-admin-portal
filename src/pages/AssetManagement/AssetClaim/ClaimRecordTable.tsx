@@ -11,17 +11,17 @@ const RETURN_CONDITION_LABEL: Record<string, string> = { normal: '正常', damag
 const RETURN_CONDITION_COLOR: Record<string, string> = { normal: 'success', damaged: 'warning', lost: 'error' }
 
 const STATUS_META: Record<ClaimStatus, { label: string; color: string }> = {
-  pending_signature: { label: '待签领用', color: 'processing' },
+  pending_signature: { label: '待簽領用', color: 'processing' },
   claimed: { label: '在用', color: 'success' },
-  returned: { label: '已归还', color: 'default' },
+  returned: { label: '已歸還', color: 'default' },
   cancelled: { label: '已取消', color: 'default' },
   transferred: { label: 'transfer.transferred', color: 'orange' },
 }
 const SIGNATURE_META: Record<SignatureStatus, { label: string; color: string }> = {
-  pending: { label: '待本人签署', color: 'processing' },
-  signed: { label: '本人已签', color: 'success' },
-  proxy_pending: { label: '代办未签', color: 'warning' },
-  not_required: { label: '已取消，无需签署', color: 'default' },
+  pending: { label: '待本人簽署', color: 'processing' },
+  signed: { label: '本人已簽', color: 'success' },
+  proxy_pending: { label: '代辦未簽', color: 'warning' },
+  not_required: { label: '已取消，無需簽署', color: 'default' },
 }
 export function ClaimStatusTag({ status }: { status: ClaimStatus }) {
   const { t } = useTranslation()
@@ -30,7 +30,7 @@ export function ClaimStatusTag({ status }: { status: ClaimStatus }) {
 }
 export function SignatureStatusTag({ status }: { status: SignatureStatus }) {
   const meta = SIGNATURE_META[status]
-  return <Tag color={meta?.color}>{meta?.label ?? '未知签署状态'}</Tag>
+  return <Tag color={meta?.color}>{meta?.label ?? '未知簽署狀態'}</Tag>
 }
 export function canSignClaim(record: ClaimRow): boolean {
   return (record.status === CLAIM_STATUS.PENDING && record.signatureStatus === SIGNATURE_STATUS.PENDING)
@@ -49,26 +49,26 @@ export default function ClaimRecordTable({ data, query, loading, pageKey, onQuer
   const { t } = useTranslation()
   const paramCatalog = useAssetParameterCatalog()
   const columns: TableColumnsType<ClaimRow> = [
-    { key: 'claimNo', title: '领用编号', dataIndex: 'claimNo', width: 180 },
+    { key: 'claimNo', title: '領用編號', dataIndex: 'claimNo', width: 180 },
     { key: 'assetNo', title: t('asset.assetNo'), dataIndex: 'assetNo', width: 180 },
     { key: 'assetName', title: t('asset.assetNameLabel'), dataIndex: 'assetName', width: 180, ellipsis: true },
     { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 120, render: (value?: number) => value ? <BrandTag value={value} /> : '—' },
-    { key: 'brand', title: '资产品牌', dataIndex: 'brand', width: 110 },
-    { key: 'status', title: '领用状态', dataIndex: 'status', width: 110, render: (value: ClaimStatus) => <ClaimStatusTag status={value} /> },
-    { key: 'signatureStatus', title: '签收状态', dataIndex: 'signatureStatus', width: 150, render: (value: SignatureStatus, row) => <Tooltip title={row.proxyReason}><span><SignatureStatusTag status={value} /></span></Tooltip> },
+    { key: 'brand', title: '資產品牌', dataIndex: 'brand', width: 110 },
+    { key: 'status', title: '領用狀態', dataIndex: 'status', width: 110, render: (value: ClaimStatus) => <ClaimStatusTag status={value} /> },
+    { key: 'signatureStatus', title: '簽收狀態', dataIndex: 'signatureStatus', width: 150, render: (value: SignatureStatus, row) => <Tooltip title={row.proxyReason}><span><SignatureStatusTag status={value} /></span></Tooltip> },
     { key: 'claimDate', title: t('asset.colClaimDate'), dataIndex: 'claimDate', width: 120 },
     { key: 'returnDate', title: t('asset.colReturnDate'), dataIndex: 'returnDate', width: 120, render: (value?: string) => value || '—' },
-    { key: 'assetCondition', title: '资产验收', dataIndex: 'assetCondition', width: 110, render: (value?: string) => value ? <Tag color={RETURN_CONDITION_COLOR[value]}>{RETURN_CONDITION_LABEL[value] ?? value}</Tag> : '—' },
+    { key: 'assetCondition', title: '資產驗收', dataIndex: 'assetCondition', width: 110, render: (value?: string) => value ? <Tag color={RETURN_CONDITION_COLOR[value]}>{RETURN_CONDITION_LABEL[value] ?? value}</Tag> : '—' },
     { key: 'operator', title: t('asset.colOperator'), dataIndex: 'operator', width: 110 },
     { key: 'action', title: t('asset.colAction'), fixed: 'right', width: onSign ? 160 : 90, render: (_, row) => <>
       <Button type="link" size="small" onClick={() => onView(row)}>{t('common.detail')}</Button>
-      {onSign && canSignClaim(row) && <><span className="action-split">|</span><Button type="link" size="small" onClick={() => onSign(row)}>{row.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING ? '补签' : '签署'}</Button></>}
+      {onSign && canSignClaim(row) && <><span className="action-split">|</span><Button type="link" size="small" onClick={() => onSign(row)}>{row.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING ? '補簽' : '簽署'}</Button></>}
     </> },
   ]
   const { applyConfig, configComponent } = useColumnConfig(pageKey, columns.map((column) => ({ key: String(column.key), title: String(column.title) })))
   return <>
-    <div className="claim-table-tools"><span className="claim-muted">领用状态与员工签收状态分别记录，代办不等于本人已签。</span>{configComponent}</div>
+    <div className="claim-table-tools"><span className="claim-muted">領用狀態與員工簽收狀態分別記錄，代辦不等於本人已簽。</span>{configComponent}</div>
     <Table<ClaimRow> rowKey="id" columns={applyConfig(columns)} dataSource={data?.records ?? []} loading={loading} size="middle" scroll={{ x: 1400 }}
       locale={{ emptyText: <Empty description={t('common.noData')} /> }}
       pagination={{ current: query.page, pageSize: query.size, total: data?.total ?? 0, showQuickJumper: true, showSizeChanger: true,
