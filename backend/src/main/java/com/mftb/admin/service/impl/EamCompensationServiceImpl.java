@@ -155,6 +155,67 @@ public class EamCompensationServiceImpl implements EamCompensationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public long createDirect(EamCompensationSaveDTO dto) {
+        if (dto.getAssetId() == null) throw new BusinessException("資產 ID 不能為空");
+        if (!"damage".equals(dto.getDamageType()) && !"loss".equals(dto.getDamageType()))
+            throw new BusinessException("損失類型必須為 damage 或 loss");
+
+        EamAsset asset = assetMapper.selectById(dto.getAssetId());
+        if (asset == null) throw new BusinessException("資產不存在");
+
+        // 生成赔付编号
+        String compNo = bizSeqService.next(BizSeqService.RULE_EAM_COMPENSATION);
+
+        // 获取当前持有人信息
+        Long holderId = asset.getCurrentHolderId();
+        String holderName = "";
+        if (holderId != null) {
+            SysUser holder = userMapper.selectById(holderId);
+            holderName = holder != null && holder.getName() != null ? holder.getName() : holder != null ? holder.getUsername() : "";
+        }
+
+        EamCompensation comp = new EamCompensation();
+        comp.setCompNo(compNo);
+        comp.setReturnId(dto.getReturnId());
+        comp.setLossId(dto.getLossId());
+        comp.setAssetId(dto.getAssetId());
+        comp.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
+        comp.setAssetNo(asset.getAssetNo());
+        comp.setHolderId(holderId);
+        comp.setHolderName(holderName);
+        comp.setDamageType(dto.getDamageType());
+        comp.setCause(dto.getCause());
+        comp.setParty(dto.getParty());
+        comp.setResponsibleId(dto.getResponsibleId());
+        comp.setResponsibleName(dto.getResponsibleName());
+        comp.setDepartment(dto.getDepartment());
+        comp.setAmount(0L);
+        comp.setNetPaid(0L);
+        comp.setStatus("pending");
+        comp.setReviewRequired(0);
+        comp.setReason(dto.getReason());
+        comp.setOperatorId(operatorResolver.currentUser() != null ? operatorResolver.currentUser().getId() : null);
+        comp.setOperatorName(operatorResolver.currentOperatorName());
+        comp.setCreatedBy(operatorResolver.currentOperatorName());
+        comp.setUpdatedBy(operatorResolver.currentOperatorName());
+        compensationMapper.insert(comp);
+
+        // 如果有关联归还记录，更新归还记录
+        if (dto.getReturnId() != null) {
+            EamReturn ret = returnMapper.selectById(dto.getReturnId());
+            if (ret != null) {
+                ret.setCompensationId(comp.getId());
+                returnMapper.updateById(ret);
+            }
+        }
+
+        log.info("直接创建赔付记录 compId={}, compNo={}, assetId={}, damageType={}",
+                comp.getId(), compNo, dto.getAssetId(), dto.getDamageType());
+        return comp.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void setLiability(EamCompensationLiabilityDTO dto) {
         EamCompensation comp = compensationMapper.selectForUpdate(dto.getCompensationId());
         if (comp == null) throw new BusinessException("賠付記錄不存在");
@@ -323,6 +384,12 @@ public class EamCompensationServiceImpl implements EamCompensationService {
         vo.setCreatedAt(DateTimeUtils.format(comp.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(comp.getUpdatedAt()));
 
+        // 填充所属品牌
+        EamAsset asset = assetMapper.selectById(comp.getAssetId());
+        if (asset != null) {
+            vo.setCompanyBrand(asset.getCompanyBrand());
+        }
+
         // 收款/退款记录
         List<EamCompensationPayment> payments = paymentMapper.selectList(
                 new LambdaQueryWrapper<EamCompensationPayment>()
@@ -383,6 +450,18 @@ public class EamCompensationServiceImpl implements EamCompensationService {
         w.eq(hasText(q.getParty()), EamCompensation::getParty, q.getParty());
         w.eq(q.getReviewRequired() != null, EamCompensation::getReviewRequired,
                 q.getReviewRequired() != null && q.getReviewRequired() ? 1 : 0);
+        if (q.getCompanyBrand() != null) {
+            java.util.List<Long> brandAssetIds = assetMapper.selectList(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .eq(EamAsset::getCompanyBrand, q.getCompanyBrand())
+                            .select(EamAsset::getId)
+            ).stream().map(EamAsset::getId).toList();
+            if (brandAssetIds.isEmpty()) {
+                w.eq(EamCompensation::getId, -1L);
+            } else {
+                w.in(EamCompensation::getAssetId, brandAssetIds);
+            }
+        }
         return w;
     }
 

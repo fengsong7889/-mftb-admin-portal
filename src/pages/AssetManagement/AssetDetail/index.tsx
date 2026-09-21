@@ -34,6 +34,7 @@ const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
   scrapped:  { key: 'asset.statusScrapped', color: 'error' },
   lost:      { key: 'asset.statusLost',     color: 'warning' },
   pending_inspection: { key: 'asset.statusPendingInspection', color: 'blue' },
+  pending_disposal: { key: 'asset.statusPendingDisposal', color: 'orange' },
   written_off: { key: 'asset.statusWrittenOff', color: 'default' },
 }
 

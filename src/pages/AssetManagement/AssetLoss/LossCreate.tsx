@@ -9,14 +9,17 @@
  * 樣式基準：EAM 詳情頁統一規範（DetailPageHeader + 無邊框模塊卡片 + Descriptions column=4）。
  */
 import { useState, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Button, DatePicker, Descriptions, Empty, Form, Input, Select, Spin, Tag, message,
 } from 'antd'
 import {
-  AppstoreOutlined, UserOutlined, SearchOutlined, ReloadOutlined,
+  AppstoreOutlined, UserOutlined, SearchOutlined, ReloadOutlined, InboxOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import BrandTag from '../../../components/BrandTag'
+import AssetParameters from '../../../components/AssetParameters'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   fetchAssetDetail, fetchAssetList,
@@ -27,7 +30,7 @@ import { createLoss, type LossSaveDTO } from '../../../api/eamLoss'
 /** 資產狀態 → 標籤顏色 */
 const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {
   idle: 'default', in_use: 'success', in_repair: 'processing', scrapped: 'error',
-  lost: 'warning', pending_inspection: 'blue', written_off: 'default',
+  lost: 'warning', pending_inspection: 'blue', pending_disposal: 'orange', written_off: 'default',
 }
 
 /** 模塊卡片統一樣式 */
@@ -64,6 +67,7 @@ interface Props {
 }
 
 export default function LossCreate({ onBack, onCreated }: Props) {
+  const { t } = useTranslation()
   const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
 
@@ -169,7 +173,7 @@ export default function LossCreate({ onBack, onCreated }: Props) {
         {/* ====== 模塊 1：資產信息 ====== */}
         <div style={detailCardStyle}>
           <SectionTitle
-            icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
             iconBg="#e6f7ff"
             title="資產信息"
             tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{
@@ -202,16 +206,20 @@ export default function LossCreate({ onBack, onCreated }: Props) {
           </Form.Item>
 
           {asset && (
-            <Descriptions column={3} size="middle">
-              <Descriptions.Item label="資產編號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
-              <Descriptions.Item label="資產名稱">{asset.assetName}</Descriptions.Item>
-              <Descriptions.Item label="分類">{asset.assetType || '-'}</Descriptions.Item>
-              <Descriptions.Item label="品牌">{asset.brand || '-'}</Descriptions.Item>
-              <Descriptions.Item label="位置">{asset.location || '-'}</Descriptions.Item>
-              <Descriptions.Item label="購買價值">
-                {asset.purchaseValue != null ? `MOP ${Number(asset.purchaseValue).toLocaleString()}` : '-'}
-              </Descriptions.Item>
-            </Descriptions>
+            <>
+              <Descriptions column={4} size="middle">
+                <Descriptions.Item label="資產編號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
+                <Descriptions.Item label="資產名稱">{asset.assetName}</Descriptions.Item>
+                <Descriptions.Item label="所屬品牌">{asset.companyBrand ? <BrandTag value={asset.companyBrand} /> : '-'}</Descriptions.Item>
+                <Descriptions.Item label="資產品牌">{asset.brand || '-'}</Descriptions.Item>
+                <Descriptions.Item label="資產分類">{asset.assetType || '-'}</Descriptions.Item>
+                <Descriptions.Item label="購買時價值">
+                  {asset.purchaseValue != null ? `MOP ${Number(asset.purchaseValue).toLocaleString()}` : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="管理部門">{asset.adminDepartment || '-'}</Descriptions.Item>
+              </Descriptions>
+              <AssetParameters asset={asset} current />
+            </>
           )}
         </div>
 
@@ -226,10 +234,10 @@ export default function LossCreate({ onBack, onCreated }: Props) {
             <Descriptions column={4} size="middle">
               <Descriptions.Item label="使用人">{asset.userName || '-'}</Descriptions.Item>
               <Descriptions.Item label="部門">{asset.department || '-'}</Descriptions.Item>
-              <Descriptions.Item label="持有方式">
+              <Descriptions.Item label={t('asset.colHoldType')}>
                 {asset.holdType === 'borrowed'
-                  ? <Tag color="orange">借用</Tag>
-                  : <Tag color="blue">領用</Tag>}
+                  ? <Tag color="orange">{t('asset.holdBorrowed')}</Tag>
+                  : <Tag color="blue">{t('asset.holdOwned')}</Tag>}
               </Descriptions.Item>
               <Descriptions.Item label="領用日期">{asset.claimDate || '-'}</Descriptions.Item>
             </Descriptions>
@@ -268,7 +276,7 @@ export default function LossCreate({ onBack, onCreated }: Props) {
 
       {/* ====== 頁面底部按鈕 ====== */}
       <div className="form-footer">
-        <Button icon={<ReloadOutlined />} onClick={onBack}>取消</Button>
+        <Button onClick={onBack}>取消</Button>
         <Button type="primary" onClick={handleSubmit} loading={submitting} disabled={!asset}>
           確認報失
         </Button>

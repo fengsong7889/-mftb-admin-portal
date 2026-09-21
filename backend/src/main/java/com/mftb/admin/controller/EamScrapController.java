@@ -44,7 +44,7 @@ public class EamScrapController {
         return Result.success(scrapService.create(dto));
     }
 
-    /** 删除报废记录（仅允许待审批状态） */
+    /** 删除报废记录（同时恢复关联资产为闲置状态） */
     @DeleteMapping("/{id}")
     @RequirePermission(menu = MENU, action = "edit")
     public Result<Void> delete(@PathVariable long id) {

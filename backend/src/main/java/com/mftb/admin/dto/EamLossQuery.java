@@ -27,8 +27,16 @@ public class EamLossQuery {
     private String compensationStatus;
     /** 归属部门（模糊） */
     private String department;
-    /** 开始日期 yyyy-MM-dd */
+    /** 开始日期 yyyy-MM-dd（登记日期） */
     private String startDate;
-    /** 结束日期 yyyy-MM-dd */
+    /** 结束日期 yyyy-MM-dd（登记日期） */
     private String endDate;
+    /** 最后更新人（模糊） */
+    private String updatedBy;
+    /** 最后更新开始日期 yyyy-MM-dd */
+    private String updateStartDate;
+    /** 最后更新结束日期 yyyy-MM-dd */
+    private String updateEndDate;
+    /** 所属品牌（sys_company_brand.id） */
+    private Integer companyBrand;
 }

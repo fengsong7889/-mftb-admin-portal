@@ -28,20 +28,28 @@ export interface LossRow {
   assetName: string
   assetType?: string
   brand?: string
+  /** 遗失时资产状态快照（idle/in_use），用于判断是否展示「遗失时使用人」模块 */
+  assetStatus?: string
   originalHolderId?: number
   originalHolderName?: string
+  /** 原持有人工号 */
+  originalHolderNo?: string
   originalDepartment?: string
   lastKnownLocation?: string
   lossDate: string
   lossReason: string
   reporterId?: number
   reporterName?: string
+  /** 登记人工号 */
+  reporterNo?: string
   status: LossStatus
   openDays?: number
   recoveredDate?: string
   recoveredLocation?: string
   recoveredById?: number
   recoveredByName?: string
+  /** 找回登记人工号 */
+  recoveredByNo?: string
   recoveredNote?: string
   inspectionResult?: InspectionResult
   inspectionDate?: string
@@ -56,7 +64,11 @@ export interface LossRow {
   lastFollowUpAt?: string
   createdAt: string
   updatedAt: string
+  /** 最后更新人姓名 */
+  updatedByName?: string
   fromMigration?: number
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
   events?: LossEventVO[]
 }
 
@@ -70,6 +82,8 @@ export interface LossEventVO {
   changeReason?: string
   operatorId?: number
   operatorName?: string
+  /** 操作人工号 */
+  operatorNo?: string
   evidenceId?: number
   createdAt: string
 }
@@ -87,6 +101,14 @@ export interface LossQuery {
   department?: string
   startDate?: string
   endDate?: string
+  /** 最后更新人 */
+  updatedBy?: string
+  /** 最后更新开始日期 */
+  updateStartDate?: string
+  /** 最后更新结束日期 */
+  updateEndDate?: string
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
 }
 
 /** 分页结果 */
@@ -165,6 +187,10 @@ export async function fetchLossList(query: LossQuery): Promise<LossPage<LossRow>
     if (query.department) params.set('department', query.department)
     if (query.startDate) params.set('startDate', query.startDate)
     if (query.endDate) params.set('endDate', query.endDate)
+    if (query.updatedBy) params.set('updatedBy', query.updatedBy)
+    if (query.updateStartDate) params.set('updateStartDate', query.updateStartDate)
+    if (query.updateEndDate) params.set('updateEndDate', query.updateEndDate)
+    if (query.companyBrand) params.set('companyBrand', String(query.companyBrand))
     return await request.get<unknown, LossPage<LossRow>>(`/eam/losses?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {

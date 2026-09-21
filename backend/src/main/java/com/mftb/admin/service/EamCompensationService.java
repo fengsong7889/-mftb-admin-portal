@@ -19,6 +19,17 @@ public interface EamCompensationService {
     /** 从处置流程自动创建赔付记录（仅需归还 ID） */
     long createFromDispose(long returnId);
 
+    /**
+     * 直接创建赔付记录（无需归还记录）
+     *
+     * 适用场景：
+     * - 员工离职时资产损坏，资产已不在公司
+     * - 第三方损坏资产（如快递损坏）
+     * - 历史遗留问题补录赔付
+     * - 遗失核销后需要员工赔付
+     */
+    long createDirect(EamCompensationSaveDTO dto);
+
     /** 定责 */
     void setLiability(EamCompensationLiabilityDTO dto);
 

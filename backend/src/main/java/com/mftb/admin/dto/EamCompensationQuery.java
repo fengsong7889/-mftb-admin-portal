@@ -27,4 +27,6 @@ public class EamCompensationQuery {
     private String party;
     /** 是否需要找回复核 */
     private Boolean reviewRequired;
+    /** 所属品牌（sys_company_brand.id） */
+    private Integer companyBrand;
 }

@@ -163,6 +163,7 @@ public class EamBorrowServiceImpl implements EamBorrowService {
             vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
+            vo.setCompanyBrand(asset.getCompanyBrand());
         }
 
         // 计算逾期天数
@@ -187,6 +188,18 @@ public class EamBorrowServiceImpl implements EamBorrowService {
         }
         if (hasText(q.getEndDate())) {
             w.le(EamBorrow::getStartDate, LocalDate.parse(q.getEndDate(), DateTimeFormatter.ISO_DATE));
+        }
+        if (q.getCompanyBrand() != null) {
+            List<Long> assetIds = assetMapper.selectList(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .eq(EamAsset::getCompanyBrand, q.getCompanyBrand())
+                            .select(EamAsset::getId)
+            ).stream().map(EamAsset::getId).toList();
+            if (assetIds.isEmpty()) {
+                w.eq(EamBorrow::getId, -1L);
+            } else {
+                w.in(EamBorrow::getAssetId, assetIds);
+            }
         }
         return w;
     }

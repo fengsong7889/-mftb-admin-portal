@@ -18,9 +18,11 @@ import { TransferError } from '../AssetTransfer/TransferLayout'
 import { buildTransferTree, positiveId, updateQuery, HOLD_TYPE, TRANSFER_MENU } from '../AssetTransfer/transferUtils'
 import { exportToCSV } from '../../../utils/exportCSV'
 import AssetParameters from '../../../components/AssetParameters'
+import BrandTag from '../../../components/BrandTag'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 
-type CandidateQuery = Pick<AssetListQuery, 'assetNo' | 'assetName' | 'categoryId' | 'brandId' | 'departmentId' | 'userName' | 'holdType' | 'page' | 'size'>
+type CandidateQuery = Pick<AssetListQuery, 'assetNo' | 'assetName' | 'categoryId' | 'brandId' | 'departmentId' | 'userName' | 'holdType' | 'companyBrand' | 'page' | 'size'>
 
 interface Props {
   options?: TransferOptions
@@ -31,6 +33,7 @@ interface Props {
 export default function TransferableTab({ onTransfer, onDetail, options }: Props) {
   const { t } = useTranslation()
   const paramCatalog = useAssetParameterCatalog()
+  const { numericOptions } = useCompanyBrand()
   const { hasPermission } = useAuth()
   const [form] = Form.useForm<AssetListQuery>()
   const [params, setParams] = useSearchParams()
@@ -42,6 +45,7 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
     userName: params.get('assets.userName') || undefined,
     departmentId: positiveId(params.get('assets.departmentId')),
     holdType: params.get('assets.holdType') === HOLD_TYPE.OWNED ? HOLD_TYPE.OWNED : params.get('assets.holdType') === HOLD_TYPE.BORROWED ? HOLD_TYPE.BORROWED : undefined,
+    companyBrand: positiveId(params.get('assets.companyBrand')) || undefined,
     page: positiveId(params.get('assets.page')) || 1,
     size: positiveId(params.get('assets.size')) || 10,
   }), [params])
@@ -54,7 +58,7 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
     setParams(updateQuery(params, 'assets', {
       assetNo: values.assetNo?.trim(), assetName: values.assetName?.trim(), categoryId: values.categoryId,
       brandId: values.brandId, userName: values.userName?.trim(), departmentId: values.departmentId,
-      holdType: values.holdType, page: 1, size: query.size,
+      holdType: values.holdType, companyBrand: values.companyBrand, page: 1, size: query.size,
     }), { replace: true })
     refresh()
   }
@@ -69,6 +73,7 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
     const cols = [
       { title: t('asset.colAssetNo'), dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'), dataIndex: 'assetName' },
+      { title: t('asset.colCompanyBrand'), dataIndex: 'companyBrand', render: (v: number | null | undefined) => v === 1 ? '闪蜂' : v === 2 ? 'mFood' : '' },
       { title: t('asset.colAssetType'), dataIndex: 'assetType' },
       { title: t('transfer.brand'), dataIndex: 'brand' },
       { title: t('asset.colUserName'), dataIndex: 'userName' },
@@ -87,6 +92,10 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
     { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
+    {
+      title: t('asset.colCompanyBrand'), dataIndex: 'companyBrand', key: 'companyBrand', width: 100,
+      render: (v: number | null | undefined) => v ? <BrandTag value={v} /> : '-',
+    },
     { title: t('asset.paramInfoTitle'), key: 'params', width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 110 },
     { title: t('transfer.brand'), dataIndex: 'brand', key: 'brand', width: 120, render: (value?: string) => value || '—' },
@@ -135,6 +144,7 @@ export default function TransferableTab({ onTransfer, onDetail, options }: Props
           <Form.Item label={t('asset.colHoldType')} name="holdType"><Select allowClear placeholder={t('common.all')} options={[
             { value: HOLD_TYPE.OWNED, label: t('asset.holdOwned') }, { value: HOLD_TYPE.BORROWED, label: t('asset.holdBorrowed') },
           ]} /></Form.Item>
+          <Form.Item label={t('asset.colCompanyBrand')} name="companyBrand"><Select allowClear placeholder={t('common.all')} options={numericOptions} /></Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} htmlType="submit">{t('common.search')}</Button>

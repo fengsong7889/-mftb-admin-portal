@@ -8,6 +8,7 @@ import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.EamAssetLifecycleService;
 import com.mftb.admin.service.EamCompensationService;
 import com.mftb.admin.service.EamLossService;
 import com.mftb.admin.util.BizSeqService;
@@ -44,6 +45,7 @@ public class EamLossServiceImpl implements EamLossService {
     private final EamLocationMapper locationMapper;
     private final DepartmentService departmentService;
     private final EamCompensationService compensationService;
+    private final EamAssetLifecycleService lifecycleService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -107,22 +109,42 @@ public class EamLossServiceImpl implements EamLossService {
                         .in(EamLoss::getStatus, "searching", "found_pending"));
         if (openCount > 0) throw new BusinessException("該資產已有未結束的遺失單，不可重複報失");
 
-        // 解析来源
+        // 幂等：同操作人同请求键直接返回既有遗失单（在资产行锁内检查）
+        SysUser currentUser = operatorResolver.currentUser();
+        Long operatorId = currentUser != null ? currentUser.getId() : null;
+        if (StringUtils.hasText(dto.getRequestKey())) {
+            Long priorLossId = lifecycleService.findBizIdByRequestKey(operatorId, dto.getRequestKey());
+            if (priorLossId != null) {
+                log.info("主動報失冪等命中：requestKey={}, lossId={}", dto.getRequestKey(), priorLossId);
+                return priorLossId;
+            }
+        }
+
+        // 持有关系快照（释放前读取）
         String sourceType = "direct";
         Long sourceId = 0L;
         Long holderId = asset.getCurrentHolderId();
         String holderName = asset.getUserName();
         String department = asset.getDepartment();
+        String beforeStatus = asset.getStatus();
 
-        // 使用中 → 关闭领用记录
-        if ("in_use".equals(asset.getStatus()) && asset.getActiveClaimId() != null) {
-            EamClaim claim = claimMapper.selectForUpdate(asset.getActiveClaimId());
-            if (claim != null && "claimed".equals(claim.getStatus())) {
-                claim.setStatus("loss_closed");
-                claim.setUpdatedBy(operatorResolver.currentOperatorName());
-                claimMapper.updateById(claim);
-                sourceType = "claim";
-                sourceId = claim.getId();
+        // 预判来源（供遗失单 sourceType/sourceId；实际关闭由生命周期服务在锁内执行）
+        if ("in_use".equals(beforeStatus)) {
+            if (asset.getActiveClaimId() != null) {
+                EamClaim claim = claimMapper.selectById(asset.getActiveClaimId());
+                if (claim != null && "claimed".equals(claim.getStatus())) {
+                    sourceType = "claim";
+                    sourceId = claim.getId();
+                }
+            } else {
+                EamBorrow activeBorrow = borrowMapper.selectOne(new LambdaQueryWrapper<EamBorrow>()
+                        .eq(EamBorrow::getAssetId, asset.getId())
+                        .in(EamBorrow::getStatus, "active", "overdue")
+                        .orderByDesc(EamBorrow::getId).last("LIMIT 1"));
+                if (activeBorrow != null) {
+                    sourceType = "borrow";
+                    sourceId = activeBorrow.getId();
+                }
             }
         }
 
@@ -139,6 +161,7 @@ public class EamLossServiceImpl implements EamLossService {
         loss.setAssetName(asset.getAssetName());
         loss.setAssetType(asset.getAssetType());
         loss.setBrand(asset.getBrand());
+        loss.setAssetStatusAtLoss(beforeStatus);
         loss.setOriginalHolderId(holderId);
         loss.setOriginalHolderName(holderName);
         loss.setOriginalDepartment(department);
@@ -146,22 +169,30 @@ public class EamLossServiceImpl implements EamLossService {
                 ? dto.getLastKnownLocation() : asset.getLocation());
         loss.setLossDate(lossDate);
         loss.setLossReason(dto.getLossReason());
-        SysUser currentUser = operatorResolver.currentUser();
-        loss.setReporterId(currentUser != null ? currentUser.getId() : null);
+        loss.setReporterId(operatorId);
         loss.setReporterName(operatorResolver.currentOperatorName());
         loss.setStatus("searching");
         loss.setFromMigration(0);
         loss.setCreatedBy(operatorResolver.currentOperatorName());
         loss.setUpdatedBy(operatorResolver.currentOperatorName());
+        loss.setRequestKey(StringUtils.hasText(dto.getRequestKey()) ? dto.getRequestKey() : null);
         lossMapper.insert(loss);
 
-        // 资产置为遗失
-        setAssetStatus(asset, "lost", holderId);
+        // 关闭有效来源（领用或借用）→ loss_closed，回填终止单据 ID
+        EamAssetLifecycleService.ClosedSource closed =
+                lifecycleService.closeActiveSource(asset, EamAssetLifecycleService.CLOSE_LOSS, loss.getId(), "報失登記：" + dto.getLossReason());
+
+        // 记录持有关系状态事件（释放前，asset 仍为旧状态）
+        lifecycleService.recordEvent(asset, "loss", loss.getId(), closed, "lost", department, lossDate, dto.getRequestKey());
+
+        // 解除持有关系并置为遗失（显式清空持有人/领用关联）
+        lifecycleService.releaseAssetToStatus(asset, "lost", null, null);
 
         // 记录事件
         addSystemEvent(loss.getId(), "create", "登記遺失：" + dto.getLossReason(), null, null);
 
-        log.info("主動報失：lossNo={}, assetId={}, asset={}", lossNo, asset.getId(), asset.getAssetNo());
+        log.info("主動報失：lossNo={}, assetId={}, asset={}, closedSource={}",
+                lossNo, asset.getId(), asset.getAssetNo(), closed.sourceType());
         return loss.getId();
     }
 
@@ -434,6 +465,7 @@ public class EamLossServiceImpl implements EamLossService {
         loss.setAssetName(asset.getAssetName());
         loss.setAssetType(asset.getAssetType());
         loss.setBrand(asset.getBrand());
+        loss.setAssetStatusAtLoss(asset.getStatus());
         loss.setOriginalHolderId(holderId);
         loss.setOriginalHolderName(holderName);
         loss.setOriginalDepartment(asset.getDepartment());
@@ -457,6 +489,41 @@ public class EamLossServiceImpl implements EamLossService {
 
         log.info("歸還驗收自動建立遺失單：lossNo={}, returnId={}, assetId={}", lossNo, returnId, asset.getId());
         return loss.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatusByReturnId(long returnId, String newStatus, LocalDate writeOffDate) {
+        EamLoss loss = lossMapper.selectOne(
+                new LambdaQueryWrapper<EamLoss>().eq(EamLoss::getReturnId, returnId));
+        if (loss == null) {
+            log.warn("歸還記錄 {} 未關聯遺失單，跳過狀態同步", returnId);
+            return;
+        }
+        loss.setStatus(newStatus);
+        if ("written_off".equals(newStatus)) {
+            loss.setWriteOffDate(writeOffDate);
+            loss.setWriteOffReason("歸還處置遺失核銷");
+        }
+        loss.setUpdatedBy(operatorResolver.currentOperatorName());
+        lossMapper.updateById(loss);
+
+        // 核销时同步资产台账：置为遗失核销终态并清除持有人/领用关联，
+        // 避免归还处置为遗失核销后资产仍停留在 in_use 造成交接/领用数据不一致
+        if ("written_off".equals(newStatus)) {
+            EamAsset asset = assetMapper.selectById(loss.getAssetId());
+            if (asset != null) {
+                setAssetStatus(asset, "written_off", null);
+                log.info("歸還處置核銷同步資產台账：assetId={}, assetNo={}, status=written_off",
+                        asset.getId(), asset.getAssetNo());
+            } else {
+                log.warn("歸還處置核銷同步資產台账失敗：資產不存在 assetId={}, returnId={}",
+                        loss.getAssetId(), returnId);
+            }
+        }
+
+        log.info("歸還處置同步更新遺失單狀態：lossId={}, lossNo={}, status={}, returnId={}",
+                loss.getId(), loss.getLossNo(), newStatus, returnId);
     }
 
     /* ====================================================================== */
@@ -553,6 +620,17 @@ public class EamLossServiceImpl implements EamLossService {
         vo.setCreatedAt(DateTimeUtils.format(loss.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(loss.getUpdatedAt()));
 
+        // 使用遗失单上存储的资产状态快照（创建时保存）
+        if (StringUtils.hasText(loss.getAssetStatusAtLoss())) {
+            vo.setAssetStatus(loss.getAssetStatusAtLoss());
+        }
+
+        // 填充所属品牌
+        EamAsset asset = assetMapper.selectById(loss.getAssetId());
+        if (asset != null) {
+            vo.setCompanyBrand(asset.getCompanyBrand());
+        }
+
         // 计算未结天数
         if (loss.getLossDate() != null) {
             LocalDate endDate = ("recovered".equals(loss.getStatus()) && loss.getInspectionDate() != null)
@@ -567,6 +645,29 @@ public class EamLossServiceImpl implements EamLossService {
         if (loss.getCompensationId() != null) {
             EamCompensation comp = compensationMapper.selectById(loss.getCompensationId());
             if (comp != null) vo.setCompensationNo(comp.getCompNo());
+        }
+
+        // 原持有人工号
+        if (loss.getOriginalHolderId() != null) {
+            SysUser holder = userMapper.selectById(loss.getOriginalHolderId());
+            if (holder != null) vo.setOriginalHolderNo(holder.getEmpId());
+        }
+
+        // 登记人工号
+        if (loss.getReporterId() != null) {
+            SysUser reporter = userMapper.selectById(loss.getReporterId());
+            if (reporter != null) vo.setReporterNo(reporter.getEmpId());
+        }
+
+        // 找回登记人工号
+        if (loss.getRecoveredById() != null) {
+            SysUser recoverer = userMapper.selectById(loss.getRecoveredById());
+            if (recoverer != null) vo.setRecoveredByNo(recoverer.getEmpId());
+        }
+
+        // 最后更新人姓名
+        if (StringUtils.hasText(loss.getUpdatedBy())) {
+            vo.setUpdatedByName(loss.getUpdatedBy());
         }
 
         return vo;
@@ -584,6 +685,13 @@ public class EamLossServiceImpl implements EamLossService {
         vo.setOperatorName(event.getOperatorName());
         vo.setEvidenceId(event.getEvidenceId());
         vo.setCreatedAt(DateTimeUtils.format(event.getCreatedAt()));
+
+        // 操作人工号
+        if (event.getOperatorId() != null) {
+            SysUser operator = userMapper.selectById(event.getOperatorId());
+            if (operator != null) vo.setOperatorNo(operator.getEmpId());
+        }
+
         return vo;
     }
 
@@ -644,6 +752,27 @@ public class EamLossServiceImpl implements EamLossService {
         }
         if (StringUtils.hasText(q.getEndDate())) {
             w.le(EamLoss::getLossDate, LocalDate.parse(q.getEndDate(), DateTimeFormatter.ISO_DATE));
+        }
+        if (StringUtils.hasText(q.getUpdatedBy())) {
+            w.like(EamLoss::getUpdatedBy, q.getUpdatedBy().trim());
+        }
+        if (StringUtils.hasText(q.getUpdateStartDate())) {
+            w.ge(EamLoss::getUpdatedAt, LocalDate.parse(q.getUpdateStartDate(), DateTimeFormatter.ISO_DATE).atStartOfDay());
+        }
+        if (StringUtils.hasText(q.getUpdateEndDate())) {
+            w.le(EamLoss::getUpdatedAt, LocalDate.parse(q.getUpdateEndDate(), DateTimeFormatter.ISO_DATE).atTime(23, 59, 59));
+        }
+        if (q.getCompanyBrand() != null) {
+            java.util.List<Long> brandAssetIds = assetMapper.selectList(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .eq(EamAsset::getCompanyBrand, q.getCompanyBrand())
+                            .select(EamAsset::getId)
+            ).stream().map(EamAsset::getId).toList();
+            if (brandAssetIds.isEmpty()) {
+                w.eq(EamLoss::getId, -1L);
+            } else {
+                w.in(EamLoss::getAssetId, brandAssetIds);
+            }
         }
         return w;
     }

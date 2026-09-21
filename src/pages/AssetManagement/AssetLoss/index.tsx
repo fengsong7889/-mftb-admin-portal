@@ -4,6 +4,7 @@
  * 同一路由內視圖切換：遺失單列表 ⇄ 新建報失 ⇄ 遺失單詳情
  * 支持 URL ?id= 直接進入指定遺失單詳情
  * 支持 URL ?create=1 直接進入新建報失頁
+ * 支持 URL ?followUp=1 進入詳情並自動打開跟進彈窗
  */
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -14,22 +15,23 @@ import LossCreate from './LossCreate'
 type View =
   | { mode: 'list' }
   | { mode: 'create' }
-  | { mode: 'detail'; lossId: number }
+  | { mode: 'detail'; lossId: number; followUp?: boolean }
 
 export default function AssetLoss() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlId = searchParams.get('id') ? Number(searchParams.get('id')) : null
   const urlCreate = searchParams.get('create') === '1'
+  const urlFollowUp = searchParams.get('followUp') === '1'
   const [view, setView] = useState<View>(
     urlCreate ? { mode: 'create' }
-      : urlId ? { mode: 'detail', lossId: urlId }
+      : urlId ? { mode: 'detail', lossId: urlId, followUp: urlFollowUp }
         : { mode: 'list' },
   )
 
   useEffect(() => {
-    if (urlId && !urlCreate) setView({ mode: 'detail', lossId: urlId })
-  }, [urlId, urlCreate])
+    if (urlId && !urlCreate) setView({ mode: 'detail', lossId: urlId, followUp: urlFollowUp })
+  }, [urlId, urlCreate, urlFollowUp])
 
   const backToList = () => {
     setView({ mode: 'list' })
@@ -43,6 +45,10 @@ export default function AssetLoss() {
           onViewDetail={(lossId) => {
             setView({ mode: 'detail', lossId })
             navigate(`/asset-loss?id=${lossId}`, { replace: true })
+          }}
+          onFollowUp={(lossId) => {
+            setView({ mode: 'detail', lossId, followUp: true })
+            navigate(`/asset-loss?id=${lossId}&followUp=1`, { replace: true })
           }}
           onCreate={() => {
             setView({ mode: 'create' })
@@ -61,6 +67,7 @@ export default function AssetLoss() {
         <LossDetail
           key={view.lossId}
           lossId={view.lossId}
+          followUp={view.followUp}
           onBack={backToList}
         />
       )}

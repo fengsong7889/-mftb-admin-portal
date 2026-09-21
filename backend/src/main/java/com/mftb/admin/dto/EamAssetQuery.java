@@ -16,10 +16,14 @@ public class EamAssetQuery {
     private Long categoryId;
     private Long departmentId;
     private String holdType;
+    /** 所属品牌（sys_company_brand.id） */
+    private Integer companyBrand;
     private String status;
     private String company;
     private String department;
     private String userName;
+    /** 当前持有人（sys_user.id 精确匹配） */
+    private Long currentHolderId;
     private String source;
     private Long orderId;
     private Long batchId;

@@ -21,10 +21,16 @@ public class EamLossVO {
     private String assetName;
     private String assetType;
     private String brand;
+    /** 所属品牌/公司品牌 ID */
+    private Integer companyBrand;
+    /** 遗失时资产状态（idle=in_use 快照） */
+    private String assetStatus;
 
     /* ---- 持有快照 ---- */
     private Long originalHolderId;
     private String originalHolderName;
+    /** 原持有人工号 */
+    private String originalHolderNo;
     private String originalDepartment;
     private String lastKnownLocation;
 
@@ -33,6 +39,8 @@ public class EamLossVO {
     private String lossReason;
     private Long reporterId;
     private String reporterName;
+    /** 登记人工号 */
+    private String reporterNo;
 
     /* ---- 状态 ---- */
     private String status;
@@ -44,6 +52,8 @@ public class EamLossVO {
     private String recoveredLocation;
     private Long recoveredById;
     private String recoveredByName;
+    /** 找回登记人工号 */
+    private String recoveredByNo;
     private String recoveredNote;
 
     /* ---- 验收信息 ---- */
@@ -71,6 +81,8 @@ public class EamLossVO {
     /* ---- 元数据 ---- */
     private String createdAt;
     private String updatedAt;
+    /** 最后更新人姓名 */
+    private String updatedByName;
     private Integer fromMigration;
 
     /* ---- 事件日志（详情页加载） ---- */
@@ -86,6 +98,8 @@ public class EamLossVO {
         private String changeReason;
         private Long operatorId;
         private String operatorName;
+        /** 操作人工号 */
+        private String operatorNo;
         private Long evidenceId;
         private String createdAt;
     }

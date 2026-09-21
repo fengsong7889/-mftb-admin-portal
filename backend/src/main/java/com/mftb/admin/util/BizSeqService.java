@@ -123,6 +123,8 @@ public class BizSeqService {
     public static final String RULE_EAM_INVENTORY = "eam_inventory";
     /** EAM 遗失编号 */
     public static final String RULE_EAM_LOSS = "eam_loss";
+    /** EAM 报废编号 */
+    public static final String RULE_EAM_SCRAP = "eam_scrap";
 
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）

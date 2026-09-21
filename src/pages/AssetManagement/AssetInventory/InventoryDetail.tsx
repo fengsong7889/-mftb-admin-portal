@@ -3,12 +3,12 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Button, Space, Table, Tag, Select, Input, Modal, message, Segmented, TreeSelect, Empty, Spin,
+  Button, Descriptions, Space, Table, Tag, Select, Input, Modal, message, Segmented, TreeSelect, Empty, Spin,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AimOutlined, CheckCircleOutlined, ExclamationCircleOutlined, ClockCircleOutlined,
-  ExportOutlined, SaveOutlined,
+  ExportOutlined, SaveOutlined, EditOutlined, FileSearchOutlined, ProfileOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../../components/DetailPageHeader'
@@ -28,6 +28,22 @@ import {
 interface Props {
   taskId: number
   onBack: () => void
+}
+
+/** 模块标题栏（28×28 图标色块 + 15px/600 标题 + 右侧延伸分隔线，对齐详情页规范 §D.3） */
+function SectionTitle({ icon, iconBg, title, extra }: {
+  icon: React.ReactNode; iconBg: string; title: string; extra?: React.ReactNode
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {icon}
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+      {extra}
+    </div>
+  )
 }
 
 interface EditorState {
@@ -65,13 +81,21 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
   const [closeType, setCloseType] = useState<'COMPLETE' | 'PARTIAL'>('COMPLETE')
   const [closeReason, setCloseReason] = useState('')
   const [prepare, setPrepare] = useState<Awaited<ReturnType<typeof prepareCloseInventory>> | null>(null)
+  /** 操作记录（详情页规范 §D.4：用专用 state 存最后更新人/时间） */
+  const [updatedBy, setUpdatedBy] = useState('')
+  const [updatedAt, setUpdatedAt] = useState('')
 
   const isV2 = !!task && task.contractVersion >= 2
   const editable = !!task && isV2 && task.status === 'in_progress'
 
   const loadTask = useCallback(async () => {
     setTaskLoading(true)
-    try { setTask(await fetchInventoryTask(taskId)) } catch { /* 拦截器提示 */ } finally { setTaskLoading(false) }
+    try {
+      const res = await fetchInventoryTask(taskId)
+      setTask(res)
+      setUpdatedBy(res.updatedBy || res.operator || '')
+      setUpdatedAt(res.updatedAt || '')
+    } catch { /* 拦截器提示 */ } finally { setTaskLoading(false) }
   }, [taskId])
 
   const loadItems = useCallback(async () => {
@@ -222,6 +246,23 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
 
   const resultTag = (key?: string | null) => key ? <Tag color={RESULT_COLOR[key]}>{t(RESULT_LABEL_KEY[key] || key)}</Tag> : <span style={{ color: '#bfbfbf' }}>-</span>
 
+  /** 盘点范围摘要（与列表页同口径） */
+  const scopeText = (r: InventoryTaskRecord) => {
+    const s = r.scopeSummary
+    if (!s || (s.scopeMode ?? r.scopeMode) === 'ALL') return t('asset.invScopeAll', { defaultValue: '全部適用資產' })
+    const parts: string[] = []
+    if (s.locationNames?.length) parts.push(s.locationNames.join('/'))
+    if (s.categoryNames?.length) parts.push(s.categoryNames.join('/'))
+    if (s.departmentNames?.length) parts.push(s.departmentNames.join('/'))
+    return parts.length ? parts.join('、') : t('asset.invScopeCondition', { defaultValue: '按條件盤點' })
+  }
+
+  /** 负责人统一带工号 */
+  const ownerText = (r: InventoryTaskRecord) => {
+    const name = r.ownerName || r.operator || '-'
+    return r.ownerEmpNo ? `${name}（${r.ownerEmpNo}）` : name
+  }
+
   const columns: TableColumnsType<InventoryItemRecord> = [
     { key: 'assetNo', title: t('asset.colAssetNo'), width: 150, fixed: 'left', render: (_, r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.assetNo}</span> },
     { key: 'assetName', title: t('asset.colAssetName'), width: 170, ellipsis: true },
@@ -239,8 +280,9 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
     { key: 'action', title: t('common.colAction'), width: 200, fixed: 'right', render: (_, r) => editable ? (
       <Space size={0} split={<span className="action-split">|</span>}>
         <Button type="link" size="small" onClick={() => openEditor(r, 'normal')}>{t('asset.invOpFound', { defaultValue: '找到' })}</Button>
-        <Button type="link" size="small" danger onClick={() => openEditor(r, 'lost')}>{t('asset.invOpLost', { defaultValue: '缺失' })}</Button>
         <Button type="link" size="small" onClick={() => openEditor(r, 'damaged')}>{t('asset.invOpDamaged', { defaultValue: '損壞' })}</Button>
+        {/* 危险（缺失）操作按规范放最后 */}
+        <Button type="link" size="small" danger onClick={() => openEditor(r, 'lost')}>{t('asset.invOpLost', { defaultValue: '缺失' })}</Button>
       </Space>
     ) : <span style={{ color: '#bfbfbf' }}>-</span> },
   ]
@@ -318,14 +360,28 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
     )
   }
 
-  if (taskLoading) return <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin /></div>
-  if (!task) return <Empty description={t('common.noData')} />
+  if (taskLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" tip={t('common.loading')} />
+      </div>
+    )
+  }
+  if (!task) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />
 
   const headerTags = <Tag color={TASK_STATUS_COLOR[task.status]}>{t(TASK_STATUS_LABEL_KEY[task.status] || task.status)}</Tag>
+  /** 结束方式（完整完成/部分完成/已取消） */
+  const closeTypeText = task.status === 'cancelled'
+    ? t('asset.statusCancelled')
+    : task.closeType === 'PARTIAL'
+      ? t('asset.invPartial', { defaultValue: '部分完成' })
+      : task.closeType === 'COMPLETE'
+        ? t('asset.invComplete', { defaultValue: '完整完成' })
+        : '-'
   const meta = `${task.taskNo} · ${t('asset.colOwner')}：${task.ownerName || task.operator}${task.ownerEmpNo ? `（${task.ownerEmpNo}）` : ''} · ${t('asset.colInventoryDate')}：${task.inventoryDate}`
 
   return (
-    <div className="content-area">
+    <>
       <DetailPageHeader
         title={<>{t('asset.invDetailTitle')}：{task.taskName}</>}
         tags={<Space size={4}>{headerTags}{!isV2 && <Tag color="default">{t('asset.invHistoryTag', { defaultValue: '歷史盤點紀錄' })}</Tag>}</Space>}
@@ -347,35 +403,66 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
 
       {!isV2 && <div style={{ marginBottom: 12, color: '#8c8c8c', fontSize: 13 }}>{t('asset.invHistoryTip', { defaultValue: '歷史任務僅可查看/導出' })}</div>}
 
+      {/* 盘点任务信息（详情页规范 §D.3：白底卡片 + 模块标题行 + Descriptions） */}
+      <div className="detail-card">
+        <SectionTitle
+          icon={<FileSearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          iconBg="#e6f7ff"
+          title={t('asset.invTaskInfoTitle', { defaultValue: '盤點任務信息' })}
+        />
+        <Descriptions column={4} size="middle">
+          <Descriptions.Item label={t('asset.colTaskNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{task.taskNo}</span></Descriptions.Item>
+          <Descriptions.Item label={t('asset.colTaskName')} span={2}>{task.taskName || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colStatus')}>{headerTags}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.invOwnerLabel')}>{ownerText(task)}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colInventoryDate')}>{task.inventoryDate || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colCreatedBy', { defaultValue: '發起人' })}>{task.createdBy || task.operator || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colCreatedAt')}>{task.createdAt || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colExpectedCount')}>{task.expectedCount}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.invColCloseType', { defaultValue: '結束方式' })}>{closeTypeText}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.invColClosedAt', { defaultValue: '結束時間' })}>{task.closedAt || task.cancelledAt || '-'}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.invRangeSummary')}>{scopeText(task)}</Descriptions.Item>
+          <Descriptions.Item label={t('asset.colRemark')} span={3}>{task.remark || '-'}</Descriptions.Item>
+          {(task.closeReason || task.cancelReason) && (
+            <Descriptions.Item label={t('asset.colReason')} span={4}>{task.cancelReason || task.closeReason}</Descriptions.Item>
+          )}
+        </Descriptions>
+      </div>
+
       <div style={{ marginBottom: 16 }}>
         <StatCards items={statItems} animationKey={`${taskId}-${stats?.checkedCount ?? 0}`} />
       </div>
 
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-          <Space wrap>
-            <Input.Search allowClear placeholder={t('asset.searchAssetNo', { defaultValue: '資產編號/名稱' })} style={{ width: 200 }}
-              onSearch={v => { setPage(1); setQuery(q => ({ ...q, keyword: v || undefined })) }} />
-            <Select allowClear placeholder={t('asset.colCheckStatus')} style={{ width: 140 }}
-              onChange={v => { setPage(1); setQuery(q => ({ ...q, checkProgress: v })) }}
-              options={[{ value: 'checked', label: t('asset.invStatChecked') }, { value: 'unchecked', label: t('asset.invStatNotChecked') }, { value: 'recheck', label: t('asset.colRecheckCount') }]} />
-            <Select allowClear placeholder={t('asset.invStatAnomaly')} style={{ width: 150 }}
-              onChange={v => { setPage(1); setQuery(q => ({ ...q, anomaly: v })) }}
-              options={[{ value: 'missing', label: t('asset.invItemLost') }, { value: 'damaged', label: t('asset.invItemDamaged') }, { value: 'location_diff', label: t('asset.invActualLocation') + t('asset.invResultDiff') }, { value: 'holder_diff', label: t('asset.invActualHolder') + t('asset.invResultDiff') }]} />
-          </Space>
-          {editable && selected.length > 0 && (
+      {/* 盘点明细 */}
+      <div className="detail-card">
+        <SectionTitle
+          icon={<ProfileOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          iconBg="#fff7e6"
+          title={t('asset.invDetailListTitle', { defaultValue: '盤點明細' })}
+          extra={editable && selected.length > 0 ? (
             <Button icon={<CheckCircleOutlined />} onClick={handleBatch}>{t('asset.invBatchCheck')}（{selected.length}）</Button>
-          )}
+          ) : undefined}
+        />
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <Input.Search allowClear placeholder={t('asset.searchAssetNo', { defaultValue: '資產編號/名稱' })} style={{ width: 200 }}
+            onSearch={v => { setPage(1); setQuery(q => ({ ...q, keyword: v || undefined })) }} />
+          <Select allowClear placeholder={t('asset.colCheckStatus')} style={{ width: 140 }}
+            onChange={v => { setPage(1); setQuery(q => ({ ...q, checkProgress: v })) }}
+            options={[{ value: 'checked', label: t('asset.invStatChecked') }, { value: 'unchecked', label: t('asset.invStatNotChecked') }, { value: 'recheck', label: t('asset.colRecheckCount') }]} />
+          <Select allowClear placeholder={t('asset.invStatAnomaly')} style={{ width: 150 }}
+            onChange={v => { setPage(1); setQuery(q => ({ ...q, anomaly: v })) }}
+            options={[{ value: 'missing', label: t('asset.invItemLost') }, { value: 'damaged', label: t('asset.invItemDamaged') }, { value: 'location_diff', label: t('asset.invActualLocation') + t('asset.invResultDiff') }, { value: 'holder_diff', label: t('asset.invActualHolder') + t('asset.invResultDiff') }]} />
         </div>
 
         <Table<InventoryItemRecord>
           rowKey="id"
+          className="nowrap-table"
           columns={columns}
           dataSource={items}
           loading={itemLoading}
           size="small"
           scroll={{ x: 1500 }}
-          locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} /> }}
           rowSelection={editable ? {
             selectedRowKeys: selected,
             preserveSelectedRowKeys: false,
@@ -389,10 +476,32 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
           }}
           pagination={{
             current: page, pageSize: size, total,
-            showSizeChanger: true, showQuickJumper: true, showTotal: (tt) => `共 ${tt} 條`,
-            onChange: (p, ps) => { setPage(p); setSize(ps) },
+            showSizeChanger: true, showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: (tt) => t('common.total', { count: tt }),
+            // 每页条数变化时必须回到第 1 页
+            onChange: (p, ps) => { if (ps !== size) { setSize(ps); setPage(1) } else { setPage(p) } },
           }}
         />
+      </div>
+
+      {/* 操作记录（详情页规范 §D.4：仅展示最后更新人 + 最后更新时间） */}
+      <div className="detail-card">
+        <SectionTitle
+          icon={<EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          iconBg="#e6f7ff"
+          title={t('asset.operationRecord')}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div>
+            <div style={labelStyle}>{t('asset.colUpdatedBy')}</div>
+            <div style={{ fontSize: 14, color: '#262626' }}>{updatedBy || '-'}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>{t('asset.colUpdatedAt')}</div>
+            <div style={{ fontSize: 14, color: '#262626' }}>{updatedAt || '-'}</div>
+          </div>
+        </div>
       </div>
 
       <Modal
@@ -430,7 +539,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
           </>
         )}
       </Modal>
-    </div>
+    </>
   )
 }
 

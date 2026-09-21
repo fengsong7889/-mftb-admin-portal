@@ -21,8 +21,9 @@ import CompensationWaive from './CompensationWaive'
 import CompensationPayment from './CompensationPayment'
 import CompensationRefund from './CompensationRefund'
 import CompensationReview from './CompensationReview'
+import CompensationForm from './CompensationForm'
 
-type View = 'list' | 'detail' | 'liability' | 'waive' | 'payment' | 'refund' | 'review'
+type View = 'list' | 'detail' | 'liability' | 'waive' | 'payment' | 'refund' | 'review' | 'add'
 
 function parseId(raw: string | null): number | undefined {
   if (!raw || !/^[1-9]\d*$/.test(raw)) return undefined
@@ -38,7 +39,9 @@ export default function AssetCompensation() {
   const canEdit = user?.role === 'admin' || hasPermission('asset-compensation:edit')
 
   const mode = pathname.split('/')[2] || 'list'
-  const view: View = mode === 'detail' ? 'detail'
+  const isNew = searchParams.get('new') === '1'
+  const view: View = isNew ? 'add'
+    : mode === 'detail' ? 'detail'
     : mode === 'liability' ? 'liability'
     : mode === 'waive' ? 'waive'
     : mode === 'payment' ? 'payment'
@@ -131,7 +134,16 @@ export default function AssetCompensation() {
   return (
     <div className="content-area claim-module return-module">
       {view === 'list' && (
-        <CompensationList data={listData} loading={loading} error={error} onQuery={handleQuery} canEdit={canEdit} />
+        <CompensationList data={listData} loading={loading} error={error} onQuery={handleQuery} canEdit={canEdit} onCreate={() => navigate('/asset-compensation/add?new=1')} />
+      )}
+
+      {view === 'add' && (
+        <CompensationForm
+          onBack={back}
+          onCreated={(compId) => {
+            navigate(`/asset-compensation/detail?id=${compId}`, { replace: true })
+          }}
+        />
       )}
 
       {view === 'detail' && recordId != null && (

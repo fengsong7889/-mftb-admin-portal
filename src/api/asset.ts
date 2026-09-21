@@ -14,7 +14,7 @@ import { normalizeAssetParams, type AssetParameterSource } from '../utils/assetP
 /* ==================== 枚举类型 ==================== */
 
 /** 资产状态 */
-export type AssetStatus = 'idle' | 'in_use' | 'in_repair' | 'scrapped' | 'lost' | 'pending_inspection' | 'written_off'
+export type AssetStatus = 'idle' | 'in_use' | 'in_repair' | 'scrapped' | 'lost' | 'pending_inspection' | 'pending_disposal' | 'written_off'
 
 /** 自购/租用 */
 export type AssetSource = 'self' | 'lease'
@@ -203,10 +203,14 @@ export interface InventoryItemRecord {
 export interface ScrapRecord {
   id: number
   assetId: number
+  /** 报废编号 */
+  scrapNo?: string
   assetNo: string
   assetName: string
   assetType: string
   brand: string
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
   /** 报废日期 */
   scrapDate: string
   /** 申请人 */
@@ -223,8 +227,6 @@ export interface ScrapRecord {
   appraisal: string
   /** 备注 */
   remark: string
-  /** 状态：pending / approved / rejected / cancelled */
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   /** 创建时间 */
   createdAt: string
   /** 最后更新人 */
@@ -237,22 +239,22 @@ export interface ScrapRecord {
 export interface ScrapQuery {
   page?: number
   size?: number
-  /** 资产编号（模糊） */
-  assetNo?: string
-  /** 资产名称（模糊） */
-  assetName?: string
+  /** 报废编号（模糊） */
+  scrapNo?: string
+  /** 资产编码/名称（模糊，同时匹配编号和名称） */
+  assetKeyword?: string
   /** 资产分类编码 */
   assetType?: string
   /** 资产品牌（模糊） */
   brand?: string
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
   /** 报废时间范围 [start, end] */
   scrapDate?: [string, string]
   /** 申请人（模糊） */
   applyBy?: string
   /** 处置方式 */
   disposeType?: ScrapRecord['disposeType']
-  /** 状态 */
-  status?: ScrapRecord['status']
   /** 创建时间范围 [start, end] */
   createdAt?: [string, string]
   /** 最后更新人 */
@@ -269,6 +271,8 @@ export interface AssetRepairRecord {
   assetName: string
   /** 资产品牌（来自关联资产） */
   brand?: string
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
   /** 维修日期 */
   repairDate: string
   /** 故障描述 */
@@ -315,10 +319,14 @@ export interface AssetListQuery {
   categoryId?: number
   departmentId?: number
   holdType?: 'owned' | 'borrowed'
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
   status?: AssetStatus | 'all'
   company?: string
   department?: string
   userName?: string
+  /** 当前持有人（sys_user.id 精确匹配） */
+  currentHolderId?: number
   source?: AssetSource
   /** 购买日期范围 [start, end] */
   purchaseDate?: [string, string]
@@ -612,11 +620,11 @@ export async function fetchScrapDetail(id: number): Promise<ScrapRecord> {
 }
 
 /** 新增报废记录（资产快照字段由后端按 assetId 生成） */
-export function createScrapRecord(data: Omit<ScrapRecord, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'updatedBy'>): Promise<number> {
+export function createScrapRecord(data: Omit<ScrapRecord, 'id' | 'createdAt' | 'updatedAt' | 'updatedBy'>): Promise<number> {
   return request.post<unknown, number>('/eam/scraps', data)
 }
 
-/** 删除报废记录（仅允许待审批状态） */
+/** 删除报废记录（同时恢复关联资产为闲置状态） */
 export function deleteScrapRecord(id: number): Promise<void> {
   return request.delete<unknown, void>(`/eam/scraps/${id}`)
 }

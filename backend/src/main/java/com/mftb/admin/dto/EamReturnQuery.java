@@ -33,4 +33,6 @@ public class EamReturnQuery {
     private String endDate;
     /** 领用时部门 ID（通过员工部门过滤） */
     private Long departmentId;
+    /** 所属品牌（sys_company_brand.id） */
+    private Integer companyBrand;
 }

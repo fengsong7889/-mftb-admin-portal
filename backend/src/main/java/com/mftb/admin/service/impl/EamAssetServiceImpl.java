@@ -43,7 +43,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     private final JdbcTemplate jdbcTemplate;
     private final SysCompanyBrandService companyBrandService;
     private final com.mftb.admin.service.EamTransferLookup transferLookup;
-    private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped", "lost", "pending_inspection", "written_off");
+    private static final Set<String> STATUSES = Set.of("idle", "in_use", "in_repair", "scrapped", "lost", "pending_inspection", "pending_disposal", "written_off");
 
     @Override
     public PageResult<EamAssetVO> page(EamAssetQuery query) {
@@ -316,11 +316,13 @@ public class EamAssetServiceImpl implements EamAssetService {
                 .eq(hasText(q.getCompany()), EamAsset::getCompany, q.getCompany())
                 .eq(hasText(q.getDepartment()), EamAsset::getDepartment, q.getDepartment())
                 .like(hasText(q.getUserName()), EamAsset::getUserName, q.getUserName())
+                .eq(q.getCurrentHolderId() != null, EamAsset::getCurrentHolderId, q.getCurrentHolderId())
                 .eq(hasText(q.getSource()), EamAsset::getSource, q.getSource())
                 .eq(q.getOrderId() != null, EamAsset::getOrderId, q.getOrderId())
                 .eq(q.getBatchId() != null, EamAsset::getBatchId, q.getBatchId())
                 .like(hasText(q.getUpdatedBy()), EamAsset::getUpdatedBy, q.getUpdatedBy());
         w.eq(q.getBrandId() != null, EamAsset::getBrandId, q.getBrandId());
+        w.eq(q.getCompanyBrand() != null, EamAsset::getCompanyBrand, q.getCompanyBrand());
         if (q.getCategoryId() != null) w.in(EamAsset::getCategoryId, transferLookup.categoryIds(q.getCategoryId()));
         if (q.getDepartmentId() != null) {
             List<String> names = transferLookup.departmentNames(q.getDepartmentId());

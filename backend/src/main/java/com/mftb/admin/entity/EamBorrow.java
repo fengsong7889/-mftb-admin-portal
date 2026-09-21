@@ -58,6 +58,18 @@ public class EamBorrow {
     /** 关联归还记录 ID */
     private Long returnId;
 
+    /** 异常处置终止时间（遗失/报废/送修直接登记时写入） */
+    private LocalDateTime closedAt;
+
+    /** 终止来源类型：loss/scrap/repair */
+    private String closeType;
+
+    /** 终止来源单据 ID */
+    private Long closeBizId;
+
+    /** 终止说明 */
+    private String closeReason;
+
     /** 创建人 */
     private String createdBy;
 

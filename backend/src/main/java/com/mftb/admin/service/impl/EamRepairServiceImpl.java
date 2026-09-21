@@ -11,6 +11,7 @@ import com.mftb.admin.entity.EamReturn;
 import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.EamRepairMapper;
 import com.mftb.admin.mapper.EamReturnMapper;
+import com.mftb.admin.service.EamAssetLifecycleService;
 import com.mftb.admin.service.EamRepairService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -21,8 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -32,9 +35,12 @@ public class EamRepairServiceImpl implements EamRepairService {
     private final EamRepairMapper repairMapper;
     private final EamAssetMapper assetMapper;
     private final EamReturnMapper returnMapper;
+    private final EamAssetLifecycleService lifecycleService;
     private final OperatorResolver operatorResolver;
 
     private static final List<String> VALID_STATUSES = List.of("repairing", "done");
+    /** 允许直接送修的资产状态 */
+    private static final Set<String> REPAIRABLE_STATUSES = Set.of("idle", "in_use", "pending_disposal");
 
     @Override
     public List<EamRepairVO> list(Long assetId, String status) {
@@ -80,25 +86,58 @@ public class EamRepairServiceImpl implements EamRepairService {
         if (!StringUtils.hasText(dto.getRepairContent())) throw new BusinessException("维修内容不能为空");
         if (!StringUtils.hasText(dto.getRepairBy())) throw new BusinessException("维修方不能为空");
 
-        // 验证资产存在
-        EamAsset asset = assetMapper.selectById(dto.getAssetId());
+        // 幂等：同操作人同请求键直接返回既有维修记录
+        var currentUser = operatorResolver.currentUser();
+        Long operatorId = currentUser != null ? currentUser.getId() : null;
+        if (StringUtils.hasText(dto.getRequestKey())) {
+            Long prior = lifecycleService.findBizIdByRequestKey(operatorId, dto.getRequestKey());
+            if (prior != null) {
+                log.info("送修登记幂等命中：requestKey={}, repairId={}", dto.getRequestKey(), prior);
+                return prior;
+            }
+        }
+
+        // 验证资产存在并加行锁
+        EamAsset asset = assetMapper.selectOne(
+                new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, dto.getAssetId()).last("FOR UPDATE"));
         if (asset == null) throw new BusinessException("资产不存在");
+        if (!REPAIRABLE_STATUSES.contains(asset.getStatus())) {
+            throw new BusinessException("当前资产状态不允许直接送修（仅闲置/使用中/待处置可送修）");
+        }
+        Long openRepairs = repairMapper.selectCount(new LambdaQueryWrapper<EamRepair>()
+                .eq(EamRepair::getAssetId, asset.getId()).eq(EamRepair::getStatus, "repairing"));
+        if (openRepairs != null && openRepairs > 0) {
+            throw new BusinessException("该资产已有进行中的维修记录，不可重复送修");
+        }
 
         EamRepair repair = new EamRepair();
         BeanUtils.copyProperties(dto, repair);
         repair.setAssetNo(asset.getAssetNo());
         repair.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
         repair.setStatus("repairing");
+        repair.setHoldType(asset.getHoldType());
+        repair.setOriginalHolderId(asset.getCurrentHolderId());
+        repair.setOriginalHolderName(asset.getUserName());
+        repair.setRequestKey(StringUtils.hasText(dto.getRequestKey()) ? dto.getRequestKey() : null);
         repair.setCreatedBy(operatorResolver.currentOperatorName());
         repair.setUpdatedBy(operatorResolver.currentOperatorName());
         repairMapper.insert(repair);
 
-        // 更新资产状态为维修中
-        asset.setStatus("in_repair");
-        asset.setUpdatedBy(operatorResolver.currentOperatorName());
-        assetMapper.updateById(asset);
+        // 送修即收回：关闭有效来源→ repair_closed，并回填来源快照
+        EamAssetLifecycleService.ClosedSource closed = lifecycleService.closeActiveSource(
+                asset, EamAssetLifecycleService.CLOSE_REPAIR, repair.getId(), "送修登记：" + dto.getFaultDesc());
+        if ("claim".equals(closed.sourceType())) repair.setSourceClaimId(closed.sourceId());
+        else if ("borrow".equals(closed.sourceType())) repair.setSourceBorrowId(closed.sourceId());
+        repairMapper.updateById(repair);
 
-        log.info("创建维修记录：资产 {} ({}), 维修方 {}", asset.getAssetNo(), asset.getAssetName(), dto.getRepairBy());
+        LocalDate bizDate = parseDateOrToday(dto.getRepairDate());
+        lifecycleService.recordEvent(asset, "repair", repair.getId(), closed, "in_repair", asset.getDepartment(), bizDate, dto.getRequestKey());
+
+        // 解除持有关系并置为维修中（清持有人/领用关联，维修完成后回库闲置）
+        lifecycleService.releaseAssetToStatus(asset, "in_repair", null, null);
+
+        log.info("创建维修记录：资产 {} ({}), 维修方 {}, closedSource={}",
+                asset.getAssetNo(), asset.getAssetName(), dto.getRepairBy(), closed.sourceType());
         return repair.getId();
     }
 
@@ -114,15 +153,29 @@ public class EamRepairServiceImpl implements EamRepairService {
         repair.setUpdatedBy(operatorResolver.currentOperatorName());
         repairMapper.updateById(repair);
 
-        // 恢复资产状态为闲置
-        EamAsset asset = assetMapper.selectById(repair.getAssetId());
-        if (asset != null && "in_repair".equals(asset.getStatus())) {
-            asset.setStatus("idle");
-            asset.setUpdatedBy(operatorResolver.currentOperatorName());
-            assetMapper.updateById(asset);
+        // 仅当该资产无其它进行中维修时，维修完成回库闲置并显式解除持有关系（清持有人/领用关联）
+        Long remaining = repairMapper.selectCount(new LambdaQueryWrapper<EamRepair>()
+                .eq(EamRepair::getAssetId, repair.getAssetId()).eq(EamRepair::getStatus, "repairing"));
+        if (remaining == null || remaining == 0) {
+            EamAsset asset = assetMapper.selectOne(
+                    new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, repair.getAssetId()).last("FOR UPDATE"));
+            if (asset != null && "in_repair".equals(asset.getStatus())) {
+                lifecycleService.releaseAssetToStatus(asset, "idle", null, null);
+            }
         }
 
-        log.info("完成维修记录：{}，资产 {} 状态恢复为闲置", repair.getAssetNo(), repair.getAssetNo());
+        // 若本维修由归还处置(apply_repair)触发，维修完成后回写关联归还单为异常已结束
+        if (repair.getReturnId() != null) {
+            EamReturn ret = returnMapper.selectById(repair.getReturnId());
+            if (ret != null && "exception_pending".equals(ret.getReturnStatus())
+                    && "apply_repair".equals(ret.getDisposition())) {
+                ret.setReturnStatus("exception_closed");
+                ret.setUpdatedBy(operatorResolver.currentOperatorName());
+                returnMapper.updateById(ret);
+            }
+        }
+
+        log.info("完成维修记录：{}，资产 {} 无其它进行中维修时回库闲置", repair.getAssetNo(), repair.getAssetNo());
     }
 
     @Override
@@ -154,17 +207,16 @@ public class EamRepairServiceImpl implements EamRepairService {
 
         repairMapper.deleteById(id);
 
-        // 检查该资产是否还有其他维修中的记录，没有则恢复资产状态为闲置
+        // 检查该资产是否还有其他维修中的记录，没有则恢复资产状态为闲置并显式解除持有关系
         Long remainingCount = repairMapper.selectCount(
                 new LambdaQueryWrapper<EamRepair>()
                         .eq(EamRepair::getAssetId, repair.getAssetId())
                         .eq(EamRepair::getStatus, "repairing"));
         if (remainingCount == 0) {
-            EamAsset asset = assetMapper.selectById(repair.getAssetId());
+            EamAsset asset = assetMapper.selectOne(
+                    new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, repair.getAssetId()).last("FOR UPDATE"));
             if (asset != null && "in_repair".equals(asset.getStatus())) {
-                asset.setStatus("idle");
-                asset.setUpdatedBy(operatorResolver.currentOperatorName());
-                assetMapper.updateById(asset);
+                lifecycleService.releaseAssetToStatus(asset, "idle", null, null);
             }
         }
 
@@ -176,6 +228,12 @@ public class EamRepairServiceImpl implements EamRepairService {
         BeanUtils.copyProperties(repair, vo, "createdAt", "updatedAt");
         vo.setCreatedAt(DateTimeUtils.format(repair.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(repair.getUpdatedAt()));
+        // 填充所属品牌
+        EamAsset asset = assetMapper.selectById(repair.getAssetId());
+        if (asset != null) {
+            vo.setCompanyBrand(asset.getCompanyBrand());
+            vo.setBrand(asset.getBrand());
+        }
         return vo;
     }
 
@@ -191,7 +249,8 @@ public class EamRepairServiceImpl implements EamRepairService {
             return ret.getRepairId();
         }
 
-        EamAsset asset = assetMapper.selectById(ret.getAssetId());
+        EamAsset asset = assetMapper.selectOne(
+                new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, ret.getAssetId()).last("FOR UPDATE"));
         if (asset == null) throw new BusinessException("關聯資產不存在 assetId=" + ret.getAssetId());
 
         // 构建维修记录
@@ -211,14 +270,19 @@ public class EamRepairServiceImpl implements EamRepairService {
         repair.setStatus("repairing");
         repair.setApplicant(operatorResolver.currentOperatorName());
         repair.setReturnId(returnId);
+        // 责任快照取归还单持有人（损坏归还时台账持有关系已由 register 解除）
+        repair.setOriginalHolderId(ret.getEmployeeId());
+        repair.setHoldType(asset.getHoldType());
         repair.setCreatedBy(operatorResolver.currentOperatorName());
         repair.setUpdatedBy(operatorResolver.currentOperatorName());
         repairMapper.insert(repair);
 
-        // 更新资产状态为维修中
-        asset.setStatus("in_repair");
-        asset.setUpdatedBy(operatorResolver.currentOperatorName());
-        assetMapper.updateById(asset);
+        // 资产置为维修中（来源已在归还时结束，不重复关闭）
+        lifecycleService.recordEvent(asset, "repair", repair.getId(),
+                new EamAssetLifecycleService.ClosedSource(null, null, ret.getEmployeeId(), null, asset.getDepartment()),
+                "in_repair", asset.getDepartment(),
+                ret.getDispositionDate() != null ? ret.getDispositionDate() : ret.getReturnDate(), null);
+        lifecycleService.releaseAssetToStatus(asset, "in_repair", null, null);
 
         // 回写归还记录的 repairId
         ret.setRepairId(repair.getId());
@@ -226,5 +290,15 @@ public class EamRepairServiceImpl implements EamRepairService {
 
         log.info("处置流程自动创建维修记录 repairId={}, assetId={}, returnId={}", repair.getId(), asset.getId(), returnId);
         return repair.getId();
+    }
+
+    /** 解析 yyyy-MM-dd 业务日期，无效或缺失时回退今日 */
+    private LocalDate parseDateOrToday(String value) {
+        if (!StringUtils.hasText(value)) return LocalDate.now();
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (RuntimeException e) {
+            return LocalDate.now();
+        }
     }
 }

@@ -18,6 +18,8 @@ public class EamCompensationVO {
     /** 当前台账配置，只读。 */
     private Map<String, Object> params;
     private String categoryCode;
+    /** 所属品牌/公司品牌 ID */
+    private Integer companyBrand;
     private String assetNo;
     private Long holderId;
     private String holderName;

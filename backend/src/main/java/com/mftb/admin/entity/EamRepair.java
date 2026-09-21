@@ -55,6 +55,24 @@ public class EamRepair {
     /** 关联归还记录 ID（从归还处置流程自动创建时有值） */
     private Long returnId;
 
+    /** 原持有人 ID 快照（送修前资产当前使用人） */
+    private Long originalHolderId;
+
+    /** 原持有人姓名快照 */
+    private String originalHolderName;
+
+    /** 来源领用 ID 快照（送修前活跃领用） */
+    private Long sourceClaimId;
+
+    /** 来源借用 ID 快照（送修前活跃借用） */
+    private Long sourceBorrowId;
+
+    /** 持有方式快照：owned/borrowed */
+    private String holdType;
+
+    /** 幂等请求键（直接登记防重） */
+    private String requestKey;
+
     /** 创建人 */
     private String createdBy;
 

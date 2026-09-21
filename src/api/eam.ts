@@ -1447,11 +1447,12 @@ export async function fetchHandoverDetail(id: number): Promise<HandoverRecord> {
   return normalizeHandoverRecord(await request.get<unknown, HandoverRecord>(`/eam/handovers/${id}`))
 }
 
-/** 查詢某使用人名下資產（交接頁勾選用） */
-export async function fetchUserAssets(userName: string): Promise<AssetItem[]> {
-  if (!userName) return []
-  const res = await fetchAssetList({ page: 1, size: 9999, userName })
-  return res.records.filter((a) => a.status !== 'scrapped')
+/** 查詢某持有人名下資產（交接頁勾選用，按 sys_user.id 精确匹配） */
+export async function fetchUserAssets(currentHolderId: number): Promise<AssetItem[]> {
+  if (!currentHolderId) return []
+  // 按 currentHolderId 精确过滤，避免 userName LIKE 模糊匹配命中残留/同名数据
+  const res = await fetchAssetList({ page: 1, size: 9999, currentHolderId, status: 'in_use' })
+  return res.records
 }
 
 /** 取消交接 */

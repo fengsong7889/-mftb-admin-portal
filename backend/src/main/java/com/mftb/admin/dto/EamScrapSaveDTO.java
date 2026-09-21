@@ -29,4 +29,7 @@ public class EamScrapSaveDTO {
     private String appraisal;
     /** 备注 */
     private String remark;
+
+    /** 幂等请求键（直接登记报废防重，可空） */
+    private String requestKey;
 }

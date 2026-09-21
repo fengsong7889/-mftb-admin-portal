@@ -12,7 +12,7 @@ import { Alert, Button, DatePicker, Descriptions, Empty, Form, Modal, Radio, Res
 import {
   FileTextOutlined, ProfileOutlined, InboxOutlined,
   FileProtectOutlined, RollbackOutlined, AppstoreOutlined,
-  ToolOutlined, SearchOutlined, SaveOutlined,
+  ToolOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -46,6 +46,9 @@ const CLAIM_STATUS_META: Record<string, { label: string; color: string }> = {
   returned: { label: '已歸還', color: 'default' },
   cancelled: { label: '已取消', color: 'default' },
   transferred: { label: '已調撥', color: 'orange' },
+  loss_closed: { label: '異常終止·遺失', color: 'warning' },
+  scrap_closed: { label: '異常終止·報廢', color: 'error' },
+  repair_closed: { label: '異常終止·送修', color: 'processing' },
 }
 const SIGNATURE_META: Record<string, { label: string; color: string }> = {
   pending: { label: '待本人簽署', color: 'processing' },
@@ -87,7 +90,7 @@ interface Props {
   onRecover?: (dto: ReturnRecoverDTO) => void
 }
 
-export default function ReturnDetail({ record, loading = false, error, canEdit = false, showResult = false, editMode = false, onBack, onRefresh: _onRefresh, onDispose, onRecover }: Props) {
+export default function ReturnDetail({ record, loading = false, error, canEdit = false, showResult = false, editMode = false, onBack, onRefresh: _onRefresh, onDispose, onRecover: _onRecover }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -97,18 +100,14 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
 
   /** 處置 / 找回表單 */
   const [dispositionForm] = Form.useForm()
-  const [recoverForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   const dispositionRef = useRef<HTMLDivElement>(null)
-  const recoverRef = useRef<HTMLDivElement>(null)
 
   /** editMode 時自動滾動到對應模塊 */
   useEffect(() => {
     if (!editMode || !record) return
     const timer = setTimeout(() => {
-      if (record.assetCondition === 'lost' && !record.recovered && recoverRef.current) {
-        recoverRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      } else if (record.assetCondition !== 'normal' && !record.disposition && dispositionRef.current) {
+      if (record.assetCondition !== 'normal' && !record.disposition && dispositionRef.current) {
         dispositionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }
     }, 300)
@@ -144,7 +143,6 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
   const status = record.returnStatus
   const isException = record.assetCondition !== 'normal'
   const canDispose = canEdit && isException && !record.disposition
-  const canRecover = canEdit && record.assetCondition === 'lost' && !record.recovered
 
   /** 處置選項：損壞時排除「遺失核銷」，遺失時排除「收回閒置」和「申請維修」 */
   const dispositionOptions = ALL_DISPOSITION_OPTIONS.filter(o => {
@@ -198,17 +196,6 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
 
       setSubmitting(true)
       await onDispose?.(dto)
-    } catch { /* validation */ } finally {
-      setSubmitting(false)
-    }
-  }
-
-  /** 找回提交 */
-  const handleRecoverSubmit = async () => {
-    try {
-      const values = await recoverForm.validateFields()
-      setSubmitting(true)
-      await onRecover?.({ recoveredNote: values.note })
     } catch { /* validation */ } finally {
       setSubmitting(false)
     }
@@ -458,27 +445,19 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       </div>
       )}
 
-      {/* ====== 模块 7：遗失找回（已迁移至遗失找回模块） ====== */}
-      {canRecover && (
-        <div style={detailCardStyle} ref={recoverRef}>
-          <SectionTitle
-            icon={<SearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
-            iconBg="#e6f7ff"
-            title="遺失資產"
-            tag={record.recovered === 1
-              ? <Tag color="success">已找回</Tag>
-              : <Tag>未找回</Tag>}
+      {/* ====== 模塊 7：遺失提醒（驗收狀況=遺失時僅展示提示） ====== */}
+      {record.assetCondition === 'lost' && (
+        <div style={detailCardStyle}>
+          <Alert
+            className="claim-notice"
+            showIcon
+            type="info"
+            message={
+              <span>
+                遺失資產會進入「遺失資產」模塊。後續可前往遺失資產菜單 TB-Z-02-01-0007 進行找回、驗收等操作。
+              </span>
+            }
           />
-          {record.recovered === 1 ? (
-            <Descriptions column={4} size="middle">
-              <Descriptions.Item label="找回日期">{record.recoveredDate || '—'}</Descriptions.Item>
-              <Descriptions.Item label="找回說明">{record.recoveredNote || '—'}</Descriptions.Item>
-            </Descriptions>
-          ) : (
-            <Alert className="claim-notice" showIcon type="info" message={
-              <span>遺失資產功能已遷移至「遺失資產」模塊。請前往 <a onClick={() => navigate('/asset-loss')}>遺失資產</a> 菜單進行找回、驗收等操作。</span>
-            } />
-          )}
         </div>
       )}
     </Spin>

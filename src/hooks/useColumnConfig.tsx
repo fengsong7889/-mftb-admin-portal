@@ -43,6 +43,12 @@ function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[
         if (hasStaleKeys) {
           localStorage.setItem(`table-config-${storageKey}`, JSON.stringify(result))
         }
+        // 安全检查：如果可见列过少（少于 2 列），说明配置异常，回退到默认配置
+        const visibleCount = result.filter(c => c.visible).length
+        if (visibleCount < 2) {
+          localStorage.removeItem(`table-config-${storageKey}`)
+          return defaults
+        }
         return result
       }
     }

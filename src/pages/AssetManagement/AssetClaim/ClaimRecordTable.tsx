@@ -16,6 +16,9 @@ const STATUS_META: Record<ClaimStatus, { label: string; color: string }> = {
   returned: { label: '已歸還', color: 'default' },
   cancelled: { label: '已取消', color: 'default' },
   transferred: { label: 'transfer.transferred', color: 'orange' },
+  loss_closed: { label: '異常終止·遺失', color: 'warning' },
+  scrap_closed: { label: '異常終止·報廢', color: 'error' },
+  repair_closed: { label: '異常終止·送修', color: 'processing' },
 }
 const SIGNATURE_META: Record<SignatureStatus, { label: string; color: string }> = {
   pending: { label: '待本人簽署', color: 'processing' },

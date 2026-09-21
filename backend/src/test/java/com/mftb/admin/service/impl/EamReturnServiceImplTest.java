@@ -11,6 +11,7 @@ import com.mftb.admin.entity.EamClaim;
 import com.mftb.admin.entity.EamReturn;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.EamCompensationService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ class EamReturnServiceImplTest {
     @Mock private EamClaimEvidenceMapper evidenceMapper;
     @Mock private SysUserMapper userMapper;
     @Mock private EamLocationMapper locationMapper;
+    @Mock private EamCompensationService compensationService;
     @Mock private DepartmentService departmentService;
     @Mock private BizSeqService bizSeqService;
     @Mock private OperatorResolver operatorResolver;
@@ -156,7 +158,7 @@ class EamReturnServiceImplTest {
         service.dispose(disposition("  用戶運營部  "));
 
         assertEquals("用戶運營部", asset.getDepartment());
-        verify(assetMapper).updateById(asset);
+        verify(assetMapper).update(eq(asset), any());
     }
 
     @Test
@@ -171,6 +173,27 @@ class EamReturnServiceImplTest {
 
         assertEquals("用戶運營部", asset.getDepartment());
         verify(assetMapper).update(eq(asset), any());
+    }
+
+    @Test
+    void damagedReturnReleasesToPendingDisposalAndCreatesLiability() {
+        EamClaim claim = stubClaim();
+        EamAsset asset = stubAssetForReturn();
+        when(departmentService.requireEnabledDepartmentName("用戶運營部")).thenReturn("用戶運營部");
+        when(compensationService.createFromDispose(11L)).thenReturn(401L);
+        EamReturnDTO dto = dto("用戶運營部");
+        dto.setAssetCondition("damaged");
+        dto.setExceptionReason("屏幕破裂");
+
+        assertEquals(11L, service.register(dto));
+
+        assertEquals("returned", claim.getStatus());
+        assertEquals("pending_disposal", asset.getStatus());
+        assertNull(asset.getCurrentHolderId());
+        ArgumentCaptor<UpdateWrapper<EamAsset>> update = ArgumentCaptor.forClass(UpdateWrapper.class);
+        verify(assetMapper).update(eq(asset), update.capture());
+        assertTrue(update.getValue().getSqlSet().contains("current_holder_id="));
+        verify(compensationService).createFromDispose(11L);
     }
 
     private void rejectDepartment(String reason) {

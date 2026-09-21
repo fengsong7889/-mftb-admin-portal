@@ -263,6 +263,7 @@ public class EamAssetTransferServiceImpl implements EamAssetTransferService {
         if (asset != null) {
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
+            vo.setCompanyBrand(asset.getCompanyBrand());
         }
         String blocked = cancelBlocked(t, asset,
                 t.getFromClaimId() == null ? null : claimMapper.selectById(t.getFromClaimId()),

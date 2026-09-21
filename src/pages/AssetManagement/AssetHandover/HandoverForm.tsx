@@ -11,11 +11,11 @@ import {
   message, Alert, Tag, TreeSelect, Modal, Radio,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import { fetchUserAssets, createHandover, type HandoverSaveData } from '../../../api/eam'
-import type { AssetItem } from '../../../api/asset'
+import type { AssetItem, AssetStatus } from '../../../api/asset'
 import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { fetchDepartments, type DepartmentItem } from '../../../api/department'
@@ -24,13 +24,19 @@ import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
 import { fetchEmployeeOptions, fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import type { OptionItem } from '../../../api/types'
 
+/** 员工缓存条目（id = sys_user.id = 资产 currentHolderId） */
+type EmployeeCacheEntry = { name: string; department: string; id: number }
+
 /** 仅返回「姓名(工号)」格式的选项，不含部门/职位/职级 */
-async function fetchSimpleNameOptions(keyword: string): Promise<OptionItem[]> {
-  const opts = await fetchEmployeeOptions(keyword)
-  return opts.map(o => {
-    const namePart = o.label.split('(')[0]?.trim() ?? o.label
-    const empIdPart = o.label.match(/\(([^)]+)\)/)?.[1] ?? ''
-    return { value: o.value, label: empIdPart ? `${namePart}(${empIdPart})` : namePart }
+async function fetchSimpleNameOptions(
+  keyword: string,
+  employeeCache: Map<string, EmployeeCacheEntry>,
+): Promise<OptionItem[]> {
+  // 直接请求员工列表，从原始数据构建 label，避免从字符串解析的不确定性
+  const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
+  return (res.records || []).map(e => {
+    employeeCache.set(e.empId, { name: e.name, department: e.department || '', id: e.id })
+    return { value: e.empId, label: `${e.name}(${e.empId})` }
   })
 }
 
@@ -56,6 +62,17 @@ const REASON_OPTIONS: { value: HandoverReason; key: string }[] = [
   { value: 'other', key: 'asset.reasonOther' },
 ]
 
+const STATUS_META: Record<AssetStatus, { key: string; color: string }> = {
+  idle:      { key: 'asset.statusIdle',      color: 'default' },
+  in_use:    { key: 'asset.statusInUse',     color: 'success' },
+  in_repair: { key: 'asset.statusInRepair',  color: 'processing' },
+  scrapped:  { key: 'asset.statusScrapped',  color: 'error' },
+  lost:      { key: 'asset.statusLost',      color: 'warning' },
+  pending_inspection: { key: 'asset.statusPendingInspection', color: 'blue' },
+  pending_disposal: { key: 'asset.statusPendingDisposal', color: 'orange' },
+  written_off: { key: 'asset.statusWrittenOff', color: 'default' },
+}
+
 export default function HandoverForm({ onBack }: Props) {
   const { t } = useTranslation()
   const paramCatalog = useAssetParameterCatalog()
@@ -63,6 +80,7 @@ export default function HandoverForm({ onBack }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(false)
   const [fromUser, setFromUser] = useState('')
+  const [fromUserEmpId, setFromUserEmpId] = useState('')
   const [fromUserDept, setFromUserDept] = useState('')
   const [userAssets, setUserAssets] = useState<AssetItem[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -72,8 +90,8 @@ export default function HandoverForm({ onBack }: Props) {
   const receiverType = Form.useWatch('receiverType', form) || 'employee'
 
   /* ----- 员工数据缓存 ----- */
-  const employeeDataRef = useRef<Map<string, { name: string; department: string }>>(new Map())
-  const fromUserEmpDataRef = useRef<Map<string, { name: string; department: string }>>(new Map())
+  const employeeDataRef = useRef<Map<string, EmployeeCacheEntry>>(new Map())
+  const fromUserEmpDataRef = useRef<Map<string, EmployeeCacheEntry>>(new Map())
 
   useEffect(() => {
     let alive = true
@@ -82,37 +100,45 @@ export default function HandoverForm({ onBack }: Props) {
     return () => { alive = false }
   }, [])
 
-  /** 交接人搜索（仅姓名+工号） */
+  /** 交接人搜索（仅姓名+工号，部门已在旁边单独展示） */
   const handleFromUserSearch = useCallback(async (keyword: string) => {
-    const opts = await fetchSimpleNameOptions(keyword)
-    if (keyword) {
-      const res = await fetchEmployees({ page: 1, size: 50, keyword, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
-      ;(res.records || []).forEach((e: EmployeeItem) => {
-        fromUserEmpDataRef.current.set(e.empId, { name: e.name, department: e.department || '' })
-      })
-    }
-    return opts
+    return fetchSimpleNameOptions(keyword, fromUserEmpDataRef.current)
   }, [])
 
-  /** 交接人选择 → 自动带入部门 + 查询名下资产 */
-  const handleFromUserSelect = useCallback(async (empId: string) => {
+  /** 交接人选择 → 自动带入部门（不自动查询资产，由按钮触发） */
+  const handleFromUserSelect = useCallback((empId: string) => {
     const emp = fromUserEmpDataRef.current.get(empId)
     if (emp) {
+      setFromUserEmpId(empId)
       setFromUser(emp.name)
       setFromUserDept(emp.department)
-      setLoading(true)
-      try {
-        const list = await fetchUserAssets(emp.name)
-        setUserAssets(list)
-        setSelectedIds([])
-        setQueried(true)
-      } catch (e: unknown) {
-        message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-      } finally {
-        setLoading(false)
-      }
+      // 切换交接人时清空之前的资产查询结果
+      setUserAssets([])
+      setSelectedIds([])
+      setQueried(false)
     }
-  }, [t])
+  }, [])
+
+  /** 点击「查询资产」按钮 → 查询交接人名下资产 */
+  const handleQueryAssets = useCallback(async () => {
+    if (!fromUserEmpId) {
+      message.warning(t('asset.fromUserRequired'))
+      return
+    }
+    const emp = fromUserEmpDataRef.current.get(fromUserEmpId)
+    if (!emp) return
+    setLoading(true)
+    try {
+      const list = await fetchUserAssets(emp.id)
+      setUserAssets(list)
+      setSelectedIds([])
+      setQueried(true)
+    } catch (e: unknown) {
+      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
+    } finally {
+      setLoading(false)
+    }
+  }, [fromUserEmpId, t])
 
   /** 接收人搜索 */
   const handleEmployeeSearch = useCallback(async (keyword: string) => {
@@ -120,7 +146,7 @@ export default function HandoverForm({ onBack }: Props) {
     if (keyword) {
       const res = await fetchEmployees({ page: 1, size: 50, keyword, employmentStatus: 'active' }).catch(() => ({ records: [] as EmployeeItem[], total: 0 }))
       ;(res.records || []).forEach((e: EmployeeItem) => {
-        employeeDataRef.current.set(e.empId, { name: e.name, department: e.department || '' })
+        employeeDataRef.current.set(e.empId, { name: e.name, department: e.department || '', id: e.id })
       })
     }
     return opts
@@ -137,7 +163,7 @@ export default function HandoverForm({ onBack }: Props) {
 
   /** 经办人搜索（仅姓名+工号） */
   const handleOperatorSearch = useCallback(async (keyword: string) => {
-    return await fetchSimpleNameOptions(keyword)
+    return fetchSimpleNameOptions(keyword, employeeDataRef.current)
   }, [])
 
   const selectedAssets = userAssets.filter((a) => selectedIds.includes(a.id))
@@ -150,7 +176,7 @@ export default function HandoverForm({ onBack }: Props) {
         message.error(t('asset.handoverAssetRequired'))
         return
       }
-      if (v.toUser?.trim() && v.toUser.trim() === fromUser.trim()) {
+      if (v.toUser?.trim() && v.toUser.trim() === fromUserEmpId) {
         message.error(t('asset.toUserRequired'))
         return
       }
@@ -211,14 +237,18 @@ export default function HandoverForm({ onBack }: Props) {
       title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
       render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>,
     },
-    { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 200, ellipsis: true },
-    { title: t('asset.paramInfoTitle'), key: 'params', width: 240, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
+    { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', width: 180, ellipsis: true },
+    { title: t('asset.colBrand'), dataIndex: 'brand', key: 'brand', width: 100, render: (v: string) => v || '-' },
+    { title: t('asset.paramInfoTitle'), key: 'params', width: 220, render: (_, asset) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 110 },
     { title: t('asset.colDepartment'), dataIndex: 'department', key: 'department', width: 110 },
     { title: t('asset.colLocationName'), dataIndex: 'location', key: 'location', width: 170, ellipsis: true },
     {
       title: t('asset.colStatus'), dataIndex: 'status', key: 'status', width: 100,
-      render: (v: string) => <Tag color={v === 'in_use' ? 'success' : 'default'}>{v}</Tag>,
+      render: (v: string) => {
+        const meta = STATUS_META[v as AssetStatus]
+        return meta ? <Tag color={meta.color}>{t(meta.key)}</Tag> : <Tag>{v}</Tag>
+      },
     },
   ]
 
@@ -248,32 +278,48 @@ export default function HandoverForm({ onBack }: Props) {
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionFromUser')}</h3>
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <RemoteSearchSelect
             placeholder={t('asset.handoverFromUserPh')}
             fetchOptions={handleFromUserSearch}
-            value={fromUser}
-            onChange={(val) => {
-              setFromUser(val || '')
-              if (!val) {
-                setFromUserDept('')
-                setUserAssets([])
-                setSelectedIds([])
-                setQueried(false)
-              }
+            value={fromUserEmpId || undefined}
+            initialOptions={fromUserEmpId && fromUser ? [{ value: fromUserEmpId, label: `${fromUser}(${fromUserEmpId})` }] : []}
+            onChange={() => {
+              setFromUser('')
+              setFromUserEmpId('')
+              setFromUserDept('')
+              setUserAssets([])
+              setSelectedIds([])
+              setQueried(false)
             }}
             onSelect={handleFromUserSelect}
             style={{ width: 280 }}
           />
-          {fromUserDept && (
-            <Input
-              placeholder={t('asset.colDepartment')}
-              value={fromUserDept}
-              readOnly
-              style={{ width: 280, color: '#8C8C8C' }}
-            />
-          )}
-        </Space>
+          <Input
+            placeholder={t('asset.colDepartment')}
+            value={fromUserDept}
+            readOnly
+            style={{ width: 220, color: fromUserDept ? undefined : '#BFBFBF' }}
+          />
+          <Button
+            type="primary"
+            icon={<SearchOutlined />}
+            loading={loading}
+            disabled={!fromUserEmpId}
+            onClick={handleQueryAssets}
+            style={{
+              backgroundColor: '#E8720C',
+              borderColor: '#E8720C',
+              borderRadius: 6,
+              height: 32,
+              fontSize: 13,
+              fontWeight: 500,
+              boxShadow: '0 2px 4px rgba(232,114,12,0.25)',
+            }}
+          >
+            {t('asset.btnQueryAssets')}
+          </Button>
+        </div>
 
         {/* ====== 名下資產列表 ====== */}
         {queried && (

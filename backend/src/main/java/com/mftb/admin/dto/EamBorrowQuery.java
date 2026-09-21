@@ -21,4 +21,6 @@ public class EamBorrowQuery {
     private String startDate;
     /** 结束日期 yyyy-MM-dd */
     private String endDate;
+    /** 所属品牌（sys_company_brand.id） */
+    private Integer companyBrand;
 }

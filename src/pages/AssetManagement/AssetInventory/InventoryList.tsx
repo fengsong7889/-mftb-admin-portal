@@ -9,8 +9,9 @@ import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
+import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
 import {
-  fetchInventoryTasks, downloadInventoryCsv,
+  fetchInventoryTasks, downloadInventoryCsv, searchInventoryEmployees,
   type InventoryTaskRecord, type InventoryTaskQuery,
 } from '../../../api/eamInventory'
 import { TASK_STATUS_LABEL_KEY, TASK_STATUS_COLOR } from './inventoryMeta'
@@ -51,22 +52,40 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
   const handleSearch = () => {
     const v = form.getFieldsValue()
     const range = v.date as [dayjs.Dayjs, dayjs.Dayjs] | undefined
+    const opRange = v.opDate as [dayjs.Dayjs, dayjs.Dayjs] | undefined
     setPage(1)
     setFilters({
+      taskNo: v.taskNo || undefined,
       keyword: v.keyword || undefined,
       ownerKeyword: v.ownerKeyword || undefined,
       status: v.status || undefined,
       dateFrom: range?.[0] ? range[0].format('YYYY-MM-DD') : undefined,
       dateTo: range?.[1] ? range[1].format('YYYY-MM-DD') : undefined,
+      opDateFrom: opRange?.[0] ? opRange[0].format('YYYY-MM-DD') : undefined,
+      opDateTo: opRange?.[1] ? opRange[1].format('YYYY-MM-DD') : undefined,
     })
   }
 
   const handleReset = () => { form.resetFields(); setPage(1); setFilters({}) }
 
+  /**
+   * 负责人下拉选项：后端 ownerKeyword 按负责人姓名/工号模糊匹配，
+   * 所以选项值取工号（缺工号时回退姓名），保证选中后能精确命中。
+   */
+  const fetchOwnerOptions = useCallback(async (keyword: string) => {
+    const list = await searchInventoryEmployees(keyword)
+    return list.map(e => ({
+      value: e.empId || e.name,
+      label: e.empId ? `${e.name}（${e.empId}）` : e.name,
+    }))
+  }, [])
+
+  /** 导出按当前筛选条件全量导出，与列表保持一致 */
   const handleExport = async () => {
     const params = new URLSearchParams()
-    if (filters.keyword) params.set('keyword', filters.keyword)
-    if (filters.status) params.set('status', filters.status)
+    Object.entries(filters).forEach(([k, val]) => {
+      if (val !== undefined && val !== null && val !== '') params.set(k, String(val))
+    })
     const qs = params.toString()
     try {
       await downloadInventoryCsv(`/eam/inventory/v2/tasks/export${qs ? `?${qs}` : ''}`, `asset_inventory_tasks_${dayjs().format('YYYYMMDD')}.csv`)
@@ -105,7 +124,9 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
     { key: 'status', title: t('asset.colStatus'), width: 110,
       render: (_, r) => <Tag color={TASK_STATUS_COLOR[r.status]}>{t(TASK_STATUS_LABEL_KEY[r.status] || r.status)}</Tag> },
     { key: 'inventoryDate', title: t('asset.colInventoryDate'), dataIndex: 'inventoryDate', width: 120 },
-    { key: 'closedAt', title: t('asset.colOperateTime', { defaultValue: '結束時間' }), width: 160, render: (_, r) => r.closedAt || r.cancelledAt || '-' },
+    { key: 'closedAt', title: t('asset.invColClosedAt', { defaultValue: '結束時間' }), width: 160, render: (_, r) => r.closedAt || r.cancelledAt || '-' },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', width: 110, ellipsis: true, render: (v: string) => v || '-' },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     { key: 'action', title: t('common.colAction'), width: 140, fixed: 'right',
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
@@ -127,7 +148,9 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
     { key: 'notCheckedCount', title: t('asset.colNotCheckedCount') },
     { key: 'status', title: t('asset.colStatus') },
     { key: 'inventoryDate', title: t('asset.colInventoryDate') },
-    { key: 'closedAt', title: t('asset.colOperateTime', { defaultValue: '結束時間' }) },
+    { key: 'closedAt', title: t('asset.invColClosedAt', { defaultValue: '結束時間' }) },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -139,11 +162,14 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
     <>
       <div className="search-section">
         <Form form={form} layout="inline">
+          <Form.Item label={t('asset.colTaskNo')} name="taskNo">
+            <Input placeholder={t('asset.taskNoPh', { defaultValue: '請輸入盤點任務編號搜索' })} allowClear style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item label={t('asset.colTaskName')} name="keyword">
             <Input placeholder={t('asset.taskNamePh', { defaultValue: '請輸入任務名稱' })} allowClear style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colOwner')} name="ownerKeyword">
-            <Input placeholder={t('asset.invOwnerPh', { defaultValue: '請輸入姓名或工號搜尋' })} allowClear style={{ width: '100%' }} />
+            <RemoteSearchSelect fetchOptions={fetchOwnerOptions} placeholder={t('asset.invOwnerPh', { defaultValue: '請輸入姓名或工號搜尋' })} />
           </Form.Item>
           <Form.Item label={t('asset.colStatus')} name="status">
             <Select allowClear style={{ width: '100%' }} placeholder={t('common.all', { defaultValue: '全部' })}
@@ -155,6 +181,9 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
               ]} />
           </Form.Item>
           <Form.Item label={t('asset.colInventoryDate')} name="date">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label={t('asset.colOpDate', { defaultValue: '操作日期' })} name="opDate">
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item>
@@ -179,19 +208,22 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
       </div>
 
       <Table<InventoryTaskRecord>
+        className="nowrap-table"
         columns={applyConfig(allColumns) as TableColumnsType<InventoryTaskRecord>}
         dataSource={data}
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 1700 }}
-        locale={{ emptyText: <Empty description={t('common.noData')} /> }}
+        scroll={{ x: 2030 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} /> }}
         onRow={(record) => ({ onClick: () => onOpen(record.id), style: { cursor: 'pointer' } })}
         pagination={{
           current: page, pageSize, total,
           showSizeChanger: true, showQuickJumper: true,
-          showTotal: (tt) => `共 ${tt} 條`,
-          onChange: (p, ps) => { setPage(p); setPageSize(ps) },
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: (tt) => t('common.total', { count: tt }),
+          // 每页条数变化时必须回到第 1 页，否则会停留在越界页码上显示空列表
+          onChange: (p, ps) => { if (ps !== pageSize) { setPageSize(ps); setPage(1) } else { setPage(p) } },
         }}
       />
     </>

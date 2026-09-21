@@ -209,7 +209,20 @@ public class EamInventoryServiceImpl implements EamInventoryService {
 
     @Override
     public PageResult<EamInventoryTaskVO> page(EamInventoryQuery query) {
+        LambdaQueryWrapper<EamInventoryTask> w = taskFilterWrapper(query);
+        Page<EamInventoryTask> page = taskMapper.selectPage(
+                new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
+                w.orderByDesc(EamInventoryTask::getCreatedAt, EamInventoryTask::getId));
+        return new PageResult<>(page.getRecords().stream().map(this::toTaskVO).toList(), page.getTotal());
+    }
+
+    /**
+     * 任务列表与任务导出的共用筛选条件。
+     * <p>两者必须使用同一份条件，否则「导出当前筛选」会与所见列表不一致。</p>
+     */
+    private LambdaQueryWrapper<EamInventoryTask> taskFilterWrapper(EamInventoryQuery query) {
         LambdaQueryWrapper<EamInventoryTask> w = new LambdaQueryWrapper<>();
+        if (query == null) return w;
         if (StringUtils.hasText(query.getKeyword())) w.like(EamInventoryTask::getTaskName, query.getKeyword().trim());
         if (StringUtils.hasText(query.getTaskNo())) w.like(EamInventoryTask::getTaskNo, query.getTaskNo().trim());
         if (StringUtils.hasText(query.getOwnerKeyword())) {
@@ -219,10 +232,10 @@ public class EamInventoryServiceImpl implements EamInventoryService {
         if (StringUtils.hasText(query.getStatus())) w.eq(EamInventoryTask::getStatus, query.getStatus());
         if (StringUtils.hasText(query.getDateFrom())) w.ge(EamInventoryTask::getInventoryDate, query.getDateFrom());
         if (StringUtils.hasText(query.getDateTo())) w.le(EamInventoryTask::getInventoryDate, query.getDateTo());
-        Page<EamInventoryTask> page = taskMapper.selectPage(
-                new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
-                w.orderByDesc(EamInventoryTask::getCreatedAt, EamInventoryTask::getId));
-        return new PageResult<>(page.getRecords().stream().map(this::toTaskVO).toList(), page.getTotal());
+        // 操作日期按任务最后更新时间过滤（发起后的核对/结束/取消均会刷新 updated_at）
+        if (StringUtils.hasText(query.getOpDateFrom())) w.ge(EamInventoryTask::getUpdatedAt, query.getOpDateFrom().trim());
+        if (StringUtils.hasText(query.getOpDateTo())) w.lt(EamInventoryTask::getUpdatedAt, query.getOpDateTo().trim() + " 23:59:59");
+        return w;
     }
 
     @Override
@@ -494,9 +507,7 @@ public class EamInventoryServiceImpl implements EamInventoryService {
 
     @Override
     public String exportTasksCsv(EamInventoryQuery query) {
-        LambdaQueryWrapper<EamInventoryTask> w = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(query.getKeyword())) w.like(EamInventoryTask::getTaskName, query.getKeyword().trim());
-        if (StringUtils.hasText(query.getStatus())) w.eq(EamInventoryTask::getStatus, query.getStatus());
+        LambdaQueryWrapper<EamInventoryTask> w = taskFilterWrapper(query);
         List<EamInventoryTask> tasks = taskMapper.selectList(w.orderByDesc(EamInventoryTask::getId));
         StringBuilder sb = new StringBuilder();
         sb.append(csvRow(List.of("任務編號", "任務名稱", "範圍模式", "負責人", "工號", "應盤", "已核對", "異常", "未完成", "狀態", "發起日期", "結束時間"))).append('\n');

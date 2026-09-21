@@ -31,4 +31,7 @@ public class EamRepairSaveDTO {
 
     /** 损坏原因：human/natural/third_party/quality */
     private String causeType;
+
+    /** 幂等请求键（直接登记送修防重，可空） */
+    private String requestKey;
 }

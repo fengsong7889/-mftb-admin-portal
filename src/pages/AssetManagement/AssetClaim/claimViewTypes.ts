@@ -5,6 +5,7 @@ import type { DepartmentItem } from '../../../api/department'
 // 界面契約與數據接入分離；第三階段由真實 API 提供這些只讀模型。
 export const CLAIM_STATUS = {
   PENDING: 'pending_signature', CLAIMED: 'claimed', RETURNED: 'returned', CANCELLED: 'cancelled', TRANSFERRED: 'transferred',
+  LOSS_CLOSED: 'loss_closed', SCRAP_CLOSED: 'scrap_closed', REPAIR_CLOSED: 'repair_closed',
 } as const
 export type ClaimStatus = typeof CLAIM_STATUS[keyof typeof CLAIM_STATUS]
 export const SIGNATURE_STATUS = {

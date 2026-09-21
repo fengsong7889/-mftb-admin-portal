@@ -17,6 +17,6 @@ public interface EamScrapService {
     /** 创建报废记录（快照资产信息，流程暂未启用，直接生效并将资产置为已报废） */
     long create(EamScrapSaveDTO dto);
 
-    /** 删除报废记录（仅允许待审批状态） */
+    /** 删除报废记录（同时恢复关联资产为闲置状态） */
     void delete(long id);
 }

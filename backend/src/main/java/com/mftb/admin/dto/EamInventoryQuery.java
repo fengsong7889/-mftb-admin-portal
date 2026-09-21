@@ -22,6 +22,10 @@ public class EamInventoryQuery {
     private String dateFrom;
     private String dateTo;
 
+    /** 操作日期区间 yyyy-MM-dd（按任务最后更新时间 updated_at 过滤，含发起后的核对/结束/取消操作） */
+    private String opDateFrom;
+    private String opDateTo;
+
     /** 页码（从 1 开始） */
     private Integer page = 1;
 

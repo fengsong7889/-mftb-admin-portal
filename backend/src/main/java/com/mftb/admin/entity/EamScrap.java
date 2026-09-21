@@ -20,6 +20,9 @@ public class EamScrap {
     /** 资产 ID */
     private Long assetId;
 
+    /** 报废编号（如 BF202609210001） */
+    private String scrapNo;
+
     /** 资产编号（快照） */
     private String assetNo;
 
@@ -31,6 +34,9 @@ public class EamScrap {
 
     /** 品牌（快照） */
     private String brand;
+
+    /** 所属品牌/公司品牌 ID（快照） */
+    private Integer companyBrand;
 
     /** 报废日期 */
     private LocalDate scrapDate;
@@ -61,6 +67,21 @@ public class EamScrap {
 
     /** 关联遗失单 ID（遗失核销时关联） */
     private Long lossId;
+
+    /** 原持有人 ID 快照（登记报废前资产当前使用人，用于责任追溯） */
+    private Long originalHolderId;
+
+    /** 原持有人姓名快照 */
+    private String originalHolderName;
+
+    /** 来源领用 ID 快照（报废前活跃领用） */
+    private Long sourceClaimId;
+
+    /** 来源借用 ID 快照（报废前活跃借用） */
+    private Long sourceBorrowId;
+
+    /** 幂等请求键（直接登记防重） */
+    private String requestKey;
 
     /** 状态：pending/approved/rejected/cancelled */
     private String status;

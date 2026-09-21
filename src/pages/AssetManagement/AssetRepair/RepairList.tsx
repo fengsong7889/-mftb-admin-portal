@@ -12,6 +12,8 @@ import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@a
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { exportToCSV } from '../../../utils/exportCSV'
+import BrandTag from '../../../components/BrandTag'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   fetchRepairList, deleteRepair,
@@ -31,6 +33,7 @@ interface Props {
 interface RepairFilters {
   keyword?: string
   brand?: string
+  companyBrand?: number
   repairDates?: [Dayjs, Dayjs]
   status?: 'repairing' | 'done'
   finishDates?: [Dayjs, Dayjs]
@@ -41,6 +44,7 @@ interface RepairFilters {
 
 export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Props) {
   const { t } = useTranslation()
+  const { numericOptions } = useCompanyBrand()
   const [form] = Form.useForm<RepairFilters>()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<AssetRepairRecord[]>([])
@@ -94,6 +98,7 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
   const applyFilters = useCallback((list: AssetRepairRecord[], f: RepairFilters) => list.filter((r) => {
     if (f.keyword && !matchKeyword(r, f.keyword)) return false
     if (f.brand && r.brand !== f.brand) return false
+    if (f.companyBrand && r.companyBrand !== f.companyBrand) return false
     if (!inDateRange(r.repairDate, f.repairDates)) return false
     if (f.status && r.status !== f.status) return false
     if (!inDateRange(r.finishDate, f.finishDates)) return false
@@ -122,6 +127,7 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
     setFilters({
       keyword: v.keyword?.trim() || undefined,
       brand: v.brand || undefined,
+      companyBrand: v.companyBrand || undefined,
       repairDates: v.repairDates,
       status: v.status || undefined,
       finishDates: v.finishDates,
@@ -136,6 +142,7 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
     const cols = [
       { title: t('asset.colAssetNo'), dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'), dataIndex: 'assetName' },
+      { title: '所属品牌', dataIndex: 'companyBrand', render: (v: number | null) => v === 1 ? '闪蜂' : v === 2 ? 'mFood' : '' },
       { title: t('asset.colBrand'), dataIndex: 'brand' },
       { title: t('asset.colRepairDate'), dataIndex: 'repairDate' },
       { title: t('asset.colFaultDesc'), dataIndex: 'faultDesc' },
@@ -190,6 +197,10 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
       ),
     },
     { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 180, ellipsis: true },
+    {
+      key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 100,
+      render: (v: number | null) => v ? <BrandTag value={v} /> : '-',
+    },
     { key: 'brand', title: t('asset.colBrand'), dataIndex: 'brand', width: 110, ellipsis: true, render: (v: string | null) => v || '-' },
     { key: 'repairDate', title: t('asset.colRepairDate'), dataIndex: 'repairDate', width: 120 },
     { key: 'faultDesc', title: t('asset.colFaultDesc'), dataIndex: 'faultDesc', width: 200, ellipsis: true },
@@ -241,6 +252,7 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
   const columnMeta = useMemo(() => [
     { key: 'assetNo', title: t('asset.colAssetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'companyBrand', title: '所屬品牌' },
     { key: 'brand', title: t('asset.colBrand') },
     { key: 'repairDate', title: t('asset.colRepairDate') },
     { key: 'faultDesc', title: t('asset.colFaultDesc') },
@@ -293,6 +305,9 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
               allowClear showSearch optionFilterProp="label"
               options={brands.map((b) => ({ label: b.brandZh, value: b.brandZh }))}
             />
+          </Form.Item>
+          <Form.Item label="所屬品牌" name="companyBrand">
+            <Select allowClear placeholder={t('common.all')} options={numericOptions} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label={t('asset.colRepairDate')} name="repairDates">
             <DatePicker.RangePicker />

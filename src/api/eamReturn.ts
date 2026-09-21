@@ -44,6 +44,8 @@ export interface ReturnRow extends AssetParameterSource {
   createdAt: string
   updatedAt: string
   evidenceImageUrl?: string
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
 }
 
 export interface ReturnQuery {
@@ -60,6 +62,8 @@ export interface ReturnQuery {
   startDate?: string
   endDate?: string
   departmentId?: number
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
 }
 
 export interface ReturnPage<T> {
@@ -117,6 +121,7 @@ export async function fetchReturnList(query: ReturnQuery): Promise<ReturnPage<Re
     if (query.startDate) params.set('startDate', query.startDate)
     if (query.endDate) params.set('endDate', query.endDate)
     if (query.departmentId) params.set('departmentId', String(query.departmentId))
+    if (query.companyBrand) params.set('companyBrand', String(query.companyBrand))
     return await request.get<unknown, ReturnPage<ReturnRow>>(`/eam/returns?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {

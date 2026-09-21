@@ -8,6 +8,8 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import AssetParameters from '../../../components/AssetParameters'
+import BrandTag from '../../../components/BrandTag'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { exportToCSV } from '../../../utils/exportCSV'
 import { fetchDepartments } from '../../../api/department'
@@ -26,11 +28,12 @@ interface Props {
   canReturn?: boolean
 }
 
-interface Filters { keyword?: string; status?: string; department?: string }
+interface Filters { keyword?: string; status?: string; department?: string; companyBrand?: number }
 
 export default function BorrowList({ data, loading = false, error, onQuery, canEdit = false, canReturn = false }: Props) {
   const { t } = useTranslation()
   const paramCatalog = useAssetParameterCatalog()
+  const { numericOptions } = useCompanyBrand()
   const navigate = useNavigate()
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
@@ -59,6 +62,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
       keyword: v.keyword?.trim() || undefined,
       status: v.status || undefined,
       department: v.department || undefined,
+      companyBrand: v.companyBrand || undefined,
     })
     setPage(1)
   }
@@ -71,6 +75,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
       { title: t('asset.colBorrowNo'), dataIndex: 'borrowNo' },
       { title: '资产编号', dataIndex: 'assetNo' },
       { title: '资产名称', dataIndex: 'assetName' },
+      { title: '所属品牌', dataIndex: 'companyBrand', render: (v: number | null) => v === 1 ? '闪蜂' : v === 2 ? 'mFood' : '' },
       { title: '借用人', dataIndex: 'holderName' },
       { title: '借用部门', dataIndex: 'department' },
       { title: '借出日期', dataIndex: 'startDate' },
@@ -92,6 +97,10 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
   const allColumns = [
     { key: 'borrowNo', title: t('asset.colBorrowNo'), dataIndex: 'borrowNo', width: 175, fixed: 'left' as const },
     { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_: unknown, b: BorrowRow) => <>{b.assetName}<div className="claim-muted">{b.assetNo}</div></> },
+    {
+      key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 100,
+      render: (v: number | null) => v ? <BrandTag value={v} /> : '-',
+    },
     { key: 'params', title: t('asset.paramInfoTitle'), width: 240, render: (_: unknown, asset: BorrowRow) => <AssetParameters asset={asset} compact catalog={paramCatalog} /> },
     { key: 'holderName', title: '借用人', dataIndex: 'holderName', width: 130 },
     { key: 'department', title: '借用部门', dataIndex: 'department', width: 120 },
@@ -115,6 +124,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
   const columnMeta = useMemo(() => [
     { key: 'borrowNo', title: t('asset.colBorrowNo') },
     { key: 'asset', title: t('asset.colAssetName') },
+    { key: 'companyBrand', title: '所屬品牌' },
     { key: 'holderName', title: '借用人' },
     { key: 'department', title: '借用部门' },
     { key: 'startDate', title: '借出日期' },
@@ -141,6 +151,9 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
         </Form.Item>
         <Form.Item label="部门" name="department">
           <TreeSelect allowClear treeDefaultExpandAll showSearch treeNodeFilterProp="title" treeData={deptTree} placeholder={t('common.all')} />
+        </Form.Item>
+        <Form.Item label="所屬品牌" name="companyBrand">
+          <Select allowClear placeholder={t('common.all')} options={numericOptions} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item>
           <div className="search-actions">
@@ -171,7 +184,7 @@ export default function BorrowList({ data, loading = false, error, onQuery, canE
       locale={{ emptyText: <Empty description={t('common.noData')} /> }}
       loading={loading}
       size="middle"
-      scroll={{ x: 1485 }}
+      scroll={{ x: 1585 }}
       onChange={handleTableChange}
       pagination={{
         current: page, pageSize: size, total,

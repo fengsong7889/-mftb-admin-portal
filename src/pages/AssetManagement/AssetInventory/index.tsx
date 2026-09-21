@@ -39,7 +39,23 @@ export default function AssetInventory() {
   const goCreate = () => { navigate('/asset-inventory?create=1'); setView({ mode: 'create' }) }
   const goDetail = (taskId: number) => { navigate(`/asset-inventory?id=${taskId}`); setView({ mode: 'detail', taskId }) }
 
-  if (view.mode === 'create') return <InventoryCreate onBack={goList} onCreated={goDetail} />
-  if (view.mode === 'detail') return <InventoryDetail taskId={view.taskId} onBack={goList} />
-  return <InventoryList onCreate={goCreate} onOpen={goDetail} />
+  if (view.mode === 'create') {
+    return (
+      <div className="content-area">
+        <InventoryCreate onBack={goList} onCreated={goDetail} />
+      </div>
+    )
+  }
+  if (view.mode === 'detail') {
+    return (
+      <div className="content-area">
+        <InventoryDetail taskId={view.taskId} onBack={goList} />
+      </div>
+    )
+  }
+  return (
+    <div className="content-area">
+      <InventoryList onCreate={goCreate} onOpen={goDetail} />
+    </div>
+  )
 }

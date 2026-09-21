@@ -28,6 +28,8 @@ export interface BorrowRow extends AssetParameterSource {
   createdAt: string
   updatedAt: string
   overdueDays?: number
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
 }
 
 export interface BorrowQuery {
@@ -38,6 +40,8 @@ export interface BorrowQuery {
   department?: string
   startDate?: string
   endDate?: string
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
 }
 
 export interface BorrowPage<T> {
@@ -71,6 +75,7 @@ export async function fetchBorrowList(query: BorrowQuery): Promise<BorrowPage<Bo
     if (query.department) params.set('department', query.department)
     if (query.startDate) params.set('startDate', query.startDate)
     if (query.endDate) params.set('endDate', query.endDate)
+    if (query.companyBrand) params.set('companyBrand', String(query.companyBrand))
     return await request.get<unknown, BorrowPage<BorrowRow>>(`/eam/borrows?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {

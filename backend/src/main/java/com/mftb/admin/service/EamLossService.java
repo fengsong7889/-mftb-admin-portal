@@ -39,4 +39,14 @@ public interface EamLossService {
      * @return 遗失单 ID
      */
     long createFromReturn(long returnId);
+
+    /**
+     * 归还处置时同步更新关联遗失单状态（内部调用）。
+     * 当归还验收状况=遗失且处置结果=遗失核销时，将遗失单状态更新为已核销。
+     *
+     * @param returnId 归还记录 ID
+     * @param newStatus 新状态（written_off）
+     * @param writeOffDate 核销日期
+     */
+    void updateStatusByReturnId(long returnId, String newStatus, java.time.LocalDate writeOffDate);
 }

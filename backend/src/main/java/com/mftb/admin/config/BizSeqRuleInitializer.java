@@ -79,6 +79,9 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
      */
     private static final String V_INIT_EAM_MENU_LABEL_UNIFY = "seq:init-v16";
 
+    /** 增量版本: 遗失编号 (YS) + 报废编号 (BF) 规则种子 */
+    private static final String V_INIT_EAM_LOSS_SCRAP_RULE = "seq:init-v17";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -137,6 +140,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
             seedEamInventoryRule();
         });
         versionTracker.applyOnce(V_INIT_EAM_MENU_LABEL_UNIFY, this::normalizeEamRuleBizMenu);
+        versionTracker.applyOnce(V_INIT_EAM_LOSS_SCRAP_RULE, this::seedEamLossScrapRules);
     }
 
     /**
@@ -681,6 +685,39 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 "{prefix} + YYYYMMDD + {n}位自增序號");
         if (inserted > 0) {
             log.info("已写入/修正盘点任务编号规则种子数据 (PD + YYYYMMDD + 4位)");
+            bizSeqService.refreshRules();
+        }
+    }
+
+    /** 遗失编号 (YS+YYYYMMDD+4位) + 报废编号 (BF+YYYYMMDD+4位) 规则种子 (v17) */
+    private void seedEamLossScrapRules() {
+        int inserted = 0;
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_LOSS, "遺失編號", "物資管理-遺失資產",
+                "YS", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        inserted += jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), "
+                        + "prefix = VALUES(prefix), date_format = VALUES(date_format), "
+                        + "seq_length = VALUES(seq_length), seq_start = VALUES(seq_start), "
+                        + "remark = VALUES(remark), status = VALUES(status)",
+                BizSeqService.RULE_EAM_SCRAP, "報廢編號", "物資管理-報廢資產",
+                "BF", "YYYYMMDD", 4, 0, 1,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (inserted > 0) {
+            log.info("已写入/修正遗失 + 报废编号规则种子数据 (YS/BF + YYYYMMDD + 4位)");
             bizSeqService.refreshRules();
         }
     }

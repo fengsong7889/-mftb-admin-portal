@@ -31,6 +31,8 @@ export interface CompensationRow extends AssetParameterSource {
   reason?: string
   waiveReason?: string
   operatorName: string
+  /** 所属品牌/公司品牌 ID */
+  companyBrand?: number | null
   createdAt: string
   updatedAt: string
   payments?: PaymentRecord[]
@@ -68,6 +70,8 @@ export interface CompensationQuery {
   damageType?: string
   party?: string
   reviewRequired?: boolean
+  /** 所属品牌（sys_company_brand.id） */
+  companyBrand?: number
 }
 
 export interface CompensationPage<T> {
@@ -103,6 +107,20 @@ export interface ReviewDTO {
   reason: string
 }
 
+/** 直接创建赔付单 DTO */
+export interface CompensationSaveDTO {
+  assetId: number
+  damageType: 'damage' | 'loss'
+  cause?: 'human' | 'natural' | 'third_party' | 'quality'
+  party?: 'employee' | 'department' | 'company' | 'none'
+  responsibleId?: number
+  responsibleName?: string
+  department?: string
+  reason?: string
+  returnId?: number
+  lossId?: number
+}
+
 /* ==================== API 方法 ==================== */
 
 /** 分页查询 */
@@ -118,6 +136,7 @@ export async function fetchCompensationList(query: CompensationQuery): Promise<C
     if (query.damageType) params.set('damageType', query.damageType)
     if (query.party) params.set('party', query.party)
     if (query.reviewRequired !== undefined) params.set('reviewRequired', String(query.reviewRequired))
+    if (query.companyBrand) params.set('companyBrand', String(query.companyBrand))
     return await request.get<unknown, CompensationPage<CompensationRow>>(`/eam/compensations?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {
@@ -150,4 +169,9 @@ export async function addPayment(id: number, dto: PaymentDTO): Promise<void> {
 /** 找回复核 */
 export async function reviewCompensation(id: number, dto: ReviewDTO): Promise<void> {
   await request.post<unknown, void>(`/eam/compensations/${id}/review`, dto)
+}
+
+/** 直接创建赔付记录 */
+export async function createCompensation(dto: CompensationSaveDTO): Promise<number> {
+  return request.post<unknown, number>('/eam/compensations', dto)
 }

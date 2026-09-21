@@ -184,7 +184,19 @@ public class EamReturnServiceImpl implements EamReturnService {
 
         // 更新资产状态（仅正常归还）：按接收管理部门/归还位置归位，实现归还即承接
         if ("completed".equals(ret.getReturnStatus())) {
-            releaseAsset(assetId, receiveDepartment, dto.getReceiveLocationId());
+            releaseAsset(assetId, "idle", receiveDepartment, dto.getReceiveLocationId());
+        }
+
+        // 损坏归还：实物已收回→解除持有转待处置，并自动建立待定责赔付记录（不预设员工有责）
+        if ("damaged".equals(condition)) {
+            releaseAsset(assetId, "pending_disposal", receiveDepartment, dto.getReceiveLocationId());
+            try {
+                long compId = compensationService.createFromDispose(ret.getId());
+                log.info("损坏归还自动建立待定责赔付记录 compId={}, returnId={}", compId, ret.getId());
+            } catch (Exception e) {
+                log.error("损坏归还自动建立待定责赔付记录失败 returnId={}: {}", ret.getId(), e.getMessage());
+                throw new BusinessException("歸還登記成功但建立待定責記錄失敗：" + e.getMessage());
+            }
         }
 
         // 遗失状况：自动生成遗失单，资产状态由遗失模块统一管理
@@ -212,9 +224,11 @@ public class EamReturnServiceImpl implements EamReturnService {
 
         LocalDate dispositionDate = parseDate(dto.getDispositionDate());
         String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
+        // 申请维修：维修未完成前保持异常处理中，由维修完成时回写为已结束；其余处置即时结束
+        boolean keepsPending = "apply_repair".equals(dto.getDisposition());
         ret.setDisposition(dto.getDisposition());
         ret.setDispositionDate(dispositionDate);
-        ret.setReturnStatus("exception_closed");
+        ret.setReturnStatus(keepsPending ? "exception_pending" : "exception_closed");
 
         // 保存处置凭证
         if (hasText(dto.getEvidenceDataUrl())) {
@@ -232,22 +246,32 @@ public class EamReturnServiceImpl implements EamReturnService {
 
         returnMapper.updateById(ret);
 
-        // 更新资产状态（遗失资产由遗失模块管理，此处跳过）
+        // 更新资产状态（遗失资产由遗失模块管理，此处跳过；维修由 createFromDispose 统一处理）
         EamAsset asset = assetMapper.selectById(ret.getAssetId());
         if (asset != null && !"lost".equals(ret.getAssetCondition())) {
-            switch (dto.getDisposition()) {
-                case "scrapped" -> asset.setStatus("scrapped");
-                case "written_off" -> asset.setStatus("scrapped"); // 注销也标记为报废
-                case "apply_repair" -> asset.setStatus("in_repair"); // 申请维修
-                case "idle" -> {
-                    asset.setStatus("idle");
-                    asset.setCurrentHolderId(null);
-                    asset.setActiveClaimId(null);
-                    asset.setUserName(null);
+            String target = switch (dto.getDisposition()) {
+                case "idle" -> "idle";
+                case "scrapped", "written_off" -> "scrapped"; // 注销也标记为报废
+                default -> null; // apply_repair 交由 createFromDispose 置 in_repair
+            };
+            if (target != null) {
+                UpdateWrapper<EamAsset> update = new UpdateWrapper<EamAsset>()
+                        .eq("id", asset.getId())
+                        .set("status", target);
+                if ("idle".equals(target)) {
+                    // 收回闲置：显式清空持有关系（updateById 默认 NOT_NULL 策略不会落库 null）
                     applyReceiveLocation(asset, receiveDepartment, dto.getReceiveLocationId());
+                    update.set("current_holder_id", null)
+                            .set("user_name", null)
+                            .set("active_claim_id", null)
+                            .set("usage_date", null)
+                            .set("department", asset.getDepartment())
+                            .set("location_id", asset.getLocationId())
+                            .set("location", asset.getLocation());
                 }
+                asset.setStatus(target);
+                assetMapper.update(asset, update);
             }
-            assetMapper.updateById(asset);
         }
 
         // 自动创建赔付记录（业务选择需要鉴定赔付定责时）
@@ -264,6 +288,11 @@ public class EamReturnServiceImpl implements EamReturnService {
         // 报废/遗失核销时自动创建报废记录（流入资产报废菜单）
         if ("scrapped".equals(dto.getDisposition()) || "written_off".equals(dto.getDisposition())) {
             createScrapRecordFromDispose(ret, asset, dispositionDate);
+        }
+
+        // 遗失核销时同步更新关联遗失单状态（流入遗失资产菜单）
+        if ("lost".equals(ret.getAssetCondition()) && "written_off".equals(dto.getDisposition())) {
+            lossService.updateStatusByReturnId(ret.getId(), "written_off", dispositionDate);
         }
 
         // 申请维修时自动创建维修记录（流入维修管理菜单）
@@ -330,25 +359,27 @@ public class EamReturnServiceImpl implements EamReturnService {
     }
 
     /**
-     * 释放资产并归位：清持有人转闲置，同时按「接收管理部门 + 归还位置」更新归属（归还即承接）。
+     * 释放资产并归位：清持有人转目标状态，同时按「接收管理部门 + 归还位置」更新归属（归还即承接）。
      * 接收部门/位置未提供时保持原值，兼容旧调用。
      */
-    private void releaseAsset(long assetId, String receiveDepartment, Long receiveLocationId) {
+    private void releaseAsset(long assetId, String targetStatus, String receiveDepartment, Long receiveLocationId) {
         EamAsset asset = assetMapper.selectOne(
                 new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, assetId).last("FOR UPDATE"));
         if (asset != null) {
             asset.setCurrentHolderId(null);
             asset.setActiveClaimId(null);
-            asset.setStatus("idle");
+            asset.setStatus(targetStatus);
             asset.setUserName(null);
+            asset.setUsageDate(null);
             applyReceiveLocation(asset, receiveDepartment, receiveLocationId);
             // MyBatis-Plus updateById 默认 NOT_NULL 策略，null 字段需用 UpdateWrapper 显式清空
             assetMapper.update(asset, new UpdateWrapper<EamAsset>()
                     .eq("id", asset.getId())
                     .set("current_holder_id", null)
                     .set("active_claim_id", null)
-                    .set("status", "idle")
+                    .set("status", targetStatus)
                     .set("user_name", null)
+                    .set("usage_date", null)
                     .set("department", asset.getDepartment())
                     .set("location_id", asset.getLocationId())
                     .set("location", asset.getLocation()));
@@ -379,10 +410,12 @@ public class EamReturnServiceImpl implements EamReturnService {
         }
         EamScrap scrap = new EamScrap();
         scrap.setAssetId(asset.getId());
+        scrap.setScrapNo(bizSeqService.next(BizSeqService.RULE_EAM_SCRAP));
         scrap.setAssetNo(asset.getAssetNo());
         scrap.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
         scrap.setAssetType(asset.getCategoryCode());
         scrap.setBrand(asset.getBrand());
+        scrap.setCompanyBrand(asset.getCompanyBrand());
         scrap.setScrapDate(scrapDate);
         scrap.setApplyBy(operatorResolver.currentOperatorName());
         SysUser currentUser = operatorResolver.currentUser();
@@ -399,7 +432,7 @@ public class EamReturnServiceImpl implements EamReturnService {
         scrap.setReason(reason);
         scrap.setResidualValue(BigDecimal.ZERO);
         scrap.setReturnId(ret.getId());
-        scrap.setStatus("pending");
+        scrap.setStatus("approved");
         scrap.setCreatedBy(operatorResolver.currentOperatorName());
         scrap.setUpdatedBy(operatorResolver.currentOperatorName());
         scrapMapper.insert(scrap);
@@ -428,6 +461,7 @@ public class EamReturnServiceImpl implements EamReturnService {
             vo.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
             vo.setParams(JsonUtils.parseMap(asset.getParams()));
             vo.setCategoryCode(asset.getCategoryCode());
+            vo.setCompanyBrand(asset.getCompanyBrand());
         }
 
         // 员工信息
@@ -525,6 +559,18 @@ public class EamReturnServiceImpl implements EamReturnService {
         }
         if (hasText(q.getEndDate())) {
             w.le(EamReturn::getReturnDate, LocalDate.parse(q.getEndDate(), DateTimeFormatter.ISO_DATE));
+        }
+        if (q.getCompanyBrand() != null) {
+            List<Long> brandAssetIds = assetMapper.selectList(
+                    new LambdaQueryWrapper<EamAsset>()
+                            .eq(EamAsset::getCompanyBrand, q.getCompanyBrand())
+                            .select(EamAsset::getId)
+            ).stream().map(EamAsset::getId).toList();
+            if (brandAssetIds.isEmpty()) {
+                w.eq(EamReturn::getId, -1L);
+            } else {
+                w.in(EamReturn::getAssetId, brandAssetIds);
+            }
         }
         return w;
     }

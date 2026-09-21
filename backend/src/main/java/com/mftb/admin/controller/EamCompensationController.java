@@ -32,6 +32,13 @@ public class EamCompensationController {
         return Result.success(compensationService.detail(id));
     }
 
+    /** 直接创建赔付记录（无需归还记录） */
+    @PostMapping
+    @RequirePermission(menu = MENU, action = "create")
+    public Result<Long> create(@RequestBody EamCompensationSaveDTO dto) {
+        return Result.success(compensationService.createDirect(dto));
+    }
+
     /** 定责 */
     @PostMapping("/{id}/liability")
     @RequirePermission(menu = MENU, action = "edit")

@@ -74,6 +74,22 @@ public class EamClaim {
     /** 取消原因 */
     private String cancelledReason;
 
+    /**
+     * 异常处置终止时间（遗失/报废/送修直接登记时写入；正常归还走 returnDate）。
+     * <p>领用被异常单据终止（status = loss_closed/scrap_closed/repair_closed）时记录，
+     * 使领用历史可追溯到终止它的单据，且不可被归还/取消/补签复活。</p>
+     */
+    private LocalDateTime closedAt;
+
+    /** 终止来源类型：loss/scrap/repair */
+    private String closeType;
+
+    /** 终止来源单据 ID（biz_eam_loss.id / biz_eam_scrap.id / biz_eam_repair.id） */
+    private Long closeBizId;
+
+    /** 终止说明 */
+    private String closeReason;
+
     /** 领用内容 SHA-256 摘要 */
     private String contentHash;
 

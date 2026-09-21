@@ -66,7 +66,73 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v24-loss-tables", this::createLossTables);
         versionTracker.applyOnce("eam:schema-v25-loss-menu", this::createLossMenu);
         versionTracker.applyOnce("eam:schema-v26-loss-menu-rename", this::renameLossMenu);
+        versionTracker.applyOnce("eam:schema-v27-loss-disposition-sync", this::syncLossDispositionFromReturn);
+        versionTracker.applyOnce("eam:schema-v28-loss-unique-constraint", this::addLossAssetOpenConstraint);
+        versionTracker.applyOnce("eam:schema-v29-loss-asset-status", this::addLossAssetStatusAtLossColumn);
+        versionTracker.applyOnce("eam:schema-v30-scrap-company-brand", this::addScrapCompanyBrandColumn);
+        versionTracker.applyOnce("eam:schema-v31-scrap-scrap-no", this::addScrapScrapNoColumn);
+        versionTracker.applyOnce("eam:schema-v32-fix-written-off-asset", this::fixWrittenOffAssetLedger);
         versionTracker.applyOnce("eam:schema-v33-inventory-v2", this::upgradeInventoryV2);
+        versionTracker.applyOnce("eam:schema-v34-asset-lifecycle", this::applyAssetLifecycleSchema);
+    }
+
+    /**
+     * v34: 资产异常处置一致性 —— 领用/借用补异常终止追溯列，报废/维修补来源快照与幂等键，
+     * 新建资产持有关系状态事件表 biz_eam_asset_state_event。
+     */
+    private void applyAssetLifecycleSchema() {
+        log.info("开始执行 v34 迁移：资产异常处置一致性表结构 ...");
+        // 领用：异常终止追溯（不删除归还语义字段，仅新增终止快照）
+        alterSafe("biz_eam_claim", "ADD COLUMN closed_at DATETIME NULL COMMENT '异常处置终止时间'");
+        alterSafe("biz_eam_claim", "ADD COLUMN close_type VARCHAR(20) NULL COMMENT '终止来源：loss/scrap/repair'");
+        alterSafe("biz_eam_claim", "ADD COLUMN close_biz_id BIGINT NULL COMMENT '终止来源单据 ID'");
+        alterSafe("biz_eam_claim", "ADD COLUMN close_reason VARCHAR(500) NULL COMMENT '终止说明'");
+        // 借用：同上
+        alterSafe("biz_eam_borrow", "ADD COLUMN closed_at DATETIME NULL COMMENT '异常处置终止时间'");
+        alterSafe("biz_eam_borrow", "ADD COLUMN close_type VARCHAR(20) NULL COMMENT '终止来源：loss/scrap/repair'");
+        alterSafe("biz_eam_borrow", "ADD COLUMN close_biz_id BIGINT NULL COMMENT '终止来源单据 ID'");
+        alterSafe("biz_eam_borrow", "ADD COLUMN close_reason VARCHAR(500) NULL COMMENT '终止说明'");
+        // 报废：原持有人与来源快照、幂等键
+        alterSafe("biz_eam_scrap", "ADD COLUMN original_holder_id BIGINT NULL COMMENT '报废前资产当前使用人 ID 快照'");
+        alterSafe("biz_eam_scrap", "ADD COLUMN original_holder_name VARCHAR(128) NULL COMMENT '报废前资产当前使用人姓名快照'");
+        alterSafe("biz_eam_scrap", "ADD COLUMN source_claim_id BIGINT NULL COMMENT '报废前活跃领用 ID 快照'");
+        alterSafe("biz_eam_scrap", "ADD COLUMN source_borrow_id BIGINT NULL COMMENT '报废前活跃借用 ID 快照'");
+        alterSafe("biz_eam_scrap", "ADD COLUMN request_key VARCHAR(64) NULL COMMENT '直接登记幂等请求键'");
+        // 维修：原持有人与来源快照、持有方式快照、幂等键
+        alterSafe("biz_eam_repair", "ADD COLUMN original_holder_id BIGINT NULL COMMENT '送修前资产当前使用人 ID 快照'");
+        alterSafe("biz_eam_repair", "ADD COLUMN original_holder_name VARCHAR(128) NULL COMMENT '送修前资产当前使用人姓名快照'");
+        alterSafe("biz_eam_repair", "ADD COLUMN source_claim_id BIGINT NULL COMMENT '送修前活跃领用 ID 快照'");
+        alterSafe("biz_eam_repair", "ADD COLUMN source_borrow_id BIGINT NULL COMMENT '送修前活跃借用 ID 快照'");
+        alterSafe("biz_eam_repair", "ADD COLUMN hold_type VARCHAR(20) NULL COMMENT '送修时持有方式快照：owned/borrowed'");
+        alterSafe("biz_eam_repair", "ADD COLUMN request_key VARCHAR(64) NULL COMMENT '直接登记幂等请求键'");
+        addIndexSafe("biz_eam_claim", "idx_claim_close_type", "close_type");
+        addIndexSafe("biz_eam_borrow", "idx_borrow_close_type", "close_type");
+
+        // 资产持有关系状态事件表
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_asset_state_event ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                + "biz_type VARCHAR(20) NOT NULL COMMENT '业务类型：loss/scrap/repair/return', "
+                + "biz_id BIGINT NULL COMMENT '业务单据 ID', "
+                + "source_type VARCHAR(20) NULL COMMENT '来源类型：claim/borrow', "
+                + "source_id BIGINT NULL COMMENT '来源领用/借用 ID', "
+                + "before_status VARCHAR(32) NULL COMMENT '变更前资产状态', "
+                + "after_status VARCHAR(32) NULL COMMENT '变更后资产状态', "
+                + "before_holder_id BIGINT NULL COMMENT '变更前持有人 ID', "
+                + "before_holder_name VARCHAR(128) NULL COMMENT '变更前持有人姓名', "
+                + "before_department VARCHAR(128) NULL COMMENT '变更前归属部门', "
+                + "after_department VARCHAR(128) NULL COMMENT '变更后归属部门', "
+                + "operator_id BIGINT NULL COMMENT '操作人 ID', "
+                + "operator_name VARCHAR(128) NULL COMMENT '操作人姓名', "
+                + "biz_date DATE NULL COMMENT '业务日期', "
+                + "request_key VARCHAR(64) NULL COMMENT '幂等请求键', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间', "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "KEY idx_state_event_asset (asset_id, id), "
+                + "KEY idx_state_event_biz (biz_type, biz_id))");
+        addUniqueIndexSafe("biz_eam_asset_state_event", "uk_state_event_request", "operator_id, request_key");
+        log.info("v34 迁移完成：资产异常处置一致性表结构已就绪");
     }
 
     private void upgradeTransferIntegrity() {
@@ -845,7 +911,7 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         log.info("资产台账配件清单回填 {} 条", rows);
     }
 
-    /** v17: 清空无领用记录但手动填写了使用人信息的资产数据（对应 SQL: 175_clear_orphan_asset_user.sql） */
+   /** v17: 清空无领用记录但手动填写了使用人信息的资产数据（对应 SQL: 175_clear_orphan_asset_user.sql） */
     private void clearOrphanAssetUserData() {
         log.info("开始清空无领用记录的孤立资产使用人数据 ...");
         int rows = jdbcTemplate.update(
@@ -856,6 +922,23 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
             + "WHERE asset_no = 'XX-M-01-01-0001' AND deleted = 0 AND active_claim_id IS NULL"
         );
         log.info("孤立资产使用人数据清空完成，影响 {} 条", rows);
+    }
+
+    /** v32: 校正归还处置为遗失核销但资产台账仍 in_use 的异常数据（对应 SQL: 183_fix_written_off_asset.sql） */
+    private void fixWrittenOffAssetLedger() {
+        log.info("开始执行 v32 迁移：同步遗失核销状态到资产台账 ...");
+        int rows = jdbcTemplate.update(
+            "UPDATE biz_eam_asset a "
+            + "INNER JOIN biz_eam_loss l ON l.asset_id = a.id AND l.status = 'written_off' AND l.deleted = 0 "
+            + "SET a.status = 'written_off', "
+            + "    a.current_holder_id = NULL, "
+            + "    a.user_name = NULL, "
+            + "    a.active_claim_id = NULL, "
+            + "    a.updated_by = 'system', "
+            + "    a.updated_at = NOW() "
+            + "WHERE a.status = 'in_use' AND a.deleted = 0"
+        );
+        log.info("v32 迁移完成：校正 {} 条遗失核销资产台账", rows);
     }
 
     /** v18: 修复签署页提交时 signature image 过长导致 storage_path 字段溢出 */
@@ -1117,6 +1200,90 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         log.info("开始执行 v26 迁移：菜单名称 遺失找回 → 遺失資產 ...");
         jdbcTemplate.update("UPDATE sys_menu SET name = '遺失資產' WHERE menu_key = 'asset-loss' AND deleted = 0");
         log.info("v26 迁移完成：菜单名称已更新为 遺失資產");
+    }
+
+    /**
+     * v27: 修复历史数据——归还处置=遗失核销时，同步更新关联遗失单状态。
+     * 此前 dispose() 方法遗漏了遗失单状态同步，导致遗失单仍为 searching 状态。
+     */
+    private void syncLossDispositionFromReturn() {
+        log.info("开始执行 v27 迁移：同步归还处置遗失核销到遗失单状态 ...");
+        int updated = jdbcTemplate.update(
+                "UPDATE biz_eam_loss l "
+                + "INNER JOIN biz_eam_return r ON l.return_id = r.id "
+                + "SET l.status = 'written_off', "
+                + "    l.write_off_date = r.disposition_date, "
+                + "    l.write_off_reason = '歸還處置遺失核銷（歷史數據修復）', "
+                + "    l.updated_at = NOW() "
+                + "WHERE l.status = 'searching' "
+                + "  AND r.asset_condition = 'lost' "
+                + "  AND r.disposition = 'written_off' "
+                + "  AND l.deleted = 0 AND r.deleted = 0");
+        log.info("v27 迁移完成：同步更新 {} 条遗失单状态为 written_off", updated);
+    }
+
+    /**
+     * v28: 补充 biz_eam_loss 表缺失的 uk_asset_open 唯一约束（同一资产至多一条未结束遗失单）。
+     * SQL 脚本 145 中有此约束，但 Java 迁移 v24 建表时遗漏。
+     */
+    private void addLossAssetOpenConstraint() {
+        log.info("开始执行 v28 迁移：添加 biz_eam_loss.uk_asset_open 唯一约束 ...");
+        // 先清理可能导致冲突的重复数据（保留每组 asset_id+status 中 id 最大的记录）
+        jdbcTemplate.update(
+                "DELETE l1 FROM biz_eam_loss l1 "
+                + "INNER JOIN biz_eam_loss l2 ON l1.asset_id = l2.asset_id AND l1.status = l2.status AND l1.id < l2.id "
+                + "WHERE l1.deleted = 0 AND l2.deleted = 0");
+        // 添加唯一约束（使用 INFORMATION_SCHEMA 检查是否已存在）
+        Integer idxExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS "
+                + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_loss' AND INDEX_NAME = 'uk_asset_open'",
+                Integer.class);
+        if (idxExists != null && idxExists == 0) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE biz_eam_loss ADD UNIQUE KEY uk_asset_open (asset_id, status) "
+                    + "COMMENT '同一资产至多一条未结束遗失单（written_off/recovered 为终态）'");
+            log.info("uk_asset_open 唯一约束已添加");
+        } else {
+            log.info("uk_asset_open 唯一约束已存在，跳过");
+        }
+        log.info("v28 迁移完成");
+    }
+
+    /**
+     * v29: biz_eam_loss 新增 asset_status_at_loss 列，记录遗失时资产状态快照。
+     * 用于前端判断是否需要展示「遗失时使用人」模块。
+     * 存量数据按原持有人回填：有原持有人 → in_use，无 → idle。
+     */
+    private void addLossAssetStatusAtLossColumn() {
+        log.info("开始执行 v29 迁移：添加 biz_eam_loss.asset_status_at_loss 列 ...");
+        alterSafe("biz_eam_loss",
+                "ADD COLUMN asset_status_at_loss VARCHAR(20) DEFAULT NULL COMMENT '遗失时资产状态快照（idle/in_use）' AFTER brand");
+        // 存量回填：按报失时业务逻辑推断（有原持有人 = 使用中）
+        int updated = jdbcTemplate.update(
+                "UPDATE biz_eam_loss l "
+                + "SET l.asset_status_at_loss = CASE WHEN l.original_holder_id IS NOT NULL THEN 'in_use' ELSE 'idle' END "
+                + "WHERE l.asset_status_at_loss IS NULL AND l.deleted = 0");
+        log.info("v29 迁移完成：asset_status_at_loss 列已添加，回填 {} 条存量记录", updated);
+    }
+
+    /**
+     * v30: biz_eam_scrap 新增 company_brand 列，记录所属品牌快照。
+     */
+    private void addScrapCompanyBrandColumn() {
+        log.info("开始执行 v30 迁移：添加 biz_eam_scrap.company_brand 列 ...");
+        alterSafe("biz_eam_scrap",
+                "ADD COLUMN company_brand INT NULL COMMENT '所属品牌/公司品牌ID（快照）' AFTER brand");
+        log.info("v30 迁移完成：company_brand 列已添加");
+    }
+
+    /**
+     * v31: biz_eam_scrap 新增 scrap_no 列，报废编号。
+     */
+    private void addScrapScrapNoColumn() {
+        log.info("开始执行 v31 迁移：添加 biz_eam_scrap.scrap_no 列 ...");
+        alterSafe("biz_eam_scrap",
+                "ADD COLUMN scrap_no VARCHAR(64) NULL COMMENT '报废编号' AFTER asset_id");
+        log.info("v31 迁移完成：scrap_no 列已添加");
     }
 
     /**

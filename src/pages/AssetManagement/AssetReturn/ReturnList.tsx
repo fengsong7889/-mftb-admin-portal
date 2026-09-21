@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next'
 import type { Dayjs } from 'dayjs'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import AssetParameters from '../../../components/AssetParameters'
+import BrandTag from '../../../components/BrandTag'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { exportToCSV } from '../../../utils/exportCSV'
 import type { ReturnRow, ReturnQuery } from '../../../api/eamReturn'
@@ -45,16 +47,18 @@ interface Filters {
   condition?: string
   status?: string
   dates?: [Dayjs, Dayjs]
+  companyBrand?: number
 }
 
 export default function ReturnList({ data, loading = false, error, onQuery, canEdit = false }: Props) {
   const { t } = useTranslation()
   const paramCatalog = useAssetParameterCatalog()
+  const { numericOptions } = useCompanyBrand()
   const navigate = useNavigate()
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
-  const [filters, setFilters] = useState<Pick<ReturnQuery, 'returnNo' | 'assetKeyword' | 'empName' | 'actualReturneeName' | 'departmentId' | 'sourceType' | 'returnStatus' | 'assetCondition' | 'startDate' | 'endDate'>>({})
+  const [filters, setFilters] = useState<Pick<ReturnQuery, 'returnNo' | 'assetKeyword' | 'empName' | 'actualReturneeName' | 'departmentId' | 'sourceType' | 'returnStatus' | 'assetCondition' | 'startDate' | 'endDate' | 'companyBrand'>>({})
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   /* ----- 部门树数据 ----- */
@@ -116,6 +120,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       assetCondition: v.condition || undefined,
       startDate: v.dates?.[0]?.format('YYYY-MM-DD'),
       endDate: v.dates?.[1]?.format('YYYY-MM-DD'),
+      companyBrand: v.companyBrand || undefined,
     })
     setPage(1)
   }
@@ -129,6 +134,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       { title: '歸還來源', dataIndex: 'sourceType', render: (v: string) => SOURCE_LABEL[v] || v },
       { title: '資產編號', dataIndex: 'assetNo' },
       { title: '資產名稱', dataIndex: 'assetName' },
+      { title: '所屬品牌', dataIndex: 'companyBrand', render: (v: number | null) => v === 1 ? '闪蜂' : v === 2 ? 'mFood' : '' },
       { title: '領用人', dataIndex: 'empName' },
       { title: '領用時部門', dataIndex: 'department' },
       { title: '實際歸還人', dataIndex: 'actualReturneeName' },
@@ -158,6 +164,10 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
     },
     { key: 'assetNo', title: '資產編號', dataIndex: 'assetNo', width: 160 },
     { key: 'assetName', title: '資產名稱', dataIndex: 'assetName', width: 160, ellipsis: true },
+    {
+      key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 100,
+      render: (v: number | null) => v ? <BrandTag value={v} /> : '-',
+    },
     { key: 'empName', title: '領用人', dataIndex: 'empName', width: 140, ellipsis: true, render: (v: string, r) => {
       const name = v || '—'
       return r.empNo ? `${name}（${r.empNo}）` : name
@@ -201,6 +211,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
     { key: 'source', title: '歸還來源' },
     { key: 'assetNo', title: '資產編號' },
     { key: 'assetName', title: '資產名稱' },
+    { key: 'companyBrand', title: '所屬品牌' },
     { key: 'empName', title: '領用人' },
     { key: 'department', title: '領用時部門' },
     { key: 'actualReturnee', title: '實際歸還人' },
@@ -272,6 +283,9 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
           <Form.Item label="處理狀態" name="status">
             <Select allowClear placeholder="全部狀態" options={Object.entries(STATUS_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
           </Form.Item>
+          <Form.Item label="所屬品牌" name="companyBrand">
+            <Select allowClear placeholder={t('common.all')} options={numericOptions} style={{ width: '100%' }} />
+          </Form.Item>
           <Form.Item label="歸還日期" name="dates">
             <DatePicker.RangePicker />
           </Form.Item>
@@ -300,7 +314,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         size="middle"
-        scroll={{ x: 1505 }}
+        scroll={{ x: 1605 }}
         columns={applyConfig(allColumns) as TableColumnsType<ReturnRow>}
         dataSource={error ? [] : dataSource}
         locale={{ emptyText: <Empty description={t('common.noData')} /> }}

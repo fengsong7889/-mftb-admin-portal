@@ -43,6 +43,9 @@ public class EamLoss {
     /** 品牌（快照） */
     private String brand;
 
+    /** 遗失时资产状态快照（idle/in_use） */
+    private String assetStatusAtLoss;
+
     /** 原持有人 ID（快照） */
     private Long originalHolderId;
 

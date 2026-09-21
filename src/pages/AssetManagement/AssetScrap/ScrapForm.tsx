@@ -1,5 +1,5 @@
 /**
- * 新增報廢表單頁
+ * 新增報廢資產表單頁
  *
  * 兩種入口：
  * 1. 從列表點擊「新增報廢」→ create 模式，頁面頂部 Select 下拉選資產
@@ -10,13 +10,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Form, Input, Button, message, Row, Col, Tag, DatePicker, InputNumber, Select, Empty, Spin,
+  Descriptions,
 } from 'antd'
-import { SaveOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { SaveOutlined, ExclamationCircleOutlined, InboxOutlined, UserOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchAssetDetail, fetchAssetList, createScrapRecord, type AssetItem } from '../../../api/asset'
+import BrandTag from '../../../components/BrandTag'
+import { fetchAssetDetail, fetchAssetList, createScrapRecord, fetchRepairApplicantOptions, type AssetItem, type AssetStatus, type RepairApplicantOption } from '../../../api/asset'
 import AssetParameters from '../../../components/AssetParameters'
+import type { OptionItem } from '../../../api/types'
 
 interface Props {
   /** 從資產台賬跳轉時傳入（form 模式） */
@@ -31,7 +34,6 @@ interface FormValues {
   reason: string
   residualValue: number
   applyBy: string
-  empId: string
   disposeType?: 'sale' | 'donate' | 'recycle' | 'destroy'
   appraisal?: string
 }
@@ -43,6 +45,17 @@ const DISPOSE_OPTIONS = [
   { label: '銷毀', value: 'destroy' },
 ]
 
+/** 資產狀態 → 標籤顏色 */
+const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {
+  idle: 'default', in_use: 'success', in_repair: 'processing', scrapped: 'error',
+  lost: 'warning', pending_inspection: 'blue', pending_disposal: 'orange', written_off: 'default',
+}
+
+/** 格式化員工顯示：姓名（工號） */
+const formatEmployee = (emp: RepairApplicantOption) => emp.empNo
+  ? `${emp.empName}（${emp.empNo}）`
+  : emp.empName
+
 /** 模块卡片统一样式 */
 const detailCardStyle: React.CSSProperties = {
   borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
@@ -50,13 +63,14 @@ const detailCardStyle: React.CSSProperties = {
 }
 
 /** 卡片标题 */
-function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: string; title: string }) {
+function SectionTitle({ icon, iconBg, title, tag }: { icon: React.ReactNode; iconBg: string; title: string; tag?: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
       <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      {tag}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -74,6 +88,42 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
   const [assetSelectOptions, setAssetSelectOptions] = useState<AssetItem[]>([])
   const [assetSelectLoading, setAssetSelectLoading] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  /* ----- 经办人下拉搜索 ----- */
+  const [handlerOptions, setHandlerOptions] = useState<OptionItem[]>([])
+  const [handlerLoading, setHandlerLoading] = useState(false)
+  const handlerTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  /** 加载初始经办人列表 */
+  const loadInitialHandlers = useCallback(async () => {
+    if (handlerOptions.length > 0) return
+    setHandlerLoading(true)
+    try {
+      const employees = await fetchRepairApplicantOptions('')
+      setHandlerOptions(employees.map(e => ({ value: formatEmployee(e), label: formatEmployee(e) })))
+    } catch {
+      setHandlerOptions([])
+    } finally {
+      setHandlerLoading(false)
+    }
+  }, [handlerOptions.length])
+
+  /** 经办人远程搜索（300ms 防抖） */
+  const handleHandlerSearch = useCallback((keyword: string) => {
+    if (handlerTimerRef.current) clearTimeout(handlerTimerRef.current)
+    if (!keyword) { loadInitialHandlers(); return }
+    handlerTimerRef.current = setTimeout(async () => {
+      setHandlerLoading(true)
+      try {
+        const employees = await fetchRepairApplicantOptions(keyword)
+        setHandlerOptions(employees.map(e => ({ value: formatEmployee(e), label: formatEmployee(e) })))
+      } catch {
+        setHandlerOptions([])
+      } finally {
+        setHandlerLoading(false)
+      }
+    }, 300)
+  }, [loadInitialHandlers])
 
   /** 加载初始资产列表 */
   const loadInitialAssets = useCallback(async () => {
@@ -152,6 +202,9 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
         return
       }
       setSubmitting(true)
+      // 从 applyBy 值中提取工号（格式：姓名（工号））
+      const empIdMatch = v.applyBy?.match(/（([^）]+)）$/)
+      const empId = empIdMatch ? empIdMatch[1] : ''
       await createScrapRecord({
         assetId: asset.id,
         assetNo: asset.assetNo,
@@ -160,7 +213,7 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
         brand: asset.brand,
         scrapDate: v.scrapDate.format('YYYY-MM-DD'),
         applyBy: v.applyBy,
-        empId: v.empId,
+        empId,
         reason: v.reason,
         residualValue: v.residualValue || 0,
         disposeType: v.disposeType || null,
@@ -181,7 +234,7 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
     <>
       {/* ====== 页面头部 ====== */}
       <DetailPageHeader
-        title={t('asset.scrapCreateTitle', '新增報廢申請')}
+        title="新增報廢資產"
         meta={asset ? <>{asset.assetNo} · {asset.assetName}</> : undefined}
         onBack={onBack}
         extra={
@@ -192,22 +245,25 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
       />
 
       <Spin spinning={assetLoading}>
-        {/* ====== 模块 1：资产选择 + 资产信息 ====== */}
+        {/* ====== 模塊 1：資產選擇 + 資產信息 ====== */}
         <div style={detailCardStyle}>
           <SectionTitle
-            icon={<ExclamationCircleOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
             iconBg="#e6f7ff"
-            title={t('asset.sectionAssetInfo')}
+            title="資產信息"
+            tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{
+              asset.status === 'idle' ? '閒置' : asset.status === 'in_use' ? '使用中' : asset.status === 'in_repair' ? '維修中' : asset.status === 'scrapped' ? '已報廢' : asset.status === 'lost' ? '遺失' : asset.status === 'pending_inspection' ? '待驗收' : '已核銷'
+            }</Tag> : undefined}
           />
 
           {isCreateMode && (
             <Form.Item
-              label={t('asset.colAssetNo')}
+              label="資產編號"
               required
               style={{ marginBottom: 20, maxWidth: 480 }}
             >
               <Select
-                placeholder={t('asset.searchAssetPh', '請輸入資產編號/名稱搜索')}
+                placeholder="請輸入資產編號/名稱搜索"
                 allowClear
                 showSearch
                 filterOption={false}
@@ -216,7 +272,7 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
                 onChange={handleAssetSelect}
                 loading={assetSelectLoading}
                 value={asset?.id}
-                notFoundContent={assetSelectLoading ? t('common.searching', '搜索中...') : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />}
+                notFoundContent={assetSelectLoading ? '搜索中...' : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="無數據" />}
                 options={assetSelectOptions.map((a) => ({
                   label: `${a.assetNo} / ${a.assetName}`,
                   value: a.id,
@@ -227,22 +283,44 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
 
           {asset && (
             <>
-              <Row gutter={16}>
-                <Col span={8}><b>{t('asset.colAssetNo')}:</b> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Col>
-                <Col span={8}><b>{t('asset.colAssetName')}:</b> {asset.assetName}</Col>
-                <Col span={8}><b>{t('asset.colAssetType')}:</b> {asset.assetType}</Col>
-                <Col span={8} style={{ marginTop: 8 }}><b>{t('asset.colBrand')}:</b> {asset.brand || '-'}</Col>
-                <Col span={8} style={{ marginTop: 8 }}><b>{t('asset.colPurchaseDate')}:</b> {asset.purchaseDate || '-'}</Col>
-                <Col span={8} style={{ marginTop: 8 }}><b>{t('asset.colPurchaseValue')}:</b> {asset.purchaseValue ? `MOP ${asset.purchaseValue.toLocaleString()}` : '-'}</Col>
-                <Col span={8} style={{ marginTop: 8 }}><b>{t('asset.colDepartment')}:</b> {asset.department || '-'}</Col>
-                <Col span={8} style={{ marginTop: 8 }}><b>{t('asset.colUserName')}:</b> {asset.userName || '-'}</Col>
-              </Row>
-              <AssetParameters asset={asset} />
+              <Descriptions column={4} size="middle">
+                <Descriptions.Item label="資產編號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset.assetNo}</span></Descriptions.Item>
+                <Descriptions.Item label="資產名稱">{asset.assetName}</Descriptions.Item>
+                <Descriptions.Item label="所屬品牌">{asset.companyBrand ? <BrandTag value={asset.companyBrand} /> : '-'}</Descriptions.Item>
+                <Descriptions.Item label="資產品牌">{asset.brand || '-'}</Descriptions.Item>
+                <Descriptions.Item label="資產分類">{asset.assetType || '-'}</Descriptions.Item>
+                <Descriptions.Item label="購買時價值">
+                  {asset.purchaseValue != null ? `MOP ${Number(asset.purchaseValue).toLocaleString()}` : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="管理部門">{asset.adminDepartment || '-'}</Descriptions.Item>
+              </Descriptions>
+              <AssetParameters asset={asset} current />
             </>
           )}
         </div>
 
-        {/* ====== 模块 2：报废表单 ====== */}
+        {/* ====== 模塊 2：當前使用人（僅資產有人使用時展示） ====== */}
+        {asset && asset.status === 'in_use' && (
+          <div style={detailCardStyle}>
+            <SectionTitle
+              icon={<UserOutlined style={{ fontSize: 14, color: '#13C2C2' }} />}
+              iconBg="#e6fffb"
+              title="當前使用人"
+            />
+            <Descriptions column={4} size="middle">
+              <Descriptions.Item label="使用人">{asset.userName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="部門">{asset.department || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('asset.colHoldType')}>
+                {asset.holdType === 'borrowed'
+                  ? <Tag color="orange">{t('asset.holdBorrowed')}</Tag>
+                  : <Tag color="blue">{t('asset.holdOwned')}</Tag>}
+              </Descriptions.Item>
+              <Descriptions.Item label="領用日期">{asset.claimDate || '-'}</Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+
+        {/* ====== 模塊 3：報廢信息（選擇資產後才顯示） ====== */}
         {asset && (
           <div style={detailCardStyle}>
             <SectionTitle
@@ -253,30 +331,35 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
             <Form<FormValues> form={form} layout="vertical" initialValues={{ scrapDate: dayjs() }}>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Form.Item label={t('asset.colScrapDate')} name="scrapDate" rules={[{ required: true, message: '請選擇報廢日期' }]}>
+                  <Form.Item label="報廢日期" name="scrapDate" rules={[{ required: true, message: '請選擇報廢日期' }]}>
                     <DatePicker style={{ width: '100%' }} disabledDate={(d) => d.isAfter(dayjs(), 'day')} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item label={t('asset.colApplyBy')} name="applyBy" rules={[{ required: true, message: '請輸入申請人' }]}>
-                    <Input placeholder="申請人姓名" allowClear />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label={t('asset.colUserEmpId')} name="empId" rules={[{ required: true, message: '請輸入工號' }]}>
-                    <Input placeholder="申請人工號" allowClear />
+                  <Form.Item label="經辦人" name="applyBy" rules={[{ required: true, message: '請選擇經辦人' }]}>
+                    <Select
+                      placeholder="請輸入姓名或工號搜索"
+                      allowClear
+                      showSearch
+                      filterOption={false}
+                      onSearch={handleHandlerSearch}
+                      onFocus={loadInitialHandlers}
+                      loading={handlerLoading}
+                      notFoundContent={handlerLoading ? '搜索中...' : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="無數據" />}
+                      options={handlerOptions}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
               <Row gutter={16}>
                 <Col span={8}>
-                  <Form.Item label={t('asset.colResidualValue')} name="residualValue">
+                  <Form.Item label="殘值" name="residualValue">
                     <InputNumber min={0} step={100} addonAfter="MOP" style={{ width: '100%' }} />
                   </Form.Item>
                 </Col>
                 <Col span={8}>
-                  <Form.Item label={t('asset.colDisposeType')} name="disposeType">
-                    <Select placeholder={t('common.placeholderSelect')} allowClear
+                  <Form.Item label="處置方式" name="disposeType">
+                    <Select placeholder="請選擇" allowClear
                       options={DISPOSE_OPTIONS.map((o) => ({ ...o }))}
                     />
                   </Form.Item>
@@ -284,14 +367,14 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
               </Row>
               <Row gutter={16}>
                 <Col span={24}>
-                  <Form.Item label={t('asset.colScrapReason')} name="reason" rules={[{ required: true, message: '請輸入報廢原因' }]}>
+                  <Form.Item label="報廢原因" name="reason" rules={[{ required: true, message: '請輸入報廢原因' }]}>
                     <Input.TextArea rows={2} placeholder="請詳細說明報廢原因" maxLength={300} showCount />
                   </Form.Item>
                 </Col>
               </Row>
               <Row gutter={16}>
                 <Col span={24}>
-                  <Form.Item label={t('asset.colAppraisal')} name="appraisal" style={{ marginBottom: 0 }}>
+                  <Form.Item label="鑑定意見" name="appraisal" style={{ marginBottom: 0 }}>
                     <Input.TextArea rows={2} placeholder="鑑定意見（可選）" maxLength={300} showCount />
                   </Form.Item>
                 </Col>
@@ -301,9 +384,9 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
         )}
       </Spin>
 
-      {/* ====== 页面底部按钮 ====== */}
+      {/* ====== 頁面底部按鈕 ====== */}
       <div className="form-footer">
-        <Button onClick={onBack}>{t('common.cancel')}</Button>
+        <Button onClick={onBack}>取消</Button>
         <Button danger type="primary" icon={<SaveOutlined />} onClick={handleSubmit} loading={submitting} disabled={!asset}>
           確認提交
         </Button>

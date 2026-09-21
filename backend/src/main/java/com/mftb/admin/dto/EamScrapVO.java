@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 public class EamScrapVO {
     private Long id;
     private Long assetId;
+    /** 报废编号 */
+    private String scrapNo;
     /** 资产编号（快照） */
     private String assetNo;
     /** 资产名称（快照） */
@@ -19,6 +21,8 @@ public class EamScrapVO {
     private String assetType;
     /** 资产品牌（快照） */
     private String brand;
+    /** 所属品牌/公司品牌 ID（快照） */
+    private Integer companyBrand;
     /** 报废日期 yyyy-MM-dd */
     private String scrapDate;
     /** 申请人 */

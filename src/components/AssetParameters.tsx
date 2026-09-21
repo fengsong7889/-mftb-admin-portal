@@ -2,6 +2,7 @@ import { Descriptions, Tag } from 'antd'
 import { AppstoreOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { AssetItem } from '../api/asset'
+import BrandTag from './BrandTag'
 import { useAssetParameterCatalog } from '../hooks/useAssetParameterCatalog'
 import { assetParameterFields, normalizeAssetParams, type AssetParameterCatalog, type AssetParameterSource } from '../utils/assetParams'
 import './AssetParameters.css'
@@ -43,6 +44,7 @@ export function AssetSummary({ asset, hideAccessories = false }: { asset: Summar
       { key: 'name', label: t('asset.colAssetName'), children: asset.assetName },
       { key: 'type', label: t('asset.colAssetType'), children: asset.assetType || '—' },
       { key: 'brand', label: t('asset.colBrand'), children: asset.brand || '—' },
+      { key: 'companyBrand', label: '所屬品牌', children: asset.companyBrand ? <BrandTag value={asset.companyBrand} /> : '—' },
       { key: 'location', label: t('asset.colLocationName'), children: asset.location || '—' },
       { key: 'value', label: t('asset.colPurchaseValue'), children: asset.purchaseValue != null ? `MOP ${asset.purchaseValue.toLocaleString()}` : '—' },
     ]} />

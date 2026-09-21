@@ -14,6 +14,8 @@ public class EamRepairVO {
     private String assetName;
     /** 资产品牌（来自关联资产） */
     private String brand;
+    /** 所属品牌/公司品牌 ID */
+    private Integer companyBrand;
     private String repairDate;
     private String faultDesc;
     private String repairContent;

@@ -132,16 +132,18 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
   const cardStyle = { border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } as const
 
   return (
-    <div className="content-area">
+    <>
       <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)', backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite' }} />
-        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>
-            {t('common.back', { defaultValue: '返回' })}
-          </Button>
-          <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('asset.invCreateTitle', { defaultValue: '發起盤點' })}</h2>
+        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
+              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+              {t('common.back', { defaultValue: '返回' })}
+            </Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('asset.invCreateTitle', { defaultValue: '發起盤點' })}</h2>
+          </div>
         </div>
       </div>
 
@@ -183,7 +185,7 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
             </Space>
           </div>
 
-          <Form.Item label={t('asset.invScopeMode')} style={{ marginBottom: 12 }}>
+          <Form.Item label={t('asset.invScopeModeLabel', { defaultValue: '盤點方式' })} style={{ marginBottom: 12 }}>
             <Radio.Group value={scopeMode} onChange={e => { setScopeMode(e.target.value); invalidatePreview() }}>
               <Radio.Button value="CONDITION">{t('asset.invScopeCondition', { defaultValue: '按條件盤點' })}</Radio.Button>
               <Radio.Button value="ALL">{t('asset.invScopeAll', { defaultValue: '全部適用資產' })}</Radio.Button>
@@ -223,6 +225,6 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
           {t('asset.btnNewInventory')}
         </Button>
       </div>
-    </div>
+    </>
   )
 }

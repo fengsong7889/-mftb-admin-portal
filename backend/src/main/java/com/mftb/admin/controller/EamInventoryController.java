@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * 资产盘点管理接口（v2）。
  * <p>读操作需 asset-inventory view；写操作需 create；导出需 export。
- * 选项/员工检索在 create 权限下提供最小数据集，不要求员工管理等无关菜单权限。</p>
+ * 选项/员工检索仅返回菜单所需最小数据集，不要求员工管理等无关菜单权限。</p>
  */
 @RestController
 @RequestMapping("/api/eam/inventory")
@@ -37,9 +37,9 @@ public class EamInventoryController {
         return Result.success(inventoryService.options());
     }
 
-    /** 员工检索（发起选负责人 / 核对选实际持有人） */
+    /** 员工检索（列表按负责人筛选 / 发起选负责人 / 核对选实际持有人），查看权限即可用 */
     @GetMapping("/v2/employees")
-    @RequirePermission(menu = MENU, action = "create")
+    @RequirePermission(menu = MENU)
     public Result<List<EamTransferOptionsVO.EmployeeOption>> employees(@RequestParam(required = false) String keyword) {
         return Result.success(lookup.employees(keyword));
     }

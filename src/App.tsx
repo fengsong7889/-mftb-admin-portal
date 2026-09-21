@@ -451,6 +451,7 @@ function AuthenticatedLayout() {
               <Route path="/asset-compensation/payment" element={<AssetCompensation />} />
               <Route path="/asset-compensation/refund" element={<AssetCompensation />} />
               <Route path="/asset-compensation/review" element={<AssetCompensation />} />
+              <Route path="/asset-compensation/add" element={<AssetCompensation />} />
               {/* 員工個人資產入口 */}
               <Route path="/my-assets"        element={<MyAssets />} />
               <Route path="/my-claims"        element={<MyClaims />} />

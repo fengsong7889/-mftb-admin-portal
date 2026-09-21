@@ -170,6 +170,9 @@ export interface InventoryTaskQuery {
   status?: string
   dateFrom?: string
   dateTo?: string
+  /** 操作日期区间（按任务最后更新时间过滤）yyyy-MM-dd */
+  opDateFrom?: string
+  opDateTo?: string
 }
 
 export interface InventoryItemQuery {

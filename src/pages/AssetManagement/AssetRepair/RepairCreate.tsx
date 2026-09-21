@@ -45,7 +45,7 @@ const CAUSE_OPTIONS = [
 /** 资产状态 → 标签颜色 */
 const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {
   idle: 'default', in_use: 'success', in_repair: 'processing', scrapped: 'error',
-  lost: 'warning', pending_inspection: 'blue', written_off: 'default',
+  lost: 'warning', pending_inspection: 'blue', pending_disposal: 'orange', written_off: 'default',
 }
 
 /** 模块卡片统一样式（无边框阴影，对齐 EAM 详情页规范） */

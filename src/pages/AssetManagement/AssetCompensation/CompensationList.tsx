@@ -4,10 +4,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Button, Empty, Form, Input, Select, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { ReloadOutlined, SearchOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import BrandTag from '../../../components/BrandTag'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import type { CompensationRow, CompensationQuery } from '../../../api/eamCompensation'
 
 /* ----- 状态元数据 ----- */
@@ -33,12 +35,14 @@ interface Props {
   error?: string
   onQuery?: (query: CompensationQuery) => void
   canEdit?: boolean
+  onCreate?: () => void
 }
 
-interface Filters { compNo?: string; assetName?: string; holderName?: string; status?: string; damageType?: string; party?: string }
+interface Filters { compNo?: string; assetName?: string; holderName?: string; status?: string; damageType?: string; party?: string; companyBrand?: number }
 
-export default function CompensationList({ data, loading = false, error, onQuery, canEdit: _canEdit = false }: Props) {
+export default function CompensationList({ data, loading = false, error, onQuery, canEdit: _canEdit = false, onCreate }: Props) {
   const { t } = useTranslation()
+  const { numericOptions } = useCompanyBrand()
   const navigate = useNavigate()
   const [form] = Form.useForm<Filters>()
   const [page, setPage] = useState(1)
@@ -62,6 +66,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
       status: v.status || undefined,
       damageType: v.damageType || undefined,
       party: v.party || undefined,
+      companyBrand: v.companyBrand || undefined,
     })
     setPage(1)
   }
@@ -81,6 +86,10 @@ export default function CompensationList({ data, loading = false, error, onQuery
       render: (v: string, c) => <Button type="link" onClick={() => navigate(`/asset-compensation/detail?id=${c.id}`)}>{v}</Button>,
     },
     { key: 'asset', title: t('asset.colAssetName'), width: 200, render: (_, c) => <>{c.assetName}<div className="claim-muted">{c.assetNo}</div></> },
+    {
+      key: 'companyBrand', title: '所屬品牌', dataIndex: 'companyBrand', width: 100,
+      render: (v: number | null) => v ? <BrandTag value={v} /> : '-',
+    },
     { key: 'holderName', title: '原持有人', dataIndex: 'holderName', width: 130 },
     { key: 'damageType', title: '损失类型', dataIndex: 'damageType', width: 100, render: (v: string) => <Tag color={v === 'loss' ? 'error' : 'warning'}>{DAMAGE_LABEL[v] || v}</Tag> },
     { key: 'party', title: '责任对象', width: 130, render: (_, c) => c.party ? <Tag>{PARTY_LABEL[c.party] || c.party}</Tag> : '待定' },
@@ -103,6 +112,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
   const columnMeta = useMemo(() => [
     { key: 'compNo', title: t('asset.colCompNo') },
     { key: 'asset', title: t('asset.colAssetName') },
+    { key: 'companyBrand', title: '所屬品牌' },
     { key: 'holderName', title: '原持有人' },
     { key: 'damageType', title: '损失类型' },
     { key: 'party', title: '责任对象' },
@@ -139,6 +149,9 @@ export default function CompensationList({ data, loading = false, error, onQuery
         <Form.Item label="责任对象" name="party">
           <Select allowClear placeholder="全部" options={Object.entries(PARTY_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
         </Form.Item>
+        <Form.Item label="所屬品牌" name="companyBrand">
+          <Select allowClear placeholder={t('common.all')} options={numericOptions} style={{ width: '100%' }} />
+        </Form.Item>
         <Form.Item>
           <div className="search-actions">
             <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
@@ -152,6 +165,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
     <div className="action-section">
       <div className="action-section-left">赔付记录 {total > 0 ? `共 ${total} 条` : ''}</div>
       <div className="action-section-right">
+        <Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>新增赔付</Button>
         {configComponent}
       </div>
     </div>
@@ -164,7 +178,7 @@ export default function CompensationList({ data, loading = false, error, onQuery
       locale={{ emptyText: <Empty description={t('common.noData')} /> }}
       loading={loading}
       size="middle"
-      scroll={{ x: 1585 }}
+      scroll={{ x: 1685 }}
       onChange={handleTableChange}
       pagination={{
         current: page, pageSize: size, total,

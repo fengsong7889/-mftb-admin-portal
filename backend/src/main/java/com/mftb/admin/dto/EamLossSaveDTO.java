@@ -31,4 +31,7 @@ public class EamLossSaveDTO {
 
     /** 修改原因（编辑时必填） */
     private String changeReason;
+
+    /** 幂等请求键（直接报失防重，可空） */
+    private String requestKey;
 }

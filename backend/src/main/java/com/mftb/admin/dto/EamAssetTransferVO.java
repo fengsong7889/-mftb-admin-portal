@@ -24,6 +24,8 @@ public class EamAssetTransferVO {
     /** 当前台账配置，只读；调拨前后归属仍使用原单据快照。 */
     private Map<String, Object> params;
     private String categoryCode;
+    /** 所属品牌/公司品牌 ID */
+    private Integer companyBrand;
     private Long brandId;
     private String brand;
     private Integer brandBackfilled;
