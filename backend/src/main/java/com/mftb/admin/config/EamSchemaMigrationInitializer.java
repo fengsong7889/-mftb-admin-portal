@@ -66,6 +66,7 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v24-loss-tables", this::createLossTables);
         versionTracker.applyOnce("eam:schema-v25-loss-menu", this::createLossMenu);
         versionTracker.applyOnce("eam:schema-v26-loss-menu-rename", this::renameLossMenu);
+        versionTracker.applyOnce("eam:schema-v33-inventory-v2", this::upgradeInventoryV2);
     }
 
     private void upgradeTransferIntegrity() {
@@ -410,6 +411,19 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         } catch (Exception e) {
             if (isDuplicateColumnError(e) || isDuplicateIndexError(e)) {
                 log.debug("索引已存在, 跳过: {}.{}", table, indexName);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /** 安全添加唯一索引 —— 已存在则跳过 */
+    private void addUniqueIndexSafe(String table, String indexName, String columns) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD UNIQUE INDEX " + indexName + " (" + columns + ")");
+        } catch (Exception e) {
+            if (isDuplicateColumnError(e) || isDuplicateIndexError(e)) {
+                log.debug("唯一索引已存在, 跳过: {}.{}", table, indexName);
             } else {
                 throw e;
             }
@@ -1103,5 +1117,106 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         log.info("开始执行 v26 迁移：菜单名称 遺失找回 → 遺失資產 ...");
         jdbcTemplate.update("UPDATE sys_menu SET name = '遺失資產' WHERE menu_key = 'asset-loss' AND deleted = 0");
         log.info("v26 迁移完成：菜单名称已更新为 遺失資產");
+    }
+
+    /**
+     * v33: 资产盘点 v2 —— 任务/明细表扩列（范围快照、账实核对、并发版本、结构化统计）
+     * + 操作日志表 + 新版明细条件唯一索引。对应 backend/sql/184_eam_inventory_v2.sql。
+     */
+    private void upgradeInventoryV2() {
+        log.info("开始执行 v33 迁移：资产盘点 v2 表结构升级 ...");
+
+        String[] taskColumns = {
+            "contract_version INT NOT NULL DEFAULT 1 COMMENT '契约版本(1=历史,2=新版)'",
+            "scope_mode VARCHAR(16) NULL COMMENT '范围模式 CONDITION/ALL'",
+            "scope_json TEXT NULL COMMENT '范围原始条件快照 JSON'",
+            "scope_resolved_json TEXT NULL COMMENT '展开后范围 ID/名称快照 JSON'",
+            "scope_hash VARCHAR(64) NULL COMMENT '范围指纹'",
+            "snapshot_at DATETIME NULL COMMENT '应盘清单冻结时间'",
+            "owner_id BIGINT NULL COMMENT '盘点负责人 sys_user.id'",
+            "owner_emp_no VARCHAR(32) NULL COMMENT '盘点负责人工号'",
+            "owner_name VARCHAR(128) NULL COMMENT '盘点负责人姓名'",
+            "created_by_id BIGINT NULL COMMENT '创建人 sys_user.id'",
+            "created_by_emp_no VARCHAR(32) NULL COMMENT '创建人工号'",
+            "task_revision INT NOT NULL DEFAULT 0 COMMENT '任务修订号(并发控制)'",
+            "checked_count INT NOT NULL DEFAULT 0 COMMENT '已核对数'",
+            "confirmed_count INT NOT NULL DEFAULT 0 COMMENT '实物确认数(完好+损坏)'",
+            "anomaly_count INT NOT NULL DEFAULT 0 COMMENT '异常资产去重数'",
+            "not_checked_count INT NOT NULL DEFAULT 0 COMMENT '未完成核对数'",
+            "missing_count INT NOT NULL DEFAULT 0 COMMENT '未找到数'",
+            "damaged_count INT NOT NULL DEFAULT 0 COMMENT '实物损坏数'",
+            "location_diff_count INT NOT NULL DEFAULT 0 COMMENT '位置差异数'",
+            "holder_diff_count INT NOT NULL DEFAULT 0 COMMENT '持有人差异数'",
+            "recheck_count INT NOT NULL DEFAULT 0 COMMENT '期间业务变更待复核数'",
+            "close_type VARCHAR(16) NULL COMMENT '结束方式 COMPLETE/PARTIAL/CANCEL'",
+            "close_reason VARCHAR(500) NULL COMMENT '结束原因'",
+            "closed_at DATETIME NULL COMMENT '结束时间'",
+            "closed_by VARCHAR(128) NULL COMMENT '结束操作人'",
+            "closed_by_id BIGINT NULL COMMENT '结束操作人 ID'",
+            "cancelled_at DATETIME NULL COMMENT '取消时间'",
+            "cancelled_by VARCHAR(128) NULL COMMENT '取消操作人'",
+            "cancel_reason VARCHAR(500) NULL COMMENT '取消原因'",
+            "create_request_key VARCHAR(64) NULL COMMENT '创建幂等键'",
+            "create_request_hash VARCHAR(64) NULL COMMENT '创建请求摘要'",
+        };
+        for (String col : taskColumns) alterSafe("biz_eam_inventory_task", "ADD COLUMN " + col);
+        addIndexSafe("biz_eam_inventory_task", "idx_task_owner", "owner_id");
+        addIndexSafe("biz_eam_inventory_task", "idx_task_created_by", "created_by");
+        // 创建请求幂等唯一（(created_by_id, create_request_key)）
+        addUniqueIndexSafe("biz_eam_inventory_task", "uk_task_create_request", "created_by_id,create_request_key");
+
+        String[] itemColumns = {
+            "contract_version INT NOT NULL DEFAULT 1 COMMENT '契约版本(1=历史,2=新版)'",
+            "book_snapshot_json TEXT NULL COMMENT '发起时账面快照 JSON'",
+            "ledger_fingerprint VARCHAR(64) NULL COMMENT '发起时台账关键字段指纹'",
+            "actual_location_id BIGINT NULL COMMENT '实际位置 ID'",
+            "actual_location_name VARCHAR(256) NULL COMMENT '实际位置名称快照'",
+            "actual_location_other VARCHAR(256) NULL COMMENT '其他位置自由文本'",
+            "location_check_result VARCHAR(16) NULL COMMENT '位置核对 CONSISTENT/DIFF/PENDING/NA'",
+            "actual_holder_type VARCHAR(16) NULL COMMENT '实际持有人类型 EMPLOYEE/NONE/EXTERNAL/PENDING'",
+            "actual_holder_id BIGINT NULL COMMENT '实际持有人 sys_user.id'",
+            "actual_holder_emp_no VARCHAR(32) NULL COMMENT '实际持有人工号'",
+            "actual_holder_name VARCHAR(128) NULL COMMENT '实际持有人姓名'",
+            "actual_holder_external VARCHAR(128) NULL COMMENT '外部保管名称'",
+            "holder_check_result VARCHAR(16) NULL COMMENT '持有人核对 CONSISTENT/DIFF/PENDING/NA'",
+            "check_method VARCHAR(16) NULL COMMENT '核对方式 ONSITE/HOLDER/DOC'",
+            "checked_at DATETIME NULL COMMENT '核对时间'",
+            "checked_by VARCHAR(128) NULL COMMENT '核对操作人'",
+            "checked_by_id BIGINT NULL COMMENT '核对操作人 ID'",
+            "checked_by_emp_no VARCHAR(32) NULL COMMENT '核对操作人工号'",
+            "item_revision INT NOT NULL DEFAULT 0 COMMENT '明细修订号(并发控制)'",
+            "current_snapshot_json TEXT NULL COMMENT '核对时台账快照 JSON'",
+            "closed_snapshot_json TEXT NULL COMMENT '结束时台账比对快照 JSON'",
+            "recheck_required TINYINT NOT NULL DEFAULT 0 COMMENT '期间业务变更待复核'",
+            "anomaly_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否异常资产(去重统计)'",
+            "holder_name VARCHAR(128) NULL COMMENT '发起时使用人姓名快照'",
+            "holder_emp_no VARCHAR(32) NULL COMMENT '发起时使用人工号快照'",
+            "holder_dept VARCHAR(128) NULL COMMENT '发起时资产归属部门快照'",
+            "unique_scope_asset BIGINT GENERATED ALWAYS AS (CASE WHEN contract_version >= 2 THEN asset_id ELSE NULL END) STORED COMMENT '新版行资产唯一作用域'",
+        };
+        for (String col : itemColumns) alterSafe("biz_eam_inventory_item", "ADD COLUMN " + col);
+        addUniqueIndexSafe("biz_eam_inventory_item", "uk_item_task_asset_new", "task_id,unique_scope_asset");
+        addIndexSafe("biz_eam_inventory_item", "idx_item_anomaly", "task_id,anomaly_flag");
+
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_eam_inventory_event ("
+            + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
+            + "task_id BIGINT NOT NULL COMMENT '盘点任务 ID', "
+            + "item_id BIGINT NULL COMMENT '盘点明细 ID(任务级动作为空)', "
+            + "action VARCHAR(32) NOT NULL COMMENT '动作 create/check/batch/reset/complete/partial/cancel', "
+            + "request_key VARCHAR(64) NULL COMMENT '幂等键', "
+            + "request_hash VARCHAR(64) NULL COMMENT '请求摘要', "
+            + "before_json TEXT NULL COMMENT '变更前值 JSON', "
+            + "after_json TEXT NULL COMMENT '变更后值 JSON', "
+            + "reason VARCHAR(500) NULL COMMENT '原因/说明', "
+            + "operator_id BIGINT NULL COMMENT '登录操作人 ID', "
+            + "operator_name VARCHAR(128) NULL COMMENT '操作人姓名', "
+            + "operator_emp_no VARCHAR(32) NULL COMMENT '操作人工号', "
+            + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间', "
+            + "UNIQUE KEY uk_event_request (task_id, request_key), "
+            + "KEY idx_event_task (task_id, id)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产盘点操作日志表'");
+
+        log.info("v33 迁移完成：资产盘点 v2 表结构升级完成");
     }
 }
