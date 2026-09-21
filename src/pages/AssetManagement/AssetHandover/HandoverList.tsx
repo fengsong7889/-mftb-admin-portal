@@ -6,13 +6,14 @@
  * - 列配置按鈕（useColumnConfig）控制列顯隱與順序，偏好存 localStorage
  * - 展開行查看本次交接的資產明細（編號 + 名稱）
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker, TreeSelect, Alert } from 'antd'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker, TreeSelect, Alert } from 'antd'
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { Dayjs } from 'dayjs'
 import { fetchHandoverList, fetchHandoverDetail, cancelHandover, type HandoverRecord, type HandoverListParams, type HandoverItem } from '../../../api/eam'
+import { fetchAssetList, type AssetItem } from '../../../api/asset'
 import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
 import { useTransferData } from '../AssetTransfer/useTransferData'
@@ -32,6 +33,7 @@ interface Props {
 
 interface SearchValues {
   handoverNo?: string
+  assetKeyword?: string
   fromUserName?: string
   fromDepartmentId?: number
   toUserName?: string
@@ -115,11 +117,32 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
     return () => { alive = false }
   }, [])
 
+  /* ----- 資產編號/名稱下拉搜索（遠程，300ms 防抖，與歸還/維修頁統一） ----- */
+  const [assetOptions, setAssetOptions] = useState<AssetItem[]>([])
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const assetSearchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const handleAssetSearch = useCallback((keyword: string) => {
+    if (assetSearchTimerRef.current) clearTimeout(assetSearchTimerRef.current)
+    if (!keyword) { setAssetOptions([]); return }
+    assetSearchTimerRef.current = setTimeout(async () => {
+      setAssetSearchLoading(true)
+      try {
+        const res = await fetchAssetList({ keyword, status: 'all', page: 1, size: 50 })
+        setAssetOptions(res.records.filter((a) => a.status !== 'scrapped'))
+      } catch {
+        setAssetOptions([])
+      } finally {
+        setAssetSearchLoading(false)
+      }
+    }, 300)
+  }, [])
+
   const handleSearch = () => {
     const v = form.getFieldsValue()
     const range = v.handoverDateRange
     setFilters({
       handoverNo: v.handoverNo?.trim() || undefined,
+      assetKeyword: v.assetKeyword || undefined,
       fromUserName: v.fromUserName?.trim() || undefined,
       fromDepartment: departments.find(d => d.id === v.fromDepartmentId)?.name,
       toUserName: v.toUserName?.trim() || undefined,
@@ -278,6 +301,21 @@ export default function HandoverList({ onAdd, onViewAsset, onViewDetail }: Props
         >
           <Form.Item label={t('asset.colHandoverNo')} name="handoverNo">
             <Input placeholder={t('asset.phHandoverNo')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('asset.searchAssetLabel')} name="assetKeyword">
+            <Select
+              placeholder={t('asset.searchAssetPh')}
+              allowClear
+              showSearch
+              filterOption={false}
+              onSearch={handleAssetSearch}
+              loading={assetSearchLoading}
+              notFoundContent={assetSearchLoading ? t('common.searching', '搜索中...') : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />}
+              options={assetOptions.map((a) => ({
+                label: `${a.assetNo} - ${a.assetName}`,
+                value: a.assetNo,
+              }))}
+            />
           </Form.Item>
           <Form.Item label={t('asset.handoverFromUser')} name="fromUserName">
             <Input placeholder={t('asset.handoverFromUserPh')} allowClear />

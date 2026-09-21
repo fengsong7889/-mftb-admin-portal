@@ -31,6 +31,11 @@
   .notification-app__fields { grid-template-columns: 1fr; }
 }
 
+/* 备注等长文本字段平铺整行 */
+.notification-app__fields .notification-app__field-full {
+  grid-column: 1 / -1;
+}
+
 .notification-app__section-title {
   display: flex;
   align-items: center;

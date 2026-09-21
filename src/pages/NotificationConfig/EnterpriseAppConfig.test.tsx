@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { message, Modal } from 'antd'
 import EnterpriseAppConfig from './EnterpriseAppConfig'
@@ -159,18 +159,28 @@ describe('企业内部应用配置', () => {
     expect(fetchAppConfig).not.toHaveBeenCalled()
   })
 
+  /**
+   * 本页在 jsdom 下的成本集中在两处：整页渲染（Tabs + Table + cssinjs 样式注入）约 10~15s，
+   * 以及对全量 button 做可访问名称计算（首次会触发 CSSOM 解析）约 6~9s。
+   * 因此确认框按钮一律用 within(dialog) 收窄到弹窗内部，并显式放宽超时避免冷启动误报。
+   */
   it('应用启停先确认，取消不会更新配置', async () => {
     render(<MemoryRouter initialEntries={['/notification-config?tab=app']}><NotificationConfig /></MemoryRouter>)
     await screen.findByText(config.name)
-    fireEvent.click(screen.getByRole('switch'))
+    // Modal.confirm 渲染在独立 React root 上，点击后需 flush 一次微任务队列再取弹窗。
+    await act(async () => { fireEvent.click(screen.getByRole('switch')) })
     expect(toggleNotificationApp).not.toHaveBeenCalled()
-    fireEvent.click(await screen.findByRole('button', { name: 'notificationApp.cancel' }))
+    const dismissed = await screen.findByRole('dialog')
+    // antd ConfirmDialog 会在 header 与确认体各渲染一次标题，故用 getAllByText。
+    expect(within(dismissed).getAllByText('確定要停用該配置嗎？').length).toBeGreaterThan(0)
+    await act(async () => { fireEvent.click(within(dismissed).getByRole('button', { name: 'notificationApp.cancel' })) })
     expect(toggleNotificationApp).not.toHaveBeenCalled()
-    await waitFor(() => expect(screen.queryByText('確定要停用該配置嗎？')).not.toBeInTheDocument())
-    fireEvent.click(screen.getByRole('switch'))
-    fireEvent.click(await screen.findByRole('button', { name: 'notificationApp.confirm' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await act(async () => { fireEvent.click(screen.getByRole('switch')) })
+    const confirmed = await screen.findByRole('dialog')
+    await act(async () => { fireEvent.click(within(confirmed).getByRole('button', { name: 'notificationApp.confirm' })) })
     await waitFor(() => expect(toggleNotificationApp).toHaveBeenCalledWith(1, false))
-  })
+  }, 60000)
 
   it('应用停用时场景列表明确显示不发送，并禁止启用未绑定规则', async () => {
     vi.mocked(fetchNotificationScenarios).mockResolvedValueOnce([{ ...scenario, appEnabled: false }])

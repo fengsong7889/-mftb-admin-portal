@@ -35,4 +35,6 @@ public class EamHandoverQuery {
     private String operatorName;
     /** 接收人类型（employee/department） */
     private String receiverType;
+    /** 资产编号/名称（模糊，匹配交接明细快照） */
+    private String assetKeyword;
 }

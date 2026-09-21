@@ -2,33 +2,43 @@
  * 归还详情 — 接通真实后端 API
  *
  * 模块拆分（自上而下）：
- *   1. 资产信息  2. 领用信息  3. 签收信息与凭证
- *   4. 处理进度  5. 验收信息
+ *   1. 处理进度  2. 资产信息  3. 领用信息
+ *   4. 签收信息与凭证  5. 验收信息
+ *   6. 处置结果（editMode 下可操作）  7. 遗失找回（editMode 下可操作）
  * 样式基准：采购订单详情 — DetailPageHeader + 无边框模块卡片 + Descriptions column=4 + footer。
  */
-import { useEffect, useState } from 'react'
-import { Alert, Button, Descriptions, Empty, Result, Space, Spin, Steps, Tag } from 'antd'
+import { useEffect, useRef, useState } from 'react'
+import { Alert, Button, DatePicker, Descriptions, Empty, Form, Radio, Result, Space, Spin, Steps, Switch, Tag } from 'antd'
 import {
   FileTextOutlined, ProfileOutlined, InboxOutlined,
   FileProtectOutlined, RollbackOutlined, AppstoreOutlined,
+  ToolOutlined, SearchOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import AssetParameters from '../../../components/AssetParameters'
 import BrandTag from '../../../components/BrandTag'
-import type { ReturnRow } from '../../../api/eamReturn'
+import type { ReturnRow, ReturnDispositionDTO, ReturnRecoverDTO } from '../../../api/eamReturn'
 import { fetchClaimDetail } from '../../../api/eamClaim'
 import type { ClaimRow } from '../AssetClaim/claimViewTypes'
 import { fetchBorrowDetail, type BorrowRow } from '../../../api/eamBorrow'
 import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
+
+const ALL_DISPOSITION_OPTIONS = [
+  { value: 'idle', label: '收回閒置（可再次使用）' },
+  { value: 'apply_repair', label: '申請維修（進入維修管理）' },
+  { value: 'scrapped', label: '登記報廢' },
+  { value: 'written_off', label: '遺失核銷' },
+]
 
 const SOURCE_LABEL: Record<string, string> = { claim: '領用歸還', borrow: '借用歸還', historical: '歷史資產歸還' }
 const STATUS_LABEL: Record<string, string> = { completed: '正常完成', exception_pending: '異常處理中', exception_closed: '異常已結束' }
 const STATUS_COLOR: Record<string, string> = { completed: 'success', exception_pending: 'processing', exception_closed: 'default' }
 const CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '損壞', lost: '遺失' }
 const CONDITION_COLOR: Record<string, string> = { normal: 'success', damaged: 'error', lost: 'warning' }
-const DISPOSITION_LABEL: Record<string, string> = { idle: '已收回·可使用', scrapped: '已登記報廢', written_off: '遺失已核銷' }
+const DISPOSITION_LABEL: Record<string, string> = { idle: '已收回·可使用', apply_repair: '已申請維修', scrapped: '已登記報廢', written_off: '遺失已核銷' }
 
 const CLAIM_STATUS_META: Record<string, { label: string; color: string }> = {
   pending_signature: { label: '待簽領用', color: 'processing' },
@@ -70,17 +80,43 @@ interface Props {
   error?: string
   canEdit?: boolean
   showResult?: boolean
+  editMode?: boolean
   onBack: () => void
   onRefresh?: () => void
+  onDispose?: (dto: ReturnDispositionDTO) => void
+  onRecover?: (dto: ReturnRecoverDTO) => void
 }
 
-export default function ReturnDetail({ record, loading = false, error, canEdit = false, showResult = false, onBack, onRefresh: _onRefresh }: Props) {
+export default function ReturnDetail({ record, loading = false, error, canEdit = false, showResult = false, editMode = false, onBack, onRefresh: _onRefresh, onDispose, onRecover }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
   /** 加载来源详情（领用 / 借用 / 资产台账），供模块 1-3 展示 */
   const [source, setSource] = useState<ClaimRow | BorrowRow | AssetItem | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
+
+  /** 處置 / 找回表單 */
+  const [dispositionForm] = Form.useForm()
+  const [recoverForm] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
+  const dispositionRef = useRef<HTMLDivElement>(null)
+  const recoverRef = useRef<HTMLDivElement>(null)
+
+  /** 監聽處置結果，控制賠付定責開關的可見性 */
+  const watchedDisposition = Form.useWatch('disposition', dispositionForm)
+
+  /** editMode 時自動滾動到對應模塊 */
+  useEffect(() => {
+    if (!editMode || !record) return
+    const timer = setTimeout(() => {
+      if (record.assetCondition === 'lost' && !record.recovered && recoverRef.current) {
+        recoverRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else if (record.assetCondition !== 'normal' && !record.disposition && dispositionRef.current) {
+        dispositionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [editMode, record?.id])
 
   useEffect(() => {
     if (!record || error) { setSource(null); return }
@@ -113,11 +149,44 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
   const canDispose = canEdit && isException && !record.disposition
   const canRecover = canEdit && record.assetCondition === 'lost' && !record.recovered
 
+  /** 處置選項：損壞時排除「遺失核銷」，遺失時排除「收回閒置」和「申請維修」 */
+  const dispositionOptions = ALL_DISPOSITION_OPTIONS.filter(o => {
+    if (record.assetCondition === 'damaged' && o.value === 'written_off') return false
+    if (record.assetCondition === 'lost' && (o.value === 'idle' || o.value === 'apply_repair')) return false
+    return true
+  })
+
   const cr = source as ClaimRow | undefined
   const br = source as BorrowRow | undefined
   const ai = source as AssetItem | undefined
   const isClaim = !!record.claimId
   const isBorrow = !!record.borrowId
+
+  /** 處置提交 */
+  const handleDispositionSubmit = async () => {
+    try {
+      const values = await dispositionForm.validateFields()
+      setSubmitting(true)
+      await onDispose?.({
+        disposition: values.disposition,
+        dispositionDate: values.date.format('YYYY-MM-DD'),
+        needCompensation: values.needCompensation ?? false,
+      })
+    } catch { /* validation */ } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** 找回提交 */
+  const handleRecoverSubmit = async () => {
+    try {
+      const values = await recoverForm.validateFields()
+      setSubmitting(true)
+      await onRecover?.({ recoveredNote: values.note })
+    } catch { /* validation */ } finally {
+      setSubmitting(false)
+    }
+  }
 
   return <>
     {/* ====== 详情页头部 ====== */}
@@ -133,22 +202,16 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       onBack={onBack}
       extra={
         <Space>
-          {canDispose && (
-            <Button onClick={() => navigate(`/asset-return/dispose?id=${record.id}`)}
-              style={{ borderRadius: 8, height: 36, padding: '0 16px' }}>
-              登記處置結果
-            </Button>
-          )}
-          {canRecover && (
-            <Button onClick={() => navigate(`/asset-return/recover?id=${record.id}`)}
-              style={{ borderRadius: 8, height: 36, padding: '0 16px' }}>
-              登記遺失找回
-            </Button>
-          )}
           {record.compensationId && (
             <Button type="primary" onClick={() => navigate(`/asset-compensation/detail?id=${record.compensationId}`)}
               style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
               查看關聯賠付單
+            </Button>
+          )}
+          {record.repairId && (
+            <Button type="primary" onClick={() => navigate(`/asset-repair?id=${record.assetId}`)}
+              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+              查看關聯維修單
             </Button>
           )}
         </Space>
@@ -314,6 +377,102 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
           </Descriptions.Item>
         </Descriptions>
       </div>
+
+      {/* ====== 模块 6：处置结果（仅异常/损坏时显示） ====== */}
+      {canDispose && (
+        <div style={detailCardStyle} ref={dispositionRef}>
+        <SectionTitle
+          icon={<ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          iconBg="#fff7e6"
+          title="處置結果"
+          tag={record.disposition
+            ? <Tag color="success">已登記</Tag>
+            : editMode && canDispose
+              ? <Tag color="processing">編輯中</Tag>
+              : <Tag>未登記</Tag>}
+        />
+        {canDispose && editMode ? (
+          <>
+            <Alert className="claim-notice" showIcon type="warning" message={
+              record.assetCondition === 'damaged'
+                ? '請選擇處置方式。選擇報廢將自動創建報廢記錄；選擇申請維修將自動創建維修記錄並流入維修管理菜單。'
+                : '請選擇處置方式。選擇報廢或遺失核銷將自動創建報廢記錄。'
+            } style={{ marginBottom: 16 }} />
+            <Form form={dispositionForm} layout="vertical" disabled={submitting} initialValues={{ date: dayjs(), needCompensation: false }}>
+              <Form.Item name="disposition" label="處置結果" rules={[{ required: true, message: '請選擇處置結果' }]}>
+                <Radio.Group optionType="button" buttonStyle="solid" options={dispositionOptions} />
+              </Form.Item>
+              <Form.Item name="date" label="處置日期" rules={[{ required: true, message: '請選擇處置日期' }]}>
+                <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
+              </Form.Item>
+              {watchedDisposition !== 'apply_repair' && (
+                <Form.Item name="needCompensation" label="是否需要鑑定賠付定責" valuePropName="checked"
+                  tooltip="選擇「是」將自動創建賠付記錄，可在「損壞賠付」菜單中後續定責、收款">
+                  <Switch checkedChildren="是" unCheckedChildren="否" />
+                </Form.Item>
+              )}
+            </Form>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+              <Button onClick={onBack}>取消</Button>
+              <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleDispositionSubmit}
+                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', boxShadow: '0 2px 4px rgba(232,114,12,0.25)' }}>
+                確認處置
+              </Button>
+            </div>
+          </>
+        ) : record.disposition ? (
+          <Descriptions column={4} size="middle">
+            <Descriptions.Item label="處置結果">{DISPOSITION_LABEL[record.disposition] || record.disposition}</Descriptions.Item>
+            <Descriptions.Item label="處置日期">{record.dispositionDate || '—'}</Descriptions.Item>
+          </Descriptions>
+        ) : (
+          <Empty description="尚未登記處置結果" />
+        )}
+      </div>
+      )}
+
+      {/* ====== 模块 7：遗失找回 ====== */}
+      {canRecover && (
+        <div style={detailCardStyle} ref={recoverRef}>
+          <SectionTitle
+            icon={<SearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            iconBg="#e6f7ff"
+            title="遺失找回"
+            tag={record.recovered === 1
+              ? <Tag color="success">已找回</Tag>
+              : editMode
+                ? <Tag color="processing">編輯中</Tag>
+                : <Tag>未找回</Tag>}
+          />
+          {editMode && !record.recovered ? (
+            <>
+              <Alert className="claim-notice" showIcon type="info" message="登記找回事實，不改寫原始歸還記錄。找回後資產恢復可使用狀態。" style={{ marginBottom: 16 }} />
+              <Form form={recoverForm} layout="vertical" disabled={submitting}>
+                <Form.Item name="note" label="找回說明" rules={[{ required: true, whitespace: true, message: '請填寫找回說明' }]}>
+                  <Radio.Group optionType="button" buttonStyle="solid" options={[
+                    { value: '已尋回，資產恢復可使用', label: '已尋回，資產恢復可使用' },
+                    { value: '部分尋回，需進一步確認', label: '部分尋回，需進一步確認' },
+                  ]} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }} />
+                </Form.Item>
+              </Form>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
+                <Button onClick={onBack}>取消</Button>
+                <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleRecoverSubmit}
+                  style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', boxShadow: '0 2px 4px rgba(232,114,12,0.25)' }}>
+                  確認找回
+                </Button>
+              </div>
+            </>
+          ) : record.recovered === 1 ? (
+            <Descriptions column={4} size="middle">
+              <Descriptions.Item label="找回日期">{record.recoveredDate || '—'}</Descriptions.Item>
+              <Descriptions.Item label="找回說明">{record.recoveredNote || '—'}</Descriptions.Item>
+            </Descriptions>
+          ) : (
+            <Empty description="尚未登記找回" />
+          )}
+        </div>
+      )}
     </Spin>
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}

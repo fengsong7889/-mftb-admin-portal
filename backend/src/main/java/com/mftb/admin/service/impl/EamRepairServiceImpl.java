@@ -7,8 +7,10 @@ import com.mftb.admin.dto.EamRepairSaveDTO;
 import com.mftb.admin.dto.EamRepairVO;
 import com.mftb.admin.entity.EamAsset;
 import com.mftb.admin.entity.EamRepair;
+import com.mftb.admin.entity.EamReturn;
 import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.EamRepairMapper;
+import com.mftb.admin.mapper.EamReturnMapper;
 import com.mftb.admin.service.EamRepairService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -28,6 +31,7 @@ public class EamRepairServiceImpl implements EamRepairService {
 
     private final EamRepairMapper repairMapper;
     private final EamAssetMapper assetMapper;
+    private final EamReturnMapper returnMapper;
     private final OperatorResolver operatorResolver;
 
     private static final List<String> VALID_STATUSES = List.of("repairing", "done");
@@ -43,14 +47,29 @@ public class EamRepairServiceImpl implements EamRepairService {
         }
         wrapper.orderByDesc(EamRepair::getCreatedAt, EamRepair::getId);
         List<EamRepair> records = repairMapper.selectList(wrapper);
-        return records.stream().map(this::toVO).toList();
+        List<EamRepairVO> vos = records.stream().map(this::toVO).toList();
+        fillBrands(vos);
+        return vos;
+    }
+
+    /** 批量填充资产品牌（来自关联资产表，避免 N+1 查询） */
+    private void fillBrands(List<EamRepairVO> vos) {
+        if (vos.isEmpty()) return;
+        List<Long> assetIds = vos.stream().map(EamRepairVO::getAssetId).filter(java.util.Objects::nonNull).distinct().toList();
+        if (assetIds.isEmpty()) return;
+        Map<Long, String> brandMap = assetMapper.selectList(
+                        new LambdaQueryWrapper<EamAsset>().select(EamAsset::getId, EamAsset::getBrand).in(EamAsset::getId, assetIds))
+                .stream().collect(java.util.stream.Collectors.toMap(EamAsset::getId, a -> a.getBrand() == null ? "" : a.getBrand()));
+        vos.forEach(vo -> vo.setBrand(brandMap.get(vo.getAssetId())));
     }
 
     @Override
     public EamRepairVO detail(long id) {
         EamRepair repair = repairMapper.selectById(id);
         if (repair == null) throw new BusinessException("维修记录不存在");
-        return toVO(repair);
+        EamRepairVO vo = toVO(repair);
+        fillBrands(List.of(vo));
+        return vo;
     }
 
     @Override
@@ -158,5 +177,54 @@ public class EamRepairServiceImpl implements EamRepairService {
         vo.setCreatedAt(DateTimeUtils.format(repair.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(repair.getUpdatedAt()));
         return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public long createFromDispose(long returnId) {
+        EamReturn ret = returnMapper.selectById(returnId);
+        if (ret == null) throw new BusinessException("歸還記錄不存在");
+
+        // 幂等：已有 repairId 则直接返回
+        if (ret.getRepairId() != null) {
+            log.info("归还记录 {} 已关联维修记录 {}，跳过自动创建", returnId, ret.getRepairId());
+            return ret.getRepairId();
+        }
+
+        EamAsset asset = assetMapper.selectById(ret.getAssetId());
+        if (asset == null) throw new BusinessException("關聯資產不存在 assetId=" + ret.getAssetId());
+
+        // 构建维修记录
+        EamRepair repair = new EamRepair();
+        repair.setAssetId(asset.getId());
+        repair.setAssetNo(asset.getAssetNo());
+        repair.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
+        repair.setRepairDate(ret.getDispositionDate() != null ? ret.getDispositionDate().toString() : ret.getReturnDate().toString());
+        // 故障描述：使用归还异常原因
+        String faultDesc = StringUtils.hasText(ret.getExceptionReason())
+                ? ret.getExceptionReason()
+                : "歸還時資產損壞（來源歸還單 " + ret.getReturnNo() + "）";
+        repair.setFaultDesc(faultDesc);
+        repair.setRepairContent("待維修人員補充");
+        repair.setRepairBy(""); // 待后续维修管理中补充
+        repair.setCost(java.math.BigDecimal.ZERO);
+        repair.setStatus("repairing");
+        repair.setApplicant(operatorResolver.currentOperatorName());
+        repair.setReturnId(returnId);
+        repair.setCreatedBy(operatorResolver.currentOperatorName());
+        repair.setUpdatedBy(operatorResolver.currentOperatorName());
+        repairMapper.insert(repair);
+
+        // 更新资产状态为维修中
+        asset.setStatus("in_repair");
+        asset.setUpdatedBy(operatorResolver.currentOperatorName());
+        assetMapper.updateById(asset);
+
+        // 回写归还记录的 repairId
+        ret.setRepairId(repair.getId());
+        returnMapper.updateById(ret);
+
+        log.info("处置流程自动创建维修记录 repairId={}, assetId={}, returnId={}", repair.getId(), asset.getId(), returnId);
+        return repair.getId();
     }
 }

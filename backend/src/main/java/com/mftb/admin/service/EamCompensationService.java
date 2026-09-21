@@ -16,6 +16,9 @@ public interface EamCompensationService {
     /** 创建赔付记录（从归还异常触发） */
     long create(EamReturnDTO returnDto, long returnId);
 
+    /** 从处置流程自动创建赔付记录（仅需归还 ID） */
+    long createFromDispose(long returnId);
+
     /** 定责 */
     void setLiability(EamCompensationLiabilityDTO dto);
 

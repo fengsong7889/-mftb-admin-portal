@@ -108,6 +108,52 @@ public class EamCompensationServiceImpl implements EamCompensationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public long createFromDispose(long returnId) {
+        EamReturn ret = returnMapper.selectById(returnId);
+        if (ret == null) throw new BusinessException("歸還記錄不存在");
+        if (ret.getCompensationId() != null) {
+            log.info("归还记录 {} 已关联赔付记录 {}，跳过自动创建", returnId, ret.getCompensationId());
+            return ret.getCompensationId();
+        }
+
+        EamAsset asset = assetMapper.selectById(ret.getAssetId());
+        if (asset == null) throw new BusinessException("資產不存在");
+
+        String compNo = bizSeqService.next(BizSeqService.RULE_EAM_COMPENSATION);
+
+        EamCompensation comp = new EamCompensation();
+        comp.setCompNo(compNo);
+        comp.setReturnId(returnId);
+        comp.setAssetId(ret.getAssetId());
+        comp.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
+        comp.setAssetNo(asset.getAssetNo());
+        comp.setHolderId(ret.getEmployeeId());
+
+        SysUser holder = userMapper.selectById(ret.getEmployeeId());
+        comp.setHolderName(holder != null && holder.getName() != null ? holder.getName() : holder != null ? holder.getUsername() : "");
+
+        comp.setDamageType("lost".equals(ret.getAssetCondition()) ? "loss" : "damage");
+        comp.setAmount(0L);
+        comp.setNetPaid(0L);
+        comp.setStatus("pending");
+        comp.setReviewRequired(0);
+        comp.setReason(ret.getExceptionReason());
+        comp.setOperatorId(operatorResolver.currentUser() != null ? operatorResolver.currentUser().getId() : null);
+        comp.setOperatorName(operatorResolver.currentOperatorName());
+        comp.setCreatedBy(operatorResolver.currentOperatorName());
+        comp.setUpdatedBy(operatorResolver.currentOperatorName());
+        compensationMapper.insert(comp);
+
+        // 更新归还记录关联赔付
+        ret.setCompensationId(comp.getId());
+        returnMapper.updateById(ret);
+
+        log.info("处置流程自动创建赔付记录 compId={}, returnId={}", comp.getId(), returnId);
+        return comp.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void setLiability(EamCompensationLiabilityDTO dto) {
         EamCompensation comp = compensationMapper.selectForUpdate(dto.getCompensationId());
         if (comp == null) throw new BusinessException("賠付記錄不存在");

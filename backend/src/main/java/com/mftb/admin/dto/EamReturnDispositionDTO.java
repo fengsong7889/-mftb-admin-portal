@@ -9,7 +9,7 @@ import lombok.Data;
 public class EamReturnDispositionDTO {
     /** 归还记录 ID */
     private Long returnId;
-    /** 处置结果：idle/scrapped/written_off */
+    /** 处置结果：idle/scrapped/written_off/apply_repair */
     private String disposition;
     /** 处置日期 yyyy-MM-dd */
     private String dispositionDate;
@@ -21,4 +21,6 @@ public class EamReturnDispositionDTO {
     private String receiveDepartment;
     /** 归还位置 ID（空则保持原位置） */
     private Long receiveLocationId;
+    /** 是否需要鉴定赔付定责（损坏/遗失时可选，true 则自动创建赔付记录） */
+    private Boolean needCompensation;
 }

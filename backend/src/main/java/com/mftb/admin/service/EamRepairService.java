@@ -25,4 +25,7 @@ public interface EamRepairService {
 
     /** 删除维修记录（仅允许维修中状态，删除后恢复资产状态） */
     void delete(long id);
+
+    /** 从归还处置流程自动创建维修记录（仅需归还记录 ID） */
+    long createFromDispose(long returnId);
 }

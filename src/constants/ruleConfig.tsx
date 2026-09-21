@@ -396,7 +396,7 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_asset', label: '資產編號', type: 'table', value: 'TB', defaultValue: 'TB', dateFormat: '', min: 4, max: 4, unit: 'TB-ZH-0101-0001', remark: '{品牌编碼}-{倉庫编碼}-{分類碼}-{n}位分類內自增序號', menu: '物資管理-資產台賬' },
       { key: 'eam_consumable_item', label: '耗材編碼', type: 'table', value: 'HC', defaultValue: 'HC', dateFormat: '', min: 6, max: 6, unit: 'HC000001', remark: '{prefix} + {n}位數字自增（全局自增）', menu: '物資管理-耗材檔案' },
       { key: 'eam_consumable_claim', label: '耗材領用單號', type: 'table', value: 'HCLY', defaultValue: 'HCLY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'HCLY202609180000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-耗材領用' },
-      { key: 'eam_inventory', label: '盤點任務編號', type: 'table', value: 'PD', defaultValue: 'PD', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PD202609190000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-資產盤點' },
+      { key: 'eam_inventory', label: '盤點任務編號', type: 'table', value: 'PD', defaultValue: 'PD', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PD202609190000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-盤點資產' },
       { key: 'workflow_config', label: '流程配置ID', type: 'table', value: 'LC', defaultValue: 'LC', dateFormat: '', min: 5, max: 5, unit: 'LC00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '審批中心' },
       /* ── 員工管理 ── */
       { key: 'employee_no', label: '工號', type: 'table', value: 'MF', defaultValue: 'MF', dateFormat: '', min: 5, max: 5, unit: 'MF00001', remark: '{prefix} + {n}位自增序號（全局自增）', menu: '員工管理' },
@@ -415,13 +415,13 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       /* ── AI智能中心 ── */
       { key: 'ai_conversation', label: '對話編號', type: 'table', value: 'DH', defaultValue: 'DH', dateFormat: 'YYYYMMDD', min: 5, max: 5, unit: 'DH2026090700001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: 'AI智能中心' },
       /* ── 物資管理（EAM）── 基礎配置 / 供應商管理 ── */
-      { key: 'eam_category_l1', label: '資產分類編碼-一級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01', remark: '2位數字自增，同級最大序號+1（如 01、02、03）', menu: '物資管理-基礎配置' },
-      { key: 'eam_category_l2', label: '資產分類編碼-二級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01、01-02）', menu: '物資管理-基礎配置' },
-      { key: 'eam_category_l3', label: '資產分類編碼-三級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01-01、01-01-02）', menu: '物資管理-基礎配置' },
-      { key: 'eam_location_warehouse', label: '倉庫編碼', type: 'table', value: '', defaultValue: '', dateFormat: '', min: 1, max: 10, unit: 'M', remark: '人工手動輸入編碼（如 M、T、Z），無固定格式', menu: '物資管理-基礎配置' },
+      { key: 'eam_category_l1', label: '資產分類編碼-一級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01', remark: '2位數字自增，同級最大序號+1（如 01、02、03）', menu: '物資管理-基礎數據' },
+      { key: 'eam_category_l2', label: '資產分類編碼-二級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01、01-02）', menu: '物資管理-基礎數據' },
+      { key: 'eam_category_l3', label: '資產分類編碼-三級', type: 'table', value: '-', defaultValue: '-', dateFormat: '', min: 2, max: 2, unit: '01-01-01', remark: '父編碼 +「-」+ 2位數字自增（如 01-01-01、01-01-02）', menu: '物資管理-基礎數據' },
+      { key: 'eam_location_warehouse', label: '倉庫編碼', type: 'table', value: '', defaultValue: '', dateFormat: '', min: 1, max: 10, unit: 'M', remark: '人工手動輸入編碼（如 M、T、Z），無固定格式', menu: '物資管理-基礎數據' },
       { key: 'eam_supplier_code', label: '供應商編碼', type: 'table', value: 'CGSJ', defaultValue: 'CGSJ', dateFormat: '', min: 6, max: 6, unit: 'CGSJ000001', remark: '{prefix} + 6位數字自增（全局自增，如 CGSJ000001、CGSJ000002）', menu: '物資管理-供應商管理' },
       { key: 'eam_claim', label: '領用編號', type: 'table', value: 'LY', defaultValue: 'LY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'LY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-領用資產' },
-      { key: 'eam_return', label: '歸還編號', type: 'table', value: 'GH', defaultValue: 'GH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'GH202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-資產歸還' },
+      { key: 'eam_return', label: '歸還編號', type: 'table', value: 'GH', defaultValue: 'GH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'GH202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-歸還資產' },
       { key: 'eam_borrow', label: '借用編號', type: 'table', value: 'JY', defaultValue: 'JY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'JY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-借用資產' },
       { key: 'eam_compensation', label: '賠付編號', type: 'table', value: 'PF', defaultValue: 'PF', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PF202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-損壞賠付' },
     ],

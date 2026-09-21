@@ -37,9 +37,24 @@ public class EamHandoverServiceImpl implements EamHandoverService {
 
     @Override
     public PageResult<EamHandoverVO> page(EamHandoverQuery query) {
+        LambdaQueryWrapper<EamHandover> wrapper = queryWrapper(query);
+        // 资产编号/名称过滤：命中交接明细快照的单据，无命中直接返回空页
+        if (hasText(query.getAssetKeyword())) {
+            String kw = query.getAssetKeyword().trim();
+            List<Long> handoverIds = handoverItemMapper.selectList(
+                            new LambdaQueryWrapper<EamHandoverItem>()
+                                    .and(x -> x.like(EamHandoverItem::getAssetNo, kw)
+                                            .or().like(EamHandoverItem::getAssetName, kw))
+                                    .select(EamHandoverItem::getHandoverId))
+                    .stream().map(EamHandoverItem::getHandoverId).distinct().toList();
+            if (handoverIds.isEmpty()) {
+                return new PageResult<EamHandoverVO>(List.of(), 0L);
+            }
+            wrapper.in(EamHandover::getId, handoverIds);
+        }
         Page<EamHandover> page = handoverMapper.selectPage(
                 new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
-                queryWrapper(query).orderByDesc(EamHandover::getCreatedAt, EamHandover::getId));
+                wrapper.orderByDesc(EamHandover::getCreatedAt, EamHandover::getId));
         List<EamHandoverVO> records = page.getRecords().stream().map(this::toVO).toList();
         // 批量填充 assetIds（列表页展开行需要）
         for (EamHandoverVO vo : records) {

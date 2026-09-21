@@ -12,6 +12,8 @@ public class EamRepairVO {
     private Long assetId;
     private String assetNo;
     private String assetName;
+    /** 资产品牌（来自关联资产） */
+    private String brand;
     private String repairDate;
     private String faultDesc;
     private String repairContent;
@@ -21,6 +23,8 @@ public class EamRepairVO {
     private String status;
     private String applicant;
     private String causeType;
+    /** 关联归还记录 ID（从归还处置自动创建时有值） */
+    private Long returnId;
     private String createdBy;
     private String createdAt;
     private String updatedBy;

@@ -83,7 +83,10 @@ public class DataInitializer implements CommandLineRunner {
     // v40: 菜单真值统一——菜单默认名/层级/排序以「当前数据库实际展示」为基准反向对齐种子：
     //      物資管理(原種子「資產管理(EAM)」)/資產運營(原「資產管理」)/採購執行(原「採購訂單」)，
     //      AI 与耗材菜单名转繁体，清理重复空目录（eam-master-data/eam-procurement）与 sort 冲突
-    private static final String V_MENU_SEED = "core:menu-seed-v40";
+    // v41: 物資管理菜單重組——合併「維護與處置」進「資產運營」；
+    //      新建「採購與供應」分組整合採購鏈（採購執行+驗收入庫+供應商管理）；
+    //      「基礎配置」改名「基礎數據」；耗材管理排序提前至 sort=2
+    private static final String V_MENU_SEED = "core:menu-seed-v41";
 
     @Override
     public void run(String... args) {
@@ -1800,23 +1803,22 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("ai-emp-quota", "Employee Quota"),
                 // 物資管理 (EAM)
                 Map.entry("asset-dashboard", "Asset Dashboard"),
-                Map.entry("asset-purchase", "Procurement & Inbound"),
                 Map.entry("purchase-order", "Purchase Execution"),
                 Map.entry("asset-inbound", "Asset Inbound"),
                 Map.entry("asset-flow-ops", "Asset Operations"),
                 Map.entry("asset-list", "Asset Ledger"),
                 Map.entry("asset-claim", "Asset Claim"),
                 Map.entry("asset-borrow", "Asset Borrow"),
-                Map.entry("asset-return", "Asset Return"),
-                Map.entry("asset-transfer-list", "Asset Transfer"),
-                Map.entry("asset-handover", "Asset Handover"),
-                Map.entry("asset-maintenance", "Maintenance & Disposal"),
+                Map.entry("asset-return", "Return Asset"),
+                Map.entry("asset-transfer-list", "Transfer Asset"),
+                Map.entry("asset-handover", "Handover Asset"),
                 Map.entry("asset-repair", "Asset Repair"),
                 Map.entry("asset-compensation", "Damage Compensation"),
-                Map.entry("asset-scrap", "Asset Scrap"),
-                Map.entry("asset-inventory", "Asset Inventory"),
+                Map.entry("asset-scrap", "Scrap Asset"),
+                Map.entry("asset-inventory", "Inventory Asset"),
                 Map.entry("asset-flow", "Asset Change History"),
-                Map.entry("asset-basic", "Basic Configuration"),
+                Map.entry("eam-procurement", "Procurement & Supply"),
+                Map.entry("asset-basic", "Master Data"),
                 Map.entry("asset-category", "Category Library"),
                 Map.entry("asset-model", "Brand Product Library"),
                 Map.entry("asset-location", "Warehouse Management"),
@@ -1886,8 +1888,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 1 WHERE menu_key = 'process-center' AND sort_order != 1");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'oa-requests' AND sort_order != 2");
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'workflow-config' AND sort_order != 3");
-        // 耗材管理分组排序调整：从 sort=6 改为 sort=4（紧跟在资产维护与处置之后）
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND sort_order != 4");
+        // 耗材管理分组排序调整：v41 改为 sort=2（紧跟资产看板，两个业务线入口对称）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'consumable-ops' AND sort_order != 2");
         // 修正 oa-requests 名称（曾与 process-center 重名为"流程中心"，应为"流程事项"）
         jdbcTemplate.update("UPDATE sys_menu SET name = '流程事項' WHERE menu_key = 'oa-requests' AND name != '流程事項'");
         // 图标统一（无条件覆盖，前端 Sidebar 图标颜色由 CSS nth-child 按位置着色，顺序正确后颜色自然对齐）
@@ -1896,10 +1898,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v23/v24: 物资管理菜单图标（分组 + 子菜单）
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'InboxOutlined'     WHERE menu_key = 'asset-management' AND (icon IS NULL OR icon = '')");
         // 分组图标
-        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingCartOutlined' WHERE menu_key = 'asset-purchase' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ShoppingCartOutlined' WHERE menu_key = 'eam-procurement' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'SwapOutlined'       WHERE menu_key = 'asset-flow-ops' AND (icon IS NULL OR icon = '')");
-        jdbcTemplate.update("UPDATE sys_menu SET icon = 'ToolOutlined'       WHERE menu_key = 'asset-maintenance' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'ControlOutlined'    WHERE menu_key = 'asset-basic' AND (icon IS NULL OR icon = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'GoldOutlined'       WHERE menu_key = 'consumable-ops' AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'DashboardOutlined'  WHERE menu_key = 'asset-dashboard'  AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'AppstoreOutlined'  WHERE menu_key = 'asset-list'      AND (icon IS NULL OR icon = '')");
         jdbcTemplate.update("UPDATE sys_menu SET icon = 'TagsOutlined'      WHERE menu_key = 'asset-category'  AND (icon IS NULL OR icon = '')");
@@ -1932,8 +1934,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 0, updated_by = 'system' WHERE menu_key IN ('asset-claim','asset-return') AND deleted = 1");
 
         // v35: 强制修正基础配置子菜单名称与图标（125_rename_basic_menus.sql 可能未执行或数据库被重置）
-        // 基础设置 → 基础配置（图标改为 ControlOutlined，避免与系统配置重复）
-        jdbcTemplate.update("UPDATE sys_menu SET name = '基礎配置', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎配置'");
+        // v41: 基础配置 → 基礎數據（Master Data），语义更准确
+        jdbcTemplate.update("UPDATE sys_menu SET name = '基礎數據', icon = 'ControlOutlined' WHERE menu_key = 'asset-basic' AND deleted = 0 AND name != '基礎數據'");
         // 资产分类 → 分类库
         jdbcTemplate.update("UPDATE sys_menu SET name = '分類庫', icon = 'TagsOutlined' WHERE menu_key = 'asset-category' AND deleted = 0 AND name != '分類庫'");
         // 资产型号 → 品牌产品库
@@ -1943,7 +1945,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 参数库 → 产品参数库
         jdbcTemplate.update("UPDATE sys_menu SET name = '產品參數庫', icon = 'DatabaseOutlined' WHERE menu_key = 'param-library' AND deleted = 0 AND name != '產品參數庫'");
         // 同步英文名称
-        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Basic Configuration'     WHERE menu_key = 'asset-basic'  AND (name_en IS NULL OR name_en != 'Basic Configuration')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Master Data'              WHERE menu_key = 'asset-basic'  AND (name_en IS NULL OR name_en != 'Master Data')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Category Library'        WHERE menu_key = 'asset-category' AND (name_en IS NULL OR name_en != 'Category Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Brand Product Library'    WHERE menu_key = 'asset-model'    AND (name_en IS NULL OR name_en != 'Brand Product Library')");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Warehouse Management'     WHERE menu_key = 'asset-location' AND (name_en IS NULL OR name_en != 'Warehouse Management')");
@@ -2221,34 +2223,32 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 二级直达菜单（无分组）
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
         // 二级分组
-        menus.put("asset-purchase",    new String[]{"採購入庫",         "asset-management",   "2"});
+        menus.put("consumable-ops",    new String[]{"耗材管理",         "asset-management",   "2"});
         menus.put("asset-flow-ops",    new String[]{"資產運營",         "asset-management",   "3"});
-        menus.put("asset-maintenance", new String[]{"維護與處置",       "asset-management",   "5"});
-        menus.put("asset-basic",       new String[]{"基礎配置",         "asset-management",   "7"});
-        // 三级菜单 → 采购入库
-        menus.put("purchase-order",     new String[]{"採購執行",         "asset-purchase",     "1"});
-        menus.put("asset-inbound",      new String[]{"驗收入庫",         "asset-purchase",     "2"});
-        // 三级菜单 → 资产管理
+        menus.put("eam-procurement",   new String[]{"採購與供應",       "asset-management",   "4"});
+        menus.put("asset-basic",       new String[]{"基礎數據",         "asset-management",   "5"});
+        // 三级菜单 → 采购与供应
+        menus.put("purchase-order",     new String[]{"採購執行",         "eam-procurement",    "1"});
+        menus.put("asset-inbound",      new String[]{"驗收入庫",         "eam-procurement",    "2"});
+        menus.put("asset-supplier",     new String[]{"供應商管理",       "eam-procurement",    "3"});
+        // 三级菜单 → 资产运营（合并原「維護與處置」）
         menus.put("asset-list",         new String[]{"資產台賬",         "asset-flow-ops",     "1"});
         menus.put("asset-claim",        new String[]{"領用資產",         "asset-flow-ops",     "2"});
         menus.put("asset-borrow",       new String[]{"借用資產",         "asset-flow-ops",     "3"});
-        menus.put("asset-return",       new String[]{"資產歸還",         "asset-flow-ops",     "4"});
-        menus.put("asset-transfer-list",new String[]{"資產調撥",         "asset-flow-ops",     "5"});
-        menus.put("asset-handover",     new String[]{"資產交接",         "asset-flow-ops",     "6"});
-        // 三级菜单 → 维护与处置
-        menus.put("asset-repair",       new String[]{"維修管理",         "asset-maintenance",  "1"});
-        menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-maintenance",  "2"});
-        menus.put("asset-scrap",        new String[]{"資產報廢",         "asset-maintenance",  "3"});
-        menus.put("asset-inventory",    new String[]{"資產盤點",         "asset-maintenance",  "4"});
-        menus.put("asset-flow",         new String[]{"變更歷史",         "asset-maintenance",  "5"});
-        // 三级菜单 → 基础配置
+        menus.put("asset-return",       new String[]{"歸還資產",         "asset-flow-ops",     "4"});
+        menus.put("asset-transfer-list",new String[]{"調撥資產",         "asset-flow-ops",     "5"});
+        menus.put("asset-handover",     new String[]{"交接資產",         "asset-flow-ops",     "6"});
+        menus.put("asset-repair",       new String[]{"維修管理",         "asset-flow-ops",     "7"});
+        menus.put("asset-compensation", new String[]{"損壞賠付",         "asset-flow-ops",     "8"});
+        menus.put("asset-scrap",        new String[]{"報廢資產",         "asset-flow-ops",     "9"});
+        menus.put("asset-inventory",    new String[]{"盤點資產",         "asset-flow-ops",     "10"});
+        menus.put("asset-flow",         new String[]{"變更歷史",         "asset-flow-ops",     "11"});
+        // 三级菜单 → 基础数据
         menus.put("asset-category",     new String[]{"分類庫",           "asset-basic",        "1"});
-        menus.put("asset-model",        new String[]{"品牌產品庫",         "asset-basic",        "2"});
+        menus.put("asset-model",        new String[]{"品牌產品庫",       "asset-basic",        "2"});
         menus.put("asset-location",     new String[]{"倉庫管理",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
-        menus.put("asset-tag",         new String[]{"資產標籤",         "asset-basic",        "5"});
-        // 二级直达菜单：供應商管理（耗材管理/维护与处置之后, 基礎配置之前）
-        menus.put("asset-supplier",     new String[]{"供應商管理",       "asset-management",   "6"});
+        menus.put("asset-tag",          new String[]{"資產標籤",         "asset-basic",        "5"});
         // ── OA中心 ──
         menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
         menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
@@ -2392,10 +2392,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
                 {"asset-claim",     "領用資產",   "UserAddOutlined",     "3"},
                 {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
-                {"asset-return",    "資產歸還",   "RollbackOutlined",    "5"},
-                {"asset-scrap",     "資產報廢",   "DeleteOutlined",      "6"},
+                {"asset-return",    "歸還資產",   "RollbackOutlined",    "5"},
+                {"asset-scrap",     "報廢資產",   "DeleteOutlined",      "6"},
                 {"asset-repair",    "資產維修",   "ToolOutlined",        "7"},
-                {"asset-inventory", "資產盤點",   "AuditOutlined",       "8"},
+                {"asset-inventory", "盤點資產",   "AuditOutlined",       "8"},
         };
         String actions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
         for (String[] child : children) {
@@ -2430,8 +2430,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * 物资管理菜单分组重构强制修正（幂等，每次启动确保结构正确）
      * 1. 删除旧 asset-overview 分组
      * 2. 资产看板改为直达二级菜单
-     * 3. 分组排序: 采购入库(2) → 资产管理(3) → 维护与处置(4) → 供應商管理(5) → 基礎配置(6)
-     * 4. 确保采购订单存在并挂在采购入库下
+     * 3. 分组排序: 資產看板(1) → 耗材管理(2) → 資產運營(3) → 採購與供應(4) → 基礎數據(5)
+     * 4. 确保采购订单存在并挂在采购与供应下
      */
     private void fixAssetMenuGrouping() {
         Long assetMgrId = queryMenuIdByKey("asset-management");
@@ -2445,26 +2445,24 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "UPDATE sys_menu SET parent_id = ?, sort_order = 1 WHERE menu_key = 'asset-dashboard' AND deleted = 0",
                 assetMgrId);
 
-        // 3. 分组排序修正
-        Long purchaseId = queryMenuIdByKey("asset-purchase");
-        Long flowOpsId  = queryMenuIdByKey("asset-flow-ops");
-        Long maintId     = queryMenuIdByKey("asset-maintenance");
-        Long basicId     = queryMenuIdByKey("asset-basic");
-        Long supplierId  = queryMenuIdByKey("asset-supplier");
-        if (purchaseId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE id = ?", purchaseId);
-        if (flowOpsId  != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE id = ?", flowOpsId);
-        if (maintId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE id = ?", maintId);
-        if (supplierId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", supplierId);
-        if (basicId    != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 6 WHERE id = ?", basicId);
+        // 3. 分组排序修正（v41: 新结构）
+        Long consumableOpsId = queryMenuIdByKey("consumable-ops");
+        Long flowOpsId       = queryMenuIdByKey("asset-flow-ops");
+        Long procurementId   = queryMenuIdByKey("eam-procurement");
+        Long basicId         = queryMenuIdByKey("asset-basic");
+        if (consumableOpsId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE id = ?", consumableOpsId);
+        if (flowOpsId       != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE id = ?", flowOpsId);
+        if (procurementId   != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE id = ?", procurementId);
+        if (basicId         != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", basicId);
 
-        // 4. 确保采购订单存在并挂在采购入库下
-        if (purchaseId != null) {
+        // 4. 确保采购订单存在并挂在采购与供应下
+        if (procurementId != null) {
             // 使用 ON DUPLICATE KEY UPDATE 兼容已存在但 deleted=1 的旧记录
             jdbcTemplate.update(
                     "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, icon, status, deleted, updated_by) "
                             + "VALUES (?, 'purchase-order', '採購執行', 2, 1, 'FileDoneOutlined', 1, 0, 'system') "
                             + "ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), deleted = 0, sort_order = 1, updated_by = 'system'",
-                    purchaseId);
+                    procurementId);
             // 给 admin 角色授权
             Long adminRoleId2 = jdbcTemplate.queryForObject(
                     "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
@@ -2478,7 +2476,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 }
             }
             // 验收入库排序=2
-            jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'asset-inbound' AND deleted = 0 AND parent_id = ?", purchaseId);
+            jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'asset-inbound' AND deleted = 0 AND parent_id = ?", procurementId);
         }
 
         // 5. 确保 asset-dashboard 的 admin 授权
@@ -2541,9 +2539,21 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // AI 模型接入的上游供应商, 与物資管理的實物供應商重名, 改为「模型供應商」区分
         renameMenuIfLegacy("ai-model-provider", "模型供應商", "供应商管理", "供應商管理");
         renameMenuIfLegacy("asset-supplier", "供應商管理", "供应商管理");
+        // v41: 資產運營子菜單名稱統一（動詞前置：歸還/調撥/交接/報廢/盤點）
+        renameMenuIfLegacy("asset-return",        "歸還資產",   "資產歸還");
+        renameMenuIfLegacy("asset-transfer-list", "調撥資產",   "資產調撥");
+        renameMenuIfLegacy("asset-handover",      "交接資產",   "資產交接");
+        renameMenuIfLegacy("asset-scrap",         "報廢資產",   "資產報廢");
+        renameMenuIfLegacy("asset-inventory",     "盤點資產",   "資產盤點");
         // 同步英文名（仅当前值仍为旧默认名时, 不覆盖人工自定义）
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Model Provider' WHERE menu_key = 'ai-model-provider' "
                 + "AND deleted = 0 AND name_en = 'Provider Management'");
+        // v41: 資產運營子菜單英文名同步（動詞前置）
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Return Asset'       WHERE menu_key = 'asset-return'        AND deleted = 0 AND name_en = 'Asset Return'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Transfer Asset'     WHERE menu_key = 'asset-transfer-list' AND deleted = 0 AND name_en = 'Asset Transfer'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Handover Asset'     WHERE menu_key = 'asset-handover'      AND deleted = 0 AND name_en = 'Asset Handover'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Scrap Asset'        WHERE menu_key = 'asset-scrap'         AND deleted = 0 AND name_en = 'Asset Scrap'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Inventory Asset'    WHERE menu_key = 'asset-inventory'     AND deleted = 0 AND name_en = 'Asset Inventory'");
     
         // 2. 层级自愈：基礎配置五个叶子始终挂 asset-basic
         //    （167 菜单重组脚本曾引入 eam-master-data 分组，与种子 asset-basic 同名并存）
@@ -2554,15 +2564,19 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     
         // 3. 清理重组遗留的空目录（仅在无未删除子节点时软删, 不会误删有内容的节点）
         removeEmptyDirectoryMenu("eam-master-data");
-        removeEmptyDirectoryMenu("eam-procurement");
+        removeEmptyDirectoryMenu("asset-maintenance");
+        removeEmptyDirectoryMenu("asset-purchase");
     
         // 4. 停用残留：订单管理入口已统一至广告类型卡片「查看订单」(v28)，从菜单树移除
         jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' "
                 + "WHERE menu_key = 'promotion-order-manage' AND deleted = 0 AND status = 0");
     
         // 5. 同父排序唯一化（历史 sort 冲突导致菜单顺序不稳定）
-        applyMenuSort("asset-management", "asset-dashboard", "asset-purchase", "asset-flow-ops",
-                "consumable-ops", "asset-maintenance", "asset-supplier", "asset-basic");
+        applyMenuSort("asset-management", "asset-dashboard", "consumable-ops", "asset-flow-ops",
+                "eam-procurement", "asset-basic");
+        applyMenuSort("asset-flow-ops", "asset-list", "asset-claim", "asset-borrow",
+                "asset-return", "asset-transfer-list", "asset-handover",
+                "asset-repair", "asset-compensation", "asset-scrap", "asset-inventory", "asset-flow");
         applyMenuSort("system-config", "menu-config", "rule-config", "version-history", "notification-config");
         applyMenuSort("i18n-center", "translation-manage", "i18n-language", "i18n-import-export",
                 "i18n-mt-engine", "i18n-dashboard");
@@ -2668,9 +2682,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("asset-dashboard", "DashboardOutlined"),
             Map.entry("asset-flow-ops", "SwapOutlined"),
             Map.entry("asset-inbound", "ImportOutlined"),
-            Map.entry("asset-maintenance", "ToolOutlined"),
             Map.entry("asset-management", "InboxOutlined"),
-            Map.entry("asset-purchase", "ShoppingCartOutlined"),
+            Map.entry("eam-procurement", "ShoppingCartOutlined"),
             Map.entry("batch-query", "SearchOutlined"),
             Map.entry("channel-strategy", "ThunderboltOutlined"),
             Map.entry("consume-risk", "SafetyCertificateOutlined"),
@@ -3215,7 +3228,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             }
             String[][] menusToRestore = {
                 {"asset-claim",  "領用資產", "UserAddOutlined",  "9"},
-                {"asset-return", "資產歸還", "RollbackOutlined", "11"},
+                {"asset-return", "歸還資產", "RollbackOutlined", "11"},
             };
             int restored = 0;
             for (String[] menu : menusToRestore) {

@@ -9,6 +9,8 @@ import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamReturnService;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.EamCompensationService;
+import com.mftb.admin.service.EamRepairService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
@@ -19,6 +21,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -36,7 +39,10 @@ public class EamReturnServiceImpl implements EamReturnService {
     private final EamClaimEvidenceMapper evidenceMapper;
     private final SysUserMapper userMapper;
     private final EamLocationMapper locationMapper;
+    private final EamScrapMapper scrapMapper;
     private final DepartmentService departmentService;
+    private final EamCompensationService compensationService;
+    private final EamRepairService repairService;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
 
@@ -219,6 +225,7 @@ public class EamReturnServiceImpl implements EamReturnService {
             switch (dto.getDisposition()) {
                 case "scrapped" -> asset.setStatus("scrapped");
                 case "written_off" -> asset.setStatus("scrapped"); // 注销也标记为报废
+                case "apply_repair" -> asset.setStatus("in_repair"); // 申请维修
                 case "idle" -> {
                     asset.setStatus("idle");
                     asset.setCurrentHolderId(null);
@@ -228,6 +235,33 @@ public class EamReturnServiceImpl implements EamReturnService {
                 }
             }
             assetMapper.updateById(asset);
+        }
+
+        // 自动创建赔付记录（业务选择需要鉴定赔付定责时）
+        if (Boolean.TRUE.equals(dto.getNeedCompensation())) {
+            try {
+                long compId = compensationService.createFromDispose(ret.getId());
+                log.info("处置流程自动创建赔付记录成功 compId={}, returnId={}", compId, ret.getId());
+            } catch (Exception e) {
+                log.error("处置流程自动创建赔付记录失败 returnId={}: {}", ret.getId(), e.getMessage());
+                throw new BusinessException("處置成功但創建賠付記錄失敗：" + e.getMessage());
+            }
+        }
+
+        // 报废/遗失核销时自动创建报废记录（流入资产报废菜单）
+        if ("scrapped".equals(dto.getDisposition()) || "written_off".equals(dto.getDisposition())) {
+            createScrapRecordFromDispose(ret, asset, dispositionDate);
+        }
+
+        // 申请维修时自动创建维修记录（流入维修管理菜单）
+        if ("apply_repair".equals(dto.getDisposition())) {
+            try {
+                long repairId = repairService.createFromDispose(ret.getId());
+                log.info("处置流程自动创建维修记录成功 repairId={}, returnId={}", repairId, ret.getId());
+            } catch (Exception e) {
+                log.error("处置流程自动创建维修记录失败 returnId={}: {}", ret.getId(), e.getMessage());
+                throw new BusinessException("處置成功但創建維修記錄失敗：" + e.getMessage());
+            }
         }
     }
 
@@ -317,6 +351,41 @@ public class EamReturnServiceImpl implements EamReturnService {
                 asset.setLocation(location.getName());
             }
         }
+    }
+
+    /** 从归还处置自动创建报废记录（流入资产报废菜单，待操作人员补充残值/处置方式等） */
+    private void createScrapRecordFromDispose(EamReturn ret, EamAsset asset, LocalDate scrapDate) {
+        if (asset == null) {
+            log.warn("归还处置报废但未找到资产 assetId={}，跳过报废记录创建", ret.getAssetId());
+            return;
+        }
+        EamScrap scrap = new EamScrap();
+        scrap.setAssetId(asset.getId());
+        scrap.setAssetNo(asset.getAssetNo());
+        scrap.setAssetName(EamAssetServiceImpl.stripBrandPrefix(asset.getAssetName(), asset.getBrand()));
+        scrap.setAssetType(asset.getCategoryCode());
+        scrap.setBrand(asset.getBrand());
+        scrap.setScrapDate(scrapDate);
+        scrap.setApplyBy(operatorResolver.currentOperatorName());
+        SysUser currentUser = operatorResolver.currentUser();
+        if (currentUser != null) {
+            scrap.setEmpId(currentUser.getEmpId());
+        }
+        // 报废原因：根据处置类型和异常原因生成
+        String reason = "written_off".equals(ret.getDisposition())
+                ? "遺失核銷（來源歸還單 " + ret.getReturnNo() + "）"
+                : "歸還處置報廢（來源歸還單 " + ret.getReturnNo() + "）";
+        if (hasText(ret.getExceptionReason())) {
+            reason += "：" + ret.getExceptionReason();
+        }
+        scrap.setReason(reason);
+        scrap.setResidualValue(BigDecimal.ZERO);
+        scrap.setReturnId(ret.getId());
+        scrap.setStatus("pending");
+        scrap.setCreatedBy(operatorResolver.currentOperatorName());
+        scrap.setUpdatedBy(operatorResolver.currentOperatorName());
+        scrapMapper.insert(scrap);
+        log.info("处置流程自动创建报废记录 scrapId={}, assetId={}, returnId={}", scrap.getId(), asset.getId(), ret.getId());
     }
 
     private EamReturnVO toVO(EamReturn ret) {

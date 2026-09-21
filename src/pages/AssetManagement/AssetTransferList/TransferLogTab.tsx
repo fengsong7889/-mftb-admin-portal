@@ -2,9 +2,9 @@
  * 調撥記錄（只讀）
  *
  * 數據來源：後端調撥單 /eam/transfers（由資產調撥頁登記寫入，作廢單據 status='cancelled'）
- * 支持 10 項搜索條件：調撥單號 / 調撥日期 / 資產編號 / 資產名稱 / 原使用人 / 調入使用人 / 原歸屬部門 / 調入部門 / 狀態 / 經辦人
+ * 支持搜索條件：調撥單號 / 調撥日期 / 資產編號名稱（遠程下拉） / 原使用人 / 調入使用人 / 原歸屬部門 / 調入部門 / 狀態 / 經辦人
  */
-import { useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import dayjs, { type Dayjs } from 'dayjs'
 import { Button, Empty, Form, Input, Select, Table, Tag, Space, DatePicker, TreeSelect, Tooltip, message } from 'antd'
@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import AssetParameters from '../../../components/AssetParameters'
 import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
-import { fetchTransferList, type TransferRecord, type TransferQuery, type TransferOptions } from '../../../api/asset'
+import { fetchTransferList, fetchAssetList, type AssetItem, type TransferRecord, type TransferQuery, type TransferOptions } from '../../../api/asset'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
@@ -27,7 +27,7 @@ interface Props {
   onViewDetail: (id: number) => void
   onCancel: (id: number) => void
 }
-type FilterValues = Omit<TransferQuery, 'page' | 'size' | 'startDate' | 'endDate'> & { transferDate?: [Dayjs, Dayjs] }
+type FilterValues = Omit<TransferQuery, 'page' | 'size' | 'startDate' | 'endDate' | 'assetNo'> & { transferDate?: [Dayjs, Dayjs]; assetKeyword?: string }
 
 /** 格式化使用人展示：姓名(工号) */
 function formatUser(name: string | null | undefined, empId: string | null | undefined): string {
@@ -43,7 +43,8 @@ export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, op
   const [params, setParams] = useSearchParams()
   const query = useMemo<TransferQuery>(() => ({
     transferNo: params.get('log.transferNo') || undefined,
-    assetNo: params.get('log.assetNo') || undefined, assetName: params.get('log.assetName') || undefined,
+    // 資產編號/名稱合併下拉：選中值為精確編號，統一走 assetNo 條件
+    assetNo: params.get('log.assetKeyword') || undefined,
     brandId: positiveId(params.get('log.brandId')),
     fromUserName: params.get('log.fromUserName') || undefined, toUserName: params.get('log.toUserName') || undefined,
     fromDepartmentId: positiveId(params.get('log.fromDepartmentId')), toDepartmentId: positiveId(params.get('log.toDepartmentId')),
@@ -55,13 +56,34 @@ export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, op
   const fetcher = useCallback(() => fetchTransferList(query), [query])
   const { data, loading, error, refresh } = useTransferData(fetcher)
   const deptTree = useMemo(() => buildTransferTree(options?.departments || []), [options])
+
+  /* ----- 資產編號/名稱下拉搜索（遠程，300ms 防抖，與歸還/維修頁統一） ----- */
+  const [assetOptions, setAssetOptions] = useState<AssetItem[]>([])
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const assetSearchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const handleAssetSearch = useCallback((keyword: string) => {
+    if (assetSearchTimerRef.current) clearTimeout(assetSearchTimerRef.current)
+    if (!keyword) { setAssetOptions([]); return }
+    assetSearchTimerRef.current = setTimeout(async () => {
+      setAssetSearchLoading(true)
+      try {
+        const res = await fetchAssetList({ keyword, status: 'all', page: 1, size: 50 })
+        setAssetOptions(res.records.filter((a) => a.status !== 'scrapped'))
+      } catch {
+        setAssetOptions([])
+      } finally {
+        setAssetSearchLoading(false)
+      }
+    }, 300)
+  }, [])
+
   useEffect(() => {
-    form.setFieldsValue({ ...query, transferDate: query.startDate && query.endDate && dayjs(query.startDate).isValid() && dayjs(query.endDate).isValid()
+    form.setFieldsValue({ ...query, assetKeyword: query.assetNo, transferDate: query.startDate && query.endDate && dayjs(query.startDate).isValid() && dayjs(query.endDate).isValid()
       ? [dayjs(query.startDate), dayjs(query.endDate)] : undefined })
   }, [query, form])
   const handleSearch = (v: FilterValues) => {
     setParams(updateQuery(params, 'log', {
-      transferNo: v.transferNo?.trim(), assetNo: v.assetNo?.trim(), assetName: v.assetName?.trim(), brandId: v.brandId,
+      transferNo: v.transferNo?.trim(), assetKeyword: v.assetKeyword?.trim(), brandId: v.brandId,
       fromUserName: v.fromUserName?.trim(), toUserName: v.toUserName?.trim(),
       fromDepartmentId: v.fromDepartmentId, toDepartmentId: v.toDepartmentId,
       status: v.status, operatorName: v.operatorName?.trim(),
@@ -190,11 +212,20 @@ export default function TransferLogTab({ onViewAsset, onViewDetail, onCancel, op
           <Form.Item label={t('asset.colTransferDate')} name="transferDate">
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label={t('asset.colAssetNo')} name="assetNo">
-            <Input placeholder={t('asset.searchAssetNoPh')} allowClear style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item label={t('asset.colAssetName')} name="assetName">
-            <Input placeholder={t('asset.searchAssetNamePh')} allowClear style={{ width: '100%' }} />
+          <Form.Item label={t('asset.searchAssetLabel')} name="assetKeyword">
+            <Select
+              placeholder={t('asset.searchAssetPh')}
+              allowClear
+              showSearch
+              filterOption={false}
+              onSearch={handleAssetSearch}
+              loading={assetSearchLoading}
+              notFoundContent={assetSearchLoading ? t('common.searching', '搜索中...') : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />}
+              options={assetOptions.map((a) => ({
+                label: `${a.assetNo} - ${a.assetName}`,
+                value: a.assetNo,
+              }))}
+            />
           </Form.Item>
           <Form.Item label={t('transfer.brand')} name="brandId">
             <Select allowClear showSearch optionFilterProp="label" placeholder={t('common.all')} disabled={!options}

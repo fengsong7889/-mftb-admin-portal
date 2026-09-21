@@ -227,19 +227,38 @@ export interface ScrapRecord {
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   /** 创建时间 */
   createdAt: string
+  /** 最后更新人 */
+  updatedBy?: string
   /** 更新时间 */
   updatedAt: string
 }
 
-/** 报废记录查询参数 */
+/** 报废记录查询参数（与搜索区字段一一对应） */
 export interface ScrapQuery {
   page?: number
   size?: number
-  keyword?: string
-  status?: ScrapRecord['status']
+  /** 资产编号（模糊） */
+  assetNo?: string
+  /** 资产名称（模糊） */
+  assetName?: string
+  /** 资产分类编码 */
+  assetType?: string
+  /** 资产品牌（模糊） */
+  brand?: string
+  /** 报废时间范围 [start, end] */
+  scrapDate?: [string, string]
+  /** 申请人（模糊） */
+  applyBy?: string
+  /** 处置方式 */
   disposeType?: ScrapRecord['disposeType']
-  startDate?: string
-  endDate?: string
+  /** 状态 */
+  status?: ScrapRecord['status']
+  /** 创建时间范围 [start, end] */
+  createdAt?: [string, string]
+  /** 最后更新人 */
+  updatedBy?: string
+  /** 最后更新时间范围 [start, end] */
+  updatedAt?: [string, string]
 }
 
 /** 资产维修记录 */
@@ -248,6 +267,8 @@ export interface AssetRepairRecord {
   assetId: number
   assetNo: string
   assetName: string
+  /** 资产品牌（来自关联资产） */
+  brand?: string
   /** 维修日期 */
   repairDate: string
   /** 故障描述 */
@@ -266,6 +287,16 @@ export interface AssetRepairRecord {
   applicant: string
   /** 损坏原因分类（EAM 增强） */
   causeType?: 'human' | 'natural' | 'third_party' | 'quality'
+  /** 关联归还记录 ID（从归还处置自动创建时有值） */
+  returnId?: number
+  /** 创建人 */
+  createdBy?: string
+  /** 创建时间 */
+  createdAt?: string
+  /** 最后更新人 */
+  updatedBy?: string
+  /** 最后更新时间 */
+  updatedAt?: string
 }
 
 /* ==================== 查询参数 ==================== */
@@ -545,26 +576,49 @@ export function scrapAsset(data: { assetId: number; reason: string; scrapDate: s
   return unavailableAssetOperation('资产报废')
 }
 
-/* ==================== 报废记录 API（Mock） ==================== */
+/* ==================== 报废记录 API ==================== */
+
+function scrapQueryParams(params: ScrapQuery = {}) {
+  const { scrapDate, createdAt, updatedAt, ...rest } = params
+  return {
+    ...rest,
+    scrapDateStart: scrapDate?.[0], scrapDateEnd: scrapDate?.[1],
+    createdAtStart: createdAt?.[0], createdAtEnd: createdAt?.[1],
+    updatedAtStart: updatedAt?.[0], updatedAtEnd: updatedAt?.[1],
+  }
+}
+
+/** 后端返回的报废记录可能省略 null 字段（Jackson non_null），统一补齐默认值 */
+function normalizeScrap(record: ScrapRecord): ScrapRecord {
+  return {
+    ...record,
+    brand: record.brand || '', assetType: record.assetType || '',
+    disposeType: record.disposeType ?? null, appraisal: record.appraisal || '',
+    remark: record.remark || '', empId: record.empId || '',
+    updatedBy: record.updatedBy || '',
+  }
+}
 
 /** 报废记录列表 */
 export async function fetchScrapList(params?: ScrapQuery): Promise<PageResult<ScrapRecord>> {
-  return { records: [], total: 0 }
+  const result = await request.get<unknown, PageResult<ScrapRecord>>('/eam/scraps', { params: scrapQueryParams(params) })
+  return { records: (result.records || []).map(normalizeScrap), total: result.total || 0 }
 }
 
 /** 报废记录详情 */
 export async function fetchScrapDetail(id: number): Promise<ScrapRecord> {
-  return unavailableAssetOperation('报废记录详情')
+  const result = await request.get<unknown, ScrapRecord>(`/eam/scraps/${id}`)
+  return normalizeScrap(result)
 }
 
-/** 新增报废记录 */
-export async function createScrapRecord(data: Omit<ScrapRecord, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Promise<number> {
-  return unavailableAssetOperation('新增报废记录')
+/** 新增报废记录（资产快照字段由后端按 assetId 生成） */
+export function createScrapRecord(data: Omit<ScrapRecord, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'updatedBy'>): Promise<number> {
+  return request.post<unknown, number>('/eam/scraps', data)
 }
 
 /** 删除报废记录（仅允许待审批状态） */
-export async function deleteScrapRecord(id: number): Promise<void> {
-  return unavailableAssetOperation('删除报废记录')
+export function deleteScrapRecord(id: number): Promise<void> {
+  return request.delete<unknown, void>(`/eam/scraps/${id}`)
 }
 
 /** 资产维修 */

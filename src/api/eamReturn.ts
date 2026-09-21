@@ -31,7 +31,7 @@ export interface ReturnRow extends AssetParameterSource {
   returnStatus: 'completed' | 'exception_pending' | 'exception_closed'
   assetCondition: 'normal' | 'damaged' | 'lost'
   exceptionReason?: string
-  disposition?: 'idle' | 'scrapped' | 'written_off'
+  disposition?: 'idle' | 'scrapped' | 'written_off' | 'apply_repair'
   dispositionDate?: string
   recovered: number
   recoveredDate?: string
@@ -40,6 +40,7 @@ export interface ReturnRow extends AssetParameterSource {
   actualReturneeName?: string
   actualReturneeNo?: string
   compensationId?: number
+  repairId?: number
   createdAt: string
   updatedAt: string
   evidenceImageUrl?: string
@@ -85,10 +86,12 @@ export interface ReturnRegisterDTO {
 }
 
 export interface ReturnDispositionDTO {
-  disposition: 'idle' | 'scrapped' | 'written_off'
+  disposition: 'idle' | 'scrapped' | 'written_off' | 'apply_repair'
   dispositionDate: string
   evidenceDataUrl?: string
   evidenceFileName?: string
+  /** 是否需要鉴定赔付定责 */
+  needCompensation?: boolean
 }
 
 export interface ReturnRecoverDTO {

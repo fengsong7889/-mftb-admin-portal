@@ -1,7 +1,7 @@
 /**
  * 歸還管理（物資管理 - 領用借用）
  *
- * 同一路由內視圖切換：歸還記錄列表 ⇄ 歸還登記表單 ⇄ 歸還詳情 ⇄ 處置/找回
+ * 同一路由內視圖切換：歸還記錄列表 ⇄ 歸還登記表單 ⇄ 歸還詳情（含內聯處置/找回）
  * 支持 URL ?borrowId= 直接進入借用歸還（由借用管理「歸還」跳轉）
  *
  * 階段三：已接通真實后端 API。
@@ -12,14 +12,13 @@ import { message } from 'antd'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   fetchReturnList, fetchReturnDetail, registerReturn, disposeReturn, recoverReturn,
-  type ReturnRow, type ReturnQuery, type ReturnRegisterDTO, type ReturnDispositionDTO,
+  type ReturnRow, type ReturnQuery, type ReturnRegisterDTO, type ReturnDispositionDTO, type ReturnRecoverDTO,
 } from '../../../api/eamReturn'
 import ReturnList from './ReturnList'
 import ReturnForm from './ReturnForm'
 import ReturnDetail from './ReturnDetail'
-import ReturnDisposition from './ReturnDisposition'
 
-type View = 'list' | 'add' | 'detail' | 'dispose' | 'recover'
+type View = 'list' | 'add' | 'detail'
 
 function parseId(raw: string | null): number | undefined {
   if (!raw || !/^[1-9]\d*$/.test(raw)) return undefined
@@ -38,8 +37,6 @@ export default function AssetReturn() {
   const mode = pathname.split('/')[2] || 'list'
   const view: View = mode === 'add' ? 'add'
     : mode === 'detail' ? 'detail'
-    : mode === 'dispose' ? 'dispose'
-    : mode === 'recover' ? 'recover'
     : 'list'
 
   const recordId = parseId(searchParams.get('id'))
@@ -83,7 +80,7 @@ export default function AssetReturn() {
 
   /* ----- 自动加载详情 ----- */
   useEffect(() => {
-    if (['detail', 'dispose', 'recover'].includes(view) && recordId != null) {
+    if (view === 'detail' && recordId != null) {
       handleLoadDetail(recordId)
     }
   }, [view, recordId, handleLoadDetail])
@@ -99,14 +96,18 @@ export default function AssetReturn() {
   const handleDispose = useCallback(async (dto: ReturnDispositionDTO) => {
     if (recordId == null) return
     await disposeReturn(recordId, dto)
-    message.success('處置登記成功')
+    const msgs = ['處置登記成功']
+    if (dto.needCompensation) msgs.push('已自動創建賠付記錄')
+    if (dto.disposition === 'scrapped' || dto.disposition === 'written_off') msgs.push('已自動創建報廢記錄')
+    if (dto.disposition === 'apply_repair') msgs.push('已自動創建維修記錄')
+    message.success(msgs.join('，'))
     handleLoadDetail(recordId)
   }, [recordId, handleLoadDetail])
 
   /* ----- 找回提交 ----- */
-  const handleRecover = useCallback(async (_dto: { disposition: string; dispositionDate: string }) => {
+  const handleRecover = useCallback(async (dto: ReturnRecoverDTO) => {
     if (recordId == null) return
-    await recoverReturn(recordId, {})
+    await recoverReturn(recordId, dto)
     message.success('找回登記成功')
     handleLoadDetail(recordId)
   }, [recordId, handleLoadDetail])
@@ -145,33 +146,15 @@ export default function AssetReturn() {
           error={error}
           canEdit={canEdit}
           showResult={searchParams.get('result') === '1'}
+          editMode={searchParams.get('editMode') === '1'}
           onBack={back}
           onRefresh={() => handleLoadDetail(recordId)}
+          onDispose={handleDispose}
+          onRecover={handleRecover}
         />
       )}
 
-      {view === 'dispose' && recordId != null && (
-        <ReturnDisposition
-          record={detail}
-          loading={loading}
-          canEdit={canEdit}
-          onSubmit={handleDispose}
-          onBack={() => recordId != null && navigate(`/asset-return/detail?id=${recordId}`)}
-        />
-      )}
-
-      {view === 'recover' && recordId != null && (
-        <ReturnDisposition
-          record={detail}
-          loading={loading}
-          canEdit={canEdit}
-          recover
-          onSubmit={handleRecover}
-          onBack={() => recordId != null && navigate(`/asset-return/detail?id=${recordId}`)}
-        />
-      )}
-
-      {['detail', 'dispose', 'recover'].includes(view) && recordId == null && (
+      {view === 'detail' && recordId == null && (
         <div className="claim-notice">缺少有效的歸還記錄 ID。<button onClick={back}>返回列表</button></div>
       )}
     </div>

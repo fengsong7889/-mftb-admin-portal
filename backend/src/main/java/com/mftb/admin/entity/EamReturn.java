@@ -88,6 +88,9 @@ public class EamReturn {
     /** 关联赔付记录 ID */
     private Long compensationId;
 
+    /** 关联维修记录 ID（处置为申请维修时有值） */
+    private Long repairId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

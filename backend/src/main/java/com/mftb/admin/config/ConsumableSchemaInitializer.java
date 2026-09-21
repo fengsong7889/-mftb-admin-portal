@@ -41,8 +41,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     public void run(String... args) {
         versionTracker.applyOnce(V_CONSUMABLE_SCHEMA, this::migrate);
         versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
-        // 每次启动均修正排序（v167 菜单重组后，耗材管理在「物資管理」下排第 4, 与 asset-flow-ops=3 不冲突）
-        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 4");
+        // 每次启动均修正排序（v41 菜单重组后，耗材管理排在資產看板之後 sort=2，两个业务线入口对称）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 2");
         // 补种子：出入库流水菜单（v3，幂等）
         seedStockTxnMenu();
         // v40: 耗材领用菜单每次启动幂等补种（不受 applyOnce 门控）：
@@ -256,8 +256,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
             return;
         }
         String actions = "[\"view\",\"create\",\"edit\",\"delete\"]";
-        // 耗材管理分组（二级，挂在物資管理下，sort=4）
-        ensureMenu(assetMgmtId, "consumable-ops", "耗材管理", "", "", "GoldOutlined", 4, "[\"view\"]");
+        // 耗材管理分组（二级，挂在物資管理下，sort=2）
+        ensureMenu(assetMgmtId, "consumable-ops", "耗材管理", "", "", "GoldOutlined", 2, "[\"view\"]");
         Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
         if (groupId == null) return;
         // 5 个子菜单

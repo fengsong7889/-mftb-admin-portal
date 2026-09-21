@@ -52,6 +52,9 @@ public class EamRepair {
     /** 损坏原因：human/natural/third_party/quality */
     private String causeType;
 
+    /** 关联归还记录 ID（从归还处置流程自动创建时有值） */
+    private Long returnId;
+
     /** 创建人 */
     private String createdBy;
 

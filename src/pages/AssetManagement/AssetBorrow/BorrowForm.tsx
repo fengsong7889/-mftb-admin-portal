@@ -5,7 +5,7 @@
  * 替代原始 InputNumber 手輸 ID；部門由所選員工自動帶出。
  */
 import { useState, useEffect, useRef } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Select, Spin, Pagination, Modal, message, Row, Col } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Select, Spin, Modal, message, Row, Col } from 'antd'
 import { SaveOutlined, DatabaseOutlined, UserOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { ReturnHeader } from '../AssetReturn/ReturnLayout'
@@ -138,10 +138,6 @@ export default function BorrowForm({
                   onChange={(id: number) => setSelected(assetOptions.find(a => a.id === id))}
                   options={assetOptions.map(a => ({ label: `${a.assetNo} / ${a.assetName}`, value: a.id }))} />
               </Form.Item>
-              <Pagination className="claim-selection-pagination" size="small"
-                current={assetQuery.page} pageSize={assetQuery.size} total={assets?.total ?? 0}
-                showSizeChanger={false} hideOnSinglePage
-                onChange={(page) => setAssetQuery({ ...assetQuery, page })} />
             </Col>
           </Row>
           {selected && (

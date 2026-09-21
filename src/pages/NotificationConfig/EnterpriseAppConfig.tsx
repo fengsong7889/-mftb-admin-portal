@@ -177,7 +177,7 @@ export default function EnterpriseAppConfig() {
                   ]}>
                   <Input maxLength={500} placeholder="https://admin.example.com" />
                 </Form.Item>
-                <Form.Item name="remark" label={t('notificationApp.remark')}>
+                <Form.Item name="remark" label={t('notificationApp.remark')} className="notification-app__field-full">
                   <Input.TextArea rows={2} maxLength={500} showCount />
                 </Form.Item>
               </div>

@@ -1417,6 +1417,8 @@ export interface HandoverListParams {
   reason?: string
   operatorName?: string
   receiverType?: string
+  /** 資產編號/名稱（模糊，匹配交接明細快照） */
+  assetKeyword?: string
 }
 
 export async function fetchHandoverList(params?: HandoverListParams): Promise<PageResult<HandoverRecord>> {
@@ -1434,6 +1436,7 @@ export async function fetchHandoverList(params?: HandoverListParams): Promise<Pa
       reason: params?.reason,
       operatorName: params?.operatorName,
       receiverType: params?.receiverType,
+      assetKeyword: params?.assetKeyword,
     },
   })
   return res

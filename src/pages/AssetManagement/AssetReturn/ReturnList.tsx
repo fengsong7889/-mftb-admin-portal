@@ -3,7 +3,7 @@
  *
  * 接通真实后端 API，使用 ReturnRow 类型。
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, DatePicker, Empty, Form, Input, Select, Table, Tag, TreeSelect, message, type TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -18,6 +18,7 @@ import { fetchClaimEmployeeOptions } from '../../../api/eamClaim'
 import type { ClaimEmployee, DepartmentNode } from '../AssetClaim/claimViewTypes'
 import { buildDeptTree } from '../AssetClaim/claimViewTypes'
 import { fetchDepartments } from '../../../api/department'
+import { fetchAssetList, type AssetItem } from '../../../api/asset'
 
 /* ----- 状态元数据 ----- */
 const SOURCE_LABEL: Record<string, string> = { claim: '領用歸還', borrow: '借用歸還' }
@@ -72,6 +73,26 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
   const handleSearchReturnee = useCallback(async (kw: string) => {
     if (!kw || kw.trim().length < 1) { setReturneeOptions([]); return }
     try { const res = await fetchClaimEmployeeOptions(kw.trim()); setReturneeOptions(res.records || []) } catch { setReturneeOptions([]) }
+  }, [])
+
+  /* ----- 资产编号/名称下拉搜索（远程，300ms 防抖） ----- */
+  const [assetOptions, setAssetOptions] = useState<AssetItem[]>([])
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const assetSearchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const handleAssetSearch = useCallback((keyword: string) => {
+    if (assetSearchTimerRef.current) clearTimeout(assetSearchTimerRef.current)
+    if (!keyword) { setAssetOptions([]); return }
+    assetSearchTimerRef.current = setTimeout(async () => {
+      setAssetSearchLoading(true)
+      try {
+        const res = await fetchAssetList({ keyword, status: 'all', page: 1, size: 50 })
+        setAssetOptions(res.records.filter((a) => a.status !== 'scrapped'))
+      } catch {
+        setAssetOptions([])
+      } finally {
+        setAssetSearchLoading(false)
+      }
+    }, 300)
   }, [])
 
   const dataSource = data?.records ?? []
@@ -137,13 +158,15 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
     },
     { key: 'assetNo', title: '資產編號', dataIndex: 'assetNo', width: 160 },
     { key: 'assetName', title: '資產名稱', dataIndex: 'assetName', width: 160, ellipsis: true },
-    { key: 'empName', title: '領用人', dataIndex: 'empName', width: 140, render: (v: string, r) => {
+    { key: 'empName', title: '領用人', dataIndex: 'empName', width: 140, ellipsis: true, render: (v: string, r) => {
       const name = v || '—'
       return r.empNo ? `${name}（${r.empNo}）` : name
     }},
-    { key: 'department', title: '領用時部門', dataIndex: 'department', width: 120, render: (v: string) => v || '—' },
-    { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 150, render: (v: string, r) => {
+    { key: 'department', title: '領用時部門', dataIndex: 'department', width: 160, ellipsis: true, render: (v: string) => v || '—' },
+    { key: 'actualReturnee', title: '實際歸還人', dataIndex: 'actualReturneeName', width: 160, ellipsis: true, render: (v: string, r) => {
       const name = v || r.empName || '—'
+      // actualReturneeName 可能已含工号（如 "冯松（MF00002）"），避免重复拼接
+      if (v) return name
       const no = r.actualReturneeNo
       return no ? `${name}（${no}）` : name
     }},
@@ -157,9 +180,17 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
       render: (v: string) => <Tag color={STATUS_COLOR[v] || 'default'}>{STATUS_LABEL[v] || v}</Tag>,
     },
     {
-      key: 'action', title: t('common.colAction'), width: 90, fixed: 'right',
+      key: 'action', title: t('common.colAction'), width: 130, fixed: 'right',
       render: (_, r) => (
-        <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>詳情</Button>
+        <>
+          <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}`)}>詳情</Button>
+          {r.returnStatus === 'exception_pending' && (
+            <>
+              <span className="action-split" />
+              <Button type="link" onClick={() => navigate(`/asset-return/detail?id=${r.id}&editMode=1`)}>處理</Button>
+            </>
+          )}
+        </>
       ),
     },
   ]
@@ -191,8 +222,20 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
           <Form.Item label="歸還單號" name="returnNo">
             <Input allowClear placeholder="輸入歸還單號" />
           </Form.Item>
-          <Form.Item label="資產編號/名稱" name="assetKeyword">
-            <Input allowClear placeholder="輸入資產編號或名稱" />
+          <Form.Item label={t('asset.searchAssetLabel')} name="assetKeyword">
+            <Select
+              placeholder={t('asset.searchAssetPh')}
+              allowClear
+              showSearch
+              filterOption={false}
+              onSearch={handleAssetSearch}
+              loading={assetSearchLoading}
+              notFoundContent={assetSearchLoading ? t('common.searching', '搜索中...') : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />}
+              options={assetOptions.map((a) => ({
+                label: `${a.assetNo} - ${a.assetName}`,
+                value: a.assetNo,
+              }))}
+            />
           </Form.Item>
           <Form.Item label="歸還來源" name="source">
             <Select allowClear placeholder="全部來源" options={Object.entries(SOURCE_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
@@ -257,7 +300,7 @@ export default function ReturnList({ data, loading = false, error, onQuery, canE
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         size="middle"
-        scroll={{ x: 1380 }}
+        scroll={{ x: 1505 }}
         columns={applyConfig(allColumns) as TableColumnsType<ReturnRow>}
         dataSource={error ? [] : dataSource}
         locale={{ emptyText: <Empty description={t('common.noData')} /> }}

@@ -46,6 +46,8 @@ public class EamReturnVO {
     /** 实际归还人工号 */
     private String actualReturneeNo;
     private Long compensationId;
+    /** 关联维修记录 ID */
+    private Long repairId;
     private String createdAt;
     private String updatedAt;
     /** 凭证 Data URL */

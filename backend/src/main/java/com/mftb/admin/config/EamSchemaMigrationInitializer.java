@@ -61,6 +61,8 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v19-evidence-storage-mediumtext", this::upgradeEvidenceStorageToMediumText);
         versionTracker.applyOnce("eam:schema-v20-claim-accessories", this::addClaimAccessoriesColumn);
         versionTracker.applyOnce("eam:schema-v21-return-operator-id", this::addReturnOperatorIdColumn);
+        versionTracker.applyOnce("eam:schema-v22-scrap-table", this::createScrapTable);
+        versionTracker.applyOnce("eam:schema-v23-repair-return-link", this::addRepairReturnLinkColumns);
     }
 
     private void upgradeTransferIntegrity() {
@@ -889,5 +891,65 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 + "SET r.operator_id = u.id "
                 + "WHERE r.operator_id IS NULL AND r.deleted = 0");
         log.info("归还记录表 operator_id 列添加完成，历史数据回填 {} 条", rows);
+    }
+
+    /** v22: 资产报废记录表（支持归还处置→报废自动流转） */
+    private void createScrapTable() {
+        log.info("开始创建 EAM 资产报废记录表 ...");
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_scrap ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "asset_id BIGINT NOT NULL COMMENT '资产 ID', "
+                + "asset_no VARCHAR(64) NOT NULL COMMENT '资产编号（快照）', "
+                + "asset_name VARCHAR(200) NOT NULL COMMENT '资产名称（快照）', "
+                + "asset_type VARCHAR(100) NULL COMMENT '资产分类（快照）', "
+                + "brand VARCHAR(100) NULL COMMENT '品牌（快照）', "
+                + "scrap_date DATE NOT NULL COMMENT '报废日期', "
+                + "apply_by VARCHAR(64) NOT NULL COMMENT '申请人', "
+                + "emp_id VARCHAR(32) NULL COMMENT '申请人工号', "
+                + "reason VARCHAR(500) NOT NULL COMMENT '报废原因', "
+                + "residual_value DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '残值（MOP）', "
+                + "dispose_type VARCHAR(20) NULL COMMENT '处置方式：sale/donate/recycle/destroy', "
+                + "appraisal VARCHAR(500) NULL COMMENT '鉴定意见', "
+                + "remark VARCHAR(500) NULL COMMENT '备注', "
+                + "return_id BIGINT NULL COMMENT '关联归还记录 ID', "
+                + "status VARCHAR(20) NOT NULL DEFAULT 'pending' COMMENT 'pending/approved/rejected/cancelled', "
+                + "created_by VARCHAR(64) NULL, "
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) NULL, "
+                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "INDEX idx_asset (asset_id), "
+                + "INDEX idx_return (return_id), "
+                + "INDEX idx_status (status), "
+                + "INDEX idx_scrap_date (scrap_date)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='资产报废记录表'");
+        log.info("EAM 资产报废记录表创建完成");
+    }
+
+    /** v23: 维修记录表增加 return_id 列 + 归还记录表增加 repair_id 列（支持归还处置→维修自动流转） */
+    private void addRepairReturnLinkColumns() {
+        log.info("开始执行 v23 迁移：维修-归还关联列 ...");
+        // biz_eam_repair 增加 return_id
+        Integer repairReturnIdCol = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_repair' AND COLUMN_NAME = 'return_id'",
+                Integer.class);
+        if (repairReturnIdCol != null && repairReturnIdCol == 0) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE biz_eam_repair ADD COLUMN return_id BIGINT NULL COMMENT '关联归还记录 ID' AFTER cause_type");
+            jdbcTemplate.execute(
+                    "ALTER TABLE biz_eam_repair ADD INDEX idx_return_id (return_id)");
+        }
+        // biz_eam_return 增加 repair_id
+        Integer returnRepairIdCol = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS "
+                + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_eam_return' AND COLUMN_NAME = 'repair_id'",
+                Integer.class);
+        if (returnRepairIdCol != null && returnRepairIdCol == 0) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE biz_eam_return ADD COLUMN repair_id BIGINT NULL COMMENT '关联维修记录 ID' AFTER compensation_id");
+        }
+        log.info("v23 迁移完成：维修-归还关联列添加完成");
     }
 }

@@ -1,83 +1,146 @@
 /**
  * 維修記錄全局列表
  *
- * - 展示所有資產的維修記錄（單號/資產/故障/維修方/費用/狀態）
- * - 支持按狀態、關鍵詞搜索
+ * - 展示所有資產的維修記錄（資產/品牌/故障/維修方/費用/狀態/更新信息）
+ * - 支持按資產編號/名稱、資產品牌、送修日期、狀態、完成日期、申請人、最後更新人、最後更新時間搜索
  * - 點擊資產編號跳轉資產詳情，點擊行跳轉維修詳情
  */
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, DatePicker, InputNumber, Row, Col } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { exportToCSV } from '../../../utils/exportCSV'
-import dayjs from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import {
-  fetchRepairList, fetchAssetList, updateRepair, deleteRepair,
+  fetchRepairList, updateRepair, deleteRepair,
+  fetchAssetList,
   type AssetRepairRecord, type AssetItem,
 } from '../../../api/asset'
+import { fetchBrandList, type AssetBrand } from '../../../api/eam'
 
 interface Props {
   onViewAsset: (assetNo: string) => void
   onViewDetail: (assetId: number) => void
+  /** 进入新建维修记录页（独立页面，替代原弹窗选择资产） */
+  onCreate: () => void
 }
 
-export default function RepairList({ onViewAsset, onViewDetail }: Props) {
+/** 搜索過濾條件 */
+interface RepairFilters {
+  keyword?: string
+  brand?: string
+  repairDates?: [Dayjs, Dayjs]
+  status?: 'repairing' | 'done'
+  finishDates?: [Dayjs, Dayjs]
+  applicant?: string
+  updatedBy?: string
+  updatedDates?: [Dayjs, Dayjs]
+}
+
+export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Props) {
   const { t } = useTranslation()
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<RepairFilters>()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<AssetRepairRecord[]>([])
-  const [filters, setFilters] = useState<{ keyword?: string; status?: 'repairing' | 'done' }>({})
+  const [filters, setFilters] = useState<RepairFilters>({})
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
-  const [assetModalOpen, setAssetModalOpen] = useState(false)
-  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
-  const [assetList, setAssetList] = useState<AssetItem[]>([])
-  const [assetKeyword, setAssetKeyword] = useState('')
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState<AssetRepairRecord | null>(null)
   const [editForm] = Form.useForm()
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [brands, setBrands] = useState<AssetBrand[]>([])
+
+  /* ----- 資產下拉搜索（編號/名稱） ----- */
+  const [assetOptions, setAssetOptions] = useState<AssetItem[]>([])
+  const [assetSearchLoading, setAssetSearchLoading] = useState(false)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    fetchBrandList({ bizType: 'ASSET' }).then(setBrands).catch(() => setBrands([]))
+  }, [])
+
+  /** 資產遠程搜索（300ms 防抖） */
+  const handleAssetSearch = useCallback((keyword: string) => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    if (!keyword) { setAssetOptions([]); return }
+    searchTimerRef.current = setTimeout(async () => {
+      setAssetSearchLoading(true)
+      try {
+        const res = await fetchAssetList({ keyword, status: 'all', page: 1, size: 50 })
+        setAssetOptions(res.records.filter((a) => a.status !== 'scrapped'))
+      } catch {
+        setAssetOptions([])
+      } finally {
+        setAssetSearchLoading(false)
+      }
+    }, 300)
+  }, [])
+
+  /** 關鍵字匹配（編號/名稱，忽略大小寫） */
+  const matchKeyword = useCallback((r: AssetRepairRecord, kw: string) => {
+    const lower = kw.toLowerCase()
+    return (
+      r.assetNo?.toLowerCase().includes(lower) ||
+      r.assetName?.toLowerCase().includes(lower)
+    )
+  }, [])
+
+  /** 日期範圍匹配（YYYY-MM-DD 字符串比較，缺值記錄不過濾） */
+  const inDateRange = (value: string | null | undefined, range?: [Dayjs, Dayjs], skipEmpty = false) => {
+    if (!range || !range[0] || !range[1]) return true
+    if (!value) return skipEmpty
+    const d = dayjs(value)
+    return !d.isBefore(range[0], 'day') && !d.isAfter(range[1], 'day')
+  }
+
+  const applyFilters = useCallback((list: AssetRepairRecord[], f: RepairFilters) => list.filter((r) => {
+    if (f.keyword && !matchKeyword(r, f.keyword)) return false
+    if (f.brand && r.brand !== f.brand) return false
+    if (!inDateRange(r.repairDate, f.repairDates)) return false
+    if (f.status && r.status !== f.status) return false
+    if (!inDateRange(r.finishDate, f.finishDates)) return false
+    if (f.applicant && !r.applicant?.toLowerCase().includes(f.applicant.toLowerCase())) return false
+    if (f.updatedBy && !r.updatedBy?.toLowerCase().includes(f.updatedBy.toLowerCase())) return false
+    if (!inDateRange(r.updatedAt, f.updatedDates)) return false
+    return true
+  }), [matchKeyword])
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchRepairList({ status: filters.status })
-      let list = res
-      if (filters.keyword) {
-        const kw = filters.keyword.toLowerCase()
-        list = list.filter(
-          (r) =>
-            r.assetNo.toLowerCase().includes(kw) ||
-            r.assetName.toLowerCase().includes(kw) ||
-            r.faultDesc.toLowerCase().includes(kw) ||
-            r.repairBy.toLowerCase().includes(kw) ||
-            r.applicant.toLowerCase().includes(kw),
-        )
-      }
-      setDataSource(list)
+      const res = await fetchRepairList()
+      setDataSource(applyFilters(res, filters))
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
     } finally {
       setLoading(false)
     }
-  }, [filters, t])
+  }, [filters, applyFilters, t])
 
   useEffect(() => { loadData() }, [loadData])
 
   const handleSearch = () => {
     const v = form.getFieldsValue()
     setFilters({
-      keyword: v.keyword || undefined,
+      keyword: v.keyword?.trim() || undefined,
+      brand: v.brand || undefined,
+      repairDates: v.repairDates,
       status: v.status || undefined,
+      finishDates: v.finishDates,
+      applicant: v.applicant?.trim() || undefined,
+      updatedBy: v.updatedBy?.trim() || undefined,
+      updatedDates: v.updatedDates,
     })
   }
-  const handleReset = () => { form.resetFields(); setFilters({}) }
+  const handleReset = () => { form.resetFields(); setFilters({}); setAssetOptions([]) }
 
   const handleExport = () => {
     const cols = [
       { title: t('asset.colAssetNo'), dataIndex: 'assetNo' },
       { title: t('asset.colAssetName'), dataIndex: 'assetName' },
+      { title: t('asset.colBrand'), dataIndex: 'brand' },
       { title: t('asset.colRepairDate'), dataIndex: 'repairDate' },
       { title: t('asset.colFaultDesc'), dataIndex: 'faultDesc' },
       { title: t('asset.colRepairContent'), dataIndex: 'repairContent' },
@@ -87,32 +150,11 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
       { title: t('asset.colFinishDate'), dataIndex: 'finishDate' },
       { title: t('asset.colApplicant'), dataIndex: 'applicant' },
       { title: t('asset.colCauseType'), dataIndex: 'causeType' },
+      { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy' },
+      { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
     exportToCSV(`repair_${new Date().toISOString().slice(0, 10)}`, cols, dataSource)
     message.success(t('common.exportSuccess'))
-  }
-
-  const handleOpenAssetModal = () => {
-    setAssetModalOpen(true)
-    setAssetKeyword('')
-    searchAssets('')
-  }
-
-  const searchAssets = async (keyword: string) => {
-    setAssetSearchLoading(true)
-    try {
-      const res = await fetchAssetList({ keyword: keyword || undefined, page: 1, size: 20 })
-      setAssetList(res.records)
-    } catch {
-      setAssetList([])
-    } finally {
-      setAssetSearchLoading(false)
-    }
-  }
-
-  const handleSelectAsset = (asset: AssetItem) => {
-    setAssetModalOpen(false)
-    onViewDetail(asset.id)
   }
 
   const REPAIR_BY_OPTIONS = [
@@ -200,6 +242,7 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
       ),
     },
     { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 180, ellipsis: true },
+    { key: 'brand', title: t('asset.colBrand'), dataIndex: 'brand', width: 110, ellipsis: true, render: (v: string | null) => v || '-' },
     { key: 'repairDate', title: t('asset.colRepairDate'), dataIndex: 'repairDate', width: 120 },
     { key: 'faultDesc', title: t('asset.colFaultDesc'), dataIndex: 'faultDesc', width: 200, ellipsis: true },
     { key: 'repairContent', title: t('asset.colRepairContent'), dataIndex: 'repairContent', width: 200, ellipsis: true },
@@ -224,6 +267,14 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
       render: (v: string) => v ? <Tag>{t(`asset.cause${v.charAt(0).toUpperCase() + v.slice(1)}`)}</Tag> : '-',
     },
     {
+      key: 'source', title: '來源', width: 100,
+      render: (_: unknown, r: AssetRepairRecord) => r.returnId
+        ? <Tag color="blue">歸還處置</Tag>
+        : <span style={{ color: '#8C8C8C' }}>-</span>,
+    },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', width: 110, ellipsis: true, render: (v: string | null) => v || '-' },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', width: 170, render: (v: string | null) => v || '-' },
+    {
       key: 'action', title: t('common.colAction'), width: 140, fixed: 'right',
       render: (_: unknown, r: AssetRepairRecord) => (
         <Space size={0} split={<span className="action-split">|</span>}>
@@ -243,6 +294,7 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
   const columnMeta = useMemo(() => [
     { key: 'assetNo', title: t('asset.colAssetNo') },
     { key: 'assetName', title: t('asset.colAssetName') },
+    { key: 'brand', title: t('asset.colBrand') },
     { key: 'repairDate', title: t('asset.colRepairDate') },
     { key: 'faultDesc', title: t('asset.colFaultDesc') },
     { key: 'repairContent', title: t('asset.colRepairContent') },
@@ -252,6 +304,9 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
     { key: 'finishDate', title: t('asset.colFinishDate') },
     { key: 'applicant', title: t('asset.colApplicant') },
     { key: 'causeType', title: t('asset.colCauseType') },
+    { key: 'source', title: '來源' },
+    { key: 'updatedBy', title: t('asset.colUpdatedBy') },
+    { key: 'updatedAt', title: t('asset.colUpdatedAt') },
     { key: 'action', title: t('common.colAction') },
   ], [t])
 
@@ -270,11 +325,45 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
       {/* ====== 搜索區 ====== */}
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label={t('asset.searchKeyword')} name="keyword">
-            <Input placeholder={t('asset.searchKeywordPh')} allowClear style={{ width: 220 }} />
+          <Form.Item label={t('asset.searchAssetLabel')} name="keyword">
+            <Select
+              placeholder={t('asset.searchAssetPh')}
+              allowClear
+              showSearch
+              filterOption={false}
+              onSearch={handleAssetSearch}
+              loading={assetSearchLoading}
+              notFoundContent={assetSearchLoading ? t('common.searching', '搜索中...') : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('common.noData')} />}
+              options={assetOptions.map((a) => ({
+                label: `${a.assetNo} - ${a.assetName}`,
+                value: a.assetNo,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item label={t('asset.colBrand')} name="brand">
+            <Select
+              placeholder={t('asset.colBrand')}
+              allowClear showSearch optionFilterProp="label"
+              options={brands.map((b) => ({ label: b.brandZh, value: b.brandZh }))}
+            />
+          </Form.Item>
+          <Form.Item label={t('asset.colRepairDate')} name="repairDates">
+            <DatePicker.RangePicker />
           </Form.Item>
           <Form.Item label={t('asset.colStatus')} name="status">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={statusOptions} />
+            <Select placeholder={t('common.all')} allowClear options={statusOptions} />
+          </Form.Item>
+          <Form.Item label={t('asset.colFinishDate')} name="finishDates">
+            <DatePicker.RangePicker />
+          </Form.Item>
+          <Form.Item label={t('asset.colApplicant')} name="applicant">
+            <Input placeholder={t('asset.searchApplicantPh')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('asset.searchUpdatedBy')} name="updatedBy">
+            <Input placeholder={t('asset.searchUpdatedByPh')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('asset.searchUpdatedAt')} name="updatedDates">
+            <DatePicker.RangePicker />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -295,7 +384,7 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
           </Space>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenAssetModal}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onCreate}>
             {t('asset.btnNewRepair', '新增維修')}
           </Button>
           {configComponent}
@@ -309,7 +398,7 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
         rowKey="id"
         loading={loading}
         size="middle"
-        scroll={{ x: 1700 }}
+        scroll={{ x: 2200 }}
         rowSelection={rowSelection}
         locale={{ emptyText: <Empty description={t('common.noData')} /> }}
         onRow={(record) => ({
@@ -322,50 +411,6 @@ export default function RepairList({ onViewAsset, onViewDetail }: Props) {
           showTotal: (tt) => `${t('common.total', { count: tt })}`,
         }}
       />
-
-      {/* ====== 選擇資產彈窗 ====== */}
-      <Modal
-        title={t('asset.selectAssetForRepair', '選擇資產 - 新增維修記錄')}
-        open={assetModalOpen}
-        onCancel={() => setAssetModalOpen(false)}
-        footer={null}
-        width={720}
-        destroyOnClose
-      >
-        <div style={{ marginBottom: 12 }}>
-          <Input.Search
-            placeholder={t('asset.searchByKeyword', '輸入資產編號/名稱搜索')}
-            allowClear
-            value={assetKeyword}
-            onChange={(e) => setAssetKeyword(e.target.value)}
-            onSearch={searchAssets}
-            style={{ width: '100%' }}
-          />
-        </div>
-        <Table<AssetItem>
-          columns={[
-            { title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 140,
-              render: (v: string) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span> },
-            { title: t('asset.colAssetName'), dataIndex: 'assetName', key: 'assetName', ellipsis: true },
-            { title: t('asset.colAssetType'), dataIndex: 'assetType', key: 'assetType', width: 100 },
-            { title: t('asset.colDepartment'), dataIndex: 'department', key: 'department', width: 120, ellipsis: true },
-            { title: t('asset.colUserName'), dataIndex: 'userName', key: 'userName', width: 100 },
-            {
-              key: 'action', title: t('common.colAction'), width: 80, fixed: 'right' as const,
-              render: (_: unknown, record: AssetItem) => (
-                <Button type="link" size="small" onClick={() => handleSelectAsset(record)}>{t('common.select', '選擇')}</Button>
-              ),
-            },
-          ]}
-          dataSource={assetList}
-          rowKey="id"
-          loading={assetSearchLoading}
-          size="small"
-          pagination={false}
-          scroll={{ x: 700, y: 320 }}
-          locale={{ emptyText: <Empty description={t('common.noData')} /> }}
-        />
-      </Modal>
 
       {/* ====== 編輯維修記錄彈窗 ====== */}
       <Modal
