@@ -1,0 +1,125 @@
+{
+  "$schema": "https://mftb.local/schemas/migration-catalog.v1.json",
+  "comment": "运行时数据库迁移登记表：唯一登记在启动期被自动执行的迁移。backend/sql/ 下的历史脚本为参考文档，不在此表者不参与自动执行。执行阶段与顺序由 SchemaPhase 决定，同阶段内按 dependencies 排序。",
+  "migrations": [
+    {
+      "versionKey": "core:schema-v10",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "core:menu-seed-v41",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": ["core:schema-v10"],
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "core:legacy-perm-migrate-v1",
+      "module": "core",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": ["core:menu-seed-v41"],
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "biz:tables-v1",
+      "module": "biz",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "bizDataInitializer",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "seq:init-v1",
+      "module": "seq",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "eam:schema-v1",
+      "module": "eam",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "eamSchemaMigrationInitializer",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "consumable:schema-v1.0",
+      "module": "consumable",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "consumableSchemaInitializer",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "adpromo:09_ad_promotion.sql:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "SQL",
+      "resource": "09_ad_promotion.sql",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "adpromo:13_waterfall_strategy.sql:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "SQL",
+      "resource": "13_waterfall_strategy.sql",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "adpromo:15_hot_merchant_ad.sql:v1.1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "SQL",
+      "resource": "15_hot_merchant_ad.sql",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "adpromo:63_card_order.sql:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "SQL",
+      "resource": "63_card_order.sql",
+      "status": "ACTIVE"
+    },
+    {
+      "versionKey": "adpromo:signboard_pricing_tables:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "SUPERSEDED",
+      "supersededBy": "adpromo:signboard_pricing_tables:v2",
+      "comment": "v1 补列辅助方法吞异常，无法保证结构就绪；由带后置校验的 v2 取代。"
+    },
+    {
+      "versionKey": "adpromo:signboard_pricing_tables:v2",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "ACTIVE",
+      "selfHealContract": "signboard-pricing",
+      "comment": "金字招牌计价主表 + 标签明细表自动建表与补列，附结构后置校验。"
+    },
+    {
+      "versionKey": "core:drop-ai-access-request-v1",
+      "module": "core",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "RETIRED",
+      "comment": "ai_access_request 表已废弃删除；不再自动重建废弃业务表。历史记录保留。"
+    }
+  ]
+}

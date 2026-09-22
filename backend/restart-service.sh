@@ -152,17 +152,24 @@ detect_change_type() {
     CHANGE_POM=false
     CHANGE_CONFIG=false
     CHANGE_JAVA=false
+    CHANGE_RESOURCE=false
 
-    # 检查 git 变更（工作区 + 暂存区）
+    # 检查 git 变更（工作区 + 暂存区），包含未跟踪的新文件
     if command -v git &>/dev/null && git rev-parse --is-inside-work-tree &>/dev/null; then
-        if git diff --name-only HEAD 2>/dev/null | grep -qE '(^|/)pom\.xml$'; then
+        local changed
+        changed="$(git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)"
+        if printf '%s\n' "$changed" | grep -qE '(^|/)pom\.xml$'; then
             CHANGE_POM=true
         fi
-        if git diff --name-only HEAD 2>/dev/null | grep -qE 'application(-.*)?\.(yml|yaml|properties)$'; then
+        if printf '%s\n' "$changed" | grep -qE 'application(-.*)?\.(yml|yaml|properties)$'; then
             CHANGE_CONFIG=true
         fi
-        if git diff --name-only HEAD 2>/dev/null | grep -qE '\.java$'; then
+        if printf '%s\n' "$changed" | grep -qE '\.java$'; then
             CHANGE_JAVA=true
+        fi
+        # 迁移资源变更（classpath SQL / db/migrations / backend/sql）也必须重新编译打包
+        if printf '%s\n' "$changed" | grep -qE '(src/main/resources/.*\.sql$|db/migrations/|backend/sql/)'; then
+            CHANGE_RESOURCE=true
         fi
     fi
 }
@@ -173,13 +180,19 @@ build_jar() {
     local start_time end_time elapsed
     start_time=$(date +%s)
 
-    mvn package -DskipTests -q -e 2>&1 | tail -5 || true
+    # 编译失败必须立即中止：先删除旧 JAR，避免“编译失败但复用旧 JAR”造成假象
+    rm -f "$JAR_PATH"
+    if ! mvn package -DskipTests -q; then
+        echo -e "${RED}❌ 编译失败，已中止重启（不会复用旧 JAR）${NC}"
+        echo -e "${YELLOW}   查看完整错误: mvn package -DskipTests${NC}"
+        exit 1
+    fi
 
     end_time=$(date +%s)
     elapsed=$((end_time - start_time))
 
     if [ ! -f "$JAR_PATH" ]; then
-        echo -e "${RED}❌ 编译失败，JAR 未生成（耗时 ${elapsed}s）${NC}"
+        echo -e "${RED}❌ 编译退出码为 0 但 JAR 未生成（耗时 ${elapsed}s）${NC}"
         echo -e "${YELLOW}   可运行完整输出查看错误: mvn package -DskipTests${NC}"
         exit 1
     fi
@@ -211,31 +224,42 @@ start_jar() {
 
     # 等待启动确认
     echo -e "${CYAN}⏳ 等待服务启动...${NC}"
-    local max_wait=90
+    local max_wait=120
     local waited=0
+    local live_ok=false
+
     while [ $waited -lt $max_wait ]; do
         # 检查进程是否还活着
         if ! kill -0 "$pid" 2>/dev/null; then
             echo ""
-            echo -e "${RED}❌ 服务启动失败，请检查日志: $LOG_FILE${NC}"
+            echo -e "${RED}❌ 服务启动失败（进程已退出），请检查日志: $LOG_FILE${NC}"
             echo -e "${YELLOW}─────────── 日志末尾 20 行 ───────────${NC}"
             tail -20 "$LOG_FILE"
             exit 1
         fi
 
-        # HTTP 健康检查（000=未响应，其余任意码都说明 Tomcat 已起来）
-        local http_code
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ 2>/dev/null || true)
-        http_code="${http_code:-000}"
-        if [ "$http_code" != "000" ]; then
-            echo ""
-            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            echo -e "${GREEN}✅ 后端服务启动成功！(${waited}s)${NC}"
-            echo -e "${GREEN}   端口: 8080 | PID: $pid | HTTP: $http_code${NC}"
-            echo -e "${GREEN}   日志: tail -f $LOG_FILE${NC}"
-            echo -e "${GREEN}   停止: bash restart-service.sh --stop${NC}"
-            echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-            return 0
+        # 阶段1：确认 Tomcat 起来（存活探针 200）
+        if [ "$live_ok" = false ]; then
+            local live_code
+            live_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8080/api/health/live 2>/dev/null || true)
+            if [ "${live_code:-000}" = "200" ]; then
+                live_ok=true
+                echo -e "${GREEN}   ✔ 进程存活（live 200），继续等待数据库迁移就绪...${NC}"
+            fi
+        else
+            # 阶段2：确认迁移与结构契约校验通过（就绪探针 200）
+            local ready_code
+            ready_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:8080/api/health/ready 2>/dev/null || true)
+            if [ "${ready_code:-000}" = "200" ]; then
+                echo ""
+                echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                echo -e "${GREEN}✅ 后端服务启动成功且数据库就绪！(${waited}s)${NC}"
+                echo -e "${GREEN}   端口: 8080 | PID: $pid | ready=200${NC}"
+                echo -e "${GREEN}   日志: tail -f $LOG_FILE${NC}"
+                echo -e "${GREEN}   停止: bash restart-service.sh --stop${NC}"
+                echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+                return 0
+            fi
         fi
 
         printf "."
@@ -243,10 +267,17 @@ start_jar() {
         waited=$((waited + 2))
     done
 
+    # 超时即失败（不再打印“可能仍在初始化”后返回成功）
     echo ""
-    echo -e "${YELLOW}⚠️  等待超时 (${max_wait}s)，服务可能仍在初始化${NC}"
-    echo -e "${YELLOW}   查看状态: bash restart-service.sh --status${NC}"
-    echo -e "${YELLOW}   查看日志: tail -f $LOG_FILE${NC}"
+    echo -e "${RED}❌ 启动超时 (${max_wait}s)：数据库迁移/结构契约校验未在时限内就绪${NC}"
+    if [ "$live_ok" = false ]; then
+        echo -e "${YELLOW}   进程未通过存活探针（Tomcat 可能未起来），查看日志: tail -f $LOG_FILE${NC}"
+    else
+        echo -e "${YELLOW}   已存活但未就绪（ready≠200），可能存在无法自愈的结构漂移，查看日志: tail -f $LOG_FILE${NC}"
+    fi
+    echo -e "${YELLOW}─────────── 日志末尾 20 行 ───────────${NC}"
+    tail -20 "$LOG_FILE"
+    exit 1
 }
 
 # ── 全量启动（mvn spring-boot:run，兼容旧方式）──
@@ -283,6 +314,11 @@ auto_restart() {
         start_jar
     elif [ "$CHANGE_JAVA" = true ]; then
         echo -e "${YELLOW}   ⚡ 检测到 Java 源码变更 → 重新编译${NC}"
+        stop_service
+        build_jar
+        start_jar
+    elif [ "$CHANGE_RESOURCE" = true ]; then
+        echo -e "${YELLOW}   ⚡ 检测到迁移资源/SQL 变更 → 重新编译打包${NC}"
         stop_service
         build_jar
         start_jar

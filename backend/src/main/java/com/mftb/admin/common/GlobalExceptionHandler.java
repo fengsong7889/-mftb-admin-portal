@@ -3,12 +3,18 @@ package com.mftb.admin.common;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * 全局异常处理器
@@ -45,6 +51,28 @@ public class GlobalExceptionHandler {
         FieldError fieldError = e.getBindingResult().getFieldError();
         String message = fieldError != null ? fieldError.getDefaultMessage() : "参数绑定失败";
         return Result.error(ResultCode.PARAM_ERROR.getCode(), message);
+    }
+
+    /** 路径或查询参数转换失败，包括数字超出目标类型范围。 */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public Result<Void> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException e) {
+        // 不回显原始输入及底层异常，避免泄露数据或将非法参数记为系统故障。
+        log.warn("请求参数类型或范围错误: {}", e.getName());
+        return Result.error(ResultCode.PARAM_ERROR.getCode(), "請求參數格式錯誤，請檢查數據類型及取值範圍");
+    }
+
+    /** 路由未匹配：兼容开启和关闭静态资源映射的场景。 */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<Result<Void>> handleNotFound(Exception e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.error(ResultCode.NOT_FOUND.getCode(), "請求的資源不存在"));
+    }
+
+    /** 请求方法不匹配时保留 405 及 Allow 响应头。 */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Result<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).headers(e.getHeaders())
+                .body(Result.error(ResultCode.METHOD_NOT_ALLOWED.getCode(), "不支援此請求方法"));
     }
 
     /** 请求体反序列化失败（如类型不匹配） */

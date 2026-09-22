@@ -66,6 +66,8 @@ export default function ConsumableDashboardPage() {
           {data && (
             <>
               <Tag color="orange" style={{ fontSize: 12 }}>本月領用 {data.monthClaimCount}</Tag>
+              <Tag color="volcano" style={{ fontSize: 12 }}>本月消耗 ¥{(data.monthConsumeAmount ?? 0).toFixed(2)}</Tag>
+              <Tag color="processing" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => navigate('/consumable-report')}>消耗統計 →</Tag>
               <Tag color="processing" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => navigate('/consumable-claim')}>領用記錄 →</Tag>
             </>
           )}

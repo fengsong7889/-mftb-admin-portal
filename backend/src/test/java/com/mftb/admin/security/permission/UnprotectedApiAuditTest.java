@@ -2,24 +2,36 @@ package com.mftb.admin.security.permission;
 
 import com.mftb.admin.controller.*;
 import com.mftb.admin.dto.EamClaimEmployeeOptionVO;
+import com.mftb.admin.dto.EamRepairSaveDTO;
+import com.mftb.admin.dto.EamRepairVO;
 import com.mftb.admin.security.SecurityTestBase;
-import com.mftb.admin.service.EamBasicDataService;
 import com.mftb.admin.service.EamClaimService;
 import com.mftb.admin.service.EamRepairService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -52,8 +64,6 @@ class UnprotectedApiAuditTest extends SecurityTestBase {
     private EamRepairService repairService;
     @MockBean
     private EamClaimService claimService;
-    @MockBean
-    private EamBasicDataService basicDataService;
 
     @Test
     @DisplayName("维修申请人搜索：仅维修查看权限即可搜索，不依赖领用或员工管理权限")
@@ -67,6 +77,7 @@ class UnprotectedApiAuditTest extends SecurityTestBase {
         when(claimService.employeeOptions("MF00003", null)).thenReturn(List.of(employee));
 
         mockMvc.perform(authGet("/api/eam/repairs/applicant-options?keyword=MF00003", viewerUser))
+                .andExpect(handler().methodName("applicantOptions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data[0].empName").value("测试员工"))
@@ -99,15 +110,16 @@ class UnprotectedApiAuditTest extends SecurityTestBase {
         denyAllPermissions(viewerUser);
         grantPermission(viewerUser, "asset-repair", "view");
         Map<String, Object> supplier = Map.of("id", 1L, "code", "CGSJ000001", "name", "测试供应商");
-        when(basicDataService.listSuppliersDropdown(any())).thenReturn(List.of(supplier));
+        when(eamBasicDataService.listSuppliersDropdown(any())).thenReturn(List.of(supplier));
 
         mockMvc.perform(authGet("/api/eam/repairs/repairer-options", viewerUser))
+                .andExpect(handler().methodName("repairerOptions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data[0].value").value("自修"))
                 .andExpect(jsonPath("$.data[1].value").value("测试供应商"))
                 .andExpect(jsonPath("$.data[1].label").value("CGSJ000001 - 测试供应商"));
-        verify(basicDataService).listSuppliersDropdown(null);
+        verify(eamBasicDataService).listSuppliersDropdown(null);
         verifyNoInteractions(repairService);
     }
 
@@ -118,7 +130,7 @@ class UnprotectedApiAuditTest extends SecurityTestBase {
         mockMvc.perform(authGet("/api/eam/repairs/repairer-options", guestUser))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(403));
-        verifyNoInteractions(basicDataService);
+        verifyNoInteractions(eamBasicDataService);
     }
 
     @Test
@@ -126,7 +138,121 @@ class UnprotectedApiAuditTest extends SecurityTestBase {
     void repairerOptionsBlockedWithoutLogin() throws Exception {
         mockMvc.perform(get("/api/eam/repairs/repairer-options"))
                 .andExpect(status().isUnauthorized());
-        verifyNoInteractions(basicDataService);
+        verifyNoInteractions(eamBasicDataService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"42", "0", "01", "9223372036854775807"})
+    @DisplayName("维修详情：合法数字路径仍进入详情接口")
+    void numericRepairIdReachesDetail(String pathId) throws Exception {
+        grantPermission(viewerUser, "asset-repair", "view");
+        long id = Long.parseLong(pathId);
+        EamRepairVO detail = new EamRepairVO();
+        detail.setId(id);
+        when(repairService.detail(id)).thenReturn(detail);
+
+        mockMvc.perform(authGet("/api/eam/repairs/" + pathId, viewerUser))
+                .andExpect(handler().methodName("detail"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(equalTo(id), Long.class));
+        verify(repairService).detail(id);
+        verifyNoInteractions(claimService, eamBasicDataService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"PUT, /42, update", "DELETE, /42, delete", "POST, /42/finish, finish"})
+    @DisplayName("维修写接口：数字 ID 与原有业务调用保持一致")
+    void numericRepairWriteRoutesRemainAccessible(String method, String suffix, String handlerName) throws Exception {
+        grantPermission(viewerUser, "asset-repair", "edit");
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs" + suffix)
+                        .header("Authorization", "Bearer " + tokenFor(viewerUser))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"finishDate\":\"2026-09-22\"}"))
+                .andExpect(handler().methodName(handlerName))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+        switch (method) {
+            case "PUT" -> verify(repairService).update(eq(42L), any(EamRepairSaveDTO.class));
+            case "DELETE" -> verify(repairService).delete(42L);
+            case "POST" -> verify(repairService).finish(42L, "2026-09-22");
+            default -> throw new AssertionError("未覆盖的请求方法：" + method);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "GET, /unknown", "GET, /-1", "GET, /+1", "GET, /1.5",
+            "PUT, /unknown", "DELETE, /unknown", "POST, /unknown/finish",
+            "POST, /repairer-options/finish", "POST, /applicant-options/finish"
+    })
+    @DisplayName("维修 ID 路由：非数字路径返回 404，不进入业务服务")
+    void nonNumericRepairPathsAreNotFound(String method, String suffix) throws Exception {
+        grantAllPermissions(viewerUser, "asset-repair");
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs" + suffix)
+                        .header("Authorization", "Bearer " + tokenFor(viewerUser))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(404));
+        verifyNoInteractions(repairService, claimService, eamBasicDataService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "PUT, /repairer-options", "DELETE, /repairer-options", "POST, /repairer-options",
+            "PUT, /applicant-options", "DELETE, /applicant-options", "POST, /applicant-options"
+    })
+    @DisplayName("维修下拉：错误 HTTP 方法返回 405，不误入 ID 接口")
+    void wrongMethodOnOptionsIsRejected(String method, String suffix) throws Exception {
+        grantAllPermissions(viewerUser, "asset-repair");
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs" + suffix)
+                        .header("Authorization", "Bearer " + tokenFor(viewerUser))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(header().string("Allow", containsString("GET")))
+                .andExpect(jsonPath("$.code").value(405));
+        verifyNoInteractions(repairService, claimService, eamBasicDataService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GET, ''", "PUT, ''", "DELETE, ''", "POST, /finish"})
+    @DisplayName("维修 ID 溢出：返回参数错误，不执行业务服务")
+    void overflowingRepairIdsAreParameterErrors(String method, String suffix) throws Exception {
+        grantAllPermissions(viewerUser, "asset-repair");
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs/9223372036854775808" + suffix)
+                        .header("Authorization", "Bearer " + tokenFor(viewerUser))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("請求參數格式錯誤，請檢查數據類型及取值範圍"));
+        verifyNoInteractions(repairService, claimService, eamBasicDataService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"repairer-options", "9223372036854775808"})
+    @DisplayName("维修列表：查询参数类型错误或溢出返回参数错误")
+    void invalidAssetIdQueryIsParameterError(String assetId) throws Exception {
+        grantPermission(viewerUser, "asset-repair", "view");
+        mockMvc.perform(authGet("/api/eam/repairs", viewerUser).param("assetId", assetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400));
+        verifyNoInteractions(repairService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GET, /42", "PUT, /42", "DELETE, /42", "POST, /42/finish"})
+    @DisplayName("维修 ID 路由：无权限及未登录用户仍被拦截")
+    void numericRepairRoutesRetainPermissionChecks(String method, String suffix) throws Exception {
+        denyAllPermissions(guestUser);
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs" + suffix)
+                        .header("Authorization", "Bearer " + tokenFor(guestUser))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(403));
+        mockMvc.perform(request(HttpMethod.valueOf(method), "/api/eam/repairs" + suffix)
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(repairService);
     }
 
     // ── MCP 工具执行（已修复: 需要 ai-mcp-service 权限） ──

@@ -99,6 +99,18 @@ translation:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io,http://192.168.31.88:3000,http://192.168.31.88:3001,http://192.168.31.88:3002,http://192.168.31.88:3003,http://192.168.31.88:3004,http://192.168.31.88:3005,http://192.168.31.88:3006,http://192.168.31.88:3007,http://192.168.31.88:3008,http://192.168.31.88:3009,http://192.168.31.88:3010,http://192.168.31.88:5173,http://192.168.6.174:3000,http://192.168.6.174:3001,http://192.168.6.174:3002,http://192.168.6.174:3003,http://192.168.6.174:3004,http://192.168.6.174:3005,http://192.168.6.174:3006,http://192.168.6.174:3007,http://192.168.6.174:3008,http://192.168.6.174:3009,http://192.168.6.174:3010,http://192.168.6.174:5173}
 
+# 数据库迁移治理（兼容式）
+schema:
+  # 严格模式：存在无法自愈的结构漂移时中止启动（生产设 true，配合 maxUnavailable:0）
+  strict: ${SCHEMA_STRICT:false}
+  # 只读预检模式：不执行初始化器/不自愈，仅校验契约并按退出码结束（0=就绪 2=漂移）
+  check-only: ${SCHEMA_CHECK_ONLY:false}
+
+# 构建/部署标识，用于迁移审计表 sys_schema_migration_log 追溯
+app:
+  build-tag: ${APP_BUILD_TAG:unknown}
+
+
 logging:
   level:
     # 生产默认 info（debug 会逐请求打印日志推高 CPU）；开发调试通过环境变量 LOG_LEVEL=debug 开启

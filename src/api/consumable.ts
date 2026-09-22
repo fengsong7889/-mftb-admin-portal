@@ -244,6 +244,8 @@ export interface ConsumableDashboard {
   itemKinds: number
   totalStockQty: number
   totalStockValue: number
+  /** 本月消耗金额（领用出库实际成本） */
+  monthConsumeAmount: number
   alertCount: number
   pendingApproveCount: number
   monthClaimCount: number
@@ -494,4 +496,306 @@ export function fetchConsumableBrandDetail(id: number) {
 
 export function toggleConsumableBrandStatus(id: number) {
   return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}/status`)
+}
+
+/* ==================== 退料 ==================== */
+
+/** 退料单 */
+export interface ConsumableReturn {
+  id: number
+  returnNo: string
+  claimId?: number
+  claimItemId?: number
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  spec?: string
+  unit?: string
+  locationId: number
+  locationName?: string
+  qty: number
+  unitCost?: number
+  amount?: number
+  applicantId?: number
+  applicantName?: string
+  departmentId?: number
+  department?: string
+  reason?: string
+  operator?: string
+  createdBy?: string
+  createdAt?: string
+}
+
+export interface ConsumableReturnSave {
+  claimId?: number
+  claimItemId?: number
+  itemId: number
+  locationId?: number
+  qty: number
+  unitCost?: number
+  departmentId?: number
+  reason?: string
+}
+
+export function fetchConsumableReturns(params?: {
+  page?: number; size?: number; itemCode?: string; itemName?: string
+  returnNo?: string; applicantName?: string; startTime?: string; endTime?: string
+}) {
+  return request.get<unknown, PageResult<ConsumableReturn>>('/eam/consumables/returns', { params })
+}
+
+export function createConsumableReturn(data: ConsumableReturnSave) {
+  return request.post<unknown, number>('/eam/consumables/returns', data)
+}
+
+/* ==================== 库存调整 ==================== */
+
+/** 库存调整单 */
+export interface ConsumableAdjust {
+  id: number
+  adjustNo: string
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  spec?: string
+  unit?: string
+  locationId: number
+  locationName?: string
+  direction: 'in' | 'out'
+  qty: number
+  unitCost?: number
+  amount?: number
+  reason?: string
+  operator?: string
+  createdBy?: string
+  createdAt?: string
+}
+
+export interface ConsumableAdjustSave {
+  itemId: number
+  locationId?: number
+  direction: 'in' | 'out'
+  qty: number
+  unitCost?: number
+  reason?: string
+}
+
+export function fetchConsumableAdjusts(params?: {
+  page?: number; size?: number; itemCode?: string; itemName?: string
+  adjustNo?: string; direction?: string; startTime?: string; endTime?: string
+}) {
+  return request.get<unknown, PageResult<ConsumableAdjust>>('/eam/consumables/adjusts', { params })
+}
+
+export function createConsumableAdjust(data: ConsumableAdjustSave) {
+  return request.post<unknown, number>('/eam/consumables/adjusts', data)
+}
+
+/* ==================== 仓库调拨 ==================== */
+
+/** 库存调拨单 */
+export interface ConsumableTransfer {
+  id: number
+  transferNo: string
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  spec?: string
+  unit?: string
+  fromLocationId: number
+  fromLocationName?: string
+  toLocationId: number
+  toLocationName?: string
+  qty: number
+  unitCost?: number
+  amount?: number
+  operator?: string
+  createdBy?: string
+  createdAt?: string
+}
+
+export interface ConsumableTransferSave {
+  itemId: number
+  fromLocationId: number
+  toLocationId: number
+  qty: number
+}
+
+export function fetchConsumableTransfers(params?: {
+  page?: number; size?: number; itemCode?: string; itemName?: string
+  transferNo?: string; startTime?: string; endTime?: string
+}) {
+  return request.get<unknown, PageResult<ConsumableTransfer>>('/eam/consumables/transfers', { params })
+}
+
+export function createConsumableTransfer(data: ConsumableTransferSave) {
+  return request.post<unknown, number>('/eam/consumables/transfers', data)
+}
+
+/* ==================== 入库单（独立 CRUD） ==================== */
+
+/** 入库单明细 */
+export interface ConsumableInboundItem {
+  id: number
+  inboundId: number
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  spec?: string
+  unit?: string
+  locationId: number
+  locationName?: string
+  qty: number
+  unitPrice?: number
+  amount?: number
+}
+
+/** 入库单 */
+export interface ConsumableInboundOrder {
+  id: number
+  inboundNo: string
+  inboundType: string
+  companyBrand?: number
+  companyBrandName?: string
+  purchaseCompanyId?: number
+  purchaseCompany?: string
+  supplierId?: number
+  supplierName?: string
+  poId?: number
+  poNo?: string
+  bizDate?: string
+  remark?: string
+  createdBy?: string
+  createdAt?: string
+  items: ConsumableInboundItem[]
+  totalQty: number
+  totalAmount?: number
+}
+
+export interface ConsumableInboundOrderSave {
+  inboundType?: string
+  companyBrand?: number
+  purchaseCompanyId?: number
+  supplierId?: number
+  supplierName?: string
+  poId?: number
+  bizDate?: string
+  remark?: string
+  items: { itemId: number; locationId?: number; qty: number; unitPrice: number }[]
+}
+
+export function fetchConsumableInboundOrders(params?: {
+  page?: number; size?: number; inboundNo?: string; inboundType?: string
+  companyBrand?: number; purchaseCompanyId?: number; startTime?: string; endTime?: string
+}) {
+  return request.get<unknown, PageResult<ConsumableInboundOrder>>('/eam/consumables/inbound-orders', { params })
+}
+
+export function fetchConsumableInboundOrderDetail(id: number) {
+  return request.get<unknown, ConsumableInboundOrder>(`/eam/consumables/inbound-orders/${id}`)
+}
+
+export function createConsumableInboundOrder(data: ConsumableInboundOrderSave) {
+  return request.post<unknown, number>('/eam/consumables/inbound-orders', data)
+}
+
+/* ==================== 消耗统计报表 ==================== */
+
+/** 报表查询参数 */
+export interface ConsumableReportQuery {
+  /** 统计起始日期 yyyy-MM-dd */
+  startDate?: string
+  /** 统计截止日期 yyyy-MM-dd */
+  endDate?: string
+  /** 所属品牌 ID */
+  companyBrand?: number
+  /** 购买公司 ID */
+  purchaseCompanyId?: number
+}
+
+/** 报表汇总指标 */
+export interface ConsumableReportSummary {
+  purchaseAmount: number
+  purchaseQty: number
+  manualInboundAmount: number
+  inboundTotalAmount: number
+  consumeAmount: number
+  consumeQty: number
+  returnAmount: number
+  adjustOutAmount: number
+  stockAmount: number
+  stockQty: number
+  deptCount: number
+  applicantCount: number
+}
+
+/** 按公司统计行 */
+export interface ConsumableCompanyStat {
+  companyBrand?: number
+  companyBrandName?: string
+  purchaseCompanyId?: number
+  purchaseCompanyName?: string
+  inboundQty: number
+  inboundAmount: number
+  consumeQty: number
+  consumeAmount: number
+  returnQty: number
+  returnAmount: number
+  stockQty: number
+  stockAmount: number
+}
+
+/** 按部门统计行 */
+export interface ConsumableDeptStat {
+  departmentId?: number
+  department?: string
+  consumeQty: number
+  consumeAmount: number
+  claimCount: number
+}
+
+/** 按员工统计行 */
+export interface ConsumableApplicantStat {
+  applicantId?: number
+  applicantEmpId?: string
+  applicantName?: string
+  department?: string
+  consumeQty: number
+  consumeAmount: number
+  claimCount: number
+}
+
+/** 按耗材统计行 */
+export interface ConsumableItemStat {
+  itemId: number
+  itemCode?: string
+  itemName?: string
+  spec?: string
+  unit?: string
+  inboundQty: number
+  inboundAmount: number
+  consumeQty: number
+  consumeAmount: number
+  stockQty: number
+  stockAmount: number
+}
+
+export function fetchConsumableReportSummary(params?: ConsumableReportQuery) {
+  return request.get<unknown, ConsumableReportSummary>('/eam/consumables/report/summary', { params })
+}
+
+export function fetchConsumableReportByCompany(params?: ConsumableReportQuery) {
+  return request.get<unknown, ConsumableCompanyStat[]>('/eam/consumables/report/by-company', { params })
+}
+
+export function fetchConsumableReportByDept(params?: ConsumableReportQuery) {
+  return request.get<unknown, ConsumableDeptStat[]>('/eam/consumables/report/by-dept', { params })
+}
+
+export function fetchConsumableReportByApplicant(params?: ConsumableReportQuery) {
+  return request.get<unknown, ConsumableApplicantStat[]>('/eam/consumables/report/by-applicant', { params })
+}
+
+export function fetchConsumableReportByItem(params?: ConsumableReportQuery) {
+  return request.get<unknown, ConsumableItemStat[]>('/eam/consumables/report/by-item', { params })
 }

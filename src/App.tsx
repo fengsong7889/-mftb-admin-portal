@@ -192,6 +192,8 @@ const ConsumableStock = lazy(() => import('./pages/Consumable/Stock'))
 const ConsumableStockTxn = lazy(() => import('./pages/Consumable/Stock/StockTxnDetail'))
 const ConsumableStockTxnList = lazy(() => import('./pages/Consumable/Stock/StockTxnList'))
 const ConsumableAlert = lazy(() => import('./pages/Consumable/Alert'))
+const ConsumableInbound = lazy(() => import('./pages/Consumable/Inbound'))
+const ConsumableReport = lazy(() => import('./pages/Consumable/Report'))
 // EAM 採購入庫
 const PurchaseOrder = lazy(() => import('./pages/AssetManagement/PurchaseOrder'))
 const AssetInbound = lazy(() => import('./pages/AssetManagement/AssetInbound'))
@@ -427,6 +429,8 @@ function AuthenticatedLayout() {
               <Route path="/consumable-stock/txn" element={<ConsumableStockTxn />} />
               <Route path="/consumable-stock-txn" element={<ConsumableStockTxnList />} />
               <Route path="/consumable-alert"     element={<ConsumableAlert />} />
+              <Route path="/consumable-inbound"   element={<ConsumableInbound />} />
+              <Route path="/consumable-report"    element={<ConsumableReport />} />
               {/* EAM 採購入庫 */}
               <Route path="/purchase-order"   element={<PurchaseOrder />} />
               <Route path="/asset-inbound"    element={<AssetInbound />} />

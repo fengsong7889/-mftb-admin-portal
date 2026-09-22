@@ -5,17 +5,24 @@ on:
     branches: ['main']
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-docker.yml'
+      - 'scripts/**'
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
+# 生产发布串行化：迁移期间不自动取消正在运行的发布，避免并发部署相互踩踏
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/mftb-admin-backend
 
 jobs:
-  # ── 后端测试门禁：测试失败时中断流水线，不推送镜像 ──
+  # ── 后端测试门禁：真实执行单元/集成测试 + 迁移资源打包校验，失败即中断流水线 ──
   test:
     runs-on: ubuntu-latest
     steps:
@@ -28,19 +35,46 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # 真实执行测试（不再 -DskipTests）：迁移登记表一致性、执行器与契约校验的单测在此把关
       - name: Run tests
-        run: mvn test -B -DskipTests -f backend/pom.xml
+        run: mvn -B test -f backend/pom.xml
+
+      # 构建产物并断言迁移清单及其引用的 SQL 资源确实进入镜像（漏打包即失败）
+      - name: Build jar
+        run: mvn -B package -DskipTests -f backend/pom.xml
+
+      - name: Verify migration resources are packaged
+        run: |
+          set -euo pipefail
+          JAR=backend/target/mftb-admin.jar
+          test -f "$JAR" || { echo "❌ 未生成 $JAR"; exit 1; }
+          echo "→ 校验迁移登记表随包分发"
+          unzip -l "$JAR" | grep -F 'BOOT-INF/classes/db/migrations/catalog.json' > /dev/null \
+            || { echo "❌ catalog.json 未打包进镜像"; exit 1; }
+          echo "→ 校验被登记的 SQL 资源存在"
+          for res in 09_ad_promotion.sql 13_waterfall_strategy.sql 15_hot_merchant_ad.sql 63_card_order.sql; do
+            unzip -l "$JAR" | grep -F "BOOT-INF/classes/$res" > /dev/null \
+              || { echo "❌ 迁移资源未打包: $res"; exit 1; }
+          done
+          echo "✅ 迁移资源完整性校验通过"
 
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
     outputs:
-      image_tag: ${{ steps.meta.outputs.sha }}
+      image_tag: ${{ steps.tag.outputs.sha }}
     steps:
       # fetch-depth: 0 拉取完整 git 历史，镜像内 .git 供「從 Git 同步版本記錄」读取全部 commit
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Resolve immutable image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          test -n "${GITHUB_SHA}" || { echo "❌ GITHUB_SHA 为空，拒绝以空标签部署"; exit 1; }
+          echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -53,7 +87,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        id: meta
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,6 +95,7 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
+
 
   # ── 自動觸發 Sealos/K8s 重新部署 ──────────────────────────────────
   # 前置條件（在 GitHub Settings → Secrets → Actions 中配置）：
@@ -98,6 +132,7 @@ jobs:
           IMAGE_TAG:  ${{ needs.build-and-push.outputs.image_tag }}
         run: |
           echo "→ 更新 ${DEPLOYMENT} 鏡像為 ${IMAGE}:${IMAGE_TAG}"
+          test -n "${IMAGE_TAG}" || { echo "❌ IMAGE_TAG 為空，拒絕部署"; exit 1; }
           kubectl set image deployment/${DEPLOYMENT} \
             ${DEPLOYMENT}=${IMAGE}:${IMAGE_TAG} \
             -n ${NAMESPACE}

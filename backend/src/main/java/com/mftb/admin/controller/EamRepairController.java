@@ -73,7 +73,7 @@ public class EamRepairController {
     }
 
     /** 维修记录详情 */
-    @GetMapping("/{id}")
+    @GetMapping("/{id:[0-9]+}")
     @RequirePermission(menu = MENU)
     public Result<EamRepairVO> detail(@PathVariable long id) {
         return Result.success(repairService.detail(id));
@@ -87,7 +87,7 @@ public class EamRepairController {
     }
 
     /** 完成维修 */
-    @PostMapping("/{id}/finish")
+    @PostMapping("/{id:[0-9]+}/finish")
     @RequirePermission(menu = MENU, action = "edit")
     public Result<Void> finish(@PathVariable long id, @RequestBody Map<String, String> body) {
         repairService.finish(id, body.get("finishDate"));
@@ -95,7 +95,7 @@ public class EamRepairController {
     }
 
     /** 更新维修记录（仅允许维修中状态） */
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9]+}")
     @RequirePermission(menu = MENU, action = "edit")
     public Result<Void> update(@PathVariable long id, @RequestBody EamRepairSaveDTO dto) {
         repairService.update(id, dto);
@@ -103,7 +103,7 @@ public class EamRepairController {
     }
 
     /** 删除维修记录（仅允许维修中状态） */
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id:[0-9]+}")
     @RequirePermission(menu = MENU, action = "edit")
     public Result<Void> delete(@PathVariable long id) {
         repairService.delete(id);

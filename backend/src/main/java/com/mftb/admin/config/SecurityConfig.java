@@ -57,6 +57,8 @@ public class SecurityConfig {
             "/api/auth/captcha",  // 滑块安全验证 Token 签发（登录前调用）
             "/api/auth/check",  // 前端轮询会话状态（内部自行校验 Token）
             "/api/sign-page/**",  // 钉钉签署页（内部凭 HMAC 令牌校验身份）
+            "/api/health/live",   // 存活探针（匿名，不依赖数据库）
+            "/api/health/ready",  // 就绪探针（匿名，迁移/结构校验未通过时返回 503）
             "/error"
     };
 

@@ -2,12 +2,25 @@ package com.mftb.admin.common;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.core.MethodParameter;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLException;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * GlobalExceptionHandler 单元测试
@@ -59,6 +72,50 @@ class GlobalExceptionHandlerTest {
     void duplicateKey() {
         Result<Void> result = handler.handleDuplicateKeyException(new DuplicateKeyException("dup"));
         assertThat(result.getCode()).isEqualTo(ResultCode.PARAM_ERROR.getCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"repairer-options", "9223372036854775808"})
+    @DisplayName("路径或查询参数转换失败：返回参数错误且不泄露输入和内部异常")
+    void typeMismatchDoesNotLeakDetails(String input) {
+        MethodArgumentTypeMismatchException exception = new MethodArgumentTypeMismatchException(
+                input, Long.class, "id", mock(MethodParameter.class),
+                new NumberFormatException("internal conversion detail: " + input));
+
+        Result<Void> result = handler.handleMethodArgumentTypeMismatch(exception);
+
+        assertThat(result.getCode()).isEqualTo(ResultCode.PARAM_ERROR.getCode());
+        assertThat(result.getMessage())
+                .isEqualTo("請求參數格式錯誤，請檢查數據類型及取值範圍")
+                .doesNotContain(input, "NumberFormatException", "internal conversion detail");
+    }
+
+    @Test
+    @DisplayName("未匹配路由：两类异常均返回 404，且不回显路径")
+    void missingRouteReturnsNotFound() {
+        for (Exception exception : new Exception[]{
+                new NoHandlerFoundException("GET", "/internal-path", new HttpHeaders()),
+                new NoResourceFoundException(HttpMethod.GET, "internal-path")
+        }) {
+            ResponseEntity<Result<Void>> response = handler.handleNotFound(exception);
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().getCode()).isEqualTo(ResultCode.NOT_FOUND.getCode());
+            assertThat(response.getBody().getMessage()).doesNotContain("internal-path");
+        }
+    }
+
+    @Test
+    @DisplayName("错误 HTTP 方法：返回 405 并保留 Allow 响应头")
+    void unsupportedMethodPreservesAllowHeader() {
+        ResponseEntity<Result<Void>> response = handler.handleMethodNotAllowed(
+                new HttpRequestMethodNotSupportedException("PUT", List.of("GET", "HEAD")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getHeaders().getAllow()).containsExactlyInAnyOrder(HttpMethod.GET, HttpMethod.HEAD);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo(ResultCode.METHOD_NOT_ALLOWED.getCode());
+        assertThat(response.getBody().getMessage()).isEqualTo("不支援此請求方法");
     }
 
     @Test

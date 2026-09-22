@@ -93,7 +93,36 @@ jwt.expiration: 86400000  # 24 小时
 
 > ⚠️ **数据库默认值已统一为开发库 `fengsong`（SQLPub 开发版付费库）**：无论通过 `run-local.sh`、IDE 直接运行、还是 `mvn spring-boot:run`，默认都连开发库，不再需要手动设置环境变量。生产环境由 Sealos 平台通过 `DB_URL` 环境变量覆盖指向阿里云 RDS。
 
+### 2.4 数据库迁移治理与发布验收（兼容式）
+
+生产环境反复出现“迁移未执行导致保存报数据库异常”，已建立统一治理机制：
+
+| 机制 | 说明 |
+|------|------|
+| 迁移登记表 | `backend/src/main/resources/db/migrations/catalog.json`，登记所有启动期自动迁移；CI 校验唯一键/依赖/资源已打包 |
+| 后置校验执行 | `SchemaVersionTracker.applyOnce(key, task, verify)`：任务 + 校验都成功才记成功版本，失败写审计 `sys_schema_migration_log` 并下次重试 |
+| 每次启动契约自愈 | `SchemaContractValidator` 不受版本门控，关键表缺表/缺列在迁移命名锁内自愈并复核 |
+| 就绪探针 | `GET /api/health/ready`（匿名）：迁移 + 契约通过返回 200，否则 503 |
+| 存活探针 | `GET /api/health/live`（匿名）：进程存活即 200 |
+| 只读预检 | `java -jar app.jar --schema.check-only=true`，退出码 0=就绪 / 2=漂移 |
+
+**生产环境变量（Sealos 注入）**：
+
+```text
+SCHEMA_STRICT=true      # 存在无法自愈的结构漂移时中止启动（配合 maxUnavailable:0，旧实例继续服务）
+APP_BUILD_TAG=<git-sha> # 迁移审计表记录本次部署版本，便于追溯
+```
+
+**发布验收**（凭据通过环境变量注入，脚本不落盘任何密钥）：
+
+```bash
+BASE_URL=https://dacnhtyrpxhc.sealoshzh.site \
+VERIFY_USER=<最小权限账号> VERIFY_PASS=<密码> \
+bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口业务码，任一失败非零退出
+```
+
 ---
+
 
 ## 三、数据库部署信息
 

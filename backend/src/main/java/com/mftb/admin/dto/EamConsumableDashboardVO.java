@@ -14,8 +14,10 @@ public class EamConsumableDashboardVO {
     private Integer itemKinds;
     /** 库存总数量 */
     private Integer totalStockQty;
-    /** 库存总金额（按参考单价估算） */
+    /** 库存总金额（按移动加权平均实际成本汇总） */
     private BigDecimal totalStockValue;
+    /** 本月消耗金额（领用出库实际成本） */
+    private BigDecimal monthConsumeAmount;
     /** 低库存预警品类数 */
     private Integer alertCount;
     /** 待审批领用单数 */

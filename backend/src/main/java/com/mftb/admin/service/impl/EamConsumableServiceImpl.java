@@ -328,21 +328,25 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         List<EamConsumableItem> items = itemMapper.selectList(new LambdaQueryWrapper<>());
         List<EamConsumableItem> enabled = items.stream()
                 .filter(i -> "enabled".equals(i.getStatus())).toList();
-        Map<Long, EamConsumableItem> itemMap = items.stream()
-                .collect(Collectors.toMap(EamConsumableItem::getId, i -> i, (a, b) -> a));
+        LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
 
         List<EamConsumableStock> stocks = stockMapper.selectList(new LambdaQueryWrapper<>());
         int totalQty = stocks.stream().mapToInt(s -> s.getQty() == null ? 0 : s.getQty()).sum();
-        BigDecimal totalValue = BigDecimal.ZERO;
-        for (EamConsumableStock s : stocks) {
-            EamConsumableItem it = itemMap.get(s.getItemId());
-            BigDecimal price = it != null && it.getRefPrice() != null ? it.getRefPrice() : BigDecimal.ZERO;
-            totalValue = totalValue.add(price.multiply(BigDecimal.valueOf(s.getQty() == null ? 0 : s.getQty())));
-        }
+        // 库存金额取移动加权平均实际成本（total_cost），不再用档案参考单价估算
+        BigDecimal totalValue = stocks.stream()
+                .map(s -> s.getTotalCost() == null ? BigDecimal.ZERO : s.getTotalCost())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         vo.setItemKinds(enabled.size());
         vo.setTotalStockQty(totalQty);
-        vo.setTotalStockValue(totalValue.setScale(2, java.math.RoundingMode.HALF_UP));
+        vo.setTotalStockValue(money(totalValue));
+
+        // 本月消耗金额（out_claim 流水金额绝对值合计，按业务记账日期）
+        vo.setMonthConsumeAmount(money(txnMapper.selectList(new LambdaQueryWrapper<EamConsumableTxn>()
+                        .eq(EamConsumableTxn::getTxnType, "out_claim")
+                        .ge(EamConsumableTxn::getBizDate, monthStart.toLocalDate()))
+                .stream().map(t -> t.getAmount() == null ? BigDecimal.ZERO : t.getAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add).abs()));
 
         List<EamConsumableItemVO> alertItems = enabled.stream().map(this::toItemVO)
                 .filter(v -> Boolean.TRUE.equals(v.getAlert()))
@@ -354,7 +358,6 @@ public class EamConsumableServiceImpl implements EamConsumableService {
 
         vo.setPendingApproveCount(Math.toIntExact(claimMapper.selectCount(
                 new LambdaQueryWrapper<EamConsumableClaim>().eq(EamConsumableClaim::getStatus, "pending"))));
-        LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
         vo.setMonthClaimCount(Math.toIntExact(claimMapper.selectCount(
                 new LambdaQueryWrapper<EamConsumableClaim>().ge(EamConsumableClaim::getCreatedAt, monthStart))));
 

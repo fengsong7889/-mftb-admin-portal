@@ -13,6 +13,7 @@ public enum ResultCode {
     UNAUTHORIZED(401, "未认证或登录已过期"),
     FORBIDDEN(403, "没有访问权限"),
     NOT_FOUND(404, "资源不存在"),
+    METHOD_NOT_ALLOWED(405, "不支援此請求方法"),
     PARAM_ERROR(400, "请求参数错误"),
     LOGIN_ERROR(1001, "账号或密码错误"),
     ACCOUNT_DISABLED(1002, "账号已被禁用"),

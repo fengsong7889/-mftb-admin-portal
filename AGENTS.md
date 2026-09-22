@@ -239,33 +239,53 @@ ALTER TABLE 表名 ADD COLUMN 列名 VARCHAR(255) DEFAULT NULL COMMENT '说明';
 | 幂等性 | SQL 脚本为**一次性参考文档**，实际幂等保证由 Java 迁移代码负责 |
 | 禁止破坏性操作 | 生产环境禁止 `DROP TABLE` / `DROP COLUMN` / `TRUNCATE`，仅允许 `ADD` / `MODIFY` / `UPDATE` |
 
-#### 3. Java 迁移代码规范
+#### 3. Java 迁移代码规范（兼容式治理 · 强制）
 
-- **迁移入口**：`EamSchemaMigrationInitializer`（实现 `CommandLineRunner`，启动时自动执行）
-- **幂等保证**：通过 `SchemaVersionTracker.applyOnce(versionKey, callback)` 注册，每个 `versionKey` 只执行一次
-- **versionKey 命名**：`eam:schema-v{N}-{描述}`，如 `eam:schema-v16-asset-accessories`
-- **编号递增**：查看 `EamSchemaMigrationInitializer` 中已注册的最大 v 编号，新迁移 +1
-- **日志输出**：迁移开始和结束必须打印 `log.info()`，便于排查启动日志
-- **事务注意**：`applyOnce` 内部无事务包装，多步操作需自行保证幂等性
+> 本项目已建立统一的迁移治理框架 `com.mftb.admin.config.migration`，解决“生产库迁移反复漏执行”。
+> 所有新增迁移必须遵循以下标准，不再把“某个初始化器”当唯一入口。
+
+- **登记先行**：任何启动期自动迁移，必须先在 `backend/src/main/resources/db/migrations/catalog.json` 登记
+  （`versionKey` / `module` / `phase` / `executionType` / `executor`|`resource` / `status` / `dependencies`）。
+  未登记的脚本不参与自动执行；`backend/sql/` 下的历史文件仅为参考文档。CI 会校验清单一致性（唯一键、依赖存在且无环、资源已打包）。
+- **迁移入口按模块就近**：放在对应模块的初始化器（如广告 → `AdPromotionDataInitializer`、EAM → `EamSchemaMigrationInitializer`）。`@Order` 决定阶段顺序（`SchemaPhase`）。
+- **幂等 + 后置校验**：结构类迁移**必须**用带校验的重载 `SchemaVersionTracker.applyOnce(versionKey, task, verify)`，
+  `verify` 校验表/列确实就绪；**只有任务与校验都成功才记录成功版本**。校验失败 → 不记录、写 `sys_schema_migration_log` 失败审计、下次启动重试。
+- **严禁吞异常**：结构迁移的补列/建表辅助方法**不得** `catch(Exception){log.warn}` 后继续——失败必须抛出，
+  否则会被误记为“已迁移”。（历史事故：金字招牌 `addColumnIfAbsent` 吞异常导致生产缺列。）
+- **关键结构登记契约**：为事故相关/关键写入路径的表在 `ContractRegistry` 登记 `ContractSpec`（含可自愈的 CREATE/ADD DDL）。
+  `SchemaContractValidator` **每次启动**（不受 `applyOnce` 门控）在迁移命名锁内自愈并复核，通过后置就绪位；
+  `SCHEMA_STRICT=true`（生产）时残余漂移将中止启动。
+- **versionKey 命名**：`{module}:{step}-v{major}.{minor}`；内容变更必须递增版本，不复用旧 key（被取代的旧键在 catalog 标 `SUPERSEDED` 并用新版本键重跑）。
+- **并发保护**：多副本启动由 `MigrationLock`（MySQL `GET_LOCK`，独占连接）串行化自愈 DDL。
+- **日志/审计**：迁移开始结束打印 `log.info()`；执行结果落 `sys_schema_migration_log`。
+- **只读预检**：发布前可用 `java -jar app.jar --schema.check-only=true` 做免写结构校验（退出码 0=就绪 / 2=漂移）。
 
 ```java
-// ✅ 正确：注册新迁移
-@Override
-public void run(String... args) {
-    // ... 已有迁移 ...
-    versionTracker.applyOnce("eam:schema-v{N}-描述", this::migrationMethod);
-}
+// ✅ 正确：登记 + 带后置校验 + 不吞异常
+versionTracker.applyOnce("adpromo:xxx:v2", this::doMigration, this::verifyMigration);
 
-private void migrationMethod() {
-    log.info("开始执行 XXX 迁移 ...");
-    // 1. 检查列/表是否存在
-    // 2. 执行 DDL
-    // 3. 执行数据回填（如有）
-    log.info("XXX 迁移完成");
+private void doMigration() {
+    addColumnIfAbsent("t", "c", "ALTER TABLE t ADD COLUMN c ..."); // 失败抛出，不 catch
+}
+private void verifyMigration() {
+    if (!columnExists("t", "c")) throw new IllegalStateException("列 c 未就绪");
 }
 ```
 
-#### 4. 常见踩坑记录
+```java
+// ❌ 禁止：吞异常会使 applyOnce 误记成功，下次启动不再重试
+try { jdbcTemplate.execute("ALTER TABLE ..."); } catch (Exception e) { log.warn("失败:{}", e); }
+```
+
+#### 4. 就绪与发布门禁
+
+- **就绪探针** `/api/health/ready`（匿名）：迁移 + 契约校验通过才 200，否则 503；K8s readiness 据此切流。
+- **存活探针** `/api/health/live`：进程/容器存活即 200，不因数据库瞬时故障反复重启。
+- **CI 门禁**：`backend-docker.yml` 真实执行 `mvn test`（含迁移框架单测），并断言 `catalog.json` 及被登记 SQL 已打进镜像。
+- **生产发布**：`SCHEMA_STRICT=true` + `maxUnavailable: 0`，未就绪实例不接流量、迁移失败保留旧版本。
+
+
+#### 5. 常见踩坑记录
 
 | 问题 | 原因 | 正确做法 |
 |------|------|----------|
@@ -274,6 +294,7 @@ private void migrationMethod() {
 | `ALTER TABLE` 后列未生效 | 连接池缓存旧 schema | 迁移后无需特殊处理，新连接自动生效 |
 | 迁移重复执行报错 | 未使用 `applyOnce` 保护 | 所有迁移必须注册 `versionKey` |
 | JSON 字段查询返回 null | 字段值为字符串 `"null"` 而非 JSON null | 查询时加 `IS NOT NULL AND != 'null'` 条件 |
+| **迁移记成功但生产缺表/缺列** | 补列/建表**吞异常**，或 SQL 未进镜像 | 用 `applyOnce(key,task,verify)` 后置校验 + 不吞异常 + 关键表登记 `ContractRegistry` 契约每次启动自愈 |
 
 # 前端 UI/UX 设计规范（强制）
 

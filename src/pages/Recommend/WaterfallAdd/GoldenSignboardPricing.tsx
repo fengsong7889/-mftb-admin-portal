@@ -63,8 +63,8 @@ const COMPARISON_LABELS = ['hot', 'popular', 'sales', 'rating', 'repurchase']
 const AGGREGATE_LABELS = ['favorites', 'customers']
 /** 場景定義（與 AlgorithmAdd.tsx 保持一致） */
 const SCENARIO_DEFS = [
-  { key: 'allMacau', apiValue: 'all_macau', label: '全澳對比', icon: '🌏', color: '#E8720C', bg: '#FFF7E6', border: '#FFD591' },
-  { key: 'district', apiValue: 'district', label: '商圈對比', icon: '🏙️', color: '#1890FF', bg: '#E6F7FF', border: '#91D5FF' },
+  { key: 'allMacau', apiValue: 'all_macau', label: '全澳售价', icon: '🌏', color: '#E8720C', bg: '#FFF7E6', border: '#FFD591' },
+  { key: 'district', apiValue: 'district', label: '商圈售价', icon: '🏙️', color: '#1890FF', bg: '#E6F7FF', border: '#91D5FF' },
 ] as const
 
 const isComparisonLabel = (v: string) => COMPARISON_LABELS.includes(v)

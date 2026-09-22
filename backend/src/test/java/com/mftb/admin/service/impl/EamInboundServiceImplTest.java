@@ -86,6 +86,7 @@ class EamInboundServiceImplTest {
         o.setPoNo("DDCG202609150005");
         o.setBrand(1);
         o.setDepartment("物資部");
+        o.setOrderDate("2026-09-15");
         o.setRemark("季度採購");
         o.setExecStatus(execStatus);
         o.setStatus(status);
@@ -170,7 +171,9 @@ class EamInboundServiceImplTest {
             assertEquals("Apple", a.getBrand());
             assertEquals(8L, a.getBrandId());
             assertEquals(1, a.getCompanyBrand());
-            assertEquals("物資部", a.getDepartment());
+            // 验收入库把采购订单归属部门写入资产「管理部门(adminDepartment)」，使用部门(department)保持为空
+            assertEquals("物資部", a.getAdminDepartment());
+            assertNull(a.getDepartment());
             assertNull(a.getUserName());
             assertEquals("倉庫A", a.getLocation());
             assertEquals(LOCATION_ID, a.getLocationId());

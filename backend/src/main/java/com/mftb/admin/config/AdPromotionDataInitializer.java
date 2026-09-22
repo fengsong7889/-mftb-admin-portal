@@ -62,6 +62,9 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         runSafely("biz_ad_cell_lock 唯一键升级", "adpromo:cell_lock_uk:v1", this::ensureCellLockGroupKey);
         runSafely("存量广告消费明细迁移", "adpromo:consume_migrate:v1", this::migrateAdConsumeDetails);
         runSafely("广告明细实收变动修复", "adpromo:actual_change_fix:v1", this::repairAdDetailActualChange);
+        // v2: 金字招牌计价表建表/补列，附结构后置校验；v1 因补列吞异常可能误记成功，故用新版本键重跑并以校验兜底
+        runVerified("金字招牌计价表自动创建与补列", "adpromo:signboard_pricing_tables:v2",
+                this::ensureSignboardPricingTables, this::verifySignboardPricing);
     }
 
     /** 单步容错执行: 异常仅记录不抛出, 版本化后重启跳过已完成步骤 */
@@ -70,6 +73,18 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
             versionTracker.applyOnce(versionKey, task);
         } catch (Exception e) {
             log.error("广告推广初始化 [{}] 失败: {}", name, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 带后置校验的执行：任务成功且校验通过后 {@link SchemaVersionTracker#applyOnce} 才记录版本；
+     * 校验失败会向上抛出（不记录、写失败审计），本方法捕获后仅记录错误、下次启动重试。
+     */
+    private void runVerified(String name, String versionKey, Runnable task, Runnable verify) {
+        try {
+            versionTracker.applyOnce(versionKey, task, verify);
+        } catch (Exception e) {
+            log.error("广告推广初始化 [{}] 失败(未记录版本, 下次启动重试): {}", name, e.getMessage(), e);
         }
     }
 
@@ -96,41 +111,21 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 存量库兼容: biz_ad_pricing_star 旧表无 sell_time_slots 列时自动补列（幂等）
+     * 存量库兼容: biz_ad_pricing_star 旧表无 sell_time_slots 列时自动补列（幂等，失败上抛）。
      */
     private void ensureSellTimeSlotsColumn() {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()"
-                            + " AND table_name = 'biz_ad_pricing_star' AND column_name = 'sell_time_slots'",
-                    Integer.class);
-            if (count == null || count == 0) {
-                jdbcTemplate.execute("ALTER TABLE biz_ad_pricing_star ADD COLUMN sell_time_slots JSON"
+        addColumnIfAbsent("biz_ad_pricing_star", "sell_time_slots",
+                "ALTER TABLE biz_ad_pricing_star ADD COLUMN sell_time_slots JSON"
                         + " COMMENT '可售时段(JSON数组, 如[\"breakfast\",\"lunch\"], 空或含fullDay=全部时段)'");
-                log.info("已为 biz_ad_pricing_star 补充 sell_time_slots 列");
-            }
-        } catch (Exception e) {
-            log.warn("sell_time_slots 列检查/补列失败: {}", e.getMessage());
-        }
     }
 
     /**
-     * 存量库兼容: biz_ad_pricing_star 旧表无 slot_discounts 列时自动补列（幂等）
+     * 存量库兼容: biz_ad_pricing_star 旧表无 slot_discounts 列时自动补列（幂等，失败上抛）。
      */
     private void ensureSlotDiscountsColumn() {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()"
-                            + " AND table_name = 'biz_ad_pricing_star' AND column_name = 'slot_discounts'",
-                    Integer.class);
-            if (count == null || count == 0) {
-                jdbcTemplate.execute("ALTER TABLE biz_ad_pricing_star ADD COLUMN slot_discounts JSON"
+        addColumnIfAbsent("biz_ad_pricing_star", "slot_discounts",
+                "ALTER TABLE biz_ad_pricing_star ADD COLUMN slot_discounts JSON"
                         + " COMMENT '时段折扣配置(JSON数组, 分商圈, 百分比记法)'");
-                log.info("已为 biz_ad_pricing_star 补充 slot_discounts 列");
-            }
-        } catch (Exception e) {
-            log.warn("slot_discounts 列检查/补列失败: {}", e.getMessage());
-        }
     }
 
     /**
@@ -326,19 +321,119 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** 列不存在时执行 ALTER（幂等） */
-    private void addColumnIfAbsent(String table, String column, String ddl) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()"
-                            + " AND table_name = '" + table + "' AND column_name = '" + column + "'",
-                    Integer.class);
-            if (count == null || count == 0) {
-                jdbcTemplate.execute(ddl);
-                log.info("已为 {} 补充 {} 列", table, column);
-            }
-        } catch (Exception e) {
-            log.warn("{}.{} 列检查/补列失败: {}", table, column, e.getMessage());
+    /**
+     * 金字招牌计价表自动创建与补列（幂等）
+     * 对应脚本: 54_golden_signboard_pricing.sql / 57_signboard_discount_mode.sql / 58_signboard_label_scenario.sql
+     * 生产环境若未手动执行上述脚本，表或列缺失会导致 INSERT 报数据库异常。
+     */
+    private void ensureSignboardPricingTables() {
+        // ── 1. 创建主表 biz_ad_pricing_signboard（含 discount_mode / global_discount_tiers 列） ──
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_ad_pricing_signboard ("
+                + "id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                + "pricing_no      VARCHAR(32)   NOT NULL                   COMMENT '定价编号（DJZP + YYYYMMDD + 3位）', "
+                + "algo_id         BIGINT        NOT NULL                   COMMENT '关联算法ID', "
+                + "algo_name       VARCHAR(128)  DEFAULT NULL               COMMENT '算法名称快照', "
+                + "brand           VARCHAR(32)   DEFAULT NULL               COMMENT '所属品牌', "
+                + "channel         INT           DEFAULT NULL               COMMENT '业务频道', "
+                + "presale_days    INT           NOT NULL DEFAULT 7         COMMENT '预售天数', "
+                + "refund_enabled  INT           NOT NULL DEFAULT 1         COMMENT '退款开关: 1=允许 2=不允许', "
+                + "cancel_fee_tiers TEXT         DEFAULT NULL               COMMENT '取消扣费梯度JSON', "
+                + "discount_mode   VARCHAR(10)   NOT NULL DEFAULT 'local'   COMMENT '折扣模式: global/local', "
+                + "global_discount_tiers TEXT    DEFAULT NULL               COMMENT '全局折扣梯度JSON', "
+                + "status          INT           NOT NULL DEFAULT 1         COMMENT '服务状态: 1=启用 2=停用', "
+                + "remark          VARCHAR(255)  DEFAULT NULL               COMMENT '备注', "
+                + "updated_by      VARCHAR(64)   DEFAULT NULL               COMMENT '最后更新人', "
+                + "deleted         TINYINT       DEFAULT 0                  COMMENT '逻辑删除', "
+                + "created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间', "
+                + "updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "UNIQUE KEY uk_pricing_signboard_no (pricing_no), "
+                + "KEY idx_pricing_signboard_algo (algo_id), "
+                + "KEY idx_pricing_signboard_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='金字招牌计价主表'");
+
+        // ── 2. 创建标签明细表 biz_ad_pricing_signboard_label（含 scenario 列） ──
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_ad_pricing_signboard_label ("
+                + "id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                + "pricing_id      BIGINT        NOT NULL                   COMMENT '计价主表ID', "
+                + "label_type      VARCHAR(32)   NOT NULL                   COMMENT '标签类型', "
+                + "scenario        VARCHAR(32)   DEFAULT NULL               COMMENT '场景（all_macau/district/NULL）', "
+                + "enabled         TINYINT       NOT NULL DEFAULT 1         COMMENT '是否启用', "
+                + "price           DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '标签日单价', "
+                + "discount_tiers  TEXT          DEFAULT NULL               COMMENT '梯度折扣JSON', "
+                + "deleted         TINYINT       DEFAULT 0                  COMMENT '逻辑删除', "
+                + "created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '创建时间', "
+                + "updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "KEY idx_signboard_label_pricing (pricing_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='金字招牌标签计价明细表'");
+
+        // ── 3. 存量表补列（表已存在但缺列的场景） ──
+        addColumnIfAbsent("biz_ad_pricing_signboard", "discount_mode",
+                "ALTER TABLE biz_ad_pricing_signboard ADD COLUMN discount_mode VARCHAR(10) NOT NULL DEFAULT 'local'"
+                + " COMMENT '折扣模式: global/local' AFTER cancel_fee_tiers");
+        addColumnIfAbsent("biz_ad_pricing_signboard", "global_discount_tiers",
+                "ALTER TABLE biz_ad_pricing_signboard ADD COLUMN global_discount_tiers TEXT DEFAULT NULL"
+                + " COMMENT '全局折扣梯度JSON' AFTER discount_mode");
+        addColumnIfAbsent("biz_ad_pricing_signboard_label", "scenario",
+                "ALTER TABLE biz_ad_pricing_signboard_label ADD COLUMN scenario VARCHAR(32) DEFAULT NULL"
+                + " COMMENT '场景（all_macau/district/NULL）' AFTER label_type");
+
+        log.info("金字招牌计价表结构就绪: biz_ad_pricing_signboard + biz_ad_pricing_signboard_label");
+    }
+
+    /**
+     * 金字招牌计价结构后置校验：确认两张表及关键列（discount_mode/global_discount_tiers/scenario）均已就绪，
+     * 任一缺失即抛异常，使 {@code applyOnce} 不记录成功版本并在下次启动重试。
+     */
+    private void verifySignboardPricing() {
+        if (!tableExists("biz_ad_pricing_signboard")) {
+            throw new IllegalStateException("金字招牌计价主表未就绪: biz_ad_pricing_signboard");
         }
+        if (!columnExists("biz_ad_pricing_signboard", "discount_mode")) {
+            throw new IllegalStateException("列未就绪: biz_ad_pricing_signboard.discount_mode");
+        }
+        if (!columnExists("biz_ad_pricing_signboard", "global_discount_tiers")) {
+            throw new IllegalStateException("列未就绪: biz_ad_pricing_signboard.global_discount_tiers");
+        }
+        if (!tableExists("biz_ad_pricing_signboard_label")) {
+            throw new IllegalStateException("金字招牌标签明细表未就绪: biz_ad_pricing_signboard_label");
+        }
+        if (!columnExists("biz_ad_pricing_signboard_label", "scenario")) {
+            throw new IllegalStateException("列未就绪: biz_ad_pricing_signboard_label.scenario");
+        }
+    }
+
+    /**
+     * 列不存在时执行 ALTER（幂等）。
+     * 兼容式治理：不再吞异常——补列失败必须向上抛出，使 {@link SchemaVersionTracker#applyOnce}
+     * 不记录成功版本、写失败审计并在下次启动重试，杜绝“结构未就绪却被记为已迁移”。
+     */
+    private void addColumnIfAbsent(String table, String column, String ddl) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()"
+                        + " AND table_name = ? AND column_name = ?",
+                Integer.class, table, column);
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(ddl);
+            log.info("已为 {} 补充 {} 列", table, column);
+        }
+    }
+
+    /** 表存在性检查（供结构后置校验使用）。 */
+    private boolean tableExists(String table) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES WHERE table_schema = DATABASE() AND table_name = ?",
+                Integer.class, table);
+        return count != null && count > 0;
+    }
+
+    /** 列存在性检查（供结构后置校验使用）。 */
+    private boolean columnExists(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE()"
+                        + " AND table_name = ? AND column_name = ?",
+                Integer.class, table, column);
+        return count != null && count > 0;
     }
 }
