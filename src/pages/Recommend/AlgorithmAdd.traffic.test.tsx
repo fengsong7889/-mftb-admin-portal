@@ -1,13 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ConfigProvider } from 'antd'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { Link, MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AlgorithmAdd from './AlgorithmAdd'
 import { readTrafficParams } from './TrafficAlgorithmConfig/config'
-import { AlgorithmType } from './constants'
+import { ALGORITHM_TYPE_OPTIONS, AlgorithmType } from './constants'
+import MenuTabs from '../../components/MenuTabs'
 
-const api = vi.hoisted(() => ({ fetch: vi.fn(), create: vi.fn(), update: vi.fn(), t: (key: string) => key }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: api.t }) }))
+const api = vi.hoisted(() => ({ fetch: vi.fn(), create: vi.fn(), update: vi.fn(), t: (key: string) => key, i18n: { language: 'zh-TW' } }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: api.t, i18n: api.i18n }) }))
+vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
+vi.mock('../../components/Sidebar', () => ({ pathToKey: {} }))
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(), message: { success: vi.fn(), error: vi.fn() },
 }))
@@ -15,17 +18,27 @@ vi.mock('../../api/adPromotion', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/adPromotion')>(),
   fetchAdAlgorithmDetail: api.fetch, createAdAlgorithm: api.create, updateAdAlgorithm: api.update,
 }))
-vi.mock('./OrganicTrafficScoreConfig', () => ({ default: () => null }))
+vi.mock('./OrganicTrafficScoreConfig', () => ({ default: () => <section aria-label="自然流量评分配置" /> }))
 vi.mock('../../components/PopularLayoutPreviewModal', () => ({ default: () => null }))
-vi.mock('../../components/DetailPageHeader', () => ({ default: ({ title }: { title: string }) => <h2>{title}</h2> }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
 
 function LocationIndicator() {
   const location = useLocation()
   return <output aria-label="当前路由">{location.pathname}</output>
 }
-function mountPage(query: string) {
+function NavigationControls({ queries }: { queries: string[] }) {
+  const navigate = useNavigate()
+  return <nav aria-label="算法测试导航">
+    {queries.map(query => <Link key={query} to={`/promotion-algorithm-add?${query}`}>{query}</Link>)}
+    <button onClick={() => navigate(-1)}>后退</button>
+    <button onClick={() => navigate(1)}>前进</button>
+  </nav>
+}
+
+function mountPage(query: string, destinations: string[] = []) {
   return render(<ConfigProvider theme={{ token: { motion: false } }}>
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[`/promotion-algorithm-add?${query}`]}>
+      {destinations.length > 0 && <NavigationControls queries={destinations} />}
       <AlgorithmAdd /><LocationIndicator />
     </MemoryRouter>
   </ConfigProvider>)
@@ -39,6 +52,51 @@ beforeEach(() => {
   })
   api.create.mockResolvedValue({ id: 8 })
   api.update.mockResolvedValue({ id: 7 })
+})
+
+describe('算法详情页签', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  const modes = [
+    { query: '', title: 'recommend.addAlgo' },
+    { query: '&id=7', title: 'recommend.editAlgo' },
+    { query: '&id=7&mode=detail', title: 'recommend.algoDetail' },
+  ]
+  const cases = ALGORITHM_TYPE_OPTIONS.flatMap(option => modes.map(mode => ({ ...option, ...mode })))
+
+  it.each(cases)('类型 $value 的 $title 页签保留正确的模式和广告名称', ({ value, labelKey, query, title }) => {
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[`/promotion-algorithm-add?type=${value}${query}`]}>
+      <MenuTabs />
+    </MemoryRouter>)
+    expect(screen.getByText(`${title} · ${labelKey}`).closest('.menu-tab-item')).toHaveClass('menu-tab-item--active')
+  })
+
+  it('恢复历史详情页签时纠正旧的新增标题，切换编辑后仍保留详情标题', () => {
+    const query = `type=${AlgorithmType.HOT_REVIVE_AD}&id=7`
+    const detailPath = `/promotion-algorithm-add?${query}&mode=detail`
+    localStorage.setItem('menu_tabs_history', JSON.stringify([{ path: detailPath, title: '新增算法 · 盤活復蘇' }]))
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[detailPath]}>
+      <NavigationControls queries={[query]} /><MenuTabs />
+    </MemoryRouter>)
+    const detailTitle = 'recommend.algoDetail · recommend.algoHotReviveAd'
+    expect(screen.getByText(detailTitle).closest('.menu-tab-item')).toHaveClass('menu-tab-item--active')
+    fireEvent.click(screen.getByText(query))
+    expect(screen.getByText('recommend.editAlgo · recommend.algoHotReviveAd').closest('.menu-tab-item')).toHaveClass('menu-tab-item--active')
+    fireEvent.click(screen.getByText(detailTitle))
+    expect(screen.getByText(detailTitle).closest('.menu-tab-item')).toHaveClass('menu-tab-item--active')
+    expect(screen.queryByText('新增算法 · 盤活復蘇')).not.toBeInTheDocument()
+  })
+})
+
+describe('算法详情标题同行布局', () => {
+  it.each(ALGORITHM_TYPE_OPTIONS)('类型 $value 的名称和算法详情标题处于同一行', async ({ value, labelKey }) => {
+    api.fetch.mockResolvedValueOnce({ id: 7, algoName: '详情标题测试', algoType: value, brand: 'flashBee', params: '{}' })
+    await act(async () => { mountPage(`type=${value}&id=7&mode=detail`) })
+    const row = screen.getByText('recommend.algoDetail').parentElement
+    expect(row).toHaveStyle({ display: 'flex', alignItems: 'center' })
+    expect(row).toHaveTextContent(labelKey)
+    expect(row?.querySelector('span')).toHaveStyle({ fontSize: '14px', color: '#595959', whiteSpace: 'nowrap' })
+  })
 })
 
 describe('算法库统一表单样式', () => {
@@ -99,6 +157,76 @@ describe('算法库统一表单样式', () => {
     const { container } = mountPage(`type=${type}`)
     expect(container.querySelector('.algorithm-section')).toBeInTheDocument()
     expect(screen.queryByTestId('algorithm-merchant-status')).not.toBeInTheDocument()
+  })
+})
+
+describe('算法页签切换状态隔离', () => {
+  const organicQuery = `type=${AlgorithmType.ORGANIC_TRAFFIC}`
+  const trafficQuery = `type=${AlgorithmType.TRAFFIC_AD}`
+
+  function expectAlgorithmPage(type: AlgorithmType) {
+    const isTraffic = type === AlgorithmType.TRAFFIC_AD
+    const titleKey = isTraffic ? 'recommend.algoTrafficAd' : 'recommend.algoOrganicTraffic'
+    expect(screen.getByRole('heading', { name: 'recommend.addAlgo' }).parentElement).toHaveTextContent(titleKey)
+    if (isTraffic) {
+      expect(screen.getByLabelText('投流配置概览')).toBeInTheDocument()
+      expect(screen.queryByLabelText('自然流量评分配置')).not.toBeInTheDocument()
+    } else {
+      expect(screen.getByLabelText('自然流量评分配置')).toBeInTheDocument()
+      expect(screen.queryByLabelText('投流配置概览')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('algorithm-merchant-status')).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('')
+  }
+
+  it.each([AlgorithmType.ORGANIC_TRAFFIC, AlgorithmType.TRAFFIC_AD])('从类型 %s 双向切换和前进后退时，标题、参数区与表单保持一致', firstType => {
+    const secondType = firstType === AlgorithmType.ORGANIC_TRAFFIC ? AlgorithmType.TRAFFIC_AD : AlgorithmType.ORGANIC_TRAFFIC
+    mountPage(`type=${firstType}`, [organicQuery, trafficQuery])
+    expectAlgorithmPage(firstType)
+    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '前一页未保存的名称' } })
+    fireEvent.click(screen.getByRole('link', { name: `type=${secondType}` }))
+    expectAlgorithmPage(secondType)
+    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '另一页未保存的名称' } })
+    fireEvent.click(screen.getByRole('link', { name: `type=${firstType}` }))
+    expectAlgorithmPage(firstType)
+    fireEvent.click(screen.getByRole('button', { name: '后退' }))
+    expectAlgorithmPage(secondType)
+    fireEvent.click(screen.getByRole('button', { name: '前进' }))
+    expectAlgorithmPage(firstType)
+    expect(api.fetch).not.toHaveBeenCalled()
+    expect(api.create).not.toHaveBeenCalled()
+    expect(api.update).not.toHaveBeenCalled()
+  })
+
+  it('同类型编辑页切回新增页时，不残留记录名称和配置', async () => {
+    const query = `type=${AlgorithmType.INVINCIBLE_STAR}`
+    api.fetch.mockResolvedValueOnce({ id: 7, algoName: '已有算法', algoType: AlgorithmType.INVINCIBLE_STAR, brand: 'flashBee',
+      params: JSON.stringify({ consistencyCheckInterval: 11, statusRest: true }),
+    })
+    mountPage(`${query}&id=7`, [query])
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('已有算法'))
+    expect(screen.getByRole('switch', { name: 'recommend.statusRest' })).toBeChecked()
+    fireEvent.click(screen.getByRole('link', { name: query }))
+    expect(screen.getByRole('heading', { name: 'recommend.addAlgo' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('')
+    expect(screen.getByRole('switch', { name: 'recommend.statusRest' })).not.toBeChecked()
+    expect(api.create).not.toHaveBeenCalled()
+    expect(api.update).not.toHaveBeenCalled()
+  })
+
+  it('切换记录后，旧页面的延迟响应不会覆盖当前表单', async () => {
+    const query = `type=${AlgorithmType.INVINCIBLE_STAR}`
+    const oldDetail = { id: 1, algoName: '旧记录', algoType: AlgorithmType.INVINCIBLE_STAR, brand: 'flashBee', params: '{}' }
+    let resolveOldDetail!: (detail: typeof oldDetail) => void
+    api.fetch.mockReturnValueOnce(new Promise<typeof oldDetail>(resolve => { resolveOldDetail = resolve }))
+    api.fetch.mockResolvedValueOnce({ ...oldDetail, id: 2, algoName: '当前记录' })
+    mountPage(`${query}&id=1`, [`${query}&id=2`])
+    fireEvent.click(screen.getByRole('link', { name: `${query}&id=2` }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('当前记录'))
+    await act(async () => { resolveOldDetail(oldDetail) })
+    expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('当前记录')
+    expect(api.fetch).toHaveBeenCalledTimes(2)
+    expect(api.update).not.toHaveBeenCalled()
   })
 })
 

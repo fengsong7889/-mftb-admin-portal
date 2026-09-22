@@ -1203,15 +1203,30 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                   const form = inlineForm[rule.id] || rule
                   return (
                   <div className="algorithm-form__rule-body">
-                    {/* ── 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
+                    {/* ── 前提條件行（僅 COM_02） ── */}
+                    {!isEditingInline && rule.id === 'COM_02' && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '4px 10px', background: '#f9f0ff', borderRadius: 6,
+                          border: '1px solid #d3adf7',
+                        }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
+                          <span style={{ fontSize: 12, color: '#595959' }}>報名減免運費</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* ─ 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                       {!isEditingInline && (
                         <>
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'COM_01' && (
+                          {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'COM_01') && (
                             <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
-                              {(rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
-                                ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
-                                : MODE_LABEL[rule.mode]}
+                              {(rule.id === 'COM_02')
+                                ? '固定加分'
+                                : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
+                                  ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
+                                  : MODE_LABEL[rule.mode]}
                             </Tag>
                           )}
                           {rule.id === 'STB_02' && (
@@ -1248,9 +1263,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <Tag color="#E8720C" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
                           )}
 
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
+                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
                             rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_02' ? '運費金額' : rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
+                              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
                               : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
                           ) : (
                             <>
@@ -1982,38 +1997,35 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           </div>
                         )}
-                        {/* 備註（描述 + 前提條件）放最下面 */}
+                        {/* 備註（描述）放最下面 */}
                         <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e8e8e8' }}>
                           <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
                             {rule.description}
                           </div>
-                          {rule.prerequisites && rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && (
-                            <div style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 6,
-                              padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
-                              border: '1px solid #d3adf7', marginTop: 8,
-                            }}>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
-                              <span style={{ fontSize: 13, color: '#595959' }}>{rule.prerequisites}</span>
-                            </div>
-                          )}
                         </div>
                       </>
                     ) : (
                       /* 編輯模式 */
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: (rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'STB_02' || rule.id === 'STB_03' || rule.id === 'PLT_03' || rule.id === 'PLT_04' || rule.id === 'STB_05' || rule.id === 'STB_06' || rule.id === 'STB_07' || rule.id === 'STB_08' || rule.id === 'STB_09' || rule.id === 'PLT_01' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT') ? '1fr' : '1fr 1fr', gap: 12 }}>
-                          <div>
-                            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>規則名稱</div>
-                            <Input value={form.name} maxLength={30} showCount
-                              onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], name: e.target.value } }) as any)} />
-                          </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: rule.id === 'COM_01' || rule.id === 'COM_02' ? '1fr' : '1fr 1fr', gap: 12 }}>
                           {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
                                 placeholder="填寫規則生效的前提條件"
                                 onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
+                            </div>
+                          )}
+                          {rule.id === 'COM_02' && (
+                            <div>
+                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
+                              <div style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
+                                border: '1px solid #d3adf7',
+                              }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>報名減免運費</span>
+                              </div>
                             </div>
                           )}
                           {/* PLT_03 區域扶持配置（屏蔽商家 + 區域切換 + 前提條件/統計天數/梯度） */}
@@ -2868,9 +2880,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
-                                options={rule.id === 'STB_01' || rule.id === 'STB_04' ? [
+                                options={rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'COM_02' ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
-                                ] : (rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') ? [
+                                ] : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
                                   { label: '動態加分', value: ScoreMode.AMOUNT_MULTIPLIER },
                                 ] : MODE_OPTIONS}
@@ -2879,17 +2891,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
                                 <span style={{ fontSize: 12, color: '#595959' }}>
-                                  {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? '倍率' : '分值'}
+                                  {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? '倍率' : '分值'}
                                 </span>
-                                {(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && (
+                                {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && (
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                                     {form.mode === ScoreMode.AMOUNT_MULTIPLIER
-                                      ? rule.id === 'COM_01' ? '（立減金額 × 倍率 = 得分）' : rule.id === 'COM_02' ? '（運費金額 × 倍率 = 得分）' : rule.id === 'COM_03' ? '（領券金額 × 倍率 = 得分）' : rule.id === 'COM_04' ? '（新客立減金額 × 倍率 = 得分）' : rule.id === 'COM_05' ? '（贈券金額 × 倍率 = 得分）' : rule.id === 'COM_06' ? '（紅包金額 × 倍率 = 得分）' : rule.id === 'COM_07' ? '（神券金額 × 倍率 = 得分）' : '（廣告金額 × 倍率 = 得分）'
+                                      ? rule.id === 'COM_01' ? '（立減金額 × 倍率 = 得分）' : rule.id === 'COM_03' ? '（領券金額 × 倍率 = 得分）' : rule.id === 'COM_04' ? '（新客立減金額 × 倍率 = 得分）' : rule.id === 'COM_05' ? '（贈券金額 × 倍率 = 得分）' : rule.id === 'COM_06' ? '（紅包金額 × 倍率 = 得分）' : rule.id === 'COM_07' ? '（神券金額 × 倍率 = 得分）' : '（廣告金額 × 倍率 = 得分）'
                                       : '（直接加固定分）'}
                                   </span>
                                 )}
                               </div>
-                              <InputNumber value={form.score} min={(rule.id === 'COM_01' || rule.id === 'COM_02' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? 0.1 : -100} max={100} style={{ width: '100%' }}
+                              <InputNumber value={form.score} min={(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? 0.1 : -100} max={100} style={{ width: '100%' }}
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                             </div>
                           </div>

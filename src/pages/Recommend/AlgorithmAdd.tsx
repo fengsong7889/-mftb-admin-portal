@@ -59,19 +59,25 @@ const STORE_LEVEL_BLOCK_OPTIONS = [
 ]
 
 export default function AlgorithmAdd() {
+  const [searchParams] = useSearchParams()
+  // 同一路由切换页签不会自动卸载页面，按类型、记录及模式隔离整个表单状态。
+  const pageKey = JSON.stringify(['type', 'id', 'mode'].map(param => searchParams.get(param) || ''))
+  return <AlgorithmAddForm key={pageKey} searchParams={searchParams} />
+}
+
+function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
   const { t } = useTranslation()
   const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const algorithmTypeParam = searchParams.get('type') || ''
   const algorithmIdParam = searchParams.get('id') || ''
   const modeParam = searchParams.get('mode') || ''
   const isDetailMode = modeParam === 'detail' // 只读详情模式
-  const initialType = algorithmTypeParam ? Number(algorithmTypeParam) as AlgorithmType : null
+  const selectedAlgorithmType = algorithmTypeParam ? Number(algorithmTypeParam) as AlgorithmType : null
   const isEditMode = !!algorithmIdParam && !isDetailMode // 有 id 参数且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听曝光策略选择
-  const isTrafficAlgorithm = initialType === AlgorithmType.TRAFFIC_AD
+  const isTrafficAlgorithm = selectedAlgorithmType === AlgorithmType.TRAFFIC_AD
 
   // 商家维度配置（按商家维度曝光策略）
   interface DimensionItem {
@@ -90,7 +96,6 @@ export default function AlgorithmAdd() {
   const [orderCompletionDays, setOrderCompletionDays] = useState(30) // 订单完成率天数
   const [tooltipVisible, setTooltipVisible] = useState<Record<string, boolean>>({})
   const hideTimerRef = useRef<Record<string, NodeJS.Timeout>>({})
-  const [selectedAlgorithmType, _setSelectedAlgorithmType] = useState<AlgorithmType | null>(initialType) // 从 URL 参数初始化
   const [presaleMode, _setPresaleMode] = useState(true) // false: 固定, true: 滚动
   const [continuousPurchase, _setContinuousPurchase] = useState(false) // false: 不支持, true: 支持
   const [merchantLimit, _setMerchantLimit] = useState(false) // false: 不限制, true: 限制
@@ -439,8 +444,10 @@ export default function AlgorithmAdd() {
   // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
     if (!algorithmIdParam || isTrafficAlgorithm) return
+    let active = true
     fetchAdAlgorithmDetail(Number(algorithmIdParam))
       .then(detail => {
+        if (!active) return
         setAlgoDetailData({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
         form.setFieldsValue({
           name: detail.algoName,
@@ -534,6 +541,7 @@ export default function AlgorithmAdd() {
         }
       })
       .catch(() => { /* 静默请求：错误不阻断页面 */ })
+    return () => { active = false }
   }, [algorithmIdParam, form, isTrafficAlgorithm])
 
   // 返回算法列表页
@@ -697,7 +705,11 @@ export default function AlgorithmAdd() {
       {isDetailMode ? (
         <DetailPageHeader
           title={t('recommend.algoDetail')}
-          meta={selectedAlgorithmType ? (<>{TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}</>) : undefined}
+          tags={selectedAlgorithmType ? (
+            <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>
+              {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
+            </span>
+          ) : undefined}
           onBack={handleBack}
           onEdit={() => {
             const p = new URLSearchParams(searchParams)
@@ -802,7 +814,7 @@ export default function AlgorithmAdd() {
       ) : selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
         <OrganicTrafficScoreConfig readOnly={isDetailMode} />
-      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE || selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD || selectedAlgorithmType === AlgorithmType.TRAFFIC_AD) ? (
+      ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE || selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD) ? (
         <div className="algorithm-form__parameters">
 
 
@@ -1076,8 +1088,10 @@ export default function AlgorithmAdd() {
                 onUpdate: (condId: number, patch: Partial<QualificationCondition>) => void
                 onRemove: (condId: number) => void
                 onAdd: () => void
+                showAddButton?: boolean  // 是否顯示「添加條件」按鈕，統計類標籤設為 false
               }) => {
                 const scopeOptions = opts.scenario ? SCOPE_OPTIONS_BY_SCENARIO[opts.scenario] : undefined
+                const showAdd = opts.showAddButton ?? true
                 return (
                   <>
                     {opts.conditions.map((cond, condIdx) => (
@@ -1183,7 +1197,7 @@ export default function AlgorithmAdd() {
                         )}
                       </div>
                     ))}
-                    {!isDetailMode && (
+                    {!isDetailMode && showAdd && (
                       <Button type="dashed" icon={<PlusOutlined />} onClick={opts.onAdd}
                         style={{ marginTop: 12, width: '100%', fontSize: 13, borderRadius: 6, color: '#E8720C', borderColor: '#E8720C' }}>
                         添加條件
@@ -1274,6 +1288,7 @@ export default function AlgorithmAdd() {
                     onUpdate: updateAggregateCondition,
                     onRemove: removeAggregateCondition,
                     onAdd: addAggregateCondition,
+                    showAddButton: false,
                   })}
                   {/* 文案規則 + 預覽文案 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
@@ -1294,7 +1309,8 @@ export default function AlgorithmAdd() {
 
           {/* ===== 其他算法：商家狀態計算 + 數據一致性校驗 ===== */}
           {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && (
-            <AlgorithmSection title={t('recommend.merchantStatusCalc')} icon={<ShopOutlined />} tone="info">
+            <AlgorithmSection title={t('recommend.merchantStatusCalc')} icon={<ShopOutlined />} tone="info"
+              extra={<span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('recommend.merchantStatusCalcHint')}</span>}>
               <MerchantStatusFields readOnly={isDetailMode} initializeOpen />
               <ConsistencyCheckField readOnly={isDetailMode} />
             </AlgorithmSection>
