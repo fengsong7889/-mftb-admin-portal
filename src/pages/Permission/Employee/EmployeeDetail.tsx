@@ -929,6 +929,7 @@ export default function EmployeeDetail() {
 
   const handleEditPersonal = () => {
     personalForm.setFieldsValue({
+      name: employee?.name ?? '',
       gender: basicInfo.gender,
       nationality: basicInfo.nationality,
       ethnicity: basicInfo.ethnicity,
@@ -950,6 +951,10 @@ export default function EmployeeDetail() {
       await savePersonalInfo(Number(empId), normalized)
     }
     setBasicInfo(prev => ({ ...prev, ...normalized }))
+    // 同步更新 employee 中的姓名，使頁面即時反映新姓名
+    if (values.name !== undefined && employee) {
+      setEmployee(prev => prev ? { ...prev, name: values.name } : prev)
+    }
     message.success(t('employeeDetail.personalUpdated'))
     if (empId) markTabUpdated('basic', empId)
     setPersonalModalVisible(false)
@@ -2295,6 +2300,10 @@ export default function EmployeeDetail() {
       >
         <Form form={personalForm} layout="vertical">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+            {/* 1.0 姓名 */}
+            <Form.Item name="name" label={t('employee.nameLabel')} rules={[{ required: true, message: t('employeeDetail.nameRequired') }]}>
+              <Input placeholder={t('employeeDetail.namePh')} />
+            </Form.Item>
             {/* 1.1 性别 */}
             <Form.Item name="gender" label={t('employeeDetail.labelGender')}>
               <Select options={[{ value: '男', label: '男' }, { value: '女', label: '女' }]} placeholder={t('employeeDetail.labelGender')} allowClear />

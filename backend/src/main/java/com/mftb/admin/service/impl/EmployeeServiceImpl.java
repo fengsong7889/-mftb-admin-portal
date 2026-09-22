@@ -383,6 +383,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void saveBasicInfo(Long id, BasicInfoRequest request) {
         SysUser user = requireUser(id);
         // 个人信息
+        if (request.getName() != null) user.setName(request.getName());
         if (request.getNationality() != null) user.setNationality(request.getNationality());
         if (request.getEthnicity() != null) user.setEthnicity(request.getEthnicity());
         if (request.getBirthDate() != null) user.setBirthDate(request.getBirthDate());

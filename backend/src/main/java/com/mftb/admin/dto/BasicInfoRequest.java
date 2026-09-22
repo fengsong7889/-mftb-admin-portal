@@ -11,6 +11,7 @@ import java.time.LocalDate;
 public class BasicInfoRequest {
 
     // ── 个人信息 ──
+    private String name;
     private String gender;
     private String nationality;
     private String ethnicity;
