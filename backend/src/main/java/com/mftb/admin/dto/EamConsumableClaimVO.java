@@ -2,6 +2,7 @@ package com.mftb.admin.dto;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -15,6 +16,16 @@ public class EamConsumableClaimVO {
     private String applicantName;
     private String applicantEmpId;
     private String department;
+    /** 承担部门 ID */
+    private Long departmentId;
+    /** 所属品牌 ID 快照 */
+    private Long companyBrand;
+    /** 购买公司 ID 快照 */
+    private Long purchaseCompanyId;
+    /** 购买公司名称快照 */
+    private String purchaseCompany;
+    /** 出库成本合计 */
+    private BigDecimal costAmount;
     private String reason;
     private String status;
     private Long approverId;

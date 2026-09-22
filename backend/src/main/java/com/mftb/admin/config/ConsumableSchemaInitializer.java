@@ -32,6 +32,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     private static final String V_CONSUMABLE_REFACTOR = "consumable:refactor-v2.2";
     /** 计量单位字典表废弃清理（一次性） */
     private static final String V_DROP_UNIT_TABLE = "consumable:drop-unit-table-v1";
+    /** 所属品牌 + 购买公司 + 成本/归属快照 + 业务单据表 + 购买公司字典（一次性大迁移） */
+    private static final String V_BRAND_COMPANY = "consumable:brand-company-v1";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -41,6 +43,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     public void run(String... args) {
         versionTracker.applyOnce(V_CONSUMABLE_SCHEMA, this::migrate);
         versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
+        // 耗材改造：所属品牌 + 购买公司 + 成本/归属快照 + 入库/退料/调整/调拨单据表 + 购买公司字典
+        versionTracker.applyOnce(V_BRAND_COMPANY, this::migrateBrandCompany);
         // 每次启动均修正排序（v41 菜单重组后，耗材管理排在資產看板之後 sort=2，两个业务线入口对称）
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 2");
         // 补种子：出入库流水菜单（v3，幂等）
@@ -463,6 +467,285 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         if (cnt != null && cnt == 0) {
             jdbcTemplate.execute("ALTER TABLE " + table + " ADD INDEX " + indexName + " (" + columns + ")");
             log.info("已为 {} 表添加索引 {}", table, indexName);
+        }
+    }
+
+    /** 安全添加唯一索引（幂等） */
+    private void addUniqueIndexIfNotExists(String table, String indexName, String columns) {
+        Integer cnt = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, indexName);
+        if (cnt != null && cnt == 0) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD UNIQUE " + indexName + " (" + columns + ")");
+            log.info("已为 {} 表添加唯一索引 {}", table, indexName);
+        }
+    }
+
+    /* ==================== 7. 品牌/公司改造大迁移 ==================== */
+
+    /**
+     * 耗材改造（一次性）：
+     *   1. 档案 item 新增所属品牌 + 购买公司
+     *   2. 库存 stock 新增归属快照 + 移动加权均价 + 成本金额 + 操作人
+     *   3. 流水 txn 新增成本金额 + 归属/部门/领用人快照 + 记账日期 + 幂等键
+     *   4. 领用单/明细新增归属快照 + 成本 + 退料数量
+     *   5. 新建入库单/入库明细/退料/调整/调拨 5 张单据表
+     *   6. 新建购买公司字典 + 种子；新增入库/统计菜单 + 编号规则
+     */
+    private void migrateBrandCompany() {
+        log.info("开始执行耗材改造迁移（所属品牌 + 购买公司 + 成本/归属快照 + 单据表）...");
+        addConsumableBrandCompanyColumns();
+        createConsumableDocTables();
+        createPurchaseCompanyDict();
+        seedPurchaseCompanyData();
+        seedConsumableDocMenus();
+        seedConsumableDocSeqRules();
+        log.info("耗材改造迁移完成");
+    }
+
+    /** 为现有 5 张表补充归属/成本/快照列（逐列查 information_schema 后再 ADD） */
+    private void addConsumableBrandCompanyColumns() {
+        // 1. 主数据
+        addColumnIfNotExists("biz_eam_consumable_item", "company_brand",
+                "BIGINT DEFAULT NULL COMMENT '所属品牌ID（sys_company_brand）'");
+        addColumnIfNotExists("biz_eam_consumable_item", "purchase_company_id",
+                "BIGINT DEFAULT NULL COMMENT '购买公司ID（sys_purchase_company）'");
+        addColumnIfNotExists("biz_eam_consumable_item", "purchase_company",
+                "VARCHAR(100) DEFAULT '' COMMENT '购买公司名称快照'");
+        addIndexIfNotExists("biz_eam_consumable_item", "idx_company_brand", "company_brand");
+        addIndexIfNotExists("biz_eam_consumable_item", "idx_purchase_company", "purchase_company_id");
+        // 2. 库存
+        addColumnIfNotExists("biz_eam_consumable_stock", "company_brand",
+                "BIGINT DEFAULT NULL COMMENT '所属品牌ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_stock", "purchase_company_id",
+                "BIGINT DEFAULT NULL COMMENT '购买公司ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_stock", "purchase_company",
+                "VARCHAR(100) DEFAULT '' COMMENT '购买公司名称快照'");
+        addColumnIfNotExists("biz_eam_consumable_stock", "avg_cost",
+                "DECIMAL(16,6) NOT NULL DEFAULT 0 COMMENT '移动加权平均单位成本'");
+        addColumnIfNotExists("biz_eam_consumable_stock", "total_cost",
+                "DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '库存成本金额'");
+        addColumnIfNotExists("biz_eam_consumable_stock", "updated_by",
+                "VARCHAR(64) DEFAULT '' COMMENT '库存最后操作人'");
+        // 3. 流水
+        addColumnIfNotExists("biz_eam_consumable_txn", "amount",
+                "DECIMAL(18,2) DEFAULT NULL COMMENT '变动成本金额（入库正/出库负）'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "company_brand",
+                "BIGINT DEFAULT NULL COMMENT '所属品牌ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "purchase_company_id",
+                "BIGINT DEFAULT NULL COMMENT '购买公司ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "department_id",
+                "BIGINT DEFAULT NULL COMMENT '承担部门ID'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "department",
+                "VARCHAR(100) DEFAULT '' COMMENT '承担部门名称快照'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "applicant_id",
+                "BIGINT DEFAULT NULL COMMENT '领用人ID（sys_user.id）'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "applicant_emp_id",
+                "VARCHAR(32) DEFAULT '' COMMENT '领用人工号'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "applicant_name",
+                "VARCHAR(64) DEFAULT '' COMMENT '领用人姓名'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "biz_date",
+                "DATE DEFAULT NULL COMMENT '业务记账日期'");
+        addColumnIfNotExists("biz_eam_consumable_txn", "idempotency_key",
+                "VARCHAR(80) DEFAULT NULL COMMENT '幂等键（来源单据行）'");
+        addUniqueIndexIfNotExists("biz_eam_consumable_txn", "uk_txn_idem", "idempotency_key");
+        addIndexIfNotExists("biz_eam_consumable_txn", "idx_txn_company", "purchase_company_id");
+        addIndexIfNotExists("biz_eam_consumable_txn", "idx_txn_dept", "department_id");
+        addIndexIfNotExists("biz_eam_consumable_txn", "idx_txn_applicant", "applicant_id");
+        // 4. 领用单
+        addColumnIfNotExists("biz_eam_consumable_claim", "company_brand",
+                "BIGINT DEFAULT NULL COMMENT '所属品牌ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_claim", "purchase_company_id",
+                "BIGINT DEFAULT NULL COMMENT '购买公司ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_claim", "purchase_company",
+                "VARCHAR(100) DEFAULT '' COMMENT '购买公司名称快照'");
+        addColumnIfNotExists("biz_eam_consumable_claim", "department_id",
+                "BIGINT DEFAULT NULL COMMENT '承担部门ID'");
+        addColumnIfNotExists("biz_eam_consumable_claim", "cost_amount",
+                "DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '出库成本合计'");
+        // 5. 领用明细
+        addColumnIfNotExists("biz_eam_consumable_claim_item", "company_brand",
+                "BIGINT DEFAULT NULL COMMENT '所属品牌ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_claim_item", "purchase_company_id",
+                "BIGINT DEFAULT NULL COMMENT '购买公司ID快照'");
+        addColumnIfNotExists("biz_eam_consumable_claim_item", "actual_unit_cost",
+                "DECIMAL(16,6) DEFAULT NULL COMMENT '实际出库加权均价'");
+        addColumnIfNotExists("biz_eam_consumable_claim_item", "amount",
+                "DECIMAL(18,2) DEFAULT NULL COMMENT '出库成本金额'");
+        addColumnIfNotExists("biz_eam_consumable_claim_item", "returned_qty",
+                "INT NOT NULL DEFAULT 0 COMMENT '已退料数量'");
+    }
+
+    /** 新建入库/退料/调整/调拨单据表（与 186 SQL 结构一致） */
+    private void createConsumableDocTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_consumable_inbound ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "inbound_no VARCHAR(40) NOT NULL COMMENT '入库单号', "
+                + "inbound_type VARCHAR(20) NOT NULL DEFAULT 'in_manual' COMMENT 'in_purchase/in_manual/in_init', "
+                + "company_brand BIGINT DEFAULT NULL COMMENT '所属品牌ID', "
+                + "purchase_company_id BIGINT DEFAULT NULL COMMENT '购买公司ID', "
+                + "purchase_company VARCHAR(100) DEFAULT '' COMMENT '购买公司名称快照', "
+                + "supplier_id BIGINT DEFAULT NULL COMMENT '供应商ID', "
+                + "supplier_name VARCHAR(128) DEFAULT '' COMMENT '供应商名称快照', "
+                + "po_id BIGINT DEFAULT NULL COMMENT '采购订单ID', "
+                + "po_no VARCHAR(40) DEFAULT '' COMMENT '采购订单号快照', "
+                + "source_type VARCHAR(20) DEFAULT '' COMMENT '来源类型', "
+                + "source_id BIGINT DEFAULT NULL COMMENT '来源单据ID', "
+                + "biz_date DATE DEFAULT NULL COMMENT '入库日期', "
+                + "remark VARCHAR(500) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) DEFAULT '', updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_inbound_no (inbound_no), KEY idx_po (po_id), KEY idx_created (created_at)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材入库单'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_consumable_inbound_item ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "inbound_id BIGINT NOT NULL COMMENT '入库单ID', "
+                + "item_id BIGINT NOT NULL COMMENT '耗材ID', "
+                + "item_code VARCHAR(32) DEFAULT '', item_name VARCHAR(128) DEFAULT '', "
+                + "spec VARCHAR(200) DEFAULT '', unit VARCHAR(32) DEFAULT '', "
+                + "location_id BIGINT NOT NULL DEFAULT 0, location_name VARCHAR(200) DEFAULT '', "
+                + "qty INT NOT NULL COMMENT '入库数量', "
+                + "unit_price DECIMAL(16,6) DEFAULT NULL COMMENT '实际入库单价', "
+                + "amount DECIMAL(18,2) DEFAULT NULL COMMENT '入库成本金额', "
+                + "source_line_id BIGINT DEFAULT NULL COMMENT '来源验收明细ID（幂等）', "
+                + "KEY idx_inbound (inbound_id), KEY idx_item (item_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材入库单明细'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_consumable_return ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "return_no VARCHAR(40) NOT NULL COMMENT '退料单号', "
+                + "claim_id BIGINT DEFAULT NULL, claim_item_id BIGINT DEFAULT NULL, "
+                + "item_id BIGINT NOT NULL, location_id BIGINT NOT NULL DEFAULT 0, location_name VARCHAR(200) DEFAULT '', "
+                + "qty INT NOT NULL, unit_cost DECIMAL(16,6) DEFAULT NULL, amount DECIMAL(18,2) DEFAULT NULL, "
+                + "applicant_id BIGINT DEFAULT NULL, applicant_name VARCHAR(64) DEFAULT '', "
+                + "department_id BIGINT DEFAULT NULL, department VARCHAR(100) DEFAULT '', "
+                + "reason VARCHAR(500) DEFAULT '', operator VARCHAR(64) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_return_no (return_no), KEY idx_claim_item (claim_item_id), KEY idx_item (item_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材退料单'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_consumable_adjust ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "adjust_no VARCHAR(40) NOT NULL COMMENT '调整单号', "
+                + "item_id BIGINT NOT NULL, location_id BIGINT NOT NULL DEFAULT 0, location_name VARCHAR(200) DEFAULT '', "
+                + "direction VARCHAR(10) NOT NULL COMMENT 'in=盘盈/out=盘亏', qty INT NOT NULL, "
+                + "unit_cost DECIMAL(16,6) DEFAULT NULL, amount DECIMAL(18,2) DEFAULT NULL, "
+                + "reason VARCHAR(500) NOT NULL DEFAULT '', operator VARCHAR(64) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_adjust_no (adjust_no), KEY idx_item (item_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材库存调整单'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_eam_consumable_transfer ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "transfer_no VARCHAR(40) NOT NULL COMMENT '调拨单号', "
+                + "item_id BIGINT NOT NULL, from_location_id BIGINT NOT NULL DEFAULT 0, from_location_name VARCHAR(200) DEFAULT '', "
+                + "to_location_id BIGINT NOT NULL DEFAULT 0, to_location_name VARCHAR(200) DEFAULT '', "
+                + "qty INT NOT NULL, unit_cost DECIMAL(16,6) DEFAULT NULL, amount DECIMAL(18,2) DEFAULT NULL, "
+                + "operator VARCHAR(64) DEFAULT '', created_by VARCHAR(64) DEFAULT '', "
+                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_transfer_no (transfer_no), KEY idx_item (item_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='耗材库存调拨单'");
+        log.info("耗材单据表（入库/入库明细/退料/调整/调拨）创建完成");
+    }
+
+    /** 购买公司字典表 */
+    private void createPurchaseCompanyDict() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS sys_purchase_company ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "code VARCHAR(32) NOT NULL COMMENT '公司稳定编码', "
+                + "name VARCHAR(128) NOT NULL COMMENT '公司全称', "
+                + "short_name VARCHAR(64) DEFAULT '' COMMENT '公司简称', "
+                + "status TINYINT NOT NULL DEFAULT 1 COMMENT '1=启用 0=停用', "
+                + "sort_order INT NOT NULL DEFAULT 0, "
+                + "remark VARCHAR(500) DEFAULT '', "
+                + "created_by VARCHAR(64) DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_by VARCHAR(64) DEFAULT '', updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_purchase_company_code (code)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='购买公司字典'");
+    }
+
+    /** 购买公司种子（与资产/员工现有硬编码公司一致，幂等按 code） */
+    private void seedPurchaseCompanyData() {
+        String[][] companies = {
+                {"SFCO", "珠海閃蜂科技有限公司", "閃蜂", "1"},
+                {"MFCO", "珠海麥峰科技有限公司", "mFood", "2"}
+        };
+        for (String[] c : companies) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_purchase_company (code, name, short_name, status, sort_order, updated_by, deleted) "
+                            + "VALUES (?, ?, ?, 1, ?, 'system', 0)",
+                    c[0], c[1], c[2], Integer.parseInt(c[3]));
+        }
+        log.info("购买公司字典种子写入完成");
+    }
+
+    /** 新增耗材入库 / 消耗统计菜单，并修正子菜单排序 */
+    private void seedConsumableDocMenus() {
+        Long groupId = queryLong("SELECT id FROM sys_menu WHERE menu_key = 'consumable-ops' AND deleted = 0 LIMIT 1");
+        if (groupId == null) {
+            log.warn("未找到 consumable-ops 分组，跳过耗材单据菜单创建");
+            return;
+        }
+        ensureMenu(groupId, "consumable-inbound", "耗材入庫", "/consumable-inbound", "ConsumableInbound",
+                "ImportOutlined", 3, "[\"view\",\"create\",\"edit\"]");
+        ensureMenu(groupId, "consumable-report", "消耗統計", "/consumable-report", "ConsumableReport",
+                "FundOutlined", 8, "[\"view\"]");
+        // 子菜单排序（入库紧随档案，领用/库存/流水/预警顺延）
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'consumable-claim' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE menu_key = 'consumable-stock' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 6 WHERE menu_key = 'consumable-stock-txn' AND deleted = 0");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 7 WHERE menu_key = 'consumable-alert' AND deleted = 0");
+        // 英文名
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Consumable Inbound' "
+                + "WHERE menu_key = 'consumable-inbound' AND deleted = 0 AND (name_en IS NULL OR name_en = '')");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Consumption Report' "
+                + "WHERE menu_key = 'consumable-report' AND deleted = 0 AND (name_en IS NULL OR name_en = '')");
+        grantAdminMenu("consumable-inbound", "[\"view\",\"create\",\"edit\"]");
+        grantAdminMenu("consumable-report", "[\"view\"]");
+        log.info("耗材入库 / 消耗统计菜单创建完成");
+    }
+
+    /** admin 角色授权某菜单（INSERT IGNORE + 自愈 actions） */
+    private void grantAdminMenu(String menuKey, String actionsJson) {
+        Long adminRoleId = queryLong("SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1");
+        if (adminRoleId == null) return;
+        jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                        + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0",
+                adminRoleId, actionsJson, menuKey);
+        jdbcTemplate.update(
+                "UPDATE sys_role_menu rm JOIN sys_menu m ON rm.menu_id = m.id "
+                        + "SET rm.actions = ? WHERE rm.role_id = ? AND m.menu_key = ? AND m.deleted = 0 "
+                        + "AND (rm.actions IS NULL OR rm.actions = '')",
+                actionsJson, adminRoleId, menuKey);
+    }
+
+    /** 入库/退料/调整/调拨单号规则种子 */
+    private void seedConsumableDocSeqRules() {
+        int affected = 0;
+        affected += seedRule("eam_consumable_inbound", "耗材入庫單號", "物資管理-耗材入庫", "HCRK", "YYYYMMDD", 4, 0,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        affected += seedRule("eam_consumable_return", "耗材退料單號", "物資管理-耗材領用", "HCTL", "YYYYMMDD", 4, 0,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        affected += seedRule("eam_consumable_adjust", "耗材調整單號", "物資管理-耗材庫存", "HCTZ", "YYYYMMDD", 4, 0,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        affected += seedRule("eam_consumable_transfer", "耗材調撥單號", "物資管理-耗材庫存", "HCDB", "YYYYMMDD", 4, 0,
+                "{prefix} + YYYYMMDD + {n}位自增序號");
+        if (affected > 0) {
+            bizSeqService.refreshRules();
+            log.info("已写入耗材单据编号规则种子（HCRK/HCTL/HCTZ/HCDB）");
         }
     }
 }

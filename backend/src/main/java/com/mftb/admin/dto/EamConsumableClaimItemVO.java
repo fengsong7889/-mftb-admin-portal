@@ -19,4 +19,10 @@ public class EamConsumableClaimItemVO {
     private Long locationId;
     private String locationName;
     private BigDecimal unitCost;
+    /** 实际出库加权均价 */
+    private BigDecimal actualUnitCost;
+    /** 出库成本金额 */
+    private BigDecimal amount;
+    /** 已退料数量 */
+    private Integer returnedQty;
 }

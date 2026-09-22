@@ -3,6 +3,7 @@ package com.mftb.admin.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -29,6 +30,18 @@ public class EamConsumableClaim {
 
     /** 申请部门 */
     private String department;
+
+    /** 承担部门 ID */
+    private Long departmentId;
+
+    /** 所属品牌 ID 快照 */
+    private Long companyBrand;
+
+    /** 购买公司 ID 快照 */
+    private Long purchaseCompanyId;
+
+    /** 购买公司名称快照 */
+    private String purchaseCompany;
 
     /** 领用事由 */
     private String reason;
@@ -59,6 +72,9 @@ public class EamConsumableClaim {
 
     /** 取消原因 */
     private String cancelReason;
+
+    /** 出库成本合计 */
+    private BigDecimal costAmount;
 
     private String createdBy;
 

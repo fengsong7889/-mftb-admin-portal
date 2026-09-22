@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.math.BigDecimal;
+
 /**
  * 耗材库存 Mapper
  * <p>
@@ -21,24 +23,42 @@ public interface EamConsumableStockMapper extends BaseMapper<EamConsumableStock>
     EamConsumableStock selectForUpdate(@Param("itemId") long itemId, @Param("locationId") long locationId);
 
     /**
-     * 入库（采购/手工/盘盈）：不存在则插入，存在则累加。
-     * ON DUPLICATE KEY 依赖 uk_item_location 唯一键，保证并发下只有一行。
+     * 入库（采购/手工/期初）：不存在则插入，存在则累加，并按移动加权平均更新成本。
+     * ON DUPLICATE KEY 依赖 uk_item_location 唯一键，保证并发下只有一行；
+     * 赋值从左到右求值，avg_cost 在 qty/total_cost 已更新后重算 = 新成本金额 / 新数量。
+     *
+     * @param amount 本次入库成本金额（数量 × 实际入库单价）
      */
-    @Update("INSERT INTO biz_eam_consumable_stock (item_id, location_id, location_name, qty, locked_qty, version) "
-            + "VALUES (#{itemId}, #{locationId}, #{locationName}, #{qty}, 0, 0) "
-            + "ON DUPLICATE KEY UPDATE qty = qty + #{qty}, location_name = VALUES(location_name), version = version + 1")
+    @Update("INSERT INTO biz_eam_consumable_stock "
+            + "(item_id, location_id, location_name, qty, locked_qty, version, avg_cost, total_cost, "
+            + " company_brand, purchase_company_id, purchase_company, updated_by) "
+            + "VALUES (#{itemId}, #{locationId}, #{locationName}, #{qty}, 0, 0, #{amount}, #{amount}, "
+            + " #{companyBrand}, #{purchaseCompanyId}, #{purchaseCompany}, #{updatedBy}) "
+            + "ON DUPLICATE KEY UPDATE "
+            + " qty = qty + #{qty}, "
+            + " total_cost = total_cost + #{amount}, "
+            + " avg_cost = CASE WHEN (qty + #{qty}) <= 0 THEN 0 ELSE (total_cost + #{amount}) / (qty + #{qty}) END, "
+            + " location_name = VALUES(location_name), updated_by = VALUES(updated_by), version = version + 1")
     int inbound(@Param("itemId") long itemId, @Param("locationId") long locationId,
-                @Param("locationName") String locationName, @Param("qty") int qty);
+                @Param("locationName") String locationName, @Param("qty") int qty,
+                @Param("amount") BigDecimal amount, @Param("companyBrand") Long companyBrand,
+                @Param("purchaseCompanyId") Long purchaseCompanyId, @Param("purchaseCompany") String purchaseCompany,
+                @Param("updatedBy") String updatedBy);
 
     /** 领用提交时占用库存：仅当「可用量(qty-locked_qty) >= 申请量」时锁定成功 */
     @Update("UPDATE biz_eam_consumable_stock SET locked_qty = locked_qty + #{qty}, version = version + 1 "
             + "WHERE item_id = #{itemId} AND location_id = #{locationId} AND (qty - locked_qty) >= #{qty}")
     int lock(@Param("itemId") long itemId, @Param("locationId") long locationId, @Param("qty") int qty);
 
-    /** 出库核销：同时扣减实际库存与占用量，双重条件防超卖 */
-    @Update("UPDATE biz_eam_consumable_stock SET qty = qty - #{qty}, locked_qty = locked_qty - #{qty}, version = version + 1 "
+    /**
+     * 出库核销：同时扣减实际库存与占用量，并结转成本（newTotalCost 由服务层基于 FOR UPDATE 快照算出）。
+     * 双重条件防超卖；调用前已 selectForUpdate 锁行，total_cost/avg_cost 写入确定值避免并发漂移。
+     */
+    @Update("UPDATE biz_eam_consumable_stock SET qty = qty - #{qty}, locked_qty = locked_qty - #{qty}, "
+            + "total_cost = #{newTotalCost}, updated_by = #{updatedBy}, version = version + 1 "
             + "WHERE item_id = #{itemId} AND location_id = #{locationId} AND qty >= #{qty} AND locked_qty >= #{qty}")
-    int deductOnIssue(@Param("itemId") long itemId, @Param("locationId") long locationId, @Param("qty") int qty);
+    int deductOnIssue(@Param("itemId") long itemId, @Param("locationId") long locationId, @Param("qty") int qty,
+                      @Param("newTotalCost") BigDecimal newTotalCost, @Param("updatedBy") String updatedBy);
 
     /** 释放占用（驳回/撤销领用）：仅回退 locked_qty，不动实际库存 */
     @Update("UPDATE biz_eam_consumable_stock SET locked_qty = locked_qty - #{qty}, version = version + 1 "

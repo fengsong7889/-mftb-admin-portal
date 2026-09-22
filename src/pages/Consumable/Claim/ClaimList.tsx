@@ -9,7 +9,7 @@ import { Button, Table, Tabs, Modal, message, Space, Tag, Input, Form } from 'an
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import {
-  fetchConsumableClaims, fetchMyConsumableClaims, cancelConsumableClaim,
+  fetchConsumableClaims, fetchMyConsumableClaims, cancelConsumableClaim, issueConsumableClaim,
   type ConsumableClaim,
 } from '../../../api/consumable'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -20,7 +20,7 @@ interface Props {
   onDetail: (id: number) => void
 }
 
-type TabKey = 'all' | 'issued' | 'mine'
+type TabKey = 'all' | 'pending' | 'issued' | 'mine'
 
 export default function ClaimList({ onAdd, onDetail }: Props) {
   const { hasPermission } = useAuth()
@@ -40,7 +40,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
     setLoading(true)
     try {
       const statusMap: Record<TabKey, string | undefined> = {
-        all: undefined, issued: 'issued', mine: undefined,
+        all: undefined, pending: 'pending', issued: 'issued', mine: undefined,
       }
       const res = tab === 'mine'
         ? await fetchMyConsumableClaims({ page, size })
@@ -59,6 +59,33 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
   const handleExport = () => {
     if (rows.length === 0) { message.warning('暫無數據可導出'); return }
     message.success('導出成功')
+  }
+
+  const handleIssue = (record: ConsumableClaim) => {
+    Modal.confirm({
+      title: '確認發放？',
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>領用單號：</span><b>{record.claimNo}</b></div>
+          <div className="confirm-info-row"><span>申請人：</span><b>{record.applicantName}</b></div>
+          <div className="confirm-info-row"><span>總數量：</span><b>{record.totalQty}</b></div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>发放后按移动加权均价扣减库存并结转实际成本，不可撤销。</div>
+        </div>
+      ),
+      okText: '確認發放',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await issueConsumableClaim(record.id)
+          message.success('已發放，庫存已扣減')
+          loadData()
+        } catch (e: unknown) {
+          message.error(e instanceof Error ? e.message : '發放失敗')
+        }
+      },
+    })
   }
 
   const handleCancel = (record: ConsumableClaim) => {
@@ -105,6 +132,9 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
       render: (_: unknown, record: ConsumableClaim) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => onDetail(record.id)}>詳情</Button>
+          {canManage && (record.status === 'pending' || record.status === 'approved') && (
+            <Button type="link" size="small" onClick={() => handleIssue(record)}>發放</Button>
+          )}
           {(canManage || tab === 'mine') && (record.status === 'pending' || record.status === 'approved') && (
             <Button type="link" size="small" danger onClick={() => handleCancel(record)}>撤銷</Button>
           )}
@@ -145,6 +175,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
         items={[
           ...(canViewAll ? [
             { key: 'all', label: '全部' },
+            { key: 'pending', label: '待發放' },
             { key: 'issued', label: '已出庫' },
           ] : []),
           { key: 'mine', label: '我的領用' },

@@ -12,8 +12,7 @@ import {
   fetchConsumableItemOptions, submitConsumableClaim, type ConsumableItem,
 } from '../../../api/consumable'
 import { fetchLocationList, type AssetLocation } from '../../../api/eam'
-import { fetchEmployeeOptions } from '../../../api/employee'
-import type { OptionItem } from '../../../api/types'
+import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { useAuth } from '../../../contexts/AuthContext'
 
 interface LineForm {
@@ -37,28 +36,28 @@ export default function ClaimForm({ onBack }: Props) {
   const [form] = Form.useForm<FormValues>()
   const [items, setItems] = useState<ConsumableItem[]>([])
   const [locations, setLocations] = useState<AssetLocation[]>([])
-  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
+  const [employees, setEmployees] = useState<EmployeeItem[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [employeeLoading, setEmployeeLoading] = useState(false)
 
   useEffect(() => {
     fetchConsumableItemOptions().then(setItems).catch((e: Error) => message.error(e.message))
     fetchLocationList().then(setLocations).catch(() => { /* 仓库可空，降级为空列表 */ })
-    // 加载员工选项（用于领用人选择）
+    // 加载员工选项（applicantId = sys_user 主键 id）
     setEmployeeLoading(true)
-    fetchEmployeeOptions('').then((opts) => {
-      setEmployeeOptions(opts)
-      // 默认选中当前登录人
-      if (user?.empId) {
-        const currentEmp = opts.find(o => {
-          // OptionItem.value 是员工 ID（数字字符串），需要通过 empId 匹配
-          // 这里我们直接用 name 匹配
-          return o.label.includes(user.name)
-        })
-        if (currentEmp) form.setFieldsValue({ applicantId: Number(currentEmp.value) })
-      }
+    fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' }).then((res) => {
+      const list = res.records || []
+      setEmployees(list)
+      // 默认选中当前登录人（按工号匹配）
+      const me = user?.empId ? list.find(e => e.empId === user.empId) : undefined
+      if (me) form.setFieldsValue({ applicantId: me.id })
     }).catch(() => { /* 忽略 */ }).finally(() => setEmployeeLoading(false))
-  }, [form, user?.empId, user?.name])
+  }, [form, user?.empId])
+
+  const applicantOptions = employees.map(e => {
+    const extra = [e.department, e.position].filter(Boolean).join(' / ')
+    return { label: `${e.name}（${e.empId}）${extra ? ' · ' + extra : ''}`, value: e.id }
+  })
 
   const itemOptions = items.map(it => ({
     label: `${it.name}${it.spec ? ' / ' + it.spec : ''}（可用 ${it.availableQty} ${it.unit}）`,
@@ -84,7 +83,7 @@ export default function ClaimForm({ onBack }: Props) {
     setSubmitting(true)
     try {
       await submitConsumableClaim(payload)
-      message.success('領用成功，庫存已扣減')
+      message.success('領用已提交，待倉管發放')
       onBack()
     } catch (e: unknown) {
       message.error(e instanceof Error ? e.message : '提交失敗')
@@ -102,7 +101,7 @@ export default function ClaimForm({ onBack }: Props) {
     }
     const lines = (values.items || []).filter(l => l && l.itemId != null && (l.qty ?? 0) > 0)
     const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0)
-    const applicantName = employeeOptions.find(o => Number(o.value) === values.applicantId)?.label ?? '当前登录人'
+    const applicantName = employees.find(e => e.id === values.applicantId)?.name ?? '当前登録人'
     Modal.confirm({
       title: '確認領用？',
       className: 'custom-confirm-modal',
@@ -112,7 +111,7 @@ export default function ClaimForm({ onBack }: Props) {
           <div className="confirm-info-row"><span>領用人：</span><b>{applicantName}</b></div>
           <div className="confirm-info-row"><span>明細數量：</span><b>{lines.length} 項 / 共 {totalQty}</b></div>
           <div className="confirm-info-row"><span>領用事由：</span><b>{values.reason}</b></div>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>提交後系統將自動通過並直接扣減庫存，無需審批。</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>提交後進入待發放，倉管確認發放時扣減庫存並結轉實際成本。</div>
         </div>
       ),
       okText: '確認領用',
@@ -152,7 +151,7 @@ export default function ClaimForm({ onBack }: Props) {
                 showSearch
                 optionFilterProp="label"
                 loading={employeeLoading}
-                options={employeeOptions}
+                options={applicantOptions}
               />
             </Form.Item>
             <Form.Item label="領用事由" name="reason" rules={[{ required: true, message: '請填寫領用事由' }]} style={{ marginBottom: 0 }}>

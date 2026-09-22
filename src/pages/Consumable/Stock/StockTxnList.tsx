@@ -110,6 +110,9 @@ export default function StockTxnList() {
     { title: '耗材名稱', dataIndex: 'itemName', key: 'itemName', width: 150, ellipsis: true },
     { title: '倉庫', dataIndex: 'locationName', key: 'locationName', width: 120, render: (v: string) => v || '-' },
     { title: '變動數量', dataIndex: 'qty', key: 'qty', width: 90, align: 'right', render: (v: number) => <span style={{ color: v >= 0 ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}>{v > 0 ? `+${v}` : v}</span> },
+    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: (v?: number) => (v != null ? <span style={{ color: v >= 0 ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}>{v > 0 ? `+¥${v.toFixed(2)}` : `¥${v.toFixed(2)}`}</span> : '-') },
+    { title: '領用人', dataIndex: 'applicantName', key: 'applicantName', width: 100, render: (v: string) => v || '-' },
+    { title: '部門', dataIndex: 'department', key: 'department', width: 120, ellipsis: true, render: (v: string) => v || '-' },
     { title: '變動前庫存', dataIndex: 'beforeQty', key: 'beforeQty', width: 100, align: 'right' },
     { title: '變動後庫存', dataIndex: 'afterQty', key: 'afterQty', width: 100, align: 'right' },
     { title: '操作人', dataIndex: 'operator', key: 'operator', width: 100, render: (v: string) => v || '-' },
@@ -124,6 +127,9 @@ export default function StockTxnList() {
     { key: 'itemName', title: '耗材名稱' },
     { key: 'locationName', title: '倉庫' },
     { key: 'qty', title: '變動數量' },
+    { key: 'amount', title: '成本金額' },
+    { key: 'applicantName', title: '領用人' },
+    { key: 'department', title: '部門' },
     { key: 'beforeQty', title: '變動前庫存' },
     { key: 'afterQty', title: '變動後庫存' },
     { key: 'operator', title: '操作人' },
@@ -180,7 +186,7 @@ export default function StockTxnList() {
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1700 }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,

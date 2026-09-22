@@ -5,16 +5,19 @@
  * 低库存行以橙色「預警」标签提示（可用库存 < 安全库存）
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Button, Form, Input, Select, Table, Modal, message, Space, Tag, Switch, DatePicker } from 'antd'
+import { Button, Form, Input, Select, Table, Modal, message, Space, Tag, Switch, DatePicker, TreeSelect } from 'antd'
 import type { TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItems, deleteConsumableItem, toggleConsumableItemStatus,
-  fetchConsumableCategoryOptions, fetchConsumableBrandOptions,
-  type ConsumableItem, type ConsumableCategory, type ConsumableBrand,
+  fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchPurchaseCompanyOptions,
+  type ConsumableItem, type ConsumableCategory, type ConsumableBrand, type PurchaseCompany,
 } from '../../../api/consumable'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import BrandTag from '../../../components/BrandTag'
+import { buildTree, toTreeSelectData } from '../../AssetManagement/eamUtils'
 
 const { RangePicker } = DatePicker
 
@@ -29,6 +32,8 @@ interface SearchFormValues {
   name?: string
   categoryId?: number
   brand?: string
+  companyBrand?: number
+  purchaseCompanyId?: number
   unit?: string
   status?: string
   updatedBy?: string
@@ -44,13 +49,17 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
   const [size, setSize] = useState(10)
   const [categories, setCategories] = useState<ConsumableCategory[]>([])
   const [brands, setBrands] = useState<ConsumableBrand[]>([])
+  const [companies, setCompanies] = useState<PurchaseCompany[]>([])
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const { numericOptions: companyBrandOptions } = useCompanyBrand()
 
   // 搜索条件
   const [qItemCode, setQItemCode] = useState<string>()
   const [qName, setQName] = useState<string>()
   const [qCategory, setQCategory] = useState<number>()
   const [qBrand, setQBrand] = useState<string>()
+  const [qCompanyBrand, setQCompanyBrand] = useState<number>()
+  const [qPurchaseCompanyId, setQPurchaseCompanyId] = useState<number>()
   const [qUnit, setQUnit] = useState<string>()
   const [qStatus, setQStatus] = useState<string>()
   const [qUpdatedBy, setQUpdatedBy] = useState<string>()
@@ -62,7 +71,8 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     try {
       const res = await fetchConsumableItems({
         page, size, itemCode: qItemCode, name: qName, categoryId: qCategory,
-        brand: qBrand, unit: qUnit, status: qStatus, updatedBy: qUpdatedBy,
+        brand: qBrand, companyBrand: qCompanyBrand, purchaseCompanyId: qPurchaseCompanyId,
+        unit: qUnit, status: qStatus, updatedBy: qUpdatedBy,
         updateTimeStart: qTimeStart, updateTimeEnd: qTimeEnd,
       })
       setItems(res.records)
@@ -72,21 +82,26 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [page, size, qItemCode, qName, qCategory, qBrand, qUnit, qStatus, qUpdatedBy, qTimeStart, qTimeEnd])
+  }, [page, size, qItemCode, qName, qCategory, qBrand, qCompanyBrand, qPurchaseCompanyId, qUnit, qStatus, qUpdatedBy, qTimeStart, qTimeEnd])
 
   useEffect(() => { loadData() }, [loadData])
   useEffect(() => {
     fetchConsumableCategoryOptions().then(setCategories).catch(() => { /* 忽略：分类仅用于筛选下拉 */ })
     fetchConsumableBrandOptions().then(setBrands).catch(() => { /* 忽略 */ })
+    fetchPurchaseCompanyOptions().then(setCompanies).catch(() => { /* 忽略 */ })
   }, [])
 
-  const categoryOptions = useMemo(
-    () => categories.map(c => ({ label: c.name, value: c.id })),
+  const categoryTreeData = useMemo(
+    () => toTreeSelectData(buildTree(categories)),
     [categories],
   )
   const brandOptions = useMemo(
     () => brands.map(b => ({ label: b.name, value: b.name })),
     [brands],
+  )
+  const companyOptions = useMemo(
+    () => companies.map(c => ({ label: c.name, value: c.id })),
+    [companies],
   )
 
   const handleSearch = () => {
@@ -96,6 +111,8 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     setQName(v.name?.trim() || undefined)
     setQCategory(v.categoryId)
     setQBrand(v.brand?.trim() || undefined)
+    setQCompanyBrand(v.companyBrand)
+    setQPurchaseCompanyId(v.purchaseCompanyId)
     setQUnit(v.unit?.trim() || undefined)
     setQStatus(v.status)
     setQUpdatedBy(v.updatedBy?.trim() || undefined)
@@ -107,7 +124,7 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     form.resetFields()
     setPage(1)
     setQItemCode(undefined); setQName(undefined); setQCategory(undefined)
-    setQBrand(undefined); setQUnit(undefined); setQStatus(undefined)
+    setQBrand(undefined); setQCompanyBrand(undefined); setQPurchaseCompanyId(undefined); setQUnit(undefined); setQStatus(undefined)
     setQUpdatedBy(undefined); setQTimeStart(undefined); setQTimeEnd(undefined)
   }
 
@@ -162,6 +179,8 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
   const columnMeta = useMemo(() => [
     { key: 'itemCode', title: '耗材編碼' },
     { key: 'name', title: '耗材名稱' },
+    { key: 'companyBrand', title: '所屬品牌' },
+    { key: 'purchaseCompanyName', title: '購買公司' },
     { key: 'categoryName', title: '耗材分類' },
     { key: 'brand', title: '耗材品牌' },
     { key: 'spec', title: '規格型號' },
@@ -181,6 +200,10 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     { title: '耗材編碼', dataIndex: 'itemCode', key: 'itemCode', width: 120, ellipsis: true,
       render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span> },
     { title: '耗材名稱', dataIndex: 'name', key: 'name', width: 140, ellipsis: true },
+    { title: '所屬品牌', dataIndex: 'companyBrand', key: 'companyBrand', width: 96,
+      render: (v: number | null) => (v ? <BrandTag value={v} /> : '待確認') },
+    { title: '購買公司', dataIndex: 'purchaseCompanyName', key: 'purchaseCompanyName', width: 150, ellipsis: true,
+      render: (v: string) => v || '待確認' },
     { title: '耗材分類', dataIndex: 'categoryName', key: 'categoryName', width: 110, ellipsis: true,
       render: (v: string) => v || '-' },
     { title: '耗材品牌', dataIndex: 'brand', key: 'brand', width: 100, ellipsis: true, render: (v: string) => v || '-' },
@@ -230,8 +253,15 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
           <Form.Item label="耗材名稱" name="name">
             <Input placeholder="名稱" allowClear onPressEnter={handleSearch} />
           </Form.Item>
+          <Form.Item label="所屬品牌" name="companyBrand">
+            <Select placeholder="全部" allowClear showSearch optionFilterProp="label" options={companyBrandOptions} />
+          </Form.Item>
+          <Form.Item label="購買公司" name="purchaseCompanyId">
+            <Select placeholder="全部" allowClear showSearch optionFilterProp="label" options={companyOptions} />
+          </Form.Item>
           <Form.Item label="耗材分類" name="categoryId">
-            <Select placeholder="全部分類" allowClear showSearch optionFilterProp="label" options={categoryOptions} />
+            <TreeSelect treeData={categoryTreeData} placeholder="全部分類" allowClear showSearch
+              treeDefaultExpandAll treeNodeFilterProp="title" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item label="耗材品牌" name="brand">
             <Select placeholder="全部品牌" allowClear showSearch optionFilterProp="label" options={brandOptions} />
@@ -278,7 +308,7 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
-        scroll={{ x: 1505 }}
+        scroll={{ x: 1750 }}
         pagination={{
           current: page, pageSize: size, total,
           showSizeChanger: true, showQuickJumper: true,

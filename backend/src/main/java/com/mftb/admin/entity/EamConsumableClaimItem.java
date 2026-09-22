@@ -42,6 +42,21 @@ public class EamConsumableClaimItem {
     /** 出库仓库名称快照 */
     private String locationName;
 
-    /** 出库成本单价快照（取参考价） */
+    /** 出库成本单价快照（历史兼容：曾取参考价） */
     private BigDecimal unitCost;
+
+    /** 所属品牌 ID 快照 */
+    private Long companyBrand;
+
+    /** 购买公司 ID 快照 */
+    private Long purchaseCompanyId;
+
+    /** 实际出库加权均价 */
+    private BigDecimal actualUnitCost;
+
+    /** 出库成本金额 */
+    private BigDecimal amount;
+
+    /** 已退料数量 */
+    private Integer returnedQty;
 }

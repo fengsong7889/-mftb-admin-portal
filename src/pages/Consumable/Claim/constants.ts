@@ -4,7 +4,7 @@
 export type ClaimStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'cancelled'
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
-  pending: '待審批',
+  pending: '待發放',
   approved: '待出庫',
   rejected: '已駁回',
   issued: '已出庫',

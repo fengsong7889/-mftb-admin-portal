@@ -20,6 +20,14 @@ public class EamConsumableItemVO {
     private Long brandId;
     private String brandName;
     private String brand;
+    /** 所属品牌 ID（sys_company_brand） */
+    private Long companyBrand;
+    /** 所属品牌名称（閃蜂/mFood） */
+    private String companyBrandName;
+    /** 购买公司 ID */
+    private Long purchaseCompanyId;
+    /** 购买公司名称 */
+    private String purchaseCompanyName;
     private String spec;
     private String unit;
     private BigDecimal refPrice;

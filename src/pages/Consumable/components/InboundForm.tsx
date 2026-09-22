@@ -140,8 +140,8 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
             <Form.Item label="入庫數量" name="qty" rules={[{ required: true, message: '請填寫入庫數量' }]}>
               <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="正整數" />
             </Form.Item>
-            <Form.Item label="入庫單價（元）" name="unitCost">
-              <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="成本核算用" />
+            <Form.Item label="入庫單價（元）" name="unitCost" rules={[{ required: true, message: '請填寫實際入庫單價' }]}>
+              <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="實際入庫單價（成本核算必填）" />
             </Form.Item>
           </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>

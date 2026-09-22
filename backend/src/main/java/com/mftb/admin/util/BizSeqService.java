@@ -119,6 +119,14 @@ public class BizSeqService {
     public static final String RULE_EAM_CONSUMABLE_ITEM = "eam_consumable_item";
     /** EAM 耗材领用单号 */
     public static final String RULE_EAM_CONSUMABLE_CLAIM = "eam_consumable_claim";
+    /** EAM 耗材入库单号 */
+    public static final String RULE_EAM_CONSUMABLE_INBOUND = "eam_consumable_inbound";
+    /** EAM 耗材退料单号 */
+    public static final String RULE_EAM_CONSUMABLE_RETURN = "eam_consumable_return";
+    /** EAM 耗材库存调整单号 */
+    public static final String RULE_EAM_CONSUMABLE_ADJUST = "eam_consumable_adjust";
+    /** EAM 耗材库存调拨单号 */
+    public static final String RULE_EAM_CONSUMABLE_TRANSFER = "eam_consumable_transfer";
     /** EAM 盘点任务编号 */
     public static final String RULE_EAM_INVENTORY = "eam_inventory";
     /** EAM 遗失编号 */

@@ -15,6 +15,10 @@ public class EamConsumableItemSaveDTO {
     private Long consumableCategoryId;
     private Long brandId;
     private String brand;
+    /** 所属品牌 ID（sys_company_brand） */
+    private Long companyBrand;
+    /** 购买公司 ID（sys_purchase_company） */
+    private Long purchaseCompanyId;
     private String spec;
     private String unit;
     private BigDecimal refPrice;

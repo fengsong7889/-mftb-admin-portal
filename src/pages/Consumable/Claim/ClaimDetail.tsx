@@ -130,14 +130,14 @@ export default function ClaimDetail({ id, onBack }: Props) {
     { title: '規格型號', dataIndex: 'spec', key: 'spec', width: 140, ellipsis: true, render: (v: string) => v || '-' },
     { title: '出庫倉庫', dataIndex: 'locationName', key: 'locationName', width: 130, render: (v: string) => v || '-' },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 90, align: 'right', render: (v: number, r) => `${v} ${r.unit ?? ''}` },
-    { title: '成本單價', dataIndex: 'unitCost', key: 'unitCost', width: 100, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
-    { title: '小計', key: 'subtotal', width: 100, align: 'right', render: (_: unknown, r) => `¥${((r.unitCost ?? 0) * r.qty).toFixed(2)}` },
+    { title: '成本單價', dataIndex: 'actualUnitCost', key: 'actualUnitCost', width: 100, align: 'right', render: (v: number | undefined, r) => `¥${((v ?? r.unitCost ?? 0)).toFixed(2)}` },
+    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 100, align: 'right', render: (v: number | undefined, r) => `¥${(v ?? (r.unitCost ?? 0) * r.qty).toFixed(2)}` },
   ]
 
   if (!claim) return <Spin spinning={loading}><div style={{ minHeight: 200 }} /></Spin>
 
   const status = claim.status as ClaimStatus
-  const totalAmount = claim.items.reduce((s, i) => s + (i.unitCost ?? 0) * i.qty, 0)
+  const totalAmount = claim.costAmount ?? claim.items.reduce((s, i) => s + (i.amount ?? (i.unitCost ?? 0) * i.qty), 0)
 
   return (
     <Spin spinning={loading}>
@@ -154,8 +154,8 @@ export default function ClaimDetail({ id, onBack }: Props) {
         <Space>
           {canManage && status === 'pending' && (
             <>
-              <Button danger onClick={() => handleApprove(false)}>駁回</Button>
-              <Button type="primary" onClick={() => handleApprove(true)}>審批通過</Button>
+              <Button danger onClick={() => handleApprove(false)}>拒絕</Button>
+              <Button type="primary" onClick={handleIssue}>確認發放</Button>
             </>
           )}
           {canManage && status === 'approved' && (

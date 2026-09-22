@@ -87,6 +87,8 @@ export default function StockList({ onInbound }: Props) {
     { title: '可用庫存', dataIndex: 'availableQty', key: 'availableQty', width: 110, align: 'right',
       render: (v: number, r) => <b style={{ color: r.alert ? '#FF4D4F' : '#262626' }}>{v}</b> },
     { title: '安全庫存', dataIndex: 'safetyStock', key: 'safetyStock', width: 90, align: 'right', render: (v: number) => (v > 0 ? v : '-') },
+    { title: '加權均價', dataIndex: 'avgCost', key: 'avgCost', width: 100, align: 'right', render: (v?: number) => (v != null ? `¥${v.toFixed(2)}` : '-') },
+    { title: '庫存成本', dataIndex: 'totalCost', key: 'totalCost', width: 120, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
     { title: '狀態', key: 'alert', width: 90, render: (_: unknown, r) => (r.alert ? <Tag color="orange">預警</Tag> : <Tag color="green">正常</Tag>) },
     { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, ellipsis: true, render: (v: string) => v || '-' },
     { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 165, render: (v: string) => v || '-' },
@@ -108,6 +110,8 @@ export default function StockList({ onInbound }: Props) {
     { key: 'lockedQty', title: '審批佔用' },
     { key: 'availableQty', title: '可用庫存' },
     { key: 'safetyStock', title: '安全庫存' },
+    { key: 'avgCost', title: '加權均價' },
+    { key: 'totalCost', title: '庫存成本' },
     { key: 'alert', title: '狀態' },
     { key: 'updatedBy', title: '最後更新人' },
     { key: 'updatedAt', title: '最後更新時間' },
@@ -165,7 +169,7 @@ export default function StockList({ onInbound }: Props) {
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1720 }}
         pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (t) => `共 ${t} 條` }}
       />
     </>

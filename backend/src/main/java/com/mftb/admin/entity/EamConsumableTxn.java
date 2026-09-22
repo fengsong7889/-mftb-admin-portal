@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -48,6 +49,36 @@ public class EamConsumableTxn {
 
     /** 入库单价（成本核算） */
     private BigDecimal unitCost;
+
+    /** 变动成本金额（入库正/出库负） */
+    private BigDecimal amount;
+
+    /** 所属品牌 ID 快照 */
+    private Long companyBrand;
+
+    /** 购买公司 ID 快照 */
+    private Long purchaseCompanyId;
+
+    /** 承担部门 ID */
+    private Long departmentId;
+
+    /** 承担部门名称快照 */
+    private String department;
+
+    /** 领用人 ID（sys_user.id） */
+    private Long applicantId;
+
+    /** 领用人工号 */
+    private String applicantEmpId;
+
+    /** 领用人姓名 */
+    private String applicantName;
+
+    /** 业务记账日期 */
+    private LocalDate bizDate;
+
+    /** 幂等键（来源单据行） */
+    private String idempotencyKey;
 
     /** 关联单据类型：claim/adjust */
     private String refType;

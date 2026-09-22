@@ -63,6 +63,14 @@ export interface ConsumableItem {
   brandId?: number | null
   brandName?: string
   brand?: string
+  /** 所属品牌 ID（sys_company_brand：閃蜂/mFood） */
+  companyBrand?: number | null
+  /** 所属品牌名称 */
+  companyBrandName?: string
+  /** 购买公司 ID */
+  purchaseCompanyId?: number | null
+  /** 购买公司名称 */
+  purchaseCompanyName?: string
   spec?: string
   unit: string
   refPrice?: number
@@ -93,6 +101,10 @@ export interface ConsumableItemSave {
   consumableCategoryId?: number | null
   brandId?: number | null
   brand?: string
+  /** 所属品牌 ID（sys_company_brand） */
+  companyBrand?: number | null
+  /** 购买公司 ID（sys_purchase_company） */
+  purchaseCompanyId?: number | null
   spec?: string
   unit: string
   refPrice?: number
@@ -113,12 +125,20 @@ export interface ConsumableStock {
   spec?: string
   unit?: string
   categoryName?: string
+  /** 所属品牌 ID 快照 */
+  companyBrand?: number
+  /** 购买公司名称快照 */
+  purchaseCompanyName?: string
   locationId: number
   locationName?: string
   qty: number
   lockedQty: number
   availableQty: number
   safetyStock: number
+  /** 移动加权平均单位成本 */
+  avgCost?: number
+  /** 库存账面成本金额 */
+  totalCost?: number
   alert: boolean
   updatedBy?: string
   updatedAt?: string
@@ -138,6 +158,14 @@ export interface ConsumableTxn {
   beforeQty: number
   afterQty: number
   unitCost?: number
+  /** 变动成本金额（入库正/出库负） */
+  amount?: number
+  companyBrand?: number
+  purchaseCompanyId?: number
+  department?: string
+  applicantEmpId?: string
+  applicantName?: string
+  bizDate?: string
   refType?: string
   refId?: number
   operator?: string
@@ -157,6 +185,12 @@ export interface ConsumableClaimItem {
   locationId?: number
   locationName?: string
   unitCost?: number
+  /** 实际出库加权均价 */
+  actualUnitCost?: number
+  /** 出库成本金额 */
+  amount?: number
+  /** 已退料数量 */
+  returnedQty?: number
 }
 
 /** 领用单 */
@@ -167,7 +201,18 @@ export interface ConsumableClaim {
   applicantName: string
   applicantEmpId?: string
   department?: string
+  /** 承担部门 ID */
+  departmentId?: number
+  /** 所属品牌 ID 快照 */
+  companyBrand?: number
+  /** 购买公司 ID 快照 */
+  purchaseCompanyId?: number
+  /** 购买公司名称快照 */
+  purchaseCompany?: string
+  /** 出库成本合计 */
+  costAmount?: number
   reason: string
+  /** pending=待發放(新流程), approved=待出庫(历史), issued=已出庫 */
   status: 'pending' | 'approved' | 'rejected' | 'issued' | 'cancelled'
   approverId?: number
   approverName?: string
@@ -216,6 +261,19 @@ export interface ConsumableInbound {
   remark?: string
 }
 
+/** 购买公司字典选项（耗材/资产表单用） */
+export interface PurchaseCompany {
+  id: number
+  code: string
+  name: string
+  shortName?: string
+}
+
+/** 启用购买公司下拉（登录即可） */
+export function fetchPurchaseCompanyOptions() {
+  return request.get<unknown, PurchaseCompany[]>('/purchase-companies')
+}
+
 /* ==================== 看板 ==================== */
 
 export function fetchConsumableDashboard() {
@@ -237,6 +295,10 @@ export function fetchConsumableItems(params?: {
   brand?: string
   /** 品牌 ID（精确，用于品牌页两级视图） */
   brandId?: number
+  /** 所属品牌 ID（精确） */
+  companyBrand?: number
+  /** 购买公司 ID（精确） */
+  purchaseCompanyId?: number
   /** 计量单位 */
   unit?: string
   status?: string

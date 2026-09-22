@@ -40,6 +40,15 @@ public class EamConsumableItem {
     /** 品牌 */
     private String brand;
 
+    /** 所属品牌 ID（sys_company_brand：閃蜂/mFood），与厂商品牌 brand 独立 */
+    private Long companyBrand;
+
+    /** 购买公司 ID（sys_purchase_company） */
+    private Long purchaseCompanyId;
+
+    /** 购买公司名称快照 */
+    private String purchaseCompany;
+
     /** 规格型号 */
     private String spec;
 

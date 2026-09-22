@@ -7,6 +7,8 @@ import com.mftb.admin.dto.*;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
 import com.mftb.admin.service.EamConsumableService;
+import com.mftb.admin.service.SysCompanyBrandService;
+import com.mftb.admin.service.SysPurchaseCompanyService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ import java.util.stream.Collectors;
 public class EamConsumableServiceImpl implements EamConsumableService {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter TXN_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final EamConsumableItemMapper itemMapper;
@@ -44,8 +47,9 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     private final EamConsumableClaimMapper claimMapper;
     private final EamCategoryMapper categoryMapper;
     private final EamLocationMapper locationMapper;
-    private final ConsumableCategoryMapper consumableCategoryMapper;
-    private final ConsumableBrandMapper consumableBrandMapper;
+    private final EamBrandMapper brandMapper;
+    private final SysCompanyBrandService companyBrandService;
+    private final SysPurchaseCompanyService purchaseCompanyService;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -67,6 +71,8 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         if (StringUtils.hasText(query.getName())) wrapper.like(EamConsumableItem::getName, query.getName().trim());
         if (StringUtils.hasText(query.getBrand())) wrapper.like(EamConsumableItem::getBrand, query.getBrand().trim());
         if (query.getBrandId() != null) wrapper.eq(EamConsumableItem::getBrandId, query.getBrandId());
+        if (query.getCompanyBrand() != null) wrapper.eq(EamConsumableItem::getCompanyBrand, query.getCompanyBrand());
+        if (query.getPurchaseCompanyId() != null) wrapper.eq(EamConsumableItem::getPurchaseCompanyId, query.getPurchaseCompanyId());
         // 单位不再是字典下拉（已废弃 biz_consumable_unit），改为自由文本，因此用模糊匹配
         if (StringUtils.hasText(query.getUnit())) wrapper.like(EamConsumableItem::getUnit, query.getUnit().trim());
         if (StringUtils.hasText(query.getUpdatedBy())) wrapper.like(EamConsumableItem::getUpdatedBy, query.getUpdatedBy().trim());
@@ -205,22 +211,28 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     public void inbound(EamConsumableInboundDTO dto) {
         if (dto.getItemId() == null) throw new BusinessException("請選擇耗材");
         if (dto.getQty() == null || dto.getQty() <= 0) throw new BusinessException("入庫數量必須大於 0");
+        if (dto.getUnitCost() == null || dto.getUnitCost().signum() < 0)
+            throw new BusinessException("請填寫實際入庫單價（成本核算必填，不可為負）");
         EamConsumableItem item = itemMapper.selectById(dto.getItemId());
         if (item == null) throw new BusinessException("耗材不存在");
+        if (item.getCompanyBrand() == null || item.getPurchaseCompanyId() == null)
+            throw new BusinessException("耗材檔案未設置所屬品牌/購買公司，不可入庫：" + item.getName());
         long locationId = dto.getLocationId() == null ? 0L : dto.getLocationId();
         String locationName = resolveLocationName(locationId);
         if (locationId != 0 && locationName == null) throw new BusinessException("倉庫不存在");
 
         String txnType = "in_purchase".equals(dto.getTxnType()) ? "in_purchase" : "in_manual";
         EamConsumableStock before = stockMapper.selectForUpdate(item.getId(), locationId);
-        int beforeQty = before == null ? 0 : before.getQty();
+        int beforeQty = before == null ? 0 : nz(before.getQty());
+        BigDecimal amount = money(dto.getUnitCost().multiply(BigDecimal.valueOf(dto.getQty())));
 
-        stockMapper.inbound(item.getId(), locationId, locationName == null ? "" : locationName, dto.getQty());
+        stockMapper.inbound(item.getId(), locationId, locationName == null ? "" : locationName,
+                dto.getQty(), amount, item.getCompanyBrand(), item.getPurchaseCompanyId(),
+                nullToEmpty(item.getPurchaseCompany()), operatorResolver.currentOperatorName());
         int afterQty = beforeQty + dto.getQty();
 
-        BigDecimal unitCost = dto.getUnitCost() != null ? dto.getUnitCost() : item.getRefPrice();
         writeTxn(item, locationId, locationName, txnType, dto.getQty(), beforeQty, afterQty,
-                unitCost, null, null, dto.getRemark());
+                dto.getUnitCost(), amount, null, null, dto.getRemark());
     }
 
     /* ==================== 流水 ==================== */
@@ -355,6 +367,8 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     private void validateItemDto(EamConsumableItemSaveDTO dto) {
         if (!StringUtils.hasText(dto.getName())) throw new BusinessException("耗材名稱不能為空");
         if (!StringUtils.hasText(dto.getUnit())) throw new BusinessException("計量單位不能為空");
+        if (dto.getCompanyBrand() == null) throw new BusinessException("所屬品牌不能為空");
+        if (dto.getPurchaseCompanyId() == null) throw new BusinessException("購買公司不能為空");
         if (dto.getSafetyStock() != null && dto.getSafetyStock() < 0) throw new BusinessException("安全庫存不可為負");
         if (dto.getMaxStock() != null && dto.getMaxStock() < 0) throw new BusinessException("庫存上限不可為負");
         if (dto.getPerClaimLimit() != null && dto.getPerClaimLimit() < 0) throw new BusinessException("限領量不可為負");
@@ -371,9 +385,9 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         item.setMaxStock(dto.getMaxStock() == null ? 0 : dto.getMaxStock());
         item.setPerClaimLimit(dto.getPerClaimLimit() == null ? 0 : dto.getPerClaimLimit());
         item.setRemark(nullToEmpty(dto.getRemark()));
-        // 耗材分类快照（独立于资产分类）
+        // 耗材分类快照（统一分类库 biz_eam_category，biz_type=CONSUMABLE）
         if (dto.getConsumableCategoryId() != null) {
-            ConsumableCategory cc = consumableCategoryMapper.selectById(dto.getConsumableCategoryId());
+            EamCategory cc = categoryMapper.selectById(dto.getConsumableCategoryId());
             item.setConsumableCategoryId(dto.getConsumableCategoryId());
             if (cc != null) {
                 // 同时更新旧的 categoryId/categoryCode/categoryName 以保持兼容
@@ -387,15 +401,19 @@ public class EamConsumableServiceImpl implements EamConsumableService {
             item.setCategoryCode("");
             item.setCategoryName("");
         }
-        // 耗材品牌快照
+        // 耗材厂商品牌快照（统一品牌库 biz_eam_brand，biz_type=CONSUMABLE）
         if (dto.getBrandId() != null) {
-            ConsumableBrand cb = consumableBrandMapper.selectById(dto.getBrandId());
+            EamBrand cb = brandMapper.selectById(dto.getBrandId());
             item.setBrandId(dto.getBrandId());
-            item.setBrand(cb != null ? cb.getName() : nullToEmpty(dto.getBrand()));
+            item.setBrand(cb != null ? cb.getBrandZh() : nullToEmpty(dto.getBrand()));
         } else {
             item.setBrandId(null);
             item.setBrand(nullToEmpty(dto.getBrand()));
         }
+        // 所属品牌（閃蜂/mFood）+ 购买公司（名称快照由字典解析）
+        item.setCompanyBrand(dto.getCompanyBrand());
+        item.setPurchaseCompanyId(dto.getPurchaseCompanyId());
+        item.setPurchaseCompany(purchaseCompanyService.getNameById(dto.getPurchaseCompanyId()));
     }
 
     private EamConsumableItemVO toItemVO(EamConsumableItem item) {
@@ -407,17 +425,24 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         vo.setCategoryCode(item.getCategoryCode());
         vo.setCategoryName(item.getCategoryName());
         vo.setConsumableCategoryId(item.getConsumableCategoryId());
-        // 耗材分类名称（优先从新表查）
+        // 耗材分类名称（统一分类库）
         if (item.getConsumableCategoryId() != null) {
-            ConsumableCategory cc = consumableCategoryMapper.selectById(item.getConsumableCategoryId());
+            EamCategory cc = categoryMapper.selectById(item.getConsumableCategoryId());
             vo.setConsumableCategoryName(cc != null ? cc.getName() : item.getCategoryName());
         }
         vo.setBrandId(item.getBrandId());
         if (item.getBrandId() != null) {
-            ConsumableBrand cb = consumableBrandMapper.selectById(item.getBrandId());
-            vo.setBrandName(cb != null ? cb.getName() : item.getBrand());
+            EamBrand cb = brandMapper.selectById(item.getBrandId());
+            vo.setBrandName(cb != null ? cb.getBrandZh() : item.getBrand());
         }
         vo.setBrand(item.getBrand());
+        // 所属品牌 + 购买公司
+        vo.setCompanyBrand(item.getCompanyBrand());
+        vo.setCompanyBrandName(item.getCompanyBrand() != null ? companyBrandService.getLabelById(item.getCompanyBrand()) : "");
+        vo.setPurchaseCompanyId(item.getPurchaseCompanyId());
+        vo.setPurchaseCompanyName(StringUtils.hasText(item.getPurchaseCompany())
+                ? item.getPurchaseCompany()
+                : purchaseCompanyService.getNameById(item.getPurchaseCompanyId()));
         vo.setSpec(item.getSpec());
         vo.setUnit(item.getUnit());
         vo.setRefPrice(item.getRefPrice());
@@ -448,6 +473,13 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         vo.setQty(nz(s.getQty()));
         vo.setLockedQty(nz(s.getLockedQty()));
         vo.setAvailableQty(nz(s.getQty()) - nz(s.getLockedQty()));
+        vo.setCompanyBrand(s.getCompanyBrand());
+        vo.setPurchaseCompanyName(s.getPurchaseCompany());
+        vo.setAvgCost(s.getAvgCost());
+        vo.setTotalCost(s.getTotalCost());
+        // 库存审计取真实库存行变更人/时间（而非档案）
+        vo.setUpdatedBy(StringUtils.hasText(s.getUpdatedBy()) ? s.getUpdatedBy() : (item != null ? item.getUpdatedBy() : null));
+        vo.setUpdatedAt(dt(s.getUpdatedAt() != null ? s.getUpdatedAt() : (item != null ? item.getUpdatedAt() : null)));
         if (item != null) {
             vo.setItemCode(item.getItemCode());
             vo.setItemName(item.getName());
@@ -456,8 +488,6 @@ public class EamConsumableServiceImpl implements EamConsumableService {
             vo.setCategoryName(item.getCategoryName());
             vo.setSafetyStock(nz(item.getSafetyStock()));
             vo.setAlert(nz(item.getSafetyStock()) > 0 && vo.getAvailableQty() < nz(item.getSafetyStock()));
-            vo.setUpdatedBy(item.getUpdatedBy());
-            vo.setUpdatedAt(dt(item.getUpdatedAt()));
         } else {
             vo.setSafetyStock(0);
             vo.setAlert(false);
@@ -479,6 +509,13 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         vo.setBeforeQty(t.getBeforeQty());
         vo.setAfterQty(t.getAfterQty());
         vo.setUnitCost(t.getUnitCost());
+        vo.setAmount(t.getAmount());
+        vo.setCompanyBrand(t.getCompanyBrand());
+        vo.setPurchaseCompanyId(t.getPurchaseCompanyId());
+        vo.setDepartment(t.getDepartment());
+        vo.setApplicantEmpId(t.getApplicantEmpId());
+        vo.setApplicantName(t.getApplicantName());
+        vo.setBizDate(t.getBizDate() == null ? null : t.getBizDate().format(DATE_FMT));
         vo.setRefType(t.getRefType());
         vo.setRefId(t.getRefId());
         vo.setOperator(t.getOperator());
@@ -487,9 +524,9 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         return vo;
     }
 
-    /** 写一条出入库流水（append-only） */
+    /** 写一条出入库流水（append-only），携带成本金额与归属/领用人快照 */
     void writeTxn(EamConsumableItem item, long locationId, String locationName, String txnType,
-                  int qty, int beforeQty, int afterQty, BigDecimal unitCost,
+                  int qty, int beforeQty, int afterQty, BigDecimal unitCost, BigDecimal amount,
                   String refType, Long refId, String remark) {
         EamConsumableTxn txn = new EamConsumableTxn();
         txn.setTxnNo("CK" + LocalDateTime.now().format(TXN_FMT) + ThreadLocalRandom.current().nextInt(1000, 9999));
@@ -503,6 +540,10 @@ public class EamConsumableServiceImpl implements EamConsumableService {
         txn.setBeforeQty(beforeQty);
         txn.setAfterQty(afterQty);
         txn.setUnitCost(unitCost);
+        txn.setAmount(amount);
+        txn.setCompanyBrand(item.getCompanyBrand());
+        txn.setPurchaseCompanyId(item.getPurchaseCompanyId());
+        txn.setBizDate(LocalDate.now());
         txn.setRefType(refType);
         txn.setRefId(refId);
         SysUser op = operatorResolver.currentUser();
@@ -536,4 +577,9 @@ public class EamConsumableServiceImpl implements EamConsumableService {
     private static int nz(Integer v) { return v == null ? 0 : v; }
     private static String nullToEmpty(String s) { return s == null ? "" : s; }
     private static String dt(LocalDateTime t) { return t == null ? null : t.format(DT_FMT); }
+    /** 金额取两位小数（HALF_UP） */
+    static BigDecimal money(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP)
+                : v.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
 }

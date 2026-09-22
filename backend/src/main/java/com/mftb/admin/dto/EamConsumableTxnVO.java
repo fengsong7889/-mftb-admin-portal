@@ -21,6 +21,20 @@ public class EamConsumableTxnVO {
     private Integer beforeQty;
     private Integer afterQty;
     private BigDecimal unitCost;
+    /** 变动成本金额（入库正/出库负） */
+    private BigDecimal amount;
+    /** 所属品牌 ID 快照 */
+    private Long companyBrand;
+    /** 购买公司 ID 快照 */
+    private Long purchaseCompanyId;
+    /** 承担部门名称快照 */
+    private String department;
+    /** 领用人工号 */
+    private String applicantEmpId;
+    /** 领用人姓名 */
+    private String applicantName;
+    /** 业务记账日期 */
+    private String bizDate;
     private String refType;
     private Long refId;
     private String operator;

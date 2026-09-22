@@ -5,18 +5,22 @@
  * readOnly=true 时为详情模式（禁用输入、隐藏保存）
  */
 import { useState, useEffect, useMemo } from 'react'
-import { Button, Form, Input, InputNumber, Select, Spin, message, Space, Switch } from 'antd'
+import { Button, Form, Input, InputNumber, Select, Spin, message, Space, Switch, TreeSelect } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemDetail, createConsumableItem, updateConsumableItem,
-  fetchConsumableCategoryOptions, fetchConsumableBrandOptions,
-  type ConsumableItemSave, type ConsumableCategory, type ConsumableBrand,
+  fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchPurchaseCompanyOptions,
+  type ConsumableItemSave, type ConsumableCategory, type ConsumableBrand, type PurchaseCompany,
 } from '../../../api/consumable'
+import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { buildTree, toTreeSelectData } from '../../AssetManagement/eamUtils'
 
 interface FormValues {
   name: string
   consumableCategoryId?: number
   brandId?: number
+  companyBrand?: number
+  purchaseCompanyId?: number
   spec?: string
   unit: string
   refPrice?: number
@@ -40,20 +44,27 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<ConsumableCategory[]>([])
   const [brands, setBrands] = useState<ConsumableBrand[]>([])
+  const [companies, setCompanies] = useState<PurchaseCompany[]>([])
   const [detailMeta, setDetailMeta] = useState<{ updatedBy?: string; updatedAt?: string }>({})
+  const { numericOptions: companyBrandOptions } = useCompanyBrand()
 
-  const categoryOptions = useMemo(
-    () => categories.map(c => ({ label: c.name, value: c.id })),
+  const categoryTreeData = useMemo(
+    () => toTreeSelectData(buildTree(categories)),
     [categories],
   )
   const brandOptions = useMemo(
     () => brands.map(b => ({ label: b.nameEn ? `${b.name}（${b.nameEn}）` : b.name, value: b.id })),
     [brands],
   )
+  const companyOptions = useMemo(
+    () => companies.map(c => ({ label: c.name, value: c.id })),
+    [companies],
+  )
 
   useEffect(() => {
     fetchConsumableCategoryOptions().then(setCategories).catch(() => { /* 忽略 */ })
     fetchConsumableBrandOptions().then(setBrands).catch(() => { /* 忽略 */ })
+    fetchPurchaseCompanyOptions().then(setCompanies).catch(() => { /* 忽略 */ })
   }, [])
 
   useEffect(() => {
@@ -68,6 +79,8 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             name: it.name,
             consumableCategoryId: it.consumableCategoryId ?? undefined,
             brandId: it.brandId ?? undefined,
+            companyBrand: it.companyBrand ?? undefined,
+            purchaseCompanyId: it.purchaseCompanyId ?? undefined,
             spec: it.spec || undefined,
             unit: it.unit,
             refPrice: it.refPrice ?? 0,
@@ -93,6 +106,8 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
         name: v.name.trim(),
         consumableCategoryId: v.consumableCategoryId ?? null,
         brandId: v.brandId ?? null,
+        companyBrand: v.companyBrand ?? null,
+        purchaseCompanyId: v.purchaseCompanyId ?? null,
         spec: v.spec?.trim(),
         unit: v.unit,
         refPrice: v.refPrice ?? 0,
@@ -154,8 +169,15 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             <Form.Item label="耗材名稱" name="name" rules={[{ required: true, message: '請填寫耗材名稱' }]}>
               <Input placeholder="如：A4打印紙 / 中性筆" allowClear />
             </Form.Item>
+            <Form.Item label="所屬品牌" name="companyBrand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
+              <Select placeholder="選擇所屬品牌（閃蜂/mFood）" allowClear showSearch optionFilterProp="label" options={companyBrandOptions} />
+            </Form.Item>
+            <Form.Item label="購買公司" name="purchaseCompanyId" rules={[{ required: true, message: '請選擇購買公司' }]}>
+              <Select placeholder="選擇購買公司" allowClear showSearch optionFilterProp="label" options={companyOptions} />
+            </Form.Item>
             <Form.Item label="耗材分類" name="consumableCategoryId">
-              <Select placeholder="選擇分類" allowClear showSearch optionFilterProp="label" options={categoryOptions} />
+              <TreeSelect treeData={categoryTreeData} placeholder="選擇分類" allowClear showSearch
+                treeDefaultExpandAll treeNodeFilterProp="title" style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label="耗材品牌" name="brandId">
               <Select placeholder="選擇品牌" allowClear showSearch optionFilterProp="label" options={brandOptions} />
