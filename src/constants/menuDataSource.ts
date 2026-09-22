@@ -168,6 +168,8 @@ export const keyToPath: Record<string, string> = {
   // 耗材管理
   'consumable-dashboard': '/consumable-dashboard',
   'consumable-item':      '/consumable-item',
+  'consumable-inbound':   '/consumable-inbound',
+  'consumable-report':    '/consumable-report',
   'consumable-claim':     '/consumable-claim',
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
@@ -246,6 +248,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'purchase-order', 'purchase-request',
   // 耗材管理
   'consumable-dashboard', 'consumable-item', 'consumable-claim',
+  'consumable-inbound', 'consumable-report',
   'consumable-stock', 'consumable-stock-txn', 'consumable-alert',
 ])
 

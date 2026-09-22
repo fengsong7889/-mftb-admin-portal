@@ -54,6 +54,7 @@ function buildKeyNameMap(menus: MenuVO[], result: Record<string, { name: string;
  * 子页面完整标题 —— 与页面标题（H2 / DetailPageHeader）完全一致，优先级最高
  * fixed：固定标题；add/edit：新增/編輯标题（判定与页面 isEdit 一致：editParam 参数非空且 mode≠detail，editParam 默认 'id'）
  * typeParam/typeMap/typeDefault：标题按 query 参数值切换（如審批中心按 type、贈送管理按 mode）
+ * nameParam/nameMap：标题追加 query 参数对应名称后缀（如新增算法按 type 追加算法类型名）
  * 值以 'i18n:' 前缀标识 i18n key（随语言切换），其余为页面硬编码文案原样使用
  */
 interface SubPageTitle {
@@ -69,6 +70,10 @@ interface SubPageTitle {
   /** 标题按 mode query 参数值切换（如採購訂單 ?mode=add） */
   modeParam?: string
   modeMap?: Record<string, string>
+  /** 追加名称后缀的 query 参数名（默认 'type'），配合 nameMap 使用 */
+  nameParam?: string
+  /** query 参数值 → 追加到标题尾部的名称（如算法类型 i18n key） */
+  nameMap?: Record<string, string>
 }
 
 const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
@@ -94,7 +99,26 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   // 搜索校验（动态路由 /search-verify-detail/:id）
   '/search-verify-detail': { fixed: 'i18n:searchVerifyDetail.title' },
   // 商家推广工具
-  '/promotion-algorithm-add': { add: 'i18n:recommend.addAlgo', edit: 'i18n:recommend.editAlgo' },
+  '/promotion-algorithm-add': {
+    add: 'i18n:recommend.addAlgo',
+    edit: 'i18n:recommend.editAlgo',
+    modeParam: 'mode',
+    modeMap: { detail: 'i18n:recommend.algoDetail' },
+    nameMap: {
+      '1': 'i18n:recommend.algoInvincibleStar',
+      '2': 'i18n:recommend.algoNewStoreAd',
+      '3': 'i18n:recommend.algoHotReviveAd',
+      '4': 'i18n:recommend.algoExclusiveMerchant',
+      '5': 'i18n:recommend.algoPopularMerchant',
+      '6': 'i18n:recommend.algoGuessYouLike',
+      '7': 'i18n:recommend.algoOrganicTraffic',
+      '11': 'i18n:recommend.algoBrandMerchant',
+      '12': 'i18n:recommend.algoGoldAd',
+      '13': 'i18n:recommend.algoGoldenSignboard',
+      '14': 'i18n:recommend.algoProductPromo',
+      '15': 'i18n:recommend.algoTrafficAd',
+    },
+  },
   '/promotion-slot-config-add': { add: 'i18n:promotionSlotConfig:addSlotConfig', edit: 'i18n:promotionSlotConfig:editSlotConfig' },
   '/promotion-waterfall-add': { add: 'i18n:recommend.addPricingTitle', edit: 'i18n:recommend.editPricingTitle' },
   '/order-detail': { fixed: 'i18n:orderDetail.detailTitle' },
@@ -198,6 +222,14 @@ function resolveTitle(raw: string, t: TFunction): string {
   return raw.startsWith('i18n:') ? t(raw.slice(5)) : raw
 }
 
+/** 追加名称后缀（如算法类型名）：nameMap 命中 query 参数值时以「 · 名称」拼接 */
+function appendName(title: string, entry: SubPageTitle, params: URLSearchParams | null, t: TFunction): string {
+  if (!entry.nameMap || !params) return title
+  const value = params.get(entry.nameParam ?? 'type')
+  const raw = value ? entry.nameMap[value] : undefined
+  return raw ? `${title} · ${resolveTitle(raw, t)}` : title
+}
+
 /** 匹配子页面完整标题（与页面标题一致；支持动态路由前缀与 query 参数区分新增/編輯/类型） */
 function matchFullTitle(pathname: string, t: TFunction): string | null {
   const normalized = normalizePath(pathname)
@@ -223,23 +255,23 @@ function matchFullTitle(pathname: string, t: TFunction): string | null {
   // 标题按 query 参数值切换（如審批中心按 type、贈送管理按 mode）
   if (entry.typeParam && entry.typeMap) {
     const typeValue = params?.get(entry.typeParam) ?? entry.typeDefault ?? ''
-    if (entry.typeMap[typeValue]) return resolveTitle(entry.typeMap[typeValue], t)
+    if (entry.typeMap[typeValue]) return appendName(resolveTitle(entry.typeMap[typeValue], t), entry, params, t)
   }
 
   // 标题按 mode query 参数值切换（如採購訂單 ?mode=add/edit）
   if (entry.modeParam && entry.modeMap) {
     const modeValue = params?.get(entry.modeParam) ?? ''
-    if (entry.modeMap[modeValue]) return resolveTitle(entry.modeMap[modeValue], t)
+    if (entry.modeMap[modeValue]) return appendName(resolveTitle(entry.modeMap[modeValue], t), entry, params, t)
     // 有 id 但无 mode → 详情页标题
-    if (entry.detailFixed && params?.get('id')) return resolveTitle(entry.detailFixed, t)
+    if (entry.detailFixed && params?.get('id')) return appendName(resolveTitle(entry.detailFixed, t), entry, params, t)
   }
 
-  if (entry.fixed) return resolveTitle(entry.fixed, t)
+  if (entry.fixed) return appendName(resolveTitle(entry.fixed, t), entry, params, t)
   if (entry.add && entry.edit) {
     // 与页面 isEdit 判定一致：editParam（默认 id）非空且 mode≠detail 为編輯模式
     const editParam = entry.editParam ?? 'id'
     const isEdit = !!params?.get(editParam) && params.get('mode') !== 'detail'
-    return resolveTitle(isEdit ? entry.edit : entry.add, t)
+    return appendName(resolveTitle(isEdit ? entry.edit : entry.add, t), entry, params, t)
   }
   return null
 }

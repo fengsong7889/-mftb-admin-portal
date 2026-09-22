@@ -98,6 +98,28 @@ const seedLeafKeys = seedKeys.filter((k) => !parentKeys.has(k))
 const SEEDED_ELSEWHERE = new Set(['consumable-ops', 'consumable-dashboard', 'consumable-item',
   'consumable-claim', 'consumable-stock', 'consumable-stock-txn', 'consumable-alert'])
 
+// 域初始化器不经过 menus.put；直接解析 ensureMenu，避免新增菜单落在主种子门禁盲区。
+const initializerDir = 'backend/src/main/java/com/mftb/admin/config'
+const domainSeedMenus = readdirSync(join(ROOT, initializerDir))
+  .filter((file) => file.endsWith('Initializer.java'))
+  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+    /\bensureMenu\(\s*\w+,\s*"([^"]+)",\s*"([^"]+)",\s*"(\/[^"\s]*)",\s*"([^"]+)",\s*"([^"]+)"/g,
+  )].map((m) => ({ key: m[1], name: m[2], path: m[3], icon: m[5], file })))
+if (!domainSeedMenus.some((menu) => menu.file === 'ConsumableSchemaInitializer.java')) {
+  fail('未能解析耗材初始化器的 ensureMenu 种子，不能跳过域菜单检查')
+}
+const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KEYS[^=]*= new Set\(\[([\s\S]*?)\]\)/)
+const backendKeys = new Set(backendKeysBlock
+  ? [...backendKeysBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+  : (fail('未能解析 BACKEND_CONNECTED_KEYS'), []))
+const registeredIcons = new Set([...read('src/components/MenuIcon.tsx')
+  .matchAll(/'([^']+)':\s*\w+/g)].map((m) => m[1]))
+const fallbackIcons = Object.fromEntries([...sidebar.matchAll(/'([^']+)':\s*<(\w+)/g)]
+  .map((m) => [m[1], m[2]]))
+const routeMenuMap = routeMapBlock
+  ? Object.fromEntries([...routeMapBlock[1].matchAll(/'([^']+)':\s*'([^']+)'/g)].map((m) => [m[1], m[2]]))
+  : {}
+
 // ────────── 校验 1：离线菜单必须有路由映射且在种子中 ──────────
 for (const key of offlineKeys) {
   if (!keyToPath[key] && !parentKeys.has(key) && !SEEDED_ELSEWHERE.has(key)) {
@@ -216,8 +238,23 @@ for (const [key, label] of Object.entries(offlineLabelByKeys)) {
   }
 }
 
+// 域菜单同时检查导航、页面、后端连接、权限和两级图标，不再只检查主初始化器。
+for (const { key, name, path, icon, file } of domainSeedMenus) {
+  const label = `${file}: ${key}「${name}」`
+  if (keyToPath[key] !== path) fail(`${label} 导航映射缺失或与后端路径 ${path} 不一致`)
+  if (!appRoutes.has(path)) fail(`${label} 未在 App.tsx 注册页面 ${path}`)
+  if (!backendKeys.has(key)) fail(`${label} 未登记 BACKEND_CONNECTED_KEYS，离线路由无法阻断`)
+  if (routeMenuMap[path] !== key) fail(`${label} 缺少 ROUTE_MENU_KEY_MAP 权限路由登记`)
+  // 耗材领用为已有全员自助入口；资产历史授权/图标差异仅告警，不在本轮改变授权语义。
+  const reportAccessIssue = key.startsWith('consumable-') ? fail : warn
+  if (key !== 'consumable-claim' && !controlledKeys.includes(key)) reportAccessIssue(`${label} 未登记 CONTROLLED_MENU_KEYS`)
+  if (!registeredIcons.has(icon)) reportAccessIssue(`${label} 的后端图标 ${icon} 未在 MenuIcon 注册`)
+  if (fallbackIcons[key] !== icon) reportAccessIssue(`${label} 缺少与 ${icon} 一致的 Sidebar 兜底图标`)
+}
+
 // ────────── 输出 ──────────
 console.log('菜单一致性检查')
+console.log(`  域初始化器菜单声明 ${domainSeedMenus.length} 条（含导航、权限、图标检查）`)
 console.log(`  后端种子菜单 ${seedKeys.length} 条 / 前端路由映射 ${Object.keys(keyToPath).length} 条 / `
   + `离线菜单 ${offlineKeys.length} 条 / 受控菜单 ${controlledKeys.length} 条`)
 console.log(`  已接入后端 API 的菜单 ${backendIntegratedMenuKeys.size} 条`)

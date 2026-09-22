@@ -1010,6 +1010,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   //     计量单位已改为产品/耗材表单上的文本属性），不再受控
   'consumable-dashboard',
   'consumable-item',
+  'consumable-inbound',
+  'consumable-report',
   'consumable-stock',
   'consumable-alert',
 ]
@@ -1178,6 +1180,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 耗材管理（领用为全员自助，其余为管理类受控路由）
   '/consumable-dashboard': 'consumable-dashboard',
   '/consumable-item': 'consumable-item',
+  '/consumable-inbound': 'consumable-inbound',
+  '/consumable-report': 'consumable-report',
   '/consumable-claim': 'consumable-claim',
   '/consumable-stock': 'consumable-stock',
   '/consumable-alert': 'consumable-alert',

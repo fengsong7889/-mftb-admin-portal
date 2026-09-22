@@ -75,7 +75,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 110px;
+  max-width: 150px;
 }
 
 /* 关闭按钮 */

@@ -86,6 +86,7 @@ import {
   BellOutlined, // 通知渠道配置
   GoldOutlined, // 耗材管理分组
   ProfileOutlined, // 耗材档案
+  FundOutlined, // 消耗统计
   AlertOutlined, // 库存预警
   TranslationOutlined, // 多语言管理
 } from '@ant-design/icons'
@@ -459,6 +460,8 @@ const keyToIcon: Record<string, ReactNode> = {
   'consumable-ops':   <GoldOutlined />,
   'consumable-dashboard': <DashboardOutlined />,
   'consumable-item':  <ProfileOutlined />,
+  'consumable-inbound': <ImportOutlined />,
+  'consumable-report': <FundOutlined />,
   'consumable-claim': <UserAddOutlined />,
   'consumable-stock': <DatabaseOutlined />,
   'consumable-stock-txn': <SwapOutlined />,
