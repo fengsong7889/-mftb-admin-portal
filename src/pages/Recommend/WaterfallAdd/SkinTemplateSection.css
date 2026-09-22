@@ -1,0 +1,757 @@
+/**
+ * SkinTemplateSection 样式
+ *
+ * 包含：
+ * 1. SkinTemplatePreview 画布与等比缩放（.skin-preview / .skin-stage 系列）
+ * 2. 全宽模板画廊卡片（.skin-gallery 系列）
+ * 3. 下方配置面板（.skin-config 系列）
+ * 4. 小图精简色卡（.skin-swatch-card 系列）
+ */
+
+/* ==================== 预览画布容器 ==================== */
+
+.skin-preview {
+  width: 100%;
+}
+
+.skin-preview__viewport {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+/* ==================== 舞台（固定画布尺寸，CSS transform 等比缩放） ==================== */
+
+.skin-stage {
+  position: relative;
+  border: 2px solid;
+  border-radius: 12px;
+  transform-origin: top left;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.skin-stage--small {
+  gap: 10px;
+  padding: 10px;
+}
+
+/* ---- 小图：商品图（与右侧等高） ---- */
+
+.skin-stage__logo {
+  width: 100px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #FFE2B8, #FFAE5E);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.skin-stage__logo-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 9px;
+  color: #fff;
+  background: rgba(0,0,0,0.35);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.skin-stage__logo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  padding: 3px 0;
+}
+
+/* ---- 大图：竖版海报 ---- */
+
+.skin-studio__poster {
+  width: 120px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+}
+
+.skin-studio__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.skin-studio__muted {
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+/* ---- 右侧内容区 ---- */
+
+.skin-stage__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skin-stage__title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skin-stage__gold-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8B5E00;
+  background: linear-gradient(135deg, #FFE58F, #FFD666);
+  border: 1px solid #FAAD14;
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+.skin-stage__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-stage__rating {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.skin-stage__rating strong {
+  color: #FA8C16;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.skin-stage__delivery {
+  font-size: 11px;
+  color: #8C8C8C;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.skin-stage__delivery-icon {
+  font-size: 12px;
+}
+
+.skin-stage__rank-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.skin-stage__rank-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.skin-stage__rank-tag--gold {
+  color: #8B5E00;
+  background: linear-gradient(135deg, #FFFBE6, #FFE58F);
+  border: 1px solid #FAAD14;
+}
+
+.skin-stage__rank-tag--purple {
+  color: #722ED1;
+  background: #F9F0FF;
+  border: 1px solid #D3ADF7;
+}
+
+.skin-stage__coupons {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.skin-stage__coupon {
+  font-size: 9px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.skin-stage__coupon--member {
+  color: #fff;
+  background: linear-gradient(135deg, #FF4D4F, #FF7A45);
+  border: none;
+}
+
+.skin-stage__coupon--reduce {
+  color: #FF4D4F;
+  background: #FFF1F0;
+  border: 1px solid #FFCCC7;
+}
+
+/* ==================== 商品卡区域 ==================== */
+
+.skin-stage__dishes {
+  margin-top: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* grid: 1大1小（大图模式默认版式） */
+.skin-stage__dishes--grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 6px;
+}
+
+/* triple: 三图等宽 */
+.skin-stage__dishes--triple {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+/* hero: 单张大图 */
+.skin-stage__dishes--hero {
+  display: flex;
+}
+
+/* carousel: 阶梯堆叠 */
+.skin-stage__dishes--carousel {
+  position: relative;
+}
+
+/* ---- 商品卡 ---- */
+
+.skin-stage__dish {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 48px;
+}
+
+.skin-stage__food {
+  font-size: 36px;
+}
+
+.skin-stage__dish-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 8px 4px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55));
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.skin-stage__dish-caption strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.skin-stage__dish-caption del {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.skin-stage__dish-caption span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- carousel 堆叠卡片 ---- */
+
+.skin-stage__slide {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.skin-stage__slide--0 {
+  z-index: 3;
+}
+
+.skin-stage__slide--1 {
+  z-index: 2;
+  transform: translateX(10%) scale(0.94);
+  opacity: 0.7;
+}
+
+.skin-stage__slide--2 {
+  z-index: 1;
+  transform: translateX(20%) scale(0.88);
+  opacity: 0.4;
+}
+
+/* ---- 轮播控制 ---- */
+
+.skin-preview__controls {
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* ==================== 全宽模板画廊 ==================== */
+
+.skin-gallery {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.skin-gallery--large {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* ---- 小图精简色卡（图1草图风格） ---- */
+
+.skin-swatch-card {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skin-swatch-card:hover {
+  transform: translateY(-2px);
+}
+
+.skin-swatch-card__body {
+  position: relative;
+  border-radius: 10px;
+  border: 2px solid #e8eaed;
+  background: #fff;
+  padding: 12px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skin-swatch-card:hover .skin-swatch-card__body {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.skin-swatch-card--selected .skin-swatch-card__body {
+  border-color: #E8720C;
+  box-shadow: 0 2px 10px rgba(232, 114, 12, 0.18);
+}
+
+.skin-swatch-card__gradient {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.skin-swatch-card__index {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #bfbfbf;
+  background: #fff;
+  color: #595959;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.skin-swatch-card__tier {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #8C8C8C;
+  z-index: 1;
+}
+
+.skin-swatch-card__name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #262626;
+  text-align: center;
+  margin: 8px 0 4px;
+  z-index: 1;
+}
+
+.skin-swatch-card__price {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  font-size: 12px;
+  color: #BFBFBF;
+  z-index: 1;
+}
+
+.skin-swatch-card__price--set {
+  color: #FF4D4F;
+  font-weight: 600;
+}
+
+.skin-swatch-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 0 2px;
+}
+
+.skin-swatch-card__preview-btn {
+  font-size: 12px;
+  color: #595959;
+  cursor: pointer;
+  padding: 2px 0;
+  transition: color 0.2s;
+}
+
+.skin-swatch-card__preview-btn:hover {
+  color: #E8720C;
+}
+
+.skin-swatch-card__status {
+  font-size: 11px;
+}
+
+/* ---- 大图模式保留完整卡片 ---- */
+
+.skin-gallery-card {
+  position: relative;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  border: 1px solid #e8eaed;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.skin-gallery-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.skin-gallery-card--selected {
+  border: 2px solid #E8720C;
+  background: #FFF9F2;
+  box-shadow: 0 2px 10px rgba(232, 114, 12, 0.18);
+}
+
+.skin-gallery-card--selected:hover {
+  transform: none;
+}
+
+.skin-gallery-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.skin-gallery-card__index {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  color: #8C8C8C;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skin-gallery-card__status {
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+.skin-gallery-card__preview {
+  margin-bottom: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.skin-gallery-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-gallery-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.skin-gallery-card__spacer {
+  flex: 1;
+}
+
+.skin-gallery-card__price {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FF4D4F;
+}
+
+.skin-gallery-card__price-unit {
+  font-size: 9px;
+  color: #8C8C8C;
+  font-weight: 400;
+}
+
+.skin-gallery-card__unpriced {
+  font-size: 10px;
+  color: #BFBFBF;
+}
+
+.skin-gallery-card__actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+/* ==================== 预览弹窗 ==================== */
+
+.skin-preview-modal .ant-modal-body {
+  padding: 16px 24px !important;
+}
+
+.skin-preview-modal__content {
+  background: #F5F5F5;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.skin-preview-modal__hint {
+  font-size: 11px;
+  color: #8C8C8C;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ==================== 下方配置面板 ==================== */
+
+.skin-config {
+  margin-top: 20px;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  background: #FAFAFA;
+}
+
+.skin-config__header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.skin-config__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.skin-config__switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+}
+
+.skin-config__switch-hint {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+.skin-config__fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 16px;
+  margin-bottom: 14px;
+}
+
+.skin-config__fields > :last-child {
+  grid-column: span 2;
+}
+
+.skin-config__poster-section {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.skin-config__poster-current {
+  width: 84px;
+  flex-shrink: 0;
+}
+
+.skin-config__poster-thumb {
+  width: 84px;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #d9d9d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skin-config__poster-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skin-config__poster-grid {
+  flex: 1;
+  min-width: 220px;
+}
+
+.skin-config__poster-grid-label {
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-bottom: 6px;
+}
+
+.skin-config__poster-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.skin-config__poster-option {
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 44 / 72;
+  border: 1px solid #e8eaed;
+  transition: all 0.2s;
+}
+
+.skin-config__poster-option:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.skin-config__poster-option--active {
+  border: 2px solid #E8720C;
+  box-shadow: 0 2px 8px rgba(232, 114, 12, 0.35);
+}
+
+.skin-config__poster-option-name {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 9px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.skin-config__poster-option-check {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: #E8720C;
+  background: #fff;
+  border-radius: 50%;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skin-config__layout-info {
+  font-size: 12px;
+  color: #595959;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid #f0f0f0;
+  margin-bottom: 14px;
+}
+
+.skin-config__warning {
+  font-size: 12px;
+  color: #FA8C16;
+  background: #FFF7E6;
+  border: 1px solid #FFD591;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 12px;
+}

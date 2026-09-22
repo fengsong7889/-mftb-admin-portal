@@ -126,6 +126,8 @@ interface SaleSkin {
   dishLayout: DishLayout
   /** 皮膚段位（經典/精選/旗艦/至尊） */
   tier: 'classic' | 'premium' | 'flagship' | 'ultimate'
+  /** 展示模式（新版定價返回，舊數據默認 small） */
+  displayMode?: 'small' | 'large'
   /** 賣點描述 */
   desc: string
   /** 已售套數（氛圍數據） */
@@ -307,6 +309,9 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+
+  // 皮膚模式篩選（新版：小圖/大圖 Tab）
+  const [skinModeFilter, setSkinModeFilter] = useState<'all' | 'small' | 'large'>('all')
 
   // 選購狀態
   const [selectedSkinId, setSelectedSkinId] = useState<number | null>(null)
@@ -1006,8 +1011,27 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
               }
               style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 20px' }}
             >
+              {/* 模式篩選 Tab（新版定價支持小圖/大圖分離售賣） */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {([['all', '全部'], ['small', '小圖模式'], ['large', '大圖模式']] as const).map(([key, label]) => (
+                  <span key={key}
+                    onClick={() => setSkinModeFilter(key)}
+                    style={{
+                      fontSize: 12, cursor: 'pointer', borderRadius: 4, padding: '2px 12px', lineHeight: '22px',
+                      color: skinModeFilter === key ? '#E8720C' : '#8C8C8C',
+                      background: skinModeFilter === key ? '#FFF7E6' : '#F5F5F5',
+                      border: `1px solid ${skinModeFilter === key ? '#E8720C' : 'transparent'}`,
+                      fontWeight: skinModeFilter === key ? 600 : 400,
+                      transition: 'all 0.2s',
+                    }}
+                  >{label}</span>
+                ))}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                {effectiveSkins.map(skin => {
+                {effectiveSkins.filter(skin => {
+                  if (skinModeFilter === 'all') return true
+                  return (skin.displayMode ?? 'small') === skinModeFilter
+                }).map(skin => {
                   const isSelected = selectedSkinId === skin.id
                   // 贈送天數支付模式：皮膚日單價 > 現金價值時置灰不可選
                   const skinRealPrice = skinPriceMap[skin.name] ?? skin.pricePerDay
