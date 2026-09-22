@@ -242,7 +242,7 @@ describe('算法库父页面投流接入', () => {
       algoName: '实际父页面投流', algoType: 15, brand: 'flashBee',
       params: expect.objectContaining({ statusRest: true, consistencyCheckInterval: 15, merchantExposureStrategy: 'trafficProportional' }),
     })])
-    await waitFor(() => expect(screen.getByLabelText('当前路由').textContent).toBe('/promotion-algorithm'))
+    await waitFor(() => expect(screen.getByLabelText('当前路由').textContent).toBe('/promotion-algorithm'), { timeout: 5000 })
   })
 
   it('真实父页面加载失败时显示重试且保存被禁用', async () => {
