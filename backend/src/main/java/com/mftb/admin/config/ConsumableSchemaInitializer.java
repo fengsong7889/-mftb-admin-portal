@@ -34,6 +34,9 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     private static final String V_DROP_UNIT_TABLE = "consumable:drop-unit-table-v1";
     /** 所属品牌 + 购买公司 + 成本/归属快照 + 业务单据表 + 购买公司字典（一次性大迁移） */
     private static final String V_BRAND_COMPANY = "consumable:brand-company-v1";
+    static final String V_RETIRE_LEGACY_MENUS = "consumable:retire-legacy-menus-v1.0";
+    private static final String LEGACY_MENU_FILTER =
+            "menu_key IN ('consumable-category', 'consumable-brand', 'consumable-unit')";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -55,6 +58,32 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         // 计量单位字典表废弃：存量库（含生产）一次性 DROP，单位已改为产品/耗材上的文本属性
         versionTracker.applyOnce(V_DROP_UNIT_TABLE, this::dropLegacyUnitTable);
         // 方案二：耗材分类/品牌/计量单位三个基础配置菜单已下线（并入分类库/品牌产品库），不再补种
+        reconcileLegacyConsumableMenus();
+    }
+
+    /** 独立收敛旧菜单；不能通过重跑含业务数据搬迁的 EAM v8 来修复菜单漂移。 */
+    void reconcileLegacyConsumableMenus() {
+        if (!versionTracker.applyOnce(V_RETIRE_LEGACY_MENUS,
+                this::retireLegacyConsumableMenus, this::verifyLegacyConsumableMenusRetired)) {
+            // 一次性版本已记录后仍校验并修复，防止旧实例或历史脚本恢复废弃菜单。
+            retireLegacyConsumableMenus();
+            verifyLegacyConsumableMenusRetired();
+        }
+    }
+
+    private void retireLegacyConsumableMenus() {
+        log.info("开始收敛耗材旧分类/品牌/计量单位菜单");
+        int affected = jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, status = 0, updated_by = 'system' "
+                + "WHERE " + LEGACY_MENU_FILTER + " AND (deleted <> 1 OR status <> 0)");
+        log.info("耗材旧菜单收敛完成：{} 条；保留菜单记录及业务数据", affected);
+    }
+
+    private void verifyLegacyConsumableMenusRetired() {
+        Integer remaining = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE "
+                + LEGACY_MENU_FILTER + " AND (deleted <> 1 OR status <> 0)", Integer.class);
+        if (remaining == null || remaining != 0) {
+            throw new IllegalStateException("耗材旧分类/品牌/计量单位菜单未全部下线");
+        }
     }
 
     /** 删除已废弃的耗材计量单位字典表（幂等，表不存在时不报错） */

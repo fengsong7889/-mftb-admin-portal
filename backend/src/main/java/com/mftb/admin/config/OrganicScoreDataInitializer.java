@@ -32,6 +32,7 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     private static final String MIGRATION_SCRIPT = "51_organic_score_code_normalization.sql";
     private static final String RENAME_SCRIPT = "53_rename_sto_to_stb_plt.sql";
     private static final String CLEANUP_SCRIPT = "52_cleanup_tmp_organic_rules.sql";
+    private static final String COM02_PREREQ_SCRIPT = "187_com02_prerequisites.sql";
 
     /** 需要幂等添加的列：列名 → DDL 定义 */
     private static final Map<String, String> NEW_COLUMNS = new LinkedHashMap<>();
@@ -92,6 +93,16 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
             versionTracker.applyOnce("organic:cleanup-52-v1", () -> runSqlScript(CLEANUP_SCRIPT));
         } catch (Exception e) {
             log.error("自然流量评分临时编码清理失败：{}", e.getMessage(), e);
+        }
+        
+        // Step 6: COM_02 减免运费增加前置条件 + 限定固定加分 (一次性, 版本化)
+        try {
+            versionTracker.applyOnce("organic:com02-prereq-v1", () -> {
+                runSqlScript(COM02_PREREQ_SCRIPT);
+                log.info("已更新 COM_02 减免运费前置条件为「報名減免運費」");
+            });
+        } catch (Exception e) {
+            log.error("COM_02 减免运费前置条件迁移失败：{}", e.getMessage(), e);
         }
     }
 

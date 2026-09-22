@@ -25,19 +25,19 @@ public interface EamConsumableStockMapper extends BaseMapper<EamConsumableStock>
     /**
      * 入库（采购/手工/期初）：不存在则插入，存在则累加，并按移动加权平均更新成本。
      * ON DUPLICATE KEY 依赖 uk_item_location 唯一键，保证并发下只有一行；
-     * 赋值从左到右求值，avg_cost 在 qty/total_cost 已更新后重算 = 新成本金额 / 新数量。
+     * 先用旧数量/金额与本次入库计算均价，再累加数量/金额，避免 MySQL 从左到右赋值时重复计入本次入库。
      *
      * @param amount 本次入库成本金额（数量 × 实际入库单价）
      */
     @Update("INSERT INTO biz_eam_consumable_stock "
             + "(item_id, location_id, location_name, qty, locked_qty, version, avg_cost, total_cost, "
             + " company_brand, purchase_company_id, purchase_company, updated_by) "
-            + "VALUES (#{itemId}, #{locationId}, #{locationName}, #{qty}, 0, 0, #{amount}, #{amount}, "
+            + "VALUES (#{itemId}, #{locationId}, #{locationName}, #{qty}, 0, 0, #{amount} / #{qty}, #{amount}, "
             + " #{companyBrand}, #{purchaseCompanyId}, #{purchaseCompany}, #{updatedBy}) "
             + "ON DUPLICATE KEY UPDATE "
+            + " avg_cost = CASE WHEN (qty + #{qty}) <= 0 THEN 0 ELSE (total_cost + #{amount}) / (qty + #{qty}) END, "
             + " qty = qty + #{qty}, "
             + " total_cost = total_cost + #{amount}, "
-            + " avg_cost = CASE WHEN (qty + #{qty}) <= 0 THEN 0 ELSE (total_cost + #{amount}) / (qty + #{qty}) END, "
             + " location_name = VALUES(location_name), updated_by = VALUES(updated_by), version = version + 1")
     int inbound(@Param("itemId") long itemId, @Param("locationId") long locationId,
                 @Param("locationName") String locationName, @Param("qty") int qty,

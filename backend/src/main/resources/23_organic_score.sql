@@ -68,7 +68,7 @@ INSERT IGNORE INTO `biz_organic_score_dimension` (`dimension`, `weight`, `sort_o
 -- ===== 商業維度 =====
 INSERT IGNORE INTO `biz_organic_score_rule` (`rule_code`, `dimension`, `name`, `description`, `mode`, `score`, `prerequisites`, `condition_items`, `status`, `builtin`, `sort_order`, `updated_by`) VALUES
 ('COM_01', 1, '滿額立減', '商家參與滿額立減活動加分', 1, 30, NULL, NULL, 1, 1, 1, 'system'),
-('COM_02', 1, '減免運費', '商家減免配送運費加分', 1, 20, NULL, NULL, 1, 1, 2, 'system'),
+('COM_02', 1, '減免運費', '商家減免配送運費加分', 1, 20, '報名減免運費', NULL, 1, 1, 2, 'system'),
 ('COM_03', 1, '進店領券', '商家設置進店領券加分', 4, 2, NULL, NULL, 1, 1, 3, 'system'),
 ('COM_04', 1, '新客立減', '商家參與新客立減活動加分', 1, 30, NULL, NULL, 1, 1, 4, 'system'),
 ('COM_05', 1, '收藏送券', '商家設置收藏送券加分', 4, 2, NULL, NULL, 1, 1, 5, 'system'),

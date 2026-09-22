@@ -36,6 +36,19 @@ class MigrationCatalogTest {
     }
 
     @Test
+    void legacyConsumableMenuRetirementIsRegisteredIndependently() throws Exception {
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(e -> "consumable:retire-legacy-menus-v1.0".equals(e.getVersionKey()))
+                .findFirst().orElseThrow();
+        assertEquals(MigrationStatus.ACTIVE, entry.getStatus());
+        assertEquals(SchemaPhase.MENU_SEED, entry.getPhase());
+        assertEquals(MigrationEntry.ExecutionType.JAVA, entry.getExecutionType());
+        assertEquals("consumableSchemaInitializer", entry.getExecutor());
+        assertTrue(entry.getDependencies().contains("core:menu-seed-v41"));
+        assertFalse(entry.getDependencies().contains("eam:schema-v8-merge-category-brand"));
+    }
+
+    @Test
     void detectsDuplicateVersionKeysAndMissingDependency() {
         MigrationEntry a = entry("x:a", MigrationStatus.ACTIVE);
         MigrationEntry dup = entry("x:a", MigrationStatus.ACTIVE);

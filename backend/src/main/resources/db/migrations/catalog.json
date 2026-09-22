@@ -61,6 +61,16 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "consumable:retire-legacy-menus-v1.0",
+      "module": "consumable",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "consumableSchemaInitializer",
+      "dependencies": ["core:menu-seed-v41", "consumable:schema-v1.0"],
+      "status": "ACTIVE",
+      "comment": "独立下线耗材分类、品牌、计量单位三个旧菜单，仅停用并软删除菜单；附后置校验，每次启动修复复活记录，不重跑 EAM v8 或修改业务表。"
+    },
+    {
       "versionKey": "adpromo:09_ad_promotion.sql:v1",
       "module": "adpromo",
       "phase": "MODULE_STRUCTURE",
