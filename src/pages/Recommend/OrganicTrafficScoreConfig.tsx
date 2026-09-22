@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip, Segmented } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import { ServiceStatus } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
@@ -400,6 +401,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const handleToggleWeightCollapsed = () => {
     const next = !weightConfigCollapsed
     setWeightConfigCollapsed(next)
+    if (readOnly) return
     updateSystemConfig(WEIGHT_COLLAPSED_KEY, String(next)).catch(() => {
       message.warning('配置保存失敗，請重試')
     })
@@ -1092,8 +1094,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     return (
       <>
         {/* 篩選工具條 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <div className="algorithm-form__row">
           <Input
+            disabled={false}
             allowClear
             value={keyword}
             prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
@@ -1102,6 +1105,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             onChange={e => setKeyword(e.target.value)}
           />
           <Select
+            disabled={false}
             allowClear
             value={statusFilter}
             placeholder={t('organicTrafficScore.allStatus')}
@@ -1186,7 +1190,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                       unCheckedChildren={t('common.disable')}
                       disabled={readOnly}
                       onChange={() => handleToggleStatus(rule)}
-                      size="small"
                     />
                     {!readOnly && (
                       <Button type="link" size="small" danger onClick={e => { e.stopPropagation(); handleDelete(rule) }}>{t('common.delete')}</Button>
@@ -1199,11 +1202,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                   const isEditingInline = !!inlineEditing[rule.id]
                   const form = inlineForm[rule.id] || rule
                   return (
-                  <div style={{
-                    padding: '16px 20px 16px 50px',
-                    background: isEditingInline ? '#FFFBE6' : '#FAFAFA',
-                    borderTop: '1px solid ' + (isEditingInline ? '#FFE58F' : '#f0f0f0'),
-                  }}>
+                  <div className="algorithm-form__rule-body">
                     {/* ── 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                       {!isEditingInline && (
@@ -1505,6 +1504,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <Segmented
                                   value={activeRegion}
+                                  disabled={false}
                                   onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
                                   options={REGION_KEYS.map(k => ({
                                     value: k,
@@ -1585,6 +1585,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <Segmented
                                   value={activeRegion}
+                                  disabled={false}
                                   onChange={val => setPlt04Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
                                   options={REGION_KEYS.map(k => ({
                                     value: k,
@@ -2086,6 +2087,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 {/* 區域切換 */}
                                 <Segmented
                                   value={activeRegion}
+                                  disabled={false}
                                   onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
                                   options={REGION_KEYS.map(k => ({
                                     value: k,
@@ -2941,44 +2943,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
 
   return (
     <Spin spinning={loading}>
-    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <SettingOutlined style={{ fontSize: 16, color: '#fa8c16' }} />
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.pageTitle')}</span>
-        <Button size="small" icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
-          {t('organicTrafficScore.rankingRuleDesc')}
-        </Button>
-      </div>
+    <div className="algorithm-form__organic">
       {/* 維度權重配置（可收起） */}
       {showDimensionWeight && (
-        <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, marginBottom: 12 }}>
-          <div
-            onClick={handleToggleWeightCollapsed}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
-              cursor: 'pointer', userSelect: 'none', background: '#FAFAFA', borderRadius: weightConfigCollapsed ? 8 : '8px 8px 0 0',
-            }}
-          >
-            {weightConfigCollapsed
-              ? <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
-              : <UpOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />}
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.dimensionWeightConfig')}</span>
-            <span style={{ fontSize: 12, color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
+        <AlgorithmSection title={t('organicTrafficScore.dimensionWeightConfig')} readOnly={readOnly}
+          expanded={!weightConfigCollapsed} onExpandedChange={handleToggleWeightCollapsed}
+          extra={<>
+            <span style={{ color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
               {t('organicTrafficScore.currentTotal', { total: weightTotal })}{weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}
             </span>
-            {DIMENSION_ORDER.map(d => (
-              <Tag key={d} color={SCORE_DIMENSION_COLOR[d].color} style={{ margin: 0, fontSize: 11 }}>
-                {DIM_LABEL[d]} {dimensionWeight[d]}%
-              </Tag>
-            ))}
-          </div>
-          {!weightConfigCollapsed && (
-            <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            {DIMENSION_ORDER.map(d => <Tag key={d} color={SCORE_DIMENSION_COLOR[d].color}>{DIM_LABEL[d]} {dimensionWeight[d]}%</Tag>)}
+          </>}>
+            <div className="algorithm-fields">
               {DIMENSION_ORDER.map(dimension => (
                 <div key={dimension} style={{ flex: 1 }}>
                   <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
                   <InputNumber value={dimensionWeight[dimension]} min={0} max={DIMENSION_WEIGHT_TOTAL}
-                    addonAfter="%" style={{ width: '100%' }} disabled={readOnly}
+                    suffix="%" style={{ width: '100%' }} disabled={readOnly}
                     onChange={val => setDimensionWeight(prev => ({ ...prev, [dimension]: val ?? 0 }))} />
                 </div>
               ))}
@@ -2990,15 +2971,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 </Button>
               )}
             </div>
-          )}
-        </div>
+        </AlgorithmSection>
       )}
 
       {/* 各維度評分項配置：Tabs 切換，頁面高度固定不隨評分項增多而拉長 */}
-      <div style={{
-        padding: '4px 20px 16px', background: '#fff',
-        border: '1px solid #f0f0f0', borderRadius: 8,
-      }}>
+      <AlgorithmSection title={t('organicTrafficScore.pageTitle')} readOnly={readOnly}
+        extra={<Button size="small" disabled={false} icon={<QuestionCircleOutlined />} onClick={() => setRuleModalOpen(true)}>
+          {t('organicTrafficScore.rankingRuleDesc')}
+        </Button>}>
         <Tabs
           activeKey={String(activeDimension)}
           onChange={handleDimensionChange}
@@ -3015,7 +2995,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             children: renderRulePanel(dimension),
           }))}
         />
-      </div>
+      </AlgorithmSection>
 
       {/* 自然流量排名規則說明彈窗 */}
       <Modal
@@ -3023,7 +3003,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         open={ruleModalOpen}
         width={680}
         onCancel={() => setRuleModalOpen(false)}
-        footer={<Button onClick={() => setRuleModalOpen(false)}>{t('organicTrafficScore.close')}</Button>}
+        footer={<Button disabled={false} onClick={() => setRuleModalOpen(false)}>{t('organicTrafficScore.close')}</Button>}
       >
         <div style={{ fontSize: 13, lineHeight: 2, color: '#595959', marginTop: 12 }}>
           <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t('organicTrafficScore.rule1')) }} />

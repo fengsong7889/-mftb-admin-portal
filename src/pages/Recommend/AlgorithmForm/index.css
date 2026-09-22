@@ -1,0 +1,61 @@
+/* 仅作用于算法库表单，不改变销售定价及其他业务页面。 */
+.algorithm-form-page, .algorithm-section { min-width: 0; }
+.algorithm-section {
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+.algorithm-form-page--detail .algorithm-section,
+.algorithm-section--detail {
+  border: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.algorithm-section__header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.algorithm-section__heading { flex: 1; min-width: 180px; margin: 0; font-size: 15px; font-weight: 600; }
+.algorithm-section__heading button,
+.algorithm-section__static-heading {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px;
+  padding: 0; border: 0; background: transparent; color: #262626;
+  font: inherit; text-align: left; scroll-margin-top: 200px;
+}
+.algorithm-section__heading button { cursor: pointer; }
+.algorithm-section__heading button:focus-visible { outline: 2px solid #e8720c; outline-offset: 4px; border-radius: 6px; }
+.algorithm-section__icon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 6px; font-size: 14px;
+  color: #fa8c16; background: #fff7e6;
+}
+.algorithm-section__icon--info { color: #1890ff; background: #e6f7ff; }
+.algorithm-section__icon--advanced { color: #722ed1; background: #f9f0ff; }
+.algorithm-section__divider { flex: 1; min-width: 12px; height: 1px; background: #f0f0f0; }
+.algorithm-section__extra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #8c8c8c; }
+.algorithm-section__chevron { font-size: 12px; color: #8c8c8c; transition: transform 0.2s; }
+.algorithm-section__chevron--expanded { transform: rotate(180deg); }
+.algorithm-section__body { padding-top: 16px; }
+.algorithm-section__body[hidden] { display: none; }
+.algorithm-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.algorithm-fields .ant-form-item { min-width: 0; margin-bottom: 0; }
+.algorithm-fields .ant-form-item-label > label { font-size: 13px; color: #595959; height: auto; }
+.algorithm-fields .ant-form-item-label { padding-bottom: 4px; }
+.algorithm-fields .ant-form-item-extra { font-size: 12px; color: #8c8c8c; margin-top: 6px; }
+.algorithm-fields .ant-input-number-affix-wrapper,
+.algorithm-fields .ant-input-number, .algorithm-fields .ant-select { width: 100%; }
+.algorithm-fields--compact { max-width: 420px; }
+.algorithm-fields--statuses .ant-form-item-label { min-height: 40px; }
+.algorithm-form__rule-body { padding: 16px 20px; border-top: 1px solid #f0f0f0; background: #fff; }
+.algorithm-fields__danger { color: #ff4d4f; }
+.algorithm-form__hint { font-size: 12px; color: #8c8c8c; line-height: 1.8; margin: 0 0 12px; }
+.algorithm-form__note { padding: 12px 16px; border: 1px solid #f0f0f0; border-radius: 6px; margin-top: 16px; font-size: 13px; color: #595959; line-height: 1.8; }
+.algorithm-form__row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.algorithm-form__footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 24px; padding: 12px 24px; border: 1px solid #f0f0f0; border-radius: 8px; font-size: 12px; color: #8c8c8c; }
+.algorithm-form__footer b { font-weight: 400; color: #595959; }
+.algorithm-form__choice { border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; padding: 6px 14px; font: inherit; cursor: pointer; }
+.algorithm-form__choice:focus-visible { outline: 2px solid #e8720c; outline-offset: 2px; }

@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Form, Input, Select, message, Tag, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Radio } from 'antd'
+import { Alert, Button, Form, Input, Select, message, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Spin } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, SettingOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined, EditOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
+import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
+import MerchantStatusFields, { ConsistencyCheckField } from './AlgorithmForm/MerchantStatusFields'
 import { AlgorithmType, APP_OPTIONS } from './constants'
 import dayjs from 'dayjs'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
+import TrafficAlgorithmConfig from './TrafficAlgorithmConfig'
+import useTrafficAlgorithmForm from './TrafficAlgorithmConfig/useTrafficAlgorithmForm'
+import { TRAFFIC_DEFAULTS } from './TrafficAlgorithmConfig/config'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import './WeightSlider.css'
@@ -66,14 +71,7 @@ export default function AlgorithmAdd() {
   const isEditMode = !!algorithmIdParam && !isDetailMode // 有 id 参数且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听曝光策略选择
-  const soldOutFilterEnabled = Form.useWatch('soldOutFilterEnabled', form) // 售罄過濾開關（商品可用性校驗）
-  const generativeRecommendEnabled = Form.useWatch('generativeRecommendEnabled', form) // 生成式推薦總開關
-  const newUserDimensions = Form.useWatch('newUserDimensions', form) as string[] | undefined // 新用戶推薦維度選擇
-  const merchantKeywordStatsMode = Form.useWatch('merchantKeywordStatsMode', form) // 商家關鍵詞統計範圍（全量/自定義）
-  const userKeywordStatsMode = Form.useWatch('userKeywordStatsMode', form) // 用戶關鍵詞統計範圍（全量/自定義）
-  const generativeTriggerMode = Form.useWatch('generativeTriggerMode', form) // 生成式推薦觸發模式（點擊即觸發/停留觸發）
-  const generativeMerchantCount = Form.useWatch('generativeMerchantCount', form) // 生成式推薦商家數量
-  const generativeDailyLimitMode = Form.useWatch('generativeDailyLimitMode', form) // 每日觸發上限模式（不限/限制）
+  const isTrafficAlgorithm = initialType === AlgorithmType.TRAFFIC_AD
 
   // 商家维度配置（按商家维度曝光策略）
   interface DimensionItem {
@@ -104,6 +102,11 @@ export default function AlgorithmAdd() {
   const [selectedRegions, _setSelectedRegions] = useState<string[]>([])
   const [_isEditing, setIsEditing] = useState(isEditMode && !isDetailMode) // 编辑模式（详情模式下不可编辑）
   const [algoDetailData, setAlgoDetailData] = useState<{ updatedBy?: string; updatedAt?: string } | null>(null) // 详情模式操作记录数据
+  const trafficForm = useTrafficAlgorithmForm({
+    enabled: isTrafficAlgorithm, algorithmId: algorithmIdParam, readOnly: isDetailMode, form,
+    onLoaded: setAlgoDetailData,
+    onSaved: () => navigate(`/promotion-algorithm?type=${algorithmTypeParam}`),
+  })
 
   /** 金字招牌 - 資格條件（同一場景/統計類標籤內多條件以且/或組合） */
   interface QualificationCondition {
@@ -435,7 +438,7 @@ export default function AlgorithmAdd() {
 
   // 编辑模式或详情模式下加载默认数据
   useEffect(() => {
-    if (!algorithmIdParam) return
+    if (!algorithmIdParam || isTrafficAlgorithm) return
     fetchAdAlgorithmDetail(Number(algorithmIdParam))
       .then(detail => {
         setAlgoDetailData({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
@@ -527,52 +530,11 @@ export default function AlgorithmAdd() {
               setScenarioConfigs(restoredScenarios)
               setAggregateConditions(prev => ({ ...prev, ...restoredAggregate }))
             }
-            // 投流廣告：回填關鍵詞匹配 + 頻控 + 衰減 + 生成式推薦參數
-            if (p.merchantKeywordStatsMode !== undefined) form.setFieldsValue({ merchantKeywordStatsMode: p.merchantKeywordStatsMode })
-            if (p.merchantKeywordStatsDays !== undefined) form.setFieldsValue({ merchantKeywordStatsDays: p.merchantKeywordStatsDays })
-            if (p.userKeywordStatsMode !== undefined) form.setFieldsValue({ userKeywordStatsMode: p.userKeywordStatsMode })
-            if (p.userKeywordStatsDays !== undefined) form.setFieldsValue({ userKeywordStatsDays: p.userKeywordStatsDays })
-            if (p.userPreferenceMinScore !== undefined) form.setFieldsValue({ userPreferenceMinScore: p.userPreferenceMinScore })
-            if (p.matchThreshold !== undefined) form.setFieldsValue({ matchThreshold: p.matchThreshold })
-            if (p.soldOutFilterEnabled !== undefined) form.setFieldsValue({ soldOutFilterEnabled: p.soldOutFilterEnabled })
-            if (p.productCheckInterval !== undefined) form.setFieldsValue({ productCheckInterval: p.productCheckInterval })
-            if (p.merchantFreqHours !== undefined) form.setFieldsValue({ merchantFreqHours: p.merchantFreqHours })
-            if (p.merchantFreqTimes !== undefined) form.setFieldsValue({ merchantFreqTimes: p.merchantFreqTimes })
-            if (p.keywordFreqHours !== undefined) form.setFieldsValue({ keywordFreqHours: p.keywordFreqHours })
-            if (p.keywordFreqTimes !== undefined) form.setFieldsValue({ keywordFreqTimes: p.keywordFreqTimes })
-            if (p.maxUserTags !== undefined) form.setFieldsValue({ maxUserTags: p.maxUserTags })
-            if (p.explorationSlots !== undefined) form.setFieldsValue({ explorationSlots: p.explorationSlots })
-            if (p.maxMerchantsPerKeyword !== undefined) form.setFieldsValue({ maxMerchantsPerKeyword: p.maxMerchantsPerKeyword })
-            if (p.merchantDecayDays !== undefined) form.setFieldsValue({ merchantDecayDays: p.merchantDecayDays })
-            if (p.merchantDecayPoints !== undefined) form.setFieldsValue({ merchantDecayPoints: p.merchantDecayPoints })
-            if (p.merchantRetainedTagCount !== undefined) form.setFieldsValue({ merchantRetainedTagCount: p.merchantRetainedTagCount })
-            if (p.userDecayDays !== undefined) form.setFieldsValue({ userDecayDays: p.userDecayDays })
-            if (p.userDecayPoints !== undefined) form.setFieldsValue({ userDecayPoints: p.userDecayPoints })
-            if (p.userRetainedTagCount !== undefined) form.setFieldsValue({ userRetainedTagCount: p.userRetainedTagCount })
-            if (p.newTagBoostMultiplier !== undefined) form.setFieldsValue({ newTagBoostMultiplier: p.newTagBoostMultiplier })
-            if (p.maxBoostTagCount !== undefined) form.setFieldsValue({ maxBoostTagCount: p.maxBoostTagCount })
-            if (p.generativeRecommendEnabled !== undefined) form.setFieldsValue({ generativeRecommendEnabled: p.generativeRecommendEnabled })
-            if (p.generativeTriggerMode !== undefined) form.setFieldsValue({ generativeTriggerMode: p.generativeTriggerMode })
-            if (p.dwellTimeThreshold !== undefined) form.setFieldsValue({ dwellTimeThreshold: p.dwellTimeThreshold })
-            if (p.generativeTriggerScope !== undefined) form.setFieldsValue({ generativeTriggerScope: p.generativeTriggerScope })
-            if (p.generativeMerchantCount !== undefined) form.setFieldsValue({ generativeMerchantCount: p.generativeMerchantCount })
-            if (p.generativePriorityMode !== undefined) form.setFieldsValue({ generativePriorityMode: p.generativePriorityMode })
-            if (p.generativePriorityMode2 !== undefined) form.setFieldsValue({ generativePriorityMode2: p.generativePriorityMode2 })
-            if (p.generativeDailyLimitMode !== undefined) form.setFieldsValue({ generativeDailyLimitMode: p.generativeDailyLimitMode })
-            if (p.generativeDailyLimit !== undefined) form.setFieldsValue({ generativeDailyLimit: p.generativeDailyLimit })
-            if (p.generativeSkipMerchantCount !== undefined) form.setFieldsValue({ generativeSkipMerchantCount: p.generativeSkipMerchantCount })
-            if (p.newUserDimensions !== undefined) form.setFieldsValue({ newUserDimensions: p.newUserDimensions })
-            if (p.qualityScoreThreshold !== undefined) form.setFieldsValue({ qualityScoreThreshold: p.qualityScoreThreshold })
-            if (p.regionPopularStatsDays !== undefined) form.setFieldsValue({ regionPopularStatsDays: p.regionPopularStatsDays })
-            if (p.popularityMetrics !== undefined) form.setFieldsValue({ popularityMetrics: p.popularityMetrics })
-            if (p.regionPopularTopPercent !== undefined) form.setFieldsValue({ regionPopularTopPercent: p.regionPopularTopPercent })
-            if (p.completionRateThreshold !== undefined) form.setFieldsValue({ completionRateThreshold: p.completionRateThreshold })
-            if (p.completionMinOrderCount !== undefined) form.setFieldsValue({ completionMinOrderCount: p.completionMinOrderCount })
           } catch { /* params 解析失敗保持默認值 */ }
         }
       })
       .catch(() => { /* 静默请求：错误不阻断页面 */ })
-  }, [algorithmIdParam, form])
+  }, [algorithmIdParam, form, isTrafficAlgorithm])
 
   // 返回算法列表页
   const handleBack = () => {
@@ -629,6 +591,10 @@ export default function AlgorithmAdd() {
 
   // 提交表单（新增/编辑写入后端，后端不可用时降级为本地提示）
   const handleSubmit = async () => {
+    if (isTrafficAlgorithm) {
+      await trafficForm.handleSave()
+      return
+    }
     try {
       const values = await form.validateFields()
       // 人气商家：校验
@@ -664,7 +630,7 @@ export default function AlgorithmAdd() {
           merchants: selectedMerchants,
           regionLimit,
           regions: selectedRegions,
-          merchantExposureStrategy: selectedAlgorithmType === AlgorithmType.TRAFFIC_AD ? 'trafficProportional' : values.merchantExposureStrategy,
+          merchantExposureStrategy: values.merchantExposureStrategy,
           ...(selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? {
             layoutMode,
             manualRules: layoutMode === 'manual' ? manualRules.map(({ position, layout }) => ({ position, layout })) : [],
@@ -699,48 +665,6 @@ export default function AlgorithmAdd() {
                 conditions: (aggregateConditions[opt.value] || []).map(condToPayload),
               }
             }),
-          } : selectedAlgorithmType === AlgorithmType.TRAFFIC_AD ? {
-            // 投流廣告：關鍵詞匹配 + 頻控 + 衰減 + 生成式推薦
-            merchantKeywordStatsMode: values.merchantKeywordStatsMode ?? 'all',
-            merchantKeywordStatsDays: values.merchantKeywordStatsDays,
-            userKeywordStatsMode: values.userKeywordStatsMode ?? 'all',
-            userKeywordStatsDays: values.userKeywordStatsDays,
-            userPreferenceMinScore: values.userPreferenceMinScore,
-            matchThreshold: values.matchThreshold,
-            soldOutFilterEnabled: values.soldOutFilterEnabled ?? true,
-            productCheckInterval: values.productCheckInterval,
-            merchantFreqHours: values.merchantFreqHours,
-            merchantFreqTimes: values.merchantFreqTimes,
-            keywordFreqHours: values.keywordFreqHours,
-            keywordFreqTimes: values.keywordFreqTimes,
-            maxUserTags: values.maxUserTags,
-            explorationSlots: values.explorationSlots,
-            maxMerchantsPerKeyword: values.maxMerchantsPerKeyword,
-            merchantDecayDays: values.merchantDecayDays,
-            merchantDecayPoints: values.merchantDecayPoints,
-            merchantRetainedTagCount: values.merchantRetainedTagCount,
-            userDecayDays: values.userDecayDays,
-            userDecayPoints: values.userDecayPoints,
-            userRetainedTagCount: values.userRetainedTagCount,
-            newTagBoostMultiplier: values.newTagBoostMultiplier,
-            maxBoostTagCount: values.maxBoostTagCount,
-            generativeRecommendEnabled: values.generativeRecommendEnabled ?? true,
-            generativeTriggerMode: values.generativeTriggerMode ?? 'dwell',
-            dwellTimeThreshold: values.dwellTimeThreshold,
-            generativeTriggerScope: values.generativeTriggerScope,
-            generativeMerchantCount: values.generativeMerchantCount ?? 1,
-            generativePriorityMode: values.generativePriorityMode,
-            generativePriorityMode2: values.generativePriorityMode2,
-            generativeDailyLimitMode: values.generativeDailyLimitMode ?? 'limited',
-            generativeDailyLimit: values.generativeDailyLimit,
-            generativeSkipMerchantCount: values.generativeSkipMerchantCount,
-            newUserDimensions: values.newUserDimensions ?? [],
-            qualityScoreThreshold: values.qualityScoreThreshold,
-            regionPopularStatsDays: values.regionPopularStatsDays,
-            popularityMetrics: values.popularityMetrics ?? [],
-            regionPopularTopPercent: values.regionPopularTopPercent,
-            completionRateThreshold: values.completionRateThreshold,
-            completionMinOrderCount: values.completionMinOrderCount,
           } : {
             // 非人氣商家/金字招牌：商家狀態計算 + 數據一致性校驗定時器
             consistencyCheckInterval: values.consistencyCheckInterval,
@@ -768,7 +692,7 @@ export default function AlgorithmAdd() {
   }
 
   return (
-    <div className="content-area">
+    <div className={`content-area algorithm-form-page${isDetailMode ? ' algorithm-form-page--detail' : ''}`}>
       {/* 页面头部：详情模式走全局详情规范（紫条+橙返回+权限门控紫编辑），新增/编辑模式保留橙色头部 */}
       {isDetailMode ? (
         <DetailPageHeader
@@ -821,28 +745,33 @@ export default function AlgorithmAdd() {
       </div>
       )}
 
+      {isTrafficAlgorithm && trafficForm.loadState === 'error' && (
+        <Alert type="error" showIcon style={{ marginBottom: 16 }}
+          message="投流配置加载失败，已禁止保存，避免覆盖原配置"
+          description={trafficForm.loadError}
+          action={<Button onClick={trafficForm.retry}>重试</Button>}
+        />
+      )}
+      {isTrafficAlgorithm && trafficForm.loadState === 'loading' && (
+        <div role="status" style={{ padding: 16 }}><Spin size="small" /> 正在加载投流配置…</div>
+      )}
       <Form
         form={form}
         layout="vertical"
-        disabled={isDetailMode}
+        disabled={isDetailMode || (isTrafficAlgorithm && (trafficForm.loadState !== 'ready' || trafficForm.saving))}
+        onValuesChange={isTrafficAlgorithm ? trafficForm.clearErrors : undefined}
         initialValues={{
           presaleMode: 'rolling',
           continuousPurchase: 'notSupport',
           merchantLimit: 'unlimited',
           regionLimit: 'limited',
           merchantExposureStrategy: 'random',
+          ...(isTrafficAlgorithm ? TRAFFIC_DEFAULTS : {}),
         }}
       >
       {/* 算法选择区域 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.algoSelect')}</span>
-          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+      <AlgorithmSection title={t('recommend.algoSelect')} icon={<AppstoreOutlined />} tone="info">
+        <div className="algorithm-fields">
           <Form.Item
             label={t('recommend.algoName')}
             name="name"
@@ -865,56 +794,28 @@ export default function AlgorithmAdd() {
             />
           </Form.Item>
         </div>
-      </div>
+      </AlgorithmSection>
 
       {/* 算法参数区域 */}
-      {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
+      {isTrafficAlgorithm ? (
+        <TrafficAlgorithmConfig form={form} readOnly={isDetailMode} errors={trafficForm.errors} />
+      ) : selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
         <OrganicTrafficScoreConfig readOnly={isDetailMode} />
       ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE || selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD || selectedAlgorithmType === AlgorithmType.TRAFFIC_AD) ? (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.algoParams')}</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.paramConfigTag')}</Tag>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.configAlgoParams')}</span>
-          </div>
+        <div className="algorithm-form__parameters">
 
 
           {/* ===== 人氣商家：商家展示樣式 + 數據一致性校驗 ===== */}
           {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
             <>
             {/* 數據一致性校驗定時器 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend.timerLabel')}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.everyPrefix')}</span>
-                <Form.Item name="consistencyCheckInterval" noStyle initialValue={5} rules={[{ required: true, message: t('common:required') }]}>
-                  <InputNumber min={1} max={1440} placeholder={t('recommend.unitMinute')} style={{ width: 70 }} />
-                </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.verifyDataConsistency')}</span>
-              </div>
-            </div>
+            <AlgorithmSection title={t('recommend.verifyDataConsistency')}>
+              <ConsistencyCheckField readOnly={isDetailMode} initialValue={5} />
+            </AlgorithmSection>
             {/* 商家展示樣式配置 */}
-            <div style={{ marginBottom: 16 }}>
-              {/* 標題區 */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #f6ffed, #e6f7ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #b7eb8f' }}>
-                  <AppstoreOutlined style={{ fontSize: 15, color: '#52C41A' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend.merchantDisplayStyle')}</span>
-                    <PopularLayoutPreviewModal />
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '18px' }}>
-                    {t('recommend:merchantDisplayStyleHint')}
-                  </div>
-                </div>
-              </div>
+            <AlgorithmSection title={t('recommend.merchantDisplayStyle')} icon={<AppstoreOutlined />} extra={<PopularLayoutPreviewModal />}>
+              <p className="algorithm-form__hint">{t('recommend:merchantDisplayStyleHint')}</p>
 
               {/* 模式切換 */}
               <div style={{ display: 'flex', gap: 0, marginBottom: 14 }}>
@@ -1063,13 +964,13 @@ export default function AlgorithmAdd() {
                   )}
                 </div>
               )}
-            </div>
+            </AlgorithmSection>
             </>
           )}
 
           {/* ===== 金字招牌：標籤配置（固定 7 個標籤 Tab + 各標籤獨立條件） ===== */}
           {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
-            <>
+            <AlgorithmSection title={t('recommend.algoParams')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌標籤配置</span>
@@ -1129,10 +1030,10 @@ export default function AlgorithmAdd() {
                 const isEnabled = signboardEnabledLabels[opt.value] ?? false
                 const configured = isLabelConfigured(opt.value)
                 return (
-                  <div key={opt.value}
-                    onClick={() => !isDetailMode && setActiveSignboardTab(opt.value)}
+                  <button key={opt.value} type="button" className="algorithm-form__choice"
+                    aria-pressed={isActive} onClick={() => setActiveSignboardTab(opt.value)}
                     style={{
-                      padding: '6px 14px', borderRadius: 6, cursor: isDetailMode ? 'default' : 'pointer',
+                      padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
                       border: '1px solid',
                       borderColor: isActive ? '#E8720C' : '#f0f0f0',
                       background: isActive ? '#FFF7E6' : '#fff',
@@ -1143,7 +1044,7 @@ export default function AlgorithmAdd() {
                     <span style={{ fontSize: 14 }}>{opt.icon}</span>
                     <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#E8720C' : '#595959' }}>{opt.label}</span>
                     {configured && <span style={{ fontSize: 10, color: '#fff', background: '#52C41A', borderRadius: 3, padding: '0 4px', lineHeight: '16px', fontWeight: 600 }}>已配置</span>}
-                  </div>
+                  </button>
                 )
               }
               return (
@@ -1388,767 +1289,65 @@ export default function AlgorithmAdd() {
                 </div>
               )
             })()}
-            </>
+            </AlgorithmSection>
           )}
 
           {/* ===== 其他算法：商家狀態計算 + 數據一致性校驗 ===== */}
           {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && (
-            <>
-          {/* 商家状态计算 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:merchantStatusCalc')}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <Form.Item name="statusOpen" noStyle valuePropName="checked" initialValue={true}>
-                <Checkbox disabled>{t('recommend:statusOpen')}</Checkbox>
-              </Form.Item>
-              <Form.Item name="statusRest" noStyle valuePropName="checked">
-                <Checkbox>{t('recommend:statusRest')}<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:statusRestHint')}</span></Checkbox>
-              </Form.Item>
-              <Form.Item name="statusOverwhelmed" noStyle valuePropName="checked">
-                <Checkbox>{t('recommend:statusOverwhelmed')}<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:statusOverwhelmedHint')}</span></Checkbox>
-              </Form.Item>
-              <Form.Item name="statusClosed" noStyle valuePropName="checked">
-                <Checkbox>{t('recommend:statusClosed')}<span style={{ fontSize: 12, color: '#ff4d4f' }}>{t('recommend:statusClosedHint')}</span></Checkbox>
-              </Form.Item>
-            </div>
-          </div>
-
-          {/* 定时器 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:timerLabel')}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:everyPrefix')}</span>
-              <Form.Item name="consistencyCheckInterval" noStyle rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                <InputNumber
-                  min={1}
-                  max={1440}
-                  placeholder={t('recommend:minutePlaceholder')}
-                  style={{ width: 70 }}
-                />
-              </Form.Item>
-              <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:consistencyCheckSuffix')}</span>
-            </div>
-          </div>
-            </>
+            <AlgorithmSection title={t('recommend.merchantStatusCalc')} icon={<ShopOutlined />} tone="info">
+              <MerchantStatusFields readOnly={isDetailMode} initializeOpen />
+              <ConsistencyCheckField readOnly={isDetailMode} />
+            </AlgorithmSection>
           )}
 
           {/* ===== 猜你喜歡：用戶興趣得分規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
-            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>{t('recommend:userInterestScoreRules')}</div>
+            <AlgorithmSection title={t('recommend:userInterestScoreRules')}>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
                 {t('recommend:userInterestScoreHint')}
               </div>
           
-              {/* 收藏店鋪得分 + 下單店鋪得分（並排只讀展示） */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:favoriteStoreScore')}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#1890FF' }}>
-                    <Form.Item name="favoriteScore" noStyle initialValue={5}>
-                      <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#1890FF', fontSize: 15 }} className="no-spinner-input" disabled />
-                    </Form.Item>
-                  </span>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>{t('recommend:scoreUnit')}</span>
-                </div>
-                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:orderStoreScore')}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#52C41A' }}>
-                    <Form.Item name="orderScore" noStyle initialValue={10}>
-                      <InputNumber min={1} max={100} precision={0} style={{ width: 40, border: 'none', background: 'transparent', padding: 0, fontWeight: 700, color: '#52C41A', fontSize: 15 }} className="no-spinner-input" disabled />
-                    </Form.Item>
-                  </span>
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 2 }}>{t('recommend:scoreUnit')}</span>
-                </div>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:dataSourceBizConfig')}</span>
-              </div>
-          
-              {/* 得分有效期 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:scoreValidDaysLabel')}</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:calcRecentPrefix')}</span>
-                <Form.Item name="scoreValidDays" noStyle initialValue={30} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                  <InputNumber min={1} max={365} precision={0} style={{ width: 100 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
+              <div className="algorithm-fields">
+                <Form.Item name="favoriteScore" label={t('recommend:favoriteStoreScore')} initialValue={5}>
+                  <InputNumber min={1} max={100} precision={0} suffix={t('recommend:scoreUnit')} disabled />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:scoreValidSuffix')}</span>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:scoreValidHint')}</span>
+                <Form.Item name="orderScore" label={t('recommend:orderStoreScore')} initialValue={10}>
+                  <InputNumber min={1} max={100} precision={0} suffix={t('recommend:scoreUnit')} disabled />
+                </Form.Item>
+                <Form.Item name="scoreValidDays" label={t('recommend:scoreValidDaysLabel')} initialValue={30}
+                  rules={[{ required: true, message: t('recommend:inputRequired') }]} extra={t('recommend:scoreValidHint')}>
+                  <InputNumber min={1} max={365} precision={0} suffix={t('recommend:dayUnit')} disabled={isDetailMode} />
+                </Form.Item>
               </div>
-            </div>
+              <p className="algorithm-form__hint">{t('recommend:dataSourceBizConfig')}</p>
+            </AlgorithmSection>
           )}
 
           {/* ===== 猜你喜歡：推送規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
-            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 4 }}>{t('recommend:pushRules')}</div>
+            <AlgorithmSection title={t('recommend:pushRules')}>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
                 {t('recommend:pushRulesHint')}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:pushThresholdLabel')}</span>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:whenScoreGe')}</span>
-                <Form.Item name="pushThreshold" noStyle initialValue={5} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                  <InputNumber min={1} max={9999} precision={0} style={{ width: 100 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
+              <div className="algorithm-fields algorithm-fields--compact">
+                <Form.Item name="pushThreshold" label={t('recommend:pushThresholdLabel')} initialValue={5}
+                  rules={[{ required: true, message: t('recommend:inputRequired') }]} extra={t('recommend:pushToWaterfall')}>
+                  <InputNumber min={1} max={9999} precision={0} suffix={t('recommend:scoreUnit')} disabled={isDetailMode} />
                 </Form.Item>
-                <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:pushToWaterfall')}</span>
               </div>
-              <div style={{ marginTop: 10, fontSize: 12, color: '#8c8c8c', paddingLeft: 108 }}>
-                {t('recommend:belowThresholdHint')}
-              </div>
-            </div>
-          )}
-
-          {/* ===== 投流廣告：關鍵詞匹配引擎 ===== */}
-          {selectedAlgorithmType === AlgorithmType.TRAFFIC_AD && (
-            <>
-              {/* 模塊1：關鍵詞匹配引擎 */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f0f5ff', border: '1px solid #d6e4ff', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(24,144,255,0.12)', color: '#1890ff', fontSize: 14 }}>🔍</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficKeywordEngine')}</span>
-                  <Tag color="blue" style={{ fontSize: 11 }}>{t('recommend:coreMatching')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficKeywordEngineHint')}
-                </div>
-
-                {/* 商家關鍵詞統計 + 用戶關鍵詞統計 並排 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 14 }}>
-                  {/* 商家關鍵詞統計 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1890ff' }}>🏪 {t('recommend:trafficMerchantKeywordStats')}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>{t('recommend:trafficMerchantKeywordHint')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Form.Item name="merchantKeywordStatsMode" noStyle initialValue="all">
-                        <Radio.Group disabled={isDetailMode}>
-                          <Radio value="all"><span style={{ fontSize: 13 }}>{t('recommend:trafficStatsModeAll')}</span></Radio>
-                          <Radio value="custom"><span style={{ fontSize: 13 }}>{t('recommend:trafficStatsModeCustom')}</span></Radio>
-                        </Radio.Group>
-                      </Form.Item>
-                      {merchantKeywordStatsMode === 'custom' && (
-                        <>
-                          <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficStatsPeriod')}</span>
-                          <Form.Item name="merchantKeywordStatsDays" noStyle initialValue={30} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                            <InputNumber min={1} max={365} precision={0} style={{ width: 100 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
-                          </Form.Item>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {/* 用戶關鍵詞統計 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#722ed1' }}>👤 {t('recommend:trafficUserKeywordStats')}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>{t('recommend:trafficUserKeywordHint')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Form.Item name="userKeywordStatsMode" noStyle initialValue="all">
-                        <Radio.Group disabled={isDetailMode}>
-                          <Radio value="all"><span style={{ fontSize: 13 }}>{t('recommend:trafficStatsModeAll')}</span></Radio>
-                          <Radio value="custom"><span style={{ fontSize: 13 }}>{t('recommend:trafficStatsModeCustom')}</span></Radio>
-                        </Radio.Group>
-                      </Form.Item>
-                      {userKeywordStatsMode === 'custom' && (
-                        <>
-                          <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficStatsPeriod')}</span>
-                          <Form.Item name="userKeywordStatsDays" noStyle initialValue={30} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                            <InputNumber min={1} max={365} precision={0} style={{ width: 100 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
-                          </Form.Item>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 匹配度閾值：用戶偏好覆蓋率 */}
-                <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficMatchThreshold')}</span>
-                    <Tag color="cyan" style={{ fontSize: 11 }}>{t('recommend:trafficCoverageRate')}</Tag>
-                    <Popover
-                      trigger="click"
-                      placement="right"
-                      title={<span style={{ fontWeight: 600, color: '#1890ff' }}>{t('recommend:trafficMatchThresholdTitle')}</span>}
-                      content={
-                        <div style={{ maxWidth: 360, fontSize: 12, lineHeight: '20px' }}>
-                          <div style={{ color: '#595959', marginBottom: 8 }}>
-                            {t('recommend:trafficCoverageStep1')}
-                          </div>
-                          <div style={{ color: '#595959', marginBottom: 8 }}>
-                            {t('recommend:trafficCoverageStep2')}
-                          </div>
-                          <div style={{ color: '#595959', marginBottom: 8 }}>
-                            {t('recommend:trafficCoverageStep3')}
-                          </div>
-                          <div style={{ padding: '8px 10px', background: '#f0f5ff', borderRadius: 4, marginBottom: 8 }}>
-                            <div style={{ fontWeight: 600, color: '#1890ff', marginBottom: 4 }}>📝 {t('recommend:trafficCoverageExampleTitle')}</div>
-                            <div style={{ color: '#595959' }}>{t('recommend:trafficCoverageExample')}</div>
-                          </div>
-                          <div style={{ padding: '6px 8px', background: '#f6ffed', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                            {t('recommend:trafficMatchThresholdHint')}
-                          </div>
-                        </div>
-                      }
-                    >
-                      <QuestionCircleOutlined style={{ color: '#1890ff', cursor: 'pointer', fontSize: 14 }} />
-                    </Popover>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>{t('recommend:trafficCoverageDesc')}</div>
-
-                  {/* 偏好識別閾值 + 覆蓋率閾值 並排 */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficPreferenceMinScore')}</span>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                      <Form.Item name="userPreferenceMinScore" noStyle initialValue={3} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={100} precision={0} style={{ width: 100 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficPreferenceMinScoreHint')}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficCoverageThreshold')}</span>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                      <Form.Item name="matchThreshold" noStyle initialValue={30} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={100} precision={0} style={{ width: 100 }} addonAfter="%" disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficCoverageThresholdHint')}</span>
-                    </div>
-                  </div>
-
-                  {/* 計算公式 */}
-                  <div style={{ marginTop: 12, padding: '8px 10px', background: '#e6fffb', border: '1px solid #87e8de', borderRadius: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontWeight: 600, color: '#13c2c2', fontSize: 12 }}>{t('recommend:trafficDecayFormula')}</span>
-                      <span style={{ fontFamily: 'monospace', fontSize: 12 }}>覆蓋率 = 商家覆蓋的用戶偏好關鍵詞數 / 用戶偏好關鍵詞總數</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 模塊2：商品可用性校驗 */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(82,196,26,0.12)', color: '#52c41a', fontSize: 14 }}>✅</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficProductAvailability')}</span>
-                  <Tag color="success" style={{ fontSize: 11 }}>{t('recommend:trafficRealtimeCheck')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficProductAvailabilityHint')}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficSoldOutFilter')}</span>
-                    <Form.Item name="soldOutFilterEnabled" noStyle valuePropName="checked" initialValue={true}>
-                      <Switch disabled={isDetailMode} />
-                    </Form.Item>
-                  </div>
-                  {/* 開關關閉時收起校驗頻率配置 */}
-                  {soldOutFilterEnabled && (
-                    <>
-                      <div style={{ width: 1, height: 20, background: '#d9d9d9' }} />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficCheckFrequency')}</span>
-                        <Form.Item name="productCheckInterval" noStyle initialValue={5} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                          <InputNumber min={1} max={60} precision={0} style={{ width: 100 }} addonAfter={t('recommend:minuteUnit')} disabled={isDetailMode} />
-                        </Form.Item>
-                      </div>
-                    </>
-                  )}
-                  {!soldOutFilterEnabled && (
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:trafficSwitchOffHint')}</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 模塊3：曝光退出機制（頻控） */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(250,173,20,0.12)', color: '#faad14', fontSize: 14 }}>⏱️</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficExposureExit')}</span>
-                  <Tag color="warning" style={{ fontSize: 11 }}>{t('recommend:trafficFreqControl')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficExposureExitHint')}
-                </div>
-
-                {/* 兩項頻控配置 並排 */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                  {/* 同商家頻控 */}
-                  <div style={{ padding: '10px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 6 }}>🏪 {t('recommend:trafficMerchantFreqControl')}</div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 8 }}>{t('recommend:trafficMerchantFreqControlDesc')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#595959' }}>
-                      <span>{t('recommend:trafficPer')}</span>
-                      <Form.Item name="merchantFreqHours" noStyle initialValue={2}>
-                        <InputNumber min={1} max={24} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficHourUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span>{t('recommend:trafficHourMaxShow')}</span>
-                      <Form.Item name="merchantFreqTimes" noStyle initialValue={3}>
-                        <InputNumber min={1} max={20} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficTimes')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                  {/* 同關鍵詞頻控（用戶側） */}
-                  <div style={{ padding: '10px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 6 }}>🏷️ {t('recommend:trafficKeywordFreqControl')}</div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 8 }}>{t('recommend:trafficKeywordFreqControlDesc')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#595959' }}>
-                      <span>{t('recommend:trafficPer')}</span>
-                      <Form.Item name="keywordFreqHours" noStyle initialValue={1}>
-                        <InputNumber min={1} max={24} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficHourUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span>{t('recommend:trafficHourMaxShow')}</span>
-                      <Form.Item name="keywordFreqTimes" noStyle initialValue={5}>
-                        <InputNumber min={1} max={20} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficTimes')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                </div>
-                {/* 頻控與流量包消耗速度聯動提示 + 候選耗盡規則 */}
-                <div style={{ marginTop: 10, padding: '8px 10px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 11, color: '#8c8c8c', lineHeight: '18px' }}>
-                  <div>⚠️ {t('recommend:trafficFreqPackageHint')}</div>
-                  <div style={{ marginTop: 4 }}>🚪 {t('recommend:trafficFreqExhaustRule')}</div>
-                </div>
-
-                {/* 標籤匹配配置 */}
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#d46b08', marginBottom: 6 }}>🎯 {t('recommend:trafficTagMatchConfig')}</div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 10 }}>{t('recommend:trafficTagMatchConfigDesc')}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#595959' }}>
-                      <span style={{ whiteSpace: 'nowrap' }}>{t('recommend:trafficMaxUserTags')}</span>
-                      <Form.Item name="maxUserTags" noStyle initialValue={5}>
-                        <InputNumber min={1} max={20} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficTagUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#595959' }}>
-                      <span style={{ whiteSpace: 'nowrap' }}>{t('recommend:trafficExplorationSlots')}</span>
-                      <Form.Item
-                        name="explorationSlots"
-                        noStyle
-                        initialValue={1}
-                        dependencies={['maxUserTags']}
-                        rules={[
-                          { required: true, message: t('recommend:inputRequired') },
-                          ({ getFieldValue }) => ({
-                            validator(_, value) {
-                              const maxTags = getFieldValue('maxUserTags')
-                              if (value === undefined || maxTags === undefined || value < maxTags) return Promise.resolve()
-                              return Promise.reject(new Error(t('recommend:trafficExplorationSlotsError')))
-                            },
-                          }),
-                        ]}
-                      >
-                        <InputNumber min={0} max={10} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficTagUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#595959' }}>
-                      <span style={{ whiteSpace: 'nowrap' }}>{t('recommend:trafficMaxMerchantsPerKeyword')}</span>
-                      <Form.Item name="maxMerchantsPerKeyword" noStyle initialValue={3}>
-                        <InputNumber min={1} max={10} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficMerchantUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                  {/* 標籤選取規則說明 */}
-                  <div style={{ marginTop: 10, padding: '8px 10px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                    {t('recommend:trafficTagSelectionRule')}
-                  </div>
-                </div>
-              </div>
-
-              {/* 模塊4：標籤衰減策略 */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(114,46,209,0.12)', color: '#722ed1', fontSize: 14 }}>📉</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficTagDecay')}</span>
-                  <Tag color="purple" style={{ fontSize: 11 }}>{t('recommend:trafficLinearDecay')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficTagDecayHint')}
-                </div>
-
-                {/* 商家標籤衰減 + 用戶標籤衰減 並排 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  {/* 商家標籤衰減 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#722ed1', marginBottom: 8 }}>🏪 {t('recommend:trafficMerchantTagDecay')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficDecayPeriod')}</span>
-                      <Form.Item name="merchantDecayDays" noStyle initialValue={7} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={365} precision={0} style={{ width: 120 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:trafficDecayDeductLabel')}</span>
-                      <Form.Item name="merchantDecayPoints" noStyle initialValue={1} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={100} precision={0} style={{ width: 120 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>，</span>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficRetainedTagCount')}</span>
-                      <Form.Item name="merchantRetainedTagCount" noStyle initialValue={5} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={50} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficTagUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                  {/* 用戶標籤衰減 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#722ed1', marginBottom: 8 }}>👤 {t('recommend:trafficUserTagDecay')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficDecayPeriod')}</span>
-                      <Form.Item name="userDecayDays" noStyle initialValue={14} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={365} precision={0} style={{ width: 120 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:trafficDecayDeductLabel')}</span>
-                      <Form.Item name="userDecayPoints" noStyle initialValue={1} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={100} precision={0} style={{ width: 120 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>，</span>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficRetainedTagCount')}</span>
-                      <Form.Item name="userRetainedTagCount" noStyle initialValue={5} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={50} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficTagUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 新標籤加速機制 */}
-                <div style={{ marginTop: 12, padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#722ed1' }}>🚀 {t('recommend:trafficNewTagBoost')}</span>
-                    <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficNewTagBoostHint')}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficNewTagBoostMultiplier')}</span>
-                      <Form.Item name="newTagBoostMultiplier" noStyle initialValue={3} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={10} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficBoostTimesUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficMaxBoostTagCount')}</span>
-                      <Form.Item name="maxBoostTagCount" noStyle initialValue={10} rules={[{ required: true, message: t('recommend:inputRequired') }]}>
-                        <InputNumber min={1} max={50} precision={0} style={{ width: 100 }} addonAfter={t('recommend:trafficTagUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '20px' }}>
-                    <div>🆕 {t('recommend:trafficNewTagScope')}</div>
-                    <div>📈 {t('recommend:trafficNewTagRecover')}</div>
-                  </div>
-                </div>
-
-                {/* 衰減計算說明 */}
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#f9f0ff', border: '1px solid #d3adf7', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#722ed1' }}>{t('recommend:trafficDecayFormula')}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 12, whiteSpace: 'nowrap' }}>score(t) = max(0, initial_score − floor(t / decayDays) × decayPoints)</span>
-                    <span style={{ color: '#8c8c8c' }}>{t('recommend:trafficDecayExample')}</span>
-                  </div>
-                  <div style={{ marginTop: 6, padding: '6px 8px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 4 }}>
-                    <span style={{ fontWeight: 600, color: '#722ed1' }}>🔒 {t('recommend:trafficFreezeRule')}</span>
-                    <span style={{ color: '#8c8c8c' }}>{t('recommend:trafficFreezeRuleDesc')}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 模塊5：生成式推薦（相似度推薦） */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#e6fffb', border: '1px solid #87e8de', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(19,194,194,0.12)', color: '#13c2c2', fontSize: 14 }}>🧠</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficGenerativeRecommend')}</span>
-                  <Tag color="cyan" style={{ fontSize: 11 }}>{t('recommend:trafficSimilarityRec')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficGenerativeRecommendHint')}
-                </div>
-
-                {/* 總開關 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{t('recommend:trafficGenerativeSwitch')}</span>
-                  <Form.Item name="generativeRecommendEnabled" noStyle valuePropName="checked" initialValue={true}>
-                    <Switch disabled={isDetailMode} />
-                  </Form.Item>
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend:trafficGenerativeSwitchHint')}</span>
-                </div>
-
-                {/* 開關關閉時收起所有配置面板 */}
-                {!generativeRecommendEnabled && (
-                  <div style={{ fontSize: 12, color: '#8c8c8c', padding: '6px 0' }}>{t('recommend:trafficSwitchOffHint')}</div>
-                )}
-                {generativeRecommendEnabled && (
-                  <>
-                {/* 觸發條件 + 觸發範圍 + 推薦商家配置 並排 */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                  {/* 觸發條件配置 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#13c2c2', marginBottom: 8 }}>⚡ {t('recommend:trafficTriggerConditions')}<span style={{ fontWeight: 400, fontSize: 11, color: '#8c8c8c' }}>（{t('recommend:trafficTriggerCondHint')}）</span></div>
-                    <Form.Item name="generativeTriggerMode" noStyle initialValue="dwell">
-                      <Select
-                        style={{ width: '100%' }}
-                        disabled={isDetailMode}
-                        options={[
-                          { label: t('recommend:trafficTriggerModeInstant'), value: 'instant' },
-                          { label: t('recommend:trafficTriggerModeDwellPrefix'), value: 'dwell' },
-                        ]}
-                      />
-                    </Form.Item>
-                    {generativeTriggerMode === 'dwell' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficDwellTimeThreshold')}</span>
-                        <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                        <Form.Item name="dwellTimeThreshold" noStyle initialValue={10}>
-                          <InputNumber min={3} max={120} precision={0} style={{ width: 120 }} addonAfter={t('recommend:secondUnit')} disabled={isDetailMode} />
-                        </Form.Item>
-                        <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficDwellTimeHint')}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 觸發範圍 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#13c2c2', marginBottom: 8 }}>🎯 {t('recommend:trafficTriggerScope')}</div>
-                    <Form.Item name="generativeTriggerScope" noStyle initialValue="all">
-                      <Select
-                        style={{ width: '100%' }}
-                        disabled={isDetailMode}
-                        options={[
-                          { label: t('recommend:trafficTriggerAllSlots'), value: 'all' },
-                          { label: t('recommend:trafficTriggerTrafficOnly'), value: 'trafficOnly' },
-                        ]}
-                      />
-                    </Form.Item>
-                  </div>
-
-                  {/* 推薦商家數量 + 逐位優先級 */}
-                  <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#13c2c2', marginBottom: 8 }}>📊 {t('recommend:trafficPriorityCalc')}<span style={{ fontWeight: 400, fontSize: 11, color: '#8c8c8c' }}>（{t('recommend:trafficPriorityCalcHint')}）</span></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficRecMerchantCount')}</span>
-                      <Form.Item name="generativeMerchantCount" noStyle initialValue={1}>
-                        <InputNumber min={1} max={2} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficMerchantUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: generativeMerchantCount === 2 ? 8 : 0 }}>
-                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficMerchantPriority1')}</span>
-                      <Form.Item name="generativePriorityMode" noStyle initialValue="matchFirst">
-                        <Select
-                          style={{ flex: 1, minWidth: 120 }}
-                          disabled={isDetailMode}
-                          options={[
-                            { label: t('recommend:trafficPriorityMatchFirst'), value: 'matchFirst' },
-                            { label: t('recommend:trafficPriorityTrafficBalance'), value: 'trafficBalance' },
-                            { label: t('recommend:trafficPriorityHybrid'), value: 'hybrid' },
-                          ]}
-                        />
-                      </Form.Item>
-                    </div>
-                    {generativeMerchantCount === 2 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficMerchantPriority2')}</span>
-                        <Form.Item name="generativePriorityMode2" noStyle initialValue="trafficBalance">
-                          <Select
-                            style={{ flex: 1, minWidth: 120 }}
-                            disabled={isDetailMode}
-                            options={[
-                              { label: t('recommend:trafficPriorityMatchFirst'), value: 'matchFirst' },
-                              { label: t('recommend:trafficPriorityTrafficBalance'), value: 'trafficBalance' },
-                              { label: t('recommend:trafficPriorityHybrid'), value: 'hybrid' },
-                            ]}
-                          />
-                        </Form.Item>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 疲勞度控制 */}
-                <div style={{ marginTop: 12, padding: '10px 12px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#13c2c2' }}>😌 {t('recommend:trafficFatigueControl')}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficGenerativeDailyLimit')}</span>
-                      <Form.Item name="generativeDailyLimitMode" noStyle initialValue="limited">
-                        <Select
-                          style={{ width: 120 }}
-                          disabled={isDetailMode}
-                          options={[
-                            { label: t('recommend:trafficLimitUnlimited'), value: 'unlimited' },
-                            { label: t('recommend:trafficLimitLimited'), value: 'limited' },
-                          ]}
-                        />
-                      </Form.Item>
-                      {generativeDailyLimitMode === 'limited' && (
-                        <Form.Item name="generativeDailyLimit" noStyle initialValue={3}>
-                          <InputNumber min={1} max={50} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficTimes')} disabled={isDetailMode} />
-                        </Form.Item>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficGenerativeSkipMerchants')}</span>
-                      <Form.Item name="generativeSkipMerchantCount" noStyle initialValue={2}>
-                        <InputNumber min={0} max={50} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficMerchantUnit')} disabled={isDetailMode} />
-                      </Form.Item>
-                    </div>
-                    <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficFatigueControlHint')}</span>
-                  </div>
-                </div>
-
-                {/* 優先級策略說明 */}
-                <div style={{ marginTop: 10, padding: '8px 10px', background: '#e6fffb', border: '1px solid #87e8de', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                  <div>{t('recommend:trafficPriorityDesc')}</div>
-                  {generativeMerchantCount === 2 && (
-                    <>
-                      <div style={{ marginTop: 6 }}>🔀 {t('recommend:trafficDedupRule')}</div>
-                      <div style={{ marginTop: 2 }}>1️⃣ {t('recommend:trafficSingleMerchantRule')}</div>
-                    </>
-                  )}
-                </div>
-                  </>
-                )}
-              </div>
-
-              {/* 模塊6：新用戶推薦策略（冷啟動） */}
-              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#fff0f6', border: '1px solid #ffadd2', borderRadius: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(235,47,150,0.12)', color: '#eb2f96', fontSize: 14 }}>🌱</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend:trafficNewUserStrategy')}</span>
-                  <Tag color="magenta" style={{ fontSize: 11 }}>{t('recommend:trafficColdStart')}</Tag>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14, paddingLeft: 36 }}>
-                  {t('recommend:trafficNewUserStrategyHint')}
-                </div>
-
-                {/* 排序維度配置 */}
-                <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e8eaed', borderRadius: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#eb2f96', marginBottom: 10 }}>📐 {t('recommend:trafficNewUserDimensions')}</div>
-                  <Form.Item name="newUserDimensions" noStyle initialValue={['remainingTraffic', 'regionPopular']}>
-                    <Checkbox.Group style={{ width: '100%' }} disabled={isDetailMode}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
-                        <Checkbox value="remainingTraffic">
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficDimRemainingTraffic')}</span>
-                        </Checkbox>
-                        <Checkbox value="qualityScore">
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficDimQualityScore')}</span>
-                        </Checkbox>
-                        <Checkbox value="regionPopular">
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficDimRegionPopular')}</span>
-                        </Checkbox>
-                        <Checkbox value="completionRate">
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficDimCompletionRate')}</span>
-                        </Checkbox>
-                        <Checkbox value="distance">
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:trafficDimDistance')}</span>
-                        </Checkbox>
-                      </div>
-                    </Checkbox.Group>
-                  </Form.Item>
-
-                  {/* 維度門檻配置（根據勾選動態顯示） */}
-                  {newUserDimensions && (newUserDimensions.includes('qualityScore') || newUserDimensions.includes('regionPopular') || newUserDimensions.includes('completionRate')) && (
-                    <div style={{ marginTop: 12, padding: '10px 12px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: '#eb2f96', marginBottom: 8 }}>{t('recommend:trafficDimThresholdTitle')}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {/* 商家質量分門檻（滿分5分，支持小數） */}
-                        {newUserDimensions.includes('qualityScore') && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficQualityScoreThreshold')}</span>
-                            <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                            <Form.Item name="qualityScoreThreshold" noStyle initialValue={3.5}>
-                              <InputNumber min={0} max={5} step={0.5} precision={1} style={{ width: 120 }} addonAfter={t('recommend:scoreUnit')} disabled={isDetailMode} />
-                            </Form.Item>
-                            <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficQualityScoreRange')}</span>
-                          </div>
-                        )}
-                        {/* 區域熱門度：統計週期 + 熱度指標 + Top N% */}
-                        {newUserDimensions.includes('regionPopular') && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficPopularityStatsDays')}</span>
-                            <Form.Item name="regionPopularStatsDays" noStyle initialValue={30}>
-                              <InputNumber min={1} max={365} precision={0} style={{ width: 120 }} addonAfter={t('recommend:dayUnit')} disabled={isDetailMode} />
-                            </Form.Item>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficPopularityMetrics')}</span>
-                            <Form.Item name="popularityMetrics" noStyle initialValue={['orderCount', 'visitCount']}>
-                              <Checkbox.Group disabled={isDetailMode}>
-                                <Checkbox value="orderCount"><span style={{ fontSize: 12 }}>{t('recommend:trafficMetricOrderCount')}</span></Checkbox>
-                                <Checkbox value="visitCount"><span style={{ fontSize: 12 }}>{t('recommend:trafficMetricVisitCount')}</span></Checkbox>
-                                <Checkbox value="repurchaseRate"><span style={{ fontSize: 12 }}>{t('recommend:trafficMetricRepurchaseRate')}</span></Checkbox>
-                              </Checkbox.Group>
-                            </Form.Item>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficRegionPopularTop')}</span>
-                            <Form.Item name="regionPopularTopPercent" noStyle initialValue={20}>
-                              <InputNumber min={1} max={100} precision={0} style={{ width: 120 }} addonAfter="%" disabled={isDetailMode} />
-                            </Form.Item>
-                          </div>
-                        )}
-                        {newUserDimensions.includes('regionPopular') && (
-                          <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-                            {t('recommend:trafficRegionPopularCalc')}
-                          </div>
-                        )}
-                        {/* 訂單完單率門檻 + 最低樣本單量（防小樣本偏差） */}
-                        {newUserDimensions.includes('completionRate') && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficCompletionRateThreshold')}</span>
-                            <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                            <Form.Item name="completionRateThreshold" noStyle initialValue={80}>
-                              <InputNumber min={0} max={100} precision={0} style={{ width: 120 }} addonAfter="%" disabled={isDetailMode} />
-                            </Form.Item>
-                            <span style={{ fontSize: 12, color: '#8c8c8c' }}>，</span>
-                            <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:trafficCompletionMinSample')}</span>
-                            <span style={{ fontSize: 12, color: '#8c8c8c' }}>≥</span>
-                            <Form.Item name="completionMinOrderCount" noStyle initialValue={20}>
-                              <InputNumber min={1} max={10000} precision={0} style={{ width: 120 }} addonAfter={t('recommend:trafficOrderUnit')} disabled={isDetailMode} />
-                            </Form.Item>
-                          </div>
-                        )}
-                        {newUserDimensions.includes('completionRate') && (
-                          <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-                            {t('recommend:trafficCompletionMinSampleHint')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: 8, padding: '8px 10px', background: '#fff0f6', border: '1px solid #ffadd2', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
-                    {t('recommend:trafficNewUserDimensionRule')}
-                  </div>
-                </div>
-              </div>
-            </>
+              <p className="algorithm-form__hint">{t('recommend:belowThresholdHint')}</p>
+            </AlgorithmSection>
           )}
 
           {/* ===== 猜你喜歡：算法策略（三種曝光方案可選） ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
-            <div style={{
-              border: '1px solid #d6e4ff',
-              borderRadius: 8,
-              background: '#f0f5ff',
-              overflow: 'hidden',
-              marginBottom: 16,
-            }}>
-              {/* 標題欄 */}
-              <div style={{
-                fontSize: 14, fontWeight: 600, color: '#1890ff',
-                padding: '10px 20px',
-                borderBottom: '1px solid #d6e4ff',
-                background: '#e6f4ff',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <SettingOutlined />
-                {t('recommend:algoStrategy')}
-              </div>
-
-              <div style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                  <Form.Item
-                    name="merchantExposureStrategy"
-                    style={{ flex: 1, marginBottom: 0 }}
-                    wrapperCol={{ span: 24 }}
-                  >
+            <AlgorithmSection title={t('recommend:algoStrategy')}>
+              <div>
+                <div className="algorithm-fields algorithm-fields--compact">
+                  <Form.Item name="merchantExposureStrategy" label={t('recommend:merchantExposureLabel')}>
                     <Select
                       placeholder={t('recommend:selectPlaceholder')}
-                      style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                      style={{ width: '100%', maxWidth: 360 }}
                       options={[
                         { label: t('recommend:roundRobinCalc'), value: 'random' },
                         { label: t('recommend:weightedRandomCalc'), value: 'weightedRandom' },
@@ -2160,7 +1359,7 @@ export default function AlgorithmAdd() {
 
                 {/* 輪詢計算說明 */}
                 {merchantExposureStrategy === 'random' && (
-                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                  <div className="algorithm-form__note">
                     <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                       {t('recommend:roundRobinStrategyDesc')}
                     </span>
@@ -2169,7 +1368,7 @@ export default function AlgorithmAdd() {
 
                 {/* 加權隨機說明 */}
                 {merchantExposureStrategy === 'weightedRandom' && (
-                  <div style={{ marginTop: 16, padding: '12px 16px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6 }}>
+                  <div className="algorithm-form__note">
                     <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
                       {t('recommend:weightedRandomDesc')}
                     </div>
@@ -2200,18 +1399,14 @@ export default function AlgorithmAdd() {
                   </div>
                 )}
               </div>
-            </div>
+            </AlgorithmSection>
           )}
 
           {/* 波浪計算（僅新店廣告） */}
           {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
             <div style={{ marginBottom: 16 }}>
               {/* 策略类型模块区域 */}
-              <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fafafa', padding: '16px 20px' }}>
-                <div style={{ marginBottom: 14, fontSize: 14, fontWeight: 600, color: '#262626', paddingBottom: 12, borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                  <span>{t('recommend:waveStrategyType')}</span>
-                  <span style={{ fontSize: 12, fontWeight: 400, color: '#d46b08' }}>{t('recommend:newStoreWaveWarning')}</span>
-                </div>
+              <AlgorithmSection title={t('recommend:waveStrategyType')} extra={t('recommend:newStoreWaveWarning')}>
 
                 {/* 默認參數說明 + 清空操作（緊鄰說明文字，便於發現） */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -2261,14 +1456,13 @@ export default function AlgorithmAdd() {
                 <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
                   {t('recommend:waveHint')}
                 </div>
-              </div>
+              </AlgorithmSection>
             </div>
           )}
 
           {/* 配送範圍計算（僅盤活復蘇） - 4 個固定參數 */}
           {selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:deliveryRangeCalc')}</span>
+            <AlgorithmSection title={t('recommend:deliveryRangeCalc')}>
               <Checkbox.Group
                 options={[
                   { label: t('recommend:rangeShort'), value: 'short' },
@@ -2280,42 +1474,19 @@ export default function AlgorithmAdd() {
                 disabled={isDetailMode}
                 onChange={(vals) => setReviveDeliveryRange(vals as string[])}
               />
-            </div>
+            </AlgorithmSection>
           )}
 
           {/* 區域商家展示限制（盤活復蘇 / 無敵星星） */}
           {(selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR) && (
             /* 盤活復蘇/無敵星星：區域商家展示限制 */
-              <div style={{
-                border: '1px solid #d6e4ff',
-                borderRadius: 8,
-                background: '#f0f5ff',
-                overflow: 'hidden',
-                marginBottom: 16,
-              }}>
-                    {/* 標題欄 */}
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#1890ff',
-                      padding: '10px 20px',
-                      borderBottom: '1px solid #d6e4ff',
-                      background: '#e6f4ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <SettingOutlined />
-                      {t('recommend:algoStrategy')}
-                    </div>
-
-                  <div style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                      <Form.Item
-                        name="merchantExposureStrategy"
-                        style={{ flex: 1, marginBottom: 0 }}
-                        wrapperCol={{ span: 24 }}
-                      >
+              <AlgorithmSection title={t('recommend:algoStrategy')}>
+                  <div>
+                    <div className="algorithm-fields algorithm-fields--compact">
+                      <Form.Item name="merchantExposureStrategy" label={t('recommend:merchantExposureLabel')}>
                         <Select
                           placeholder={t('recommend:selectPlaceholder')}
-                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          style={{ width: '100%', maxWidth: 360 }}
                           options={selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ? [
                             { label: t('recommend:randomCalc'), value: 'random' },
                           ] : selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD ? [
@@ -2331,7 +1502,7 @@ export default function AlgorithmAdd() {
 
                       {/* 按轮询维度配置 */}
                       {merchantExposureStrategy === 'random' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                        <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                               {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR
@@ -2608,14 +1779,12 @@ export default function AlgorithmAdd() {
                         </div>
                       )}
                   </div>
-            </div>
-
-
+              </AlgorithmSection>
           )}
 
           {/* ===== 獨家商家：計算訂單類型（獨立模塊） ===== */}
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
-            <div style={{ marginBottom: 16 }}>
+            <AlgorithmSection title={t('recommend:storeLevelBlockOrders')} icon={<ShopOutlined />}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:calcOrderType')}</span>
                 <Form.Item name="orderTypeDelivery" noStyle valuePropName="checked">
@@ -2629,8 +1798,7 @@ export default function AlgorithmAdd() {
                 </span>
               </div>
               {/* 店鋪等級保障單量配置（樣式與品牌商家店鋪等級配置保持一致） */}
-              <div style={{ marginTop: 12, padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>{t('recommend:storeLevelBlockOrders')}</div>
+              <div>
                 <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
                   {t('recommend:storeLevelBlockHint')}
                 </div>
@@ -2657,7 +1825,7 @@ export default function AlgorithmAdd() {
                           min={1}
                           precision={0}
                           style={{ width: '100%' }}
-                          addonAfter={t('recommend:unitOrder')}
+                          suffix={t('recommend:unitOrder')}
                           disabled={isDetailMode}
                         />
                       </Form.Item>
@@ -2665,41 +1833,18 @@ export default function AlgorithmAdd() {
                   ))}
                 </div>
               </div>
-            </div>
+            </AlgorithmSection>
           )}
 
           {/* ===== 獨家商家：算法策略（獨立模塊，與盤活復蘇/無敵星星互不影響） ===== */}
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
-              <div style={{
-                border: '1px solid #d6e4ff',
-                borderRadius: 8,
-                background: '#f0f5ff',
-                overflow: 'hidden',
-                marginBottom: 16,
-              }}>
-                    {/* 標題欄 */}
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#1890ff',
-                      padding: '10px 20px',
-                      borderBottom: '1px solid #d6e4ff',
-                      background: '#e6f4ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <SettingOutlined />
-                      {t('recommend:algoStrategy')}
-                    </div>
-
-                  <div style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                      <Form.Item
-                        name="merchantExposureStrategy"
-                        style={{ flex: 1, marginBottom: 0 }}
-                        wrapperCol={{ span: 24 }}
-                      >
+              <AlgorithmSection title={t('recommend:algoStrategy')}>
+                  <div>
+                    <div className="algorithm-fields algorithm-fields--compact">
+                      <Form.Item name="merchantExposureStrategy" label={t('recommend:merchantExposureLabel')}>
                         <Select
                           placeholder={t('recommend:selectPlaceholder')}
-                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          style={{ width: '100%', maxWidth: 360 }}
                           options={[
                             { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
@@ -2710,7 +1855,7 @@ export default function AlgorithmAdd() {
 
                       {/* 按轮询维度配置 */}
                       {merchantExposureStrategy === 'random' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                        <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
@@ -2719,31 +1864,14 @@ export default function AlgorithmAdd() {
                         </div>
                       )}
                   </div>
-            </div>
+              </AlgorithmSection>
           )}
 
           {/* ===== 品牌商家(KA)：流量曝光保障（獨立模塊，互不影響） ===== */}
           {selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT && (
-            <div style={{ marginBottom: 16 }}>
-              {/* 店鋪等級保障流量配置 */}
-              <div style={{ padding: '14px 16px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                {/* 標題區：明確提示這是店鋪等級配置 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(232,114,12,0.12)', color: '#E8720C', fontSize: 14,
-                  }}>
-                    <ShopOutlined />
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('recommend:storeLevelTraffic')}</span>
-                  <span style={{
-                    padding: '0 8px', height: 20, lineHeight: '20px', borderRadius: 10,
-                    fontSize: 11, fontWeight: 500, color: '#E8720C',
-                    background: 'rgba(232,114,12,0.08)', border: '1px solid rgba(232,114,12,0.3)',
-                  }}>{t('recommend:byStoreLevelConfig')}</span>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12, paddingLeft: 36 }}>
+            <AlgorithmSection title={t('recommend:storeLevelTraffic')} icon={<ShopOutlined />} extra={t('recommend:byStoreLevelConfig')}>
+              <div>
+                <div className="algorithm-form__hint">
                   {t('recommend:storeLevelTrafficHint')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
@@ -2769,7 +1897,7 @@ export default function AlgorithmAdd() {
                           min={1}
                           precision={0}
                           style={{ width: '100%' }}
-                          addonAfter={t('recommend:unitTimes')}
+                          suffix={t('recommend:unitTimes')}
                           disabled={isDetailMode}
                         />
                       </Form.Item>
@@ -2777,41 +1905,18 @@ export default function AlgorithmAdd() {
                   ))}
                 </div>
               </div>
-            </div>
+            </AlgorithmSection>
           )}
 
           {/* ===== 品牌商家(KA)：算法策略（獨立模塊，複製自獨家商家，互不影響） ===== */}
           {selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT && (
-              <div style={{
-                border: '1px solid #d6e4ff',
-                borderRadius: 8,
-                background: '#f0f5ff',
-                overflow: 'hidden',
-                marginBottom: 16,
-              }}>
-                    {/* 標題欄 */}
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#1890ff',
-                      padding: '10px 20px',
-                      borderBottom: '1px solid #d6e4ff',
-                      background: '#e6f4ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <SettingOutlined />
-                      {t('recommend:algoStrategy')}
-                    </div>
-
-                  <div style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                      <Form.Item
-                        name="merchantExposureStrategy"
-                        style={{ flex: 1, marginBottom: 0 }}
-                        wrapperCol={{ span: 24 }}
-                      >
+              <AlgorithmSection title={t('recommend:algoStrategy')}>
+                  <div>
+                    <div className="algorithm-fields algorithm-fields--compact">
+                      <Form.Item name="merchantExposureStrategy" label={t('recommend:merchantExposureLabel')}>
                         <Select
                           placeholder={t('recommend:selectPlaceholder')}
-                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          style={{ width: '100%', maxWidth: 360 }}
                           options={[
                             { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
@@ -2822,7 +1927,7 @@ export default function AlgorithmAdd() {
 
                       {/* 按轮询维度配置 */}
                       {merchantExposureStrategy === 'random' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                        <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
@@ -2831,41 +1936,18 @@ export default function AlgorithmAdd() {
                         </div>
                       )}
                   </div>
-            </div>
+              </AlgorithmSection>
           )}
 
           {/* ===== 人氣商家：算法策略（僅輪詢計算） ===== */}
           {selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA && (
-              <div style={{
-                border: '1px solid #d6e4ff',
-                borderRadius: 8,
-                background: '#f0f5ff',
-                overflow: 'hidden',
-                marginBottom: 16,
-              }}>
-                    {/* 標題欄 */}
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#1890ff',
-                      padding: '10px 20px',
-                      borderBottom: '1px solid #d6e4ff',
-                      background: '#e6f4ff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <SettingOutlined />
-                      {t('recommend:algoStrategy')}
-                    </div>
-
-                  <div style={{ padding: '16px 20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:bigSmallStrategy')}</span>
-                      <Form.Item
-                        name="merchantExposureStrategy"
-                        style={{ flex: 1, marginBottom: 0 }}
-                        wrapperCol={{ span: 24 }}
-                      >
+              <AlgorithmSection title={t('recommend:algoStrategy')}>
+                  <div>
+                    <div className="algorithm-fields algorithm-fields--compact">
+                      <Form.Item name="merchantExposureStrategy" label={t('recommend:bigSmallStrategy')}>
                         <Select
                           placeholder={t('recommend:selectPlaceholder')}
-                          style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
+                          style={{ width: '100%', maxWidth: 360 }}
                           options={[
                             { label: t('recommend:roundRobinCalc'), value: 'random' },
                           ]}
@@ -2876,7 +1958,7 @@ export default function AlgorithmAdd() {
 
                       {/* 按轮询维度配置 */}
                       {merchantExposureStrategy === 'random' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                        <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                             <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
@@ -2885,121 +1967,34 @@ export default function AlgorithmAdd() {
                         </div>
                       )}
                   </div>
-            </div>
+              </AlgorithmSection>
           )}
 
           {/* 新店廣告：算法策略（波浪計算 + 輪詢曝光） */}
           {selectedAlgorithmType === AlgorithmType.NEW_STORE_AD && (
-            <div style={{
-              border: '1px solid #d6e4ff',
-              borderRadius: 8,
-              background: '#f0f5ff',
-              overflow: 'hidden',
-              marginBottom: 16,
-            }}>
-              {/* 標題欄 */}
-              <div style={{
-                fontSize: 14, fontWeight: 600, color: '#1890ff',
-                padding: '10px 20px',
-                borderBottom: '1px solid #d6e4ff',
-                background: '#e6f4ff',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <SettingOutlined />
-                {t('recommend:algoStrategy')}
-              </div>
-
-              <div style={{ padding: '16px 20px' }}>
+            <AlgorithmSection title={t('recommend:algoStrategy')}>
+              <div>
                 {/* 商家曝光策略 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                  <Select
-                    value="roundRobin"
-                    style={{ width: '25%', height: 36, borderRadius: 6, fontSize: 14 }}
-                    options={[{ label: t('recommend:roundRobinCalc'), value: 'roundRobin' }]}
-                    disabled={isDetailMode}
-                  />
+                <div className="algorithm-fields algorithm-fields--compact">
+                  <Form.Item label={t('recommend:merchantExposureLabel')}>
+                    <Select value="roundRobin" options={[{ label: t('recommend:roundRobinCalc'), value: 'roundRobin' }]} disabled={isDetailMode} />
+                  </Form.Item>
                 </div>
 
                 {/* 輪詢說明 */}
-                <div style={{ marginTop: 16, padding: '12px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                <div className="algorithm-form__note">
                   <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
                     {t('recommend:newStoreRoundRobinDesc')}
                   </span>
                 </div>
               </div>
-            </div>
+            </AlgorithmSection>
           )}
 
-          {/* ===== 投流廣告：曝光策略（商家多於坑位時的分配機制） ===== */}
-          {selectedAlgorithmType === AlgorithmType.TRAFFIC_AD && (
-            <div style={{
-              border: '1px solid #d6e4ff',
-              borderRadius: 8,
-              background: '#f0f5ff',
-              overflow: 'hidden',
-              marginBottom: 16,
-            }}>
-              {/* 標題欄 */}
-              <div style={{
-                fontSize: 14, fontWeight: 600, color: '#1890ff',
-                padding: '10px 20px',
-                borderBottom: '1px solid #d6e4ff',
-                background: '#e6f4ff',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <SettingOutlined />
-                {t('recommend:algoStrategy')}
-              </div>
-
-              <div style={{ padding: '16px 20px' }}>
-                {/* 固定策略：按流量包比例分配（付費流量包必須按購買量消耗） */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:merchantExposureLabel')}</span>
-                  <Tag color="cyan" style={{ fontSize: 13, padding: '3px 12px' }}>{t('recommend:trafficTrafficProportional')}</Tag>
-                  <span style={{ fontSize: 11, color: '#8c8c8c' }}>{t('recommend:trafficFixedStrategyHint')}</span>
-                </div>
-
-                {/* 流量包比例分配說明 */}
-                <div style={{ marginTop: 16, padding: '12px 16px', background: '#e6fffb', border: '1px solid #87e8de', borderRadius: 6 }}>
-                  <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
-                    {t('recommend:trafficProportionalDesc')}
-                  </div>
-                  <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 600, color: '#13c2c2', fontSize: 12 }}>{t('recommend:allocationFormula')}</span>
-                    <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(商家i) = 剩餘流量包_i / Σ(所有商家剩餘流量包)</span>
-                    <Popover
-                      trigger="click"
-                      placement="right"
-                      title={<span style={{ fontWeight: 600, color: '#13c2c2' }}>{t('recommend:allocationExampleTitle')}</span>}
-                      content={
-                        <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px' }}>
-                          <div style={{ color: '#595959', marginBottom: 6 }}>
-                            {t('recommend:trafficProportionalExample')}
-                          </div>
-                          <div style={{ padding: '6px 8px', background: '#e6fffb', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
-                            {t('recommend:trafficProportionalHint')}
-                          </div>
-                        </div>
-                      }
-                    >
-                      <QuestionCircleOutlined style={{ color: '#13c2c2', cursor: 'pointer', fontSize: 13 }} />
-                    </Popover>
-                  </div>
-                </div>
-
-                {/* 補充規則：平局決勝 + 流量包耗盡停投 */}
-                <div style={{ marginTop: 10, padding: '10px 12px', background: '#f0f5ff', border: '1px solid #d6e4ff', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '22px' }}>
-                  <div>⚖️ {t('recommend:trafficTieBreakRule')}</div>
-                  <div>🛑 {t('recommend:trafficPackageExhaustRule')}</div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ) : selectedAlgorithmType ? (
         /* 其它算法类型：显示提示 */
-        <div style={{ border: '1px solid #ffe58f', borderRadius: 8, background: '#fffbe6', padding: '20px 24px', marginBottom: 16 }}>
+        <div className="algorithm-section">
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
@@ -3016,7 +2011,7 @@ export default function AlgorithmAdd() {
         </div>
       ) : (
         /* 未选择算法类型：显示提示 */
-        <div style={{ border: '1px solid #d6e4ff', borderRadius: 8, background: '#f0f5ff', padding: '20px 24px', marginBottom: 16 }}>
+        <div className="algorithm-section">
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
@@ -3037,24 +2032,9 @@ export default function AlgorithmAdd() {
 
       {/* 操作记录（仅详情模式） */}
       {isDetailMode && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{algoDetailData?.updatedBy || '-'}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{algoDetailData?.updatedAt ? dayjs(algoDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
-            </div>
-          </div>
+        <div className="algorithm-form__footer">
+          <span>最后更新人：<b>{algoDetailData?.updatedBy || '-'}</b></span>
+          <span>最后更新时间：<b>{algoDetailData?.updatedAt ? dayjs(algoDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</b></span>
         </div>
       )}
 
@@ -3066,6 +2046,8 @@ export default function AlgorithmAdd() {
             type="primary"
             icon={<SaveOutlined />}
             onClick={handleSubmit}
+            loading={isTrafficAlgorithm && trafficForm.saving}
+            disabled={isTrafficAlgorithm && trafficForm.loadState !== 'ready'}
           >
             {t('common:save')}
           </Button>
