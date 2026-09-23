@@ -896,7 +896,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
                   ))}
                 </div>
               </div>
-              <div key={skinModeFilter} className="skin-gallery-scroll skin-purchase__gallery" role="region"
+              <div key={skinModeFilter} className={`skin-gallery-scroll skin-purchase__gallery skin-purchase__gallery--${skinModeFilter}`} role="region"
                 aria-label={t(skinModeFilter === 'small' ? 'smallMode' : 'bigMode')} tabIndex={0}>
                 {visibleSkins.length === 0 ? (
                   <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr('common.noData')} />

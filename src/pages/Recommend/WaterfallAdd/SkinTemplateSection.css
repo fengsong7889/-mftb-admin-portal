@@ -220,11 +220,16 @@
   min-height: 0;
 }
 
-/* grid: 1大1小（大图模式默认版式） */
+/* grid: 1大2小（大图拼列）—— 左侧大图跨两行占满高度，右侧两张小图上下排列 */
 .skin-stage__dishes--grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 6px;
+}
+
+.skin-stage__dishes--grid .skin-stage__dish:first-child {
+  grid-row: 1 / span 2;
 }
 
 /* triple: 三图等宽 */
@@ -234,9 +239,13 @@
   gap: 6px;
 }
 
-/* hero: 单张大图 */
+/* hero: 单张大图铺满整行 */
 .skin-stage__dishes--hero {
   display: flex;
+}
+
+.skin-stage__dishes--hero .skin-stage__dish {
+  flex: 1;
 }
 
 /* carousel: 阶梯堆叠 */
@@ -538,13 +547,12 @@
 }
 
 .skin-purchase__main {
-  flex: 1 1 560px;
+  flex: 2 1 640px;
   min-width: 0;
 }
 
 .skin-purchase__sidebar {
-  flex: 0 1 340px;
-  width: 340px;
+  flex: 1 1 440px;
   max-width: 100%;
   min-width: 0;
   display: flex;
@@ -560,18 +568,22 @@
   height: clamp(300px, 42vh, 440px);
 }
 
-.skin-purchase__gallery .skin-gallery--large {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+.skin-purchase__gallery--large {
+  height: auto;
 }
 
-/* 保留空列并限制卡片上限，只有一套大图时也不拉伸成整行。 */
+/* 大图最多两列，四套皮肤完整展示为两行；窄容器自动改为单列。 */
+.skin-purchase__gallery .skin-gallery--large {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(280px, calc((100% - 12px) / 2))), 1fr));
+  gap: 12px;
+}
+
 .skin-purchase__gallery .skin-gallery--large .skin-gallery-card {
   width: 100%;
-  max-width: 322px;
   box-sizing: border-box;
 }
 
-.skin-purchase__gallery .skin-gallery--small .skin-gallery-card__preview {
+.skin-purchase__gallery .skin-gallery-card__preview {
   max-width: none;
 }
 

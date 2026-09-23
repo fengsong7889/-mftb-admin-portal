@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, DatePicker, Switch } from 'antd'
+import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, Switch, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
@@ -7,163 +7,144 @@ import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import {
-  fetchWaterfallList, updateWaterfallStatus, deleteWaterfall,
-  fetchAdAlgorithms,
-} from '../../api/adPromotion'
+import { fetchWaterfallList, updateWaterfallStatus, deleteWaterfall, fetchAdAlgorithms } from '../../api/adPromotion'
 import { isBackendUnavailable } from '../../api/request'
-import type { WaterfallStrategy } from '../../api/adPromotion'
+import {
+  mergeServerToStrategies, mergeLocalToStrategies, listLocalStrategies,
+  getLocalStrategy, upsertLocalStrategy, removeLocalStrategy, removeExtension,
+} from '../waterfallConfig/waterfallExtStore'
+import type { WaterfallListView, WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns } from '../waterfallConfig/types'
+import { CONTENT_TYPE_LABEL_KEY, BUSINESS_TYPE_LABEL_KEY } from '../waterfallConfig/types'
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  /** 状态标签: 1=启用 2=停用（依赖 t，定义在组件内以便响应语言切换） */
-  const statusLabel = (v: number) => (v === 1 ? t('common.enable') : t('common.disable'))
   const [searchForm] = Form.useForm()
-  const [data, setData] = useState<WaterfallStrategy[]>([])
-  const [total, setTotal] = useState(0)
+  const [activeBiz, setActiveBiz] = useState<WaterfallBusinessType>('delivery')
+  const [allMerged, setAllMerged] = useState<WaterfallListView[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [loading, setLoading] = useState(false)
-  /** 算法名称筛选选项（来自算法库） */
+  /** 搜索条件快照（驱动客户端过滤重算，避免在依赖数组里调用 getFieldsValue） */
+  const [searchValues, setSearchValues] = useState<Record<string, unknown>>({})
+  /** 算法筛选选项 + 编码->频道映射（业务线推断用） */
   const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>([])
+  const algoChannelByCodeRef = useRef<Record<string, number>>({})
 
-  /** 算法名称选项: 来自算法库已启用算法（当前仅无敌星星接入） */
+  /** 加载算法库：构建 algoCode->channel 映射，供业务线推断 */
   useEffect(() => {
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
+    fetchAdAlgorithms({ page: 1, size: 500 })
       .then(res => {
-        if (res.records.length > 0) {
-          setAlgoOptions(res.records.map(a => ({ label: a.algoName, value: a.id as number })))
-        }
+        const map: Record<string, number> = {}
+        for (const a of res.records ?? []) { if (a.algoCode) map[a.algoCode] = a.channel ?? 0 }
+        algoChannelByCodeRef.current = map
+        setAlgoOptions((res.records ?? []).map(a => ({ label: a.algoName, value: a.id as number })))
       })
-      .catch(() => { /* 保留降级选项 */ })
+      .catch(() => { /* 保留空选项 */ })
   }, [])
 
-  /** 加载列表: 始终优先尝试后端 API，失败时降级本地 Mock */
+  /** 加载列表：一次性拉取后端全量（大分页）+ 本地团购策略，统一归类后再筛选/分页 */
   const loadingRef = useRef(false)
-  const load = useCallback(async (p: number, s: number, values?: Record<string, unknown>) => {
-    if (loadingRef.current) {
-      console.log('[WaterfallList] load 被跳过（上一次仍在进行）')
-      return
-    }
+  const load = useCallback(async (algoId?: number) => {
+    if (loadingRef.current) return
     loadingRef.current = true
-    const v = values ?? searchForm.getFieldsValue()
-    console.log('[WaterfallList] load 开始, page=', p, 'pageSize=', s, new Error().stack?.split('\n').slice(1, 4).join(' | '))
     setLoading(true)
     try {
+      let serverViews: WaterfallListView[] = []
       try {
-        const res = await fetchWaterfallList({
-          page: p, size: s,
-          id: v.id ? Number(v.id) : undefined,
-          strategyCode: v.strategyCode || undefined,
-          strategyName: v.strategyName || undefined,
-          brand: v.brand || undefined,
-          status: v.status,
-          algoId: v.algoId,
-          updatedBy: v.updatedBy || undefined,
-          updatedAtStart: Array.isArray(v.updatedAtRange) && v.updatedAtRange[0] ? (v.updatedAtRange[0] as dayjs.Dayjs).startOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
-          updatedAtEnd: Array.isArray(v.updatedAtRange) && v.updatedAtRange[1] ? (v.updatedAtRange[1] as dayjs.Dayjs).endOf('day').format('YYYY-MM-DD HH:mm:ss') : undefined,
-        })
-        console.log('[WaterfallList] API 成功, records=', res?.records?.length ?? 'null/undefined', 'total=', res?.total)
-        setData(res?.records ?? [])
-        setTotal(res?.total ?? 0)
+        const res = await fetchWaterfallList({ page: 1, size: 1000, algoId })
+        serverViews = mergeServerToStrategies(res?.records ?? [], algoChannelByCodeRef.current)
       } catch (apiErr) {
-        if (isBackendUnavailable(apiErr)) {
-          console.warn('[WaterfallList] 后端不可用，顯示空白列表')
-        } else {
-          const status = (apiErr as { response?: { status?: number } })?.response?.status
-          const msg = (apiErr as Error)?.message || '未知错误'
-          console.error('[WaterfallList] API 业务错误:', status, msg)
-          if (status === 403) {
-            message.error('沒有權限訪問瀑布流配置，請聯繫管理員授權')
-          } else {
-            message.error(`加載列表失敗: ${msg}`)
-          }
-        }
-        setData([])
-        setTotal(0)
+        if (isBackendUnavailable(apiErr)) { message.warning(t('promotionSlotConfig:backendUnavailable')) }
+        else { message.error(t('promotionSlotConfig:loadFailed')) }
       }
+      const localViews = mergeLocalToStrategies(listLocalStrategies())
+      setAllMerged([...serverViews, ...localViews])
     } finally {
       setLoading(false)
       loadingRef.current = false
     }
-  }, [searchForm])
+  }, [t])
 
-  // 初始化查询（仅挂载时执行一次）
-  useEffect(() => {
-    load(1, pageSize)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 稳定的分页 onChange 引用（避免每次渲染创建新函数导致 Table 重复触发）
-  const loadRef = useRef(load)
-  loadRef.current = load
-  const handlePaginationChange = useCallback((p: number, s: number) => {
-    setPage(p)
-    setPageSize(s)
-    loadRef.current(p, s)
-  }, [])
+  /** 客户端按业务线 + 搜索条件过滤 */
+  const filtered = useMemo(() => {
+    const v = searchValues as {
+      strategyCode?: string; strategyName?: string; brand?: string
+      status?: number; contentType?: WaterfallContentType; layoutColumns?: WaterfallLayoutColumns
+    }
+    return allMerged.filter(item => {
+      if (item.businessType !== activeBiz) return false
+      if (v.strategyCode && !(item.strategyCode || '').toLowerCase().includes(String(v.strategyCode).toLowerCase())) return false
+      if (v.strategyName && !item.strategyName.toLowerCase().includes(String(v.strategyName).toLowerCase())) return false
+      if (v.brand && item.brand !== v.brand) return false
+      if (v.status && item.status !== v.status) return false
+      if (v.contentType && item.contentType !== v.contentType) return false
+      if (v.layoutColumns && item.layoutColumns !== v.layoutColumns) return false
+      return true
+    })
+  }, [allMerged, activeBiz, searchValues])
 
-  // 编辑
-  const handleEdit = (record: WaterfallStrategy) => {
-    navigate(`/promotion-slot-config-add?id=${record.id}`)
+  const paged = useMemo(() => filtered.slice((page - 1) * pageSize, page * pageSize), [filtered, page, pageSize])
+
+  const handleSearch = () => {
+    setPage(1)
+    const v = searchForm.getFieldsValue()
+    setSearchValues(v)
+    load(v.algoId)
+  }
+  const handleReset = () => { searchForm.resetFields(); setPage(1); setSearchValues({}); load() }
+
+  const handleAdd = () => navigate(`/promotion-slot-config-add?biz=${activeBiz}`)
+  const handleEdit = (r: WaterfallListView) => {
+    if (r.source === 'local') navigate(`/promotion-slot-config-add?localId=${r.localId}`)
+    else navigate(`/promotion-slot-config-add?id=${r.id}`)
+  }
+  const handleDetail = (r: WaterfallListView) => {
+    if (r.source === 'local') navigate(`/promotion-slot-config-add?localId=${r.localId}&mode=detail`)
+    else navigate(`/promotion-slot-config-add?id=${r.id}&mode=detail`)
   }
 
-  // 查看详情
-  const handleViewDetail = (record: WaterfallStrategy) => {
-    navigate(`/promotion-slot-config-add?id=${record.id}&mode=detail`)
-  }
-
-  // 启用/停用
-  const handleToggleStatus = (record: WaterfallStrategy) => {
-    const newStatus = record.status === 1 ? 2 : 1
+  const handleToggleStatus = (r: WaterfallListView) => {
+    const newStatus = r.status === 1 ? 2 : 1
     const actionText = newStatus === 1 ? t('common.enable') : t('common.disable')
     Modal.confirm({
       title: t('promotionSlotConfig.confirmToggleTitle', { action: actionText }),
-      content: t('promotionSlotConfig.confirmToggleContent', { action: actionText, name: record.strategyName }),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
+      content: t('promotionSlotConfig.confirmToggleContent', { action: actionText, name: r.strategyName }),
+      okText: t('common.confirm'), cancelText: t('common.cancel'),
       onOk: async () => {
-        await updateWaterfallStatus(record.id as number, newStatus)
-        message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: record.strategyName }))
-        load(page, pageSize)
+        if (r.source === 'local') {
+          const d = getLocalStrategy(r.localId as string)
+          if (d) upsertLocalStrategy({ ...d, status: newStatus })
+        } else {
+          await updateWaterfallStatus(r.id as number, newStatus)
+        }
+        message.success(t('promotionSlotConfig.toggleSuccess', { action: actionText, name: r.strategyName }))
+        load()
       },
     })
   }
 
-  // 删除
-  const handleDelete = (record: WaterfallStrategy) => {
+  const handleDelete = (r: WaterfallListView) => {
     Modal.confirm({
       title: t('common.confirmDelete'),
-      content: t('promotionSlotConfig.confirmDeleteContent', { name: record.strategyName }),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      okButtonProps: { danger: true },
+      content: t('promotionSlotConfig.confirmDeleteContent', { name: r.strategyName }),
+      okText: t('common.confirm'), cancelText: t('common.cancel'), okButtonProps: { danger: true },
       onOk: async () => {
-        await deleteWaterfall(record.id as number)
+        if (r.source === 'local') removeLocalStrategy(r.localId as string)
+        else { await deleteWaterfall(r.id as number); removeExtension(r.id as number) }
         message.success(t('common.deleteSuccess'))
-        load(page, pageSize)
+        load()
       },
     })
   }
 
-  // 搜索处理
-  const handleSearch = () => {
-    setPage(1)
-    load(1, pageSize)
-  }
-
-  // 重置搜索
-  const handleReset = () => {
-    searchForm.resetFields()
-    setPage(1)
-    load(1, pageSize, {})
-  }
-
-  /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'strategyCode', title: t('promotionSlotConfig.colConfigId') },
     { key: 'strategyName', title: t('promotionSlotConfig.colWaterfallName') },
+    { key: 'contentType', title: t('promotionSlotConfig.colContentType') },
+    { key: 'layoutColumns', title: t('promotionSlotConfig.colLayout') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'status', title: t('common.colStatus') },
     { key: 'updatedBy', title: t('promotionSlotConfig.colLastUpdater') },
@@ -175,99 +156,60 @@ export default function PromotionSlotConfig() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  // 列定义
-  const columns: ColumnsType<WaterfallStrategy> = [
+  const columns: ColumnsType<WaterfallListView> = [
     {
-      title: t('promotionSlotConfig.colConfigId'),
-      dataIndex: 'strategyCode',
-      key: 'strategyCode',
-      width: 160,
-      align: 'center',
-      render: (v: string) => (
-        <Tag color="blue">{v || '-'}</Tag>
+      title: t('promotionSlotConfig.colConfigId'), dataIndex: 'strategyCode', key: 'strategyCode', width: 170, align: 'center',
+      render: (v: string, r) => (
+        <Space size={4}>
+          <Tag color="blue">{v || (r.source === 'local' ? t('promotionSlotConfig.localTag') : '-')}</Tag>
+          {r.source === 'local' && <Tag color="orange">{t('promotionSlotConfig.unpublishedTag')}</Tag>}
+        </Space>
       ),
     },
+    { title: t('promotionSlotConfig.colWaterfallName'), dataIndex: 'strategyName', key: 'strategyName', width: 200, render: (text: string) => <strong>{text}</strong> },
     {
-      title: t('promotionSlotConfig.colWaterfallName'),
-      dataIndex: 'strategyName',
-      key: 'strategyName',
-      width: 200,
-      render: (text: string) => <strong>{text}</strong>,
+      title: t('promotionSlotConfig.colContentType'), dataIndex: 'contentType', key: 'contentType', width: 100, align: 'center',
+      render: (v: WaterfallContentType) => <Tag>{t(CONTENT_TYPE_LABEL_KEY[v])}</Tag>,
     },
     {
-      title: t('common.colBrand'),
-      dataIndex: 'brand',
-      key: 'app',
-      width: 100,
-      render: (v: string) => (
-        <BrandTag value={v} />
+      title: t('promotionSlotConfig.colLayout'), dataIndex: 'layoutColumns', key: 'layoutColumns', width: 110, align: 'center',
+      render: (v: number) => <span>{v === 2 ? t('promotionSlotConfig:layoutDouble') : t('promotionSlotConfig:layoutSingle')}</span>,
+    },
+    { title: t('common.colBrand'), dataIndex: 'brand', key: 'app', width: 100, render: (v: string) => <BrandTag value={v} /> },
+    {
+      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 80, align: 'center',
+      render: (_: unknown, r) => (
+        <Switch checked={r.status === 1} checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')} onChange={() => handleToggleStatus(r)} />
       ),
     },
+    { title: t('promotionSlotConfig.colLastUpdater'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span> },
+    { title: t('promotionSlotConfig.colLastUpdateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180, render: (v: string | number) => <span style={{ whiteSpace: 'nowrap' }}>{v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-'}</span> },
     {
-      title: t('common.colStatus'),
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      align: 'center',
-      render: (_: unknown, record: WaterfallStrategy) => (
-        <Switch
-          checked={record.status === 1}
-          checkedChildren={t('common.enable')}
-          unCheckedChildren={t('common.disable')}
-          onChange={() => handleToggleStatus(record)}
-        />
-      ),
-    },
-    {
-      title: t('promotionSlotConfig.colLastUpdater'),
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
-      width: 120,
-      render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
-    },
-    {
-      title: t('promotionSlotConfig.colLastUpdateTime'),
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 180,
-      render: (v: string | number) => <span style={{ whiteSpace: 'nowrap' }}>{v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>,
-    },
-    {
-      title: t('common.colAction'),
-      key: 'action',
-      width: 180,
-      fixed: 'right' as const,
-      render: (_, record) => (
+      title: t('common.colAction'), key: 'action', width: 200, fixed: 'right' as const,
+      render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button 
-            type="link" 
-            size="small"
-            onClick={() => handleViewDetail(record)}
-          >
-            {t('promotionSlotConfig.detail')}
-          </Button>
-          <Button 
-            type="link" 
-            size="small"
-            onClick={() => handleEdit(record)}
-          >
-            {t('common.edit')}
-          </Button>
-          <Button 
-            type="link" 
-            size="small"
-            danger
-            onClick={() => handleDelete(record)}
-          >
-            {t('common.delete')}
-          </Button>
+          <Button type="link" size="small" onClick={() => handleDetail(r)}>{t('promotionSlotConfig.detail')}</Button>
+          <Button type="link" size="small" onClick={() => handleEdit(r)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" danger onClick={() => handleDelete(r)}>{t('common.delete')}</Button>
         </Space>
       ),
     },
   ]
 
+  const isDelivery = activeBiz === 'delivery'
+
   return (
     <div className="content-area">
+      <Tabs
+        activeKey={activeBiz}
+        onChange={k => { setActiveBiz(k as WaterfallBusinessType); setPage(1) }}
+        items={[
+          { key: 'delivery', label: t(BUSINESS_TYPE_LABEL_KEY.delivery) },
+          { key: 'groupBuy', label: t(BUSINESS_TYPE_LABEL_KEY.groupBuy) },
+        ]}
+        style={{ marginBottom: 8 }}
+      />
+
       {/* 查询区域 */}
       <div className="search-section">
         <Form layout="inline" form={searchForm} onFinish={handleSearch}>
@@ -278,42 +220,21 @@ export default function PromotionSlotConfig() {
             <Input placeholder={t('promotionSlotConfig.placeholderWaterfallName')} allowClear />
           </Form.Item>
           <Form.Item label={t('common.colBrand')} name="brand">
-            <Select 
-              placeholder={t('common.all')} 
-              allowClear
-              style={{ width: 120 }}
-              options={[
-                { label: t('common.flashBee'), value: 'flashBee' },
-                { label: 'mFood', value: 'mFood' },
-              ]}
-            />
+            <Select placeholder={t('common.all')} allowClear style={{ width: 120 }} options={[{ label: t('common.flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
           </Form.Item>
-          <Form.Item label={t('promotionSlotConfig.colAlgorithmName')} name="algoId">
-            <Select 
-              placeholder={t('promotionSlotConfig.placeholderSelectAlgorithm')} 
-              allowClear
-              showSearch
-              style={{ width: 220 }}
-              optionFilterProp="label"
-              options={algoOptions}
-            />
+          <Form.Item label={t('promotionSlotConfig.colContentType')} name="contentType">
+            <Select placeholder={t('common.all')} allowClear style={{ width: 110 }} options={[{ label: t(CONTENT_TYPE_LABEL_KEY.store), value: 'store' }, { label: t(CONTENT_TYPE_LABEL_KEY.product), value: 'product' }]} />
           </Form.Item>
+          <Form.Item label={t('promotionSlotConfig.colLayout')} name="layoutColumns">
+            <Select placeholder={t('common.all')} allowClear style={{ width: 130 }} options={[{ label: t('promotionSlotConfig:layoutSingle'), value: 1 }, { label: t('promotionSlotConfig:layoutDouble'), value: 2 }]} />
+          </Form.Item>
+          {isDelivery && (
+            <Form.Item label={t('promotionSlotConfig.colAlgorithmName')} name="algoId">
+              <Select placeholder={t('promotionSlotConfig.placeholderSelectAlgorithm')} allowClear showSearch style={{ width: 220 }} optionFilterProp="label" options={algoOptions} />
+            </Form.Item>
+          )}
           <Form.Item label={t('common.colStatus')} name="status">
-            <Select 
-              placeholder={t('common.all')}
-              allowClear
-              style={{ width: 100 }}
-              options={[
-                { label: t('common.enable'), value: 1 },
-                { label: t('common.disable'), value: 2 },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label={t('promotionSlotConfig.colLastUpdater')} name="updatedBy">
-            <Input placeholder={t('promotionSlotConfig.placeholderUpdater')} allowClear />
-          </Form.Item>
-          <Form.Item label={t('promotionSlotConfig.colLastUpdateTime')} name="updatedAtRange">
-            <DatePicker.RangePicker style={{ width: '100%' }} allowClear />
+            <Select placeholder={t('common.all')} allowClear style={{ width: 100 }} options={[{ label: t('common.enable'), value: 1 }, { label: t('common.disable'), value: 2 }]} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -327,40 +248,28 @@ export default function PromotionSlotConfig() {
       {/* 功能区域 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/promotion-slot-config-add')}
-          >
-            {t('promotionSlotConfig.addStrategy')}
-          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>{t('promotionSlotConfig.addStrategy')}</Button>
           {configComponent}
         </div>
       </div>
 
       {/* 列表区域 */}
       <div className="table-section">
-        <Table<WaterfallStrategy>
+        <Table<WaterfallListView>
           columns={applyConfig(columns)}
-          dataSource={data}
+          dataSource={paged}
           loading={loading}
+          rowKey="key"
           pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50'],
-            showQuickJumper: true,
+            current: page, pageSize, total: filtered.length,
+            showSizeChanger: true, pageSizeOptions: ['10', '20', '50'], showQuickJumper: true,
             showTotal: (total) => t('common.total', { count: total }),
-            onChange: handlePaginationChange,
+            onChange: (p, s) => { setPage(p); setPageSize(s) },
           }}
           size="small"
-          rowKey="id"
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1300 }}
         />
       </div>
-
-
     </div>
   )
 }

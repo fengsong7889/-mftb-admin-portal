@@ -4,6 +4,7 @@ import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, S
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
+import CouponIntensityPanel from './CouponIntensityConfig'
 import { ServiceStatus } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
@@ -18,6 +19,8 @@ import {
   TIER_DIRECTION_LABEL,
   type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem, type MultiplierTier, type RegionSupportConfig, type RegionOverheatConfig, type RegionKey,
   REGION_KEYS, REGION_LABELS, REGION_COLORS,
+  isCouponIntensityRule, createDefaultCouponIntensityConfig, validateCouponIntensityConfig,
+  type CouponIntensityConfig,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -28,6 +31,9 @@ import {
 import { fetchStores } from '@/api/store'
 import { fetchAdAlgorithms, fetchAdAlgorithmByCode, type AdAlgorithm } from '@/api/adPromotion'
 
+
+// 原型模板独立于后端规则；编辑和保存仅操作当前页面草稿。
+const COUPON_PREVIEW_TEMPLATE = createDefaultCouponIntensityConfig()
 
 /** 維度順序（界面展示順序） */
 const DIMENSION_ORDER: ScoreDimension[] = [
@@ -287,6 +293,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
             // 舊數據無門檻≤客單價加分配置時補預設值
             if (r.thresholdScore == null) r.thresholdScore = 10
           }
+          // 減免運費本質為「報名即給分」，後端缺 prerequisites 時補默認，使報名計分開關正確顯示為開啟
+          if (r.id === 'COM_02' && !r.prerequisites) {
+            r.prerequisites = '報名減免運費'
+          }
           if (r.id === 'PLT_03') {
             r.name = '商家扶持'
             // 升級舊格式為區域配置
@@ -359,6 +369,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     [ScoreMode.TIERED]: '梯度計分',
     [ScoreMode.CONDITIONAL]: '條件計分',
     [ScoreMode.TIERED_MULTIPLIER]: '倍數梯度計分',
+    [ScoreMode.COUPON_INTENSITY]: '優惠券力度計分',
   }
   /** 配送範圍分層標籤（依賴 t） */
   const RANGE_LABEL: Record<keyof RangeScores, string> = {
@@ -410,6 +421,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const [inlineEditing, setInlineEditing] = useState<Record<string, boolean>>({})
   /** 內聯編輯臨時表單值 */
   const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
+  const [couponDrafts, setCouponDrafts] = useState<Record<string, CouponIntensityConfig>>({})
   /** PLT_03 屏蔽商家輸入框臨時值 */
   const [blockedMerchantInput, setBlockedMerchantInput] = useState('')
   /** PLT_03 區域切換狀態 */
@@ -520,7 +532,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   /** 進入內聯編輯模式 */
   const handleInlineEdit = (rule: OrganicScoreRule) => {
     setInlineEditing(prev => ({ ...prev, [rule.id]: true }))
-    setInlineForm(prev => ({ ...prev, [rule.id]: { ...rule } }))
+    setInlineForm(prev => ({ ...prev, [rule.id]: {
+      ...rule,
+      ...(isCouponIntensityRule(rule.id) ? {
+        couponIntensityConfig: couponDrafts[rule.id] ?? rule.couponIntensityConfig ?? createDefaultCouponIntensityConfig(),
+      } : {}),
+    } }))
     // 自動展開詳情區
     if (!expandedRules[rule.id]) {
       setExpandedRules(prev => ({ ...prev, [rule.id]: true }))
@@ -531,6 +548,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     setInlineEditing(prev => { const n = { ...prev }; delete n[ruleId]; return n })
     setInlineForm(prev => { const n = { ...prev }; delete n[ruleId]; return n })
   }
+  /** 原型草稿不提交到旧规则接口，避免误报生产配置生效。 */
+  const handleSaveCouponDraft = (ruleId: string, config: CouponIntensityConfig) => {
+    if (readOnly) return
+    const error = validateCouponIntensityConfig(config)
+    if (error) { message.warning(error); return }
+    setCouponDrafts(prev => ({ ...prev, [ruleId]: config }))
+    handleInlineCancel(ruleId)
+    message.info('已保存當前頁面草稿；刷新或離開頁面後不保留，未影響真實排名')
+  }
+
   /** 保存內聯編輯 */
   const handleInlineSave = async (ruleId: string) => {
     const values = inlineForm[ruleId]
@@ -1201,21 +1228,31 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                 {isExpanded && (() => {
                   const isEditingInline = !!inlineEditing[rule.id]
                   const form = inlineForm[rule.id] || rule
+                  const tone = dimension === ScoreDimension.COMMERCIAL ? 'strategy' : dimension === ScoreDimension.PLATFORM ? 'advanced' : 'info'
+                  if (isCouponIntensityRule(rule.id)) {
+                    const saved = couponDrafts[rule.id] ?? rule.couponIntensityConfig ?? COUPON_PREVIEW_TEMPLATE
+                    return (
+                      <div className="algorithm-form__rule-body">
+                        <CouponIntensityPanel
+                          ruleName={rule.name.replace('-按金額', '')}
+                          config={isEditingInline ? form.couponIntensityConfig ?? saved : saved}
+                          editing={isEditingInline}
+                          readOnly={readOnly}
+                          hasDraft={!!couponDrafts[rule.id]}
+                          onEdit={() => handleInlineEdit(rule)}
+                          onCancel={() => handleInlineCancel(rule.id)}
+                          onChange={config => {
+                            if (readOnly) return
+                            setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], couponIntensityConfig: config } }))
+                          }}
+                          onSave={config => handleSaveCouponDraft(rule.id, config)}
+                        />
+                      </div>
+                    )
+                  }
                   return (
                   <div className="algorithm-form__rule-body">
-                    {/* ── 前提條件行（僅 COM_02） ── */}
-                    {!isEditingInline && rule.id === 'COM_02' && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          padding: '4px 10px', background: '#f9f0ff', borderRadius: 6,
-                          border: '1px solid #d3adf7',
-                        }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>前提條件</span>
-                          <span style={{ fontSize: 12, color: '#595959' }}>報名減免運費</span>
-                        </div>
-                      </div>
-                    )}
+                    {/* COM_02 前提條件已改為「報名計分」開關，見下方計分明細卡片 */}
                     {/* ─ 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
                       {!isEditingInline && (
@@ -1224,7 +1261,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
                               {(rule.id === 'COM_02')
                                 ? '固定加分'
-                                : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
+                                : (rule.mode === ScoreMode.COUPON_INTENSITY)
+                                  ? '力度計分'
+                                  : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
                                   ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
                                   : MODE_LABEL[rule.mode]}
                             </Tag>
@@ -1263,7 +1302,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <Tag color="#E8720C" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
                           )}
 
-                          {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
+                          {rule.mode !== ScoreMode.COUPON_INTENSITY && rule.id !== 'COM_02' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
                             rule.mode === ScoreMode.AMOUNT_MULTIPLIER
                               ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
                               : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
@@ -1296,7 +1335,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           {!readOnly && (
                             <div style={{ flexShrink: 0 }}>
                               <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
-                                style={{ borderRadius: 4, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
+                                style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
                                 編輯
                               </Button>
                             </div>
@@ -1308,7 +1347,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     {/* ── 內容區：顯示模式 vs 編輯模式 ── */}
                     {!isEditingInline ? (
                       /* 顯示模式 */
-                      <>
+                      <AlgorithmSection title="計分明細" icon={<SettingOutlined />} tone={tone}>
+                        {rule.id === 'COM_02' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+                            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>報名計分</span>
+                            <Switch size="small" aria-label="報名計分" checked={!!rule.prerequisites} disabled />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
+                            <span style={{ fontSize: 12, color: '#8C8C8C' }}>商家報名減免運費活動生效後給分</span>
+                          </div>
+                        )}
                         {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
@@ -2003,9 +2050,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             {rule.description}
                           </div>
                         </div>
-                      </>
+                      </AlgorithmSection>
                     ) : (
                       /* 編輯模式 */
+                      <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: rule.id === 'COM_01' || rule.id === 'COM_02' ? '1fr' : '1fr 1fr', gap: 12 }}>
                           {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
@@ -2018,13 +2066,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           )}
                           {rule.id === 'COM_02' && (
                             <div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
-                              <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 6,
-                                padding: '6px 12px', background: '#f9f0ff', borderRadius: 6,
-                                border: '1px solid #d3adf7',
-                              }}>
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1', whiteSpace: 'nowrap' }}>報名減免運費</span>
+                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>報名計分</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <Switch aria-label="報名計分" checked={!!form.prerequisites}
+                                  checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
+                                  onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: checked ? '報名減免運費' : undefined } }) as any)} />
+                                <span style={{ fontSize: 12, color: '#8C8C8C' }}>開啟後，商家報名減免運費活動即按下方分值給分</span>
                               </div>
                             </div>
                           )}
@@ -2927,6 +2974,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           </Space>
                         </div>
                       </div>
+                      </AlgorithmSection>
                     )}
                   </div>
                   )

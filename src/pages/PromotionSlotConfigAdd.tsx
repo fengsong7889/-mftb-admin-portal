@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Form, Input, Select, Space, message, Table, Tag, Badge, Switch, Popover, Modal } from 'antd'
+import { Button, Form, Input, Select, Space, message, Table, Tag, Switch, Popover, Modal, Radio, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, MobileOutlined, PlusOutlined, QuestionCircleOutlined, HolderOutlined, AppstoreOutlined, ThunderboltOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, QuestionCircleOutlined, AppstoreOutlined, ShopOutlined } from '@ant-design/icons'
 import BrandTag from '../components/BrandTag'
 import DetailPageHeader from '../components/DetailPageHeader'
 import {
@@ -11,66 +11,35 @@ import {
 } from '../api/adPromotion'
 import { isBackendUnavailable } from '../api/request'
 import type { WaterfallStrategyRequest } from '../api/adPromotion'
-import { SLOT_DRAFT_KEY, SLOT_RESULT_KEY } from './PromotionSlotConfigSlots'
+import { fetchWaterfallCategories, fetchCategoryCandidates } from '../api/waterfallCatalog'
+import type { WaterfallCategory } from '../api/waterfallCatalog'
+import {
+  type WaterfallBusinessType, type WaterfallContentType, type WaterfallLayoutColumns,
+  type AlgoSlotDraft, type FixedContentSlot, type WaterfallDraft, type WaterfallBizChannel,
+  ALGO_TYPE_LABEL, ALGO_TYPE_COLOR,
+  CONTENT_TYPE_OPTIONS, LAYOUT_OPTIONS, BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS,
+  serverKey, localKey,
+} from './waterfallConfig/types'
+import {
+  getExtension, setExtension, getLocalStrategy, upsertLocalStrategy,
+  buildDraftFromServer, newLocalId,
+} from './waterfallConfig/waterfallExtStore'
+import { writeDraft, consumeDraft, newSessionKey } from './waterfallConfig/waterfallDraft'
+import { buildGroupBuyPreview, type PreviewCard } from './waterfallConfig/previewLayout'
+import WaterfallPreview from './waterfallConfig/WaterfallPreview'
 
 /** 品牌选项（与后端 brand 枚举对齐） */
 const APP_OPTIONS = [
   { labelKey: 'common:flashBee', value: 'flashBee' },
   { labelKey: 'recommend:appMfood', value: 'mFood' },
 ]
-
-/** 品牌标签 */
 const APP_LABEL: Record<string, string> = { flashBee: 'common:flashBee', mFood: 'recommend:appMfood' }
 
-/** 算法类型标签（与算法库 algo_type 枚举对齐） */
-const ALGO_TYPE_LABEL: Record<number, string> = {
-  1: 'recommend:algoInvincibleStar',
-  2: 'recommend:algoNewStoreAd',
-  3: 'recommend:algoHotReviveAd',
-  4: 'recommend:algoExclusiveMerchant',
-  5: 'recommend:algoPopularMerchant',
-  6: 'recommend:algoGuessYouLike',
-  7: 'recommend:algoOrganicTraffic',
-  11: 'recommend:algoBrandMerchant',
-  12: 'recommend:algoGoldAd',
-  13: 'recommend:algoGoldenSignboard',
-  14: 'recommend:algoProductPromo',
-  15: 'recommend:algoTrafficAd',
-}
-
-/** 算法类型颜色 */
-const ALGO_TYPE_COLOR: Record<number, string> = {
-  1: 'gold',
-  2: 'green',
-  3: 'magenta',
-  4: 'purple',
-  5: 'red',
-  6: 'blue',
-  7: 'lime',
-  11: 'orange',
-  12: 'cyan',
-  13: 'geekblue',
-  14: 'volcano',
-  15: 'yellow',
-}
-
-/** 坑位算法配置 */
-interface SlotAlgorithm {
-  position: number
-  algorithmId: string
-  algorithmName: string
-  algorithmType: number
-  brand?: string
-  status: 1 | 2
-}
-
 /** 可选算法条目 */
-interface AlgorithmOption {
-  label: string
-  value: string
-  type: number
-  brand?: string
-}
+interface AlgorithmOption { label: string; value: string; type: number; brand?: string }
+
+/** 团购候选资源条目（预览补位用） */
+interface CandidateLite { id: string; name: string; image?: string; rating?: number; monthlySales?: number; price?: number; originPrice?: number; distance?: string; deliveryTime?: string }
 
 export default function PromotionSlotConfigAdd() {
   const { t } = useTranslation()
@@ -78,26 +47,48 @@ export default function PromotionSlotConfigAdd() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const editIdParam = searchParams.get('id') || ''
+  const localIdParam = searchParams.get('localId') || ''
+  const bizParam = (searchParams.get('biz') as WaterfallBusinessType | null) || 'delivery'
   const modeParam = searchParams.get('mode') || ''
   const isDetailMode = modeParam === 'detail'
-  const isEditMode = !!editIdParam && !isDetailMode
+
+  const isLocal = !!localIdParam
+  const isServer = !isLocal && !!editIdParam
+  const isEdit = isLocal || isServer
+  const isNew = !isEdit
+
   const [form] = Form.useForm()
+  /** 业务线：新增来自 Tab 参数；编辑来自记录 */
+  const [businessType, setBusinessType] = useState<WaterfallBusinessType>(isNew ? bizParam : 'delivery')
+  const [contentType, setContentType] = useState<WaterfallContentType>('store')
+  const [layoutColumns, setLayoutColumns] = useState<WaterfallLayoutColumns>(1)
+  /** 外卖到家业务频道（美食外卖/超市百货） */
+  const [bizChannel, setBizChannel] = useState<WaterfallBizChannel>('food')
   const [filterDislike, setFilterDislike] = useState(false)
-  const [slotAlgorithms, setSlotAlgorithms] = useState<SlotAlgorithm[]>([])
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  /** 算法库选项（来自「算法库」已启用算法） */
-  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>([])
-  const [saving, setSaving] = useState(false)
-  /** 自然流量兜底算法编码（未配置坑位統一讀取該算法數據） */
   const [naturalAlgoId, setNaturalAlgoId] = useState<string | undefined>(undefined)
-  /** 是否有未保存的坑位變更（從坑位頁返回後或修改坑位後為 true） */
-  const [hasUnsavedSlotChanges, setHasUnsavedSlotChanges] = useState(false)
-  /** 手机状态栏实时时间 */
+  const [naturalAlgoName, setNaturalAlgoName] = useState<string | undefined>(undefined)
+  const [algoSlots, setAlgoSlots] = useState<AlgoSlotDraft[]>([])
+  const [fallbackCategoryIds, setFallbackCategoryIds] = useState<string[]>([])
+  const [fixedSlots, setFixedSlots] = useState<FixedContentSlot[]>([])
+  /** 草稿归属 key（表单页 <-> 坑位页传递用） */
+  const [draftKey, setDraftKey] = useState<string>(() => {
+    if (localIdParam) return localKey(localIdParam)
+    if (editIdParam) return serverKey(Number(editIdParam))
+    return newSessionKey(bizParam)
+  })
+  const [algorithmOptions, setAlgorithmOptions] = useState<AlgorithmOption[]>([])
+  const [categories, setCategories] = useState<WaterfallCategory[]>([])
+  const [candidates, setCandidates] = useState<CandidateLite[]>([])
+  const [saving, setSaving] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [phoneTime, setPhoneTime] = useState(() => {
     const now = new Date()
     return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
   })
+
+  const isGroupBuy = businessType === 'groupBuy'
+  const draftConsumedRef = useRef(false)
+
   useEffect(() => {
     const tick = () => {
       const now = new Date()
@@ -107,804 +98,436 @@ export default function PromotionSlotConfigAdd() {
     return () => clearInterval(id)
   }, [])
 
-  /** 自然流量兜底算法選項：只展示算法庫中「自然流量」類型（algoType=7）的算法 */
-  const naturalAlgoOptions = useMemo(
-    () => algorithmOptions.filter(a => a.type === 7),
-    [algorithmOptions],
-  )
-
-  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
-  const tAlgoTypeLabel = useCallback((v: number) => ALGO_TYPE_LABEL[v] ? t(ALGO_TYPE_LABEL[v]) : t('promotionSlotConfig:algoTypeFallback', { type: v }), [t])
-
-  /** 加载可选算法: 来自算法库已启用算法（当前仅无敌星星接入） */
+  /** 加载算法库（外卖兜底/坑位；团购不使用假算法） */
   useEffect(() => {
     fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
       .then(res => {
-        if (res.records.length > 0) {
-          // 排除金字招牌（只需标签，不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
-          const filtered = res.records.filter(a => !a.algoCode?.startsWith('SFJZ'))
-          setAlgorithmOptions(filtered.map(a => ({
-            label: a.algoName,
-            value: a.algoCode as string,
-            type: a.algoType,
-            brand: a.brand as string | undefined,
-          })))
-        }
+        const filtered = (res.records ?? []).filter(a => !a.algoCode?.startsWith('SFJZ'))
+        setAlgorithmOptions(filtered.map(a => ({ label: a.algoName, value: a.algoCode as string, type: a.algoType, brand: a.brand as string | undefined })))
       })
-      .catch(() => { /* 保留降级选项 */ })
+      .catch(() => { /* 保留降级空选项 */ })
   }, [])
 
-  /** 编辑/详情模式加载数据，后端完全不可用时降级 Mock，后端返回业务错误时提示用户 */
-  const slotResultConsumedRef = useRef(false)
+  /** 团购分类 */
   useEffect(() => {
-    if (!editIdParam) return
-    const id = Number(editIdParam)
+    if (!isGroupBuy) { setCategories([]); return }
+    const brand = form.getFieldValue('app') as string | undefined
+    fetchWaterfallCategories(contentType, brand).then(setCategories).catch(() => setCategories([]))
+  }, [isGroupBuy, contentType, location.key, form])
 
-    // 同步检查 sessionStorage（坑位配置页返回的结果优先于 API 数据）
-    const resultRaw = sessionStorage.getItem(SLOT_RESULT_KEY)
-    if (resultRaw) {
-      sessionStorage.removeItem(SLOT_RESULT_KEY)
-      sessionStorage.removeItem(SLOT_DRAFT_KEY)
-      slotResultConsumedRef.current = true
-      try {
-        const parsed = JSON.parse(resultRaw) as SlotAlgorithm[]
-        console.log('[WaterfallAdd] 编辑模式读取坑位配置页结果:', parsed.length, '条')
-        setSlotAlgorithms(parsed)
-        setHasUnsavedSlotChanges(true)
-      } catch { /* 忽略脏数据 */ }
-    }
+  /** 团购候选（预览补位） */
+  useEffect(() => {
+    if (!isGroupBuy || fallbackCategoryIds.length === 0) { setCandidates([]); return }
+    const brand = form.getFieldValue('app') as string | undefined
+    const exclude = fixedSlots.map(s => s.itemId)
+    fetchCategoryCandidates({ contentType, brand, categoryIds: fallbackCategoryIds, excludeItemIds: exclude, limit: 20 })
+      .then(list => setCandidates(list.map(i => ({ id: i.id, name: i.name, image: i.image, rating: i.rating, monthlySales: i.monthlySales, price: i.price, originPrice: i.originPrice, distance: i.distance, deliveryTime: i.deliveryTime }))))
+      .catch(() => setCandidates([]))
+  }, [isGroupBuy, contentType, fallbackCategoryIds, fixedSlots, location.key, form])
 
-    fetchWaterfallDetail(id)
-      .then(detail => {
-        loadDetailIntoForm(detail, id)
-      })
-      .catch(err => {
-        if (isBackendUnavailable(err)) {
-          console.warn('[WaterfallDetail] 后端不可用，顯示空白表單')
-          loadDetailIntoForm({ strategyName: '', slots: [] }, id)
-        } else {
-          const status = err?.response?.status
-          const msg = err?.message || '未知错误'
-          console.error('[WaterfallDetail] 加载失败:', status, msg)
-          if (status === 403) {
-            message.error('沒有權限訪問該配置，請聯繫管理員授權')
-          } else if (status === 404) {
-            message.error('該配置記錄不存在，可能尚未保存至數據庫')
-          } else {
-            message.error(`加載配置失敗: ${msg}`)
-          }
-        }
-      })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editIdParam, location.key])
+  /** 自然流量兜底算法选项（算法库 algoType=7） */
+  const naturalAlgoOptions = useMemo(() => algorithmOptions.filter(a => a.type === 7), [algorithmOptions])
 
-  /** 将后端详情数据填入表单与坑位列表 */
-  const loadDetailIntoForm = (detail: { strategyName?: string; brand?: string; naturalAlgoId?: string | null; filterDislike?: number; slots?: { slotPosition: number; algoId: string; algoName?: string; algoType?: number; status?: number }[] }, id: number | string) => {
-    form.setFieldsValue({
-      promotionName: detail.strategyName,
-      app: detail.brand,
-    })
-    setNaturalAlgoId(detail.naturalAlgoId ?? undefined)
-    setFilterDislike(detail.filterDislike === 1)
-    // 如果 sessionStorage 已经提供了坑位数据，不再用 API 数据覆盖
-    if (slotResultConsumedRef.current) {
-      console.log('[WaterfallAdd] sessionStorage 已提供坑位数据，跳过 API 坑位数据')
+  /** 编辑/详情：加载数据 */
+  useEffect(() => {
+    if (isNew) return
+    if (isLocal) {
+      const d = getLocalStrategy(localIdParam)
+      if (d) applyDraft(d)
+      else message.error(t('promotionSlotConfig:recordNotFound'))
       return
     }
-    const slots: SlotAlgorithm[] = (detail.slots ?? []).map(s => ({
-      position: s.slotPosition,
-      algorithmId: s.algoId,
-      algorithmName: s.algoName ?? '',
-      algorithmType: s.algoType ?? 1,
-      brand: undefined,
-      status: (s.status === 2 ? 2 : 1) as 1 | 2,
-    }))
-    setSlotAlgorithms(slots)
-  }
+    const id = Number(editIdParam)
+    // 坑位页返回的草稿优先
+    const returned = consumeDraft(serverKey(id))
+    fetchWaterfallDetail(id)
+      .then(detail => {
+        const ext = getExtension(id)
+        const base = buildDraftFromServer(detail, ext)
+        if (returned) { base.algoSlots = returned.algoSlots; base.fixedSlots = returned.fixedSlots }
+        applyDraft(base)
+        setDraftKey(serverKey(id))
+      })
+      .catch(err => {
+        if (isBackendUnavailable(err)) { message.warning(t('promotionSlotConfig:backendUnavailable')) }
+        else message.error(t('promotionSlotConfig:loadDetailFailed'))
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editIdParam, localIdParam, location.key])
 
-  // 进入坑位配置独立页面：当前配置写入草稿后跳转
-  const handleGoSlots = () => {
-    sessionStorage.setItem(SLOT_DRAFT_KEY, JSON.stringify(slotAlgorithms))
-    navigate('/promotion-slot-config-slots')
-  }
-
-  // 新增模式：应用坑位配置页返回的配置结果
+  /** 新增模式：应用坑位页返回的草稿 */
   useEffect(() => {
-    if (editIdParam) return
-    const raw = sessionStorage.getItem(SLOT_RESULT_KEY)
-    if (!raw) return
-    sessionStorage.removeItem(SLOT_RESULT_KEY)
-    sessionStorage.removeItem(SLOT_DRAFT_KEY)
-    try {
-      setSlotAlgorithms(JSON.parse(raw) as SlotAlgorithm[])
-      setHasUnsavedSlotChanges(true)
-    } catch { /* 忽略脏数据 */ }
-  }, [editIdParam])
+    if (!isNew || draftConsumedRef.current) return
+    const returned = consumeDraft(draftKey)
+    if (returned) {
+      setAlgoSlots(returned.algoSlots)
+      setFixedSlots(returned.fixedSlots)
+      draftConsumedRef.current = true
+      setHasUnsavedChanges(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
 
-  // 删除坑位配置（删除后该坑位回归自然流量）
-  const handleDeleteSlot = (record: SlotAlgorithm) => {
+  const applyDraft = (d: WaterfallDraft) => {
+    form.setFieldsValue({ promotionName: d.strategyName, app: d.brand })
+    setBusinessType(d.businessType)
+    setContentType(d.contentType)
+    setLayoutColumns(d.layoutColumns)
+    setBizChannel(d.bizChannel ?? 'food')
+    setFilterDislike(d.filterDislike === 1)
+    setNaturalAlgoId(d.naturalAlgoId ?? undefined)
+    setNaturalAlgoName(d.naturalAlgoName)
+    setAlgoSlots(d.algoSlots)
+    setFallbackCategoryIds(d.fallbackCategoryIds)
+    setFixedSlots(d.fixedSlots)
+    setDraftKey(d.key)
+  }
+
+  /** 组装当前草稿 */
+  const buildDraft = (): WaterfallDraft => {
+    const values = form.getFieldsValue()
+    return {
+      key: draftKey,
+      source: isLocal ? 'local' : 'server',
+      id: isServer ? Number(editIdParam) : undefined,
+      localId: isLocal ? localIdParam : (isNew && isGroupBuy ? draftKey.replace(/^new_/, '') : undefined),
+      strategyName: values.promotionName || '',
+      brand: values.app,
+      businessType,
+      contentType,
+      layoutColumns,
+      bizChannel,
+      filterDislike: filterDislike ? 1 : 2,
+      status: 1,
+      naturalAlgoId: naturalAlgoId ?? null,
+      naturalAlgoName,
+      algoSlots,
+      fallbackCategoryIds,
+      fixedSlots,
+      businessConfirmed: true,
+    }
+  }
+
+  /** 进入坑位配置页 */
+  const handleGoSlots = () => {
+    writeDraft(buildDraft())
+    const q = new URLSearchParams({ key: draftKey })
+    if (isDetailMode) q.set('mode', 'detail')
+    navigate(`/promotion-slot-config-slots?${q.toString()}`)
+  }
+
+  /** 内容类型切换（团购）：清理不兼容的分类/坑位 */
+  const handleChangeContentType = (next: WaterfallContentType) => {
+    if (next === contentType) return
+    const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0
+    if (!hasConfig) { setContentType(next); return }
+    Modal.confirm({
+      title: t('promotionSlotConfig:switchContentTypeTitle'),
+      content: t('promotionSlotConfig:switchContentTypeContent'),
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
+      onOk: () => { setContentType(next); setFallbackCategoryIds([]); setFixedSlots([]); setHasUnsavedChanges(true) },
+    })
+  }
+
+  /** 品牌切换（团购）：清理不兼容配置 */
+  const handleChangeBrand = () => {
+    if (!isGroupBuy) return
+    const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0
+    if (hasConfig) { setFallbackCategoryIds([]); setFixedSlots([]) }
+  }
+
+  const toggleSlotStatus = (position: number) => {
+    if (isGroupBuy) setFixedSlots(prev => prev.map(s => s.position === position ? { ...s, status: s.status === 1 ? 2 : 1 } : s))
+    else setAlgoSlots(prev => prev.map(s => s.position === position ? { ...s, status: s.status === 1 ? 2 : 1 } : s))
+    setHasUnsavedChanges(true)
+  }
+
+  const deleteSlot = (position: number) => {
     Modal.confirm({
       title: t('common:confirmDelete'),
-      content: t('promotionSlotConfig:deleteSlotConfirm', { pos: record.position }),
-      okText: t('common:confirm'),
-      cancelText: t('common:cancel'),
-      okButtonProps: { danger: true },
+      content: t('promotionSlotConfig:deleteSlotConfirm', { pos: position }),
+      okText: t('common:confirm'), cancelText: t('common:cancel'), okButtonProps: { danger: true },
       onOk: () => {
-        setSlotAlgorithms(prev => prev.filter(item => item.position !== record.position))
-        setHasUnsavedSlotChanges(true)
-        message.success(t('promotionSlotConfig:deleteSlotSuccess', { pos: record.position }))
+        if (isGroupBuy) setFixedSlots(prev => prev.filter(s => s.position !== position))
+        else setAlgoSlots(prev => prev.filter(s => s.position !== position))
+        setHasUnsavedChanges(true)
       },
     })
   }
-
-  // 切换启用/停用状态
-  const handleToggleStatus = (record: SlotAlgorithm) => {
-    const newStatus: 1 | 2 = record.status === 1 ? 2 : 1
-    const actionText = newStatus === 1 ? t('common:enable') : t('common:disable')
-    Modal.confirm({
-      title: t('promotionSlotConfig:confirmToggleTitle', { action: actionText }),
-      content: t('promotionSlotConfig:confirmToggleContent', { action: actionText, name: record.algorithmName }),
-      okText: t('common:confirm'),
-      cancelText: t('common:cancel'),
-      onOk: () => {
-        setSlotAlgorithms(prev =>
-          prev.map(item =>
-            item.position === record.position ? { ...item, status: newStatus } : item
-          )
-        )
-        setHasUnsavedSlotChanges(true)
-        message.success(t('promotionSlotConfig:toggleSuccess', { action: actionText, name: record.algorithmName }))
-      },
-    })
-  }
-
-  // 拖拽排序
-  const handleDragStart = useCallback((index: number) => {
-    setDragIndex(index)
-  }, [])
-
-  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    setDragOverIndex(index)
-  }, [])
-
-  const handleDrop = useCallback((index: number) => {
-    if (dragIndex === null || dragIndex === index) return
-    const newList = [...slotAlgorithms]
-    const [moved] = newList.splice(dragIndex, 1)
-    newList.splice(index, 0, moved)
-    // 重新编号 position
-    const reordered = newList.map((item, i) => ({ ...item, position: i + 1 }))
-    setSlotAlgorithms(reordered)
-    setHasUnsavedSlotChanges(true)
-    setDragIndex(null)
-    setDragOverIndex(null)
-    message.success(t('promotionSlotConfig:moveSuccess', { name: moved.algorithmName, pos: index + 1 }))
-  }, [dragIndex, slotAlgorithms])
-
-  const handleDragEnd = useCallback(() => {
-    setDragIndex(null)
-    setDragOverIndex(null)
-  }, [])
-
-  // 上移/下移（基于全量数组定位，避免分页内索引偏差），移动后重新编号
-  const handleMoveSlot = (record: SlotAlgorithm, direction: -1 | 1) => {
-    const index = slotAlgorithms.findIndex(s => s.position === record.position)
-    const target = index + direction
-    if (index < 0 || target < 0 || target >= slotAlgorithms.length) return
-    const newList = [...slotAlgorithms]
-    const [moved] = newList.splice(index, 1)
-    newList.splice(target, 0, moved)
-    setSlotAlgorithms(newList.map((item, i) => ({ ...item, position: i + 1 })))
-    setHasUnsavedSlotChanges(true)
-  }
-
-  // 手机模型标题
-  const phoneTitle = useMemo(() => {
-    const app = form.getFieldValue('app') as string | undefined
-    const appName = app ? app : 'flashBee'
-    return t('promotionSlotConfig:waterfallPreview', { appName: t(APP_LABEL[appName] || 'common:flashBee') })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, slotAlgorithms])
 
   const handleBack = () => {
-    if (hasUnsavedSlotChanges) {
+    if (hasUnsavedChanges && !isDetailMode) {
       Modal.confirm({
         title: t('promotionSlotConfig:discardConfirmTitle'),
         content: t('promotionSlotConfig:discardConfirmContent'),
-        okText: t('promotionSlotConfig:discardConfirmOk'),
-        cancelText: t('promotionSlotConfig:discardConfirmCancel'),
+        okText: t('promotionSlotConfig:discardConfirmOk'), cancelText: t('promotionSlotConfig:discardConfirmCancel'),
         okButtonProps: { danger: true },
         onOk: () => navigate('/promotion-slot-config'),
       })
-    } else {
-      navigate('/promotion-slot-config')
-    }
+    } else navigate('/promotion-slot-config')
   }
 
   const handleSave = async () => {
     try {
       const values = await form.validateFields()
-      if (!naturalAlgoId) {
-        message.warning(t('promotionSlotConfig:fallbackAlgoRequired'))
+      if (!isGroupBuy && !naturalAlgoId) { message.warning(t('promotionSlotConfig:fallbackAlgoRequired')); return }
+      if (isGroupBuy && fallbackCategoryIds.length === 0) { message.warning(t('promotionSlotConfig:categoryFallbackRequired')); return }
+      setSaving(true)
+
+      if (!isGroupBuy) {
+        // 外卖：基础字段走后端接口，扩展字段走本地
+        const request: WaterfallStrategyRequest = {
+          strategyName: values.promotionName,
+          brand: values.app,
+          naturalAlgoId: naturalAlgoId ?? null,
+          filterDislike: filterDislike ? 1 : 2,
+          status: isServer ? undefined : 1,
+          slots: algoSlots.map(item => ({ slotPosition: item.position, algoId: item.algorithmId, status: item.status })),
+        }
+        let serverId = isServer ? Number(editIdParam) : undefined
+        try {
+          if (isServer) { const res = await updateWaterfall(serverId as number, request); serverId = res.id ?? serverId }
+          else { const res = await createWaterfall(request); serverId = res.id }
+        } catch { message.error(t('promotionSlotConfig:saveFailed')); setSaving(false); return }
+        const effectiveLayout: WaterfallLayoutColumns = bizChannel === 'supermarket' ? 1 : layoutColumns
+        const extOk = serverId != null && setExtension(serverId, { businessType: 'delivery', contentType: 'store', layoutColumns: effectiveLayout, bizChannel, fallbackCategoryIds: [], fixedSlots: [], confirmed: true })
+        message.success(t('promotionSlotConfig:saveSuccessMsg'))
+        if (!extOk) message.warning(t('promotionSlotConfig:extSaveFailed'))
+        navigate('/promotion-slot-config')
         return
       }
-      setSaving(true)
-      const request: WaterfallStrategyRequest = {
-        strategyName: values.promotionName,
-        brand: values.app,
-        naturalAlgoId: naturalAlgoId ?? null,
-        filterDislike: filterDislike ? 1 : 2,
-        status: isEditMode ? undefined : 1,
-        slots: slotAlgorithms.map(item => ({
-          slotPosition: item.position,
-          algoId: item.algorithmId,
-          status: item.status,
-        })),
-      }
-      console.log('[WaterfallAdd] handleSave 开始, isEditMode=', isEditMode, 'editId=', editIdParam)
-      console.log('[WaterfallAdd] request payload:', JSON.stringify(request))
-      console.log('[WaterfallAdd] slotAlgorithms count:', slotAlgorithms.length)
-      if (isEditMode) {
-        const res = await updateWaterfall(Number(editIdParam), request)
-        console.log('[WaterfallAdd] update 成功, response:', res)
-      } else {
-        const res = await createWaterfall(request)
-        console.log('[WaterfallAdd] create 成功, response:', res)
-      }
-      message.success(t('promotionSlotConfig:saveSuccessMsg'))
-      setHasUnsavedSlotChanges(false)
+
+      // 团购：整体存本地（后端不支持这些字段），不向算法坑位接口塞门店/商品
+      const draft = buildDraft()
+      const localId = isLocal ? localIdParam : newLocalId()
+      const saved: WaterfallDraft = { ...draft, source: 'local', localId, key: localKey(localId) }
+      const ok = upsertLocalStrategy(saved)
+      if (!ok) { message.error(t('promotionSlotConfig:localSaveFailed')); setSaving(false); return }
+      message.success(t('promotionSlotConfig:localSaveSuccess'))
       navigate('/promotion-slot-config')
-    } catch (error) {
-      const errStatus = (error as { response?: { status?: number } })?.response?.status
-      const errMsg = (error as Error)?.message || '未知错误'
-      const errData = (error as { response?: { data?: unknown } })?.response?.data
-      console.error('[WaterfallAdd] 保存失败, status=', errStatus, 'msg=', errMsg, 'data=', errData, error)
-      message.error(t('promotionSlotConfig:saveFailed'))
+    } catch {
+      /* validateFields 失败由表单提示 */
     } finally {
       setSaving(false)
     }
   }
 
-  /** 模块卡片标题行 */
-  const cardTitle = (icon: React.ReactNode, iconBg: string, iconColor: string, title: string, extra?: React.ReactNode, rightText?: React.ReactNode) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {icon}
-      </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
-      {extra}
-      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {rightText && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{rightText}</span>}
-    </div>
-  )
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tAlgoTypeLabel = useCallback((v: number) => (ALGO_TYPE_LABEL[v] ? t(ALGO_TYPE_LABEL[v]) : t('promotionSlotConfig:algoTypeFallback', { type: v })), [t])
+
+  const phoneTitle = useMemo(() => {
+    const app = form.getFieldValue('app') as string | undefined
+    return t('promotionSlotConfig:waterfallPreview', { appName: app ? t(APP_LABEL[app] || 'common:flashBee') : t('common:flashBee') })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, businessType, t])
+
+  /** 团购预览卡片序列 */
+  const previewCards = useMemo<PreviewCard[]>(() => {
+    if (!isGroupBuy) return []
+    const maxPos = Math.max(8, ...fixedSlots.map(s => s.position), 0)
+    return buildGroupBuyPreview(fixedSlots, candidates, maxPos)
+  }, [isGroupBuy, fixedSlots, candidates])
 
   const cardShellStyle: React.CSSProperties = {
     border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
     padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
   }
+  const cardTitle = (icon: React.ReactNode, iconBg: string, title: string, extra?: React.ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      {extra}
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+    </div>
+  )
 
-  const columns: ColumnsType<SlotAlgorithm> = [
-    {
-      title: t('promotionSlotConfig:colPosition'),
-      dataIndex: 'position',
-      key: 'position',
-      width: 100,
-      align: 'center',
-      render: (v: number) => <Tag color="green">{t('promotionSlotConfig:posNum', { pos: v })}</Tag>,
-    },
-    {
-      title: t('promotionSlotConfig:colAlgoId'),
-      dataIndex: 'algorithmId',
-      key: 'algorithmId',
-      width: 200,
-      align: 'center',
-      render: (code: string) => (
-        <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
-          {code}
-        </code>
-      ),
-    },
-    {
-      title: t('promotionSlotConfig:colAlgoName'),
-      dataIndex: 'algorithmName',
-      key: 'algorithmName',
-      width: 180,
-      ellipsis: true,
-      render: (text: string) => <strong>{text}</strong>,
-    },
-    {
-      title: t('promotionSlotConfig:colAlgoType'),
-      dataIndex: 'algorithmType',
-      key: 'algorithmType',
-      width: 110,
-      render: (v: number) => (
-        <Tag color={ALGO_TYPE_COLOR[v] ?? 'default'}>{tAlgoTypeLabel(v)}</Tag>
-      ),
-    },
-    {
-      title: t('common:brand'),
-      dataIndex: 'brand',
-      key: 'brand',
-      width: 100,
-      render: (_: unknown, record: SlotAlgorithm) => {
-        const brand = record.brand ?? algorithmOptions.find(a => a.value === record.algorithmId)?.brand
-        return brand ? <BrandTag value={brand} /> : '-'
-      },
-    },
-    {
-      title: t('promotionSlotConfig:colStatus'),
-      dataIndex: 'status',
-      key: 'status',
-      width: 80,
-      align: 'center',
-      render: (_: unknown, record: SlotAlgorithm) => (
-        <Switch
-          checked={record.status === 1}
-          checkedChildren={t('promotionSlotConfig:enabled')}
-          unCheckedChildren={t('promotionSlotConfig:disabled')}
-          onChange={() => handleToggleStatus(record)}
-        />
-      ),
-    },
-    ...(!isDetailMode ? [{
-      title: t('common:colAction'),
-      key: 'action',
-      width: 150,
-      align: 'center' as const,
-      render: (_: unknown, record: SlotAlgorithm) => {
-        const index = slotAlgorithms.findIndex(s => s.position === record.position)
-        return (
-        <Space size={4}>
-          <Button
-            type="link"
-            size="small"
-            disabled={index <= 0}
-            onClick={() => handleMoveSlot(record, -1)}
-          >
-            {t('promotionSlotConfig:moveUp')}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            disabled={index === slotAlgorithms.length - 1}
-            onClick={() => handleMoveSlot(record, 1)}
-          >
-            {t('promotionSlotConfig:moveDown')}
-          </Button>
-          <Button type="link" size="small" danger onClick={() => handleDeleteSlot(record)}>
-            {t('common:delete')}
-          </Button>
-        </Space>
-        )
-      },
-    }] : []),
+  /** 坑位表格列（团购/外卖共用，按模式切换列内容） */
+  const algoColumns: ColumnsType<AlgoSlotDraft> = [
+    { title: t('promotionSlotConfig:colPosition'), dataIndex: 'position', key: 'position', width: 90, align: 'center', render: (v: number) => <Tag color="green">{t('promotionSlotConfig:posNum', { pos: v })}</Tag> },
+    { title: t('promotionSlotConfig:colAlgoName'), dataIndex: 'algorithmName', key: 'algorithmName', ellipsis: true, render: (text: string) => <strong>{text}</strong> },
+    { title: t('promotionSlotConfig:colAlgoType'), dataIndex: 'algorithmType', key: 'algorithmType', width: 120, render: (v: number) => <Tag color={ALGO_TYPE_COLOR[v] ?? 'default'}>{tAlgoTypeLabel(v)}</Tag> },
+    { title: t('common:brand'), dataIndex: 'brand', key: 'brand', width: 100, render: (v: string | undefined, r) => { const b = v ?? algorithmOptions.find(a => a.value === r.algorithmId)?.brand; return b ? <BrandTag value={b} /> : '-' } },
+    { title: t('promotionSlotConfig:colStatus'), dataIndex: 'status', key: 'status', width: 90, align: 'center', render: (_: unknown, r) => <Switch size="small" checked={r.status === 1} disabled={isDetailMode} onChange={() => toggleSlotStatus(r.position)} /> },
+    ...(!isDetailMode ? [{ title: t('common:colAction'), key: 'action', width: 90, align: 'center' as const, render: (_: unknown, r: AlgoSlotDraft) => <Button type="link" size="small" danger onClick={() => deleteSlot(r.position)}>{t('common:delete')}</Button> }] : []),
+  ]
+  const fixedColumns: ColumnsType<FixedContentSlot> = [
+    { title: t('promotionSlotConfig:colPosition'), dataIndex: 'position', key: 'position', width: 90, align: 'center', render: (v: number) => <Tag color="green">{t('promotionSlotConfig:posNum', { pos: v })}</Tag> },
+    { title: contentType === 'store' ? t('promotionSlotConfig:colStore') : t('promotionSlotConfig:colProduct'), dataIndex: 'itemName', key: 'itemName', ellipsis: true, render: (text: string) => <strong>{text}</strong> },
+    { title: t('promotionSlotConfig:colItemId'), dataIndex: 'itemId', key: 'itemId', width: 140, render: (v: string) => <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>{v}</code> },
+    { title: t('promotionSlotConfig:colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 120, render: (v?: string) => v || '-' },
+    { title: t('promotionSlotConfig:colStatus'), dataIndex: 'status', key: 'status', width: 90, align: 'center', render: (_: unknown, r) => <Switch size="small" checked={r.status === 1} disabled={isDetailMode} onChange={() => toggleSlotStatus(r.position)} /> },
+    ...(!isDetailMode ? [{ title: t('common:colAction'), key: 'action', width: 90, align: 'center' as const, render: (_: unknown, r: FixedContentSlot) => <Button type="link" size="small" danger onClick={() => deleteSlot(r.position)}>{t('common:delete')}</Button> }] : []),
   ]
 
   return (
     <div className="content-area">
-      {/* 页面头部：详情模式走全局详情规范（紫条+橙返回+权限门控紫编辑），新增/编辑模式保留橙色头部 */}
       {isDetailMode ? (
-        <DetailPageHeader
-          title={t('promotionSlotConfig:slotConfigDetail')}
-          onBack={handleBack}
-          onEdit={() => {
-            const p = new URLSearchParams(searchParams)
-            p.delete('mode')
-            navigate(`/promotion-slot-config-add?${p.toString()}`)
-          }}
-          menuKey="promotion-slot-config"
-        />
+        <DetailPageHeader title={t('promotionSlotConfig:slotConfigDetail')} onBack={handleBack} onEdit={() => { const p = new URLSearchParams(searchParams); p.delete('mode'); navigate(`/promotion-slot-config-add?${p.toString()}`) }} menuKey="promotion-slot-config" />
       ) : (
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>{t('common:back')}</Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEditMode ? t('promotionSlotConfig:editSlotConfig') : t('promotionSlotConfig:addSlotConfig')}
-            </h2>
-          </div>
-        </div>
-      </div>
-      )}
-
-      <Form form={form} layout="vertical" disabled={isDetailMode}>
-        {/* 基础信息 */}
-        <div style={cardShellStyle}>
-          {cardTitle(
-            <MobileOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
-            '#e6f7ff', '#1890ff', t('promotionSlotConfig:basicInfo'),
-            undefined,
-            t('promotionSlotConfig:saveHint'),
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-            <Form.Item
-              label={t('promotionSlotConfig:waterfallNameLabel')}
-              name="promotionName"
-              rules={[{ required: true, message: t('promotionSlotConfig:enterWaterfallName') }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Input placeholder={t('promotionSlotConfig:enterWaterfallName')} allowClear />
-            </Form.Item>
-            <Form.Item
-              label={t('common:brand')}
-              name="app"
-              rules={[{ required: true, message: t('common:selectBrand') }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Select placeholder={t('common:selectBrand')} options={tAppOptions} />
-            </Form.Item>
-          </div>
-        </div>
-      </Form>
-
-      {/* 下方：手机模型 + 算法列表 */}
-      <div style={{ display: 'flex', gap: 24 }}>
-        {/* 左侧：手机模型（iPhone 风格高仿真预览） */}
-        <div style={{ width: 375, flexShrink: 0, position: 'relative' }}>
-          {/* 侧边按钮：音量 + */}
-          <div style={{
-            position: 'absolute', left: -3, top: 150,
-            width: 3, height: 32, borderRadius: '2px 0 0 2px',
-            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
-          }} />
-          {/* 侧边按钮：音量 - */}
-          <div style={{
-            position: 'absolute', left: -3, top: 195,
-            width: 3, height: 32, borderRadius: '2px 0 0 2px',
-            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
-          }} />
-          {/* 侧边按钮：静音开关 */}
-          <div style={{
-            position: 'absolute', left: -3, top: 112,
-            width: 3, height: 20, borderRadius: '2px 0 0 2px',
-            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
-          }} />
-          {/* 侧边按钮：电源 */}
-          <div style={{
-            position: 'absolute', right: -3, top: 160,
-            width: 3, height: 52, borderRadius: '0 2px 2px 0',
-            background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)',
-          }} />
-
-          {/* 手机外壳（深空蓝钛金属配色） */}
-          <div style={{
-            width: 375, height: 720, borderRadius: 52, position: 'relative',
-            background: 'linear-gradient(160deg, #3E5C76 0%, #2C4A64 30%, #1B3A52 60%, #263F56 100%)',
-            boxShadow: [
-              '0 24px 64px rgba(20,40,65,0.40)',
-              '0 8px 24px rgba(0,0,0,0.22)',
-              'inset 0 1px 0 rgba(180,210,240,0.18)',
-              'inset 0 -1px 0 rgba(0,0,0,0.35)',
-              'inset 1px 0 0 rgba(180,210,240,0.08)',
-              'inset -1px 0 0 rgba(180,210,240,0.08)',
-            ].join(', '),
-          }}>
-            {/* 金属中框高光边 */}
-            <div style={{
-              position: 'absolute', inset: 0, borderRadius: 52,
-              border: '1px solid rgba(180,210,240,0.12)',
-              pointerEvents: 'none', zIndex: 2,
-            }} />
-
-            {/* 天线带 */}
-            <div style={{
-              position: 'absolute', top: 90, left: -1, width: 2, height: 6,
-              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
-            }} />
-            <div style={{
-              position: 'absolute', top: 90, right: -1, width: 2, height: 6,
-              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
-            }} />
-            <div style={{
-              position: 'absolute', bottom: 130, left: -1, width: 2, height: 6,
-              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
-            }} />
-            <div style={{
-              position: 'absolute', bottom: 130, right: -1, width: 2, height: 6,
-              background: '#4E6E8A', borderRadius: 1, zIndex: 3,
-            }} />
-
-            {/* 屏幕区域 */}
-            <div style={{
-              position: 'absolute', inset: 10, borderRadius: 42,
-              background: '#000', overflow: 'hidden',
-            }}>
-              {/* 屏幕内容容器 */}
-              <div style={{
-                position: 'absolute', inset: 0, borderRadius: 42,
-                background: '#F5F5F5', overflow: 'hidden',
-                display: 'flex', flexDirection: 'column',
-              }}>
-                {/* 状态栏 */}
-                <div style={{
-                  height: 50, padding: '14px 28px 0', display: 'flex',
-                  justifyContent: 'space-between', alignItems: 'center',
-                  background: '#fff', flexShrink: 0, position: 'relative', zIndex: 5,
-                }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: '#000', letterSpacing: 0.5 }}>{phoneTime}</span>
-                  {/* 灵动岛 */}
-                  <div style={{
-                    position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
-                    width: 110, height: 30, background: '#000', borderRadius: 16, zIndex: 10,
-                  }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    {/* 蜂窝信号图标 */}
-                    <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
-                      <rect x="0" y="9" width="3" height="3" rx="0.5" fill="#000"/>
-                      <rect x="4.5" y="6" width="3" height="6" rx="0.5" fill="#000"/>
-                      <rect x="9" y="3" width="3" height="9" rx="0.5" fill="#000"/>
-                      <rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#000"/>
-                    </svg>
-                    {/* WiFi 图标 */}
-                    <svg width="16" height="12" viewBox="0 0 16 12" fill="none">
-                      <circle cx="8" cy="10" r="1.5" fill="#000"/>
-                      <path d="M4.5 8c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8" stroke="#000" strokeWidth="1.3" strokeLinecap="round"/>
-                      <path d="M1.8 5.5C3.5 3.5 5.6 2.5 8 2.5s4.5 1 6.2 3" stroke="#000" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
-                    {/* 电池图标 */}
-                    <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
-                      <rect x="0.5" y="0.5" width="22" height="12" rx="2.5" stroke="#000" strokeOpacity="0.35"/>
-                      <rect x="2" y="2" width="19" height="9" rx="1.5" fill="#000"/>
-                      <path d="M24 4.5v4a2 2 0 0 0 0-4z" fill="#000" fillOpacity="0.4"/>
-                    </svg>
-                  </div>
-                </div>
-
-                {/* APP 导航栏 */}
-                <div style={{
-                  background: '#fff', padding: '8px 16px 12px',
-                  borderBottom: '0.5px solid rgba(0,0,0,0.08)', flexShrink: 0,
-                  textAlign: 'center', position: 'relative',
-                }}>
-                  <div style={{ fontSize: 17, fontWeight: 700, color: '#262626', letterSpacing: 0.3 }}>
-                    {phoneTitle}
-                  </div>
-                  <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, lineHeight: 1.4 }}>
-                    {t('promotionSlotConfig:previewHint')}
-                  </div>
-                </div>
-
-                {/* 瀑布流位置列表（支持拖拽排序） */}
-                <div style={{
-                  flex: 1, overflow: 'auto', padding: '12px 14px 28px',
-                  display: 'flex', flexDirection: 'column', gap: 10,
-                }}>
-                  {slotAlgorithms.filter(item => item.status === 1).length === 0 && (
-                    <div style={{
-                      textAlign: 'center', padding: '36px 14px', lineHeight: 1.7,
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                    }}>
-                      <ExclamationCircleOutlined style={{ fontSize: 28, color: '#FAAD14' }} />
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>
-                        {t('promotionSlotConfig:noConfiguredSlot')}
-                      </div>
-                      <div style={{
-                        fontSize: 11, color: '#8c8c8c',
-                        background: '#FFFBE6', border: '1px solid #FFE58F',
-                        borderRadius: 8, padding: '8px 12px', lineHeight: 1.7,
-                      }}>
-                        未配置坑位时，系统默认读取自然流量算法展示数据
-                      </div>
-                    </div>
-                  )}
-                  {slotAlgorithms.filter(item => item.status === 1).map((item, index) => (
-                    <div
-                      key={item.position}
-                      draggable={!isDetailMode}
-                      onDragStart={() => !isDetailMode && handleDragStart(index)}
-                      onDragOver={(e) => !isDetailMode && handleDragOver(e, index)}
-                      onDrop={() => !isDetailMode && handleDrop(index)}
-                      onDragEnd={handleDragEnd}
-                      style={{
-                        background: '#FAFAFA',
-                        borderRadius: 12,
-                        padding: '12px 16px',
-                        border: dragOverIndex === index ? '2px solid #1890ff' : '1px solid #F0F0F0',
-                        opacity: dragIndex === index ? 0.4 : 1,
-                        cursor: isDetailMode ? 'default' : 'grab',
-                        transition: 'border 0.2s, opacity 0.2s',
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          {!isDetailMode && (
-                            <HolderOutlined style={{ color: '#bfbfbf', fontSize: 14, cursor: 'grab' }} />
-                          )}
-                          <Badge
-                            count={t('promotionSlotConfig:posNum', { pos: item.position })}
-                            style={{ backgroundColor: '#1890ff' }}
-                          />
-                        </div>
-                        <Tag color={ALGO_TYPE_COLOR[item.algorithmType] ?? 'default'}>
-                          {ALGO_TYPE_LABEL[item.algorithmType] ? t(ALGO_TYPE_LABEL[item.algorithmType]) : t('promotionSlotConfig:algoTypeFallback', { type: item.algorithmType })}
-                        </Tag>
-                      </div>
-                      <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>
-                        {item.algorithmName}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Home 指示条 */}
-                <div style={{
-                  height: 28, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', flexShrink: 0, background: '#F5F5F5',
-                }}>
-                  <div style={{
-                    width: 120, height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.18)',
-                  }} />
-                </div>
-              </div>
-
-              {/* 屏幕玻璃光泽反射 */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, right: '40%', bottom: '55%',
-                background: 'linear-gradient(165deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 40%, transparent 100%)',
-                borderRadius: '42px 42px 60px 0', pointerEvents: 'none', zIndex: 20,
-              }} />
+        <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+          <div style={{ height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)', backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite' }} />
+          <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack} style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {t('common:back')}
+              </Button>
+              <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: isGroupBuy ? '#E8720C' : '#1890ff' }}>
+                {isNew ? t('promotionSlotConfig:addSlotConfig') : t('promotionSlotConfig:editSlotConfig')}
+                <Tag color={isGroupBuy ? 'orange' : 'blue'} style={{ marginLeft: 10, verticalAlign: 'middle' }}>{t(BUSINESS_TYPE_LABEL_KEY[businessType])}</Tag>
+              </h2>
             </div>
           </div>
         </div>
+      )}
 
-        {/* 右侧：算法列表 */}
-        <div style={{ flex: 1, minWidth: 360 }}>
-          <div style={cardShellStyle}>
-            {cardTitle(
-              <AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
-              '#fff7e6', '#fa8c16', t('promotionSlotConfig:slotAlgoList'),
-              undefined,
-              !isDetailMode ? (
-                <Space size={16}>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={handleGoSlots} size="small">
-                    {t('promotionSlotConfig:addEditBtn')}
-                  </Button>
-                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('promotionSlotConfig:filterDislike')}</span>
-                    <Switch
-                      size="small"
-                      checked={filterDislike}
-                      onChange={(checked) => {
-                        setFilterDislike(checked)
-                        message.info(checked ? t('promotionSlotConfig:filterDislikeOn') : t('promotionSlotConfig:filterDislikeOff'))
-                      }}
-                      style={{ marginLeft: 8 }}
-                      disabled={isDetailMode}
-                    />
-                    <Popover
-                      content={
-                        <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                          {t('promotionSlotConfig:filterDislikePopover')}
-                        </div>
-                      }
-                      trigger="hover"
-                      placement="topRight"
-                    >
-                      <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 14, cursor: 'pointer', marginLeft: 6 }} />
-                    </Popover>
-                  </span>
-                </Space>
-              ) : undefined,
+      {isGroupBuy && (
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={t('promotionSlotConfig:localOnlyBanner')} />
+      )}
+
+      {/* 基础信息 */}
+      <div style={cardShellStyle}>
+        {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('promotionSlotConfig:basicInfo'))}
+        <Form form={form} layout="vertical" disabled={isDetailMode} onValuesChange={() => setHasUnsavedChanges(true)}>
+          <div style={{ display: 'grid', gridTemplateColumns: isGroupBuy ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: 16 }}>
+            <Form.Item label={t('promotionSlotConfig:waterfallNameLabel')} name="promotionName" rules={[{ required: true, message: t('promotionSlotConfig:enterWaterfallName') }]} style={{ marginBottom: 0 }}>
+              <Input placeholder={t('promotionSlotConfig:enterWaterfallName')} allowClear />
+            </Form.Item>
+            <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]} style={{ marginBottom: 0 }}>
+              <Select placeholder={t('common:selectBrand')} options={tAppOptions} onChange={handleChangeBrand} />
+            </Form.Item>
+            {isGroupBuy ? (
+              <>
+                <Form.Item label={t('promotionSlotConfig:colBusinessType')} style={{ marginBottom: 0 }}>
+                  <Input value={t(BUSINESS_TYPE_LABEL_KEY[businessType])} disabled />
+                </Form.Item>
+                <Form.Item label={t('promotionSlotConfig:colContentType')} style={{ marginBottom: 0 }}>
+                  <Select value={contentType} disabled={isDetailMode} onChange={handleChangeContentType} options={CONTENT_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value }))} />
+                </Form.Item>
+              </>
+            ) : (
+              <Form.Item label={t('promotionSlotConfig:colBizChannel')} style={{ marginBottom: 0 }}>
+                <Select
+                  value={bizChannel}
+                  disabled={isDetailMode}
+                  onChange={(v: WaterfallBizChannel) => { setBizChannel(v); if (v === 'supermarket') setLayoutColumns(1); setHasUnsavedChanges(true) }}
+                  options={BIZ_CHANNEL_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value }))}
+                />
+              </Form.Item>
             )}
+          </div>
+        </Form>
+      </div>
 
-            {/* 自然流量兜底：未配置坑位統一讀取該算法數據 */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              background: 'linear-gradient(135deg, #f9f0ff 0%, #efdbff 60%, #e6fffb 130%)',
-              border: '1px solid #d3adf7', borderRadius: 8, padding: '12px 16px', marginBottom: 16,
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 8, background: '#fff', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(114, 46, 209, 0.15)',
-              }}>
-                <ThunderboltOutlined style={{ fontSize: 16, color: '#722ed1' }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#391085' }}>
-                    <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>
-                    {t('promotionSlotConfig:naturalFallback')}
-                  </span>
-                  <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>{t('promotionSlotConfig:unconfiguredSlotEffective')}</Tag>
-                  <Popover
-                    content={
-                      <div style={{ maxWidth: 320, fontSize: 12, lineHeight: '20px', color: '#595959' }}>
-                        {t('promotionSlotConfig:naturalFallbackPopover')}
-                      </div>
-                    }
-                    trigger="hover"
-                    placement="top"
-                  >
-                    <QuestionCircleOutlined style={{ color: '#9254de', fontSize: 14, cursor: 'pointer' }} />
-                  </Popover>
-                </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
-                  {t('promotionSlotConfig:naturalFallbackHint')}
-                </div>
+      {/* 展示与过滤设置 */}
+      <div style={cardShellStyle}>
+        {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: '#722ed1' }} />, '#f9f0ff', t('promotionSlotConfig:displayFilterSection'))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24, alignItems: 'start' }}>
+          {(isGroupBuy || bizChannel === 'food') && (
+            <div>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('promotionSlotConfig:colLayout')}</div>
+              <Radio.Group value={layoutColumns} disabled={isDetailMode} onChange={e => { setLayoutColumns(e.target.value as WaterfallLayoutColumns); setHasUnsavedChanges(true) }}>
+                {LAYOUT_OPTIONS.map(o => <Radio key={o.value} value={o.value}>{t(o.labelKey)}</Radio>)}
+              </Radio.Group>
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+              {t('promotionSlotConfig:filterDislike')}
+              <Popover content={<div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>{t('promotionSlotConfig:filterDislikePopover')}</div>} trigger="hover">
+                <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13, cursor: 'pointer', marginLeft: 6 }} />
+              </Popover>
+            </div>
+            <Switch checked={filterDislike} disabled={isDetailMode} checkedChildren={t('promotionSlotConfig:enabled')} unCheckedChildren={t('promotionSlotConfig:disabled')} onChange={c => { setFilterDislike(c); setHasUnsavedChanges(true) }} />
+          </div>
+          {!isGroupBuy && (
+            <div>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+                <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>
+                {t('promotionSlotConfig:naturalFallback')}
+                <Popover content={<div style={{ maxWidth: 320, fontSize: 12, lineHeight: '20px', color: '#595959' }}>{t('promotionSlotConfig:naturalFallbackPopover')}</div>} trigger="hover">
+                  <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13, cursor: 'pointer', marginLeft: 6 }} />
+                </Popover>
               </div>
               <Select
                 value={naturalAlgoId}
-                onChange={(val) => setNaturalAlgoId(val)}
-                placeholder={t('promotionSlotConfig:selectFallbackAlgo')}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                style={{ width: 240, flexShrink: 0 }}
-                disabled={isDetailMode}
+                onChange={(val) => { setNaturalAlgoId(val); setNaturalAlgoName(algorithmOptions.find(a => a.value === val)?.label); setHasUnsavedChanges(true) }}
+                placeholder={t('promotionSlotConfig:selectFallbackAlgo')} allowClear showSearch optionFilterProp="label"
+                style={{ width: '100%', maxWidth: 320 }} disabled={isDetailMode}
                 options={naturalAlgoOptions.map(a => ({ label: a.label, value: a.value }))}
               />
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>{t('promotionSlotConfig:naturalFallbackHint')}</div>
             </div>
-
-            {/* 未保存变更提示横幅 */}
-            {hasUnsavedSlotChanges && !isDetailMode && (
-              <div style={{
-                background: 'linear-gradient(135deg, #FFF7E6 0%, #FFE7BA 100%)',
-                border: '1px solid #FFD591',
-                borderRadius: 8,
-                padding: '10px 16px',
-                marginBottom: 16,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                  <ExclamationCircleOutlined style={{ color: '#FA8C16', fontSize: 16, flexShrink: 0 }} />
-                  <span style={{ color: '#D46B08', fontSize: 13, fontWeight: 500 }}>
-                    {t('promotionSlotConfig:unsavedChanges')}
-                  </span>
-                </div>
-                <Button type="primary" size="small" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
-                  {t('promotionSlotConfig:saveNow')}
-                </Button>
-              </div>
-            )}
-
-            <Table<SlotAlgorithm>
-              columns={columns}
-              dataSource={slotAlgorithms}
-              rowKey="position"
-              pagination={{
-                pageSize: 10,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total) => t('common:total', { count: total }),
-              }}
-              size="small"
-              scroll={{ y: 540 }}
-            />
-          </div>
+          )}
         </div>
       </div>
 
-      {/* 底部操作按钮（详情模式下隐藏） */}
+      <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* 兜底区域（仅团购分类兜底；外卖自然流量兜底已移入上方展示与过滤设置） */}
+          {isGroupBuy && (
+            <div style={cardShellStyle}>
+              {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7F0', t('promotionSlotConfig:categoryFallback'), (
+                <Tag color="orange" style={{ margin: 0 }}>{t('promotionSlotConfig:mockDataTag')}</Tag>
+              ))}
+              <Select
+                mode="multiple"
+                allowClear
+                disabled={isDetailMode}
+                style={{ width: '100%' }}
+                placeholder={t('promotionSlotConfig:selectCategoryPlaceholder')}
+                value={fallbackCategoryIds}
+                optionFilterProp="label"
+                onChange={(vals: string[]) => { setFallbackCategoryIds(vals); setHasUnsavedChanges(true) }}
+                options={categories.map(c => ({ label: c.name, value: c.id }))}
+                maxTagCount="responsive"
+              />
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
+                {t('promotionSlotConfig:categoryFallbackHint')}
+                {fallbackCategoryIds.length > 0 && (
+                  <span style={{ marginLeft: 8, color: '#E8720C' }}>{t('promotionSlotConfig:matchedCount', { count: candidates.length + fixedSlots.filter(s => s.status === 1).length })}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 坑位列表 */}
+          <div style={cardShellStyle}>
+            {cardTitle(
+              <AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6',
+              isGroupBuy ? t('promotionSlotConfig:fixedContentSlots') : t('promotionSlotConfig:slotAlgoList'),
+              !isDetailMode ? (
+                <Button type="primary" icon={<PlusOutlined />} onClick={handleGoSlots} size="small">{t('promotionSlotConfig:addEditBtn')}</Button>
+              ) : undefined,
+            )}
+            {isGroupBuy ? (
+              <Table<FixedContentSlot> columns={fixedColumns} dataSource={fixedSlots} rowKey="position" size="small" pagination={false} scroll={{ y: 360 }} locale={{ emptyText: t('promotionSlotConfig:noFixedSlot') }} />
+            ) : (
+              <Table<AlgoSlotDraft> columns={algoColumns} dataSource={algoSlots} rowKey="position" size="small" pagination={false} scroll={{ y: 360 }} locale={{ emptyText: t('promotionSlotConfig:noConfiguredSlot') }} />
+            )}
+          </div>
+        </div>
+
+        {/* 右侧：手机预览 */}
+        <WaterfallPreview
+          businessType={businessType}
+          contentType={contentType}
+          layoutColumns={layoutColumns}
+          phoneTitle={phoneTitle}
+          algoSlots={algoSlots.filter(s => s.status === 1).map(s => ({ position: s.position, algorithmName: s.algorithmName, algorithmType: s.algorithmType }))}
+          previewCards={previewCards}
+          naturalFallbackName={naturalAlgoName ?? naturalAlgoOptions.find(a => a.value === naturalAlgoId)?.label}
+          phoneTime={phoneTime}
+        />
+      </div>
+
       {!isDetailMode && (
         <div className="form-footer">
-          <Button onClick={handleBack}>{t('common:cancel')}</Button>
-          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>{t('common:save')}</Button>
+          <Space>
+            <Button onClick={handleBack}>{t('common:cancel')}</Button>
+            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>{t('common:save')}</Button>
+          </Space>
         </div>
       )}
     </div>
