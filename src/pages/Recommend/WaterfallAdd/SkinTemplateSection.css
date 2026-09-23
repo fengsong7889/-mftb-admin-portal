@@ -12,10 +12,14 @@
 
 .skin-preview {
   width: 100%;
+  min-width: 0;
 }
 
 .skin-preview__viewport {
+  position: relative;
   width: 100%;
+  min-width: 0;
+  margin-inline: auto;
   overflow: hidden;
   border-radius: 8px;
   background: #fafafa;
@@ -24,7 +28,9 @@
 /* ==================== 舞台（固定画布尺寸，CSS transform 等比缩放） ==================== */
 
 .skin-stage {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   border: 2px solid;
   border-radius: 12px;
   transform-origin: top left;
@@ -56,30 +62,6 @@
   align-self: stretch;
 }
 
-.skin-stage__logo-tag {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  font-size: 9px;
-  color: #fff;
-  background: rgba(0,0,0,0.35);
-  border-radius: 3px;
-  padding: 1px 4px;
-}
-
-.skin-stage__logo-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(0,0,0,0.55);
-  padding: 3px 0;
-}
-
 /* ---- 大图：竖版海报 ---- */
 
 .skin-studio__poster {
@@ -102,8 +84,10 @@
 }
 
 .skin-studio__muted {
+  padding: 8px;
+  text-align: center;
   font-size: 12px;
-  color: #bfbfbf;
+  color: #8C8C8C;
 }
 
 /* ---- 右侧内容区 ---- */
@@ -311,8 +295,17 @@
 
 .skin-stage__slide {
   position: absolute;
-  inset: 0;
+  left: 0;
+  top: 20px;
+  bottom: 6px;
+  width: 60%;
+  transform-origin: left center;
   transition: transform 0.5s ease, opacity 0.5s ease;
+}
+
+.skin-stage__slide .skin-stage__dish {
+  border: 2px solid #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 
 .skin-stage__slide--0 {
@@ -321,216 +314,168 @@
 
 .skin-stage__slide--1 {
   z-index: 2;
-  transform: translateX(10%) scale(0.94);
-  opacity: 0.7;
+  left: 21%;
+  transform: translateY(-10px) scale(0.9);
+  opacity: 0.95;
 }
 
 .skin-stage__slide--2 {
   z-index: 1;
-  transform: translateX(20%) scale(0.88);
-  opacity: 0.4;
-}
-
-/* ---- 轮播控制 ---- */
-
-.skin-preview__controls {
-  margin-top: 6px;
-  text-align: center;
+  left: 43%;
+  transform: translateY(-20px) scale(0.8);
+  opacity: 0.85;
 }
 
 /* ==================== 全宽模板画廊 ==================== */
 
-.skin-gallery {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, 1fr);
+.skin-template-section {
+  min-width: 0;
 }
 
-.skin-gallery--large {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-/* ---- 小图精简色卡（图1草图风格） ---- */
-
-.skin-swatch-card {
-  position: relative;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.skin-swatch-card:hover {
-  transform: translateY(-2px);
-}
-
-.skin-swatch-card__body {
-  position: relative;
-  border-radius: 10px;
-  border: 2px solid #e8eaed;
-  background: #fff;
-  padding: 12px;
-  min-height: 100px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.skin-swatch-card:hover .skin-swatch-card__body {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.skin-swatch-card--selected .skin-swatch-card__body {
-  border-color: #E8720C;
-  box-shadow: 0 2px 10px rgba(232, 114, 12, 0.18);
-}
-
-.skin-swatch-card__gradient {
-  position: absolute;
-  inset: 0;
-  opacity: 0.08;
-  border-radius: 8px;
-  pointer-events: none;
-}
-
-.skin-swatch-card__index {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1.5px solid #bfbfbf;
-  background: #fff;
-  color: #595959;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-}
-
-.skin-swatch-card__tier {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #8C8C8C;
-  z-index: 1;
-}
-
-.skin-swatch-card__name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #262626;
-  text-align: center;
-  margin: 8px 0 4px;
-  z-index: 1;
-}
-
-.skin-swatch-card__price {
-  position: absolute;
-  bottom: 8px;
-  right: 10px;
+.skin-gallery-summary,
+.skin-gallery-toolbar__hint {
   font-size: 12px;
-  color: #BFBFBF;
-  z-index: 1;
+  color: #8C8C8C;
 }
 
-.skin-swatch-card__price--set {
-  color: #FF4D4F;
-  font-weight: 600;
+.skin-gallery-summary {
+  margin-bottom: 12px;
 }
 
-.skin-swatch-card__footer {
+.skin-gallery-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
-  padding: 0 2px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
 }
 
-.skin-swatch-card__preview-btn {
-  font-size: 12px;
-  color: #595959;
-  cursor: pointer;
-  padding: 2px 0;
-  transition: color 0.2s;
+.skin-gallery-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.skin-swatch-card__preview-btn:hover {
-  color: #E8720C;
+.skin-gallery-modes .ant-btn {
+  height: 32px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.skin-swatch-card__status {
-  font-size: 11px;
+/* 列表独立滚动，切换模式时不改变下方售价配置的位置。 */
+.skin-gallery-scroll {
+  height: clamp(220px, 32vh, 280px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  padding: 4px 8px 4px 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
 }
 
-/* ---- 大图模式保留完整卡片 ---- */
+.skin-gallery {
+  display: grid;
+  align-content: start;
+  align-items: start;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.skin-gallery--large {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
 
 .skin-gallery-card {
-  position: relative;
-  border-radius: 10px;
-  padding: 12px;
-  cursor: pointer;
+  min-width: 0;
+  border-radius: 8px;
+  padding: 8px;
   border: 1px solid #e8eaed;
   background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .skin-gallery-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #F59432;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .skin-gallery-card--selected {
-  border: 2px solid #E8720C;
-  background: #FFF9F2;
-  box-shadow: 0 2px 10px rgba(232, 114, 12, 0.18);
+  border-color: #E8720C;
+  background: #FFF7F0;
+  box-shadow: inset 0 0 0 1px #E8720C;
 }
 
-.skin-gallery-card--selected:hover {
-  transform: none;
+.skin-gallery-card__select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.skin-gallery-card__select:focus-visible,
+.skin-gallery-scroll:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
 }
 
 .skin-gallery-card__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .skin-gallery-card__index {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
   border-radius: 6px;
   background: #f0f0f0;
-  color: #8C8C8C;
+  color: #595959;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.skin-gallery-card__status {
-  font-size: 10px;
-  border-radius: 4px;
-  padding: 0 6px;
-  line-height: 18px;
+.skin-gallery-card__check {
+  color: #E8720C;
+  font-size: 14px;
 }
 
 .skin-gallery-card__preview {
-  margin-bottom: 8px;
-  border-radius: 6px;
-  overflow: hidden;
+  max-width: 360px;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.skin-gallery--large .skin-gallery-card__preview {
+  max-width: 304px;
+}
+
+.skin-gallery-card__heading {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
 }
 
 .skin-gallery-card__name {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: #262626;
@@ -542,8 +487,21 @@
 .skin-gallery-card__footer {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 4px;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.skin-tier-badge.ant-tag {
+  flex-shrink: 0;
+  margin: 0;
+  line-height: 18px;
+}
+
+.skin-gallery-card__heading .skin-tier-badge.ant-tag {
+  padding-inline: 6px !important;
+  font-size: 11px !important;
 }
 
 .skin-gallery-card__spacer {
@@ -552,25 +510,106 @@
 
 .skin-gallery-card__price {
   font-size: 13px;
-  font-weight: 700;
-  color: #FF4D4F;
+  font-weight: 600;
+  color: #E8720C;
 }
 
-.skin-gallery-card__price-unit {
-  font-size: 9px;
+.skin-gallery-card__price-unit,
+.skin-gallery-card__unpriced {
+  font-size: 12px;
   color: #8C8C8C;
   font-weight: 400;
 }
 
-.skin-gallery-card__unpriced {
-  font-size: 10px;
-  color: #BFBFBF;
+.skin-gallery-card__footer .ant-btn-link {
+  padding: 0;
+  height: 24px;
+  font-size: 12px;
+  color: #E8720C;
 }
 
-.skin-gallery-card__actions {
+/* ==================== 购买页：复用定价画廊与单模式预览 ==================== */
+
+.skin-purchase__layout {
   display: flex;
-  gap: 4px;
-  margin-top: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.skin-purchase__main {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+.skin-purchase__sidebar {
+  flex: 0 1 340px;
+  width: 340px;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skin-purchase .ant-card-head-title {
+  white-space: normal;
+}
+
+.skin-purchase__gallery {
+  height: clamp(300px, 42vh, 440px);
+}
+
+.skin-purchase__gallery .skin-gallery--large {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+
+/* 保留空列并限制卡片上限，只有一套大图时也不拉伸成整行。 */
+.skin-purchase__gallery .skin-gallery--large .skin-gallery-card {
+  width: 100%;
+  max-width: 322px;
+  box-sizing: border-box;
+}
+
+.skin-purchase__gallery .skin-gallery--small .skin-gallery-card__preview {
+  max-width: none;
+}
+
+.skin-purchase__sold {
+  color: #E8720C;
+}
+
+.skin-purchase__price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FF4D4F;
+  white-space: nowrap;
+}
+
+.skin-purchase__card--disabled,
+.skin-purchase__card--disabled:hover {
+  opacity: 0.55;
+  border-color: #e8eaed;
+  background: #F5F5F5;
+  box-shadow: none;
+}
+
+.skin-purchase__card--disabled .skin-gallery-card__select {
+  cursor: not-allowed;
+}
+
+.skin-purchase__disabled-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #FF4D4F;
+}
+
+.skin-purchase__preview-label {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #595959;
+  overflow-wrap: anywhere;
 }
 
 /* ==================== 预览弹窗 ==================== */
@@ -595,17 +634,29 @@
 /* ==================== 下方配置面板 ==================== */
 
 .skin-config {
-  margin-top: 20px;
+  margin-top: 12px;
+  min-width: 0;
   border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  padding: 20px 24px;
+  border-radius: 8px;
+  padding: 16px;
   background: #FAFAFA;
 }
 
 .skin-config__header {
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.skin-config__selected-name {
+  display: inline-block;
+  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #E8720C;
+  overflow-wrap: anywhere;
 }
 
 .skin-config__title {
@@ -632,47 +683,93 @@
 
 .skin-config__fields {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 12px 16px;
   margin-bottom: 14px;
 }
 
-.skin-config__fields > :last-child {
-  grid-column: span 2;
+.skin-config__fields > * {
+  min-width: 0;
 }
 
-.skin-config__poster-section {
+.skin-config__poster-modes {
   display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
   flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
 }
 
-.skin-config__poster-current {
-  width: 84px;
-  flex-shrink: 0;
+.skin-config__poster-local-hint,
+.skin-config__poster-help {
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-bottom: 12px;
 }
 
-.skin-config__poster-thumb {
-  width: 84px;
-  height: 140px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #d9d9d9;
+.skin-config__poster-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 112px));
+  gap: 12px;
+  max-width: 360px;
+  margin-bottom: 8px;
+}
+
+.skin-config__poster-upload-item {
+  min-width: 0;
+}
+
+.skin-config__poster-upload-item .ant-upload-wrapper,
+.skin-config__poster-upload-item .ant-upload {
+  display: block;
+  width: 100%;
+}
+
+.skin-config__poster-upload {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 112px;
+  padding: 8px;
+  border: 1px dashed #D9D9D9;
+  border-radius: 8px;
+  background: #fff;
+  color: #595959;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
 
-.skin-config__poster-thumb img {
+.skin-config__poster-upload:hover:not(:disabled) {
+  border-color: #E8720C;
+}
+
+.skin-config__poster-upload:disabled,
+.skin-config__poster-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+.skin-config__poster-upload img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  min-height: 0;
+  flex: 1;
+  object-fit: contain;
+}
+
+.skin-config__poster-upload:focus-visible,
+.skin-config__poster-option:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
 }
 
 .skin-config__poster-grid {
-  flex: 1;
-  min-width: 220px;
+  min-width: 0;
 }
 
 .skin-config__poster-grid-label {
@@ -683,13 +780,16 @@
 
 .skin-config__poster-options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 64px), 1fr));
   gap: 8px;
   max-height: 200px;
   overflow-y: auto;
 }
 
 .skin-config__poster-option {
+  padding: 0;
+  font: inherit;
+  min-width: 0;
   border-radius: 6px;
   cursor: pointer;
   position: relative;

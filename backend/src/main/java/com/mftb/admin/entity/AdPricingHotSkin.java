@@ -25,6 +25,8 @@ public class AdPricingHotSkin {
 
     /** 皮肤名称 */
     private String skinName;
+    private String templateKey;
+    private String displayMode;
 
     /** 皮肤日单价（MOP） */
     private BigDecimal price;

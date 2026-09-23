@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode, CSSProperties } from 'react'
 import { Button, Card, DatePicker, Empty, Form, Modal, Select, Space, Tag, message, InputNumber, Radio } from 'antd'
@@ -14,6 +14,11 @@ import {
 import { useNavigate } from 'react-router-dom'
 import GradientDiscountBanner from './GradientDiscountBanner'
 import NoRefundBadge from './NoRefundBadge'
+import SkinTemplatePreview from '../Recommend/WaterfallAdd/SkinTemplatePreview'
+import {
+  SMALL_SKIN_TEMPLATES, LARGE_SKIN_TEMPLATES, getSmallTemplate, getLargeTemplate,
+  type DisplayMode, type LargeLayout, type SkinSaleConfig,
+} from '../../constants/popularSkinTemplates'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { fetchGiftAvailableDays } from '../../api/gift'
@@ -21,8 +26,11 @@ import { usePaymentRule } from '../../hooks/usePaymentRule'
 import {
   fetchAdHotPricingList,
   fetchAdHotInventory,
+  fetchAdHotQuote,
   placeAdHotOrder,
   type AdHotInventoryVO,
+  type AdHotInventoryCell,
+  type AdHotQuote,
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
@@ -43,70 +51,17 @@ const { RangePicker } = DatePicker
  */
 
 /** 菜品展示佈局（同銷售定價配置）：大圖拼列 / 階梯輪播 — 移入組件內使用 t() */
-type DishLayout = 'grid' | 'carousel'
+type DishLayout = LargeLayout
 
-/** 預覽用 Mock 餐品（與銷售定價預覽一致，bg 為餐品底圖漸變） */
-const PREVIEW_DISHES = [
-  { emoji: '🍔', name: '招牌雙層牛堡·特惠一人餐', price: '$43.3', original: '$65', discount: '6.6折', bg: 'linear-gradient(135deg, #FFE2B8, #FFAE5E)' },
-  { emoji: '🍟', name: '黃金薯條（大）', price: '$12.9', original: '$19', discount: '6.8折', bg: 'linear-gradient(135deg, #FFF3C4, #FFD662)' },
-  { emoji: '🥤', name: '冰爽可樂（中）', price: '$5.9', original: '$9', discount: '6.5折', bg: 'linear-gradient(135deg, #C9E7FF, #7FB8F0)' },
-  { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', discount: '7.4折', bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
-]
+// 旧接口缺少模板标识时，按定价页固定名称识别；显式模式始终优先。
+function getInventorySkinTemplate(cell: AdHotInventoryCell) {
+  if (cell.templateKey) return getSmallTemplate(cell.templateKey) ?? getLargeTemplate(cell.templateKey)
+  return [...SMALL_SKIN_TEMPLATES, ...LARGE_SKIN_TEMPLATES].find(template => template.defaultName === cell.skinName)
+}
 
-/** 預覽標籤樣式（同定價預覽，縮小字號適配右側窄栏） */
-const tagStyle = (color: string, bg: string): CSSProperties => ({
-  fontSize: 9, color, background: bg, borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap', flexShrink: 0,
-})
-
-/** 商家 LOGO：根據門店名稱生成（首字招牌 + 名稱哈希取色，同店同色），同 APP 店鋪卡 LOGO 位 */
-const LOGO_PALETTES: [string, string][] = [
-  ['#DA291C', '#FFC72C'], // 紅底金字
-  ['#0F4C81', '#BFE3FF'], // 深藍底淺藍字
-  ['#00754A', '#C9F2DE'], // 墨綠底淺綠字
-  ['#5C2D91', '#E5D4FF'], // 紫底淡紫字
-  ['#B45309', '#FDE68A'], // 棕底金字
-  ['#C2185B', '#FAD1E0'], // 红色底粉字
-]
-/** 品牌門店專屬 LOGO（門店名命中即用品牌標誌） */
-const BRAND_LOGOS: { match: string; bg: string; fg: string; mark: string }[] = [
-  { match: '麥當勞', bg: '#DA291C', fg: '#FFC72C', mark: 'M' },   // 金拱門
-  { match: '肯德基', bg: '#E4002B', fg: '#FFFFFF', mark: 'KFC' }, // KFC
-]
-
-const renderStoreLogo = (storeName: string, size: number) => {
-  const name = storeName || '示例店鋪'
-  const brand = BRAND_LOGOS.find(b => name.includes(b.match))
-  if (brand) {
-    return (
-      <div style={{
-        width: size, height: size, borderRadius: 8, flexShrink: 0,
-        background: brand.bg, overflow: 'hidden',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-      }}>
-        <span style={{
-          fontSize: Math.round(size * (brand.mark.length > 1 ? 0.28 : 0.5)), fontWeight: 900, color: brand.fg,
-          fontFamily: '"Arial Black", "Arial Rounded MT Bold", sans-serif',
-          lineHeight: 1, letterSpacing: brand.mark.length > 1 ? 0 : -1, textShadow: '0 1px 1px rgba(0,0,0,0.18)',
-        }}>{brand.mark}</span>
-        <span style={{ fontSize: Math.max(7, Math.round(size * 0.16)), color: '#fff', fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap' }}>{brand.match}</span>
-      </div>
-    )
-  }
-  const hash = [...name].reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
-  const [bg, fg] = LOGO_PALETTES[hash % LOGO_PALETTES.length]
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: 8, flexShrink: 0,
-      background: bg, overflow: 'hidden',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-    }}>
-      <span style={{ fontSize: Math.round(size * 0.42), fontWeight: 800, color: fg, lineHeight: 1 }}>{name.charAt(0)}</span>
-      <span style={{
-        fontSize: Math.max(7, Math.round(size * 0.16)), color: '#fff', fontWeight: 600, lineHeight: 1,
-        maxWidth: size - 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>{name.slice(0, 4)}</span>
-    </div>
-  )
+function getInventorySkinMode(cell: AdHotInventoryCell): DisplayMode {
+  const template = getInventorySkinTemplate(cell)
+  return cell.displayMode ?? (template && 'layout' in template ? 'large' : 'small')
 }
 
 /** 銷售中的皮膚套件（來自銷售定價-人氣商家配置） */
@@ -127,16 +82,15 @@ interface SaleSkin {
   /** 皮膚段位（經典/精選/旗艦/至尊） */
   tier: 'classic' | 'premium' | 'flagship' | 'ultimate'
   /** 展示模式（新版定價返回，舊數據默認 small） */
-  displayMode?: 'small' | 'large'
+  displayMode?: DisplayMode
+  templateKey?: string
+  gradientType?: string
+  gradientColor?: string
   /** 賣點描述 */
   desc: string
   /** 已售套數（氛圍數據） */
   sold: number
 }
-
-/** 海報標語：按皮膚 id 輪換，各皮膚標語不盡相同 */
-const POSTER_SLOGANS = ['人氣商家', '人氣爆棚', '人氣之選', '人氣王牌', '人氣好店', '人氣首選']
-const posterSlogan = (skinId: number) => POSTER_SLOGANS[skinId % POSTER_SLOGANS.length]
 
 /** 皮膚段位配置（同定價頁，購買頁卡片展示用）—— 等級越高視覺越華麗 */
 const SKIN_TIER_CONFIG: Record<string, {
@@ -311,7 +265,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const [hasSearched, setHasSearched] = useState(false)
 
   // 皮膚模式篩選（新版：小圖/大圖 Tab）
-  const [skinModeFilter, setSkinModeFilter] = useState<'all' | 'small' | 'large'>('all')
+  const [skinModeFilter, setSkinModeFilter] = useState<DisplayMode>('small')
 
   // 選購狀態
   const [selectedSkinId, setSelectedSkinId] = useState<number | null>(null)
@@ -343,8 +297,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const [paymentMode, setPaymentMode] = useState<'promo' | 'gift'>('promo')
   // 強制模式：僅推廣金/僅贈送天數時固定支付方式，否則跟隨用戶切換
   const activeMode: 'promo' | 'gift' = mode === 'promo_only' ? 'promo' : mode === 'gift_only' ? 'gift' : paymentMode
-  // 階梯輪播餐品指針（定價配置 carousel 時使用）
-  const [dishState, setDishState] = useState<{ current: number; prev: number | null }>({ current: 0, prev: null })
+  // 試算結果（來自後端權威計價）
+  const [quoteResult, setQuoteResult] = useState<AdHotQuote | null>(null)
+  const [quoteError, setQuoteError] = useState(false)
+  const quoteAbortRef = useRef<AbortController | null>(null)
 
   // ===== 真實接口接線 =====
   // 人氣名稱下拉（從銷售定價配置加載，value=algoId）
@@ -373,6 +329,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
         const palette = SKIN_COLOR_PALETTE[idx % SKIN_COLOR_PALETTE.length]
         // 邊框配置以定價配置為準：配色邊框用真實顏色；無邊框/上傳邊框圖無顏色數據時以色板兜底
         const useRealColor = cell.borderType === 'color' && !!cell.borderColor
+        const template = getInventorySkinTemplate(cell)
         list.push({
           id: idx + 1,
           name: cell.skinName,
@@ -381,7 +338,12 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
           borderColor: useRealColor ? cell.borderColor : palette.borderColor,
           tagBg: palette.tagBg,
           // 菜品展示佈局：讀取定價配置的單選值（grid/carousel）
-          dishLayout: cell.dishLayout === 'carousel' ? 'carousel' : 'grid',
+          dishLayout: template && 'layout' in template ? template.layout
+            : (cell.dishLayout === 'carousel' || cell.dishLayout === 'triple' || cell.dishLayout === 'hero' ? cell.dishLayout : 'grid'),
+          displayMode: getInventorySkinMode(cell),
+          templateKey: cell.templateKey ?? template?.key,
+          gradientType: cell.gradientType,
+          gradientColor: cell.gradientColor,
           tier: (cell.tier === 'classic' || cell.tier === 'premium' || cell.tier === 'flagship' || cell.tier === 'ultimate') ? cell.tier : 'classic',
           desc: cell.skinName,
           sold: inventoryData.skinSoldCounts?.[cell.skinName] ?? 0,
@@ -389,13 +351,24 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       })
       skins = list
     } else {
-      skins = SALE_SKINS
+      skins = inventoryData ? [] : [...SALE_SKINS]
     }
     // 按段位排序：經典 → 精選 → 旗艦 → 至尊
     return skins.sort((a, b) => (TIER_ORDER[a.tier] ?? 0) - (TIER_ORDER[b.tier] ?? 0))
   }, [inventoryData])
 
-  const selectedSkin = effectiveSkins.find(s => s.id === selectedSkinId) || null
+  const visibleSkins = effectiveSkins.filter(skin => (skin.displayMode ?? 'small') === skinModeFilter)
+  const selectedSkin = visibleSkins.find(s => s.id === selectedSkinId) || null
+
+  const handleSkinModeChange = (mode: DisplayMode) => {
+    if (mode === skinModeFilter) return
+    setSkinModeFilter(mode)
+    // 防止隐藏的旧模式皮肤继续参与预览和结算，已选投放日期保留。
+    setSelectedSkinId(null)
+    quoteAbortRef.current?.abort()
+    setQuoteResult(null)
+    setQuoteError(false)
+  }
 
   // 可售天數：真實庫存以預售天數為準，否則兜底 MAX_BUY_DAYS 天
   const sellableDays = inventoryData ? inventoryData.presaleDays : MAX_BUY_DAYS
@@ -453,23 +426,16 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   //   ? `${customDates[0]} ~ ${customDates[customDates.length - 1]}（${t('selfSelectDays', { count: customDates.length })}）`
   //   : t('notSelected')
 
-  // 階梯輪播預覽：所選皮膚配置為 carousel 時逐張輪播，切換皮膚時重置
-  useEffect(() => {
-    if (!selectedSkin || selectedSkin.dishLayout !== 'carousel') return
-    setDishState({ current: 0, prev: null })
-    const timer = setInterval(() => {
-      setDishState(s => ({ current: (s.current + 1) % PREVIEW_DISHES.length, prev: s.current }))
-    }, 3000)
-    return () => clearInterval(timer)
-  }, [selectedSkin])
-
-  // 命中折扣檔位（按生效購買天數計算，使用真實梯度折扣）
+  // 命中折扣檔位（優先使用後端試算結果，否則用本地梯度匹配）
   const currentTier = useMemo(() => {
+    if (quoteResult && quoteResult.discountPercent > 0) {
+      return { minDays: quoteResult.matchedMinDays ?? 0, discount: quoteResult.discountPercent }
+    }
     for (let i = discountTiers.length - 1; i >= 0; i--) {
       if (effectiveDays >= discountTiers[i].minDays) return discountTiers[i]
     }
     return null
-  }, [effectiveDays, discountTiers])
+  }, [effectiveDays, discountTiers, quoteResult])
 
   // 初始化：加載門店下拉（真實門店，含集團編碼與BD）
   useEffect(() => {
@@ -529,6 +495,43 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const effectiveGiftDays = !mixedPayment && activeMode === 'gift'
     ? maxGiftDaysUsable
     : Math.min(giftDaysUsed, maxGiftDaysUsable)
+
+  // 權威試算：所選皮膚、日期或贈送天數變化時請求後端試算，取消過期請求
+  useEffect(() => {
+    quoteAbortRef.current?.abort()
+    if (!selectedSkin || customDates.length === 0 || !searchAlgorithm || !searchStoreName) {
+      setQuoteResult(null)
+      setQuoteError(false)
+      return
+    }
+    const store = storeMap[searchStoreName]
+    if (!store) return
+    const ctrl = new AbortController()
+    quoteAbortRef.current = ctrl
+    const algoId = Number(searchAlgorithm)
+    const orderReq = {
+      algoId,
+      groupCode: store.groupCode || '',
+      storeCode: store.storeCode,
+      bdEmpId: searchBD ?? undefined,
+      giftDays: effectiveGiftDays > 0 ? effectiveGiftDays : undefined,
+      cells: customDates.map(d => ({ bizDate: d, skinName: selectedSkin.name })),
+    }
+    fetchAdHotQuote(orderReq, ctrl.signal)
+      .then(res => {
+        if (!ctrl.signal.aborted) {
+          setQuoteResult(res)
+          setQuoteError(false)
+        }
+      })
+      .catch(err => {
+        if (!ctrl.signal.aborted) {
+          setQuoteResult(null)
+          setQuoteError(true)
+        }
+      })
+    return () => ctrl.abort()
+  }, [selectedSkin, customDates, searchAlgorithm, searchStoreName, searchBD, storeMap, effectiveGiftDays])
   // 每日折後單價（用於計算現金價值抵扣上限）
   const dailySalePrice = effectiveDays > 0 ? Math.round(basePriceSummary.sale / effectiveDays) : 0
   // 每日贈送抵扣額：有現金價值配置時取 min(日單價, 現金價值)；未配置時回退全額抵扣
@@ -608,6 +611,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       .then(inv => {
         setInventoryData(inv)
         setHasSearched(true)
+        setSkinModeFilter(inv.cells.length > 0 && inv.cells.every(cell => getInventorySkinMode(cell) === 'large') ? 'large' : 'small')
         setSelectedSkinId(null)
         setCustomDates([])
         // 推廣金餘額（集團+品牌）
@@ -624,6 +628,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
     setSearchAlgorithm(null); setSearchBrand(null)
     setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false); setSelectedSkinId(null)
+    setSkinModeFilter('small')
     setInventoryData(null); setCustomDates([])
     setPricingOptions([])
   }
@@ -669,6 +674,15 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const handlePayment = () => {
     if (!selectedSkin) { message.warning(t('selectSkinFirst')); return }
     if (customDates.length === 0) { message.warning(t('selectDatesInCalendar')); return }
+    // 試算未完成或失敗時禁止支付
+    if (!quoteResult && !quoteError) {
+      message.warning(t('quoteCalculating', { defaultValue: '正在計算金額，請稍候' }))
+      return
+    }
+    if (quoteError || !quoteResult) {
+      message.error(t('quoteFailed', { defaultValue: '金額計算失敗，請重試' }))
+      return
+    }
     // 校驗餘額是否充足
     if (!mixedPayment && activeMode === 'promo') {
       // 單獨使用推廣金：全額需推廣金覆蓋
@@ -703,19 +717,27 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
     const skinName = selectedSkin.name
     setPaying(true)
     try {
-      await placeAdHotOrder({
+      const orderResp = await placeAdHotOrder({
         algoId,
         groupCode: store?.groupCode || '',
         storeCode: store?.storeCode,
-        bdEmpId: searchBD || undefined,
+        bdEmpId: searchBD ?? undefined,
         giftDays: effectiveGiftDays > 0 ? effectiveGiftDays : undefined,
+        expectedAmount: quoteResult?.actualAmount,
         cells: customDates.map(d => ({ bizDate: d, skinName })),
       })
       setIsPaymentModalVisible(false)
       setPaidGiftDays(effectiveGiftDays)
-      setPaidPromoAmount(priceSummary.payable)
+      // 使用訂單實際金額更新展示，而非本地估算
+      setPaidPromoAmount(orderResp?.actualAmount ?? priceSummary.payable)
       setPaidPaymentMode(mixedPayment ? 'mixed' : activeMode)
-      setMerchantBalance(prev => prev - priceSummary.payable)
+      // 刷新餘額（從服務端獲取最新值，而非本地減扣）
+      const backendBrand = (searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand) || undefined
+      fetchFinAccounts({ groupId: store?.groupCode, brand: backendBrand, page: 1, size: 10 })
+        .then(res => {
+          const acc = (res.records ?? [])[0]
+          setMerchantBalance(acc ? Number(acc.virtualBalance) : 0)
+        }).catch(() => setMerchantBalance(0))
       setIsSuccessModalVisible(true)
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('orderFailed'))
@@ -733,179 +755,30 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
     message.success(t('continuePurchaseHint'))
   }
 
-  /** 店鋪信息行（與銷售定價預覽字段保持一致：店名 + 評分/月售/起送信息） */
-  const previewInfoRows = (nameSize: number) => (
-    <>
-      <div style={{
-        fontSize: nameSize, fontWeight: 600, color: '#262626',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>{selectedStore?.storeName || '示例店鋪'}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#FA8C16' }}>⭐ 4.6</span>
-        <span style={{ fontSize: 10, color: '#8C8C8C' }}>月售 1196</span>
-        <span style={{ fontSize: 10, color: '#8C8C8C' }}>起送$40・減配$0~3・32分鐘・1.9km</span>
-      </div>
-    </>
-  )
-
-  /** 標籤行：銷量/店鋪/評價標籤合併一排不換行（同定價預覽） */
-  const previewTagsRow = () => (
-    <div style={{ display: 'flex', gap: 3, marginTop: 6, flexWrap: 'nowrap', overflow: 'hidden' }}>
-      <span style={tagStyle('#1565C0', '#E3F2FD')}>全澳銷量第1名</span>
-      <span style={tagStyle('#722ED1', '#F9F0FF')}>熱門店鋪</span>
-      <span style={tagStyle('#D46B08', '#FFF3E8')}>金黃酥脆，澳門人氣漢堡首選！</span>
-      <span style={tagStyle('#8C8C8C', '#F5F5F5')}>千人收藏好店</span>
-    </div>
-  )
-
-  /** 小圖模式預覽（同定價預覽：LOGO + 信息 + 標籤一排，皮膚體現為卡片邊框） */
-  const renderSkinPreview = (skin: SaleSkin, large?: boolean) => (
-    <div style={{
-      position: 'relative', background: '#fff', borderRadius: 10,
-      padding: large ? '12px 14px' : '10px 12px',
-      border: skin.borderType === 'color' ? `2px solid ${skin.borderColor}` : '1px solid #f0f0f0',
-      boxShadow: skin.borderType === 'color' ? `0 2px 8px ${skin.borderColor}33` : '0 1px 4px rgba(0,0,0,0.04)',
-    }}>
-      <div style={{ display: 'flex', gap: large ? 10 : 8 }}>
-        {renderStoreLogo(selectedStore?.storeName || '示例店鋪', large ? 56 : 44)}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {previewInfoRows(large ? 13 : 12)}
-        </div>
-      </div>
-      {previewTagsRow()}
-    </div>
-  )
-
-  /** 菜品佈局① 大圖拼列（縮小版，同定價預覽：左 1 張大圖疊價格 + 右 2 張小圖） */
-  const renderDishGridMini = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 6, marginTop: 8 }}>
-      <div style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', background: PREVIEW_DISHES[0].bg, height: 104 }}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 54, lineHeight: 1 }}>
-          {PREVIEW_DISHES[0].emoji}
-        </div>
-        <div style={{
-          position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 6px 4px',
-          background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.55))',
-        }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{PREVIEW_DISHES[0].price}</span>
-          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', textDecoration: 'line-through', marginLeft: 4 }}>{PREVIEW_DISHES[0].original}</span>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {PREVIEW_DISHES.slice(1, 3).map(dish => (
-          <div key={dish.name} style={{
-            borderRadius: 8, background: dish.bg, height: 49,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, lineHeight: 1,
-          }}>{dish.emoji}</div>
-        ))}
-      </div>
-    </div>
-  )
-
-  /** 菜品佈局② 階梯輪播（縮小版，定價配置 carousel 時使用）：頂層向左滑出的同時，後方卡片沿階梯位彈性頂上來 */
-  const renderDishCarouselMini = () => {
-    const n = PREVIEW_DISHES.length
-    const depthStyles: CSSProperties[] = [
-      { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 3, opacity: 1, transform: 'translateX(0) rotate(0deg)', boxShadow: '3px 0 10px rgba(0,0,0,0.12)' },
-      { top: 6, bottom: 6, left: 22, right: 0, zIndex: 2, opacity: 0.75, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
-      { top: 12, bottom: 12, left: 44, right: -4, zIndex: 1, opacity: 0.5, transform: 'translateX(0) rotate(0deg)', boxShadow: 'none' },
-    ]
-    const exitStyle: CSSProperties = { top: 0, bottom: 0, left: 0, right: '28%', zIndex: 4, opacity: 0, transform: 'translateX(-118%) rotate(-5deg)' }
-    return (
-      <div style={{ position: 'relative', height: 104, marginTop: 8, overflow: 'hidden' }}>
-        {PREVIEW_DISHES.map((dish, i) => {
-          const depth = (i - dishState.current + n) % n
-          const prevDepth = dishState.prev !== null ? (i - dishState.prev + n) % n : depth
-          const isExiting = depth > 2 && prevDepth === 0
-          const reJoining = depth <= 2 && prevDepth > 2
-          const style = depth <= 2 ? depthStyles[depth] : isExiting ? exitStyle : { ...depthStyles[2], opacity: 0, zIndex: 0 }
-          const isFront = depth === 0 || isExiting
-          return (
-            <div key={dish.name} style={{
-              position: 'absolute', borderRadius: 8, overflow: 'hidden', background: dish.bg, pointerEvents: 'none',
-              transition: reJoining ? 'none' : 'all 0.65s cubic-bezier(0.34, 1.25, 0.5, 1)',
-              animation: reJoining ? 'dishBackIn 0.5s ease' : undefined,
-              ...style,
-            }}>
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 72, lineHeight: 1,
-                transform: isFront ? 'scale(1)' : 'scale(0.6)',
-                filter: isFront ? 'none' : 'saturate(0.85)',
-                transition: reJoining ? 'none' : 'transform 0.65s cubic-bezier(0.34, 1.25, 0.5, 1), filter 0.4s ease',
-              }}>{dish.emoji}</div>
-              <div style={{ opacity: isFront ? 1 : 0, transition: 'opacity 0.3s ease 0.25s' }}>
-                <div style={{ position: 'absolute', left: 5, bottom: 22, display: 'flex', alignItems: 'stretch', borderRadius: 10, overflow: 'hidden' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#E8302D', background: '#fff', padding: '2px 5px' }}>🏷️ {dish.discount}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#E8302D', padding: '2px 5px', display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                    {dish.price}
-                    <span style={{ fontSize: 8, fontWeight: 400, color: 'rgba(255,255,255,0.8)', textDecoration: 'line-through' }}>{dish.original}</span>
-                  </span>
-                </div>
-                <div style={{
-                  position: 'absolute', left: 0, right: 0, bottom: 0, padding: '2px 6px',
-                  background: 'rgba(255,255,255,0.92)', fontSize: 10, fontWeight: 600, color: '#262626',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{dish.name}</div>
-              </div>
-            </div>
-          )
-        })}
-        <div style={{ position: 'absolute', right: 3, bottom: 3, zIndex: 5, display: 'flex', gap: 3 }}>
-          {PREVIEW_DISHES.map((_, i) => (
-            <span key={i} style={{
-              width: i === dishState.current ? 10 : 4, height: 4, borderRadius: 2,
-              background: i === dishState.current ? '#E8302D' : '#D9D9D9', transition: 'all 0.3s',
-            }} />
-          ))}
-        </div>
-      </div>
-    )
+  // 列表和右侧效果共用定价画布，避免购买时展示另一套样式。
+  const renderSkinPreview = (skin: SaleSkin, autoPlay = false) => {
+    const displayMode = skin.displayMode ?? 'small'
+    const template = getSmallTemplate(skin.templateKey ?? '')
+      ?? (!skin.templateKey ? SMALL_SKIN_TEMPLATES.find(item => item.defaultName === skin.name) : undefined)
+    const previewSkin: SkinSaleConfig = {
+      templateKey: skin.templateKey ?? template?.key ?? `legacy_${skin.id}`,
+      displayMode,
+      saleEnabled: true,
+      name: skin.name,
+      price: skin.pricePerDay,
+      tier: skin.tier,
+      layout: skin.dishLayout,
+      // 当前接口尚未返回海报配置，沿用定价页默认兜底图。
+      fallbackPosterKey: 'poster_red',
+    }
+    const appearance = displayMode === 'small' && !template ? {
+      borderColor: skin.borderType === 'none' ? 'transparent' : skin.borderColor,
+      backgroundImage: skin.gradientType === 'color' && skin.gradientColor
+        ? `linear-gradient(180deg, ${skin.gradientColor}66, ${skin.gradientColor}18 55%, #fff)` : 'none',
+    } : undefined
+    return <SkinTemplatePreview key={skin.id} skin={previewSkin} autoPlay={autoPlay}
+      merchantName={selectedStore?.storeName} appearance={appearance} />
   }
-
-
-  /** 大圖模式預覽（同定價預覽：左側豎版主圖 + 右側信息/標籤 + 按皮膚配置的菜品佈局） */
-  const renderSkinBigPreview = (skin: SaleSkin) => (
-    <div style={{
-      position: 'relative', background: '#fff', borderRadius: 10, padding: '12px 14px',
-      border: skin.borderType === 'color' ? `2px solid ${skin.borderColor}` : '1px solid #f0f0f0',
-      boxShadow: skin.borderType === 'color' ? `0 2px 8px ${skin.borderColor}33` : '0 1px 4px rgba(0,0,0,0.04)',
-    }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
-        {/* 左側豎版主圖（3:4）：人氣商家宣傳海報，標語與皮膚漸變底融為一體 */}
-        <div style={{
-          position: 'relative', width: 84, flexShrink: 0, alignSelf: 'stretch', borderRadius: 8,
-          background: skin.tagBg, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 6px 8px',
-        }}>
-          {/* 光影縱深：頂部提亮、底部壓暗，讓文字自然沉入背景 */}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,0) 62%, rgba(0,0,0,0.28) 100%)' }} />
-          {/* 巨型水印「人」字：半透明嚆空效果，作為背景紋理 */}
-          <span style={{
-            position: 'absolute', bottom: -14, right: -10, fontSize: 88, fontWeight: 900, lineHeight: 1,
-            color: 'rgba(255,255,255,0.12)', userSelect: 'none', pointerEvents: 'none',
-          }}>人</span>
-          {renderStoreLogo(selectedStore?.storeName || '示例店鋪', 40)}
-          {/* 豎排標語：白→半透漸變字溶入底色，不加任何牌面/邊框 */}
-          <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{
-              writingMode: 'vertical-rl', fontSize: 19, fontWeight: 900, letterSpacing: 7, lineHeight: 1,
-              background: 'linear-gradient(180deg, #FFFFFF 0%, rgba(255,255,255,0.55) 100%)',
-              WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-            }}>{posterSlogan(skin.id)}</span>
-          </div>
-          {/* 底部淡化英文副標，融於壓暗區 */}
-          <span style={{ position: 'relative', fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 3, whiteSpace: 'nowrap' }}>POPULAR</span>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {previewInfoRows(13)}
-          {previewTagsRow()}
-          {/* 菜品展示區：根據定價配置的 dishLayout 渲染對應樣式 */}
-          {skin.dishLayout === 'carousel' ? renderDishCarouselMini() : renderDishGridMini()}
-        </div>
-      </div>
-    </div>
-  )
 
   /** 默認樣式店鋪卡（無皮膚，用作瀑布流上下列對比） */
   const renderNormalCard = (storeName: string, emoji: string, rating: string) => (
@@ -951,7 +824,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   )
 
   return (
-    <div>
+    <div className="skin-purchase">
       {/* 查詢區域 - 與其它購買界面保持一致 */}
       <div className="search-section" style={{ marginBottom: 16 }}>
         <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: storeMode ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '16px 12px' }}>
@@ -987,108 +860,81 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
           <Empty description={t('pspEmptyHint')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         </Card>
       ) : (
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+        <div className="skin-purchase__layout">
           {/* 左側：選皮膚 + 選時長 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="skin-purchase__main">
             {/* ① 選擇皮膚套件（簡化卡片：色块示意 + 名稱 + 價格，每行 4 個） */}
             <Card
               title={
                 <div>
-                  <Space><SkinOutlined style={{ color: '#E8720C' }} /><span>{t('selectSkinKit')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('skinSelectHint')}</span></Space>
+                  <Space wrap><SkinOutlined style={{ color: '#E8720C' }} /><span>{t('selectSkinKit')}</span><span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('skinSelectHint')}</span></Space>
                   {/* 購買規則說明：生效時間 / 唯一生效 / 到期恢復 */}
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     marginTop: 8, padding: '6px 12px', borderRadius: 6,
                     background: '#FFF9F0', border: '1px solid #FFE0B2',
                   }}>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoEffective')}</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00' }}>{t('ruleAutoEffective')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleUniqueSkin')}</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00' }}>{t('ruleUniqueSkin')}</span>
                     <span style={{ color: '#FFD591' }}>|</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00', whiteSpace: 'nowrap' }}>{t('ruleAutoRevert')}</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: '#8C6E00' }}>{t('ruleAutoRevert')}</span>
                   </div>
                 </div>
               }
               style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 20px' }}
             >
               {/* 模式篩選 Tab（新版定價支持小圖/大圖分離售賣） */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                {([['all', '全部'], ['small', '小圖模式'], ['large', '大圖模式']] as const).map(([key, label]) => (
-                  <span key={key}
-                    onClick={() => setSkinModeFilter(key)}
-                    style={{
-                      fontSize: 12, cursor: 'pointer', borderRadius: 4, padding: '2px 12px', lineHeight: '22px',
-                      color: skinModeFilter === key ? '#E8720C' : '#8C8C8C',
-                      background: skinModeFilter === key ? '#FFF7E6' : '#F5F5F5',
-                      border: `1px solid ${skinModeFilter === key ? '#E8720C' : 'transparent'}`,
-                      fontWeight: skinModeFilter === key ? 600 : 400,
-                      transition: 'all 0.2s',
-                    }}
-                  >{label}</span>
-                ))}
+              <div className="skin-gallery-toolbar">
+                <div className="skin-gallery-modes" role="group" aria-label={t('selectSkinKit')}>
+                  {(['small', 'large'] as const).map(mode => (
+                    <Button key={mode} type={skinModeFilter === mode ? 'primary' : 'default'}
+                      aria-pressed={skinModeFilter === mode} onClick={() => handleSkinModeChange(mode)}>
+                      {t(mode === 'small' ? 'smallMode' : 'bigMode')}
+                      {' '}({effectiveSkins.filter(skin => (skin.displayMode ?? 'small') === mode).length})
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                {effectiveSkins.filter(skin => {
-                  if (skinModeFilter === 'all') return true
-                  return (skin.displayMode ?? 'small') === skinModeFilter
-                }).map(skin => {
-                  const isSelected = selectedSkinId === skin.id
-                  // 贈送天數支付模式：皮膚日單價 > 現金價值時置灰不可選
-                  const skinRealPrice = skinPriceMap[skin.name] ?? skin.pricePerDay
-                  const isGiftOnlyMode = !mixedPayment && paymentMode === 'gift'
-                  const isDisabled = isGiftOnlyMode && giftCashValue > 0 && skinRealPrice > giftCashValue
-                  return (
-                    <div
-                      key={skin.id}
-                      title={isDisabled ? t('skinExceedCashValue', { value: giftCashValue }) : skin.desc}
-                      onClick={() => { if (!isDisabled) setSelectedSkinId(skin.id) }}
-                      style={{
-                        position: 'relative', borderRadius: 10, padding: 12,
-                        cursor: isDisabled ? 'not-allowed' : 'pointer',
-                        border: isSelected ? '2px solid #E8720C' : '1px solid #f0f0f0',
-                        background: isDisabled ? '#F5F5F5' : isSelected ? '#FFF7E6' : '#FAFAFA',
-                        boxShadow: isSelected ? '0 4px 12px rgba(232,114,12,0.18)' : 'none',
-                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                        opacity: isDisabled ? 0.55 : 1,
-                      }}
-                      onMouseEnter={e => { if (!isSelected && !isDisabled) e.currentTarget.style.transform = 'translateY(-2px)' }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-                    >
-                      {isSelected && (
-                        <CheckCircleFilled style={{ position: 'absolute', top: 8, right: 8, fontSize: 16, color: '#E8720C', zIndex: 1 }} />
-                      )}
-                      {/* 置灰原因標籤 */}
-                      {isDisabled && (
-                        <div style={{
-                          position: 'absolute', top: 6, right: 6, fontSize: 9, color: '#FF4D4F',
-                          background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 3, padding: '0 4px',
-                          whiteSpace: 'nowrap', zIndex: 1,
-                        }}>{t('exceedCashValueTag')}</div>
-                      )}
-                      {/* 皮膚色块示意：邊框色 + 套件名稱 */}
-                      <div style={{
-                        height: 56, borderRadius: 8, background: '#fff',
-                        border: skin.borderType === 'color' ? `2px solid ${skin.borderColor}` : '1px dashed #d9d9d9',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px',
-                      }}>
-                        <span style={{
-                          fontSize: 13, fontWeight: 600, color: '#262626',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{skin.name}</span>
-                      </div>
-                      {/* 段位標籤（左下角）+ 銷量 + 價格 */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                        {(() => { const tc = getSaleTierConfig(skin.tier); return (
-                          <span style={tc.badge}>{tc.icon ? `${tc.icon} ` : ''}{tr(tc.labelKey)}</span>
-                        )})()}
-                        <span style={{ fontSize: 10, color: '#E8720C', whiteSpace: 'nowrap' }}>{t('soldCount', { count: skin.sold })}</span>
-                        <div style={{ flex: 1 }} />
-                        <span style={{ fontSize: 16, fontWeight: 700, color: '#FF4D4F' }}>${skinPriceMap[skin.name] ?? skin.pricePerDay}</span>
-                        <span style={{ fontSize: 10, color: '#8C8C8C', marginLeft: 1 }}>{t('perDay')}</span>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div key={skinModeFilter} className="skin-gallery-scroll skin-purchase__gallery" role="region"
+                aria-label={t(skinModeFilter === 'small' ? 'smallMode' : 'bigMode')} tabIndex={0}>
+                {visibleSkins.length === 0 ? (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={tr('common.noData')} />
+                ) : (
+                  <div className={`skin-gallery skin-gallery--${skinModeFilter}`}>
+                    {visibleSkins.map((skin, index) => {
+                      const isSelected = selectedSkinId === skin.id
+                      const skinRealPrice = skinPriceMap[skin.name] ?? skin.pricePerDay
+                      const isDisabled = !mixedPayment && activeMode === 'gift' && giftCashValue > 0 && skinRealPrice > giftCashValue
+                      const tier = getSaleTierConfig(skin.tier)
+                      return (
+                        <div key={skin.id}
+                          className={`skin-gallery-card${isSelected ? ' skin-gallery-card--selected' : ''}${isDisabled ? ' skin-purchase__card--disabled' : ''}`}
+                          title={isDisabled ? t('skinExceedCashValue', { value: giftCashValue }) : skin.desc}>
+                          <button type="button" className="skin-gallery-card__select" disabled={isDisabled}
+                            aria-pressed={isSelected} aria-label={tr('recommend.popularSkin.gallerySelect', { name: skin.name })}
+                            onClick={() => setSelectedSkinId(skin.id)}>
+                            <span className="skin-gallery-card__header">
+                              <span className="skin-gallery-card__index">{index + 1}</span>
+                              <span className="skin-gallery-card__heading">
+                                <span className="skin-gallery-card__name" title={skin.name}>{skin.name}</span>
+                                <Tag className="skin-tier-badge" style={tier.badge}>{tier.icon}{tr(tier.labelKey)}</Tag>
+                              </span>
+                              {isSelected && <CheckCircleFilled className="skin-gallery-card__check" />}
+                            </span>
+                            <div className="skin-gallery-card__preview" aria-hidden="true">{renderSkinPreview(skin)}</div>
+                            <span className="skin-gallery-card__footer">
+                              <span className="skin-purchase__sold">{t('soldCount', { count: skin.sold })}</span>
+                              <span className="skin-gallery-card__spacer" />
+                              <span className="skin-purchase__price">${skinRealPrice} <span className="skin-gallery-card__price-unit">{t('perDay')}</span></span>
+                            </span>
+                          </button>
+                          {isDisabled && <span className="skin-purchase__disabled-hint">{t('exceedCashValueTag')}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -1273,15 +1119,16 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
           </div>
 
           {/* 右側：效果預覽 + 當前所選 + 訂單結算 */}
-          <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="skin-purchase__sidebar">
             {/* 效果預覽：瀑布流對比視角，上下模糊普通店鋪卡，突出當前所選皮膚 */}
-            <Card size="small" title={<Space><span>📱</span><span>{t('previewTitle')}</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
+            <Card className="skin-purchase__effect" size="small" title={<Space><span>📱</span><span>{t('previewTitle')}</span></Space>} bodyStyle={{ padding: '12px 16px', background: '#F5F5F5' }}>
               {selectedSkin ? (
                 <div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('smallMode')}</div>
+                  <div className="skin-purchase__preview-label">
+                    {t((selectedSkin.displayMode ?? 'small') === 'small' ? 'smallMode' : 'bigMode')} · {selectedSkin.name}
+                  </div>
                   {renderWaterfallCompare(renderSkinPreview(selectedSkin, true))}
-                  <div style={{ fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px' }}>{t('bigMode')}</div>
-                  {renderWaterfallCompare(renderSkinBigPreview(selectedSkin))}
+                  <div className="skin-preview-modal__hint">{tr('recommend.popularSkin.previewDataHint')}</div>
 
                 </div>
               ) : (

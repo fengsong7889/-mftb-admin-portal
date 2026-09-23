@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdHotInventoryVO;
 import com.mftb.admin.dto.AdHotOrderRequest;
 import com.mftb.admin.dto.AdOrderVO;
+import com.mftb.admin.dto.AdHotQuoteVO;
 import com.mftb.admin.service.AdSalesHotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,13 @@ public class AdSalesHotController {
                                               @RequestParam(required = false) String storeCode,
                                               @RequestParam(required = false) String groupCode) {
         return Result.success(salesService.inventory(algoId, storeCode, groupCode));
+    }
+
+    /** 只读报价：权限与下单一致，不产生订单、扣款或流水。 */
+    @PostMapping("/quote")
+    @RequirePermission(menu = "ad-sales", action = "create")
+    public Result<AdHotQuoteVO> quote(@Valid @RequestBody AdHotOrderRequest request) {
+        return Result.success(salesService.quote(request));
     }
 
     /** 提交订单并从推广金账户扣款（同商家已购买的皮肤x日期不可重复购买） */

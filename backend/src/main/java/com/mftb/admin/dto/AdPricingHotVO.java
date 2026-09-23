@@ -27,6 +27,10 @@ public class AdPricingHotVO {
     private Integer refundEnabled;
     /** 多格梯度折扣 JSON 字符串 */
     private String discountTiers;
+    private Boolean discountEnabled;
+    private String discountMode;
+    private String smallDiscountTiers;
+    private String largeDiscountTiers;
     /** 取消扣费梯度 JSON 字符串 */
     private String cancelFeeTiers;
     private Integer blockMerchant;
@@ -53,6 +57,10 @@ public class AdPricingHotVO {
         vo.setGiftCashValue(entity.getGiftCashValue());
         vo.setRefundEnabled(entity.getRefundEnabled());
         vo.setDiscountTiers(entity.getDiscountTiers());
+        vo.setDiscountEnabled(com.mftb.admin.util.HotDiscountPolicy.enabled(entity.getDiscountEnabled(), entity.getDiscountTiers()));
+        vo.setDiscountMode(com.mftb.admin.util.HotDiscountPolicy.mode(entity.getDiscountMode()));
+        vo.setSmallDiscountTiers(entity.getSmallDiscountTiers());
+        vo.setLargeDiscountTiers(entity.getLargeDiscountTiers());
         vo.setCancelFeeTiers(entity.getCancelFeeTiers());
         vo.setBlockMerchant(entity.getBlockMerchant());
         vo.setBlockList(entity.getBlockList());
@@ -69,6 +77,8 @@ public class AdPricingHotVO {
     public static class SkinPriceItem {
         private Long id;
         private String skinName;
+        private String templateKey;
+        private String displayMode;
         private BigDecimal price;
         /** 边框方式: none=无边框 color=选择配色 image=上传边框图 */
         private String borderType;

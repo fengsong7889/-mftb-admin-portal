@@ -18,7 +18,22 @@ public class ContractRegistry {
      * （对应事故：新增金字招牌定价保存报数据库异常）。
      */
     public List<ContractSpec> allContracts() {
-        return List.of(signboardPricingMain(), signboardPricingLabel());
+        return java.util.stream.Stream.concat(List.of(signboardPricingMain(), signboardPricingLabel()).stream(),
+                hotDiscountContracts().stream()).toList();
+    }
+
+    /** 基础表由人气商家基础迁移创建，此处统一提供新增列的幂等自愈定义。 */
+    public static List<ContractSpec> hotDiscountContracts() {
+        return List.of(
+                new ContractSpec("hot-skin-discount-main", "biz_ad_pricing_hot", null, List.of(
+                        new ContractSpec.ColumnSpec("discount_enabled", "ALTER TABLE biz_ad_pricing_hot ADD COLUMN discount_enabled TINYINT DEFAULT NULL COMMENT '折扣总开关，空值兼容旧规则'"),
+                        new ContractSpec.ColumnSpec("discount_mode", "ALTER TABLE biz_ad_pricing_hot ADD COLUMN discount_mode VARCHAR(16) NOT NULL DEFAULT 'shared' COMMENT 'shared/independent'"),
+                        new ContractSpec.ColumnSpec("small_discount_tiers", "ALTER TABLE biz_ad_pricing_hot ADD COLUMN small_discount_tiers JSON DEFAULT NULL COMMENT '小图折扣百分比梯度'"),
+                        new ContractSpec.ColumnSpec("large_discount_tiers", "ALTER TABLE biz_ad_pricing_hot ADD COLUMN large_discount_tiers JSON DEFAULT NULL COMMENT '大图折扣百分比梯度'"))),
+                new ContractSpec("hot-skin-discount-skin", "biz_ad_pricing_hot_skin", null, List.of(
+                        new ContractSpec.ColumnSpec("display_mode", "ALTER TABLE biz_ad_pricing_hot_skin ADD COLUMN display_mode VARCHAR(16) DEFAULT NULL COMMENT 'small/large，旧皮肤待确认'"),
+                        new ContractSpec.ColumnSpec("template_key", "ALTER TABLE biz_ad_pricing_hot_skin ADD COLUMN template_key VARCHAR(64) DEFAULT NULL COMMENT '固定皮肤模板键'")))
+        );
     }
 
     private ContractSpec signboardPricingMain() {

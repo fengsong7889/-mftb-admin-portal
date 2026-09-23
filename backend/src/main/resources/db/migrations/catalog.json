@@ -123,6 +123,17 @@
       "comment": "金字招牌计价主表 + 标签明细表自动建表与补列，附结构后置校验。"
     },
     {
+      "versionKey": "adpromo:hot-skin-discount-v1.0",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "dependencies": ["adpromo:15_hot_merchant_ad.sql:v1.1"],
+      "status": "ACTIVE",
+      "selfHealContract": "hot-skin-discount",
+      "comment": "人气商家共享/独立折扣及皮肤归属，仅补列，保留历史百分比和订单。"
+    },
+    {
       "versionKey": "core:drop-ai-access-request-v1",
       "module": "core",
       "phase": "MODULE_STRUCTURE",

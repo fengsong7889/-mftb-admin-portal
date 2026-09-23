@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.AdPricingHotSkinMapper;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.HotDiscountPolicy;
 import com.mftb.admin.util.OperatorResolver;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -73,6 +74,63 @@ public class AdPricingHotServiceImpl extends
         return pricing == null ? null : toVO(pricing);
     }
 
+    @Override
+    protected void preCreate(AdPricingHotRequest request) {
+        validateRequest(request);
+    }
+
+    @Override
+    protected void preUpdate(Long id, AdPricingHotRequest request) {
+        AdPricingHot existing = require(id);
+        if (request.getDiscountMode() == null && HotDiscountPolicy.INDEPENDENT.equals(existing.getDiscountMode())) {
+            throw new BusinessException("此定價使用獨立折扣，請刷新客戶端後重試");
+        }
+        // 旧客户端整体替换皮肤时，保留已确认的归属与模板键。
+        List<AdPricingHotSkin> previous = skinMapper.selectList(new LambdaQueryWrapper<AdPricingHotSkin>()
+                .eq(AdPricingHotSkin::getPricingId, id));
+        if (request.getSkins() != null) {
+            for (AdPricingHotRequest.SkinPrice skin : request.getSkins()) {
+                if (skin == null) continue;
+                previous.stream().filter(old -> old.getSkinName().equals(skin.getSkinName())).findFirst().ifPresent(old -> {
+                    if (skin.getTemplateKey() == null) skin.setTemplateKey(old.getTemplateKey());
+                    if (skin.getDisplayMode() == null) skin.setDisplayMode(old.getDisplayMode());
+                });
+            }
+        }
+        validateRequest(request);
+    }
+
+    private void validateRequest(AdPricingHotRequest request) {
+        request.setDiscountMode(HotDiscountPolicy.mode(request.getDiscountMode()));
+        request.setDiscountTiers(HotDiscountPolicy.normalize(request.getDiscountTiers()));
+        if (request.getSmallDiscountTiers() != null) request.setSmallDiscountTiers(HotDiscountPolicy.normalize(request.getSmallDiscountTiers()));
+        if (request.getLargeDiscountTiers() != null) request.setLargeDiscountTiers(HotDiscountPolicy.normalize(request.getLargeDiscountTiers()));
+        if (request.getDiscountEnabled() == null) request.setDiscountEnabled(!request.getDiscountTiers().isEmpty());
+        boolean independent = HotDiscountPolicy.INDEPENDENT.equals(request.getDiscountMode());
+        if (Boolean.TRUE.equals(request.getDiscountEnabled())) {
+            boolean hasRules = independent
+                    ? (request.getSmallDiscountTiers() != null && !request.getSmallDiscountTiers().isEmpty())
+                        || (request.getLargeDiscountTiers() != null && !request.getLargeDiscountTiers().isEmpty())
+                    : !request.getDiscountTiers().isEmpty();
+            if (!hasRules) throw new BusinessException("啟用折扣時請至少配置一組梯度");
+        }
+        if (request.getSkins() == null || request.getSkins().isEmpty()) throw new BusinessException("請至少配置一個皮膚");
+        Set<String> names = new HashSet<>();
+        Set<String> keys = new HashSet<>();
+        for (AdPricingHotRequest.SkinPrice skin : request.getSkins()) {
+            if (skin == null || !StringUtils.hasText(skin.getSkinName()) || skin.getSkinName().length() > 64
+                    || !names.add(skin.getSkinName())) throw new BusinessException("皮膚名稱為空、過長或重複");
+            if (skin.getPrice() == null || skin.getPrice().signum() <= 0 || skin.getPrice().stripTrailingZeros().scale() > 2) {
+                throw new BusinessException("皮膚日單價須大於0且最多兩位小數");
+            }
+            HotDiscountPolicy.Metadata meta = HotDiscountPolicy.metadata(skin.getSkinName(), skin.getTemplateKey(), skin.getDisplayMode());
+            skin.setTemplateKey(meta.templateKey());
+            skin.setDisplayMode(meta.displayMode());
+            if (meta.templateKey() != null && !keys.add(meta.templateKey())) throw new BusinessException("皮膚模板重複");
+            if (independent && meta.displayMode() == null) throw new BusinessException("請確認所有歷史皮膚的小圖/大圖歸屬");
+        }
+    }
+
     /* ==================== 抽象方法实现 ==================== */
 
     @Override
@@ -86,6 +144,9 @@ public class AdPricingHotServiceImpl extends
             AdPricingHotVO.SkinPriceItem item = new AdPricingHotVO.SkinPriceItem();
             item.setId(skin.getId());
             item.setSkinName(skin.getSkinName());
+            HotDiscountPolicy.Metadata meta = HotDiscountPolicy.metadata(skin.getSkinName(), skin.getTemplateKey(), skin.getDisplayMode());
+            item.setTemplateKey(meta.templateKey());
+            item.setDisplayMode(meta.displayMode());
             item.setPrice(skin.getPrice());
             item.setBorderType(skin.getBorderType());
             item.setBorderColor(skin.getBorderColor());
@@ -114,7 +175,11 @@ public class AdPricingHotServiceImpl extends
                 ? DEFAULT_PRESALE_DAYS : request.getPresaleDays());
         entity.setGiftCashValue(request.getGiftCashValue());
         entity.setRefundEnabled(request.getRefundEnabled() == null ? 1 : request.getRefundEnabled());
-        entity.setDiscountTiers(request.getDiscountTiers() == null ? null : JsonUtils.toJson(request.getDiscountTiers()));
+        entity.setDiscountTiers(JsonUtils.toJson(request.getDiscountTiers()));
+        entity.setDiscountEnabled(request.getDiscountEnabled());
+        entity.setDiscountMode(request.getDiscountMode());
+        if (request.getSmallDiscountTiers() != null) entity.setSmallDiscountTiers(JsonUtils.toJson(request.getSmallDiscountTiers()));
+        if (request.getLargeDiscountTiers() != null) entity.setLargeDiscountTiers(JsonUtils.toJson(request.getLargeDiscountTiers()));
         entity.setCancelFeeTiers(request.getCancelFeeTiers() == null ? null : JsonUtils.toJson(request.getCancelFeeTiers()));
         entity.setBlockMerchant(request.getBlockMerchant() == null ? 2 : request.getBlockMerchant());
         entity.setBlockList(request.getBlockList() == null ? null : JsonUtils.toJson(request.getBlockList()));
@@ -163,6 +228,8 @@ public class AdPricingHotServiceImpl extends
             AdPricingHotSkin entity = new AdPricingHotSkin();
             entity.setPricingId(pricingId);
             entity.setSkinName(skin.getSkinName());
+            entity.setTemplateKey(skin.getTemplateKey());
+            entity.setDisplayMode(skin.getDisplayMode());
             entity.setPrice(skin.getPrice() == null ? BigDecimal.ZERO : skin.getPrice());
             entity.setBorderType(StringUtils.hasText(skin.getBorderType()) ? skin.getBorderType() : "color");
             entity.setBorderColor(skin.getBorderColor());

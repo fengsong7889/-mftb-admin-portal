@@ -37,7 +37,12 @@ public class AdPricingHotRequest {
     private Integer refundEnabled;
 
     /** 多格梯度折扣: [{"minDays":3,"discount":95},{"minDays":7,"discount":90}]（按购买格子数匹配） */
-    private List<Map<String, Object>> discountTiers;
+    private List<AdDiscountTier> discountTiers;
+    /** 总开关为空时兼容历史共享规则。 */
+    private Boolean discountEnabled;
+    private String discountMode;
+    private List<AdDiscountTier> smallDiscountTiers;
+    private List<AdDiscountTier> largeDiscountTiers;
 
     /** 取消扣费梯度: [{"remainDays":0,"ratio":100},{"remainDays":3,"ratio":80}] */
     private List<Map<String, Object>> cancelFeeTiers;
@@ -63,6 +68,8 @@ public class AdPricingHotRequest {
     public static class SkinPrice {
         /** 皮肤名称 */
         private String skinName;
+        private String templateKey;
+        private String displayMode;
         /** 皮肤日单价（MOP） */
         private BigDecimal price;
         /** 边框方式: none=无边框 color=选择配色 image=上传边框图 */

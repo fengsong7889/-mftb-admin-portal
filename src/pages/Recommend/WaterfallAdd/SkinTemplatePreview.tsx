@@ -1,9 +1,10 @@
 /** 定价画廊、实时预览和放大预览共用同一画布，整体等比缩放，不挤压内部版式。 */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Button } from 'antd'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   buildPosterSvgDataUrl, getFallbackPoster, getSmallTemplate,
-  type LargeLayout, type SkinSaleConfig,
+  getCustomPosterImages, getPosterSource, getPosterLocale, POSTER_LANGUAGES,
+  type LargeLayout, type SkinSaleConfig, type PosterLocale,
 } from '../../../constants/popularSkinTemplates'
 import './SkinTemplateSection.css'
 
@@ -15,18 +16,21 @@ const DISHES = [
   { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
 ]
 
-/** 自定义图失败后使用所选兜底图；两个来源都失败则显示中性占位。 */
-export function SkinPoster({ skin }: { skin: SkinSaleConfig }) {
+/** 严格按来源和语言展示，缺失的自定义图不静默替换成兜底图。 */
+export function SkinPoster({ skin, locale }: { skin: SkinSaleConfig; locale: PosterLocale }) {
+  const { t } = useTranslation()
+  const custom = getPosterSource(skin) === 'custom'
   const poster = getFallbackPoster(skin.fallbackPosterKey ?? '')
-  const fallback = poster ? buildPosterSvgDataUrl(poster) : undefined
-  const [failedSources, setFailedSources] = useState<string[]>([])
-  const src = [skin.customImage, fallback].find(source => source && !failedSources.includes(source))
+  const source = custom ? getCustomPosterImages(skin)[locale] : poster ? buildPosterSvgDataUrl(poster) : undefined
+  const [failedSource, setFailedSource] = useState<string>()
+  const src = source !== failedSource ? source : undefined
+  const language = POSTER_LANGUAGES.find(item => item.locale === locale)!
   return (
     <div className="skin-studio__poster">
       {src ? (
-        <img src={src} alt="人气商家海报" draggable={false}
-          onError={() => setFailedSources(previous => [...previous, src])} />
-      ) : <span className="skin-studio__muted">暫無圖片</span>}
+        <img src={src} alt={t('recommend.popularSkin.posterLabel')} draggable={false}
+          onError={() => setFailedSource(src)} />
+      ) : <span className="skin-studio__muted">{t(custom ? 'recommend.popularSkin.posterMissingImage' : 'recommend.popularSkin.posterNoImage', { language: t(language.labelKey) })}</span>}
     </div>
   )
 }
@@ -71,12 +75,12 @@ function Dishes({ layout, animate }: { layout: LargeLayout; animate: boolean }) 
   )
 }
 
-function MerchantInfo() {
+function MerchantInfo({ merchantName = '示例门店名称' }: { merchantName?: string }) {
   return (
     <>
       <div className="skin-stage__title-row">
         <span className="skin-stage__gold-badge">金牌</span>
-        <span className="skin-stage__name">示例门店名称</span>
+        <span className="skin-stage__name" title={merchantName}>{merchantName}</span>
       </div>
       <div className="skin-stage__rating"><strong>★4.5</strong><span>月售 1196</span></div>
       <div className="skin-stage__delivery">
@@ -97,18 +101,25 @@ function MerchantInfo() {
   )
 }
 
-export default function SkinTemplatePreview({ skin, interactive = false }: {
+export default function SkinTemplatePreview({ skin, autoPlay = false, posterLocale, merchantName, appearance }: {
   skin: SkinSaleConfig
-  interactive?: boolean
+  autoPlay?: boolean
+  posterLocale?: PosterLocale
+  merchantName?: string
+  /** 旧版非模板皮肤保留原配色；标准模板仍由共享常量决定。 */
+  appearance?: Pick<CSSProperties, 'borderColor' | 'backgroundImage'>
 }) {
+  const { i18n } = useTranslation()
+  const locale = posterLocale ?? getPosterLocale(i18n.resolvedLanguage ?? i18n.language)
   const viewportRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
-  const [paused, setPaused] = useState(false)
   const small = skin.displayMode === 'small'
   const canvasWidth = small ? 560 : 760
   const canvasHeight = small ? 140 : 300
-  const palette = small ? getSmallTemplate(skin.templateKey) : getFallbackPoster(skin.fallbackPosterKey ?? '')
+  const palette = small ? getSmallTemplate(skin.templateKey)
+    : getPosterSource(skin) === 'fallback' ? getFallbackPoster(skin.fallbackPosterKey ?? '') : undefined
   const color = palette && 'borderColor' in palette ? palette.borderColor : palette && 'color' in palette ? palette.color : '#E8720C'
+  const backgroundImage = small && palette ? palette.gradientCss : `linear-gradient(180deg, ${color}18 0%, #fff 85%)`
 
   useLayoutEffect(() => {
     const element = viewportRef.current
@@ -130,27 +141,18 @@ export default function SkinTemplatePreview({ skin, interactive = false }: {
         style={{ maxWidth: canvasWidth, aspectRatio: `${canvasWidth} / ${canvasHeight}` }}>
         <div className={`skin-stage skin-stage--${skin.displayMode}`}
           style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${width / canvasWidth})`,
-            borderColor: color, backgroundImage: `linear-gradient(180deg, ${color}18, #fff 80%)` }}>
+            borderColor: color, backgroundImage, ...appearance }}>
           {small ? (
             <div className="skin-stage__logo" aria-hidden="true">
               🍣
-              <span className="skin-stage__logo-tag">广告</span>
-              <span className="skin-stage__logo-overlay">爆單暫停接單</span>
             </div>
-          ) : <SkinPoster key={`${skin.templateKey}:${skin.customImage}:${skin.fallbackPosterKey}`} skin={skin} />}
+          ) : <SkinPoster skin={skin} locale={locale} />}
           <div className="skin-stage__body">
-            <MerchantInfo />
-            {!small && <Dishes key={skin.templateKey} layout={skin.layout ?? 'grid'} animate={interactive && !paused} />}
+            <MerchantInfo merchantName={merchantName} />
+            {!small && <Dishes key={skin.templateKey} layout={skin.layout ?? 'grid'} animate={autoPlay} />}
           </div>
         </div>
       </div>
-      {interactive && !small && skin.layout === 'carousel' && (
-        <div className="skin-preview__controls">
-          <Button size="small" disabled={false} onClick={() => setPaused(value => !value)}>
-            {paused ? '播放輪播' : '暫停輪播'}
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

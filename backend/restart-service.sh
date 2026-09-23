@@ -102,10 +102,12 @@ stop_service() {
     fi
 
     # 方式2：兜底 - 通过端口查找并停止
+    # 注意：必须限定本机 LISTEN 状态的 socket，否则 lsof -i:8080 会误匹配
+    # 其它进程「连到远程 :8080」的出站连接（如微信），导致误杀无关进程
     local port_pid
-    port_pid=$(lsof -ti:8080 2>/dev/null | tr '\n' ' ' | xargs 2>/dev/null || true)
+    port_pid=$(lsof -nP -iTCP:8080 -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' | xargs 2>/dev/null || true)
     if [ -n "$port_pid" ]; then
-        echo -e "${YELLOW}⏹  停止端口 8080 上的进程 (PID: $port_pid)${NC}"
+        echo -e "${YELLOW}⏹  停止端口 8080 上的监听进程 (PID: $port_pid)${NC}"
         kill -9 $port_pid 2>/dev/null || true
         sleep 1
         stopped=true
@@ -120,8 +122,9 @@ stop_service() {
 
 # ── 查看状态 ──
 show_status() {
+    # 仅统计本机 8080 的 LISTEN 进程，避免误匹配连到远程 :8080 的无关进程
     local port_pid
-    port_pid=$(lsof -ti:8080 2>/dev/null | tr '\n' ' ' | xargs 2>/dev/null || true)
+    port_pid=$(lsof -nP -iTCP:8080 -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' | xargs 2>/dev/null || true)
     if [ -n "$port_pid" ]; then
         echo -e "${GREEN}✅ 后端服务运行中 (PID: $port_pid, 端口: 8080)${NC}"
         local http_code

@@ -2109,7 +2109,7 @@ export default function EmployeeDetail() {
                 allowClear
                 options={positions
                   .filter(p => !watchPosSequence || p.sequence === watchPosSequence)
-                  .map(p => ({ value: p.name, label: `${p.name}${p.jobLevel ? ` (${p.sequence}${p.jobLevel})` : ''}` }))}
+                  .map(p => ({ value: p.name, label: `${p.name}${p.jobLevel ? ` (${p.jobLevel})` : ''}` }))}
               />
             </Form.Item>
             <Form.Item name="directSuperior" label={t('employeeDetail.colDirectSuperior')}>

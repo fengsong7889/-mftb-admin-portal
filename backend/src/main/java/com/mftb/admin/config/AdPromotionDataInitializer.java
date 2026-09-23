@@ -1,6 +1,9 @@
 package com.mftb.admin.config;
 
 import com.mftb.admin.util.ConvertUtils;
+import com.mftb.admin.config.migration.ContractRegistry;
+import com.mftb.admin.config.migration.ContractSpec;
+import com.mftb.admin.config.migration.MigrationLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -36,6 +39,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final MigrationLock migrationLock;
 
     @Override
     public void run(String... args) {
@@ -65,6 +69,30 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         // v2: 金字招牌计价表建表/补列，附结构后置校验；v1 因补列吞异常可能误记成功，故用新版本键重跑并以校验兜底
         runVerified("金字招牌计价表自动创建与补列", "adpromo:signboard_pricing_tables:v2",
                 this::ensureSignboardPricingTables, this::verifySignboardPricing);
+        String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
+                versionTracker.applyOnce("adpromo:hot-skin-discount-v1.0",
+                        this::ensureHotDiscountColumns, this::verifyHotDiscountColumns));
+    }
+
+    private void ensureHotDiscountColumns() {
+        log.info("开始迁移人气商家大小图折扣结构");
+        for (ContractSpec contract : ContractRegistry.hotDiscountContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                addColumnIfAbsent(contract.table(), column.column(), column.addColumnDdl());
+            }
+        }
+    }
+
+    private void verifyHotDiscountColumns() {
+        for (ContractSpec contract : ContractRegistry.hotDiscountContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                if (!columnExists(contract.table(), column.column())) {
+                    throw new IllegalStateException("人气商家折扣列未就绪: " + contract.table() + "." + column.column());
+                }
+            }
+        }
+        log.info("人气商家大小图折扣结构就绪");
     }
 
     /** 单步容错执行: 异常仅记录不抛出, 版本化后重启跳过已完成步骤 */

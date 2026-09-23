@@ -21,6 +21,18 @@ export type LargeLayout = 'grid' | 'carousel' | 'triple' | 'hero'
 /** 皮肤等级 */
 export type SkinTier = 'classic' | 'premium' | 'flagship' | 'ultimate'
 
+/** 海报来源互斥，未选择自定义时只使用兜底图。 */
+export type PosterSource = 'fallback' | 'custom'
+
+export const POSTER_LANGUAGES = [
+  { locale: 'zh-CN', labelKey: 'recommend.popularSkin.posterSimplified' },
+  { locale: 'zh-TW', labelKey: 'recommend.popularSkin.posterTraditional' },
+  { locale: 'en', labelKey: 'recommend.popularSkin.posterEnglish' },
+] as const
+
+export type PosterLocale = typeof POSTER_LANGUAGES[number]['locale']
+export type CustomPosterImages = Partial<Record<PosterLocale, string>>
+
 /** 小图模板定义 */
 export interface SmallSkinTemplate {
   key: string
@@ -76,22 +88,26 @@ export interface SkinSaleConfig {
   fallbackPosterKey?: string
   /** 自定义上传图 dataURL（仅 large 模式，非必填） */
   customImage?: string | null
+  /** 仅用于本地预览，尚未接入后端保存。 */
+  posterSource?: PosterSource
+  customImages?: CustomPosterImages
 }
 
 /* ==================== 小图模式：11套固定配色模板 ==================== */
 
+// 保留模板键与名称，利用色相、明度和饱和度区分近色，避免影响已有定价匹配。
 export const SMALL_SKIN_TEMPLATES: SmallSkinTemplate[] = [
-  { key: 'small_red', defaultName: '活力红', borderColor: '#FF1806', gradientColor: '#FF1806', gradientCss: 'linear-gradient(135deg, #FF1806, #FF6347)' },
-  { key: 'small_orange', defaultName: '暖橙', borderColor: '#FF5400', gradientColor: '#FF5400', gradientCss: 'linear-gradient(135deg, #FF5400, #FF8C42)' },
-  { key: 'small_amber', defaultName: '明黄', borderColor: '#FF9E00', gradientColor: '#FF9E00', gradientCss: 'linear-gradient(135deg, #FF9E00, #FFD54F)' },
-  { key: 'small_purple', defaultName: '魅紫', borderColor: '#7C4DFF', gradientColor: '#7C4DFF', gradientCss: 'linear-gradient(135deg, #7C4DFF, #B388FF)' },
-  { key: 'small_magenta', defaultName: '洋红', borderColor: '#E20BFE', gradientColor: '#E20BFE', gradientCss: 'linear-gradient(135deg, #E20BFE, #F48FB1)' },
-  { key: 'small_pink', defaultName: '桃粉', borderColor: '#FF4081', gradientColor: '#FF4081', gradientCss: 'linear-gradient(135deg, #FF4081, #FF80AB)' },
-  { key: 'small_blue', defaultName: '天蓝', borderColor: '#00B5FD', gradientColor: '#00B5FD', gradientCss: 'linear-gradient(135deg, #00B5FD, #4FC3F7)' },
-  { key: 'small_green', defaultName: '鲜绿', borderColor: '#00C100', gradientColor: '#00C100', gradientCss: 'linear-gradient(135deg, #00C100, #69F0AE)' },
-  { key: 'small_teal', defaultName: '湖青', borderColor: '#00BCD4', gradientColor: '#00BCD4', gradientCss: 'linear-gradient(135deg, #00BCD4, #4DD0E1)' },
-  { key: 'small_brown', defaultName: '深棕', borderColor: '#5D4037', gradientColor: '#5D4037', gradientCss: 'linear-gradient(135deg, #5D4037, #8D6E63)' },
-  { key: 'small_gold', defaultName: '鎏金', borderColor: '#A16E1B', gradientColor: '#A16E1B', gradientCss: 'linear-gradient(135deg, #A16E1B, #FFD54F)' },
+  { key: 'small_red', defaultName: '活力红', borderColor: '#D92D3A', gradientColor: '#F15B64', gradientCss: 'linear-gradient(180deg, #F15B6466, #F15B6418 55%, #fff)' },
+  { key: 'small_orange', defaultName: '暖橙', borderColor: '#E86A00', gradientColor: '#FF9B36', gradientCss: 'linear-gradient(180deg, #FF9B3666, #FF9B3618 55%, #fff)' },
+  { key: 'small_amber', defaultName: '明黄', borderColor: '#C9A900', gradientColor: '#F7DA46', gradientCss: 'linear-gradient(180deg, #F7DA4680, #F7DA4618 55%, #fff)' },
+  { key: 'small_purple', defaultName: '魅紫', borderColor: '#6036C8', gradientColor: '#956EE8', gradientCss: 'linear-gradient(180deg, #956EE866, #956EE818 55%, #fff)' },
+  { key: 'small_magenta', defaultName: '洋红', borderColor: '#A81498', gradientColor: '#C850B9', gradientCss: 'linear-gradient(180deg, #C850B966, #C850B918 55%, #fff)' },
+  { key: 'small_pink', defaultName: '桃粉', borderColor: '#D56B96', gradientColor: '#F6BDCF', gradientCss: 'linear-gradient(180deg, #F6BDCF80, #F6BDCF18 55%, #fff)' },
+  { key: 'small_blue', defaultName: '天蓝', borderColor: '#2370D8', gradientColor: '#77B3F4', gradientCss: 'linear-gradient(180deg, #77B3F466, #77B3F418 55%, #fff)' },
+  { key: 'small_green', defaultName: '鲜绿', borderColor: '#43951A', gradientColor: '#A3D15B', gradientCss: 'linear-gradient(180deg, #A3D15B66, #A3D15B18 55%, #fff)' },
+  { key: 'small_teal', defaultName: '湖青', borderColor: '#008D8F', gradientColor: '#55C7BF', gradientCss: 'linear-gradient(180deg, #55C7BF66, #55C7BF18 55%, #fff)' },
+  { key: 'small_brown', defaultName: '深棕', borderColor: '#704638', gradientColor: '#9D7765', gradientCss: 'linear-gradient(180deg, #9D776580, #9D776518 55%, #fff)' },
+  { key: 'small_gold', defaultName: '鎏金', borderColor: '#8F7B39', gradientColor: '#CCB978', gradientCss: 'linear-gradient(180deg, #CCB97880, #CCB97818 55%, #fff)' },
 ]
 
 /* ==================== 大图模式：4套版式模板 ==================== */
@@ -182,6 +198,27 @@ export const SKIN_TIER_ORDER: SkinTier[] = ['classic', 'premium', 'flagship', 'u
 
 /* ==================== 工具函数 ==================== */
 
+/** 兼容旧单图预览；旧图只算繁体图，不能代替另外两种语言。 */
+export function getCustomPosterImages(skin: SkinSaleConfig): CustomPosterImages {
+  return { ...(skin.customImage ? { 'zh-TW': skin.customImage } : {}), ...skin.customImages }
+}
+
+export function getPosterSource(skin: SkinSaleConfig): PosterSource {
+  return skin.posterSource ?? (Object.values(getCustomPosterImages(skin)).some(Boolean) ? 'custom' : 'fallback')
+}
+
+export function getMissingPosterLanguages(skin: SkinSaleConfig) {
+  if (skin.displayMode !== 'large' || getPosterSource(skin) !== 'custom') return []
+  const images = getCustomPosterImages(skin)
+  return POSTER_LANGUAGES.filter(({ locale }) => !images[locale])
+}
+
+export function getPosterLocale(language: string): PosterLocale {
+  if (language.toLowerCase().startsWith('en')) return 'en'
+  if (language === 'zh-CN' || language.toLowerCase().startsWith('zh-hans')) return 'zh-CN'
+  return 'zh-TW'
+}
+
 /** 根据模板 key 获取小图模板 */
 export function getSmallTemplate(key: string): SmallSkinTemplate | undefined {
   return SMALL_SKIN_TEMPLATES.find(t => t.key === key)
@@ -225,6 +262,8 @@ export function createDefaultLargeSkins(): SkinSaleConfig[] {
     tier: 'classic' as SkinTier,
     layout: t.layout,
     fallbackPosterKey: 'poster_red',
+    posterSource: 'fallback',
+    customImages: {},
     customImage: null,
   }))
 }

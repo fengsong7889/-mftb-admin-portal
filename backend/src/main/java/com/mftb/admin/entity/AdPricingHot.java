@@ -46,6 +46,10 @@ public class AdPricingHot {
 
     /** 多格梯度折扣（JSON 字符串，按购买格子数匹配，如 [{"minDays":3,"discount":95}]） */
     private String discountTiers;
+    private Boolean discountEnabled;
+    private String discountMode;
+    private String smallDiscountTiers;
+    private String largeDiscountTiers;
 
     /** 取消扣费梯度（JSON 字符串） */
     private String cancelFeeTiers;

@@ -26,6 +26,10 @@ public class AdHotInventoryVO {
 
     /** 多格梯度折扣 JSON 字符串（前端展示折扣规则） */
     private String discountTiers;
+    private Boolean discountEnabled;
+    private String discountMode;
+    private String smallDiscountTiers;
+    private String largeDiscountTiers;
 
     /** 退款开关: 1=允许退款 2=不允许 */
     private Integer refundEnabled;
@@ -43,6 +47,8 @@ public class AdHotInventoryVO {
         private LocalDate bizDate;
         /** 皮肤名称 */
         private String skinName;
+        private String templateKey;
+        private String displayMode;
         /** 皮肤日单价 */
         private BigDecimal price;
         /** 边框方式: none=无边框 color=选择配色 image=上传边框图 */

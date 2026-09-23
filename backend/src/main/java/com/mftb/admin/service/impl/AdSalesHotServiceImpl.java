@@ -4,6 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdHotInventoryVO;
 import com.mftb.admin.dto.AdHotOrderRequest;
+import com.mftb.admin.dto.AdHotQuoteVO;
+import com.mftb.admin.dto.AdDiscountTier;
+import com.mftb.admin.entity.BizMerchantGroup;
+import com.mftb.admin.mapper.BizMerchantGroupMapper;
+import com.mftb.admin.service.DataScopeService;
+import com.mftb.admin.util.HotDiscountPolicy;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.entity.AdOrder;
@@ -54,12 +60,15 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     private final AdOrderSupport orderSupport;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final BizMerchantGroupMapper groupMapper;
+    private final DataScopeService dataScopeService;
 
     /* ==================== 库存查询 ==================== */
 
     @Override
     public AdHotInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
         AdPricingHotVO pricing = requireActivePricing(algoId);
+        if (StringUtils.hasText(groupCode)) requireGroupAccess(groupCode);
         if (pricing.getSkins().isEmpty()) {
             throw new BusinessException("該算法未配置皮膚計價");
         }
@@ -76,12 +85,18 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         vo.setPresaleDays(pricing.getPresaleDays());
         vo.setGiftCashValue(pricing.getGiftCashValue());
         vo.setDiscountTiers(pricing.getDiscountTiers());
+        vo.setDiscountEnabled(pricing.getDiscountEnabled());
+        vo.setDiscountMode(pricing.getDiscountMode());
+        vo.setSmallDiscountTiers(pricing.getSmallDiscountTiers());
+        vo.setLargeDiscountTiers(pricing.getLargeDiscountTiers());
         vo.setRefundEnabled(pricing.getRefundEnabled());
         for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
             for (AdPricingHotVO.SkinPriceItem skin : pricing.getSkins()) {
                 AdHotInventoryVO.Cell cell = new AdHotInventoryVO.Cell();
                 cell.setBizDate(date);
                 cell.setSkinName(skin.getSkinName());
+                cell.setTemplateKey(skin.getTemplateKey());
+                cell.setDisplayMode(skin.getDisplayMode());
                 cell.setPrice(skin.getPrice());
                 cell.setBorderType(skin.getBorderType());
                 cell.setBorderColor(skin.getBorderColor());
@@ -106,68 +121,21 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdOrderVO placeOrder(AdHotOrderRequest request) {
-        AdPricingHotVO pricing = requireActivePricing(request.getAlgoId());
-        if (pricing.getSkins().isEmpty()) {
-            throw new BusinessException("該算法未配置皮膚計價");
-        }
-        // 解耦算法库：品牌/频道/名称均从定价记录获取
+        PreparedOrder prepared = prepareOrder(request);
+        AdPricingHotVO pricing = prepared.pricing();
+        AdHotQuoteVO quote = prepared.quote();
+        BizStore store = prepared.store();
         String brand = pricing.getBrand();
         Integer channel = pricing.getChannel();
-        // 屏蔽商家拦截
-        requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
-
-        // 2. 格子去重 + 窗口/皮肤定价校验
-        LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
-        LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Map<String, BigDecimal> skinPrice = new LinkedHashMap<>();
-        for (AdPricingHotVO.SkinPriceItem skin : pricing.getSkins()) {
-            skinPrice.put(skin.getSkinName(), skin.getPrice());
-        }
-        Set<String> requestKeys = new HashSet<>();
-        for (AdHotOrderRequest.CellSelection cell : request.getCells()) {
-            if (cell.getBizDate() == null || !StringUtils.hasText(cell.getSkinName())) {
-                throw new BusinessException("格子信息不完整");
-            }
-            if (cell.getBizDate().isBefore(today) || cell.getBizDate().isAfter(endDate)) {
-                throw new BusinessException("購買日期超出預售窗口(" + today + " ~ " + endDate + ")");
-            }
-            if (!skinPrice.containsKey(cell.getSkinName())) {
-                throw new BusinessException("皮膚未配置計價: " + cell.getSkinName());
-            }
-            if (!requestKeys.add(cellKey(cell.getBizDate(), cell.getSkinName()))) {
-                throw new BusinessException("選購格子重複（同一皮膚同一日期只能購買一次）");
-            }
-        }
-
-        // 3. 重复购买校验: 同商家已购买的「皮肤x日期」不能重复购买（退款释放后可再购）
-        Set<String> purchased = purchasedCells(request.getAlgoId(), request.getGroupCode(), today, endDate);
-        for (String key : requestKeys) {
-            if (purchased.contains(key)) {
-                throw new BusinessException("該皮膚在所選日期已購買，不能重複購買");
-            }
-        }
-
-        // 4. 计价: 皮肤日单价合计 → 按购买格子数匹配梯度折扣
-        BigDecimal originalTotal = BigDecimal.ZERO;
-        Map<String, BigDecimal> cellPriceMap = new LinkedHashMap<>();
-        for (AdHotOrderRequest.CellSelection cell : request.getCells()) {
-            BigDecimal price = AdCalcUtils.round2(skinPrice.get(cell.getSkinName()));
-            String key = cellKey(cell.getBizDate(), cell.getSkinName());
-            cellPriceMap.put(key, price);
-            originalTotal = originalTotal.add(price);
-        }
-        BigDecimal discountPercent = AdCalcUtils.matchDiscountTier(pricing.getDiscountTiers(), "minDays", request.getCells().size());
-        BigDecimal discountedTotal = AdCalcUtils.round2(originalTotal.multiply(discountPercent)
-                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
-
-        // 5. 赠送天数抵扣: 按折后日均价折算，封顶折后总额（赠送部分不走推广金，退款不返还）
-        int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
-        BizStore store = orderSupport.findStore(request.getStoreCode());
-        BigDecimal giftDeduction = orderSupport.calcGiftDeduction(GIFT_AD_TYPE, store, giftDays,
-                request.getCells().size(), discountedTotal);
-        BigDecimal actualTotal = discountedTotal.subtract(giftDeduction);
+        BigDecimal originalTotal = quote.originalAmount();
+        BigDecimal actualTotal = quote.actualAmount();
+        BigDecimal giftDeduction = quote.giftAmount();
+        int giftDays = quote.giftDays();
         BigDecimal discountAmount = originalTotal.subtract(actualTotal);
+        if (request.getExpectedAmount() != null && request.getExpectedAmount().compareTo(actualTotal) != 0) {
+            throw new BusinessException("報價已變更，請重新確認付款金額");
+        }
 
         // 6. 推广金账户校验 + 余额校验（仅实际需要推广金时才检查账户状态）
         orderSupport.requireSufficientBalance(request.getGroupCode(), brand, actualTotal);
@@ -207,28 +175,16 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         orderMapper.insert(order);
 
         // 明细实付按折后价等比分摊（尾差修正保证合计 = 实付，退款只退推广金部分）
-        BigDecimal allocated = BigDecimal.ZERO;
         List<AdHotOrderRequest.CellSelection> cells = request.getCells();
         for (int i = 0; i < cells.size(); i++) {
             AdHotOrderRequest.CellSelection cell = cells.get(i);
-            String key = cellKey(cell.getBizDate(), cell.getSkinName());
-            BigDecimal salePrice;
-            if (i == cells.size() - 1) {
-                salePrice = actualTotal.subtract(allocated);
-            } else {
-                salePrice = discountedTotal.signum() == 0 ? BigDecimal.ZERO
-                        : AdCalcUtils.round2(cellPriceMap.get(key).multiply(discountPercent)
-                                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP)
-                                .multiply(actualTotal)
-                                .divide(discountedTotal, RoundingMode.HALF_UP));
-                allocated = allocated.add(salePrice);
-            }
+            BigDecimal salePrice = allocateDailyAmount(actualTotal, cells.size(), i);
             AdOrderItemHot item = new AdOrderItemHot();
             item.setOrderId(order.getId());
             item.setOrderNo(orderNo);
             item.setBizDate(cell.getBizDate());
             item.setSkinName(cell.getSkinName());
-            item.setOriginalPrice(cellPriceMap.get(key));
+            item.setOriginalPrice(quote.unitPrice());
             item.setSalePrice(salePrice);
             item.setRefundPrice(BigDecimal.ZERO);
             item.setDeliveryStatus(1);
@@ -246,6 +202,80 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         orderSupport.writeAdConsume(order, request.getGroupCode(), brand, finChannel,
                 actualTotal, changeType, request.getBdEmpId(), now);
         return AdOrderVO.from(order);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdHotQuoteVO quote(AdHotOrderRequest request) {
+        return prepareOrder(request).quote();
+    }
+
+    private record PreparedOrder(AdPricingHotVO pricing, BizStore store, AdHotQuoteVO quote) { }
+
+    /** 报价和下单唯一的校验、计价入口，无写操作。 */
+    private PreparedOrder prepareOrder(AdHotOrderRequest request) {
+        if (request == null || request.getAlgoId() == null || !StringUtils.hasText(request.getGroupCode())
+                || request.getCells() == null || request.getCells().isEmpty()) throw new BusinessException("訂單信息不完整");
+        Set<String> names = new HashSet<>();
+        Set<LocalDate> dates = new HashSet<>();
+        for (AdHotOrderRequest.CellSelection cell : request.getCells()) {
+            if (cell == null || cell.getBizDate() == null || !StringUtils.hasText(cell.getSkinName())) throw new BusinessException("格子信息不完整");
+            names.add(cell.getSkinName());
+            if (names.size() > 1) throw new BusinessException("一張訂單只能購買一套皮膚，不能混購");
+            if (!dates.add(cell.getBizDate())) throw new BusinessException("同一皮膚的購買日期不能重複");
+        }
+        requireGroupAccess(request.getGroupCode());
+        AdPricingHotVO pricing = requireActivePricing(request.getAlgoId());
+        BizMerchantGroup group = groupMapper.selectOne(new LambdaQueryWrapper<BizMerchantGroup>()
+                .eq(BizMerchantGroup::getGroupCode, request.getGroupCode()).last("LIMIT 1"));
+        if (group == null) throw new BusinessException("商家集團不存在");
+        BizStore store = orderSupport.findStore(request.getStoreCode());
+        if (StringUtils.hasText(request.getStoreCode()) && (store == null || !group.getId().equals(store.getGroupId()))) {
+            throw new BusinessException("門店與商家集團不匹配");
+        }
+        if (store != null && StringUtils.hasText(store.getBrand()) && StringUtils.hasText(pricing.getBrand())
+                && java.util.Arrays.stream(store.getBrand().split(",")).map(String::trim).noneMatch(pricing.getBrand()::equals)) {
+            throw new BusinessException("門店與定價品牌不匹配");
+        }
+        requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
+        if (dates.stream().anyMatch(date -> date.isBefore(today) || date.isAfter(endDate))) {
+            throw new BusinessException("購買日期超出預售窗口(" + today + " ~ " + endDate + ")");
+        }
+        String skinName = names.iterator().next();
+        AdPricingHotVO.SkinPriceItem skin = pricing.getSkins().stream().filter(s -> skinName.equals(s.getSkinName()))
+                .findFirst().orElseThrow(() -> new BusinessException("皮膚未配置計價"));
+        if (skin.getPrice() == null || skin.getPrice().signum() <= 0) throw new BusinessException("皮膚售價無效");
+        Set<String> purchased = purchasedCells(request.getAlgoId(), request.getGroupCode(), today, endDate);
+        if (dates.stream().anyMatch(date -> purchased.contains(cellKey(date, skinName)))) {
+            throw new BusinessException("該皮膚在所選日期已購買，不能重複購買");
+        }
+        HotDiscountPolicy.Effective effective = HotDiscountPolicy.resolve(pricing, skin);
+        AdDiscountTier matched = effective.match(dates.size());
+        BigDecimal percent = matched == null ? BigDecimal.valueOf(100) : matched.discount();
+        BigDecimal unitPrice = AdCalcUtils.round2(skin.getPrice());
+        BigDecimal original = unitPrice.multiply(BigDecimal.valueOf(dates.size()));
+        BigDecimal discounted = original.multiply(percent).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        int giftDays = request.getGiftDays() == null ? 0 : request.getGiftDays();
+        if (giftDays < 0 || giftDays > dates.size()) throw new BusinessException("贈送抵扣天數無效");
+        BigDecimal gift = orderSupport.calcGiftDeduction(GIFT_AD_TYPE, store, giftDays, dates.size(), discounted);
+        AdHotQuoteVO quote = new AdHotQuoteVO(pricing.getId(), skinName, skin.getDisplayMode(), dates.size(),
+                effective.source(), matched == null ? null : matched.minDays().intValueExact(), percent,
+                unitPrice, original, discounted, giftDays, gift, discounted.subtract(gift));
+        return new PreparedOrder(pricing, store, quote);
+    }
+
+    private void requireGroupAccess(String groupCode) {
+        Set<String> authorized = dataScopeService.resolveAuthorizedGroupCodes();
+        if (authorized != null && !authorized.contains(groupCode)) throw new BusinessException("無權訪問該商家集團");
+    }
+
+    /** 分摊到分，余数分配给前几天，避免小额订单尾差出现负数。 */
+    static BigDecimal allocateDailyAmount(BigDecimal total, int count, int index) {
+        BigDecimal base = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.DOWN);
+        int remainder = total.subtract(base.multiply(BigDecimal.valueOf(count))).movePointRight(2).intValueExact();
+        return index < remainder ? base.add(new BigDecimal("0.01")) : base;
     }
 
     /* ==================== 内部方法 ==================== */

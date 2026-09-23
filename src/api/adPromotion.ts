@@ -668,9 +668,23 @@ export function placeAdNewStoreOrder(data: AdNewStoreOrderRequest) {
 
 /* ==================== 銷售定價（人氣商家計價） ==================== */
 
+export type HotDiscountMode = 'shared' | 'independent'
+export type HotDisplayMode = 'small' | 'large'
+
+/** 折扣接口统一使用百分比：80 表示8折。 */
+export interface AdDiscountTier { minDays: number; discount: number }
+export interface HotDiscountFields {
+  discountEnabled?: boolean | null
+  discountMode?: HotDiscountMode | null
+  smallDiscountTiers?: string | null
+  largeDiscountTiers?: string | null
+}
+
 /** 人氣商家皮膚計價條目（與後端 SkinPriceItem 對齊） */
 export interface AdHotSkinPrice {
   id?: number
+  templateKey?: string | null
+  displayMode?: HotDisplayMode | null
   /** 皮膚名稱 */
   skinName: string
   /** 皮膚日單價（MOP） */
@@ -690,7 +704,7 @@ export interface AdHotSkinPrice {
 }
 
 /** 人氣商家計價配置（與後端 AdPricingHotVO 對齊） */
-export interface AdPricingHot {
+export interface AdPricingHot extends HotDiscountFields {
   id?: number
   /** 定價編號（按編號生成規則 config_pricing_hot 生成，如 DJRQ20260812000） */
   pricingNo?: string
@@ -733,7 +747,11 @@ export interface AdPricingHotRequest {
   giftCashValue?: number
   refundEnabled?: number
   /** 多格梯度折扣: [{"minDays":3,"discount":95}] */
-  discountTiers?: Record<string, unknown>[]
+  discountTiers?: AdDiscountTier[]
+  discountEnabled?: boolean
+  discountMode?: HotDiscountMode
+  smallDiscountTiers?: AdDiscountTier[] | null
+  largeDiscountTiers?: AdDiscountTier[] | null
   /** 取消扣費梯度: [{"remainDays":0,"ratio":100}] */
   cancelFeeTiers?: Record<string, unknown>[]
   blockMerchant?: number
@@ -792,6 +810,8 @@ export function deleteAdHotPricing(id: number) {
 
 /** 人氣商家可售格子（皮膚 x 日期） */
 export interface AdHotInventoryCell {
+  templateKey?: string | null
+  displayMode?: HotDisplayMode | null
   /** 投放日期 YYYY-MM-DD */
   bizDate: string
   /** 皮膚名稱 */
@@ -815,7 +835,7 @@ export interface AdHotInventoryCell {
 }
 
 /** 人氣商家庫存查詢結果 */
-export interface AdHotInventoryVO {
+export interface AdHotInventoryVO extends HotDiscountFields {
   algoId: number
   presaleDays: number
   /** 贈送天數每日現金價值（MOP），從定價配置穿透 */
@@ -836,6 +856,7 @@ export function fetchAdHotInventory(algoId: number, storeCode?: string, groupCod
 
 /** 人氣商家下單請求（從推廣金賬戶扣款） */
 export interface AdHotOrderRequest {
+  expectedAmount?: number
   algoId: number
   groupCode: string
   storeCode?: string
@@ -845,6 +866,27 @@ export interface AdHotOrderRequest {
   giftDays?: number
   /** 選購的格子列表（皮膚 x 日期） */
   cells: { bizDate: string; skinName: string }[]
+}
+
+export interface AdHotQuote {
+  pricingId: number
+  skinName: string
+  displayMode?: HotDisplayMode | null
+  days: number
+  discountSource: 'none' | 'shared' | HotDisplayMode
+  matchedMinDays: number | null
+  discountPercent: number
+  unitPrice: number
+  originalAmount: number
+  discountedAmount: number
+  giftDays: number
+  giftAmount: number
+  actualAmount: number
+}
+
+/** 只读试算，取消过期请求不影响订单与余额。 */
+export function fetchAdHotQuote(data: AdHotOrderRequest, signal?: AbortSignal) {
+  return request.post<unknown, AdHotQuote>('/ad/sales/hot/quote', data, { ...SILENT, signal })
 }
 
 /** 提交人氣商家訂單並從推廣金賬戶扣款 */
