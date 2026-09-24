@@ -71,29 +71,40 @@ public class AuthController {
     /** 登出 */
     @PostMapping("/logout")
     public Result<Void> logout(HttpServletRequest request) {
-        // 记录主动退出
+        // 提取 username + token，同时完成：
+        //  1. 服务端撤销会话（清 active_token，旧 JWT 下次请求直接 401）
+        //  2. 写登出日志（与旧行为一致，不阻断主流程）
+        String username = null;
+        String presentingToken = null;
+        String header = request.getHeader("Authorization");
+        if (header != null && header.startsWith("Bearer ")) {
+            presentingToken = header.substring(7);
+        }
         try {
-            String username = null;
-            // 优先从 SecurityContext 获取用户名
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.getName() != null
                     && !"anonymousUser".equals(authentication.getName())) {
                 username = authentication.getName();
             }
-            // Fallback: 直接从 JWT Token 解析用户名（防止 Filter 未设置 SecurityContext 的情况）
-            if (username == null) {
-                String header = request.getHeader("Authorization");
-                if (header != null && header.startsWith("Bearer ")) {
-                    String token = header.substring(7);
-                    username = jwtUtil.getUsername(token);
-                }
+        } catch (Exception ignore) { /* SecurityContext 不可用时回退 JWT 解析 */ }
+        if (username == null && presentingToken != null) {
+            username = jwtUtil.getUsername(presentingToken);
+        }
+        // 1. 服务端撤销：失败不阻断日志写入，也不影响前端本地登出
+        if (username != null && presentingToken != null) {
+            try {
+                authService.revokeActiveToken(username, presentingToken);
+            } catch (Exception e) {
+                log.warn("服务端撤销会话失败: {}", e.getMessage());
             }
-            if (username != null) {
+        }
+        // 2. 登出日志
+        if (username != null) {
+            try {
                 loginLogService.recordLogout(username);
+            } catch (Exception e) {
+                log.warn("记录登出日志失败: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            // 日志记录失败不影响登出流程
-            log.warn("记录登出日志失败: {}", e.getMessage());
         }
         return Result.success();
     }

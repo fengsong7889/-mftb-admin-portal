@@ -75,6 +75,17 @@ export interface EmployeeQuery {
   size: number
   keyword?: string
   employmentStatus?: string
+  /** 部门ID（后端含子孙部门） */
+  departmentId?: number | null
+  sequence?: string
+  jobLevel?: string
+  rank?: string
+  /** 功能角色ID */
+  roleId?: number | null
+  updatedBy?: string
+  /** 最后更新时间范围（yyyy-MM-dd） */
+  updatedAtFrom?: string
+  updatedAtTo?: string
 }
 
 /** 分页结果 */
@@ -86,6 +97,11 @@ export interface PageResult<T> {
 /** 分页查询员工 */
 export async function fetchEmployees(params: EmployeeQuery) {
   return request.get<unknown, PageResult<EmployeeItem>>('/employees', { params })
+}
+
+/** 按 ID 查询单个员工详情（含派生在职状态） */
+export function fetchEmployee(id: number) {
+  return request.get<unknown, EmployeeItem>(`/employees/${id}`)
 }
 
 /** 员工搜索下拉选项（选项值为工号，仅在职状态；门店绑定BD选择员工用，附带部门/职位/职级信息） */
@@ -136,6 +152,11 @@ export interface BasicInfoResponse {
 /** 获取员工基础信息 */
 export function fetchBasicInfo(employeeId: number) {
   return request.get<unknown, BasicInfoResponse>(`/employees/${employeeId}/basic-info`)
+}
+
+/** 明文查看证件号/住址（P1-D 受控：需 employee-management:edit，服务端留痕） */
+export function fetchBasicInfoSensitive(employeeId: number) {
+  return request.get<unknown, BasicInfoResponse>(`/employees/${employeeId}/basic-info/sensitive`)
 }
 
 /** 保存个人信息 */
@@ -389,4 +410,90 @@ export function fetchSalaryConfig(employeeId: number) {
 /** 保存费用信息-薪资配置（存在则更新，不存在则新建） */
 export function saveSalaryConfig(employeeId: number, data: SalaryConfigPayload) {
   return request.put<unknown, SalaryConfigItem>(`/employees/${employeeId}/salary/config`, data)
+}
+
+// ── 合同台账 (P1-B) ──
+
+/** 合同记录（后端返回） */
+export interface ContractItem {
+  id: number
+  userId?: number
+  contractNo: string
+  contractType?: string
+  company?: string
+  startDate?: string
+  endDate?: string
+  signDate?: string
+  status?: string
+  remark?: string
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+/** 合同新增/编辑请求 */
+export interface ContractPayload {
+  contractNo: string
+  contractType?: string
+  company?: string
+  startDate?: string
+  endDate?: string
+  signDate?: string
+  status?: string
+  remark?: string
+}
+
+/** 获取员工合同列表 */
+export function fetchContracts(employeeId: number) {
+  return request.get<unknown, ContractItem[]>(`/employees/${employeeId}/contracts`)
+}
+
+/** 新增合同 */
+export function createContract(employeeId: number, data: ContractPayload) {
+  return request.post<unknown, ContractItem>(`/employees/${employeeId}/contracts`, data)
+}
+
+/** 编辑合同 */
+export function updateContract(employeeId: number, contractId: number, data: ContractPayload) {
+  return request.put<unknown, ContractItem>(`/employees/${employeeId}/contracts/${contractId}`, data)
+}
+
+/** 删除合同 */
+export function deleteContract(employeeId: number, contractId: number) {
+  return request.delete<unknown, void>(`/employees/${employeeId}/contracts/${contractId}`)
+}
+
+/** 合同全局台账行（P1-B） */
+export interface ContractLedgerItem {
+  id: number
+  userId: number
+  empId?: string
+  employeeName?: string
+  department?: string
+  contractNo: string
+  contractType?: string
+  company?: string
+  startDate?: string
+  endDate?: string
+  signDate?: string
+  status?: string
+  remark?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+/** 合同台账分页查询参数 */
+export interface ContractLedgerQuery {
+  page: number
+  size: number
+  keyword?: string
+  company?: string
+  contractType?: string
+  status?: string
+}
+
+/** 合同全局台账分页查询 */
+export function fetchContractLedger(params: ContractLedgerQuery) {
+  return request.get<unknown, PageResult<ContractLedgerItem>>('/contracts', { params })
 }

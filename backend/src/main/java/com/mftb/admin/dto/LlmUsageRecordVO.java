@@ -41,5 +41,11 @@ public class LlmUsageRecordVO {
 
     private String currency;
 
+    /** V0 §B.5：VERIFIED / ESTIMATED / UNKNOWN；前端据此展示可信度标签 */
+    private String verificationStatus;
+
+    /** 关联的网关侧 request_id（服务端计量口径下不为空） */
+    private String requestId;
+
     private LocalDateTime createdAt;
 }

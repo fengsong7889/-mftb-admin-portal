@@ -42,7 +42,7 @@ public class EamAssetController {
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "create")
     public Result<Long> create(@RequestBody EamAssetSaveDTO dto) {
         return Result.success(assetService.create(dto));
     }

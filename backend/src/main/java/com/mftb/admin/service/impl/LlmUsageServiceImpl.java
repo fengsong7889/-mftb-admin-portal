@@ -73,6 +73,7 @@ public class LlmUsageServiceImpl implements LlmUsageService {
         usage.setPromptTokens(request.getPromptTokens());
         usage.setCompletionTokens(request.getCompletionTokens());
         usage.setCachedTokens(Math.max(0, request.getCachedTokens()));
+        usage.setRequestId(request.getRequestId());
 
         ModelPrice price = loadPrices().get(request.getModel());
         if (price != null && price.getInput() != null && price.getOutput() != null) {
@@ -85,11 +86,14 @@ public class LlmUsageServiceImpl implements LlmUsageService {
                     .divide(MILLION, 6, RoundingMode.HALF_UP);
             usage.setCost(cost);
             usage.setCurrency(price.getCurrency() != null ? price.getCurrency() : "");
+            // V0 §B.5：命中单价 → VERIFIED（服务端计量口径）
+            usage.setVerificationStatus("VERIFIED");
         } else {
-            // 无单价配置的模型照常记录用量，费用记 0（币种为空，前端显示 --）
+            // 无单价配置的模型：费用保留 0，但 verification_status=UNKNOWN，前端展示「未知」而非伪装免费
             usage.setCost(BigDecimal.ZERO);
             usage.setCurrency("");
-            log.warn("LLM 用量计价缺少模型 [{}] 的单价配置，费用按 0 记录", request.getModel());
+            usage.setVerificationStatus("UNKNOWN");
+            log.warn("LLM 用量计价缺少模型 [{}] 的单价配置，费用记 0 但标记为 UNKNOWN", request.getModel());
         }
         llmUsageMapper.insert(usage);
     }
@@ -183,6 +187,8 @@ public class LlmUsageServiceImpl implements LlmUsageService {
             vo.setCachedTokens(row.getCachedTokens());
             vo.setCost(row.getCost());
             vo.setCurrency(row.getCurrency());
+            vo.setVerificationStatus(row.getVerificationStatus());
+            vo.setRequestId(row.getRequestId());
             vo.setCreatedAt(row.getCreatedAt());
             return vo;
         }).toList();

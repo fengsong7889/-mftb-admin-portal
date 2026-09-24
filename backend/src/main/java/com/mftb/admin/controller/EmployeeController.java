@@ -17,7 +17,9 @@ import com.mftb.admin.dto.SalaryDeductionRequest;
 import com.mftb.admin.dto.SalaryDeductionVO;
 import com.mftb.admin.dto.SalaryIncomeRequest;
 import com.mftb.admin.dto.SalaryIncomeVO;
+import com.mftb.admin.entity.EmpContract;
 import com.mftb.admin.service.EmergencyContactService;
+import com.mftb.admin.service.EmployeeContractService;
 import com.mftb.admin.service.EmployeeSalaryService;
 import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.service.PositionRecordService;
@@ -48,6 +50,7 @@ public class EmployeeController {
     private final EmergencyContactService emergencyContactService;
     private final PositionRecordService positionRecordService;
     private final EmployeeSalaryService employeeSalaryService;
+    private final EmployeeContractService employeeContractService;
 
     /** 分页查询员工 */
     @GetMapping
@@ -56,8 +59,24 @@ public class EmployeeController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String employmentStatus) {
-        return Result.success(employeeService.list(page, size, keyword, employmentStatus));
+            @RequestParam(required = false) String employmentStatus,
+            @RequestParam(required = false) Long departmentId,
+            @RequestParam(required = false) String sequence,
+            @RequestParam(required = false) String jobLevel,
+            @RequestParam(required = false) String rank,
+            @RequestParam(required = false) Long roleId,
+            @RequestParam(required = false) String updatedBy,
+            @RequestParam(required = false) String updatedAtFrom,
+            @RequestParam(required = false) String updatedAtTo) {
+        return Result.success(employeeService.list(page, size, keyword, employmentStatus,
+                departmentId, sequence, jobLevel, rank, roleId, updatedBy, updatedAtFrom, updatedAtTo));
+    }
+
+    /** 按 ID 查询单个员工详情（含派生在职状态） */
+    @GetMapping("/{id}")
+    @RequirePermission(menu = "employee-management")
+    public Result<EmployeeVO> getById(@PathVariable Long id) {
+        return Result.success(employeeService.getDetail(id));
     }
 
     /** 新增员工 */
@@ -100,11 +119,18 @@ public class EmployeeController {
 
     // ── 基础信息 ──
 
-    /** 获取基础信息（个人信息 + 证件信息 + 通讯信息 + 账号信息） */
+    /** 获取基础信息（个人信息 + 证件信息 + 通讯信息 + 账号信息），证件/住址默认脱敏 */
     @GetMapping("/{id}/basic-info")
     @RequirePermission(menu = "employee-management")
     public Result<Map<String, Object>> getBasicInfo(@PathVariable Long id) {
-        return Result.success(employeeService.getBasicInfo(id));
+        return Result.success(employeeService.getBasicInfo(id, false));
+    }
+
+    /** 明文查看证件号/住址（P1-D 受控：需 employee-management:edit，服务端留痕） */
+    @GetMapping("/{id}/basic-info/sensitive")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<Map<String, Object>> getBasicInfoSensitive(@PathVariable Long id) {
+        return Result.success(employeeService.getBasicInfo(id, true));
     }
 
     /** 保存个人信息 */
@@ -286,5 +312,37 @@ public class EmployeeController {
     public Result<SalaryConfigVO> saveSalaryConfig(@PathVariable Long id,
                                                     @Valid @RequestBody SalaryConfigRequest request) {
         return Result.success("薪資配置已更新", employeeSalaryService.saveConfig(id, request));
+    }
+
+    // ── 合同台账 (P1-B) ──
+
+    /** 合同列表 */
+    @GetMapping("/{id}/contracts")
+    @RequirePermission(menu = "employee-management")
+    public Result<List<EmpContract>> listContracts(@PathVariable Long id) {
+        return Result.success(employeeContractService.listByUserId(id));
+    }
+
+    /** 新增合同 */
+    @PostMapping("/{id}/contracts")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<EmpContract> createContract(@PathVariable Long id, @RequestBody EmpContract contract) {
+        return Result.success("合同已新增", employeeContractService.create(id, contract));
+    }
+
+    /** 编辑合同 */
+    @PutMapping("/{id}/contracts/{contractId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<EmpContract> updateContract(@PathVariable Long id, @PathVariable Long contractId,
+                                              @RequestBody EmpContract contract) {
+        return Result.success("合同已更新", employeeContractService.update(id, contractId, contract));
+    }
+
+    /** 删除合同 */
+    @DeleteMapping("/{id}/contracts/{contractId}")
+    @RequirePermission(menu = "employee-management", action = "edit")
+    public Result<Void> deleteContract(@PathVariable Long id, @PathVariable Long contractId) {
+        employeeContractService.delete(id, contractId);
+        return Result.success();
     }
 }

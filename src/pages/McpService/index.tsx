@@ -3,6 +3,7 @@ import { Alert, Button, Empty, Input, Modal, Segmented, Steps, Switch, Tabs, Tag
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { fetchMcpTools, installMcpTool, uninstallMcpTool, type McpTool } from '../../api/mcpService'
+import { fetchToolRegistry, type ToolPolicyRow } from '../../api/aiOperationAuth'
 import { TOOL_LEVEL_META, type ToolLevel } from '../../api/mock/aiPlatformMock'
 import { renderMenuIcon } from '../../components/MenuIcon'
 
@@ -18,14 +19,22 @@ type SourceTab = 'builtin' | 'external'
 export default function McpService() {
   const { t } = useTranslation()
 
-  /* ── 數據 ── */
+  /* ── 数据 ── */
   const [tools, setTools] = useState<McpTool[]>([])
+  /** V0 §五：工具与连接器 → 安装状态 + 授权状态分离；本 map 来自 ai_tool_policy */
+  const [policyByKey, setPolicyByKey] = useState<Map<string, ToolPolicyRow>>(new Map())
   const [loading, setLoading] = useState(false)
-
+  
   const load = () => {
     setLoading(true)
-    fetchMcpTools()
-      .then(setTools)
+    Promise.all([
+      fetchMcpTools(),
+      fetchToolRegistry().catch(() => [] as ToolPolicyRow[]),
+    ])
+      .then(([toolList, registry]) => {
+        setTools(toolList)
+        setPolicyByKey(new Map((registry ?? []).map((row) => [row.code, row])))
+      })
       .catch(() => message.error(t('mcpService.loadFailed')))
       .finally(() => setLoading(false))
   }
@@ -137,6 +146,13 @@ export default function McpService() {
                   {t('mcpService.transport_' + (tool.transport === 'local-stdio' ? 'local_stdio' : 'remote_http'))}
                 </Tag>
               )}
+              {/* V0 §五：安装与授权分离；仅展示已安装工具的执行策略状态 */}
+              {tool.installed === 1 && (() => {
+                const policy = policyByKey.get(tool.toolKey)
+                if (!policy) return <Tag color="orange" style={{ borderRadius: 4, marginRight: 0 }}>未授权</Tag>
+                if (policy.status !== 1) return <Tag color="red" style={{ borderRadius: 4, marginRight: 0 }}>已停用</Tag>
+                return <Tag color="green" style={{ borderRadius: 4, marginRight: 0 }}>已放行</Tag>
+              })()}
             </div>
             <div style={{ fontSize: 11, color: '#8C8C8C', fontFamily: 'monospace', marginTop: 2 }}>{tool.toolKey}</div>
           </div>

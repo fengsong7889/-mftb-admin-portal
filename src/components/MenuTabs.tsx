@@ -7,6 +7,8 @@ import { OFFLINE_MENU_LABELS } from '../constants/offlineMenus'
 import { pathToKey } from './Sidebar'
 import { isPathBackendConnected } from '../constants/menuDataSource'
 import { useMenu } from '../contexts/MenuContext'
+import { useAuth } from '../contexts/AuthContext'
+import { ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import './MenuTabs.css'
@@ -314,6 +316,7 @@ export default function MenuTabs() {
   const navigate = useNavigate()
   const { i18n: i18nInstance, t } = useTranslation()
   const { menuTree, status: menuStatus } = useMenu()
+  const { hasMenuPermission } = useAuth()
   const [tabs, setTabs] = useState<MenuTab[]>([HOME_TAB])
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -378,8 +381,17 @@ export default function MenuTabs() {
     return FALLBACK_PATH_NAME[normalized] || normalized.replace(/^\//, '').replace(/-/g, ' ')
   }, [pathNameMap, keyNameMap, t])
 
+  /** 判断路由是否为「受控但当前用户无权限」（与 MenuPermissionGuard 同口径） */
+  const isDeniedRoute = useCallback((pathname: string, search: string): boolean => {
+    const isTransferAsset = pathname === '/asset-detail' && new URLSearchParams(search).get('context') === 'transfer'
+    const menuKey = isTransferAsset ? 'asset-transfer-list' : (ROUTE_MENU_KEY_MAP[pathname] ?? pathToKey[pathname])
+    return !!menuKey && !hasMenuPermission(menuKey)
+  }, [hasMenuPermission])
+
   /** 路由变化时自动添加/激活标签 */
   useEffect(() => {
+    // 无权限的受控路由不创建标签：避免泄漏无权限菜单名称、且点击标签只会反复 403
+    if (isDeniedRoute(location.pathname, location.search)) return
     // location.pathname 不含 query string，需拼接 location.search
     const fullPath = location.pathname + location.search
     const currentTabPath = tabPath(fullPath)
@@ -402,7 +414,17 @@ export default function MenuTabs() {
       const title = getMenuName(currentTabPath)
       return [...prev, { path: currentTabPath, title }]
     })
-  }, [location.pathname, location.search, getMenuName])
+  }, [location.pathname, location.search, getMenuName, isDeniedRoute])
+
+  /** 清理当前用户无权限的标签（含从 localStorage 恢复的越权历史标签），避免菜单名泄漏与反复 403 */
+  useEffect(() => {
+    setTabs((prev) => {
+      const kept = prev.filter((tab) =>
+        tab.path === '/' || !isDeniedRoute(normalizePath(tab.path), tab.path.split('?')[1] ?? ''),
+      )
+      return kept.length === prev.length ? prev : kept
+    })
+  }, [isDeniedRoute])
 
   /** 语言变化时刷新所有标签名称 */
   useEffect(() => {

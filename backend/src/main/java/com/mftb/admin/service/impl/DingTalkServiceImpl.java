@@ -99,6 +99,55 @@ public class DingTalkServiceImpl implements DingTalkService {
         return notificationChannelService.sendTest(channelId);
     }
 
+    /** V0 §八 V0-6：同步执行 text，返回渠道受理状态；与 @Async sendText 共享 body 结构 */
+    @Override
+    public SendOutcome sendTextSync(String scenario, String content, List<String> atMobiles, boolean isAtAll) {
+        SysNotificationChannel channel = resolveChannel(scenario);
+        if (channel == null) return SendOutcome.unknown("channel_not_found");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "text");
+        Map<String, String> text = new HashMap<>();
+        text.put("content", content);
+        body.put("text", text);
+        body.put("at", buildAt(channel, atMobiles, isAtAll));
+        return doPostSync(channel, body);
+    }
+
+    /** V0 §八 V0-6：同步执行 markdown，返回渠道受理状态 */
+    @Override
+    public SendOutcome sendMarkdownSync(String scenario, String title, String text, List<String> atMobiles, boolean isAtAll) {
+        SysNotificationChannel channel = resolveChannel(scenario);
+        if (channel == null) return SendOutcome.unknown("channel_not_found");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "markdown");
+        Map<String, String> md = new HashMap<>();
+        md.put("title", title);
+        md.put("text", text);
+        body.put("markdown", md);
+        body.put("at", buildAt(channel, atMobiles, isAtAll));
+        return doPostSync(channel, body);
+    }
+
+    /** 同步执行 HTTP POST，捕获渠道 errcode；异常不抛，转为 SendOutcome.rejected */
+    @SuppressWarnings("unchecked")
+    private SendOutcome doPostSync(SysNotificationChannel channel, Map<String, Object> body) {
+        String name = channel.getName();
+        try {
+            String url = buildSignedUrl(channel.getWebhookUrl(), channel.getSecret());
+            Map<String, Object> response = restTemplate.postForObject(url, body, Map.class);
+            if (response == null) return SendOutcome.rejected("EMPTY", "钉钉返回空响应", name);
+            Object codeObj = response.get("errcode");
+            String code = codeObj == null ? "0" : String.valueOf(codeObj);
+            String msg = String.valueOf(response.getOrDefault("errmsg", ""));
+            if ("0".equals(code)) return SendOutcome.accepted(name);
+            log.warn("[DingTalk Sync] 渠道 {} 返回 errcode={} errmsg={}", name, code, msg);
+            return SendOutcome.rejected(code, msg, name);
+        } catch (Exception e) {
+            log.error("[DingTalk Sync] 渠道 {} 发送异常: {}", name, e.getMessage());
+            return SendOutcome.rejected("EXCEPTION", e.getClass().getSimpleName() + ": " + e.getMessage(), name);
+        }
+    }
+
     /* ==================== 内部方法 ==================== */
 
     /**

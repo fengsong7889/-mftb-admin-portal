@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, Timeline, TreeSelect, message } from 'antd'
+import { Alert, Button, DatePicker, Empty, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tabs, Timeline, TreeSelect, message } from 'antd'
 import type { TableColumnsType, TabsProps } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -8,17 +8,21 @@ import {
   ArrowLeftOutlined, PlusOutlined, EditOutlined, SaveOutlined,
   UserOutlined, IdcardOutlined, DeleteOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
-import { fetchEmployees, createEmployee, resetEmployeePassword, updateEmployeeStatus, type EmployeeItem, type EmployeePayload,
-  fetchBasicInfo, savePersonalInfo, saveIdInfo, saveContactInfo, saveAccountInfo,
+import { fetchEmployees, fetchEmployee, createEmployee, resetEmployeePassword, updateEmployeeStatus, type EmployeeItem, type EmployeePayload,
+  fetchBasicInfo, fetchBasicInfoSensitive, savePersonalInfo, saveIdInfo, saveContactInfo, saveAccountInfo,
   fetchEmergencyContacts, createEmergencyContact, updateEmergencyContact, deleteEmergencyContact,
   fetchPositionRecords, createPositionRecord, updatePositionRecord, deletePositionRecord,
   fetchSalaryIncomes, createSalaryIncome, updateSalaryIncome, deleteSalaryIncome,
   fetchSalaryDeductions, createSalaryDeduction, updateSalaryDeduction, deleteSalaryDeduction,
   fetchSalaryConfig, saveSalaryConfig,
+  fetchContracts, createContract, updateContract, deleteContract,
   type SalaryIncomeItem, type SalaryDeductionItem, type SalaryConfigItem,
+  type PositionRecordItem, type PositionRecordPayload,
+  type ContractItem, type ContractPayload,
 } from '../../../api/employee'
 import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
 import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
+import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
 import { fetchRoles, type RoleItem } from '../../../api/role'
 import { useAuth } from '../../../contexts/AuthContext'
 import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '../../Permission/types'
@@ -125,6 +129,99 @@ interface RewardPunishRecord {
   remark?: string
 }
 
+/** 职务弹窗表单值（表单字段名；与后端 PositionRecordPayload 通过 buildPositionPayload 显式转换） */
+interface PositionFormValues {
+  effectiveDate?: dayjs.Dayjs | string
+  operation: string
+  reason?: string
+  serviceDept?: string
+  sequence?: string
+  positionLevel?: string
+  rank?: string
+  company?: string
+  employeeCategory?: string
+  workSystem?: string
+  position?: string
+  directSuperior?: string
+  mentor?: string
+  workCountry?: string
+  workCity?: string
+  officeAddress?: string
+  contractLocation?: string
+}
+
+/** 后端职务记录 VO → 前端展示记录（positionName→position, sequenceType→sequence, rankCode→rank） */
+function mapPositionRecord(r: PositionRecordItem): PositionRecord {
+  return {
+    id: r.id,
+    effectiveDate: r.effectiveDate,
+    effectiveSeq: r.effectiveSeq,
+    operation: r.operation,
+    reason: r.reason ?? '',
+    serviceDept: r.serviceDept,
+    position: r.positionName,
+    workCountry: r.workCountry,
+    workCity: r.workCity,
+    officeAddress: r.officeAddress,
+    company: r.company,
+    contractLocation: r.contractLocation,
+    employeeCategory: r.employeeCategory,
+    mentor: r.mentor,
+    workSystem: r.workSystem,
+    sequence: r.sequenceType,
+    positionLevel: r.positionLevel,
+    rank: r.rankCode,
+    directSuperior: r.directSuperior,
+    updatedBy: r.updatedBy,
+    updatedAt: r.updatedAt,
+  }
+}
+
+/** 表单值 → 后端请求（sequence→sequenceType, rank→rankCode, position→positionName），修复直接透传导致的字段丢失 */
+function buildPositionPayload(values: PositionFormValues): PositionRecordPayload {
+  const effectiveDate = values.effectiveDate
+  return {
+    effectiveDate: dayjs.isDayjs(effectiveDate) ? effectiveDate.format('YYYY-MM-DD') : (effectiveDate ?? ''),
+    operation: values.operation,
+    reason: values.reason,
+    serviceDept: values.serviceDept,
+    sequenceType: values.sequence,
+    positionLevel: values.positionLevel,
+    rankCode: values.rank,
+    company: values.company,
+    employeeCategory: values.employeeCategory,
+    workSystem: values.workSystem,
+    positionName: values.position,
+    directSuperior: values.directSuperior,
+    mentor: values.mentor,
+    workCountry: values.workCountry,
+    workCity: values.workCity,
+    officeAddress: values.officeAddress,
+    contractLocation: values.contractLocation,
+  }
+}
+
+/** 合同后端 VO → 前端展示记录 */
+function toContractRecord(c: ContractItem): ContractRecord {
+  return {
+    id: c.id,
+    contractNo: c.contractNo ?? '',
+    contractType: c.contractType ?? '',
+    startDate: c.startDate ?? '',
+    endDate: c.endDate ?? '',
+    signDate: c.signDate ?? '',
+    company: c.company ?? '',
+    status: c.status ?? '',
+    remark: c.remark,
+  }
+}
+
+/** DatePicker(dayjs) 或字符串 → 'YYYY-MM-DD'；空值返回 undefined */
+function toDateStr(v: dayjs.Dayjs | string | undefined): string | undefined {
+  if (!v) return undefined
+  return dayjs.isDayjs(v) ? v.format('YYYY-MM-DD') : v
+}
+
 /** 民族枚举（中国56个民族） */
 const ETHNICITY_OPTIONS = [
   '汉', '蒙古', '回', '藏', '维吾尔', '苗', '彝', '壮', '布依', '朝鲜',
@@ -198,11 +295,25 @@ const RELATIONSHIP_OPTIONS = [
   '连襟', '妯娌', '朋友', '同事', '其他',
 ].map(v => ({ value: v, label: v }))
 
-/** 任职公司枚举（新增表单 / 职务弹窗 / 合同弹窗共用） */
+/** 任职公司枚举（HR 字典 EMPLOYER_COMPANY 不可用时的回退选项） */
 const COMPANY_OPTIONS = [
   { value: '珠海闪蜂科技有限公司', label: '珠海闪蜂科技有限公司' },
   { value: '珠海麦峰科技有限公司', label: '珠海麦峰科技有限公司' },
 ]
+
+/** 人员类别回退选项（HR 字典 EMPLOYEE_CATEGORY 不可用时） */
+const DEFAULT_CATEGORY_OPTIONS = [
+  { value: '正式员工', label: '正式员工' },
+  { value: '实习生', label: '实习生' },
+  { value: '劳务派遣', label: '劳务派遣' },
+  { value: '外包', label: '外包' },
+]
+
+/** 合同类型回退选项（HR 字典 CONTRACT_TYPE 不可用时） */
+const DEFAULT_CONTRACT_TYPE_OPTIONS = ['劳动合同', '劳务合同', '实习协议', '竞业协议'].map(v => ({ value: v, label: v }))
+
+/** 工时制回退选项（HR 字典 WORK_SYSTEM 不可用时） */
+const DEFAULT_WORK_SYSTEM_OPTIONS = ['标准工时制', '综合工时制', '不定时工时制'].map(v => ({ value: v, label: v }))
 
 /** 收入项 - 项目名称枚举 */
 const INCOME_NAME_OPTIONS = [
@@ -257,6 +368,41 @@ export default function EmployeeDetail() {
   const [employee, setEmployee] = useState<EmployeeItem | null>(null)
   const [loading, setLoading] = useState(false)
 
+  /* ── HR 人事字典（雇主法人/人员类别/合同类型/工时制）动态加载，失败回退硬编码 ── */
+  const [hrCompanies, setHrCompanies] = useState<HrDictOption[]>([])
+  const [hrCategories, setHrCategories] = useState<HrDictOption[]>([])
+  const [hrContractTypes, setHrContractTypes] = useState<HrDictOption[]>([])
+  const [hrWorkSystems, setHrWorkSystems] = useState<HrDictOption[]>([])
+  useEffect(() => {
+    fetchHrDictOptions(HR_DICT_TYPE.EMPLOYER_COMPANY).then(setHrCompanies).catch(() => { /* 回退硬编码 */ })
+    fetchHrDictOptions(HR_DICT_TYPE.EMPLOYEE_CATEGORY).then(setHrCategories).catch(() => { /* 回退硬编码 */ })
+    fetchHrDictOptions(HR_DICT_TYPE.CONTRACT_TYPE).then(setHrContractTypes).catch(() => { /* 回退硬编码 */ })
+    fetchHrDictOptions(HR_DICT_TYPE.WORK_SYSTEM).then(setHrWorkSystems).catch(() => { /* 回退硬编码 */ })
+  }, [])
+  /** 任职公司下拉：有字典用字典（存名称，保持既有存储语义），否则回退 COMPANY_OPTIONS */
+  const companyOptions = useMemo(
+    () => (hrCompanies.length ? hrCompanies.map(c => ({ value: c.name, label: c.name })) : COMPANY_OPTIONS),
+    [hrCompanies],
+  )
+  /** 人员类别下拉：同上，回退 DEFAULT_CATEGORY_OPTIONS */
+  const categoryOptions = useMemo(
+    () => (hrCategories.length ? hrCategories.map(c => ({ value: c.name, label: c.name })) : DEFAULT_CATEGORY_OPTIONS),
+    [hrCategories],
+  )
+  /** 合同类型下拉：字典优先，回退硬编码（存名称） */
+  const contractTypeOptions = useMemo(
+    () => (hrContractTypes.length ? hrContractTypes.map(c => ({ value: c.name, label: c.name })) : DEFAULT_CONTRACT_TYPE_OPTIONS),
+    [hrContractTypes],
+  )
+  /** 工时制下拉：字典优先，回退硬编码（存名称） */
+  const workSystemOptions = useMemo(
+    () => (hrWorkSystems.length ? hrWorkSystems.map(c => ({ value: c.name, label: c.name })) : DEFAULT_WORK_SYSTEM_OPTIONS),
+    [hrWorkSystems],
+  )
+  /** 国家/城市 code → 中文显示（兼容历史以中文名存储的行） */
+  const countryLabel = (v?: string) => (!v ? '' : (permCountryOptions.find(c => c.key === v || c.label === v)?.label || v))
+  const cityLabel = (v?: string) => (!v ? '' : (locationOptions.find(c => c.key === v || c.label === v)?.label || v))
+
   /* ── 下拉数据（新增模式） ── */
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   const [positions, setPositions] = useState<PositionItem[]>([])
@@ -266,22 +412,15 @@ export default function EmployeeDetail() {
   const [activeTab, setActiveTab] = useState('position')
 
   /* ── 各 Tab 最后更新追蹤 ── */
-  const { user } = useAuth()
+  const { user, hasPermission } = useAuth()
   const [tabUpdateInfo, setTabUpdateInfo] = useState<Record<string, { updatedBy: string; updatedAt: string }>>({})
 
-  /** 标记某个 Tab 已更新（写入 state + localStorage） */
-  const markTabUpdated = (tabKey: string, empIdStr: string) => {
+  /** 标记某个 Tab 已更新（仅页面内反馈；不再写 localStorage 伪审计，列表统一用服务端 updatedBy/updatedAt） */
+  const markTabUpdated = (tabKey: string, _empIdStr?: string) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const by = user?.name || user?.username || '-'
     const newInfo = { updatedBy: by, updatedAt: now }
     setTabUpdateInfo(prev => ({ ...prev, [tabKey]: newInfo }))
-    // 同步写入 localStorage，供列表页讀取
-    const storageKey = `emp_tab_update_${empIdStr}`
-    try {
-      const existing = JSON.parse(localStorage.getItem(storageKey) || '{}')
-      existing[tabKey] = newInfo
-      localStorage.setItem(storageKey, JSON.stringify(existing))
-    } catch { /* 静默 */ }
   }
 
   /** 渲染 Tab 底部更新資訊条 */
@@ -303,13 +442,14 @@ export default function EmployeeDetail() {
   const [positionRecords, setPositionRecords] = useState<PositionRecord[]>([])
   const [posModalVisible, setPosModalVisible] = useState(false)
   const [editingPos, setEditingPos] = useState<PositionRecord | null>(null)
-  const [posForm] = Form.useForm()
+  const [posForm] = Form.useForm<PositionFormValues>()
   const [allEmployees, setAllEmployees] = useState<EmployeeItem[]>([])
 
-  /** 工龄：根据最早入职日期自动计算 */
+  /** 工龄：根据最早入职日期自动计算（按生效日期取最早一条，不跨日期比较序号） */
   const seniorityText = useMemo(() => {
     if (!positionRecords.length) return null
-    const earliest = positionRecords.reduce((min, r) => r.effectiveSeq < min.effectiveSeq ? r : min)
+    const earliest = positionRecords.reduce((min, r) =>
+      (r.effectiveDate || '').localeCompare(min.effectiveDate || '') < 0 ? r : min)
     const start = dayjs(earliest.effectiveDate)
     if (!start.isValid()) return null
     const now = dayjs()
@@ -406,6 +546,7 @@ export default function EmployeeDetail() {
     emergencyContacts: [],
   })
   const [personalModalVisible, setPersonalModalVisible] = useState(false)
+  const [piiRevealed, setPiiRevealed] = useState(false)
   const [idInfoModalVisible, setIdInfoModalVisible] = useState(false)
   const [contactModalVisible, setContactModalVisible] = useState(false)
   const [emergencyModalVisible, setEmergencyModalVisible] = useState(false)
@@ -451,11 +592,10 @@ export default function EmployeeDetail() {
     if (!empId) return
     let cancelled = false
     setLoading(true)
-    // 无 getById 接口，取较大分页后按 id 匹配
-    fetchEmployees({ page: 1, size: 500 })
-      .then((result) => {
+    // 按 ID 精确获取详情（旧实现拉 500 条再匹配，受后端 200 上限影响会漏人）
+    fetchEmployee(Number(empId))
+      .then((emp) => {
         if (cancelled) return
-        const emp = result.records.find(e => e.id === Number(empId))
         if (emp) {
           setEmployee(emp)
           // 账号管理：登录账号与状态取员工真实数据（修复 mock 写死 MT00001 的显示错误）
@@ -465,8 +605,9 @@ export default function EmployeeDetail() {
             loginPassword: '••••••••',
             status: emp.status === 0 ? 'frozen' : 'normal',
           })
+        } else {
+          message.error(t('employeeDetail.notFound'))
         }
-        else message.error(t('employeeDetail.notFound'))
       })
       .catch(() => { if (!cancelled) message.error(t('employeeDetail.loadFailed')) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -478,6 +619,7 @@ export default function EmployeeDetail() {
   useEffect(() => {
     if (!empId || !isEdit) return
     const numId = Number(empId)
+    setPiiRevealed(false)
     // 基础信息
     fetchBasicInfo(numId).then(res => {
       const p = res.personalInfo || {}
@@ -486,6 +628,7 @@ export default function EmployeeDetail() {
       const a = res.accountInfo || {}
       setBasicInfo(prev => ({
         ...prev,
+        gender: (p.gender as string) ?? '',
         nationality: (p.nationality as string) ?? '',
         ethnicity: (p.ethnicity as string) ?? '',
         birthDate: (p.birthDate as string) ?? '',
@@ -498,6 +641,8 @@ export default function EmployeeDetail() {
         householdType: (idI.householdType as string) ?? '',
         householdLocation: (idI.householdLocation as string) ?? '',
         nativePlace: (idI.nativePlace as string) ?? '',
+        mobile: (c.mobile as string) ?? '',
+        email: (c.email as string) ?? '',
         addressCountry: (c.addressCountry as string) ?? '',
         addressCity: (c.addressCity as string) ?? '',
         addressDetail: (c.addressDetail as string) ?? '',
@@ -510,29 +655,7 @@ export default function EmployeeDetail() {
     }).catch(() => { /* 静默 */ })
     // 职务记录
     fetchPositionRecords(numId).then(list => {
-      setPositionRecords(list.map(r => ({
-        id: r.id,
-        effectiveDate: r.effectiveDate,
-        effectiveSeq: r.effectiveSeq,
-        operation: r.operation,
-        reason: r.reason ?? '',
-        serviceDept: r.serviceDept,
-        position: r.positionName,
-        workCountry: r.workCountry,
-        workCity: r.workCity,
-        officeAddress: r.officeAddress,
-        company: r.company,
-        contractLocation: r.contractLocation,
-        employeeCategory: r.employeeCategory,
-        mentor: r.mentor,
-        workSystem: r.workSystem,
-        sequence: r.sequenceType,
-        positionLevel: r.positionLevel,
-        rank: r.rankCode,
-        directSuperior: r.directSuperior,
-        updatedBy: r.updatedBy,
-        updatedAt: r.updatedAt,
-      })))
+      setPositionRecords(list.map(mapPositionRecord))
     }).catch(() => { /* 静默 */ })
     // 費用信息: 收入項 / 扣除項 / 薪資配置
     fetchSalaryIncomes(numId).then(setSalaryIncome).catch(() => { /* 静默 */ })
@@ -540,6 +663,8 @@ export default function EmployeeDetail() {
     fetchSalaryConfig(numId).then(config => {
       setSalaryConfig(prev => ({ ...prev, ...config }))
     }).catch(() => { /* 静默 */ })
+    // 合同台账 (P1-B)
+    fetchContracts(numId).then(list => setContracts(list.map(toContractRecord))).catch(() => { /* 静默 */ })
   }, [empId, isEdit])
 
   /* ── 加载下拉数据（新增模式）── */
@@ -651,19 +776,19 @@ export default function EmployeeDetail() {
     return [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || ''))[0]?.effectiveDate || ''
   }, [positionRecords])
 
-  /** 当前生效的职务记录：effectiveSeq 最大且生效日期 <= 今天的记录 */
+  /** 当前生效的职务记录：生效日期 <= 今天，按（日期 desc, 同日序号 desc）取最新 */
   const activePosRecord = useMemo(() => {
     const today = dayjs().format('YYYY-MM-DD')
     const eligible = positionRecords
       .filter(r => r.effectiveDate <= today)
-      .sort((a, b) => (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))
+      .sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || '') || (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))
     return eligible[0] ?? null
   }, [positionRecords])
 
-  /** 最新一条记录（effectiveSeq 最大）的操作类型，用于判断是否允许“重新入职” */
+  /** 最新一条记录（按日期+同日序号）的操作类型，用于判断是否允许“重新入职” */
   const latestPosOperation = useMemo(() => {
     if (!positionRecords.length) return ''
-    const latest = [...positionRecords].sort((a, b) => (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))[0]
+    const latest = [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || '') || (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))[0]
     return latest?.operation ?? ''
   }, [positionRecords])
   const canRehire = !latestPosOperation || /离职/.test(latestPosOperation)
@@ -673,6 +798,7 @@ export default function EmployeeDetail() {
     if (!op) return 'default'
     if (/離职|离职/.test(op)) return 'red'
     if (/晉升|晋升/.test(op)) return 'gold'
+    if (/转正/.test(op)) return 'geekblue'
     if (/降职|降职/.test(op)) return 'orange'
     if (/調动|调动/.test(op)) return 'blue'
     if (/入职|入职/.test(op)) return 'green'
@@ -689,66 +815,82 @@ export default function EmployeeDetail() {
   const handleEditPos = (record: PositionRecord) => {
     setEditingPos(record)
     posForm.setFieldsValue({
-      ...record,
       effectiveDate: record.effectiveDate ? dayjs(record.effectiveDate) : undefined,
+      operation: record.operation,
+      reason: record.reason,
+      serviceDept: record.serviceDept,
+      sequence: record.sequence,
+      positionLevel: record.positionLevel,
+      rank: record.rank,
+      company: record.company,
+      employeeCategory: record.employeeCategory,
+      workSystem: record.workSystem,
+      position: record.position,
+      directSuperior: record.directSuperior,
+      mentor: record.mentor,
+      workCountry: record.workCountry,
+      workCity: record.workCity,
+      officeAddress: record.officeAddress,
+      contractLocation: record.contractLocation,
     })
     setPosModalVisible(true)
   }
 
   const handleSavePos = async () => {
     const values = await posForm.validateFields()
-    // DatePicker 返回 dayjs 对象，转为字符串
-    const normalized = {
-      ...values,
-      effectiveDate: values.effectiveDate?.format?.('YYYY-MM-DD') ?? values.effectiveDate,
-    }
+    const payload = buildPositionPayload(values)
     const nowStr = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const curUser = user?.name || user?.username || '-'
     if (empId) {
+      const numId = Number(empId)
       if (editingPos) {
-        const updated = await updatePositionRecord(Number(empId), editingPos.id, normalized)
-        setPositionRecords(prev => prev.map(r =>
-          r.id === editingPos.id ? {
-            ...r, ...normalized,
-            effectiveSeq: updated.effectiveSeq,
-            updatedBy: updated.updatedBy || curUser,
-            updatedAt: updated.updatedAt || nowStr,
-          } : r
-        ))
+        const updated = await updatePositionRecord(numId, editingPos.id, payload)
+        setPositionRecords(prev => prev.map(r => (r.id === editingPos.id ? mapPositionRecord(updated) : r)))
         message.success(t('employeeDetail.posUpdated'))
       } else {
-        const created = await createPositionRecord(Number(empId), normalized)
-        const newRecord: PositionRecord = {
-          ...normalized,
-          id: created.id,
-          effectiveSeq: created.effectiveSeq,
-          position: normalized.positionName,
-          sequence: normalized.sequence,
-          positionLevel: normalized.positionLevel,
-          rank: normalized.rankCode,
-          updatedBy: created.updatedBy || curUser,
-          updatedAt: created.updatedAt || nowStr,
-        }
-        setPositionRecords(prev => [newRecord, ...prev])
-        setSelectedPosId(created.id)
+        const created = await createPositionRecord(numId, payload)
+        const rec = mapPositionRecord(created)
+        setPositionRecords(prev => [rec, ...prev])
+        setSelectedPosId(rec.id)
         message.success(t('employeeDetail.posAdded'))
       }
+      markTabUpdated('position', empId)
     } else {
-      // 无 empId 时仅本地更新
+      // 新增模式（尚无员工 ID）：仅本地预览，不持久化（职务 Tab 在未保存前已禁用，此为兼容分支）
+      const localRecord: PositionRecord = {
+        id: editingPos ? editingPos.id : Date.now(),
+        effectiveDate: payload.effectiveDate,
+        effectiveSeq: editingPos
+          ? (editingPos.effectiveSeq ?? 0) + 1
+          : Math.max(...positionRecords.map(r => r.effectiveSeq ?? 0), -1) + 1,
+        operation: payload.operation,
+        reason: payload.reason ?? '',
+        serviceDept: payload.serviceDept,
+        position: payload.positionName,
+        workCountry: payload.workCountry,
+        workCity: payload.workCity,
+        officeAddress: payload.officeAddress,
+        company: payload.company,
+        contractLocation: payload.contractLocation,
+        employeeCategory: payload.employeeCategory,
+        mentor: payload.mentor,
+        workSystem: payload.workSystem,
+        sequence: payload.sequenceType,
+        positionLevel: payload.positionLevel,
+        rank: payload.rankCode,
+        directSuperior: payload.directSuperior,
+        updatedBy: curUser,
+        updatedAt: nowStr,
+      }
       if (editingPos) {
-        setPositionRecords(prev => prev.map(r =>
-          r.id === editingPos.id ? { ...r, ...normalized, effectiveSeq: (r.effectiveSeq ?? 0) + 1, updatedBy: curUser, updatedAt: nowStr } : r
-        ))
+        setPositionRecords(prev => prev.map(r => (r.id === editingPos.id ? localRecord : r)))
         message.success(t('employeeDetail.posUpdated'))
       } else {
-        const newId = Date.now()
-        const maxSeq = Math.max(...positionRecords.map(r => r.effectiveSeq ?? 0), -1)
-        setPositionRecords(prev => [{ ...normalized, id: newId, effectiveSeq: maxSeq + 1, updatedBy: curUser, updatedAt: nowStr }, ...prev])
-        setSelectedPosId(newId)
+        setPositionRecords(prev => [localRecord, ...prev])
+        setSelectedPosId(localRecord.id)
         message.success(t('employeeDetail.posAdded'))
       }
     }
-    if (empId) markTabUpdated('position', empId)
     setPosModalVisible(false)
   }
 
@@ -983,6 +1125,21 @@ export default function EmployeeDetail() {
     setIdInfoModalVisible(false)
   }
 
+  /** P1-D：受控明文查看证件号/住址（需 edit 权限，服务端留痕） */
+  const handleRevealPII = async () => {
+    if (!empId) return
+    const res = await fetchBasicInfoSensitive(Number(empId))
+    const idI = res.idInfo || {}
+    const c = res.contactInfo || {}
+    setBasicInfo(prev => ({
+      ...prev,
+      idNumber: (idI.idNumber as string) ?? prev.idNumber,
+      idAddress: (idI.idAddress as string) ?? prev.idAddress,
+      addressDetail: (c.addressDetail as string) ?? prev.addressDetail,
+    }))
+    setPiiRevealed(true)
+  }
+
   const handleEditContact = () => {
     contactForm.setFieldsValue({
       mobile: basicInfo.mobile,
@@ -1185,7 +1342,7 @@ export default function EmployeeDetail() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEditContract(record)}>{t('common.edit')}</Button>
-          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteContract()} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+          <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteContract(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
             <Button type="link" size="small" danger>{t('common.delete')}</Button>
           </Popconfirm>
         </Space>
@@ -1201,17 +1358,52 @@ export default function EmployeeDetail() {
 
   const handleEditContract = (record: ContractRecord) => {
     setEditingContract(record)
-    contractForm.setFieldsValue(record)
+    contractForm.setFieldsValue({
+      contractNo: record.contractNo,
+      contractType: record.contractType,
+      company: record.company,
+      status: record.status,
+      remark: record.remark,
+      startDate: record.startDate ? dayjs(record.startDate) : undefined,
+      endDate: record.endDate ? dayjs(record.endDate) : undefined,
+      signDate: record.signDate ? dayjs(record.signDate) : undefined,
+    })
     setContractModalVisible(true)
   }
 
   const handleSaveContract = async () => {
-    message.warning('合同管理尚未接入後端 API')
+    if (!empId) { message.warning('請先保存員工後再維護合同'); return }
+    const values = await contractForm.validateFields()
+    const payload: ContractPayload = {
+      contractNo: (values.contractNo || '').trim(),
+      contractType: values.contractType,
+      company: values.company,
+      startDate: toDateStr(values.startDate),
+      endDate: toDateStr(values.endDate),
+      signDate: toDateStr(values.signDate),
+      status: values.status,
+      remark: values.remark,
+    }
+    const numId = Number(empId)
+    if (editingContract) {
+      await updateContract(numId, editingContract.id, payload)
+      message.success('合同已更新')
+    } else {
+      await createContract(numId, payload)
+      message.success('合同已新增')
+    }
+    const list = await fetchContracts(numId)
+    setContracts(list.map(toContractRecord))
+    markTabUpdated('contract', empId)
     setContractModalVisible(false)
   }
 
-  const handleDeleteContract = () => {
-    message.warning('合同管理尚未接入後端 API')
+  const handleDeleteContract = async (id: number) => {
+    if (!empId) return
+    await deleteContract(Number(empId), id)
+    setContracts(prev => prev.filter(c => c.id !== id))
+    message.success('合同已删除')
+    markTabUpdated('contract', empId)
   }
 
   /* ═══════════════════════════════════════════
@@ -1552,6 +1744,9 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.idInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+            {hasPermission('employee-management:edit') && !piiRevealed && (
+              <Button type="link" size="small" onClick={handleRevealPII}>查看明文</Button>
+            )}
             <Button icon={<EditOutlined />} onClick={handleEditIdInfo}>{t('common.edit')}</Button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
@@ -1603,11 +1798,11 @@ export default function EmployeeDetail() {
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
               <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCountry')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressCountry || '-'}</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{countryLabel(basicInfo.addressCountry) || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
               <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCity')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressCity || '-'}</span>
+              <span style={{ fontSize: 14, color: '#262626' }}>{cityLabel(basicInfo.addressCity) || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gridColumn: 'span 2' }}>
               <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressDetail')}：</span>
@@ -1724,6 +1919,13 @@ export default function EmployeeDetail() {
   function renderRewardTab() {
     return (
       <div>
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="奖惩管理尚未接入后端，暂不支持新增/编辑/删除"
+          description="后端奖惩记录与流程接入后才会开放，此处仅为界面占位，填写的内容不会被保存。"
+        />
         <Table
           columns={rpColumns}
           dataSource={rewardsPunish}
@@ -1732,9 +1934,9 @@ export default function EmployeeDetail() {
           scroll={{ x: 'max-content' }}
           size="middle"
         />
-        {/* Tab 下方操作按鈕 */}
+        {/* Tab 下方操作按鈕（后端未就绪，写操作禁用） */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRp}>{t('employeeDetail.addRp')}</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRp} disabled>{t('employeeDetail.addRp')}</Button>
         </div>
         {renderTabUpdateBar('reward')}
       </div>
@@ -1794,7 +1996,7 @@ export default function EmployeeDetail() {
           {employee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.empIdColon', { empId: employee.empId })}</span>
-              {latestPosOperation === '离职'
+              {employee.employmentStatus === 'resigned'
                 ? <Tag color="default">{t('employee.statusResigned')}</Tag>
                 : <Tag color="success">{t('employee.statusActive')}</Tag>}
             </div>
@@ -1861,7 +2063,7 @@ export default function EmployeeDetail() {
               {/* 在职状态 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.employmentStatus')}：</span>
-                {latestPosOperation === '离职'
+                {employee.employmentStatus === 'resigned'
                   ? <Tag color="default">{t('employee.statusResigned')}</Tag>
                   : <Tag color="success">{t('employee.statusActive')}</Tag>}
               </div>
@@ -1961,7 +2163,7 @@ export default function EmployeeDetail() {
                 />
               </Form.Item>
               <Form.Item name="company" label={t('employeeDetail.colPosCompany')} extra={t('employee.companyExtra')}>
-                <Select placeholder={t('employee.companyPlaceholder')} allowClear options={COMPANY_OPTIONS} />
+                <Select placeholder={t('employee.companyPlaceholder')} allowClear options={companyOptions} />
               </Form.Item>
               <Form.Item name="functionRoleIds" label={t('employee.roleAuthLabel')} extra={t('employee.roleAuthExtra')}>
                 <Select
@@ -2033,6 +2235,7 @@ export default function EmployeeDetail() {
             <Form.Item name="operation" label={t('employeeDetail.colOperation')} rules={[{ required: true, message: t('employeeDetail.operationRequired') }]}>
               <Select options={[
                 { value: '入职', label: '入职' },
+                { value: '转正', label: '转正' },
                 { value: '调动', label: '调动' },
                 { value: '晋升', label: '晋升' },
                 { value: '降职', label: '降职' },
@@ -2081,22 +2284,13 @@ export default function EmployeeDetail() {
           {/* 1.5 任职公司 + 1.6 员工类别 + 1.8 工时制 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="company" label={t('employeeDetail.colPosCompany')}>
-              <Select placeholder={t('employeeDetail.colPosCompany')} allowClear options={COMPANY_OPTIONS} />
+              <Select placeholder={t('employeeDetail.colPosCompany')} allowClear options={companyOptions} />
             </Form.Item>
             <Form.Item name="employeeCategory" label={t('employeeDetail.colEmployeeCategory')}>
-              <Select placeholder={t('employeeDetail.colEmployeeCategory')} allowClear options={[
-                { value: '正式员工', label: '正式员工' },
-                { value: '实习生', label: '实习生' },
-                { value: '劳务派遣', label: '劳务派遣' },
-                { value: '外包', label: '外包' },
-              ]} />
+              <Select placeholder={t('employeeDetail.colEmployeeCategory')} allowClear options={categoryOptions} />
             </Form.Item>
             <Form.Item name="workSystem" label={t('employeeDetail.colWorkSystem')}>
-              <Select placeholder={t('employeeDetail.colWorkSystem')} allowClear options={[
-                { value: '标准工时制', label: '标准工时制' },
-                { value: '综合工时制', label: '综合工时制' },
-                { value: '不定时工时制', label: '不定时工时制' },
-              ]} />
+              <Select placeholder={t('employeeDetail.colWorkSystem')} allowClear options={workSystemOptions} />
             </Form.Item>
           </div>
           {/* 职位 + 1.9 直属上级 + 1.10 导师 */}
@@ -2427,7 +2621,7 @@ export default function EmployeeDetail() {
                 optionFilterProp="label"
                 placeholder={t('employeeDetail.labelAddressCountry')}
                 allowClear
-                options={permCountryOptions.map(c => ({ value: c.label, label: c.label }))}
+                options={permCountryOptions.map(c => ({ value: c.key, label: c.label }))}
               />
             </Form.Item>
             {/* 2.1 住址拆分：城市（联动国家） */}
@@ -2438,7 +2632,7 @@ export default function EmployeeDetail() {
                 placeholder={t('employeeDetail.labelAddressCity')}
                 allowClear
                 disabled={!watchContactCountry}
-                options={contactCityOptions.map(c => ({ value: c.label, label: c.label }))}
+                options={contactCityOptions.map(c => ({ value: c.key, label: c.label }))}
               />
             </Form.Item>
           </div>
@@ -2539,28 +2733,23 @@ export default function EmployeeDetail() {
               <Input placeholder={t('employeeDetail.contractNoPh')} />
             </Form.Item>
             <Form.Item name="contractType" label={t('employeeDetail.colContractType')} rules={[{ required: true }]}>
-              <Select options={[
-                { value: '劳动合同', label: '劳动合同' },
-                { value: '劳务合同', label: '劳务合同' },
-                { value: '实习协议', label: '实习协议' },
-                { value: '竞业协议', label: '竞业协议' },
-              ]} />
+              <Select options={contractTypeOptions} />
             </Form.Item>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="startDate" label={t('employeeDetail.colStartDate')} rules={[{ required: true }]}>
-              <Input placeholder={t('employeeDetail.datePh')} />
+              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
             </Form.Item>
             <Form.Item name="endDate" label={t('employeeDetail.colEndDate')} rules={[{ required: true }]}>
-              <Input placeholder={t('employeeDetail.datePh')} />
+              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
             </Form.Item>
             <Form.Item name="signDate" label={t('employeeDetail.colSignDate')} rules={[{ required: true }]}>
-              <Input placeholder={t('employeeDetail.datePh')} />
+              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
             </Form.Item>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="company" label={t('employeeDetail.colCompany')} rules={[{ required: true }]}>
-              <Select placeholder={t('employeeDetail.colCompany')} allowClear options={COMPANY_OPTIONS} />
+              <Select placeholder={t('employeeDetail.colCompany')} allowClear options={companyOptions} />
             </Form.Item>
             <Form.Item name="status" label={t('common.colStatus')}>
               <Select options={[

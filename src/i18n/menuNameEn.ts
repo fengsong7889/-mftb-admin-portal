@@ -87,6 +87,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'role-management': 'Role Management',
   'function-permission': 'Function Authorization',
   'data-permission': 'Data Authorization',
+  'system-authorization': 'System Authorization',
   // 系統配置
   'system-config': 'System Config',
   'menu-config': 'Menu Config',

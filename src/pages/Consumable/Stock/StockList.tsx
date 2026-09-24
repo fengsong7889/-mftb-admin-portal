@@ -14,6 +14,7 @@ import type { Dayjs } from 'dayjs'
 import { fetchConsumableStock, type ConsumableStock } from '@/api/consumable'
 import { type AssetLocation, fetchLocationList } from '@/api/eam'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
 
 interface Props {
   onInbound: (itemId?: number) => void
@@ -74,6 +75,22 @@ export default function StockList({ onInbound }: Props) {
 
   const handleExport = () => {
     if (rows.length === 0) { message.warning('暫無數據可導出'); return }
+    const cols = [
+      { title: '耗材編碼', dataIndex: 'itemCode' },
+      { title: '名稱', dataIndex: 'itemName' },
+      { title: '規格型號', dataIndex: 'spec', render: (v: string) => v || '-' },
+      { title: '倉庫', dataIndex: 'locationName', render: (v: string) => v || '-' },
+      { title: '實際庫存', dataIndex: 'qty', render: (v: number, r: ConsumableStock) => `${v} ${r.unit ?? ''}` },
+      { title: '審批佔用', dataIndex: 'lockedQty' },
+      { title: '可用庫存', dataIndex: 'availableQty' },
+      { title: '安全庫存', dataIndex: 'safetyStock', render: (v: number) => (v > 0 ? String(v) : '-') },
+      { title: '加權均價', dataIndex: 'avgCost', render: (v?: number) => (v != null ? `MOP ${v.toFixed(2)}` : '-') },
+      { title: '庫存成本', dataIndex: 'totalCost', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+      { title: '狀態', dataIndex: 'alert', render: (v: boolean) => (v ? '預警' : '正常') },
+      { title: '最後更新人', dataIndex: 'updatedBy', render: (v: string) => v || '-' },
+      { title: '最後更新時間', dataIndex: 'updatedAt', render: (v: string) => v || '-' },
+    ]
+    exportToCSV(`consumable_stock_${new Date().toISOString().slice(0, 10)}`, cols, rows)
     message.success('導出成功')
   }
 
@@ -87,8 +104,8 @@ export default function StockList({ onInbound }: Props) {
     { title: '可用庫存', dataIndex: 'availableQty', key: 'availableQty', width: 110, align: 'right',
       render: (v: number, r) => <b style={{ color: r.alert ? '#FF4D4F' : '#262626' }}>{v}</b> },
     { title: '安全庫存', dataIndex: 'safetyStock', key: 'safetyStock', width: 90, align: 'right', render: (v: number) => (v > 0 ? v : '-') },
-    { title: '加權均價', dataIndex: 'avgCost', key: 'avgCost', width: 100, align: 'right', render: (v?: number) => (v != null ? `¥${v.toFixed(2)}` : '-') },
-    { title: '庫存成本', dataIndex: 'totalCost', key: 'totalCost', width: 120, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
+    { title: '加權均價', dataIndex: 'avgCost', key: 'avgCost', width: 100, align: 'right', render: (v?: number) => (v != null ? `MOP ${v.toFixed(2)}` : '-') },
+    { title: '庫存成本', dataIndex: 'totalCost', key: 'totalCost', width: 120, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
     { title: '狀態', key: 'alert', width: 90, render: (_: unknown, r) => (r.alert ? <Tag color="orange">預警</Tag> : <Tag color="green">正常</Tag>) },
     { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 110, ellipsis: true, render: (v: string) => v || '-' },
     { title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 165, render: (v: string) => v || '-' },

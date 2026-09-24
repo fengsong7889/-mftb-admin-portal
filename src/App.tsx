@@ -9,6 +9,7 @@ import { CompanyBrandProvider } from './contexts/CompanyBrandContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
 import MenuTabs from './components/MenuTabs'
+import PortalTopBar from './components/PortalTopBar'
 import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
@@ -19,6 +20,7 @@ import './App.css'
 
 /* 懶加载所有页面组件，避免启动时一次性加载所有模块 */
 const Home = lazy(() => import('./pages/Home'))
+const Portal = lazy(() => import('./pages/Portal'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
 const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
 const TransferAdd = lazy(() => import('./pages/AccountBalance/TransferAdd'))
@@ -59,10 +61,14 @@ const EmployeeManagement = lazy(() => import('./pages/Permission/Employee'))
 const EmployeeDetail = lazy(() => import('./pages/Permission/Employee/EmployeeDetail'))
 const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
+const HrDictManagement = lazy(() => import('./pages/Permission/HrDict'))
+const HrDictForm = lazy(() => import('./pages/Permission/HrDict/HrDictForm'))
+const ContractLedger = lazy(() => import('./pages/Permission/ContractLedger'))
 const LoginLog = lazy(() => import('./pages/LoginLog'))
 const RoleManagement = lazy(() => import('./pages/Permission/RoleManagement'))
 const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
+const SystemAuthorization = lazy(() => import('./pages/Permission/SystemAuthorization'))
 // 商家推广工具
 const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
 const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
@@ -130,7 +136,6 @@ import AiDeptModelAuth from './pages/AiQuotaAuth/QuotaAndPolicy'
 import { AiDeptQuota } from './pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from './pages/AiQuotaAuth/AiEmployeeAuthControl'
 import EmpQuotaList from './pages/AiQuotaAuth/empQuota/EmpQuotaList'
-import AiPositionAuth from './pages/AiQuotaAuth/AiPositionAuth'
 const DeptAuthGroupEdit = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupEdit'))
 const DeptAuthGroupDetail = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupDetail'))
 // 部门额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门模型权控）
@@ -242,6 +247,26 @@ function AuthenticatedLayout() {
     void ensureLanguageBundle(getSavedLanguage())
   }, [])
 
+  // 统一门户 Round 2：/portal 作为应用入口，不注入 Sidebar / MenuTabs，
+  // 避免默认业务菜单遮挡卡片；登录后默认落地。
+  if (location.pathname === '/portal') {
+    return (
+      <Layout className="app-layout app-layout-portal">
+        <Layout>
+          <PortalTopBar />
+          <Content className="app-content app-content-portal">
+            <RouteErrorBoundary key={location.pathname}>
+              <Suspense fallback={<PageLoading />}>
+                <Portal />
+              </Suspense>
+            </RouteErrorBoundary>
+          </Content>
+        </Layout>
+        <VersionUpdateNotification updateAvailable={updateAvailable} />
+      </Layout>
+    )
+  }
+
   return (
     <Layout className="app-layout">
       <Sidebar collapsed={collapsed} />
@@ -254,6 +279,9 @@ function AuthenticatedLayout() {
               <MenuPermissionGuard>
               <Routes>
               <Route path="/" element={<Home />} />
+              {/* 统一门户（阶段 B）：登录默认入口，无侧边栏不属任何业务系统；
+                  实际渲染已提到 AuthenticatedLayout 分支内，此处仅保留占位避免旧链接 fallback 时落入 *“ → 首页”。 */}
+              <Route path="/portal" element={<Portal />} />
               {/* 財務管理 */}
               <Route path="/account-balance" element={<AccountBalance />} />
               <Route path="/consume-risk" element={<ConsumeRisk />} />
@@ -297,10 +325,14 @@ function AuthenticatedLayout() {
               <Route path="/employee-detail" element={<EmployeeDetail />} />
               <Route path="/organization-management" element={<OrganizationManagement />} />
               <Route path="/position-management" element={<PositionManagement />} />
+              <Route path="/hr-dict" element={<HrDictManagement />} />
+              <Route path="/hr-dict-edit" element={<HrDictForm />} />
+              <Route path="/contract-ledger" element={<ContractLedger />} />
               <Route path="/login-log" element={<LoginLog />} />
               <Route path="/role-management" element={<RoleManagement />} />
               <Route path="/function-permission" element={<FunctionPermission />} />
               <Route path="/data-permission" element={<DataPermission />} />
+              <Route path="/system-authorization" element={<SystemAuthorization />} />
               {/* 商戶集團管理 */}
               <Route path="/merchant-group-list" element={<GroupList />} />
               <Route path="/store-list" element={<StoreList />} />
@@ -368,7 +400,9 @@ function AuthenticatedLayout() {
               {/* AI 配額与策略管理 - 子菜单 */}
               <Route path="/ai-dept-model-auth" element={<AiDeptModelAuth />} />
               <Route path="/ai-emp-model-auth" element={<AiEmployeeAuthControl />} />
-              <Route path="/ai-pos-auth" element={<AiPositionAuth />} />
+              {/* V0 §八 V0-6：旧职位权控列表页（基于 mock）已隐藏，历史链接重定向到员工模型权控真实页；
+                  /ai-pos-auth-edit|-detail 仍由 AiEmployeeAuthControl 直接注入，保留不拆 */}
+              <Route path="/ai-pos-auth" element={<Navigate to="/ai-emp-model-auth" replace />} />
               <Route path="/ai-dept-auth-edit" element={<DeptAuthGroupEdit />} />
               <Route path="/ai-dept-auth-detail" element={<DeptAuthGroupDetail />} />
               <Route path="/ai-pos-auth-edit" element={<EmpPosAuthEdit />} />

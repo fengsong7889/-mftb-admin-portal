@@ -6,6 +6,7 @@ import {
   SafetyCertificateOutlined, CalculatorOutlined,
 } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
+import ScoreRow from './AlgorithmForm/ScoreRow'
 import {
   validateCouponIntensityConfig,
   type CouponIntensityConfig, type IntensityTier, type ThresholdCoefficientTier,
@@ -160,8 +161,8 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
 
   return (
     <section aria-label={`${ruleName}優惠配置`}>
-      <div className="algorithm-form__row">
-        <Tag color="orange">報名分＋優惠力度分</Tag>
+      <div className="organic-score-toolbar">
+        <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>報名分＋優惠力度分</Tag>
         <span className="algorithm-form__hint" style={{ margin: 0 }}>
           {isEditing ? '編輯中' : hasDraft ? '當前頁面草稿' : '示例模板'} · 未接入真實排名
         </span>
@@ -177,38 +178,39 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
       {isEditing && validationError && <Alert type="warning" showIcon message={validationError} style={{ marginBottom: 12 }} />}
       {!isEditing ? <>
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info">
-          <span>報名分：{config.enrollmentEnabled ? `+${config.enrollmentScore} 分` : '停用'}</span>
-          <p className="algorithm-form__hint" style={{ marginTop: 8 }}>每門店、每活動類型僅計一次有效報名。</p>
+          <div className="organic-score-panel">
+            <ScoreRow label="報名計分" score={config.enrollmentScore} enabled={config.enrollmentEnabled}
+              control={<Switch size="small" aria-label="報名計分" checked={config.enrollmentEnabled} disabled />}
+              hint="每門店、每活動類型僅計一次有效報名。" />
+          </div>
         </AlgorithmSection>
         <AlgorithmSection title="優惠力度" icon={<ThunderboltOutlined />} tone="strategy"
           extra={<span>{config.intensityEnabled ? `啟用 · 上限 ${config.intensityCap} 分` : '停用'}</span>}>
-          <div className="algorithm-fields">
-            {config.intensityTiers.map((tier, index) => <div key={index}>
-              <span>{intensityRangeLabel(tier, index === config.intensityTiers.length - 1)}</span>
-              <strong style={{ marginLeft: 12, color: '#E8720C' }}>+{tier.score} 分</strong>
-            </div>)}
+          <div className="organic-score-panel organic-score-list">
+            {config.intensityTiers.map((tier, index) => <ScoreRow key={index} index={index}
+              label={intensityRangeLabel(tier, index === config.intensityTiers.length - 1)}
+              score={tier.score} enabled={config.intensityEnabled} />)}
           </div>
         </AlgorithmSection>
         <AlgorithmSection title="門檻保護" icon={<SafetyCertificateOutlined />} tone="advanced">
-          <div className="algorithm-fields">
-            {config.thresholdTiers.map((tier, index) => <div key={index}>
-              <span>{thresholdRangeLabel(config.thresholdTiers, index)}</span>
-              <strong style={{ marginLeft: 12, color: '#722ED1' }}>×{tier.coefficient}</strong>
-            </div>)}
+          <div className="organic-score-panel organic-score-list">
+            {config.thresholdTiers.map((tier, index) => <ScoreRow key={index} index={index}
+              label={thresholdRangeLabel(config.thresholdTiers, index)} score={tier.coefficient}
+              kind="coefficient" enabled={config.intensityEnabled} />)}
           </div>
-          <p className="algorithm-form__hint">缺少可信基準時不計算力度分；完整口徑見「試算與說明」。</p>
+          <p className="organic-score-note">缺少可信基準時不計算力度分；完整口徑見「試算與說明」。</p>
         </AlgorithmSection>
       </> : <>
       {/* 1. 报名计分 */}
       <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>啟用報名分</span>
+        <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="organic-score-edit-row">
+            <span className="organic-score-edit-row__label">啟用報名分</span>
             <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={config.enrollmentEnabled} onChange={v => patch({ enrollmentEnabled: v })} />
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>每門店、每活動類型只給一次報名分，多張券不重複加報名分</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>報名分值</span>
+          <div className="organic-score-edit-row">
+            <span className="organic-score-edit-row__label">報名分值</span>
             <InputNumber aria-label="報名分值" value={config.enrollmentScore} min={0} max={100} disabled={!config.enrollmentEnabled}
               onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
           </div>
@@ -221,9 +223,9 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
       {/* 2. 优惠力度 */}
       <AlgorithmSection title="優惠力度" icon={<ThunderboltOutlined />} tone="strategy"
         extra={<span style={{ fontSize: 12, color: '#8C8C8C' }}>R = 有效抵扣額 / 參考消費額，單檔命中不累加</span>}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>啟用力度分</span>
+        <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="organic-score-edit-row">
+            <span className="organic-score-edit-row__label">啟用力度分</span>
             <Switch aria-label="啟用力度分" checkedChildren="啟用" unCheckedChildren="停用" checked={config.intensityEnabled} onChange={v => patch({ intensityEnabled: v })} />
           </div>
           <div>
@@ -231,7 +233,7 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
               <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>優惠比例檔位</span>
               <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addIntensityTier} disabled={!config.intensityEnabled} style={{ color: '#E8720C' }}>添加比例檔位</Button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="organic-score-edit-table"><div className="organic-score-edit-table__content" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 120px 40px', gap: 12, fontSize: 12, color: '#8C8C8C' }}>
                 <span>下界（含，%）</span><span>上界（末檔含 100%）</span><span>力度基礎分</span><span>區間預覽</span><span />
               </div>
@@ -247,10 +249,10 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
                   </div>
                 )
               })}
-            </div>
+            </div></div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>力度分上限</span>
+          <div className="organic-score-edit-row">
+            <span className="organic-score-edit-row__label">力度分上限</span>
             <InputNumber aria-label="力度分上限" value={config.intensityCap} min={0} max={1000} disabled={!config.intensityEnabled} onChange={v => patch({ intensityCap: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
             <Tooltip title="對單項力度分封頂，避免優惠分壓過餐點質量與履約表現">
               <QuestionCircleOutlined style={{ color: '#8C8C8C' }} />
@@ -262,7 +264,7 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
       {/* 3. 门槛保护 */}
       <AlgorithmSection title="門檻保護" icon={<SafetyCertificateOutlined />} tone="advanced"
         extra={<span style={{ fontSize: 12, color: '#8C8C8C' }}>M = 使用門檻 / 基準客單價，單檔命中不累加</span>}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ fontSize: 12, color: '#595959', lineHeight: '20px', background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 6, padding: '10px 12px' }}>
             <div style={{ fontWeight: 600, color: '#262626', marginBottom: 4 }}>基準口徑（統一，五項共用）</div>
             {config.benchmarkDescription}
@@ -279,7 +281,7 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
               {config.thresholdTiers.map((t, i) => {
                 const isInfinite = t.maxMultiplier === Infinity
                 return (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 40px', gap: 12, alignItems: 'center' }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 40px', gap: 12, alignItems: 'center' }}>
                     {isInfinite
                       ? <Tag color="default" style={{ margin: 0, height: 32, lineHeight: '30px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>不限（兜底檔）</Tag>
                       : <InputNumber aria-label={`第 ${i + 1} 檔門檻倍數上界`} disabled={!config.intensityEnabled} value={t.maxMultiplier} min={0.01} step={0.5} onChange={v => updateThresholdTier(i, { maxMultiplier: v ?? 0 })} style={{ width: '100%' }} addonAfter="倍" />}
@@ -296,7 +298,7 @@ export default function CouponIntensityPanel({ ruleName, config, editing, readOn
         </div>
       </AlgorithmSection>
 
-      <div className="algorithm-form__row" style={{ justifyContent: 'flex-end', marginBottom: 0 }}>
+      <div className="organic-score-edit-actions">
         <span className="algorithm-form__hint" style={{ margin: 0 }}>僅保存當前頁面草稿</span>
         <Button size="small" onClick={onCancel}>取消</Button>
         <Button size="small" type="primary" icon={<SaveOutlined aria-hidden="true" />} onClick={handleSave}>保存</Button>

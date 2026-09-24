@@ -13,8 +13,8 @@ import {
   mergeServerToStrategies, mergeLocalToStrategies, listLocalStrategies,
   getLocalStrategy, upsertLocalStrategy, removeLocalStrategy, removeExtension,
 } from '../waterfallConfig/waterfallExtStore'
-import type { WaterfallListView, WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns } from '../waterfallConfig/types'
-import { CONTENT_TYPE_LABEL_KEY, BUSINESS_TYPE_LABEL_KEY } from '../waterfallConfig/types'
+import type { WaterfallListView, WaterfallBusinessType, WaterfallBizChannel } from '../waterfallConfig/types'
+import { BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS } from '../waterfallConfig/types'
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
@@ -72,7 +72,7 @@ export default function PromotionSlotConfig() {
   const filtered = useMemo(() => {
     const v = searchValues as {
       strategyCode?: string; strategyName?: string; brand?: string
-      status?: number; contentType?: WaterfallContentType; layoutColumns?: WaterfallLayoutColumns
+      status?: number; bizChannel?: WaterfallBizChannel
     }
     return allMerged.filter(item => {
       if (item.businessType !== activeBiz) return false
@@ -80,8 +80,7 @@ export default function PromotionSlotConfig() {
       if (v.strategyName && !item.strategyName.toLowerCase().includes(String(v.strategyName).toLowerCase())) return false
       if (v.brand && item.brand !== v.brand) return false
       if (v.status && item.status !== v.status) return false
-      if (v.contentType && item.contentType !== v.contentType) return false
-      if (v.layoutColumns && item.layoutColumns !== v.layoutColumns) return false
+      if (v.bizChannel && item.bizChannel !== v.bizChannel) return false
       return true
     })
   }, [allMerged, activeBiz, searchValues])
@@ -143,8 +142,7 @@ export default function PromotionSlotConfig() {
   const columnMeta = useMemo(() => [
     { key: 'strategyCode', title: t('promotionSlotConfig.colConfigId') },
     { key: 'strategyName', title: t('promotionSlotConfig.colWaterfallName') },
-    { key: 'contentType', title: t('promotionSlotConfig.colContentType') },
-    { key: 'layoutColumns', title: t('promotionSlotConfig.colLayout') },
+    { key: 'bizChannel', title: t('promotionSlotConfig.colBizChannel') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'status', title: t('common.colStatus') },
     { key: 'updatedBy', title: t('promotionSlotConfig.colLastUpdater') },
@@ -168,12 +166,12 @@ export default function PromotionSlotConfig() {
     },
     { title: t('promotionSlotConfig.colWaterfallName'), dataIndex: 'strategyName', key: 'strategyName', width: 200, render: (text: string) => <strong>{text}</strong> },
     {
-      title: t('promotionSlotConfig.colContentType'), dataIndex: 'contentType', key: 'contentType', width: 100, align: 'center',
-      render: (v: WaterfallContentType) => <Tag>{t(CONTENT_TYPE_LABEL_KEY[v])}</Tag>,
-    },
-    {
-      title: t('promotionSlotConfig.colLayout'), dataIndex: 'layoutColumns', key: 'layoutColumns', width: 110, align: 'center',
-      render: (v: number) => <span>{v === 2 ? t('promotionSlotConfig:layoutDouble') : t('promotionSlotConfig:layoutSingle')}</span>,
+      title: t('promotionSlotConfig.colBizChannel'), dataIndex: 'bizChannel', key: 'bizChannel', width: 120, align: 'center',
+      render: (v: WaterfallBizChannel) => (
+        <Tag color={v === 'food' ? 'orange' : 'cyan'}>
+          {BIZ_CHANNEL_OPTIONS.find(o => o.value === v)?.labelKey ? t(BIZ_CHANNEL_OPTIONS.find(o => o.value === v)!.labelKey) : (v || '-')}
+        </Tag>
+      ),
     },
     { title: t('common.colBrand'), dataIndex: 'brand', key: 'app', width: 100, render: (v: string) => <BrandTag value={v} /> },
     {
@@ -222,12 +220,11 @@ export default function PromotionSlotConfig() {
           <Form.Item label={t('common.colBrand')} name="brand">
             <Select placeholder={t('common.all')} allowClear style={{ width: 120 }} options={[{ label: t('common.flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
           </Form.Item>
-          <Form.Item label={t('promotionSlotConfig.colContentType')} name="contentType">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 110 }} options={[{ label: t(CONTENT_TYPE_LABEL_KEY.store), value: 'store' }, { label: t(CONTENT_TYPE_LABEL_KEY.product), value: 'product' }]} />
-          </Form.Item>
-          <Form.Item label={t('promotionSlotConfig.colLayout')} name="layoutColumns">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 130 }} options={[{ label: t('promotionSlotConfig:layoutSingle'), value: 1 }, { label: t('promotionSlotConfig:layoutDouble'), value: 2 }]} />
-          </Form.Item>
+          {isDelivery && (
+            <Form.Item label={t('promotionSlotConfig.colBizChannel')} name="bizChannel">
+              <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={BIZ_CHANNEL_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value }))} />
+            </Form.Item>
+          )}
           {isDelivery && (
             <Form.Item label={t('promotionSlotConfig.colAlgorithmName')} name="algoId">
               <Select placeholder={t('promotionSlotConfig.placeholderSelectAlgorithm')} allowClear showSearch style={{ width: 220 }} optionFilterProp="label" options={algoOptions} />
@@ -267,7 +264,7 @@ export default function PromotionSlotConfig() {
             onChange: (p, s) => { setPage(p); setPageSize(s) },
           }}
           size="small"
-          scroll={{ x: 1300 }}
+          scroll={{ x: 1200 }}
         />
       </div>
     </div>

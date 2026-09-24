@@ -82,6 +82,13 @@ export default function ScrapList({ onCreate, onViewDetail }: Props) {
     return buildTree(0)
   }, [categories])
 
+  /** 分類編碼 → 名稱映射（列表/導出將 assetType 編碼轉為可讀名稱，找不到回退原值） */
+  const categoryNameByCode = useMemo(() => {
+    const map: Record<string, string> = {}
+    categories.forEach(c => { map[c.code] = c.name })
+    return map
+  }, [categories])
+
   /** 品牌選項（同名品牌按 brandZh 去重，避免 Select 重複 key） */
   const brandOptions = useMemo(
     () => [...new Map(brands.map(b => [b.brandZh, { label: b.brandZh, value: b.brandZh }])).values()],
@@ -185,7 +192,7 @@ export default function ScrapList({ onCreate, onViewDetail }: Props) {
       { title: '資產名稱', dataIndex: 'assetName' },
       { title: '所屬品牌', dataIndex: 'companyBrand' },
       { title: '資產品牌', dataIndex: 'brand' },
-      { title: '資產分類', dataIndex: 'assetType' },
+      { title: '資產分類', dataIndex: 'assetType', render: (v: string) => categoryNameByCode[v] || v || '' },
       { title: '報廢日期', dataIndex: 'scrapDate' },
       { title: '經辦人', dataIndex: 'applyBy' },
       { title: '報廢原因', dataIndex: 'reason' },
@@ -251,7 +258,7 @@ export default function ScrapList({ onCreate, onViewDetail }: Props) {
       render: (v: number | null) => v ? <BrandTag value={v} /> : '-',
     },
     { key: 'brand', title: '資產品牌', dataIndex: 'brand', width: 100, ellipsis: true },
-    { key: 'assetType', title: '資產分類', dataIndex: 'assetType', width: 100 },
+    { key: 'assetType', title: '資產分類', dataIndex: 'assetType', width: 100, render: (v: string) => categoryNameByCode[v] || v || '-' },
     { key: 'scrapDate', title: '報廢日期', dataIndex: 'scrapDate', width: 120 },
     {
       key: 'applyBy', title: '經辦人', dataIndex: 'applyBy', width: 140,

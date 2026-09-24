@@ -1,4 +1,20 @@
 /**
+ * ⚠️ **DEMO / 遗留 mock 数据层**（V0 §八 V0-6）
+ *
+ * 本文件仅供尚未接入真实后端的遗留页面作为 fallback（例如 AiQuotaAuth 中旧的
+ * index / AiAuth / AiQuota / AiPositionAuth 入口），**不得**在新增页面上直接引用。
+ *
+ * V0 已接入真实 API 的页面（仅作为参考，下面列表为完备的官方入口）：
+ * - AI 操作授权 → {@link ../aiOperationAuth.ts} 的 {@code fetchToolRegistry / toggleToolStatus / updateToolPolicy / fetchExecLogs}
+ * - 模型供应商/接入 → {@code api/aiProvider.ts / aiModel.ts}
+ * - 部门与员工权控 → {@code api/aiQuotaAuth.ts} 中 {auth/quota} 相关方法
+ * - 会话审计 → {@code api/aiConversation.ts}
+ * - AI 使用申请 → 直接走 OA 接口 {@code api/oaRequest.ts}
+ *
+ * 下一迭代 V1 将逐个删除本文件中的固定方法，仅保留历史页面确需的少量 helper。
+ *
+ * 历史注茅（2026-09 之前）：
+ *
  * 智能中心(AI) 一期 Mock 数据层
  *
  * 覆盖：模型接入（供应商/模型/参数/价格/健康）、授权与配额（部门授权/员工覆盖/

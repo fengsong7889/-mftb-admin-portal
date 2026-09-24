@@ -61,59 +61,97 @@ public class EmployeeServiceImpl implements EmployeeService {
     private static final String BUILTIN_ADMIN = "MF00001";
 
     @Override
-    public PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus) {
+    public PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus,
+                                       Long departmentId, String sequence, String jobLevel, String rank,
+                                       Long roleId, String updatedBy, String updatedAtFrom, String updatedAtTo) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
 
-        // 先查询符合关键字条件的全部用户（不分页），用于后续 employmentStatus 过滤
+        // 先按 DB 侧可下推条件过滤全部匹配用户（不分页），再对派生状态过滤 + 内存分页
         LambdaQueryWrapper<SysUser> baseWrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
             baseWrapper.and(w -> w.like(SysUser::getUsername, keyword)
                     .or().like(SysUser::getName, keyword)
                     .or().like(SysUser::getEmpId, keyword));
         }
+        if (departmentId != null) {
+            baseWrapper.in(SysUser::getDepartmentId, collectDeptAndDescendants(departmentId));
+        }
+        if (StringUtils.hasText(sequence)) baseWrapper.eq(SysUser::getSequence, sequence);
+        if (StringUtils.hasText(jobLevel)) baseWrapper.eq(SysUser::getJobLevel, jobLevel);
+        if (StringUtils.hasText(rank)) baseWrapper.eq(SysUser::getRank, rank);
+        if (roleId != null) {
+            baseWrapper.isNotNull(SysUser::getFunctionRoles)
+                    .apply("JSON_CONTAINS(function_roles, {0})", String.valueOf(roleId));
+        }
+        if (StringUtils.hasText(updatedBy)) baseWrapper.like(SysUser::getUpdatedBy, updatedBy);
+        if (StringUtils.hasText(updatedAtFrom)) baseWrapper.apply("DATE(updated_at) >= {0}", updatedAtFrom);
+        if (StringUtils.hasText(updatedAtTo)) baseWrapper.apply("DATE(updated_at) <= {0}", updatedAtTo);
         baseWrapper.orderByDesc(SysUser::getCreatedAt);
         List<SysUser> allUsers = sysUserMapper.selectList(baseWrapper);
 
-        // 批量获取最新职务记录，派生 employmentStatus
-        if (!allUsers.isEmpty()) {
-            List<Long> userIds = allUsers.stream().map(SysUser::getId).toList();
-            Map<Long, String> latestOps = getLatestOperations(userIds);
-
-            // 按 employmentStatus 过滤
-            if (StringUtils.hasText(employmentStatus)) {
-                allUsers = allUsers.stream().filter(u -> {
-                    String op = latestOps.get(u.getId());
-                    boolean isResigned = "离职".equals(op);
-                    return "resigned".equals(employmentStatus) ? isResigned : !isResigned;
-                }).toList();
-            }
-
-            // 手动分页
-            long total = allUsers.size();
-            int from = (int) ((page - 1) * size);
-            int to = (int) Math.min(from + size, total);
-            List<EmployeeVO> records = (from < total)
-                    ? allUsers.subList(from, to).stream()
-                        .map(u -> {
-                            EmployeeVO vo = EmployeeVO.from(u, JsonUtils.parseLongList(u.getFunctionRoles()));
-                            String op = latestOps.get(u.getId());
-                            vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
-                            return vo;
-                        })
-                        .toList()
-                    : List.of();
-            return new PageResult<>(records, total);
+        if (allUsers.isEmpty()) {
+            return new PageResult<>(List.of(), 0L);
         }
 
-        return new PageResult<>(List.of(), 0L);
+        // 批量获取最新职务记录，派生 employmentStatus（已排除未来生效记录）
+        List<Long> userIds = allUsers.stream().map(SysUser::getId).toList();
+        Map<Long, String> latestOps = getLatestOperations(userIds);
+
+        // 按 employmentStatus 过滤（派生字段，内存过滤）
+        if (StringUtils.hasText(employmentStatus)) {
+            allUsers = allUsers.stream().filter(u -> {
+                String op = latestOps.get(u.getId());
+                boolean isResigned = "离职".equals(op);
+                return "resigned".equals(employmentStatus) ? isResigned : !isResigned;
+            }).toList();
+        }
+
+        // 手动分页（total 为筛选+派生过滤后的完整数量）
+        long total = allUsers.size();
+        int from = (int) ((page - 1) * size);
+        int to = (int) Math.min(from + size, total);
+        List<EmployeeVO> records = (from < total)
+                ? allUsers.subList(from, to).stream()
+                    .map(u -> {
+                        EmployeeVO vo = EmployeeVO.from(u, JsonUtils.parseLongList(u.getFunctionRoles()));
+                        String op = latestOps.get(u.getId());
+                        vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
+                        return vo;
+                    })
+                    .toList()
+                : List.of();
+        return new PageResult<>(records, total);
     }
 
-    /** 批量查询多个用户的最新职务记录操作类型 */
+    /** 收集指定部门及其全部子孙部门 ID（查询父部门时同时匹配下级部门员工） */
+    private List<Long> collectDeptAndDescendants(Long rootId) {
+        List<SysDepartment> all = sysDepartmentMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, List<Long>> childMap = new HashMap<>();
+        for (SysDepartment d : all) {
+            if (d.getParentId() != null) {
+                childMap.computeIfAbsent(d.getParentId(), k -> new java.util.ArrayList<>()).add(d.getId());
+            }
+        }
+        List<Long> ids = new java.util.ArrayList<>();
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        java.util.Deque<Long> stack = new java.util.ArrayDeque<>();
+        stack.push(rootId);
+        while (!stack.isEmpty()) {
+            Long cur = stack.pop();
+            if (!visited.add(cur)) continue;
+            ids.add(cur);
+            for (Long child : childMap.getOrDefault(cur, List.of())) stack.push(child);
+        }
+        return ids;
+    }
+
+    /** 批量查询多个用户的最新职务记录操作类型（仅统计生效日 <= 今天的记录，未来异动不提前生效） */
     private Map<Long, String> getLatestOperations(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return Map.of();
         LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(EmpPositionRecord::getUserId, userIds)
+                .le(EmpPositionRecord::getEffectiveDate, LocalDate.now())
                 .orderByDesc(EmpPositionRecord::getEffectiveDate)
                 .orderByDesc(EmpPositionRecord::getEffectiveSeq);
         List<EmpPositionRecord> records = empPositionRecordMapper.selectList(wrapper);
@@ -125,6 +163,16 @@ public class EmployeeServiceImpl implements EmployeeService {
                         Map.Entry::getKey,
                         e -> e.getValue().get(0).getOperation()
                 ));
+    }
+
+    @Override
+    public EmployeeVO getDetail(Long id) {
+        SysUser user = requireUser(id);
+        EmployeeVO vo = EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
+        Map<Long, String> latestOps = getLatestOperations(List.of(user.getId()));
+        String op = latestOps.get(user.getId());
+        vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
+        return vo;
     }
 
     @Override
@@ -141,7 +189,21 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setEmpId(empId);
         user.setAvatar("pikachu-default");
         user.setRole(StringUtils.hasText(request.getRole()) ? request.getRole() : "guest");
-        user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds() == null ? List.of() : request.getFunctionRoleIds()));
+        // Round 6：新员工未显式绑定角色时，默认绑“员工自助”基底角色，
+        // 保证统一门户上线后普通员工能默认进入 OA；已绑其他角色的不覆盖。
+        java.util.List<Long> roleIds = request.getFunctionRoleIds() == null
+                ? new java.util.ArrayList<>()
+                : new java.util.ArrayList<>(request.getFunctionRoleIds());
+        if (roleIds.isEmpty()) {
+            Long selfServiceRoleId = lookupRoleIdByCode("employee_self_service");
+            if (selfServiceRoleId != null) {
+                roleIds.add(selfServiceRoleId);
+                log.info("新员工 {} 默认绑定员工自助角色 roleId={}", empId, selfServiceRoleId);
+            } else {
+                log.warn("员工自助角色尚未初始化，新员工 {} 将不绑默认角色（需 HR 手工分配）", empId);
+            }
+        }
+        user.setFunctionRoles(JsonUtils.toJson(roleIds));
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
         // 职等由 applyPosition 从职位配置自动带出，不再接受前端传入
@@ -151,7 +213,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         sysUserMapper.insert(user);
         // 自动写入初始职务记录: operation 固定「入职」, 任职信息映射自新增表单基础信息
         insertInitialPositionRecord(user, request.getCompany());
+        // 默认角色绑定同样需要 bump revision，确保本实例/其他实例下次读能看到新权限
+        permissionService.evictAll();
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
+    }
+
+    /** 按 code 查 roleId（包含已软删的则过滤）；不存在返回 null，不抛异常。 */
+    private Long lookupRoleIdByCode(String code) {
+        java.util.List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = ? AND deleted = 0 AND status = 1 LIMIT 1",
+                Long.class, code);
+        return ids.isEmpty() ? null : ids.get(0);
     }
 
     @Override
@@ -345,11 +417,16 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    public Map<String, Object> getBasicInfo(Long id) {
+    public Map<String, Object> getBasicInfo(Long id, boolean reveal) {
         SysUser user = requireUser(id);
+        if (reveal) {
+            // P1-D 受控明文查看留痕（调用方已通过 employee-management:edit 权限校验）
+            log.info("明文查看员工敏感信息: operator={}, targetUserId={}", operatorResolver.currentOperatorName(), id);
+        }
         Map<String, Object> result = new HashMap<>();
         // 个人信息
         Map<String, Object> personal = new HashMap<>();
+        personal.put("gender", user.getGender());
         personal.put("nationality", user.getNationality());
         personal.put("ethnicity", user.getEthnicity());
         personal.put("birthDate", user.getBirthDate());
@@ -360,17 +437,19 @@ public class EmployeeServiceImpl implements EmployeeService {
         // 证件信息
         Map<String, Object> idInfo = new HashMap<>();
         idInfo.put("idType", user.getIdType());
-        idInfo.put("idNumber", user.getIdNumber());
-        idInfo.put("idAddress", user.getIdAddress());
+        idInfo.put("idNumber", reveal ? user.getIdNumber() : maskIdNumber(user.getIdNumber()));
+        idInfo.put("idAddress", reveal ? user.getIdAddress() : maskAddress(user.getIdAddress()));
         idInfo.put("householdType", user.getHouseholdType());
         idInfo.put("householdLocation", user.getHouseholdLocation());
         idInfo.put("nativePlace", user.getNativePlace());
         result.put("idInfo", idInfo);
         // 通讯信息
         Map<String, Object> contact = new HashMap<>();
+        contact.put("mobile", user.getMobile());
+        contact.put("email", user.getEmail());
         contact.put("addressCountry", user.getAddressCountry());
         contact.put("addressCity", user.getAddressCity());
-        contact.put("addressDetail", user.getAddressDetail());
+        contact.put("addressDetail", reveal ? user.getAddressDetail() : maskAddress(user.getAddressDetail()));
         result.put("contactInfo", contact);
         // 账号信息（三方通讯/邮箱等账号绑定，后续可扩展企微ID、QQ邮箱、公司邮箱等）
         Map<String, Object> account = new HashMap<>();
@@ -379,11 +458,28 @@ public class EmployeeServiceImpl implements EmployeeService {
         return result;
     }
 
+    /** 证件号脱敏：保留前4后4，其余打码；过短则全码 */
+    private static String maskIdNumber(String v) {
+        if (v == null || v.isBlank()) return v;
+        String t = v.trim();
+        if (t.length() <= 8) return "******";
+        return t.substring(0, 4) + "*".repeat(t.length() - 8) + t.substring(t.length() - 4);
+    }
+
+    /** 地址脱敏：保留前缀（区划）其余打码 */
+    private static String maskAddress(String v) {
+        if (v == null || v.isBlank()) return v;
+        String t = v.trim();
+        int keep = Math.min(6, t.length());
+        return t.substring(0, keep) + "****";
+    }
+
     @Override
     public void saveBasicInfo(Long id, BasicInfoRequest request) {
         SysUser user = requireUser(id);
         // 个人信息
         if (request.getName() != null) user.setName(request.getName());
+        if (request.getGender() != null) user.setGender(request.getGender());
         if (request.getNationality() != null) user.setNationality(request.getNationality());
         if (request.getEthnicity() != null) user.setEthnicity(request.getEthnicity());
         if (request.getBirthDate() != null) user.setBirthDate(request.getBirthDate());
@@ -398,6 +494,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (request.getHouseholdLocation() != null) user.setHouseholdLocation(request.getHouseholdLocation());
         if (request.getNativePlace() != null) user.setNativePlace(request.getNativePlace());
         // 通讯信息
+        if (request.getMobile() != null) user.setMobile(request.getMobile());
+        if (request.getEmail() != null) user.setEmail(request.getEmail());
         if (request.getAddressCountry() != null) user.setAddressCountry(request.getAddressCountry());
         if (request.getAddressCity() != null) user.setAddressCity(request.getAddressCity());
         if (request.getAddressDetail() != null) user.setAddressDetail(request.getAddressDetail());

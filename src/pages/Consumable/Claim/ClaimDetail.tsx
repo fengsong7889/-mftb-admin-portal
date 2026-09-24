@@ -130,8 +130,8 @@ export default function ClaimDetail({ id, onBack }: Props) {
     { title: '規格型號', dataIndex: 'spec', key: 'spec', width: 140, ellipsis: true, render: (v: string) => v || '-' },
     { title: '出庫倉庫', dataIndex: 'locationName', key: 'locationName', width: 130, render: (v: string) => v || '-' },
     { title: '數量', dataIndex: 'qty', key: 'qty', width: 90, align: 'right', render: (v: number, r) => `${v} ${r.unit ?? ''}` },
-    { title: '成本單價', dataIndex: 'actualUnitCost', key: 'actualUnitCost', width: 100, align: 'right', render: (v: number | undefined, r) => `¥${((v ?? r.unitCost ?? 0)).toFixed(2)}` },
-    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 100, align: 'right', render: (v: number | undefined, r) => `¥${(v ?? (r.unitCost ?? 0) * r.qty).toFixed(2)}` },
+    { title: '成本單價', dataIndex: 'actualUnitCost', key: 'actualUnitCost', width: 100, align: 'right', render: (v: number | undefined, r) => `MOP ${((v ?? r.unitCost ?? 0)).toFixed(2)}` },
+    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 100, align: 'right', render: (v: number | undefined, r) => `MOP ${(v ?? (r.unitCost ?? 0) * r.qty).toFixed(2)}` },
   ]
 
   if (!claim) return <Spin spinning={loading}><div style={{ minHeight: 200 }} /></Spin>
@@ -173,7 +173,7 @@ export default function ClaimDetail({ id, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 14, color: '#1890ff' }}>📋</span>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>领用信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>領用信息</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Descriptions column={4} size="middle">
@@ -213,10 +213,10 @@ export default function ClaimDetail({ id, onBack }: Props) {
           <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: 14, color: '#FA8C16' }}>🧾</span>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>领用明细</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>領用明細</span>
           <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{claim.totalKinds} 項 / 共 {claim.totalQty}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          <span style={{ fontSize: 13, color: '#595959' }}>成本合計：<b style={{ color: '#E8720C' }}>¥{totalAmount.toFixed(2)}</b></span>
+          <span style={{ fontSize: 13, color: '#595959' }}>成本合計：<b style={{ color: '#E8720C' }}>MOP {totalAmount.toFixed(2)}</b></span>
         </div>
         <Table<ConsumableClaimItem>
           columns={columns}

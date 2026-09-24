@@ -4,11 +4,16 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.entity.AiConversation;
+import com.mftb.admin.entity.AiConversationEvent;
+import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiConversationService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,10 +26,18 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ai/conversations")
 @RequiredArgsConstructor
+@Slf4j
 @Tag(name = "AI 智能中心 - 会话管理", description = "AI 助手多窗口会话 CRUD 接口")
 public class AiConversationController {
 
+    /** V0 §B.6：PUT messages 上限，防止客户端无节制写入塑入不确定的历史。 */
+    private static final int MAX_MESSAGES = 200;
+    private static final int MAX_SINGLE_MESSAGE_BYTES = 32 * 1024;
+    private static final int MAX_TOTAL_MESSAGES_BYTES = 1024 * 1024;
+
     private final AiConversationService conversationService;
+    private final AiConversationEventService eventService;
+    private final ObjectMapper objectMapper;
 
     /** 列出当前用户所有会话（按更新时间倒序） */
     @GetMapping
@@ -40,12 +53,37 @@ public class AiConversationController {
         return Result.success(conversationService.createConversation());
     }
 
-    /** 更新会话（标题 / 消息 / 模型 / tokens） */
+    /** 更新会话（标题 / 消息 / 模型 / tokens）；V0 §B.6 新增 messages 长度/条数上限 */
     @PutMapping("/{id}")
     @Operation(summary = "更新会话")
     public Result<Void> update(@PathVariable Long id, @RequestBody UpdateRequest req) {
+        validateMessages(req.getMessages());
         conversationService.updateConversation(id, req.getTitle(), req.getMessages(), req.getModelKey(), req.getTotalTokens());
         return Result.success();
+    }
+
+    /** messages JSON 上限：条数≤200，单条≤32KB，总长≤1MB；防止客户端无节制写入 */
+    private void validateMessages(String messages) {
+        if (messages == null || messages.isEmpty() || "[]".equals(messages)) return;
+        if (messages.length() > MAX_TOTAL_MESSAGES_BYTES) {
+            throw new IllegalArgumentException("会话消息总长度超限（≤ 1MB）");
+        }
+        try {
+            List<Map<String, Object>> rows = objectMapper.readValue(messages, new TypeReference<>() {});
+            if (rows.size() > MAX_MESSAGES) {
+                throw new IllegalArgumentException("会话消息条数超限（≤ " + MAX_MESSAGES + "）");
+            }
+            for (Map<String, Object> row : rows) {
+                Object content = row.get("content");
+                if (content != null && content.toString().length() > MAX_SINGLE_MESSAGE_BYTES) {
+                    throw new IllegalArgumentException("单条消息长度超限（≤ 32KB）");
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("会话消息 JSON 解析失败，仅依赖总长度校验: {}", e.getMessage());
+        }
     }
 
     /** 删除指定会话（移至回收站） */
@@ -126,6 +164,15 @@ public class AiConversationController {
             return Result.error(404, "會話不存在");
         }
         return Result.success(conv);
+    }
+
+    /** V0 §B.6：服务端追加的运行事件（不可篡改），审计详情页使用。 */
+    @GetMapping("/audit/{id}/events")
+    @RequirePermission(menu = "ai-conversation-audit")
+    @Operation(summary = "审计：读取会话服务端执行事件")
+    public Result<List<AiConversationEvent>> auditEvents(@PathVariable Long id,
+                                                          @RequestParam(defaultValue = "200") int limit) {
+        return Result.success(eventService.listByConversation(id, limit));
     }
 
     @Data

@@ -27,6 +27,10 @@ public interface FinAccountMapper extends BaseMapper<FinAccount> {
             LEFT JOIN biz_fin_account a
               ON a.group_code = g.group_code AND a.brand = b.brand AND a.deleted = 0
             WHERE g.deleted = 0
+            <if test='authorizedGroupCodes != null'>
+              AND g.group_code IN
+              <foreach collection="authorizedGroupCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+            </if>
             <if test='groupId != null and groupId != ""'>
               AND g.group_code LIKE CONCAT('%', #{groupId}, '%')
             </if>
@@ -56,6 +60,7 @@ public interface FinAccountMapper extends BaseMapper<FinAccount> {
                                          @Param("groupName") String groupName,
                                          @Param("brand") String brand,
                                          @Param("status") String status,
+                                         @Param("authorizedGroupCodes") java.util.Collection<String> authorizedGroupCodes,
                                          @Param("offset") long offset,
                                          @Param("size") long size);
 
@@ -66,5 +71,6 @@ public interface FinAccountMapper extends BaseMapper<FinAccount> {
     long countDerived(@Param("groupId") String groupId,
                       @Param("groupName") String groupName,
                       @Param("brand") String brand,
-                      @Param("status") String status);
+                      @Param("status") String status,
+                      @Param("authorizedGroupCodes") java.util.Collection<String> authorizedGroupCodes);
 }

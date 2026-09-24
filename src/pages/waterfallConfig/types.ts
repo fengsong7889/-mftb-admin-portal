@@ -103,6 +103,8 @@ export interface WaterfallListView {
   businessType: WaterfallBusinessType
   contentType: WaterfallContentType
   layoutColumns: WaterfallLayoutColumns
+  /** 外卖到家业务频道（美食外卖/超市百货）；团购不使用 */
+  bizChannel?: WaterfallBizChannel
   filterDislike?: number
   naturalAlgoName?: string
   businessConfirmed: boolean

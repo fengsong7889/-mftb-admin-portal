@@ -289,7 +289,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
         <SectionTitle icon={<EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="報失信息" />
         <Descriptions column={4} size="middle">
           <Descriptions.Item label="遺失單號">{loss.lossNo}</Descriptions.Item>
-          <Descriptions.Item label="來源">{loss.sourceType === 'return' ? '歸還驗收' : loss.sourceType === 'direct' ? '主動報失' : loss.sourceType}</Descriptions.Item>
+          <Descriptions.Item label="來源">{({ return: '歸還驗收', direct: '主動報失', claim: '領用報失', borrow: '借用報失' } as Record<string, string>)[loss.sourceType] || loss.sourceType}</Descriptions.Item>
           <Descriptions.Item label="登記人">
             {(() => {
               const name = loss.reporterName || '-'

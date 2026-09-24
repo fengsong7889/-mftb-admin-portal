@@ -98,6 +98,9 @@ public class SysUser {
 
     // ── 个人信息 ──
 
+    /** 性别 */
+    private String gender;
+
     /** 国籍 */
     private String nationality;
 
@@ -140,6 +143,12 @@ public class SysUser {
     private String dingtalkUserId;
 
     // ── 通讯信息 ──
+
+    /** 手机号 */
+    private String mobile;
+
+    /** 邮箱 */
+    private String email;
 
     /** 住址-国家 */
     private String addressCountry;

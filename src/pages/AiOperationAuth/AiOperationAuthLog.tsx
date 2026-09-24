@@ -17,48 +17,53 @@ import {
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
 import type { ToolDefinition, ToolLevel } from '../../api/mock/aiPlatformMock'
+import { fetchToolRegistry, fetchExecLogs, type ExecLogRow } from '../../api/aiOperationAuth'
 
-/** mock 調用日誌明細 */
-function getMockLogs(tool: ToolDefinition): Array<Record<string, string>> {
-  if (tool.level === 'L0') {
-    return [
-      { time: '2026-09-01 15:32:08', operator: 'chenwei', action: 'AI 請求調用（攔截）', result: '已攔截並提示人工處理' },
-    ]
+/** 将后端 ExecLogRow 映射为展示行（保留旧 UI 字段命名，但内容真实） */
+function toDisplayRow(row: ExecLogRow): Record<string, string> {
+  const resultLabel = row.decision === 'reject' || row.decision === 'approval_required'
+    ? '已拦截'
+    : row.success === 1 ? '成功' : '失败'
+  const actionLabel = row.decision === 'reject'
+    ? `AI 调用→策略拒绝 (${row.rejectReason ?? ''})`
+    : row.decision === 'approval_required'
+      ? `AI 调用→需审批凭证`
+      : row.success === 1
+        ? `AI 直接執行 (${row.elapsedMs ?? 0}ms)`
+        : `AI 直接執行失敗 (${row.rejectReason ?? ''})`
+  return {
+    time: row.createdAt,
+    operator: row.caller ?? '--',
+    action: actionLabel,
+    result: resultLabel,
+    id: String(row.id),
   }
-  if (tool.level === 'L1') {
-    return [
-      { time: '2026-09-02 10:24:18', operator: 'liuyang', action: 'AI 直接調用', result: '成功' },
-      { time: '2026-09-02 09:11:52', operator: 'zhaomin', action: 'AI 直接調用', result: '成功' },
-    ]
-  }
-  if (tool.level === 'L2') {
-    return [
-      { time: '2026-08-31 09:12:44', operator: 'zhaomin', action: 'AI 生成草稿 → 用戶確認', result: '成功' },
-      { time: '2026-08-30 16:05:31', operator: 'chenwei', action: 'AI 生成草稿 → 用戶確認', result: '成功' },
-    ]
-  }
-  return [
-    { time: '2026-08-30 11:05:56', operator: 'zhaomin', action: 'AI 發起 → 主管審批通過', result: '成功' },
-  ]
 }
 
 export default function AiOperationAuthLog() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const toolId = searchParams.get('id') || ''
+  // V0 §B.2：入口同时支持 toolKey（新）/ id（旧回退）
+  const toolKey = searchParams.get('toolKey') || ''
+  const toolId = searchParams.get('id') || toolKey
 
   const [tool, setTool] = useState<ToolDefinition | null>(null)
+  const [logs, setLogs] = useState<Record<string, string>[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!toolId) return
     let cancelled = false
     setLoading(true)
-    fetchMockToolRegistry()
-      .then((data) => {
+    Promise.all([
+      fetchToolRegistry().catch(() => fetchMockToolRegistry()),
+      fetchExecLogs({ toolKey: toolId, size: 50 }).catch(() => ({ records: [], total: 0 })),
+    ])
+      .then(([rows, logResult]) => {
         if (cancelled) return
-        const found = data.find((t) => t.id === toolId)
-        if (found) setTool(found)
+        const found = rows.find((t) => t.id === toolId || t.code === toolId)
+        if (found) setTool(found as unknown as ToolDefinition)
+        setLogs(logResult.records.map(toDisplayRow))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -147,17 +152,17 @@ export default function AiOperationAuthLog() {
         )}
 
         <Table
-          rowKey={(row) => row.time}
+          rowKey={(row) => row.id ?? row.time}
           size="small"
           loading={loading}
           columns={logColumns}
-          dataSource={tool ? getMockLogs(tool) : []}
+          dataSource={logs}
           pagination={false}
         />
 
         <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
           <FileSearchOutlined />
-          演示數據；後端網關落地後將記錄完整調用鏈（請求 ID、參數摘要、執行結果、耗時）。
+          日志来源：ai_tool_exec_log（参数以 SHA-256 前 16 位落库，不落敏感原文）。
         </div>
       </div>
     </div>

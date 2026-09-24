@@ -115,7 +115,7 @@ export default function InboundList() {
     { title: '供應商', dataIndex: 'supplierName', key: 'supplierName', width: 130, ellipsis: true, render: (v: string) => v || '-' },
     { title: '明細行數', key: 'lineCount', width: 90, align: 'right', render: (_: unknown, r) => r.items?.length ?? 0 },
     { title: '總數量', dataIndex: 'totalQty', key: 'totalQty', width: 90, align: 'right' },
-    { title: '總金額', dataIndex: 'totalAmount', key: 'totalAmount', width: 120, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
+    { title: '總金額', dataIndex: 'totalAmount', key: 'totalAmount', width: 120, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
     { title: '入庫日期', dataIndex: 'bizDate', key: 'bizDate', width: 110, render: (v: string) => v || '-' },
     { title: '創建人', dataIndex: 'createdBy', key: 'createdBy', width: 100, render: (v: string) => v || '-' },
     { title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 165, render: (v: string) => v || '-' },
@@ -241,7 +241,7 @@ export default function InboundList() {
               <Descriptions.Item label="供應商">{detailData.supplierName || '-'}</Descriptions.Item>
               <Descriptions.Item label="入庫日期">{detailData.bizDate || '-'}</Descriptions.Item>
               <Descriptions.Item label="總數量">{detailData.totalQty}</Descriptions.Item>
-              <Descriptions.Item label="總金額">¥{(detailData.totalAmount ?? 0).toFixed(2)}</Descriptions.Item>
+              <Descriptions.Item label="總金額">MOP {(detailData.totalAmount ?? 0).toFixed(2)}</Descriptions.Item>
               <Descriptions.Item label="備註">{detailData.remark || '-'}</Descriptions.Item>
             </Descriptions>
             <Table
@@ -251,8 +251,8 @@ export default function InboundList() {
                 { title: '規格', dataIndex: 'spec', key: 'spec', width: 120 },
                 { title: '倉庫', dataIndex: 'locationName', key: 'locationName', width: 100 },
                 { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right' },
-                { title: '單價', dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
-                { title: '金額', dataIndex: 'amount', key: 'amount', width: 110, align: 'right', render: (v?: number) => `¥${(v ?? 0).toFixed(2)}` },
+                { title: '單價', dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+                { title: '金額', dataIndex: 'amount', key: 'amount', width: 110, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
               ]}
               dataSource={detailData.items}
               rowKey="id"

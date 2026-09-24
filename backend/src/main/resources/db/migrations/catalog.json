@@ -141,6 +141,104 @@
       "executor": "dataInitializer",
       "status": "RETIRED",
       "comment": "ai_access_request 表已废弃删除；不再自动重建废弃业务表。历史记录保留。"
+    },
+    {
+      "versionKey": "ai:governance:v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiGovernanceSchemaInitializer",
+      "dependencies": ["core:schema-v10"],
+      "status": "ACTIVE",
+      "selfHealContract": "ai-tool-policy",
+      "comment": "V0 企业治理底座：ai_tool_policy / ai_tool_exec_log / ai_budget_ledger / ai_grant_log / ai_conversation_event 5 表 + ai_employee_auth.capability_json + biz_llm_usage.verification_status 补列 + 内置工具策略种子；applyOnce 附后置强校验，失败不记版本。"
+    },
+    {
+      "versionKey": "ai:delivery-log:v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiDeliveryLogInitializer",
+      "dependencies": ["ai:governance:v1.0"],
+      "status": "ACTIVE",
+      "selfHealContract": "ai-delivery-log",
+      "comment": "V0 §八 V0-6：ai_delivery_log 建表，记录 AI 工具向外部渠道投递的受理状态（dingtalk/email/wecom）。"
+    },
+    {
+      "versionKey": "employee:contact-fields-v1",
+      "module": "employee",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "employeeDetailDataInitializer",
+      "status": "ACTIVE",
+      "comment": "员工详情: sys_user 补 gender/mobile/email 三列（此前前端提交但后端未持久化），带后置校验，失败不记版本下次重试。"
+    },
+    {
+      "versionKey": "employee:contract-schema-v1",
+      "module": "employee",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "employeeDetailDataInitializer",
+      "status": "ACTIVE",
+      "comment": "P1-B 员工合同台账 emp_contract 建表（CREATE IF NOT EXISTS），applyOnce 带后置校验。"
+    },
+    {
+      "versionKey": "core:system-portal:v1.0",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemPortalSchemaInitializer",
+      "dependencies": ["core:menu-seed-v41"],
+      "status": "ACTIVE",
+      "comment": "统一门户与分系统改造阶段 B 底座：建 sys_system / sys_role_system / sys_department_system 3 表 + sys_menu 补列 system_code + 10 个业务系统种子 + 顶级菜单归属回填 + 叶子菜单继承 + 一次性从菜单授权推导系统准入（仅当版本未记录时执行）。后置校验失败不记版本，下次启动重试。唯一真值来源：docs/system-portal/inventory.md。"
+    },
+    {
+      "versionKey": "hr:dict-schema-v1",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrDictSchemaInitializer",
+      "status": "ACTIVE",
+      "comment": "P1-A HR 人事通用字典 sys_hr_dict 建表 + 幂等种子（雇主法人/人员类别/工作地点），applyOnce 带后置校验，失败不记版本。"
+    },
+    {
+      "versionKey": "hr:dict-type-extra-v1",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrDictSchemaInitializer",
+      "status": "ACTIVE",
+      "comment": "P1-A 追加：合同类型(CONTRACT_TYPE)/工时制(WORK_SYSTEM) 幂等种子入 sys_hr_dict，applyOnce 带后置校验。"
+    },
+    {
+      "versionKey": "core:permission-revision:v1.0",
+      "module": "core",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "permissionRevisionInitializer",
+      "dependencies": ["core:schema-v10", "core:system-portal:v1.0"],
+      "status": "ACTIVE",
+      "comment": "权限版本号（统一门户 Round 3）：建 sys_permission_revision 单行表 + seed id=1；与 PermissionService.evictAll 搭配，任意实例的授权写入 → 其他实例下次读自动重新加载，不依赖内存 evictAll 传递。"
+    },
+    {
+      "versionKey": "iam:system-authz-menu:v1.0",
+      "module": "iam",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemAuthorizationMenuInitializer",
+      "dependencies": ["core:menu-seed-v41", "core:system-portal:v1.0", "core:permission-revision:v1.0"],
+      "status": "ACTIVE",
+      "comment": "权限中心系统授权菜单（Round 4）：在 permission 下注入 system-authorization 叶子菜单，归属 iam 系统；内置 admin 角色补授 view/edit；落地后 evictAll 递增 revision 保证跨实例菜单快照与新页面入口同步生效。"
+    },
+    {
+      "versionKey": "iam:employee-self-service-role:v1.0",
+      "module": "iam",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "employeeSelfServiceRoleInitializer",
+      "dependencies": ["core:system-portal:v1.0", "core:permission-revision:v1.0", "iam:system-authz-menu:v1.0"],
+      "status": "ACTIVE",
+      "comment": "员工自助基底角色（Round 6）：内置 code=employee_self_service 角色 + OA 系统准入 + 流程事项/流程中心 view；新员工创建时若无其他角色自动绑定。不会批量回填存量员工，避免越权。"
     }
   ]
 }

@@ -4,6 +4,7 @@ import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, S
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
+import ScoreRow from './AlgorithmForm/ScoreRow'
 import CouponIntensityPanel from './CouponIntensityConfig'
 import { ServiceStatus } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
@@ -1254,7 +1255,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                   <div className="algorithm-form__rule-body">
                     {/* COM_02 前提條件已改為「報名計分」開關，見下方計分明細卡片 */}
                     {/* ─ 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                    <div className="organic-score-toolbar">
                       {!isEditingInline && (
                         <>
                           {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'COM_01') && (
@@ -1269,59 +1270,39 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </Tag>
                           )}
                           {rule.id === 'STB_02' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>四檔狀態計分</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>四檔狀態計分</Tag>
                           )}
                           {rule.id === 'STB_03' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>雙檔評價計分</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>雙檔評價計分</Tag>
                           )}
                           {rule.id === 'PLT_03' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>梯度扶持計分</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>梯度扶持計分</Tag>
                           )}
                           {rule.id === 'PLT_04' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>梯度降權計分</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>梯度降權計分</Tag>
                           )}
                           {rule.id === 'STB_05' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>時間窗口對比</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>時間窗口對比</Tag>
                           )}
                           {rule.id === 'STB_06' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
                           {rule.id === 'STB_07' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
                           {rule.id === 'STB_08' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
                           {rule.id === 'STB_09' && (
-                            <Tag color="#722ED1" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
+                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
                           )}
                           {rule.id === 'PLT_01' && (
-                            <Tag color="#1890FF" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
+                            <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
                           )}
                           {rule.id === 'COM_01' && (
-                            <Tag color="#E8720C" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
+                            <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
                           )}
 
-                          {rule.mode !== ScoreMode.COUPON_INTENSITY && rule.id !== 'COM_02' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && ((rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04') ? (
-                            rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                              ? <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>倍率 ×{rule.score} <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>({rule.id === 'COM_03' ? '領券金額' : rule.id === 'COM_04' ? '新客立減金額' : rule.id === 'COM_05' ? '贈券金額' : rule.id === 'COM_06' ? '紅包金額' : rule.id === 'COM_07' ? '神券金額' : '廣告金額'} × 倍率 = 得分)</span></span>
-                              : <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>分值 +{rule.score} 分 <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C' }}>（直接加固定分）</span></span>
-                          ) : (
-                            <>
-                              {rule.mode === ScoreMode.RULE_BONUS && (
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
-                              )}
-                              {rule.mode === ScoreMode.RULE_DEDUCTION && (
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#FF4D4F' }}>{rule.score} 分</span>
-                              )}
-                              {rule.mode === ScoreMode.DECAY && (
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#722ED1' }}>{rule.score} 分</span>
-                              )}
-                              {rule.mode === ScoreMode.AMOUNT_MULTIPLIER && (
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C' }}>×{rule.score}</span>
-                              )}
-                            </>
-                          ))}
 
                           {/* 最後更新信息（只讀模式） */}
                           {(rule.updatedBy || rule.updatedAt) && (
@@ -1333,7 +1314,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           )}
 
                           {!readOnly && (
-                            <div style={{ flexShrink: 0 }}>
+                            <div className="organic-score-toolbar__actions" style={{ flexShrink: 0 }}>
                               <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
                                 style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
                                 編輯
@@ -1348,31 +1329,27 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <AlgorithmSection title="計分明細" icon={<SettingOutlined />} tone={tone}>
+                        {!['COM_01', 'COM_02', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_09', 'STB_ACT', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
+                          && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY, ScoreMode.AMOUNT_MULTIPLIER].includes(rule.mode) && (
+                          <div className="organic-score-panel">
+                            <ScoreRow label={rule.name} score={rule.score}
+                              kind={rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? 'multiplier' : rule.mode === ScoreMode.RULE_DEDUCTION ? 'deduction' : rule.mode === ScoreMode.DECAY ? 'base' : undefined}
+                              hint={rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '金額 × 倍率 = 得分' : undefined} />
+                          </div>
+                        )}
                         {rule.id === 'COM_02' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
-                            <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right' }}>報名計分</span>
-                            <Switch size="small" aria-label="報名計分" checked={!!rule.prerequisites} disabled />
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#52C41A' }}>+{rule.score} 分</span>
-                            <span style={{ fontSize: 12, color: '#8C8C8C' }}>商家報名減免運費活動生效後給分</span>
+                          <div className="organic-score-panel">
+                            <ScoreRow label="報名計分" score={rule.score} enabled={!!rule.prerequisites}
+                              control={<Switch size="small" aria-label="報名計分" checked={!!rule.prerequisites} disabled />}
+                              hint="商家報名減免運費活動生效後給分" />
                           </div>
                         )}
                         {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div className="organic-score-panel organic-score-list">
                               {rule.conditionItems.map((item: ScoreConditionItem, i: number) => (
-                                <div key={i} style={{
-                                  display: 'flex', alignItems: 'center', gap: 8,
-                                  padding: '8px 12px', borderRadius: 6,
-                                  background: item.score >= 0 ? '#f6ffed' : '#fff2f0',
-                                  border: `1px solid ${item.score >= 0 ? '#b7eb8f' : '#ffccc7'}`,
-                                }}>
-                                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 24 }}>#{i + 1}</span>
-                                  <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>{item.condition}</span>
-                                  <span style={{ fontWeight: 600, fontSize: 14, color: item.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
-                                    {item.score >= 0 ? '+' : ''}{item.score} 分
-                                  </span>
-                                </div>
+                                <ScoreRow key={i} index={i} label={item.condition} score={item.score} />
                               ))}
                             </div>
                           </div>
@@ -1381,39 +1358,27 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {rule.id === 'STB_ACT' && (() => {
                           const items = rule.activityItems || []
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               {items.length === 0 ? (
                                 <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置，請點擊編輯添加算法並配置固定加分</div>
                               ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div className="organic-score-list">
                                   {items.map((item, idx) => {
                                     const live = algoOptions.find(a => a.algoCode === item.activityId)
                                     const name = live?.algoName ?? item.activityName ?? '—'
                                     const status = live?.status
                                     return (
-                                      <div key={item.activityId || idx} style={{
-                                        display: 'flex', alignItems: 'center', gap: 12,
-                                        padding: '10px 12px', background: '#f6ffed', borderRadius: 6,
-                                      }}>
-                                        <span style={{ fontSize: 12, color: '#1890FF', fontFamily: 'monospace' }}>{item.activityId}</span>
-                                        <span style={{ fontSize: 13, color: '#595959' }}>{name}</span>
-                                        <Tag color={status === 1 ? 'success' : status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
-                                          {status === 1 ? '啟用' : status === 2 ? '停用' : '未知'}
-                                        </Tag>
-                                        <span style={{
-                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                          color: '#52C41A', background: '#f6ffed', border: '1px solid #b7eb8f',
-                                        }}>
-                                          固定加分
-                                        </span>
-                                        <span style={{ fontWeight: 600, fontSize: 15, color: '#52C41A' }}>+{item.score} 分</span>
-                                      </div>
+                                      <ScoreRow key={item.activityId || idx} score={item.score} label={<>
+                                        <span style={{ color: '#1890FF', fontFamily: 'monospace' }}>{item.activityId}</span>
+                                        <div>{name}</div>
+                                      </>} hint={<Tag color={status === 1 ? 'success' : status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
+                                        {status === 1 ? '啟用' : status === 2 ? '停用' : '未知'}
+                                      </Tag>} />
                                     )
                                   })}
                                 </div>
                               )}
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：暫以算法庫算法ID對接驗證（後續切換為系統活動）；店鋪報名參與即獲得對應固定加分，名稱與狀態與算法庫實時同步，停用後不再計分
                               </div>
                             </div>
@@ -1424,8 +1389,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const defaultSTB02 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_02')
                           const items = rule.conditionItems?.length ? rule.conditionItems : (defaultSTB02?.conditionItems || [])
                           return (
-                          <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                          <div className="organic-score-panel">
+                            <div className="organic-score-list">
                               {[
                                 { key: 'operating', label: '營業額中狀態', desc: '正常營業中' },
                                 { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業' },
@@ -1434,34 +1399,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               ].map((item, idx) => {
                                 const condItem = items[idx] || { condition: 'bonus', score: 0 }
                                 const isBonus = condItem.condition !== 'deduction'
-                                const isLast = idx === 3
-                                return (
-                                  <div key={item.key} style={{
-                                    display: 'grid', gridTemplateColumns: '140px 80px 1fr', gap: 12, alignItems: 'center',
-                                    padding: '10px 0',
-                                    borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                  }}>
-                                    <div>
-                                      <div style={{ fontSize: 13, color: '#262626', fontWeight: 500, lineHeight: '20px' }}>{item.label}</div>
-                                      <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: '16px' }}>{item.desc}</div>
-                                    </div>
-                                    <span style={{
-                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                      height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                      color: isBonus ? '#52C41A' : '#FF4D4F',
-                                      background: isBonus ? '#f6ffed' : '#fff2f0',
-                                      border: `1px solid ${isBonus ? '#b7eb8f' : '#ffccc7'}`,
-                                    }}>
-                                      {isBonus ? '固定加分' : '固定減分'}
-                                    </span>
-                                    <span style={{
-                                      fontSize: 15, fontWeight: 600,
-                                      color: isBonus ? '#52C41A' : '#FF4D4F',
-                                    }}>
-                                      {isBonus ? '+' : '-'}{condItem.score} 分
-                                    </span>
-                                  </div>
-                                )
+                                return <ScoreRow key={item.key} label={item.label} hint={item.desc}
+                                  score={condItem.score} kind={isBonus ? 'bonus' : 'deduction'} />
                               })}
                             </div>
                           </div>
@@ -1471,28 +1410,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {rule.id === 'STB_03' && (() => {
                           const defaultSTB03 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
                           const items = rule.conditionItems?.length === 5 ? rule.conditionItems : (defaultSTB03?.conditionItems || [])
-                          const parseMode = (cond: string) => {
-                            if (cond === 'fixed_bonus') return { badge: '固定加分', color: '#52C41A', bg: '#f6ffed', border: '#b7eb8f' }
-                            if (cond === 'fixed_deduction') return { badge: '固定減分', color: '#FF4D4F', bg: '#fff2f0', border: '#ffccc7' }
-                            if (cond === 'dynamic_bonus') return { badge: '動態加分', color: '#52C41A', bg: '#f6ffed', border: '#b7eb8f' }
-                            if (cond === 'dynamic_deduction') return { badge: '動態減分', color: '#FF4D4F', bg: '#fff2f0', border: '#ffccc7' }
-                            return { badge: '固定加分', color: '#52C41A', bg: '#f6ffed', border: '#b7eb8f' }
-                          }
                           return (
-                          <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                          <div className="organic-score-panel">
+                            <div className="organic-score-list">
                               {[5, 4, 3, 2, 1].map((star, idx) => {
                                 const condItem = items[idx] || { condition: 'fixed_bonus', score: 0 }
-                                const m = parseMode(condItem.condition)
                                 const isDynamic = condItem.condition.startsWith('dynamic')
-                                const isLast = idx === 4
+                                const isDeduction = condItem.condition.endsWith('deduction')
                                 return (
-                                  <div key={star} style={{
-                                    display: 'grid', gridTemplateColumns: '120px 100px 1fr', gap: 12, alignItems: 'center',
-                                    padding: '10px 0',
-                                    borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                  }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+                                  <ScoreRow key={star} score={condItem.score}
+                                    kind={isDynamic ? (isDeduction ? 'dynamic-deduction' : 'dynamic-bonus') : (isDeduction ? 'deduction' : 'bonus')}
+                                    label={<div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                                       <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{star}星</span>
                                       <span style={{ fontSize: 18, letterSpacing: 2, lineHeight: 1 }}>
                                         {Array.from({ length: 5 }, (_, i) => (
@@ -1502,22 +1430,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                           }}>{i < star ? '★' : '☆'}</span>
                                         ))}
                                       </span>
-                                    </div>
-                                    <span style={{
-                                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                      height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                      color: m.color, background: m.bg, border: `1px solid ${m.border}`,
-                                    }}>
-                                      {m.badge}
-                                    </span>
-                                    <span style={{ fontSize: 15, fontWeight: 600, color: m.color }}>
-                                      {isDynamic ? `${star} × ${condItem.score} = ${star * condItem.score} 分` : `${condItem.score} 分`}
-                                    </span>
-                                  </div>
+                                    </div>}>
+                                    {isDynamic ? `${star} × ${condItem.score} = ${isDeduction ? '-' : '+'}${star * condItem.score} 分` : undefined}
+                                  </ScoreRow>
                                 )
                               })}
                             </div>
-                            <div style={{ marginTop: 10, padding: '8px 12px', background: '#FFFBE6', borderRadius: 6, border: '1px solid #FFE58F', fontSize: 11, color: '#8C6D1F', lineHeight: 1.6 }}>
+                            <div className="organic-score-note">
                               <span style={{ fontWeight: 600 }}>計分規則：</span>固定加分/減分 = 用戶評價訂單，所選的星級匹配對應配置分數，直接加/減分；動態加分/減分 = 用戶評價訂單，所選星級 × 配置倍數 = 最終分數，再根據規則加/減分。
                             </div>
                           </div>
@@ -1581,7 +1500,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 />
                               </div>
                               {/* 區域配置卡片 */}
-                              <div style={{ padding: '14px 16px', background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                              <div className="organic-score-panel">
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                                   <div style={{ fontSize: 13, color: '#595959' }}>
                                     <span style={{ fontWeight: 600, color: '#262626' }}>統計週期：</span>過去 <span style={{ fontWeight: 600, color: regionColor.primary }}>{days}</span> 天
@@ -1600,34 +1519,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   </div>
                                 </div>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                  {tiers.map((tier, idx) => {
-                                    const isLast = idx === tiers.length - 1
-                                    return (
-                                      <div key={idx} style={{
-                                        display: 'flex', alignItems: 'center', gap: 8,
-                                        padding: '10px 0',
-                                        borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                      }}>
-                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                        <span style={{ fontSize: 13, color: '#595959' }}>
-                                          訂單量 ≤ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
-                                        </span>
-                                        <span style={{
-                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                          color: '#52C41A',
-                                          background: '#f6ffed',
-                                          border: '1px solid #b7eb8f',
-                                        }}>
-                                          固定加分
-                                        </span>
-                                        <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
-                                          {tier.score} 分
-                                        </span>
-                                      </div>
-                                    )
-                                  })}
+                                <div className="organic-score-list">
+                                  {tiers.map((tier, idx) => (
+                                    <ScoreRow key={idx} index={idx} label={<>訂單量 ≤ <b>{tier.threshold}</b> 單</>}
+                                      score={tier.score} />
+                                  ))}
                                 </div>
                               </div>
                             </div>
@@ -1662,7 +1558,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 />
                               </div>
                               {/* 區域配置卡片 */}
-                              <div style={{ padding: '14px 16px', background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                              <div className="organic-score-panel">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                                   <div style={{ fontSize: 13, color: '#595959' }}>
                                     <span style={{ fontWeight: 600, color: '#262626' }}>監控方式：</span>
@@ -1672,34 +1568,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   </div>
                                 </div>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                  {tiers.map((tier, idx) => {
-                                    const isLast = idx === tiers.length - 1
-                                    return (
-                                      <div key={idx} style={{
-                                        display: 'flex', alignItems: 'center', gap: 8,
-                                        padding: '10px 0',
-                                        borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                      }}>
-                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                        <span style={{ fontSize: 13, color: '#595959' }}>
-                                          訂單量 ≥ <span style={{ fontWeight: 600, color: '#262626' }}>{tier.threshold}</span> 單
-                                        </span>
-                                        <span style={{
-                                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                          height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                          color: '#FF4D4F',
-                                          background: '#fff2f0',
-                                          border: '1px solid #ffccc7',
-                                        }}>
-                                          固定減分
-                                        </span>
-                                        <span style={{ fontSize: 15, fontWeight: 600, color: '#FF4D4F' }}>
-                                          {Math.abs(tier.score)} 分
-                                        </span>
-                                      </div>
-                                    )
-                                  })}
+                                <div className="organic-score-list">
+                                  {tiers.map((tier, idx) => (
+                                    <ScoreRow key={idx} index={idx} label={<>訂單量 ≥ <b>{tier.threshold}</b> 單</>}
+                                      score={tier.score} kind="deduction" />
+                                  ))}
                                 </div>
                               </div>
                             </div>
@@ -1711,7 +1584,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const items = rule.conditionItems || []
                           const deductionScore = items.find(i => i.condition === 'over_avg_deduction')?.score ?? 0
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
                                   <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
@@ -1719,25 +1592,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 </div>
                               </div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 0',
-                              }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  當日出餐時間 &gt; 過去 {totalDays} 天均值
-                                </div>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#FF4D4F',
-                                  background: '#fff2f0',
-                                  border: '1px solid #ffccc7',
-                                }}>
-                                  固定扣分
-                                </span>
-                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>-{deductionScore} 分</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <ScoreRow label={<>當日出餐時間 &gt; 過去 {totalDays} 天均值</>}
+                                score={deductionScore} kind="deduction" />
+                              <div className="organic-score-note">
                                 備注：統計天數不含當天，統計期間內平均出餐時間作為基線，當天成餐時間超過基線即扣分
                               </div>
                             </div>
@@ -1748,30 +1605,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 80
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
                                   <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
                                   <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
                                 </div>
                               </div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
-                              }}>
-                                <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每拒絕一單</span>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#FF4D4F',
-                                  background: '#fff2f0',
-                                  border: '1px solid #ffccc7',
-                                }}>
-                                  固定減分
-                                </span>
-                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <ScoreRow label="統計天數內每拒絕一單" score={perOrder} kind="deduction" />
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天拒絕接單即即時扣分
                               </div>
                             </div>
@@ -1782,30 +1624,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 70
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
                                   <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
                                   <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（不含當天）
                                 </div>
                               </div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
-                              }}>
-                                <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每超時一單</span>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#FF4D4F',
-                                  background: '#fff2f0',
-                                  border: '1px solid #ffccc7',
-                                }}>
-                                  固定減分
-                                </span>
-                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <ScoreRow label="統計天數內每超時一單" score={perOrder} kind="deduction" />
+                              <div className="organic-score-note">
                                 備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分
                               </div>
                             </div>
@@ -1816,30 +1643,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 80
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
                                   <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
                                   <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
                                 </div>
                               </div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
-                              }}>
-                                <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每取消一單</span>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#FF4D4F',
-                                  background: '#fff2f0',
-                                  border: '1px solid #ffccc7',
-                                }}>
-                                  固定減分
-                                </span>
-                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <ScoreRow label="統計天數內每取消一單" score={perOrder} kind="deduction" />
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天取消訂單即即時扣分
                               </div>
                             </div>
@@ -1850,30 +1662,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = rule.statDays || 7
                           const perOrder = rule.deductionPerOrder || 60
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
                                   <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
                                   <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
                                 </div>
                               </div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: '#fff2f0', borderRadius: 6,
-                              }}>
-                                <span style={{ fontSize: 13, color: '#595959' }}>統計天數內每超時一單</span>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#FF4D4F',
-                                  background: '#fff2f0',
-                                  border: '1px solid #ffccc7',
-                                }}>
-                                  固定減分
-                                </span>
-                                <span style={{ fontWeight: 600, fontSize: 15, color: '#FF4D4F' }}>{perOrder} 分</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <ScoreRow label="統計天數內每超時一單" score={perOrder} kind="deduction" />
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天超時接單即即時扣分
                               </div>
                             </div>
@@ -1884,24 +1681,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const fullScore = rule.score ?? 100
                           const coeff = rule.decayCoefficient ?? 5
                           return (
-                            <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>滿分：</span>
-                                  <span style={{ fontWeight: 600, color: '#52C41A' }}>{fullScore}</span> 分
-                                </div>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>衰減係數：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{coeff}</span>
-                                </div>
-                              </div>
+                            <div className="organic-score-panel">
+                              <ScoreRow label="滿分" score={fullScore} kind="base" />
+                              <ScoreRow label="衰減係數" score={coeff} kind="decay" />
                               <div style={{
                                 display: 'flex', alignItems: 'center', gap: 12,
                                 padding: '10px 12px', background: '#e6f7ff', borderRadius: 6,
                               }}>
                                 <span style={{ fontSize: 13, color: '#595959' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：距離越遠得分越低，最低為 0 分
                               </div>
                             </div>
@@ -1915,22 +1704,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               {TIME_PERIOD_KEYS.map(periodKey => {
                                 const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
                                 return (
-                                  <div key={periodKey} style={{
-                                    padding: '10px 14px', background: '#FAFAFA', borderRadius: 6,
-                                    border: '1px solid #F0F0F0',
-                                  }}>
+                                  <div key={periodKey} className="organic-score-panel">
                                     <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
                                       {TIME_PERIOD_LABELS[periodKey]}
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                                    <div className="organic-score-list">
                                       {RANGE_SCORE_KEYS.map(key => (
-                                        <div key={key} style={{
-                                          padding: '6px 10px', borderRadius: 4, background: '#fff',
-                                          border: '1px solid #f0f0f0', textAlign: 'center',
-                                        }}>
-                                          <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 2 }}>{RANGE_LABEL[key]}</div>
-                                          <div style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{scores[key]} 分</div>
-                                        </div>
+                                        <ScoreRow key={key} label={RANGE_LABEL[key]} score={scores[key]} />
                                       ))}
                                     </div>
                                   </div>
@@ -1945,20 +1725,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div className="organic-score-panel organic-score-list">
                               {rule.tiers.map((tier: ScoreTier, i: number) => (
-                                <div key={i} style={{
-                                  display: 'flex', alignItems: 'center', gap: 8,
-                                  padding: '8px 12px', borderRadius: 6,
-                                  background: tier.score >= 0 ? '#f6ffed' : '#fff2f0',
-                                }}>
-                                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 24 }}>#{i + 1}</span>
-                                  {tier.statDays && <span style={{ fontSize: 12, color: '#8C8C8C' }}>統計 {tier.statDays} 天</span>}
-                                  <span style={{ fontSize: 13, color: '#595959' }}>訂單 {TIER_DIRECTION_LABEL[tier.direction]} {tier.threshold} 單</span>
-                                  <span style={{ marginLeft: 'auto', fontWeight: 600, fontSize: 14, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>
-                                    {tier.score >= 0 ? '+' : ''}{tier.score} 分
-                                  </span>
-                                </div>
+                                <ScoreRow key={i} index={i} score={tier.score}
+                                  label={<>訂單 {TIER_DIRECTION_LABEL[tier.direction]} {tier.threshold} 單</>}
+                                  hint={tier.statDays ? `統計 ${tier.statDays} 天` : undefined} />
                               ))}
                             </div>
                           </div>
@@ -1966,96 +1737,41 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {rule.rangeScores && rule.id !== 'PLT_02A' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>配送範圍分值</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                            <div className="organic-score-panel organic-score-list">
                               {RANGE_SCORE_KEYS.map(key => (
-                                <div key={key} style={{
-                                  padding: '8px 12px', borderRadius: 6, background: '#fff',
-                                  border: '1px solid #f0f0f0', textAlign: 'center',
-                                }}>
-                                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{RANGE_LABEL[key]}</div>
-                                  <div style={{ fontSize: 16, fontWeight: 600, color: '#262626' }}>{rule.rangeScores![key]} 分</div>
-                                </div>
+                                <ScoreRow key={key} label={RANGE_LABEL[key]} score={rule.rangeScores![key]} />
                               ))}
                             </div>
                           </div>
                         )}
                         {/* COM_01 滿額立減計分展示：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
                         {rule.id === 'COM_01' && rule.multiplierTiers && rule.multiplierTiers.length > 0 && (
-                          <div style={{ padding: '14px 16px', background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                          <div className="organic-score-panel">
                             {/* ① 基礎條件加分：門檻 ≤ 客單價 → 直接給分 */}
                             <div style={{ marginBottom: 12 }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>基礎條件加分</div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 8,
-                                padding: '10px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                              }}>
-                                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>—</span>
-                                <span style={{ fontSize: 13, color: '#595959' }}>
-                                  滿額立減門檻 ≤ 客單價
-                                </span>
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                  color: '#52C41A',
-                                  background: '#f6ffed',
-                                  border: '1px solid #b7eb8f',
-                                }}>
-                                  固定加分
-                                </span>
-                                <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
-                                  {rule.thresholdScore ?? 10} 分
-                                </span>
-                              </div>
+                              <ScoreRow label="滿額立減門檻 ≤ 客單價" score={rule.thresholdScore ?? 10} />
                             </div>
                             {/* ② 倍數梯度加分：門檻 < 客單價 × 倍數 → 按檔加分 */}
                             <div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>倍數梯度加分（以門店客單價為基準）</div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                                {[...rule.multiplierTiers].sort((a, b) => a.multiplier - b.multiplier).map((tier, idx, arr) => {
-                                  const isLast = idx === arr.length - 1
-                                  return (
-                                    <div key={idx} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8,
-                                      padding: '10px 0',
-                                      borderBottom: isLast ? 'none' : '1px dashed #E8E8E8',
-                                    }}>
-                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                      <span style={{ fontSize: 13, color: '#595959' }}>
-                                        滿額立減門檻 {'<'} 客單價 ×{' '}
-                                        <span style={{ fontWeight: 600, color: '#E8720C' }}>{tier.multiplier}</span>
-                                        {tier.multiplier === 1 ? '（即低於客單價）' : '倍'}
-                                      </span>
-                                      <span style={{
-                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                        height: 24, minWidth: 72, borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                        color: '#52C41A',
-                                        background: '#f6ffed',
-                                        border: '1px solid #b7eb8f',
-                                      }}>
-                                        固定加分
-                                      </span>
-                                      <span style={{ fontSize: 15, fontWeight: 600, color: '#52C41A' }}>
-                                        {tier.score} 分
-                                      </span>
-                                    </div>
-                                  )
-                                })}
+                              <div className="organic-score-list">
+                                {[...rule.multiplierTiers].sort((a, b) => a.multiplier - b.multiplier).map((tier, idx) => (
+                                  <ScoreRow key={idx} index={idx} score={tier.score}
+                                    label={<>滿額立減門檻 {'<'} 客單價 × <b>{tier.multiplier}</b>{tier.multiplier === 1 ? '（即低於客單價）' : '倍'}</>} />
+                                ))}
                               </div>
                             </div>
                           </div>
                         )}
                         {/* 備註（描述）放最下面 */}
-                        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px dashed #e8e8e8' }}>
-                          <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
-                            {rule.description}
-                          </div>
-                        </div>
+                        <div className="organic-score-note">{rule.description}</div>
                       </AlgorithmSection>
                     ) : (
                       /* 編輯模式 */
                       <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: rule.id === 'COM_01' || rule.id === 'COM_02' ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div className="organic-score-config-grid">
                           {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
@@ -2065,9 +1781,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )}
                           {rule.id === 'COM_02' && (
-                            <div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>報名計分</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div className="organic-score-panel">
+                              <div className="organic-score-edit-row">
+                                <span className="organic-score-edit-row__label">報名計分</span>
                                 <Switch aria-label="報名計分" checked={!!form.prerequisites}
                                   checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
                                   onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: checked ? '報名減免運費' : undefined } }) as any)} />
@@ -2081,7 +1797,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             const rc: Record<string, RegionSupportConfig> = (form as any).regionConfigs || {}
                             const regionData = rc[activeRegion] || { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [] }
                             const blocked: string[] = (form as any).blockedMerchants || []
-                            const regionColor = REGION_COLORS[activeRegion]
                             const prereqVal = regionData.prerequisites || 'UNCONDITIONAL'
                             const isUnconditional = prereqVal === 'UNCONDITIONAL'
                             const selectedConds: string[] = isUnconditional ? [] : (() => { try { return JSON.parse(prereqVal) } catch { return [] } })()
@@ -2160,7 +1875,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
                                 />
                                 {/* 區域配置卡片 */}
-                                <div style={{ padding: 12, background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                                <div className="organic-score-panel">
                                   {/* 前提條件 */}
                                   <div style={{ marginBottom: 12 }}>
                                     <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>前提條件</div>
@@ -2206,10 +1921,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
-                                      <div key={idx} style={{
-                                        display: 'flex', alignItems: 'center', gap: 8,
-                                        padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                                      }}>
+                                      <div key={idx} className="organic-score-edit-tier">
                                         <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
                                         <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
                                         <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≤</span>
@@ -2272,7 +1984,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
 
                           {/* COM_01 滿額立減計分配置：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
                           {rule.id === 'COM_01' && (
-                            <div style={{ padding: 12, background: '#FFF7E6', borderRadius: 8, border: '1px solid #FFE7D1' }}>
+                            <div className="organic-score-panel">
                               {/* ① 基礎條件加分 */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                                 <div style={{ width: 24, height: 24, borderRadius: 6, background: '#52C41A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2281,10 +1993,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>基礎條件加分</span>
                                 <span style={{ fontSize: 11, color: '#8C8C8C' }}>門檻≤客單價直接給分</span>
                               </div>
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 8,
-                                padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0', marginBottom: 16,
-                              }}>
+                              <div className="organic-score-edit-tier" style={{ marginBottom: 16 }}>
                                 <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>滿額立減門檻 ≤ 客單價</span>
                                 <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
                                 <InputNumber
@@ -2307,10 +2016,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {((form as any).multiplierTiers || []).map((tier: MultiplierTier, idx: number) => (
-                                  <div key={idx} style={{
-                                    display: 'flex', alignItems: 'center', gap: 8,
-                                    padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                                  }}>
+                                  <div key={idx} className="organic-score-edit-tier">
                                     <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
                                     <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
                                     <InputNumber
@@ -2372,7 +2078,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         </div>
                         {/* STB_02 營業狀態專屬配置 */}
                         {rule.id === 'STB_02' && (
-                          <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                          <div className="organic-score-panel">
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                               {[
                                 { key: 'operating', label: '營業額中狀態', desc: '正常營業中' },
@@ -2383,7 +2089,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 const items = (form as any).conditionItems || []
                                 const currentItem = items[idx] || { condition: '', score: 0 }
                                 return (
-                                  <div key={item.key} style={{ display: 'grid', gridTemplateColumns: '140px 100px 1fr', gap: 8, alignItems: 'center' }}>
+                                  <div key={item.key} className="organic-score-edit-tier">
                                     <div>
                                       <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>{item.label}</div>
                                       <div style={{ fontSize: 11, color: '#8C8C8C' }}>{item.desc}</div>
@@ -2409,7 +2115,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       value={currentItem.score}
                                       min={0}
                                       max={100}
-                                      style={{ width: '100%' }}
+                                      style={{ width: 130 }}
+                                      addonAfter="分"
                                       placeholder="輸入分數"
                                       onChange={val => {
                                         const newItems = [...(form as any).conditionItems || []]
@@ -2425,7 +2132,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         )}
                         {/* STB_03 評價得分專屬配置（5 星） */}
                         {rule.id === 'STB_03' && (
-                          <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                          <div className="organic-score-panel">
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                               <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
                               <InputNumber
@@ -2443,7 +2150,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 const currentItem = items[idx] || { condition: 'fixed_bonus', score: 0 }
                                 const isDynamic = currentItem.condition?.startsWith('dynamic')
                                 return (
-                                  <div key={star} style={{ display: 'grid', gridTemplateColumns: '120px 120px 1fr', gap: 8, alignItems: 'center' }}>
+                                  <div key={star} className="organic-score-edit-tier">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
                                       <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{star}星</span>
                                       <span style={{ fontSize: 18, letterSpacing: 2, lineHeight: 1 }}>
@@ -2480,7 +2187,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                       value={currentItem.score}
                                       min={0}
                                       max={isDynamic ? 10 : 100}
-                                      style={{ width: '100%' }}
+                                      style={{ width: 130 }}
                                       placeholder={isDynamic ? '輸入倍數' : '輸入分數'}
                                       addonAfter={isDynamic ? undefined : '分'}
                                       onChange={val => {
@@ -2493,7 +2200,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 )
                               })}
                             </div>
-                            <div style={{ marginTop: 10, padding: '8px 12px', background: '#FFFBE6', borderRadius: 6, border: '1px solid #FFE58F', fontSize: 11, color: '#8C6D1F', lineHeight: 1.6 }}>
+                            <div className="organic-score-note">
                               <span style={{ fontWeight: 600 }}>計分規則：</span>固定加分/減分 = 用戶評價訂單，所選的星級匹配對應配置分數，直接加/減分；動態加分/減分 = 用戶評價訂單，所選星級 × 配置倍數 = 最終分數，再根據規則加/減分。
                             </div>
                           </div>
@@ -2527,7 +2234,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
                               />
                               {/* 區域配置卡片 */}
-                              <div style={{ padding: 12, background: regionColor.bg, borderRadius: 8, border: `1px solid ${regionColor.border}` }}>
+                              <div className="organic-score-panel">
                                 {/* 校驗間隔 */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>監控方式</span>
@@ -2549,10 +2256,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
-                                    <div key={idx} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8,
-                                      padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                                    }}>
+                                    <div key={idx} className="organic-score-edit-tier">
                                       <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
                                       <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
                                       <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≥</span>
@@ -2622,7 +2326,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], conditionItems: newItems } }) as any)
                           }
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -2636,14 +2340,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 </div>
                               </div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>當日出餐 &gt; 統計均值扣分</span>
+                              <div className="organic-score-edit-tier">
+                                <span className="organic-score-edit-tier__label">當日出餐 &gt; 統計均值扣分</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={deductionScore} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分" placeholder="輸入分數"
                                   onChange={val => updateCond('over_avg_deduction', val ?? 0)} />
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：統計天數不含當天，統計期間內平均出餐時間作為基線，當天成餐時間超過基線即扣分
                               </div>
                             </div>
@@ -2654,7 +2358,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 80
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -2667,14 +2371,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>每拒絕一單扣分</span>
+                              <div className="organic-score-edit-tier">
+                                <span className="organic-score-edit-tier__label">每拒絕一單扣分</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分/單" placeholder="輸入分數"
                                   onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 80 } }) as any)} />
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天拒絕接單即即時扣分
                               </div>
                             </div>
@@ -2685,7 +2389,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 70
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -2698,14 +2402,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>（不含當天）</span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>每超時一單扣分</span>
+                              <div className="organic-score-edit-tier">
+                                <span className="organic-score-edit-tier__label">每超時一單扣分</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分/單" placeholder="輸入分數"
                                   onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 70 } }) as any)} />
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分
                               </div>
                             </div>
@@ -2716,7 +2420,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 80
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -2729,14 +2433,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>每取消一單扣分</span>
+                              <div className="organic-score-edit-tier">
+                                <span className="organic-score-edit-tier__label">每取消一單扣分</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分/單" placeholder="輸入分數"
                                   onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 80 } }) as any)} />
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天取消訂單即即時扣分
                               </div>
                             </div>
@@ -2747,7 +2451,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const days = (form as any).statDays ?? 7
                           const perOrder = (form as any).deductionPerOrder ?? 60
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
@@ -2760,14 +2464,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                                <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>每超時一單扣分</span>
+                              <div className="organic-score-edit-tier">
+                                <span className="organic-score-edit-tier__label">每超時一單扣分</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分/單" placeholder="輸入分數"
                                   onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 60 } }) as any)} />
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：統計天數含當天，商家當天超時接單即即時扣分
                               </div>
                             </div>
@@ -2778,7 +2482,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                           const fullScore = form.score ?? 100
                           const coeff = (form as any).decayCoefficient ?? 5
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>滿分</span>
@@ -2818,14 +2522,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               {TIME_PERIOD_KEYS.map(periodKey => {
                                 const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
                                 return (
-                                  <div key={periodKey} style={{
-                                    padding: '12px 14px', background: '#FAFAFA', borderRadius: 6,
-                                    border: '1px solid #F0F0F0',
-                                  }}>
+                                  <div key={periodKey} className="organic-score-panel">
                                     <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10 }}>
                                       {TIME_PERIOD_LABELS[periodKey]}
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                                    <div className="organic-score-fields">
                                       {RANGE_SCORE_KEYS.map(key => (
                                         <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                           <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{RANGE_LABEL[key]}</span>
@@ -2854,7 +2555,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         {rule.id === 'STB_ACT' && (() => {
                           const items: ActivityScoreItem[] = ((form as any).activityItems || [])
                           return (
-                            <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8, border: '1px solid #F0F0F0' }}>
+                            <div className="organic-score-panel">
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {items.length === 0 && (
                                   <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: '8px 0' }}>請點擊下方「添加算法」，輸入算法ID後系統自動獲取算法名稱與狀態</div>
@@ -2862,10 +2563,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 {items.map((item, idx) => {
                                   const live = algoOptions.find(a => a.algoCode === item.activityId?.trim())
                                   return (
-                                    <div key={idx} style={{
-                                      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-                                      padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0',
-                                    }}>
+                                    <div key={idx} className="organic-score-edit-tier">
                                       <AutoComplete
                                         value={item.activityId}
                                         style={{ width: 200 }}
@@ -2905,7 +2603,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                     })
                                   }}>添加算法</Button>
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 8 }}>
+                              <div className="organic-score-note">
                                 備注：暫以算法庫算法ID對接驗證，後續有活動功能後再切換為活動對接；輸入算法ID後系統自動獲取算法名稱與狀態，店鋪報名參與即得固定加分，每個獨立計分、可累加
                               </div>
                             </div>
@@ -2913,8 +2611,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         })()}
                         {/* STB_01/STB_04 主營時段/店鋪標籤自定義編輯（固定加分，無下拉框） */}
                         {(rule.id === 'STB_01' || rule.id === 'STB_04') && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                            <span style={{ fontSize: 13, color: '#595959', flex: 1 }}>{rule.id === 'STB_01' ? '主營時段加分' : '金牌店鋪身份標籤'}</span>
+                          <div className="organic-score-edit-tier">
+                            <span className="organic-score-edit-tier__label">{rule.id === 'STB_01' ? '主營時段加分' : '金牌店鋪身份標籤'}</span>
                             <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
                             <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
                               addonAfter="分" placeholder="輸入分數"
@@ -2923,7 +2621,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                         )}
                         {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT/COM_01 顯示標準計分方式 */}
                         {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div className="organic-score-fields">
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
@@ -2959,19 +2657,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
                         </div>
                         {/* 最後一排：狀態 + 取消/保存 */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px dashed #e8e8e8' }}>
+                        <div className="organic-score-toolbar" style={{ paddingTop: 12, borderTop: '1px dashed #e8eaed', marginBottom: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 12, color: '#595959' }}>狀態</span>
                             <Switch checked={form.status === ServiceStatus.ENABLED}
                               checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
                               onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], status: checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED } }) as any)} />
                           </div>
-                          <Space size={6}>
-                            <Button size="small" onClick={() => handleInlineCancel(rule.id)}
-                              style={{ borderRadius: 4, fontSize: 12, height: 28 }}>取消</Button>
-                            <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}
-                              style={{ borderRadius: 4, fontSize: 12, height: 28, backgroundColor: '#E8720C', borderColor: '#E8720C' }}>保存</Button>
-                          </Space>
+                          <div className="organic-score-edit-actions organic-score-toolbar__actions">
+                            <Button size="small" onClick={() => handleInlineCancel(rule.id)}>取消</Button>
+                            <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}>保存</Button>
+                          </div>
                         </div>
                       </div>
                       </AlgorithmSection>

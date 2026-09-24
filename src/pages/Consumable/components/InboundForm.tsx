@@ -43,10 +43,10 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
           form.setFieldsValue({
             itemId: presetItemId,
             unitCost: preset?.refPrice ?? 0,
-            // 补货建议量：上限-可用（无上限则给安全库存缺口）
+            // 補貨建議量：與預警列表 suggestQty 口径一致——有上限補至上限，否則補至安全庫存的 1.5 倍
             qty: preset ? (preset.maxStock > 0
               ? Math.max(1, preset.maxStock - preset.availableQty)
-              : Math.max(1, preset.safetyStock - preset.availableQty)) : 1,
+              : Math.max(1, Math.ceil(preset.safetyStock * 1.5) - preset.availableQty)) : 1,
           })
         } else {
           form.setFieldsValue({ qty: 1 })
@@ -98,7 +98,7 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>耗材：</span><b>{it?.name ?? ''}</b></div>
           <div className="confirm-info-row"><span>入庫數量：</span><b>{v.qty} {it?.unit ?? ''}</b></div>
-          <div className="confirm-info-row"><span>入庫單價：</span><b>¥{(v.unitCost ?? 0).toFixed(2)}</b></div>
+          <div className="confirm-info-row"><span>入庫單價：</span><b>MOP {(v.unitCost ?? 0).toFixed(2)}</b></div>
         </div>
       ),
       okText: '確認入庫',
@@ -127,7 +127,7 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#1890ff' }}>📥</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>入库信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>入庫信息</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
@@ -140,7 +140,7 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
             <Form.Item label="入庫數量" name="qty" rules={[{ required: true, message: '請填寫入庫數量' }]}>
               <InputNumber min={1} precision={0} style={{ width: '100%' }} placeholder="正整數" />
             </Form.Item>
-            <Form.Item label="入庫單價（元）" name="unitCost" rules={[{ required: true, message: '請填寫實際入庫單價' }]}>
+            <Form.Item label="入庫單價（MOP）" name="unitCost" rules={[{ required: true, message: '請填寫實際入庫單價' }]}>
               <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="實際入庫單價（成本核算必填）" />
             </Form.Item>
           </div>

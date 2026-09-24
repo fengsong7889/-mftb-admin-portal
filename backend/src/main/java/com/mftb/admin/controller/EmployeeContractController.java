@@ -1,0 +1,42 @@
+package com.mftb.admin.controller;
+
+import com.mftb.admin.annotation.RequirePermission;
+import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.ContractLedgerVO;
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.service.EmployeeContractService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 合同全局台账接口 (P1-B)
+ * <p>
+ * 跨员工查看/筛选合同；查看权限沿用 employee-management。新增/编辑/删除仍在员工详情内维护。
+ */
+@RestController
+@RequestMapping("/api/contracts")
+@RequiredArgsConstructor
+@Tag(name = "集团人事 - 合同台账", description = "跨员工合同全局台账查询")
+public class EmployeeContractController {
+
+    private final EmployeeContractService employeeContractService;
+
+    /** 合同全局台账（分页 + 关键字/签约主体/类型/状态筛选） */
+    @GetMapping
+    @RequirePermission(menu = "employee-management")
+    @Operation(summary = "合同全局台账分页查询")
+    public Result<PageResult<ContractLedgerVO>> ledger(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String company,
+            @RequestParam(required = false) String contractType,
+            @RequestParam(required = false) String status) {
+        return Result.success(employeeContractService.ledger(page, size, keyword, company, contractType, status));
+    }
+}

@@ -101,7 +101,7 @@ export default function ClaimForm({ onBack }: Props) {
     }
     const lines = (values.items || []).filter(l => l && l.itemId != null && (l.qty ?? 0) > 0)
     const totalQty = lines.reduce((s, l) => s + (l.qty ?? 0), 0)
-    const applicantName = employees.find(e => e.id === values.applicantId)?.name ?? '当前登録人'
+    const applicantName = employees.find(e => e.id === values.applicantId)?.name ?? '當前登録人'
     Modal.confirm({
       title: '確認領用？',
       className: 'custom-confirm-modal',
@@ -141,7 +141,7 @@ export default function ClaimForm({ onBack }: Props) {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#1890ff' }}>📝</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>领用信息</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>領用信息</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
@@ -169,7 +169,7 @@ export default function ClaimForm({ onBack }: Props) {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#FA8C16' }}>🧾</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>领用明细</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>領用明細</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 

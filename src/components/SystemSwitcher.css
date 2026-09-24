@@ -1,0 +1,52 @@
+/* 系统切换器（Round 2）：与全局 header-bar 主色/圆角保持一致，避免另立色板。 */
+
+.system-switcher-trigger.ant-btn {
+  height: 32px;
+  padding: 0 12px;
+  margin-left: 12px;
+  color: #262626;
+  border-radius: 6px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.system-switcher-trigger.ant-btn:hover {
+  background: #FFF7F0 !important;
+  color: #E8720C !important;
+}
+
+.system-switcher-trigger-label {
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-switcher-dropdown .ant-dropdown-menu-item-group-title {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.system-switcher-group {
+  font-size: 12px;
+  color: #8c8c8c;
+  letter-spacing: 0.4px;
+}
+
+.system-switcher-item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 180px;
+}
+
+.system-switcher-item-name {
+  flex: 1;
+}
+
+.system-switcher-item-active {
+  color: #E8720C;
+  font-size: 11px;
+  margin-left: 8px;
+}

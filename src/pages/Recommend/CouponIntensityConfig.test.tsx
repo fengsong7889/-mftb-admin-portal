@@ -3,7 +3,8 @@ import { ConfigProvider, Form, message } from 'antd'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
-import { createDefaultCouponIntensityConfig, validateCouponIntensityConfig } from './organicTrafficConfig'
+import { createDefaultCouponIntensityConfig, validateCouponIntensityConfig, DEFAULT_ORGANIC_SCORE_RULES, ScoreDimension } from './organicTrafficConfig'
+import ScoreRow from './AlgorithmForm/ScoreRow'
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), create: vi.fn(), toggle: vi.fn(), remove: vi.fn() }))
 vi.mock('@/api/organicScore', () => ({
@@ -67,12 +68,12 @@ describe('优惠配置原位编辑', () => {
     fireEvent.click(panel.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     changeNumber('報名分值', 25)
     fireEvent.click(panel.getByRole('button', { hidden: true, name: /保\s*存/ }))
-    expect(panel.getByText('報名分：+25 分')).toBeInTheDocument()
+    expect(panel.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
     expect(panel.queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(message.info).toHaveBeenCalledWith(expect.stringContaining('當前頁面草稿'))
     fireEvent.click(screen.getByText('COM_03'))
     panel = openRule()
-    expect(panel.getByText('報名分：+25 分')).toBeInTheDocument()
+    expect(panel.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
     expect(screen.getByLabelText('当前位置')).toHaveTextContent('/promotion-algorithm-add?type=7&id=123')
     expect(api.update).not.toHaveBeenCalled()
     expect(api.create).not.toHaveBeenCalled()
@@ -87,17 +88,17 @@ describe('优惠配置原位编辑', () => {
     fireEvent.click(first.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     changeNumber('報名分值', 99)
     fireEvent.click(first.getByRole('button', { hidden: true, name: /取\s*消/ }))
-    expect(first.getByText('報名分：+25 分')).toBeInTheDocument()
+    expect(first.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
     let second = openRule('COM_04', '新客立減')
-    expect(second.getByText('報名分：+10 分')).toBeInTheDocument()
+    expect(second.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+10 分')
     fireEvent.click(second.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     changeNumber('報名分值', 40)
     fireEvent.click(screen.getByText('COM_04'))
     second = openRule('COM_04', '新客立減')
     expect(second.getByRole('spinbutton', { hidden: true, name: '報名分值' })).toHaveValue('40')
     fireEvent.click(second.getByRole('button', { hidden: true, name: /保\s*存/ }))
-    expect(second.getByText('報名分：+40 分')).toBeInTheDocument()
-    expect(first.getByText('報名分：+25 分')).toBeInTheDocument()
+    expect(second.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+40 分')
+    expect(first.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
   }, 60000) // 多轮编辑/折叠交互，冷启动下放宽时限。
 
   it('非法区间阻止保存和试算，取消仍可退出编辑', async () => {
@@ -212,6 +213,81 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     await mount()
     fireEvent.click(screen.getByText('COM_09'))
     expect(screen.getByText('計分明細')).toBeInTheDocument()
+  })
+})
+
+describe('自然流量计分展示一致性', () => {
+  it.each([
+    [ScoreDimension.COMMERCIAL, 'dimCommercial'],
+    [ScoreDimension.STORE, 'dimStore'],
+    [ScoreDimension.PLATFORM, 'dimPlatform'],
+  ] as const)('%s 维度所有非空计分项复用统一行、标签和分值', async (dimension, tab) => {
+    await mount(true)
+    fireEvent.click(screen.getByRole('tab', { name: new RegExp(tab) }))
+    const rules = DEFAULT_ORGANIC_SCORE_RULES.filter(rule => rule.dimension === dimension)
+    for (const rule of rules) {
+      fireEvent.click(screen.getByText(rule.id))
+      const body = screen.getByText(rule.id).parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
+      expect(body).toBeTruthy()
+      if (rule.id === 'STB_ACT') {
+        expect(body).toHaveTextContent('尚未配置')
+      } else {
+        const rows = body!.querySelectorAll('.organic-score-row')
+        expect(rows.length, rule.id).toBeGreaterThan(0)
+        for (const row of rows) {
+          expect(row.querySelector('.organic-score-row__condition')).toBeTruthy()
+          expect(row.querySelector('.organic-score-value__badge')).toBeTruthy()
+          expect(row.querySelector('.organic-score-value__number')).toBeTruthy()
+          expect(row.closest('.organic-score-panel')).toBeTruthy()
+        }
+      }
+      fireEvent.click(screen.getByText(rule.id))
+    }
+    expect(api.update).not.toHaveBeenCalled()
+  }, 60000)
+
+  it('报名开关关闭后保留配置值、灰显，不误显示为生效加分', async () => {
+    await mount()
+    const panel = openRule()
+    fireEvent.click(panel.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
+    fireEvent.click(panel.getByRole('switch', { name: '啟用報名分' }))
+    fireEvent.click(panel.getByRole('button', { hidden: true, name: /保\s*存/ }))
+    const sw = panel.getByRole('switch', { name: '報名計分' })
+    expect(sw).not.toBeChecked()
+    expect(sw).toBeDisabled()
+    expect(sw.closest('.organic-score-row')?.querySelector('.organic-score-value--disabled')).toHaveTextContent('+10 分')
+    expect(api.update).not.toHaveBeenCalled()
+  })
+
+  it('区域切换保留各区域独立梯度，扣分展示使用统一负号', async () => {
+    const rule = DEFAULT_ORGANIC_SCORE_RULES.find(item => item.id === 'PLT_03')!
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ ...rule, ruleCode: rule.id, builtin: 1,
+      regionConfigs: JSON.stringify({ MACAU: { statDays: 30, tiers: [{ threshold: 50, score: 20 }] },
+        TAIPA: { statDays: 7, tiers: [{ threshold: 100, score: 45 }] } }) }] })
+    await mount(true)
+    fireEvent.click(screen.getByRole('tab', { name: /dimPlatform/ }))
+    fireEvent.click(screen.getByText('PLT_03'))
+    expect(screen.getByText('+20 分')).toHaveClass('organic-score-value__number')
+    fireEvent.click(screen.getByText('氹仔區域'))
+    expect(screen.getByText('+45 分')).toHaveClass('organic-score-value__number')
+    expect(screen.queryByText('+20 分')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('澳門區域'))
+    expect(screen.getByText('+20 分')).toBeInTheDocument()
+  })
+
+  it('统一正负分、零值和倍率格式，不出现双负号或将倍率标作分', () => {
+    render(<>
+      <ScoreRow label="固定奖励" score={20} />
+      <ScoreRow label="负数扣分" score={-30} kind="deduction" />
+      <ScoreRow label="正数扣分配置" score={40} kind="deduction" />
+      <ScoreRow label="零分" score={0} />
+      <ScoreRow label="倍率" score={0.5} kind="coefficient" />
+    </>)
+    expect(screen.getByText('+20 分')).toHaveClass('organic-score-value__number')
+    expect(screen.getByText('-30 分').parentElement).toHaveClass('organic-score-value--deduction')
+    expect(screen.getByText('-40 分').parentElement).toHaveClass('organic-score-value--deduction')
+    expect(screen.getByText('0 分')).toBeInTheDocument()
+    expect(screen.getByText('×0.5').parentElement).toHaveClass('organic-score-value--multiplier')
   })
 })
 

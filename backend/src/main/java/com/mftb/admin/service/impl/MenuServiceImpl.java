@@ -8,6 +8,7 @@ import com.mftb.admin.dto.MenuVO;
 import com.mftb.admin.entity.SysMenu;
 import com.mftb.admin.mapper.SysMenuMapper;
 import com.mftb.admin.service.MenuService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class MenuServiceImpl implements MenuService {
 
     private final SysMenuMapper sysMenuMapper;
     private final OperatorResolver operatorResolver;
+    private final PermissionService permissionService;
 
     @Override
     public List<MenuVO> list() {
@@ -89,6 +91,8 @@ public class MenuServiceImpl implements MenuService {
         menu.setDeleted(0);
         menu.setUpdatedBy(operatorResolver.currentOperatorName());
         sysMenuMapper.insert(menu);
+        // 菜单新增可能引入新的 menuKey，让所有实例的权限快照自动失效
+        permissionService.evictAll();
         return MenuVO.from(menu);
     }
 
@@ -124,6 +128,9 @@ public class MenuServiceImpl implements MenuService {
         int affected = sysMenuMapper.update(null, updateWrapper);
         log.info("更新菜单 id={}, 影响行数={}", id, affected);
 
+        // 菜单结构/启用变更影响所有实例的权限快照，统一递增 revision
+        permissionService.evictAll();
+
         // 重新查询返回最新数据
         SysMenu updated = requireMenu(id);
         return MenuVO.from(updated);
@@ -135,6 +142,8 @@ public class MenuServiceImpl implements MenuService {
         menu.setStatus(status);
         menu.setUpdatedBy(operatorResolver.currentOperatorName());
         sysMenuMapper.updateById(menu);
+        // 启用/停用改变可访问菜单集，需要失效缓存
+        permissionService.evictAll();
     }
 
     @Override
@@ -147,6 +156,8 @@ public class MenuServiceImpl implements MenuService {
             throw new BusinessException("該菜單存在子菜單，請先刪除子菜單");
         }
         sysMenuMapper.deleteById(id);
+        // 删除后历史菜单授权失效，同样递增 revision
+        permissionService.evictAll();
     }
 
     /** 构建菜单树, 父菜单在前、同级按 sort 排序 */

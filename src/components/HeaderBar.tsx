@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import PikachuFace from './PikachuFace'
+import SystemSwitcher from './SystemSwitcher'
 import { useTranslation } from 'react-i18next'
 import { changeAppLanguage, SUPPORTED_LANGUAGES, ensureLanguageBundle } from '../i18n'
 import type { AppLanguage } from '../i18n'
@@ -522,6 +523,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
           <span className="trigger-icon" onClick={onToggle}>
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </span>
+          <SystemSwitcher />
         </div>
         <div className="header-right">
           {/* 国家选择器 */}

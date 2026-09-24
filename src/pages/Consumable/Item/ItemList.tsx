@@ -15,6 +15,7 @@ import {
   type ConsumableItem, type ConsumableCategory, type ConsumableBrand, type PurchaseCompany,
 } from '../../../api/consumable'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { exportToCSV } from '../../../utils/exportCSV'
 import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
 import BrandTag from '../../../components/BrandTag'
 import { buildTree, toTreeSelectData } from '../../AssetManagement/eamUtils'
@@ -130,6 +131,24 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
 
   const handleExport = () => {
     if (items.length === 0) { message.warning('暫無數據可導出'); return }
+    const cols = [
+      { title: '耗材編碼', dataIndex: 'itemCode' },
+      { title: '耗材名稱', dataIndex: 'name' },
+      { title: '所屬品牌', dataIndex: 'companyBrand', render: (v: number | null) => (v === 1 ? '閃蜂' : v === 2 ? 'mFood' : '待確認') },
+      { title: '購買公司', dataIndex: 'purchaseCompanyName', render: (v: string) => v || '待確認' },
+      { title: '耗材分類', dataIndex: 'categoryName', render: (v: string) => v || '-' },
+      { title: '耗材品牌', dataIndex: 'brand', render: (v: string) => v || '-' },
+      { title: '規格型號', dataIndex: 'spec', render: (v: string) => v || '-' },
+      { title: '單位', dataIndex: 'unit' },
+      { title: '參考單價', dataIndex: 'refPrice', render: (v: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+      { title: '可用庫存', dataIndex: 'availableQty' },
+      { title: '總庫存', dataIndex: 'totalQty' },
+      { title: '安全庫存', dataIndex: 'safetyStock', render: (v: number) => (v > 0 ? String(v) : '-') },
+      { title: '狀態', dataIndex: 'status', render: (v: string) => (v === 'enabled' ? '啟用' : '停用') },
+      { title: '最後更新人', dataIndex: 'updatedBy', render: (v: string) => v || '-' },
+      { title: '最後更新時間', dataIndex: 'updatedAt', render: (v: string) => v || '-' },
+    ]
+    exportToCSV(`consumable_items_${new Date().toISOString().slice(0, 10)}`, cols, items)
     message.success('導出成功')
   }
 
@@ -210,7 +229,7 @@ export default function ItemList({ onAdd, onEdit, onView }: Props) {
     { title: '規格型號', dataIndex: 'spec', key: 'spec', width: 140, ellipsis: true, render: (v: string) => v || '-' },
     { title: '單位', dataIndex: 'unit', key: 'unit', width: 70 },
     { title: '參考單價', dataIndex: 'refPrice', key: 'refPrice', width: 100,
-      render: (v: number) => `¥${(v ?? 0).toFixed(2)}` },
+      render: (v: number) => `MOP ${(v ?? 0).toFixed(2)}` },
     { title: '可用/總庫存', key: 'stock', width: 130,
       render: (_: unknown, r: ConsumableItem) => (
         <Space size={4}>

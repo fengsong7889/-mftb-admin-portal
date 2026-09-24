@@ -196,7 +196,9 @@ export default function Login() {
         setFailCount(0)
         localStorage.removeItem(FAIL_COUNT_KEY)
         message.success(t('login.success'))
-        navigate('/', { replace: true })
+        // 统一门户阶段 B：AuthContext 基于 accessibleSystems 计算了 redirectPath，
+        // 默认跳 `/portal`；无系统时回退旧菜单首页，避免黑屏。
+        navigate(result.redirectPath || '/', { replace: true })
       } else if (result.accountDisabled) {
         // 账号被停用: 弹窗提醒（不显示 toast、不计入失败次数）
         setAccountDisabledVisible(true)

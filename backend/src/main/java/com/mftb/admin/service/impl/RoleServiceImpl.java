@@ -70,6 +70,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public RoleVO create(RoleRequest request) {
+        assertNameUnique(request.getName(), null);
         SysRole role = new SysRole();
         role.setName(request.getName());
         // code 唯一约束, 自动生成
@@ -87,6 +88,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public RoleVO update(Long id, RoleRequest request) {
         SysRole role = requireRole(id);
+        assertNameUnique(request.getName(), id);
         role.setName(request.getName());
         role.setDescription(request.getDescription());
         role.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -98,6 +100,10 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
         requireRole(id);
+        // Round 5 · 旧写入口告警：全量写会跨系统覆盖，与新的原子写接口
+        // （PUT /api/roles/{id}/systems/{code}/authorization）并存时容易引发误操作；
+        // 保留向后兼容，仅记录 warn，为未来一个 cycle 删除提供依据。
+        log.warn("[deprecated-path] RoleServiceImpl.updatePermissions 正在全量覆盖角色 {} 的菜单授权（跨系统）；推荐前端迁移到系统授权页 PUT /api/roles/{}/systems/{{code}}/authorization", id, id);
         saveRoleMenus(id, permissions);
         permissionService.evictAll();
     }
@@ -324,5 +330,18 @@ public class RoleServiceImpl implements RoleService {
             throw new BusinessException("角色不存在");
         }
         return role;
+    }
+
+    /** 角色名稱唯一性校驗（排除自身；@TableLogic 自動過濾已刪除記錄） */
+    private void assertNameUnique(String name, Long excludeId) {
+        if (!StringUtils.hasText(name)) {
+            return;
+        }
+        Long count = sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getName, name.trim())
+                .ne(excludeId != null, SysRole::getId, excludeId));
+        if (count != null && count > 0) {
+            throw new BusinessException("角色名稱已存在：" + name.trim());
+        }
     }
 }

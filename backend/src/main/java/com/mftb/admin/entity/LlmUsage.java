@@ -45,5 +45,18 @@ public class LlmUsage {
     /** 币种: CNY/USD；无单价配置时为空 */
     private String currency;
 
+    /**
+     * V0 计量可信等级（§B.5）：
+     * <ul>
+     *   <li>VERIFIED：网关侧实际取到 usage 且命中单价</li>
+     *   <li>ESTIMATED：网关侧取到 usage 但无单价，费用记 0（展示为“估算”）</li>
+     *   <li>UNKNOWN：历史客户端自报或无 usage，展示为“未知”</li>
+     * </ul>
+     */
+    private String verificationStatus;
+
+    /** 关联 {@code ai_budget_ledger.request_id}，服务端计量口径下不为空 */
+    private String requestId;
+
     private LocalDateTime createdAt;
 }

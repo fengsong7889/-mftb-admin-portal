@@ -8,10 +8,12 @@ import com.mftb.admin.entity.EmpPositionRecord;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.EmpPositionRecordMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.EmployeeService;
 import com.mftb.admin.service.PositionRecordService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,6 +28,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
     private final EmpPositionRecordMapper positionRecordMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
+    private final EmployeeService employeeService;
 
     @Override
     public List<PositionRecordVO> listByUserId(Long userId) {
@@ -40,6 +43,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
     }
 
     @Override
+    @Transactional
     public PositionRecordVO create(Long userId, PositionRecordRequest request) {
         requireUser(userId);
         int nextSeq = getNextEffectiveSeq(userId, request.getEffectiveDate());
@@ -68,6 +72,12 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         entity.setDeleted(0);
         positionRecordMapper.insert(entity);
+        // P1-F: 离职记录且生效日 <= 今天时，自动停用账号并强制下线（复用员工服务，同一事务）
+        if ("离职".equals(request.getOperation())
+                && request.getEffectiveDate() != null
+                && !request.getEffectiveDate().isAfter(LocalDate.now())) {
+            employeeService.updateStatus(userId, 0);
+        }
         return PositionRecordVO.from(entity);
     }
 

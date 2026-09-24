@@ -9,9 +9,15 @@ import {
   FileTextOutlined,
   PaperClipOutlined,
   MessageOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../components/DetailPageHeader'
-import { fetchAuditConversation, parseConversation } from '../../api/aiConversation'
+import {
+  fetchAuditConversation,
+  fetchConversationEvents,
+  parseConversation,
+  type ConversationEvent,
+} from '../../api/aiConversation'
 import type { AiConversation } from '../../api/aiConversation'
 import type { ChatAttachment } from '../../api/agent'
 
@@ -74,13 +80,21 @@ export default function AiConversationAuditDetail() {
   const { id } = useParams<{ id: string }>()
   const [loading, setLoading] = useState(true)
   const [conversation, setConversation] = useState<AiConversation | null>(null)
+  /** V0 §B.6：服务端追加的运行事件（不可篮改），审计详情页下方展示 */
+  const [events, setEvents] = useState<ConversationEvent[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    fetchAuditConversation(Number(id))
-      .then(setConversation)
+    Promise.all([
+      fetchAuditConversation(Number(id)),
+      fetchConversationEvents(Number(id)).catch(() => [] as ConversationEvent[]),
+    ])
+      .then(([conv, evs]) => {
+        setConversation(conv)
+        setEvents(evs ?? [])
+      })
       .catch(() => setError(t('conversationAudit.detailLoadError')))
       .finally(() => setLoading(false))
   }, [id, t])
@@ -253,6 +267,47 @@ export default function AiConversationAuditDetail() {
                     </div>
                   )}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* V0 §B.6：服务端执行事件（不可篮改），网关/策略/预算写入 */}
+      <div style={{
+        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      }}>
+        <SectionHeader
+          icon={<HistoryOutlined />}
+          iconBg="#fff7e6"
+          iconColor="#fa8c16"
+          title={t('conversationAudit.eventList', '執行事件')}
+          count={events.length}
+        />
+        {events.length === 0 ? (
+          <Empty description={t('conversationAudit.noEvents', '暂无服务端事件（历史会话未采集或网关尚未接入）')} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {events.map((ev) => (
+              <div
+                key={ev.id}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 8,
+                  padding: '8px 12px', background: '#fafafa',
+                  borderRadius: 6, border: '1px solid #f0f0f0', fontSize: 12,
+                }}
+              >
+                <Tag style={{ margin: 0 }}>{ev.eventType}</Tag>
+                <span style={{ color: '#8c8c8c', minWidth: 140 }}>
+                  {dayjs(ev.createdAt).format('YYYY-MM-DD HH:mm:ss')}
+                </span>
+                <span style={{ color: '#595959', minWidth: 80 }}>{ev.actor ?? '--'}</span>
+                {ev.payloadJson && (
+                  <Text code style={{ fontSize: 11, flex: 1, wordBreak: 'break-all' }}>
+                    {ev.payloadJson}
+                  </Text>
+                )}
               </div>
             ))}
           </div>

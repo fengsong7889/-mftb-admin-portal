@@ -149,3 +149,26 @@ export function fetchAuditModelKeys(): Promise<string[]> {
 export function fetchAuditConversation(id: number): Promise<AiConversation> {
   return request.get<unknown, AiConversation>(`/ai/conversations/audit/${id}`)
 }
+
+/* ────────────────── V0 §B.6：服务端运行事件（不可篡改） ────────────────── */
+
+/** 事件类型（与后端 AiConversationEvent.ALLOWED_TYPES 对齐） */
+export type ConversationEventType =
+  | 'USER_TURN' | 'ASSISTANT_TURN' | 'TOOL_CALL' | 'TOOL_RESULT'
+  | 'POLICY_DECISION' | 'QUOTA_CHARGE' | 'GATEWAY_ERROR'
+
+export interface ConversationEvent {
+  id: number
+  conversationPk: number
+  conversationNo: string | null
+  eventType: ConversationEventType | string
+  actor: string | null
+  /** 事件载荷（脱敏后 JSON 字符串） */
+  payloadJson: string | null
+  createdAt: string
+}
+
+/** 读取指定会话的服务端运行事件（审计详情页 Tab 使用） */
+export function fetchConversationEvents(id: number, limit = 200): Promise<ConversationEvent[]> {
+  return request.get(`/ai/conversations/audit/${id}/events`, { params: { limit } })
+}

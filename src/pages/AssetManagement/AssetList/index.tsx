@@ -36,6 +36,7 @@ import type { OptionItem } from '../../../api/types'
 import { exportToCSV } from '../../../utils/exportCSV'
 import BrandTag from '../../../components/BrandTag'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '../../../contexts/AuthContext'
 
 /* ==================== 枚举映射 ==================== */
 
@@ -85,6 +86,13 @@ function buildDeptTree(depts: DepartmentItem[]): { title: string; value: string;
 export default function AssetList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { hasPermission, hasMenuPermission } = useAuth()
+  /** 按钮级权限（与后端 @RequirePermission 及功能授權 action 对齐；admin 自动全放） */
+  const canCreate = hasPermission('asset-list:create')
+  const canEdit = hasPermission('asset-list:edit')
+  const canDelete = hasPermission('asset-list:delete')
+  const canExport = hasPermission('asset-list:export')
+  const canRepair = hasMenuPermission('asset-repair')
   const [searchParams] = useSearchParams()
   const urlAssetNo = searchParams.get('assetNo') || ''
   const [form] = Form.useForm()
@@ -564,27 +572,31 @@ export default function AssetList() {
             <Button type="link" size="small" onClick={() => handleDetail(record)}>
               {t('common.detail')}
             </Button>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>
-              {t('common.edit')}
-            </Button>
-            {canNewRepair && (
+            {canEdit && (
+              <Button type="link" size="small" onClick={() => handleEdit(record)}>
+                {t('common.edit')}
+              </Button>
+            )}
+            {canNewRepair && canRepair && (
               <Button type="link" size="small" onClick={() => handleRepair(record)}>
                 {t('asset.btnRepair')}
               </Button>
             )}
-            {canViewRepair && (
+            {canViewRepair && canRepair && (
               <Button type="link" size="small" onClick={() => handleRepair(record)}>
                 {t('asset.btnViewRepair')}
               </Button>
             )}
-            {canScrap && (
+            {canScrap && canEdit && (
               <Button type="link" size="small" danger onClick={() => handleScrap(record)}>
                 {t('asset.btnScrap')}
               </Button>
             )}
-            <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
-              {t('common.delete')}
-            </Button>
+            {canDelete && (
+              <Button type="link" size="small" danger onClick={() => handleDelete(record)}>
+                {t('common.delete')}
+              </Button>
+            )}
           </Space>
         )
       },
@@ -693,23 +705,29 @@ export default function AssetList() {
       {/* ====== 操作区 ====== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            {t('common.export')}
-          </Button>
+          {canExport && (
+            <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
+              {t('common.export')}
+            </Button>
+          )}
           <Button
             icon={<PrinterOutlined />} disabled={selectedRowKeys.length === 0}
             onClick={() => navigate(`/asset-tag-print?ids=${selectedRowKeys.join(',')}`)}
           >
             {t('asset.batchPrintTags')}
           </Button>
-          <Button icon={<TagsOutlined />} disabled={selectedRowKeys.length === 0} onClick={openBatchBind}>
-            {t('asset.batchBindTags')}
-          </Button>
+          {canEdit && (
+            <Button icon={<TagsOutlined />} disabled={selectedRowKeys.length === 0} onClick={openBatchBind}>
+              {t('asset.batchBindTags')}
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            {t('asset.btnAddAsset')}
-          </Button>
+          {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              {t('asset.btnAddAsset')}
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

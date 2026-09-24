@@ -21,6 +21,7 @@ import {
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
 import type { ToolDefinition, ToolLevel, ToolParam } from '../../api/mock/aiPlatformMock'
+import { fetchToolRegistry, updateToolPolicy } from '../../api/aiOperationAuth'
 
 const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whitelist: [], desc: '' }
@@ -28,21 +29,23 @@ const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whit
 export default function AiOperationAuthEdit() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const toolId = searchParams.get('id') || ''
+  // V0 §B.2：入口从 mock id 切为真实 toolKey（无 toolKey 时保留旧 id 回退兼容）
+  const toolKey = searchParams.get('toolKey') || ''
+  const toolId = searchParams.get('id') || toolKey
   const isEditMode = !!toolId
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [draftParams, setDraftParams] = useState<ToolParam[]>([])
 
-  /* ── 加载编辑数据 ── */
+  /* ── 加载编辑数据（后端优先，失败回退 mock） ── */
   useEffect(() => {
     if (!toolId) return
     let cancelled = false
     setLoading(true)
-    fetchMockToolRegistry()
-      .then((data) => {
+    fetchToolRegistry()
+      .then((rows) => {
         if (cancelled) return
-        const tool = data.find((t) => t.id === toolId)
+        const tool = rows.find((t) => t.id === toolId || t.code === toolId)
         if (tool) {
           form.setFieldsValue({
             name: tool.name,
@@ -50,9 +53,25 @@ export default function AiOperationAuthEdit() {
             menuName: tool.menuName,
             level: tool.level,
             description: tool.description,
+            requireApproval: tool.requireApproval,
+            remark: tool.remark ?? '',
           })
-          setDraftParams(tool.params.map((p) => ({ ...p })))
+          setDraftParams(tool.params.map((p) => ({
+            name: p.name, type: p.type, required: p.required, whitelist: [], desc: p.description,
+          })))
+          return
         }
+        // 后端未命中时 fallback 到 mock（向后兼容，可观察列表里无此 toolKey 时开发时不白屏）
+        return fetchMockToolRegistry().then((data) => {
+          if (cancelled) return
+          const t2 = data.find((t) => t.id === toolId)
+          if (!t2) return
+          form.setFieldsValue({
+            name: t2.name, code: t2.code, menuName: t2.menuName,
+            level: t2.level, description: t2.description,
+          })
+          setDraftParams(t2.params.map((p) => ({ ...p })))
+        })
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -61,9 +80,26 @@ export default function AiOperationAuthEdit() {
   const handleBack = () => navigate('/ai-operation-auth')
 
   const handleSave = () => {
-    form.validateFields().then(() => {
-      message.success('工具已保存，權限等級即時生效')
-      navigate('/ai-operation-auth')
+    form.validateFields().then((values) => {
+      const levelMap: Record<string, string> = { L0: 'low', L1: 'low', L2: 'medium', L3: 'high', L4: 'high' }
+      const enabled = values.level === 'L0' ? 0 : 1
+      const riskLevel = levelMap[values.level as string] ?? 'low'
+      const key = toolKey || (values.code as string)
+      if (!isEditMode || !key) {
+        message.info('本 PR 仅开放编辑现有内置/外部工具策略；新增工具请先在 MCP 服务页安装')
+        return
+      }
+      updateToolPolicy(key, {
+        enabled,
+        riskLevel,
+        requireApproval: (values.requireApproval ?? 0) as number,
+        remark: (values.remark as string) ?? null as unknown as string,
+      })
+        .then(() => {
+          message.success('工具已保存，權限等級即時生效')
+          navigate('/ai-operation-auth')
+        })
+        .catch(() => message.error('保存失敗'))
     })
   }
 

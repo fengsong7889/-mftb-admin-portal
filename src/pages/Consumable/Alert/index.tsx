@@ -9,6 +9,7 @@ import { Button, Form, Input, Select, Table, Tag, message, Empty } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { AlertOutlined, ExportOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { fetchConsumableAlerts, fetchConsumableCategoryOptions, type ConsumableItem, type ConsumableCategory } from '../../../api/consumable'
+import { exportToCSV } from '../../../utils/exportCSV'
 import InboundForm from '../components/InboundForm'
 
 type View = { mode: 'list' } | { mode: 'inbound'; itemId: number }
@@ -73,6 +74,17 @@ export default function ConsumableAlert() {
 
   const handleExport = () => {
     if (rows.length === 0) { message.warning('暫無數據可導出'); return }
+    const cols = [
+      { title: '耗材編碼', dataIndex: 'itemCode' },
+      { title: '耗材名稱', dataIndex: 'name' },
+      { title: '規格型號', dataIndex: 'spec', render: (v: string) => v || '-' },
+      { title: '耗材分類', dataIndex: 'categoryName', render: (v: string) => v || '-' },
+      { title: '可用庫存', dataIndex: 'availableQty', render: (v: number, r: ConsumableItem) => `${v} ${r.unit ?? ''}` },
+      { title: '安全庫存', dataIndex: 'safetyStock' },
+      { title: '缺口', dataIndex: 'availableQty', render: (_v: number, r: ConsumableItem) => `${Math.max(0, r.safetyStock - r.availableQty)}` },
+      { title: '建議補貨量', dataIndex: 'availableQty', render: (_v: number, r: ConsumableItem) => `${suggestQty(r)}` },
+    ]
+    exportToCSV(`consumable_alerts_${new Date().toISOString().slice(0, 10)}`, cols, rows)
     message.success('導出成功')
   }
 
@@ -110,7 +122,7 @@ export default function ConsumableAlert() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', marginBottom: 16, background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8 }}>
         <AlertOutlined style={{ color: '#FA8C16', fontSize: 18 }} />
         <span style={{ fontSize: 13, color: '#595959' }}>
-          以下耗材<b style={{ color: '#FF4D4F' }}> 可用库存 </b>已低于安全库存，建议及时补货。共 <b>{rows.length}</b> 项预警。
+          以下耗材<b style={{ color: '#FF4D4F' }}>可用庫存</b>已低於安全庫存，建議及時補貨。共 <b>{rows.length}</b> 項預警。
         </span>
       </div>
 

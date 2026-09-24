@@ -63,6 +63,8 @@ export const keyToPath: Record<string, string> = {
   'role-management': '/role-management',
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
+  // 系統授權（Round 4）
+  'system-authorization': '/system-authorization',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤（prototype — 纯前端 mock）
@@ -207,6 +209,8 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'employee-management', 'organization-management', 'position-management', 'login-log',
   // 權限管理
   'role-management', 'function-permission', 'data-permission',
+  // 系統授權（Round 4，已接入後端 @RequirePermission(function-permission)）
+  'system-authorization',
   // 商家推广工具（已接入后端的部分）
   'promotion-word-library',
   'promotion-dashboard', 'promotion-algorithm', 'promotion-slot-config',

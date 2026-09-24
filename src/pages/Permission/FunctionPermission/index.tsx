@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Tree, TreeSelect, message } from 'antd'
+import { Alert, Button, Modal, Popconfirm, Select, Space, Table, Tabs, Tag, Tree, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import type { DataNode } from 'antd/es/tree'
@@ -154,6 +155,7 @@ function buildDeptTreeData(list: DepartmentItem[], disabledIds?: Set<number>, ge
 
 export default function FunctionPermission() {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
 
   /** 當前是否非繁中語言 */
   const isNonZh = !i18n.language?.startsWith('zh')
@@ -470,6 +472,28 @@ export default function FunctionPermission() {
 
   return (
     <div className="content-area">
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message={t('functionPermission.migrationHintTitle', '推荐使用“系统授权”页按系统维护权限')}
+        description={
+          <span>
+            {t(
+              'functionPermission.migrationHintBody',
+              '本页面保存会全量覆盖当前目标一切系统的菜单授权；如需仅影响单个系统，请前往“权限中心 → 系統授權”。',
+            )}
+            <Button
+              type="link"
+              size="small"
+              style={{ paddingInline: 4 }}
+              onClick={() => navigate('/system-authorization')}
+            >
+              {t('functionPermission.gotoSystemAuthz', '前往系统授权')}
+            </Button>
+          </span>
+        }
+      />
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setActiveTab(key as TargetType)}

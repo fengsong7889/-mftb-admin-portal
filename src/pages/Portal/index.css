@@ -1,0 +1,163 @@
+/* 统一门户页样式（阶段 B）。
+   遵循 AGENTS.md §A/B：主色 #E8720C、卡片圆角 12px、hover 微动效 translateY(-2px) + 阴影加深。
+   禁止在本文件内引入品牌色之外的新色值。 */
+
+.portal-page {
+  padding: 20px 24px;
+  animation: pageFadeIn 0.3s ease;
+}
+
+.portal-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.portal-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+
+.portal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.portal-subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.portal-loading,
+.portal-empty {
+  background: #fff;
+  border-radius: 12px;
+  padding: 60px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  text-align: center;
+}
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.portal-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px;
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  min-height: 130px;
+}
+
+.portal-card:hover,
+.portal-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(232, 114, 12, 0.12);
+  border-color: #FFE7D1;
+}
+
+.portal-card:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
+}
+
+.portal-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #FFF7F0;
+  color: #E8720C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.portal-card:hover .portal-card-icon {
+  transform: scale(1.08);
+}
+
+.portal-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.portal-card-title-en {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 6px;
+}
+
+.portal-card-desc {
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.portal-card-action {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #E8720C;
+  opacity: 0.65;
+  transition: opacity 0.2s;
+}
+
+.portal-card:hover .portal-card-action {
+  opacity: 1;
+}
+
+.portal-card-enter-icon {
+  font-size: 11px;
+  transition: transform 0.2s;
+}
+
+.portal-card:hover .portal-card-enter-icon {
+  transform: translateX(2px);
+}

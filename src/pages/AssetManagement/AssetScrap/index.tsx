@@ -7,7 +7,7 @@
  * 支持 URL ?detail={scrapId} 進入報廢詳情頁
  */
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import ScrapList from './ScrapList'
 import ScrapForm from './ScrapForm'
 import ScrapDetail from './ScrapDetail'
@@ -19,6 +19,7 @@ type View =
   | { mode: 'form'; assetId: number }
 
 export default function AssetScrap() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const urlCreate = searchParams.get('create') === '1'
   const urlDetailId = searchParams.get('detail') ? Number(searchParams.get('detail')) : null
@@ -32,35 +33,42 @@ export default function AssetScrap() {
     : { mode: 'list' },
   )
 
-  // 外部跳轉帶入 id 時同步打開報廢表單
+  // 視圖完全由 URL 驅動：無任何參數時回列表（修復點側欄菜單卡在詳情/新建）
   useEffect(() => {
-    if (urlAssetId && !urlCreate && !urlDetailId) setView({ mode: 'form', assetId: urlAssetId })
-  }, [urlAssetId, urlCreate, urlDetailId])
+    if (urlCreate) setView({ mode: 'create' })
+    else if (urlDetailId) setView({ mode: 'detail', scrapId: urlDetailId })
+    else if (urlAssetId) setView({ mode: 'form', assetId: urlAssetId })
+    else setView({ mode: 'list' })
+  }, [urlCreate, urlDetailId, urlAssetId])
+
+  const goList = () => { setView({ mode: 'list' }); navigate('/asset-scrap', { replace: true }) }
+  const goCreate = () => { setView({ mode: 'create' }); navigate('/asset-scrap?create=1', { replace: true }) }
+  const goDetail = (scrapId: number) => { setView({ mode: 'detail', scrapId }); navigate(`/asset-scrap?detail=${scrapId}`, { replace: true }) }
 
   return (
     <div className="content-area">
       {view.mode === 'list' ? (
         <ScrapList
-          onCreate={() => setView({ mode: 'create' })}
-          onViewDetail={(scrapId) => setView({ mode: 'detail', scrapId })}
+          onCreate={goCreate}
+          onViewDetail={goDetail}
         />
       ) : view.mode === 'detail' ? (
         <ScrapDetail
           key={view.scrapId}
           scrapId={view.scrapId}
-          onBack={() => setView({ mode: 'list' })}
-          onDeleted={() => setView({ mode: 'list' })}
+          onBack={goList}
+          onDeleted={goList}
         />
       ) : view.mode === 'create' ? (
         <ScrapForm
-          onBack={() => setView({ mode: 'list' })}
-          onCreated={() => setView({ mode: 'list' })}
+          onBack={goList}
+          onCreated={goList}
         />
       ) : (
         <ScrapForm
           key={view.assetId}
           assetId={view.assetId}
-          onBack={() => setView({ mode: 'list' })}
+          onBack={goList}
         />
       )}
     </div>

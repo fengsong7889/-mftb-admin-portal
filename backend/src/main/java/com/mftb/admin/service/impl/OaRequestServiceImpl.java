@@ -24,6 +24,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.mapper.WorkflowConfigMapper;
 import com.mftb.admin.service.ApproverResolverService;
+import com.mftb.admin.service.AiGrantOnApprovalService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
@@ -75,6 +76,8 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final EamPurchaseRequestMapper eamPurchaseRequestMapper;
     private final DingTalkService dingTalkService;
     private final DataScopeService dataScopeService;
+    /** V0 §B.4：AI 使用申请审批通过后自动发放模型/额度，幂等由 ai_grant_log 保证。 */
+    private final AiGrantOnApprovalService aiGrantOnApprovalService;
 
     /* ==================== 查询 ==================== */
 
@@ -734,6 +737,13 @@ public class OaRequestServiceImpl implements OaRequestService {
                 } catch (Exception e) {
                     log.error("采购申请审批回调失败: flowNo={}, error={}", flowNo, e.getMessage(), e);
                 }
+            }
+
+            // V0 §B.4: AI 使用申请审批全部通过 → 自动发放模型授权与额度（幂等，失败向上抛）
+            if ("ai_access".equals(request.getProcessCode())) {
+                OaRequest latest = oaRequestMapper.selectById(request.getId());
+                aiGrantOnApprovalService.grant(latest, approver);
+                log.info("AI 使用申请审批已全部通过，发放完成：flowNo={}", flowNo);
             }
 
             // 钉钉通知：流程全部通过，通知发起人

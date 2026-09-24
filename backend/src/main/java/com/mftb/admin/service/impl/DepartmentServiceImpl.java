@@ -163,6 +163,9 @@ public class DepartmentServiceImpl implements DepartmentService {
     @Transactional
     public void updatePermissions(Long id, List<MenuPermissionDTO> permissions) {
         requireDept(id);
+        // Round 5 · 旧写入口告警：全量写会跨系统覆盖，推荐迁移到
+        // PUT /api/departments/{id}/systems/{code}/authorization，保存不跨系统。
+        log.warn("[deprecated-path] DepartmentServiceImpl.updatePermissions 正在全量覆盖部门 {} 的菜单授权（跨系统）；推荐前端迁移到系统授权页", id);
         saveDeptMenus(id, permissions);
         permissionService.evictAll();
     }

@@ -20,7 +20,7 @@ vi.mock('../../api/adPromotion', async importOriginal => ({
 }))
 vi.mock('./OrganicTrafficScoreConfig', () => ({ default: () => <section aria-label="自然流量评分配置" /> }))
 vi.mock('../../components/PopularLayoutPreviewModal', () => ({ default: () => null }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }) }))
 
 function LocationIndicator() {
   const location = useLocation()

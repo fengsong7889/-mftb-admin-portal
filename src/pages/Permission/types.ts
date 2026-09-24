@@ -636,6 +636,91 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '發起' },
     { key: 'export', label: '導出' },
   ],
+  // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
+  'asset-claim': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '領用/審核' },
+  ],
+  'asset-borrow': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '借用/續借' },
+  ],
+  'asset-return': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '歸還/驗收' },
+  ],
+  'asset-handover': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '交接' },
+  ],
+  'asset-compensation': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '定責/處理' },
+  ],
+  'asset-transfer-list': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '調撥/撤銷' },
+  ],
+  // ── 採購與供應 / 基礎數據（view/edit/delete）──
+  'asset-inbound': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '驗收' },
+  ],
+  'purchase-order': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-category': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-model': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-location': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'param-library': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-supplier': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-tag': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // ── 僅查看 / 系統配置 / OA / AI ──
+  'consumable-stock-txn': [
+    { key: 'view', label: '查看' },
+  ],
+  'process-center': [
+    { key: 'view', label: '查看' },
+  ],
+  'ai-conversation-audit': [
+    { key: 'view', label: '查看' },
+  ],
+  'notification-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'version-history': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
 }
 
 /** 获取菜单的功能操作（如果未定义则返回默认功能） */
@@ -974,6 +1059,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'role-management',
   'function-permission',
   'data-permission',
+  // 系統授權（Round 4）
+  'system-authorization',
   // 系統配置
   'menu-config',
   'translation-manage',
@@ -1005,6 +1092,15 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'asset-repair',
   'asset-loss',
   'asset-inventory',
+  // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
+  'asset-claim',
+  'asset-borrow',
+  'asset-return',
+  'asset-transfer-list',
+  'asset-handover',
+  'asset-compensation',
+  // 採購與供應 - 驗收入庫（後端 EamInboundController 按菜單鉴权）
+  'asset-inbound',
   // 耗材管理（管理类菜单受控；耗材领用 consumable-claim 为全员自助，不受控）
   // 注：consumable-category / consumable-brand / consumable-unit 菜单已下线（功能并入分类库/品牌产品库，
   //     计量单位已改为产品/耗材表单上的文本属性），不再受控
@@ -1014,6 +1110,22 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'consumable-report',
   'consumable-stock',
   'consumable-alert',
+  // 出入庫流水（後端按菜單鉴权）
+  'consumable-stock-txn',
+  // ── 补齐：後端已 @RequirePermission 鉴权、但此前未纳入受控的菜單（消除「看得见却 403」）──
+  // 基礎數據 / 採購與供應
+  'asset-category',
+  'asset-model',
+  'asset-location',
+  'param-library',
+  'asset-supplier',
+  'asset-tag',
+  'purchase-order',
+  // 系統配置 / OA / AI
+  'notification-config',
+  'version-history',
+  'process-center',
+  'ai-conversation-audit',
 ]
 
 /**
@@ -1105,6 +1217,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/role-management': 'role-management',
   '/function-permission': 'function-permission',
   '/data-permission': 'data-permission',
+  // 系統授權（Round 4）
+  '/system-authorization': 'system-authorization',
   // 系統配置
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
@@ -1177,6 +1291,26 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-compensation/payment': 'asset-compensation',
   '/asset-compensation/refund': 'asset-compensation',
   '/asset-compensation/review': 'asset-compensation',
+  // 交接管理（子路由歸屬 asset-handover 菜單）
+  '/asset-handover': 'asset-handover',
+  '/asset-handover/add': 'asset-handover',
+  '/asset-handover/detail': 'asset-handover',
+  // 驗收入庫（歸屬 asset-inbound 菜單）
+  '/asset-inbound': 'asset-inbound',
+  // 基礎數據 / 採購與供應（纳入受控后补登路徑映射，供登录首站与守卫一致解析）
+  '/asset-category': 'asset-category',
+  '/asset-model': 'asset-model',
+  '/asset-location': 'asset-location',
+  '/param-library': 'param-library',
+  '/asset-supplier': 'asset-supplier',
+  '/asset-tag': 'asset-tag',
+  '/asset-tag-print': 'asset-tag',
+  '/purchase-order': 'purchase-order',
+  // 系統配置 / OA / AI / 耗材流水（notification-config / version-history 已在上方登记）
+  '/process-center': 'process-center',
+  '/ai-conversation-audit': 'ai-conversation-audit',
+  '/consumable-stock-txn': 'consumable-stock-txn',
+  '/consumable-stock/txn': 'consumable-stock-txn',
   // 耗材管理（领用为全员自助，其余为管理类受控路由）
   '/consumable-dashboard': 'consumable-dashboard',
   '/consumable-item': 'consumable-item',

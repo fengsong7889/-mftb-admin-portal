@@ -7,6 +7,7 @@ import { STORAGE_KEYS, CONTROLLED_MENU_KEYS, resolveFirstAccessiblePath } from '
 import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLICT_EVENT, FORCE_LOGOUT_EVENT, ACCOUNT_DISABLED_EVENT, resetUnauthorizedGuard } from '../api'
 import { updateAvatarApi } from '../api/auth'
 import { isBackendUnavailable } from '../api/request'
+import { writeCurrentSystemCode } from '../hooks/useCurrentSystem'
 import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
 export interface UserInfo {
@@ -23,6 +24,8 @@ export interface UserInfo {
   functionRoles?: string[] // 绑定的功能角色ID数组
   functionRoleCodes?: string[] // 绑定的功能角色编码（如 FIN_BIZ_APPROVER）
   permissions?: MenuPermission[] // 后端登录时下发的合并菜单权限
+  /** 当前用户可进入的业务系统编码列表（后端下发，前端仅展示，不作为安全边界）*/
+  accessibleSystems?: string[]
   dataPermissions?: {
     locations?: string[] // 有权限的地点
     merchants?: string[] // 有权限的商家
@@ -41,6 +44,40 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
+
+/**
+ * 跨标签页会话同步（Round 5）。
+ * <p>BroadcastChannel 在新浏览器上即时传递；旧浏览器无 BroadcastChannel 时，
+ * 依赖 localStorage 的 storage 事件作为降级（在 AuthProvider 内部实现）。
+ * <p>目前只处理 logout；后续如需“新 tab 登录 → 其他 tab 自动顶下线”可拓展 type。
+ */
+const AUTH_CHANNEL_NAME = 'mftb-auth'
+/**
+ * 登录相关事件：
+ * - `logout`：当前 tab 已登出，其他 tab 直接清登录态。
+ * - `login`：新 tab 刚完成登录，旧 tab 收到后 → 主动触发一次会话重验，
+ *   命中后端单设备 SESSION_CONFLICT 时弹“被顶下线”弹窗，不用等 10s 心跳。
+ */
+type AuthBroadcastEvent = { type: 'logout' } | { type: 'login' }
+
+function openAuthChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null
+  try {
+    return new BroadcastChannel(AUTH_CHANNEL_NAME)
+  } catch {
+    return null
+  }
+}
+
+function broadcastAuthEvent(event: AuthBroadcastEvent): void {
+  const channel = openAuthChannel()
+  if (!channel) return
+  try {
+    channel.postMessage(event)
+  } finally {
+    channel.close()
+  }
+}
 
 /** 英文地名 → 中文映射（覆盖港澳台 + 大陆主要省市） */
 const LOCATION_ZH_MAP: Record<string, string> = {
@@ -129,6 +166,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   /**
+   * Round 5 · 跨标签页会话一致性：
+   * - BroadcastChannel 收到 logout → 本标签同步清登录态（后端 active_token 已失效，无需再调接口）
+   * - storage 事件作为降级（旧浏览器无 BroadcastChannel 时，TOKEN_KEY 变化仍会广播）
+   * 两者都仅在“其他”标签触发，本标签自己的 logout 不受影响。
+   */
+  useEffect(() => {
+    const channel = openAuthChannel()
+    const onBroadcast = (ev: MessageEvent<AuthBroadcastEvent>) => {
+      if (ev.data?.type === 'logout') {
+        setIsAuthenticated(false)
+        setUser(null)
+      } else if (ev.data?.type === 'login') {
+        // 其他 tab 完成登录 → 本 tab 的 active_token 已在后端被顶替，
+        // 主动派发重验事件，让会话轮询立刻命中 SESSION_CONFLICT 弹窗，不用等 10s。
+        window.dispatchEvent(new CustomEvent('auth:revalidate'))
+      }
+    }
+    if (channel) channel.addEventListener('message', onBroadcast)
+    const onStorage = (ev: StorageEvent) => {
+      // 仅关心 TOKEN_KEY 变 null（其他标签 logout）或账号切换（新 token写入）
+      if (ev.key === TOKEN_KEY && ev.newValue === null) {
+        setIsAuthenticated(false)
+        setUser(null)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      if (channel) {
+        channel.removeEventListener('message', onBroadcast)
+        channel.close()
+      }
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
+
+  /**
    * 清除登錄態的公共邏輯
    */
   const clearAuthState = useCallback(() => {
@@ -153,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
+      writeCurrentSystemCode(null)
 
       // 先解析 IP 地點，完成後再彈窗（確保地點數據不為空）
       if (detail.loginIp) {
@@ -181,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
+      writeCurrentSystemCode(null)
     }
     window.addEventListener(FORCE_LOGOUT_EVENT, handleForceLogout)
     return () => window.removeEventListener(FORCE_LOGOUT_EVENT, handleForceLogout)
@@ -197,6 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
+      writeCurrentSystemCode(null)
     }
     window.addEventListener(ACCOUNT_DISABLED_EVENT, handleAccountDisabled)
     return () => window.removeEventListener(ACCOUNT_DISABLED_EVENT, handleAccountDisabled)
@@ -227,6 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             functionRoles: info.functionRoleIds?.map(String),
             functionRoleCodes: info.functionRoleCodes,
             permissions: info.permissions,
+            accessibleSystems: info.accessibleSystems,
           }
           localStorage.setItem('user_info', JSON.stringify(refreshed))
           return refreshed
@@ -309,9 +386,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const timer = setInterval(poll, 10_000)
+    // Round 6：其他 tab 登录 / 登出时主动触发一次重验，不必等 10s 心跳
+    const onRevalidate = () => { void poll() }
+    window.addEventListener('auth:revalidate', onRevalidate)
     return () => {
       stopped = true
       clearInterval(timer)
+      window.removeEventListener('auth:revalidate', onRevalidate)
     }
   }, [isAuthenticated])
 
@@ -340,6 +421,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         functionRoles: backendUser.functionRoleIds?.map(String),
         functionRoleCodes: backendUser.functionRoleCodes,
         permissions: backendUser.permissions,
+        accessibleSystems: backendUser.accessibleSystems,
       }
       setIsAuthenticated(true)
       setUser(mappedUser)
@@ -349,11 +431,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(TOKEN_KEY, result.token)
       localStorage.setItem('is_authenticated', 'true')
       localStorage.setItem('user_info', JSON.stringify(mappedUser))
-      // 計算首個有權限的菜單路徑，供登錄後智能跳轉
-      const redirectPath = resolveFirstAccessiblePath(
+      // Round 6：同域其他 tab 中旧会话的 Sidebar 不会主动刷新，广播 login 事件触发它们重验，
+      // 命中后端 SESSION_CONFLICT 时弹“被顶下线”提醒，而非继续展示旧菜单。
+      broadcastAuthEvent({ type: 'login' })
+      // 计算登录后默认跳转：
+      // 1. 有可访问系统 → 统一门户 `/portal`（本轮新默认）
+      // 2. 无系统但超管（旧行为） → `/portal`（门户会显示全部系统，避免黑屏）
+      // 3. 无任何入口时回退到旧的首个有权限菜单，仍无则首页
+      const hasAccessibleSystems = (mappedUser.accessibleSystems?.length ?? 0) > 0
+      const fallbackPath = resolveFirstAccessiblePath(
         mappedUser.role === 'admin',
         (key) => mappedUser.permissions?.some(p => p.menuKey === key && p.actions.length > 0) ?? false,
       )
+      const redirectPath = hasAccessibleSystems || mappedUser.role === 'admin' ? '/portal' : fallbackPath
       return { success: true, redirectPath }
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
@@ -384,6 +474,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('is_authenticated')
     localStorage.removeItem('user_info')
+    // 统一门户 Round 2：同步清除 currentSystemCode，避免下一个登录账号沿用上一个系统的 Sidebar 锁释状态
+    writeCurrentSystemCode(null)
+    // Round 5：广播多标签页同步登出（BroadcastChannel 不会回声到发送页，避免自己重复处理）
+    broadcastAuthEvent({ type: 'logout' })
   }, [])
 
   const updateAvatar = useCallback((avatar: string) => {

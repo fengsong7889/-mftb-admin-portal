@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined, DatabaseOutlined, ProfileOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { Dayjs } from 'dayjs'
@@ -12,7 +12,7 @@ import {
   fetchEmployees,
   resetEmployeePassword,
 } from '../../../api/employee'
-import type { EmployeeItem } from '../../../api/employee'
+import type { EmployeeItem, EmployeeQuery } from '../../../api/employee'
 import { fetchRoles } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
@@ -138,17 +138,22 @@ export default function EmployeeManagement() {
   const [pwdTarget, setPwdTarget] = useState<EmployeeItem | null>(null)
   const [pwdForm] = Form.useForm<{ password: string }>()
 
-  /** 加载员工列表 */
+  /** 加载员工列表（筛选条件已下沉后端，后端分页与计数为完整结果） */
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchEmployees({ page, size: pageSize, keyword, employmentStatus })
+      const result = await fetchEmployees({
+        page, size: pageSize, keyword, employmentStatus,
+        departmentId: deptFilter, sequence: sequenceFilter, jobLevel: jobLevelFilter,
+        rank: rankFilter, roleId: roleIdFilter, updatedBy: updatedByFilter,
+        updatedAtFrom: updatedAtRange?.[0], updatedAtTo: updatedAtRange?.[1],
+      })
       setDataSource(result.records)
       setTotal(result.total)
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, keyword, employmentStatus])
+  }, [page, pageSize, keyword, employmentStatus, deptFilter, sequenceFilter, jobLevelFilter, rankFilter, roleIdFilter, updatedByFilter, updatedAtRange])
 
   useEffect(() => {
     fetchList()
@@ -249,82 +254,8 @@ export default function EmployeeManagement() {
     setPage(1)
   }
 
-  /** 所属部门及其全部子孙部门 id（查询父部门时同时匹配下级部门员工） */
-  const deptDescendantIds = useMemo(() => {
-    if (deptFilter == null) return undefined
-    const childMap = new Map<number, number[]>()
-    departments.forEach(d => {
-      if (d.parentId != null) {
-        const arr = childMap.get(d.parentId) ?? []
-        arr.push(d.id)
-        childMap.set(d.parentId, arr)
-      }
-    })
-    const ids = new Set<number>([deptFilter])
-    const stack = [deptFilter]
-    while (stack.length > 0) {
-      const cur = stack.pop()!
-      for (const child of childMap.get(cur) ?? []) {
-        if (!ids.has(child)) {
-          ids.add(child)
-          stack.push(child)
-        }
-      }
-    }
-    return Array.from(ids)
-  }, [deptFilter, departments])
-
-  /** 从 localStorage 读取各员工各 Tab 的最新更新信息，取所有 Tab 中最新的一条 */
-  const getTabUpdateOverrides = useCallback((): Record<number, { updatedBy: string; updatedAt: string }> => {
-    const result: Record<number, { updatedBy: string; updatedAt: string }> = {}
-    const prefix = 'emp_tab_update_'
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (!key || !key.startsWith(prefix)) continue
-      const empNumId = Number(key.slice(prefix.length))
-      if (isNaN(empNumId)) continue
-      try {
-        const tabData = JSON.parse(localStorage.getItem(key) || '{}')
-        let latestBy = ''
-        let latestAt = ''
-        for (const info of Object.values(tabData) as Array<{ updatedBy: string; updatedAt: string }>) {
-          if (info.updatedAt && info.updatedAt > latestAt) {
-            latestAt = info.updatedAt
-            latestBy = info.updatedBy
-          }
-        }
-        if (latestAt) result[empNumId] = { updatedBy: latestBy, updatedAt: latestAt }
-      } catch { /* 静默 */ }
-    }
-    return result
-  }, [])
-
-  /** 扩展筛选条件的前端过滤（后端 /employees 接口扩展前先在当前页数据上过滤） */
-  const filteredData = useMemo(() => {
-    const tabOverrides = getTabUpdateOverrides()
-    let data = dataSource.map(e => {
-      const override = tabOverrides[e.id]
-      return override ? { ...e, updatedBy: override.updatedBy, updatedAt: override.updatedAt } : e
-    })
-    if (deptDescendantIds) data = data.filter(e => e.departmentId != null && deptDescendantIds.includes(e.departmentId))
-    if (sequenceFilter) data = data.filter(e => e.sequence === sequenceFilter)
-    if (jobLevelFilter) data = data.filter(e => e.jobLevel === jobLevelFilter)
-    if (rankFilter) data = data.filter(e => e.rank === rankFilter)
-    if (roleIdFilter != null) data = data.filter(e => e.functionRoleIds?.includes(roleIdFilter))
-    if (updatedByFilter) {
-      const kw = updatedByFilter.toLowerCase()
-      data = data.filter(e => (e.updatedBy ?? '').toLowerCase().includes(kw))
-    }
-    if (updatedAtRange) {
-      const [start, end] = updatedAtRange
-      data = data.filter(item => {
-        if (!item.updatedAt) return false
-        const d = dayjs(item.updatedAt)
-        return !d.isBefore(dayjs(start), 'day') && !d.isAfter(dayjs(end), 'day')
-      })
-    }
-    return data
-  }, [dataSource, deptDescendantIds, sequenceFilter, jobLevelFilter, rankFilter, roleIdFilter, updatedByFilter, updatedAtRange, getTabUpdateOverrides])
+  /** 列表数据直接取服务端已筛选/分页结果（不再客户端二次过滤，避免跨页漏人） */
+  const filteredData = dataSource
 
   /** 新增员工 → 跳转独立详情页（新增模式） */
   const handleCreate = () => {
@@ -365,9 +296,32 @@ export default function EmployeeManagement() {
     fetchRoleList()
   }
 
-  /** 导出当前搜索结果 */
-  const handleExport = () => {
-    if (filteredData.length === 0) {
+  /** 导出全部符合筛选条件的记录（逐页拉取，避免只导出当前页） */
+  const handleExport = async () => {
+    const baseParams: EmployeeQuery = {
+      page: 1, size: 200, keyword, employmentStatus,
+      departmentId: deptFilter, sequence: sequenceFilter, jobLevel: jobLevelFilter,
+      rank: rankFilter, roleId: roleIdFilter, updatedBy: updatedByFilter,
+      updatedAtFrom: updatedAtRange?.[0], updatedAtTo: updatedAtRange?.[1],
+    }
+    setLoading(true)
+    let all: EmployeeItem[] = []
+    try {
+      let p = 1
+      // size 上限 200，逐页拉取直到覆盖 total（p>=50 为安全上限，防止异常时死循环）
+      for (;;) {
+        const res = await fetchEmployees({ ...baseParams, page: p })
+        all = all.concat(res.records)
+        if (res.records.length === 0 || all.length >= res.total || p >= 50) break
+        p += 1
+      }
+    } catch {
+      message.error(t('employee.noDataToExport'))
+      return
+    } finally {
+      setLoading(false)
+    }
+    if (all.length === 0) {
       message.warning(t('employee.noDataToExport'))
       return
     }
@@ -384,7 +338,7 @@ export default function EmployeeManagement() {
       { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
       { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
     ]
-    exportToCSV(t('employee.pageTitle'), exportColumns, filteredData)
+    exportToCSV(t('employee.pageTitle'), exportColumns, all)
   }
 
   /** 根据角色ID渲染角色名称标签（单行展示，禁止换行） */
@@ -575,6 +529,14 @@ export default function EmployeeManagement() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
+          {hasPermission('rule-config:edit') && (
+            <Button icon={<DatabaseOutlined />} onClick={() => navigate('/hr-dict')} style={{ marginLeft: 8 }}>
+              字典維護
+            </Button>
+          )}
+          <Button icon={<ProfileOutlined />} onClick={() => navigate('/contract-ledger')} style={{ marginLeft: 8 }}>
+            合同台賬
+          </Button>
         </div>
         <div className="action-section-right">
           {hasPermission('employee-management:create') && (

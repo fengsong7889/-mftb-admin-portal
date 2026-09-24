@@ -189,7 +189,7 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
               {/* 计量单位不再是字典表，直接录入文本（如：包/盒/瓶） */}
               <Input placeholder="輸入單位，如 包/盒/瓶" maxLength={16} allowClear />
             </Form.Item>
-            <Form.Item label="參考單價（元）" name="refPrice">
+            <Form.Item label="參考單價（MOP）" name="refPrice">
               <InputNumber min={0} step={0.01} precision={2} style={{ width: '100%' }} placeholder="0.00" />
             </Form.Item>
           </div>
@@ -201,9 +201,9 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#FA8C16' }}>📊</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>库存策略</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>庫存策略</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>安全库存用于低库存预警；限领量控制单次领用上限（0=不限）</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>安全庫存用於低庫存預警；限領量控制單次領用上限（0=不限）</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <Form.Item label="安全庫存下限" name="safetyStock">

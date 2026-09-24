@@ -33,6 +33,8 @@ public class UserInfoVO {
     private List<String> functionRoleCodes;
     /** 合并后的菜单权限 (登录时下发, 前端据此做权限判断) */
     private List<MenuPermissionDTO> permissions;
+    /** 当前用户可进入的业务系统编码集合（按 sys_system.sort_order 排序）；不包含哨兵 'portal' */
+    private List<String> accessibleSystems;
 
     public static UserInfoVO from(SysUser user) {
         UserInfoVO vo = new UserInfoVO();

@@ -14,13 +14,14 @@ import {
 } from '../../../api/consumable'
 import { useAuth } from '../../../contexts/AuthContext'
 import { CLAIM_STATUS_LABEL, CLAIM_STATUS_COLOR, type ClaimStatus } from './constants'
+import { exportToCSV } from '../../../utils/exportCSV'
 
 interface Props {
   onAdd: () => void
   onDetail: (id: number) => void
 }
 
-type TabKey = 'all' | 'pending' | 'issued' | 'mine'
+type TabKey = 'all' | 'pending' | 'issued' | 'cancelled' | 'mine'
 
 export default function ClaimList({ onAdd, onDetail }: Props) {
   const { hasPermission } = useAuth()
@@ -40,7 +41,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
     setLoading(true)
     try {
       const statusMap: Record<TabKey, string | undefined> = {
-        all: undefined, pending: 'pending', issued: 'issued', mine: undefined,
+        all: undefined, pending: 'pending', issued: 'issued', cancelled: 'cancelled', mine: undefined,
       }
       const res = tab === 'mine'
         ? await fetchMyConsumableClaims({ page, size })
@@ -58,6 +59,17 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
 
   const handleExport = () => {
     if (rows.length === 0) { message.warning('暫無數據可導出'); return }
+    const cols = [
+      { title: '領用單號', dataIndex: 'claimNo' },
+      { title: '申請人', dataIndex: 'applicantName' },
+      { title: '部門', dataIndex: 'department', render: (v: string) => v || '-' },
+      { title: '領用事由', dataIndex: 'reason', render: (v: string) => v || '-' },
+      { title: '品類數', dataIndex: 'totalKinds' },
+      { title: '總數量', dataIndex: 'totalQty' },
+      { title: '狀態', dataIndex: 'status', render: (v: string) => CLAIM_STATUS_LABEL[v as ClaimStatus] ?? v },
+      { title: '申請時間', dataIndex: 'createdAt', render: (v: string) => v || '-' },
+    ]
+    exportToCSV(`consumable_claims_${new Date().toISOString().slice(0, 10)}`, cols, rows)
     message.success('導出成功')
   }
 
@@ -71,7 +83,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
           <div className="confirm-info-row"><span>領用單號：</span><b>{record.claimNo}</b></div>
           <div className="confirm-info-row"><span>申請人：</span><b>{record.applicantName}</b></div>
           <div className="confirm-info-row"><span>總數量：</span><b>{record.totalQty}</b></div>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>发放后按移动加权均价扣减库存并结转实际成本，不可撤销。</div>
+          <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>發放後按移動加權均價扣減庫存並結轉實際成本，不可撤銷。</div>
         </div>
       ),
       okText: '確認發放',
@@ -177,6 +189,7 @@ export default function ClaimList({ onAdd, onDetail }: Props) {
             { key: 'all', label: '全部' },
             { key: 'pending', label: '待發放' },
             { key: 'issued', label: '已出庫' },
+            { key: 'cancelled', label: '已撤銷' },
           ] : []),
           { key: 'mine', label: '我的領用' },
         ]}

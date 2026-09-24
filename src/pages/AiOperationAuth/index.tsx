@@ -25,6 +25,11 @@ import {
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
 import type { ToolDefinition, ToolLevel } from '../../api/mock/aiPlatformMock'
+import {
+  fetchToolRegistry,
+  toggleToolStatus,
+  type ToolPolicyRow,
+} from '../../api/aiOperationAuth'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 
 /* ────────────────── 展示常量 ────────────────── */
@@ -36,14 +41,22 @@ export default function AiOperationAuth() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   /* ── 數據 ── */
-  const [tools, setTools] = useState<ToolDefinition[]>([])
+  const [tools, setTools] = useState<ToolPolicyRow[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  const loadTools = () => {
     setLoading(true)
-    fetchMockToolRegistry().then((data) => { if (!cancelled) setTools(data) }).finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+    fetchToolRegistry()
+      .then(setTools)
+      .catch(() => {
+        // 后端不可用时回退 mock 列表，保证管理页不白屏；日志中已含真实失败信息
+        fetchMockToolRegistry().then(setTools as unknown as (rows: ToolDefinition[]) => void)
+      })
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadTools()
   }, [])
 
   /* ── 查詢條件 ── */
@@ -86,24 +99,29 @@ export default function AiOperationAuth() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  /* ── 工具啟停（二次確認） ── */
-  const handleToggleStatus = (row: ToolDefinition) => {
+  /* ── 工具啟停（二次確認 + 真实后端） ── */
+  const handleToggleStatus = (row: ToolPolicyRow) => {
     const toDisable = row.status === 1
     const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
       title: `確認${actionText}該工具？`,
-      content: `${actionText}後「${row.name}」將${toDisable ? '不再' : '恢復'}在 AI 對話中${toDisable ? '提供' : '提供'}該能力`,
+      content: `${actionText}後「${row.name}」將${toDisable ? '不再' : '恢復'}在 AI 對話中提供該能力`,
       okText: '確認',
       cancelText: '取消',
-      onOk: () => {
-        setTools((prev) => prev.map((t) => (t.id === row.id ? { ...t, status: toDisable ? 0 : 1 } : t)))
-        message.success(`${row.name} 已${actionText}`)
+      onOk: async () => {
+        try {
+          await toggleToolStatus(row.code, toDisable ? 0 : 1)
+          setTools((prev) => prev.map((t) => (t.id === row.id ? { ...t, status: toDisable ? 0 : 1 } : t)))
+          message.success(`${row.name} 已${actionText}`)
+        } catch {
+          message.error(`${actionText}失敗`)
+        }
       },
     })
   }
 
   /* ── 表格列 ── */
-  const toolColumns: ColumnsType<ToolDefinition> = [
+  const toolColumns: ColumnsType<ToolPolicyRow> = [
     {
       title: '工具名稱', dataIndex: 'name', width: 130,
       render: (_, row) => (
@@ -130,7 +148,7 @@ export default function AiOperationAuth() {
     { title: '最近調用', dataIndex: 'lastCalledAt', width: 160, render: (v: string | null) => v ?? <span style={{ color: '#BFBFBF' }}>--</span> },
     {
       title: '狀態', dataIndex: 'status', width: 80, align: 'center',
-      render: (_: unknown, row: ToolDefinition) => (
+      render: (_: unknown, row: ToolPolicyRow) => (
         <Switch
           checked={row.status === 1}
           checkedChildren="啟用"
@@ -145,8 +163,8 @@ export default function AiOperationAuth() {
       title: '操作', key: 'action', width: 140, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?id=${row.id}`)}>編輯</Button>
-          <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?id=${row.id}`)}>調用日誌</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?toolKey=${encodeURIComponent(row.code)}`)}>編輯</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?toolKey=${encodeURIComponent(row.code)}`)}>調用日誌</Button>
         </Space>
       ),
     },

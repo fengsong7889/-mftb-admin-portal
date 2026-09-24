@@ -26,6 +26,8 @@ public class MenuVO {
     private String component;
     private String icon;
     private Integer type;
+    /** 归属系统编码（sys_system.code）；顶级菜单必填，叶子菜单继承父级；NULL 表示暂未归属 */
+    private String systemCode;
     private Integer sort;
     /** 可用操作 */
     private List<String> actions;
@@ -54,6 +56,7 @@ public class MenuVO {
         vo.setComponent(menu.getComponent());
         vo.setIcon(menu.getIcon());
         vo.setType(menu.getType());
+        vo.setSystemCode(menu.getSystemCode());
         vo.setSort(menu.getSort());
         vo.setActions(JsonUtils.parseStringList(menu.getActions()));
         vo.setStatus(menu.getStatus());

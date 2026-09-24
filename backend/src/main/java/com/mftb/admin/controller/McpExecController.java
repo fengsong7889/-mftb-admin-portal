@@ -4,6 +4,7 @@ import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.McpExecRequest;
 import com.mftb.admin.service.McpExecService;
+import com.mftb.admin.service.impl.McpExecServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,8 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * MCP 外部工具统一执行网关
- * 安全加固: 需 ai-mcp-service 菜单权限方可调用（R-24 安全审计修复）
- * 高风险执行由前端人工确认（AI 操作授权 L3）+ 服务端校验 installed/source + 日志留痕兜底
+ * V0 §B.2：需 ai-mcp-service 菜单权限 + ai_tool_policy 前置拦截（默认拒绝/启停/审批凭证），执行写审计日志
  */
 @RestController
 @RequestMapping("/api/mcp")
@@ -25,8 +25,13 @@ public class McpExecController {
 
     @PostMapping("/exec")
     @RequirePermission(menu = "ai-mcp-service")
-    @Operation(summary = "外部工具統一執行（需 ai-mcp-service 權限）")
+    @Operation(summary = "外部工具統一執行（需 ai-mcp-service 權限 + 工具级授权）")
     public Result<String> exec(@RequestBody McpExecRequest request) {
+        if (mcpExecService instanceof McpExecServiceImpl impl) {
+            return Result.success(impl.execute(
+                    request.getToolKey(), request.getArgs(),
+                    request.getApprovalToken(), request.getConversationId(), request.getConversationPk()));
+        }
         return Result.success(mcpExecService.execute(request.getToolKey(), request.getArgs()));
     }
 }

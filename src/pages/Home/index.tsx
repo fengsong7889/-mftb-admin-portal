@@ -879,8 +879,10 @@ export default function Home() {
     const opts: LlmRequestOptions = {}
     if (contextWindow) opts.contextWindow = contextWindow
     if (thinkingEnabled && thinkingAvailable) opts.thinkingDepth = thinkingDepth
+    // V0 §B.6：当前会话主键 → 后端写 ai_conversation_event（QUOTA_CHARGE/TOOL_CALL/…）
+    if (activeConvId) opts.conversationPk = activeConvId
     return opts
-  }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth])
+  }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth, activeConvId])
 
   /** 处理排队中的下一条消息 */
   const processNextInQueue = useCallback(async () => {

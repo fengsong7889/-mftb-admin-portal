@@ -6,6 +6,7 @@ import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.entity.AiDeptAuthGroup;
 import com.mftb.admin.entity.AiDeptAuthGroupDept;
 import com.mftb.admin.entity.AiDeptAuthGroupModel;
+import com.mftb.admin.entity.AiDeptQuotaPolicy;
 import com.mftb.admin.entity.AiEmpPosAuthStrategy;
 import com.mftb.admin.entity.AiEmpQuotaPolicy;
 import com.mftb.admin.entity.AiEmpRoleAuth;
@@ -20,6 +21,7 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AiDeptAuthGroupDeptMapper;
 import com.mftb.admin.mapper.AiDeptAuthGroupMapper;
 import com.mftb.admin.mapper.AiDeptAuthGroupModelMapper;
+import com.mftb.admin.mapper.AiDeptQuotaPolicyMapper;
 import com.mftb.admin.mapper.AiEmpPosAuthStrategyMapper;
 import com.mftb.admin.mapper.AiEmpQuotaPolicyMapper;
 import com.mftb.admin.mapper.AiEmpRoleAuthMapper;
@@ -38,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -79,6 +82,8 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
     private final AiQuotaOverrideMapper quotaOverrideMapper;
     private final AiEmpQuotaPolicyMapper empQuotaPolicyMapper;
     private final AiRoleQuotaPolicyMapper roleQuotaPolicyMapper;
+    /** V0 §B.3 新部门额度策略表（ai_dept_quota_policy），与旧 ai_quota_config 取并集 */
+    private final AiDeptQuotaPolicyMapper deptQuotaPolicyMapper;
     private final LlmUsageMapper llmUsageMapper;
     private final AiModelMapper modelMapper;
     private final AiProviderMapper providerMapper;
@@ -183,8 +188,52 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         }
         List<Dim> dims = new ArrayList<>();
         dims.addAll(collectConfigDimensions(user));
+        // V0 §B.3：新部门额度策略表接入，与旧 ai_quota_config 取并集；同一目标两个表都命中时 checkQuota 取最严格
+        dims.addAll(collectDeptPolicyDimensions(user));
         dims.addAll(collectPositionDimensions(user));
         dims.addAll(collectRoleDimensions(user));
+        return dims;
+    }
+
+    /**
+     * V0 §B.3 新部门额度策略（ai_dept_quota_policy）：
+     * <ul>
+     *   <li>allocateMode=total → 整个部门共享池，members=部门全员，聚合用量比对 quotaValue；</li>
+     *   <li>allocateMode=per_capita → 每人独立额度，members=本人；</li>
+     *   <li>quotaValue 为 0/null → 跳过（与旧配置一致）。</li>
+     * </ul>
+     */
+    private List<Dim> collectDeptPolicyDimensions(SysUser user) {
+        if (user.getDepartmentId() == null) {
+            return List.of();
+        }
+        List<AiDeptQuotaPolicy> policies = deptQuotaPolicyMapper.selectList(
+                new LambdaQueryWrapper<AiDeptQuotaPolicy>().eq(AiDeptQuotaPolicy::getStatus, 1));
+        List<Dim> dims = new ArrayList<>();
+        Set<String> selfMembers = Set.of(user.getUsername());
+        Set<String> deptMembers = null;
+        for (AiDeptQuotaPolicy policy : policies) {
+            List<Long> targetDeptIds = JsonUtils.parseLongList(policy.getDeptIds());
+            if (!targetDeptIds.contains(user.getDepartmentId())) {
+                continue;
+            }
+            if (policy.getQuotaValue() == null || policy.getQuotaValue().signum() <= 0) {
+                continue;
+            }
+            boolean perCapita = "per_capita".equals(policy.getAllocateMode());
+            if (!perCapita) {
+                if (deptMembers == null) {
+                    deptMembers = deptMemberUsernames(user.getDepartmentId(), user.getUsername());
+                }
+            }
+            dims.add(toPolicyDim(
+                    "department",
+                    StringUtils.hasText(policy.getName()) ? policy.getName() : "部門額度",
+                    policy.getPeriod(), policy.getQuotaType(),
+                    policy.getQuotaValue(), policy.getCurrency(), policy.getSoftThreshold(),
+                    perCapita ? selfMembers : deptMembers,
+                    policy.getOverLimitAction(), policy.getDowngradeModelId()));
+        }
         return dims;
     }
 

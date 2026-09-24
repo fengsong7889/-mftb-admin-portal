@@ -24,9 +24,11 @@ export default function AssetRepair() {
         : { mode: 'list' },
   )
 
-  // 外部跳轉帶入 id 時同步打開維修詳情（create 模式優先，不覆蓋）
+  // 視圖完全由 URL 驅動：外鏈帶 id 進詳情、?create=1 進新建、無參數回列表（修復點側欄菜單卡在詳情）
   useEffect(() => {
-    if (urlId && !urlCreate) setView({ mode: 'detail', assetId: urlId })
+    if (urlCreate) setView({ mode: 'create' })
+    else if (urlId) setView({ mode: 'detail', assetId: urlId })
+    else setView({ mode: 'list' })
   }, [urlId, urlCreate])
 
   const backToList = () => {

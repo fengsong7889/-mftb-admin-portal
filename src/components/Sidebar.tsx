@@ -6,6 +6,12 @@ import { useTranslation } from 'react-i18next'
 import BrandLogo from './BrandLogo'
 import { useAuth } from '../contexts/AuthContext'
 import { useMenu } from '../contexts/MenuContext'
+import {
+  useCurrentSystem,
+  resolveSystemFromPathname,
+  isBusinessSystemCode,
+} from '../hooks/useCurrentSystem'
+import { useSystemNavigation } from '../hooks/useSystemNavigation'
 import type { MenuVO } from '../api/menu'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
 import { keyToPath, pathToKey } from '../constants/menuDataSource'
@@ -143,6 +149,7 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'role-management': '/role-management',
   'function-permission': '/function-permission',
   'data-permission': '/data-permission',
+  'system-authorization': '/system-authorization',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤
@@ -397,6 +404,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'role-management': <SolutionOutlined />,
   'function-permission': <AppstoreOutlined />,
   'data-permission': <DatabaseOutlined />,
+  'system-authorization': <SafetyCertificateOutlined />,
   'system-config': <SettingOutlined />,
   'menu-config': <MenuOutlined />,
   'translation-manage': <TranslationOutlined />,
@@ -482,6 +490,38 @@ const keyToIcon: Record<string, ReactNode> = {
   'purchase-request': <ShoppingCartOutlined />,
 }
 
+/** 判定一个顶级 Sidebar item 是否属于指定系统：
+ *  - menuTree 中同级 menuKey 对应节点的 systemCode 匹配即命中；
+ *  - 未匹配→菜单树不中属于当前系统，隐藏；
+ *  - 当前系统为 null 时本函数不被调用（外层已判断）。*/
+function belongsToSystem(item: MenuItem | null, menuTree: MenuVO[], systemCode: string): boolean {
+  if (!item) return false
+  const key = String(item.key)
+  const hit = (nodes: MenuVO[]): boolean => {
+    for (const n of nodes) {
+      if (n.menuKey === key) return n.systemCode === systemCode
+      if (n.children?.length && hit(n.children)) return true
+    }
+    return false
+  }
+  // 菜单树里找不到的顶级项（例如离线菜单）：当前不强行隐藏，保留旧行为
+  const found = hit(menuTree)
+  if (!found) {
+    // 菜单树内无任何同名节点 → 保留（属于离线菜单/原型项）
+    return anyMenuKeyMatches(menuTree, key)
+  }
+  return true
+}
+
+/** 菜单树中存在同名节点（不区分系统），作为“离线项”与“已归属项”的分界。 */
+function anyMenuKeyMatches(nodes: MenuVO[], key: string): boolean {
+  for (const n of nodes) {
+    if (n.menuKey === key) return true
+    if (n.children?.length && anyMenuKeyMatches(n.children, key)) return true
+  }
+  return false
+}
+
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
 const HIDDEN_MENU_KEYS = new Set([
   'ai-access-request', // AI 使用申請：功能入口已整合至智能中心其他菜單
@@ -541,19 +581,43 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
   const { menuTree, status: menuStatus } = useMenu()
+  const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
+  // Round 6：锁到业务系统时优先拉服务端剪枝导航（与后端 strict-mode 同源）；
+  // 未锁 / 接口失败 → 降级到旧的全量 menuTree 客户端过滤，不阻断入口。
+  const systemNavigation = useSystemNavigation(currentSystemCode)
   const [openKeys, setOpenKeys] = useState<string[]>([])
 
-  /** 按當前登錄人權限過濾後的可見菜單：
-   *  后端菜单树可用 → 以 DB 为唯一真值（名称/层级/排序/图标）, 仅补挂 DB 完全缺失的离线菜单；
-   *  后端菜单树不可用 → 只展示离线清单（仍依赖 mock 的模块）；語言變化時重算菜單名稱 */
+  /** 自动同步 currentSystemCode：
+   *  - 菜单树就绪后，若当前 pathname 属于某业务系统→写入；
+   *  - 当前处于门户/工作台等无系统上下文页面→保持旧值，不主动清空，避免刷新时 Sidebar 无菜单可展。 */
+  useEffect(() => {
+    if (!menuTree) return
+    const sys = resolveSystemFromPathname(location.pathname, menuTree)
+    if (isBusinessSystemCode(sys) && sys !== currentSystemCode) {
+      setCurrentSystemCode(sys)
+    }
+  }, [menuTree, location.pathname, currentSystemCode, setCurrentSystemCode])
+
+  /** 按当前登录人权限过滤后的可见菜单：
+   *  1) currentSystemCode 已锁 + 服务端导航非空 → 直接用服务端剪枝树（已仅包含当前用户可访问菜单），
+   *     保留 filterMenusByPermission 作为本地 revision 无变更时的双重无洞防护；
+   *  2) 否则回退旧行为：后端菜单树可用 → 以 DB 为唯一真值 + 补挂离线菜单 + 客户端过滤；
+   *     后端不可用 → 只展离线清单；语言变化时重算菜单名称 */
   const visibleMenuItems = useMemo(() => {
+    if (currentSystemCode && systemNavigation.tree.length > 0) {
+      const serverItems = buildMenuItemsFromVO(systemNavigation.tree)
+      return filterMenusByPermission(serverItems, hasMenuPermission)
+    }
     const items = menuTree
       ? attachOfflineMenus(buildMenuItemsFromVO(menuTree), collectMenuTreeKeys(menuTree))
       : OFFLINE_MENUS
         .map((node) => buildOfflineMenuItem(node))
         .filter((item): item is MenuItem => item !== null)
-    return filterMenusByPermission(items, hasMenuPermission)
-  }, [menuTree, hasMenuPermission, i18nInstance.language])
+    const scoped = currentSystemCode && menuTree
+      ? items.filter((item): item is MenuItem => !!item && belongsToSystem(item, menuTree, currentSystemCode))
+      : items
+    return filterMenusByPermission(scoped, hasMenuPermission)
+  }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree])
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'

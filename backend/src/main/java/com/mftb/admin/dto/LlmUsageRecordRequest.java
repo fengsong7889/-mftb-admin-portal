@@ -34,4 +34,7 @@ public class LlmUsageRecordRequest {
     /** 命中缓存的输入 tokens（可选，按缓存单价计费） */
     @Min(0)
     private int cachedTokens;
+
+    /** 关联的服务端计量请求 ID（{@code ai_budget_ledger.request_id}）；网关内部上报时不为空 */
+    private String requestId;
 }

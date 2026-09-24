@@ -12,8 +12,16 @@ import java.util.Map;
  */
 public interface EmployeeService {
 
-    /** 分页查询员工（支持 employmentStatus 过滤：active/resigned） */
-    PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus);
+    /**
+     * 分页查询员工（服务端完整筛选与计数）。
+     * departmentId 含全部子孙部门；employmentStatus 由职务记录派生（active/resigned）。
+     */
+    PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus,
+                                Long departmentId, String sequence, String jobLevel, String rank,
+                                Long roleId, String updatedBy, String updatedAtFrom, String updatedAtTo);
+
+    /** 按 ID 获取单个员工详情（含派生在职状态），员工不存在抛出业务异常 */
+    EmployeeVO getDetail(Long id);
 
     /** 新增员工 */
     EmployeeVO create(EmployeeRequest request);
@@ -30,8 +38,11 @@ public interface EmployeeService {
     /** 删除员工 */
     void delete(Long id);
 
-    /** 获取员工基础信息（个人信息 + 证件信息 + 通讯信息） */
-    Map<String, Object> getBasicInfo(Long id);
+    /**
+     * 获取员工基础信息（个人信息 + 证件信息 + 通讯信息）。
+     * @param reveal true=返回证件号/住址明文（仅供受控明文端点使用）；false=默认脱敏。
+     */
+    Map<String, Object> getBasicInfo(Long id, boolean reveal);
 
     /** 保存员工基础信息 */
     void saveBasicInfo(Long id, BasicInfoRequest request);

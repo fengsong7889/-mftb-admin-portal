@@ -39,7 +39,7 @@ export default function ConsumableDashboardPage() {
   const cards = data ? [
     { label: '耗材品類', value: <AnimatedNumber value={data.itemKinds} />, icon: <AppstoreOutlined />, color: '#1890FF', bg: '#E6F7FF' },
     { label: '庫存總量', value: <AnimatedNumber value={data.totalStockQty} />, icon: <DatabaseOutlined />, color: '#52C41A', bg: '#F6FFED' },
-    { label: '庫存總值', value: <AnimatedNumber value={data.totalStockValue} decimals={2} prefix="¥" />, icon: <DollarOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+    { label: '庫存總值', value: <AnimatedNumber value={data.totalStockValue} decimals={2} prefix="MOP " />, icon: <DollarOutlined />, color: '#E8720C', bg: '#FFF7E6' },
     { label: '庫存預警', value: <AnimatedNumber value={data.alertCount} />, icon: <AlertOutlined />, color: '#722ED1', bg: '#F9F0FF' },
   ] : []
 
@@ -66,7 +66,7 @@ export default function ConsumableDashboardPage() {
           {data && (
             <>
               <Tag color="orange" style={{ fontSize: 12 }}>本月領用 {data.monthClaimCount}</Tag>
-              <Tag color="volcano" style={{ fontSize: 12 }}>本月消耗 ¥{(data.monthConsumeAmount ?? 0).toFixed(2)}</Tag>
+              <Tag color="volcano" style={{ fontSize: 12 }}>本月消耗 MOP {(data.monthConsumeAmount ?? 0).toFixed(2)}</Tag>
               <Tag color="processing" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => navigate('/consumable-report')}>消耗統計 →</Tag>
               <Tag color="processing" style={{ fontSize: 12, cursor: 'pointer' }} onClick={() => navigate('/consumable-claim')}>領用記錄 →</Tag>
             </>
@@ -100,7 +100,7 @@ export default function ConsumableDashboardPage() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AlertOutlined style={{ fontSize: 14, color: '#FA8C16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>库存预警</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>庫存預警</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Table<ConsumableItem>
@@ -119,7 +119,7 @@ export default function ConsumableDashboardPage() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>最近出入库</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>最近出入庫</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Table<ConsumableTxn>

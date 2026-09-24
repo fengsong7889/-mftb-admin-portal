@@ -1,0 +1,51 @@
+/* 门户顶栏（Round 2）：与全局 header-bar 视觉一致（同高、同阴影），仅去掉与 Sidebar 折叠相关的元素。 */
+
+.portal-top-bar.ant-layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  line-height: 56px;
+  padding: 0 24px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.portal-top-bar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  letter-spacing: 0.5px;
+}
+
+.portal-top-bar-badge.ant-tag {
+  margin-inline-start: 4px;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+.portal-top-bar-user {
+  font-size: 13px;
+  color: #595959;
+}
+
+.portal-top-bar-logout.ant-btn {
+  height: 32px;
+  padding: 0 12px;
+  color: #595959;
+  border-radius: 6px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.portal-top-bar-logout.ant-btn:hover {
+  color: #E8720C !important;
+  background: #FFF7F0 !important;
+}
+
+/* 门户内容区背景与主色渐变过渡，视觉区别于业务系统内的白底卡片。 */
+.app-content-portal {
+  background: linear-gradient(180deg, #FFF9F2 0%, #F5F5F7 220px);
+  padding: 0;
+}

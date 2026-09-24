@@ -43,6 +43,10 @@ public class SysMenu {
     /** 类型: 1=目录 2=菜单 3=按钮 */
     private Integer type;
 
+    /** 归属系统编码（sys_system.code）；顶级菜单必填，叶子菜单继承父级；NULL 表示暂未归属 */
+    @TableField("system_code")
+    private String systemCode;
+
     /** 排序 */
     @TableField("sort_order")
     private Integer sort;

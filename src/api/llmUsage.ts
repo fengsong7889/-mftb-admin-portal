@@ -59,6 +59,10 @@ export interface UsageRecord {
   cachedTokens: number
   cost: number
   currency: string
+  /** V0 §B.5：VERIFIED / ESTIMATED / UNKNOWN（历史无字段时后端会回默认为 ESTIMATED） */
+  verificationStatus?: 'VERIFIED' | 'ESTIMATED' | 'UNKNOWN' | string | null
+  /** 网关侧计量时不为空（ai_budget_ledger.request_id） */
+  requestId?: string | null
   createdAt: string
 }
 

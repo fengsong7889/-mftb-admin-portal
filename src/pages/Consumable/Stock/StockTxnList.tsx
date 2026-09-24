@@ -17,6 +17,7 @@ import {
 } from '../../../api/consumable'
 import { TXN_TYPE_LABEL, TXN_TYPE_COLOR } from '../Claim/constants'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { exportToCSV } from '../../../utils/exportCSV'
 
 const TXN_TYPE_OPTIONS = [
   { label: '採購入庫', value: 'in_purchase' },
@@ -99,6 +100,23 @@ export default function StockTxnList() {
 
   const handleExport = () => {
     if (data.length === 0) { message.warning('暫無數據可導出'); return }
+    const cols = [
+      { title: '操作編號', dataIndex: 'txnNo' },
+      { title: '操作類型', dataIndex: 'txnType', render: (v: string) => TXN_TYPE_LABEL[v] ?? v },
+      { title: '耗材編碼', dataIndex: 'itemCode' },
+      { title: '耗材名稱', dataIndex: 'itemName' },
+      { title: '倉庫', dataIndex: 'locationName', render: (v: string) => v || '-' },
+      { title: '變動數量', dataIndex: 'qty', render: (v: number) => (v > 0 ? `+${v}` : `${v}`) },
+      { title: '成本金額', dataIndex: 'amount', render: (v?: number) => (v != null ? (v > 0 ? `+MOP ${v.toFixed(2)}` : v < 0 ? `-MOP ${Math.abs(v).toFixed(2)}` : 'MOP 0.00') : '-') },
+      { title: '領用人', dataIndex: 'applicantName', render: (v: string) => v || '-' },
+      { title: '部門', dataIndex: 'department', render: (v: string) => v || '-' },
+      { title: '變動前庫存', dataIndex: 'beforeQty' },
+      { title: '變動後庫存', dataIndex: 'afterQty' },
+      { title: '操作人', dataIndex: 'operator', render: (v: string) => v || '-' },
+      { title: '操作時間', dataIndex: 'createdAt', render: (v: string) => v || '-' },
+      { title: '備註', dataIndex: 'remark', render: (v: string) => v || '-' },
+    ]
+    exportToCSV(`consumable_txn_${new Date().toISOString().slice(0, 10)}`, cols, data)
     message.success('導出成功')
   }
 
@@ -110,7 +128,7 @@ export default function StockTxnList() {
     { title: '耗材名稱', dataIndex: 'itemName', key: 'itemName', width: 150, ellipsis: true },
     { title: '倉庫', dataIndex: 'locationName', key: 'locationName', width: 120, render: (v: string) => v || '-' },
     { title: '變動數量', dataIndex: 'qty', key: 'qty', width: 90, align: 'right', render: (v: number) => <span style={{ color: v >= 0 ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}>{v > 0 ? `+${v}` : v}</span> },
-    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: (v?: number) => (v != null ? <span style={{ color: v >= 0 ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}>{v > 0 ? `+¥${v.toFixed(2)}` : `¥${v.toFixed(2)}`}</span> : '-') },
+    { title: '成本金額', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: (v?: number) => (v != null ? <span style={{ color: v >= 0 ? '#52C41A' : '#FF4D4F', fontWeight: 600 }}>{v > 0 ? `+MOP ${v.toFixed(2)}` : v < 0 ? `-MOP ${Math.abs(v).toFixed(2)}` : 'MOP 0.00'}</span> : '-') },
     { title: '領用人', dataIndex: 'applicantName', key: 'applicantName', width: 100, render: (v: string) => v || '-' },
     { title: '部門', dataIndex: 'department', key: 'department', width: 120, ellipsis: true, render: (v: string) => v || '-' },
     { title: '變動前庫存', dataIndex: 'beforeQty', key: 'beforeQty', width: 100, align: 'right' },

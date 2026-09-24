@@ -4594,6 +4594,16 @@
     "deleteFailed": "刪除失敗"
   },
   "organicTrafficScore": {
+    "display": {
+      "bonus": "固定加分",
+      "deduction": "固定減分",
+      "multiplier": "動態加分",
+      "coefficient": "折減係數",
+      "decay": "衰減係數",
+      "base": "基礎分值",
+      "dynamic-bonus": "動態加分",
+      "dynamic-deduction": "動態減分"
+    },
     "dimCommercial": "商業維度",
     "dimStore": "店鋪維度",
     "dimPlatform": "平台維度",

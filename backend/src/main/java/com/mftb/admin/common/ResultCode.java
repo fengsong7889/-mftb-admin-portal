@@ -19,7 +19,8 @@ public enum ResultCode {
     ACCOUNT_DISABLED(1002, "账号已被禁用"),
     ACCOUNT_NOT_EXIST(1003, "账号不存在"),
     SESSION_IDLE_TIMEOUT(1004, "您已长时间未操作，会话已过期"),
-    CAPTCHA_REQUIRED(1005, "請先完成安全驗證");
+    CAPTCHA_REQUIRED(1005, "請先完成安全驗證"),
+    CONFLICT(1006, "資源已被他人修改，請刷新後重試");
 
     private final Integer code;
     private final String message;

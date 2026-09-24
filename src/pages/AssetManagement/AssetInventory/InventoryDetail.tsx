@@ -265,8 +265,8 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
 
   const columns: TableColumnsType<InventoryItemRecord> = [
     { key: 'assetNo', title: t('asset.colAssetNo'), width: 150, fixed: 'left', render: (_, r) => <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{r.assetNo}</span> },
-    { key: 'assetName', title: t('asset.colAssetName'), width: 170, ellipsis: true },
-    { key: 'assetType', title: t('asset.colAssetType'), width: 110 },
+    { key: 'assetName', title: t('asset.colAssetName'), dataIndex: 'assetName', width: 170, ellipsis: true },
+    { key: 'assetType', title: t('asset.colAssetType'), dataIndex: 'assetType', width: 110 },
     { key: 'location', title: t('asset.invScopeLocations'), width: 180, ellipsis: true, render: (_, r) => r.location || '-' },
     { key: 'holder', title: t('asset.colCurrentUserName'), width: 150, render: (_, r) => {
         if (r.bookStatus === 'idle') return '-'

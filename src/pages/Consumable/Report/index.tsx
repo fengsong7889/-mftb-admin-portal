@@ -173,7 +173,8 @@ export default function ConsumableReport() {
 
       {/* 匯總指標卡 */}
       <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-        <SummaryCard icon="💰" color="#1890FF" bg="#E6F7FF" value={money(summary?.purchaseAmount)} label={`期間採購金額（${summary?.purchaseQty ?? 0} 件）`} />
+        <SummaryCard icon="💰" color="#1890FF" bg="#E6F7FF" value={money(summary?.purchaseAmount)} label={`期間採購入庫金額（${summary?.purchaseQty ?? 0} 件）`} />
+        <SummaryCard icon="🧾" color="#13C2C2" bg="#E6FFFB" value={money(summary?.manualInboundAmount)} label="期間手工入庫金額" />
         <SummaryCard icon="🔥" color="#E8720C" bg="#FFF7E6" value={money(summary?.consumeAmount)} label={`期間消耗金額（${summary?.consumeQty ?? 0} 件）`} />
         <SummaryCard icon="📦" color="#52C41A" bg="#F6FFED" value={money(summary?.stockAmount)} label={`當前庫存金額（${summary?.stockQty ?? 0} 件）`} />
         <SummaryCard icon="👥" color="#722ED1" bg="#F9F0FF"

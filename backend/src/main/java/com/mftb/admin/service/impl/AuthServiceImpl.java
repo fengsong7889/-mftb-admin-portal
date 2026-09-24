@@ -14,6 +14,7 @@ import com.mftb.admin.service.AuthService;
 import com.mftb.admin.service.CaptchaService;
 import com.mftb.admin.service.DepartmentService;
 import com.mftb.admin.service.LoginLogService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.JwtUtil;
@@ -49,6 +50,7 @@ public class AuthServiceImpl implements AuthService {
     private final LoginLogService loginLogService;
     private final SysConfigService sysConfigService;
     private final CaptchaService captchaService;
+    private final PermissionService permissionService;
 
     /** 登录失败频率限制: 同一账号 15 分钟内最多 5 次失败 */
     private static final int MAX_LOGIN_ATTEMPTS = 5;
@@ -147,8 +149,15 @@ public class AuthServiceImpl implements AuthService {
             data.put("operatorEmpId", user.getForceLogoutEmpId());
             return SessionCheckResult.fail(401, "您的账号已被管理员强制下线", data);
         }
-        // 单设备登录冲突
-        if (user.getActiveToken() != null && !token.equals(user.getActiveToken())) {
+        // 单设备登录冲突：
+        //  - active_token 为空 → 服务端已撤销会话（logout / admin 强制下线后续），旧 JWT 不再允许存活
+        //  - active_token 非空但与本次携带 token 不一致 → 其他设备顶下线（legacy 行为保留）
+        if (user.getActiveToken() == null) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("reason", "SESSION_REVOKED");
+            return SessionCheckResult.fail(401, "登出已生效，请重新登录", data);
+        }
+        if (!token.equals(user.getActiveToken())) {
             if ("account_disabled".equals(user.getForceLogoutReason())) {
                 return SessionCheckResult.fail(ResultCode.ACCOUNT_DISABLED.getCode(), "账号已被停用", null);
             }
@@ -168,7 +177,7 @@ public class AuthServiceImpl implements AuthService {
         return SessionCheckResult.ok();
     }
 
-    /** 构建用户信息: 合并「绑定角色」与「所在部门」授权的菜单权限 */
+    /** 构建用户信息: 合并「绑定角色」与「所在部门」授权的菜单权限，同时下发可访问系统列表 */
     private UserInfoVO buildUserInfo(SysUser user) {
         UserInfoVO vo = UserInfoVO.from(user);
         List<MenuPermissionDTO> rolePerms = roleService.mergePermissions(vo.getFunctionRoleIds());
@@ -176,6 +185,8 @@ public class AuthServiceImpl implements AuthService {
         vo.setPermissions(mergePermissionLists(rolePerms, deptPerms));
         // 下发角色编码，供前端审批流程校验节点权限
         vo.setFunctionRoleCodes(roleService.codesOf(vo.getFunctionRoleIds()));
+        // 下发可访问系统列表（供门户卡片与顶部切换器使用）
+        vo.setAccessibleSystems(permissionService.listAccessibleSystems(user));
         return vo;
     }
 
@@ -259,6 +270,26 @@ public class AuthServiceImpl implements AuthService {
         if (loginAttemptMap.size() > 200) {
             long threshold = System.currentTimeMillis() - LOCK_DURATION_MS;
             loginAttemptMap.entrySet().removeIf(e -> e.getValue().firstFailTime < threshold);
+        }
+    }
+
+    @Override
+    public void revokeActiveToken(String username, String presentingToken) {
+        if (username == null || username.isBlank() || presentingToken == null || presentingToken.isBlank()) {
+            return;
+        }
+        // 原子写：仅当当前 active_token 与传入的完全一致时清空，避免旧标签页延迟 logout 误新会话
+        int affected = sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .eq(SysUser::getActiveToken, presentingToken)
+                        .set(SysUser::getActiveToken, null)
+                        .set(SysUser::getActiveLoginIp, null));
+        if (affected == 0) {
+            // 当前会话已被新登录顶替，或已被管理员强制下线：无需报错，保证幂等
+            log.info("撤销会话未命中（可能已被新登录顶替）：username={}", username);
+        } else {
+            log.info("会话已在服务端撤销：username={}", username);
         }
     }
 

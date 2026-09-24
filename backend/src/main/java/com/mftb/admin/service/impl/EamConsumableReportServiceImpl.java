@@ -1,6 +1,8 @@
 package com.mftb.admin.service.impl;
 
 import com.mftb.admin.dto.*;
+import com.mftb.admin.entity.EamConsumableItem;
+import com.mftb.admin.mapper.EamConsumableItemMapper;
 import com.mftb.admin.mapper.EamConsumableReportMapper;
 import com.mftb.admin.service.EamConsumableReportService;
 import com.mftb.admin.service.SysCompanyBrandService;
@@ -15,6 +17,10 @@ import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 耗材消耗统计报表服务实现
@@ -26,6 +32,7 @@ import java.util.Map;
 public class EamConsumableReportServiceImpl implements EamConsumableReportService {
 
     private final EamConsumableReportMapper reportMapper;
+    private final EamConsumableItemMapper consumableItemMapper;
     private final SysCompanyBrandService companyBrandService;
     private final SysPurchaseCompanyService purchaseCompanyService;
 
@@ -119,7 +126,29 @@ public class EamConsumableReportServiceImpl implements EamConsumableReportServic
         for (EamConsumableItemStatVO s : stockMap.values()) {
             rows.add(s);
         }
+        // 從耗材主档批量补齐编码/名称/规格/单位（修复：期间内无流水的耗材行身份字段为空、规格/单位始终缺失）
+        enrichItemMaster(rows);
         return rows;
+    }
+
+    /** 用耗材主档批量补齐 itemCode/itemName/spec/unit；主档缺失（如已删除）时保留流水快照值。 */
+    private void enrichItemMaster(List<EamConsumableItemStatVO> rows) {
+        if (rows.isEmpty()) return;
+        Set<Long> ids = rows.stream()
+                .map(EamConsumableItemStatVO::getItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return;
+        Map<Long, EamConsumableItem> masterMap = consumableItemMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(EamConsumableItem::getId, Function.identity(), (a, b) -> a));
+        for (EamConsumableItemStatVO row : rows) {
+            EamConsumableItem item = row.getItemId() == null ? null : masterMap.get(row.getItemId());
+            if (item == null) continue;
+            if (StringUtils.hasText(item.getItemCode())) row.setItemCode(item.getItemCode());
+            if (StringUtils.hasText(item.getName())) row.setItemName(item.getName());
+            row.setSpec(item.getSpec());
+            row.setUnit(item.getUnit());
+        }
     }
 
     /* ==================== 工具 ==================== */

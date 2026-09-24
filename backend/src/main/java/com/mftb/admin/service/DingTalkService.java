@@ -68,6 +68,22 @@ public interface DingTalkService {
     boolean isEnabled();
 
     /**
+     * V0 §八 V0-6：同步发送文本消息（不走 @Async），返回渠道实际受理状态。
+     * 供 AI 通知工具 handler 使用；业务通知继续走 {@link #sendText} 保持异步非阻塞。
+     */
+    SendOutcome sendTextSync(String scenario, String content, java.util.List<String> atMobiles, boolean isAtAll);
+
+    /** V0 §八 V0-6：同步发送 Markdown 消息，返回渠道实际受理状态。 */
+    SendOutcome sendMarkdownSync(String scenario, String title, String text, java.util.List<String> atMobiles, boolean isAtAll);
+
+    /** 同步发送的返回：channelAccepted=钉钉侧是否返回 errcode=0 */
+    record SendOutcome(boolean channelAccepted, String errcode, String errmsg, String channelName) {
+        public static SendOutcome accepted(String channelName) { return new SendOutcome(true, "0", "ok", channelName); }
+        public static SendOutcome rejected(String errcode, String errmsg, String channelName) { return new SendOutcome(false, errcode, errmsg, channelName); }
+        public static SendOutcome unknown(String reason) { return new SendOutcome(false, "UNKNOWN", reason, null); }
+    }
+
+    /**
      * 发送测试消息（使用指定渠道的 webhook/secret）
      *
      * @param channelId 通知渠道 ID

@@ -29,8 +29,11 @@ export default function AssetLoss() {
         : { mode: 'list' },
   )
 
+  // 視圖完全由 URL 驅動：無 id/create 時回列表（修復點側欄菜單卡在詳情）
   useEffect(() => {
-    if (urlId && !urlCreate) setView({ mode: 'detail', lossId: urlId, followUp: urlFollowUp })
+    if (urlCreate) setView({ mode: 'create' })
+    else if (urlId) setView({ mode: 'detail', lossId: urlId, followUp: urlFollowUp })
+    else setView({ mode: 'list' })
   }, [urlId, urlCreate, urlFollowUp])
 
   const backToList = () => {

@@ -1,0 +1,110 @@
+/* 权限中心 · 系统授权配置页样式（Round 4） */
+
+.sys-authz-page {
+  padding: 4px;
+}
+
+.sys-authz-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.sys-authz-card {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.sys-authz-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.sys-authz-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.sys-authz-card-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.sys-authz-target-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sys-authz-label {
+  font-size: 13px;
+  color: #595959;
+  min-width: 96px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.sys-authz-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 260px;
+}
+
+.sys-authz-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.sys-authz-revoke-hint {
+  font-size: 12px;
+  color: #fa8c16;
+}
+
+.sys-authz-tree {
+  background: transparent;
+}
+
+/* 每个节点行：名称 + 动作 checkbox 组，动作组右对齐并紧凑排列 */
+.sys-authz-tree-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 320px;
+}
+
+.sys-authz-tree-node-label {
+  font-size: 13px;
+  color: #262626;
+}
+
+.sys-authz-tree-node-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.sys-authz-tree-node-actions .ant-checkbox-wrapper {
+  font-size: 12px;
+}
+
+/* 底部按钮区（沿用全局 form-footer 样式，仅在页内做微调） */
+.sys-authz-page .form-footer {
+  margin-top: 20px;
+}

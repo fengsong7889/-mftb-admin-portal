@@ -13,6 +13,8 @@ export interface MenuVO {
   component?: string
   icon?: string
   type: number          // 1=目录 2=菜单 3=按钮
+  /** 归属系统编码（sys_system.code）；叶子菜单继承父级，`'portal'` 为个人工作台哨兵 */
+  systemCode?: string | null
   sort: number
   actions?: string[]
   status: number        // 1=启用 0=停用

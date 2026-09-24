@@ -29,6 +29,18 @@ const MODE_META: Record<string, { label: string; color: string }> = {
 /** 路由通道 → 展示文案 */
 const CHANNEL_LABEL: Record<string, string> = { primary: 'QW（百煉）', 'off-peak': 'DS（DeepSeek）' }
 
+/** V0 §B.5：计量可信度标签（VERIFIED=服务端实取，ESTIMATED=无单价但取到 tokens，UNKNOWN=历史自报） */
+const VERIFICATION_META: Record<string, { label: string; color: string }> = {
+  VERIFIED: { label: '已核實', color: 'green' },
+  ESTIMATED: { label: '估算', color: 'blue' },
+  UNKNOWN: { label: '未知', color: 'default' },
+}
+const VERIFICATION_LABEL: Record<string, string> = {
+  VERIFIED: '已核實',
+  ESTIMATED: '估算',
+  UNKNOWN: '未知',
+}
+
 /** 格式化時間（後端 LocalDateTime 序列化為時間戳/字串均可解析） */
 const formatTime = (value: string | number | null) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '--')
 
@@ -117,11 +129,12 @@ export default function AiEnergyDetail() {
         message.info('當前範圍內沒有可導出的記錄')
         return
       }
-      const header = '時間,使用員工,引擎模式,通道,模型,輸入tokens,輸出tokens,緩存tokens,費用,幣種'
+      const header = '時間,使用員工,引擎模式,通道,模型,輸入tokens,輸出tokens,緩存tokens,費用,幣種,計量可信度'
       const lines = filteredRecords.map((r) => [
         formatTime(r.createdAt), employeeLabel(r), MODE_META[r.mode]?.label ?? r.mode,
         CHANNEL_LABEL[r.channel] ?? r.channel, r.model,
         r.promptTokens, r.completionTokens, r.cachedTokens, r.cost, r.currency || '--',
+        VERIFICATION_LABEL[r.verificationStatus ?? 'ESTIMATED'] ?? r.verificationStatus ?? 'ESTIMATED',
       ].join(','))
       const blob = new Blob([`\uFEFF${header}\n${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -156,9 +169,21 @@ export default function AiEnergyDetail() {
     { title: '輸出 tokens', dataIndex: 'completionTokens', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
     {
       title: '費用', key: 'cost', width: 130, align: 'right',
-      render: (_, record) => record.currency
-        ? `${currencySymbol(record.currency)}${Number(record.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-        : '--',
+      render: (_, record) => {
+        // V0 §B.5：UNKNOWN 不再伪装为 0；无单价时展示“未知”灰字
+        if (record.verificationStatus === 'UNKNOWN' || !record.currency) {
+          return <span style={{ color: '#8C8C8C' }}>未知</span>
+        }
+        return `${currencySymbol(record.currency)}${Number(record.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+      },
+    },
+    {
+      title: '計量可信度', key: 'verification', width: 110, align: 'center',
+      render: (_, record) => {
+        const status = record.verificationStatus ?? 'ESTIMATED'
+        const meta = VERIFICATION_META[status] ?? VERIFICATION_META.ESTIMATED
+        return <Tag color={meta.color} style={{ margin: 0 }}>{meta.label}</Tag>
+      },
     },
   ]
 

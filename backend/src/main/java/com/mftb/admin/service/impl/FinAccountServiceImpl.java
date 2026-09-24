@@ -10,6 +10,7 @@ import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.FinAccount;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.FinAccountMapper;
+import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.FinAccountService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 推广金账户服务实现
@@ -36,16 +38,23 @@ public class FinAccountServiceImpl implements FinAccountService {
     private final FinAccountMapper accountMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
+    /** V0 Sprint 1 §B.7：账户列表与 AI 内置工具同源，无授权不展示。 */
+    private final DataScopeService dataScopeService;
 
     @Override
     public PageResult<FinAccountVO> page(FinAccountQuery query) {
         // 以集团管理数据为源按「集团×品牌」派生：集团有对应品牌门店才展示，未开户显示零余额
+        // 非超管仅可见已授权集团（与 AdOrderServiceImpl 同源）；空集合直接短路避免全量泄露
+        Set<String> authorizedGroups = dataScopeService.resolveAuthorizedGroupCodes();
+        if (authorizedGroups != null && authorizedGroups.isEmpty()) {
+            return new PageResult<>(List.of(), 0L);
+        }
         long total = accountMapper.countDerived(query.getGroupId(), query.getGroupName(),
-                query.getBrand(), query.getStatus());
+                query.getBrand(), query.getStatus(), authorizedGroups);
         long offset = (long) (query.getPage() - 1) * query.getSize();
         List<FinAccountVO> records = total == 0 ? List.of()
                 : accountMapper.selectDerivedPage(query.getGroupId(), query.getGroupName(),
-                        query.getBrand(), query.getStatus(), offset, query.getSize());
+                        query.getBrand(), query.getStatus(), authorizedGroups, offset, query.getSize());
         return new PageResult<>(records, total);
     }
 

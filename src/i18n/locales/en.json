@@ -4713,6 +4713,16 @@
     "deleteFailed": "Failed to delete"
   },
   "organicTrafficScore": {
+    "display": {
+      "bonus": "Fixed Bonus",
+      "deduction": "Fixed Deduction",
+      "multiplier": "Dynamic Bonus",
+      "coefficient": "Reduction Factor",
+      "decay": "Decay Coefficient",
+      "base": "Base Score",
+      "dynamic-bonus": "Dynamic Bonus",
+      "dynamic-deduction": "Dynamic Deduction"
+    },
     "dimCommercial": "Commercial",
     "dimStore": "Store",
     "dimPlatform": "Platform",

@@ -29,6 +29,8 @@ export interface UserInfo {
   functionRoleIds?: number[] // 绑定的功能角色ID
   functionRoleCodes?: string[] // 绑定的功能角色编码（如 FIN_BIZ_APPROVER）
   permissions?: MenuPermission[] // 登录时下发的合并菜单权限
+  /** 当前用户可进入的业务系统编码列表（后端按 sys_system.sort_order 排序，不包含哨兵 'portal'）*/
+  accessibleSystems?: string[]
 }
 
 /** 登录响应 */

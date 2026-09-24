@@ -92,6 +92,8 @@ public abstract class SecurityTestBase {
     protected EmergencyContactService emergencyContactService;
     @MockBean(name = "positionRecordService")
     protected PositionRecordService positionRecordService;
+    @MockBean(name = "employeeContractService")
+    protected EmployeeContractService employeeContractService;
     @MockBean(name = "roleService")
     protected RoleService roleService;
     @MockBean(name = "menuService")
