@@ -77,7 +77,7 @@ describe('字典表单保存与国际化', () => {
     expect(container.querySelector('.menu-tabs-bar')).toHaveTextContent('Add · Work Location')
     fireEvent.click(screen.getByRole('button', { name: /Save/ }))
     await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/hr-dict?type=WORK_LOCATION'))
-    expect(container.querySelector('.menu-tabs-bar')).not.toHaveTextContent('Add · Work Location')
+    await waitFor(() => expect(container.querySelector('.menu-tabs-bar')).not.toHaveTextContent('Add · Work Location'))
     expect(dictApi.createHrDict).toHaveBeenLastCalledWith(expect.objectContaining({ dictType: 'WORK_LOCATION', code: 'TEST-LOC', name: '測試地點', status: 1 }))
   })
 
