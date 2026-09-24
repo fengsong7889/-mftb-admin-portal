@@ -305,6 +305,16 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 字典維護（集团人事独立菜单，可单独授权）
+  'hr-dict': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 合同台賬（集团人事独立菜单，只读台账 + 导出）
+  'contract-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
   // 组织管理
   'organization-management': [
     { key: 'view', label: '查看' },
@@ -1052,6 +1062,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'flash-sale-price',
   // 集團人事
   'employee-management',
+  'hr-dict',
+  'contract-ledger',
   'organization-management',
   'position-management',
   'login-log',
@@ -1210,6 +1222,9 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 集團人事
   '/employee-management': 'employee-management',
   '/employee-detail': 'employee-management',
+  '/hr-dict': 'hr-dict',
+  '/hr-dict-edit': 'hr-dict',
+  '/contract-ledger': 'contract-ledger',
   '/organization-management': 'organization-management',
   '/position-management': 'position-management',
   '/login-log': 'login-log',

@@ -5,7 +5,7 @@
  * 本期委托 Mock；接入外部系统后，仅需把各函数实现替换为 request.* 调用，
  * 保持函数签名与返回类型不变即可，业务页面无需改动。
  */
-import type { WaterfallContentType } from '../pages/waterfallConfig/types'
+import type { WaterfallContentType, WaterfallSortMode, WaterfallCatalogChannel } from '../pages/waterfallConfig/types'
 import {
   mockListCategories,
   mockSearchItems,
@@ -24,9 +24,10 @@ const delay = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms))
 export async function fetchWaterfallCategories(
   contentType: WaterfallContentType,
   brand?: string,
+  channel: WaterfallCatalogChannel = 'groupBuy',
 ): Promise<MockCategory[]> {
   await delay()
-  return mockListCategories(contentType, brand)
+  return mockListCategories(contentType, brand, channel)
 }
 
 /** 分页搜索资源（门店 / 商品） */
@@ -35,6 +36,7 @@ export async function searchWaterfallCatalog(params: {
   brand?: string
   categoryId?: string
   keyword?: string
+  channel?: WaterfallCatalogChannel
   page?: number
   size?: number
 }): Promise<{ records: MockCatalogItem[]; total: number }> {
@@ -44,6 +46,7 @@ export async function searchWaterfallCatalog(params: {
     brand: params.brand,
     categoryId: params.categoryId,
     keyword: params.keyword,
+    channel: params.channel,
     page: params.page ?? 1,
     size: params.size ?? 20,
   })
@@ -53,9 +56,10 @@ export async function searchWaterfallCatalog(params: {
 export async function fetchCatalogByIds(
   contentType: WaterfallContentType,
   ids: string[],
+  channel: WaterfallCatalogChannel = 'groupBuy',
 ): Promise<MockCatalogItem[]> {
   await delay()
-  return mockGetItemsByIds(contentType, ids)
+  return mockGetItemsByIds(contentType, ids, channel)
 }
 
 /** 按分类并集取候选（预览补位用，父含子、去重、排除已固定） */
@@ -64,6 +68,8 @@ export async function fetchCategoryCandidates(params: {
   brand?: string
   categoryIds: string[]
   excludeItemIds?: string[]
+  sortMode?: WaterfallSortMode
+  channel?: WaterfallCatalogChannel
   limit?: number
 }): Promise<MockCatalogItem[]> {
   await delay()

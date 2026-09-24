@@ -504,22 +504,8 @@ function belongsToSystem(item: MenuItem | null, menuTree: MenuVO[], systemCode: 
     }
     return false
   }
-  // 菜单树里找不到的顶级项（例如离线菜单）：当前不强行隐藏，保留旧行为
-  const found = hit(menuTree)
-  if (!found) {
-    // 菜单树内无任何同名节点 → 保留（属于离线菜单/原型项）
-    return anyMenuKeyMatches(menuTree, key)
-  }
-  return true
-}
-
-/** 菜单树中存在同名节点（不区分系统），作为“离线项”与“已归属项”的分界。 */
-function anyMenuKeyMatches(nodes: MenuVO[], key: string): boolean {
-  for (const n of nodes) {
-    if (n.menuKey === key) return true
-    if (n.children?.length && anyMenuKeyMatches(n.children, key)) return true
-  }
-  return false
+  // 未命中当前系统就隐藏，不能仅因菜单存在而放行其他系统的节点。
+  return hit(menuTree)
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
@@ -604,7 +590,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
    *  2) 否则回退旧行为：后端菜单树可用 → 以 DB 为唯一真值 + 补挂离线菜单 + 客户端过滤；
    *     后端不可用 → 只展离线清单；语言变化时重算菜单名称 */
   const visibleMenuItems = useMemo(() => {
-    if (currentSystemCode && systemNavigation.tree.length > 0) {
+    if (currentSystemCode && systemNavigation.loaded) {
       const serverItems = buildMenuItemsFromVO(systemNavigation.tree)
       return filterMenusByPermission(serverItems, hasMenuPermission)
     }
@@ -617,7 +603,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       ? items.filter((item): item is MenuItem => !!item && belongsToSystem(item, menuTree, currentSystemCode))
       : items
     return filterMenusByPermission(scoped, hasMenuPermission)
-  }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree])
+  }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'

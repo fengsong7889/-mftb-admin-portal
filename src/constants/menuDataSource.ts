@@ -56,6 +56,8 @@ export const keyToPath: Record<string, string> = {
   'hot-search-verify': '/hot-search-verify',
   // 集團人事
   'employee-management': '/employee-management',
+  'hr-dict': '/hr-dict',
+  'contract-ledger': '/contract-ledger',
   'organization-management': '/organization-management',
   'position-management': '/position-management',
   'login-log': '/login-log',
@@ -178,6 +180,12 @@ export const keyToPath: Record<string, string> = {
   'consumable-alert':     '/consumable-alert',
 }
 
+/** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
+export function resolveMenuPath(menu: { menuKey: string; path?: string }): string | null {
+  const path = menu.path || keyToPath[menu.menuKey]
+  return path?.startsWith('/') && !path.startsWith('//') ? path : null
+}
+
 /** ────────────────────────────────────────────────────────────
  *  2. 路由路径 → 菜单 key 反向映射
  *  ──────────────────────────────────────────────────────────── */
@@ -186,6 +194,8 @@ Object.entries(keyToPath).forEach(([key, path]) => {
   const cleanPath = path.split('#')[0]
   pathToKey[cleanPath] = key
 })
+// 字典表单为 hr-dict 菜单的子页面（非独立菜单），归入 hr-dict 供侧边栏高亮/标签名/离线过滤使用
+pathToKey['/hr-dict-edit'] = 'hr-dict'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -206,7 +216,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   // 搜索管理 — 熱搜配置/預覽已接入 fetchAdAlgorithms/fetchStores（混合页面按 backend 处理）
   'hot-search-config', 'hot-search-preview',
   // 集團人事
-  'employee-management', 'organization-management', 'position-management', 'login-log',
+  'employee-management', 'hr-dict', 'contract-ledger', 'organization-management', 'position-management', 'login-log',
   // 權限管理
   'role-management', 'function-permission', 'data-permission',
   // 系統授權（Round 4，已接入後端 @RequirePermission(function-permission)）

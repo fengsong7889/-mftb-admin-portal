@@ -23,8 +23,9 @@ import java.util.Map;
 /**
  * HR 人事通用字典接口
  * <p>
- * 读操作要求 {@code employee-management} 菜单权限（员工/合同/异动等业务模块消费）；
- * 写操作要求 {@code rule-config:edit}（与购买公司字典一致，独立于业务模块的编辑权限）。
+ * 字典管理页（列表/增删改）归入独立菜单 {@code hr-dict}（view/edit），可单独授权；
+ * {@code /options} 启用下拉为员工详情/合同台账/字典管理共同消费的只读引用数据，
+ * 通过 anyOf 允许 employee-management / contract-ledger / hr-dict 任一菜单访问（默认拒绝）。
  */
 @RestController
 @RequestMapping("/api/hr-dict")
@@ -32,14 +33,14 @@ import java.util.Map;
 @Tag(name = "集团人事 - HR 字典", description = "雇主法人 / 工作地点 / 人员类别 等 HR 通用字典")
 public class SysHrDictController {
 
-    private static final String READ_MENU = "employee-management";
-    private static final String WRITE_MENU = "rule-config";
+    /** 字典管理菜单（独立授权） */
+    private static final String MANAGE_MENU = "hr-dict";
 
     private final SysHrDictService hrDictService;
 
-    /** 指定类型的启用下拉（value=code, label=name, 附 nameEn/parentCode） */
+    /** 指定类型的启用下拉（value=code, label=name, 附 nameEn/parentCode）——跨菜单共享只读 */
     @GetMapping("/options")
-    @RequirePermission(menu = READ_MENU)
+    @RequirePermission(menu = "employee-management", anyOf = {"hr-dict", "contract-ledger"})
     @Operation(summary = "HR 字典启用下拉")
     public Result<List<Map<String, Object>>> options(@RequestParam("type") String type) {
         return Result.success(hrDictService.listOptions(type));
@@ -47,7 +48,7 @@ public class SysHrDictController {
 
     /** 按类型查询（含停用, 供管理/回溯） */
     @GetMapping
-    @RequirePermission(menu = READ_MENU)
+    @RequirePermission(menu = MANAGE_MENU)
     @Operation(summary = "HR 字典列表")
     public Result<List<SysHrDict>> list(
             @RequestParam(value = "type", required = false) String type,
@@ -57,7 +58,7 @@ public class SysHrDictController {
 
     /** 新增字典项 */
     @PostMapping
-    @RequirePermission(menu = WRITE_MENU, action = "edit")
+    @RequirePermission(menu = MANAGE_MENU, action = "edit")
     @Operation(summary = "新增 HR 字典项")
     public Result<Long> create(@RequestBody SysHrDict dict) {
         return Result.success("字典項已新增", hrDictService.create(dict));
@@ -65,7 +66,7 @@ public class SysHrDictController {
 
     /** 更新字典项（不允许改 dictType / code 身份键） */
     @PutMapping("/{id}")
-    @RequirePermission(menu = WRITE_MENU, action = "edit")
+    @RequirePermission(menu = MANAGE_MENU, action = "edit")
     @Operation(summary = "更新 HR 字典项")
     public Result<Void> update(@PathVariable Long id, @RequestBody SysHrDict dict) {
         hrDictService.update(id, dict);
@@ -74,7 +75,7 @@ public class SysHrDictController {
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
-    @RequirePermission(menu = WRITE_MENU, action = "edit")
+    @RequirePermission(menu = MANAGE_MENU, action = "edit")
     @Operation(summary = "启用/停用 HR 字典项")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         hrDictService.updateStatus(id, status);
@@ -83,7 +84,7 @@ public class SysHrDictController {
 
     /** 删除（逻辑删除） */
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = WRITE_MENU, action = "edit")
+    @RequirePermission(menu = MANAGE_MENU, action = "edit")
     @Operation(summary = "删除 HR 字典项")
     public Result<Void> delete(@PathVariable Long id) {
         hrDictService.delete(id);

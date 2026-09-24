@@ -86,7 +86,7 @@ public class DataInitializer implements CommandLineRunner {
     // v41: 物資管理菜單重組——合併「維護與處置」進「資產運營」；
     //      新建「採購與供應」分組整合採購鏈（採購執行+驗收入庫+供應商管理）；
     //      「基礎配置」改名「基礎數據」；耗材管理排序提前至 sort=2
-    private static final String V_MENU_SEED = "core:menu-seed-v41";
+    private static final String V_MENU_SEED = "core:menu-seed-v42";
 
     @Override
     public void run(String... args) {
@@ -1751,6 +1751,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("approval-center", "Approval Center"),
                 Map.entry("hr", "Group HR"),
                 Map.entry("employee-management", "Employee Management"),
+                Map.entry("hr-dict", "HR Dictionary"),
+                Map.entry("contract-ledger", "Contract Ledger"),
                 Map.entry("organization-management", "Organization"),
                 Map.entry("position-management", "Position"),
                 Map.entry("login-log", "Employee Activity"),
@@ -2217,10 +2219,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("flash-sale-stats",   new String[]{"秒殺商品統計",     "group-purchase",      "3"});
         menus.put("flash-sale-price",   new String[]{"澳覓秒殺價",       "group-purchase",      "4"});
         // ── 集团人事 ──
+        // v42: 字典維護/合同台賬 从员工管理页按钮拆分为 hr 分组下的独立菜单（可独立授权）
         menus.put("employee-management", new String[]{"員工管理",         "hr",                 "1"});
-        menus.put("organization-management", new String[]{"組織管理",     "hr",                 "2"});
-        menus.put("position-management", new String[]{"職位管理",         "hr",                 "3"});
-        menus.put("login-log",           new String[]{"員工動態",         "hr",                 "4"});
+        menus.put("hr-dict",             new String[]{"字典維護",         "hr",                 "2"});
+        menus.put("contract-ledger",     new String[]{"合同台賬",         "hr",                 "3"});
+        menus.put("organization-management", new String[]{"組織管理",     "hr",                 "4"});
+        menus.put("position-management", new String[]{"職位管理",         "hr",                 "5"});
+        menus.put("login-log",           new String[]{"員工動態",         "hr",                 "6"});
         // ── 物资管理（EAM 分组子菜单）──
         // 二级直达菜单（无分组）
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
@@ -2581,6 +2586,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "asset-return", "asset-transfer-list", "asset-handover",
                 "asset-repair", "asset-compensation", "asset-scrap", "asset-inventory", "asset-flow");
         applyMenuSort("system-config", "menu-config", "rule-config", "version-history", "notification-config");
+        // v42: 集团人事子菜单排序唯一化（字典維護/合同台賬 紧跟员工管理）
+        applyMenuSort("hr", "employee-management", "hr-dict", "contract-ledger",
+                "organization-management", "position-management", "login-log");
         applyMenuSort("i18n-center", "translation-manage", "i18n-language", "i18n-import-export",
                 "i18n-mt-engine", "i18n-dashboard");
         applyMenuSort("promotion_tool", "promotion-sales-config", "promotion-report-group");
@@ -2591,6 +2599,21 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         MENU_ICON_DEFAULTS.forEach((menuKey, icon) -> jdbcTemplate.update(
                 "UPDATE sys_menu SET icon = ? WHERE menu_key = ? AND deleted = 0 AND (icon IS NULL OR icon = '')",
                 icon, menuKey));
+
+        // 7. system_code 叶子继承：种子新建的菜单（如 v42 的 hr-dict/contract-ledger）system_code 为 NULL，
+        //    而 core:system-portal 的一次性继承迁移不会为其重跑；此处每次启动幂等补齐，
+        //    保证锁系统视图的导航剪枝与系统准入正确（仅处理 NULL 且父级已有非 portal 归属的行）。
+        for (int i = 0; i < 6; i++) {
+            int affected = jdbcTemplate.update(
+                    "UPDATE sys_menu c "
+                            + "JOIN sys_menu p ON c.parent_id = p.id "
+                            + "SET c.system_code = p.system_code "
+                            + "WHERE c.system_code IS NULL AND p.system_code IS NOT NULL AND p.system_code <> 'portal' "
+                            + "AND c.deleted = 0 AND p.deleted = 0");
+            if (affected == 0) {
+                break;
+            }
+        }
     }
     
     /** 菜单改名：仅当当前名为旧默认名时才改, 保留用户在「菜單配置」页的自定义名 */
@@ -2700,6 +2723,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("debt-reconcile", "CheckCircleOutlined"),
             Map.entry("detail-query", "FileSearchOutlined"),
             Map.entry("employee-management", "UserOutlined"),
+            Map.entry("hr-dict", "DatabaseOutlined"),
+            Map.entry("contract-ledger", "ProfileOutlined"),
             Map.entry("finance", "MoneyCollectOutlined"),
             Map.entry("flash-sale-price", "MoneyCollectOutlined"),
             Map.entry("flash-sale-register", "FileTextOutlined"),

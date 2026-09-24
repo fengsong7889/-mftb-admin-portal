@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS sys_department_system (
 
 -- 5. 系统种子（10 个业务系统；portal 作为哨兵不落库）
 INSERT INTO sys_system (code, name, name_en, description, icon, sort_order, status, deleted) VALUES
-  ('ads',      '廣告與推廣系統',  'Ads & Promotion',   '广告销售、商家推广、推广通、团购秒杀',       'CampaignOutlined',          10,  1, 0),
+  ('ads',      '廣告推薦系統',  'Ads & Recommendation', '广告销售、商家推广、推广通、团购秒杀',       'AimOutlined',               10,  1, 0),
   ('merchant', '商戶運營系統',    'Merchant Ops',      '商户集团、门店、门店数据、地图规划',         'ShopOutlined',              20,  1, 0),
   ('search',   '搜索運營系統',    'Search Ops',        '搜索词库、引导、策略、校验、报表',           'SearchOutlined',            30,  1, 0),
   ('finance',  '財務系統',        'Finance',           '账户余额、批次、明细、对账、审批中心',       'AccountBookOutlined',       40,  1, 0),

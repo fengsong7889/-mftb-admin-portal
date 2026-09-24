@@ -39,6 +39,10 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         versionTracker.applyOnce(VERSION_KEY, this::doMigrate, this::verifyMigration);
+        // 展示元数据（名称/英文/简介/图标/排序）以代码种子为准，每次启动幂等刷新，
+        // 使重命名等调整无需新增迁移即可对已初始化库生效；仅更新展示字段，
+        // 不触碰 status/deleted 及系统准入关系。
+        seedSystems();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -111,7 +115,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     /** 种子 10 个业务系统；portal 是哨兵值不落库。 */
     private void seedSystems() {
         Object[][] rows = {
-                {SystemCode.ADS.code(),      "廣告與推廣系統", "Ads & Promotion",   "广告销售、商家推广、推广通、团购秒杀",       "CampaignOutlined",          10},
+                {SystemCode.ADS.code(),      "廣告推薦系統", "Ads & Recommendation", "广告销售、商家推广、推广通、团购秒杀",       "AimOutlined",               10},
                 {SystemCode.MERCHANT.code(), "商戶運營系統",   "Merchant Ops",      "商户集团、门店、门店数据、地图规划",         "ShopOutlined",              20},
                 {SystemCode.SEARCH.code(),   "搜索運營系統",   "Search Ops",        "搜索词库、引导、策略、校验、报表",           "SearchOutlined",            30},
                 {SystemCode.FINANCE.code(),  "財務系統",       "Finance",           "账户余额、批次、明细、对账、审批中心",       "AccountBookOutlined",       40},

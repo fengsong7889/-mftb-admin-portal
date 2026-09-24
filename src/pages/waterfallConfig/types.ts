@@ -17,6 +17,23 @@ export type WaterfallBusinessType = 'delivery' | 'groupBuy'
 /** 展示内容类型：门店 / 商品（团购二选一；外卖固定 store） */
 export type WaterfallContentType = 'store' | 'product'
 
+/** 展示类目的数据来源；旧团购配置未保存该字段时沿用分类模式。 */
+export type WaterfallDisplayCategoryMode = 'algorithm' | 'category' | 'custom'
+
+/** 分类候选整体排序，不改变人工固定坑位。 */
+export type WaterfallSortMode = 'score' | 'sales' | 'distance' | 'random'
+export const DEFAULT_WATERFALL_SORT: WaterfallSortMode = 'score'
+
+export type WaterfallCatalogChannel = 'groupBuy' | 'supermarket'
+export const SUPERMARKET_CHANNEL = 3
+export const GROUP_BUY_CHANNEL = 4
+export const NATURAL_ALGORITHM_TYPE = 7
+export const MAX_SLOT_POSITION = 500
+
+export function getDisplayCategoryMode(draft: Pick<WaterfallDraft, 'businessType' | 'displayCategoryMode'>): WaterfallDisplayCategoryMode {
+  return draft.displayCategoryMode ?? (draft.businessType === 'groupBuy' ? 'category' : 'algorithm')
+}
+
 /** 展示布局：单列（一行 1 个）/ 双列（一行 2 个） */
 export type WaterfallLayoutColumns = 1 | 2
 
@@ -69,6 +86,8 @@ export interface WaterfallDraft {
   brand?: string
   businessType: WaterfallBusinessType
   contentType: WaterfallContentType
+  displayCategoryMode?: WaterfallDisplayCategoryMode
+  sortMode?: WaterfallSortMode
   layoutColumns: WaterfallLayoutColumns
   /** 外卖到家业务频道（美食外卖/超市百货）；团购不使用 */
   bizChannel: WaterfallBizChannel
@@ -92,6 +111,7 @@ export interface WaterfallDraft {
 export interface WaterfallListView {
   key: string
   source: 'server' | 'local'
+  localOnly?: boolean
   id?: number
   localId?: string
   strategyCode?: string

@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchWaterfallList, updateWaterfallStatus, deleteWaterfall, fetchAdAlgorithms } from '../../api/adPromotion'
@@ -18,9 +18,11 @@ import { BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS } from '../waterfallConfig
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
   const { t } = useTranslation()
   const [searchForm] = Form.useForm()
-  const [activeBiz, setActiveBiz] = useState<WaterfallBusinessType>('delivery')
+  const [activeBiz, setActiveBiz] = useState<WaterfallBusinessType>(searchParams.get('biz') === 'groupBuy' ? 'groupBuy' : 'delivery')
   const [allMerged, setAllMerged] = useState<WaterfallListView[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -66,7 +68,11 @@ export default function PromotionSlotConfig() {
     }
   }, [t])
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load() }, [load, location.key])
+
+  useEffect(() => {
+    if (searchParams.get('biz') === 'groupBuy') setActiveBiz('groupBuy')
+  }, [searchParams])
 
   /** 客户端按业务线 + 搜索条件过滤 */
   const filtered = useMemo(() => {
@@ -160,16 +166,16 @@ export default function PromotionSlotConfig() {
       render: (v: string, r) => (
         <Space size={4}>
           <Tag color="blue">{v || (r.source === 'local' ? t('promotionSlotConfig.localTag') : '-')}</Tag>
-          {r.source === 'local' && <Tag color="orange">{t('promotionSlotConfig.unpublishedTag')}</Tag>}
+          {(r.source === 'local' || r.localOnly) && <Tag color="orange">{t('promotionSlotConfig.unpublishedTag')}</Tag>}
         </Space>
       ),
     },
     { title: t('promotionSlotConfig.colWaterfallName'), dataIndex: 'strategyName', key: 'strategyName', width: 200, render: (text: string) => <strong>{text}</strong> },
     {
       title: t('promotionSlotConfig.colBizChannel'), dataIndex: 'bizChannel', key: 'bizChannel', width: 120, align: 'center',
-      render: (v: WaterfallBizChannel) => (
-        <Tag color={v === 'food' ? 'orange' : 'cyan'}>
-          {BIZ_CHANNEL_OPTIONS.find(o => o.value === v)?.labelKey ? t(BIZ_CHANNEL_OPTIONS.find(o => o.value === v)!.labelKey) : (v || '-')}
+      render: (v: WaterfallBizChannel, record) => (
+        <Tag color={record.businessType === 'groupBuy' || v === 'food' ? 'orange' : 'cyan'}>
+          {record.businessType === 'groupBuy' ? t('promotionSlotConfig:bizGroupBuy') : BIZ_CHANNEL_OPTIONS.find(o => o.value === v)?.labelKey ? t(BIZ_CHANNEL_OPTIONS.find(o => o.value === v)!.labelKey) : (v || '-')}
         </Tag>
       ),
     },

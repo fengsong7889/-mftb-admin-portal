@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import { HR_DICT_TYPE } from '../api/hrDict'
 import './MenuTabs.css'
 
 /** 标签页信息 */
@@ -235,6 +236,11 @@ function appendName(title: string, entry: SubPageTitle, params: URLSearchParams 
 /** 匹配子页面完整标题（与页面标题一致；支持动态路由前缀与 query 参数区分新增/編輯/类型） */
 function matchFullTitle(pathname: string, t: TFunction): string | null {
   const normalized = normalizePath(pathname)
+  if (normalized === '/hr-dict-edit') {
+    const params = new URLSearchParams(pathname.split('?')[1])
+    const type = Object.values(HR_DICT_TYPE).find(value => value === params.get('type')) ?? HR_DICT_TYPE.EMPLOYER_COMPANY
+    return t(params.get('id') ? 'hrDict.editTitle' : 'hrDict.addTitle', { type: t(`hrDict.types.${type}`) })
+  }
   let entry = SUB_PAGE_FULL_TITLE[normalized]
   if (!entry) {
     // 动态路由前缀匹配（如 /search-verify-detail/:id、/workflow-config/detail/:id）
@@ -298,6 +304,7 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/ai-role-quota-edit',
   '/ai-role-quota-detail',
   '/ai-operation-auth-edit',
+  '/hr-dict-edit',
   '/purchase-order',
 ])
 
@@ -397,7 +404,12 @@ export default function MenuTabs() {
     const currentTabPath = tabPath(fullPath)
     if (normalizePath(currentTabPath) === '/login') return
 
-    setTabs((prev) => {
+    const state: unknown = location.state
+    const closingPath = state && typeof state === 'object' && 'closeMenuTab' in state && typeof state.closeMenuTab === 'string'
+      ? tabPath(state.closeMenuTab) : null
+    setTabs((previous) => {
+      const prev = closingPath && closingPath !== '/' && closingPath !== currentTabPath
+        ? previous.filter(tab => tab.path !== closingPath) : previous
       const exists = prev.find(t => t.path === currentTabPath)
       if (exists) return prev
       // 若當前路徑的基礎路徑已存在標籤（含 query），更新該標籤路徑與標題
@@ -414,7 +426,13 @@ export default function MenuTabs() {
       const title = getMenuName(currentTabPath)
       return [...prev, { path: currentTabPath, title }]
     })
-  }, [location.pathname, location.search, getMenuName, isDeniedRoute])
+    if (closingPath && state && typeof state === 'object') {
+      // 消费一次性关闭指令，避免浏览器后退到列表时再次关闭后来新开的标签。
+      const remainingState = { ...state }
+      delete (remainingState as { closeMenuTab?: unknown }).closeMenuTab
+      navigate(fullPath, { replace: true, state: remainingState })
+    }
+  }, [location.pathname, location.search, location.state, navigate, getMenuName, isDeniedRoute])
 
   /** 清理当前用户无权限的标签（含从 localStorage 恢复的越权历史标签），避免菜单名泄漏与反复 403 */
   useEffect(() => {

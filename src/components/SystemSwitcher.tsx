@@ -10,7 +10,7 @@
  *
  * 空态：无 portal 系统权限（用户 `accessibleSystems` 为空）时仅显示"返回門戶"按钮，不显示切换。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Dropdown, Button, Space, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import { AppstoreOutlined, RightOutlined, SwapOutlined } from '@ant-design/icons'
@@ -23,6 +23,7 @@ import { useCurrentSystem } from '../hooks/useCurrentSystem'
 import { loadSystemNavigation, pickFirstEntryPath } from '../hooks/useSystemNavigation'
 import { renderMenuIcon } from './MenuIcon'
 import type { MenuVO } from '../api/menu'
+import { resolveMenuPath } from '../constants/menuDataSource'
 import './SystemSwitcher.css'
 
 /** 系统内首个可用菜单：与 Portal 页保持一致的解析口径，避免进入系统后 Sidebar 高亮与跳转路径不一致 */
@@ -42,8 +43,9 @@ function resolveFirstEntryPath(
         const child = visit(node.children)
         if (child) return child
       }
-      if (node.type === 2 && node.path) {
-        if (isAdmin || hasMenuPermission(node.menuKey)) return node.path
+      const path = resolveMenuPath(node)
+      if (node.type === 2 && path) {
+        if (isAdmin || hasMenuPermission(node.menuKey)) return path
       }
     }
     return null
@@ -58,6 +60,8 @@ export default function SystemSwitcher() {
   const { menuTree } = useMenu()
   const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
   const [systems, setSystems] = useState<PortalSystem[]>([])
+  const switchRequest = useRef(0)
+  useEffect(() => () => { switchRequest.current += 1 }, [])
 
   /** 加载可访问系统列表；无权限用户 systems=[]，仅显示"返回門戶"按钮。 */
   useEffect(() => {
@@ -108,13 +112,13 @@ export default function SystemSwitcher() {
   }, [systems, currentSystemCode, t, i18nInstance.language])
 
   const handleClick: MenuProps['onClick'] = ({ key }) => {
+    const ticket = ++switchRequest.current
     if (key === '__portal') {
       setCurrentSystemCode(null)
       navigate('/portal')
       return
     }
     if (!currentSystemCode || key !== currentSystemCode) {
-      setCurrentSystemCode(key)
       // Round 5：优先走服务端剪枝导航，与后端 strict-mode 同源；失败回退旧的 menuTree 客户端解析。
       void (async () => {
         let firstPath: string | null
@@ -124,8 +128,10 @@ export default function SystemSwitcher() {
         } catch {
           firstPath = resolveFirstEntryPath(key, menuTree, hasMenuPermission, user?.role === 'admin')
         }
-        if (firstPath) navigate(firstPath)
-        // 无可用菜单：仅切换 currentSystemCode，不跳转，Sidebar 会展示空态
+        if (ticket !== switchRequest.current) return
+        // 路径与系统同步提交，避免旧页面的自动归属覆盖新选择；迟到请求不再导航。
+        setCurrentSystemCode(key)
+        navigate(firstPath ?? '/')
       })()
     }
   }

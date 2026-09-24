@@ -52,14 +52,26 @@ public class PermissionAspect {
             log.warn("权限拦截: 未获取到登录员工信息, menu={}, action={}", permission.menu(), permission.action());
             throw new PermissionDeniedException(permission.menu(), permission.action());
         }
-        // 1) 菜单动作校验（现有语义，保持不变）
-        if (!permissionService.hasPermission(user, permission.menu(), permission.action())) {
-            log.warn("权限拦截: 员工 [{}] 无权访问 menu={}, action={}",
-                    user.getUsername(), permission.menu(), permission.action());
-            throw new PermissionDeniedException(permission.menu(), permission.action());
+        // 1) 菜单动作校验：主菜单不通过时, 回退到 anyOf 备选菜单（OR 语义, 仍默认拒绝）
+        String action = permission.action();
+        String grantedMenu = null;
+        if (permissionService.hasPermission(user, permission.menu(), action)) {
+            grantedMenu = permission.menu();
+        } else {
+            for (String alt : permission.anyOf()) {
+                if (permissionService.hasPermission(user, alt, action)) {
+                    grantedMenu = alt;
+                    break;
+                }
+            }
         }
-        // 2) 系统准入校验（Round 3；默认观察模式）
-        checkSystemAccess(user, permission.menu());
+        if (grantedMenu == null) {
+            log.warn("权限拦截: 员工 [{}] 无权访问 menu={}, anyOf={}, action={}",
+                    user.getUsername(), permission.menu(), java.util.Arrays.toString(permission.anyOf()), action);
+            throw new PermissionDeniedException(permission.menu(), action);
+        }
+        // 2) 系统准入校验（Round 3；默认观察模式）——按实际授权的菜单反查归属系统
+        checkSystemAccess(user, grantedMenu);
         return joinPoint.proceed();
     }
 

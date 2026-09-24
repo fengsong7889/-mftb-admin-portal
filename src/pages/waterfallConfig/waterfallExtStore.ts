@@ -14,11 +14,13 @@ import type {
   WaterfallContentType,
   WaterfallLayoutColumns,
   WaterfallBizChannel,
+  WaterfallDisplayCategoryMode,
+  WaterfallSortMode,
   WaterfallDraft,
   WaterfallListView,
   FixedContentSlot,
 } from './types'
-import { serverKey, localKey, defaultExtension } from './types'
+import { serverKey, localKey, defaultExtension, getDisplayCategoryMode, DEFAULT_WATERFALL_SORT } from './types'
 import type { WaterfallStrategy } from '../../api/adPromotion'
 
 const SCHEMA_VERSION = 'v1'
@@ -29,6 +31,10 @@ const LOCAL_PREFIX = 'wf_local'
 export interface WaterfallExtension {
   businessType: WaterfallBusinessType
   contentType: WaterfallContentType
+  displayCategoryMode?: WaterfallDisplayCategoryMode
+  sortMode?: WaterfallSortMode
+  /** 超市非算法模式只保存本地完整草稿，不覆盖线上仍在使用的算法配置。 */
+  localDraft?: WaterfallDraft
   layoutColumns: WaterfallLayoutColumns
   /** 外卖到家业务频道（美食外卖/超市百货） */
   bizChannel: WaterfallBizChannel
@@ -172,10 +178,11 @@ export function mergeServerToStrategies(
     return {
       key: serverKey(s.id as number),
       source: 'server' as const,
+      localOnly: !!ext?.localDraft,
       id: s.id,
       strategyCode: s.strategyCode,
-      strategyName: s.strategyName,
-      brand: s.brand,
+      strategyName: ext?.localDraft?.strategyName ?? s.strategyName,
+      brand: ext?.localDraft?.brand ?? s.brand,
       status: s.status,
       updatedBy: s.updatedBy,
       updatedAt: s.updatedAt,
@@ -195,6 +202,7 @@ export function mergeLocalToStrategies(list: WaterfallDraft[]): WaterfallListVie
   return list.map(d => ({
     key: localKey(d.localId ?? d.key.replace(/^local_/, '')),
     source: 'local' as const,
+    localOnly: true,
     localId: d.localId,
     strategyCode: d.strategyCode,
     strategyName: d.strategyName,
@@ -218,6 +226,9 @@ export function buildDraftFromServer(
   ext?: WaterfallExtension,
 ): WaterfallDraft {
   const base = ext ?? defaultExtension('delivery')
+  if (ext?.localDraft) {
+    return { ...ext.localDraft, key: serverKey(s.id as number), source: 'server', id: s.id, strategyCode: s.strategyCode, status: s.status === 2 ? 2 : 1 }
+  }
   return {
     key: serverKey(s.id as number),
     source: 'server',
@@ -227,6 +238,8 @@ export function buildDraftFromServer(
     brand: s.brand,
     businessType: base.businessType,
     contentType: base.contentType,
+    displayCategoryMode: getDisplayCategoryMode(base),
+    sortMode: ext?.sortMode ?? DEFAULT_WATERFALL_SORT,
     layoutColumns: base.layoutColumns,
     bizChannel: base.bizChannel ?? 'food',
     filterDislike: (s.filterDislike === 1 ? 1 : 2),
@@ -259,6 +272,8 @@ export function emptyDraft(businessType: WaterfallBusinessType, brand?: string):
     brand,
     businessType,
     contentType: 'store',
+    displayCategoryMode: 'algorithm',
+    sortMode: DEFAULT_WATERFALL_SORT,
     layoutColumns: 1,
     bizChannel: 'food',
     filterDislike: 2,

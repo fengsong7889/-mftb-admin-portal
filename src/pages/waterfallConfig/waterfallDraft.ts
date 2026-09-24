@@ -15,12 +15,13 @@ interface DraftEnvelope {
 }
 
 /** 写入草稿（进入坑位页前调用） */
-export function writeDraft(draft: WaterfallDraft): void {
+export function writeDraft(draft: WaterfallDraft): boolean {
   const env: DraftEnvelope = { key: draft.key, draft }
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(env))
+    return true
   } catch {
-    /* 忽略存储异常 */
+    return false
   }
 }
 
@@ -43,7 +44,7 @@ export function readDraft(expectedKey?: string): WaterfallDraft | null {
 /** 消费草稿（读取后清除），避免下次进入误用旧草稿 */
 export function consumeDraft(expectedKey?: string): WaterfallDraft | null {
   const draft = readDraft(expectedKey)
-  clearDraft()
+  if (draft) clearDraft()
   return draft
 }
 

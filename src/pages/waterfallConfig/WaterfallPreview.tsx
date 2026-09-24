@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Tag } from 'antd'
-import type { WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns } from './types'
+import type { WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns, WaterfallDisplayCategoryMode, WaterfallBizChannel } from './types'
 import { toPreviewRows, type PreviewCard } from './previewLayout'
 
 /** 算法类型标签/配色（预览用，与算法库 algo_type 对齐） */
@@ -23,6 +23,8 @@ export interface PreviewAlgoSlot {
 
 interface Props {
   businessType: WaterfallBusinessType
+  bizChannel?: WaterfallBizChannel
+  displayCategoryMode?: WaterfallDisplayCategoryMode
   contentType: WaterfallContentType
   layoutColumns: WaterfallLayoutColumns
   /** 手机顶部标题 */
@@ -43,12 +45,13 @@ interface Props {
  * 团购：按单列/双列布局渲染固定内容与分类补位卡片。
  */
 export default function WaterfallPreview({
-  businessType, contentType, layoutColumns, phoneTitle,
+  businessType, bizChannel, displayCategoryMode, contentType, layoutColumns, phoneTitle,
   algoSlots, previewCards, naturalFallbackName, phoneTime,
 }: Props) {
   const { t } = useTranslation()
   const isGroupBuy = businessType === 'groupBuy'
   const enabledAlgoSlots = algoSlots
+  const isContentPreview = (isGroupBuy || bizChannel === 'supermarket') && displayCategoryMode !== 'algorithm'
 
   return (
     <div style={{ width: 375, flexShrink: 0, position: 'relative' }}>
@@ -92,13 +95,13 @@ export default function WaterfallPreview({
             <div style={{ background: '#fff', padding: '8px 16px 12px', borderBottom: '0.5px solid rgba(0,0,0,0.08)', flexShrink: 0, textAlign: 'center' }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: '#262626', letterSpacing: 0.3 }}>{phoneTitle}</div>
               <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, lineHeight: 1.4 }}>
-                {isGroupBuy ? t('promotionSlotConfig:previewHintGroupBuy') : t('promotionSlotConfig:previewHintDelivery')}
+                {isContentPreview ? t('promotionSlotConfig:previewHintGroupBuy') : t('promotionSlotConfig:previewHintAlgorithm')}
               </div>
             </div>
 
             {/* 内容区 */}
             <div style={{ flex: 1, overflow: 'auto', padding: '12px 14px 28px' }}>
-              {isGroupBuy ? (
+              {isContentPreview ? (
                 <GroupBuyPreview contentType={contentType} layoutColumns={layoutColumns} cards={previewCards} />
               ) : (
                 <DeliveryPreview slots={enabledAlgoSlots} naturalFallbackName={naturalFallbackName} />

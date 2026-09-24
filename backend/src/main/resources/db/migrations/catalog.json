@@ -17,7 +17,18 @@
       "executionType": "JAVA",
       "executor": "dataInitializer",
       "dependencies": ["core:schema-v10"],
-      "status": "ACTIVE"
+      "status": "SUPERSEDED",
+      "supersededBy": "core:menu-seed-v42"
+    },
+    {
+      "versionKey": "core:menu-seed-v42",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": ["core:schema-v10"],
+      "status": "ACTIVE",
+      "comment": "v42: 集团人事拆分——将字典维护(hr-dict)、合同台账(contract-ledger)从员工管理页按钮提升为 hr 分组下的独立菜单（可单独授权）。seedSystemMenus 幂等重跑：新增两菜单 + 回填 admin 授权 + reconcileMenuMasterData 每次启动自愈排序/图标/英文名。"
     },
     {
       "versionKey": "core:legacy-perm-migrate-v1",

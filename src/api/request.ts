@@ -25,6 +25,8 @@ const SUCCESS_CODE = 200
 const UNAUTHORIZED_CODE = 401
 /** 无权限状态码 */
 const FORBIDDEN_CODE = 403
+/** 接口或资源不存在状态码 */
+const NOT_FOUND_CODE = 404
 /** 空闲超时状态码（后端检测用户长时间无操作后返回） */
 const SESSION_IDLE_TIMEOUT_CODE = 1004
 
@@ -150,6 +152,15 @@ request.interceptors.response.use(
       // HTTP 403: 优先展示后端返回的提示信息（Spring Security 拦截时可能无 body）
       const backendMsg = error?.response?.data?.message
       if (!silent) message.error(backendMsg || '您没有权限执行此操作，请联系管理员授权')
+    } else if (status === NOT_FOUND_CODE) {
+      // HTTP 404 也可能是业务资源不存在；只展示路径，避免暴露查询参数。
+      const url = typeof error?.config?.url === 'string' ? error.config.url : ''
+      const baseURL = typeof error?.config?.baseURL === 'string' ? error.config.baseURL : ''
+      const fullUrl = /^(?:https?:)?\/\//i.test(url)
+        ? url
+        : `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
+      const path = fullUrl.split(/[?#]/)[0]
+      if (!silent) message.error(`接口或资源不存在（404）：${path}，请检查请求地址、资源是否存在及后端版本是否已更新`)
     } else if (status >= 500) {
       if (!silent) message.error('服务器异常, 请稍后重试')
     } else {

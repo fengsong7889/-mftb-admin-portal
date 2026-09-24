@@ -11,7 +11,7 @@
 
 | SystemCode | 中文显示 | 英文名 | 图标 key | 排序 | 说明 |
 |---|---|---|---|---|---|
-| `ads` | 廣告與推廣系統 | Ads & Promotion | `CampaignOutlined` | 10 | 广告销售 / 商家推广 / 推广通 / 团购秒杀 |
+| `ads` | 廣告推薦系統 | Ads & Recommendation | `AimOutlined` | 10 | 广告销售 / 商家推广 / 推广通 / 团购秒杀 |
 | `merchant` | 商戶運營系統 | Merchant Ops | `ShopOutlined` | 20 | 商户集团、门店、门店数据、地图规划 |
 | `search` | 搜索運營系統 | Search Ops | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
 | `finance` | 財務系統 | Finance | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |

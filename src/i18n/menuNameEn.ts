@@ -73,6 +73,8 @@ export const MENU_NAME_EN: Record<string, string> = {
   // 集團人事
   'hr': 'Group HR',
   'employee-management': 'Employee Management',
+  'hr-dict': 'HR Dictionary',
+  'contract-ledger': 'Contract Ledger',
   'organization-management': 'Organization',
   'position-management': 'Position',
   'login-log': 'Employee Activity',

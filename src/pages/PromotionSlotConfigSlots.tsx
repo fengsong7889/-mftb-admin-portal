@@ -5,8 +5,9 @@ import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined } from '@ant-design/i
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import BrandTag from '../components/BrandTag'
 import { fetchAdAlgorithms } from '../api/adPromotion'
-import { fetchWaterfallCategories, searchWaterfallCatalog } from '../api/waterfallCatalog'
-import type { WaterfallCategory, WaterfallCatalogItem } from '../api/waterfallCatalog'
+import { searchWaterfallCatalog } from '../api/waterfallCatalog'
+import type { WaterfallCatalogItem } from '../api/waterfallCatalog'
+import { getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from './waterfallConfig/types'
 import { readDraft, writeDraft } from './waterfallConfig/waterfallDraft'
 import type {
   WaterfallDraft, AlgoSlotDraft, FixedContentSlot, WaterfallContentType, WaterfallStatus,
@@ -93,6 +94,11 @@ export default function PromotionSlotConfigSlots() {
   const [draft, setDraft] = useState<WaterfallDraft | null>(() => readDraft(draftKey))
 
   const isGroupBuy = draft?.businessType === 'groupBuy'
+  const isSupermarket = !isGroupBuy && draft?.bizChannel === 'supermarket'
+  const supportsContentConfig = isGroupBuy || isSupermarket
+  const catalogChannel = isSupermarket ? 'supermarket' : 'groupBuy'
+  const algorithmChannel = isGroupBuy ? GROUP_BUY_CHANNEL : isSupermarket ? SUPERMARKET_CHANNEL : undefined
+  const isContentMode = !!draft && supportsContentConfig && getDisplayCategoryMode(draft) !== 'algorithm'
   const contentType = draft?.contentType ?? 'store'
   const brand = draft?.brand
 
@@ -103,14 +109,17 @@ export default function PromotionSlotConfigSlots() {
   const [selectedAlgoBrand, setSelectedAlgoBrand] = useState<string | undefined>(undefined)
 
   /** 团购目录（groupBuy 模式） */
-  const [categories, setCategories] = useState<WaterfallCategory[]>([])
-  const [categoryFilter, setCategoryFilter] = useState<string | undefined>(undefined)
+  const searchRequestRef = useRef(0)
+  const initialDraftRef = useRef(JSON.stringify(draft))
   const [resourceOptions, setResourceOptions] = useState<WaterfallCatalogItem[]>([])
   const [resourceLoading, setResourceLoading] = useState(false)
   const [currentResource, setCurrentResource] = useState<WaterfallCatalogItem | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [totalPositions, setTotalPositions] = useState<number>(100)
+  const [totalPositions, setTotalPositions] = useState<number>(() => {
+    const highest = Math.max(0, ...(draft?.fixedSlots ?? []).map(slot => slot.position), ...(draft?.algoSlots ?? []).map(slot => slot.position))
+    return [100, 200, 300, MAX_SLOT_POSITION].find(limit => limit >= highest) ?? MAX_SLOT_POSITION
+  })
   const slotGridRef = useRef<HTMLDivElement | null>(null)
   const [slotCellWidth, setSlotCellWidth] = useState(0)
 
@@ -125,45 +134,45 @@ export default function PromotionSlotConfigSlots() {
 
   /** 加载可选算法（delivery：排除自然流量/人气商家/金字招牌） */
   useEffect(() => {
-    if (isGroupBuy) return
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1 })
+    if (isContentMode) return
+    let active = true
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand, channel: algorithmChannel } : {}) })
       .then(res => {
-        if (res.records.length > 0) {
+        if (active && res.records.length > 0) {
           setAlgorithmOptions(
             res.records
-              .filter(a => a.algoType !== 7 && a.algoType !== 5 && !a.algoCode?.startsWith('SFJZ'))
+              .filter(a => a.algoCode && a.algoType !== NATURAL_ALGORITHM_TYPE && a.algoType !== 5 && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || (a.brand === brand && a.channel === algorithmChannel)))
               .map(a => ({ label: a.algoName, value: a.algoCode as string, type: a.algoType, brand: a.brand as string | undefined })),
           )
         }
       })
       .catch(() => { /* 保留空选项 */ })
-  }, [isGroupBuy])
-
-  /** 加载团购分类（groupBuy） */
-  useEffect(() => {
-    if (!isGroupBuy) return
-    fetchWaterfallCategories(contentType, brand).then(setCategories).catch(() => setCategories([]))
-  }, [isGroupBuy, contentType, brand])
+    return () => { active = false }
+  }, [isContentMode, supportsContentConfig, algorithmChannel, brand])
 
   /** 搜索团购资源（groupBuy，防抖） */
-  const doSearchResource = useCallback((keyword?: string, categoryId?: string) => {
-    if (!isGroupBuy) return
+  const doSearchResource = useCallback((keyword?: string) => {
+    if (!isContentMode || !brand) return
+    const requestId = ++searchRequestRef.current
     setResourceLoading(true)
-    searchWaterfallCatalog({ contentType, brand, categoryId, keyword, page: 1, size: 50 })
-      .then(res => setResourceOptions(res.records))
-      .catch(() => setResourceOptions([]))
-      .finally(() => setResourceLoading(false))
-  }, [isGroupBuy, contentType, brand])
+    searchWaterfallCatalog({ contentType, brand, keyword, channel: catalogChannel, page: 1, size: 50 })
+      .then(res => { if (requestId === searchRequestRef.current) setResourceOptions(res.records.filter(item => item.brand === brand && item.contentType === contentType && item.enabled)) })
+      .catch(() => { if (requestId === searchRequestRef.current) setResourceOptions([]) })
+      .finally(() => { if (requestId === searchRequestRef.current) setResourceLoading(false) })
+  }, [isContentMode, contentType, brand, catalogChannel])
 
   useEffect(() => {
-    if (!isGroupBuy) return
-    doSearchResource(undefined, categoryFilter)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isGroupBuy, categoryFilter])
+    doSearchResource()
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current)
+      searchRequestRef.current += 1
+    }
+  }, [doSearchResource])
 
   const handleResourceSearch = (value: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => doSearchResource(value, categoryFilter), 300)
+    searchRequestRef.current += 1
+    searchTimer.current = setTimeout(() => doSearchResource(value), 300)
   }
 
   /** 測量坑位單格寬度 */
@@ -178,14 +187,14 @@ export default function PromotionSlotConfigSlots() {
   /** 网格统一条目 */
   const cells = useMemo<SlotCell[]>(() => {
     if (!draft) return []
-    if (isGroupBuy) {
+    if (isContentMode) {
       return draft.fixedSlots.map(s => ({
         position: s.position,
         label: s.itemName,
         subLabel: contentType === 'store' ? t('promotionSlotConfig:contentTypeStore') : t('promotionSlotConfig:contentTypeProduct'),
         style: CONTENT_STYLE[contentType],
         typeColor: contentType === 'store' ? 'orange' : 'blue',
-        typeLabel: s.categoryName || '',
+        typeLabel: '',
       }))
     }
     return draft.algoSlots.map(s => ({
@@ -196,7 +205,7 @@ export default function PromotionSlotConfigSlots() {
       typeColor: ALGO_TYPE_COLOR[s.algorithmType] ?? 'default',
       typeLabel: '',
     }))
-  }, [draft, isGroupBuy, contentType, t, tAlgoTypeLabel])
+  }, [draft, isContentMode, contentType, t, tAlgoTypeLabel])
 
   const assignedByPos = useMemo(() => new Map(cells.map(c => [c.position, c])), [cells])
 
@@ -223,15 +232,21 @@ export default function PromotionSlotConfigSlots() {
   const toggleFixedPosition = (pos: number) => {
     if (!draft) return
     const existing = draft.fixedSlots.find(s => s.position === pos)
+    if (currentResource && currentResource.id !== existing?.itemId) {
+      if (currentResource.brand !== brand || currentResource.contentType !== contentType || !currentResource.enabled) { message.error(t('promotionSlotConfig:resourceNotAllowed')); return }
+      const duplicate = draft.fixedSlots.find(s => s.itemId === currentResource.id && s.position !== pos)
+      if (duplicate) { message.error(t('promotionSlotConfig:duplicateResource', { pos: duplicate.position })); return }
+    }
     if (existing) {
       if (currentResource && currentResource.id !== existing.itemId) {
         Modal.confirm({
           title: t('promotionSlotConfig:replaceSlotTitle'),
+          className: 'custom-confirm-modal',
           content: t('promotionSlotConfig:replaceSlotContent', { pos, name: currentResource.name }),
           okText: t('common:confirm'),
           cancelText: t('common:cancel'),
           onOk: () => {
-            setDraft(prev => prev ? { ...prev, fixedSlots: prev.fixedSlots.map(s => s.position === pos ? { ...s, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, categoryName: categories.find(c => c.id === currentResource.categoryId)?.name, status: 1 as WaterfallStatus } : s).sort((a, b) => a.position - b.position) } : prev)
+            setDraft(prev => prev ? { ...prev, fixedSlots: prev.fixedSlots.map(s => s.position === pos ? { ...s, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, status: 1 as WaterfallStatus } : s).sort((a, b) => a.position - b.position) } : prev)
           },
         })
       } else {
@@ -243,13 +258,13 @@ export default function PromotionSlotConfigSlots() {
     // 同一门店/商品不能重复固定到多个启用坑位
     const dup = draft.fixedSlots.find(s => s.itemId === currentResource.id)
     if (dup) { message.error(t('promotionSlotConfig:duplicateResource', { pos: dup.position })); return }
-    const added: FixedContentSlot = { position: pos, contentType, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, categoryName: categories.find(c => c.id === currentResource.categoryId)?.name, status: 1 }
+    const added: FixedContentSlot = { position: pos, contentType, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, status: 1 }
     setDraft(prev => prev ? { ...prev, fixedSlots: [...prev.fixedSlots, added].sort((a, b) => a.position - b.position) } : prev)
   }
 
   const togglePosition = (pos: number) => {
     if (readOnly) return
-    if (isGroupBuy) toggleFixedPosition(pos)
+    if (isContentMode) toggleFixedPosition(pos)
     else toggleAlgoPosition(pos)
   }
 
@@ -257,21 +272,35 @@ export default function PromotionSlotConfigSlots() {
     if (readOnly) return
     setDraft(prev => {
       if (!prev) return prev
-      return isGroupBuy
+      return isContentMode
         ? { ...prev, fixedSlots: prev.fixedSlots.filter(s => s.position !== pos) }
         : { ...prev, algoSlots: prev.algoSlots.filter(s => s.position !== pos) }
     })
   }
 
   const clearAllPositions = () => {
-    setDraft(prev => prev ? (isGroupBuy ? { ...prev, fixedSlots: [] } : { ...prev, algoSlots: [] }) : prev)
+    if (readOnly) return
+    Modal.confirm({
+      title: t('promotionSlotConfig:clearSlotsConfirm'), className: 'custom-confirm-modal',
+      okText: t('common:confirm'), cancelText: t('common:cancel'), okButtonProps: { danger: true },
+      onOk: () => setDraft(prev => prev ? (isContentMode ? { ...prev, fixedSlots: [] } : { ...prev, algoSlots: [] }) : prev),
+    })
   }
 
-  const handleBack = () => navigate(-1)
+  const handleBack = () => {
+    if (!readOnly && JSON.stringify(draft) !== initialDraftRef.current) {
+      Modal.confirm({
+        title: t('promotionSlotConfig:discardConfirmTitle'), className: 'custom-confirm-modal',
+        content: t('promotionSlotConfig:discardConfirmContent'),
+        okText: t('promotionSlotConfig:discardConfirmOk'), cancelText: t('common:cancel'),
+        onOk: () => navigate(-1),
+      })
+    } else navigate(-1)
+  }
 
   const handleSave = () => {
-    if (!draft) return
-    writeDraft(draft)
+    if (!draft || readOnly) return
+    if (!writeDraft(draft)) { message.error(t('promotionSlotConfig:localSaveFailed')); return }
     message.success(t('promotionSlotConfig:slotConfigApplied'))
     navigate(-1)
   }
@@ -311,7 +340,7 @@ export default function PromotionSlotConfigSlots() {
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isGroupBuy
+              {isContentMode
                 ? t('promotionSlotConfig:contentPosConfig', { type: contentType === 'store' ? t('promotionSlotConfig:contentTypeStore') : t('promotionSlotConfig:contentTypeProduct') })
                 : t('promotionSlotConfig:addEditPosConfig')}
             </h2>
@@ -324,28 +353,18 @@ export default function PromotionSlotConfigSlots() {
         {cardTitle(
           <AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
           '#fff7e6',
-          isGroupBuy ? t('promotionSlotConfig:resourceSelectSection') : t('promotionSlotConfig:algoSelectSection'),
+          isContentMode ? t('promotionSlotConfig:resourceSelectSection') : t('promotionSlotConfig:algoSelectSection'),
         )}
-        {isGroupBuy ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('promotionSlotConfig:colCategory')}</div>
-              <Select
-                allowClear
-                placeholder={t('promotionSlotConfig:allCategories')}
-                style={{ width: '100%' }}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-                options={categories.map(c => ({ label: c.name, value: c.id }))}
-              />
-            </div>
+        {isContentMode ? (
+          <div>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
                 <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
                 {contentType === 'store' ? t('promotionSlotConfig:selectStore') : t('promotionSlotConfig:selectProduct')}
               </div>
               <Select
-                showSearch
+                aria-label={contentType === 'store' ? t('promotionSlotConfig:selectStore') : t('promotionSlotConfig:selectProduct')}
+                showSearch allowClear
                 filterOption={false}
                 placeholder={t('promotionSlotConfig:searchResourcePlaceholder')}
                 style={{ width: '100%' }}
@@ -357,24 +376,19 @@ export default function PromotionSlotConfigSlots() {
                   setCurrentResource(item)
                 }}
                 options={resourceOptions.map(r => ({ label: `${r.name}（${r.id}）`, value: r.id }))}
-                disabled={readOnly}
+                disabled={readOnly || !brand}
               />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('common:brand')}</div>
-              <div style={{ minHeight: 32, display: 'flex', alignItems: 'center' }}>
-                {currentResource ? <BrandTag value={currentResource.brand} /> : <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectResourceFirst')}</span>}
-              </div>
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: supportsContentConfig ? '1fr' : 'repeat(3, 1fr)', gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
                 <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
                 {t('promotionSlotConfig:colAlgoName')}
               </div>
               <Select
+                aria-label={t('promotionSlotConfig:colAlgoName')}
                 placeholder={t('promotionSlotConfig:selectAlgoPlaceholder')}
                 showSearch optionFilterProp="label" style={{ width: '100%' }}
                 value={currentAlgo?.value}
@@ -388,6 +402,7 @@ export default function PromotionSlotConfigSlots() {
                 disabled={readOnly}
               />
             </div>
+            {!supportsContentConfig && <>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('promotionSlotConfig:colAlgoType')}</div>
               <Input value={selectedAlgoType !== null ? tAlgoTypeLabel(selectedAlgoType) : ''} disabled placeholder={t('promotionSlotConfig:selectAlgoFirst')} style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }} />
@@ -398,6 +413,7 @@ export default function PromotionSlotConfigSlots() {
                 {selectedAlgoBrand ? <BrandTag value={selectedAlgoBrand} /> : <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectAlgoFirst')}</span>}
               </div>
             </div>
+            </>}
           </div>
         )}
       </div>
@@ -431,6 +447,12 @@ export default function PromotionSlotConfigSlots() {
                   return (
                     <div
                       key={pos}
+                      role="button"
+                      tabIndex={readOnly ? -1 : 0}
+                      aria-label={assigned ? `${t('promotionSlotConfig:posNum', { pos })}：${assigned.label}` : t('promotionSlotConfig:posNum', { pos })}
+                      aria-pressed={!!assigned}
+                      aria-disabled={readOnly}
+                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); togglePosition(pos) } }}
                       onClick={() => togglePosition(pos)}
                       style={{
                         position: 'relative', height: 44, borderRadius: 6,
@@ -471,7 +493,7 @@ export default function PromotionSlotConfigSlots() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexShrink: 0 }}>
               <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{t('promotionSlotConfig:slotStats', { count: cells.length })}</span>
               {cells.length > 0 && !readOnly && (
-                <Button size="small" onClick={clearAllPositions} style={{ fontSize: 12, padding: '0 8px', height: 22 }}>{t('promotionSlotConfig:clearAll')}</Button>
+                <Button size="small" danger onClick={clearAllPositions} style={{ fontSize: 12, padding: '0 8px', height: 22 }}>{t('promotionSlotConfig:clearAll')}</Button>
               )}
             </div>
             {cells.length > 0 ? (
@@ -495,12 +517,12 @@ export default function PromotionSlotConfigSlots() {
       </div>
 
       {/* 底部操作按钮 */}
-      <div className="form-footer">
+      {!readOnly && <div className="form-footer">
         <Space>
           <Button onClick={handleBack}>{t('common:cancel')}</Button>
-          {!readOnly && <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>{t('promotionSlotConfig:applyAndBack')}</Button>}
+          <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>{t('promotionSlotConfig:applyAndBack')}</Button>
         </Space>
-      </div>
+      </div>}
     </div>
   )
 }

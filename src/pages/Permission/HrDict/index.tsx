@@ -1,39 +1,37 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd'
+import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   fetchHrDict, updateHrDictStatus, deleteHrDict,
-  HR_DICT_TYPE, type HrDictItem, type HrDictType,
+  HR_DICT_TYPE, type HrDictItem,
 } from '../../../api/hrDict'
 
-/** 顶部 Tab 定义 */
-const DICT_TABS = [
-  { key: HR_DICT_TYPE.EMPLOYER_COMPANY, label: '僱主法人' },
-  { key: HR_DICT_TYPE.WORK_LOCATION, label: '工作地点' },
-  { key: HR_DICT_TYPE.EMPLOYEE_CATEGORY, label: '人員類別' },
-  { key: HR_DICT_TYPE.CONTRACT_TYPE, label: '合同类型' },
-  { key: HR_DICT_TYPE.WORK_SYSTEM, label: '工时制' },
-]
-
-const STATUS_OPTIONS = [
-  { value: 1, label: '啟用' },
-  { value: 0, label: '停用' },
-]
+/** 类型值保持后端编码不变，展示标签随语言切换。 */
+const DICT_TYPES = Object.values(HR_DICT_TYPE)
 
 export default function HrDictManagement() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [modal, contextHolder] = Modal.useModal()
   const { hasPermission } = useAuth()
-  const canEdit = hasPermission('rule-config:edit')
+  const canEdit = hasPermission('hr-dict:edit')
 
-  const [activeType, setActiveType] = useState<HrDictType>(HR_DICT_TYPE.EMPLOYER_COMPANY)
+  const activeType = DICT_TYPES.find(type => type === searchParams.get('type')) ?? HR_DICT_TYPE.EMPLOYER_COMPANY
+  const dictTabs = DICT_TYPES.map(key => ({ key, label: t(`hrDict.types.${key}`) }))
+  const statusOptions = [{ value: 1, label: t('hrDict.enabled') }, { value: 0, label: t('hrDict.disabled') }]
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [all, setAll] = useState<HrDictItem[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState<string>()
   const [statusFilter, setStatusFilter] = useState<number>()
-  const [searchForm] = Form.useForm()
+  const [searchForm] = Form.useForm<{ keyword?: string; status?: number }>()
 
   /** 加载当前类型全量字典（含停用），关键字/状态在前端过滤（数据量小） */
   const fetchList = useCallback(async () => {
@@ -76,12 +74,14 @@ export default function HrDictManagement() {
     const v = searchForm.getFieldsValue()
     setKeyword(v.keyword?.trim() || undefined)
     setStatusFilter(v.status)
+    setPage(1)
   }
 
   const handleReset = () => {
     searchForm.resetFields()
     setKeyword(undefined)
     setStatusFilter(undefined)
+    setPage(1)
   }
 
   const handleCreate = () => {
@@ -92,20 +92,26 @@ export default function HrDictManagement() {
     navigate(`/hr-dict-edit?type=${activeType}&id=${record.id}`)
   }
 
-  const handleToggleStatus = async (record: HrDictItem, checked: boolean) => {
-    try {
-      await updateHrDictStatus(record.id, checked ? 1 : 0)
-      message.success(checked ? '已啟用' : '已停用')
-      fetchList()
-    } catch {
-      // 错误提示由请求层统一处理
-    }
+  const handleToggleStatus = (record: HrDictItem, checked: boolean) => {
+    // §B.8 强制：列表状态 Switch 切换必须先二次确认，确认后才调接口
+    modal.confirm({
+      title: t(checked ? 'hrDict.enableConfirm' : 'hrDict.disableConfirm', { name: record.name }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        await updateHrDictStatus(record.id, checked ? 1 : 0)
+        message.success(t(checked ? 'common.enableSuccess' : 'common.disableSuccess'))
+        fetchList()
+      },
+    })
   }
 
   const handleDelete = async (record: HrDictItem) => {
     try {
       await deleteHrDict(record.id)
-      message.success('刪除成功')
+      message.success(t('common.deleteSuccess'))
       fetchList()
     } catch {
       // 错误提示由请求层统一处理
@@ -113,56 +119,61 @@ export default function HrDictManagement() {
   }
 
   const columns: TableColumnsType<HrDictItem> = [
-    { title: '編碼', dataIndex: 'code', key: 'code', width: 180 },
-    { title: '名稱', dataIndex: 'name', key: 'name', width: 200 },
-    { title: '英文名稱', dataIndex: 'nameEn', key: 'nameEn', width: 220, render: (v: string) => v || '-' },
+    { title: t('hrDict.code'), dataIndex: 'code', key: 'code', width: 180 },
+    { title: t('common.colName'), dataIndex: 'name', key: 'name', width: 200 },
+    { title: t('hrDict.nameEn'), dataIndex: 'nameEn', key: 'nameEn', width: 220, render: (v: string) => v || '-' },
     ...(activeType === HR_DICT_TYPE.WORK_LOCATION
       ? [{
-          title: '所屬國家/地區', dataIndex: 'parentCode', key: 'parentCode', width: 140,
-          render: (v: string) => (v ? (countryNameByCode[v] || v) : '—（國家/頂級）'),
+          title: t('hrDict.country'), dataIndex: 'parentCode', key: 'parentCode', width: 140,
+          render: (v: string) => (v ? (countryNameByCode[v] || v) : t('hrDict.topLevel')),
         } as TableColumnsType<HrDictItem>[number]]
       : []),
-    { title: '排序', dataIndex: 'sortOrder', key: 'sortOrder', width: 80 },
+    { title: t('hrDict.sort'), dataIndex: 'sortOrder', key: 'sortOrder', width: 80 },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       render: (v: number, record) => (
         canEdit
-          ? <Switch checked={v === 1} checkedChildren="啟用" unCheckedChildren="停用"
+          ? <Switch checked={v === 1} checkedChildren={t('hrDict.enabled')} unCheckedChildren={t('hrDict.disabled')}
               onChange={(checked) => handleToggleStatus(record, checked)} />
-          : <Tag color={v === 1 ? 'success' : 'default'}>{v === 1 ? '啟用' : '停用'}</Tag>
+          : <Tag color={v === 1 ? 'success' : 'default'}>{t(v === 1 ? 'hrDict.enabled' : 'hrDict.disabled')}</Tag>
       ),
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 130, render: (v: string) => v || '-' },
+    { title: t('common.colUpdater'), dataIndex: 'updatedBy', key: 'updatedBy', width: 130, render: (v: string) => v || '-' },
     {
-      title: '操作', key: 'action', width: 120,
+      title: t('common.colAction'), key: 'action', width: 120,
       render: (_, record) => (
         canEdit ? (
           <Space size={0} split={<span className="action-split">|</span>}>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>編輯</Button>
-            <Popconfirm title="確認刪除該字典項？" onConfirm={() => handleDelete(record)} okText="確認" cancelText="取消">
-              <Button type="link" size="small" danger>刪除</Button>
+            <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('common.edit')}</Button>
+            <Popconfirm title={t('hrDict.deleteConfirm', { name: record.name })} onConfirm={() => handleDelete(record)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+              <Button type="link" size="small" danger>{t('common.delete')}</Button>
             </Popconfirm>
           </Space>
-        ) : <span style={{ color: '#8C8C8C' }}>僅查看</span>
+        ) : <span style={{ color: '#8C8C8C' }}>{t('hrDict.readOnly')}</span>
       ),
     },
   ]
 
+  const { configComponent, applyConfig } = useColumnConfig('hr-dict', columns.map(col => ({ key: String(col.key), title: String(col.title) })), [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
+
   return (
     <div className="content-area">
+      {contextHolder}
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="關鍵詞" name="keyword">
-            <Input placeholder="編碼 / 名稱 / 英文名" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('hrDict.keyword')} name="keyword">
+            <Input placeholder={t('hrDict.keywordPlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" allowClear style={{ width: 120 }} options={STATUS_OPTIONS} />
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select placeholder={t('common.all')} allowClear options={statusOptions} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -174,27 +185,31 @@ export default function HrDictManagement() {
         <div className="action-section-right">
           {canEdit && (
             <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-              新增{DICT_TABS.find(t => t.key === activeType)?.label}
+              {t('hrDict.addTitle', { type: t(`hrDict.types.${activeType}`) })}
             </Button>
           )}
+          {configComponent}
         </div>
       </div>
 
       <Tabs
         activeKey={activeType}
-        onChange={(key) => { setActiveType(key as HrDictType); handleReset() }}
-        items={DICT_TABS.map(t => ({ key: t.key, label: t.label }))}
+        onChange={(key) => { setSearchParams({ type: key }, { replace: true }); handleReset() }}
+        items={dictTabs}
         style={{ marginBottom: 12 }}
       />
 
       <Table
         className="nowrap-table"
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={tableData}
         rowKey="id"
         loading={loading}
         scroll={{ x: 'max-content' }}
-        pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (total) => `共 ${total} 條` }}
+        pagination={{ current: page, pageSize, showSizeChanger: true, showQuickJumper: true,
+                  showTotal: (total) => t('common.total', { count: total }),
+                  onChange: (next, size) => { setPage(size !== pageSize ? 1 : next); setPageSize(size) },
+                }}
       />
     </div>
   )

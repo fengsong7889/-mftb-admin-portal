@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined, DatabaseOutlined, ProfileOutlined } from '@ant-design/icons'
+import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { Dayjs } from 'dayjs'
@@ -529,14 +529,6 @@ export default function EmployeeManagement() {
       <div className="action-section">
         <div className="action-section-left">
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
-          {hasPermission('rule-config:edit') && (
-            <Button icon={<DatabaseOutlined />} onClick={() => navigate('/hr-dict')} style={{ marginLeft: 8 }}>
-              字典維護
-            </Button>
-          )}
-          <Button icon={<ProfileOutlined />} onClick={() => navigate('/contract-ledger')} style={{ marginLeft: 8 }}>
-            合同台賬
-          </Button>
         </div>
         <div className="action-section-right">
           {hasPermission('employee-management:create') && (

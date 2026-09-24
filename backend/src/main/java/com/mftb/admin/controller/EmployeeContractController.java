@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 合同全局台账接口 (P1-B)
  * <p>
- * 跨员工查看/筛选合同；查看权限沿用 employee-management。新增/编辑/删除仍在员工详情内维护。
+ * 跨员工查看/筛选合同；查看权限归入独立菜单 {@code contract-ledger}（可单独授权），
+ * 并通过 anyOf 兼容存量 employee-management 授权（拆分前经员工页按钮进入），避免拆分瞬间断访。
+ * 新增/编辑/删除仍在员工详情内维护（employee-management）。
  */
 @RestController
 @RequestMapping("/api/contracts")
@@ -28,7 +30,7 @@ public class EmployeeContractController {
 
     /** 合同全局台账（分页 + 关键字/签约主体/类型/状态筛选） */
     @GetMapping
-    @RequirePermission(menu = "employee-management")
+    @RequirePermission(menu = "contract-ledger", anyOf = {"employee-management"})
     @Operation(summary = "合同全局台账分页查询")
     public Result<PageResult<ContractLedgerVO>> ledger(
             @RequestParam(defaultValue = "1") long page,

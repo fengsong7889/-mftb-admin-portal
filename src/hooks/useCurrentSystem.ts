@@ -13,8 +13,11 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import type { MenuVO } from '../api/menu'
+import { resolveMenuPath } from '../constants/menuDataSource'
+import { ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 
 export const CURRENT_SYSTEM_STORAGE_KEY = 'current_system_code'
+const CURRENT_SYSTEM_CHANGE_EVENT = 'current-system:change'
 
 /** 与后端 `SystemCode.PORTAL` 对齐：个人工作台/公共入口，不作为业务系统持久化 */
 export const PORTAL_SENTINEL = 'portal'
@@ -28,7 +31,7 @@ export function isBusinessSystemCode(code: string | null | undefined): code is s
 export function readCurrentSystemCode(): string | null {
   try {
     const raw = localStorage.getItem(CURRENT_SYSTEM_STORAGE_KEY)
-    return raw && raw !== 'null' ? raw : null
+    return raw && raw !== 'null' && raw !== PORTAL_SENTINEL ? raw : null
   } catch {
     return null
   }
@@ -45,17 +48,25 @@ export function writeCurrentSystemCode(code: string | null): void {
   } catch {
     /* localStorage 不可用时忽略（隐私模式等） */
   }
+  // storage 仅通知其他标签页；同页所有 Hook 实例必须同步接收变更，包括登出清空。
+  window.dispatchEvent(new CustomEvent<string | null>(CURRENT_SYSTEM_CHANGE_EVENT, {
+    detail: isBusinessSystemCode(code) ? code : null,
+  }))
 }
 
 /** 从菜单树自顶向下建立 path → systemCode 映射；仅使用带 path 的叶子节点 */
 export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, string> {
   const map: Record<string, string> = {}
   if (!tree) return map
+  const systemByKey: Record<string, string> = {}
   const walk = (nodes: MenuVO[], inherited: string | null): void => {
     for (const node of nodes) {
+      if (node.status !== 1) continue
       const sys = node.systemCode ?? inherited
-      if (node.path && sys && sys !== PORTAL_SENTINEL) {
-        map[node.path] = sys
+      const path = resolveMenuPath(node)
+      if (isBusinessSystemCode(sys)) {
+        systemByKey[node.menuKey] = sys
+        if (path) map[path] = sys
       }
       if (node.children?.length) {
         walk(node.children, sys)
@@ -63,6 +74,10 @@ export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, stri
     }
   }
   walk(tree, null)
+  // 子页面继承已返回菜单的系统归属；不为服务端缺失的菜单创建入口。
+  for (const [path, menuKey] of Object.entries(ROUTE_MENU_KEY_MAP)) {
+    if (systemByKey[menuKey]) map[path] ??= systemByKey[menuKey]
+  }
   return map
 }
 
@@ -104,8 +119,16 @@ export function useCurrentSystem() {
         setCode(readCurrentSystemCode())
       }
     }
+    const onChange = (event: Event) => {
+      setCode((event as CustomEvent<string | null>).detail)
+    }
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    window.addEventListener(CURRENT_SYSTEM_CHANGE_EVENT, onChange)
+    setCode(readCurrentSystemCode())
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(CURRENT_SYSTEM_CHANGE_EVENT, onChange)
+    }
   }, [])
 
   return {

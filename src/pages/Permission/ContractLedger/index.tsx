@@ -1,23 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ExportOutlined, ReloadOutlined, SearchOutlined, UserOutlined } from '@ant-design/icons'
+import { ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useTranslation } from 'react-i18next'
+import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { useAuth } from '../../../contexts/AuthContext'
 import { fetchContractLedger, type ContractLedgerItem, type ContractLedgerQuery } from '../../../api/employee'
-import { fetchHrDictOptions, HR_DICT_TYPE } from '../../../api/hrDict'
+import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
 import { exportToCSV } from '../../../utils/exportCSV'
 
 /** 合同类型回退选项（HR 字典 CONTRACT_TYPE 不可用时） */
-const DEFAULT_CONTRACT_TYPE_OPTIONS = ['劳动合同', '劳务合同', '实习协议', '竞业协议'].map(v => ({ value: v, label: v }))
+const CONTRACT_TYPE_KEYS: Record<string, string> = {
+  '劳动合同': 'contractLedger.labor', '劳务合同': 'contractLedger.service',
+  '实习协议': 'contractLedger.internship', '竞业协议': 'contractLedger.nonCompete',
+}
 /** 合同状态选项 */
-const CONTRACT_STATUS_OPTIONS = ['生效中', '已终止', '已过期'].map(v => ({ value: v, label: v }))
+const CONTRACT_STATUS_KEYS: Record<string, string> = {
+  '生效中': 'contractLedger.active', '已终止': 'contractLedger.terminated', '已过期': 'contractLedger.expired',
+}
 
 export default function ContractLedger() {
   const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission('employee-management:edit')
+  const canViewEmployee = hasPermission('employee-management:view')
 
   const [dataSource, setDataSource] = useState<ContractLedgerItem[]>([])
   const [total, setTotal] = useState(0)
@@ -29,18 +38,28 @@ export default function ContractLedger() {
   const [company, setCompany] = useState<string>()
   const [contractType, setContractType] = useState<string>()
   const [status, setStatus] = useState<string>()
-  const [searchForm] = Form.useForm()
+  const [searchForm] = Form.useForm<{ keyword?: string; company?: string; contractType?: string; status?: string }>()
 
   // 签约主体 / 合同类型 下拉（HR 字典，值=名称，与存储一致）
-  const [companyOptions, setCompanyOptions] = useState<{ value: string; label: string }[]>([])
-  const [contractTypeOptions, setContractTypeOptions] = useState<{ value: string; label: string }[]>([])
+  const [companies, setCompanies] = useState<HrDictOption[]>([])
+  const [contractTypes, setContractTypes] = useState<HrDictOption[]>([])
+  const isZh = i18n.language.startsWith('zh')
+  const companyOptions = companies.map(item => ({ value: item.name, label: isZh ? item.name : (item.nameEn || item.name) }))
+  const contractTypeLabel = (value: string) => {
+    const item = contractTypes.find(item => item.name === value)
+    if (!isZh && item?.nameEn) return item.nameEn
+    return CONTRACT_TYPE_KEYS[value] ? t(CONTRACT_TYPE_KEYS[value]) : value
+  }
+  const contractTypeOptions = (contractTypes.length ? contractTypes.map(item => item.name) : Object.keys(CONTRACT_TYPE_KEYS))
+    .map(value => ({ value, label: contractTypeLabel(value) }))
+  const statusOptions = Object.entries(CONTRACT_STATUS_KEYS).map(([value, key]) => ({ value, label: t(key) }))
   useEffect(() => {
     fetchHrDictOptions(HR_DICT_TYPE.EMPLOYER_COMPANY)
-      .then(list => setCompanyOptions(list.map(c => ({ value: c.name, label: c.name }))))
-      .catch(() => setCompanyOptions([]))
+      .then(setCompanies)
+      .catch(() => setCompanies([]))
     fetchHrDictOptions(HR_DICT_TYPE.CONTRACT_TYPE)
-      .then(list => setContractTypeOptions(list.length ? list.map(c => ({ value: c.name, label: c.name })) : DEFAULT_CONTRACT_TYPE_OPTIONS))
-      .catch(() => setContractTypeOptions(DEFAULT_CONTRACT_TYPE_OPTIONS))
+      .then(setContractTypes)
+      .catch(() => setContractTypes([]))
   }, [])
 
   const baseQuery = useMemo<Omit<ContractLedgerQuery, 'page' | 'size'>>(
@@ -96,34 +115,34 @@ export default function ContractLedger() {
         p += 1
       }
     } catch {
-      message.warning('導出失敗，請重試')
+      // 请求层已显示错误，避免重复提示。
       return
     } finally {
       setLoading(false)
     }
     if (all.length === 0) {
-      message.warning('暫無可導出數據')
+      message.warning(t('common.noDataToExport'))
       return
     }
     const exportColumns = [
-      { title: '工號', dataIndex: 'empId' },
-      { title: '姓名', dataIndex: 'employeeName' },
-      { title: '部門', dataIndex: 'department' },
-      { title: '合同編號', dataIndex: 'contractNo' },
-      { title: '合同類型', dataIndex: 'contractType' },
-      { title: '簽約主體', dataIndex: 'company' },
-      { title: '開始日期', dataIndex: 'startDate' },
-      { title: '結束日期', dataIndex: 'endDate' },
-      { title: '簽訂日期', dataIndex: 'signDate' },
-      { title: '狀態', dataIndex: 'status' },
-      { title: '最後更新人', dataIndex: 'updatedBy' },
+      { title: t('employee.colEmpId'), dataIndex: 'empId' },
+      { title: t('employee.colName'), dataIndex: 'employeeName' },
+      { title: t('employee.colDepartment'), dataIndex: 'department' },
+      { title: t('contractLedger.contractNo'), dataIndex: 'contractNo' },
+      { title: t('hrDict.types.CONTRACT_TYPE'), dataIndex: 'contractType' },
+      { title: t('contractLedger.company'), dataIndex: 'company' },
+      { title: t('common.startDate'), dataIndex: 'startDate' },
+      { title: t('common.endDate'), dataIndex: 'endDate' },
+      { title: t('contractLedger.signDate'), dataIndex: 'signDate' },
+      { title: t('common.colStatus'), dataIndex: 'status' },
+      { title: t('common.colUpdater'), dataIndex: 'updatedBy' },
     ]
-    exportToCSV('合同台賬', exportColumns, all)
+    exportToCSV(t('contractLedger.title'), exportColumns, all)
   }
 
   const columns: TableColumnsType<ContractLedgerItem> = [
     {
-      title: '員工', key: 'employee', width: 160, fixed: 'left',
+      title: t('contractLedger.employee'), key: 'employee', width: 160, fixed: 'left',
       render: (_, r) => (
         <Space size={4}>
           <span>{r.employeeName || '-'}</span>
@@ -131,53 +150,57 @@ export default function ContractLedger() {
         </Space>
       ),
     },
-    { title: '部門', dataIndex: 'department', key: 'department', width: 140, render: (v: string) => v || '-' },
-    { title: '合同編號', dataIndex: 'contractNo', key: 'contractNo', width: 160 },
-    { title: '合同類型', dataIndex: 'contractType', key: 'contractType', width: 120, render: (v: string) => v || '-' },
-    { title: '簽約主體', dataIndex: 'company', key: 'company', width: 200, render: (v: string) => v || '-' },
-    { title: '開始日期', dataIndex: 'startDate', key: 'startDate', width: 120, render: (v: string) => v || '-' },
-    { title: '結束日期', dataIndex: 'endDate', key: 'endDate', width: 120, render: (v: string) => v || '-' },
-    { title: '簽訂日期', dataIndex: 'signDate', key: 'signDate', width: 120, render: (v: string) => v || '-' },
+    { title: t('employee.colDepartment'), dataIndex: 'department', key: 'department', width: 140, render: (v: string) => v || '-' },
+    { title: t('contractLedger.contractNo'), dataIndex: 'contractNo', key: 'contractNo', width: 160 },
+    { title: t('hrDict.types.CONTRACT_TYPE'), dataIndex: 'contractType', key: 'contractType', width: 120, render: (v: string) => contractTypeLabel(v) || '-' },
+    { title: t('contractLedger.company'), dataIndex: 'company', key: 'company', width: 200, render: (v: string) => v || '-' },
+    { title: t('common.startDate'), dataIndex: 'startDate', key: 'startDate', width: 120, render: (v: string) => v || '-' },
+    { title: t('common.endDate'), dataIndex: 'endDate', key: 'endDate', width: 120, render: (v: string) => v || '-' },
+    { title: t('contractLedger.signDate'), dataIndex: 'signDate', key: 'signDate', width: 120, render: (v: string) => v || '-' },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
-      render: (v: string) => <Tag color={v === '生效中' ? 'green' : 'default'}>{v || '-'}</Tag>,
+      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
+      render: (v: string) => <Tag color={v === '生效中' ? 'green' : 'default'}>{CONTRACT_STATUS_KEYS[v] ? t(CONTRACT_STATUS_KEYS[v]) : (v || '-')}</Tag>,
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', key: 'updatedBy', width: 130, render: (v: string) => v || '-' },
+    { title: t('common.colUpdater'), dataIndex: 'updatedBy', key: 'updatedBy', width: 130, render: (v: string) => v || '-' },
     {
-      title: '最後更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 180,
+      title: t('common.colUpdateTime'), dataIndex: 'updatedAt', key: 'updatedAt', width: 180,
       render: (v: string) => (v ? <span style={{ whiteSpace: 'nowrap' }}>{dayjs(v).format('YYYY-MM-DD HH:mm:ss')}</span> : '-'),
     },
     {
-      title: '操作', key: 'action', width: 100, fixed: 'right',
-      render: (_, r) => (
-        <Button type="link" size="small" icon={<UserOutlined />} onClick={() => navigate(`/employee-detail?id=${r.userId}`)}>
-          查看員工
+      title: t('common.colAction'), key: 'action', width: 100, fixed: 'right',
+      render: (_, r) => canViewEmployee ? (
+        <Button type="link" size="small" onClick={() => navigate(`/employee-detail?id=${r.userId}`)}>
+          {t('common.detail')}
         </Button>
-      ),
+      ) : null,
     },
   ]
+
+  const { configComponent, applyConfig } = useColumnConfig('contract-ledger', columns.map(col => ({ key: String(col.key), title: String(col.title) })), [
+    { key: 'action', visible: true, locked: 'tail' },
+  ])
 
   return (
     <div className="content-area">
       {/* 搜索区 */}
       <div className="search-section">
         <Form form={searchForm} layout="inline">
-          <Form.Item label="關鍵詞" name="keyword">
-            <Input placeholder="姓名 / 工號 / 合同編號" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('hrDict.keyword')} name="keyword">
+            <Input placeholder={t('contractLedger.keywordPlaceholder')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="簽約主體" name="company">
-            <Select placeholder="全部" allowClear style={{ width: 200 }} options={companyOptions} showSearch optionFilterProp="label" />
+          <Form.Item label={t('contractLedger.company')} name="company">
+            <Select placeholder={t('common.all')} allowClear options={companyOptions} showSearch optionFilterProp="label" />
           </Form.Item>
-          <Form.Item label="合同類型" name="contractType">
-            <Select placeholder="全部" allowClear style={{ width: 140 }} options={contractTypeOptions} />
+          <Form.Item label={t('hrDict.types.CONTRACT_TYPE')} name="contractType">
+            <Select placeholder={t('common.all')} allowClear options={contractTypeOptions} />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部" allowClear style={{ width: 120 }} options={CONTRACT_STATUS_OPTIONS} />
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select placeholder={t('common.all')} allowClear options={statusOptions} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -186,20 +209,19 @@ export default function ContractLedger() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
-        </div>
-        <div className="action-section-right">
+          {hasPermission('contract-ledger:export') && <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>}
           {canEdit && (
-            <Button type="primary" onClick={() => navigate('/employee-management')}>
-              到員工詳情維護合同
+            <Button onClick={() => navigate('/employee-management')}>
+              {t('contractLedger.maintain')}
             </Button>
           )}
         </div>
+        <div className="action-section-right">{configComponent}</div>
       </div>
 
       <Table<ContractLedgerItem>
         className="nowrap-table"
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={dataSource}
         rowKey="id"
         loading={loading}
@@ -210,7 +232,7 @@ export default function ContractLedger() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (count) => t('common.total', { count }),
           onChange: (p, s) => {
             setPage(s !== size ? 1 : p)
             setSize(s)
