@@ -531,7 +531,7 @@ function PromotionSlotConfigForm() {
           {!isGroupBuy && bizChannel === 'food' && (
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('promotionSlotConfig:colLayout')}</div>
-              <Radio.Group name="waterfall-layout" value={layoutColumns} disabled={isDetailMode || importing} onChange={e => { setLayoutColumns(e.target.value as WaterfallLayoutColumns); setHasUnsavedChanges(true) }}>
+              <Radio.Group name="waterfall-layout" aria-label={t('promotionSlotConfig:colLayout')} value={layoutColumns} disabled={isDetailMode || importing} onChange={e => { setLayoutColumns(e.target.value as WaterfallLayoutColumns); setHasUnsavedChanges(true) }}>
                 {LAYOUT_OPTIONS.map(o => <Radio key={o.value} value={o.value}>{t(o.labelKey)}</Radio>)}
               </Radio.Group>
             </div>
@@ -682,14 +682,6 @@ function PromotionSlotConfigForm() {
 
         {/* 右侧：手机预览 */}
         <div>
-          {supportsContentConfig && (
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 12 }}>{t('promotionSlotConfig:colLayout')}</span>
-              <Radio.Group name="waterfall-layout" aria-label={t('promotionSlotConfig:colLayout')} value={layoutColumns} disabled={isDetailMode || importing} onChange={e => { setLayoutColumns(e.target.value as WaterfallLayoutColumns); setHasUnsavedChanges(true) }}>
-                {LAYOUT_OPTIONS.map(o => <Radio key={o.value} value={o.value}>{t(o.labelKey)}</Radio>)}
-              </Radio.Group>
-            </div>
-          )}
         <WaterfallPreview
           businessType={businessType}
           bizChannel={bizChannel}

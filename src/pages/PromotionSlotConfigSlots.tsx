@@ -381,7 +381,7 @@ export default function PromotionSlotConfigSlots() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: supportsContentConfig ? '1fr' : 'repeat(3, 1fr)', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
                 <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
@@ -402,10 +402,9 @@ export default function PromotionSlotConfigSlots() {
                 disabled={readOnly}
               />
             </div>
-            {!supportsContentConfig && <>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('promotionSlotConfig:colAlgoType')}</div>
-              <Input value={selectedAlgoType !== null ? tAlgoTypeLabel(selectedAlgoType) : ''} disabled placeholder={t('promotionSlotConfig:selectAlgoFirst')} style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }} />
+              <Input aria-label={t('promotionSlotConfig:colAlgoType')} value={selectedAlgoType !== null ? tAlgoTypeLabel(selectedAlgoType) : ''} disabled placeholder={t('promotionSlotConfig:selectAlgoFirst')} style={{ color: selectedAlgoType !== null ? '#333' : '#bfbfbf' }} />
             </div>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('common:brand')}</div>
@@ -413,7 +412,6 @@ export default function PromotionSlotConfigSlots() {
                 {selectedAlgoBrand ? <BrandTag value={selectedAlgoBrand} /> : <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectAlgoFirst')}</span>}
               </div>
             </div>
-            </>}
           </div>
         )}
       </div>
