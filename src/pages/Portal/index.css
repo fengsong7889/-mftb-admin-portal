@@ -138,14 +138,18 @@
   gap: 16px;
 }
 
+.portal-card-shell {
+  display: flex;
+  min-width: 0;
+}
+
 .portal-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   width: 100%;
   min-width: 0;
-  min-height: 148px;
-  padding: 20px;
+  padding: 0;
+  overflow: hidden;
   box-sizing: border-box;
   font: inherit;
   color: inherit;
@@ -171,53 +175,277 @@
   outline-offset: 2px;
 }
 
-.portal-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.portal-card-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 320 / 190;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: #E8720C;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.portal-card-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: #FFF7F0;
-  color: #E8720C;
-  display: flex;
+.portal-card-artwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.portal-card-artwork[data-scene='merchantWorkbench'] {
+  color: #1890FF;
+}
+
+.portal-card-artwork[data-scene='translation'] {
+  color: #722ED1;
+}
+
+.portal-card-artwork[data-scene='platform'] {
+  color: #595959;
+}
+
+.portal-card-artwork .portal-art-motion {
+  animation-duration: 5s;
+  animation-delay: 0s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.portal-card-artwork .portal-art-signal {
+  animation-name: portalSignalBreathe;
+}
+
+.portal-card-artwork .portal-art-chart {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation-name: portalChartRise;
+}
+
+.portal-card-artwork .portal-art-draw {
+  stroke-dasharray: 1;
+  animation-name: portalCheckDraw;
+}
+
+.portal-card-artwork .portal-art-scan {
+  animation-name: portalScanSweep;
+}
+
+.portal-card-artwork .portal-art-flow {
+  animation-name: portalDataFlow;
+  animation-timing-function: linear;
+}
+
+.portal-card-artwork .portal-art-receipt {
+  animation-name: portalReceiptLift;
+}
+
+.portal-card-artwork .portal-art-delay-1 {
+  animation-delay: -2s;
+}
+
+.portal-card-artwork .portal-art-delay-2 {
+  animation-delay: -4s;
+}
+
+/* 同一场景共享时钟，保证插入、拒绝、放行以及扫码与出入库的先后关系。 */
+.portal-card-artwork[data-scene='search'] .portal-art-motion { animation-duration: 8s; }
+.portal-card-artwork[data-scene='iam'] .portal-art-motion { animation-duration: 10s; }
+.portal-card-artwork[data-scene='eam'] .portal-art-motion {
+  animation-duration: 10s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.portal-card-artwork[data-scene='hr'] .portal-art-motion { animation-duration: 8s; }
+.portal-card-artwork[data-scene='oa'] .portal-art-motion { animation-duration: 9s; }
+.portal-card-artwork[data-scene='ai'] .portal-art-motion { animation-duration: 6.4s; }
+.portal-card-artwork[data-scene='ads'] .portal-art-motion,
+.portal-card-artwork[data-scene='merchant'] .portal-art-motion,
+.portal-card-artwork[data-scene='merchantWorkbench'] .portal-art-motion,
+.portal-card-artwork[data-scene='platform'] .portal-art-motion { animation-duration: 8s; }
+
+.portal-card-artwork .portal-art-typing {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation-name: portalTypeReveal;
+  animation-timing-function: steps(7, end);
+}
+
+.portal-card-artwork[data-scene='finance'] .portal-art-typing { animation-timing-function: steps(5, end); }
+.portal-card-artwork .portal-finance-key { animation-name: portalCalculatorPress; }
+.portal-card-artwork .portal-search-lens { animation-name: portalSearchExplore; }
+.portal-card-artwork[data-scene='search'] .portal-art-typing { animation-name: portalSearchTyping; }
+.portal-card-artwork .portal-search-query { animation-name: portalSearchQuery; }
+.portal-card-artwork .portal-search-result,
+.portal-card-artwork .portal-search-success-mark,
+.portal-card-artwork .portal-search-success-label { animation-name: portalSearchMatched; }
+.portal-card-artwork .portal-search-success-label { color: #52C41A; }
+.portal-card-artwork .portal-search-check { stroke-dasharray: 1; animation-name: portalSearchCheck; }
+
+.portal-card-artwork .portal-robot-eye,
+.portal-card-artwork .portal-robot-smile {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.portal-card-artwork .portal-robot-eye { animation-name: portalRobotBlink; }
+.portal-card-artwork .portal-robot-pupil { animation-name: portalRobotLook; }
+.portal-card-artwork .portal-robot-smile { animation-name: portalRobotSmile; }
+.portal-card-artwork[data-scene='ai'] .portal-robot-signal {
+  animation-name: portalSignalBreathe;
+  animation-duration: 1.6s;
+}
+
+.portal-card-artwork .portal-hr-profile { transform-origin: 90px 100px; animation-name: portalHrProfile; }
+.portal-card-artwork .portal-hr-scan { animation-name: portalHrScan; }
+.portal-card-artwork .portal-hr-match-path { animation-name: portalHrMatch; }
+.portal-card-artwork .portal-hr-profile-check { animation-name: portalHrProfileCheck; }
+.portal-card-artwork .portal-hr-connection { stroke-dasharray: 1; animation-name: portalHrConnection; }
+.portal-card-artwork .portal-hr-department { animation-name: portalHrDepartment; }
+.portal-card-artwork .portal-hr-vacancy { animation-name: portalHrVacancy; }
+.portal-card-artwork .portal-hr-member,
+.portal-card-artwork .portal-hr-welcome,
+.portal-card-artwork .portal-hr-assigned { animation-name: portalHrAssigned; }
+.portal-card-artwork .portal-hr-matching { animation-name: portalHrMatching; }
+.portal-card-artwork .portal-hr-assigned { color: #52C41A; }
+
+/* 登记设备 → 关联领用人 → 发放耗材并扣减结余，所有动作共享十秒时序。 */
+.portal-card-artwork .portal-eam-asset-tag { animation-name: portalEamTag; }
+.portal-card-artwork .portal-eam-registered { animation-name: portalEamRegistered; }
+.portal-card-artwork .portal-eam-assignment-path { stroke-dasharray: 1; animation-name: portalEamAssignment; }
+.portal-card-artwork .portal-eam-asset-confirm { animation-name: portalEamAssetConfirmed; }
+.portal-card-artwork .portal-eam-supply {
+  transform-box: view-box;
+  transform-origin: 92px 154px;
+  animation-name: portalEamSupply;
+}
+.portal-card-artwork .portal-eam-supply-confirm,
+.portal-card-artwork .portal-eam-issued-label { animation-name: portalEamSupplyConfirmed; }
+.portal-card-artwork .portal-eam-deduction { animation-name: portalEamDeduction; }
+.portal-card-artwork .portal-eam-overview { animation-name: portalEamOverview; }
+.portal-card-artwork .portal-eam-assigned-label { animation-name: portalEamAssignedLabel; }
+.portal-card-artwork .portal-eam-assigned-label,
+.portal-card-artwork .portal-eam-issued-label { color: #52C41A; }
+.portal-card-artwork[data-scene='eam'] .portal-eam-count-full { animation-name: portalEamCountFull; animation-timing-function: steps(1, end); }
+.portal-card-artwork[data-scene='eam'] .portal-eam-count-issued { animation-name: portalEamCountIssued; animation-timing-function: steps(1, end); }
+
+.portal-card-artwork .portal-workflow-paper { animation-name: portalWorkflowPaper; }
+.portal-card-artwork .portal-workflow-stage-0 { animation-name: portalWorkflowStart; }
+.portal-card-artwork .portal-workflow-stage-1 { animation-name: portalWorkflowReview; }
+.portal-card-artwork .portal-workflow-stage-2 { animation-name: portalWorkflowApproved; }
+.portal-card-artwork .portal-office-progress { stroke-dasharray: 1; animation-name: portalOfficeProgress; }
+.portal-card-artwork .portal-office-signature { stroke-dasharray: 1; animation-name: portalOfficeSignature; }
+.portal-card-artwork .portal-office-stamp { animation-name: portalOfficeStamp; }
+.portal-card-artwork .portal-office-seal { animation-name: portalOfficeSeal; }
+.portal-card-artwork .portal-office-archived { animation-name: portalOfficeArchived; }
+
+.portal-card-artwork .portal-key-denied { animation-name: portalKeyDenied; }
+.portal-card-artwork .portal-key-granted { animation-name: portalKeyGranted; }
+.portal-card-artwork .portal-lock-body { animation-name: portalLockShake; }
+.portal-card-artwork .portal-lock-shackle {
+  transform-origin: 219px 83px;
+  animation-name: portalLockOpen;
+}
+.portal-card-artwork .portal-lock-alarm { animation-name: portalLockAlarm; }
+.portal-card-artwork .portal-lock-denied { animation-name: portalLockDenied; color: #FF4D4F; }
+.portal-card-artwork .portal-lock-granted { animation-name: portalLockGranted; color: #52C41A; }
+
+.portal-card-artwork .portal-identity-scan { animation-name: portalIdentityScan; }
+.portal-card-artwork .portal-access-route { animation-name: portalDataFlow; }
+.portal-card-artwork .portal-access-pending { animation-name: portalAccessPending; }
+.portal-card-artwork .portal-access-door-left { animation-name: portalAccessDoorLeft; }
+.portal-card-artwork .portal-access-door-right { animation-name: portalAccessDoorRight; }
+
+.portal-card-artwork .portal-ads-match { animation-name: portalAdsMatch; }
+.portal-card-artwork .portal-ads-stream { animation-name: portalDataFlow; animation-timing-function: linear; }
+.portal-card-artwork .portal-ads-cursor { animation-name: portalAdsCursor; }
+.portal-card-artwork .portal-ads-click {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalAdsClick;
+}
+.portal-card-artwork .portal-ads-growth,
+.portal-card-artwork .portal-merchant-metric,
+.portal-card-artwork .portal-order-growth {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation-name: portalBusinessGrowth;
+}
+.portal-card-artwork .portal-ads-result,
+.portal-card-artwork .portal-merchant-summary { animation-name: portalBusinessResult; }
+.portal-card-artwork .portal-merchant-route { stroke-dasharray: 1; animation-name: portalMerchantLink; }
+.portal-card-artwork .portal-merchant-pin-0 { animation-name: portalMerchantPinFirst; }
+.portal-card-artwork .portal-merchant-pin-1 { animation-name: portalMerchantPinSecond; }
+.portal-card-artwork .portal-merchant-pin-2 { animation-name: portalMerchantPinThird; }
+
+.portal-card-artwork .portal-order-receipt { animation-name: portalOrderReceipt; }
+.portal-card-artwork .portal-order-cursor { animation-name: portalOrderCursor; }
+.portal-card-artwork .portal-order-stamp,
+.portal-card-artwork .portal-order-done { animation-name: portalOrderCompleted; }
+.portal-card-artwork .portal-order-arrival { animation-name: portalOrderArrival; }
+
+.portal-card-artwork .portal-config-slider-0 { animation-name: portalConfigSliderFirst; }
+.portal-card-artwork .portal-config-slider-1 { animation-name: portalConfigSliderSecond; }
+.portal-card-artwork .portal-config-slider-2 { animation-name: portalConfigSliderThird; }
+.portal-card-artwork .portal-config-node-0 { animation-name: portalConfigNodeFirst; }
+.portal-card-artwork .portal-config-node-1 { animation-name: portalConfigNodeSecond; }
+.portal-card-artwork .portal-config-node-2 { animation-name: portalConfigNodeThird; }
+.portal-card-artwork .portal-config-packet { animation-name: portalConfigPacket; }
+.portal-card-artwork .portal-config-published { animation-name: portalConfigPublished; }
+.portal-card-artwork .portal-config-gear { animation-name: portalConfigGear; transform-origin: 0 0; }
+
+/* 默认及移出时撤销动画并恢复完整静态构图，再移入从头播放。 */
+.portal-card-artwork[data-motion='idle'] .portal-art-motion,
+.portal-card-artwork[data-reduced-motion='true'] .portal-art-motion {
+  animation: none;
+  transform: none;
+  stroke-dashoffset: 0;
+}
+.portal-card-artwork[data-motion='idle'] .portal-art-static,
+.portal-card-artwork[data-reduced-motion='true'] .portal-art-static { opacity: 1; }
+.portal-card-artwork[data-motion='paused'] .portal-art-motion { animation-play-state: paused; }
+
+.portal-card[data-system='merchant'] .portal-card-cover,
+.portal-card[data-system='search'] .portal-card-cover,
+.portal-card[data-system='hr'] .portal-card-cover {
+  color: #1890FF;
+}
+
+.portal-card[data-system='ai'] .portal-card-cover,
+.portal-card[data-system='iam'] .portal-card-cover {
+  color: #722ED1;
+}
+
+.portal-card[data-system='finance'] .portal-card-cover,
+.portal-card[data-system='oa'] .portal-card-cover {
+  color: #52C41A;
+}
+
+.portal-card[data-system='platform'] .portal-card-cover {
+  color: #595959;
+}
+
+.portal-card-lock {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  flex-shrink: 0;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.portal-card:not(:disabled):hover .portal-card-icon {
-  transform: scale(1.08);
-}
-
-.portal-card[data-system='merchant']:not(:disabled) .portal-card-icon,
-.portal-card[data-system='search']:not(:disabled) .portal-card-icon,
-.portal-card[data-system='hr']:not(:disabled) .portal-card-icon {
-  color: #1890FF;
-  background: rgba(24, 144, 255, 0.08);
-}
-
-.portal-card[data-system='ai']:not(:disabled) .portal-card-icon,
-.portal-card[data-system='iam']:not(:disabled) .portal-card-icon {
-  color: #722ED1;
-  background: rgba(114, 46, 209, 0.08);
-}
-
-.portal-card[data-system='finance']:not(:disabled) .portal-card-icon,
-.portal-card[data-system='oa']:not(:disabled) .portal-card-icon {
-  color: #52C41A;
-  background: rgba(82, 196, 26, 0.08);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #fff;
+  color: #595959;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .portal-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex: 1;
+  width: 100%;
   min-width: 0;
+  padding: 18px 20px 20px;
 }
 
 .portal-card-title {
@@ -225,79 +453,101 @@
   font-size: 15px;
   font-weight: 600;
   color: #262626;
-  line-height: 1.4;
-  margin-bottom: 4px;
-}
-
-.portal-card-title-en {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  color: #8c8c8c;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .portal-card-desc {
-  min-height: 40px;
+  display: block;
+  min-height: 42px;
   font-size: 12px;
   color: #595959;
-  line-height: 1.7;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
 }
 
-.portal-card-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 16px;
-  height: 24px;
-  color: #8c8c8c;
-  font-size: 12px;
-  transition: color 0.2s;
-  pointer-events: none;
-}
-
-.portal-card:not(:disabled):hover .portal-card-action,
-.portal-card:focus-visible .portal-card-action {
-  color: #E8720C;
-}
-
-.portal-card-enter-icon {
-  font-size: 11px;
-  transition: transform 0.2s;
-}
-
-.portal-card:not(:disabled):hover .portal-card-enter-icon {
-  transform: translateX(2px);
-}
-
-.portal-card:disabled {
-  cursor: not-allowed;
+/* 未授权卡片：不置灰禁用点击，保留可交互（点击弹出申请引导），视觉上以虚线边框与降饱和区分 */
+.portal-card.is-locked {
   box-shadow: none;
   border-style: dashed;
 }
 
-.portal-card:disabled .portal-card-icon {
-  color: #8c8c8c;
-  background: #f0f0f0;
+.portal-card.is-locked:hover,
+.portal-card.is-locked:focus-visible {
+  border-color: #d9d9d9;
+  transform: none;
+  box-shadow: none;
 }
 
-.portal-card:disabled .portal-card-title {
+.portal-card.is-locked .portal-card-artwork {
+  filter: saturate(0.45);
+  opacity: 0.75;
+}
+
+.portal-card.is-locked .portal-card-title {
   color: #595959;
 }
 
-.portal-card:disabled .portal-card-desc {
+.portal-card.is-locked .portal-card-desc {
   color: #8c8c8c;
 }
 
-.portal-card:disabled .portal-card-action {
-  color: #8c8c8c;
+.portal-card-locked-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #E8720C;
+}
+
+/* 未授权系统申请引导弹窗 */
+.portal-request-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px 0 4px;
+}
+
+.portal-request-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #FFF7F0;
+  border: 1px solid #FFE7D1;
+  color: #E8720C;
+  font-size: 20px;
+}
+
+.portal-request-text {
+  min-width: 0;
+}
+
+.portal-request-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.5;
+}
+
+.portal-request-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #595959;
+  line-height: 1.7;
+}
+
+.portal-request-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .portal-access-note {

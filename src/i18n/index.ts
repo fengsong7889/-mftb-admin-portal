@@ -3,6 +3,9 @@ import type { Resource, ResourceLanguage } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import zhTW from './locales/zh-TW.json'
 import en from './locales/en.json'
+import ja from './locales/ja.json'
+import ko from './locales/ko.json'
+import ru from './locales/ru.json'
 
 /** 語言持久化 key（localStorage） */
 export const LANGUAGE_STORAGE_KEY = 'app_language'
@@ -28,11 +31,10 @@ export function getCountryLanguage(country: string): AppLanguage {
 }
 
 /** 讀取持久化的語言，無記錄時默認英文 */
-export function getSavedLanguage(): AppLanguage {
+export function getSavedLanguage(): string {
   const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY)
-  return (SUPPORTED_LANGUAGES as readonly string[]).includes(saved ?? '')
-    ? (saved as AppLanguage)
-    : 'en'
+  // 后端允许动态注册语言；这里只校验代码格式，是否启用由顶栏接口校准。
+  return saved && /^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?$/.test(saved) ? saved : 'en'
 }
 
 /**
@@ -54,6 +56,10 @@ i18n.use(initReactI18next).init({
   resources: {
     'zh-TW': buildResources(zhTW),
     en: buildResources(en),
+    // 门户五语文案离线可用；系统内其余文案继续由后端语言包补齐。
+    ja: buildResources(ja),
+    ko: buildResources(ko),
+    ru: buildResources(ru),
   },
   lng: getSavedLanguage(),
   fallbackLng: 'en',
@@ -61,7 +67,7 @@ i18n.use(initReactI18next).init({
 })
 
 /** 切換語言並持久化 */
-export function changeAppLanguage(lang: AppLanguage) {
+export function changeAppLanguage(lang: string) {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
   i18n.changeLanguage(lang)
 }

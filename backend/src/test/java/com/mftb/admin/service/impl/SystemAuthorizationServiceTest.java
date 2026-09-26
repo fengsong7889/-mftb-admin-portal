@@ -4,6 +4,7 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.dto.SystemAuthorizationRequest;
+import com.mftb.admin.service.PermissionAuditService;
 import com.mftb.admin.service.PermissionRevisionService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.SystemAuthorizationService;
@@ -44,6 +45,7 @@ class SystemAuthorizationServiceTest {
     private JdbcTemplate jdbc;
     private PermissionService permissionService;
     private PermissionRevisionService revisionService;
+    private PermissionAuditService permissionAuditService;
     private OperatorResolver operatorResolver;
     private SystemAuthorizationServiceImpl service;
 
@@ -52,8 +54,9 @@ class SystemAuthorizationServiceTest {
         jdbc = mock(JdbcTemplate.class);
         permissionService = mock(PermissionService.class);
         revisionService = mock(PermissionRevisionService.class);
+        permissionAuditService = mock(PermissionAuditService.class);
         operatorResolver = mock(OperatorResolver.class);
-        service = new SystemAuthorizationServiceImpl(jdbc, permissionService, revisionService, operatorResolver);
+        service = new SystemAuthorizationServiceImpl(jdbc, permissionService, revisionService, permissionAuditService, operatorResolver);
 
         // 目标存在（role/department 均视为存在）
         when(jdbc.queryForObject(contains("FROM sys_role WHERE id = ?"), eq(Integer.class), any(Object[].class)))

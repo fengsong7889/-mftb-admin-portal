@@ -32,6 +32,15 @@ import java.util.Map;
 public class SystemPortalSchemaInitializer implements CommandLineRunner {
 
     private static final String VERSION_KEY = "core:system-portal:v1.0";
+    static final String V_AI_MENU_OWNERSHIP = "core:ai-menu-system-ownership-v1.0";
+    static final String V_SELLER_REPORTS = "core:seller-promotion-reports-v1.0";
+    private static final String SELLER_SYSTEM = "seller";
+    private static final List<String> PROMOTION_REPORT_KEYS = List.of(
+            "promotion-report-overview", "promotion-report-order", "promotion-report-compare");
+    private static final String MISSING_AI_DESCENDANTS =
+            "SELECT c.id FROM sys_menu c JOIN sys_menu p ON c.parent_id = p.id "
+                    + "WHERE (c.system_code IS NULL OR c.system_code = '') AND p.system_code = ? "
+                    + "AND c.deleted = 0 AND p.deleted = 0";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -43,6 +52,127 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
         // 使重命名等调整无需新增迁移即可对已初始化库生效；仅更新展示字段，
         // 不触碰 status/deleted 及系统准入关系。
         seedSystems();
+        reconcileAiMenuOwnership();
+        reconcileSellerReports();
+    }
+
+    /** 延续已完成的商家工作台拆分，只迁移报表，不创建系统或重新推导准入授权。 */
+    void reconcileSellerReports() {
+        Integer systems = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_system WHERE code = ? AND deleted = 0", Integer.class, SELLER_SYSTEM);
+        if (systems == null || systems == 0) {
+            log.info("商家工作台尚未配置，延后迁移推广报表");
+            return;
+        }
+        if (!versionTracker.applyOnce(V_SELLER_REPORTS, this::moveSellerReports, this::verifySellerReports)) {
+            moveSellerReports();
+            verifySellerReports();
+        }
+    }
+
+    private Long requireMenuId(String key, String owner) {
+        List<Long> ids = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE menu_key = ? AND system_code = ? AND deleted = 0",
+                Long.class, key, owner);
+        if (ids.size() != 1) throw new IllegalStateException("菜单未就绪或系统归属不符：" + key);
+        return ids.get(0);
+    }
+
+    private void moveSellerReports() {
+        log.info("开始迁移店铺随心推报表至商家工作台");
+        Long sellerId = requireMenuId("seller-center", SELLER_SYSTEM);
+        Long purchaseId = requireMenuId("promotion-sales-config", SELLER_SYSTEM);
+        Long purchaseParent = jdbcTemplate.queryForObject(
+                "SELECT parent_id FROM sys_menu WHERE id = ?", Long.class, purchaseId);
+        if (!sellerId.equals(purchaseParent)) {
+            throw new IllegalStateException("店铺随心推购买入口尚未迁入商家工作台，报表迁移中止");
+        }
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET parent_id = ?, system_code = ?, updated_by = 'system' "
+                        + "WHERE menu_key = 'promotion-report-group' AND deleted = 0 "
+                        + "AND (parent_id IS NULL OR parent_id <> ? OR system_code IS NULL OR system_code <> ?)",
+                sellerId, SELLER_SYSTEM, sellerId, SELLER_SYSTEM);
+        Long reportId = requireMenuId("promotion-report-group", SELLER_SYSTEM);
+        for (String key : PROMOTION_REPORT_KEYS) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET parent_id = ?, system_code = ?, updated_by = 'system' "
+                            + "WHERE menu_key = ? AND deleted = 0 "
+                            + "AND (parent_id IS NULL OR parent_id <> ? OR system_code IS NULL OR system_code <> ?)",
+                    reportId, SELLER_SYSTEM, key, reportId, SELLER_SYSTEM);
+        }
+        List<Long> oldRoots = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE menu_key = 'promotion_tool' AND system_code = 'ads' AND deleted = 0",
+                Long.class);
+        for (Long id : oldRoots) {
+            Integer remaining = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE parent_id = ? AND deleted = 0 AND status = 1", Integer.class, id);
+            if (remaining != null && remaining > 0) {
+                throw new IllegalStateException("广告系统店铺随心推仍有未迁移菜单，不能停用目录");
+            }
+            jdbcTemplate.update("UPDATE sys_menu SET status = 0, updated_by = 'system' WHERE id = ? AND status <> 0", id);
+        }
+        log.info("店铺随心推报表迁移完成，保留购买入口、菜单 ID 及既有授权");
+    }
+
+    private void verifySellerReports() {
+        Long sellerId = requireMenuId("seller-center", SELLER_SYSTEM);
+        Long reportId = requireMenuId("promotion-report-group", SELLER_SYSTEM);
+        if (!sellerId.equals(jdbcTemplate.queryForObject(
+                "SELECT parent_id FROM sys_menu WHERE id = ?", Long.class, reportId))) {
+            throw new IllegalStateException("报表分析未挂载至商家工作台");
+        }
+        for (String key : PROMOTION_REPORT_KEYS) {
+            Long id = requireMenuId(key, SELLER_SYSTEM);
+            if (!reportId.equals(jdbcTemplate.queryForObject(
+                    "SELECT parent_id FROM sys_menu WHERE id = ?", Long.class, id))) {
+                throw new IllegalStateException("推广报表层级未就绪：" + key);
+            }
+        }
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'promotion_tool' "
+                        + "AND system_code = 'ads' AND deleted = 0 AND status = 1", Integer.class);
+        if (remaining == null || remaining > 0) throw new IllegalStateException("广告系统仍存在店铺随心推入口");
+    }
+
+    /** 仅修补菜单归属；不得重跑系统准入推导，以免恢复已撤销的授权。 */
+    void reconcileAiMenuOwnership() {
+        if (!versionTracker.applyOnce(V_AI_MENU_OWNERSHIP,
+                this::repairAiMenuOwnership, this::verifyAiMenuOwnership)) {
+            repairAiMenuOwnership();
+            verifyAiMenuOwnership();
+        }
+    }
+
+    private void repairAiMenuOwnership() {
+        log.info("开始修复 AI 菜单缺失的系统归属");
+        String systemCode = SystemCode.AI.code();
+        int affected = jdbcTemplate.update(
+                "UPDATE sys_menu SET system_code = ? WHERE menu_key = 'ai-assistant' "
+                        + "AND parent_id IS NULL AND deleted = 0 AND (system_code IS NULL OR system_code = '')",
+                systemCode);
+        // 逐层继承，仅填空值；显式属于其他系统的分支与已删除菜单均保持不变。
+        for (int depth = 0; depth < 6; depth++) {
+            List<Long> ids = jdbcTemplate.queryForList(MISSING_AI_DESCENDANTS, Long.class, systemCode);
+            if (ids.isEmpty()) break;
+            for (Long id : ids) {
+                affected += jdbcTemplate.update(
+                        "UPDATE sys_menu SET system_code = ? WHERE id = ? AND deleted = 0 "
+                                + "AND (system_code IS NULL OR system_code = '')",
+                        systemCode, id);
+            }
+        }
+        log.info("AI 菜单系统归属修复完成：{} 条；未变更菜单 ID、状态与授权", affected);
+    }
+
+    private void verifyAiMenuOwnership() {
+        Integer roots = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'ai-assistant' "
+                        + "AND parent_id IS NULL AND deleted = 0 AND system_code = ?",
+                Integer.class, SystemCode.AI.code());
+        if (roots == null || roots != 1
+                || !jdbcTemplate.queryForList(MISSING_AI_DESCENDANTS, Long.class, SystemCode.AI.code()).isEmpty()) {
+            throw new IllegalStateException("AI 菜单系统归属未就绪，请检查根目录及后代归属");
+        }
     }
 
     // ──────────────────────────────────────────────────────────────

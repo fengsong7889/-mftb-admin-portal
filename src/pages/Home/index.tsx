@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover } from 'antd'
+import { Button, Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMenu } from '../../contexts/MenuContext'
-import type { MenuVO } from '../../api/menu'
+import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { useCurrentSystem } from '../../hooks/useCurrentSystem'
+import { useSystemNavigation } from '../../hooks/useSystemNavigation'
+import { getPortalSystemKey } from '../../constants/portalSystems'
+import { renderMenuIcon } from '../../components/MenuIcon'
 import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
 import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
-import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, chineseNameToPinyinEnglish, getGreeting, formatAiText, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, formatAiText, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import type { AiBlockReason } from './homeUtils'
 import {
   SearchOutlined,
@@ -149,15 +153,49 @@ const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
 export default function Home() {
   const navigate = useNavigate()
   const { t, i18n: i18nInstance } = useTranslation()
-  const { user } = useAuth()
+  const { user, hasMenuPermission } = useAuth()
+  const { currentSystemCode } = useCurrentSystem()
+  const systemNavigation = useSystemNavigation(currentSystemCode)
+  const [systems, setSystems] = useState<PortalSystem[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPortalContext().then((context) => {
+      if (cancelled) return
+      setSystems(context.systems ?? [])
+    }).catch(() => {
+      if (!cancelled) setSystems([])
+    })
+    return () => { cancelled = true }
+  }, [user?.username])
+
+  const getSystemName = (system: PortalSystem) => t(
+    `portal.systems.${getPortalSystemKey(system.code, system.name) ?? system.code}.name`,
+    { defaultValue: (!i18nInstance.language.startsWith('zh') && system.nameEn) || system.name },
+  )
+  const currentSystem = systems.find((system) => system.code === currentSystemCode)
+  const systemName = currentSystemCode
+    ? getSystemName(currentSystem ?? { code: currentSystemCode, name: currentSystemCode })
+    : '個人工作台'
+  const isAiCenter = currentSystemCode === 'ai'
+
+  useEffect(() => {
+    setSearchText('')
+    setShowAddMenu(false)
+  }, [currentSystemCode])
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
   /** 标记首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
   const favoritesLoadedRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
-  const { menuTree } = useMenu()
-  const backendMenuTree = menuTree ?? []
+  const { menuTree, status: menuStatus, refresh: refreshMenus } = useMenu()
+  const menusLoading = currentSystemCode
+    ? systemNavigation.loading || (!systemNavigation.loaded && !systemNavigation.error)
+    : menuStatus === 'loading'
+  const menusError = currentSystemCode
+    ? !!systemNavigation.error
+    : menuStatus === 'offline' || menuStatus === 'error'
   const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -526,34 +564,22 @@ export default function Home() {
     return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
-  /** 递归扁平化后端菜单树 → 可搜索的菜單項（僅 type=2 的菜單，path 可選） */
-  const flattenBackendMenus = useCallback((menus: MenuVO[], parentGroup?: string): { key: string; label: string; icon: React.ReactNode; path: string; group: string }[] => {
-    const result: { key: string; label: string; icon: React.ReactNode; path: string; group: string }[] = []
-    menus.forEach((m) => {
-      if (m.type === 2) {
-        result.push({
-          key: m.menuKey,
-          label: m.name,
-          icon: <SearchOutlined />,
-          path: m.path ?? `/${m.menuKey}`,
-          group: parentGroup ?? m.parentName ?? '',
-        })
-      }
-      if (m.children?.length) {
-        const groupName = m.type === 1 ? m.name : (parentGroup ?? m.parentName ?? '')
-        result.push(...flattenBackendMenus(m.children, groupName))
-      }
-    })
-    return result
-  }, [])
-
   const menuList = useMemo(() => {
-    // 菜单项完全来自后端菜单树（DB 为唯一真值）, 仅图标允许本地映射兜底
-    return flattenBackendMenus(backendMenuTree).map((bm) => {
-      const fallbackIcon = MENU_ICON_BY_KEY[bm.key]
-      return fallbackIcon ? { ...bm, icon: fallbackIcon } : bm
-    })
-  }, [backendMenuTree, flattenBackendMenus])
+    // 空导航是有效结果；加载中或失败时不回退到全量菜单，避免串入其他系统。
+    const tree = currentSystemCode
+      ? systemNavigation.loaded && !systemNavigation.error ? systemNavigation.tree : []
+      : menuStatus === 'online' ? menuTree ?? [] : []
+    return collectHomeMenus(tree, hasMenuPermission, currentSystemCode).map((menu) => ({
+      ...menu,
+      icon: renderMenuIcon(menu.icon) ?? MENU_ICON_BY_KEY[menu.key] ?? <SearchOutlined />,
+    }))
+  }, [currentSystemCode, systemNavigation.loaded, systemNavigation.error, systemNavigation.tree, menuStatus, menuTree, hasMenuPermission])
+
+  // 只过滤展示，不将当前系统收藏子集覆盖到用户的全局收藏。
+  const visibleFavorites = favorites.flatMap((key) => {
+    const menu = menuList.find((item) => item.key === key)
+    return menu ? [menu] : []
+  })
 
   /** 时钟 */
   useEffect(() => {
@@ -584,7 +610,12 @@ export default function Home() {
     Object.entries(connectedModels).find(([, mapped]) => mapped === mode)?.[0] ?? null
 
   /** 快捷提问 */
-  const quickQuestions = [
+  const quickQuestions = currentSystemCode ? [
+    { icon: <SearchOutlined />, text: isAiCenter ? '如何規劃跨系統的數據分析？' : `介紹${systemName}的常用功能` },
+    { icon: <AuditOutlined />, text: '查詢資料與新增資料需要哪些不同權限？' },
+    { icon: <ThunderboltOutlined />, text: isAiCenter ? '跨系統操作前需要確認哪些資訊？' : `如何整理${systemName}的日常工作？` },
+    { icon: <LineChartOutlined />, text: isAiCenter ? '如何定義廣告消費排行的統計口徑？' : `如何確定${systemName}的報表統計口徑？` },
+  ] : [
     { icon: <SearchOutlined />, text: t('home.quickQ0') },
     { icon: <AuditOutlined />, text: t('home.quickQ1') },
     { icon: <ThunderboltOutlined />, text: t('home.quickQ2') },
@@ -628,9 +659,9 @@ export default function Home() {
     return true
   }
 
-  const filteredMenus = searchText
+  const filteredMenus = searchText.trim()
     ? menuList.filter((m) => {
-        const label = translateMenuName(m.key, m.label)
+        const label = translateMenuName(m.key, m.label, m.nameEn)
         const group = translateGroup(m.group)
         // 中文/英文模糊匹配
         if (fuzzyMatch(label, searchText) || fuzzyMatch(group, searchText)) return true
@@ -641,7 +672,7 @@ export default function Home() {
         }
         return false
       })
-    : []
+    : menuList
 
   const addFavorite = (key: string) => {
     if (!favorites.includes(key)) {
@@ -667,8 +698,6 @@ export default function Home() {
       saveQuickFavorites(favorites).catch(() => { /* 后端不可用时仅保留 localStorage */ })
     }
   }, [favorites, user?.username])
-
-  const getMenuInfo = (key: string) => menuList.find((m) => m.key === key)
 
   /** 发送消息（sending 时进入排队队列） */
   const handleSend = async (preset?: string) => {
@@ -1174,7 +1203,12 @@ export default function Home() {
         <div className="home-ai-header">
           <div className="home-ai-avatar"><AiLogo size={40} /></div>
           <div className="home-ai-title">
-            <h3>{t('home.aiTitle')}<span className="home-ai-badge">{t('home.aiBeta')}</span></h3>
+            <h3>
+              {t('home.aiTitle')}
+              <Tooltip title={t('home.aiBetaTip')}>
+                <span className="home-ai-badge"><InfoCircleOutlined className="home-ai-badge-icon" />{t('home.aiBeta')}</span>
+              </Tooltip>
+            </h3>
             <span className={`home-ai-status${aiBlocked ? ' home-ai-status--blocked' : ''}`}>
               <i />{aiBlocked ? t('home.aiBlockedBadge') : t('home.aiOnline')}
             </span>
@@ -1448,11 +1482,11 @@ export default function Home() {
             <div className="home-ai-hero">
               <div className="home-ai-hero-icon"><AiLogo size={64} /></div>
               <h4>{t('home.aiHeroTitle')}</h4>
-              <p>{t('home.aiHeroDesc')}</p>
+              <p>{currentSystemCode ? isAiCenter ? '在這裡規劃跨系統工作，查詢與操作均需對應授權。' : `從${systemName}開始，整理問題、分析思路與工作步驟。` : t('home.aiHeroDesc')}</p>
               <div className="home-ai-suggest">
                 {quickQuestions.map((q) => (
-                  <button key={q.text} className="home-ai-suggest-item" onClick={() => handleSend(q.text)}>
-                    <span className="home-ai-suggest-icon">{q.icon}</span>
+                  <button type="button" key={q.text} className="home-ai-suggest-item" onClick={() => setInputText(q.text)}>
+                    <span className="home-ai-suggest-icon" aria-hidden="true">{q.icon}</span>
                     <span>{q.text}</span>
                   </button>
                 ))}
@@ -1488,7 +1522,7 @@ export default function Home() {
         {!isEmpty && !blockReason && (
           <div className="home-ai-quick">
             {quickQuestions.map((q) => (
-              <button key={q.text} className="home-ai-quick-btn" onClick={() => handleSend(q.text)}>
+              <button type="button" key={q.text} className="home-ai-quick-btn" onClick={() => setInputText(q.text)}>
                 {q.text}
               </button>
             ))}
@@ -1671,68 +1705,79 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 快捷入口（极简） */}
-      <div className="home-quick">
+      {/* 菜单搜索与收藏共用当前系统的可见菜单集。 */}
+      <div className="home-quick" aria-label="系統菜單">
         <div className="home-quick-head">
           <span className="home-quick-label">{t('home.quickEntryLabel')}</span>
-          <div className="home-quick-search">
+          <span className="home-quick-scope">{currentSystemCode ? `${systemName} · 本系統菜單` : '已授權菜單'}</span>
+          <div className="home-quick-search" onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setShowAddMenu(false)
+          }}>
             <Input
-              prefix={<SearchOutlined style={{ color: '#bbb', fontSize: 13 }} />}
-              placeholder={t('home.quickEntrySearchPlaceholder')}
+              prefix={<SearchOutlined />}
+              placeholder={currentSystemCode ? '搜尋本系統菜單' : t('home.quickEntrySearchPlaceholder')}
+              aria-label="搜尋菜單"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onFocus={() => setShowAddMenu(true)}
-              onBlur={() => setTimeout(() => setShowAddMenu(false), 200)}
+              onKeyDown={(event) => { if (event.key === 'Escape') setShowAddMenu(false) }}
+              disabled={menusLoading || menusError}
               allowClear
               className="home-quick-field"
             />
-            {showAddMenu && searchText && (
+            {showAddMenu && !menusLoading && !menusError && (
               <div className="home-quick-dropdown">
-                {filteredMenus.length > 0 ? (
-                  filteredMenus.map((menu) => (
-                    <div
-                      key={menu.key}
-                      className={`home-quick-item ${favorites.includes(menu.key) ? 'is-added' : ''}`}
-                      onClick={() => !favorites.includes(menu.key) && addFavorite(menu.key)}
-                    >
-                      <span className="home-quick-item-icon">{menu.icon}</span>
-                      <span className="home-quick-item-label">{translateMenuName(menu.key, menu.label)}</span>
-                      <Tag>{translateGroup(menu.group)}</Tag>
-                      {favorites.includes(menu.key) ? (
-                        <span className="home-quick-item-added">{t('home.added')}</span>
-                      ) : (
-                        <PlusOutlined className="home-quick-item-add" />
-                      )}
-                    </div>
-                  ))
-                ) : (
+                {filteredMenus.length > 0 ? filteredMenus.map((menu) => (
+                  <div key={menu.key} className="home-quick-item">
+                    <button type="button" className="home-quick-item-open" onClick={() => navigate(menu.path)}>
+                      <span className="home-quick-item-icon" aria-hidden="true">{menu.icon}</span>
+                      <span className="home-quick-item-label">
+                        {translateMenuName(menu.key, menu.label, menu.nameEn)}
+                        <small>{translateGroup(menu.group)}</small>
+                      </span>
+                    </button>
+                    <Button
+                      type="text"
+                      size="small"
+                      aria-label={`${favorites.includes(menu.key) ? '已收藏' : '收藏'} ${translateMenuName(menu.key, menu.label, menu.nameEn)}`}
+                      disabled={favorites.includes(menu.key)}
+                      icon={favorites.includes(menu.key) ? <CheckOutlined /> : <PlusOutlined />}
+                      onClick={() => addFavorite(menu.key)}
+                    />
+                  </div>
+                )) : (
                   <div className="home-quick-dropdown-empty">{t('home.quickEntryNoResult', '無匹配結果')}</div>
                 )}
               </div>
             )}
           </div>
+          <span className="home-quick-hint">點擊菜單進入頁面，點擊「＋」加入收藏。</span>
         </div>
         <div className="home-quick-list">
-          {favorites.length === 0 ? (
+          {menusLoading ? (
+            <div className="home-quick-feedback" role="status"><Spin /><span>{t('common.loading')}</span></div>
+          ) : menusError ? (
+            <Empty description="菜單載入失敗，請重試" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+              <Button onClick={() => { void (currentSystemCode ? systemNavigation.refetch() : refreshMenus()) }}>{t('portal.retry')}</Button>
+            </Empty>
+          ) : menuList.length === 0 ? (
+            <Empty description="本系統暫無可用菜單" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : visibleFavorites.length === 0 ? (
             <Empty description={t('home.quickEntryEmpty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
-          ) : (
-            favorites.map((key) => {
-              const menu = getMenuInfo(key)
-              if (!menu) return null
-              return (
-                <div key={key} className="home-quick-chip" onClick={() => navigate(menu.path)}>
-                  <span className="home-quick-chip-icon">{menu.icon}</span>
-                  <span className="home-quick-chip-label">{translateMenuName(menu.key, menu.label)}</span>
-                  <button
-                    className="home-quick-chip-remove"
-                    onClick={(e) => { e.stopPropagation(); removeFavorite(key) }}
-                  >
-                    <DeleteOutlined />
-                  </button>
-                </div>
-              )
-            })
-          )}
+          ) : visibleFavorites.map((menu) => (
+            <div key={menu.key} className="home-quick-chip">
+              <button type="button" className="home-quick-chip-open" onClick={() => navigate(menu.path)}>
+                <span className="home-quick-chip-icon" aria-hidden="true">{menu.icon}</span>
+                <span className="home-quick-chip-label">{translateMenuName(menu.key, menu.label, menu.nameEn)}</span>
+              </button>
+              <button
+                type="button"
+                className="home-quick-chip-remove"
+                aria-label={`移除收藏 ${translateMenuName(menu.key, menu.label, menu.nameEn)}`}
+                onClick={() => removeFavorite(menu.key)}
+              ><DeleteOutlined /></button>
+            </div>
+          ))}
         </div>
       </div>
       </div>

@@ -1,16 +1,26 @@
 /**
  * 通用系統規則 Hook
  *
- * 提供規則的讀取、更新、重置、持久化能力。
- * 存儲後端：localStorage（主要）+ 後端 DB（系統安全規則同步）。
+ * 提供規則的讀取、更新、持久化能力。
+ * 存儲策略（規則菜单拆分 + 持久化改造）：
+ * - 后端 sys_config 为「规则编辑页」的唯一真值（跨账号/跨设备生效）；
+ * - localStorage 作为同步缓存，供各消费端（DayPicker/GiftAdd 等）同步读取，并在加载后端值后刷新；
+ * - 编号生成规则（id_generation）由后端 biz_seq_rule 表管理，不经本 Hook 的 sys_config 读写。
  */
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import {
   DEFAULT_RULE_GROUPS,
+  RULE_MENU_TO_GROUP,
   SYSTEM_RULE_STORAGE_KEY,
   type RuleGroup,
+  type RuleItem,
 } from '../constants/ruleConfig'
-import { updateSystemConfig, getSystemConfigSilent } from '../api/systemConfig'
+import {
+  updateSystemConfig,
+  getSystemConfigSilent,
+  batchGetSystemConfigSilent,
+  batchUpdateSystemConfig,
+} from '../api/systemConfig'
 
 /* ==================== 工具函數 ==================== */
 
@@ -60,95 +70,259 @@ function buildGroups(): RuleGroup[] {
   }))
 }
 
-/* ==================== Hook ==================== */
+/* ==================== sys_config 持久编解码 ==================== */
+
+/** 支持独立配置支付方式的广告类型（与 paymentModeRules 一致） */
+const AD_PAYMENT_TYPES = ['revival', 'popular_merchant', 'golden_signboard', 'traffic_ad'] as const
+
+/** 4 个互斥布尔 → 聚合支付模式（后端 sys_config 落库形态） */
+function deriveMode(promoOnly: boolean, giftOnly: boolean, switchable: boolean): string {
+  if (promoOnly) return 'promo_only'
+  if (giftOnly) return 'gift_only'
+  if (switchable) return 'switchable'
+  return 'mixed'
+}
+
+/** 聚合支付模式 → 4 个互斥布尔 */
+function modeToBools(mode: string): { promo_only: boolean; gift_only: boolean; mixed: boolean; switchable: boolean } {
+  return {
+    promo_only: mode === 'promo_only',
+    gift_only: mode === 'gift_only',
+    mixed: mode === 'mixed',
+    switchable: mode === 'switchable',
+  }
+}
+
+/** 值序列化为字符串（落 sys_config） */
+function toConfigValue(value: unknown): string {
+  return typeof value === 'boolean' ? String(value) : String(value ?? '')
+}
+
+/** 按规则控件类型把后端字符串值转回运行态 */
+function coerceFromConfig(rule: RuleItem, raw: string): unknown {
+  switch (rule.type) {
+    case 'number': {
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : rule.defaultValue
+    }
+    case 'switch':
+      return raw === 'true'
+    case 'select': {
+      const n = Number(raw)
+      return Number.isFinite(n) ? n : rule.defaultValue
+    }
+    default:
+      return raw
+  }
+}
+
+/** 判断是否为编辑器专用的广告类型支付互斥布尔 key（不落库） */
+function isAdPaymentBool(rule: RuleItem): boolean {
+  return !!rule.mutexGroup && rule.mutexGroup.startsWith('payment_mode_')
+}
+
+/**
+ * 将某个版块当前规则值序列化为待落库的 sys_config 载荷。
+ * - id_generation（表格）不经 sys_config，返回空；
+ * - 广告销售：4 个互斥布尔折叠为 payment_mode_{type} 单 key，其余（加购锁定/赠送天数单价）直存；
+ * - 系统安全：分钟 → 毫秒写 session_idle_timeout_ms。
+ */
+export function serializeGroupToConfig(group: RuleGroup): Record<string, string> {
+  if (group.key === 'id_generation') return {}
+  const out: Record<string, string> = {}
+  for (const rule of group.rules) {
+    if (isAdPaymentBool(rule)) continue
+    if (rule.key === 'session_idle_timeout_minutes') continue
+    out[rule.key] = toConfigValue(rule.value)
+  }
+  if (group.key === 'ad_sales') {
+    const find = (key: string) => group.rules.find(r => r.key === key)?.value === true
+    for (const type of AD_PAYMENT_TYPES) {
+      out[`payment_mode_${type}`] = deriveMode(
+        find(`payment_${type}_promo_only`),
+        find(`payment_${type}_gift_only`),
+        find(`payment_${type}_switchable`),
+      )
+    }
+  }
+  if (group.key === 'system_security') {
+    const mins = group.rules.find(r => r.key === 'session_idle_timeout_minutes')?.value
+    if (typeof mins === 'number' && mins > 0) {
+      out['session_idle_timeout_ms'] = String(mins * 60000)
+    }
+  }
+  return out
+}
+
+/** 某版块需要从后端读取的 config key 列表 */
+export function groupConfigKeys(group: RuleGroup): string[] {
+  return Object.keys(serializeGroupToConfig(group))
+}
+
+/** 用后端返回值覆盖运行态规则值（后端优先）；返回新规则数组 */
+function applyRemoteValues(group: RuleGroup, remote: Record<string, string>): RuleItem[] {
+  const rules = group.rules.map(rule => {
+    if (rule.key === 'session_idle_timeout_minutes') {
+      const ms = Number(remote['session_idle_timeout_ms'])
+      if (Number.isFinite(ms) && ms > 0) return { ...rule, value: Math.round(ms / 60000) }
+      return rule
+    }
+    if (isAdPaymentBool(rule)) return rule
+    if (rule.key in remote) return { ...rule, value: coerceFromConfig(rule, remote[rule.key]) }
+    return rule
+  })
+  if (group.key === 'ad_sales') {
+    for (const type of AD_PAYMENT_TYPES) {
+      const mode = remote[`payment_mode_${type}`]
+      if (!mode) continue
+      const b = modeToBools(mode)
+      const setBool = (suffix: keyof ReturnType<typeof modeToBools>) => {
+        const idx = rules.findIndex(r => r.key === `payment_${type}_${suffix}`)
+        if (idx >= 0) rules[idx] = { ...rules[idx], value: b[suffix] }
+      }
+      setBool('promo_only')
+      setBool('gift_only')
+      setBool('mixed')
+      setBool('switchable')
+    }
+  }
+  return rules
+}
+
+/** 把某版块的当前值合并写入 localStorage（供同步消费端读取） */
+function mergeGroupToStorage(group: RuleGroup) {
+  const saved = loadSavedValues()
+  if (group.type === 'table') {
+    for (const rule of group.rules) {
+      saved[rule.key] = stringifyTableCfg(
+        (rule.value as string) || '-',
+        rule.dateFormat || '',
+        rule.min ?? 4,
+      )
+    }
+  } else {
+    for (const rule of group.rules) {
+      saved[rule.key] = rule.value
+    }
+  }
+  persistValues(saved)
+}
+
+/* ==================== 单版块编辑 Hook（规则中心子页面） ==================== */
+
+export interface UseRuleGroupResult {
+  group: RuleGroup | null
+  loading: boolean
+  /** 从后端拉取该版块持久化值并覆盖本地（后端优先） */
+  reload: () => void
+  /** 更新单条规则值（表格类型可更新 dateFormat/min；互斥组开启自动关闭同组其它） */
+  updateRule: (key: string, value: unknown, field?: string) => void
+  /** 保存：localStorage 兜底 + 后端批量落库；后端失败抛出，由调用方提示 */
+  save: () => Promise<void>
+  /** 恢复为默认值（不落库，仅重置编辑态与本地缓存，保存后落库） */
+  resetDefaults: () => void
+}
+
+/**
+ * 规则中心单个版块页的数据编排：按子菜单 menuKey 加载对应版块，支持后端读写的规则版块编辑并落库。
+ */
+export function useRuleGroup(menuKey: string): UseRuleGroupResult {
+  const groupKey = RULE_MENU_TO_GROUP[menuKey]
+  const findGroup = useCallback(
+    () => buildGroups().find(g => g.key === groupKey) ?? null,
+    [groupKey],
+  )
+  const [group, setGroup] = useState<RuleGroup | null>(findGroup)
+  const [loading, setLoading] = useState(false)
+
+  const reload = useCallback(() => {
+    if (!groupKey) return
+    setLoading(true)
+    setGroup(findGroup())
+    const base = findGroup()
+    if (!base || base.key === 'id_generation') {
+      setLoading(false)
+      return
+    }
+    batchGetSystemConfigSilent(groupConfigKeys(base)).then(remote => {
+      if (!remote || Object.keys(remote).length === 0) {
+        setLoading(false)
+        return
+      }
+      setGroup(prev => {
+        if (!prev) return prev
+        const next: RuleGroup = { ...prev, rules: applyRemoteValues(prev, remote) }
+        mergeGroupToStorage(next)
+        return next
+      })
+      setLoading(false)
+    })
+  }, [groupKey, findGroup])
+
+  const updateRule = useCallback((key: string, value: unknown, field?: string) => {
+    setGroup(prev => {
+      if (!prev) return prev
+      // 互斥分组：开启某个 switch 时，同组其它规则置 false
+      let mutexKeys: string[] = []
+      if (value === true) {
+        const target = prev.rules.find(r => r.key === key)
+        if (target?.mutexGroup) {
+          mutexKeys = prev.rules
+            .filter(r => r.mutexGroup === target.mutexGroup && r.key !== key)
+            .map(r => r.key)
+        }
+      }
+      const rules = prev.rules.map(r => {
+        if (prev.type === 'table' && field) {
+          if (r.key !== key) return r
+          if (field === 'dateFormat') return { ...r, dateFormat: value as string }
+          if (field === 'min') return { ...r, min: value as number }
+          return r
+        }
+        if (r.key === key) return { ...r, value }
+        if (mutexKeys.includes(r.key)) return { ...r, value: false }
+        return r
+      })
+      return { ...prev, rules }
+    })
+  }, [])
+
+  const save = useCallback(async () => {
+    if (!group) return
+    mergeGroupToStorage(group)
+    if (group.key === 'id_generation') return
+    const payload = serializeGroupToConfig(group)
+    if (Object.keys(payload).length > 0) {
+      await batchUpdateSystemConfig(payload)
+    }
+  }, [group])
+
+  const resetDefaults = useCallback(() => {
+    const fresh = DEFAULT_RULE_GROUPS.find(g => g.key === groupKey)
+    if (fresh) setGroup({ ...fresh })
+  }, [groupKey])
+
+  return { group, loading, reload, updateRule, save, resetDefaults }
+}
+
+/* ==================== 兼容旧全量 Hook（总览页只读） ==================== */
 
 export function useSystemRules() {
   const [groups, setGroups] = useState<RuleGroup[]>(buildGroups)
 
-  /** 更新單條規則的值（表格類型支持更新 dateFormat / min 字段；互斥分組開啟時自動關閉同組其它） */
-  const updateRule = useCallback((key: string, value: unknown, field?: string) => {
-    setGroups(prev => {
-      // 互斥分組處理：開啟某個 switch 時，同組其它規則全部設為 false
-      let mutexKeys: string[] = []
-      if (value === true) {
-        const target = prev.flatMap(g => g.rules).find(r => r.key === key)
-        if (target?.mutexGroup) {
-          const grp = target.mutexGroup
-          mutexKeys = prev.flatMap(g => g.rules)
-            .filter(r => r.mutexGroup === grp && r.key !== key)
-            .map(r => r.key)
-        }
-      }
-      return prev.map(g => ({
-        ...g,
-        rules: g.rules.map(r => {
-          if (g.type === 'table' && field) {
-            if (r.key !== key) return r
-            if (field === 'dateFormat') return { ...r, dateFormat: value as string }
-            if (field === 'min') return { ...r, min: value as number }
-            return r
-          }
-          if (r.key === key) return { ...r, value }
-          if (mutexKeys.includes(r.key)) return { ...r, value: false }
-          return r
-        }),
-      }))
-    })
-  }, [])
-
-  /** 恢復所有規則為默認值 */
-  const resetAll = useCallback(() => {
-    setGroups(buildGroups())
-    localStorage.removeItem(SYSTEM_RULE_STORAGE_KEY)
-  }, [])
-
-  /** 从 localStorage 重建（用于取消编辑后恢复） */
+  /** 从 localStorage 重建 */
   const refresh = useCallback(() => {
     setGroups(buildGroups())
   }, [])
 
-  /** 持久化當前所有規則到 localStorage */
-  const saveAll = useCallback(() => {
-    const values: Record<string, unknown> = {}
-    groups.forEach(g => g.rules.forEach(r => {
-      if (g.type === 'table') {
-        values[r.key] = stringifyTableCfg(
-          (r.value as string) || '-',
-          r.dateFormat || '',
-          r.min ?? 4,
-        )
-      } else {
-        values[r.key] = r.value
-      }
-    }))
-    persistValues(values)
-  }, [groups])
-
-  /** 按 key 快速查找單條規則的值（供其他組件消費） */
-  const getRuleValue = useCallback(<T = unknown>(key: string): T | undefined => {
-    for (const g of groups) {
-      const found = g.rules.find(r => r.key === key)
-      if (found) return found.value as T
-    }
-    return undefined
-  }, [groups])
-
-  /** 所有規則的 key→value 平坦映射（緩存） */
-  const valueMap = useMemo(() => {
-    const map: Record<string, unknown> = {}
-    groups.forEach(g => g.rules.forEach(r => { map[r.key] = r.value }))
-    return map
-  }, [groups])
-
-  return { groups, updateRule, refresh, resetAll, saveAll, getRuleValue, valueMap }
+  return { groups, refresh }
 }
 
-/* ==================== 後端同步（系統安全規則） ==================== */
+/* ==================== 后端同步（供零散场景） ==================== */
 
 /**
  * 將空閒超時配置同步到後端 DB（分鐘 → 毫秒轉換）
- * 供 RuleConfig 頁面保存「系統安全規則」時調用
- * @returns Promise，成功時 resolve，失敗時 reject（調用方決定是否提示用戶）
+ * @returns Promise，成功时 resolve，失败时 reject（调用方决定是否提示用户）
  */
 export async function syncIdleTimeoutToBackend(minutes: number): Promise<void> {
   const ms = String(minutes * 60 * 1000)

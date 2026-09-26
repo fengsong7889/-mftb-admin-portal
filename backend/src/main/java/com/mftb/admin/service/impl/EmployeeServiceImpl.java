@@ -203,6 +203,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 log.warn("员工自助角色尚未初始化，新员工 {} 将不绑默认角色（需 HR 手工分配）", empId);
             }
         }
+        assertNoSuperAdminBinding(roleIds);
         user.setFunctionRoles(JsonUtils.toJson(roleIds));
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
@@ -226,6 +227,21 @@ public class EmployeeServiceImpl implements EmployeeService {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
+    /**
+     * 禁止员工账号绑定内置超级管理员角色（code=admin）。
+     * 后端权限判定中绑定该角色即超管直通（PermissionServiceImpl.SUPER_ADMIN_ROLE_CODE），
+     * 全系统只允许内置管理员账号（sys_user.role=admin）持有，防止权限旁路扩散。
+     */
+    private void assertNoSuperAdminBinding(java.util.List<Long> roleIds) {
+        if (roleIds == null || roleIds.isEmpty()) {
+            return;
+        }
+        Long adminRoleId = lookupRoleIdByCode("admin");
+        if (adminRoleId != null && roleIds.contains(adminRoleId)) {
+            throw new BusinessException("不允許綁定「超級管理員」角色：超管權限僅由內置管理員賬號持有，請選擇其他功能角色");
+        }
+    }
+
     @Override
     public EmployeeVO update(Long id, EmployeeRequest request) {
         SysUser user = requireUser(id);
@@ -240,6 +256,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             user.setRole(request.getRole());
         }
         if (request.getFunctionRoleIds() != null) {
+            assertNoSuperAdminBinding(request.getFunctionRoleIds());
             user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds()));
         }
         user.setUpdatedBy(operatorResolver.currentOperatorName());

@@ -25,7 +25,110 @@ public class ContractRegistry {
         combined.addAll(aiGovernanceContracts());
         // V0 §八 V0-6：启动自愈投递日志表（与 applyOnce 不互斥，无表时直接建）
         combined.add(deliveryLogContract());
+        // 权限中心重构：授权审计是关键写入路径，登记契约保证启动自愈
+        combined.add(permAuditLogContract());
+        // HR 入转调离：审批回调办理链路的关键写入表，启动自愈保证不因迁移漏执行而缺表
+        combined.add(hrLifecycleRequestContract());
         return combined;
+    }
+
+    /** HR 入转调离单据表结构契约（与 {@code HrLifecycleSchemaInitializer} 同构，建表即可，无列级自愈）。 */
+    public static ContractSpec hrLifecycleRequestContract() {
+        return new ContractSpec(
+                "hr-lifecycle-request",
+                "hr_lifecycle_request",
+                "CREATE TABLE IF NOT EXISTS hr_lifecycle_request ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                        + "req_no VARCHAR(32) NOT NULL COMMENT '单据编号(RS+YYYYMMDD+4位序号)', "
+                        + "type VARCHAR(16) NOT NULL COMMENT '单据类型: onboard/regular/transfer/dimission', "
+                        + "status VARCHAR(16) NOT NULL DEFAULT 'draft' COMMENT '单据状态: draft/pending/approved/rejected/completed', "
+                        + "flow_no VARCHAR(64) DEFAULT NULL COMMENT '关联OA流程编号', "
+                        + "user_id BIGINT DEFAULT NULL COMMENT '关联 sys_user.id(入职完成后回填)', "
+                        + "emp_name VARCHAR(64) NOT NULL COMMENT '姓名/候选人姓名', "
+                        + "emp_no VARCHAR(32) DEFAULT NULL COMMENT '员工工号(入职完成后回填)', "
+                        + "dept_id BIGINT DEFAULT NULL COMMENT '目标部门ID', "
+                        + "dept_name VARCHAR(128) DEFAULT NULL COMMENT '部门名称快照', "
+                        + "position_id BIGINT DEFAULT NULL COMMENT '职位ID', "
+                        + "position_name VARCHAR(128) DEFAULT NULL COMMENT '职位名称快照', "
+                        + "effective_date DATE DEFAULT NULL COMMENT '生效日期', "
+                        + "reason VARCHAR(512) DEFAULT NULL COMMENT '申请事由', "
+                        + "offer_date DATE DEFAULT NULL COMMENT 'Offer发放日期', "
+                        + "probation_months INT DEFAULT NULL COMMENT '试用期月数', "
+                        + "expected_regular_date DATE DEFAULT NULL COMMENT '预计转正日期', "
+                        + "id_card_no VARCHAR(64) DEFAULT NULL COMMENT '证件号码', "
+                        + "mobile VARCHAR(32) DEFAULT NULL COMMENT '手机号', "
+                        + "email VARCHAR(128) DEFAULT NULL COMMENT '邮箱', "
+                        + "candidate_info JSON DEFAULT NULL COMMENT '入职资料JSON', "
+                        + "old_dept_name VARCHAR(128) DEFAULT NULL COMMENT '调动前部门快照', "
+                        + "old_position_name VARCHAR(128) DEFAULT NULL COMMENT '调动前职位快照', "
+                        + "new_dept_id BIGINT DEFAULT NULL COMMENT '调入部门ID', "
+                        + "new_dept_name VARCHAR(128) DEFAULT NULL COMMENT '调入部门名称快照', "
+                        + "new_position_id BIGINT DEFAULT NULL COMMENT '调入职位ID', "
+                        + "new_position_name VARCHAR(128) DEFAULT NULL COMMENT '调入职位名称快照', "
+                        + "new_company VARCHAR(128) DEFAULT NULL COMMENT '调动后任职公司', "
+                        + "new_superior VARCHAR(64) DEFAULT NULL COMMENT '调动后直属上级', "
+                        + "dimission_type VARCHAR(32) DEFAULT NULL COMMENT '离职类型: voluntary/involuntary/expired', "
+                        + "last_work_date DATE DEFAULT NULL COMMENT '最后工作日', "
+                        + "settlement_info JSON DEFAULT NULL COMMENT '离职结算JSON', "
+                        + "remark VARCHAR(512) DEFAULT NULL COMMENT '备注/办理结果说明', "
+                        + "contract_id BIGINT DEFAULT NULL COMMENT '被续签的原合同ID(emp_contract.id)', "
+                        + "contract_no VARCHAR(64) DEFAULT NULL COMMENT '原合同编号快照', "
+                        + "new_contract_no VARCHAR(64) DEFAULT NULL COMMENT '新合同编号', "
+                        + "new_contract_type VARCHAR(32) DEFAULT NULL COMMENT '新合同类型(HR字典 CONTRACT_TYPE)', "
+                        + "new_contract_company VARCHAR(128) DEFAULT NULL COMMENT '新合同签约主体(HR字典 EMPLOYER_COMPANY)', "
+                        + "new_contract_start_date DATE DEFAULT NULL COMMENT '新合同开始日期', "
+                        + "new_contract_end_date DATE DEFAULT NULL COMMENT '新合同结束日期', "
+                        + "created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人', "
+                        + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                        + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                        + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                        + "UNIQUE KEY uk_hlr_req_no (req_no), "
+                        + "KEY idx_hlr_type_status (type, status), "
+                        + "KEY idx_hlr_user (user_id), "
+                        + "KEY idx_hlr_flow_no (flow_no), "
+                        + "KEY idx_hlr_emp_no (emp_no)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='HR入转调离生命周期单据'",
+                java.util.List.of(
+                        // P0 合同续签：列契约自愈（存量库缺列时启动即补，不依赖 applyOnce）
+                        new ContractSpec.ColumnSpec("contract_id",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN contract_id BIGINT DEFAULT NULL COMMENT '被续签的原合同ID(emp_contract.id)'"),
+                        new ContractSpec.ColumnSpec("contract_no",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN contract_no VARCHAR(64) DEFAULT NULL COMMENT '原合同编号快照'"),
+                        new ContractSpec.ColumnSpec("new_contract_no",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN new_contract_no VARCHAR(64) DEFAULT NULL COMMENT '新合同编号'"),
+                        new ContractSpec.ColumnSpec("new_contract_type",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN new_contract_type VARCHAR(32) DEFAULT NULL COMMENT '新合同类型(HR字典 CONTRACT_TYPE)'"),
+                        new ContractSpec.ColumnSpec("new_contract_company",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN new_contract_company VARCHAR(128) DEFAULT NULL COMMENT '新合同签约主体(HR字典 EMPLOYER_COMPANY)'"),
+                        new ContractSpec.ColumnSpec("new_contract_start_date",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN new_contract_start_date DATE DEFAULT NULL COMMENT '新合同开始日期'"),
+                        new ContractSpec.ColumnSpec("new_contract_end_date",
+                                "ALTER TABLE hr_lifecycle_request ADD COLUMN new_contract_end_date DATE DEFAULT NULL COMMENT '新合同结束日期'")
+                ));
+    }
+
+    /** 授权变更审计日志表结构契约（与 {@code PermissionAuditSchemaInitializer} 同构，建表即可，无列级自愈）。 */
+    public static ContractSpec permAuditLogContract() {
+        return new ContractSpec(
+                "perm-audit-log",
+                "sys_permission_audit_log",
+                "CREATE TABLE IF NOT EXISTS sys_permission_audit_log ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                        + "target_type VARCHAR(20) NOT NULL COMMENT '授权对象类型: role/department', "
+                        + "target_id BIGINT NOT NULL COMMENT '角色ID 或 部门ID', "
+                        + "target_name VARCHAR(128) DEFAULT NULL COMMENT '目标名称快照', "
+                        + "system_code VARCHAR(64) DEFAULT NULL COMMENT '业务系统编码, 跨系统操作为 NULL', "
+                        + "change_type VARCHAR(20) NOT NULL COMMENT '变更类型: GRANT/REVOKE/UPDATE/DELETE/COPY/BIND/STATUS', "
+                        + "before_snapshot TEXT DEFAULT NULL COMMENT '变更前快照 JSON', "
+                        + "after_snapshot TEXT DEFAULT NULL COMMENT '变更后快照 JSON', "
+                        + "operator VARCHAR(64) DEFAULT NULL COMMENT '操作人', "
+                        + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间', "
+                        + "KEY idx_perm_audit_target (target_type, target_id, created_at), "
+                        + "KEY idx_perm_audit_operator (operator, created_at), "
+                        + "KEY idx_perm_audit_time (created_at)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='授权变更审计日志表'",
+                java.util.List.of());
     }
 
     /** V0 §八 V0-6：ai_delivery_log 结构契约（无列级自愈，建表即可）。 */

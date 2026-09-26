@@ -11,6 +11,7 @@
  */
 import type { ReactNode } from 'react'
 import { Button } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -32,6 +33,7 @@ interface DetailPageHeaderProps {
 }
 
 export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, menuKey, extra }: DetailPageHeaderProps) {
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const canEdit = !!onEdit && (!menuKey || hasPermission(`${menuKey}:edit`))
 
@@ -60,7 +62,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            返回
+            {t('common.back')}
           </Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>

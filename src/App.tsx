@@ -63,12 +63,22 @@ const OrganizationManagement = lazy(() => import('./pages/Permission/Organizatio
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
 const HrDictManagement = lazy(() => import('./pages/Permission/HrDict'))
 const HrDictForm = lazy(() => import('./pages/Permission/HrDict/HrDictForm'))
+// 入轉調離（入職/轉正/調動/離職）：列表+表單+詳情
+const HrLifecycle = lazy(() => import('./pages/Permission/HrLifecycle'))
+const LifecycleForm = lazy(() => import('./pages/Permission/HrLifecycle/LifecycleForm'))
+const LifecycleDetail = lazy(() => import('./pages/Permission/HrLifecycle/LifecycleDetail'))
+const HrFlowDetail = lazy(() => import('./pages/Permission/HrLifecycle/HrFlowDetail'))
+// 請假管理 / 假期額度
+const LeaveList = lazy(() => import('./pages/Permission/HrLeave/LeaveList'))
+const LeaveForm = lazy(() => import('./pages/Permission/HrLeave/LeaveForm'))
+const LeaveDetail = lazy(() => import('./pages/Permission/HrLeave/LeaveDetail'))
+const LeaveQuotaList = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaList'))
+const LeaveQuotaForm = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaForm'))
 const ContractLedger = lazy(() => import('./pages/Permission/ContractLedger'))
 const LoginLog = lazy(() => import('./pages/LoginLog'))
 const RoleManagement = lazy(() => import('./pages/Permission/RoleManagement'))
-const FunctionPermission = lazy(() => import('./pages/Permission/FunctionPermission'))
+const AuthorizationCenter = lazy(() => import('./pages/Permission/AuthorizationCenter'))
 const DataPermission = lazy(() => import('./pages/Permission/DataPermission'))
-const SystemAuthorization = lazy(() => import('./pages/Permission/SystemAuthorization'))
 // 商家推广工具
 const PromotionDashboard = lazy(() => import('./pages/Recommend/Dashboard'))
 const PromotionAlgorithm = lazy(() => import('./pages/Recommend/Algorithm'))
@@ -119,6 +129,7 @@ const I18nImportExport = lazy(() => import('./pages/I18nCenter/ImportExport'))
 const I18nMtEngineConfig = lazy(() => import('./pages/I18nCenter/MtEngineConfig'))
 const I18nDashboard = lazy(() => import('./pages/I18nCenter/Dashboard'))
 const RuleConfig = lazy(() => import('./pages/RuleConfig'))
+const RuleGroupPage = lazy(() => import('./pages/RuleConfig/RuleGroupPage'))
 const NotificationConfig = lazy(() => import('./pages/NotificationConfig'))
 const NotificationChannelForm = lazy(() => import('./pages/NotificationChannelForm'))
 const NotificationAppForm = lazy(() => import('./pages/NotificationConfig/EnterpriseAppConfig'))
@@ -327,12 +338,38 @@ function AuthenticatedLayout() {
               <Route path="/position-management" element={<PositionManagement />} />
               <Route path="/hr-dict" element={<HrDictManagement />} />
               <Route path="/hr-dict-edit" element={<HrDictForm />} />
+              {/* 入轉調離：入職/轉正/調動/離職 */}
+              <Route path="/hr-onboarding" element={<HrLifecycle type="onboard" />} />
+              <Route path="/hr-onboarding-form" element={<LifecycleForm type="onboard" />} />
+              <Route path="/hr-onboarding-detail" element={<LifecycleDetail />} />
+              <Route path="/hr-regularization" element={<HrLifecycle type="regular" />} />
+              <Route path="/hr-regularization-form" element={<LifecycleForm type="regular" />} />
+              <Route path="/hr-regularization-detail" element={<LifecycleDetail />} />
+              <Route path="/hr-transfer" element={<HrLifecycle type="transfer" />} />
+              <Route path="/hr-transfer-form" element={<LifecycleForm type="transfer" />} />
+              <Route path="/hr-transfer-detail" element={<LifecycleDetail />} />
+              <Route path="/hr-dimission" element={<HrLifecycle type="dimission" />} />
+              <Route path="/hr-dimission-form" element={<LifecycleForm type="dimission" />} />
+              <Route path="/hr-dimission-detail" element={<LifecycleDetail />} />
+              {/* HR 審批流程詳情（OA 引擎落地页，不綁菜单独权，由流程事項/单据详情进入） */}
+              <Route path="/hr-flow-detail" element={<HrFlowDetail />} />
+              {/* 請假管理與假期額度 */}
+              <Route path="/hr-leave" element={<LeaveList />} />
+              <Route path="/hr-leave-form" element={<LeaveForm />} />
+              <Route path="/hr-leave-detail" element={<LeaveDetail />} />
+              <Route path="/hr-leave-quota" element={<LeaveQuotaList />} />
+              <Route path="/hr-leave-quota-form" element={<LeaveQuotaForm />} />
+              {/* 合同續簽：复用入转调离引擎，授权归合同台账菜单 */}
+              <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
+              <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />
               <Route path="/contract-ledger" element={<ContractLedger />} />
               <Route path="/login-log" element={<LoginLog />} />
               <Route path="/role-management" element={<RoleManagement />} />
-              <Route path="/function-permission" element={<FunctionPermission />} />
+              {/* 授權中心：合并旧「功能授權」/「系統授權」，旧路径重定向兼容存量入口 */}
+              <Route path="/authorization-center" element={<AuthorizationCenter />} />
+              <Route path="/function-permission" element={<Navigate to="/authorization-center" replace />} />
+              <Route path="/system-authorization" element={<Navigate to="/authorization-center" replace />} />
               <Route path="/data-permission" element={<DataPermission />} />
-              <Route path="/system-authorization" element={<SystemAuthorization />} />
               {/* 商戶集團管理 */}
               <Route path="/merchant-group-list" element={<GroupList />} />
               <Route path="/store-list" element={<StoreList />} />
@@ -384,6 +421,12 @@ function AuthenticatedLayout() {
               <Route path="/i18n-center/mt-engine" element={<I18nMtEngineConfig />} />
               <Route path="/i18n-center/dashboard" element={<I18nDashboard />} />
               <Route path="/rule-config" element={<RuleConfig />} />
+              {/* 規則中心 · 各版塊獨立維護頁 */}
+              <Route path="/rule-center/ad-sales" element={<RuleGroupPage menuKey="rule-ad-sales" />} />
+              <Route path="/rule-center/gift" element={<RuleGroupPage menuKey="rule-gift" />} />
+              <Route path="/rule-center/security" element={<RuleGroupPage menuKey="rule-security" />} />
+              <Route path="/rule-center/algorithm" element={<RuleGroupPage menuKey="rule-algorithm" />} />
+              <Route path="/rule-center/seq" element={<RuleGroupPage menuKey="rule-seq" />} />
               <Route path="/notification-config" element={<NotificationConfig />} />
               <Route path="/notification-channel-form" element={<NotificationChannelForm />} />
               <Route path="/notification-app-form" element={<NotificationAppForm />} />

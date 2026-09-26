@@ -93,6 +93,8 @@ public class BizSeqService {
     public static final String RULE_AI_CONVERSATION = "ai_conversation";
     /** OA流程编号 */
     public static final String RULE_OA_REQUEST = "oa_request";
+    /** HR 入转调离单据编号（RS + YYYYMMDD + 4位, 同时用于关联 OA 审批流程编号） */
+    public static final String RULE_HR_LIFECYCLE_REQUEST = "hr_lifecycle_request";
     /** AI 使用申请流程编号 */
     public static final String RULE_AI_ACCESS_REQUEST = "ai_access_request";
     /** EAM 采购申请 */

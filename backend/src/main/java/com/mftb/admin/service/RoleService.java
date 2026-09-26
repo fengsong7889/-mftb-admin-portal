@@ -23,6 +23,9 @@ public interface RoleService {
     /** 保存角色菜单权限 */
     void updatePermissions(Long id, List<MenuPermissionDTO> permissions);
 
+    /** 复制角色：克隆源角色的菜单授权与系统准入，新角色名称需唯一 */
+    RoleVO copy(Long id, RoleRequest request);
+
     /** 启用/停用 */
     void updateStatus(Long id, Integer status);
 

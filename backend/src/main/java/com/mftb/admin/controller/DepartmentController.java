@@ -33,36 +33,36 @@ public class DepartmentController {
 
     /** 查询全部部门 */
     @GetMapping
-    @RequirePermission(menu = "organization-management")
+    @RequirePermission(menu = "org-structure")
     public Result<List<DepartmentVO>> list() {
         return Result.success(departmentService.list());
     }
 
     /** 新增部门 */
     @PostMapping
-    @RequirePermission(menu = "organization-management", action = "create")
+    @RequirePermission(menu = "org-structure", action = "create")
     public Result<DepartmentVO> create(@Valid @RequestBody DepartmentRequest request) {
         return Result.success("部門創建成功", departmentService.create(request));
     }
 
     /** 编辑部门 */
     @PutMapping("/{id}")
-    @RequirePermission(menu = "organization-management", action = "edit")
+    @RequirePermission(menu = "org-structure", action = "edit")
     public Result<DepartmentVO> update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
         return Result.success("部門信息已更新", departmentService.update(id, request));
     }
 
     /** 启用/停用 */
     @PutMapping("/{id}/status")
-    @RequirePermission(menu = "organization-management", action = "edit")
+    @RequirePermission(menu = "org-structure", action = "edit")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         departmentService.updateStatus(id, status);
         return Result.success();
     }
 
-    /** 保存部门菜单权限 (部门授权) */
+    /** 保存部门菜单权限 (部门授权·旧全量写入口，已由授权中心按系统原子写替代，保留兼容) */
     @PutMapping("/{id}/permissions")
-    @RequirePermission(menu = "data-permission", action = "edit")
+    @RequirePermission(menu = "data-permission", action = "edit", anyOf = {"authorization-center"})
     public Result<Void> updatePermissions(@PathVariable Long id, @RequestBody List<MenuPermissionDTO> permissions) {
         departmentService.updatePermissions(id, permissions);
         return Result.success();
@@ -70,7 +70,7 @@ public class DepartmentController {
 
     /** 删除部门 */
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = "organization-management", action = "delete")
+    @RequirePermission(menu = "org-structure", action = "delete")
     public Result<Void> delete(@PathVariable Long id) {
         departmentService.delete(id);
         return Result.success();
@@ -78,7 +78,7 @@ public class DepartmentController {
 
     /** 批量翻译部门名称：将 nameEn 为空的部门按中文名自动翻译为英文 */
     @PostMapping("/translate-names")
-    @RequirePermission(menu = "organization-management", action = "edit")
+    @RequirePermission(menu = "org-structure", action = "edit")
     public Result<Map<String, Integer>> translateNames() {
         int count = departmentService.translateNames();
         return Result.success("翻譯完成", Map.of("translated", count));

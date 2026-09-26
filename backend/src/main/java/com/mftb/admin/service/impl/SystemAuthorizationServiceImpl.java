@@ -5,6 +5,7 @@ import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.dto.SystemAuthorizationRequest;
 import com.mftb.admin.dto.SystemAuthorizationVO;
+import com.mftb.admin.service.PermissionAuditService;
 import com.mftb.admin.service.PermissionRevisionService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.SystemAuthorizationService;
@@ -44,6 +45,7 @@ public class SystemAuthorizationServiceImpl implements SystemAuthorizationServic
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
     private final PermissionRevisionService revisionService;
+    private final PermissionAuditService permissionAuditService;
     private final OperatorResolver operatorResolver;
 
     @Override
@@ -61,6 +63,22 @@ public class SystemAuthorizationServiceImpl implements SystemAuthorizationServic
         vo.setPermissions(perms);
         vo.setRevision(revisionService.currentRevision());
         return vo;
+    }
+
+    /** 单目标 × 全部启用系统的授权快照（授权工作台总览/角色复制用）。 */
+    @Override
+    public List<SystemAuthorizationVO> readAllSystems(String targetType, Long targetId) {
+        validateTargetType(targetType);
+        requireTargetExists(targetType, targetId);
+        List<String> codes = jdbcTemplate.queryForList(
+                "SELECT code FROM sys_system WHERE deleted = 0 AND status = 1 AND code <> ? "
+                        + "ORDER BY sort_order, code",
+                String.class, PORTAL_SENTINEL);
+        List<SystemAuthorizationVO> result = new ArrayList<>(codes.size());
+        for (String code : codes) {
+            result.add(read(targetType, targetId, code));
+        }
+        return result;
     }
 
     @Override
@@ -88,6 +106,9 @@ public class SystemAuthorizationServiceImpl implements SystemAuthorizationServic
         Map<String, Long> menuKeyToId = loadSystemMenuKeyMap(systemCode);
         Set<Long> systemMenuIds = new HashSet<>(menuKeyToId.values());
         List<MenuPermissionDTO> normalized = normalizePermissions(request.getPermissions(), menuKeyToId, request.isSystemAccess());
+        // 变更前快照（审计用，与写入同事务；审计失败 → 整个保存回滚）
+        boolean wasAccess = hasSystemAccessRow(targetType, targetId, systemCode);
+        List<MenuPermissionDTO> prevPerms = loadScopedPermissions(targetType, targetId, systemCode);
 
         if (request.isSystemAccess()) {
             grantSystemAccess(targetType, targetId, systemCode);
@@ -95,6 +116,12 @@ public class SystemAuthorizationServiceImpl implements SystemAuthorizationServic
             revokeSystemAccess(targetType, targetId, systemCode);
         }
         overwriteScopedMenuPermissions(targetType, targetId, systemMenuIds, normalized);
+
+        // 授权变更审计：GRANT(首次准入) / UPDATE(已准入再调整) / REVOKE(撤销准入)
+        String changeType = !request.isSystemAccess() ? PermissionAuditService.CHANGE_REVOKE
+                : wasAccess ? PermissionAuditService.CHANGE_UPDATE : PermissionAuditService.CHANGE_GRANT;
+        permissionAuditService.record(targetType, targetId, queryTargetName(targetType, targetId), systemCode,
+                changeType, snapshot(wasAccess, prevPerms), snapshot(request.isSystemAccess(), normalized));
 
         // evictAll 内部完成本实例 cache 清空 + 全局 revision bump；事务回滚时 bump 也回滚
         permissionService.evictAll();
@@ -150,6 +177,23 @@ public class SystemAuthorizationServiceImpl implements SystemAuthorizationServic
         String code = jdbcTemplate.queryForObject(
                 "SELECT code FROM sys_role WHERE id = ? AND deleted = 0", String.class, roleId);
         return SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(code);
+    }
+
+    /** 目标名称快照（审计展示用）。 */
+    private String queryTargetName(String targetType, Long targetId) {
+        String sql = TARGET_ROLE.equals(targetType)
+                ? "SELECT name FROM sys_role WHERE id = ? AND deleted = 0"
+                : "SELECT name FROM sys_department WHERE id = ? AND deleted = 0";
+        List<String> names = jdbcTemplate.queryForList(sql, String.class, targetId);
+        return names.isEmpty() ? null : names.get(0);
+    }
+
+    /** 单系统授权快照（审计 before/after）。 */
+    private Map<String, Object> snapshot(boolean systemAccess, List<MenuPermissionDTO> permissions) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("systemAccess", systemAccess);
+        map.put("permissions", permissions);
+        return map;
     }
 
     // ────────────────────────────────────────────────────────────────

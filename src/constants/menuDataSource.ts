@@ -56,17 +56,24 @@ export const keyToPath: Record<string, string> = {
   'hot-search-verify': '/hot-search-verify',
   // 集團人事
   'employee-management': '/employee-management',
+  'hr-onboarding': '/hr-onboarding',
+  'hr-regularization': '/hr-regularization',
+  'hr-transfer': '/hr-transfer',
+  'hr-dimission': '/hr-dimission',
   'hr-dict': '/hr-dict',
   'contract-ledger': '/contract-ledger',
-  'organization-management': '/organization-management',
   'position-management': '/position-management',
   'login-log': '/login-log',
-  // 權限管理
+  // 組織管理（v44 独立一级域：目录 org-center + 叶子部門架構）
+  'hr-leave': '/hr-leave',
+  'hr-leave-quota': '/hr-leave-quota',
+  'org-center': '/org-center',
+  'org-structure': '/organization-management',
+  // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 保留映射，历史种子/缓存菜单点击直接重定向）
   'role-management': '/role-management',
-  'function-permission': '/function-permission',
+  'authorization-center': '/authorization-center',
+  'function-permission': '/authorization-center',
   'data-permission': '/data-permission',
-  // 系統授權（Round 4）
-  'system-authorization': '/system-authorization',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤（prototype — 纯前端 mock）
@@ -102,6 +109,11 @@ export const keyToPath: Record<string, string> = {
   'i18n-mt-engine': '/i18n-center/mt-engine',
   'i18n-dashboard': '/i18n-center/dashboard',
   'rule-config': '/rule-config',
+  'rule-ad-sales': '/rule-center/ad-sales',
+  'rule-gift': '/rule-center/gift',
+  'rule-security': '/rule-center/security',
+  'rule-algorithm': '/rule-center/algorithm',
+  'rule-seq': '/rule-center/seq',
   'notification-config': '/notification-config',
   'workflow-config': '/workflow-config',
   'version-history': '/version-history',
@@ -196,6 +208,19 @@ Object.entries(keyToPath).forEach(([key, path]) => {
 })
 // 字典表单为 hr-dict 菜单的子页面（非独立菜单），归入 hr-dict 供侧边栏高亮/标签名/离线过滤使用
 pathToKey['/hr-dict-edit'] = 'hr-dict'
+// 入转调离表单/详情为各菜单子页面（非独立菜单），归入各自列表菜单
+pathToKey['/hr-onboarding-form'] = 'hr-onboarding'
+pathToKey['/hr-onboarding-detail'] = 'hr-onboarding'
+pathToKey['/hr-regularization-form'] = 'hr-regularization'
+pathToKey['/hr-regularization-detail'] = 'hr-regularization'
+pathToKey['/hr-transfer-form'] = 'hr-transfer'
+pathToKey['/hr-transfer-detail'] = 'hr-transfer'
+pathToKey['/hr-dimission-form'] = 'hr-dimission'
+pathToKey['/hr-dimission-detail'] = 'hr-dimission'
+// 请假表单/详情、额度表单为各自菜单的子页面
+pathToKey['/hr-leave-form'] = 'hr-leave'
+pathToKey['/hr-leave-detail'] = 'hr-leave'
+pathToKey['/hr-leave-quota-form'] = 'hr-leave-quota'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -216,11 +241,14 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   // 搜索管理 — 熱搜配置/預覽已接入 fetchAdAlgorithms/fetchStores（混合页面按 backend 处理）
   'hot-search-config', 'hot-search-preview',
   // 集團人事
-  'employee-management', 'hr-dict', 'contract-ledger', 'organization-management', 'position-management', 'login-log',
-  // 權限管理
-  'role-management', 'function-permission', 'data-permission',
-  // 系統授權（Round 4，已接入後端 @RequirePermission(function-permission)）
-  'system-authorization',
+  'employee-management', 'hr-onboarding', 'hr-regularization', 'hr-transfer', 'hr-dimission',
+  'hr-dict', 'contract-ledger', 'position-management', 'login-log',
+  // 組織管理（一级域）
+  'org-structure',
+  // 假期域
+  'hr-leave', 'hr-leave-quota',
+  // 權限管理（授權中心已合并舊 功能授權/系統授權 兩入口，後端守衛 menu=authorization-center）
+  'role-management', 'authorization-center', 'data-permission',
   // 商家推广工具（已接入后端的部分）
   'promotion-word-library',
   'promotion-dashboard', 'promotion-algorithm', 'promotion-slot-config',
@@ -233,6 +261,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'menu-config', 'translation-manage',
   'i18n-language', 'i18n-import-export', 'i18n-mt-engine', 'i18n-dashboard',
   'rule-config', 'notification-config', 'workflow-config', 'version-history',
+  'rule-ad-sales', 'rule-gift', 'rule-security', 'rule-algorithm', 'rule-seq',
   // 智能中心(AI)
   'ai_model_hub', 'ai_quota_auth', 'ai-operation-auth', 'ai-access-request',
   'ai-mcp-service', 'ai-conversation-audit', 'ai_usage_stats', 'ai_energy_detail',

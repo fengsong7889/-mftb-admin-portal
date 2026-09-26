@@ -86,7 +86,9 @@ public class DataInitializer implements CommandLineRunner {
     // v41: 物資管理菜單重組——合併「維護與處置」進「資產運營」；
     //      新建「採購與供應」分組整合採購鏈（採購執行+驗收入庫+供應商管理）；
     //      「基礎配置」改名「基礎數據」；耗材管理排序提前至 sort=2
-    private static final String V_MENU_SEED = "core:menu-seed-v42";
+    // v44: 規則配置拆分——新增「規則中心」目录(rule-center) + 廣告銷售/贈送管理/系統安全/算法配置/編號生成 5 個子菜單，
+    //      舊 rule-config 保留並改名「規則總覽」；将存量 rule-config 角色/部门授权笛卡尔复制到新子菜單与 asset-basic。
+    private static final String V_MENU_SEED = "core:menu-seed-v44";
 
     @Override
     public void run(String... args) {
@@ -154,6 +156,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:dingtalk-notification-v1", this::seedDingTalkNotification);
         // v31: 补充 ai_access 流程类型到 biz_oa_process 和 biz_workflow_config
         versionTracker.applyOnce("core:oa-ai-access-seed-v1", this::seedAiAccessProcessType);
+        // v44: 集团人事二级菜单分组化（員工檔案/入轉調離/基礎配置）
+        versionTracker.applyOnce("core:hr-menu-groups-v44", this::migrateHrMenuGroupsV44);
         // v33: 通知渠道多场景配置改造（新建 sys_notification_channel 表 + 迁移旧 sys_config 数据）
         versionTracker.applyOnce("core:notification-channel-refactor-v1", this::migrateNotificationChannel);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
@@ -1753,9 +1757,19 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("employee-management", "Employee Management"),
                 Map.entry("hr-dict", "HR Dictionary"),
                 Map.entry("contract-ledger", "Contract Ledger"),
-                Map.entry("organization-management", "Organization"),
+                Map.entry("org-center", "Organization Management"),
+                Map.entry("org-structure", "Department Structure"),
                 Map.entry("position-management", "Position"),
                 Map.entry("login-log", "Employee Activity"),
+                Map.entry("hr-onboarding", "Onboarding"),
+                Map.entry("hr-regularization", "Regularization"),
+                Map.entry("hr-transfer", "Transfer"),
+                Map.entry("hr-dimission", "Dimission"),
+                Map.entry("hr-leave", "Leave Requests"),
+                Map.entry("hr-leave-quota", "Leave Balances"),
+                Map.entry("hr-profile", "Employee Profile"),
+                Map.entry("hr-lifecycle", "Employee Lifecycle"),
+                Map.entry("hr-config", "HR Config"),
                 // 团购管理
                 Map.entry("group-purchase", "Group Purchase"),
                 Map.entry("group-purchase-dashboard", "Flash Sale Overview"),
@@ -1777,7 +1791,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("i18n-import-export", "Import & Export"),
                 Map.entry("i18n-mt-engine", "MT Engine"),
                 Map.entry("i18n-dashboard", "Translation Dashboard"),
-                Map.entry("rule-config", "Rule Config"),
+               Map.entry("rule-config", "Rule Overview"),
+                Map.entry("rule-center", "Rule Center"),
+                Map.entry("rule-ad-sales", "Ad Sales Rules"),
+                Map.entry("rule-gift", "Gift Rules"),
+                Map.entry("rule-security", "Security Rules"),
+                Map.entry("rule-algorithm", "Algorithm Rules"),
+                Map.entry("rule-seq", "ID Sequence Rules"),
                 Map.entry("workflow-config", "Workflow Config"),
                 Map.entry("version-history", "Version History"),
                                 Map.entry("notification-config", "Notification Channels"),
@@ -2111,12 +2131,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key = 'merchant-order-manage')");
         jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = 'merchant-order-manage'");
 
-        // 清理旧的 AI 菜单占位数据（为新的层级结构做准备）
-        // 注意：必须用 'ai-%' 前缀匹配，不能用 '%ai%'，否则会误删 i18n-center / i18n-* 菜单
-        log.info("开始清理旧的 AI 菜单占位数据...");
-        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE 'ai-%')");
-        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE 'ai-%')");
-        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key LIKE 'ai-%'");
+        // AI 菜单沿用下方按 key 更新的逻辑，保留 ID、系统归属及角色/部门授权。
+        // 全量删除重建会丢失归属，且门户的一次性迁移不会再为新 ID 回填。
 
         // key -> [name, parentKey|null, sort]
         Map<String, String[]> menus = new LinkedHashMap<>();
@@ -2130,11 +2146,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
         menus.put("hr",                  new String[]{"集團人事(HR)",      null,  "9"});
-        menus.put("asset-management",    new String[]{"物資管理",          null,  "10"});
-        menus.put("oa-center",           new String[]{"OA中心",            null,  "11"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "12"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "13"});
-        menus.put("i18n-center",         new String[]{"多語言管理",          null,  "14"});
+        // v44: 組織管理提升为独立一级菜单（集团组织架构域），后续可扩组织架构/编制
+        menus.put("org-center",          new String[]{"組織管理",          null,  "10"});
+        menus.put("asset-management",    new String[]{"物資管理",          null,  "11"});
+        menus.put("oa-center",           new String[]{"OA中心",            null,  "12"});
+        menus.put("permission",          new String[]{"權限管理",          null,  "13"});
+        menus.put("system-config",       new String[]{"系統配置",          null,  "14"});
+        menus.put("i18n-center",         new String[]{"多語言管理",          null,  "15"});
         // ── 商户集团管理 ──
         menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
         menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
@@ -2220,12 +2238,27 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("flash-sale-price",   new String[]{"澳覓秒殺價",       "group-purchase",      "4"});
         // ── 集团人事 ──
         // v42: 字典維護/合同台賬 从员工管理页按钮拆分为 hr 分组下的独立菜单（可独立授权）
-        menus.put("employee-management", new String[]{"員工管理",         "hr",                 "1"});
-        menus.put("hr-dict",             new String[]{"字典維護",         "hr",                 "2"});
-        menus.put("contract-ledger",     new String[]{"合同台賬",         "hr",                 "3"});
-        menus.put("organization-management", new String[]{"組織管理",     "hr",                 "4"});
-        menus.put("position-management", new String[]{"職位管理",         "hr",                 "5"});
-        menus.put("login-log",           new String[]{"員工動態",         "hr",                 "6"});
+        // v43: 入转调离四菜单（入職/轉正/調動/離職）紧跟员工管理，存量菜单后移
+        // v44: 入转调离四菜单收入「入轉調離」分组，其余按「員工檔案/基礎配置」归类，
+        //      避免 hr 下 10 个二级菜单平铺（存量库迁移见 migrateHrMenuGroupsV44）
+        //      組織/職位 属组织与职务主数据，与字典/合同一样归入「基礎配置」，員工檔案只留员工个人记录
+        menus.put("hr-profile",          new String[]{"員工檔案",         "hr",                 "1"});
+        menus.put("hr-lifecycle",        new String[]{"入轉調離",         "hr",                 "2"});
+        menus.put("hr-config",           new String[]{"基礎配置",         "hr",                 "3"});
+        menus.put("employee-management", new String[]{"員工管理",         "hr-profile",         "1"});
+        menus.put("login-log",           new String[]{"員工動態",         "hr-profile",         "2"});
+        // v45: 假期域两菜单（请假单 + 额度台账）
+        menus.put("hr-leave",            new String[]{"請假管理",         "hr-profile",         "3"});
+        menus.put("hr-leave-quota",      new String[]{"假期額度",         "hr-profile",         "4"});
+        menus.put("hr-onboarding",       new String[]{"入職管理",         "hr-lifecycle",       "1"});
+        menus.put("hr-regularization",   new String[]{"轉正管理",         "hr-lifecycle",       "2"});
+        menus.put("hr-transfer",         new String[]{"調動管理",         "hr-lifecycle",       "3"});
+        menus.put("hr-dimission",        new String[]{"離職管理",         "hr-lifecycle",       "4"});
+        menus.put("position-management", new String[]{"職位管理",         "hr-config",          "1"});
+        menus.put("hr-dict",             new String[]{"字典維護",         "hr-config",          "2"});
+        menus.put("contract-ledger",     new String[]{"合同台賬",         "hr-config",          "3"});
+        // ── 組織管理（一级，v44）──
+        menus.put("org-structure",       new String[]{"部門架構",         "org-center",         "1"});
         // ── 物资管理（EAM 分组子菜单）──
         // 二级直达菜单（无分组）
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
@@ -2273,9 +2306,22 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("i18n-import-export",  new String[]{"導入導出",           "i18n-center",        "3"});
         menus.put("i18n-mt-engine",      new String[]{"機翻引擎",           "i18n-center",        "4"});
         menus.put("i18n-dashboard",      new String[]{"翻譯統計",           "i18n-center",        "5"});
-        menus.put("rule-config",         new String[]{"規則配置",         "system-config",      "2"});
-        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "3"});
-        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "4"});
+        // v44: 規則配置拆分为「規則中心」目录 + 5 個版塊子菜單（可分角色獨立維護）；舊 rule-config 保留為「規則總覽」
+        menus.put("rule-config",         new String[]{"規則總覽",         "system-config",      "2"});
+        menus.put("rule-center",         new String[]{"規則中心",           "system-config",      "3"});
+        menus.put("rule-ad-sales",       new String[]{"廣告銷售規則",     "rule-center",        "1"});
+        menus.put("rule-gift",           new String[]{"贈送管理規則",     "rule-center",        "2"});
+        menus.put("rule-security",       new String[]{"系統安全規則",     "rule-center",        "3"});
+        menus.put("rule-algorithm",      new String[]{"算法配置規則",     "rule-center",        "4"});
+        menus.put("rule-seq",            new String[]{"編號生成規則",     "rule-center",        "5"});
+        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "4"});
+        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "5"});
+
+        // 商家工作台已拆分时，旧菜单种子重跑也不能把购买入口和报表挂回广告系统。
+        if (queryMenuIdByKey("seller-center") != null) {
+            menus.get("promotion-sales-config")[1] = "seller-center";
+            menus.get("promotion-report-group")[1] = "seller-center";
+        }
 
         int created = 0;
         int updated = 0;
@@ -2358,7 +2404,52 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             log.info("已修正 {} 个系统菜单的占位名称/层级", updated);
         }
 
+        // v44: 规则配置拆分的存量授权复制/系统归属/重命名（幂等, 仅在 V_MENU_SEED 版本递增时随种子重跑）
+        splitRuleConfigMenus();
+    }
 
+    /**
+     * v44: 规则菜单拆分的一次性收敛（幂等）。
+     * <ul>
+     *   <li>将存量持有 rule-config 的角色/部门授权笛卡尔复制到 5 个新子菜单 + rule-center 目录 + asset-basic
+     *       （公司品牌/购买公司字典控制器的新归属），避免拆分瞬间非管理员全部失权。</li>
+     *   <li>回填新菜单的 system_code='platform'（propagateSystemToDescendants 受旧版本门控不会重跑）。</li>
+     *   <li>强制将存量 rule-config 菜单名从旧默认「規則配置」改为「規則總覽」（用户自定义名不受影响）。</li>
+     * </ul>
+     */
+    private void splitRuleConfigMenus() {
+        Long ruleConfigId = queryMenuIdByKey("rule-config");
+        // 存量持有 rule-config 的授权来源菜单：若已无 rule-config 授权则无需复制
+        List<String> newKeys = List.of(
+                "rule-center", "rule-ad-sales", "rule-gift", "rule-security", "rule-algorithm", "rule-seq",
+                "asset-basic");
+        if (ruleConfigId != null) {
+            for (String childKey : newKeys) {
+                Long childId = queryMenuIdByKey(childKey);
+                if (childId == null) {
+                    log.warn("拆分规则菜单: 子菜单 [{}] 不存在, 跳过授权复制", childKey);
+                    continue;
+                }
+                // 角色授权复制（INSERT IGNORE 幂等, 唯一键 role+menu 冲突时不覆盖）
+                jdbcTemplate.update(
+                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                                + "SELECT rm.role_id, ?, rm.actions FROM sys_role_menu rm WHERE rm.menu_id = ?",
+                        childId, ruleConfigId);
+                // 部门授权复制
+                jdbcTemplate.update(
+                        "INSERT IGNORE INTO sys_department_menu (dept_id, menu_id, actions) "
+                                + "SELECT dm.dept_id, ?, dm.actions FROM sys_department_menu dm WHERE dm.menu_id = ?",
+                        childId, ruleConfigId);
+            }
+        }
+        // system_code 回填 platform
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET system_code = 'platform' "
+                        + "WHERE menu_key IN ('rule-center','rule-ad-sales','rule-gift','rule-security','rule-algorithm','rule-seq') AND deleted = 0");
+        // 强制重命名存量 rule-config 旧默认名（种子对非占位名不覆盖, 此处专项处理）
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET name = '規則總覽' WHERE menu_key = 'rule-config' AND deleted = 0 AND name = '規則配置'");
+        log.info("规则菜单拆分收敛完成：已复制存量 rule-config 授权至新子菜单与 asset-basic，回填 system_code，重命名总览");
     }
 
     /** 修复转账/合并流程批次号唯一约束：从 (batch_no) 改为 (batch_no, group_code) */
@@ -2432,6 +2523,161 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             }
         }
         log.info("物资管理菜单重建完成");
+    }
+
+    /**
+     * v44: 集团人事菜单分组化——在 hr 下建 員工檔案/入轉調離/基礎配置 三个二级分组，
+     * 把原本平铺的 10 个二级菜单归类；分组为纯结构节点（不进前端受控清单，
+     * 叶子菜单授权不变即可见），因此仅需保证 admin 授权回填。
+     */
+    private void migrateHrMenuGroupsV44() {
+        Long hrId = queryMenuIdByKey("hr");
+        if (hrId == null) {
+            throw new IllegalStateException("父级菜单 hr 不存在，无法分组人事菜单");
+        }
+        String[][] groups = {
+                {"hr-profile", "員工檔案", "FolderOutlined", "Employee Profile"},
+                {"hr-lifecycle", "入轉調離", "PartitionOutlined", "Employee Lifecycle"},
+                {"hr-config", "基礎配置", "ControlOutlined", "HR Config"},
+        };
+        for (String[] g : groups) {
+            ensureDirectoryMenu(g[0], g[1], hrId, g[2], g[3]);
+        }
+        // menuKey -> 目标分组（分组与叶子均已由 seedSystemMenus / 上述 ensure 创建）
+        Map<String, String> reassign = new LinkedHashMap<>();
+        reassign.put("employee-management", "hr-profile");
+        reassign.put("login-log", "hr-profile");
+        reassign.put("hr-onboarding", "hr-lifecycle");
+        reassign.put("hr-regularization", "hr-lifecycle");
+        reassign.put("hr-transfer", "hr-lifecycle");
+        reassign.put("hr-dimission", "hr-lifecycle");
+        // 職位/字典/合同属主数据，归「基礎配置」；組織管理单独提升为一级（见下）
+        reassign.put("position-management", "hr-config");
+        reassign.put("hr-dict", "hr-config");
+        reassign.put("contract-ledger", "hr-config");
+        for (Map.Entry<String, String> e : reassign.entrySet()) {
+            Long parentId = queryMenuIdByKey(e.getValue());
+            if (parentId == null) {
+                throw new IllegalStateException("人事分组缺失: " + e.getValue());
+            }
+            Integer moved = jdbcTemplate.update(
+                    "UPDATE sys_menu SET parent_id = ?, updated_by = 'system' WHERE menu_key = ? AND deleted = 0 AND parent_id <> ?",
+                    parentId, e.getKey(), parentId);
+            log.info("v44 人事菜单归组: {} -> {} (moved={})", e.getKey(), e.getValue(), moved);
+        }
+        // 新建分组发生在 ensureAdminMenuGrants 之后，此处补授 admin（叶子菜单授权未动，无需 evictAll）
+        Long adminRoleId = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class)
+                .stream().findFirst().orElse(null);
+        if (adminRoleId == null) {
+            return;
+        }
+        for (String[] g : groups) {
+            Long groupId = queryMenuIdByKey(g[0]);
+            if (groupId == null) {
+                throw new IllegalStateException("人事分组未就绪: " + g[0]);
+            }
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                    adminRoleId, groupId, "[\"view\"]");
+        }
+        syncOrganizationDomain();
+    }
+
+    /**
+     * v44: 组织管理独立成一级菜单域（幂等，迁移与每次启动自愈共用）：
+     * 建顶级目录 org-center「組織管理」，原 organization-management 改 key 为
+     * org-structure「部門架構」并挂其下（路由 /organization-management 不变，避免存量收藏/深链失效）。
+     * menu_id 不变 → 角色/部门授权自动跟随；仅补建新目录的 admin 授权。
+     */
+    private void syncOrganizationDomain() {
+        Long orgCenterId = queryMenuIdByKey("org-center");
+        if (orgCenterId == null) {
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = 'org-center' AND deleted = 1");
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, status, deleted) "
+                            + "VALUES (NULL, 'org-center', '組織管理', 'ApartmentOutlined', 1, 10, 1, 0)");
+            orgCenterId = queryMenuIdByKey("org-center");
+            log.info("v44 已创建一级菜单域 org-center「組織管理」");
+        } else {
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = NULL, type = 1 WHERE id = ? AND (parent_id IS NOT NULL OR type <> 1)", orgCenterId);
+        }
+        if (orgCenterId == null) {
+            throw new IllegalStateException("一级目录 org-center 未就绪");
+        }
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Organization Management' "
+                + "WHERE id = ? AND (name_en IS NULL OR name_en = '')", orgCenterId);
+        // 一级目录归属：与 hr 同域，否则门户 HR 系统导航剪枝会把 org-center 整棵丢弃
+        String hrSystemCode = jdbcTemplate.queryForList(
+                        "SELECT system_code FROM sys_menu WHERE menu_key = 'hr' AND deleted = 0 LIMIT 1", String.class)
+                .stream().findFirst().orElse("hr");
+        jdbcTemplate.update("UPDATE sys_menu SET system_code = ? WHERE id = ? AND (system_code IS NULL OR system_code = '')",
+                hrSystemCode, orgCenterId);
+
+        // 旧 key 迁移（ID 不变，授权随 menu_id 保留）
+        Long legacyId = queryMenuIdByKey("organization-management");
+        if (legacyId != null) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET menu_key = 'org-structure', name = '部門架構', parent_id = ?, "
+                            + "path = '/organization-management', icon = 'ClusterOutlined', type = 2, updated_by = 'system' "
+                            + "WHERE id = ?",
+                    orgCenterId, legacyId);
+            log.info("v44 organization-management → org-structure「部門架構」");
+        }
+
+        Long leafId = queryMenuIdByKey("org-structure");
+        if (leafId == null) {
+            throw new IllegalStateException("org-structure 菜单不存在，组织域结构未就绪");
+        }
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET parent_id = ?, path = '/organization-management', icon = 'ClusterOutlined', type = 2, "
+                        + "name_en = COALESCE(NULLIF(name_en, ''), 'Department Structure') "
+                        + "WHERE id = ? AND (parent_id IS NULL OR parent_id <> ? OR path IS NULL OR path = '')",
+                orgCenterId, leafId, orgCenterId);
+
+        // admin 补授：目录 view + 叶子全量动作（幂等）
+        Long adminRoleId = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class)
+                .stream().findFirst().orElse(null);
+        if (adminRoleId != null) {
+            jdbcTemplate.update("INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                    adminRoleId, orgCenterId, "[\"view\"]");
+            jdbcTemplate.update("INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                    adminRoleId, leafId, "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]");
+        }
+    }
+
+    /** v44: 顶级菜单排序（组织管理独立成一级，插在集團人事之后，其余顺移） */
+    private void applyTopLevelMenuSortV44() {
+        String[] topOrder = {"home", "merchant_group", "merchant_promotion", "promotion_tool", "search",
+                "finance", "ai-assistant", "group-purchase", "hr", "org-center",
+                "asset-management", "oa-center", "permission", "system-config", "i18n-center"};
+        for (int i = 0; i < topOrder.length; i++) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
+                            + "WHERE menu_key = ? AND deleted = 0 AND parent_id IS NULL AND sort_order <> ?",
+                    i + 1, topOrder[i], i + 1);
+        }
+    }
+
+    /** 确保目录型菜单存在（已存在则校正父级与图标），返回其 id */
+    private Long ensureDirectoryMenu(String menuKey, String name, Long parentId, String icon, String nameEn) {
+        Long id = queryMenuIdByKey(menuKey);
+        if (id != null) {
+            // 分组图标属于代码侧结构定义（不开放给菜单配置页自定义），直接对齐
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = ?, icon = ? WHERE id = ?", parentId, icon, id);
+            return id;
+        }
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", menuKey);
+        jdbcTemplate.update(
+                "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, status, deleted) "
+                        + "VALUES (?, ?, ?, ?, 2, 99, 1, 0)",
+                parentId, menuKey, name, icon);
+        if (nameEn != null) {
+            jdbcTemplate.update("UPDATE sys_menu SET name_en = ? WHERE menu_key = ?", nameEn, menuKey);
+        }
+        log.info("已创建人事分组菜单: {} ({})", menuKey, name);
+        return queryMenuIdByKey(menuKey);
     }
 
     /**
@@ -2585,10 +2831,40 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         applyMenuSort("asset-flow-ops", "asset-list", "asset-claim", "asset-borrow",
                 "asset-return", "asset-transfer-list", "asset-handover",
                 "asset-repair", "asset-compensation", "asset-scrap", "asset-inventory", "asset-flow");
-        applyMenuSort("system-config", "menu-config", "rule-config", "version-history", "notification-config");
+        applyMenuSort("system-config", "menu-config", "rule-config", "rule-center", "version-history", "notification-config");
         // v42: 集团人事子菜单排序唯一化（字典維護/合同台賬 紧跟员工管理）
-        applyMenuSort("hr", "employee-management", "hr-dict", "contract-ledger",
-                "organization-management", "position-management", "login-log");
+        // v43: 入转调离四菜单插在员工管理之后
+        // v44: hr 一级下只露出三个分组，叶子在分组内排序
+        applyMenuSort("hr", "hr-profile", "hr-lifecycle", "hr-config");
+        // v44: 分组归属自愈——一次性迁移 applyOnce 已记版本不再重跑，其后调整过的
+        //      父子关系（如 職位管理 由 員工檔案 移到 基礎配置）必须在此兜住
+        ensureMenuParent("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota");
+        ensureMenuParent("hr-lifecycle", "hr-onboarding", "hr-regularization", "hr-transfer", "hr-dimission");
+        ensureMenuParent("hr-config", "position-management", "hr-dict", "contract-ledger");
+        applyMenuSort("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota");
+        applyMenuSort("hr-lifecycle", "hr-onboarding", "hr-regularization", "hr-transfer", "hr-dimission");
+        applyMenuSort("hr-config", "position-management", "hr-dict", "contract-ledger");
+        // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
+        applyMenuSort("org-center", "org-structure");
+        applyTopLevelMenuSortV44();
+        try {
+            syncOrganizationDomain();
+        } catch (Exception e) {
+            // 自愈路径不阻断启动：下一轮启动重试（一次性迁移路径仍按不吞异常原则抛出）
+            log.error("v44 组织域结构自愈失败（下次启动重试）: {}", e.getMessage(), e);
+        }
+        renameMenuIfLegacy("org-structure", "部門架構", "組織管理", "organization-management");
+        // v44 补丁：目录分组图标不开放给菜单配置页自定义，直接对齐代码侧定义
+        // （hr-profile 历史值 IdcardOutlined 与子菜单「職位管理」冲突、后一版 SolutionOutlined 又与
+        //  oa-center 重复，统一为 FolderOutlined；迁移已记版本不会重跑，故在每次启动定向修正）
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'FolderOutlined', updated_by = 'system' "
+                + "WHERE menu_key = 'hr-profile' AND deleted = 0 AND icon IN ('IdcardOutlined', 'SolutionOutlined')");
+        // 職位管理图标定向修正（历史写入过 TeamOutlined，与一级 hr 根重复）
+        jdbcTemplate.update("UPDATE sys_menu SET icon = 'IdcardOutlined', updated_by = 'system' "
+                + "WHERE menu_key = 'position-management' AND deleted = 0 AND icon = 'TeamOutlined'");
+        // org-structure 英文名定向修正（旧值为 Organization，与新一级域 org-center 撞名）
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Department Structure', updated_by = 'system' "
+                + "WHERE menu_key = 'org-structure' AND deleted = 0 AND name_en = 'Organization'");
         applyMenuSort("i18n-center", "translation-manage", "i18n-language", "i18n-import-export",
                 "i18n-mt-engine", "i18n-dashboard");
         applyMenuSort("promotion_tool", "promotion-sales-config", "promotion-report-group");
@@ -2656,6 +2932,27 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                     "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
                             + "WHERE menu_key = ? AND deleted = 0 AND parent_id = ? AND sort_order != ?",
                     i + 1, childKeysInOrder[i], parentId, i + 1);
+        }
+    }
+    
+    /**
+     * 强制把子菜单挂到指定父菜单下（幂等，只在父级不一致时更新）。
+     * 与 applyMenuSort 配套：一次性迁移 applyOnce 记录版本后不再重跑，
+     * 其后对分组归属的调整必须由每次启动的 reconcile 兜住，否则存量库结构停留在旧版本。
+     */
+    private void ensureMenuParent(String parentKey, String... childKeys) {
+        Long parentId = queryMenuIdByKey(parentKey);
+        if (parentId == null) {
+            return;
+        }
+        for (String childKey : childKeys) {
+            int moved = jdbcTemplate.update(
+                    "UPDATE sys_menu SET parent_id = ?, updated_by = 'system' "
+                            + "WHERE menu_key = ? AND deleted = 0 AND parent_id IS NOT NULL AND parent_id <> ?",
+                    parentId, childKey, parentId);
+            if (moved > 0) {
+                log.info("菜单归属修正: {} → {} (rows={})", childKey, parentKey, moved);
+            }
         }
     }
     
@@ -2744,6 +3041,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("hot-search-report", "LineChartOutlined"),
             Map.entry("hot-search-verify", "FireOutlined"),
             Map.entry("hr", "TeamOutlined"),
+            Map.entry("hr-profile", "FolderOutlined"),
+            Map.entry("hr-lifecycle", "PartitionOutlined"),
+            Map.entry("hr-config", "ControlOutlined"),
+            Map.entry("hr-onboarding", "UserAddOutlined"),
+            Map.entry("hr-regularization", "CheckCircleOutlined"),
+            Map.entry("hr-transfer", "SwapOutlined"),
+            Map.entry("hr-dimission", "UserDeleteOutlined"),
+            Map.entry("hr-leave", "CalendarOutlined"),
+            Map.entry("hr-leave-quota", "HourglassOutlined"),
             Map.entry("i18n-center", "TranslationOutlined"),
             Map.entry("i18n-dashboard", "DashboardOutlined"),
             Map.entry("i18n-import-export", "ImportOutlined"),
@@ -2758,7 +3064,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("merchant_group", "ShopOutlined"),
             Map.entry("merchant_promotion", "CrownOutlined"),
             Map.entry("notification-config", "BellOutlined"),
-            Map.entry("organization-management", "ApartmentOutlined"),
+            Map.entry("org-center", "ApartmentOutlined"),
+            Map.entry("org-structure", "ClusterOutlined"),
             Map.entry("permission", "LockOutlined"),
             Map.entry("position-management", "IdcardOutlined"),
             Map.entry("promotion", "WalletOutlined"),
@@ -2777,6 +3084,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("report", "BarChartOutlined"),
             Map.entry("role-management", "SolutionOutlined"),
             Map.entry("rule-config", "SwapOutlined"),
+            Map.entry("rule-center", "ApartmentOutlined"),
+            Map.entry("rule-ad-sales", "ShoppingCartOutlined"),
+            Map.entry("rule-gift", "GiftOutlined"),
+            Map.entry("rule-security", "SafetyCertificateOutlined"),
+            Map.entry("rule-algorithm", "ControlOutlined"),
+            Map.entry("rule-seq", "OrderedListOutlined"),
             Map.entry("search", "SearchOutlined"),
             Map.entry("search-config-new", "SettingOutlined"),
             Map.entry("search-guide", "AimOutlined"),

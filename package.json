@@ -28,6 +28,7 @@
     "@xyflow/react": "^12.11.1",
     "antd": "^5.22.0",
     "axios": "^1.18.1",
+    "d3-geo": "^3.1.1",
     "dayjs": "^1.11.21",
     "dompurify": "^3.4.15",
     "exceljs": "^4.4.0",
@@ -43,7 +44,9 @@
     "react-dom": "^18.3.1",
     "react-i18next": "^17.0.11",
     "react-leaflet": "^4.2.1",
-    "react-router-dom": "^6.28.0"
+    "react-router-dom": "^6.28.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@emnapi/core": "^1.11.3",
@@ -53,9 +56,11 @@
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/d3-geo": "^3.1.1",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.7.0",

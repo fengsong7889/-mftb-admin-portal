@@ -192,6 +192,84 @@ class PortalControllerTest {
         assertEquals("employee-management", children.get(0).getMenuKey());
     }
 
+    @Test
+    @DisplayName("AI 根归属修复后恢复多级菜单，仍按叶子 view 权限过滤")
+    void aiNavigationRecoversAfterRootOwnershipRepair() {
+        SysUser user = buildUser("ai-reader", "guest");
+        when(operatorResolver.currentUser()).thenReturn(user);
+        when(permissionService.hasSystemAccess(user, "ai")).thenReturn(true);
+        MenuVO root = buildMenu(1L, null, "ai-assistant", "智能中心", 1, null);
+        MenuVO models = buildMenu(2L, 1L, "ai-models", "模型管理", 1, null);
+        MenuVO allowed = buildMenu(3L, 2L, "ai-model-list", "模型接入", 2, null);
+        MenuVO denied = buildMenu(4L, 2L, "ai-model-provider", "模型供应商", 2, null);
+        models.setChildren(List.of(allowed, denied));
+        root.setChildren(List.of(models));
+        when(menuService.tree()).thenReturn(List.of(root));
+        when(permissionService.hasPermission(user, "ai-model-list", "view")).thenReturn(true);
+
+        assertTrue(controller.navigation("ai").getData().isEmpty(), "缺失根归属时不应绕过系统剪枝");
+        root.setSystemCode("ai");
+        List<MenuVO> navigation = controller.navigation("ai").getData();
+        assertEquals(1, navigation.size());
+        assertEquals("ai-models", navigation.get(0).getChildren().get(0).getMenuKey());
+        List<MenuVO> leaves = navigation.get(0).getChildren().get(0).getChildren();
+        assertEquals(1, leaves.size());
+        assertEquals("ai-model-list", leaves.get(0).getMenuKey());
+    }
+
+    @Test
+    void crossSystemMenusFollowExplicitOwnershipWithoutMutatingFullTree() {
+        SysUser user = buildUser("system-reader", "guest");
+        when(operatorResolver.currentUser()).thenReturn(user);
+        when(permissionService.hasSystemAccess(user, "platform")).thenReturn(true);
+        when(permissionService.hasSystemAccess(user, "iam")).thenReturn(true);
+        MenuVO root = buildMenu(1L, null, "system-config", "系统配置", 1, "platform");
+        MenuVO rules = buildMenu(2L, 1L, "rule-config", "规则配置", 2, null);
+        MenuVO menus = buildMenu(3L, 1L, "menu-config", "菜单配置", 2, "iam");
+        root.setChildren(List.of(rules, menus));
+        when(menuService.tree()).thenReturn(List.of(root));
+        when(permissionService.hasPermission(user, "rule-config", "view")).thenReturn(true);
+        when(permissionService.hasPermission(user, "menu-config", "view")).thenReturn(true);
+
+        List<MenuVO> platform = controller.navigation("platform").getData();
+        assertEquals(List.of(rules), platform.get(0).getChildren());
+        assertEquals(List.of(menus), controller.navigation("iam").getData());
+        assertEquals(List.of(rules, menus), root.getChildren(), "导航不能修改全量菜单对象");
+        when(permissionService.hasPermission(user, "menu-config", "view")).thenReturn(false);
+        assertTrue(controller.navigation("iam").getData().isEmpty());
+        root.setStatus(0);
+        assertTrue(controller.navigation("platform").getData().isEmpty());
+        assertTrue(controller.navigation("iam").getData().isEmpty());
+    }
+
+    @Test
+    void migratedReportsAppearOnlyInSellerAndRetainLeafPermissionChecks() {
+        SysUser user = buildUser("report-reader", "guest");
+        when(operatorResolver.currentUser()).thenReturn(user);
+        when(permissionService.hasSystemAccess(user, "seller")).thenReturn(true);
+        when(permissionService.hasSystemAccess(user, "ads")).thenReturn(true);
+        MenuVO oldRoot = buildMenu(1L, null, "promotion_tool", "店铺随心推", 1, "ads");
+        oldRoot.setStatus(0);
+        MenuVO seller = buildMenu(2L, null, "seller-center", "商家工作台", 1, "seller");
+        MenuVO purchase = buildMenu(3L, 2L, "promotion-sales-config", "购买广告", 2, "seller");
+        MenuVO group = buildMenu(4L, 2L, "promotion-report-group", "报表分析", 2, "seller");
+        MenuVO allowed = buildMenu(5L, 4L, "promotion-report-order", "订单效果", 2, "seller");
+        MenuVO denied = buildMenu(6L, 4L, "promotion-report-compare", "类型对比", 2, "seller");
+        group.setChildren(List.of(allowed, denied));
+        seller.setChildren(List.of(purchase, group));
+        when(menuService.tree()).thenReturn(List.of(oldRoot, seller));
+        when(permissionService.hasPermission(user, "promotion-sales-config", "view")).thenReturn(true);
+        when(permissionService.hasPermission(user, "promotion-report-order", "view")).thenReturn(true);
+
+        assertTrue(controller.navigation("ads").getData().isEmpty());
+        List<MenuVO> items = controller.navigation("seller").getData().get(0).getChildren();
+        assertEquals("promotion-sales-config", items.get(0).getMenuKey());
+        assertEquals(List.of(allowed), items.get(1).getChildren());
+        assertEquals(List.of(allowed, denied), group.getChildren());
+        oldRoot.setStatus(1);
+        assertTrue(controller.navigation("ads").getData().isEmpty(), "空目录不得生成无效入口");
+    }
+
     private MenuVO buildMenu(Long id, Long parentId, String menuKey, String name, int type, String systemCode) {
         MenuVO m = new MenuVO();
         m.setId(id);

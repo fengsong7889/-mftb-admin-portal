@@ -38,6 +38,10 @@ const APPROVAL_TYPE_I18N: Record<string, string> = {
   gift: 'approvalCenter.typeGift',
   ai_access: 'oaRequests.aiAccessType',
   oa_purchase: 'oaRequests.typePurchase',
+  hr_onboard: 'hrLifecycle.typeOnboard',
+  hr_regular: 'hrLifecycle.typeRegular',
+  hr_transfer: 'hrLifecycle.typeTransfer',
+  hr_dimission: 'hrLifecycle.typeDimission',
 }
 
 /** 審批類型 → 標籤顏色（與 WorkflowConfig 保持一致） */
@@ -64,6 +68,10 @@ const FLOW_NAME_PREFIX: Record<string, string> = {
   oa_purchase: '採購申請',
   oa_seal: '用章申請',
   oa_general: '通用審批',
+  hr_onboard: '入職手續',
+  hr_regular: '轉正申請',
+  hr_transfer: '調動申請',
+  hr_dimission: '離職手續',
 }
 
 /** 流程標籤短標籤（列表 Tag 用，與表單頁 FLOW_TAG_LABEL 保持一致） */
@@ -226,7 +234,8 @@ export default function OaRequests() {
   }
 
   /* ---- Tab 狀態 ---- */
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'my')
+  const urlFlowNo = searchParams.get('flowNo') || ''
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || (urlFlowNo ? 'all' : 'my'))
   const [isDeptLeader, setIsDeptLeader] = useState(false)
 
   const handleTabChange = (key: string) => {
@@ -551,12 +560,27 @@ export default function OaRequests() {
     setAllFilters({})
   }
 
+  /** 深链预筛：?flowNo=xx（HR 单据详情页「前往流程事項」等入口）直接按流程编号过滤全部流程 */
+  useEffect(() => {
+    if (!urlFlowNo) return
+    allForm.setFieldsValue({ flowNo: urlFlowNo })
+    setAllFilters(prev => ({ ...prev, flowNo: urlFlowNo }))
+  }, [urlFlowNo, allForm])
+
   /* ==================== 導航 ==================== */
   const handleDetail = (record: FlowRow) => {
-    navigate(`/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`)
+    navigate(
+      record.approvalType.startsWith('hr_')
+        ? `/hr-flow-detail?flowNo=${encodeURIComponent(record.flowNo)}`
+        : `/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`,
+    )
   }
   const handleApprove = (record: FlowRow) => {
-    navigate(`/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`)
+    navigate(
+      record.approvalType.startsWith('hr_')
+        ? `/hr-flow-detail?flowNo=${encodeURIComponent(record.flowNo)}`
+        : `/approval-detail?flowNo=${encodeURIComponent(record.flowNo)}&type=${record.approvalType}`,
+    )
   }
   const handleCancel = (record: FlowRow) => {
     Modal.confirm({

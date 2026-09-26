@@ -2165,13 +2165,24 @@ export default function EmployeeDetail() {
               <Form.Item name="company" label={t('employeeDetail.colPosCompany')} extra={t('employee.companyExtra')}>
                 <Select placeholder={t('employee.companyPlaceholder')} allowClear options={companyOptions} />
               </Form.Item>
-              <Form.Item name="functionRoleIds" label={t('employee.roleAuthLabel')} extra={t('employee.roleAuthExtra')}>
+              <Form.Item
+                name="functionRoleIds"
+                label={t('employee.roleAuthLabel')}
+                extra={t('employee.roleAuthExtra')}
+              >
                 <Select
                   mode="multiple"
                   placeholder={t('employee.roleAuthPlaceholder')}
                   allowClear
                   optionFilterProp="label"
-                  options={roles.map(r => ({ value: r.id, label: r.name, disabled: r.status !== 1 }))}
+                  options={roles.map(r => ({
+                    value: r.id,
+                    label: r.code?.toLowerCase() === 'admin'
+                      ? `${r.name}（${t('employee.roleAdminUnbindable', '超管內置角色，不可綁定')}）`
+                      : r.name,
+                    // 超级管理员为内置直通角色，禁止绑定给任何员工（后端同样强校验）
+                    disabled: r.status !== 1 || r.code?.toLowerCase() === 'admin',
+                  }))}
                   maxTagCount="responsive"
                 />
               </Form.Item>

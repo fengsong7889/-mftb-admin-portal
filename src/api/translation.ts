@@ -41,6 +41,9 @@ export interface CoverageVO {
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
+/** 语言配置写入成功后刷新当前顶栏，不依赖翻译管理页的本地缓存。 */
+export const LANGUAGES_CHANGED_EVENT = 'translation-languages:changed'
+
 /* ========== 翻译字段 ========== */
 
 /** 字段列表（后端不可用时返回 null，调用方降级 Mock） */
@@ -108,12 +111,15 @@ export async function fetchLanguages() {
 
 /** 注册新语言 */
 export async function createLanguage(data: Omit<LanguageVO, 'id'>) {
-  return request.post<unknown, LanguageVO>('/translations/languages', data)
+  const language = await request.post<unknown, LanguageVO>('/translations/languages', data)
+  window.dispatchEvent(new Event(LANGUAGES_CHANGED_EVENT))
+  return language
 }
 
 /** 删除语言 */
 export async function deleteLanguage(code: string) {
-  return request.delete<unknown, void>(`/translations/languages/${code}`)
+  await request.delete<unknown, void>(`/translations/languages/${code}`)
+  window.dispatchEvent(new Event(LANGUAGES_CHANGED_EVENT))
 }
 
 /* ========== 机翻 ========== */

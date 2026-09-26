@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.ContractExpirySummaryVO;
 import com.mftb.admin.dto.ContractLedgerVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.service.EmployeeContractService;
@@ -28,7 +29,7 @@ public class EmployeeContractController {
 
     private final EmployeeContractService employeeContractService;
 
-    /** 合同全局台账（分页 + 关键字/签约主体/类型/状态筛选） */
+    /** 合同全局台账（分页 + 关键字/签约主体/类型/状态/到期分桶筛选） */
     @GetMapping
     @RequirePermission(menu = "contract-ledger", anyOf = {"employee-management"})
     @Operation(summary = "合同全局台账分页查询")
@@ -38,7 +39,17 @@ public class EmployeeContractController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String company,
             @RequestParam(required = false) String contractType,
-            @RequestParam(required = false) String status) {
-        return Result.success(employeeContractService.ledger(page, size, keyword, company, contractType, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String expiryBucket) {
+        return Result.success(employeeContractService.ledger(
+                page, size, keyword, company, contractType, status, expiryBucket));
+    }
+
+    /** 合同到期预警汇总（P0）：已过期/30/60/90 天分桶数量 + 最近到期明细 */
+    @GetMapping("/expiry-summary")
+    @RequirePermission(menu = "contract-ledger", anyOf = {"employee-management"})
+    @Operation(summary = "合同到期预警汇总")
+    public Result<ContractExpirySummaryVO> expirySummary(@RequestParam(defaultValue = "90") int days) {
+        return Result.success(employeeContractService.expirySummary(days));
     }
 }

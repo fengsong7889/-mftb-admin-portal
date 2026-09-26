@@ -28,6 +28,8 @@ import com.mftb.admin.service.AiGrantOnApprovalService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
+import com.mftb.admin.service.HrLeaveCallbackService;
+import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
@@ -78,6 +80,10 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final DataScopeService dataScopeService;
     /** V0 §B.4：AI 使用申请审批通过后自动发放模型/额度，幂等由 ai_grant_log 保证。 */
     private final AiGrantOnApprovalService aiGrantOnApprovalService;
+    /** HR 入转调离单据审批回调：办理动作失败不回滚审批流转，单据停在 approved 待重试。 */
+    private final HrLifecycleCallbackService hrLifecycleCallbackService;
+    /** HR 请假单据审批回调（独立服务，避免与 HrLeaveService 形成构造器循环依赖）。 */
+    private final HrLeaveCallbackService hrLeaveCallbackService;
 
     /* ==================== 查询 ==================== */
 
@@ -400,10 +406,11 @@ public class OaRequestServiceImpl implements OaRequestService {
         String applicant = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 生成流程编号（采购申请使用 CG 编号规则，AI 申请使用 AI 编号规则）
+        // 生成流程编号（采购申请使用 CG 编号规则，AI 申请使用 AI 编号规则，HR入轉調離使用 RS 编号规则）
         String flowRuleKey = switch (request.getProcessCode()) {
             case "oa_purchase" -> BizSeqService.RULE_EAM_PURCHASE_REQUEST;
             case "ai_access" -> BizSeqService.RULE_AI_ACCESS_REQUEST;
+            case "hr_onboard", "hr_regular", "hr_transfer", "hr_dimission", "hr_renew" -> BizSeqService.RULE_HR_LIFECYCLE_REQUEST;
             default -> BizSeqService.RULE_OA_REQUEST;
         };
         String flowNo = bizSeqService.next(flowRuleKey);
@@ -746,6 +753,24 @@ public class OaRequestServiceImpl implements OaRequestService {
                 log.info("AI 使用申请审批已全部通过，发放完成：flowNo={}", flowNo);
             }
 
+            // HR 请假：审批全部通过 → 额度累加（无绑定单据的通用请假自动跳过）
+            if (hrLeaveCallbackService.isLeaveProcess(request.getProcessCode())) {
+                try {
+                    hrLeaveCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("HR請假審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
+            // HR 入转调离：审批全部通过 → 同步单据并执行办理动作（独立事务，失败仅记日志）
+            if (hrLifecycleCallbackService.isHrLifecycleProcess(request.getProcessCode())) {
+                try {
+                    hrLifecycleCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("HR入轉調離審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
             // 钉钉通知：流程全部通过，通知发起人
             try {
                 String text = String.format("### ✅ 流程审批通过\n\n"
@@ -828,6 +853,24 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .set(OaRequest::getCurrentNodeName, null));
 
         log.info("OA流程已驳回: flowNo={}, node={}, reason={}", flowNo, currentTask.getNodeName(), reason);
+
+        // HR 请假：驳回→单据回到 rejected，额度不动（无绑定单据时跳过）
+        if (hrLeaveCallbackService.isLeaveProcess(request.getProcessCode())) {
+            try {
+                hrLeaveCallbackService.onFlowRejected(flowNo);
+            } catch (Exception e) {
+                log.error("HR請假駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
+        // HR 入转调离：驳回→单据回到 rejected 可重新提交（失败仅记日志，不阻断驳回）
+        if (hrLifecycleCallbackService.isHrLifecycleProcess(request.getProcessCode())) {
+            try {
+                hrLifecycleCallbackService.onFlowRejected(flowNo);
+            } catch (Exception e) {
+                log.error("HR入轉調離駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
 
         // 钉钉通知：驳回通知发起人
         try {

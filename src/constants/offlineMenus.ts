@@ -16,6 +16,7 @@
 export interface OfflineMenuNode {
   key: string
   label: string
+  systemCode?: string
   children?: OfflineMenuNode[]
 }
 
@@ -23,6 +24,7 @@ export const OFFLINE_MENUS: OfflineMenuNode[] = [
   {
     key: 'search',
     label: '搜索管理',
+    systemCode: 'search',
     children: [
       {
         key: 'search-config-new',
@@ -74,6 +76,7 @@ export const OFFLINE_MENUS: OfflineMenuNode[] = [
   {
     key: 'promotion-report-group',
     label: '推廣報表',
+    systemCode: 'seller',
     children: [
       { key: 'promotion-report-overview', label: '報表總覽' },
       { key: 'promotion-report-order', label: '訂單報表' },

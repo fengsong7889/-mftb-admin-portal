@@ -1,5 +1,8 @@
 package com.mftb.admin.service;
 
+import java.util.Collection;
+import java.util.Map;
+
 /**
  * 系统配置服务
  * 提供通用的 key-value 配置读取与更新能力，配置值持久化到 sys_config 表
@@ -46,4 +49,19 @@ public interface SysConfigService {
      * @param configValue 新值
      */
     void updateConfig(String configKey, String configValue);
+
+    /**
+     * 批量读取配置值（一次查询，避免 N 次单 key 往返）。
+     *
+     * @param configKeys 配置项标识集合
+     * @return key → 值；不存在的 key 不出现在结果中
+     */
+    Map<String, String> getConfigValues(Collection<String> configKeys);
+
+    /**
+     * 批量更新配置值（单事务，逐项复用 {@link #updateConfig} 的 UPSERT 与缓存刷新语义）。
+     *
+     * @param values key → 新值；空映射直接返回
+     */
+    void updateConfigs(Map<String, String> values);
 }

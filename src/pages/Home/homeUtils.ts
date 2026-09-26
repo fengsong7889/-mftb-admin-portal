@@ -1,5 +1,7 @@
 import { pinyin } from 'pinyin-pro'
 import type { QuotaSource } from '../../api/aiMyCenter'
+import type { MenuVO } from '../../api/menu'
+import { resolveMenuPath } from '../../constants/menuDataSource'
 
 /* ── 类型定义 ── */
 
@@ -42,6 +44,53 @@ export const defaultFavorites = [
 export const MAX_FAVORITES = 20
 
 /* ── 纯函数 ── */
+
+export interface HomeMenu {
+  key: string
+  label: string
+  nameEn?: string | null
+  icon?: string
+  path: string
+  group: string
+}
+
+const HOME_MENU_TYPE = { DIRECTORY: 1, MENU: 2 } as const
+const ENABLED_MENU_STATUS = 1
+const HOME_HIDDEN_MENU_KEYS = new Set(['ai-access-request'])
+
+/**
+ * 系统首页只消费已成功加载的服务端导航；公共首页可传入全量菜单树。
+ * 系统导航省略归属时继承当前系统，但显式属于其他系统的节点不得混入。
+ * 这是入口展示过滤，不替代后端业务鉴权，也不回写用户的全局收藏。
+ */
+export function collectHomeMenus(
+  tree: MenuVO[],
+  hasMenuPermission: (key: string) => boolean,
+  systemCode: string | null = null,
+): HomeMenu[] {
+  const result: HomeMenu[] = []
+  const seen = new Set<string>()
+  const visit = (nodes: MenuVO[], group: string, inheritedSystem: string | null) => {
+    for (const node of nodes) {
+      if (node.status !== ENABLED_MENU_STATUS || HOME_HIDDEN_MENU_KEYS.has(node.menuKey)) continue
+      const owner = node.systemCode ?? inheritedSystem
+      if (systemCode && owner !== systemCode) continue
+      const path = resolveMenuPath(node)
+      if (node.type === HOME_MENU_TYPE.MENU && path && hasMenuPermission(node.menuKey) && !seen.has(node.menuKey)) {
+        result.push({
+          key: node.menuKey, label: node.name, nameEn: node.nameEn, icon: node.icon,
+          path, group: group || node.parentName || '',
+        })
+        seen.add(node.menuKey)
+      }
+      if (node.children?.length) {
+        visit(node.children, node.type === HOME_MENU_TYPE.DIRECTORY ? node.name : group, owner)
+      }
+    }
+  }
+  visit(tree, '', systemCode)
+  return result
+}
 
 /** localStorage key（按用户隔离） */
 export const FAV_KEY = (username: string) => `home_favorites:${username}`

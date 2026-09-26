@@ -16,7 +16,9 @@
       "phase": "MENU_SEED",
       "executionType": "JAVA",
       "executor": "dataInitializer",
-      "dependencies": ["core:schema-v10"],
+      "dependencies": [
+        "core:schema-v10"
+      ],
       "status": "SUPERSEDED",
       "supersededBy": "core:menu-seed-v42"
     },
@@ -26,9 +28,49 @@
       "phase": "MENU_SEED",
       "executionType": "JAVA",
       "executor": "dataInitializer",
-      "dependencies": ["core:schema-v10"],
-      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "core:menu-seed-v43",
       "comment": "v42: 集团人事拆分——将字典维护(hr-dict)、合同台账(contract-ledger)从员工管理页按钮提升为 hr 分组下的独立菜单（可单独授权）。seedSystemMenus 幂等重跑：新增两菜单 + 回填 admin 授权 + reconcileMenuMasterData 每次启动自愈排序/图标/英文名。"
+    },
+    {
+      "versionKey": "core:menu-seed-v43",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "core:menu-seed-v44",
+      "comment": "v43: HR 入转调离——hr 分组种子新增 hr-onboarding/hr-regularization/hr-transfer/hr-dimission 四菜单（新员工库首建即含）；reconcileMenuMasterData 同步插入员工管理后的排序与图标/英文名自愈。"
+    },
+    {
+      "versionKey": "core:menu-seed-v44",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "comment": "v44: 規則配置拆分——新增 rule-center 目录 + rule-ad-sales/rule-gift/rule-security/rule-algorithm/rule-seq 五子菜单（平台配置系统），旧 rule-config 保留改名「規則總覽」；splitRuleConfigMenus 幂等复制存量 rule-config 角色/部门授权至新子菜单与 asset-basic，回填 system_code=platform。"
+    },
+    {
+      "versionKey": "core:hr-menu-groups-v44",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:menu-seed-v44"
+      ],
+      "status": "ACTIVE",
+      "comment": "v44 集团人事菜单分组化 + 组织域独立：hr 下新增 hr-profile(員工檔案)/hr-lifecycle(入轉調離)/hr-config(基礎配置) 三个二级分组，平铺菜单归组（員工管理/員工動態 → 員工檔案；入職/轉正/調動/離職 → 入轉調離；職位管理/字典維護/合同台賬 → 基礎配置）；同时新建一级菜单域 org-center「組織管理」，原 organization-management 改 key 为 org-structure(部門架構, 路由 /organization-management 不变)并挂其下。分组与目录为纯结构节点不改叶子授权（menu_id 不变，角色/部门授权自动跟随），admin 补授目录 view；排序/图标/英文名由 reconcileMenuMasterData 每次启动自愈（含 syncOrganizationDomain）。"
     },
     {
       "versionKey": "core:legacy-perm-migrate-v1",
@@ -36,7 +78,9 @@
       "phase": "DATA_MIGRATION",
       "executionType": "JAVA",
       "executor": "dataInitializer",
-      "dependencies": ["core:menu-seed-v41"],
+      "dependencies": [
+        "core:menu-seed-v41"
+      ],
       "status": "ACTIVE"
     },
     {
@@ -77,7 +121,10 @@
       "phase": "MENU_SEED",
       "executionType": "JAVA",
       "executor": "consumableSchemaInitializer",
-      "dependencies": ["core:menu-seed-v41", "consumable:schema-v1.0"],
+      "dependencies": [
+        "core:menu-seed-v41",
+        "consumable:schema-v1.0"
+      ],
       "status": "ACTIVE",
       "comment": "独立下线耗材分类、品牌、计量单位三个旧菜单，仅停用并软删除菜单；附后置校验，每次启动修复复活记录，不重跑 EAM v8 或修改业务表。"
     },
@@ -139,7 +186,9 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "adPromotionDataInitializer",
-      "dependencies": ["adpromo:15_hot_merchant_ad.sql:v1.1"],
+      "dependencies": [
+        "adpromo:15_hot_merchant_ad.sql:v1.1"
+      ],
       "status": "ACTIVE",
       "selfHealContract": "hot-skin-discount",
       "comment": "人气商家共享/独立折扣及皮肤归属，仅补列，保留历史百分比和订单。"
@@ -159,7 +208,9 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "aiGovernanceSchemaInitializer",
-      "dependencies": ["core:schema-v10"],
+      "dependencies": [
+        "core:schema-v10"
+      ],
       "status": "ACTIVE",
       "selfHealContract": "ai-tool-policy",
       "comment": "V0 企业治理底座：ai_tool_policy / ai_tool_exec_log / ai_budget_ledger / ai_grant_log / ai_conversation_event 5 表 + ai_employee_auth.capability_json + biz_llm_usage.verification_status 补列 + 内置工具策略种子；applyOnce 附后置强校验，失败不记版本。"
@@ -170,7 +221,9 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "aiDeliveryLogInitializer",
-      "dependencies": ["ai:governance:v1.0"],
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
       "status": "ACTIVE",
       "selfHealContract": "ai-delivery-log",
       "comment": "V0 §八 V0-6：ai_delivery_log 建表，记录 AI 工具向外部渠道投递的受理状态（dingtalk/email/wecom）。"
@@ -199,9 +252,37 @@
       "phase": "MENU_SEED",
       "executionType": "JAVA",
       "executor": "systemPortalSchemaInitializer",
-      "dependencies": ["core:menu-seed-v41"],
+      "dependencies": [
+        "core:menu-seed-v41"
+      ],
       "status": "ACTIVE",
       "comment": "统一门户与分系统改造阶段 B 底座：建 sys_system / sys_role_system / sys_department_system 3 表 + sys_menu 补列 system_code + 10 个业务系统种子 + 顶级菜单归属回填 + 叶子菜单继承 + 一次性从菜单授权推导系统准入（仅当版本未记录时执行）。后置校验失败不记版本，下次启动重试。唯一真值来源：docs/system-portal/inventory.md。"
+    },
+    {
+      "versionKey": "core:ai-menu-system-ownership-v1.0",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemPortalSchemaInitializer",
+      "dependencies": [
+        "core:menu-seed-v42",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "独立修复 AI 根目录及后代缺失的系统归属，附后置校验且每次启动自愈；保留菜单 ID、显式归属及角色/部门授权，不重跑系统准入推导或全量菜单种子。"
+    },
+    {
+      "versionKey": "core:seller-promotion-reports-v1.0",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemPortalSchemaInitializer",
+      "dependencies": [
+        "core:menu-seed-v42",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "商家工作台已存在时，将报表分析及三个报表原 ID 迁入 seller-center，停用广告系统空的店铺随心推目录；不改购买入口、菜单授权或系统准入。附后置校验和启动自愈；未配置 seller 的环境延后执行且不记成功。"
     },
     {
       "versionKey": "hr:dict-schema-v1",
@@ -227,7 +308,10 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "permissionRevisionInitializer",
-      "dependencies": ["core:schema-v10", "core:system-portal:v1.0"],
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
       "status": "ACTIVE",
       "comment": "权限版本号（统一门户 Round 3）：建 sys_permission_revision 单行表 + seed id=1；与 PermissionService.evictAll 搭配，任意实例的授权写入 → 其他实例下次读自动重新加载，不依赖内存 evictAll 传递。"
     },
@@ -237,7 +321,11 @@
       "phase": "MENU_SEED",
       "executionType": "JAVA",
       "executor": "systemAuthorizationMenuInitializer",
-      "dependencies": ["core:menu-seed-v41", "core:system-portal:v1.0", "core:permission-revision:v1.0"],
+      "dependencies": [
+        "core:menu-seed-v41",
+        "core:system-portal:v1.0",
+        "core:permission-revision:v1.0"
+      ],
       "status": "ACTIVE",
       "comment": "权限中心系统授权菜单（Round 4）：在 permission 下注入 system-authorization 叶子菜单，归属 iam 系统；内置 admin 角色补授 view/edit；落地后 evictAll 递增 revision 保证跨实例菜单快照与新页面入口同步生效。"
     },
@@ -247,9 +335,108 @@
       "phase": "DATA_MIGRATION",
       "executionType": "JAVA",
       "executor": "employeeSelfServiceRoleInitializer",
-      "dependencies": ["core:system-portal:v1.0", "core:permission-revision:v1.0", "iam:system-authz-menu:v1.0"],
+      "dependencies": [
+        "core:system-portal:v1.0",
+        "core:permission-revision:v1.0",
+        "iam:system-authz-menu:v1.0"
+      ],
       "status": "ACTIVE",
       "comment": "员工自助基底角色（Round 6）：内置 code=employee_self_service 角色 + OA 系统准入 + 流程事项/流程中心 view；新员工创建时若无其他角色自动绑定。不会批量回填存量员工，避免越权。"
+    },
+    {
+      "versionKey": "iam:perm-audit-table:v1.0",
+      "module": "iam",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "permissionAuditSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "perm-audit-log",
+      "comment": "权限中心重构：建 sys_permission_audit_log 授权变更审计表（目标/系统/变更类型/前后快照/操作人）；关键写入路径同步登记 ContractRegistry 启动自愈。参考 SQL: 194_authz_center.sql"
+    },
+    {
+      "versionKey": "iam:authz-center-menu:v1.0",
+      "module": "iam",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "authzCenterMenuInitializer",
+      "dependencies": [
+        "iam:system-authz-menu:v1.0",
+        "iam:perm-audit-table:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "统一授权中心菜单：permission 下新增 authorization-center（旧 功能授權/系統授權 双入口合并）；存量目标对旧菜单的授权 union 迁移到新菜单并补齐 iam 系统准入；admin 回填全量动作；旧菜单 status=0 停用（可回滚）。参考 SQL: 194_authz_center.sql"
+    },
+    {
+      "versionKey": "hr:lifecycle-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrLifecycleSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "biz:tables-v1"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-lifecycle-request",
+      "comment": "HR 入转调离：建 hr_lifecycle_request 单据表 + biz_oa_process 四类 HR 流程定义(hr_onboard/hr_regular/hr_transfer/hr_dimission) + RS 单据编号规则种子；applyOnce 带后置校验；表结构登记 ContractRegistry 启动自愈。参考 SQL: 195_hr_lifecycle.sql"
+    },
+    {
+      "versionKey": "hr:lifecycle-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrLifecycleMenuInitializer",
+      "dependencies": [
+        "core:menu-seed-v43",
+        "hr:lifecycle-schema:v1.0",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "HR 入转调离菜单：hr 分组下新增 hr-onboarding/hr-regularization/hr-transfer/hr-dimission 四个二级菜单，admin 补授全量动作并 evictAll 递增 revision；排序/图标/英文名由 reconcileMenuMasterData 每次启动自愈。"
+    },
+    {
+      "versionKey": "hr:lifecycle-renew:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrLifecycleRenewSchemaInitializer",
+      "dependencies": [
+        "hr:lifecycle-schema:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-lifecycle-request",
+      "comment": "P0 合同到期预警与续签：hr_lifecycle_request 增加合同维度 7 列（contract_id/contract_no/new_contract_no/new_contract_type/new_contract_company/new_contract_start_date/new_contract_end_date），逐列查 INFORMATION_SCHEMA 后 ADD（MySQL 无 ADD COLUMN IF NOT EXISTS），并种子 biz_oa_process.hr_renew；列契约登记 ContractRegistry 启动自愈，续签审批通过自动写新合同+终止原合同。参考 SQL: 196_hr_lifecycle_renew.sql"
+    },
+    {
+      "versionKey": "hr:leave-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrLeaveSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:dict-schema-v1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P0 假期额度与请假：建 hr_leave_balance（员工×年度×假别额度，used_days 仅由审批回调累加）与 hr_leave_request（请假单，复用 biz_oa_process.oa_leave 审批），种子 sys_hr_dict.LEAVE_TYPE 七类与 sys_biz_seq_rule.hr_leave_request(LQ)；applyOnce 带后置校验。请假/额度两个菜单待前端页面就绪后由后续迁移创建，避免死菜单。参考 SQL: 197_hr_leave.sql"
+    },
+    {
+      "versionKey": "hr:leave-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrLeaveSchemaInitializer",
+      "dependencies": [
+        "hr:leave-schema:v1.0",
+        "core:hr-menu-groups-v44",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "HR 假期菜单：hr-profile(員工檔案) 下新增 hr-leave(請假管理) / hr-leave-quota(假期額度) 两个二级菜单，admin 补授全量动作并 evictAll 递增 revision；归属/排序/图标/英文名由 reconcileMenuMasterData 每次启动自愈。"
     }
   ]
 }

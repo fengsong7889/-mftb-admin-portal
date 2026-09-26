@@ -15,6 +15,7 @@ import java.util.Map;
 /**
  * 购买公司字典接口
  * 管理耗材/资产业务的购买公司（法人主体），前端动态加载；与所属品牌相互独立。
+ * <p>实际消费方为物资管理（资产/耗材档案），菜单拆分后归属 asset-basic（基础数据）。
  */
 @RestController
 @RequestMapping("/api/purchase-companies")
@@ -22,7 +23,7 @@ import java.util.Map;
 @Tag(name = "系统管理 - 购买公司", description = "购买公司字典 CRUD 接口")
 public class SysPurchaseCompanyController {
 
-    private static final String MENU = "rule-config";
+    private static final String MENU = "asset-basic";
 
     private final SysPurchaseCompanyService companyService;
 

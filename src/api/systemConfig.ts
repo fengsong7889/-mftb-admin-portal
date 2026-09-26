@@ -24,3 +24,33 @@ export function getSystemConfigSilent(key: string): Promise<string | null> {
 export function updateSystemConfig(key: string, value: string): Promise<void> {
   return request.put(`/sys-config/${key}`, { value })
 }
+
+/**
+ * 批量读取配置值（规则配置页一次拉取整版块，避免 N 次单 key 往返）。
+ * @param keys 需要读取的 config key 列表
+ * @returns key → 值；后端不存在或本地专用的 key 不会出现在结果中
+ */
+export function batchGetSystemConfig(keys: string[]): Promise<Record<string, string>> {
+  if (keys.length === 0) return Promise.resolve({})
+  return request.get('/sys-config/batch', { params: { keys: keys.join(',') } })
+}
+
+/** 静默批量读取：后端不可用时返回空映射，不弹错误提示 */
+export function batchGetSystemConfigSilent(keys: string[]): Promise<Record<string, string>> {
+  if (keys.length === 0) return Promise.resolve({})
+  return request
+    .get<unknown, Record<string, string>>('/sys-config/batch', {
+      params: { keys: keys.join(',') },
+      headers: { [SILENT_HEADER]: '1' },
+    })
+    .then((res) => res ?? {})
+    .catch(() => ({}))
+}
+
+/**
+ * 批量更新配置值（单事务落库）。失败时抛出，由调用方决定提示。
+ * @param values key → 新值（本地专用布尔 key 由后端自动跳过）
+ */
+export function batchUpdateSystemConfig(values: Record<string, string>): Promise<void> {
+  return request.put('/sys-config/batch', values)
+}

@@ -52,12 +52,19 @@ public class RoleController {
         return Result.success("角色信息已更新", roleService.update(id, request));
     }
 
-    /** 保存角色菜单权限 */
+    /** 保存角色菜单权限（旧全量写入口，已由授权中心按系统原子写替代，保留兼容） */
     @PutMapping("/{id}/permissions")
-    @RequirePermission(menu = "function-permission", action = "edit")
+    @RequirePermission(menu = "authorization-center", action = "edit", anyOf = {"function-permission"})
     public Result<Void> updatePermissions(@PathVariable Long id, @RequestBody List<MenuPermissionDTO> permissions) {
         roleService.updatePermissions(id, permissions);
         return Result.success();
+    }
+
+    /** 复制角色：克隆菜单授权与系统准入，新名称需唯一 */
+    @PostMapping("/{id}/copy")
+    @RequirePermission(menu = "role-management", action = "create", anyOf = {"authorization-center"})
+    public Result<RoleVO> copy(@PathVariable Long id, @Valid @RequestBody RoleRequest request) {
+        return Result.success("角色已複製", roleService.copy(id, request));
     }
 
     /** 启用/停用 */
@@ -85,7 +92,7 @@ public class RoleController {
 
     /** 全量设置绑定该角色的用户 */
     @PutMapping("/{id}/users")
-    @RequirePermission(menu = "function-permission", action = "edit")
+    @RequirePermission(menu = "role-management", action = "edit", anyOf = {"authorization-center", "function-permission"})
     public Result<Void> bindUsers(@PathVariable Long id, @RequestBody BindUsersRequest request) {
         roleService.bindUsers(id, request.getUserIds());
         return Result.success();

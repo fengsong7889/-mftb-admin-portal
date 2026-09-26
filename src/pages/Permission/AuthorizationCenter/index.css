@@ -1,0 +1,367 @@
+/* 权限中心 · 统一授权中心页面样式（权限中心重构）
+   规范对齐 AGENTS.md：页面主体使用全局 .content-area 白卡片；
+   本文件只保留页面私有布局与状态样式，不自造背景色卡片。 */
+
+.authz-center-page {
+  padding: 4px;
+}
+
+.authz-center-page .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+/* ── 授权工作台 ── */
+
+.authz-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+/* 目标选择条：表单页风格 label 在上、控件在下，底部分隔线与工作台区分 */
+.authz-target-bar {
+  padding: 0 0 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.authz-target-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.authz-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.authz-field-label {
+  font-size: 13px;
+  color: #595959;
+}
+
+.authz-member-count {
+  font-size: 12px;
+  line-height: 18px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+/* 字段等高占位：与已绑人数提示同高，保证同行选择框顶边对齐 */
+.authz-field-spacer {
+  display: block;
+  height: 18px;
+}
+
+/* 同行 Tag / 按钮与选择框垂直居中（23px = label 行高 + 4px 间距 + 控件半高） */
+.authz-target-row > .ant-tag,
+.authz-target-row > .ant-btn {
+  margin-top: 23px;
+}
+
+.authz-target-hint {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #8c8c8c;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 左系统列表 + 右工作台 */
+.authz-workbench {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 360px;
+}
+
+.authz-sys-panel {
+  width: 208px;
+  flex-shrink: 0;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.authz-sys-panel-title {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #595959;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.authz-sys-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 560px;
+}
+
+.authz-sys-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #262626;
+  border-left: 3px solid transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.authz-sys-item:hover {
+  background: #fafafa;
+}
+
+/* 选中态：品牌橙浅底 + 左侧 3px 指示条（与侧边栏选中语言一致） */
+.authz-sys-item--active {
+  background: #fff7f0;
+  border-left-color: #e8720c;
+  color: #e8720c;
+  font-weight: 500;
+}
+
+.authz-sys-item--active:hover {
+  background: #fff7f0;
+}
+
+.authz-sys-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 准入状态点：绿=已准入 灰=未准入 */
+.authz-sys-access-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  flex-shrink: 0;
+}
+
+.authz-sys-access-dot--on {
+  background: #52c41a;
+}
+
+/* 已授权菜单数角标 */
+.authz-sys-count {
+  font-size: 11px;
+  color: #8c8c8c;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+.authz-sys-item--active .authz-sys-count {
+  color: #e8720c;
+  background: #ffe7d1;
+}
+
+/* 未保存红点 */
+.authz-sys-dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  flex-shrink: 0;
+}
+
+.authz-sys-detail {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.authz-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.authz-detail-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.authz-access-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.authz-revoke-hint {
+  font-size: 12px;
+  color: #fa8c16;
+}
+
+.authz-quick-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.authz-detail-body {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.authz-menu-tree {
+  flex: 1;
+  min-width: 0;
+  max-height: 520px;
+  overflow: auto;
+}
+
+/* 右列动作面板 */
+.authz-action-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border-left: 1px solid #f0f0f0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.authz-action-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.authz-action-panel-menu {
+  font-size: 13px;
+  color: #e8720c;
+  font-weight: 500;
+}
+
+.authz-action-panel-tip {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.6;
+}
+
+.authz-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.authz-action-list .ant-checkbox-wrapper {
+  font-size: 13px;
+  color: #595959;
+}
+
+/* ── 员工权限透视 ── */
+
+.authz-trace-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.authz-trace-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.authz-trace-system-sources {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.authz-trace-collapse {
+  margin-top: 4px;
+}
+
+/* ── 变更审计 ── */
+
+.authz-audit-snapshot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.authz-audit-snapshot-col {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: #fafafa;
+}
+
+.authz-audit-snapshot-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #595959;
+  margin-bottom: 8px;
+}
+
+.authz-audit-perm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.authz-audit-empty {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+@media (max-width: 960px) {
+  .authz-audit-snapshot {
+    grid-template-columns: 1fr;
+  }
+
+  .authz-workbench {
+    flex-direction: column;
+  }
+
+  .authz-sys-panel {
+    width: 100%;
+  }
+
+  .authz-detail-body {
+    flex-direction: column;
+  }
+
+  .authz-action-panel {
+    width: 100%;
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
+  }
+}

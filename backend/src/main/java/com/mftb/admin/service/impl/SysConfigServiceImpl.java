@@ -8,7 +8,12 @@ import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -135,6 +140,43 @@ public class SysConfigServiceImpl implements SysConfigService {
             }
         }
         log.info("系统配置已更新: {} = {}", configKey, configValue);
+    }
+
+    @Override
+    public Map<String, String> getConfigValues(Collection<String> configKeys) {
+        Map<String, String> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(configKeys)) {
+            return result;
+        }
+        java.util.List<String> keys = configKeys.stream()
+                .filter(k -> k != null && !k.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (keys.isEmpty()) {
+            return result;
+        }
+        java.util.List<SysConfig> rows = sysConfigMapper.selectList(
+                new LambdaQueryWrapper<SysConfig>().in(SysConfig::getConfigKey, keys));
+        for (SysConfig row : rows) {
+            result.put(row.getConfigKey(), row.getConfigValue());
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateConfigs(Map<String, String> values) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            updateConfig(key.trim(), entry.getValue());
+        }
     }
 
     /** 从数据库加载空闲超时配置并刷新缓存 */

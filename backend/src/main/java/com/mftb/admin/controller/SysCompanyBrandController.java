@@ -15,6 +15,7 @@ import java.util.Map;
 /**
  * 公司品牌配置接口
  * 管理系统公司品牌（闪蜂/mFood 等），前端动态加载
+ * <p>实际消费方为物资管理（资产/耗材档案），菜单拆分后归属 asset-basic（基础数据）。
  */
 @RestController
 @RequestMapping("/api/company-brands")
@@ -22,7 +23,7 @@ import java.util.Map;
 @Tag(name = "系统管理 - 公司品牌", description = "公司品牌配置 CRUD 接口")
 public class SysCompanyBrandController {
 
-    private static final String MENU = "rule-config";
+    private static final String MENU = "asset-basic";
 
     private final SysCompanyBrandService brandService;
 

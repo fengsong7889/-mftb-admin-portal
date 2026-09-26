@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysDepartmentMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DepartmentService;
+import com.mftb.admin.service.PermissionAuditService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.TranslationService;
 import com.mftb.admin.util.BizSeqService;
@@ -49,6 +50,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
+    private final PermissionAuditService permissionAuditService;
     private final TranslationService translationService;
     private final BizSeqService bizSeqService;
 
@@ -165,8 +167,15 @@ public class DepartmentServiceImpl implements DepartmentService {
         requireDept(id);
         // Round 5 · 旧写入口告警：全量写会跨系统覆盖，推荐迁移到
         // PUT /api/departments/{id}/systems/{code}/authorization，保存不跨系统。
-        log.warn("[deprecated-path] DepartmentServiceImpl.updatePermissions 正在全量覆盖部门 {} 的菜单授权（跨系统）；推荐前端迁移到系统授权页", id);
+        log.warn("[deprecated-path] DepartmentServiceImpl.updatePermissions 正在全量覆盖部门 {} 的菜单授权（跨系统）；推荐前端迁移到授权中心原子写接口", id);
+        List<MenuPermissionDTO> before = loadPermissions(id);
         saveDeptMenus(id, permissions);
+        List<MenuPermissionDTO> after = loadPermissions(id);
+        String changeType = after.isEmpty()
+                ? (before.isEmpty() ? PermissionAuditService.CHANGE_UPDATE : PermissionAuditService.CHANGE_DELETE)
+                : (before.isEmpty() ? PermissionAuditService.CHANGE_GRANT : PermissionAuditService.CHANGE_UPDATE);
+        permissionAuditService.record(PermissionAuditService.TARGET_DEPARTMENT, id, null, null,
+                changeType, before, after);
         permissionService.evictAll();
     }
 

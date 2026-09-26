@@ -3,6 +3,8 @@ package com.mftb.admin.service;
 import com.mftb.admin.dto.SystemAuthorizationRequest;
 import com.mftb.admin.dto.SystemAuthorizationVO;
 
+import java.util.List;
+
 /**
  * 系统授权读写服务（Round 3）。
  * <p>把「角色 / 部门 × 单个业务系统」的准入 + 该系统内菜单动作作为一个原子单位读写，
@@ -17,6 +19,9 @@ public interface SystemAuthorizationService {
 
     /** 读取目标在指定系统的授权快照。 */
     SystemAuthorizationVO read(String targetType, Long targetId, String systemCode);
+
+    /** 单目标 × 全部启用系统（排除 portal 哨兵）的授权快照列表，供工作台总览与角色复制使用。 */
+    List<SystemAuthorizationVO> readAllSystems(String targetType, Long targetId);
 
     /**
      * 原子保存目标在指定系统的授权。

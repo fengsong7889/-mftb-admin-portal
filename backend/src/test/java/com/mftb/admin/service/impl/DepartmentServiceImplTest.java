@@ -49,7 +49,7 @@ class DepartmentServiceImplTest {
                     """);
         }
         service = new DepartmentServiceImpl(session.getMapper(SysDepartmentMapper.class),
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 
     @AfterEach

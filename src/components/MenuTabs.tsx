@@ -176,6 +176,16 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/asset-return/detail': { fixed: '歸還詳情' },
   '/asset-return/dispose': { fixed: '處置登記' },
   '/asset-return/recover': { fixed: '遺失找回' },
+  // 集團人事（入轉調離 / 請假）子頁面 —— 與頁面 DetailPageHeader 標題保持一致，禁止退回 slug 文案
+  '/hr-flow-detail': { fixed: 'i18n:hrLifecycle.flowDetailTitle' },
+  '/hr-leave-detail': { fixed: 'i18n:hrLeave.detailTitle' },
+  '/hr-leave-form': { fixed: 'i18n:hrLeave.formTitle' },
+  '/hr-leave-quota-form': { add: 'i18n:hrLeave.addQuotaTitle', edit: 'i18n:hrLeave.editQuotaTitle' },
+  '/hr-onboarding-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
+  '/hr-regularization-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
+  '/hr-transfer-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
+  '/hr-dimission-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
+  '/hr-contract-renew-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
 }
 
 /**

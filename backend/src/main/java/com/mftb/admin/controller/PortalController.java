@@ -12,6 +12,7 @@ import com.mftb.admin.service.MenuService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -98,7 +99,7 @@ public class PortalController {
         SysUser user = operatorResolver.currentUser();
         requireSystemAccess(user, code);
         List<MenuVO> fullTree = menuService.tree();
-        List<MenuVO> scoped = filterBySystemAndPermission(fullTree, code, user);
+        List<MenuVO> scoped = filterBySystemAndPermission(fullTree, code, user, null);
         return Result.success(scoped);
     }
 
@@ -114,32 +115,35 @@ public class PortalController {
      * 叶子菜单需同时满足 “启用 + 当前用户具有 view 动作”；目录保留只要子级非空。
      * 超管在 hasPermission 中已直通，无需额外分支。
      */
-    private List<MenuVO> filterBySystemAndPermission(List<MenuVO> nodes, String systemCode, SysUser user) {
+    private List<MenuVO> filterBySystemAndPermission(
+            List<MenuVO> nodes, String systemCode, SysUser user, String inheritedSystem) {
         List<MenuVO> result = new ArrayList<>();
         for (MenuVO node : nodes) {
             if (node.getStatus() == null || node.getStatus() != 1) {
                 continue;
             }
-            if (node.getParentId() == null) {
-                // 顶级：仅保留系统命中的根
-                if (!systemCode.equals(node.getSystemCode())) {
-                    continue;
-                }
-            }
+            String owner = node.getSystemCode() == null ? inheritedSystem : node.getSystemCode();
             List<MenuVO> children = node.getChildren() == null ? List.of() : node.getChildren();
-            List<MenuVO> filteredChildren = filterBySystemAndPermission(children, systemCode, user);
+            List<MenuVO> filteredChildren = filterBySystemAndPermission(children, systemCode, user, owner);
+            // 菜单配置等节点可物理挂在其他系统下，按显式归属提升，不能混入外层系统。
+            if (!systemCode.equals(owner)) {
+                result.addAll(filteredChildren);
+                continue;
+            }
             boolean isLeaf = children.isEmpty();
             if (isLeaf) {
                 // 叶子菜单：有 view 权限才保留（目录 type=1 不要求权限，自身不参与 @RequirePermission）
                 boolean permitted = node.getType() != null && node.getType() == 2
-                        ? permissionService.hasPermission(user, node.getMenuKey(), "view")
-                        : true;
+                        && permissionService.hasPermission(user, node.getMenuKey(), "view");
                 if (permitted) {
                     result.add(node);
                 }
             } else if (!filteredChildren.isEmpty()) {
-                node.setChildren(filteredChildren);
-                result.add(node);
+                // 不修改全量菜单树，避免一次系统剪枝污染后续系统导航。
+                MenuVO scoped = new MenuVO();
+                BeanUtils.copyProperties(node, scoped);
+                scoped.setChildren(filteredChildren);
+                result.add(scoped);
             }
         }
         return result;

@@ -8,6 +8,7 @@
   background: linear-gradient(180deg, #f7f8fa 0%, #f2f4f7 100%);
   /* 視口高度 - 頂栏 64px - 菜單欄目標 ~37px - .app-content 上下 margin 32px，確保頁面不滾動 */
   height: calc(100vh - 133px);
+  min-height: 640px;
   overflow: visible;
   display: flex;
   flex-direction: column;
@@ -23,10 +24,11 @@
   justify-content: space-between;
   align-items: center;
   background: #ffffff;
-  border-radius: 14px;
-  padding: 12px 24px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05);
-  border: 1px solid #eef0f3;
+  border-radius: 12px;
+  padding: 16px 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f0f0f0;
+  border-top: 3px solid #E8720C;
   flex-shrink: 0;
 }
 
@@ -123,7 +125,7 @@
    ───────────────────────────────────────── */
 .home-main-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
   flex: 1;
   min-height: 0;
@@ -223,6 +225,10 @@
 }
 
 .home-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.5px;
@@ -235,6 +241,8 @@
   line-height: 1.4;
   vertical-align: middle;
 }
+
+.home-ai-badge-icon { font-size: 10px; }
 
 /* 徽章區：引擎標識 + 內測模式 */
 .home-ai-badges {
@@ -881,6 +889,45 @@
   color: #595959;
 }
 
+.home-quick-scope { font-size: 12px; color: #E8720C; }
+.home-quick-hint { font-size: 12px; color: #8C8C8C; line-height: 1.6; }
+.home-quick-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: #8C8C8C;
+}
+
+.home-quick-item-open,
+.home-quick-chip-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-quick-item-open:focus-visible,
+.home-quick-chip-open:focus-visible,
+.home-quick-chip-remove:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
+}
+
+.home-quick-item-label { min-width: 0; overflow-wrap: anywhere; }
+.home-quick-item-label small { display: block; color: #8C8C8C; font-size: 11px; }
+
 .home-quick-search {
   position: relative;
   width: 100%;
@@ -911,15 +958,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
+  padding: 8px 10px;
   transition: background 0.2s;
   border-bottom: 1px solid #f7f7f7;
 }
 
 .home-quick-item:last-child { border-bottom: none; }
 .home-quick-item:hover { background: #fafbfc; }
-.home-quick-item.is-added { opacity: 0.55; cursor: not-allowed; }
 
 .home-quick-item-icon { color: #E8720C; font-size: 15px; }
 .home-quick-item-label { flex: 1; font-size: 13px; color: #333; }
@@ -986,7 +1031,8 @@
   align-items: center;
 }
 
-.home-quick-chip:hover .home-quick-chip-remove { opacity: 1; }
+.home-quick-chip:hover .home-quick-chip-remove,
+.home-quick-chip:focus-within .home-quick-chip-remove { opacity: 1; }
 .home-quick-chip-remove:hover { color: #ff4d4f; }
 
 /* ─────────────────────────────────────────

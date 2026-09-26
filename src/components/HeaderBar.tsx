@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Layout, Dropdown, Badge, Popover, Avatar, Modal, Input, message, Select, Tag, Button, Empty, Spin, Tabs } from 'antd'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Layout, Dropdown, Badge, Popover, Avatar, Modal, Input, message, Tag, Button, Empty, Spin, Tabs } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   MenuFoldOutlined,
@@ -20,18 +20,7 @@ import { useNavigate } from 'react-router-dom'
 import PikachuFace from './PikachuFace'
 import SystemSwitcher from './SystemSwitcher'
 import { useTranslation } from 'react-i18next'
-import { changeAppLanguage, SUPPORTED_LANGUAGES, ensureLanguageBundle } from '../i18n'
-import type { AppLanguage } from '../i18n'
-import {
-  COUNTRY_INFO,
-  countrySysName,
-  getCountryOfLanguage,
-  LANG_INFO,
-  langSysName,
-  validateLanguageConfigured,
-} from '../utils/translationConfig'
-import type { LangValidationResult } from '../utils/translationConfig'
-import { fetchCoverage } from '../api/translation'
+import { PortalLocaleControls } from './PortalTopBar'
 import { pinyin } from 'pinyin-pro'
 import { fetchNotifications, markAllNotificationsRead, type NotificationItem } from '../api/notification'
 import { updateAvatarApi, uploadAvatarApi } from '../api/auth'
@@ -83,97 +72,6 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
   const [oldPwd, setOldPwd] = useState('')
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
-  const [selectedCountry, setSelectedCountry] = useState<string>('usa')
-  const [selectedLang, setSelectedLang] = useState<string>('en')
-
-  // 国家选项：与多语言配置的国家数据一致，名称跟随全局语言
-  const countryOptions = useMemo(() =>
-    Object.keys(COUNTRY_INFO).map(code => ({
-      value: code,
-      flag: COUNTRY_INFO[code].flag,
-      label: countrySysName(code, i18nInstance.language || 'en'),
-    })), [i18nInstance.language])
-
-  // 语言选项：展示全部语言（与国家不联动），语言种类与多语言配置一致
-  const languageOptions = useMemo(() =>
-    Object.keys(LANG_INFO).map(code => ({
-      value: code,
-      flag: LANG_INFO[code]?.flag ?? '🌐',
-      label: langSysName(code, i18nInstance.language || 'en'),
-    })), [i18nInstance.language])
-
-  // 从 localStorage 读取国家/语言选择（兼容旧版数据：旧国家编码直接有效，旧语言编码反查所属国家）
-  useEffect(() => {
-    const saved = localStorage.getItem('selected_country')
-    let country = 'usa'
-    if (saved) {
-      if (COUNTRY_INFO[saved]) {
-        country = saved
-      } else if (LANG_INFO[saved]) {
-        country = getCountryOfLanguage(saved)
-      }
-    }
-    setSelectedCountry(country)
-    const savedLang = localStorage.getItem('app_language')
-    setSelectedLang(savedLang && LANG_INFO[savedLang] ? savedLang : 'en')
-  }, [])
-
-  /** 执行语言切换（含后端语言包注入，会话内同语言去重） */
-  const doSwitchLanguage = async (lang: string) => {
-    const selected = languageOptions.find(o => o.value === lang)
-    // 拉取后端数据库语言包注入 i18next（业务字段/菜单名等动态翻译）
-    await ensureLanguageBundle(lang)
-    setSelectedLang(lang)
-    localStorage.setItem('app_language', lang)
-    if ((SUPPORTED_LANGUAGES as readonly string[]).includes(lang)) {
-      changeAppLanguage(lang as AppLanguage)
-      message.success(t('header.switchedCountry', { flag: selected?.flag ?? '', name: selected?.label ?? lang }))
-    } else {
-      message.info(`已切换至 ${selected?.flag ?? ''} ${selected?.label ?? lang}，该语言的界面文案将在翻译资源导入后生效`)
-    }
-    // 触发全局事件，其他组件可以监听
-    window.dispatchEvent(new CustomEvent('countryChange', { detail: selectedCountry }))
-  }
-
-  // 处理语言选择：先校验该语言是否已在「多语言配置」完成配置（优先后端真实完成率）
-  const handleLanguageChange = async (lang: string) => {
-    const remote = await fetchCoverage(lang)
-    const validation: LangValidationResult = remote ?? validateLanguageConfigured(lang)
-    const selected = languageOptions.find(o => o.value === lang)
-    const displayName = `${selected?.flag ?? ''} ${selected?.label ?? lang}`
-
-    if (validation.status === 'not_configured') {
-      Modal.warning({
-        title: '该语言未配置',
-        content: `${displayName} 尚未在多语言配置中完成配置，请先到「系统配置 → 多语言配置」添加该语言并补充翻译后再进行选择。`,
-        okText: '知道了',
-      })
-      return
-    }
-    if (validation.status === 'partial') {
-      Modal.confirm({
-        title: '该语言翻译未完整',
-        content: `${displayName} 的翻译完成率仅 ${Math.round(validation.rate * 100)}%（未达 60% 标准，已翻译 ${validation.translated}/${validation.total} 个字段），切换后未翻译的内容将以英文显示。是否仍要切换？`,
-        okText: '仍要切换',
-        cancelText: '取消',
-        onOk: () => doSwitchLanguage(lang),
-      })
-      return
-    }
-    doSwitchLanguage(lang)
-    // 达标但未 100%：提示未配置字段将回退英文展示
-    if (validation.rate < 1) {
-      message.info(`${displayName} 翻译完成率 ${Math.round(validation.rate * 100)}%，未配置的字段将以英文显示`)
-    }
-  }
-
-  /** 处理国家选择：仅持久化国家，不联动语言（语言可独立选择任意语言） */
-  const handleCountryChange = (country: string) => {
-    setSelectedCountry(country)
-    localStorage.setItem('selected_country', country)
-    window.dispatchEvent(new CustomEvent('countryChange', { detail: country }))
-  }
-
   /** 退出登录 */
   const handleLogout = async () => {
     await logout()
@@ -526,34 +424,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
           <SystemSwitcher />
         </div>
         <div className="header-right">
-          {/* 国家选择器 */}
-          <Select
-            showSearch
-            value={selectedCountry}
-            onChange={handleCountryChange}
-            style={{ width: 150, marginRight: 12 }}
-            options={countryOptions.map(option => ({
-              value: option.value,
-              label: `${option.flag} ${option.label}`,
-            }))}
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
-          {/* 语言选择器（全部语言可选，与国家独立） */}
-          <Select
-            showSearch
-            value={selectedLang}
-            onChange={handleLanguageChange}
-            style={{ width: 130, marginRight: 16 }}
-            options={languageOptions.map(option => ({
-              value: option.value,
-              label: `${option.flag} ${option.label}`,
-            }))}
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-            }
-          />
+          <PortalLocaleControls />
 
           {/* 通知铃铛 */}
           <Popover

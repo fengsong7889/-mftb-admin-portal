@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -16,6 +16,7 @@ import {
   updateRoleStatus,
 } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
+import { copyRole } from '../../../api/authorizationCenter'
 import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
 
@@ -26,6 +27,11 @@ const ROLE_STATUS = {
   ENABLED: 1,
   DISABLED: 0,
 } as const
+
+/** 内置超级管理员角色编码：绑定即获得超管直通权限，禁止绑定账号/停用/删除 */
+const BUILTIN_ADMIN_ROLE_CODE = 'admin'
+const isBuiltinAdminRole = (record: RoleItem) =>
+  record.code?.toLowerCase() === BUILTIN_ADMIN_ROLE_CODE
 
 /** 新增/编辑表单值 */
 interface RoleFormValues {
@@ -69,6 +75,11 @@ export default function RoleManagement() {
   const [viewTarget, setViewTarget] = useState<RoleItem | null>(null)
   const [viewUsers, setViewUsers] = useState<EmployeeItem[]>([])
   const [viewLoading, setViewLoading] = useState(false)
+
+  // 复制角色弹窗（克隆菜单授权 + 系统准入）
+  const [copyModalVisible, setCopyModalVisible] = useState(false)
+  const [copyTarget, setCopyTarget] = useState<RoleItem | null>(null)
+  const [copyForm] = Form.useForm<RoleFormValues>()
 
   /** 加载角色列表 */
   const fetchList = useCallback(async () => {
@@ -232,8 +243,52 @@ export default function RoleManagement() {
     }
   }
 
+  /** 打开复制角色弹窗（预填默认名称） */
+  const handleOpenCopy = (record: RoleItem) => {
+    setCopyTarget(record)
+    copyForm.resetFields()
+    copyForm.setFieldsValue({
+      name: `${record.name}${t('roleManagement.copySuffix', '-副本')}`,
+      description: record.description,
+    })
+    setCopyModalVisible(true)
+  }
+
+  /** 提交复制角色 */
+  const handleCopySubmit = async () => {
+    if (!copyTarget) return
+    const values = await copyForm.validateFields()
+    setSubmitting(true)
+    try {
+      await copyRole(copyTarget.id, {
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+      })
+      message.success(t('roleManagement.copySuccess', '角色已複製（含菜單授權與系統准入）'))
+      setCopyModalVisible(false)
+      fetchList()
+    } catch {
+      // 错误提示由请求层统一处理
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const columns: TableColumnsType<RoleItem> = [
-    { title: t('roleManagement.colName'), dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: t('roleManagement.colName'),
+      dataIndex: 'name',
+      key: 'name',
+      width: 220,
+      render: (name: string, record) => (
+        <Space size={4}>
+          <span>{name}</span>
+          {isBuiltinAdminRole(record) && (
+            <Tag color="orange">{t('roleManagement.builtinAdminTag', '內置超管')}</Tag>
+          )}
+        </Space>
+      ),
+    },
     { title: t('roleManagement.colDescription'), dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string) => v || '-' },
     {
       title: t('common.colStatus'),
@@ -245,6 +300,7 @@ export default function RoleManagement() {
           checked={record.status === ROLE_STATUS.ENABLED}
           checkedChildren={t('roleManagement.statusEnabled')}
           unCheckedChildren={t('roleManagement.statusDisabled')}
+          disabled={isBuiltinAdminRole(record)}
           onChange={() => handleToggleStatus(record)}
         />
       ),
@@ -284,7 +340,7 @@ export default function RoleManagement() {
     {
       title: t('common.colAction'),
       key: 'action',
-      width: 180,
+      width: 230,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           {hasPermission('role-management:edit') && (
@@ -292,12 +348,17 @@ export default function RoleManagement() {
               {t('common.edit')}
             </Button>
           )}
-          {hasPermission('role-management:edit') && (
+          {hasPermission('role-management:create') && (
+            <Button type="link" size="small" onClick={() => handleOpenCopy(record)}>
+              {t('common.copy', '複製')}
+            </Button>
+          )}
+          {hasPermission('role-management:edit') && !isBuiltinAdminRole(record) && (
             <Button type="link" size="small" onClick={() => handleOpenBind(record)}>
               {t('roleManagement.bindAccount')}
             </Button>
           )}
-          {hasPermission('role-management:delete') && (
+          {hasPermission('role-management:delete') && !isBuiltinAdminRole(record) && (
             <Popconfirm
               title={t('common.confirmDelete')}
               description={t('roleManagement.confirmDeleteContent', { name: record.name })}
@@ -418,6 +479,38 @@ export default function RoleManagement() {
           <Form.Item
             name="name"
             label={t('roleManagement.nameLabel')}
+            rules={[{ required: true, message: t('roleManagement.nameRequired') }]}
+          >
+            <Input placeholder={t('roleManagement.namePlaceholder')} allowClear />
+          </Form.Item>
+          <Form.Item name="description" label={t('roleManagement.descLabel')}>
+            <TextArea rows={3} placeholder={t('roleManagement.descPlaceholder')} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 复制角色弹窗：克隆菜单授权与系统准入，名称需唯一 */}
+      <Modal
+        title={t('roleManagement.copyTitle', '複製角色')}
+        open={copyModalVisible}
+        onOk={handleCopySubmit}
+        onCancel={() => setCopyModalVisible(false)}
+        confirmLoading={submitting}
+        okText={t('roleManagement.copyOkText', '確認複製')}
+        cancelText={t('common.cancel')}
+        width={500}
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={t('roleManagement.copyHint', '將複製「{{name}}」的全部菜單授權與系統准入；不複製已綁定賬號。', { name: copyTarget?.name ?? '' })}
+        />
+        <Form form={copyForm} layout="vertical">
+          <Form.Item
+            name="name"
+            label={t('roleManagement.colName')}
             rules={[{ required: true, message: t('roleManagement.nameRequired') }]}
           >
             <Input placeholder={t('roleManagement.namePlaceholder')} allowClear />

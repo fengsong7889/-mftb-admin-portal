@@ -45,8 +45,14 @@
   flex: 1;
 }
 
-.system-switcher-item-active {
+/* 当前系统用品牌橙选中态标识（图标 + 文字 + 浅橙底），不再用箭头符号 */
+.system-switcher-dropdown .ant-dropdown-menu-item-selected,
+.system-switcher-dropdown .ant-dropdown-menu-item-selected:hover {
   color: #E8720C;
-  font-size: 11px;
-  margin-left: 8px;
+  background: #FFF7F0;
+  font-weight: 500;
+}
+
+.system-switcher-dropdown .ant-dropdown-menu-item-selected .anticon {
+  color: #E8720C;
 }

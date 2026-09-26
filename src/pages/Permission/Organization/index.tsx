@@ -129,7 +129,7 @@ export default function OrganizationManagement() {
   const [editing, setEditing] = useState<DepartmentItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form] = Form.useForm<DepartmentFormValues>()
-  // 功能权限校验（菜单 key: organization-management）
+  // 功能权限校验（菜单 key: org-structure）
   const { hasPermission } = useAuth()
   // 全选
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
@@ -423,12 +423,12 @@ export default function OrganizationManagement() {
       width: 130,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          {hasPermission('organization-management:edit') && (
+          {hasPermission('org-structure:edit') && (
             <Button type="link" size="small" onClick={() => handleEdit(record)}>
               {t('common.edit')}
             </Button>
           )}
-          {hasPermission('organization-management:delete') && (
+          {hasPermission('org-structure:delete') && (
             <Popconfirm
               title={t('common.confirmDelete')}
               description={t('organization.confirmDeleteContent', { name: record.name })}
@@ -448,7 +448,7 @@ export default function OrganizationManagement() {
 
   /** 列字段配置 */
   const columnMeta = columns.map(col => ({ key: col.key as string, title: col.title as string }))
-  const { configComponent, applyConfig } = useColumnConfig('organization-management', columnMeta, [
+  const { configComponent, applyConfig } = useColumnConfig('org-structure', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' },
   ])
 
@@ -505,7 +505,7 @@ export default function OrganizationManagement() {
             <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
           </div>
           <div className="action-section-right">
-            {hasPermission('organization-management:create') && (
+            {hasPermission('org-structure:create') && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
                 {t('common.add')}
               </Button>

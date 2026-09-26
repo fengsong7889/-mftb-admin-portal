@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layout, Menu, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -13,6 +13,8 @@ import {
 } from '../hooks/useCurrentSystem'
 import { useSystemNavigation } from '../hooks/useSystemNavigation'
 import type { MenuVO } from '../api/menu'
+import { fetchPortalContext, type PortalSystem } from '../api/portal'
+import { getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
 import { keyToPath, pathToKey } from '../constants/menuDataSource'
 import type { OfflineMenuNode } from '../constants/offlineMenus'
@@ -43,9 +45,11 @@ import {
   ThunderboltOutlined,
   StopOutlined,
   SafetyCertificateOutlined,
+  SafetyOutlined,
   AppstoreOutlined,
   PieChartOutlined,
   GiftOutlined,
+  OrderedListOutlined,
   DashboardOutlined,
   TeamOutlined,
   ShopOutlined,
@@ -79,11 +83,17 @@ import {
   InboxOutlined, // 物资管理一级菜单
   AppstoreAddOutlined, // 资产入库
   UserAddOutlined, // 资产领用/归还
+  UserDeleteOutlined, // 離職管理
+  PartitionOutlined, // 入轉調離分组
+  ClusterOutlined, // 部門架構
+  HourglassOutlined, // 假期額度
+  FolderOutlined, // 員工檔案分组
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
   TagsOutlined, // 资产分类
   TagOutlined, // 资产标签
   ContactsOutlined, // 供应商管理
+  CalendarOutlined, // 請假管理
   BarcodeOutlined, // 產品庫
   EnvironmentOutlined, // 仓库维护
   ShoppingCartOutlined, // 采购申请
@@ -142,14 +152,16 @@ const _OLD_KEY_TO_PATH_REMOVED = {
 
   // 集團人事
   'employee-management': '/employee-management',
-  'organization-management': '/organization-management',
   'position-management': '/position-management',
   'login-log': '/login-log',
-  // 權限管理
+  // 組織管理（v44 一级域）
+  'org-center': '/org-center',
+  'org-structure': '/organization-management',
+  // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 直接重定向到授權中心）
   'role-management': '/role-management',
-  'function-permission': '/function-permission',
+  'authorization-center': '/authorization-center',
+  'function-permission': '/authorization-center',
   'data-permission': '/data-permission',
-  'system-authorization': '/system-authorization',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤
@@ -189,6 +201,11 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'i18n-mt-engine': '/i18n-center/mt-engine',
   'i18n-dashboard': '/i18n-center/dashboard',
   'rule-config': '/rule-config',
+  'rule-ad-sales': '/rule-center/ad-sales',
+  'rule-gift': '/rule-center/gift',
+  'rule-security': '/rule-center/security',
+  'rule-algorithm': '/rule-center/algorithm',
+  'rule-seq': '/rule-center/seq',
   'notification-config': '/notification-config',
   'workflow-config': '/workflow-config',
     'version-history': '/version-history',
@@ -386,8 +403,18 @@ const keyToIcon: Record<string, ReactNode> = {
   'approval': <CheckCircleOutlined />,
   'approval-center': <AuditOutlined />,
   'hr': <TeamOutlined />,
+  'org-center': <ApartmentOutlined />,
+  'org-structure': <ClusterOutlined />,
+  'hr-profile': <FolderOutlined />,
+  'hr-lifecycle': <PartitionOutlined />,
+  'hr-config': <ControlOutlined />,
+  'hr-onboarding': <UserAddOutlined />,
+  'hr-regularization': <CheckCircleOutlined />,
+  'hr-transfer': <SwapOutlined />,
+  'hr-dimission': <UserDeleteOutlined />,
+  'hr-leave': <CalendarOutlined />,
+  'hr-leave-quota': <HourglassOutlined />,
   'employee-management': <UserOutlined />,
-  'organization-management': <ApartmentOutlined />,
   'position-management': <IdcardOutlined />,
   'login-log': <ScheduleOutlined />,
   // OA中心
@@ -402,6 +429,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'flash-sale-price': <MoneyCollectOutlined />,
   'permission': <LockOutlined />,
   'role-management': <SolutionOutlined />,
+  'authorization-center': <SafetyOutlined />,
   'function-permission': <AppstoreOutlined />,
   'data-permission': <DatabaseOutlined />,
   'system-authorization': <SafetyCertificateOutlined />,
@@ -414,6 +442,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'i18n-mt-engine': <ToolOutlined />,
   'i18n-dashboard': <DashboardOutlined />,
   'rule-config': <SwapOutlined />,
+  'rule-center': <ApartmentOutlined />,
+  'rule-ad-sales': <ShoppingCartOutlined />,
+  'rule-gift': <GiftOutlined />,
+  'rule-security': <SafetyCertificateOutlined />,
+  'rule-algorithm': <ControlOutlined />,
+  'rule-seq': <OrderedListOutlined />,
   'workflow-config': <ApartmentOutlined />,
   'version-history': <HistoryOutlined />,
   'notification-config': <BellOutlined />,
@@ -490,22 +524,40 @@ const keyToIcon: Record<string, ReactNode> = {
   'purchase-request': <ShoppingCartOutlined />,
 }
 
-/** 判定一个顶级 Sidebar item 是否属于指定系统：
- *  - menuTree 中同级 menuKey 对应节点的 systemCode 匹配即命中；
- *  - 未匹配→菜单树不中属于当前系统，隐藏；
- *  - 当前系统为 null 时本函数不被调用（外层已判断）。*/
-function belongsToSystem(item: MenuItem | null, menuTree: MenuVO[], systemCode: string): boolean {
-  if (!item) return false
-  const key = String(item.key)
-  const hit = (nodes: MenuVO[]): boolean => {
-    for (const n of nodes) {
-      if (n.menuKey === key) return n.systemCode === systemCode
-      if (n.children?.length && hit(n.children)) return true
-    }
-    return false
-  }
-  // 未命中当前系统就隐藏，不能仅因菜单存在而放行其他系统的节点。
-  return hit(menuTree)
+/** 按实际归属剪枝；跨系统挂载的节点提升到所属系统，不继承外层系统的入口。 */
+function scopeMenusToSystem(menus: MenuVO[], systemCode: string, inherited: string | null = null): MenuVO[] {
+  return menus.flatMap((menu) => {
+    if (menu.status !== 1) return []
+    const owner = menu.systemCode ?? inherited
+    const children = scopeMenusToSystem(menu.children ?? [], systemCode, owner)
+    if (owner !== systemCode) return children
+    if (menu.children?.length && children.length === 0) return []
+    return [{ ...menu, children }]
+  })
+}
+
+/** 只去掉拆分系统前的包装目录，不能因授权后仅剩一个业务分组就继续展平。 */
+const SYSTEM_WRAPPER_KEYS: Record<string, readonly string[]> = {
+  merchant: ['merchant_group'],
+  seller: ['seller-center'],
+  search: ['search'],
+  finance: ['finance'],
+  ai: ['ai-assistant'],
+  hr: ['hr'],
+  eam: ['asset-management'],
+  oa: ['oa-center'],
+  iam: ['permission'],
+  platform: ['system-config', 'i18n-center'],
+  i18n: ['i18n-center'],
+}
+
+function promoteSystemMenus(items: MenuItem[], systemCode: string | null): MenuItem[] {
+  const wrappers = systemCode ? SYSTEM_WRAPPER_KEYS[systemCode] : undefined
+  if (!wrappers) return items
+  return items.flatMap((item) => {
+    if (!item || !wrappers.includes(String(item.key))) return [item]
+    return (item as MenuItem & { children?: MenuItem[] }).children ?? []
+  })
 }
 
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
@@ -572,12 +624,37 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   // 未锁 / 接口失败 → 降级到旧的全量 menuTree 客户端过滤，不阻断入口。
   const systemNavigation = useSystemNavigation(currentSystemCode)
   const [openKeys, setOpenKeys] = useState<string[]>([])
+  const [systems, setSystems] = useState<PortalSystem[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPortalContext()
+      .then(context => { if (!cancelled) setSystems(context.systems ?? []) })
+      .catch(() => { if (!cancelled) setSystems([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  const currentSystem = systems.find(system => system.code === currentSystemCode)
+  const systemKey = getPortalSystemKey(currentSystemCode ?? '', currentSystem?.name ?? '')
+  const systemName = currentSystemCode
+    ? t(`portal.systems.${systemKey ?? currentSystemCode}.name`, {
+      defaultValue: (!i18nInstance.language.startsWith('zh') && currentSystem?.nameEn) || currentSystem?.name || currentSystemCode,
+    })
+    : t('portal.title')
+  const brandTitle = `MFTB${i18nInstance.language.startsWith('zh') ? '' : ' '}${systemName.replace(/^MFTB\s*/i, '')}`
+  const systemIcon = renderMenuIcon(currentSystem?.icon)
+    ?? renderMenuIcon(systemKey ? PORTAL_SYSTEM_ICONS[systemKey] : 'AppstoreOutlined')
 
   /** 自动同步 currentSystemCode：
    *  - 菜单树就绪后，若当前 pathname 属于某业务系统→写入；
-   *  - 当前处于门户/工作台等无系统上下文页面→保持旧值，不主动清空，避免刷新时 Sidebar 无菜单可展。 */
+   *  - 当前处于门户/工作台等无系统上下文页面→保持旧值，不主动清空，避免刷新时 Sidebar 无菜单可展；
+   *  - 只在路径真正变化时反查：切换系统的写入与路由跳转不是同一帧提交时，
+   *    旧路径会把刚选中的系统反向覆盖（如从商家报表切广告系统后被写回商家工作台）。 */
+  const lastSystemSyncPathRef = useRef<string | null>(null)
   useEffect(() => {
     if (!menuTree) return
+    if (lastSystemSyncPathRef.current === location.pathname) return
+    lastSystemSyncPathRef.current = location.pathname
     const sys = resolveSystemFromPathname(location.pathname, menuTree)
     if (isBusinessSystemCode(sys) && sys !== currentSystemCode) {
       setCurrentSystemCode(sys)
@@ -590,19 +667,25 @@ export default function Sidebar({ collapsed }: SidebarProps) {
    *  2) 否则回退旧行为：后端菜单树可用 → 以 DB 为唯一真值 + 补挂离线菜单 + 客户端过滤；
    *     后端不可用 → 只展离线清单；语言变化时重算菜单名称 */
   const visibleMenuItems = useMemo(() => {
+    // 首页是各系统的公共回跳入口，不参与业务菜单剪枝；沿用当前系统上下文。
+    const withSystemHome = (items: MenuItem[]): MenuItem[] => currentSystemCode
+      ? [
+        { key: 'home', icon: <HomeOutlined />, label: translateMenuName('home', '首頁', 'Home') },
+        ...promoteSystemMenus(items, currentSystemCode).filter((item) => item?.key !== 'home'),
+      ]
+      : items
     if (currentSystemCode && systemNavigation.loaded) {
-      const serverItems = buildMenuItemsFromVO(systemNavigation.tree)
-      return filterMenusByPermission(serverItems, hasMenuPermission)
+      const serverItems = buildMenuItemsFromVO(scopeMenusToSystem(systemNavigation.tree, currentSystemCode, currentSystemCode))
+      return withSystemHome(filterMenusByPermission(serverItems, hasMenuPermission))
     }
-    const items = menuTree
-      ? attachOfflineMenus(buildMenuItemsFromVO(menuTree), collectMenuTreeKeys(menuTree))
+    const scopedTree = menuTree && currentSystemCode ? scopeMenusToSystem(menuTree, currentSystemCode) : menuTree
+    const items = scopedTree
+      ? attachOfflineMenus(buildMenuItemsFromVO(scopedTree), collectMenuTreeKeys(menuTree ?? []))
       : OFFLINE_MENUS
+        .filter((node) => !currentSystemCode || node.systemCode === currentSystemCode)
         .map((node) => buildOfflineMenuItem(node))
         .filter((item): item is MenuItem => item !== null)
-    const scoped = currentSystemCode && menuTree
-      ? items.filter((item): item is MenuItem => !!item && belongsToSystem(item, menuTree, currentSystemCode))
-      : items
-    return filterMenusByPermission(scoped, hasMenuPermission)
+    return withSystemHome(filterMenusByPermission(items, hasMenuPermission))
   }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
   const selectedKey = location.pathname === '/' ? 'home'
@@ -647,18 +730,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       className="sidebar"
       theme="dark"
     >
-      <div className="sidebar-logo">
-        {collapsed ? (
-          <BrandLogo size={32} />
-        ) : (
-          <span className="logo-text">
-            <span className="logo-text-row">
-              <BrandLogo size={28} />
-              <span className="logo-text-main">{t('app.logoMain')}</span>
-            </span>
-            <span className="logo-text-sub">MFTB Search · Ads · Recommendation</span>
-          </span>
-        )}
+      <div className="sidebar-logo" title={brandTitle} aria-label={brandTitle}>
+        <span className="sidebar-system-icon" aria-hidden="true">
+          {currentSystemCode ? systemIcon : <BrandLogo size={28} />}
+        </span>
+        {!collapsed && <span className="logo-text-main">{brandTitle}</span>}
       </div>
       {menuStatus !== 'loading' && menuTree === null && (
         <div className="sidebar-offline-tip" title={t('sidebar.offlineMenuTip')}>

@@ -7,7 +7,6 @@
 import {
   ShoppingCartOutlined,
   GiftOutlined,
-  DollarOutlined,
   SafetyCertificateOutlined,
   OrderedListOutlined,
   ThunderboltOutlined,
@@ -222,43 +221,6 @@ const GIFT_MANAGEMENT_RULES: RuleItem[] = [
   },
 ]
 
-/** 財務/審批規則 */
-const FINANCE_RULES: RuleItem[] = [
-  {
-    key: 'approval_threshold',
-    label: '審批金額閾值',
-    description: '單筆超過此金額需主管審批',
-    type: 'number',
-    value: 5000,
-    defaultValue: 5000,
-    unit: '元',
-    min: 0,
-    max: 9999999,
-  },
-  {
-    key: 'debt_warning_threshold',
-    label: '欠款預警線',
-    description: '欠款超過此金額觸發系統預警通知',
-    type: 'number',
-    value: 10000,
-    defaultValue: 10000,
-    unit: '元',
-    min: 0,
-    max: 9999999,
-  },
-  {
-    key: 'auto_confirm_days',
-    label: '自動確認天數',
-    description: '賬單發送後超過此天數自動確認',
-    type: 'number',
-    value: 7,
-    defaultValue: 7,
-    unit: '天',
-    min: 1,
-    max: 90,
-  },
-]
-
 /** 系統安全規則（管理員配置） */
 const SYSTEM_SECURITY_RULES: RuleItem[] = [
   {
@@ -312,14 +274,6 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
     color: '#52C41A',
     description: '推廣贈送按廣告類型獨立配置上限與審批規則',
     rules: GIFT_MANAGEMENT_RULES,
-  },
-  {
-    key: 'finance',
-    title: '財務/審批規則',
-    icon: <DollarOutlined />,
-    color: '#FF4D4F',
-    description: '財務審批流程與預警閾值相關規則',
-    rules: FINANCE_RULES,
   },
   {
     key: 'system_security',
@@ -439,3 +393,33 @@ export const SYSTEM_RULE_STORAGE_KEY = 'system_rule_config'
 
 /** 舊版支付規則存儲 key（向後兼容） */
 export const LEGACY_PAYMENT_RULE_KEY = 'payment_rule_config'
+
+/* ==================== 規則中心菜單 ↔ 版塊映射 ==================== */
+
+/**
+ * 規則中心子菜單 menuKey → 版塊 groupKey 映射。
+ * 與後端 DataInitializer v44 種子、RuleConfigKeyRegistry 歸屬保持對齊。
+ */
+export const RULE_MENU_TO_GROUP: Record<string, string> = {
+  'rule-ad-sales': 'ad_sales',
+  'rule-gift': 'gift_management',
+  'rule-security': 'system_security',
+  'rule-algorithm': 'algorithm_config',
+  'rule-seq': 'id_generation',
+}
+
+/** 規則中心子菜單（總覽頁按此順序展示，並據用戶權限過濾） */
+export const RULE_CENTER_MENU_KEYS: string[] = [
+  'rule-ad-sales',
+  'rule-gift',
+  'rule-security',
+  'rule-algorithm',
+  'rule-seq',
+]
+
+/** 按子菜單 menuKey 取得對應的默認版塊定義（含默認值，未合併運行時值） */
+export function getRuleGroupByMenu(menuKey: string): RuleGroup | undefined {
+  const groupKey = RULE_MENU_TO_GROUP[menuKey]
+  if (!groupKey) return undefined
+  return DEFAULT_RULE_GROUPS.find(g => g.key === groupKey)
+}

@@ -27,7 +27,12 @@ vi.mock('../../../api/hrDict', async importOriginal => ({
   fetchHrDict: vi.fn(), createHrDict: vi.fn(), updateHrDict: vi.fn(), fetchHrDictOptions: vi.fn(),
   updateHrDictStatus: vi.fn(), deleteHrDict: vi.fn(),
 }))
-vi.mock('../../../api/employee', () => ({ fetchContractLedger: vi.fn() }))
+vi.mock('../../../api/employee', async importOriginal => ({
+  // 合同台账页新增到期预警（CONTRACT_EXPIRY_BUCKET / fetchContractExpirySummary），保留其余真实导出
+  ...await importOriginal<typeof import('../../../api/employee')>(),
+  fetchContractLedger: vi.fn(),
+  fetchContractExpirySummary: vi.fn(),
+}))
 
 const i18n = createInstance()
 await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: en }, 'zh-TW': { translation: zh } }, interpolation: { escapeValue: false } })

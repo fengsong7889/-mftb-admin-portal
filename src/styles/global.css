@@ -157,6 +157,368 @@ body {
   100% { transform: translateX(350%); }
 }
 
+/* 门户业务插画：只动局部，长停顿、低幅度，不干扰卡片阅读。 */
+@keyframes portalSignalBreathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes portalChartRise {
+  0%, 15%, 100% { transform: scaleY(0.9); }
+  40%, 80% { transform: scaleY(1); }
+}
+
+@keyframes portalCheckDraw {
+  0%, 12% { stroke-dashoffset: 0.5; opacity: 0.45; }
+  40%, 80% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0.5; opacity: 0.45; }
+}
+
+@keyframes portalScanSweep {
+  0%, 15%, 100% { transform: translateY(0); opacity: 0.35; }
+  45%, 65% { transform: translateY(16px); opacity: 0.8; }
+}
+
+@keyframes portalDataFlow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -22; }
+}
+
+@keyframes portalReceiptLift {
+  0%, 15%, 100% { transform: translateY(0); }
+  45%, 70% { transform: translateY(-3px); }
+}
+
+/* 门户业务场景：每组百分比定义同一轮循环中的业务顺序。 */
+@keyframes portalTypeReveal {
+  0%, 8%, 100% { transform: scaleX(0); }
+  60%, 92% { transform: scaleX(1); }
+}
+@keyframes portalCalculatorPress {
+  0%, 18%, 38%, 58%, 100% { opacity: 0.45; }
+  10%, 30%, 50%, 75% { opacity: 1; }
+}
+@keyframes portalSearchExplore {
+  0%, 58%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-38px, 18px); }
+  34% { transform: translate(-58px, 3px); }
+  48% { transform: translate(-20px, -5px); }
+}
+@keyframes portalSearchTyping {
+  0%, 4%, 100% { transform: scaleX(0); }
+  40%, 96% { transform: scaleX(1); }
+}
+@keyframes portalSearchQuery {
+  0%, 50%, 100% { opacity: 1; }
+  54%, 99% { opacity: 0; }
+}
+@keyframes portalSearchMatched {
+  0%, 58%, 98%, 100% { opacity: 0; }
+  64%, 94% { opacity: 1; }
+}
+@keyframes portalSearchCheck {
+  0%, 58%, 100% { stroke-dashoffset: 1; }
+  70%, 94% { stroke-dashoffset: 0; }
+}
+@keyframes portalRobotBlink {
+  0%, 18%, 24%, 62%, 68%, 74%, 100% { transform: scaleY(1); }
+  21%, 65%, 71% { transform: scaleY(0.08); }
+}
+@keyframes portalRobotLook {
+  0%, 18%, 62%, 100% { transform: translate(0, 0); }
+  30%, 42% { transform: translate(-4px, 1px); }
+  48%, 58% { transform: translate(4px, -2px); }
+  78%, 88% { transform: translate(0, 3px); }
+}
+@keyframes portalRobotSmile {
+  0%, 20%, 70%, 100% { transform: scaleY(1); }
+  35%, 55% { transform: scaleY(0.2); }
+  80%, 90% { transform: scale(1.15, 1.2); }
+}
+@keyframes portalHrProfile {
+  0%, 4%, 100% { opacity: 0; transform: translate(-8px, 10px) rotate(-5deg); }
+  10%, 42% { opacity: 1; transform: translate(0, 0) scale(1); }
+  60% { opacity: 1; transform: translate(161px, 35px) scale(0.28); }
+  66%, 96% { opacity: 0; transform: translate(161px, 35px) scale(0.28); }
+}
+@keyframes portalHrScan {
+  0%, 12%, 34%, 100% { opacity: 0; transform: translateY(0); }
+  15% { opacity: 1; transform: translateY(0); }
+  29% { opacity: 1; transform: translateY(79px); }
+  33% { opacity: 0; transform: translateY(79px); }
+}
+@keyframes portalHrMatch {
+  0%, 30%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  34% { stroke-dashoffset: 1; opacity: 1; }
+  45%, 90% { stroke-dashoffset: 0; opacity: 1; }
+  97% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes portalHrProfileCheck {
+  0%, 31%, 100% { opacity: 0; }
+  36%, 95% { opacity: 1; }
+}
+@keyframes portalHrConnection {
+  0%, 46%, 100% { stroke-dashoffset: 1; }
+  62%, 95% { stroke-dashoffset: 0; }
+}
+@keyframes portalHrDepartment {
+  0%, 62%, 100% { stroke: #E8720C; stroke-dasharray: 3 3; }
+  70%, 94% { stroke: #52C41A; stroke-dasharray: 0 0; }
+}
+@keyframes portalHrVacancy {
+  0%, 44%, 100% { opacity: 1; }
+  48%, 96% { opacity: 0; }
+}
+@keyframes portalHrMatching {
+  0%, 58%, 100% { opacity: 1; }
+  62%, 99% { opacity: 0; }
+}
+@keyframes portalHrAssigned {
+  0%, 66%, 98%, 100% { opacity: 0; }
+  72%, 94% { opacity: 1; }
+}
+/* 物资卡片：先登记与关联设备，再发放一本耗材；结余仅在领用完成后扣减。 */
+@keyframes portalEamTag {
+  0%, 3%, 100% { opacity: 0; transform: translateY(-6px); }
+  12%, 90% { opacity: 1; transform: translateY(0); }
+  96% { opacity: 0; transform: translateY(0); }
+}
+@keyframes portalEamRegistered {
+  0%, 13%, 96%, 100% { opacity: 0; }
+  18%, 90% { opacity: 1; }
+}
+@keyframes portalEamAssignment {
+  0%, 20%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  22% { stroke-dashoffset: 1; opacity: 1; }
+  34%, 90% { stroke-dashoffset: 0; opacity: 1; }
+  96% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes portalEamAssetConfirmed {
+  0%, 34%, 96%, 100% { opacity: 0; }
+  38%, 90% { opacity: 1; }
+}
+@keyframes portalEamSupply {
+  0%, 46%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+  54% { transform: translate(0, -9px) scale(1); opacity: 1; }
+  70%, 90% { transform: translate(130px, -12px) scale(0.55); opacity: 1; }
+  95% { transform: translate(130px, -12px) scale(0.55); opacity: 0; }
+  96% { transform: translate(0, 0) scale(1); opacity: 0; }
+}
+@keyframes portalEamSupplyConfirmed {
+  0%, 71%, 96%, 100% { opacity: 0; }
+  75%, 90% { opacity: 1; }
+}
+@keyframes portalEamCountFull {
+  0%, 100% { opacity: 1; }
+  72% { opacity: 0; }
+  96% { opacity: 1; }
+}
+@keyframes portalEamCountIssued {
+  0%, 100% { opacity: 0; }
+  72% { opacity: 1; }
+  96% { opacity: 0; }
+}
+@keyframes portalEamDeduction {
+  0%, 71%, 92%, 100% { opacity: 0; transform: translateY(0); }
+  75%, 84% { opacity: 1; transform: translateY(-5px); }
+  90% { opacity: 0; transform: translateY(-9px); }
+}
+@keyframes portalEamOverview {
+  0%, 30%, 100% { opacity: 1; }
+  34%, 96% { opacity: 0; }
+}
+@keyframes portalEamAssignedLabel {
+  0%, 34%, 70%, 100% { opacity: 0; }
+  38%, 65% { opacity: 1; }
+}
+@keyframes portalWorkflowPaper {
+  0%, 12% { transform: translate(0, 0); opacity: 1; }
+  26%, 48% { transform: translate(90px, 0); opacity: 1; }
+  64%, 70% { transform: translate(180px, 0); opacity: 1; }
+  76% { transform: translate(180px, 13px); opacity: 1; }
+  80% { transform: translate(180px, 13px); opacity: 0; }
+  81%, 100% { transform: translate(0, 0); opacity: 0; }
+}
+@keyframes portalWorkflowStart {
+  0%, 18% { opacity: 1; }
+  24%, 100% { opacity: 0; }
+}
+@keyframes portalWorkflowReview {
+  0%, 20%, 56%, 100% { opacity: 0; }
+  26%, 48% { opacity: 1; }
+}
+@keyframes portalWorkflowApproved {
+  0%, 58%, 100% { opacity: 0; }
+  64%, 96% { opacity: 1; }
+}
+@keyframes portalOfficeProgress {
+  0%, 12%, 100% { stroke-dashoffset: 1; }
+  26%, 48% { stroke-dashoffset: 0.5; }
+  64%, 96% { stroke-dashoffset: 0; }
+}
+@keyframes portalOfficeSignature {
+  0%, 29%, 100% { opacity: 0; stroke-dashoffset: 1; }
+  30% { opacity: 1; stroke-dashoffset: 1; }
+  35%, 97% { opacity: 1; stroke-dashoffset: 0; }
+}
+@keyframes portalOfficeStamp {
+  0%, 34%, 46%, 100% { transform: translateY(0); }
+  39%, 41% { transform: translateY(18px); }
+}
+@keyframes portalOfficeSeal {
+  0%, 41%, 100% { opacity: 0; }
+  44%, 97% { opacity: 1; }
+}
+@keyframes portalOfficeArchived {
+  0%, 76%, 100% { opacity: 0; }
+  80%, 96% { opacity: 1; }
+}
+@keyframes portalKeyDenied {
+  0% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+  6% { opacity: 1; transform: translateX(-14px); stroke: #8C8C8C; }
+  18%, 20% { opacity: 1; transform: translateX(61px); stroke: #8C8C8C; }
+  22%, 34% { opacity: 1; transform: translateX(61px); stroke: #FF4D4F; }
+  42%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+}
+@keyframes portalKeyGranted {
+  0%, 45% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+  50% { opacity: 1; transform: translateX(-14px); stroke: #8C8C8C; }
+  64%, 66% { opacity: 1; transform: translateX(61px); stroke: #8C8C8C; }
+  70%, 88% { opacity: 1; transform: translateX(61px); stroke: #52C41A; }
+  97%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+}
+@keyframes portalLockShake {
+  0%, 18%, 36%, 100% { transform: translateX(0); }
+  21%, 27%, 33% { transform: translateX(-3px); }
+  24%, 30% { transform: translateX(3px); }
+}
+@keyframes portalLockOpen {
+  0%, 65%, 98%, 100% { transform: translateY(0) rotate(0); }
+  71%, 91% { transform: translateY(-12px) rotate(-24deg); }
+}
+@keyframes portalLockAlarm {
+  0%, 18%, 39%, 100% { opacity: 0; }
+  22%, 32% { opacity: 1; }
+  27% { opacity: 0.2; }
+}
+@keyframes portalLockDenied {
+  0%, 18%, 43%, 100% { opacity: 0; }
+  22%, 36% { opacity: 1; }
+}
+@keyframes portalLockGranted {
+  0%, 66%, 99%, 100% { opacity: 0; }
+  72%, 91% { opacity: 1; }
+}
+@keyframes portalIdentityScan {
+  0%, 3%, 21%, 46%, 67%, 100% { opacity: 0; transform: translateX(0); }
+  5%, 48% { opacity: 1; transform: translateX(0); }
+  17%, 62% { opacity: 1; transform: translateX(60px); }
+  20%, 66% { opacity: 0; transform: translateX(60px); }
+}
+@keyframes portalAccessPending {
+  0%, 16%, 45%, 64%, 100% { opacity: 1; }
+  18%, 43%, 66%, 99% { opacity: 0; }
+}
+@keyframes portalAccessDoorLeft {
+  0%, 67%, 99%, 100% { transform: translateX(0); }
+  76%, 91% { transform: translateX(-25px); }
+}
+@keyframes portalAccessDoorRight {
+  0%, 67%, 99%, 100% { transform: translateX(0); }
+  76%, 91% { transform: translateX(25px); }
+}
+@keyframes portalAdsMatch {
+  0%, 15%, 100% { opacity: 0; }
+  25%, 86% { opacity: 1; }
+}
+@keyframes portalAdsCursor {
+  0%, 12%, 100% { transform: translate(28px, 25px); }
+  36%, 80% { transform: translate(0, 0); }
+}
+@keyframes portalAdsClick {
+  0%, 38%, 65%, 100% { opacity: 0; transform: scale(0.35); }
+  44% { opacity: 1; transform: scale(0.6); }
+  60% { opacity: 0; transform: scale(1.8); }
+}
+@keyframes portalBusinessGrowth {
+  0%, 40%, 100% { transform: scaleY(0.35); }
+  72%, 90% { transform: scaleY(1); }
+}
+@keyframes portalBusinessResult {
+  0%, 56%, 100% { opacity: 0; }
+  68%, 88% { opacity: 1; }
+}
+@keyframes portalMerchantLink {
+  0%, 8%, 100% { stroke-dashoffset: 1; }
+  58%, 92% { stroke-dashoffset: 0; }
+}
+@keyframes portalMerchantPinFirst {
+  0%, 8%, 100% { opacity: 0.12; }
+  18%, 86% { opacity: 0.85; }
+}
+@keyframes portalMerchantPinSecond {
+  0%, 25%, 100% { opacity: 0.12; }
+  35%, 86% { opacity: 0.85; }
+}
+@keyframes portalMerchantPinThird {
+  0%, 44%, 100% { opacity: 0.12; }
+  56%, 86% { opacity: 0.85; }
+}
+@keyframes portalOrderReceipt {
+  0%, 100% { transform: translateY(-35px); opacity: 0; }
+  15%, 88% { transform: translateY(0); opacity: 1; }
+}
+@keyframes portalOrderCursor {
+  0%, 18%, 100% { transform: translate(36px, 34px); }
+  36%, 78% { transform: translate(0, 0); }
+}
+@keyframes portalOrderArrival {
+  0%, 4%, 48%, 100% { opacity: 0; }
+  15%, 34% { opacity: 1; }
+}
+@keyframes portalOrderCompleted {
+  0%, 49%, 100% { opacity: 0; }
+  59%, 88% { opacity: 1; }
+}
+@keyframes portalConfigSliderFirst {
+  0%, 8%, 100% { transform: translateX(0); }
+  27%, 87% { transform: translateX(32px); }
+}
+@keyframes portalConfigSliderSecond {
+  0%, 12%, 100% { transform: translateX(0); }
+  31%, 87% { transform: translateX(-20px); }
+}
+@keyframes portalConfigSliderThird {
+  0%, 16%, 100% { transform: translateX(0); }
+  35%, 87% { transform: translateX(13px); }
+}
+@keyframes portalConfigNodeFirst {
+  0%, 52%, 100% { fill: #8C8C8C; }
+  58%, 88% { fill: #52C41A; }
+}
+@keyframes portalConfigNodeSecond {
+  0%, 61%, 100% { fill: #8C8C8C; }
+  67%, 88% { fill: #52C41A; }
+}
+@keyframes portalConfigNodeThird {
+  0%, 70%, 100% { fill: #8C8C8C; }
+  76%, 88% { fill: #52C41A; }
+}
+@keyframes portalConfigPacket {
+  0%, 35%, 78%, 100% { opacity: 0; transform: translate(0, 0); }
+  40% { opacity: 1; transform: translate(0, 7px); }
+  60% { opacity: 1; transform: translate(-161px, 7px); }
+  70% { opacity: 0; transform: translate(-161px, -12px); }
+}
+@keyframes portalConfigPublished {
+  0%, 76%, 100% { opacity: 0; }
+  80%, 91% { opacity: 1; }
+}
+@keyframes portalConfigGear {
+  0%, 100% { transform: rotate(0); }
+  40%, 85% { transform: rotate(180deg); }
+}
+
 /* 隐藏 InputNumber 上下箭头，释放内部空间 */
 .no-spinner-input .ant-input-number-handler-wrap {
   display: none !important;

@@ -491,9 +491,46 @@ export interface ContractLedgerQuery {
   company?: string
   contractType?: string
   status?: string
+  /** 到期分桶（P0 合同到期预警）：all/expired/due30/due60/due90 */
+  expiryBucket?: string
 }
 
 /** 合同全局台账分页查询 */
 export function fetchContractLedger(params: ContractLedgerQuery) {
   return request.get<unknown, PageResult<ContractLedgerItem>>('/contracts', { params })
 }
+
+/** 合同到期预警汇总（后端 /contracts/expiry-summary） */
+export interface ContractExpirySummary {
+  days: number
+  /** 合同总数（「全部」页签计数，不受状态/分桶过滤影响） */
+  total: number
+  /** 已过期未处理 */
+  expired: number
+  /** 30 天内到期（含 0 天） */
+  due30: number
+  /** 60 天内到期 */
+  due60: number
+  /** 90 天内到期 */
+  due90: number
+  /** 无固定期限（未填结束日期） */
+  noEndDate: number
+  /** 最近到期明细（最多 20 条，按到期日升序） */
+  soonest: ContractLedgerItem[]
+}
+
+/** 查询合同到期预警汇总 */
+export function fetchContractExpirySummary(days = 90) {
+  return request.get<unknown, ContractExpirySummary>('/contracts/expiry-summary', { params: { days } })
+}
+
+/** 到期分桶选项（与后端 applyExpiryBucket 常量一致） */
+export const CONTRACT_EXPIRY_BUCKET = {
+  ALL: 'all',
+  EXPIRED: 'expired',
+  DUE_30: 'due30',
+  DUE_60: 'due60',
+  DUE_90: 'due90',
+} as const
+
+export type ContractExpiryBucket = (typeof CONTRACT_EXPIRY_BUCKET)[keyof typeof CONTRACT_EXPIRY_BUCKET]

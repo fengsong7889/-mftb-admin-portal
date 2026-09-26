@@ -11,6 +11,7 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysRoleMapper;
 import com.mftb.admin.mapper.SysRoleMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.PermissionAuditService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RoleService;
 import com.mftb.admin.util.JsonUtils;
@@ -40,12 +41,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoleServiceImpl implements RoleService {
 
+    /** 内置超级管理员角色编码（与 PermissionServiceImpl.SUPER_ADMIN_ROLE_CODE 对齐）：
+     *  绑定该角色即获得超管直通权限，因此禁止绑定账号/删除/停用，防止权限旁路扩散 */
+    private static final String BUILTIN_ADMIN_ROLE_CODE = "admin";
+
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
+    private final PermissionAuditService permissionAuditService;
 
     @Override
     public List<RoleVO> list() {
@@ -103,28 +109,54 @@ public class RoleServiceImpl implements RoleService {
         // Round 5 · 旧写入口告警：全量写会跨系统覆盖，与新的原子写接口
         // （PUT /api/roles/{id}/systems/{code}/authorization）并存时容易引发误操作；
         // 保留向后兼容，仅记录 warn，为未来一个 cycle 删除提供依据。
-        log.warn("[deprecated-path] RoleServiceImpl.updatePermissions 正在全量覆盖角色 {} 的菜单授权（跨系统）；推荐前端迁移到系统授权页 PUT /api/roles/{}/systems/{{code}}/authorization", id, id);
+        log.warn("[deprecated-path] RoleServiceImpl.updatePermissions 正在全量覆盖角色 {} 的菜单授权（跨系统）；推荐前端迁移到授权中心原子写接口", id);
+        List<MenuPermissionDTO> before = loadPermissions(id);
         saveRoleMenus(id, permissions);
+        List<MenuPermissionDTO> after = loadPermissions(id);
+        permissionAuditService.record(PermissionAuditService.TARGET_ROLE, id, null, null,
+                auditTypeOfFullWrite(before, after), before, after);
         permissionService.evictAll();
+    }
+
+    /** 全量写变更的审计类型：首次授权 GRANT，清空 DELETE，其余 UPDATE。 */
+    private String auditTypeOfFullWrite(List<MenuPermissionDTO> before, List<MenuPermissionDTO> after) {
+        if (after.isEmpty()) {
+            return before.isEmpty() ? PermissionAuditService.CHANGE_UPDATE : PermissionAuditService.CHANGE_DELETE;
+        }
+        return before.isEmpty() ? PermissionAuditService.CHANGE_GRANT : PermissionAuditService.CHANGE_UPDATE;
     }
 
     @Override
     public void updateStatus(Long id, Integer status) {
         SysRole role = requireRole(id);
+        if (isBuiltinAdminRole(role)) {
+            throw new BusinessException("內置超級管理員角色不允許停用/啟用");
+        }
+        Integer oldStatus = role.getStatus();
         role.setStatus(status);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.updateById(role);
+        permissionAuditService.record(PermissionAuditService.TARGET_ROLE, id, role.getName(), null,
+                PermissionAuditService.CHANGE_STATUS,
+                Map.of("status", oldStatus == null ? -1 : oldStatus),
+                Map.of("status", status == null ? -1 : status));
         permissionService.evictAll();
     }
 
     @Override
     @Transactional
     public void delete(Long id) {
-        requireRole(id);
+        SysRole role = requireRole(id);
+        if (isBuiltinAdminRole(role)) {
+            throw new BusinessException("內置超級管理員角色不允許刪除");
+        }
+        // 审计快照需在删除前采集（删后名称/授权均不可回溯）
+        List<MenuPermissionDTO> before = loadPermissions(id);
         sysRoleMapper.deleteById(id);
         // 清理角色菜单关联
         sysRoleMenuMapper.delete(
                 new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id));
+        jdbcTemplate.update("DELETE FROM sys_role_system WHERE role_id = ?", id);
         // 从所有员工的绑定中移除该角色
         List<SysUser> users = sysUserMapper.selectList(null);
         for (SysUser user : users) {
@@ -134,7 +166,42 @@ public class RoleServiceImpl implements RoleService {
                 sysUserMapper.updateById(user);
             }
         }
+        permissionAuditService.record(PermissionAuditService.TARGET_ROLE, id, role.getName(), null,
+                PermissionAuditService.CHANGE_DELETE, before, List.of());
         permissionService.evictAll();
+    }
+
+    @Override
+    @Transactional
+    public RoleVO copy(Long id, RoleRequest request) {
+        SysRole source = requireRole(id);
+        assertNameUnique(request.getName(), null);
+        SysRole role = new SysRole();
+        role.setName(request.getName());
+        role.setCode("role_" + System.currentTimeMillis());
+        role.setDescription(StringUtils.hasText(request.getDescription())
+                ? request.getDescription() : "復制自：" + source.getName());
+        role.setStatus(1);
+        role.setDeleted(0);
+        role.setUpdatedBy(operatorResolver.currentOperatorName());
+        sysRoleMapper.insert(role);
+        // 克隆菜单授权与系统准入（行级复制，保留 actions JSON）
+        int menuCopied = jdbcTemplate.update(
+                "INSERT INTO sys_role_menu (role_id, menu_id, actions) "
+                        + "SELECT ?, menu_id, actions FROM sys_role_menu WHERE role_id = ?",
+                role.getId(), id);
+        int systemCopied = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_role_system (role_id, system_code) "
+                        + "SELECT ?, system_code FROM sys_role_system WHERE role_id = ?",
+                role.getId(), id);
+        permissionAuditService.record(PermissionAuditService.TARGET_ROLE, role.getId(), role.getName(), null,
+                PermissionAuditService.CHANGE_COPY,
+                Map.of("fromRoleId", id, "fromRoleName", source.getName()),
+                Map.of("menuCopied", menuCopied, "systemCopied", systemCopied));
+        permissionService.evictAll();
+        log.info("角色已复制: source={}({}) -> new={}({}), menu={}, system={}",
+                source.getName(), id, role.getName(), role.getId(), menuCopied, systemCopied);
+        return toVO(role, 0L, loadPermissions(role.getId()));
     }
 
     @Override
@@ -151,8 +218,16 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void bindUsers(Long roleId, List<Long> userIds) {
-        requireRole(roleId);
+        SysRole role = requireRole(roleId);
+        List<Long> beforeIds = boundUserIds(roleId);
         Set<Long> targetIds = new LinkedHashSet<>(userIds == null ? List.of() : userIds);
+        // 内置超管角色：只允许解绑（收敛历史误绑），禁止新增绑定任何账号
+        if (isBuiltinAdminRole(role)) {
+            List<Long> additions = targetIds.stream().filter(u -> !beforeIds.contains(u)).toList();
+            if (!additions.isEmpty()) {
+                throw new BusinessException("超級管理員為內置角色，綁定即獲得全部權限，不允許綁定賬號");
+            }
+        }
         for (SysUser user : sysUserMapper.selectList(null)) {
             List<Long> roleIds = JsonUtils.parseLongList(user.getFunctionRoles());
             boolean bound = roleIds.contains(roleId);
@@ -168,6 +243,10 @@ public class RoleServiceImpl implements RoleService {
             user.setFunctionRoles(JsonUtils.toJson(roleIds));
             sysUserMapper.updateById(user);
         }
+        permissionAuditService.record(PermissionAuditService.TARGET_ROLE, roleId, null,
+                null, PermissionAuditService.CHANGE_BIND,
+                Map.of("userIds", beforeIds),
+                Map.of("userIds", new ArrayList<>(targetIds)));
         permissionService.evictAll();
     }
 
@@ -330,6 +409,11 @@ public class RoleServiceImpl implements RoleService {
             throw new BusinessException("角色不存在");
         }
         return role;
+    }
+
+    /** 是否内置超级管理员角色（code=admin，绑定即超管直通，需重点保护） */
+    private boolean isBuiltinAdminRole(SysRole role) {
+        return role != null && BUILTIN_ADMIN_ROLE_CODE.equalsIgnoreCase(role.getCode());
     }
 
     /** 角色名稱唯一性校驗（排除自身；@TableLogic 自動過濾已刪除記錄） */

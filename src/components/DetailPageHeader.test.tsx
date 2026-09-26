@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import i18n from '../i18n'
 
 /** 權限門控 mock：每個用例通過 mockHasPermission 控制返回值 */
 const mockHasPermission = vi.fn<(permission: string) => boolean>()
@@ -10,6 +11,11 @@ vi.mock('../contexts/AuthContext', () => ({
 import DetailPageHeader from './DetailPageHeader'
 
 describe('DetailPageHeader 詳情頁頂部標題欄（全局規範）', () => {
+  /** 返回按鈕文案已接入 i18n（英文態不得殘留中文），用例固定走繁體語境 */
+  beforeAll(async () => {
+    await i18n.changeLanguage('zh-TW')
+  })
+
   beforeEach(() => {
     mockHasPermission.mockReset()
   })
@@ -18,7 +24,7 @@ describe('DetailPageHeader 詳情頁頂部標題欄（全局規範）', () => {
     const onBack = vi.fn()
     render(<DetailPageHeader title="部門模型詳情" onBack={onBack} />)
     expect(screen.getByText('部門模型詳情')).toBeTruthy()
-    fireEvent.click(screen.getByText('返回'))
+    fireEvent.click(screen.getByText(i18n.t('common.back')))
     expect(onBack).toHaveBeenCalledTimes(1)
   })
 

@@ -13,6 +13,11 @@ export const PERMISSION_ACTIONS = [
   { key: 'disable', label: '停用' },
 ] as const
 
+/** 动作 key → 中文标签查找表（后端只下发 key 时渲染标签用） */
+export const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  PERMISSION_ACTIONS.map(a => [a.key, a.label]),
+)
+
 /** 菜单功能映射（每个菜单实际包含的功能操作） */
 export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string }>> = {
   // 首页
@@ -305,18 +310,59 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 入轉調離（入職/轉正/調動/離職四菜单共享后端端点, 功能操作对齐员工管理）
+  'hr-onboarding': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-regularization': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-transfer': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-dimission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 請假管理 / 假期額度
+  'hr-leave': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-leave-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
   // 字典維護（集团人事独立菜单，可单独授权）
   'hr-dict': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
-  // 合同台賬（集团人事独立菜单，只读台账 + 导出）
+  // 合同台賬（集团人事独立菜单：台账只读+导出；续签单据复用本菜单授权）
   'contract-ledger': [
     { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
     { key: 'export', label: '導出' },
   ],
-  // 组织管理
-  'organization-management': [
+  // 部門架構（v44 起属一级域 org-center，key 由 organization-management 迁移为 org-structure）
+  'org-structure': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
@@ -336,8 +382,15 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
-  // 功能权限
+  // 功能权限（已合并入授权中心，菜单下线前保留回退映射）
   'function-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 授权中心（统一授权工作台：配置/透视/审计）
+  'authorization-center': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
@@ -389,8 +442,32 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'i18n-dashboard': [
     { key: 'view', label: '查看' },
   ],
-  // 規則配置
+  // 規則配置（總覽）
   'rule-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 規則中心（目錄 + 5 版塊子菜單）
+  'rule-center': [
+    { key: 'view', label: '查看' },
+  ],
+  'rule-ad-sales': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-gift': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-security': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-algorithm': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-seq': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
@@ -733,8 +810,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   ],
 }
 
-/** 获取菜单的功能操作（如果未定义则返回默认功能） */
-export const getMenuActions = (menuKey: string) => {
+/** 获取菜单的功能操作（优先后端 sys_menu.actions 真值源，空时回退前端静态映射） */
+export const getMenuActions = (menuKey: string, backendActions?: string[] | null) => {
+  if (backendActions && backendActions.length > 0) {
+    return backendActions.map(key => ({ key, label: ACTION_LABEL_MAP[key] ?? key }))
+  }
   return MENU_ACTIONS_MAP[menuKey] || PERMISSION_ACTIONS
 }
 
@@ -1062,17 +1142,21 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'flash-sale-price',
   // 集團人事
   'employee-management',
+  'hr-onboarding',
+  'hr-regularization',
+  'hr-transfer',
+  'hr-dimission',
+  'hr-leave',
+  'hr-leave-quota',
   'hr-dict',
   'contract-ledger',
-  'organization-management',
+  'org-structure',
   'position-management',
   'login-log',
-  // 權限管理
+  // 權限管理（功能授權+系統授權已合并為授權中心，旧 key 迁移 iam:authz-center-menu:v1.0 后停用）
   'role-management',
-  'function-permission',
+  'authorization-center',
   'data-permission',
-  // 系統授權（Round 4）
-  'system-authorization',
   // 系統配置
   'menu-config',
   'translation-manage',
@@ -1081,6 +1165,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'i18n-mt-engine',
   'i18n-dashboard',
   'rule-config',
+  'rule-ad-sales',
+  'rule-gift',
+  'rule-security',
+  'rule-algorithm',
+  'rule-seq',
   // OA中心
   'oa-requests',
   'workflow-config',
@@ -1222,18 +1311,35 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 集團人事
   '/employee-management': 'employee-management',
   '/employee-detail': 'employee-management',
+  '/hr-onboarding': 'hr-onboarding',
+  '/hr-onboarding-form': 'hr-onboarding',
+  '/hr-onboarding-detail': 'hr-onboarding',
+  '/hr-regularization': 'hr-regularization',
+  '/hr-regularization-form': 'hr-regularization',
+  '/hr-regularization-detail': 'hr-regularization',
+  '/hr-transfer': 'hr-transfer',
+  '/hr-transfer-form': 'hr-transfer',
+  '/hr-transfer-detail': 'hr-transfer',
+  '/hr-dimission': 'hr-dimission',
+  '/hr-dimission-form': 'hr-dimission',
+  '/hr-dimission-detail': 'hr-dimission',
+  '/hr-leave': 'hr-leave',
+  '/hr-leave-form': 'hr-leave',
+  '/hr-leave-detail': 'hr-leave',
+  '/hr-leave-quota': 'hr-leave-quota',
+  '/hr-leave-quota-form': 'hr-leave-quota',
+  '/hr-contract-renew-form': 'contract-ledger',
+  '/hr-contract-renew-detail': 'contract-ledger',
   '/hr-dict': 'hr-dict',
   '/hr-dict-edit': 'hr-dict',
   '/contract-ledger': 'contract-ledger',
-  '/organization-management': 'organization-management',
+  '/organization-management': 'org-structure',
   '/position-management': 'position-management',
   '/login-log': 'login-log',
-  // 權限管理
+  // 權限管理（授权中心合并旧 功能授權/系統授權 两入口，旧路径由路由 redirect）
   '/role-management': 'role-management',
-  '/function-permission': 'function-permission',
+  '/authorization-center': 'authorization-center',
   '/data-permission': 'data-permission',
-  // 系統授權（Round 4）
-  '/system-authorization': 'system-authorization',
   // 系統配置
   '/menu-config': 'menu-config',
   '/translation-manage': 'translation-manage',
@@ -1243,6 +1349,11 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/i18n-center/mt-engine': 'i18n-mt-engine',
   '/i18n-center/dashboard': 'i18n-dashboard',
   '/rule-config': 'rule-config',
+    '/rule-center/ad-sales': 'rule-ad-sales',
+    '/rule-center/gift': 'rule-gift',
+    '/rule-center/security': 'rule-security',
+    '/rule-center/algorithm': 'rule-algorithm',
+    '/rule-center/seq': 'rule-seq',
   '/notification-config': 'notification-config',
   '/notification-channel-form': 'notification-config',
   '/notification-app-form': 'notification-config',

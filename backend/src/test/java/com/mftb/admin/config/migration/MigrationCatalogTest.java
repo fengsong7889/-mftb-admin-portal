@@ -49,6 +49,32 @@ class MigrationCatalogTest {
     }
 
     @Test
+    void aiMenuOwnershipRepairIsRegisteredIndependently() throws Exception {
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(e -> "core:ai-menu-system-ownership-v1.0".equals(e.getVersionKey()))
+                .findFirst().orElseThrow();
+        assertEquals(MigrationStatus.ACTIVE, entry.getStatus());
+        assertEquals(SchemaPhase.MENU_SEED, entry.getPhase());
+        assertEquals(MigrationEntry.ExecutionType.JAVA, entry.getExecutionType());
+        assertEquals("systemPortalSchemaInitializer", entry.getExecutor());
+        assertTrue(entry.getDependencies().contains("core:system-portal:v1.0"));
+        assertTrue(entry.getDependencies().contains("core:menu-seed-v42"));
+    }
+
+    @Test
+    void sellerReportMigrationIsRegisteredIndependently() throws Exception {
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(e -> "core:seller-promotion-reports-v1.0".equals(e.getVersionKey()))
+                .findFirst().orElseThrow();
+        assertEquals(MigrationStatus.ACTIVE, entry.getStatus());
+        assertEquals(SchemaPhase.MENU_SEED, entry.getPhase());
+        assertEquals(MigrationEntry.ExecutionType.JAVA, entry.getExecutionType());
+        assertEquals("systemPortalSchemaInitializer", entry.getExecutor());
+        assertTrue(entry.getDependencies().contains("core:system-portal:v1.0"));
+        assertTrue(entry.getDependencies().contains("core:menu-seed-v42"));
+    }
+
+    @Test
     void detectsDuplicateVersionKeysAndMissingDependency() {
         MigrationEntry a = entry("x:a", MigrationStatus.ACTIVE);
         MigrationEntry dup = entry("x:a", MigrationStatus.ACTIVE);
