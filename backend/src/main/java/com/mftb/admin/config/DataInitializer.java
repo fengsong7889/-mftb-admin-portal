@@ -1762,6 +1762,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("ess-leave", "My Leave"),
                 Map.entry("ess-requests", "My Requests"),
                 Map.entry("ess-profile", "My Profile"),
+                Map.entry("ess-certificate", "Certificates"),
                 Map.entry("org-structure", "Department Structure"),
                 Map.entry("position-management", "Position"),
                 Map.entry("login-log", "Employee Activity"),
@@ -2269,6 +2270,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("ess-leave",           new String[]{"我的假期",         "ess-center",         "1"});
         menus.put("ess-requests",        new String[]{"我的申請單據",      "ess-center",         "2"});
         menus.put("ess-profile",         new String[]{"我的檔案",         "ess-center",         "3"});
+        menus.put("ess-certificate",     new String[]{"證明開具",         "ess-center",         "4"});
         // ── 物资管理（EAM 分组子菜单）──
         // 二级直达菜单（无分组）
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
@@ -2873,7 +2875,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
         applyMenuSort("org-center", "org-structure");
         // v45: 員工自助域内排序（ESS 菜单由 hrEssSchemaInitializer 一次性建，此处兜归属顺序）
-        applyMenuSort("ess-center", "ess-leave", "ess-requests", "ess-profile");
+        applyMenuSort("ess-center", "ess-leave", "ess-requests", "ess-profile", "ess-certificate");
         applyTopLevelMenuSortV44();
         try {
             syncOrganizationDomain();
@@ -3052,6 +3054,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("ess-leave", "FieldTimeOutlined"),
             Map.entry("ess-profile", "FolderOpenOutlined"),
             Map.entry("ess-requests", "FormOutlined"),
+            Map.entry("ess-certificate", "FileProtectOutlined"),
             Map.entry("hr-dict", "DatabaseOutlined"),
             Map.entry("contract-ledger", "ProfileOutlined"),
             Map.entry("finance", "MoneyCollectOutlined"),

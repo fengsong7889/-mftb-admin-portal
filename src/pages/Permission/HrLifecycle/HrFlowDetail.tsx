@@ -20,6 +20,14 @@ import {
 import {
   LEAVE_DETAIL_PATH, LEAVE_PROCESS_CODE, fetchLeaveDetail, type LeaveRequestItem,
 } from '../../../api/hrLeave'
+import {
+  CERT_DETAIL_PATH, CERT_PROCESS_CODE, fetchCertificateDetail,
+  type CertificateItem,
+} from '../../../api/hrCertificate'
+import {
+  CERT_LANG_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR,
+  CERT_TYPE_LABEL_KEY,
+} from '../../Ess/meta'
 import { LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY } from '../HrLeave/meta'
 import { STATUS_LABEL_KEY, STATUS_TAG_COLOR, TYPE_LABEL_KEY, TYPE_TAG_COLOR } from './meta'
 
@@ -43,6 +51,7 @@ export default function HrFlowDetail() {
   const [flow, setFlow] = useState<OaRequestVO | null>(null)
   const [biz, setBiz] = useState<HrLifecycleItem | null>(null)
   const [leave, setLeave] = useState<LeaveRequestItem | null>(null)
+  const [cert, setCert] = useState<CertificateItem | null>(null)
   /** 流程编码判定的入转调离类型（无单据查看权限时仍可正确展示类型标签） */
   const [flowType, setFlowType] = useState<HrLifecycleType | undefined>()
   const [loading, setLoading] = useState(false)
@@ -59,6 +68,7 @@ export default function HrFlowDetail() {
       setFlow(data)
       setBiz(null)
       setLeave(null)
+      setCert(null)
       setFlowType(HR_PROCESS_CODE_TO_TYPE[data.processCode])
       const bizId = Number((data.formData as { bizId?: unknown } | null)?.bizId)
       if (!bizId) return
@@ -67,6 +77,8 @@ export default function HrFlowDetail() {
           setBiz(await fetchLifecycleRequest(bizId))
         } else if (data.processCode === LEAVE_PROCESS_CODE) {
           setLeave(await fetchLeaveDetail(bizId))
+        } else if (data.processCode === CERT_PROCESS_CODE) {
+          setCert(await fetchCertificateDetail(bizId))
         }
         // 其它流程域（财务/采购等）不在此页处理，保持只展示流程信息
       } catch {
@@ -84,12 +96,16 @@ export default function HrFlowDetail() {
   }, [load])
 
   const isLeaveFlow = flow?.processCode === LEAVE_PROCESS_CODE
-  const type: HrLifecycleType | undefined = isLeaveFlow ? undefined : (flowType ?? biz?.type)
-  const menuKey = isLeaveFlow ? 'hr-leave' : (type ? HR_LIFECYCLE_MENU_KEY[type] : undefined)
+  const isCertFlow = flow?.processCode === CERT_PROCESS_CODE
+  /** 非人事单据域（请假/证明）不套用入转调离类型，避免标签与授权菜单串域 */
+  const type: HrLifecycleType | undefined = (isLeaveFlow || isCertFlow) ? undefined : (flowType ?? biz?.type)
+  const menuKey = isLeaveFlow ? 'hr-leave'
+    : isCertFlow ? 'ess-certificate'
+    : (type ? HR_LIFECYCLE_MENU_KEY[type] : undefined)
   const status = flow?.flowStatus
   /** 关联单据展示名（两种单据域共用一套确认框/标签逻辑） */
-  const docNo = biz?.reqNo ?? leave?.reqNo
-  const docEmp = biz?.empName ?? leave?.empName
+  const docNo = biz?.reqNo ?? leave?.reqNo ?? cert?.reqNo
+  const docEmp = biz?.empName ?? leave?.empName ?? cert?.empName
 
   /** 是否可审批：流程在途 + 当前用户为节点审批人（或系统管理员），与后端身份校验口径一致 */
   const approverNames = (flow?.currentApprover || '').split(',')
@@ -112,6 +128,18 @@ export default function HrFlowDetail() {
           {isLeaveFlow && leave && (
             <div className="confirm-info-row">
               <span>{t('hrLeave.period')}：</span><b>{leave.startDate} ~ {leave.endDate}（{leave.days} {t('hrLeave.dayUnit')}）</b>
+            </div>
+          )}
+          {isCertFlow && cert && (
+            <div className="confirm-info-row">
+              <span>{t('hrCert.applicant')}：</span><b>{cert.empName}{cert.empNo ? ` (${cert.empNo})` : ''}</b>
+            </div>
+          )}
+          {isCertFlow && cert && (
+            <div className="confirm-info-row">
+              <span>{t('hrCert.certType')}：</span>
+              <b>{CERT_TYPE_LABEL_KEY[cert.certType] ? t(CERT_TYPE_LABEL_KEY[cert.certType]) : cert.certType}
+                · {cert.copies} {t('hrCert.copyUnit')}</b>
             </div>
           )}
           <div className="confirm-info-row"><span>{t('hrLifecycle.flowCurrentNode')}：</span><b>{flow?.currentNodeName || '-'}</b></div>
@@ -188,8 +216,13 @@ export default function HrFlowDetail() {
         tags={(
           <Space size={8}>
             {isLeaveFlow && <Tag color="cyan">{t('hrLeave.title')}</Tag>}
+            {isCertFlow && <Tag color="cyan">{t('hrCert.title')}</Tag>}
             {!isLeaveFlow && type && <Tag color={TYPE_TAG_COLOR[type]}>{TYPE_LABEL_KEY[type] ? t(TYPE_LABEL_KEY[type]) : type}</Tag>}
-            {isLeaveFlow ? (
+            {isCertFlow ? (
+              <Tag color={CERT_STATUS_TAG_COLOR[cert?.status ?? flow.flowStatus]}>
+                {cert && CERT_STATUS_LABEL_KEY[cert.status] ? t(CERT_STATUS_LABEL_KEY[cert.status]) : flow.flowStatus}
+              </Tag>
+            ) : isLeaveFlow ? (
               <Tag color={LEAVE_STATUS_TAG_COLOR[leave?.status ?? flow.flowStatus]}>
                 {leave && LEAVE_STATUS_LABEL_KEY[leave.status] ? t(LEAVE_STATUS_LABEL_KEY[leave.status]) : flow.flowStatus}
               </Tag>
@@ -264,6 +297,32 @@ export default function HrFlowDetail() {
           <div style={{ marginTop: 4 }}>
             <Button type="link" size="small" style={{ padding: 0 }}
               onClick={() => navigate(`${LEAVE_DETAIL_PATH}?id=${leave.id}`)}>
+              {t('hrLifecycle.viewRequest')}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* 关联单据：证明开具（第三套单据域，同样只在识别到流程编码时才回查） */}
+      {cert && (
+        <Card size="small" className="detail-card" title={t('hrLifecycle.linkedRequestTitle')} style={{ marginBottom: 16 }}>
+          <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small">
+            <Descriptions.Item label={t('hrCert.reqNo')}>{cert.reqNo}</Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.applicant')}>{cert.empName}{cert.empNo ? ` (${cert.empNo})` : ''}</Descriptions.Item>
+            <Descriptions.Item label={t('hrLeave.dept')}>{cert.deptName || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.certType')}>
+              {CERT_TYPE_LABEL_KEY[cert.certType] ? t(CERT_TYPE_LABEL_KEY[cert.certType]) : cert.certType}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.language')}>
+              {CERT_LANG_LABEL_KEY[cert.language] ? t(CERT_LANG_LABEL_KEY[cert.language]) : cert.language}
+            </Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.copies')}>{cert.copies} {t('hrCert.copyUnit')}</Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.purpose')} span={3}>{cert.purpose || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('hrCert.recipient')} span={3}>{cert.recipient || '-'}</Descriptions.Item>
+          </Descriptions>
+          <div style={{ marginTop: 4 }}>
+            <Button type="link" size="small" style={{ padding: 0 }}
+              onClick={() => navigate(`${CERT_DETAIL_PATH}?id=${cert.id}`)}>
               {t('hrLifecycle.viewRequest')}
             </Button>
           </div>

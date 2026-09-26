@@ -84,6 +84,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ess-leave': 'My Leave',
   'ess-requests': 'My Requests',
   'ess-profile': 'My Profile',
+  'ess-certificate': 'Certificates',
   'hr-leave': 'Leave Requests',
   'hr-leave-quota': 'Leave Balances',
   'hr-dict': 'HR Dictionary',

@@ -72,6 +72,10 @@ const FLOW_NAME_PREFIX: Record<string, string> = {
   hr_regular: '轉正申請',
   hr_transfer: '調動申請',
   hr_dimission: '離職手續',
+  // 後端列表 VO 的 processName 为空，流程名稱列一律由本表派生：
+  // 漏登记会直接裸露 processCode（曾缺 hr_renew / hr_certificate）
+  hr_renew: '合同續簽',
+  hr_certificate: '證明開具',
 }
 
 /** 流程標籤短標籤（列表 Tag 用，與表單頁 FLOW_TAG_LABEL 保持一致） */

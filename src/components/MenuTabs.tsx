@@ -187,6 +187,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/hr-dimission-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
   '/ess-leave-form': { fixed: 'i18n:hrLeave.formTitle' },
   '/ess-leave-detail': { fixed: 'i18n:hrLeave.detailTitle' },
+  '/ess-certificate-form': { fixed: 'i18n:hrCert.formTitle' },
+  '/ess-certificate-detail': { fixed: 'i18n:hrCert.detailTitle' },
   '/hr-contract-renew-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
 }
 

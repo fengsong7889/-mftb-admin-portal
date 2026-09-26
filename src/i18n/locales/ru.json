@@ -401,5 +401,11 @@
     "fieldDingtalk": "DingTalk",
     "fieldAddressCity": "Город",
     "fieldAddressDetail": "Адрес"
+  },
+  "hrCert": {
+    "title": "Certificates",
+    "listTitle": "My Certificate Requests",
+    "formTitle": "Certificate Request",
+    "detailTitle": "Certificate Request Detail"
   }
 }

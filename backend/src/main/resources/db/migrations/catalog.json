@@ -491,6 +491,33 @@
       ],
       "status": "ACTIVE",
       "comment": "P1 員工自助(ESS) v1.0 的补全：菜单迁移除建菜单/授菜单外，还必须写 sys_role_system 给 employee_self_service 补 hr 系统准入（系统准入与菜单授权是两条线，缺一则员工在门户看不到自助入口），并按正确 sort_order 建菜单（不依赖下次启动的 applyTopLevelMenuSort 修正）。全流程幂等，取代 hr:ess-menu:v1.0。"
+    },
+    {
+      "versionKey": "hr:certificate-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrCertificateSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:dict-schema-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 證明開具(ESS)：建 hr_certificate_request 申请单表（状态机与请假同口径，result_remark 承载办理结果），种子 sys_hr_dict.CERT_TYPE 四类、sys_biz_seq_rule.hr_certificate_request(ZM) 与 biz_oa_process.hr_certificate(workflow_type=oa_general，可在流程配置单独编排)；applyOnce 带后置校验，失败不记版本。参考 SQL: 201_hr_certificate.sql"
+    },
+    {
+      "versionKey": "hr:certificate-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrCertificateSchemaInitializer",
+      "dependencies": [
+        "hr:certificate-schema:v1.0",
+        "hr:ess-menu:v1.1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 證明開具菜单：在一级域 ess-center 下新增叶子 ess-certificate(證明開具)，沿用父域 system_code 以免被门户导航剪枝；授权 admin 全量与 employee_self_service 自助动作（hr 系统准入已由 hr:ess-menu:v1.1 建立，故不重复写），并 evictAll 递增 revision。"
     }
   ]
 }

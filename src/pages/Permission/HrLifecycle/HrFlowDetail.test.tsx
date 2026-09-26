@@ -26,6 +26,11 @@ vi.mock('../../../api/hrLeave', async importOriginal => ({
   ...await importOriginal<typeof import('../../../api/hrLeave')>(),
   fetchLeaveDetail: (id: number) => fetchLeaveDetail(id),
 }))
+const fetchCertificateDetail = vi.fn()
+vi.mock('../../../api/hrCertificate', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../api/hrCertificate')>(),
+  fetchCertificateDetail: (id: number) => fetchCertificateDetail(id),
+}))
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { name: '管理員', role: 'admin', empId: 'MF00001' }, hasPermission: () => true }),
 }))
@@ -84,6 +89,24 @@ describe('HrFlowDetail 按流程编码回查关联单据', () => {
     expect(screen.getByText('張三 (MF00024)')).toBeTruthy()
     expect(screen.queryByText('RS202609260004')).toBeNull()
     expect(screen.queryByText('測試入職員')).toBeNull()
+  })
+
+  it('证明流程只查证明申请单，不得借用请假或入转调离的主键', async () => {
+    fetchOaRequestDetail.mockResolvedValue(flow('hr_certificate'))
+    fetchCertificateDetail.mockResolvedValue({
+      id: 4, reqNo: 'ZM202609270002', userId: 28, empName: '測試入職員', empNo: 'MF00028',
+      deptName: '技術部', certType: 'EMPLOYMENT', purpose: '銀行貸款', copies: 2,
+      language: 'BOTH', status: 'pending', flowNo: 'OA202609260004',
+    })
+
+    mount()
+
+    await waitFor(() => expect(fetchCertificateDetail).toHaveBeenCalledWith(4))
+    expect(fetchLifecycleRequest).not.toHaveBeenCalled()
+    expect(fetchLeaveDetail).not.toHaveBeenCalled()
+    expect(screen.getByText('ZM202609270002')).toBeTruthy()
+    expect(screen.queryByText('LQ202609260004')).toBeNull()
+    expect(screen.queryByText('RS202609260004')).toBeNull()
   })
 
   it('入转调离流程只查生命周期单据，不得误查请假单', async () => {

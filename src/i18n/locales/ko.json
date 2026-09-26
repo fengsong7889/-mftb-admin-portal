@@ -401,5 +401,11 @@
     "fieldDingtalk": "딩톡 계정",
     "fieldAddressCity": "거주 도시",
     "fieldAddressDetail": "상세 주소"
+  },
+  "hrCert": {
+    "title": "Certificates",
+    "listTitle": "My Certificate Requests",
+    "formTitle": "Certificate Request",
+    "detailTitle": "Certificate Request Detail"
   }
 }
