@@ -279,10 +279,37 @@
       "executor": "systemPortalSchemaInitializer",
       "dependencies": [
         "core:menu-seed-v42",
-        "core:system-portal:v1.0"
+        "core:system-portal:v1.0",
+        "core:seller-workbench-menu-v1.0"
       ],
       "status": "ACTIVE",
       "comment": "商家工作台已存在时，将报表分析及三个报表原 ID 迁入 seller-center，停用广告系统空的店铺随心推目录；不改购买入口、菜单授权或系统准入。附后置校验和启动自愈；未配置 seller 的环境延后执行且不记成功。"
+    },
+    {
+      "versionKey": "core:seller-workbench-menu-v1.0",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemPortalSchemaInitializer",
+      "dependencies": [
+        "core:menu-seed-v42",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "补齐商家工作台后端缺口：创建 seller-center 顶级目录（system_code=seller），店铺随心推购买入口与报表分析组换父级并整棵子树改归属，持有子树菜单授权的角色/部门反推补授 seller 准入，admin 补授目录 view；sys_system.seller 行由 seedSystems 每次启动幂等种子。附后置校验与启动自愈，报表层级收尾依赖 core:seller-promotion-reports-v1.0。参考 SQL: sql/199_seller_workbench.sql"
+    },
+    {
+      "versionKey": "core:translation-system-v1.0",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "systemPortalSchemaInitializer",
+      "dependencies": [
+        "core:menu-seed-v42",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "翻译中心独立系统：前端门户已有翻譯中心卡片(code=i18n)但后端 i18n-center 菜单树随 v1.0 一次性回填挂在 platform，导致授权中心无该系统的授权入口。整棵子树 system_code 定向改写为 i18n，按菜单授权反推角色/部门准入；sys_system.i18n 行由 seedSystems 每次启动幂等种子。附树遍历后置校验与启动自愈。参考 SQL: sql/200_translation_system.sql"
     },
     {
       "versionKey": "hr:dict-schema-v1",
@@ -437,6 +464,33 @@
       ],
       "status": "ACTIVE",
       "comment": "HR 假期菜单：hr-profile(員工檔案) 下新增 hr-leave(請假管理) / hr-leave-quota(假期額度) 两个二级菜单，admin 补授全量动作并 evictAll 递增 revision；归属/排序/图标/英文名由 reconcileMenuMasterData 每次启动自愈。"
+    },
+    {
+      "versionKey": "hr:ess-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrEssSchemaInitializer",
+      "dependencies": [
+        "hr:leave-menu:v1.0",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "hr:ess-menu:v1.1",
+      "comment": "P1 員工自助(ESS)：新建一级菜单域 ess-center(員工自助，与 hr 同门户 system_code 否则被导航剪枝丢弃) + 叶子 ess-leave(我的假期)/ess-requests(我的申請單據)/ess-profile(我的檔案)；内置角色 employee_self_service 授自助动作、admin 授全量，并 evictAll 递增 revision；顶级排序与图标/英文名由 reconcileMenuMasterData 每次启动自愈。"
+    },
+    {
+      "versionKey": "hr:ess-menu:v1.1",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrEssSchemaInitializer",
+      "dependencies": [
+        "hr:leave-menu:v1.0",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 員工自助(ESS) v1.0 的补全：菜单迁移除建菜单/授菜单外，还必须写 sys_role_system 给 employee_self_service 补 hr 系统准入（系统准入与菜单授权是两条线，缺一则员工在门户看不到自助入口），并按正确 sort_order 建菜单（不依赖下次启动的 applyTopLevelMenuSort 修正）。全流程幂等，取代 hr:ess-menu:v1.0。"
     }
   ]
 }

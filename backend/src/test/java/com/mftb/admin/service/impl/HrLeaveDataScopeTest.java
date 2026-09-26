@@ -154,7 +154,7 @@ class HrLeaveDataScopeTest {
         login(false);
         when(leaveMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(1, 10));
 
-        service.page(1, 10, null, null);
+        service.page(1, 10, null, null, false);
 
         String sql = capturePageCondition();
         assertTrue(sql.contains("user_id"), "列表查询未下推归属条件: " + sql);
@@ -166,7 +166,7 @@ class HrLeaveDataScopeTest {
         login(true);
         when(leaveMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(1, 10));
 
-        service.page(1, 10, null, null);
+        service.page(1, 10, null, null, false);
 
         assertFalse(capturePageCondition().contains("user_id"), "人事角色不应被限定为本人");
     }
@@ -177,12 +177,37 @@ class HrLeaveDataScopeTest {
         login(false);
         when(leaveMapper.selectList(any())).thenReturn(List.of(request(1, SELF_ID, "draft")));
 
-        service.stats();
+        service.stats(false);
 
         ArgumentCaptor<LambdaQueryWrapper<HrLeaveRequest>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(leaveMapper).selectList(captor.capture());
         assertTrue(captor.getValue().getSqlSegment().contains("user_id"),
                 "计数查询未下推归属条件: " + captor.getValue().getSqlSegment());
+    }
+
+    @Test
+    @DisplayName("mineOnly=true 时人事角色也强制只看本人（自助页复用人事接口）")
+    void mineOnlyOverridesHrRole() {
+        login(true);
+        when(leaveMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(1, 10));
+
+        service.page(1, 10, null, null, true);
+
+        assertTrue(capturePageCondition().contains("user_id"), "自助页应对人事角色也收敛为本人");
+    }
+
+    @Test
+    @DisplayName("自助用户统计计数同口径")
+    void statsHonourMineOnly() {
+        login(true);
+        when(leaveMapper.selectList(any())).thenReturn(List.of());
+
+        service.stats(true);
+
+        ArgumentCaptor<LambdaQueryWrapper<HrLeaveRequest>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(leaveMapper).selectList(captor.capture());
+        assertTrue(captor.getValue().getSqlSegment().contains("user_id"),
+                "mineOnly 计数未下推归属条件: " + captor.getValue().getSqlSegment());
     }
 
     @Test
@@ -206,7 +231,10 @@ class HrLeaveDataScopeTest {
         when(leaveMapper.selectById(9L)).thenReturn(request(9L, OTHER_ID, "draft"));
         when(balanceMapper.selectOne(any())).thenReturn(null);
 
-        assertThrows(PermissionDeniedException.class, () -> service.detail(9L));
+        PermissionDeniedException denied = assertThrows(PermissionDeniedException.class,
+                () -> service.detail(9L));
+        // 提示必须是数据范围语义，不能让自助员工误以为自己没被授权菜单
+        assertTrue(denied.getMessage().contains("本人的資料"), "实际提示: " + denied.getMessage());
 
         HrLeaveRequest mine = request(9L, SELF_ID, "draft");
         when(leaveMapper.selectById(9L)).thenReturn(mine);

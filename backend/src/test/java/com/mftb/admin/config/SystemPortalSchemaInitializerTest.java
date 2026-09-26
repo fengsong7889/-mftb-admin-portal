@@ -28,8 +28,9 @@ class SystemPortalSchemaInitializerTest {
         jdbc = spy(new JdbcTemplate(new DriverManagerDataSource(
                 "jdbc:h2:mem:ai_menu_" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "")));
         jdbc.execute("CREATE TABLE sys_menu (id BIGINT AUTO_INCREMENT PRIMARY KEY, parent_id BIGINT, "
-                + "menu_key VARCHAR(100) UNIQUE, name VARCHAR(100), type INT DEFAULT 2, "
-                + "sort_order INT DEFAULT 1, status INT DEFAULT 1, deleted INT DEFAULT 0, "
+                + "menu_key VARCHAR(100) UNIQUE, name VARCHAR(100), name_en VARCHAR(100), path VARCHAR(200), "
+                + "icon VARCHAR(100), type INT DEFAULT 2, "
+                + "sort_order INT DEFAULT 1, actions VARCHAR(255), status INT DEFAULT 1, deleted INT DEFAULT 0, "
                 + "system_code VARCHAR(32), updated_by VARCHAR(64))");
         jdbc.execute("INSERT INTO sys_menu (id, parent_id, menu_key, name, system_code) VALUES "
                 + "(1, NULL, 'ai-assistant', '自定义 AI 中心', NULL), "
@@ -43,8 +44,8 @@ class SystemPortalSchemaInitializerTest {
                 + "(9, 1, 'ai-deleted', '已删除菜单', NULL), "
                 + "(10, NULL, 'unknown-root', '未知根', NULL)");
         jdbc.update("UPDATE sys_menu SET deleted = 1 WHERE id = 9");
-        jdbc.execute("CREATE TABLE sys_role (id BIGINT PRIMARY KEY, code VARCHAR(64))");
-        jdbc.execute("INSERT INTO sys_role VALUES (1, 'admin'), (2, 'reader')");
+        jdbc.execute("CREATE TABLE sys_role (id BIGINT PRIMARY KEY, code VARCHAR(64), deleted INT DEFAULT 0, status INT DEFAULT 1)");
+        jdbc.execute("INSERT INTO sys_role (id, code) VALUES (1, 'admin'), (2, 'reader')");
         jdbc.execute("CREATE TABLE sys_role_menu (role_id BIGINT, menu_id BIGINT, actions VARCHAR(255), "
                 + "PRIMARY KEY (role_id, menu_id))");
         jdbc.execute("INSERT INTO sys_role_menu VALUES (2, 3, '[\"view\"]')");
@@ -145,11 +146,38 @@ class SystemPortalSchemaInitializerTest {
     void startupInvokesIndependentVerifiedRepairWithoutRerunningPortalDerivation() {
         jdbc.execute("CREATE TABLE sys_system (code VARCHAR(32) PRIMARY KEY, name VARCHAR(64), name_en VARCHAR(64), "
                 + "description VARCHAR(255), icon VARCHAR(64), sort_order INT, status INT, deleted INT)");
+        // 广告系统内的店铺随心推现状（拆分前生产形态）
+        jdbc.execute("INSERT INTO sys_menu (id, parent_id, menu_key, name, type, system_code) VALUES "
+                + "(11, NULL, 'promotion_tool', '推廣通', 1, 'ads'), "
+                + "(12, 11, 'promotion-sales-config', '店鋪推廣', 2, 'ads'), "
+                + "(13, 11, 'promotion-report-group', '報表分析', 1, 'ads'), "
+                + "(14, 13, 'promotion-report-overview', '數據概覽', 2, 'ads'), "
+                + "(15, 13, 'promotion-report-order', '訂單效果', 2, 'ads'), "
+                + "(16, 13, 'promotion-report-compare', '類型對比', 2, 'ads'), "
+                + "(17, NULL, 'i18n-center', '多語言管理', 1, 'platform'), "
+                + "(18, 17, 'translation-manage', '翻譯工作台', 2, 'platform')");
+        jdbc.execute("INSERT INTO sys_role_menu VALUES (2, 14, '[\"view\"]'), (2, 18, '[\"view\",\"edit\"]')");
+        jdbc.execute("INSERT INTO sys_department_menu VALUES (4, 15, '[\"view\",\"export\"]')");
         initializer.run();
         assertTrue(tracker.isApplied(VERSION));
         assertEquals("ai", owner(1));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system", Integer.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_department_system", Integer.class));
+        // 商家工作台全链路：seedSystems 落 seller 系统行 → 建 seller-center 目录并迁入随心推
+        // → 报表组归位并停用广告旧目录（同一次启动内闭环）
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_system WHERE code = 'seller' AND status = 1", Integer.class));
+        Long sellerCenterId = jdbc.queryForObject("SELECT id FROM sys_menu WHERE menu_key = 'seller-center'", Long.class);
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE id = ? AND parent_id IS NULL "
+                + "AND type = 1 AND system_code = 'seller'", Integer.class, sellerCenterId));
+        assertEquals(sellerCenterId, jdbc.queryForObject("SELECT parent_id FROM sys_menu WHERE menu_key = 'promotion-sales-config'", Long.class));
+        assertEquals(sellerCenterId, jdbc.queryForObject("SELECT parent_id FROM sys_menu WHERE menu_key = 'promotion-report-group'", Long.class));
+        assertEquals(0, jdbc.queryForObject("SELECT status FROM sys_menu WHERE menu_key = 'promotion_tool'", Integer.class));
+        // 准入反推：持有随心推报表授权的角色/部门获得 seller；不重跑 v1.0 全量推导（ai 菜单无授权记录）
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE system_code = 'seller' AND role_id = 2", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_department_system WHERE system_code = 'seller' AND dept_id = 4", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE system_code = 'ai'", Integer.class));
+        // 翻译中心独立系统：i18n 行落库 + i18n-center 子树脱离 platform + 准入反推
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_system WHERE code = 'i18n' AND status = 1", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE id IN (17, 18) AND system_code = 'i18n'", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE system_code = 'i18n' AND role_id = 2", Integer.class));
     }
 
     private void seedSellerMenus() {

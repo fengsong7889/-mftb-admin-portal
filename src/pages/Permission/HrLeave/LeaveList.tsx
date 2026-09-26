@@ -10,16 +10,19 @@ import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import {
   LEAVE_EDITABLE, deleteLeaveRequest, fetchLeaveRequests, fetchLeaveStats, type LeaveRequestItem,
 } from '../../../api/hrLeave'
-import { LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TABS, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY } from './meta'
+import {
+  HR_LEAVE_SCOPE, LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TABS, LEAVE_STATUS_TAG_COLOR,
+  LEAVE_TYPE_LABEL_KEY, leaveDetailPath, leaveFormPath, type LeaveScope,
+} from './meta'
 
-/** 请假管理列表：状态页签 + 搜索 + 表格 */
-export default function LeaveList() {
+/** 请假列表：状态页签 + 搜索 + 表格。人事端与自助端共用，差异由 scope 注入 */
+export default function LeaveList({ scope = HR_LEAVE_SCOPE }: { scope?: LeaveScope } = {}) {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
-  const canCreate = hasPermission('hr-leave:create')
-  const canEdit = hasPermission('hr-leave:edit')
-  const canDelete = hasPermission('hr-leave:delete')
+  const canCreate = hasPermission(`${scope.permKey}:create`)
+  const canEdit = hasPermission(`${scope.permKey}:edit`)
+  const canDelete = hasPermission(`${scope.permKey}:delete`)
 
   const [rows, setRows] = useState<LeaveRequestItem[]>([])
   const [total, setTotal] = useState(0)
@@ -36,6 +39,7 @@ export default function LeaveList() {
     try {
       const res = await fetchLeaveRequests({
         page, size, keyword: keyword || undefined, status: status === 'all' ? undefined : status,
+        mineOnly: scope.mineOnly,
       })
       setRows(res.records || [])
       setTotal(res.total || 0)
@@ -44,11 +48,11 @@ export default function LeaveList() {
     } finally {
       setLoading(false)
     }
-  }, [page, size, status, keyword])
+  }, [page, size, status, keyword, scope.mineOnly])
 
   const loadStats = useCallback(() => {
-    fetchLeaveStats().then(setStats).catch(() => setStats({}))
-  }, [])
+    fetchLeaveStats(scope.mineOnly).then(setStats).catch(() => setStats({}))
+  }, [scope.mineOnly])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { loadStats() }, [loadStats])
@@ -105,9 +109,9 @@ export default function LeaveList() {
         const editable = LEAVE_EDITABLE.includes(r.status)
         return (
           <Space size={0}>
-            <Button type="link" size="small" onClick={() => navigate(`/hr-leave-detail?id=${r.id}`)}>{t('common.detail')}</Button>
+            <Button type="link" size="small" onClick={() => navigate(leaveDetailPath(scope, r.id))}>{t('common.detail')}</Button>
             {canEdit && editable && (<><span className="action-split">|</span>
-              <Button type="link" size="small" onClick={() => navigate(`/hr-leave-form?id=${r.id}`)}>{t('common.edit')}</Button></>)}
+              <Button type="link" size="small" onClick={() => navigate(leaveFormPath(scope, r.id))}>{t('common.edit')}</Button></>)}
             {canDelete && editable && (<><span className="action-split">|</span>
               <Button type="link" size="small" className="ant-btn-dangerous" onClick={() => handleDelete(r)}>{t('common.delete')}</Button></>)}
           </Space>
@@ -117,7 +121,7 @@ export default function LeaveList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [t, page, status, keyword, canEdit, canDelete])
 
-  const { configComponent, applyConfig } = useColumnConfig('hr-leave',
+  const { configComponent, applyConfig } = useColumnConfig(scope.columnKey,
     columns.map(c => ({ key: String(c.key), title: String(c.title) })),
     [{ key: 'action', visible: true, locked: 'tail' }])
 
@@ -145,7 +149,7 @@ export default function LeaveList() {
       <div className="action-section">
         <div className="action-section-left">
           {canCreate && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/hr-leave-form')}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(leaveFormPath(scope))}>
               {t('hrLeave.addLeave')}
             </Button>
           )}

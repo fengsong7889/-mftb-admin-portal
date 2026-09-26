@@ -28,6 +28,7 @@ import com.mftb.admin.service.AiGrantOnApprovalService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
+import com.mftb.admin.service.HrCertificateCallbackService;
 import com.mftb.admin.service.HrLeaveCallbackService;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.OaRequestService;
@@ -46,6 +47,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +86,8 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final HrLifecycleCallbackService hrLifecycleCallbackService;
     /** HR 请假单据审批回调（独立服务，避免与 HrLeaveService 形成构造器循环依赖）。 */
     private final HrLeaveCallbackService hrLeaveCallbackService;
+    /** 證明開具审批回调（员工自助） */
+    private final HrCertificateCallbackService hrCertificateCallbackService;
 
     /* ==================== 查询 ==================== */
 
@@ -659,12 +663,8 @@ public class OaRequestServiceImpl implements OaRequestService {
         String approver = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 校验审批人身份：当前用户必须是当前节点的指定审批人（或管理员）
-        if (!operatorResolver.isAdmin(current)
-                && currentTask.getApprover() != null
-                && !currentTask.getApprover().contains(approver)) {
-            throw new BusinessException("您不是當前節點的審批人，無法審批");
-        }
+        // 校验审批人身份（fail-closed：节点未配置审批人时一律拒绝）
+        requireNodeApprover(currentTask, current, "審批");
 
         // 判断审批模式：any（或签）/ all（会签）
         boolean isAllMode = "all".equals(currentTask.getApprovalRule());
@@ -771,6 +771,15 @@ public class OaRequestServiceImpl implements OaRequestService {
                 }
             }
 
+            // 證明開具：审批全部通过 → 单据置为已完成并写入领取指引（纸质由人事线下出具）
+            if (hrCertificateCallbackService.isCertificateProcess(request.getProcessCode())) {
+                try {
+                    hrCertificateCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("HR證明開具審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
             // 钉钉通知：流程全部通过，通知发起人
             try {
                 String text = String.format("### ✅ 流程审批通过\n\n"
@@ -830,12 +839,8 @@ public class OaRequestServiceImpl implements OaRequestService {
         String approver = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 校验审批人身份：当前用户必须是当前节点的指定审批人（或管理员）
-        if (!operatorResolver.isAdmin(current)
-                && currentTask.getApprover() != null
-                && !currentTask.getApprover().contains(approver)) {
-            throw new BusinessException("您不是當前節點的審批人，無法駁回");
-        }
+        // 校验审批人身份（fail-closed：节点未配置审批人时一律拒绝）
+        requireNodeApprover(currentTask, current, "駁回");
 
         // 标记当前节点为已驳回
         currentTask.setTaskStatus(FLOW_REJECTED);
@@ -869,6 +874,15 @@ public class OaRequestServiceImpl implements OaRequestService {
                 hrLifecycleCallbackService.onFlowRejected(flowNo);
             } catch (Exception e) {
                 log.error("HR入轉調離駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
+        // 證明開具：驳回→申请回到 rejected，员工可修改后重新提交
+        if (hrCertificateCallbackService.isCertificateProcess(request.getProcessCode())) {
+            try {
+                hrCertificateCallbackService.onFlowRejected(flowNo);
+            } catch (Exception e) {
+                log.error("HR證明開具駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
             }
         }
 
@@ -1000,6 +1014,50 @@ public class OaRequestServiceImpl implements OaRequestService {
             throw new BusinessException("流程不存在: " + flowNo);
         }
         return request;
+    }
+
+    /**
+     * 校验当前用户是否为该节点的审批人（管理员兜底），动作名用于提示文案。
+     * <p>
+     * fail-closed 口径：节点未解析到审批人（如部门无负责人）时**直接拒绝**，
+     * 不再像旧实现那样跳过校验 —— 那等于任何持有入口权限的人都能通过或驳回该节点。
+     * 同时把原来的「审批串包含」改为按逗号拆开后逐个精确比对，
+     * 避免工号前缀互为包含关系（MF0002 与 MF00024）造成误放行。
+     * <p>
+     * 包内可见以便 {@code OaRequestApproverGuardTest} 直接验证判定口径。
+     */
+    void requireNodeApprover(OaApprovalTask task, SysUser current, String action) {
+        if (operatorResolver.isAdmin(current)) {
+            return;
+        }
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄後審批");
+        }
+        if (!StringUtils.hasText(task.getApprover())) {
+            throw new BusinessException("當前節點未配置審批人，無法" + action
+                    + "；請先在流程配置中指定審批人或設置部門負責人");
+        }
+        String signature = operatorResolver.operatorSignature(current);
+        boolean matched = Arrays.stream(task.getApprover().split(","))
+                .map(String::trim)
+                .anyMatch(entry -> isSamePerson(entry, current, signature));
+        if (!matched) {
+            throw new BusinessException("您不是當前節點的審批人，無法" + action);
+        }
+    }
+
+    /** 节点审批人与登录人是否同一人：兼容历史上只存姓名或只存工号的配置 */
+    private static boolean isSamePerson(String entry, SysUser user, String signature) {
+        if (!StringUtils.hasText(entry)) {
+            return false;
+        }
+        if (entry.equals(signature)) {
+            return true;
+        }
+        if (StringUtils.hasText(user.getName()) && entry.equals(user.getName())) {
+            return true;
+        }
+        return StringUtils.hasText(user.getEmpId()) && entry.equals(user.getEmpId());
     }
 
     private OaApprovalTask findCurrentPendingTask(Long requestId) {

@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.constant.HrEssConstants;
 import com.mftb.admin.constant.HrLeaveConstants;
 import com.mftb.admin.dto.HrLeaveBalanceVO;
 import com.mftb.admin.dto.HrLeaveRequestSaveDTO;
@@ -28,8 +29,9 @@ import java.util.Map;
 /**
  * HR 假期接口（额度台账 + 请假申请）。
  * <p>
- * 两个菜单共享本组端点：注解层粗粒度拦截（持有任一假期菜单即可进入），
- * 接口级按额度/请假分别校验 hr-leave-quota 与 hr-leave 的类型级权限（服务层兜底）。
+ * 三个菜单共享本组端点：人事的 hr-leave / hr-leave-quota 与员工自助的 ess-leave；
+ * 注解层粗粒度拦截（持有任一假期菜单即可进入），接口级类型权限与「非人事角色只看本人」
+ * 的数据范围均由服务层兜底（见 HrLeaveServiceImpl.scopedUserId / quotaViewerScope）。
  */
 @RestController
 @RequestMapping("/api/hr/leave")
@@ -40,18 +42,19 @@ public class HrLeaveController {
 
     /** 额度台账分页 */
     @GetMapping("/balances")
-    @RequirePermission(menu = "hr-leave-quota", anyOf = {HrLeaveConstants.MENU_LEAVE})
+    @RequirePermission(menu = "hr-leave-quota", anyOf = {HrLeaveConstants.MENU_LEAVE, HrEssConstants.MENU_LEAVE})
     public Result<PageResult<HrLeaveBalanceVO>> balances(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size,
             @RequestParam(required = false) Integer year,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(hrLeaveService.balances(page, size, year, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "false") boolean mineOnly) {
+        return Result.success(hrLeaveService.balances(page, size, year, keyword, mineOnly));
     }
 
     /** 单员工单假别剩余额度（请假表单实时提示，避免前端翻页匹配） */
     @GetMapping("/balances/quota")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {HrLeaveConstants.MENU_QUOTA})
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {HrLeaveConstants.MENU_QUOTA, HrEssConstants.MENU_LEAVE})
     public Result<Map<String, Object>> quota(@RequestParam Long userId,
                                              @RequestParam String leaveType,
                                              @RequestParam(required = false) Integer year) {
@@ -93,46 +96,47 @@ public class HrLeaveController {
 
     /** 请假人选下拉（在职员工，按姓名/工号搜索） */
     @GetMapping("/employee-options")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE)
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<List<Map<String, Object>>> employeeOptions(@RequestParam(required = false) String keyword) {
         return Result.success(hrLeaveService.employeeOptions(keyword));
     }
 
     /** 请假单分页 */
     @GetMapping
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota"})
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota", HrEssConstants.MENU_LEAVE})
     public Result<PageResult<HrLeaveRequestVO>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(hrLeaveService.page(page, size, status, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "false") boolean mineOnly) {
+        return Result.success(hrLeaveService.page(page, size, status, keyword, mineOnly));
     }
 
     /** 请假单状态数量（Tab 徽标） */
     @GetMapping("/stats")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota"})
-    public Result<Map<String, Long>> stats() {
-        return Result.success(hrLeaveService.stats());
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota", HrEssConstants.MENU_LEAVE})
+    public Result<Map<String, Long>> stats(@RequestParam(defaultValue = "false") boolean mineOnly) {
+        return Result.success(hrLeaveService.stats(mineOnly));
     }
 
     /** 请假单详情 */
     @GetMapping("/{id}")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota"})
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, anyOf = {"hr-leave-quota", HrEssConstants.MENU_LEAVE})
     public Result<HrLeaveRequestVO> detail(@PathVariable Long id) {
         return Result.success(hrLeaveService.detail(id));
     }
 
     /** 保存草稿 */
     @PostMapping
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "create")
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "create", anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<HrLeaveRequestVO> saveDraft(@Valid @RequestBody HrLeaveRequestSaveDTO dto) {
         return Result.success("草稿已保存", hrLeaveService.saveDraft(dto));
     }
 
     /** 编辑草稿 */
     @PutMapping("/{id}")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit")
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit", anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<HrLeaveRequestVO> update(@PathVariable Long id,
                                            @Valid @RequestBody HrLeaveRequestSaveDTO dto) {
         return Result.success("請假單已更新", hrLeaveService.update(id, dto));
@@ -140,7 +144,7 @@ public class HrLeaveController {
 
     /** 提交审批（创建关联 OA 流程） */
     @PostMapping("/{id}/submit")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit")
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit", anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<HrLeaveRequestVO> submit(@PathVariable Long id) {
         HrLeaveRequestVO vo = hrLeaveService.submit(id);
         return Result.success("已提交審批，流程編號：" + vo.getFlowNo(), vo);
@@ -148,7 +152,7 @@ public class HrLeaveController {
 
     /** 撤销审批 */
     @PostMapping("/{id}/cancel")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit")
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "edit", anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<Void> cancel(@PathVariable Long id) {
         hrLeaveService.cancel(id);
         return Result.success("已撤銷，請假單回到草稿", null);
@@ -156,7 +160,7 @@ public class HrLeaveController {
 
     /** 删除请假单（仅草稿/驳回/已撤销） */
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "delete")
+    @RequirePermission(menu = HrLeaveConstants.MENU_LEAVE, action = "delete", anyOf = {HrEssConstants.MENU_LEAVE})
     public Result<Void> delete(@PathVariable Long id) {
         hrLeaveService.delete(id);
         return Result.success("請假單已刪除", null);

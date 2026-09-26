@@ -248,7 +248,10 @@
     "newEndDateRequired": "Please select the new end date",
     "originContractInfo": "Original contract: {{no}} ({{type}} · {{company}} · {{start}} ~ {{end}})",
     "originContractLoading": "Загружаем данные исходного договора…",
-    "linkedRequestTitle": "Связанная заявка"
+    "linkedRequestTitle": "Связанная заявка",
+    "type": "Тип заявки",
+    "contractNo": "№ договора",
+    "transferFrom": "До → После"
   },
   "common": {
     "pleaseSelect": "Please select"
@@ -358,5 +361,45 @@
     "resultRemark": "Результат обработки",
     "quotaRemark": "Примечание",
     "totalDaysHint": "Допускается шаг 0,5 дня"
+  },
+  "hrEss": {
+    "leaveTitle": "Мой отпуск",
+    "requestsTitle": "Мои заявки",
+    "profileTitle": "Моя карточка",
+    "quotaTitle": "Остаток отпуска на {{year}} г.",
+    "quotaTip": "Остаток = выделено + перенос - использовано - в согласовании",
+    "quotaEmpty": "Дни отпуска на этот год не настроены, обратитесь в HR",
+    "quotaSummary": "Выделено {{total}} дн. · Использовано {{used}} дн. · В согласовании {{occupied}} дн.",
+    "notSubmittedYet": "Не отправлено",
+    "expandTip": "Детали заявки",
+    "submitByHrTip": "Черновики и отклонённые заявки отправляет HR; для изменений обратитесь в HR",
+    "profileEditTip": "Только чтение. Номер документа и адрес маскируются по политике. Для изменений создайте заявку или обратитесь в HR.",
+    "identitySection": "Трудоустройство",
+    "personalSection": "Личные данные",
+    "idSection": "Документы",
+    "contactSection": "Контакты",
+    "fieldName": "Имя",
+    "fieldEmpNo": "Табельный №",
+    "fieldAccount": "Учётная запись",
+    "fieldDept": "Отдел",
+    "fieldPosition": "Должность",
+    "fieldJobLevel": "Уровень",
+    "fieldGender": "Пол",
+    "fieldBirthDate": "Дата рождения",
+    "fieldNationality": "Гражданство",
+    "fieldEthnicity": "Национальность",
+    "fieldMaritalStatus": "Семейное положение",
+    "fieldPoliticalStatus": "Полит. статус",
+    "fieldIdType": "Тип документа",
+    "fieldIdNumber": "Номер документа",
+    "fieldNativePlace": "Место рождения",
+    "fieldHouseholdType": "Тип прописки",
+    "fieldHouseholdLocation": "Место прописки",
+    "fieldIdAddress": "Адрес по документу",
+    "fieldMobile": "Телефон",
+    "fieldEmail": "Email",
+    "fieldDingtalk": "DingTalk",
+    "fieldAddressCity": "Город",
+    "fieldAddressDetail": "Адрес"
   }
 }

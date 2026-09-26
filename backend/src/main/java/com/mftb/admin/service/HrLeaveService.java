@@ -15,8 +15,13 @@ import java.util.Map;
  */
 public interface HrLeaveService {
 
-    /** 额度台账分页（按年度 + 员工关键字），未授予额度的假别不展示 */
-    PageResult<HrLeaveBalanceVO> balances(long page, long size, Integer year, String keyword);
+    /**
+     * 额度台账分页（按年度 + 员工关键字），未授予额度的假别不展示。
+     *
+     * @param mineOnly 只看本人（員工自助页）：即使调用者是人事角色也强制收敛为本人，
+     *                 避免「我的假期」页对管理员呈现全员数据
+     */
+    PageResult<HrLeaveBalanceVO> balances(long page, long size, Integer year, String keyword, boolean mineOnly);
 
     /** 保存额度（新建或按 id 更新；used_days 只由审批回调累加，请求值一律忽略） */
     HrLeaveBalance saveBalance(HrLeaveBalance body);
@@ -46,11 +51,11 @@ public interface HrLeaveService {
     /** 指定年度剩余额度为负（超额）的额度行数；跨分页口径，供台账预警 */
     long overdueCount(Integer year);
 
-    /** 请假单分页（状态 + 关键字） */
-    PageResult<HrLeaveRequestVO> page(long page, long size, String status, String keyword);
+    /** 请假单分页（状态 + 关键字）；mineOnly 同上，自助页强制本人 */
+    PageResult<HrLeaveRequestVO> page(long page, long size, String status, String keyword, boolean mineOnly);
 
-    /** 请假单各状态数量（列表 Tab 徽标），含 all */
-    Map<String, Long> stats();
+    /** 请假单各状态数量（列表 Tab 徽标），含 all；须与 page 同口径（mineOnly 一致） */
+    Map<String, Long> stats(boolean mineOnly);
 
     /** 请假单详情 */
     HrLeaveRequestVO detail(Long id);

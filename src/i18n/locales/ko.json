@@ -248,7 +248,10 @@
     "newEndDateRequired": "Please select the new end date",
     "originContractInfo": "Original contract: {{no}} ({{type}} · {{company}} · {{start}} ~ {{end}})",
     "originContractLoading": "원본 계약 정보를 불러오는 중…",
-    "linkedRequestTitle": "연관 결재"
+    "linkedRequestTitle": "연관 결재",
+    "type": "결재 유형",
+    "contractNo": "계약 번호",
+    "transferFrom": "이동 전 → 이동 후"
   },
   "common": {
     "pleaseSelect": "Please select"
@@ -358,5 +361,45 @@
     "resultRemark": "처리 결과",
     "quotaRemark": "비고",
     "totalDaysHint": "반일(0.5) 단위로 설정할 수 있습니다"
+  },
+  "hrEss": {
+    "leaveTitle": "내 휴가",
+    "requestsTitle": "내 신청 결재",
+    "profileTitle": "내 기록",
+    "quotaTitle": "{{year}}년 내 휴가 잔여",
+    "quotaTip": "잔여 = 부여 + 이월 - 사용 - 결재 중",
+    "quotaEmpty": "올해 부여 일수가 없습니다. HR에 문의하세요",
+    "quotaSummary": "부여 {{total}}일 · 사용 {{used}}일 · 결재 중 {{occupied}}일",
+    "notSubmittedYet": "미제출",
+    "expandTip": "결재 상세",
+    "submitByHrTip": "초안과 반려 결재는 HR이 제출합니다. 변경은 HR에 문의하세요",
+    "profileEditTip": "읽기 전용입니다. 사번과 주소는 정책에 따라 마스킹됩니다. 정정은 이직 신청 또는 HR 문의.",
+    "identitySection": "근무 정보",
+    "personalSection": "개인 정보",
+    "idSection": "신분증 정보",
+    "contactSection": "연락처",
+    "fieldName": "성명",
+    "fieldEmpNo": "사번",
+    "fieldAccount": "계정",
+    "fieldDept": "부서",
+    "fieldPosition": "직위",
+    "fieldJobLevel": "직급",
+    "fieldGender": "성별",
+    "fieldBirthDate": "생년월일",
+    "fieldNationality": "국적",
+    "fieldEthnicity": "민족",
+    "fieldMaritalStatus": "혼인 상태",
+    "fieldPoliticalStatus": "정치적 신원",
+    "fieldIdType": "신분증 유형",
+    "fieldIdNumber": "신분증 번호",
+    "fieldNativePlace": "원적",
+    "fieldHouseholdType": "호적 유형",
+    "fieldHouseholdLocation": "호적지",
+    "fieldIdAddress": "신분증 주소",
+    "fieldMobile": "휴대폰",
+    "fieldEmail": "이메일",
+    "fieldDingtalk": "딩톡 계정",
+    "fieldAddressCity": "거주 도시",
+    "fieldAddressDetail": "상세 주소"
   }
 }

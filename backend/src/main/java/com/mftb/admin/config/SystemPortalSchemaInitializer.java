@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 统一门户与分系统改造 · 基础结构迁移（阶段 B）。
@@ -34,7 +35,10 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     private static final String VERSION_KEY = "core:system-portal:v1.0";
     static final String V_AI_MENU_OWNERSHIP = "core:ai-menu-system-ownership-v1.0";
     static final String V_SELLER_REPORTS = "core:seller-promotion-reports-v1.0";
+    static final String V_SELLER_WORKBENCH = "core:seller-workbench-menu-v1.0";
+    static final String V_TRANSLATION_SYSTEM = "core:translation-system-v1.0";
     private static final String SELLER_SYSTEM = "seller";
+    private static final String TRANSLATION_SYSTEM = "i18n";
     private static final List<String> PROMOTION_REPORT_KEYS = List.of(
             "promotion-report-overview", "promotion-report-order", "promotion-report-compare");
     private static final String MISSING_AI_DESCENDANTS =
@@ -53,7 +57,174 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
         // 不触碰 status/deleted 及系统准入关系。
         seedSystems();
         reconcileAiMenuOwnership();
+        ensureSellerWorkbench();
         reconcileSellerReports();
+        reconcileTranslationSystem();
+    }
+
+    /**
+     * 翻译中心独立系统迁移：前端门户已展示「翻譯中心」卡片（code=i18n），但后端
+     * i18n-center 菜单树历史上随 v1.0 一次性回填挂在 platform 下，导致授权中心系统列表
+     * 与门户卡片对不上、非超管无法按翻译中心授权。本任务把 i18n-center 整棵子树的
+     * system_code 定向改写为 i18n（覆盖旧值 platform），并按菜单授权反推角色/部门准入。
+     * sys_system 的 i18n 行由每次启动的 seedSystems 幂等保证。任务条件化写入天然幂等，
+     * 版本已应用时每次启动仍重放自愈。
+     */
+    void reconcileTranslationSystem() {
+        if (!versionTracker.applyOnce(V_TRANSLATION_SYSTEM, this::doReconcileTranslationSystem, this::verifyTranslationSystem)) {
+            doReconcileTranslationSystem();
+        }
+    }
+
+    private void doReconcileTranslationSystem() {
+        Long rootId = queryMenuIdByKey("i18n-center");
+        if (rootId == null) {
+            throw new IllegalStateException("i18n-center 顶级菜单不存在，菜单种子未就绪");
+        }
+        forceSubtreeSystem(rootId, TRANSLATION_SYSTEM);
+        deriveSystemAccessFromMenuGrants(TRANSLATION_SYSTEM);
+    }
+
+    /** 按「持有该系统菜单授权」反推补授系统准入（角色/部门），INSERT IGNORE 幂等；admin 角色由代码直通无需登记。 */
+    private void deriveSystemAccessFromMenuGrants(String systemCode) {
+        int roles = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_role_system (role_id, system_code) "
+                        + "SELECT DISTINCT rm.role_id, ? FROM sys_role_menu rm "
+                        + "JOIN sys_menu m ON m.id = rm.menu_id AND m.deleted = 0 AND m.system_code = ? "
+                        + "JOIN sys_role r ON r.id = rm.role_id AND r.deleted = 0 AND r.status = 1 "
+                        + "WHERE r.code <> 'admin'",
+                systemCode, systemCode);
+        int depts = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_department_system (dept_id, system_code) "
+                        + "SELECT DISTINCT dm.dept_id, ? FROM sys_department_menu dm "
+                        + "JOIN sys_menu m ON m.id = dm.menu_id AND m.deleted = 0 AND m.system_code = ?",
+                systemCode, systemCode);
+        if (roles > 0 || depts > 0) {
+            log.info("{} 系统准入反推补授: roles+={} depts+={}", systemCode, roles, depts);
+        }
+    }
+
+    private void verifyTranslationSystem() {
+        Long rootId = queryMenuIdByKey("i18n-center");
+        if (rootId == null) {
+            throw new IllegalStateException("i18n-center 顶级菜单不存在");
+        }
+        // 按树遍历校验（不按 key 前缀猜），未来新增子菜单由自愈覆盖而非卡死启动
+        List<Long> frontier = List.of(rootId);
+        for (int depth = 0; depth < 6 && !frontier.isEmpty(); depth++) {
+            String inClause = frontier.stream().map(String::valueOf).collect(Collectors.joining(","));
+            Integer wrong = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE id IN (" + inClause + ") AND deleted = 0 "
+                            + "AND (system_code IS NULL OR system_code <> ?)",
+                    Integer.class, TRANSLATION_SYSTEM);
+            if (wrong != null && wrong > 0) {
+                throw new IllegalStateException("翻译中心菜单树存在未归属 i18n 的节点: " + wrong + " 条");
+            }
+            frontier = jdbcTemplate.queryForList(
+                    "SELECT id FROM sys_menu WHERE deleted = 0 AND parent_id IN (" + inClause + ")", Long.class);
+        }
+    }
+
+    /**
+     * 商家工作台拆分的后端缺口：seller 顶级菜单 + 店铺随心推购买入口迁入 + 准入派生。
+     * <p>sys_system 的 seller 行由每次启动的 {@link #seedSystems()} 幂等保证；报表层级
+     * 归位与广告系统空目录停用由 {@link #reconcileSellerReports()} 完成。本任务只补
+     * 此前缺失的一步——导致 seller-promotion-reports 迁移在生产永远「延后」的根因。
+     * 任务全部条件化写入（幂等），版本已应用时每次启动仍重放自愈。
+     */
+    void ensureSellerWorkbench() {
+        if (!versionTracker.applyOnce(V_SELLER_WORKBENCH, this::doEnsureSellerWorkbench, this::verifySellerWorkbench)) {
+            doEnsureSellerWorkbench();
+        }
+    }
+
+    private void doEnsureSellerWorkbench() {
+        Long sellerCenterId = queryMenuIdByKey("seller-center");
+        if (sellerCenterId == null) {
+            // 软删残留会撞 uk_menu_key 全局唯一索引（v44 生产事故模式），先物理清理
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 1");
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, name_en, path, icon, type, sort_order, actions, system_code, status, deleted, updated_by) "
+                            + "VALUES (NULL, 'seller-center', '商家工作台', 'Merchant Workbench', '', 'ShopOutlined', 1, 15, '[\"view\"]', ?, 1, 0, 'system')",
+                    SELLER_SYSTEM);
+            sellerCenterId = queryMenuIdByKey("seller-center");
+            if (sellerCenterId == null) {
+                throw new IllegalStateException("seller-center 菜单写入后回读缺失");
+            }
+            log.info("已创建商家工作台顶级菜单 seller-center (system_code={})", SELLER_SYSTEM);
+        } else {
+            // 归属/结构字段定向纠正，不覆盖用户自定义名称
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET parent_id = NULL, type = 1, system_code = ?, icon = COALESCE(NULLIF(icon, ''), 'ShopOutlined') "
+                            + "WHERE id = ? AND deleted = 0",
+                    SELLER_SYSTEM, sellerCenterId);
+        }
+
+        // 购买入口与报表分析组迁入（条件化：种子重跑在 seller-center 存在时本来就会挂对父级）；
+        // 报表叶子层级由随后的 reconcileSellerReports 归位到组下，此处刷其系统归属
+        for (String migratedKey : new String[]{"promotion-sales-config", "promotion-report-group"}) {
+            Long migratedId = queryMenuIdByKey(migratedKey);
+            if (migratedId == null) {
+                throw new IllegalStateException("随心推菜单 " + migratedKey + " 不存在，菜单种子未就绪");
+            }
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET parent_id = ?, system_code = ?, updated_by = 'system' "
+                            + "WHERE id = ? AND deleted = 0 AND (parent_id IS NULL OR parent_id <> ? OR system_code IS NULL OR system_code <> ?)",
+                    sellerCenterId, SELLER_SYSTEM, migratedId, sellerCenterId, SELLER_SYSTEM);
+            forceSubtreeSystem(migratedId, SELLER_SYSTEM);
+        }
+
+        // 准入派生：持有商家工作台子树菜单授权的角色/部门补授 seller，拆分不断权
+        deriveSystemAccessFromMenuGrants(SELLER_SYSTEM);
+        Long adminRoleId = jdbcTemplate.queryForList(
+                        "SELECT id FROM sys_role WHERE code = 'admin' AND deleted = 0 LIMIT 1", Long.class)
+                .stream().findFirst().orElse(null);
+        if (adminRoleId != null) {
+            jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                    adminRoleId, sellerCenterId, "[\"view\"]");
+        }
+    }
+
+    /**
+     * 子树 system_code 强制跟随（覆盖显式旧值——拆分就是要改归属）。
+     * 迭代按父链扩散，初始父仅为被迁根菜单，天然限定在子树内；MySQL 不允许在
+     * UPDATE 目标表子查询中引用自身，故逐层执行（与 propagateSystemToDescendants 同法）。
+     */
+    private void forceSubtreeSystem(Long rootId, String systemCode) {
+        List<Long> frontier = List.of(rootId);
+        for (int depth = 0; depth < 6 && !frontier.isEmpty(); depth++) {
+            String inClause = frontier.stream().map(String::valueOf).collect(Collectors.joining(","));
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET system_code = ?, updated_by = 'system' "
+                            + "WHERE id IN (" + inClause + ") AND deleted = 0 AND (system_code IS NULL OR system_code <> ?)",
+                    systemCode, systemCode);
+            frontier = jdbcTemplate.queryForList(
+                    "SELECT id FROM sys_menu WHERE deleted = 0 AND parent_id IN (" + inClause + ")", Long.class);
+        }
+    }
+
+    private void verifySellerWorkbench() {
+        Integer ok = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 0 AND status = 1 "
+                        + "AND parent_id IS NULL AND type = 1 AND system_code = ?",
+                Integer.class, SELLER_SYSTEM);
+        if (ok == null || ok != 1) {
+            throw new IllegalStateException("seller-center 顶级目录未就绪");
+        }
+        Integer purchase = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'promotion-sales-config' AND deleted = 0 AND system_code = ? "
+                        + "AND parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 0) t)",
+                Integer.class, SELLER_SYSTEM);
+        if (purchase == null || purchase != 1) {
+            throw new IllegalStateException("店铺随心推购买入口未迁入商家工作台");
+        }
+    }
+
+    private Long queryMenuIdByKey(String menuKey) {
+        return jdbcTemplate.queryForList(
+                        "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1", Long.class, menuKey)
+                .stream().findFirst().orElse(null);
     }
 
     /** 延续已完成的商家工作台拆分，只迁移报表，不创建系统或重新推导准入授权。 */
@@ -242,11 +413,12 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                         + ") COMMENT='部门与系统准入关联'");
     }
 
-    /** 种子 10 个业务系统；portal 是哨兵值不落库。 */
+    /** 种子 12 个业务系统；portal 是哨兵值不落库。每次启动幂等刷新展示元数据。 */
     private void seedSystems() {
         Object[][] rows = {
-                {SystemCode.ADS.code(),      "廣告推薦系統", "Ads & Recommendation", "广告销售、商家推广、推广通、团购秒杀",       "AimOutlined",               10},
+                {SystemCode.ADS.code(),      "廣告推薦系統", "Ads & Recommendation", "广告销售、商家推广、团购秒杀（店铺随心推已迁至商家工作台）", "AimOutlined",               10},
                 {SystemCode.MERCHANT.code(), "商戶運營系統",   "Merchant Ops",      "商户集团、门店、门店数据、地图规划",         "ShopOutlined",              20},
+                {SystemCode.SELLER.code(),   "商家工作台",   "Merchant Workbench", "店铺随心推购买与推广报表，商家侧一站式工作空间", "ShopOutlined",            25},
                 {SystemCode.SEARCH.code(),   "搜索運營系統",   "Search Ops",        "搜索词库、引导、策略、校验、报表",           "SearchOutlined",            30},
                 {SystemCode.FINANCE.code(),  "財務系統",       "Finance",           "账户余额、批次、明细、对账、审批中心",       "AccountBookOutlined",       40},
                 {SystemCode.AI.code(),       "AI 管理系統",    "AI Hub",            "模型、配额、授权、MCP、审计、能耗",          "RobotOutlined",             50},
@@ -255,6 +427,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 {SystemCode.OA.code(),       "OA 系統",        "OA",                "流程中心、流程事项、审批配置、员工自助",     "SolutionOutlined",          80},
                 {SystemCode.IAM.code(),      "權限中心",       "IAM",               "角色、功能授权、数据授权、菜单配置",         "SafetyCertificateOutlined", 90},
                 {SystemCode.PLATFORM.code(), "平台配置",       "Platform",          "通知、多语言、规则、版本、翻译工作台",       "SettingOutlined",          100},
+                {SystemCode.TRANSLATION.code(), "翻譯中心",   "Translation Center", "多语言翻译、语料维护与质量校验，连接全球业务", "GlobalOutlined",         110},
         };
         for (Object[] r : rows) {
             jdbcTemplate.update(

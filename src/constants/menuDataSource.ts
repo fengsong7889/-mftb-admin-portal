@@ -67,6 +67,11 @@ export const keyToPath: Record<string, string> = {
   // 組織管理（v44 独立一级域：目录 org-center + 叶子部門架構）
   'hr-leave': '/hr-leave',
   'hr-leave-quota': '/hr-leave-quota',
+  // 員工自助（v45 独立一级域：目录 ess-center + 三个自助叶子）
+  'ess-center': '/ess-leave',
+  'ess-leave': '/ess-leave',
+  'ess-requests': '/ess-requests',
+  'ess-profile': '/ess-profile',
   'org-center': '/org-center',
   'org-structure': '/organization-management',
   // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 保留映射，历史种子/缓存菜单点击直接重定向）
@@ -221,6 +226,9 @@ pathToKey['/hr-dimission-detail'] = 'hr-dimission'
 pathToKey['/hr-leave-form'] = 'hr-leave'
 pathToKey['/hr-leave-detail'] = 'hr-leave'
 pathToKey['/hr-leave-quota-form'] = 'hr-leave-quota'
+// 自助端请假表单/详情复用同一菜单授权
+pathToKey['/ess-leave-form'] = 'ess-leave'
+pathToKey['/ess-leave-detail'] = 'ess-leave'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -247,6 +255,8 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'org-structure',
   // 假期域
   'hr-leave', 'hr-leave-quota',
+  // 員工自助域
+  'ess-leave', 'ess-requests', 'ess-profile',
   // 權限管理（授權中心已合并舊 功能授權/系統授權 兩入口，後端守衛 menu=authorization-center）
   'role-management', 'authorization-center', 'data-permission',
   // 商家推广工具（已接入后端的部分）

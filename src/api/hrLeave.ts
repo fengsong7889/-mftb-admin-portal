@@ -91,10 +91,13 @@ export interface LeaveQuotaInfo {
 }
 
 /* ---------- 请假单 ---------- */
-export const fetchLeaveRequests = (params: { page: number; size: number; status?: string; keyword?: string }) =>
-  request.get<unknown, PageResult<LeaveRequestItem>>('/hr/leave', { params })
-export const fetchLeaveStats = () =>
-  request.get<unknown, Record<string, number>>('/hr/leave/stats')
+export const fetchLeaveRequests = (params: {
+  page: number; size: number; status?: string; keyword?: string
+  /** 只看本人（員工自助页）：服务端强制收敛，人事角色打开也只看自己 */
+  mineOnly?: boolean
+}) => request.get<unknown, PageResult<LeaveRequestItem>>('/hr/leave', { params })
+export const fetchLeaveStats = (mineOnly?: boolean) =>
+  request.get<unknown, Record<string, number>>('/hr/leave/stats', { params: { mineOnly: mineOnly || undefined } })
 export const fetchLeaveDetail = (id: number) =>
   request.get<unknown, LeaveRequestItem>(`/hr/leave/${id}`)
 export const saveLeaveDraft = (data: LeaveRequestPayload) =>
@@ -113,8 +116,11 @@ export const fetchLeaveEmployeeOptions = (keyword?: string) =>
   })
 
 /* ---------- 假期额度 ---------- */
-export const fetchLeaveBalances = (params: { page: number; size: number; year?: number; keyword?: string }) =>
-  request.get<unknown, PageResult<LeaveBalance>>('/hr/leave/balances', { params })
+export const fetchLeaveBalances = (params: {
+  page: number; size: number; year?: number; keyword?: string
+  /** 只看本人（員工自助页） */
+  mineOnly?: boolean
+}) => request.get<unknown, PageResult<LeaveBalance>>('/hr/leave/balances', { params })
 export const saveLeaveBalance = (data: Partial<LeaveBalance>) =>
   request.post<unknown, LeaveBalance>('/hr/leave/balances', data)
 export const deleteLeaveBalance = (id: number) =>

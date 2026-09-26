@@ -248,7 +248,10 @@
     "newEndDateRequired": "Please select the new end date",
     "originContractInfo": "Original contract: {{no}} ({{type}} · {{company}} · {{start}} ~ {{end}})",
     "originContractLoading": "元契約情報を読み込み中…",
-    "linkedRequestTitle": "関連伝票"
+    "linkedRequestTitle": "関連伝票",
+    "type": "伝票種類",
+    "contractNo": "契約番号",
+    "transferFrom": "異動前 → 異動後"
   },
   "common": {
     "pleaseSelect": "Please select"
@@ -358,5 +361,45 @@
     "resultRemark": "処理結果",
     "quotaRemark": "備考",
     "totalDaysHint": "半日（0.5）単位で設定できます"
+  },
+  "hrEss": {
+    "leaveTitle": "我的休暇",
+    "requestsTitle": "我的申請伝票",
+    "profileTitle": "我的档案",
+    "quotaTitle": "{{year}} 年度 休暇残数",
+    "quotaTip": "残数 = 付与 + 繰越 - 使用 - 承認中",
+    "quotaEmpty": "今年の付与日数が未設定です。人事にご連絡ください",
+    "quotaSummary": "付与 {{total}} 日 · 使用 {{used}} 日 · 承認中 {{occupied}} 日",
+    "notSubmittedYet": "未提出",
+    "expandTip": "伝票明細",
+    "submitByHrTip": "下書きと却下伝票は人事が承認申請します。変更は人事へご連絡ください",
+    "profileEditTip": "閲覧専用ページです。証件番号と住所はポリシーによりマスクされます。修正は異動申請または人事へご連絡ください。",
+    "identitySection": "雇用情報",
+    "personalSection": "基本情報",
+    "idSection": "証明書情報",
+    "contactSection": "連絡先",
+    "fieldName": "氏名",
+    "fieldEmpNo": "社員番号",
+    "fieldAccount": "ログインID",
+    "fieldDept": "部門",
+    "fieldPosition": "役職",
+    "fieldJobLevel": "職級",
+    "fieldGender": "性別",
+    "fieldBirthDate": "生年月日",
+    "fieldNationality": "国籍",
+    "fieldEthnicity": "民族",
+    "fieldMaritalStatus": "婚姻状況",
+    "fieldPoliticalStatus": "政治的身份",
+    "fieldIdType": "証明書種別",
+    "fieldIdNumber": "証明書番号",
+    "fieldNativePlace": "原籍",
+    "fieldHouseholdType": "戸籍種別",
+    "fieldHouseholdLocation": "戸籍所在地",
+    "fieldIdAddress": "証明書住所",
+    "fieldMobile": "携帯電話",
+    "fieldEmail": "メール",
+    "fieldDingtalk": "DingTalk ID",
+    "fieldAddressCity": "居住都市",
+    "fieldAddressDetail": "詳細住所"
   }
 }

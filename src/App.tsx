@@ -73,6 +73,12 @@ const LeaveList = lazy(() => import('./pages/Permission/HrLeave/LeaveList'))
 const LeaveForm = lazy(() => import('./pages/Permission/HrLeave/LeaveForm'))
 const LeaveDetail = lazy(() => import('./pages/Permission/HrLeave/LeaveDetail'))
 const LeaveQuotaList = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaList'))
+// 員工自助（ESS）：复用请假组件（作用域注入）+ 自助专属只读页
+const EssMyLeave = lazy(() => import('./pages/Ess/MyLeave'))
+const EssLeaveForm = lazy(() => import('./pages/Ess/EssLeaveForm'))
+const EssLeaveDetail = lazy(() => import('./pages/Ess/EssLeaveDetail'))
+const EssMyRequests = lazy(() => import('./pages/Ess/MyRequests'))
+const EssMyProfile = lazy(() => import('./pages/Ess/MyProfile'))
 const LeaveQuotaForm = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaForm'))
 const ContractLedger = lazy(() => import('./pages/Permission/ContractLedger'))
 const LoginLog = lazy(() => import('./pages/LoginLog'))
@@ -359,6 +365,12 @@ function AuthenticatedLayout() {
               <Route path="/hr-leave-detail" element={<LeaveDetail />} />
               <Route path="/hr-leave-quota" element={<LeaveQuotaList />} />
               <Route path="/hr-leave-quota-form" element={<LeaveQuotaForm />} />
+              {/* 員工自助：我的假期/我的申請單據/我的檔案（数据范围固定为登录人） */}
+              <Route path="/ess-leave" element={<EssMyLeave />} />
+              <Route path="/ess-leave-form" element={<EssLeaveForm />} />
+              <Route path="/ess-leave-detail" element={<EssLeaveDetail />} />
+              <Route path="/ess-requests" element={<EssMyRequests />} />
+              <Route path="/ess-profile" element={<EssMyProfile />} />
               {/* 合同續簽：复用入转调离引擎，授权归合同台账菜单 */}
               <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
               <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />

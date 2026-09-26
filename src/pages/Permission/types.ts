@@ -348,6 +348,15 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 員工自助（本人视角：可自助提单，单据与档案只读）
+  'ess-leave': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ess-requests': [{ key: 'view', label: '查看' }],
+  'ess-profile': [{ key: 'view', label: '查看' }],
   // 字典維護（集团人事独立菜单，可单独授权）
   'hr-dict': [
     { key: 'view', label: '查看' },
@@ -1148,6 +1157,10 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'hr-dimission',
   'hr-leave',
   'hr-leave-quota',
+  // 員工自助（一级目录 ess-center 不进受控清单：目录不可路由）
+  'ess-leave',
+  'ess-requests',
+  'ess-profile',
   'hr-dict',
   'contract-ledger',
   'org-structure',
@@ -1328,6 +1341,11 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hr-leave-detail': 'hr-leave',
   '/hr-leave-quota': 'hr-leave-quota',
   '/hr-leave-quota-form': 'hr-leave-quota',
+  '/ess-leave': 'ess-leave',
+  '/ess-leave-form': 'ess-leave',
+  '/ess-leave-detail': 'ess-leave',
+  '/ess-requests': 'ess-requests',
+  '/ess-profile': 'ess-profile',
   '/hr-contract-renew-form': 'contract-ledger',
   '/hr-contract-renew-detail': 'contract-ledger',
   '/hr-dict': 'hr-dict',

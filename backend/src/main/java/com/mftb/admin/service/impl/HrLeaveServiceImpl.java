@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.PermissionDeniedException;
+import com.mftb.admin.constant.HrEssConstants;
 import com.mftb.admin.constant.HrLeaveConstants;
 import com.mftb.admin.dto.HrLeaveBalanceVO;
 import com.mftb.admin.dto.HrLeaveRequestSaveDTO;
@@ -62,11 +63,15 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     // ==================== 额度台账 ====================
 
     @Override
-    public PageResult<HrLeaveBalanceVO> balances(long page, long size, Integer year, String keyword) {
-        requirePermission(HrLeaveConstants.MENU_QUOTA, "view");
+    public PageResult<HrLeaveBalanceVO> balances(long page, long size, Integer year, String keyword, boolean mineOnly) {
+        // 人事角色看全量；员工自助(ess-leave)只看本人额度行
+        Long viewerScope = quotaViewerScope();
+        // 自助页即便由人事角色打开也强制本人，避免「我的假期」呈现全员数据
+        Long ownerScope = mineOnly ? requireCurrentUser().getId() : viewerScope;
         int y = year != null ? year : LocalDate.now().getYear();
         LambdaQueryWrapper<HrLeaveBalance> wrapper = new LambdaQueryWrapper<HrLeaveBalance>()
                 .eq(HrLeaveBalance::getYear, y)
+                .eq(ownerScope != null, HrLeaveBalance::getUserId, ownerScope)
                 .orderByAsc(HrLeaveBalance::getUserId)
                 .orderByAsc(HrLeaveBalance::getLeaveType);
         if (StringUtils.hasText(keyword)) {
@@ -194,7 +199,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
 
     @Override
     public List<Map<String, Object>> employeeOptions(String keyword) {
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "view");
+        requireLeavePermission("view");
         Long self = scopedUserId();
         if (self != null) {
             // 自助请假场景不暴露同事名单，仅返回本人
@@ -213,7 +218,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
 
     @Override
     public Map<String, Object> quota(Long userId, String leaveType, Integer year) {
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "view");
+        requireLeavePermission("view");
         if (userId == null || !HrLeaveConstants.isValidType(leaveType)) {
             throw new BusinessException("員工與假期類型均為必填且假期類型需合法");
         }
@@ -249,11 +254,11 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     // ==================== 请假申请 ====================
 
     @Override
-    public PageResult<HrLeaveRequestVO> page(long page, long size, String status, String keyword) {
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "view");
+    public PageResult<HrLeaveRequestVO> page(long page, long size, String status, String keyword, boolean mineOnly) {
+        requireLeavePermission("view");
         LambdaQueryWrapper<HrLeaveRequest> wrapper = new LambdaQueryWrapper<HrLeaveRequest>()
                 .orderByDesc(HrLeaveRequest::getId);
-        Long scope = scopedUserId();
+        Long scope = mineOnly ? requireCurrentUser().getId() : scopedUserId();
         if (scope != null) {
             wrapper.eq(HrLeaveRequest::getUserId, scope);
         }
@@ -276,9 +281,9 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     }
 
     @Override
-    public Map<String, Long> stats() {
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "view");
-        Long scope = scopedUserId();
+    public Map<String, Long> stats(boolean mineOnly) {
+        requireLeavePermission("view");
+        Long scope = mineOnly ? requireCurrentUser().getId() : scopedUserId();
         List<HrLeaveRequest> all = leaveMapper.selectList(
                 new LambdaQueryWrapper<HrLeaveRequest>()
                         .eq(scope != null, HrLeaveRequest::getUserId, scope)
@@ -299,7 +304,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     @Override
     public HrLeaveRequestVO detail(Long id) {
         HrLeaveRequest entity = requireRequest(id);
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "view");
+        requireLeavePermission("view");
         requireSameEmployee(entity.getUserId());
         HrLeaveRequestVO vo = HrLeaveRequestVO.from(entity);
         vo.setRemainingDays(available(entity.getUserId(), entity.getLeaveType(), entity.getYear(), entity.getId()));
@@ -309,7 +314,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public HrLeaveRequestVO saveDraft(HrLeaveRequestSaveDTO dto) {
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "create");
+        requireLeavePermission("create");
         HrLeaveRequest entity = new HrLeaveRequest();
         entity.setStatus(HrLeaveConstants.STATUS_DRAFT);
         entity.setReqNo(generateReqNo());
@@ -326,7 +331,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     public HrLeaveRequestVO update(Long id, HrLeaveRequestSaveDTO dto) {
         HrLeaveRequest entity = requireRequest(id);
         requireEditable(entity);
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "edit");
+        requireLeavePermission("edit");
         requireSameEmployee(entity.getUserId());
         applyDto(entity, dto);
         touch(entity);
@@ -339,7 +344,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     public HrLeaveRequestVO submit(Long id) {
         HrLeaveRequest entity = requireRequest(id);
         requireEditable(entity);
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "edit");
+        requireLeavePermission("edit");
         requireSameEmployee(entity.getUserId());
         if (entity.getDays() == null || entity.getDays().compareTo(BigDecimal.ZERO) <= 0) {
             throw new BusinessException("請假天數無效");
@@ -375,7 +380,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long id) {
         HrLeaveRequest entity = requireRequest(id);
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "edit");
+        requireLeavePermission("edit");
         requireSameEmployee(entity.getUserId());
         if (!HrLeaveConstants.STATUS_PENDING.equals(entity.getStatus())) {
             throw new BusinessException("僅審批中的請假單可以撤銷");
@@ -391,7 +396,7 @@ public class HrLeaveServiceImpl implements HrLeaveService {
     public void delete(Long id) {
         HrLeaveRequest entity = requireRequest(id);
         requireEditable(entity);
-        requirePermission(HrLeaveConstants.MENU_LEAVE, "delete");
+        requireLeavePermission("delete");
         requireSameEmployee(entity.getUserId());
         leaveMapper.deleteById(id);
     }
@@ -404,6 +409,33 @@ public class HrLeaveServiceImpl implements HrLeaveService {
         if (user == null || !permissionService.hasPermission(user, menuKey, action)) {
             throw new PermissionDeniedException(menuKey, action);
         }
+    }
+
+    /**
+     * 请假单权限：人事菜单 hr-leave 与员工自助菜单 ess-leave 任一即可，
+     * 数据范围仍由 {@link #scopedUserId()} 保证非人事角色只能碰本人单据。
+     */
+    private void requireLeavePermission(String action) {
+        SysUser user = requireCurrentUser();
+        if (!permissionService.hasPermission(user, HrLeaveConstants.MENU_LEAVE, action)
+                && !permissionService.hasPermission(user, HrEssConstants.MENU_LEAVE, action)) {
+            throw new PermissionDeniedException(HrLeaveConstants.MENU_LEAVE, action);
+        }
+    }
+
+    /**
+     * 额度台账访问范围：null=人事可看全量；非 null=只能看该员工。
+     * 两种授权都没有时按 hr-leave-quota 拒绝，保持默认拒绝语义。
+     */
+    private Long quotaViewerScope() {
+        SysUser user = requireCurrentUser();
+        if (permissionService.hasPermission(user, HrLeaveConstants.MENU_QUOTA, "view")) {
+            return null;
+        }
+        if (permissionService.hasPermission(user, HrEssConstants.MENU_LEAVE, "view")) {
+            return user.getId();
+        }
+        throw new PermissionDeniedException(HrLeaveConstants.MENU_QUOTA, "view");
     }
 
     /** 当前登录用户（登录态由 JWT 过滤器保证，服务层再兜一次避免 NPE 变成 500） */
@@ -428,11 +460,11 @@ public class HrLeaveServiceImpl implements HrLeaveService {
                 ? null : user.getId();
     }
 
-    /** 需要人事角色才能查看/操作他人单据 */
+    /** 需要人事角色才能查看/操作他人单据（提示区分于"缺菜单权限"，避免自助用户误判授权） */
     private void requireSameEmployee(Long ownerUserId) {
         Long scope = scopedUserId();
         if (scope != null && !scope.equals(ownerUserId)) {
-            throw new PermissionDeniedException(HrLeaveConstants.MENU_LEAVE, "view");
+            throw PermissionDeniedException.outOfDataScope("他人的請假單或額度");
         }
     }
 

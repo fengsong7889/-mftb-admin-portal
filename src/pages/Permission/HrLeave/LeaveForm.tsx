@@ -11,7 +11,9 @@ import {
   fetchLeaveDetail, fetchLeaveEmployeeOptions, fetchLeaveQuota, saveAndSubmitLeave, saveLeaveDraft,
   updateLeaveRequest, type LeaveEmployeeOption, type LeaveQuotaInfo,
 } from '../../../api/hrLeave'
-import { LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from './meta'
+import {
+  HR_LEAVE_SCOPE, LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER, leaveDetailPath, type LeaveScope,
+} from './meta'
 
 interface FormValues {
   userId?: number
@@ -20,13 +22,13 @@ interface FormValues {
   reason?: string
 }
 
-/** 请假申请表单页（新增/编辑草稿；提交走 OA 审批 + 二次确认） */
-export default function LeaveForm() {
+/** 请假申请表单页（新增/编辑草稿；提交走 OA 审批 + 二次确认）。人事端与自助端共用 */
+export default function LeaveForm({ scope = HR_LEAVE_SCOPE }: { scope?: LeaveScope } = {}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
-  const canEdit = hasPermission('hr-leave:edit')
+  const canEdit = hasPermission(`${scope.permKey}:edit`)
   const editId = Number(searchParams.get('id')) || undefined
 
   const [form] = Form.useForm<FormValues>()
@@ -125,7 +127,7 @@ export default function LeaveForm() {
       const payload = buildValues(values)
       const saved = editId == null ? await saveLeaveDraft(payload) : await updateLeaveRequest(editId, payload)
       message.success(t('hrLeave.saved'))
-      navigate(`/hr-leave-detail?id=${saved.id}`, { replace: true })
+      navigate(leaveDetailPath(scope, saved.id), { replace: true })
     } catch {
       // 请求层已提示
     } finally {
@@ -155,7 +157,7 @@ export default function LeaveForm() {
       onOk: async () => {
         const result = await saveAndSubmitLeave(editId, buildValues(values))
         message.success(t('hrLeave.submitted', { flowNo: result.flowNo }))
-        navigate(`/hr-leave-detail?id=${result.id}`, { replace: true })
+        navigate(leaveDetailPath(scope, result.id), { replace: true })
       },
     })
   }
@@ -173,7 +175,7 @@ export default function LeaveForm() {
           backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/hr-leave')}>{t('common.back')}</Button>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(scope.basePath)}>{t('common.back')}</Button>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>{t('hrLeave.formTitle')}</div>
             {readonly && <div style={{ fontSize: 12, color: '#FF4D4F' }}>{t('hrLeave.readonlyTip')}</div>}
@@ -197,9 +199,12 @@ export default function LeaveForm() {
             </Form.Item>
             <Form.Item name="leaveType" label={t('hrLeave.leaveType')}
               rules={[{ required: true, message: t('hrLeave.leaveTypeRequired') }]}
-              extra={quota?.granted
-                ? t('hrLeave.remainingTip', { days: quota.remainingDays ?? 0 })
-                : (userId && leaveType ? t('hrLeave.noQuotaTip') : undefined)}>
+              /* 额度未回前不给任何提示：旧写法在请求期间会闪「尚未設置額度」，误导用户 */
+              extra={quota
+                ? (quota.granted
+                    ? t('hrLeave.remainingTip', { days: quota.remainingDays ?? 0 })
+                    : t('hrLeave.noQuotaTip'))
+                : undefined}>
               <Select placeholder={t('common.pleaseSelect')}
                 options={LEAVE_TYPE_ORDER.map(code => ({ value: code, label: t(LEAVE_TYPE_LABEL_KEY[code]) }))} />
             </Form.Item>
@@ -223,7 +228,7 @@ export default function LeaveForm() {
 
       {!readonly && canEdit && (
         <div className="form-footer">
-          <Button onClick={() => navigate(editId != null ? `/hr-leave-detail?id=${editId}` : '/hr-leave')}>
+          <Button onClick={() => navigate(editId != null ? leaveDetailPath(scope, editId) : scope.basePath)}>
             {t('common.cancel')}
           </Button>
           <Button icon={<SaveOutlined />} loading={saving} onClick={handleSaveDraft}>{t('hrLeave.saveDraft')}</Button>

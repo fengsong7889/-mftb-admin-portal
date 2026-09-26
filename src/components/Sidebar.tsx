@@ -87,6 +87,10 @@ import {
   PartitionOutlined, // 入轉調離分组
   ClusterOutlined, // 部門架構
   HourglassOutlined, // 假期額度
+  UserSwitchOutlined, // 員工自助（一级域）
+  FieldTimeOutlined, // 我的假期
+  FormOutlined, // 我的申請單據
+  FolderOpenOutlined, // 我的檔案
   FolderOutlined, // 員工檔案分组
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
@@ -155,6 +159,10 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'position-management': '/position-management',
   'login-log': '/login-log',
   // 組織管理（v44 一级域）
+  'ess-center': '/ess-leave',
+  'ess-leave': '/ess-leave',
+  'ess-requests': '/ess-requests',
+  'ess-profile': '/ess-profile',
   'org-center': '/org-center',
   'org-structure': '/organization-management',
   // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 直接重定向到授權中心）
@@ -412,6 +420,10 @@ const keyToIcon: Record<string, ReactNode> = {
   'hr-regularization': <CheckCircleOutlined />,
   'hr-transfer': <SwapOutlined />,
   'hr-dimission': <UserDeleteOutlined />,
+  'ess-center': <UserSwitchOutlined />,
+  'ess-leave': <FieldTimeOutlined />,
+  'ess-requests': <FormOutlined />,
+  'ess-profile': <FolderOpenOutlined />,
   'hr-leave': <CalendarOutlined />,
   'hr-leave-quota': <HourglassOutlined />,
   'employee-management': <UserOutlined />,

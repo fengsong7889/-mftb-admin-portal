@@ -10,17 +10,20 @@ import {
   LEAVE_EDITABLE, cancelLeaveRequest, deleteLeaveRequest, fetchLeaveDetail, submitLeaveRequest,
   type LeaveRequestItem,
 } from '../../../api/hrLeave'
-import { LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY } from './meta'
+import {
+  HR_LEAVE_SCOPE, LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY,
+  leaveFormPath, leaveDetailPath, type LeaveScope,
+} from './meta'
 
-/** 请假单详情页：只读展示 + 提交/撤销/删除操作，审批进度跳转 OA 流程详情 */
-export default function LeaveDetail() {
+/** 请假单详情页：只读展示 + 提交/撤销/删除操作，审批进度跳转 OA 流程详情。人事端与自助端共用 */
+export default function LeaveDetail({ scope = HR_LEAVE_SCOPE }: { scope?: LeaveScope } = {}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const id = Number(searchParams.get('id'))
-  const canEdit = hasPermission('hr-leave:edit')
-  const canDelete = hasPermission('hr-leave:delete')
+  const canEdit = hasPermission(`${scope.permKey}:edit`)
+  const canDelete = hasPermission(`${scope.permKey}:delete`)
 
   const [item, setItem] = useState<LeaveRequestItem | null>(null)
   const [busy, setBusy] = useState(false)
@@ -110,7 +113,7 @@ export default function LeaveDetail() {
       onOk: async () => {
         await deleteLeaveRequest(item.id)
         message.success(t('hrLeave.deleted'))
-        navigate('/hr-leave', { replace: true })
+        navigate(scope.basePath, { replace: true })
       },
     })
   }
@@ -135,11 +138,11 @@ export default function LeaveDetail() {
           </Space>
         )}
         meta={`${item.reqNo} · ${item.empName}${item.empNo ? `(${item.empNo})` : ''} · ${item.days} ${t('hrLeave.dayUnit')}`}
-        onBack={() => navigate('/hr-leave')}
+        onBack={() => navigate(scope.basePath)}
         extra={(
           <Space size={8}>
             {editable && canEdit && (
-              <Button icon={<EditOutlined />} onClick={() => navigate(`/hr-leave-form?id=${item.id}`)}>
+              <Button icon={<EditOutlined />} onClick={() => navigate(leaveFormPath(scope, item.id))}>
                 {t('common.edit')}
               </Button>
             )}
@@ -184,7 +187,7 @@ export default function LeaveDetail() {
           <Space size={12} wrap>
             <Tag color="orange">{t('hrLeave.flowNo')}: {item.flowNo}</Tag>
             <Button type="link" size="small" style={{ padding: 0 }}
-              onClick={() => navigate(`/hr-flow-detail?flowNo=${encodeURIComponent(item.flowNo!)}&back=${encodeURIComponent(`/hr-leave-detail?id=${item.id}`)}`)}>
+              onClick={() => navigate(`/hr-flow-detail?flowNo=${encodeURIComponent(item.flowNo!)}&back=${encodeURIComponent(leaveDetailPath(scope, item.id))}`)}>
               {t('hrLeave.gotoFlowDetail')}
             </Button>
           </Space>

@@ -15,6 +15,8 @@ public enum SystemCode {
     PORTAL("portal"),
     ADS("ads"),
     MERCHANT("merchant"),
+    /** 商家工作台：承接店铺随心推（购买入口与推广报表），与广告推荐系统拆分 */
+    SELLER("seller"),
     SEARCH("search"),
     FINANCE("finance"),
     AI("ai"),
@@ -23,6 +25,8 @@ public enum SystemCode {
     OA("oa"),
     IAM("iam"),
     PLATFORM("platform"),
+    /** 翻译中心：多语言翻译/语料/质量校验（i18n-center 菜单树，从 platform 拆出独立系统） */
+    TRANSLATION("i18n"),
     ;
 
     private final String code;

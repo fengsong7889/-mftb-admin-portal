@@ -7,12 +7,13 @@
 
 ---
 
-## 1. 系统清单（10 个业务系统 + 1 个公共入口）
+## 1. 系统清单（11 个业务系统 + 1 个公共入口）
 
 | SystemCode | 中文显示 | 英文名 | 图标 key | 排序 | 说明 |
 |---|---|---|---|---|---|
-| `ads` | 廣告推薦系統 | Ads & Recommendation | `AimOutlined` | 10 | 广告销售 / 商家推广 / 推广通 / 团购秒杀 |
+| `ads` | 廣告推薦系統 | Ads & Recommendation | `AimOutlined` | 10 | 广告销售 / 商家推广 / 团购秒杀（店铺随心推已迁出） |
 | `merchant` | 商戶運營系統 | Merchant Ops | `ShopOutlined` | 20 | 商户集团、门店、门店数据、地图规划 |
+| `seller` | 商家工作台 | Merchant Workbench | `ShopOutlined` | 25 | 店铺随心推购买入口与推广报表（v199 从 ads 拆出） |
 | `search` | 搜索運營系統 | Search Ops | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
 | `finance` | 財務系統 | Finance | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
 | `ai` | AI 管理系統 | AI Hub | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
@@ -41,7 +42,8 @@
 | `home` | 首頁 | `portal`（公共） | 迁移为个人工作台 |
 | `merchant_group` | 商戶集團管理 | `merchant` |  |
 | `merchant_promotion` | 商家推廣工具 | `ads` |  |
-| `promotion_tool` | 推廣通 | `ads` |  |
+| `promotion_tool` | 推廣通 | `ads` | v199 拆分后成为空壳目录，启用子项迁完后由启动自愈置 `status=0`；店铺随心推实际归属见下行 |
+| `seller-center` | 商家工作台 | `seller` | v199 新增一级目录，承接 `promotion-sales-config`（購買入口）与 `promotion-report-group`（報表分析） |
 | `search` | 搜索管理 | `search` |  |
 | `finance` | 財務管理 | `finance` |  |
 | `ai-assistant` | 智能中心(AI) | `ai` |  |
@@ -74,9 +76,9 @@
 以下菜单当前是**未接后端的纯前端原型**（`BACKEND_CONNECTED_KEYS` 未登记），本轮不写入 `system_code`（保留 NULL，前端仍可见）：
 
 - `waterfall-simulation`、`algorithm-simulation`、`merchant-score-insight`、`merchant-promotion-diagnose` — 商家推广工具 > 流量沙盘（原型）
-- `promotion-report-overview`、`promotion-report-order`、`promotion-report-compare` — 推广通 > 报表分析（原型）
+- `promotion-report-overview`、`promotion-report-order`、`promotion-report-compare` — 商家工作台 > 报表分析（原型）
 
-**处置策略：** 归 `ads`，`system_code` 显式设为 `ads`，但菜单 `status` 保持现状。理由：即便原型页也占用菜单槽位；未归属反而会让系统切换器看不到它们，导致后续清理困难。
+**处置策略：** 报表三兄弟随 `promotion-report-group` 归 `seller`（v199 拆分，`system_code` 显式设为 `seller`），但菜单 `status` 保持现状。理由：即便原型页也占用菜单槽位；未归属反而会让系统切换器看不到它们，导致后续清理困难。
 
 ## 5. 后端接口归属（MVP 阶段保守：只登记，不强制拒绝）
 

@@ -23,4 +23,18 @@ public class PermissionDeniedException extends RuntimeException {
         super("没有 [" + menuKey + "] 的["
                 + ACTION_LABELS.getOrDefault(action, action) + "]权限");
     }
+
+    private PermissionDeniedException(String message, boolean rawMessage) {
+        super(message);
+    }
+
+    /**
+     * 数据范围拒绝：用户持有菜单但目标数据不属于本人。
+     * <p>提示必须与「缺菜单权限」区分，否则自助员工看到「没有 xx 权限」会误以为没被授权。
+     *
+     * @param target 被访问的对象描述，如「他人的請假單」
+     */
+    public static PermissionDeniedException outOfDataScope(String target) {
+        return new PermissionDeniedException("僅能查看與操作本人的資料，無法訪問" + target, true);
+    }
 }
