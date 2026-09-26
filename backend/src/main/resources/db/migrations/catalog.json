@@ -84,6 +84,18 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "core:super-admin-dedup-v1",
+      "module": "core",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:legacy-perm-migrate-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "收敛超级管理员：内置超管唯一(MF00001)，从非内置账号 function_roles 移除 admin 角色绑定（旧 198_dedup_super_admin.sql 仅在开发库手动执行未进框架，生产残留 19 个误绑账号致角色管理成员过多且超管直通）；逐行 JSON 重写兼容 H2，cleaned>0 时 evictAll 全局失效缓存；附后置校验与启动重试；写侧 RoleService 已禁止绑定 admin 角色防复发。参考 SQL: sql/202_dedup_super_admin.sql"
+    },
+    {
       "versionKey": "biz:tables-v1",
       "module": "biz",
       "phase": "MODULE_STRUCTURE",
@@ -518,6 +530,18 @@
       ],
       "status": "ACTIVE",
       "comment": "P1 證明開具菜单：在一级域 ess-center 下新增叶子 ess-certificate(證明開具)，沿用父域 system_code 以免被门户导航剪枝；授权 admin 全量与 employee_self_service 自助动作（hr 系统准入已由 hr:ess-menu:v1.1 建立，故不重复写），并 evictAll 递增 revision。"
+    },
+    {
+      "versionKey": "hr:certificate-issue:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrCertificateIssueSchemaInitializer",
+      "dependencies": [
+        "hr:certificate-menu:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 证明开具·人事台账：hr_certificate_request 增列 cert_no/issue_date/pickup_type/issued_by（逐列查 INFORMATION_SCHEMA 后 ADD，MySQL 8 无 ADD COLUMN IF NOT EXISTS）+ cert_no 查询索引；新建人事侧菜单 hr-certificate(掛 hr-profile)并授 admin/FIN_BIZ_APPROVER；语义回填——把无证明编号的旧 completed 单据回退为 approved(待開具)，因为审批通过只代表同意开具，保留 completed 等于对外宣称一张不存在的证明。后置校验含『无编号 completed 必须为 0』。"
     }
   ]
 }

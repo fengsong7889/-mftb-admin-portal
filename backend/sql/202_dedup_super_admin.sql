@@ -1,7 +1,7 @@
--- 198: 收敛超级管理员 —— 一个系统仅允许一个内置超管（MF00001）
+-- 202: 收敛超级管理员 —— 一个系统仅允许一个内置超管（MF00001）
 -- 背景: 员工权限透视显示大量员工因 function_roles 绑定了 admin 角色(id=1) 被判定为超级管理员。
 -- 处理: 从非内置超管账号的 function_roles 中移除 admin 角色绑定，仅保留 sys_user.role='admin' 的内置超管。
--- 说明: 本脚本为一次性参考文档，已于开发库手动执行（affected=19）；生产执行前请先跑末尾的预检查询确认影响范围。
+-- 说明: 本脚本为一次性参考文档，已于开发库手动执行（affected=19）；现已登记为 core:super-admin-dedup-v1（DataInitializer#dedupSuperAdminBindings）由各环境启动自动幂等执行，本文件仅作核对参考。
 
 UPDATE sys_user
 SET function_roles = JSON_REMOVE(function_roles, JSON_UNQUOTE(JSON_SEARCH(function_roles, 'one', '1'))),

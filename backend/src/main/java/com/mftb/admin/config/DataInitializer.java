@@ -5,6 +5,7 @@ import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final PermissionService permissionService;
 
     /* ──────────────────────────────────────────────────────────
      *  产品版本号 (Semantic Versioning: major.minor.patch)
@@ -134,6 +136,10 @@ public class DataInitializer implements CommandLineRunner {
         });
         versionTracker.applyOnce("core:fin-batch-uk-v1", this::fixFinBatchUniqueKey);
         versionTracker.applyOnce("core:builtin-accounts-v1", this::migrateBuiltinAccounts);
+        // 收敛超级管理员: 内置超管唯一(MF00001)，清理非内置账号误绑的 admin 角色引用。
+        // 历史上仅 198_dedup_super_admin.sql 手动在开发库执行(affected=19)，未进迁移框架，
+        // 导致生产角色管理仍见大量绑定成员且被判定超管直通(权限旁路)。登记后各环境启动自动收敛。
+        versionTracker.applyOnce("core:super-admin-dedup-v1", this::dedupSuperAdminBindings, this::verifySuperAdminDedup);
         // 为所有缺少职务记录的员工补一条默认「入职」记录
         versionTracker.applyOnce("core:emp-position-backfill-v1", this::backfillInitialPositionRecords);
         // v24b: 恢复被 v23 清理逻辑误删的 asset-claim / asset-return 菜单
@@ -233,6 +239,57 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         int removed = jdbcTemplate.update("DELETE FROM sys_user WHERE username = 'guest'");
         if (removed > 0) {
             log.info("已移除内置 guest 账号");
+        }
+    }
+
+    /**
+     * 从非内置超管账号的 function_roles 中移除内置 admin 角色绑定（一个系统仅允许
+     * sys_user.role='admin' 的内置超管）。逐行 JSON 解析重写，不用 MySQL 专有 JSON 函数，
+     * H2(MODE=MySQL) 单测可跑。清掉绑定后必须 evictAll：同步清缓存并递增全局 revision，
+     * 多副本实例下次读自动重载。失败不吞异常（applyOnce 不记版本，下次启动重试）。
+     */
+    private void dedupSuperAdminBindings() {
+        List<Long> adminRoleIds = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = 'admin' AND deleted = 0", Long.class);
+        if (adminRoleIds.isEmpty()) {
+            log.warn("未找到内置 admin 角色，跳过超级管理员收敛");
+            return;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, function_roles FROM sys_user WHERE deleted = 0 AND role <> 'admin' AND function_roles IS NOT NULL");
+        int cleaned = 0;
+        for (Map<String, Object> row : rows) {
+            List<Long> bound = JsonUtils.parseLongList((String) row.get("function_roles"));
+            if (bound.isEmpty() || bound.stream().noneMatch(adminRoleIds::contains)) {
+                continue;
+            }
+            List<Long> kept = bound.stream().filter(id -> !adminRoleIds.contains(id)).toList();
+            jdbcTemplate.update(
+                    "UPDATE sys_user SET function_roles = ?, updated_by = 'system-super-admin-dedup' WHERE id = ?",
+                    kept.isEmpty() ? null : JsonUtils.toJson(kept), row.get("id"));
+            cleaned++;
+        }
+        if (cleaned > 0) {
+            permissionService.evictAll();
+            log.info("超级管理员收敛完成: 清理误绑 admin 角色账号 {} 个，权限缓存已全局失效", cleaned);
+        }
+    }
+
+    /** 后置校验：非内置超管账号不得再绑定 admin 角色，未收敛则不记版本、下次启动重试。 */
+    private void verifySuperAdminDedup() {
+        List<Long> adminRoleIds = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = 'admin' AND deleted = 0", Long.class);
+        if (adminRoleIds.isEmpty()) {
+            return;
+        }
+        // 逐行扫描代替 JSON 函数：候选仅为非内置超管且绑了角色的账号，与 dedup 同口径判交集
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, function_roles FROM sys_user WHERE deleted = 0 AND role <> 'admin' AND function_roles IS NOT NULL");
+        for (Map<String, Object> row : rows) {
+            List<Long> bound = JsonUtils.parseLongList((String) row.get("function_roles"));
+            if (bound.stream().anyMatch(adminRoleIds::contains)) {
+                throw new IllegalStateException("账号 id=" + row.get("id") + " 仍绑定内置 admin 角色，收敛未完成");
+            }
         }
     }
 
@@ -1757,6 +1814,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("employee-management", "Employee Management"),
                 Map.entry("hr-dict", "HR Dictionary"),
                 Map.entry("contract-ledger", "Contract Ledger"),
+                Map.entry("hr-certificate", "Certificate Issuance"),
                 Map.entry("org-center", "Organization Management"),
                 Map.entry("ess-center", "Employee Self-Service"),
                 Map.entry("ess-leave", "My Leave"),
@@ -2264,6 +2322,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("position-management", new String[]{"職位管理",         "hr-config",          "1"});
         menus.put("hr-dict",             new String[]{"字典維護",         "hr-config",          "2"});
         menus.put("contract-ledger",     new String[]{"合同台賬",         "hr-config",          "3"});
+        // 證明開具人事台账（挂 員工檔案，与请假/额度同级）
+        menus.put("hr-certificate",      new String[]{"證明開具",         "hr-profile",         "5"});
         // ── 組織管理（一级，v44）──
         menus.put("org-structure",       new String[]{"部門架構",         "org-center",         "1"});
         // ── 員工自助（一级，v45）──
@@ -2866,10 +2926,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         applyMenuSort("hr", "hr-profile", "hr-lifecycle", "hr-config");
         // v44: 分组归属自愈——一次性迁移 applyOnce 已记版本不再重跑，其后调整过的
         //      父子关系（如 職位管理 由 員工檔案 移到 基礎配置）必须在此兜住
-        ensureMenuParent("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota");
+        ensureMenuParent("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota",
+                "hr-certificate");
         ensureMenuParent("hr-lifecycle", "hr-onboarding", "hr-regularization", "hr-transfer", "hr-dimission");
         ensureMenuParent("hr-config", "position-management", "hr-dict", "contract-ledger");
-        applyMenuSort("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota");
+        applyMenuSort("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota",
+                "hr-certificate");
         applyMenuSort("hr-lifecycle", "hr-onboarding", "hr-regularization", "hr-transfer", "hr-dimission");
         applyMenuSort("hr-config", "position-management", "hr-dict", "contract-ledger");
         // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
@@ -3054,6 +3116,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("ess-leave", "FieldTimeOutlined"),
             Map.entry("ess-profile", "FolderOpenOutlined"),
             Map.entry("ess-requests", "FormOutlined"),
+            Map.entry("hr-certificate", "FileProtectOutlined"),
             Map.entry("ess-certificate", "FileProtectOutlined"),
             Map.entry("hr-dict", "DatabaseOutlined"),
             Map.entry("contract-ledger", "ProfileOutlined"),

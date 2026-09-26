@@ -133,7 +133,8 @@ class SystemPortalSchemaInitializerTest {
         var original = jdbc.queryForList("SELECT * FROM sys_menu WHERE id IN (1, 2, 3) ORDER BY id");
         var roleGrants = jdbc.queryForList("SELECT * FROM sys_role_menu WHERE role_id = 2");
         var departmentGrants = jdbc.queryForList("SELECT * FROM sys_department_menu");
-        var seeder = new DataInitializer(mock(SysUserMapper.class), mock(PasswordEncoder.class), jdbc, tracker);
+        var seeder = new DataInitializer(mock(SysUserMapper.class), mock(PasswordEncoder.class), jdbc, tracker,
+                mock(com.mftb.admin.service.PermissionService.class));
 
         ReflectionTestUtils.invokeMethod(seeder, "seedSystemMenus");
 
@@ -241,7 +242,8 @@ class SystemPortalSchemaInitializerTest {
         seedSellerMenus();
         initializer.reconcileSellerReports();
         var expected = jdbc.queryForList("SELECT * FROM sys_menu WHERE id BETWEEN 20 AND 34 ORDER BY id");
-        var seeder = new DataInitializer(mock(SysUserMapper.class), mock(PasswordEncoder.class), jdbc, tracker);
+        var seeder = new DataInitializer(mock(SysUserMapper.class), mock(PasswordEncoder.class), jdbc, tracker,
+                mock(com.mftb.admin.service.PermissionService.class));
         ReflectionTestUtils.invokeMethod(seeder, "seedSystemMenus");
         initializer.reconcileSellerReports();
         assertEquals(expected, jdbc.queryForList("SELECT * FROM sys_menu WHERE id BETWEEN 20 AND 34 ORDER BY id"));

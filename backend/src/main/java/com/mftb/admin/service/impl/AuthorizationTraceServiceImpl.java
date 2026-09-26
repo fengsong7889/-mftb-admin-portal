@@ -71,7 +71,8 @@ public class AuthorizationTraceServiceImpl implements AuthorizationTraceService 
                         return r;
                     });
         }
-        // 绑定启用的 admin 角色 → 超管直通（与 PermissionServiceImpl 判定一致）
+        // 绑定启用的 admin 角色 → 超管直通（与 PermissionServiceImpl 判定一致；
+        // 存量误绑由 core:super-admin-dedup-v1 启动收敛，写侧 RoleService 已禁止新绑定）
         boolean adminRoleBound = roles.stream().anyMatch(r ->
                 SUPER_ADMIN_ROLE.equalsIgnoreCase(r.getCode()) && Integer.valueOf(1).equals(r.getStatus()));
         boolean superAdmin = builtinAdmin || adminRoleBound;
