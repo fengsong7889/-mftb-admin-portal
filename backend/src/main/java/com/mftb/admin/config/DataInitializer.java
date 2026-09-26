@@ -1758,6 +1758,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("hr-dict", "HR Dictionary"),
                 Map.entry("contract-ledger", "Contract Ledger"),
                 Map.entry("org-center", "Organization Management"),
+                Map.entry("ess-center", "Employee Self-Service"),
+                Map.entry("ess-leave", "My Leave"),
+                Map.entry("ess-requests", "My Requests"),
+                Map.entry("ess-profile", "My Profile"),
                 Map.entry("org-structure", "Department Structure"),
                 Map.entry("position-management", "Position"),
                 Map.entry("login-log", "Employee Activity"),
@@ -2148,6 +2152,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("hr",                  new String[]{"集團人事(HR)",      null,  "9"});
         // v44: 組織管理提升为独立一级菜单（集团组织架构域），后续可扩组织架构/编制
         menus.put("org-center",          new String[]{"組織管理",          null,  "10"});
+        // v45: 員工自助独立一级域（员工本人视角，与人事管理员视角的 hr 域分开授权）
+        menus.put("ess-center",          new String[]{"員工自助",          null,  "11"});
         menus.put("asset-management",    new String[]{"物資管理",          null,  "11"});
         menus.put("oa-center",           new String[]{"OA中心",            null,  "12"});
         menus.put("permission",          new String[]{"權限管理",          null,  "13"});
@@ -2259,6 +2265,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("contract-ledger",     new String[]{"合同台賬",         "hr-config",          "3"});
         // ── 組織管理（一级，v44）──
         menus.put("org-structure",       new String[]{"部門架構",         "org-center",         "1"});
+        // ── 員工自助（一级，v45）──
+        menus.put("ess-leave",           new String[]{"我的假期",         "ess-center",         "1"});
+        menus.put("ess-requests",        new String[]{"我的申請單據",      "ess-center",         "2"});
+        menus.put("ess-profile",         new String[]{"我的檔案",         "ess-center",         "3"});
         // ── 物资管理（EAM 分组子菜单）──
         // 二级直达菜单（无分组）
         menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
@@ -2614,15 +2624,31 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         jdbcTemplate.update("UPDATE sys_menu SET system_code = ? WHERE id = ? AND (system_code IS NULL OR system_code = '')",
                 hrSystemCode, orgCenterId);
 
-        // 旧 key 迁移（ID 不变，授权随 menu_id 保留）
-        Long legacyId = queryMenuIdByKey("organization-management");
-        if (legacyId != null) {
-            jdbcTemplate.update(
-                    "UPDATE sys_menu SET menu_key = 'org-structure', name = '部門架構', parent_id = ?, "
-                            + "path = '/organization-management', icon = 'ClusterOutlined', type = 2, updated_by = 'system' "
-                            + "WHERE id = ?",
-                    orgCenterId, legacyId);
-            log.info("v44 organization-management → org-structure「部門架構」");
+        // 旧 key 迁移（ID 不变，授权随 menu_id 保留）。
+        // uk_menu_key 为全局唯一索引（不含 deleted 列），生产曾因此残留冲突行导致改名撞键、
+        // 迁移抛异常 → CommandLineRunner 失败 → 容器反复重启。先幂等清理两类冲突源：
+        // 1) 软删残留行改名让路（tombstone 加 -dup{id} 后缀，天然不重复）；
+        // 2) 启用态重复行停用让路（status=0 即从菜单树/授权 join 消失，与 LEGACY 停用策略一致）。
+        jdbcTemplate.update("UPDATE sys_menu SET menu_key = CONCAT(menu_key, '-dup', id) "
+                + "WHERE menu_key = 'org-structure' AND deleted = 1");
+        Long structureId = queryMenuIdByKey("org-structure");
+        if (structureId != null) {
+            int merged = jdbcTemplate.update(
+                    "UPDATE sys_menu SET status = 0, updated_by = 'system' "
+                            + "WHERE menu_key = 'organization-management' AND deleted = 0 AND status = 1");
+            if (merged > 0) {
+                log.warn("v44 org-structure 已存在，重复旧菜单 organization-management 已停用合并: merged={}", merged);
+            }
+        } else {
+            Long legacyId = queryMenuIdByKey("organization-management");
+            if (legacyId != null) {
+                jdbcTemplate.update(
+                        "UPDATE sys_menu SET menu_key = 'org-structure', name = '部門架構', parent_id = ?, "
+                                + "path = '/organization-management', icon = 'ClusterOutlined', type = 2, updated_by = 'system' "
+                                + "WHERE id = ?",
+                        orgCenterId, legacyId);
+                log.info("v44 organization-management → org-structure「部門架構」");
+            }
         }
 
         Long leafId = queryMenuIdByKey("org-structure");
@@ -2650,7 +2676,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     /** v44: 顶级菜单排序（组织管理独立成一级，插在集團人事之后，其余顺移） */
     private void applyTopLevelMenuSortV44() {
         String[] topOrder = {"home", "merchant_group", "merchant_promotion", "promotion_tool", "search",
-                "finance", "ai-assistant", "group-purchase", "hr", "org-center",
+                "finance", "ai-assistant", "group-purchase", "hr", "org-center", "ess-center",
                 "asset-management", "oa-center", "permission", "system-config", "i18n-center"};
         for (int i = 0; i < topOrder.length; i++) {
             jdbcTemplate.update(
@@ -2846,6 +2872,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         applyMenuSort("hr-config", "position-management", "hr-dict", "contract-ledger");
         // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
         applyMenuSort("org-center", "org-structure");
+        // v45: 員工自助域内排序（ESS 菜单由 hrEssSchemaInitializer 一次性建，此处兜归属顺序）
+        applyMenuSort("ess-center", "ess-leave", "ess-requests", "ess-profile");
         applyTopLevelMenuSortV44();
         try {
             syncOrganizationDomain();
@@ -3020,6 +3048,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("debt-reconcile", "CheckCircleOutlined"),
             Map.entry("detail-query", "FileSearchOutlined"),
             Map.entry("employee-management", "UserOutlined"),
+            Map.entry("ess-center", "UserSwitchOutlined"),
+            Map.entry("ess-leave", "FieldTimeOutlined"),
+            Map.entry("ess-profile", "FolderOpenOutlined"),
+            Map.entry("ess-requests", "FormOutlined"),
             Map.entry("hr-dict", "DatabaseOutlined"),
             Map.entry("contract-ledger", "ProfileOutlined"),
             Map.entry("finance", "MoneyCollectOutlined"),
