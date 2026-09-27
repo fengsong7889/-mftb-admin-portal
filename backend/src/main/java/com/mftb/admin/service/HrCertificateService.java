@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.HrCertificateIssueDTO;
 import com.mftb.admin.dto.HrCertificateSaveDTO;
 import com.mftb.admin.dto.HrCertificateVO;
 import com.mftb.admin.dto.PageResult;
@@ -37,4 +38,15 @@ public interface HrCertificateService {
 
     /** 删除单据（仅草稿/驳回/已撤销） */
     void delete(Long id);
+
+    // ==================== 人事台账（跨员工，需 hr-certificate 菜单） ====================
+
+    /** 证明开具台账分页：人事视角，可按状态/类型/关键字筛选全部员工申请 */
+    PageResult<HrCertificateVO> ledgerPage(long page, long size, String status, String certType, String keyword);
+
+    /** 台账状态计数（含待开具数量），口径与 ledgerPage 一致 */
+    Map<String, Long> ledgerStats();
+
+    /** 登记开具：写入实际证明编号/开具日期/领取方式，单据转为已完成 */
+    HrCertificateVO issue(Long id, HrCertificateIssueDTO dto);
 }

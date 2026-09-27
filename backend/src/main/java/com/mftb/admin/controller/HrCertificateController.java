@@ -3,6 +3,7 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.constant.HrCertificateConstants;
+import com.mftb.admin.dto.HrCertificateIssueDTO;
 import com.mftb.admin.dto.HrCertificateSaveDTO;
 import com.mftb.admin.dto.HrCertificateVO;
 import com.mftb.admin.dto.PageResult;
@@ -24,8 +25,9 @@ import java.util.Map;
 /**
  * 證明開具接口（員工自助）。
  * <p>
- * 全部端点只服务登录人本人：不接收 userId 参数，服务层按当前用户强制过滤，
- * 因此把 ess-certificate 菜单授予全员也不会泄露他人申请。
+ * 自助端点只服务登录人本人：不接收 userId 参数，服务层按当前用户强制过滤，
+ * 因此把 ess-certificate 菜单授予全员也不会泄露他人申请；
+ * 跨员工查看与开具登记走 /ledger* 端点，必须另外持有 hr-certificate 台账菜单。
  */
 @RestController
 @RequestMapping("/api/hr/certificate")
@@ -33,6 +35,32 @@ import java.util.Map;
 public class HrCertificateController {
 
     private final HrCertificateService hrCertificateService;
+
+    /** 证明开具台账分页（人事视角，跨员工） */
+    @GetMapping("/ledger")
+    @RequirePermission(menu = HrCertificateConstants.MENU_LEDGER)
+    public Result<PageResult<HrCertificateVO>> ledger(
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String certType,
+            @RequestParam(required = false) String keyword) {
+        return Result.success(hrCertificateService.ledgerPage(page, size, status, certType, keyword));
+    }
+
+    /** 台账状态计数（人事视角） */
+    @GetMapping("/ledger/stats")
+    @RequirePermission(menu = HrCertificateConstants.MENU_LEDGER)
+    public Result<Map<String, Long>> ledgerStats() {
+        return Result.success(hrCertificateService.ledgerStats());
+    }
+
+    /** 登记开具：写入实际证明编号/开具日期/领取方式 */
+    @PostMapping("/{id}/issue")
+    @RequirePermission(menu = HrCertificateConstants.MENU_LEDGER, action = "edit")
+    public Result<HrCertificateVO> issue(@PathVariable Long id, @Valid @RequestBody HrCertificateIssueDTO dto) {
+        return Result.success("已登記開具", hrCertificateService.issue(id, dto));
+    }
 
     /** 我的证明申请分页 */
     @GetMapping

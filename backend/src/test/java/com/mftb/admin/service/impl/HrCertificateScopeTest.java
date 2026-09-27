@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.PermissionDeniedException;
 import com.mftb.admin.constant.HrCertificateConstants;
+import com.mftb.admin.dto.HrCertificateIssueDTO;
 import com.mftb.admin.dto.HrCertificateSaveDTO;
 import com.mftb.admin.entity.HrCertificateRequest;
 import com.mftb.admin.entity.SysUser;
@@ -26,6 +27,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -194,6 +196,80 @@ class HrCertificateScopeTest {
         assertThrows(PermissionDeniedException.class, () -> service.page(1, 10, null, null));
         assertThrows(PermissionDeniedException.class,
                 () -> service.saveDraft(dto(HrCertificateConstants.TYPE_EMPLOYMENT)));
+    }
+
+    @Test
+    @DisplayName("台账端点必须另授 hr-certificate 菜单，自助角色查不到跨员工数据")
+    void ledgerRequiresSeparateMenu() {
+        when(permissionService.hasPermission(eq(self), eq(HrCertificateConstants.MENU_LEDGER), anyString()))
+                .thenReturn(false);
+
+        assertThrows(PermissionDeniedException.class,
+                () -> service.ledgerPage(1, 10, null, null, null));
+        assertThrows(PermissionDeniedException.class,
+                () -> service.issue(1L, issueDto("ZM-0001")));
+    }
+
+    @Test
+    @DisplayName("台账查询不加本人归属条件（人事跨员工视角）")
+    void ledgerListsAllEmployees() {
+        grantLedger();
+        when(certMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(1, 10));
+
+        service.ledgerPage(1, 10, "approved", "EMPLOYMENT", "張三");
+
+        assertFalse(capturedPageCondition().contains("user_id"), "台账应跨员工");
+    }
+
+    @Test
+    @DisplayName("登记开具：待开具→已开具，写入编号/领取方式与办理结果")
+    void issueRegistersCertificateNumberAndCompletes() {
+        grantLedger();
+        HrCertificateRequest pending = cert(9L, OTHER_ID, HrCertificateConstants.STATUS_APPROVED);
+        when(certMapper.selectById(9L)).thenReturn(pending);
+        when(certMapper.selectCount(any())).thenReturn(0L);
+
+        HrCertificateIssueDTO issueRequest = issueDto("ZM-2026-0007");
+        issueRequest.setRemark("已加盖公章，9月28日可領");
+        service.issue(9L, issueRequest);
+
+        ArgumentCaptor<HrCertificateRequest> captor = ArgumentCaptor.forClass(HrCertificateRequest.class);
+        verify(certMapper).updateById(captor.capture());
+        HrCertificateRequest saved = captor.getValue();
+        assertEquals("ZM-2026-0007", saved.getCertNo());
+        assertEquals(HrCertificateConstants.STATUS_COMPLETED, saved.getStatus());
+        assertEquals(HrCertificateConstants.PICKUP_SELF, saved.getPickupType());
+        assertTrue(saved.getResultRemark().contains("ZM-2026-0007"),
+                "办理结果应带真实编号: " + saved.getResultRemark());
+        // 表单上的备注不得被静默丢弃
+        assertTrue(saved.getResultRemark().contains("已加盖公章"),
+                "办理结果应包含登记备注: " + saved.getResultRemark());
+    }
+
+    @Test
+    @DisplayName("开具前置状态与编号唯一性：非待开具或编号重复一律拒绝")
+    void issueRejectsWrongStateAndDuplicateNo() {
+        grantLedger();
+        when(certMapper.selectById(9L)).thenReturn(cert(9L, OTHER_ID, HrCertificateConstants.STATUS_PENDING));
+        assertThrows(BusinessException.class, () -> service.issue(9L, issueDto("ZM-0001")));
+
+        when(certMapper.selectById(9L)).thenReturn(cert(9L, OTHER_ID, HrCertificateConstants.STATUS_APPROVED));
+        when(certMapper.selectCount(any())).thenReturn(1L);
+        assertThrows(BusinessException.class, () -> service.issue(9L, issueDto("ZM-0001")));
+        verify(certMapper, never()).updateById(any(HrCertificateRequest.class));
+    }
+
+    private void grantLedger() {
+        lenient().when(permissionService.hasPermission(eq(self), eq(HrCertificateConstants.MENU_LEDGER), anyString()))
+                .thenReturn(true);
+    }
+
+    private static HrCertificateIssueDTO issueDto(String certNo) {
+        HrCertificateIssueDTO dto = new HrCertificateIssueDTO();
+        dto.setCertNo(certNo);
+        dto.setIssueDate(LocalDate.now());
+        dto.setPickupType(HrCertificateConstants.PICKUP_SELF);
+        return dto;
     }
 
     @Test

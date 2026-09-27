@@ -19,7 +19,10 @@ import java.util.List;
 /**
  * 證明開具审批回调实现（独立事务：办理失败只回滚本回调，不影响 OA 流程状态落库）。
  * <p>
- * 幂等口径：已是 completed 的单据直接跳过；找不到关联单据也跳过（例如员工从 OA 中心
+ * 语义口径：审批通过只推进到「待開具」(approved)；「已開具」(completed) 必须等人事
+ * 在台账登记实际证明编号后才写入，避免系统对外宣称一张还不存在的证明。
+ * <p>
+ * 幂等口径：已离开 pending 的单据直接跳过；找不到关联单据也跳过（例如员工从 OA 中心
  * 直接发起的同名流程），保证对非自助入口零侵入。
  */
 @Slf4j
@@ -39,11 +42,11 @@ public class HrCertificateCallbackServiceImpl implements HrCertificateCallbackSe
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void onFlowApproved(String flowNo) {
         HrCertificateRequest entity = findByFlowNo(flowNo);
-        if (entity == null || HrCertificateConstants.STATUS_COMPLETED.equals(entity.getStatus())) {
+        if (entity == null || !HrCertificateConstants.STATUS_PENDING.equals(entity.getStatus())) {
             return;
         }
-        entity.setStatus(HrCertificateConstants.STATUS_COMPLETED);
-        entity.setResultRemark(HrCertificateConstants.ISSUED_REMARK);
+        entity.setStatus(HrCertificateConstants.STATUS_APPROVED);
+        entity.setResultRemark(HrCertificateConstants.APPROVED_REMARK);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         entity.setUpdatedAt(LocalDateTime.now());
         certMapper.updateById(entity);

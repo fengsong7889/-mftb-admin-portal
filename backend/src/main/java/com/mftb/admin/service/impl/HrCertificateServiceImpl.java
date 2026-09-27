@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.PermissionDeniedException;
 import com.mftb.admin.constant.HrCertificateConstants;
+import com.mftb.admin.dto.HrCertificateIssueDTO;
 import com.mftb.admin.dto.HrCertificateSaveDTO;
 import com.mftb.admin.dto.HrCertificateVO;
 import com.mftb.admin.dto.OaRequestCreateDTO;
@@ -170,6 +171,123 @@ public class HrCertificateServiceImpl implements HrCertificateService {
         HrCertificateRequest entity = requireOwn(id, "delete");
         requireEditable(entity);
         certMapper.deleteById(id);
+    }
+
+    // ==================== 人事台账 ====================
+
+    @Override
+    public PageResult<HrCertificateVO> ledgerPage(long page, long size, String status, String certType, String keyword) {
+        requireLedgerPermission("view");
+        LambdaQueryWrapper<HrCertificateRequest> wrapper = new LambdaQueryWrapper<HrCertificateRequest>()
+                .orderByDesc(HrCertificateRequest::getId);
+        applyLedgerFilters(wrapper, status, certType, keyword);
+        Page<HrCertificateRequest> result = certMapper.selectPage(
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
+        List<HrCertificateVO> records = result.getRecords().stream().map(HrCertificateVO::from).toList();
+        return new PageResult<>(records, result.getTotal());
+    }
+
+    @Override
+    public Map<String, Long> ledgerStats() {
+        requireLedgerPermission("view");
+        List<HrCertificateRequest> rows = certMapper.selectList(
+                new LambdaQueryWrapper<HrCertificateRequest>()
+                        .select(HrCertificateRequest::getStatus));
+        Map<String, Long> counts = new LinkedHashMap<>();
+        counts.put("all", (long) rows.size());
+        for (String s : List.of(HrCertificateConstants.STATUS_DRAFT, HrCertificateConstants.STATUS_PENDING,
+                HrCertificateConstants.STATUS_REJECTED, HrCertificateConstants.STATUS_APPROVED,
+                HrCertificateConstants.STATUS_COMPLETED)) {
+            counts.put(s, 0L);
+        }
+        for (HrCertificateRequest r : rows) {
+            counts.merge(r.getStatus(), 1L, Long::sum);
+        }
+        return counts;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public HrCertificateVO issue(Long id, HrCertificateIssueDTO dto) {
+        requireLedgerPermission("edit");
+        HrCertificateRequest entity = id == null ? null : certMapper.selectById(id);
+        if (entity == null) {
+            throw new BusinessException("證明申請不存在");
+        }
+        if (!HrCertificateConstants.STATUS_APPROVED.equals(entity.getStatus())) {
+            throw new BusinessException("僅「待開具」的申請可以登記開具；審批中的申請請先完成審批");
+        }
+        if (!HrCertificateConstants.isValidPickup(dto.getPickupType())) {
+            throw new BusinessException("無效的領取方式: " + dto.getPickupType());
+        }
+        String certNo = dto.getCertNo().trim();
+        Long duplicated = certMapper.selectCount(new LambdaQueryWrapper<HrCertificateRequest>()
+                .eq(HrCertificateRequest::getCertNo, certNo)
+                .ne(HrCertificateRequest::getId, entity.getId()));
+        if (duplicated != null && duplicated > 0) {
+            throw new BusinessException("證明編號已存在：" + certNo);
+        }
+        entity.setCertNo(certNo);
+        entity.setIssueDate(dto.getIssueDate());
+        entity.setPickupType(dto.getPickupType());
+        entity.setIssuedBy(operatorResolver.currentOperatorName());
+        entity.setStatus(HrCertificateConstants.STATUS_COMPLETED);
+        // 办理人填写的备注必须落到办理结果里，否则表单上的字段等于静默丢弃
+        entity.setResultRemark(issuedRemark(dto));
+        certMapper.updateById(entity);
+        log.info("HR certificate issued: reqNo={}, certNo={}, operator={}",
+                entity.getReqNo(), certNo, entity.getIssuedBy());
+        return HrCertificateVO.from(entity);
+    }
+
+    /** 台账筛选条件（列表与计数共用，避免两处口径分叉） */
+    private void applyLedgerFilters(LambdaQueryWrapper<HrCertificateRequest> wrapper,
+                                    String status, String certType, String keyword) {
+        if (StringUtils.hasText(status)) {
+            wrapper.eq(HrCertificateRequest::getStatus, status);
+        }
+        if (StringUtils.hasText(certType)) {
+            if (!HrCertificateConstants.isValidType(certType)) {
+                throw new BusinessException("無效的證明類型: " + certType);
+            }
+            wrapper.eq(HrCertificateRequest::getCertType, certType);
+        }
+        if (StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(HrCertificateRequest::getReqNo, kw)
+                    .or().like(HrCertificateRequest::getEmpName, kw)
+                    .or().like(HrCertificateRequest::getEmpNo, kw)
+                    .or().like(HrCertificateRequest::getCertNo, kw));
+        }
+    }
+
+    /**
+     * 人事台账权限：需要 hr-certificate 菜单。
+     * <p>刻意与自助权限分离——自助菜单只能看本人，跨员工查看必须显式授予台账菜单。
+     */
+    private void requireLedgerPermission(String action) {
+        SysUser user = operatorResolver.currentUser();
+        if (user == null || !permissionService.hasPermission(user, HrCertificateConstants.MENU_LEDGER, action)) {
+            throw new PermissionDeniedException(HrCertificateConstants.MENU_LEDGER, action);
+        }
+    }
+
+    /** 办理结果 = 编号 + 领取方式 +（可选）办理备注，超出列宽按 500 截断 */
+    private String issuedRemark(HrCertificateIssueDTO dto) {
+        String text = pickupLabel(dto.getPickupType(), dto.getCertNo().trim());
+        if (StringUtils.hasText(dto.getRemark())) {
+            text = text + "；備註 " + dto.getRemark().trim();
+        }
+        return text.length() > 500 ? text.substring(0, 500) : text;
+    }
+
+    private String pickupLabel(String pickupType, String certNo) {
+        String label = switch (pickupType) {
+            case HrCertificateConstants.PICKUP_DELIVERY -> "郵寄/快遞";
+            case HrCertificateConstants.PICKUP_ELECTRONIC -> "電子檔";
+            default -> "本人至人事領取";
+        };
+        return String.format(HrCertificateConstants.ISSUED_REMARK_FORMAT, certNo, label);
     }
 
     // ==================== 内部逻辑 ====================

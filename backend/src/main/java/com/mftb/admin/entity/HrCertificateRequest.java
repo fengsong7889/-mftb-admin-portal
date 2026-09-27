@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * 证明开具申请单（员工自助发起，OA 审批通过后由人事线下出具）。
  * <p>
  * 状态机与请假/入转调离同口径：draft → pending → (rejected | cancelled) / approved → completed。
- * 参考 SQL: backend/sql/198_hr_certificate.sql
+ * 参考 SQL: backend/sql/201_hr_certificate.sql
  */
 @Data
 @TableName("hr_certificate_request")
@@ -66,7 +66,19 @@ public class HrCertificateRequest {
     /** 关联 OA 流程编号 */
     private String flowNo;
 
-    /** 办理结果（审批通过后由回调写入领取指引） */
+    /** 证明编号（人事开具时登记） */
+    private String certNo;
+
+    /** 开具日期 */
+    private LocalDate issueDate;
+
+    /** 领取方式：SELF/DELIVERY/ELECTRONIC */
+    private String pickupType;
+
+    /** 开具办理人 */
+    private String issuedBy;
+
+    /** 办理结果（审批通过=等待开具；人事登记后=已开具含编号） */
     private String resultRemark;
 
     private String createdBy;

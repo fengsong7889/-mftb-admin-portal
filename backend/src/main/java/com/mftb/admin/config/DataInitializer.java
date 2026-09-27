@@ -3116,7 +3116,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("ess-leave", "FieldTimeOutlined"),
             Map.entry("ess-profile", "FolderOpenOutlined"),
             Map.entry("ess-requests", "FormOutlined"),
-            Map.entry("hr-certificate", "FileProtectOutlined"),
+            Map.entry("hr-certificate", "PrinterOutlined"),
             Map.entry("ess-certificate", "FileProtectOutlined"),
             Map.entry("hr-dict", "DatabaseOutlined"),
             Map.entry("contract-ledger", "ProfileOutlined"),

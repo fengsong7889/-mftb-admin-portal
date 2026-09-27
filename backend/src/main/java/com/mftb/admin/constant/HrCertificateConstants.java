@@ -5,7 +5,7 @@ import java.util.Set;
 /**
  * 證明開具（ESS 员工自助）域常量：证明类型、单据状态、OA 流程编码、菜单 key、编号规则。
  * <p>
- * 唯一真值来源，禁止业务代码散落魔法字符串。参考 SQL: backend/sql/198_hr_certificate.sql
+ * 唯一真值来源，禁止业务代码散落魔法字符串。参考 SQL: backend/sql/201_hr_certificate.sql
  */
 public final class HrCertificateConstants {
 
@@ -44,7 +44,12 @@ public final class HrCertificateConstants {
     public static final String STATUS_APPROVED = "approved";
     public static final String STATUS_REJECTED = "rejected";
     public static final String STATUS_CANCELLED = "cancelled";
-    /** 已完成：审批通过，进入线下开具/交付环节 */
+    /**
+     * 已完成：人事已登记证明编号并完成开具。
+     * <p>
+     * 注意与 {@link #STATUS_APPROVED} 的分工：审批通过只代表"同意开具"（待开具），
+     * 只有人事在台账登记编号后才算"已开具"，避免系统对外显示一个不存在的证明。
+     */
     public static final String STATUS_COMPLETED = "completed";
 
     /** 可编辑/可提交/可删除的草稿态 */
@@ -59,11 +64,33 @@ public final class HrCertificateConstants {
     /** 员工自助「证明开具」菜单 key（挂在一级域 ess-center 下） */
     public static final String MENU = "ess-certificate";
 
+    /** 人事侧「證明開具」台账菜单 key（挂在 hr-profile 下，可跨员工查看与登记开具） */
+    public static final String MENU_LEDGER = "hr-certificate";
+
+    // ==================== 领取方式 ====================
+
+    /** 本人至人事领取 */
+    public static final String PICKUP_SELF = "SELF";
+    /** 邮寄/快递 */
+    public static final String PICKUP_DELIVERY = "DELIVERY";
+    /** 电子档（扫描件） */
+    public static final String PICKUP_ELECTRONIC = "ELECTRONIC";
+
     /** 证明申请单编号规则 key（ZM + YYYYMMDD + 4位） */
     public static final String SEQ_RULE_KEY = "hr_certificate_request";
 
-    /** 办理结果默认话术：审批通过只代表"同意开具"，出具动作仍由人事线下完成 */
-    public static final String ISSUED_REMARK = "審批通過，人事將線下開具並通知領取";
+    /** 审批通过后的办理提示：此时尚未出具纸质证明，仅表示同意开具 */
+    public static final String APPROVED_REMARK = "審批通過，等待人事開具並登記編號";
+
+    /** 人事登记开具后的办理结果模板：{0}=证明编号，{1}=领取方式 */
+    public static final String ISSUED_REMARK_FORMAT = "已開具：證明編號 %1$s，領取方式 %2$s";
+
+    /** 领取方式合法值校验（登记开具时用） */
+    public static boolean isValidPickup(String pickupType) {
+        return PICKUP_SELF.equals(pickupType)
+                || PICKUP_DELIVERY.equals(pickupType)
+                || PICKUP_ELECTRONIC.equals(pickupType);
+    }
 
     public static boolean isValidType(String type) {
         return type != null && ALL_TYPES.contains(type);

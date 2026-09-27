@@ -1,7 +1,12 @@
--- 201: P1 員工自助 · 證明開具（一次性参考文档；实际执行与幂等由 HrCertificateSchemaInitializer 负责）
---      版本键: hr:certificate-schema:v1.0（建表/种子） + hr:certificate-menu:v1.0（菜单/授权）
---      状态机与请假一致: draft -> pending -> (rejected | cancelled) / approved -> completed
---      审批通过只代表"同意开具"，纸质证明由人事线下出具，编号登记待 HR 开具台账迭代补充
+-- 201: P1 員工自助 · 證明開具（一次性参考文档；实际执行与幂等由
+--      HrCertificateSchemaInitializer / HrCertificateIssueSchemaInitializer 负责）
+--      版本键:
+--        hr:certificate-schema:v1.0  建表 + CERT_TYPE 字典 + ZM 编号规则 + hr_certificate 流程定义
+--        hr:certificate-menu:v1.0    ess-center 下新增叶子 ess-certificate(證明開具)
+--        hr:certificate-issue:v1.0   开具登记 4 列 + 人事台账菜单 hr-certificate + 语义回填
+--      状态机: draft -> pending -> (rejected | cancelled) / approved(待開具) -> completed(已開具)
+--      语义要点: 审批通过只代表"同意开具"，只有人事登记真实证明编号后才算"已开具"，
+--               系统不对外宣称一张还不存在的证明。
 
 CREATE TABLE IF NOT EXISTS hr_certificate_request (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
@@ -19,7 +24,7 @@ CREATE TABLE IF NOT EXISTS hr_certificate_request (
     remark VARCHAR(500) DEFAULT NULL COMMENT '补充说明(申请人填写)',
     status VARCHAR(16) NOT NULL DEFAULT 'draft' COMMENT '状态: draft/pending/approved/rejected/cancelled/completed',
     flow_no VARCHAR(64) DEFAULT NULL COMMENT '关联OA流程编号',
-    result_remark VARCHAR(500) DEFAULT NULL COMMENT '办理结果(审批通过后写入领取指引)',
+    result_remark VARCHAR(500) DEFAULT NULL COMMENT '办理结果(待开具=等待提示;已开具=含真实编号)',
     created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人',
     updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -48,3 +53,19 @@ VALUES ('hr_certificate', '證明開具', 'hr', 'FileProtectOutlined',
 
 -- 菜单：ess-center(員工自助) 下新增 ess-certificate(證明開具)，system_code 沿用父域
 -- 授权：admin 全量；employee_self_service 可自助申请与撤回本人单据
+
+-- ===== hr:certificate-issue:v1.0 人事开具台账 =====
+-- MySQL 8 无 ADD COLUMN IF NOT EXISTS，迁移代码逐列查 INFORMATION_SCHEMA 后再 ADD；脚本仅为参考
+ALTER TABLE hr_certificate_request ADD COLUMN cert_no VARCHAR(64) DEFAULT NULL COMMENT '证明编号(人事开具时登记)';
+ALTER TABLE hr_certificate_request ADD COLUMN issue_date DATE DEFAULT NULL COMMENT '开具日期';
+ALTER TABLE hr_certificate_request ADD COLUMN pickup_type VARCHAR(16) DEFAULT NULL COMMENT '领取方式: SELF/DELIVERY/ELECTRONIC';
+ALTER TABLE hr_certificate_request ADD COLUMN issued_by VARCHAR(64) DEFAULT NULL COMMENT '开具办理人';
+CREATE INDEX idx_certificate_cert_no ON hr_certificate_request (cert_no);
+
+-- 语义回填：无编号的历史 completed 回退为待开具（不放任系统宣称不存在的证明）
+UPDATE hr_certificate_request SET status = 'approved'
+WHERE deleted = 0 AND status = 'completed' AND (cert_no IS NULL OR cert_no = '');
+
+-- 人事侧台账菜单：hr-profile(員工檔案) 下新增 hr-certificate(證明開具)
+-- 授权：admin 全量；FIN_BIZ_APPROVER 查看+登记开具。跨员工查看必须持有该台账菜单，
+--       自助菜单 ess-certificate 永远只能看本人（服务层强制，不靠前端隐藏）。

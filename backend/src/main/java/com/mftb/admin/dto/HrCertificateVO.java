@@ -25,7 +25,15 @@ public class HrCertificateVO {
     private String remark;
     private String status;
     private String flowNo;
-    /** 办理结果（审批通过后写入领取指引） */
+    /** 证明编号（人事开具后登记） */
+    private String certNo;
+    /** 开具日期 */
+    private LocalDate issueDate;
+    /** 领取方式：SELF/DELIVERY/ELECTRONIC */
+    private String pickupType;
+    /** 开具办理人 */
+    private String issuedBy;
+    /** 办理结果（审批通过=等待开具；登记后=已开具含编号） */
     private String resultRemark;
     private String createdBy;
     private String updatedBy;
@@ -49,6 +57,10 @@ public class HrCertificateVO {
         vo.setRemark(e.getRemark());
         vo.setStatus(e.getStatus());
         vo.setFlowNo(e.getFlowNo());
+        vo.setCertNo(e.getCertNo());
+        vo.setIssueDate(e.getIssueDate());
+        vo.setPickupType(e.getPickupType());
+        vo.setIssuedBy(e.getIssuedBy());
         vo.setResultRemark(e.getResultRemark());
         vo.setCreatedBy(e.getCreatedBy());
         vo.setUpdatedBy(e.getUpdatedBy());
