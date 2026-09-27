@@ -80,6 +80,9 @@ const EssLeaveDetail = lazy(() => import('./pages/Ess/EssLeaveDetail'))
 const EssCertificateList = lazy(() => import('./pages/Ess/CertificateList'))
 const EssCertificateForm = lazy(() => import('./pages/Ess/CertificateForm'))
 const EssCertificateDetail = lazy(() => import('./pages/Ess/CertificateDetail'))
+// 證明開具·人事台账（跨员工查看 + 开具登记）
+const CertLedger = lazy(() => import('./pages/Permission/HrCertificate/LedgerList'))
+const CertIssueForm = lazy(() => import('./pages/Permission/HrCertificate/IssueForm'))
 const EssMyRequests = lazy(() => import('./pages/Ess/MyRequests'))
 const EssMyProfile = lazy(() => import('./pages/Ess/MyProfile'))
 const LeaveQuotaForm = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaForm'))
@@ -378,6 +381,10 @@ function AuthenticatedLayout() {
               <Route path="/ess-certificate" element={<EssCertificateList />} />
               <Route path="/ess-certificate-form" element={<EssCertificateForm />} />
               <Route path="/ess-certificate-detail" element={<EssCertificateDetail />} />
+              {/* 證明開具台账（人事）：待开具队列与开具登记，需 hr-certificate 菜单 */}
+              <Route path="/hr-certificate" element={<CertLedger />} />
+              <Route path="/hr-certificate-issue" element={<CertIssueForm />} />
+              <Route path="/hr-certificate-detail" element={<EssCertificateDetail ledgerMode />} />
               {/* 合同續簽：复用入转调离引擎，授权归合同台账菜单 */}
               <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
               <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />

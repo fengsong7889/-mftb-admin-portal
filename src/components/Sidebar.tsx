@@ -91,7 +91,8 @@ import {
   FieldTimeOutlined, // 我的假期
   FormOutlined, // 我的申請單據
   FolderOpenOutlined, // 我的檔案
-  FileProtectOutlined, // 證明開具
+  FileProtectOutlined, // 證明開具（自助）
+  PrinterOutlined, // 證明開具（人事台账）
   FolderOutlined, // 員工檔案分组
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
@@ -165,6 +166,7 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'ess-requests': '/ess-requests',
   'ess-profile': '/ess-profile',
   'ess-certificate': '/ess-certificate',
+  'hr-certificate': '/hr-certificate',
   'org-center': '/org-center',
   'org-structure': '/organization-management',
   // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 直接重定向到授權中心）
@@ -427,6 +429,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'ess-requests': <FormOutlined />,
   'ess-profile': <FolderOpenOutlined />,
   'ess-certificate': <FileProtectOutlined />,
+  'hr-certificate': <PrinterOutlined />,
   'hr-leave': <CalendarOutlined />,
   'hr-leave-quota': <HourglassOutlined />,
   'employee-management': <UserOutlined />,

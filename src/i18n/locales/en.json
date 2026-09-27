@@ -8906,6 +8906,26 @@
     "saved": "Saved",
     "submittedShort": "Submitted for approval",
     "cancelled": "Cancelled, back to draft",
-    "applicant": "Applicant"
+    "applicant": "Applicant",
+    "issueTitle": "Register Issuance",
+    "issue": "Register Issuance",
+    "certNo": "Certificate No.",
+    "issueDate": "Issue Date",
+    "pickupType": "Pickup Method",
+    "issuedBy": "Issued By",
+    "pickupSelf": "Pick up at HR",
+    "pickupDelivery": "Mail / Courier",
+    "pickupElectronic": "Electronic copy",
+    "confirmIssueTitle": "Confirm issuance registration?",
+    "confirmIssue": "Confirm",
+    "issueDone": "Issued and registered: {{certNo}}",
+    "certNoRequired": "Enter the certificate number actually issued",
+    "certNoPlaceholder": "e.g. ZM-2026-0007",
+    "issueDateRequired": "Select the issue date",
+    "pickupRequired": "Select a pickup method",
+    "issueRemarkPlaceholder": "e.g. sealed with company chop, pickup time notified",
+    "notIssuableTip": "This request is not in \"To be issued\" status; finish the approval first or pick another request",
+    "ledgerKeywordPlaceholder": "No. / name / emp id / certificate no.",
+    "pendingIssueCount": "{{count}} to be issued"
   }
 }

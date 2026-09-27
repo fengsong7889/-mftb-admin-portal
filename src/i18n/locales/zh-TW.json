@@ -8907,6 +8907,26 @@
     "saved": "已保存",
     "submittedShort": "已提交審批",
     "cancelled": "已撤銷，回到草稿",
-    "applicant": "申請人"
+    "applicant": "申請人",
+    "issueTitle": "登記開具",
+    "issue": "登記開具",
+    "certNo": "證明編號",
+    "issueDate": "開具日期",
+    "pickupType": "領取方式",
+    "issuedBy": "開具人",
+    "pickupSelf": "本人至人事領取",
+    "pickupDelivery": "郵寄/快遞",
+    "pickupElectronic": "電子檔",
+    "confirmIssueTitle": "確認登記開具？",
+    "confirmIssue": "確認開具",
+    "issueDone": "已登記開具：{{certNo}}",
+    "certNoRequired": "請填寫實際出具的證明編號",
+    "certNoPlaceholder": "例如：ZM-2026-0007",
+    "issueDateRequired": "請選擇開具日期",
+    "pickupRequired": "請選擇領取方式",
+    "issueRemarkPlaceholder": "例如：已加蓋公章、已通知領取時間",
+    "notIssuableTip": "該申請目前不是「待開具」狀態，無法登記開具；請先完成審批或選擇其他申請",
+    "ledgerKeywordPlaceholder": "單號/姓名/工號/證明編號",
+    "pendingIssueCount": "{{count}} 件待開具"
   }
 }

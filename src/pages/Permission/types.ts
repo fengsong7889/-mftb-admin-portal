@@ -361,6 +361,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // 證明開具台账（人事）：跨员工查看与开具登记，不含删除以保留办理留痕
+  'hr-certificate': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
   'ess-requests': [{ key: 'view', label: '查看' }],
   'ess-profile': [{ key: 'view', label: '查看' }],
   // 字典維護（集团人事独立菜单，可单独授权）
@@ -1168,6 +1173,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ess-requests',
   'ess-profile',
   'ess-certificate',
+  'hr-certificate',
   'hr-dict',
   'contract-ledger',
   'org-structure',
@@ -1356,6 +1362,9 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ess-certificate': 'ess-certificate',
   '/ess-certificate-form': 'ess-certificate',
   '/ess-certificate-detail': 'ess-certificate',
+  '/hr-certificate': 'hr-certificate',
+  '/hr-certificate-issue': 'hr-certificate',
+  '/hr-certificate-detail': 'hr-certificate',
   '/hr-contract-renew-form': 'contract-ledger',
   '/hr-contract-renew-detail': 'contract-ledger',
   '/hr-dict': 'hr-dict',

@@ -1,29 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Card, Descriptions, Modal, Space, Tag, message } from 'antd'
-import { DeleteOutlined, EditOutlined, SendOutlined, UndoOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, SafetyCertificateOutlined, SendOutlined, UndoOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  CERT_DETAIL_PATH, CERT_EDITABLE, CERT_FORM_PATH, CERT_LIST_PATH,
+  CERT_DETAIL_PATH, CERT_EDITABLE, CERT_FORM_PATH, CERT_ISSUE_PATH, CERT_LEDGER_PATH, CERT_LIST_PATH,
   cancelCertificate, deleteCertificate, fetchCertificateDetail, submitCertificate,
   type CertificateItem,
 } from '../../api/hrCertificate'
 import {
-  CERT_LANG_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR, CERT_TYPE_LABEL_KEY,
+  CERT_LANG_LABEL_KEY, CERT_PICKUP_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR,
+  CERT_TYPE_LABEL_KEY,
 } from './meta'
 
 /** 我的证明申请详情：只读展示 + 提交/撤销/删除，审批进度跳转人事审批详情页 */
-export default function CertificateDetail() {
+/**
+ * 证明申请详情。自助端与人事台账端共用本页：
+ * ledgerMode 只切换返回路径与操作按钮（人事用「前往登記開具」，员工用提交/撤销/删除）。
+ */
+export default function CertificateDetail({ ledgerMode = false }: { ledgerMode?: boolean } = {}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const id = Number(searchParams.get('id'))
-  const canEdit = hasPermission('ess-certificate:edit')
-  const canDelete = hasPermission('ess-certificate:delete')
+  const permBase = ledgerMode ? 'hr-certificate' : 'ess-certificate'
+  const canEdit = hasPermission(`${permBase}:edit`)
+  const canDelete = hasPermission(`${permBase}:delete`)
+  const backPath = ledgerMode ? CERT_LEDGER_PATH : CERT_LIST_PATH
 
   const [item, setItem] = useState<CertificateItem | null>(null)
   const [busy, setBusy] = useState(false)
@@ -136,23 +143,29 @@ export default function CertificateDetail() {
           </Space>
         )}
         meta={`${item.reqNo} · ${item.empName}${item.empNo ? `(${item.empNo})` : ''} · ${item.copies} ${t('hrCert.copyUnit')}`}
-        onBack={() => navigate(CERT_LIST_PATH)}
+        onBack={() => navigate(backPath)}
         extra={(
           <Space size={8}>
-            {editable && canEdit && (
+            {ledgerMode && item.status === 'approved' && canEdit && (
+              <Button type="primary" icon={<SafetyCertificateOutlined />}
+                onClick={() => navigate(`${CERT_ISSUE_PATH}?id=${item.id}`)}>
+                {t('hrCert.issue')}
+              </Button>
+            )}
+            {!ledgerMode && editable && canEdit && (
               <Button icon={<EditOutlined />} onClick={() => navigate(`${CERT_FORM_PATH}?id=${item.id}`)}>
                 {t('common.edit')}
               </Button>
             )}
-            {editable && canEdit && (
+            {!ledgerMode && editable && canEdit && (
               <Button type="primary" icon={<SendOutlined />} loading={busy} onClick={handleSubmit}>
                 {t('hrLeave.submitApproval')}
               </Button>
             )}
-            {item.status === 'pending' && canEdit && (
+            {!ledgerMode && item.status === 'pending' && canEdit && (
               <Button icon={<UndoOutlined />} loading={busy} onClick={handleCancel}>{t('hrLeave.revoke')}</Button>
             )}
-            {editable && canDelete && (
+            {!ledgerMode && editable && canDelete && (
               <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>{t('common.delete')}</Button>
             )}
           </Space>
@@ -170,6 +183,20 @@ export default function CertificateDetail() {
           <Descriptions.Item label={t('hrCert.expectDate')}>{fmtDate(item.expectDate)}</Descriptions.Item>
           <Descriptions.Item label={t('hrCert.recipient')} span={2}>{item.recipient || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('hrCert.purpose')} span={3}>{item.purpose || '-'}</Descriptions.Item>
+          {item.certNo && (
+            <Descriptions.Item label={t('hrCert.certNo')}>{item.certNo}</Descriptions.Item>
+          )}
+          {item.issueDate && (
+            <Descriptions.Item label={t('hrCert.issueDate')}>{fmtDate(item.issueDate)}</Descriptions.Item>
+          )}
+          {item.pickupType && (
+            <Descriptions.Item label={t('hrCert.pickupType')}>
+              {CERT_PICKUP_LABEL_KEY[item.pickupType] ? t(CERT_PICKUP_LABEL_KEY[item.pickupType]) : item.pickupType}
+            </Descriptions.Item>
+          )}
+          {item.issuedBy && (
+            <Descriptions.Item label={t('hrCert.issuedBy')}>{item.issuedBy}</Descriptions.Item>
+          )}
           <Descriptions.Item label={t('hrCert.remark')} span={3}>{item.remark || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('common.colCreateTime')}>{fmt(item.createdAt)}</Descriptions.Item>
           <Descriptions.Item label={t('common.colUpdater')}>{item.updatedBy || '-'}</Descriptions.Item>
@@ -183,7 +210,7 @@ export default function CertificateDetail() {
           <Space size={12} wrap>
             <Tag color="orange">{t('hrLeave.flowNo')}: {item.flowNo}</Tag>
             <Button type="link" size="small" style={{ padding: 0 }}
-              onClick={() => navigate(`/hr-flow-detail?flowNo=${encodeURIComponent(item.flowNo!)}&back=${encodeURIComponent(`${CERT_DETAIL_PATH}?id=${item.id}`)}`)}>
+              onClick={() => navigate(`/hr-flow-detail?flowNo=${encodeURIComponent(item.flowNo!)}&back=${encodeURIComponent(`${ledgerMode ? CERT_LEDGER_PATH : CERT_DETAIL_PATH}?id=${item.id}`)}`)}>
               {t('hrLeave.gotoFlowDetail')}
             </Button>
           </Space>
