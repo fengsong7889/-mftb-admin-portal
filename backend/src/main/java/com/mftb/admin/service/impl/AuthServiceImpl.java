@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.ResultCode;
+import com.mftb.admin.dto.ChangePasswordRequest;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.MenuPermissionDTO;
@@ -19,6 +20,7 @@ import com.mftb.admin.service.RoleService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.JwtUtil;
 import com.mftb.admin.util.NetworkUtils;
+import com.mftb.admin.util.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -58,6 +60,9 @@ public class AuthServiceImpl implements AuthService {
     /** 滑块验证码门槛: 连续失败达到此次数后，登录必须携带有效 captchaToken */
     private static final int CAPTCHA_THRESHOLD = 3;
     private final ConcurrentHashMap<String, LoginAttempt> loginAttemptMap = new ConcurrentHashMap<>();
+
+    /** 改密失败记录（旧密码连续输错）：与登录锁定分开，避免输错旧密码直接把账号登录锁死 */
+    private final ConcurrentHashMap<String, LoginAttempt> passwordAttemptMap = new ConcurrentHashMap<>();
 
     /** 登录失败记录 */
     private static final class LoginAttempt {
@@ -316,6 +321,87 @@ public class AuthServiceImpl implements AuthService {
                 new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
                         .eq(SysUser::getUsername, username)
                         .set(SysUser::getAvatar, avatar));
+    }
+
+    @Override
+    public void changePassword(String username, ChangePasswordRequest request, String presentingToken) {
+        if (username == null || username.isBlank()) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED);
+        }
+        // 防暴力猜测旧密码：同一账号 15 分钟内最多 5 次失败
+        checkPasswordChangeRateLimit(username);
+
+        SysUser user = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
+        if (user == null) {
+            throw new BusinessException(ResultCode.ACCOUNT_NOT_EXIST);
+        }
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            recordPasswordFailure(username);
+            throw new BusinessException("當前密碼不正確，請重試或聯繫管理員重置密碼");
+        }
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BusinessException("兩次輸入的新密碼不一致");
+        }
+        // 先于强度策略判定：存量弱密码账号把新密码填成旧值时，提示应是最直接的“不能相同”
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new BusinessException("新密碼不能與當前密碼相同");
+        }
+        // 强度策略与前端清单同口径：绕过前端的提交同样拒收，违规项一次性全部返回
+        List<String> violations = PasswordPolicy.violations(request.getNewPassword(), user);
+        if (!violations.isEmpty()) {
+            throw new BusinessException(PasswordPolicy.describe(violations));
+        }
+
+        // 只更新密码相关字段，不整实体回写，避免并发覆盖其他字段
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getId, user.getId())
+                        .set(SysUser::getPassword, passwordEncoder.encode(request.getNewPassword()))
+                        // 本人已设定新密码 → 解除「首次登录/被重置后强制改密」标记
+                        .set(SysUser::getMustChangePassword, false)
+                        .set(SysUser::getUpdatedBy, username)
+                        .set(SysUser::getUpdatedAt, LocalDateTime.now()));
+        // 改密即失效：撤销本次会话，强制用新密码重新登录（其他标签页由会话轮询同步下线）
+        revokeActiveToken(username, presentingToken);
+        passwordAttemptMap.remove(username);
+        log.info("用户修改登录密码成功，已撤销当前会话要求重新登录：username={}", username);
+    }
+
+    /** 改密频率限制校验（旧密码连续错 5 次锁定 15 分钟） */
+    private void checkPasswordChangeRateLimit(String username) {
+        LoginAttempt attempt = passwordAttemptMap.get(username);
+        if (attempt == null) {
+            return;
+        }
+        long elapsed = System.currentTimeMillis() - attempt.firstFailTime;
+        if (elapsed > LOCK_DURATION_MS) {
+            passwordAttemptMap.remove(username);
+            return;
+        }
+        if (attempt.count.get() >= MAX_LOGIN_ATTEMPTS) {
+            long remainMinutes = (LOCK_DURATION_MS - elapsed) / 60000 + 1;
+            throw new BusinessException("當前密碼連續輸錯次數過多，請 " + remainMinutes + " 分鐘後再試，或聯繫管理員重置密碼");
+        }
+    }
+
+    /** 记录一次改密失败（旧密码不正确） */
+    private void recordPasswordFailure(String username) {
+        passwordAttemptMap.compute(username, (key, existing) -> {
+            long now = System.currentTimeMillis();
+            if (existing == null || (now - existing.firstFailTime) > LOCK_DURATION_MS) {
+                LoginAttempt attempt = new LoginAttempt();
+                attempt.firstFailTime = now;
+                attempt.count.set(1);
+                return attempt;
+            }
+            existing.count.incrementAndGet();
+            return existing;
+        });
+        if (passwordAttemptMap.size() > 200) {
+            long threshold = System.currentTimeMillis() - LOCK_DURATION_MS;
+            passwordAttemptMap.entrySet().removeIf(e -> e.getValue().firstFailTime < threshold);
+        }
     }
 
     @Override

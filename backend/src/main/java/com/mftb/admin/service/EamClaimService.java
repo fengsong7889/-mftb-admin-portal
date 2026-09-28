@@ -44,6 +44,9 @@ public interface EamClaimService {
     PageResult<EamClaimVO> myClaims(EamClaimQuery query);
     EamClaimVO myDetail(long id);
 
+    /** 个人领用统计（仅统计当前登录用户本人记录，登录即可，不需要领用管理菜单权限） */
+    EamClaimStatsVO myStats();
+
     /** 钉钉签署页：凭令牌读取待签署领用详情（免登录） */
     EamClaimVO signPageDetail(String token);
 

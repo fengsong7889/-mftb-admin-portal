@@ -14,6 +14,7 @@ import PetMascot from './components/PetMascot'
 import Login from './pages/Login'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import MenuPermissionGuard from './components/MenuPermissionGuard'
+import ForcePasswordChangeGate from './components/ForcePasswordChangeGate'
 import VersionUpdateNotification from './components/VersionUpdateNotification'
 import useVersionCheck from './hooks/useVersionCheck'
 import './App.css'
@@ -657,6 +658,8 @@ function App() {
         <MenuProvider>
           <CompanyBrandProvider>
             <AppRoutes />
+            {/* 首次登录/密码被重置：未完成改密前拦住整个后台（含企业门户） */}
+            <ForcePasswordChangeGate />
           </CompanyBrandProvider>
         </MenuProvider>
       </AuthProvider>

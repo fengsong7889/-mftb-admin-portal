@@ -3,7 +3,7 @@
  *
  * 后端接口: /api/eam/borrows/*
  */
-import request, { isBackendUnavailable } from './request'
+import request, { isBackendUnavailable, SILENT_HEADER } from './request'
 import type { AssetParameterSource } from '../utils/assetParams'
 
 /* ==================== 类型定义 ==================== */
@@ -62,6 +62,14 @@ export interface BorrowRenewDTO {
   newDueDate: string
 }
 
+/** 本人借用统计（“我的资产”借用页签） */
+export interface BorrowStatsData {
+  activeCount: number
+  overdueCount: number
+  returnedCount: number
+  totalCount: number
+}
+
 /* ==================== API 方法 ==================== */
 
 /** 分页查询 */
@@ -88,6 +96,30 @@ export async function fetchBorrowList(query: BorrowQuery): Promise<BorrowPage<Bo
 /** 详情 */
 export async function fetchBorrowDetail(id: number): Promise<BorrowRow> {
   return request.get<unknown, BorrowRow>(`/eam/borrows/${id}`)
+}
+
+/* ==================== 本人自助视图（登录即可，后端强制本人口径） ==================== */
+
+/** 本人借用分页（不授予 asset-borrow 菜单权限也能访问） */
+export async function fetchMyBorrows(query: BorrowQuery): Promise<BorrowPage<BorrowRow>> {
+  try {
+    return await request.get<unknown, BorrowPage<BorrowRow>>('/eam/borrows/my', { params: query })
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      return { records: [], total: 0 }
+    }
+    throw err
+  }
+}
+
+/** 本人借用统计（静默：失败由页面降级为 — 不弹全局错误提示） */
+export function fetchMyBorrowStats(): Promise<BorrowStatsData> {
+  return request.get<unknown, BorrowStatsData>('/eam/borrows/my/stats', { headers: { [SILENT_HEADER]: '1' } })
+}
+
+/** 本人借用详情（归属由服务端校验） */
+export async function fetchMyBorrowDetail(id: number): Promise<BorrowRow> {
+  return request.get<unknown, BorrowRow>(`/eam/borrows/my/${id}`)
 }
 
 /** 登记借用 */

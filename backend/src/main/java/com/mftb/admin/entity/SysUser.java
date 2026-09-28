@@ -72,6 +72,9 @@ public class SysUser {
     /** 状态: 1=启用 0=停用 */
     private Integer status;
 
+    /** 是否必须先修改密码才能使用系统：true=初始密码/被管理员重置，false=本人设定 */
+    private Boolean mustChangePassword;
+
     /** 最后活跃时间 (空闲超时检测用) */
     private LocalDateTime lastActiveAt;
 

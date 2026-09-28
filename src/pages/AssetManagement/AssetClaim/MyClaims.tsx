@@ -10,7 +10,8 @@ import { TransferError, TransferPageHeader, TransferSection } from '../AssetTran
 import { positiveId } from '../AssetTransfer/transferUtils'
 import ClaimRecordTable, { canSignClaim, ClaimStatusTag, SignatureStatusTag } from './ClaimRecordTable'
 
-function MyClaimDetail({ id, onBack }: { id?: number; onBack: () => void }) {
+/** 本人领用详情（含签署）；供 /my-claims 与「我的资产」入口复用，归属由服务端校验。 */
+export function MyClaimDetail({ id, onBack }: { id?: number; onBack: () => void }) {
   const { t } = useTranslation()
   const fetcher = useCallback(() => id ? fetchMyClaim(id) : Promise.reject(new Error(t('transfer.invalidId'))), [id, t])
   const { data: record, loading, error, refresh } = useTransferData(fetcher)

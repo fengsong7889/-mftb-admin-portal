@@ -5,7 +5,7 @@
  * 管理端: /api/eam/claims/*
  * 个人端: /api/eam/claims/my
  */
-import request, { isBackendUnavailable } from './request'
+import request, { isBackendUnavailable, SILENT_HEADER } from './request'
 import type {
   ClaimPage,
   ClaimQuery,
@@ -160,9 +160,21 @@ export async function resendClaimSignNotification(claimId: number): Promise<void
 
 /* ==================== 个人端 ==================== */
 
-/** 个人领用列表 */
+/** 个人领用列表（后端固定按当前登录人过滤；服务不可用时降级空态） */
 export async function fetchMyClaims(query: ClaimQuery): Promise<ClaimPage<ClaimRow>> {
-  return request.get<unknown, ClaimPage<ClaimRow>>('/eam/claims/my', { params: query })
+  try {
+    return await request.get<unknown, ClaimPage<ClaimRow>>('/eam/claims/my', { params: query })
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      return { records: [], total: 0 }
+    }
+    throw err
+  }
+}
+
+/** 个人领用统计（仅本人记录，登录即可；失败由调用方静默降级） */
+export function fetchMyClaimStats(): Promise<ClaimStatsData> {
+  return request.get<unknown, ClaimStatsData>('/eam/claims/my/stats', { headers: { [SILENT_HEADER]: '1' } })
 }
 
 export function fetchMyClaim(id: number): Promise<ClaimRow> {

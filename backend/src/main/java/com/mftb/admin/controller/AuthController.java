@@ -4,6 +4,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.AvatarUpdateRequest;
 import com.mftb.admin.dto.AvatarUrlDTO;
+import com.mftb.admin.dto.ChangePasswordRequest;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
@@ -75,11 +76,7 @@ public class AuthController {
         //  1. 服务端撤销会话（清 active_token，旧 JWT 下次请求直接 401）
         //  2. 写登出日志（与旧行为一致，不阻断主流程）
         String username = null;
-        String presentingToken = null;
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            presentingToken = header.substring(7);
-        }
+        String presentingToken = resolveToken(request);
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication != null && authentication.getName() != null
@@ -152,6 +149,20 @@ public class AuthController {
      */
     private void throttleUpdateLastActive(String username) {
         authService.throttleUpdateLastActive(username, UPDATE_THROTTLE_MS, checkLastUpdateMap);
+    }
+
+    /* ────────────── 账号安全 ────────────── */
+
+    /**
+     * 修改登录密码（本人）。
+     * <p>服务端已撤销当前会话，前端成功后必须跳登录页用新密码重新登录。
+     */
+    @PostMapping("/password")
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request, HttpServletRequest httpRequest) {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        authService.changePassword(username, request, resolveToken(httpRequest));
+        return Result.success("密碼已修改，請使用新密碼重新登錄", null);
     }
 
     /* ────────────── 头像管理 ────────────── */
@@ -262,6 +273,12 @@ public class AuthController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return (auth != null && auth.getName() != null && !"anonymousUser".equals(auth.getName()))
                 ? auth.getName() : null;
+    }
+
+    /** 从 Authorization 头解析当前 JWT（撤销会话需精确匹配 active_token） */
+    private String resolveToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        return (header != null && header.startsWith("Bearer ")) ? header.substring(7) : null;
     }
 
     private String toJson(List<String> keys) {

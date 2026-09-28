@@ -112,6 +112,12 @@ public class EamClaimController {
         return Result.success(claimService.myClaims(query));
     }
 
+    /** 个人领用统计（仅本人记录，登录即可；“我的资产”页数据源） */
+    @GetMapping("/my/stats")
+    public Result<EamClaimStatsVO> myStats() {
+        return Result.success(claimService.myStats());
+    }
+
     /** 重新推送签署通知（管理员手动触发，不限签署状态） */
     @PostMapping("/{id}/resend-sign-notify")
     @RequirePermission(menu = MENU, action = "edit")

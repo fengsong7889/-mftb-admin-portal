@@ -19,6 +19,9 @@ public interface EamConsumableClaimService {
     /** 我的领用详情（服务层校验归属） */
     EamConsumableClaimVO myDetail(long claimId);
 
+    /** 我的领用统计（仅本人单据，“我的资产”耗材页签数据源） */
+    EamConsumableClaimStatsVO myStats();
+
     /** 提交领用申请（占用库存 locked_qty） */
     long submit(EamConsumableClaimSaveDTO dto);
 

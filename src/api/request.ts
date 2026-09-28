@@ -41,6 +41,8 @@ export const FORCE_LOGOUT_EVENT = 'auth:force-logout'
 
 /** 账号被停用全局事件: 登录时或在线时被停用 */
 export const ACCOUNT_DISABLED_EVENT = 'auth:account-disabled'
+/** 首次登录/密码被重置：必须先改密，业务接口一律被后端拒绝 */
+export const PASSWORD_CHANGE_REQUIRED_EVENT = 'auth:password-change-required'
 
 /** 被顶下线事件详情 */
 export interface SessionConflictDetail {
@@ -129,6 +131,14 @@ request.interceptors.response.use(
     }
     // 业务层无权限: 后端权限模块以业务码 403 返回（如菜单/数据未授权）
     if (res.code === FORBIDDEN_CODE) {
+      // 强制改密门禁：不是「缺授权」，而是账号尚未完成首次改密。
+      // 不弹 toast（并发请求会刷屏），改由全局事件弹出不可跳过的改密窗口。
+      if ((res.data as { reason?: string } | null)?.reason === 'PASSWORD_CHANGE_REQUIRED') {
+        window.dispatchEvent(new CustomEvent(PASSWORD_CHANGE_REQUIRED_EVENT, {
+          detail: { message: res.message || '' },
+        }))
+        return Promise.reject(new Error(res.message || '需先修改密碼'))
+      }
       if (!silent) message.error(res.message || '您没有权限执行此操作，请联系管理员授权')
       return Promise.reject(new Error(res.message || '无权限'))
     }

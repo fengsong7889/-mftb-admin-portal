@@ -185,6 +185,16 @@ public class EamClaimServiceImpl implements EamClaimService {
         return toVO(claim);
     }
 
+    @Override
+    public EamClaimStatsVO myStats() {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) throw new BusinessException("未登录");
+        // 个人口径：固定以当前登录人作为员工过滤，不接受外部传入的 employeeId
+        EamClaimQuery query = new EamClaimQuery();
+        query.setEmployeeId(current.getId());
+        return stats(query);
+    }
+
     /* ==================== 可选领用人下拉 ==================== */
 
     @Override

@@ -13,6 +13,15 @@ public interface EamBorrowService {
     /** 详情 */
     EamBorrowVO detail(long id);
 
+    /** 本人借用分页（服务层强制按当前登录人过滤，登录即可） */
+    PageResult<EamBorrowVO> myPage(EamBorrowQuery query);
+
+    /** 本人借用详情（校验记录归属） */
+    EamBorrowVO myDetail(long id);
+
+    /** 本人借用统计（仅本人记录） */
+    EamBorrowStatsVO myStats();
+
     /** 登记借用 */
     long register(EamBorrowSaveDTO dto);
 

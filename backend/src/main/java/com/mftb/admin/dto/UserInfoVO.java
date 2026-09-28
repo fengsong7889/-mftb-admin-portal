@@ -36,6 +36,9 @@ public class UserInfoVO {
     /** 当前用户可进入的业务系统编码集合（按 sys_system.sort_order 排序）；不包含哨兵 'portal' */
     private List<String> accessibleSystems;
 
+    /** 是否必须先修改密码才能使用系统（新建员工的初始密码 / 管理员重置后为 true） */
+    private Boolean mustChangePassword;
+
     public static UserInfoVO from(SysUser user) {
         UserInfoVO vo = new UserInfoVO();
         vo.setId(user.getId());
@@ -51,6 +54,8 @@ public class UserInfoVO {
         vo.setPositionEn(user.getPositionEn());
         vo.setJobLevel(user.getJobLevel());
         vo.setFunctionRoleIds(JsonUtils.parseLongList(user.getFunctionRoles()));
+        // 后端 Jackson 以 non_null 输出，布尔标记必须显式给值，否则前端拿到 undefined
+        vo.setMustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()));
         return vo;
     }
 }

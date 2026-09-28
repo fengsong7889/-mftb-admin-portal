@@ -62,6 +62,12 @@ public class EamConsumableClaimController {
         return Result.success(claimService.myDetail(id));
     }
 
+    /** 本人领用统计（“我的资产”页数据源） */
+    @GetMapping("/my/stats")
+    public Result<EamConsumableClaimStatsVO> myStats() {
+        return Result.success(claimService.myStats());
+    }
+
     /** 提交领用申请 */
     @PostMapping("/my")
     public Result<Long> submit(@RequestBody EamConsumableClaimSaveDTO dto) {

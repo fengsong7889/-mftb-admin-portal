@@ -26,6 +26,8 @@ export interface UserInfo {
   permissions?: MenuPermission[] // 后端登录时下发的合并菜单权限
   /** 当前用户可进入的业务系统编码列表（后端下发，前端仅展示，不作为安全边界）*/
   accessibleSystems?: string[]
+  /** 是否必须先修改密码才能使用系统（初始密码/被管理员重置时后端置 true，前端据此弹强制改密门禁） */
+  mustChangePassword?: boolean
   dataPermissions?: {
     locations?: string[] // 有权限的地点
     merchants?: string[] // 有权限的商家
@@ -36,7 +38,12 @@ interface AuthContextType {
   isAuthenticated: boolean
   user: UserInfo | null
   login: (username: string, password: string, captchaToken?: string) => Promise<{ success: boolean; message?: string; redirectPath?: string; accountDisabled?: boolean; captchaRequired?: boolean; code?: number }>
-  logout: () => void
+  /**
+   * 退出登录。
+   * @param options.skipApi 服务端已主动撤销会话时（如修改密码后）跳过登出接口，
+   *                        避免拿旧 Token 再请求一次直接命中 401 弹「登录失效」。
+   */
+  logout: (options?: { skipApi?: boolean }) => Promise<void>
   updateAvatar: (avatar: string) => void
   hasPermission: (permission: string) => boolean // 权限检查方法（支持 'action' 或 'menuKey:action'）
   hasMenuPermission: (menuKey: string) => boolean // 菜单访问权限检查（仅受控菜单校验）
@@ -304,6 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             functionRoleCodes: info.functionRoleCodes,
             permissions: info.permissions,
             accessibleSystems: info.accessibleSystems,
+            mustChangePassword: info.mustChangePassword,
           }
           localStorage.setItem('user_info', JSON.stringify(refreshed))
           return refreshed
@@ -422,6 +430,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         functionRoleCodes: backendUser.functionRoleCodes,
         permissions: backendUser.permissions,
         accessibleSystems: backendUser.accessibleSystems,
+        mustChangePassword: backendUser.mustChangePassword,
       }
       setIsAuthenticated(true)
       setUser(mappedUser)
@@ -455,7 +464,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (options?: { skipApi?: boolean }) => {
     // 退出前：将首页当前的国家/语言同步到登录页独立键，确保登录页记住首页的语言
     const currentCountry = localStorage.getItem('selected_country') || 'usa'
     const currentLang = localStorage.getItem('app_language') || 'en'
@@ -463,10 +472,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('login_language', currentLang)
 
     // 通知后端登出，等待完成後再清理本地狀態，確保 logoutTime 被記錄
-    try {
-      await logoutApi()
-    } catch {
-      // 失敗不阻斷本地清理
+    // skipApi=true 用于改密等后端已撤销会话的场景，本地仍需完整清理
+    if (!options?.skipApi) {
+      try {
+        await logoutApi()
+      } catch {
+        // 失敗不阻斷本地清理
+      }
     }
     setIsAuthenticated(false)
     setUser(null)

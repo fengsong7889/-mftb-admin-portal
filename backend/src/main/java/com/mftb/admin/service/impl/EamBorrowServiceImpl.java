@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -46,6 +47,48 @@ public class EamBorrowServiceImpl implements EamBorrowService {
     public EamBorrowVO detail(long id) {
         EamBorrow borrow = requireBorrow(id);
         return toVO(borrow);
+    }
+
+    @Override
+    public PageResult<EamBorrowVO> myPage(EamBorrowQuery query) {
+        SysUser current = requireLogin();
+        // 个人口径：强制以当前登录人作为借用人过滤，不信任外部传入的 holderId
+        query.setHolderId(current.getId());
+        return page(query);
+    }
+
+    @Override
+    public EamBorrowVO myDetail(long id) {
+        SysUser current = requireLogin();
+        EamBorrow borrow = requireBorrow(id);
+        if (!Objects.equals(current.getId(), borrow.getHolderId())) {
+            throw new BusinessException(403, "僅能查看與操作本人的資料");
+        }
+        return toVO(borrow);
+    }
+
+    @Override
+    public EamBorrowStatsVO myStats() {
+        SysUser current = requireLogin();
+        EamBorrowStatsVO stats = new EamBorrowStatsVO();
+        stats.setActiveCount(countByStatus(current.getId(), "active"));
+        stats.setOverdueCount(countByStatus(current.getId(), "overdue"));
+        stats.setReturnedCount(countByStatus(current.getId(), "returned"));
+        stats.setTotalCount(borrowMapper.selectCount(
+                new LambdaQueryWrapper<EamBorrow>().eq(EamBorrow::getHolderId, current.getId())));
+        return stats;
+    }
+
+    private SysUser requireLogin() {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) throw new BusinessException("未登錄");
+        return current;
+    }
+
+    private Long countByStatus(Long holderId, String status) {
+        return borrowMapper.selectCount(new LambdaQueryWrapper<EamBorrow>()
+                .eq(EamBorrow::getHolderId, holderId)
+                .eq(EamBorrow::getStatus, status));
     }
 
     @Override
@@ -182,6 +225,7 @@ public class EamBorrowServiceImpl implements EamBorrowService {
                     .or().like(EamBorrow::getHolderName, q.getKeyword().trim()));
         }
         w.eq(hasText(q.getStatus()), EamBorrow::getStatus, q.getStatus());
+        w.eq(q.getHolderId() != null, EamBorrow::getHolderId, q.getHolderId());
         w.eq(hasText(q.getDepartment()), EamBorrow::getDepartment, q.getDepartment());
         if (hasText(q.getStartDate())) {
             w.ge(EamBorrow::getStartDate, LocalDate.parse(q.getStartDate(), DateTimeFormatter.ISO_DATE));

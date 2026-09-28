@@ -34,6 +34,26 @@ public class EamBorrowController {
         return Result.success(borrowService.detail(id));
     }
 
+    /* ===== 自助视图（登录即可，服务层强制本人口径并校验归属；“我的资产”页数据源） ===== */
+
+    /** 本人借用分页 */
+    @GetMapping("/my")
+    public Result<PageResult<EamBorrowVO>> myPage(@ModelAttribute EamBorrowQuery query) {
+        return Result.success(borrowService.myPage(query));
+    }
+
+    /** 本人借用统计 */
+    @GetMapping("/my/stats")
+    public Result<EamBorrowStatsVO> myStats() {
+        return Result.success(borrowService.myStats());
+    }
+
+    /** 本人借用详情 */
+    @GetMapping("/my/{id}")
+    public Result<EamBorrowVO> myDetail(@PathVariable long id) {
+        return Result.success(borrowService.myDetail(id));
+    }
+
     /** 登记借用 */
     @PostMapping
     @RequirePermission(menu = MENU, action = "edit")

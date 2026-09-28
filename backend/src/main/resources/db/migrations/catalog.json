@@ -11,6 +11,15 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "core:user-password-policy-v1",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "passwordPolicySchemaInitializer",
+      "status": "ACTIVE",
+      "comment": "账号安全：sys_user 补 must_change_password 列（1=初始密码/被管理员重置，须先改密才能使用系统；0=本人设定）。@Order(3) 早于任何 sys_user 实体查询，带后置校验，缺列不记版本。"
+    },
+    {
       "versionKey": "core:menu-seed-v41",
       "module": "core",
       "phase": "MENU_SEED",

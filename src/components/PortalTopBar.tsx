@@ -2,18 +2,19 @@
  * 门户顶栏（Round 2）。
  *
  * 场景：/portal 路径下不注入 Sidebar/MenuTabs，但仍需要品牌区 + 基础用户操作。
- * 本组件保持极小：品牌 Logo + 企业门户标题 + 基础用户操作，不展示业务系统名。
+ * 本组件保持极小：品牌 Logo + 企业门户标题 + 语言/国家选择 + 用户菜单。
  *
  * 与 HeaderBar 分离的原因：门户页无侧边栏折叠按钮、也无系统内切换需求；
  * 强行复用 HeaderBar 会引入 Sidebar 状态依赖，让 App.tsx 的分支渲染复杂化。
- * 用户头像/通知/语言等在进入系统后使用 HeaderBar 完整版即可。
+ * 但“姓名/工号 + 我的資產/更换头像/修改密码/退出登录”必须与系统内一致，
+ * 因此用户区直接复用 UserMenu，避免两套下拉与头像持久化逻辑漂移。
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Layout, Button, Empty, Select, Spin } from 'antd'
-import { GlobalOutlined, LogoutOutlined, TranslationOutlined } from '@ant-design/icons'
+import { Layout, Empty, Select, Spin } from 'antd'
+import { GlobalOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import BrandLogo from './BrandLogo'
-import { useAuth } from '../contexts/AuthContext'
+import UserMenu from './UserMenu'
 import { changeAppLanguage, ensureLanguageBundle } from '../i18n'
 import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '../api/translation'
 import { COUNTRY_INFO, countrySysName, getCountryOfLanguage, LANG_INFO } from '../utils/translationConfig'
@@ -126,7 +127,6 @@ export function PortalLocaleControls() {
 
 export default function PortalTopBar() {
   const { t } = useTranslation()
-  const { user, logout } = useAuth()
 
   return (
     <Header className="portal-top-bar">
@@ -138,20 +138,8 @@ export default function PortalTopBar() {
         <div className="portal-top-bar-right">
           <PortalLocaleControls />
           <div className="portal-user-controls">
-            {user?.name ? (
-              <span className="portal-top-bar-user">
-                <span className="portal-top-bar-avatar" aria-hidden="true">{user.name.trim().charAt(0)}</span>
-                <span className="portal-top-bar-user-name">{user.name}</span>
-              </span>
-            ) : null}
-            <Button
-              type="text"
-              icon={<LogoutOutlined />}
-              onClick={() => void logout()}
-              className="portal-top-bar-logout"
-            >
-              {t('portal.logout')}
-            </Button>
+            {/* 与系统内一致：直接展示姓名（工號）+ 职位 + 部门，点击展开我的資產/更换头像/修改密码/退出登录 */}
+            <UserMenu myAssetsPath="/my-assets?from=portal" />
           </div>
         </div>
       </div>

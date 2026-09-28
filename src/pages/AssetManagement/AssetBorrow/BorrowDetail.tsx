@@ -12,9 +12,7 @@ import dayjs from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import type { BorrowRow } from '../../../api/eamBorrow'
 import AssetParameters from '../../../components/AssetParameters'
-
-const STATUS_LABEL: Record<string, string> = { active: '借用中', overdue: '已逾期', returned: '已归还', cancelled: '已取消', loss_closed: '異常終止·遺失', scrap_closed: '異常終止·報廢', repair_closed: '異常終止·送修' }
-const STATUS_COLOR: Record<string, string> = { active: 'processing', overdue: 'error', returned: 'success', cancelled: 'default', loss_closed: 'warning', scrap_closed: 'error', repair_closed: 'processing' }
+import { BORROW_STATUS_LABEL as STATUS_LABEL, BORROW_STATUS_COLOR as STATUS_COLOR } from './borrowStatus'
 
 /** 详情卡片统一样式（无边框，对齐采购订单详情） */
 const detailCardStyle: React.CSSProperties = {
@@ -28,11 +26,13 @@ interface Props {
   error?: string
   canEdit?: boolean
   canReturn?: boolean
+  /** 是否展示归还单跳转（个人端无归还管理菜单权限时隐藏，避免点入被 403 拦截） */
+  canViewReturnOrder?: boolean
   onBack: () => void
   onRefresh?: () => void
 }
 
-export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, onBack, onRefresh: _onRefresh }: Props) {
+export default function BorrowDetail({ record, loading = false, error, canEdit = false, canReturn = false, canViewReturnOrder = true, onBack, onRefresh: _onRefresh }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -70,7 +70,7 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
     />
 
     {record.status === 'overdue' && <Alert className="claim-notice" type="error" showIcon message={`已逾期 ${overdueDays} 天，請盡快歸還或續借`} style={{ marginBottom: 16 }} />}
-    {record.returnId && <Alert className="claim-notice" type="success" showIcon message="已歸還"
+    {record.returnId && canViewReturnOrder && <Alert className="claim-notice" type="success" showIcon message="已歸還"
       description={<Button type="link" style={{ padding: 0 }} onClick={() => navigate(`/asset-return/detail?id=${record.returnId}`)}>查看歸還單</Button>}
       style={{ marginBottom: 16 }} />}
 

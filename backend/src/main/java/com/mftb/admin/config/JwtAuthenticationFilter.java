@@ -24,6 +24,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -44,6 +47,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     /** 活跃时间更新节流间隔（毫秒），默认 5 分钟，避免每次请求都写库 */
     private static final long UPDATE_THROTTLE_MS = 5 * 60 * 1000L;
+
+    /**
+     * 强制改密期间仍放行的接口：改密本身、登出、会话校验、用户信息、登录验证码。
+     * <p>不含业务接口——未改密用户只能完成「改密或离开」，这是 fail-closed 的账号安全底线。
+     */
+    private static final Set<String> PASSWORD_CHANGE_WHITELIST = Set.of(
+            "/api/auth/password", "/api/auth/logout", "/api/auth/check",
+            "/api/auth/info", "/api/auth/captcha");
+
+    /** 是否属于强制改密期间允许访问的接口 */
+    static boolean isPasswordChangeWhitelisted(String uri) {
+        return uri != null && PASSWORD_CHANGE_WHITELIST.contains(uri);
+    }
 
     /** 每个用户上次更新 last_active_at 的时间戳（内存节流） */
     private final ConcurrentHashMap<String, Long> lastUpdateMap = new ConcurrentHashMap<>();
@@ -71,6 +87,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SessionCheckResult check = authService.checkSession(token, username, user);
             if (!check.isPassed()) {
                 writeSessionCheckResponse(response, check);
+                return;
+            }
+
+            // 首次登录/密码被重置：只允许改密相关接口，业务接口一律拒绝（前端据此弹强制改密门禁）
+            if (Boolean.TRUE.equals(user.getMustChangePassword())
+                    && !isPasswordChangeWhitelisted(request.getRequestURI())) {
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("reason", "PASSWORD_CHANGE_REQUIRED");
+                writeSessionCheckResponse(response,
+                        SessionCheckResult.fail(403, "為了賬號安全，首次登錄需先修改密碼", data));
                 return;
             }
 

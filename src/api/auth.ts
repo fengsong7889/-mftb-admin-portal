@@ -31,6 +31,8 @@ export interface UserInfo {
   permissions?: MenuPermission[] // 登录时下发的合并菜单权限
   /** 当前用户可进入的业务系统编码列表（后端按 sys_system.sort_order 排序，不包含哨兵 'portal'）*/
   accessibleSystems?: string[]
+  /** 是否必须先修改密码才能使用系统（初始密码/被管理员重置时为 true） */
+  mustChangePassword?: boolean
 }
 
 /** 登录响应 */
@@ -54,6 +56,24 @@ export function fetchCaptchaToken() {
 /** 登出 */
 export function logout() {
   return request.post<unknown, void>('/auth/logout')
+}
+
+/** 修改密码参数（本人自助，目标账号由服务端会话确定） */
+export interface ChangePasswordParams {
+  oldPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
+/**
+ * 修改登录密码（本人）。
+ * <p>成功后服务端已撤销当前会话，调用方必须引导重新登录；
+ * 错误（如当前密码不正确）由弹窗内展示，故带静默标记避免与全局拦截器重复弹提示。
+ */
+export function changePassword(params: ChangePasswordParams) {
+  return request.post<unknown, void>('/auth/password', params, {
+    headers: { [SILENT_HEADER]: '1' },
+  })
 }
 
 /** 获取当前登录用户信息 */

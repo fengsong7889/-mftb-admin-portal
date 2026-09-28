@@ -8,7 +8,7 @@
  * 分类/品牌/计量单位使用耗材域独立基础数据（见文件末尾「基础数据 API」），
  * 仅仓库位置(fetchLocationList)仍复用 eam.ts。
  */
-import request from './request'
+import request, { SILENT_HEADER } from './request'
 import type { PageResult } from './asset'
 
 /* ==================== 基础数据类型 ==================== */
@@ -422,6 +422,19 @@ export function fetchMyConsumableClaims(params?: { page?: number; size?: number;
 
 export function fetchMyConsumableClaimDetail(id: number) {
   return request.get<unknown, ConsumableClaim>(`/eam/consumables/claims/my/${id}`)
+}
+
+/** 本人领用统计（“我的资产”耗材页签数据源） */
+export interface ConsumableClaimStats {
+  claimCount: number
+  pendingCount: number
+  approvedCount: number
+  issuedCount: number
+}
+
+/** 本人领用统计（静默：失败由页面降级为 — 不弹全局错误提示） */
+export function fetchMyConsumableClaimStats(): Promise<ConsumableClaimStats> {
+  return request.get<unknown, ConsumableClaimStats>('/eam/consumables/claims/my/stats', { headers: { [SILENT_HEADER]: '1' } })
 }
 
 export function submitConsumableClaim(data: ConsumableClaimSave) {

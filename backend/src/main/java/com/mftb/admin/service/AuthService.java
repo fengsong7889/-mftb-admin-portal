@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.ChangePasswordRequest;
 import com.mftb.admin.dto.LoginRequest;
 import com.mftb.admin.dto.LoginResponse;
 import com.mftb.admin.dto.SessionCheckResult;
@@ -43,6 +44,16 @@ public interface AuthService {
 
     /** 更新用户头像 */
     void updateAvatar(String username, String avatar);
+
+    /**
+     * 本人修改登录密码。
+     * <p>校验当前密码 + 两次输入一致 + 新旧不得相同；旧密码连续输错进入 15 分钟锁定，防暴力猜测。
+     * <p>改密成功后立即撤销当前会话（active_token 置空），旧 Token 下次请求直接 401，
+     * 其他标签页由会话轮询同步下线，必须用新密码重新登录。
+     *
+     * @param presentingToken 当前请求携带的 JWT，用于精确撤销本次会话
+     */
+    void changePassword(String username, ChangePasswordRequest request, String presentingToken);
 
     /** 获取用户快捷入口 */
     List<String> getQuickFavorites(String username);

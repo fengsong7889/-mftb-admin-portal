@@ -23,4 +23,6 @@ public class EamBorrowQuery {
     private String endDate;
     /** 所属品牌（sys_company_brand.id） */
     private Integer companyBrand;
+    /** 借用人 ID（sys_user.id）；“我的借用”视图由服务层强制回填，不接受外部传入 */
+    private Long holderId;
 }

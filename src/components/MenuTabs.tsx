@@ -176,6 +176,9 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/asset-return/detail': { fixed: '歸還詳情' },
   '/asset-return/dispose': { fixed: '處置登記' },
   '/asset-return/recover': { fixed: '遺失找回' },
+  // 員工個人入口（右上角頭像下拉進入，非菜單頁，標題必須穩定不得退回 slug）
+  '/my-assets': { fixed: 'i18n:header.myAssets' },
+  '/my-claims': { fixed: 'i18n:transfer.myClaims' },
   // 集團人事（入轉調離 / 請假）子頁面 —— 與頁面 DetailPageHeader 標題保持一致，禁止退回 slug 文案
   '/hr-flow-detail': { fixed: 'i18n:hrLifecycle.flowDetailTitle' },
   '/hr-leave-detail': { fixed: 'i18n:hrLeave.detailTitle' },

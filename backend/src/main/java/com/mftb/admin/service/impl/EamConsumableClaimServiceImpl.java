@@ -103,6 +103,25 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         return toVO(claim, loadItems(claimId));
     }
 
+    @Override
+    public EamConsumableClaimStatsVO myStats() {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) throw new BusinessException("未登錄");
+        // 个人口径：固定以当前登录人为申请人，不接受外部传入的 applicantId
+        EamConsumableClaimStatsVO stats = new EamConsumableClaimStatsVO();
+        stats.setClaimCount(claimMapper.selectCount(byApplicant(current.getId(), null)));
+        stats.setPendingCount(claimMapper.selectCount(byApplicant(current.getId(), "pending")));
+        stats.setApprovedCount(claimMapper.selectCount(byApplicant(current.getId(), "approved")));
+        stats.setIssuedCount(claimMapper.selectCount(byApplicant(current.getId(), "issued")));
+        return stats;
+    }
+
+    private LambdaQueryWrapper<EamConsumableClaim> byApplicant(Long applicantId, String status) {
+        return new LambdaQueryWrapper<EamConsumableClaim>()
+                .eq(EamConsumableClaim::getApplicantId, applicantId)
+                .eq(StringUtils.hasText(status), EamConsumableClaim::getStatus, status);
+    }
+
     /* ==================== 提交申请 ==================== */
 
     @Override

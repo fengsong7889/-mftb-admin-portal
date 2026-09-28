@@ -185,6 +185,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         SysUser user = new SysUser();
         user.setUsername(empId);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        // 初始密码由他人设定 → 首次登录必须先改密（HR 入职建档走同一入口）
+        user.setMustChangePassword(true);
         user.setName(request.getName());
         user.setEmpId(empId);
         user.setAvatar("pikachu-default");
@@ -274,9 +276,18 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void resetPassword(Long id, String password) {
         SysUser user = requireUser(id);
-        user.setPassword(passwordEncoder.encode(password));
-        user.setUpdatedBy(operatorResolver.currentOperatorName());
-        sysUserMapper.updateById(user);
+        // 定向更新，避免整实体回写覆盖并发变更；同时：
+        //  1) 置强制改密标记——管理员设定的密码不属于「本人已知密码」，首次登录必须改
+        //  2) 清空 active_token——被重置者当前会话立即失效，下次请求即被踢回登录页
+        sysUserMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, id)
+                .set(SysUser::getPassword, passwordEncoder.encode(password))
+                .set(SysUser::getMustChangePassword, true)
+                .set(SysUser::getActiveToken, null)
+                .set(SysUser::getActiveLoginIp, null)
+                .set(SysUser::getUpdatedBy, operatorResolver.currentOperatorName()));
+        log.info("管理員重置員工密碼並要求首次登錄改密: userId={}, empId={}, operator={}",
+                id, user.getEmpId(), operatorResolver.currentOperatorName());
     }
 
     @Override
