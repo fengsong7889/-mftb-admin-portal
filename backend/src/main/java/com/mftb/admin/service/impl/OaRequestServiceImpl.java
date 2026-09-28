@@ -30,6 +30,7 @@ import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.HrCertificateCallbackService;
 import com.mftb.admin.service.HrLeaveCallbackService;
+import com.mftb.admin.service.HrPerfCallbackService;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.util.BizSeqService;
@@ -88,6 +89,8 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final HrLeaveCallbackService hrLeaveCallbackService;
     /** 證明開具审批回调（员工自助） */
     private final HrCertificateCallbackService hrCertificateCallbackService;
+    /** 績效考核整批确认回调 */
+    private final HrPerfCallbackService hrPerfCallbackService;
 
     /* ==================== 查询 ==================== */
 
@@ -780,6 +783,15 @@ public class OaRequestServiceImpl implements OaRequestService {
                 }
             }
 
+            // 績效考核：整批通过 → 按计划下发最终得分与等级
+            if (hrPerfCallbackService.isPerfProcess(request.getProcessCode())) {
+                try {
+                    hrPerfCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("績效確認審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
             // 钉钉通知：流程全部通过，通知发起人
             try {
                 String text = String.format("### ✅ 流程审批通过\n\n"
@@ -883,6 +895,15 @@ public class OaRequestServiceImpl implements OaRequestService {
                 hrCertificateCallbackService.onFlowRejected(flowNo);
             } catch (Exception e) {
                 log.error("HR證明開具駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
+        // 績效考核：驳回→计划退回进行中、考核单回到待校准，HR 可改判后重新提交
+        if (hrPerfCallbackService.isPerfProcess(request.getProcessCode())) {
+            try {
+                hrPerfCallbackService.onFlowRejected(flowNo);
+            } catch (Exception e) {
+                log.error("績效確認駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
             }
         }
 

@@ -83,6 +83,18 @@ const EssCertificateDetail = lazy(() => import('./pages/Ess/CertificateDetail'))
 // 證明開具·人事台账（跨员工查看 + 开具登记）
 const CertLedger = lazy(() => import('./pages/Permission/HrCertificate/LedgerList'))
 const CertIssueForm = lazy(() => import('./pages/Permission/HrCertificate/IssueForm'))
+// 績效考核（P1）：周期與計劃 / 評分工作台 / 校準與確認 / 員工自助我的績效
+const PerfCycleList = lazy(() => import('./pages/Performance/CycleList'))
+const PerfPlanList = lazy(() => import('./pages/Performance/PlanList'))
+const PerfTemplateList = lazy(() => import('./pages/Performance/TemplateList'))
+const PerfPlanForm = lazy(() => import('./pages/Performance/PlanForm'))
+const PerfPlanDetail = lazy(() => import('./pages/Performance/PlanDetail'))
+const PerfWorkbench = lazy(() => import('./pages/Performance/Workbench'))
+const PerfCalibration = lazy(() => import('./pages/Performance/Calibration'))
+const EssMyPerformance = lazy(() => import('./pages/Ess/MyPerformance'))
+const PerfLedger = lazy(() => import('./pages/PerfReport/Ledger'))
+const PerfAuditTrail = lazy(() => import('./pages/PerfReport/AuditTrail'))
+const PerfAppeals = lazy(() => import('./pages/PerfReport/Appeals'))
 const EssMyRequests = lazy(() => import('./pages/Ess/MyRequests'))
 const EssMyProfile = lazy(() => import('./pages/Ess/MyProfile'))
 const LeaveQuotaForm = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaForm'))
@@ -385,6 +397,19 @@ function AuthenticatedLayout() {
               <Route path="/hr-certificate" element={<CertLedger />} />
               <Route path="/hr-certificate-issue" element={<CertIssueForm />} />
               <Route path="/hr-certificate-detail" element={<EssCertificateDetail ledgerMode />} />
+              {/* 績效考核：週期與計劃同属 hr-perf-admin 菜单，计划表单/详情为其子页 */}
+              <Route path="/hr-perf-cycle" element={<PerfCycleList />} />
+              <Route path="/hr-perf-plan" element={<PerfPlanList />} />
+              <Route path="/hr-perf-template" element={<PerfTemplateList />} />
+              <Route path="/hr-perf-plan-form" element={<PerfPlanForm />} />
+              <Route path="/hr-perf-plan-detail" element={<PerfPlanDetail />} />
+              <Route path="/hr-perf-review" element={<PerfWorkbench />} />
+              <Route path="/hr-perf-calibration" element={<PerfCalibration />} />
+              <Route path="/ess-performance" element={<EssMyPerformance />} />
+              {/* 績效台账（M2）：结果台账 / 改判留痕 / 申诉登记，各自独立授权 */}
+              <Route path="/hr-perf-ledger" element={<PerfLedger />} />
+              <Route path="/hr-perf-audit" element={<PerfAuditTrail />} />
+              <Route path="/hr-perf-appeal" element={<PerfAppeals />} />
               {/* 合同續簽：复用入转调离引擎，授权归合同台账菜单 */}
               <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
               <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />

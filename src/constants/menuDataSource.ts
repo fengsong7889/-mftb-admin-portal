@@ -74,6 +74,17 @@ export const keyToPath: Record<string, string> = {
   'ess-profile': '/ess-profile',
   'ess-certificate': '/ess-certificate',
   'hr-certificate': '/hr-certificate',
+  // 績效考核（v46 一级域 perf-center：HR 三叶 + 自助叶挂在 ess-center 下）
+  'perf-center': '/hr-perf-cycle',
+  'hr-perf-admin': '/hr-perf-cycle',
+  'hr-perf-review': '/hr-perf-review',
+  'hr-perf-calibration': '/hr-perf-calibration',
+  'ess-performance': '/ess-performance',
+  // 績效台账（v47 第二个绩效一级域，与执行域分开授权）
+  'perf-report-center': '/hr-perf-ledger',
+  'hr-perf-ledger': '/hr-perf-ledger',
+  'hr-perf-audit': '/hr-perf-audit',
+  'hr-perf-appeal': '/hr-perf-appeal',
   'org-center': '/org-center',
   'org-structure': '/organization-management',
   // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 保留映射，历史种子/缓存菜单点击直接重定向）
@@ -235,6 +246,11 @@ pathToKey['/ess-certificate-form'] = 'ess-certificate'
 pathToKey['/ess-certificate-detail'] = 'ess-certificate'
 pathToKey['/hr-certificate-issue'] = 'hr-certificate'
 pathToKey['/hr-certificate-detail'] = 'hr-certificate'
+// 绩效计划台账/发起表单/进度详情都是「周期與計劃」菜单的子页面（非独立菜单）
+pathToKey['/hr-perf-plan'] = 'hr-perf-admin'
+pathToKey['/hr-perf-plan-form'] = 'hr-perf-admin'
+pathToKey['/hr-perf-plan-detail'] = 'hr-perf-admin'
+pathToKey['/hr-perf-template'] = 'hr-perf-admin'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -264,6 +280,10 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   // 員工自助域
   'ess-leave', 'ess-requests', 'ess-profile', 'ess-certificate',
   'hr-certificate',
+  // 績效考核域
+  'hr-perf-admin', 'hr-perf-review', 'hr-perf-calibration', 'ess-performance',
+  // 績效台账域
+  'hr-perf-ledger', 'hr-perf-audit', 'hr-perf-appeal',
   // 權限管理（授權中心已合并舊 功能授權/系統授權 兩入口，後端守衛 menu=authorization-center）
   'role-management', 'authorization-center', 'data-permission',
   // 商家推广工具（已接入后端的部分）

@@ -2737,8 +2737,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
 
     /** v44: 顶级菜单排序（组织管理独立成一级，插在集團人事之后，其余顺移） */
     private void applyTopLevelMenuSortV44() {
+        // v46: 績效考核一级域插在组织管理之后、員工自助之前（不列入则与 ess-center 同为 sort=11，顺序不稳定）
+        // v47: 績效台賬一级域（M2）紧跟绩效执行域，不入列就会被 ess-center 等同默认排序挤乱
         String[] topOrder = {"home", "merchant_group", "merchant_promotion", "promotion_tool", "search",
-                "finance", "ai-assistant", "group-purchase", "hr", "org-center", "ess-center",
+                "finance", "ai-assistant", "group-purchase", "hr", "org-center", "perf-center",
+                "perf-report-center", "ess-center",
                 "asset-management", "oa-center", "permission", "system-config", "i18n-center"};
         for (int i = 0; i < topOrder.length; i++) {
             jdbcTemplate.update(
@@ -2937,7 +2940,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
         applyMenuSort("org-center", "org-structure");
         // v45: 員工自助域内排序（ESS 菜单由 hrEssSchemaInitializer 一次性建，此处兜归属顺序）
-        applyMenuSort("ess-center", "ess-leave", "ess-requests", "ess-profile", "ess-certificate");
+        // v46: 绩效自助叶 ess-performance 由 HrPerfSchemaInitializer 建，纳入同一顺序清单防止未列出的叶子漂到首位
+        applyMenuSort("ess-center", "ess-leave", "ess-requests", "ess-profile", "ess-certificate",
+                "ess-performance");
+        applyMenuSort("perf-center", "hr-perf-admin", "hr-perf-review", "hr-perf-calibration");
+        // v47: 績效台賬域内排序（菜单由 HrPerfReportSchemaInitializer 建，此处兜归属顺序）
+        applyMenuSort("perf-report-center", "hr-perf-ledger", "hr-perf-audit", "hr-perf-appeal");
         applyTopLevelMenuSortV44();
         try {
             syncOrganizationDomain();

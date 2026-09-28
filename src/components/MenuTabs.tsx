@@ -191,6 +191,10 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/ess-certificate-detail': { fixed: 'i18n:hrCert.detailTitle' },
   '/hr-certificate-issue': { fixed: 'i18n:hrCert.issueTitle' },
   '/hr-certificate-detail': { fixed: 'i18n:hrCert.detailTitle' },
+  // 績效考核子页面（计划发起/进度详情共用 hr-perf-admin 授权）
+  '/hr-perf-plan-form': { fixed: 'i18n:hrPerf.launchPlan' },
+  '/hr-perf-plan-detail': { fixed: 'i18n:hrPerf.planDetailTitle' },
+  '/hr-perf-template': { fixed: 'i18n:hrPerf.templateLedgerTitle' },
   '/hr-contract-renew-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
 }
 

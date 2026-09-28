@@ -542,6 +542,91 @@
       ],
       "status": "ACTIVE",
       "comment": "P1 证明开具·人事台账：hr_certificate_request 增列 cert_no/issue_date/pickup_type/issued_by（逐列查 INFORMATION_SCHEMA 后 ADD，MySQL 8 无 ADD COLUMN IF NOT EXISTS）+ cert_no 查询索引；新建人事侧菜单 hr-certificate(掛 hr-profile)并授 admin/FIN_BIZ_APPROVER；语义回填——把无证明编号的旧 completed 单据回退为 approved(待開具)，因为审批通过只代表同意开具，保留 completed 等于对外宣称一张不存在的证明。后置校验含『无编号 completed 必须为 0』。"
+    },
+    {
+      "versionKey": "hr:performance-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrPerfSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:dict-schema-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 績效考核：执行 classpath 脚本 201_hr_performance.sql 建 6 表（hr_perf_cycle/template/indicator/plan/assessment/score_item，含 uk_perf_assess_plan_user 保证一人一计划一单）并种子 PERF_GRADE 五级、PERF_INDICATOR_TYPE 四类、编号规则 PC/PP/PH、整批确认流程 hr_perf_confirm。DDL 只存脚本一份避免 Java/SQL 双份漂移；applyOnce 带后置校验，脚本缺失或种子不足即抛出不记版本。"
+    },
+    {
+      "versionKey": "hr:performance-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrPerfSchemaInitializer",
+      "dependencies": [
+        "hr:performance-schema:v1.0",
+        "hr:ess-menu:v1.1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "hr:performance-menu:v1.1",
+      "comment": "P1 績效考核菜单：一级域 perf-center(績效考核) + 叶子 hr-perf-admin(周期與計劃)/hr-perf-review(評分工作台)/hr-perf-calibration(校準與確認) + 自助叶子 ess-performance(我的績效, 挂 ess-center 下)。admin 全量、employee_self_service 仅自助叶子可提单、FIN_BIZ_APPROVER 得评分工作台；同时写 sys_role_system 的 hr 准入（菜单授权与系统准入两条独立线）。建表期直接落正确 sort_order。取代原因见 v1.1：图标名写错。"
+    },
+    {
+      "versionKey": "hr:performance-menu:v1.1",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrPerfSchemaInitializer",
+      "dependencies": [
+        "hr:performance-schema:v1.0",
+        "hr:ess-menu:v1.1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 績效考核菜单 v1.0 的修正：v1.0 给 perf-center 写的 MedalOutlined、给 ess-performance 写的 AwardOutlined 在 @ant-design/icons 里不存在（前端图标注册表查不到→退成默认图标），改为主仓已存在的 StarOutlined / FlagOutlined，并同步 Sidebar 兜底图标与 MenuIcon 注册表。upsert 自愈分支会刷正 DB 已有行的 icon/name_en，故重跑整个菜单迁移而非只发 UPDATE。后置校验含父级正确性。"
+    },
+    {
+      "versionKey": "hr:performance-report:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrPerfReportSchemaInitializer",
+      "dependencies": [
+        "hr:performance-schema:v1.0",
+        "core:schema-v10",
+        "hr:dict-schema-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 績效考核 M2：建 hr_perf_calibration_log（改判留痕流水，只增不改，存工号/姓名/部门快照 + operator_user_id，一次动作一行：CALIBRATE/APPEAL_REVISE/DIST_WAIVER）与 hr_perf_appeal（申诉登记，仅对 confirmed 结果可提，轻量流转 pending/processing/resolved/rejected，不走 OA）；种子 PERF_APPEAL_STATUS 四态字典与 PA 编号规则。DDL 只存脚本 202_hr_perf_report.sql 一份；applyOnce 带后置校验，失败不记版本。"
+    },
+    {
+      "versionKey": "hr:performance-report-menu:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrPerfReportSchemaInitializer",
+      "dependencies": [
+        "hr:performance-report:v1.0",
+        "hr:performance-menu:v1.1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "hr:performance-report-menu:v1.1",
+      "comment": "P1 績效考核 M2 菜单：新建第二个一级域 perf-report-center(績效台賬) + 三叶 hr-perf-ledger(結果台賬)/hr-perf-audit(改判留痕)/hr-perf-appeal(申訴登記)。台账与执行域分开授权：前者受众是 HR/分析岗（要导出与看全员趋势），不该与“谁能打分/谁能校准”共用一张菜单。当前只授 admin（超级管理员不走 sys_role_system）；给非超管开台账时必须同步补该表的 hr 系统准入。取代原因见 v1.1：菜单名写了简体。"
+    },
+    {
+      "versionKey": "hr:performance-report-menu:v1.1",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrPerfReportSchemaInitializer",
+      "dependencies": [
+        "hr:performance-report:v1.0",
+        "hr:performance-menu:v1.1",
+        "core:permission-revision:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "P1 績效考核 M2 菜单 v1.0 的修正：菜单名“申诉登記”是简体，改“申訴登記”。upsert 自愈分支故意不改 name（要保留菜单配置页的自定义名），所以额外发一条只匹配旧默认名的定向 UPDATE；同时登记本域新动作 REASSIGN（改派评估人也入留痕，因为“谁来打分”同样需要事后追责）。全流程幂等，取代 hr:performance-report-menu:v1.0。"
     }
   ]
 }

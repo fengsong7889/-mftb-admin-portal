@@ -17,6 +17,7 @@ import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.HrCertificateCallbackService;
 import com.mftb.admin.service.HrLeaveCallbackService;
+import com.mftb.admin.service.HrPerfCallbackService;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
@@ -52,7 +53,7 @@ class OaRequestApproverGuardTest {
                 mock(EamPurchaseService.class), mock(EamPurchaseRequestMapper.class), mock(DingTalkService.class),
                 mock(DataScopeService.class), mock(AiGrantOnApprovalService.class),
                 mock(HrLifecycleCallbackService.class), mock(HrLeaveCallbackService.class),
-                mock(HrCertificateCallbackService.class));
+                mock(HrCertificateCallbackService.class), mock(HrPerfCallbackService.class));
     }
 
     private static SysUser user(long id, String empId, String name, String role) {

@@ -366,6 +366,36 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
+  // 績效考核（周期与计划=HR 全量动作；工作台=只评名下；校准=改判与整批提交）
+  'hr-perf-admin': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-perf-review': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '評分' },
+  ],
+  'hr-perf-calibration': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '改判/提交' },
+  ],
+  'ess-performance': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '自評' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 績效台账（M2）：台账要导出，留痕只读，申诉可受理与修订
+  'hr-perf-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'hr-perf-audit': [{ key: 'view', label: '查看' }],
+  'hr-perf-appeal': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '受理/修訂' },
+  ],
   'ess-requests': [{ key: 'view', label: '查看' }],
   'ess-profile': [{ key: 'view', label: '查看' }],
   // 字典維護（集团人事独立菜单，可单独授权）
@@ -1174,6 +1204,15 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ess-profile',
   'ess-certificate',
   'hr-certificate',
+  // 績效考核（一级域 perf-center 不进受控清单：目录不可路由）
+  'hr-perf-admin',
+  'hr-perf-review',
+  'hr-perf-calibration',
+  'ess-performance',
+  // 績效台账（一级域 perf-report-center 不进受控清单：目录不可路由）
+  'hr-perf-ledger',
+  'hr-perf-audit',
+  'hr-perf-appeal',
   'hr-dict',
   'contract-ledger',
   'org-structure',
@@ -1365,6 +1404,17 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hr-certificate': 'hr-certificate',
   '/hr-certificate-issue': 'hr-certificate',
   '/hr-certificate-detail': 'hr-certificate',
+  '/hr-perf-cycle': 'hr-perf-admin',
+  '/hr-perf-plan': 'hr-perf-admin',
+  '/hr-perf-plan-form': 'hr-perf-admin',
+  '/hr-perf-plan-detail': 'hr-perf-admin',
+  '/hr-perf-template': 'hr-perf-admin',
+  '/hr-perf-review': 'hr-perf-review',
+  '/hr-perf-calibration': 'hr-perf-calibration',
+  '/ess-performance': 'ess-performance',
+  '/hr-perf-ledger': 'hr-perf-ledger',
+  '/hr-perf-audit': 'hr-perf-audit',
+  '/hr-perf-appeal': 'hr-perf-appeal',
   '/hr-contract-renew-form': 'contract-ledger',
   '/hr-contract-renew-detail': 'contract-ledger',
   '/hr-dict': 'hr-dict',

@@ -93,6 +93,15 @@ import {
   FolderOpenOutlined, // 我的檔案
   FileProtectOutlined, // 證明開具（自助）
   PrinterOutlined, // 證明開具（人事台账）
+  StarOutlined, // 績效考核（一级域）
+  RiseOutlined, // 周期與計劃
+  CheckSquareOutlined, // 評分工作台
+  SlidersOutlined, // 校準與確認
+  FlagOutlined, // 我的績效
+  FundProjectionScreenOutlined, // 績效台账（一级域）
+  TableOutlined, // 結果台賬
+  ExceptionOutlined, // 改判留痕
+  ReconciliationOutlined, // 申诉登記
   FolderOutlined, // 員工檔案分组
   RollbackOutlined, // 资产转移/归还
   DeleteOutlined, // 报废
@@ -167,6 +176,16 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'ess-profile': '/ess-profile',
   'ess-certificate': '/ess-certificate',
   'hr-certificate': '/hr-certificate',
+  // 績效考核（v46）
+  'perf-center': '/hr-perf-cycle',
+  'hr-perf-admin': '/hr-perf-cycle',
+  'hr-perf-review': '/hr-perf-review',
+  'hr-perf-calibration': '/hr-perf-calibration',
+  'ess-performance': '/ess-performance',
+  'perf-report-center': '/hr-perf-ledger',
+  'hr-perf-ledger': '/hr-perf-ledger',
+  'hr-perf-audit': '/hr-perf-audit',
+  'hr-perf-appeal': '/hr-perf-appeal',
   'org-center': '/org-center',
   'org-structure': '/organization-management',
   // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 直接重定向到授權中心）
@@ -430,6 +449,15 @@ const keyToIcon: Record<string, ReactNode> = {
   'ess-profile': <FolderOpenOutlined />,
   'ess-certificate': <FileProtectOutlined />,
   'hr-certificate': <PrinterOutlined />,
+  'perf-center': <StarOutlined />,
+  'hr-perf-admin': <RiseOutlined />,
+  'hr-perf-review': <CheckSquareOutlined />,
+  'hr-perf-calibration': <SlidersOutlined />,
+  'ess-performance': <FlagOutlined />,
+  'perf-report-center': <FundProjectionScreenOutlined />,
+  'hr-perf-ledger': <TableOutlined />,
+  'hr-perf-audit': <ExceptionOutlined />,
+  'hr-perf-appeal': <ReconciliationOutlined />,
   'hr-leave': <CalendarOutlined />,
   'hr-leave-quota': <HourglassOutlined />,
   'employee-management': <UserOutlined />,
