@@ -323,13 +323,16 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
         </div>
       </Dropdown>
 
-      {/* 修改密码弹窗（表单与首次登录强制改密门禁共用同一组件） */}
+      {/* 修改密码弹窗（表单与首次登录强制改密门禁共用同一组件）
+          填到一半时禁用 ESC 与遮罩点击关闭，避免误触丢失已输入内容；退出只走「取消」按钮 */}
       <Modal
         title={t('header.changePasswordTitle')}
         open={pwdModalOpen}
         onCancel={() => setPwdModalOpen(false)}
         footer={null}
         width={520}
+        keyboard={false}
+        maskClosable={false}
       >
         <PasswordChangeForm onCancel={() => setPwdModalOpen(false)} onSubmitted={() => setPwdModalOpen(false)} />
       </Modal>

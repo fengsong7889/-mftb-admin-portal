@@ -38,12 +38,23 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/**
+ * 弹窗开关状态判定。
+ * jsdom 不触发 transitionend，antd zoom 动画停在 appear/leave 阶段，wrap 永远等不到
+ * display:none；实测可靠信号是 .ant-modal 的 motion class（关闭过程中含 ant-zoom-leave）。
+ */
+const modalOpen = () => {
+  const modal = document.querySelector('.ant-modal')
+  return !!modal && !modal.className.includes('ant-zoom-leave')
+}
+
 describe('ForcePasswordChangeGate', () => {
   it('初始密码账号：弹出强制改密窗口，且没有关闭按钮', async () => {
     auth.state.user = { username: 'MF00031', empId: 'MF00031', name: '測試', mustChangePassword: true }
     mount()
 
     expect(await screen.findByText(i18n.t('header.forceChangeTitle'))).toBeInTheDocument()
+    expect(modalOpen()).toBe(true)
     // antd Modal 渲染在 body 门户上，需从 document 查
     expect(document.querySelector('.ant-modal-close')).toBeNull()
     // 唯一退路是退出登录；提交按钮在满足策略前保持禁用
@@ -56,12 +67,14 @@ describe('ForcePasswordChangeGate', () => {
     mount()
     await screen.findByText(i18n.t('header.forceChangeTitle'))
 
-    fireEvent.keyDown(document.querySelector('.ant-modal-wrap')!, { key: 'Escape', keyCode: 27, which: 27 })
+    // 事件从 .ant-modal 冒泡到 rc-dialog 绑定 keydown 的 wrap，覆盖真实按键路径
+    fireEvent.keyDown(document.querySelector('.ant-modal')!, { key: 'Escape', keyCode: 27, which: 27 })
     const mask = document.querySelector('.ant-modal-mask')!
     fireEvent.mouseDown(mask)
     fireEvent.mouseUp(mask)
     fireEvent.click(mask)
 
+    expect(modalOpen()).toBe(true)
     expect(screen.getByText(i18n.t('header.forceChangeTitle'))).toBeInTheDocument()
   })
 
