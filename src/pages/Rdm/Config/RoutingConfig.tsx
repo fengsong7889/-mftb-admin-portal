@@ -164,10 +164,12 @@ export default function RoutingConfig() {
     <div className="content-area">
       <div className="action-section">
         <div className="action-section-left">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增規則</Button>
           <Tag color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', borderRadius: 6 }}>
             命中順序：菜單 &gt; 系統 &gt; 部門 &gt; 類型，多條命中取優先級小者
           </Tag>
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增規則</Button>
         </div>
       </div>
 

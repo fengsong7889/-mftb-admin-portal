@@ -409,12 +409,17 @@ export interface RdmTransitionRow {
   enabled: boolean
 }
 
-/** 风险条目 */
+/**
+ * 风险条目（全局唯一口径，后端 RdmAnalyticsService.riskList 同构）。
+ * <p>状态必须带上：风险中心页要告诉用户“卡在 PRD 还是卡在测试”，
+ * 不带 status 就逼人再发一次请求反查，那又变成两套口径。
+ */
 export interface RdmRiskItem {
   riskType: RdmRiskType | string
   reqId: number
   reqNo: string
   title: string
+  status?: RdmStatus | string | null
   submitterName: string
   handler: string
   days: number
@@ -1508,12 +1513,16 @@ export async function generatePrdDraft(reqId: number): Promise<RdmPrdDraft | nul
   }
 }
 
-/** 逾期风险摘要（结构化要点 + 可选 AI 叙述） */
-export async function fetchRiskSummary(days = 14): Promise<RdmRiskSummary | null> {
+/**
+ * 逾期风险摘要（结构化要点 + 可选 AI 叙述）。
+ * @param minStayDays 只看「当前状态停留 ≥ N 天」的风险需求；0 = 全部。
+ *   旧参数名叫 days 但服务端从不用它筛选，“近 N 天”是假的窗口描述。
+ */
+export async function fetchRiskSummary(minStayDays = 0): Promise<RdmRiskSummary | null> {
   try {
-    return await request.post<unknown, RdmRiskSummary>('/rdm/assistant/risk-summary', null, { params: { days } })
+    return await request.post<unknown, RdmRiskSummary>('/rdm/assistant/risk-summary', null, { params: { minStayDays } })
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockRiskSummary(days)
+    if (isBackendUnavailable(err)) return mockRiskSummary(minStayDays)
     throw err
   }
 }

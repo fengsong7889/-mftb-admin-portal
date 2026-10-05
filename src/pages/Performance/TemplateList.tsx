@@ -214,10 +214,12 @@ export default function PerfTemplateList() {
 
       <div className="action-section" style={{ marginTop: 8 }}>
         <div className="action-section-left">
-          {canCreate && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('hrPerf.newTemplate')}</Button>}
           <Typography.Text type="secondary">{t('hrPerf.templateTip')}</Typography.Text>
         </div>
-        <div className="action-section-right">{configComponent}</div>
+        <div className="action-section-right">
+          {canCreate && <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('hrPerf.newTemplate')}</Button>}
+          {configComponent}
+        </div>
       </div>
 
       <Table<PerfTemplate>

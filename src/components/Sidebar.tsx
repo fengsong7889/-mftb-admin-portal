@@ -572,18 +572,20 @@ const keyToIcon: Record<string, ReactNode> = {
   'purchase-order':   <FileDoneOutlined />,
   'purchase-request': <ShoppingCartOutlined />,
   // 產研協同（RDM）—— 需求全生命周期（已拍平为一级菜单）
+  // 提交需求/產品需求處理/交付中需求三个菜单已收敛退役，兜底图标随之移除（需求清单复用 FileTextOutlined）
   'rdm-workbench':    <DashboardOutlined />,
-  'rdm-submit':       <FormOutlined />,
   'rdm-requirement':  <FileTextOutlined />,
   'rdm-intake':       <InboxOutlined />,
-  'rdm-product':      <AppstoreOutlined />,
   'rdm-delivery':     <NodeIndexOutlined />,
   'rdm-delivery-board': <RocketOutlined />,
   'rdm-delivery-iteration': <ScheduleOutlined />,
-  'rdm-delivery-req': <FileSearchOutlined />,
   'rdm-acceptance':   <CheckSquareOutlined />,
   'rdm-dashboard':    <RiseOutlined />,
   'rdm-dashboard-board': <BarChartOutlined />,
+  // v3.5：DB 里这三个 key 的图标（AlertOutlined / DashboardOutlined / TeamOutlined）必须与此一致，门禁会比对
+  'rdm-dashboard-risk': <AlertOutlined />,
+  'rdm-efficiency': <DashboardOutlined />,
+  'rdm-efficiency-output': <TeamOutlined />,
   'rdm-dashboard-quality': <SafetyCertificateOutlined />,
   'rdm-dashboard-version': <BranchesOutlined />,
   'rdm-dashboard-report': <CalendarOutlined />,

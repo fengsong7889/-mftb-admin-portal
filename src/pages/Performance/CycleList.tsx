@@ -238,13 +238,15 @@ export default function PerfCycleList() {
 
       <div className="action-section">
         <div className="action-section-left">
-          {canCreate && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('hrPerf.newCycle')}</Button>
-          )}
           <Button onClick={() => navigate(PERF_PLAN_PATH)}>{t('hrPerf.planLedger')}</Button>
           <Button onClick={() => navigate(PERF_TEMPLATE_PATH)}>{t('hrPerf.templateLedger')}</Button>
         </div>
-        <div className="action-section-right">{configComponent}</div>
+        <div className="action-section-right">
+          {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('hrPerf.newCycle')}</Button>
+          )}
+          {configComponent}
+        </div>
       </div>
 
       <Table<PerfCycle>

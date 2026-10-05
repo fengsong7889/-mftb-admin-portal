@@ -297,10 +297,10 @@ export default function LanguageConfig() {
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
             新增語言
           </Button>
+          <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         </div>
       </div>
 

@@ -27,42 +27,39 @@ public class RdmAnalyticsController {
 
     private final RdmAnalyticsService analyticsService;
 
-    /** 全局看板：结果指标 + 结构分布 + 阶段瓶颈 + 趋势 + 风险雷达 */
+    /** 全局看板：结果指标 + 结构分布 + 阶段负载 + 趋势 + 风险清单 */
     @GetMapping("/overview")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {
-            "rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-product", "rdm-acceptance"})
+    // rdm-dashboard-risk / rdm-efficiency-output 也要能读：风险明细与部门人员产出已拆成独立页，
+    // 它们与总看板共用同一份取数（不能再为每个页各写一份 SQL）
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-acceptance", "rdm-dashboard-risk", "rdm-efficiency-output"})
     public Result<RdmDashboardVO> overview(@RequestParam(required = false, defaultValue = "month") String period) {
         return Result.success(analyticsService.overview(period));
     }
 
     /** 质量口径：验收一次通过率 / 返工 / 缺陷 / 满意度 */
     @GetMapping("/quality")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_QUALITY, anyOf = {
-            "rdm-dashboard-board", "rdm-dashboard-report", "rdm-acceptance", "rdm-requirement"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_QUALITY, anyOf = {"rdm-dashboard-board", "rdm-dashboard-report", "rdm-acceptance", "rdm-requirement"})
     public Result<RdmQualityVO> quality() {
         return Result.success(analyticsService.quality());
     }
 
     /** 版本 → 需求（一个版本带了哪些需求） */
     @GetMapping("/version-trace")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_VERSION, anyOf = {
-            "rdm-dashboard-board", "rdm-requirement", "rdm-acceptance", "rdm-delivery-req"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_VERSION, anyOf = {"rdm-dashboard-board", "rdm-requirement", "rdm-acceptance"})
     public Result<RdmVersionTraceVO> versionTrace(@RequestParam String versionNo) {
         return Result.success(analyticsService.versionTraceByVersion(versionNo));
     }
 
     /** 需求 → 版本（上了哪个版本、同版本还有谁） */
     @GetMapping("/version-trace/requirement/{reqId}")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_VERSION, anyOf = {
-            "rdm-dashboard-board", "rdm-requirement", "rdm-acceptance", "rdm-workbench", "rdm-submit"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_VERSION, anyOf = {"rdm-dashboard-board", "rdm-requirement", "rdm-acceptance", "rdm-workbench"})
     public Result<RdmVersionTraceVO> requirementTrace(@PathVariable Long reqId) {
         return Result.success(analyticsService.versionTraceByRequirement(reqId));
     }
 
     /** 交付周报（区间/迭代维度的结果、效率、风险与下周计划） */
     @GetMapping("/weekly-report")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_REPORT, anyOf = {
-            "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-intake", "rdm-product"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_REPORT, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-intake"})
     public Result<RdmWeeklyReportVO> weeklyReport(@RequestParam(required = false) String startDate,
                                                   @RequestParam(required = false) String endDate,
                                                   @RequestParam(required = false) String iterationCode) {

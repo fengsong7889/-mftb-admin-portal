@@ -865,22 +865,15 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'rdm-workbench': [
     { key: 'view', label: '查看' },
   ],
-  'rdm-submit': [
-    { key: 'view', label: '查看' },
-    { key: 'create', label: '新增' },
-  ],
+  // 需求清单：提需求（create）与需求侧处理（edit：受理/PRD/评审/变更）已从退役的提交需求/產品需求處理平移过来
   'rdm-requirement': [
-    { key: 'view', label: '查看' },
-    { key: 'export', label: '導出' },
-  ],
-  'rdm-intake': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
-    { key: 'delete', label: '刪除' },
     { key: 'export', label: '導出' },
   ],
-  'rdm-product': [
+  // 需求池：分配侧窄权限菜单。view 就是全量可见（canSeeAll 认它），edit 就是分配权
+  'rdm-intake': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
@@ -904,10 +897,8 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
-    { key: 'export', label: '導出' },
-  ],
-  'rdm-delivery-req': [
-    { key: 'view', label: '查看' },
+    // 删除迭代也从退役的 rdm-product 平移到这里，与后端 ITERATION_ACTIONS 保持一致
+    { key: 'delete', label: '刪除' },
     { key: 'export', label: '導出' },
   ],
   'rdm-acceptance': [
@@ -919,6 +910,18 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'export', label: '導出' },
   ],
   'rdm-dashboard-board': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-risk': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 新分组：容器节点，只给查看（能进分组不等于能看子页，子页各自动作集单独控）
+  'rdm-efficiency': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-efficiency-output': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
@@ -1342,17 +1345,17 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'workflow-config',
   // 產研協同（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
   'rdm-workbench',
-  'rdm-submit',
   'rdm-requirement',
   'rdm-intake',
-  'rdm-product',
   'rdm-delivery',
   'rdm-delivery-board',
   'rdm-delivery-iteration',
-  'rdm-delivery-req',
   'rdm-acceptance',
   'rdm-dashboard',
   'rdm-dashboard-board',
+  'rdm-dashboard-risk',
+  'rdm-efficiency',
+  'rdm-efficiency-output',
   'rdm-dashboard-quality',
   'rdm-dashboard-version',
   'rdm-dashboard-report',
@@ -1574,26 +1577,32 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // OA中心
   '/oa-requests': 'oa-requests',
   '/workflow-config': 'workflow-config',
-  // 產研協同（RDM）—— 子页（详情/验收表单/研发交付）归入其列表菜单
+  // 產研協同（RDM）—— 子页（详情/验收入口/提交表单）归入其主菜单。
+  // 提交需求/產品需求處理/交付中需求退役后，这些路由必须改挂存活菜单：
+  // 它们原本的授权已随菜单清除，仍映射到退役 key 会让前端守卫把所有人都拦在门外。
   '/rdm-workbench': 'rdm-workbench',
-  '/rdm-submit': 'rdm-submit',
+  '/rdm-submit': 'rdm-requirement',
   '/rdm-requirement': 'rdm-requirement',
   '/rdm-intake': 'rdm-intake',
+  // 需求查询已并回需求池；旧地址仍可达（重定向），所以映射到 rdm-intake 而不是删掉
+  '/rdm-query': 'rdm-intake',
   '/rdm-delivery': 'rdm-delivery-board',
-  '/rdm-delivery-req': 'rdm-delivery-req',
+  '/rdm-delivery-req': 'rdm-requirement',
   '/rdm-task': 'rdm-delivery-board',
   // 分配产品经理独立页：与后端 batch-assign 的鉴权菜单一致
   '/rdm-assign': 'rdm-intake',
   '/rdm-iteration': 'rdm-delivery-iteration',
   '/rdm-iteration-form': 'rdm-delivery-iteration',
-  '/rdm-prd': 'rdm-product',
-  '/rdm-review': 'rdm-product',
+  '/rdm-prd': 'rdm-requirement',
+  '/rdm-review': 'rdm-requirement',
   '/rdm-change': 'rdm-requirement',
-  '/rdm-product': 'rdm-product',
+  '/rdm-product': 'rdm-requirement',
   '/rdm-acceptance': 'rdm-acceptance',
   '/rdm-acceptance-form': 'rdm-acceptance',
   '/rdm-detail': 'rdm-requirement',
   '/rdm-dashboard': 'rdm-dashboard-board',
+  '/rdm-risk': 'rdm-dashboard-risk',
+  '/rdm-output': 'rdm-efficiency-output',
   '/rdm-quality': 'rdm-dashboard-quality',
   '/rdm-version-trace': 'rdm-dashboard-version',
   '/rdm-weekly-report': 'rdm-dashboard-report',

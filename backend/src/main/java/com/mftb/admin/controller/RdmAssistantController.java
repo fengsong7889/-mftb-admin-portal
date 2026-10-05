@@ -53,8 +53,7 @@ public class RdmAssistantController {
     /** PRD 草稿生成（产品经理视角，结果需人工确认后才保存） */
     @PostMapping("/prd-draft")
     @Operation(summary = "生成 PRD 草稿")
-    @RequirePermission(menu = RdmConstants.MENU_PRODUCT, action = "edit", anyOf = {
-            "rdm-delivery-board", "rdm-delivery-iteration"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration"})
     public Result<RdmAssistantVO.PrdDraft> prdDraft(@RequestParam Long reqId) {
         String blocked = killSwitchNotice();
         if (blocked != null) {
@@ -67,21 +66,25 @@ public class RdmAssistantController {
         return Result.success(assistantService.prdDraft(reqId, operatorResolver.currentOperatorName()));
     }
 
-    /** 逾期风险摘要（看板视角） */
+    /**
+     * 风险摘要（风险中心页与看板共用）。
+     * <p>@param minStayDays 只看「当前状态停留 ≥ N 天」的风险；0 = 全部。旧参数名叫 days、默认 14，
+     * 但 SQL 从没用过它，“近 14 天”是假的窗口，现在按真实语义改名。
+     */
     @PostMapping("/risk-summary")
     @Operation(summary = "逾期与阻塞风险摘要")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {
-            "rdm-dashboard-quality", "rdm-dashboard-report", "rdm-intake", "rdm-product"})
-    public Result<RdmAssistantVO.RiskSummary> riskSummary(@RequestParam(required = false, defaultValue = "14") Integer days) {
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-dashboard-quality", "rdm-dashboard-report", "rdm-intake", "rdm-dashboard-risk"})
+    public Result<RdmAssistantVO.RiskSummary> riskSummary(
+            @RequestParam(required = false, defaultValue = "0") Integer minStayDays) {
         String blocked = killSwitchNotice();
-        int window = days == null ? 14 : days;
+        int stay = minStayDays == null ? 0 : minStayDays;
         if (blocked != null) {
             // 熔断不吞掉风险本身：仍返回结构化要点，只是没有 AI 叙述
-            RdmAssistantVO.RiskSummary summary = assistantService.riskSummary(window, null);
+            RdmAssistantVO.RiskSummary summary = assistantService.riskSummary(stay, null);
             summary.setNotice(blocked);
             return Result.success(summary);
         }
-        return Result.success(assistantService.riskSummary(window, operatorResolver.currentOperatorName()));
+        return Result.success(assistantService.riskSummary(stay, operatorResolver.currentOperatorName()));
     }
 
     /** 熔断时给前端的统一提示（带操作人与原因，便于管理员沟通而非让用户猜） */

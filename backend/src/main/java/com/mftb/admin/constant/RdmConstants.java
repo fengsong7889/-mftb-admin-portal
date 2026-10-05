@@ -103,6 +103,12 @@ public final class RdmConstants {
 
     public static final String SCOPE_MINE = "mine";
     public static final String SCOPE_TODO = "todo";
+    /**
+     * 视角：待我審批（准入审批人在 OA 审批任务里的待办）。
+     * <p>不能并入 {@code SCOPE_TODO}：todo 走的是需求表上的 PM/验收人/研发负责人三个字段，
+     * 而审批人只存在于 OA 审批任务表；两者混用会造成工作台显示 3 条、点进去列表为空。
+     */
+    public static final String SCOPE_APPROVING = "approving";
     public static final String SCOPE_POOL = "pool";
     public static final String SCOPE_PRODUCT = "product";
     public static final String SCOPE_DELIVERY = "delivery";
@@ -132,11 +138,21 @@ public final class RdmConstants {
     /** 需求变更审批流程编码（变更申请走 OA，通过后计 change_count） */
     public static final String CHANGE_PROCESS_CODE = "rdm_change";
 
-    /** 需求菜单 key（权限门控用） */
+    /**
+     * 需求菜单 key（权限门控用）。
+     * <p>菜单收敛（rdm:menu-seed:v3.7）后不再定义 MENU_SUBMIT / MENU_PRODUCT：
+     * 「提交需求」与「產品需求處理」已退役，它们的动作已平移到 MENU_REQUIREMENT，
+     * 保留常量只会诱导出指向死菜单的新注解。分配权仍单独锁 MENU_INTAKE。
+     */
     public static final String MENU_REQUIREMENT = "rdm-requirement";
-    public static final String MENU_SUBMIT = "rdm-submit";
+    /**
+     * 菜单：需求池（分配与审批环节）。
+     * <p>它同时承载两个能力，而这两个能力天然同侧 —— 看不到单子就分不出去：
+     * view = 全量可见（canSeeAll 认它），edit = 分配权（canDispatch 认它）。
+     * <p>全量可见以前是从 rdm-requirement 的 export/delete 推断的（等于“能导 Excel 就能读全公司需求”）；
+     * 它不该摊到人人都有的台账菜单上，而应跟分配权一起锁在这个窄权限菜单里。
+     */
     public static final String MENU_INTAKE = "rdm-intake";
-    public static final String MENU_PRODUCT = "rdm-product";
     public static final String MENU_ACCEPTANCE = "rdm-acceptance";
     public static final String MENU_DASHBOARD = "rdm-dashboard";
     public static final String MENU_WORKBENCH = "rdm-workbench";
@@ -166,10 +182,8 @@ public final class RdmConstants {
     public static final String MENU_DELIVERY = "rdm-delivery";
     /** 菜单：交付工作台（我的任务 + 进度/工时上报） */
     public static final String MENU_DELIVERY_BOARD = "rdm-delivery-board";
-    /** 菜单：迭代排期（产能与起止维护） */
+    /** 菜单：迭代排期（产能与起止维护；删除迭代也挂在这里） */
     public static final String MENU_DELIVERY_ITERATION = "rdm-delivery-iteration";
-    /** 菜单：交付中需求台账 */
-    public static final String MENU_DELIVERY_REQ = "rdm-delivery-req";
     /** 菜单：需求總看板下的四个二级菜单（v3.3 看板升为分组，分组 key 仍为 MENU_DASHBOARD） */
     public static final String MENU_DASHBOARD_BOARD = "rdm-dashboard-board";
     /** 菜单：質量口徑（一次通过率/返工/缺陷） */
@@ -182,6 +196,14 @@ public final class RdmConstants {
     public static final String MENU_DASHBOARD_SCORE = "rdm-dashboard-score";
     /** 菜单：效能量趨勢 */
     public static final String MENU_DASHBOARD_TREND = "rdm-dashboard-trend";
+    /**
+     * 菜单：風險中心（风险摘要 + 风险明细，从总看板拆出）。
+     * <p>key 前缀保留 rdm-dashboard-：菜单 key 是权限与前端映射的挂，
+     * 改名将丢存量授权，所以即使归属变更也不重命名。
+     */
+    public static final String MENU_DASHBOARD_RISK = "rdm-dashboard-risk";
+    /** 菜单：部門與人員產出（效能與產出分组，v3.5 新增） */
+    public static final String MENU_EFFICIENCY_OUTPUT = "rdm-efficiency-output";
     /** 菜单：積分規則配置（需求配置分组下） */
     public static final String MENU_CONFIG_SCORE = "rdm-config-score";
 

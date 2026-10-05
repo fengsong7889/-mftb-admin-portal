@@ -24,11 +24,15 @@ import java.util.Map;
  * （提出人 / 產品經理 / 研發負責人 / 驗收人），见
  * {@code RdmRequirementServiceImpl#canSeeAll}。因此多授一张菜单不会让员工看到别部门的需求。
  * <p>
- * 刻意<b>不</b>自动授予的：需求池分配、產品需求處理、需求看板的导出、全部需求、需求配置
+ * 刻意<b>不</b>自动授予的：需求池分配、需求清单的编辑（受理/PRD/评审/变更）、看板的导出、全部需求、需求配置
  * —— 产研职能与跨部门可见性必须由管理员在「授權中心 · 功能授權」按角色勾选，
  * 避免用角色名猜测匹配造成越权。
  * <p>
- * 版本键 {@code rdm:access-grant:v1.0}；每次启动重放自愈（幂等 ON DUPLICATE KEY UPDATE）。
+ * v1.1：菜单收敛后不再授 rdm-submit（该菜单已退役），“能提需求”改为 rdm-requirement 的 create，
+ * 与 {@code RdmMenuInitializer} 从提交需求平移过来的动作一致。
+ * 不递增版本而只改常量的话，已记账 v1.0 的环境里基线仍会把权限授到一个不存在的菜单并启动失败。
+ * <p>
+ * 版本键 {@code rdm:access-grant:v1.1}；每次启动重放自愈（幂等 ON DUPLICATE KEY UPDATE）。
  */
 @Slf4j
 @Component
@@ -36,12 +40,15 @@ import java.util.Map;
 @Order(25)
 public class RdmAccessGrantInitializer implements CommandLineRunner {
 
-    private static final String VERSION_KEY = "rdm:access-grant:v1.0";
-    /** 全员基线菜单：key → 动作（仅自我数据范围的四张） */
+    private static final String VERSION_KEY = "rdm:access-grant:v1.1";
+    /**
+     * 全员基线菜单：key → 动作。
+     * <p>rdm-requirement 带 create 是让全员能提需求（原「提交需求」菜单的 create 已平移到需求清单），
+     * 但不带 edit —— 受理/PRD/评审等需求侧处理权仍需管理员按角色授。
+     */
     private static final Map<String, String> BASELINE_MENUS = Map.of(
             "rdm-workbench", "[\"view\"]",
-            "rdm-submit", "[\"view\",\"create\"]",
-            "rdm-requirement", "[\"view\"]",
+            "rdm-requirement", "[\"view\",\"create\"]",
             "rdm-acceptance", "[\"view\",\"create\"]");
 
     private final JdbcTemplate jdbcTemplate;

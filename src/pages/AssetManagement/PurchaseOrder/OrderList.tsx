@@ -510,10 +510,12 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/oa-purchase-request?from=purchase-order')}>
             {t('asset.purchaseReqTitle')}
           </Button>
+
           <Button icon={<ShoppingCartOutlined />} onClick={() => navigate('/purchase-order?mode=add')}>
             錄入訂單
           </Button>
           {configComponent}
+        
         </div>
       </div>
 

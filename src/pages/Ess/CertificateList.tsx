@@ -149,14 +149,15 @@ export default function CertificateList() {
       </div>
 
       <div className="action-section">
-        <div className="action-section-left">
+        <div className="action-section-left" />
+        <div className="action-section-right">
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(CERT_FORM_PATH)}>
               {t('hrCert.apply')}
             </Button>
           )}
+          {configComponent}
         </div>
-        <div className="action-section-right">{configComponent}</div>
       </div>
 
       <Tabs

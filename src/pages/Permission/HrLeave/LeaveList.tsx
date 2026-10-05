@@ -147,14 +147,15 @@ export default function LeaveList({ scope = HR_LEAVE_SCOPE }: { scope?: LeaveSco
       </div>
 
       <div className="action-section">
-        <div className="action-section-left">
+        <div className="action-section-left" />
+        <div className="action-section-right">
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(leaveFormPath(scope))}>
               {t('hrLeave.addLeave')}
             </Button>
           )}
+          {configComponent}
         </div>
-        <div className="action-section-right">{configComponent}</div>
       </div>
 
       <Tabs

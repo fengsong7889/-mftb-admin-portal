@@ -1,15 +1,18 @@
 /**
  * 需求全局看板 —— 项目经理 / 公司视角
  *
- * 四块内容按「先看结果 → 再看效率 → 再看风险 → 最后看人」的顺序排布：
+ * 本页只回答「整体怎么样」，自上而下四块：
  * 1. 交付结果与效能指标（吞吐、响应时长、交付周期、按时率、驳回率）
  * 2. 需求结构（类型分布、阶段耗时瓶颈、提交/交付趋势）
- * 3. 风险雷达（逾期、无主、阻塞、审批停滞、长期无进展）
- * 4. 部门与产品经办法人产出排名（M4 转积分入绩效）
+ * 3. 阶段流水线（各阶段当前卡了多少条）
+ * 4. 風險與產出入口（只给计数）
+ *
+ * <p>逐条风险明细与部门/个人负载已拆为独立菜单（rdm-dashboard-risk / rdm-efficiency-output）：
+ * 前者是每天要动手跟催的工作页，后者是需要逐行复盘的表，
+ * 留在总看板会让一页同时承担“扫一眼”和“逐行看”两种不同任务。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Progress, Segmented, Space, Spin, Table, Tag, message } from 'antd'
-import type { TableColumnsType } from 'antd'
+import { Button, Segmented, Space, Spin, Tag, message } from 'antd'
 import { Column, Line, Pie } from '@ant-design/charts'
 import {
   AlertOutlined,
@@ -27,8 +30,6 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
-import RiskSummaryCard from './components/RiskSummaryCard'
-import { RiskTag } from './components/Tags'
 import { fetchDashboard, type RdmDashboardData } from '../../api/rdm'
 import { RDM_REQ_TYPE_LABEL, RDM_STAGE_LABEL, type RdmReqType, type RdmStage } from '../../constants/rdm'
 import './index.css'
@@ -59,43 +60,7 @@ export default function RdmDashboard() {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
   }
 
-  const { overview, typeDist, deptRank, pmRank, stageDuration, trend, risks, board } = data
-
-  const deptColumns: TableColumnsType<typeof deptRank[number]> = [
-    { title: '部門', dataIndex: 'deptName', key: 'deptName', width: 160 },
-    { title: '提交需求', dataIndex: 'submitted', key: 'submitted', width: 100, sorter: (a, b) => a.submitted - b.submitted },
-    { title: '已交付', dataIndex: 'delivered', key: 'delivered', width: 100 },
-    {
-      title: '按時交付率', key: 'onTimeRate', width: 180,
-      render: (_, r) => (
-        <Space>
-          <Progress
-            percent={Math.round(r.onTimeRate * 100)}
-            size="small"
-            style={{ width: 90 }}
-            strokeColor={r.onTimeRate >= 0.8 ? '#52C41A' : r.onTimeRate >= 0.6 ? '#FA8C16' : '#FF4D4F'}
-          />
-          <span style={{ fontSize: 12, color: '#595959' }}>{Math.round(r.onTimeRate * 100)}%</span>
-        </Space>
-      ),
-    },
-    {
-      title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 120,
-      render: (v: number) => <span style={{ color: v > 20 ? '#CF1322' : '#595959' }}>{v.toFixed(1)} 天</span>,
-    },
-    {
-      title: '操作', key: 'action', width: 90,
-      render: () => <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=all')}>明細</Button>,
-    },
-  ]
-
-  const pmColumns: TableColumnsType<typeof pmRank[number]> = [
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 120 },
-    { title: '在途需求', dataIndex: 'active', key: 'active', width: 100, render: (v: number) => <Tag color={v > 6 ? 'orange' : 'blue'}>{v}</Tag> },
-    { title: '已交付', dataIndex: 'delivered', key: 'delivered', width: 100 },
-    { title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 80, render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : '#52C41A' }}>{v}</span> },
-    { title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 130, render: (v: number) => `${v.toFixed(1)} 天` },
-  ]
+  const { overview, typeDist, stageDuration, trend, board } = data
 
   return (
     <div className="content-area">
@@ -231,66 +196,30 @@ export default function RdmDashboard() {
         />
       </div>
 
-      {/* ── 风险摘要（M4+ AI 辅助：数字来自统计，AI 只写叙述）── */}
-      <RiskSummaryCard />
-
-      {/* ── 风险雷达 ── */}
+      {/* ── 风险与产出入口：明细与两张排名表已拆为独立菜单，这里只留计数与入口，不再复制一份明细 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
-          風險雷達
+          風險與產出
           <span className="rdm-card-title-split" />
-          <Space size={6} style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <Space size={6} wrap>
             <Tag color="error" style={{ margin: 0 }}>逾期 {overview.overdueTotal}</Tag>
             <Tag color="purple" style={{ margin: 0 }}>阻塞 {overview.blockedTotal}</Tag>
             <Tag color="orange" style={{ margin: 0 }}>無主 {overview.unassignedTotal}</Tag>
             <Tag color="gold" style={{ margin: 0 }}>審批停滯 {overview.intakeStuckTotal}</Tag>
           </Space>
         </div>
-        {risks.map(r => (
-          <div key={r.reqId} className="rdm-risk-item">
-            <RiskTag riskType={r.riskType} />
-            <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{r.title}</a>
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{r.reqNo}</span>
-            <span style={{ color: '#595959', fontSize: 12 }}>提出人 {r.submitterName}</span>
-            <span style={{ color: '#595959', fontSize: 12 }}>處理人 {r.handler}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#CF1322' }}>已 {r.days} 天</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── 产出排名 ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
-        <div className="rdm-card" style={{ marginBottom: 0 }}>
-          <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><TeamOutlined /></span>
-            部門需求產出
-          </div>
-          <Table
-            rowKey="deptName"
-            size="small"
-            columns={deptColumns}
-            dataSource={deptRank}
-            pagination={false}
-            scroll={{ x: 760 }}
-          />
+        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+          风险按「当前状态停留时长」统计；逐条明细跟跟催请进風險中心，部门与个人负载在另一页复盘。
         </div>
-        <div className="rdm-card" style={{ marginBottom: 0 }}>
-          <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><TeamOutlined /></span>
-            產品經理負載
-          </div>
-          <Table
-            rowKey="pmName"
-            size="small"
-            columns={pmColumns}
-            dataSource={pmRank}
-            pagination={false}
-          />
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
-            產出積分規則與績效對接在 M4 上線，當前先沉澱原始數據。
-          </div>
-        </div>
+        <Space size={8} wrap>
+          <Button type="primary" ghost icon={<AlertOutlined />} onClick={() => navigate('/rdm-risk')}>
+            風險中心
+          </Button>
+          <Button icon={<TeamOutlined />} onClick={() => navigate('/rdm-output')}>
+            部門與人員產出
+          </Button>
+        </Space>
       </div>
     </div>
   )

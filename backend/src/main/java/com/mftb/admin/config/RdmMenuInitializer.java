@@ -1,5 +1,8 @@
 package com.mftb.admin.config;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.constant.SystemCode;
 import com.mftb.admin.service.PermissionService;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +12,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 產研協同系統（RDM）菜单与系统准入初始化。
@@ -31,8 +37,15 @@ import java.util.List;
 @Order(24)
 public class RdmMenuInitializer implements CommandLineRunner {
 
-    /** 结构升级 v3.4：看板分组新增 產出積分 / 效能量趨勢 两个二级菜单，需求配置分组新增 積分規則 */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.4";
+    /**
+     * v3.10：取消 rdm-query（需求查询）独立菜单，把全量可见并回 rdm-intake。
+     * <p>上一轮 v3.8 拆出 rdm-query 是为了把「数据范围」从 rdm-requirement 的 export/delete
+     * 上解绑——这个价值保留（全量可见不再认导出权），但落点错了：分配权必然蕴含可见权，
+     * 两者拆成两个窄权限菜单只会让管理员要同步维护两份授权。
+     * <p>为什么递增而不是改 v3.8/v3.9：本轮退役了一个已入库的菜单并改变了 canSeeAll 的口径，
+     * 复用旧 key 会让已记账环境留着 rdm-query 菜单、而代码已不再认它的全量权。
+     */
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.10";
     private static final String ADMIN_ROLE_CODE = "admin";
     /** 被取消的旧一级目录（软删，保留回滚能力） */
     private static final String LEGACY_ROOT_KEY = "rdm-center";
@@ -40,9 +53,21 @@ public class RdmMenuInitializer implements CommandLineRunner {
     private static final String VIEW_CREATE = "[\"view\",\"create\"]";
     private static final String VIEW_EDIT = "[\"view\",\"edit\"]";
     private static final String VIEW_EXPORT = "[\"view\",\"export\"]";
+    /**
+     * 需求清单：查看+导出是宽权限，create（提需求）从「提交需求」平移过来，
+     * edit 是需求侧处理（受理/PRD/评审/变更）从「產品需求處理」平移过来。
+     * <p>这里故意不含分配权 —— 分配只认 rdm-intake:edit，两者分开才能避免误授。
+     */
+    private static final String LIST_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
     private static final String FULL_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
     /** 研发侧写操作集（任务/迭代上报不涉及删除） */
     private static final String DELIVERY_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
+    /**
+     * 迭代排期额外带 delete：菜单收敛后「删除迭代」接口的锚点从已退役的 rdm-product 移到这里。
+     * <p>种子的 actions 是「该菜单可授哪些动作」，不列上 delete 则管理员在授权中心永远勾不到
+     * 这个能力，接口就只剩超管能用（他靠代码直通，不依赖授权行）。
+     */
+    private static final String ITERATION_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
 
     /**
      * 菜单种子：{menuKey, 中文名, 英文名, path, component, icon, type, sort, parentKey, actions}。
@@ -55,24 +80,35 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 看板区也是多视图（结果/质量/追溯/周报），升为一级分组，避免 PMO 只能在顶部按钮里找入口
             {"rdm-dashboard", "需求總看板", "Requirement Overview", null, null, "RiseOutlined", "1", "16", null, VIEW_ONLY},
             {"rdm-dashboard-board", "交付看板", "Delivery Overview", "/rdm-dashboard", "RdmDashboard", "BarChartOutlined", "2", "1", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-dashboard-quality", "質量口徑", "Quality Metrics", "/rdm-quality", "QualityBoard", "SafetyCertificateOutlined", "2", "2", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-dashboard-version", "版本追溯", "Version Trace", "/rdm-version-trace", "VersionTrace", "BranchesOutlined", "2", "3", "rdm-dashboard", VIEW_ONLY},
-            {"rdm-dashboard-report", "交付週報", "Weekly Report", "/rdm-weekly-report", "WeeklyReport", "CalendarOutlined", "2", "4", "rdm-dashboard", VIEW_EXPORT},
-            // M4 产出积分与效能量：绩效敏感，单独成菜单而不是挂在交付看板里
-            {"rdm-dashboard-score", "產出積分", "Output Scores", "/rdm-score", "ScoreBoard", "TrophyOutlined", "2", "5", "rdm-dashboard", VIEW_EDIT},
-            {"rdm-dashboard-trend", "效能量趨勢", "Metric Trend", "/rdm-metric-trend", "MetricTrend", "LineChartOutlined", "2", "6", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-workbench", "需求工作台", "Requirement Workbench", "/rdm-workbench", "RdmWorkbench", "DashboardOutlined", "2", "17", null, VIEW_ONLY},
-            {"rdm-submit", "提交需求", "Submit Requirement", "/rdm-submit", "RequirementSubmit", "FormOutlined", "2", "18", null, VIEW_CREATE},
-            {"rdm-requirement", "需求台賬", "Requirement Ledger", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "19", null, VIEW_EXPORT},
+            // 风险是「每天都要看并要行动」的视图（跟催/解塞/分发），与周度复盘的看板频次不同，因此单独成页
+            {"rdm-dashboard-risk", "風險中心", "Risk Center", "/rdm-risk", "RiskCenter", "AlertOutlined", "2", "2", "rdm-dashboard", VIEW_EXPORT},
+            {"rdm-dashboard-quality", "質量口徑", "Quality Metrics", "/rdm-quality", "QualityBoard", "SafetyCertificateOutlined", "2", "3", "rdm-dashboard", VIEW_EXPORT},
+            {"rdm-dashboard-version", "版本追溯", "Version Trace", "/rdm-version-trace", "VersionTrace", "BranchesOutlined", "2", "4", "rdm-dashboard", VIEW_ONLY},
+            {"rdm-dashboard-report", "交付週報", "Weekly Report", "/rdm-weekly-report", "WeeklyReport", "CalendarOutlined", "2", "5", "rdm-dashboard", VIEW_EXPORT},
+            /*
+             * 效能與產出：「看人和效率」的三个视图归同一分组。
+             * <p>原本它们与「看结果」的看板混在一个分组里达 8 个子项；而「部門與人員產出」
+             * 与「產出積分」不同：前者是在途负载/吞吐（找瓶颈），后者是绩效结果（可追溯的分）。
+             */
+            {"rdm-efficiency", "效能與產出", "Efficiency & Output", null, null, "DashboardOutlined", "1", "17", null, VIEW_ONLY},
+            {"rdm-dashboard-score", "產出積分", "Output Scores", "/rdm-score", "ScoreBoard", "TrophyOutlined", "2", "1", "rdm-efficiency", VIEW_EDIT},
+            {"rdm-dashboard-trend", "效能量趨勢", "Metric Trend", "/rdm-metric-trend", "MetricTrend", "LineChartOutlined", "2", "2", "rdm-efficiency", VIEW_EXPORT},
+            {"rdm-efficiency-output", "部門與人員產出", "Dept & People Output", "/rdm-output", "TeamOutput", "TeamOutlined", "2", "3", "rdm-efficiency", VIEW_EXPORT},
+            {"rdm-workbench", "需求工作台", "Requirement Workbench", "/rdm-workbench", "RdmWorkbench", "HistoryOutlined", "2", "18", null, VIEW_ONLY},
+            {"rdm-requirement", "需求清單", "Requirement List", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "19", null, LIST_ACTIONS},
+            /*
+             * 需求池是分配与审批环节的总台（预选 pool 视角，页面内带待分配/待我審批/全部需求三个视角）。
+             * <p>全量可见与分配权都锁在这个窄权限菜单上：看不到单子就分不出去，两者天然同侧；
+             * 而台账 rdm-requirement 是“人人可看”的宽权限，两者分开才不会“给个查看权就顺带看到全公司需求”。
+             * 页面实现与需求清单共用（只是换一组视角 Tab 与筛选条件）。
+             */
             {"rdm-intake", "需求池·分配", "Requirement Pool", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "20", null, FULL_ACTIONS},
-            {"rdm-product", "產品需求處理", "Product Backlog", "/rdm-product", "ProductBoard", "AppstoreOutlined", "2", "21", null, FULL_ACTIONS},
             // 研發交付是研发侧唯一有明确子环节的区域，升为一级分组（与「需求配置」同法）
-            {"rdm-delivery", "研發交付", "R&D Delivery", null, null, "NodeIndexOutlined", "1", "22", null, VIEW_ONLY},
+            {"rdm-delivery", "研發交付", "R&D Delivery", null, null, "NodeIndexOutlined", "1", "23", null, VIEW_ONLY},
             {"rdm-delivery-board", "交付工作台", "Delivery Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
-            {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-delivery", DELIVERY_ACTIONS},
-            {"rdm-delivery-req", "交付中需求", "In-delivery Requirements", "/rdm-delivery-req", "RequirementList", "FileSearchOutlined", "2", "3", "rdm-delivery", VIEW_EXPORT},
-            {"rdm-acceptance", "需求驗收", "Requirement Acceptance", "/rdm-acceptance", "AcceptanceList", "CheckSquareOutlined", "2", "23", null, VIEW_CREATE},
-            {"rdm-config-group", "需求配置", "Requirement Settings", null, null, "SettingOutlined", "1", "24", null, VIEW_ONLY},
+            {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-delivery", ITERATION_ACTIONS},
+            {"rdm-acceptance", "需求驗收", "Requirement Acceptance", "/rdm-acceptance", "AcceptanceList", "CheckSquareOutlined", "2", "24", null, VIEW_CREATE},
+            {"rdm-config-group", "需求配置", "Requirement Settings", null, null, "SettingOutlined", "1", "25", null, VIEW_ONLY},
             {"rdm-config-status", "狀態與流轉", "Status & Transition", "/rdm-config-status", "StatusConfig", "PartitionOutlined", "2", "1", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-routing", "分發矩陣", "Assignment Matrix", "/rdm-config-routing", "RoutingConfig", "SwapOutlined", "2", "2", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-sla", "SLA 與逾期", "SLA & Overdue", "/rdm-config-sla", "SlaConfig", "FieldTimeOutlined", "2", "3", "rdm-config-group", VIEW_EDIT},
@@ -82,8 +118,33 @@ public class RdmMenuInitializer implements CommandLineRunner {
     /** 改名意图：只当现名仍是旧默认名时才改，用户走「菜单配置」自定义的名字永远不被覆盖 */
     private static final String[][] RENAMES = {
             {"rdm-dashboard", "需求總看板", "需求看板"},
-            {"rdm-requirement", "需求台賬", "我的需求"},
+            // 台账→清单：两个历史默认名都要覆盖，否则自定义过名字的不动、没改过的也改不过来
+            {"rdm-requirement", "需求清單", "需求台賬"},
+            {"rdm-requirement", "需求清單", "我的需求"},
             {"rdm-intake", "需求池·分配", "需求池/分配"},
+    };
+
+    /**
+     * 退役菜单的授权归宿：{被退役菜单, 目标菜单, 要搬的动作}。动作用 `*` 表示全部。
+     * <p>迁移语义是「**同一动作平移到目标菜单**」：持有旧菜单某 action 的角色/部门，
+     * 在目标菜单上拿到同一个 action，绝不写入旧行里没有的动作 —— 所以既不会降权也不会扩权。
+     * <p>为什么按动作分流而不是整体搬：产品需求处理上一个 `delete` 其实是「删除迭代」接口，
+     * 它的语义归属是「迭代排期」菜单，而不是需求清单；整体搬会把删除迭代的能力扫给看需求的人。
+     * <p>同一个 fromKey 允许多行（按动作分流），退役采用两阶段：先把所有目标搬完再软删源行，
+     * 否则第一行处理完就删了源，后续行的动作会无人接而静默丢失。
+     * <p>动作集必须覆盖源菜单 actions 全集，否则持有未登记动作的角色会静默降权；
+     * 这一点由 {@code assertRetireCoverageComplete} 在迁移前实查，缺则启动失败。
+     */
+    private static final String[][] RETIRED_MENU_MERGE = {
+            {"rdm-product", "rdm-requirement", "view,create,edit,export"},
+            {"rdm-product", "rdm-delivery-iteration", "delete"},
+            {"rdm-delivery-req", "rdm-requirement", "*"},
+            {"rdm-submit", "rdm-requirement", "*"},
+            // v3.10：需求查询并回需求池。它当初被拆出来是为了把数据范围从导出权解绑，
+            // 这个价值保留（全量可见不再认 rdm-requirement:export），但落点错了：
+            // 分配权必然蕴含可见权，两者应同一个窄权限菜单。rdm-query 的 view 平移到 intake 的 view 上，
+            // 能力等价，不会新增动作。
+            {"rdm-query", "rdm-intake", "*"},
     };
 
     /**
@@ -94,16 +155,59 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 否则每次启动都会把“仅有目录权”的角色多补一份子页权限（权限只减不增是红线）。
      */
     private static final String[][] GROUP_GRANT_INHERIT = {
-            {"rdm-delivery", "rdm-delivery-board", "rdm-delivery-iteration", "rdm-delivery-req"},
+            {"rdm-delivery", "rdm-delivery-board", "rdm-delivery-iteration"},
             {"rdm-dashboard", "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-version", "rdm-dashboard-report"},
-            // v3.4 新增叶子：持有看板权的人自然看得到积分与趋势，持有配置分组权的人才能配规则
-            {"rdm-dashboard", "rdm-dashboard-score", "rdm-dashboard-trend"},
             {"rdm-config-group", "rdm-config-score"},
+            // v3.5 新增叶子：風險中心沿用看板存量授权；部門與人員產出沿用新分组授权
+            {"rdm-dashboard", "rdm-dashboard-risk"},
+            {"rdm-efficiency", "rdm-efficiency-output"},
+            /*
+             * 注：rdm-dashboard-score / rdm-dashboard-trend 已从本表移除。它们是 v3.4 已继承过的存量叶子，
+             * 本次只改挂到 rdm-efficiency（菜单行 id 不变，自身授权随行）；若继续列在这里，
+             * 管理员在授权中心主动撤销后会被每次启动重放静静补回，违反「权限只减不增」。
+             */
     };
+
+    /**
+     * 新建「分组节点」的授权来源：{存量分组, 新分组...}。
+     * <p>rdm-efficiency 是本次新建的顶级分组，本身没有存量授权，不把看板分组的授权先复制一份，
+     * 它下面的新叶子就没有继承基准。
+     * <p>必须在 {@code GROUP_GRANT_INHERIT} 之前处理，同一次启动内才能形成继承链；
+     * 新分组下的叶子只能从它继承，而它本身没有存量授权。
+     */
+    private static final String[][] GROUP_GRANT_SEED = {
+            {"rdm-dashboard", "rdm-efficiency"},
+    };
+
+    /**
+     * v3.5 分组重排后的排序对齐。
+     * <p>为什么需要单独一步：upsertMenu 对已存在的行只对齐归属与启用态，故意不碰名称与排序
+     * （尊重管理员在「菜单配置」里的自定义），所以本次只在 MENUS 里改 sort 对旧菜单无效，
+     * 新建的「風險中心」会与仍为 2 的「質量口徑」撞位。
+     * <p>只对「当前排序仍等于旧默认值」的行生效：管理员手工调过顺序的一律不动。
+     * 每行按自己的 menu_key + 旧 sort 定位，彼此不受执行顺序影响。
+     */
+    private static final String[][] SORT_ALIGN = {
+            {"rdm-dashboard-quality", "2", "3"},
+            {"rdm-dashboard-version", "3", "4"},
+            {"rdm-dashboard-report", "4", "5"},
+            {"rdm-dashboard-score", "5", "1"},
+            {"rdm-dashboard-trend", "6", "2"},
+    };
+
+    /**
+     * 授权动作的固定字典与输出顺序。
+     * <p>并集写入时按这个顺序重组 JSON，保证同一动作集每次都生成同样的字串
+     * （否则集合顺不同会被重放误判为“有变更”，每天刷一遍无效写入）。
+     * <p>出现表外动作时直接抛出：宁可启动失败，也不能静默丢掉一个动作后把它当成“已迁移”。
+     */
+    private static final List<String> ACTION_ORDER = List.of(
+            "view", "create", "edit", "delete", "export", "import", "enable", "disable");
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
     private final PermissionService permissionService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void run(String... args) {
@@ -125,11 +229,14 @@ public class RdmMenuInitializer implements CommandLineRunner {
         renameLegacyMenus();
         demoteToGroup("rdm-delivery");
         demoteToGroup("rdm-dashboard");
+        alignSeedSorts();
+        // 先搬完旧菜单授权再补新叶子继承：退役不能目标未就位就执行
+        retireMenusMergingGrants();
         inheritGroupGrants();
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研協同(RDM) 菜单已就绪（一级菜单 + 看板/研發交付/需求配置三个分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研協同(RDM) 菜单已就绪（一级菜单 + 需求總看板/效能與產出/研發交付/需求配置四个分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
     }
 
     /**
@@ -211,6 +318,182 @@ public class RdmMenuInitializer implements CommandLineRunner {
     }
 
     /**
+     * 退役被收敛的菜单，并把它们已有的授权平移到目标菜单。
+     * <p>与 {@code retireLegacyRoot}（退役空目录）不同：退役带授权的菜单必须先把授权搬干净，
+     * 否则“有产品需求处理权、没有需求清单权”的角色升级当日会直接看不到需求。
+     * <p>先搬授权再软删行，两边授权都写完才删；中途失败抛出会让 applyOnce 不记版本，
+     * 下次启动从头重跑（菜单行尚未软删，所以重跑是安全的）。
+     */
+    private void retireMenusMergingGrants() {
+        // 迁移前先确认「每个动作都有归宿」：漏配会让持有该动作的角色静默降权，事后极难发现
+        assertRetireCoverageComplete();
+
+        // 阶段 1：把所有分流目标搬完。不能边搬边删，否则同一源的后续分流行会因源已消失而静默丢动作
+        for (String[] row : RETIRED_MENU_MERGE) {
+            Long fromId = queryMenuIdByKey(row[0]);
+            if (fromId == null) {
+                // 已退役；migrate() 每次启动都重放，这里必须是空转
+                continue;
+            }
+            Long toId = queryMenuIdByKey(row[1]);
+            if (toId == null) {
+                throw new IllegalStateException("退役 " + row[0] + " 时目标菜单 " + row[1] + " 不存在，拒绝执行（否则授权无处落地）");
+            }
+            Set<String> scope = actionScope(row[2]);
+            int roles = mergeGrantsInto("sys_role_menu", "role_id", fromId, toId, scope);
+            int depts = mergeGrantsInto("sys_department_menu", "dept_id", fromId, toId, scope);
+            if (roles > 0 || depts > 0) {
+                log.info("菜单 {} 的动作 [{}] 平移到 {}: 角色 {} 条、部门 {} 条", row[0], row[2], row[1], roles, depts);
+            }
+        }
+
+        // 阶段 2：源菜单清场（先删授权再软删菜单行）
+        for (String fromKey : retiredKeys()) {
+            Long fromId = queryMenuIdByKey(fromKey);
+            if (fromId == null) {
+                continue;
+            }
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", fromId);
+            jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", fromId);
+            jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, status = 0, updated_by = 'system' WHERE id = ?", fromId);
+            log.info("菜单 {} 已退役（授权已按动作平移至归宿菜单）", fromKey);
+        }
+    }
+
+    /**
+     * 事前校验：每个待退役菜单在自己行里声明的动作，必须全部在 {@code RETIRED_MENU_MERGE} 里有归宿。
+     * <p>只按目标写分流而漏掉某个动作时，持该动作的角色不会报错、只会静默失去能力，
+     * 到用户发现“按钮点不动了”才回溯，成本极高 —— 所以宁可在启动时就失败。
+     */
+    private void assertRetireCoverageComplete() {
+        for (String fromKey : retiredKeys()) {
+            List<String> declaredRaws = jdbcTemplate.queryForList(
+                    "SELECT actions FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, fromKey);
+            if (declaredRaws.isEmpty()) {
+                continue; // 已退役，无需再校验
+            }
+            Set<String> declared = parseActions(declaredRaws.get(0));
+            Set<String> covered = new LinkedHashSet<>();
+            for (String[] row : RETIRED_MENU_MERGE) {
+                if (row[0].equals(fromKey)) {
+                    covered.addAll(actionScope(row[2]));
+                }
+            }
+            Set<String> uncovered = new LinkedHashSet<>(declared);
+            uncovered.removeAll(covered);
+            if (!uncovered.isEmpty()) {
+                throw new IllegalStateException("退役菜单 " + fromKey + " 的动作 " + uncovered
+                        + " 没有登记归宿菜单，迁移后这些能力会静默丢失；请在 RETIRED_MENU_MERGE 补上分流");
+            }
+        }
+    }
+
+    /** 去重且保序的被退役菜单 key（同一 key 可能因动作分流占多行） */
+    private static List<String> retiredKeys() {
+        Set<String> seen = new LinkedHashSet<>();
+        for (String[] row : RETIRED_MENU_MERGE) {
+            seen.add(row[0]);
+        }
+        return List.copyOf(seen);
+    }
+
+    /** 解析分流动作声明：`*` 表示全部，其余必须都在 {@code ACTION_ORDER} 字典内 */
+    private static Set<String> actionScope(String spec) {
+        Set<String> scope = new LinkedHashSet<>();
+        if ("*".equals(spec.trim())) {
+            scope.addAll(ACTION_ORDER);
+            return scope;
+        }
+        for (String part : spec.split(",")) {
+            String action = part.trim();
+            if (action.isEmpty()) {
+                continue;
+            }
+            if (!ACTION_ORDER.contains(action)) {
+                throw new IllegalStateException("RETIRED_MENU_MERGE 里出现未登记的授权动作: " + action);
+            }
+            scope.add(action);
+        }
+        return scope;
+    }
+
+    /**
+     * 把来源菜单上的授权逐条并入目标菜单，动作集取并集、只增不减。
+     * <p>目标已有该 owner 时只追加缺少的动作，绝不删掉已有动作（管理员在授权中心的自定义不被覆盖）；
+     * 并集没变化时不写，保证重放幂等。
+     * <p>表名与列名只接受本类内的字面量常量，不拼接任何外部输入。
+     *
+     * @param scope 本次允许平移的动作集（按分流过滤，避免把不属于该目标的动作一并扫过去）
+     * @return 实际发生写入（新建或修改）的条数
+     */
+    private int mergeGrantsInto(String table, String ownerColumn, Long fromId, Long toId, Set<String> scope) {
+        List<Map<String, Object>> sources = jdbcTemplate.queryForList(
+                "SELECT " + ownerColumn + " AS owner_id, actions FROM " + table + " WHERE menu_id = ?", fromId);
+        int changed = 0;
+        for (Map<String, Object> source : sources) {
+            Long ownerId = ((Number) source.get("owner_id")).longValue();
+            Set<String> moving = parseActions(source.get("actions"));
+            moving.retainAll(scope);
+            if (moving.isEmpty()) {
+                continue;
+            }
+            List<String> current = jdbcTemplate.queryForList(
+                    "SELECT actions FROM " + table + " WHERE menu_id = ? AND " + ownerColumn + " = ?",
+                    String.class, toId, ownerId);
+            if (current.isEmpty()) {
+                jdbcTemplate.update("INSERT INTO " + table + " (" + ownerColumn + ", menu_id, actions) VALUES (?, ?, ?)",
+                        ownerId, toId, writeActions(moving));
+                changed++;
+                continue;
+            }
+            Set<String> target = parseActions(current.get(0));
+            Set<String> union = new LinkedHashSet<>(target);
+            union.addAll(moving);
+            if (!union.equals(target)) {
+                jdbcTemplate.update("UPDATE " + table + " SET actions = ? WHERE menu_id = ? AND " + ownerColumn + " = ?",
+                        writeActions(union), toId, ownerId);
+                changed++;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * 解析 actions JSON 数组。
+     * <p>脏数据不吞：解析失败直接抛出，否则会当成“没授权可迁移”而误记迁移成功。
+     */
+    private Set<String> parseActions(Object raw) {
+        if (raw == null) {
+            return new LinkedHashSet<>();
+        }
+        String text = String.valueOf(raw).trim();
+        if (text.isEmpty() || "null".equals(text)) {
+            return new LinkedHashSet<>();
+        }
+        try {
+            return new LinkedHashSet<>(objectMapper.readValue(text, new TypeReference<List<String>>() {
+            }));
+        } catch (Exception e) {
+            throw new IllegalStateException("actions 字段不是合法的 JSON 数组，无法安全合并授权: " + text, e);
+        }
+    }
+
+    /** 按 {@code ACTION_ORDER} 输出 JSON；发现表外动作直接失败，不静默丢弃 */
+    private String writeActions(Set<String> actions) {
+        List<String> ordered = ACTION_ORDER.stream().filter(actions::contains).toList();
+        if (ordered.size() != actions.size()) {
+            Set<String> unknown = new LinkedHashSet<>(actions);
+            unknown.removeAll(ordered);
+            throw new IllegalStateException("发现未登记的授权动作，拒绝写入: " + unknown);
+        }
+        try {
+            return objectMapper.writeValueAsString(ordered);
+        } catch (Exception e) {
+            throw new IllegalStateException("授权动作序列化失败: " + actions, e);
+        }
+    }
+
+    /**
      * 子菜单继承父菜单存量授权（结构升级的关键一步，见 {@code GROUP_GRANT_INHERIT}）。
      * <p>菜单 key 发生变化（如 rdm-dashboard → rdm-dashboard-board/quality/...）后，
      * 原先被授了父 key 的角色/部门不会自动拥有新 key，升级当日就会出现
@@ -219,29 +502,52 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 授权中心自定义过的，本迁移每次启动都会重放，不得把它刷回父菜单的动作集。
      */
     private void inheritGroupGrants() {
+        // 先补新分组自己的授权，再处理叶子继承（顺序不能翻，否则新分组下的叶子无基准可继承）
+        for (String[] mapping : GROUP_GRANT_SEED) {
+            inheritOneGroup(mapping);
+        }
         for (String[] mapping : GROUP_GRANT_INHERIT) {
-            String parentKey = mapping[0];
-            Long parentId = queryMenuIdByKey(parentKey);
-            if (parentId == null) {
-                throw new IllegalStateException(parentKey + " 分组不存在，无法继承授权");
+            inheritOneGroup(mapping);
+        }
+    }
+
+    /** 把父节点上的角色/部门授权原样复制到列出的子节点（INSERT IGNORE，不覆盖自定义） */
+    private void inheritOneGroup(String[] mapping) {
+        String parentKey = mapping[0];
+        Long parentId = queryMenuIdByKey(parentKey);
+        if (parentId == null) {
+            throw new IllegalStateException(parentKey + " 分组不存在，无法继承授权");
+        }
+        for (int i = 1; i < mapping.length; i++) {
+            String childKey = mapping[i];
+            Long childId = queryMenuIdByKey(childKey);
+            if (childId == null) {
+                throw new IllegalStateException(childKey + " 节点未落地，无法继承授权");
             }
-            for (int i = 1; i < mapping.length; i++) {
-                String childKey = mapping[i];
-                Long childId = queryMenuIdByKey(childKey);
-                if (childId == null) {
-                    throw new IllegalStateException(childKey + " 子菜单未落地，无法继承授权");
-                }
-                int roles = jdbcTemplate.update(
-                        "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
-                                + "SELECT rm.role_id, ?, rm.actions FROM sys_role_menu rm WHERE rm.menu_id = ?",
-                        childId, parentId);
-                int depts = jdbcTemplate.update(
-                        "INSERT IGNORE INTO sys_department_menu (dept_id, menu_id, actions) "
-                                + "SELECT dm.dept_id, ?, dm.actions FROM sys_department_menu dm WHERE dm.menu_id = ?",
-                        childId, parentId);
-                if (roles > 0 || depts > 0) {
-                    log.info("子菜单 {} 继承父菜单 {} 授权: 角色 {} 条, 部门 {} 条", childKey, parentKey, roles, depts);
-                }
+            int roles = jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                            + "SELECT rm.role_id, ?, rm.actions FROM sys_role_menu rm WHERE rm.menu_id = ?",
+                    childId, parentId);
+            int depts = jdbcTemplate.update(
+                    "INSERT IGNORE INTO sys_department_menu (dept_id, menu_id, actions) "
+                            + "SELECT dm.dept_id, ?, dm.actions FROM sys_department_menu dm WHERE dm.menu_id = ?",
+                    childId, parentId);
+            if (roles > 0 || depts > 0) {
+                // 措辞不写“子菜单”：本方法也用于把存量分组的授权复制给新建分组
+                log.info("菜单 {} 继承 {} 授权: 角色 {} 条, 部门 {} 条", childKey, parentKey, roles, depts);
+            }
+        }
+    }
+
+    /** 按 {@code SORT_ALIGN} 对齐排序：仅当当前值仍是旧默认值时才动（不覆盖管理员自定义） */
+    private void alignSeedSorts() {
+        for (String[] row : SORT_ALIGN) {
+            int changed = jdbcTemplate.update(
+                    "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
+                            + "WHERE menu_key = ? AND deleted = 0 AND sort_order = ?",
+                    Integer.parseInt(row[2]), row[0], Integer.parseInt(row[1]));
+            if (changed > 0) {
+                log.info("菜单排序对齐: {} {} → {}", row[0], row[1], row[2]);
             }
         }
     }
@@ -366,6 +672,35 @@ public class RdmMenuInitializer implements CommandLineRunner {
             }
         }
         // 分组结构验收：分组本身必须不可跳转（否则侧边栏出现两个入口），子菜单必须存在、启用且归属正确
+        for (String[] mapping : GROUP_GRANT_SEED) {
+            String groupKey = mapping[0];
+            for (int i = 1; i < mapping.length; i++) {
+                String newGroupKey = mapping[i];
+                Integer active = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND status = 1 AND type = 1",
+                        Integer.class, newGroupKey);
+                if (active == null || active == 0) {
+                    throw new IllegalStateException(newGroupKey + " 新分组未就绪（缺失/停用/不是容器类型）");
+                }
+                Integer hasPath = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND path IS NOT NULL",
+                        Integer.class, newGroupKey);
+                if (hasPath != null && hasPath > 0) {
+                    throw new IllegalStateException(newGroupKey + " 带了 path，不是纯分组节点");
+                }
+                // 新分组必须是一级：若错挂到其他菜单下，侧边栏会少一层入口
+                Integer notTop = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND parent_id IS NOT NULL",
+                        Integer.class, newGroupKey);
+                if (notTop != null && notTop > 0) {
+                    throw new IllegalStateException(newGroupKey + " 未作为一级分组挂在顶级");
+                }
+                // 存量分组必须存在，否则继承基准缺失
+                if (queryMenuIdByKey(groupKey) == null) {
+                    throw new IllegalStateException(groupKey + " 存量分组不存在，无法验证授权继承链");
+                }
+            }
+        }
         for (String[] mapping : GROUP_GRANT_INHERIT) {
             String groupKey = mapping[0];
             Integer groupActive = jdbcTemplate.queryForObject(
@@ -391,6 +726,88 @@ public class RdmMenuInitializer implements CommandLineRunner {
                     throw new IllegalStateException(childKey + " 子菜单未就绪（缺失/停用/归属或路由不正确）");
                 }
             }
+        }
+        // 排序对齐验收：同一分组内不得出现重复 sort（否则新叶子会与旧菜单撞位，侧边栏顺序不稳定）
+        Integer dupSorts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM (SELECT parent_id, sort_order FROM sys_menu "
+                        + "WHERE system_code = ? AND deleted = 0 AND status = 1 AND parent_id IS NOT NULL "
+                        + "GROUP BY parent_id, sort_order HAVING COUNT(*) > 1) t",
+                Integer.class, SystemCode.RDM.code());
+        if (dupSorts != null && dupSorts > 0) {
+            throw new IllegalStateException("RDM 同一分组内存在 " + dupSorts + " 组重复 sort_order，菜单顺序会不稳定");
+        }
+        // 重排后的关键顺序必须真落地（只信 UPDATE 报的成功不算）
+        assertSortEquals("rdm-dashboard-quality", 3);
+        assertSortEquals("rdm-dashboard-risk", 2);
+        assertSortEquals("rdm-dashboard-score", 1);
+        // v3.7 退役验收：被收敛的菜单不得仍有存活行，也不得残留孤儿授权（残留会让授权树出现幽灵节点）
+        for (String[] row : RETIRED_MENU_MERGE) {
+            String retiredKey = row[0];
+            Integer alive = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0",
+                    Integer.class, retiredKey);
+            if (alive != null && alive > 0) {
+                throw new IllegalStateException(retiredKey + " 应已退役但仍存在");
+            }
+            Integer orphan = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_role_menu rm JOIN sys_menu m ON m.id = rm.menu_id "
+                            + "WHERE m.menu_key = ? AND m.deleted = 1",
+                    Integer.class, retiredKey);
+            if (orphan != null && orphan > 0) {
+                throw new IllegalStateException(retiredKey + " 退役后仍残留 " + orphan + " 条角色授权，迁移未搬干净");
+            }
+        }
+        /*
+         * 分配侧两个能力必须同时落在 rdm-intake 上，而且是同一个菜单：
+         * - edit 是全系统唯一的分配权（canDispatch 就查这个），菜单被误删不会报错，
+         *   只会让需求永远分不出去；
+         * - view 是全量可见（canSeeAll 已改认它），缺了它需求池就只能读到自己相关的单子，
+         *   界面不报错但永远筛不出待分配的全貌。
+         */
+        assertAdminHoldsAction(RdmConstants.MENU_INTAKE, "edit");
+        assertAdminHoldsAction(RdmConstants.MENU_INTAKE, "view");
+        assertAdminHoldsAction("rdm-requirement", "create");
+        // 菜单名对用户直接可见，必须真的是繁体默认名（上一轮连错两次，断言常驻而不是靠人工复查）
+        assertMenuNameEquals(RdmConstants.MENU_INTAKE, "需求池·分配");
+    }
+
+    /** 断言菜单的默认名已落地为期望值（用于验证改名真的生效） */
+    private void assertMenuNameEquals(String menuKey, String expectedName) {
+        List<String> names = jdbcTemplate.queryForList(
+                "SELECT name FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, menuKey);
+        if (names.isEmpty()) {
+            throw new IllegalStateException(menuKey + " 菜单不存在，无法校验名称");
+        }
+        if (!expectedName.equals(names.get(0))) {
+            throw new IllegalStateException(menuKey + " 菜单名应为「" + expectedName + "」，实际「" + names.get(0) + "」");
+        }
+    }
+
+    /**
+     * 断言菜单存在、启用，且 admin 在该菜单上持有指定动作。
+     * <p>用 Java 解析而不是 SQL 的 JSON_CONTAINS：actions 列是 text，脏数据下 JSON 函数会静默返回
+     * NULL 而让断言假通过，走 {@code parseActions} 则非法值直接抛出。
+     */
+    private void assertAdminHoldsAction(String menuKey, String action) {
+        List<String> rows = jdbcTemplate.queryForList(
+                "SELECT rm.actions FROM sys_role_menu rm "
+                        + "JOIN sys_role r ON r.id = rm.role_id AND r.code = ? "
+                        + "JOIN sys_menu m ON m.id = rm.menu_id AND m.menu_key = ? AND m.deleted = 0 AND m.status = 1",
+                String.class, ADMIN_ROLE_CODE, menuKey);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException(menuKey + " 不存在或未授权给 admin（菜单收敛可能误删了权限锚点）");
+        }
+        boolean held = rows.stream().anyMatch(raw -> parseActions(raw).contains(action));
+        if (!held) {
+            throw new IllegalStateException(menuKey + " 上 admin 未持有 " + action + " 动作，实际授权: " + rows);
+        }
+    }
+
+    private void assertSortEquals(String menuKey, int expected) {
+        Integer actual = jdbcTemplate.queryForObject(
+                "SELECT sort_order FROM sys_menu WHERE menu_key = ? AND deleted = 0", Integer.class, menuKey);
+        if (actual == null || actual != expected) {
+            throw new IllegalStateException(menuKey + " 排序应为 " + expected + "，实际 " + actual);
         }
     }
 

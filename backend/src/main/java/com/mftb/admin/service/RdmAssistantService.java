@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.LlmUsageRecordRequest;
 import com.mftb.admin.dto.RdmAssistantVO;
+import com.mftb.admin.dto.RdmDashboardVO;
 import com.mftb.admin.entity.RdmComment;
 import com.mftb.admin.entity.RdmPrd;
 import com.mftb.admin.entity.RdmRequirement;
@@ -59,9 +60,10 @@ public class RdmAssistantService {
     private final AiMyCenterService myCenterService;
     private final LlmUsageService llmUsageService;
     private final RdmConfigService configService;
+    /** 风险取数唯一入口所在：摘要与页面列表必须共用，所以这里依赖而不是再写一份 SQL */
+    private final RdmAnalyticsService analyticsService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     /** 一次 LLM 调用的结果 */
     private record ChatResult(String text, String model, long tokens, String channel, String error) {
@@ -193,22 +195,26 @@ public class RdmAssistantService {
      * <p>先由 SQL 算出确定性事实（哪些需求逾期/阻塞/停滞、停留多少天），
      * 再让大模型把它写成一段管理视角的摘要；模型不可用时保留结构化要点。
      */
-    public RdmAssistantVO.RiskSummary riskSummary(int days, String caller) {
-        int window = Math.min(Math.max(days, 7), 90);
+    public RdmAssistantVO.RiskSummary riskSummary(int minStayDays, String caller) {
+        // 这里的数字是「停留至少多少天」而不是「近 N 天提单」：旧实现收着 days 参数却根不用在 SQL 里，
+        // 导致页面写“近 14 天风险摘要”其实给的是全量当前快照，说好的窗口根本没生效
+        int stay = Math.min(Math.max(minStayDays, 0), 90);
         RdmAssistantVO.RiskSummary summary = new RdmAssistantVO.RiskSummary();
-        summary.setDays(window);
+        summary.setDays(stay);
         summary.setAiUsed(false);
 
-        List<RdmAssistantVO.RiskItem> risks = loadRisks(window);
+        List<RdmAssistantVO.RiskItem> risks = loadRisks(stay);
         summary.setTopRisks(risks);
         summary.setHighlights(buildHighlights(risks));
 
         if (risks.isEmpty()) {
-            summary.setNarrative("近 " + window + " 天內沒有逾期、阻塞或審批停滯的需求，交付鏈路目前暢通。");
+            summary.setNarrative(stay > 0
+                    ? "沒有在当前狀態停留滿 " + stay + " 天的風險需求，交付鏈路目前暢通。"
+                    : "當前沒有逾期、阻塞、無主或審批停滯的需求，交付鏈路目前暢通。");
             summary.setAiUsed(false);
             return summary;
         }
-        ChatResult chat = chat(buildRiskSystemPrompt(), buildRiskUserPrompt(window, risks, summary.getHighlights()),
+        ChatResult chat = chat(buildRiskSystemPrompt(), buildRiskUserPrompt(stay, risks, summary.getHighlights()),
                 caller, "risk_summary");
         if (chat.failed()) {
             summary.setNarrative(String.join("；", summary.getHighlights()) + "。");
@@ -221,31 +227,21 @@ public class RdmAssistantService {
         return summary;
     }
 
-    /** 确定性风险取数（口径与看板风险雷达一致：当前逾期/阻塞/审批停滞/超 7 天无进展） */
-    private List<RdmAssistantVO.RiskItem> loadRisks(int window) {
+    /**
+     * 风险取数：直接复用 {@link RdmAnalyticsService#riskList(int, int)}。
+     * <p>不再自写一份 SQL：之前两份的定义相同但 LIMIT 与过滤条件不一致，同页并列时会“对不上”。
+     */
+    private List<RdmAssistantVO.RiskItem> loadRisks(int minStayDays) {
         List<RdmAssistantVO.RiskItem> list = new ArrayList<>();
-        for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT id, req_no, title, status, COALESCE(current_handler_name,'待分配') AS handler, "
-                        + " CASE WHEN blocked_flag = 1 THEN 'BLOCKED' "
-                        + "      WHEN status = 'pool' THEN 'UNASSIGNED' "
-                        + "      WHEN status = 'intake_pending' THEN 'INTAKE_STUCK' "
-                        + "      WHEN overdue_flag = 1 THEN 'OVERDUE' "
-                        + "      ELSE 'STAGNANT' END AS risk_type, "
-                        + " TIMESTAMPDIFF(DAY, status_enter_time, NOW()) AS days "
-                        + "FROM rdm_requirement WHERE deleted = 0 "
-                        + "AND (overdue_flag = 1 OR blocked_flag = 1 OR status IN ('pool','intake_pending') "
-                        + "     OR status_enter_time < DATE_SUB(NOW(), INTERVAL 7 DAY)) "
-                        + "AND status <> ? "
-                        + "ORDER BY blocked_flag DESC, overdue_flag DESC, days DESC LIMIT " + MAX_RISK_ITEMS,
-                RdmConstants.STATUS_DRAFT)) {
+        for (RdmDashboardVO.Risk risk : analyticsService.riskList(MAX_RISK_ITEMS, minStayDays)) {
             RdmAssistantVO.RiskItem item = new RdmAssistantVO.RiskItem();
-            item.setReqId(((Number) row.get("id")).longValue());
-            item.setReqNo((String) row.get("req_no"));
-            item.setTitle((String) row.get("title"));
-            item.setStatus((String) row.get("status"));
-            item.setHandler(String.valueOf(row.get("handler")));
-            item.setDays(row.get("days") == null ? 0 : ((Number) row.get("days")).intValue());
-            item.setRiskType((String) row.get("risk_type"));
+            item.setReqId(risk.getReqId());
+            item.setReqNo(risk.getReqNo());
+            item.setTitle(risk.getTitle());
+            item.setStatus(risk.getStatus());
+            item.setHandler(risk.getHandler());
+            item.setDays(risk.getDays() == null ? 0 : risk.getDays().intValue());
+            item.setRiskType(risk.getRiskType());
             list.add(item);
         }
         return list;

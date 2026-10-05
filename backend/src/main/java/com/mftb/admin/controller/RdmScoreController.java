@@ -40,8 +40,7 @@ public class RdmScoreController {
 
     /** 产出看板（排名 + 部门对比 + 流水） */
     @GetMapping("/board")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, anyOf = {
-            "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-report"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-report"})
     public Result<RdmScoreVO.Board> board(@RequestParam(required = false) String periodCode,
                                           @RequestParam(required = false) Long deptId,
                                           @RequestParam(required = false) Long userId) {
@@ -50,16 +49,14 @@ public class RdmScoreController {
 
     /** 规则列表（含已停用版本，供历史流水解释） */
     @GetMapping("/rules")
-    @RequirePermission(menu = RdmConstants.MENU_CONFIG_SCORE, anyOf = {
-            "rdm-dashboard-score", "rdm-dashboard-board"})
+    @RequirePermission(menu = RdmConstants.MENU_CONFIG_SCORE, anyOf = {"rdm-dashboard-score", "rdm-dashboard-board"})
     public Result<List<RdmScoreVO.Rule>> rules() {
         return Result.success(scoreService.listRules());
     }
 
     /** 可选绩效周期 */
     @GetMapping("/cycles")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, anyOf = {
-            "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-report"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-report"})
     public Result<List<java.util.Map<String, Object>>> cycles() {
         return Result.success(scoreService.cycles());
     }
@@ -82,24 +79,21 @@ public class RdmScoreController {
 
     /** 试算（不落库），规则页「用真实需求试算」 */
     @PostMapping("/preview")
-    @RequirePermission(menu = RdmConstants.MENU_CONFIG_SCORE, anyOf = {
-            "rdm-dashboard-score", "rdm-dashboard-board"})
+    @RequirePermission(menu = RdmConstants.MENU_CONFIG_SCORE, anyOf = {"rdm-dashboard-score", "rdm-dashboard-board"})
     public Result<RdmScoreVO.Record> preview(@RequestBody RdmScoreDTO.Preview form) {
         return Result.success(scoreService.preview(form.getReqId(), form.getRoleCode(), form.getUserId()));
     }
 
     /** 按当前生效规则重算当期流水（幂等） */
     @PostMapping("/recalc")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, action = "edit", anyOf = {
-            "rdm-config-score"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, action = "edit", anyOf = {"rdm-config-score"})
     public Result<Integer> recalc(@RequestParam(required = false) String periodCode) {
         return Result.success("積分已按當前規則重算", scoreService.recalc(periodCode));
     }
 
     /** 推送建议值到绩效考核单（HR 仍需校准） */
     @PostMapping("/push-to-perf")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, action = "edit", anyOf = {
-            "rdm-config-score"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_SCORE, action = "edit", anyOf = {"rdm-config-score"})
     public Result<Integer> pushToPerf(@RequestParam String periodCode) {
         return Result.success("建議值已推送，請在績效考核單校準後確認", scoreService.pushToPerf(periodCode));
     }
@@ -108,8 +102,7 @@ public class RdmScoreController {
 
     /** 日快照趋势（只读取 rdm_metric_snapshot，不实时算） */
     @GetMapping("/metric-trend")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_TREND, anyOf = {
-            "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-score", "rdm-dashboard-report"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_TREND, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-score", "rdm-dashboard-report"})
     public Result<List<RdmScoreVO.MetricPoint>> metricTrend(
             @RequestParam(required = false) String dim,
             @RequestParam(required = false, defaultValue = "30") Integer days,

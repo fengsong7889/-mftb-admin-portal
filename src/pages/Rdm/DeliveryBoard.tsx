@@ -207,7 +207,7 @@ export default function DeliveryBoard() {
         <Space size={8} wrap>
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
           <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
-          <Button onClick={() => navigate('/rdm-delivery-req')}>查看交付中需求</Button>
+          <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
           <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>
         </Space>
       </div>

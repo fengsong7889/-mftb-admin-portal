@@ -195,15 +195,31 @@ class RdmTransitionGuardTest {
     }
 
     @Test
-    @DisplayName("超管与 PMO（持有删除/导出权）可跨部门查看")
+    @DisplayName("超管与被授需求池查看权的人可跨部门查看")
     void privilegedUsersSeeAll() {
         SysUser admin = user(13L, "MF00013", "王五");
         when(operatorResolver.isAdmin(admin)).thenReturn(true);
         assertDoesNotThrow(() -> service.requireVisible(requirement(3L, 11L, 11L), admin, "查看詳情"));
 
-        SysUser pmo = user(14L, "MF00014", "趙六");
-        when(operatorResolver.isAdmin(pmo)).thenReturn(false);
-        when(permissionService.hasPermission(pmo, "rdm-requirement", "export")).thenReturn(true);
-        assertDoesNotThrow(() -> service.requireVisible(requirement(3L, 11L, 11L), pmo, "查看詳情"));
+        SysUser dispatcher = user(14L, "MF00014", "趙六");
+        when(operatorResolver.isAdmin(dispatcher)).thenReturn(false);
+        when(permissionService.hasPermission(dispatcher, RdmConstants.MENU_INTAKE, "view")).thenReturn(true);
+        assertDoesNotThrow(() -> service.requireVisible(requirement(3L, 11L, 11L), dispatcher, "查看詳情"));
+    }
+
+    /**
+     * 数据范围只由分配侧授权（需求池 view）决定，不被台账的动作权顺带拓开。
+     * <p>这条断言专门防回退：以前持有 rdm-requirement 的 export/delete 就等于能看到全公司需求，
+     * 而 rdm-requirement 是人人可看的宽权限菜单，那等于“能导 Excel 就能读全公司单据”。
+     */
+    @Test
+    @DisplayName("仅有台账导出/删除权不等于全量可见")
+    void actionGrantsAloneDoNotOpenAllData() {
+        SysUser exporter = user(15L, "MF00015", "孫七");
+        when(operatorResolver.isAdmin(exporter)).thenReturn(false);
+        when(permissionService.hasPermission(exporter, RdmConstants.MENU_REQUIREMENT, "export")).thenReturn(true);
+        when(permissionService.hasPermission(exporter, RdmConstants.MENU_REQUIREMENT, "delete")).thenReturn(true);
+        assertThrows(BusinessException.class,
+                () -> service.requireVisible(requirement(4L, 11L, 11L), exporter, "查看詳情"));
     }
 }

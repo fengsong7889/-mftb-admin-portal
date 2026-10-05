@@ -227,14 +227,15 @@ export default function LifecycleList({ type }: Props) {
 
       {/* 操作区 */}
       <div className="action-section">
-        <div className="action-section-left">
+        <div className="action-section-left" />
+        <div className="action-section-right">
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${routeBase}-form`)}>
               {isOnboard ? t('hrLifecycle.addOnboard') : t('hrLifecycle.addRequest')}
             </Button>
           )}
+          {configComponent}
         </div>
-        <div className="action-section-right">{configComponent}</div>
       </div>
 
       {/* 状态 Tab */}

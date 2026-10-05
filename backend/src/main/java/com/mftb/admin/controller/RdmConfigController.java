@@ -32,35 +32,28 @@ public class RdmConfigController {
 
     /** 状态定义 */
     @GetMapping("/status")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {
-            RdmConstants.MENU_INTAKE, RdmConstants.MENU_PRODUCT, RdmConstants.MENU_ACCEPTANCE,
-            RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
     public Result<List<RdmConfigVO.StatusDef>> statuses() {
         return Result.success(configService.statusDefs());
     }
 
     /** 流转规则 */
     @GetMapping("/transition")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {
-            RdmConstants.MENU_INTAKE, RdmConstants.MENU_PRODUCT, RdmConstants.MENU_ACCEPTANCE,
-            RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
     public Result<List<RdmConfigVO.Transition>> transitions() {
         return Result.success(configService.transitions());
     }
 
     /** SLA 与逾期规则 */
     @GetMapping("/sla")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {
-            RdmConstants.MENU_INTAKE, RdmConstants.MENU_PRODUCT, RdmConstants.MENU_ACCEPTANCE,
-            RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
     public Result<List<RdmConfigVO.Sla>> slas() {
         return Result.success(configService.slaConfigs());
     }
 
     /** 分发矩阵 */
     @GetMapping("/routing")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, anyOf = {
-            RdmConstants.MENU_PRODUCT, RdmConstants.MENU_CONFIG, RdmConstants.MENU_REQUIREMENT})
+    @RequirePermission(menu = RdmConstants.MENU_INTAKE, anyOf = {RdmConstants.MENU_CONFIG, RdmConstants.MENU_REQUIREMENT})
     public Result<List<RdmConfigVO.Routing>> routings() {
         return Result.success(configService.routingRules());
     }

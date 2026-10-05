@@ -263,8 +263,8 @@ const WorkflowDetail = lazy(() => import('./pages/WorkflowConfig/WorkflowDetail'
 const RdmWorkbench = lazy(() => import('./pages/Rdm/Workbench'))
 const RdmRequirementSubmit = lazy(() => import('./pages/Rdm/RequirementSubmit'))
 const RdmRequirementList = lazy(() => import('./pages/Rdm/RequirementList'))
+const RdmRequirementPool = lazy(() => import('./pages/Rdm/RequirementPool'))
 const RdmRequirementDetail = lazy(() => import('./pages/Rdm/RequirementDetail'))
-const RdmProductBoard = lazy(() => import('./pages/Rdm/ProductBoard'))
 const RdmDeliveryBoard = lazy(() => import('./pages/Rdm/DeliveryBoard'))
 const RdmTaskForm = lazy(() => import('./pages/Rdm/TaskForm'))
 const RdmAssignPm = lazy(() => import('./pages/Rdm/AssignPm'))
@@ -282,6 +282,8 @@ const RdmScoreRuleConfig = lazy(() => import('./pages/Rdm/Config/ScoreRuleConfig
 const RdmAcceptanceList = lazy(() => import('./pages/Rdm/AcceptanceList'))
 const RdmAcceptanceForm = lazy(() => import('./pages/Rdm/AcceptanceForm'))
 const RdmDashboard = lazy(() => import('./pages/Rdm/Dashboard'))
+const RdmRiskCenter = lazy(() => import('./pages/Rdm/RiskCenter'))
+const RdmTeamOutput = lazy(() => import('./pages/Rdm/TeamOutput'))
 const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
@@ -561,13 +563,18 @@ function AuthenticatedLayout() {
               <Route path="/rdm-workbench" element={<RdmWorkbench />} />
               <Route path="/rdm-submit" element={<RdmRequirementSubmit />} />
               <Route path="/rdm-requirement" element={<RdmRequirementList />} />
-              <Route path="/rdm-intake" element={<RdmRequirementList scope="pool" switchable={false} />} />
+              {/* 需求池：分配与审批环节的总台（预选 pool 视角，带全量可见与分配权）；
+                  产品需求处理/交付中需求已作为纯数据切片删除，旧地址保留重定向，
+                  避免存量收藏、钉钉通知、已发出去的分享链接坏掉 */}
+              <Route path="/rdm-intake" element={<RdmRequirementPool />} />
+              {/* 需求查询已并回需求池（分配权必然蕴含可见权，不该拆成两个窄权限菜单） */}
+              <Route path="/rdm-query" element={<Navigate to="/rdm-intake" replace />} />
               <Route path="/rdm-detail" element={<RdmRequirementDetail />} />
-              <Route path="/rdm-product" element={<RdmProductBoard />} />
+              <Route path="/rdm-product" element={<Navigate to="/rdm-requirement?scope=product" replace />} />
               <Route path="/rdm-delivery" element={<RdmDeliveryBoard />} />
-              <Route path="/rdm-delivery-req" element={<RdmRequirementList scope="delivery" switchable={false} />} />
+              <Route path="/rdm-delivery-req" element={<Navigate to="/rdm-requirement?scope=delivery" replace />} />
               <Route path="/rdm-task" element={<RdmTaskForm />} />
-              {/* 分配产品经理：独立页（取代需求池弹窗），权限跟 rdm-intake 的 edit */}
+              {/* 分配产品经理：独立页（取代需求池弹窗），分配权现在 rdm-intake:edit，菜单合并后并到 rdm-requirement:edit */}
               <Route path="/rdm-assign" element={<RdmAssignPm />} />
               <Route path="/rdm-iteration" element={<RdmIterationPlan />} />
               <Route path="/rdm-iteration-form" element={<RdmIterationForm />} />
@@ -577,6 +584,9 @@ function AuthenticatedLayout() {
               <Route path="/rdm-acceptance" element={<RdmAcceptanceList />} />
               <Route path="/rdm-acceptance-form" element={<RdmAcceptanceForm />} />
               <Route path="/rdm-dashboard" element={<RdmDashboard />} />
+              {/* 風險中心 / 部門與人員產出：从总看板拆出的两个独立菜单页 */}
+              <Route path="/rdm-risk" element={<RdmRiskCenter />} />
+              <Route path="/rdm-output" element={<RdmTeamOutput />} />
               <Route path="/rdm-quality" element={<RdmQualityBoard />} />
               <Route path="/rdm-version-trace" element={<RdmVersionTrace />} />
               <Route path="/rdm-weekly-report" element={<RdmWeeklyReport />} />

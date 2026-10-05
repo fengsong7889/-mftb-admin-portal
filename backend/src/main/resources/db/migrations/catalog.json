@@ -687,7 +687,8 @@
         "rdm:menu-seed:v1.0",
         "iam:employee-self-service-role:v1.0"
       ],
-      "status": "ACTIVE",
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:access-grant:v1.1",
       "comment": "RDM 全员基线授权：给内置角色 employee_self_service 授 rdm-workbench/rdm-submit/rdm-requirement/rdm-acceptance + rdm 系统准入，否则统一门户下普通员工看不到提需求入口（与 HR ESS 同法）。刻意不自动授需求池分配/产品处理/研发交付/需求配置——产研职能须由管理员在授权中心按角色勾选，避免按角色名猜测匹配造成越权。角色不存在时告警跳过，下次启动自愈；每次启动重放。"
     },
     {
@@ -780,8 +781,117 @@
         "core:system-portal:v1.0",
         "rdm:schema:v1.4"
       ],
-      "status": "ACTIVE",
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.5",
       "comment": "M4 菜单位：看板分组新增 rdm-dashboard-score(產出積分,/rdm-score) 与 rdm-dashboard-trend(效能量趨勢,/rdm-metric-trend)，需求配置分组新增 rdm-config-score(積分規則,/rdm-score-rule)。积分会被引用进绩效，所以不挂在交付看板里也不给泛看板权直接访问。GROUP_GRANT_INHERIT 只追加本次新增的三个叶子（rdm-config-status/routing/sla 三个已存在子菜单绝不加进来，否则每次启动重放会给仅有目录权的角色多补子页权限——权限只减不增）。积分规则采 VIEW_EDIT（配规则=改所有人的分），看板/趋势按各自动作集。取代 rdm:menu-seed:v3.3。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.5",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.6",
+      "comment": "菜单信息架构重排（用户反馈：总看板子项过多且“看结果/看风险/看人和效率”混在一起）。新增顶级分组 rdm-efficiency(效能與產出,sort 17)，并把已存在的 rdm-dashboard-score/rdm-dashboard-trend 改挂到它下面（菜单行 id 不变→自身授权随行，不会丢权限）；新增叶子 rdm-dashboard-risk(風險中心,/rdm-risk) 挂在需求總看板下，新增 rdm-efficiency-output(部門與人員產出,/rdm-output)。需求池/产品处理/交付/验收/配置等顶级菜单 sort 整体 +1。GROUP_GRANT_SEED 先把看板分组存量授权复制给新建的 rdm-efficiency（否则它下面的新叶子无继承基准），必须在 GROUP_GRANT_INHERIT 前执行；继承表只列本次两个新叶子，score/trend 已从表内移除（继续列会让管理员主动撤销的权限被每次重放补回，违反权限只减不增）。关键约束：新分组不写 path；verify 新增对分组节点 type=1/path NULL/顶级归属的实查。菜单 key 不重命名（rdm-dashboard-score 等前缀不变），因为 key 是授权与前端映射的挂。取代 rdm:menu-seed:v3.4。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.6",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.7",
+      "comment": "补齐 v3.5 缺失的排序对齐。upsertMenu 对已存在行故意只对齐归属/启用态而不改 sort（尊重管理员在菜单配置里的自定义），所以在 MENUS 里改旧菜单排序无效，新建的 rdm-dashboard-risk(sort 2) 与仍为 2 的 rdm-dashboard-quality 撞位，改挂到 rdm-efficiency 的 score/trend 仍停在旧 5/6。新增 SORT_ALIGN：仅当行当前 sort 仍等于旧默认值时才写新值（管理员调过的一律不动），每行按自己的 menu_key+旧 sort 定位不受执行顺序影响。verify 加强：同一分组内不得出现重复 sort_order + 实查 quality=3/risk=2/score=1 已真落地。同时修正种子名里误写的简体「質量口径」为「質量口徑」（菜单名会写进 DB 并对用户可见，界面文案必须繁体；本次因 upsert 不改名所以存量 DB 未受影响，但种子默认值必须对）。取代 rdm:menu-seed:v3.5。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.7",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.8",
+      "comment": "需求动线菜单收敛（用户反馈：台账/需求池/产品需求处理操作本质相同）。删除 rdm-product、rdm-delivery-req、rdm-submit 三个叶子：前两个是同一个组件套不同 scope 初始值（菜单入口还用 switchable=false 把视角锁死），rdm-submit 是表单页、独立页面不等于独立菜单。关键决策：保留 rdm-intake 为独立菜单，因为它是职责边界而非数据切片——后端 canDispatch 只认 rdm-intake:edit，与台账的宽查看权分开才能避免误授分配权。新增 RETIRED_MENU_MERGE 做「同一动作平移到目标菜单」（product 的 view/create/edit/export → rdm-requirement，product 的 delete（实为删除迭代）→ rdm-delivery-iteration，delivery-req/submit 全部 → rdm-requirement；严格不写入旧行里没有的动作，所以既不降权也不扩权）；退役分两阶段（先搬完所有目标再软删源行），并有事前校验：源菜单声明的每个动作必须有归宿，漏配直接启动失败而不是静默降权。rdm-requirement 改名需求清單并扩为 [view,create,edit,export]（不含 delete，分配权仍只认 rdm-intake:edit），rdm-delivery-iteration 额外带 delete（否则管理员在授权中心勾不到删除迭代）；顶级 sort 上提（flattenExistingRows 会强制刷顶级 sort，故无需 SORT_ALIGN）；GROUP_GRANT_INHERIT 里移除 rdm-delivery-req（否则继承时因节点不存在而抛异常）。配套把 RdmRequirementController/RdmFileController/RdmDeliveryController/RdmConfigController 等处以退役菜单为锚点的注解全部收口（共 51 处 anyOf 中的 40 处清理），RdmConstants 不再定义 MENU_SUBMIT/MENU_PRODUCT/MENU_DELIVERY_REQ。verify 新增：被退役菜单不得有存活行且不得残留孤儿授权，并断言 rdm-intake:edit 与 rdm-requirement:create 两个锚点仍在（菜单被误删不会报错，只会让需求永远分不出去）。取代 rdm:menu-seed:v3.6。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.8",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.9",
+      "comment": "新增顶级叶子 rdm-query(需求查询, /rdm-query, sort 21, [view,export])，把「数据范围」从「功能动作」解绑：后端 canSeeAll 之前靠 rdm-requirement 的 export/delete 推断全量可见，等于「能导 Excel 就能浏览全公司需求」，现改为只认 rdm-query:view 与 canDispatch（实查开发库除 admin 外无人持有 rdm-requirement 的 export/delete，所以移除这两条不会让任何人丢掉既有可见范围）。新菜单故意不进 GROUP_GRANT_INHERIT：全量可见是敏感能力，默认只授 admin，开放给谁由管理员在授权中心定。verify 新增断言 rdm-query 必须存在且带 view：菜单缺失时全量检索会静默变成只能看自己的，不报错但结果不对。取代 rdm:menu-seed:v3.7。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.9",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "SUPERSEDED",
+      "supersededBy": "rdm:menu-seed:v3.10",
+      "comment": "修正 v3.8 新菜单 rdm-query 的默认名为繁体「需求查詢」（入库时误写简体「需求查询」，菜单名会写进 sys_menu.name 并直接呈现给用户，界面文案必须繁体）。因为 upsertMenu 故意不改已存在行的 name，必须同时：把新名加进 RENAMES（仅当现名仍是错名时改，不覆盖管理员自定义）、递增 versionKey 让已记账 v3.8 的环境重跑、并在 verify 加 assertMenuNameEquals 实查落地结果（不能只信改名 SQL 报成功）。这是本项目第二次把简体字写进菜单种子（前一次是「質量口径」），所以补了断言而不是只靠人工复查。取代 rdm:menu-seed:v3.8。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.10",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.5"
+      ],
+      "status": "ACTIVE",
+      "comment": "退役 v3.8/v3.9 建的 rdm-query（需求查询），把全量可见并回 rdm-intake：canSeeAll 现在认 rdm-intake:view 加 canDispatch，不再认 rdm-query，也不再把 rdm-requirement 的 export/delete 当全量凭证。上一轮拆分的目的（把数据范围从功能动作解绑）价值保留，但落点错了：分配权必然蕴含可见权（看不到单子就分不出去），两者拆成两个窄权限菜单只会让管理员同步维护两份授权。rdm-query 的授权按同动作平移到 rdm-intake（RETIRED_MENU_MERGE 新增一行，view/export 原样搬，不新增动作；实查开发库只有 admin 持有它，且 admin 靠代码直通）。同时前端把视角 Tab 集合下沉为调用方传入：需求池给「待分配/待我審批/全部需求」+跨部门筛选（它是审批与分配环节的总台），需求清单只留「我提的/待我處理/我負責的產品/研發交付中」执行侧四片——清单不该出现审批切片，因为动线是提出→審批→进池→分配→才到执行。verify 改为断言 rdm-intake 同时持有 edit 与 view（缺 view 时需求池只读到自己的单子，界面不报错但永远筛不出待分配全貌），并把菜单名繁体断言移到 rdm-intake 上常驻。取代 rdm:menu-seed:v3.9。"
+    },
+    {
+      "versionKey": "rdm:access-grant:v1.1",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmAccessGrantInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.7",
+        "iam:employee-self-service-role:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "基线菜单集合跟随菜单收敛（rdm:menu-seed:v3.7）。不再授已退役的 rdm-submit，“全员能提需求”改为 rdm-requirement 的 [view,create]，与 RETIRED_MENU_MERGE 从提交需求平移过来的动作一致。这一步必须同时递增版本：因为 RdmAccessGrantInitializer 在菜单未就绪时会抛异常（rdm-submit 已被软删，查不到就会“RDM 菜单未就绪”），只改常量不改版本的话，已记账 v1.0 的环境仍会在新代码下启动失败。verify 遍历 BASELINE_MENUS 自动跟随，无需另改断言。取代 rdm:access-grant:v1.0。"
     },
     {
       "versionKey": "rdm:schema:v1.2",

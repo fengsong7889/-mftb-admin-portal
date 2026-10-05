@@ -60,7 +60,8 @@ public class RdmAnalyticsService {
         vo.setPmRank(buildPmRank());
         vo.setStageDuration(buildStageDuration());
         vo.setTrend(buildTrend(period));
-        vo.setRisks(buildRisks());
+        // 风险统一由 riskList 提供：「風險中心」页明细与 AI 风险摘要共用这一份 SQL（0 = 不按停留天数筛选）
+        vo.setRisks(riskList(20, 0));
         vo.setBoard(buildBoard());
         return vo;
     }
@@ -709,11 +710,21 @@ public class RdmAnalyticsService {
         return list;
     }
 
-    /** 风险清单：逾期 / 超 7 天无进展 / 阻塞 / 无主 / 审批停滞 */
-    private List<RdmDashboardVO.Risk> buildRisks() {
+    /**
+     * 风险清单（全局唯一口径）：逾期 / 超 7 天无进展 / 阻塞 / 无主 / 审批停滞。
+     * <p>必须只有一个入口：之前看板雷达与 AI 风险摘要各写一份 SQL（LIMIT 20 / 12 不一），
+     * 同页并列会出现“上面说 5 条、下面列 6 条”，且改定义要改两处。
+     * <p>minStayDays 按「当前状态停留天数」筛选，而不是“提单时间窗口”：风险本质是
+     * “现在卡在谁手上卡了多久”，用提交时间筛选会把早就卡住的存量需求滤掉，反而漏掉最严的。
+     * <p>周报的 buildWeeklyRisks 不走这里：它只统计交付风险（阻塞/逾期/停滞），语义不同。
+     */
+    public List<RdmDashboardVO.Risk> riskList(int limit, int minStayDays) {
         List<RdmDashboardVO.Risk> list = new ArrayList<>();
+        // 停留天数阈值：0 表示不按卡住时长过滤（风险列表默认看全部）
+        String stayCond = minStayDays > 0
+                ? "AND TIMESTAMPDIFF(DAY, status_enter_time, NOW()) >= ? " : "";
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT id, req_no, title, submitter_name, COALESCE(current_handler_name,'待分配') AS handler, "
+                "SELECT id, req_no, title, status, submitter_name, COALESCE(current_handler_name,'待分配') AS handler, "
                         + " CASE WHEN blocked_flag = 1 THEN 'BLOCKED' "
                         + "      WHEN status = 'pool' THEN 'UNASSIGNED' "
                         + "      WHEN status = 'intake_pending' THEN 'INTAKE_STUCK' "
@@ -723,12 +734,15 @@ public class RdmAnalyticsService {
                         + "FROM rdm_requirement WHERE deleted = 0 "
                         + "AND (overdue_flag = 1 OR blocked_flag = 1 OR status IN ('pool','intake_pending') "
                         + "     OR (status_enter_time < DATE_SUB(NOW(), INTERVAL 7 DAY) AND status <> 'draft')) "
-                        + "ORDER BY blocked_flag DESC, overdue_flag DESC, days DESC LIMIT 20")) {
+                        + stayCond
+                        + "ORDER BY blocked_flag DESC, overdue_flag DESC, days DESC LIMIT " + Math.max(limit, 1),
+                minStayDays > 0 ? new Object[]{minStayDays} : new Object[0])) {
             RdmDashboardVO.Risk risk = new RdmDashboardVO.Risk();
             risk.setRiskType((String) row.get("risk_type"));
             risk.setReqId(toLong(row.get("id")));
             risk.setReqNo((String) row.get("req_no"));
             risk.setTitle((String) row.get("title"));
+            risk.setStatus((String) row.get("status"));
             risk.setSubmitterName((String) row.get("submitter_name"));
             risk.setHandler((String) row.get("handler"));
             risk.setDays(toLong(row.get("days")));

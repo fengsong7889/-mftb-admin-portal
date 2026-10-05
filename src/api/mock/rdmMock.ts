@@ -595,6 +595,9 @@ export function mockScopeCounts(): Record<string, number> {
   return {
     mine: by(r => r.submitterName === '张晓琳'),
     todo: by(r => inStatuses(TODO_STATUSES, r.status)),
+    // 近似口径：真实环境里审批人只存在于 OA 审批任务表，mock 无这层数据，
+    // 所以用「待准入」状态代替（仅用于后端不可用时的 Tab 计数展示）
+    approving: by(r => r.status === RDM_STATUS.INTAKE_PENDING),
     pool: by(r => r.status === RDM_STATUS.POOL),
     product: by(r => r.pmName === '陳雅婷'),
     delivery: by(r => inStatuses(DELIVERY_STATUSES, r.status)),
@@ -838,10 +841,10 @@ export function mockDashboard(): RdmDashboardData {
       delivered: 4 + ((i + 1) % 4) * 2,
     })),
     risks: ([
-      { riskType: RDM_RISK_TYPE.OVERDUE as RdmRiskType, reqId: 1, reqNo: 'XQ202609260001', title: '推薦報表支持自定義時間區間導出', submitterName: '张晓琳', handler: '商家運營部', days: 30 },
-      { riskType: RDM_RISK_TYPE.UNASSIGNED as RdmRiskType, reqId: 3, reqNo: 'XQ202609240002', title: '新增「達人生態」獨立菜單與結算報表', submitterName: '王大衛', handler: '待分配', days: 120 },
-      { riskType: RDM_RISK_TYPE.INTAKE_STUCK as RdmRiskType, reqId: 10, reqNo: 'XQ202609170005', title: '新增商戶分層定價策略配置', submitterName: '刘洋', handler: '王志强', days: 400 },
-      { riskType: RDM_RISK_TYPE.STAGNANT as RdmRiskType, reqId: 2, reqNo: 'XQ202609250003', title: '門店列表新增「停業風險」標籤列', submitterName: '孫小紅', handler: '周建平', days: 84 },
+      { riskType: RDM_RISK_TYPE.OVERDUE as RdmRiskType, reqId: 1, reqNo: 'XQ202609260001', title: '推薦報表支持自定義時間區間導出', status: RDM_STATUS.TESTING, submitterName: '张晓琳', handler: '商家運營部', days: 30 },
+      { riskType: RDM_RISK_TYPE.UNASSIGNED as RdmRiskType, reqId: 3, reqNo: 'XQ202609240002', title: '新增「達人生態」獨立菜單與結算報表', status: RDM_STATUS.POOL, submitterName: '王大衛', handler: '待分配', days: 120 },
+      { riskType: RDM_RISK_TYPE.INTAKE_STUCK as RdmRiskType, reqId: 10, reqNo: 'XQ202609170005', title: '新增商戶分層定價策略配置', status: RDM_STATUS.INTAKE_PENDING, submitterName: '刘洋', handler: '王志强', days: 400 },
+      { riskType: RDM_RISK_TYPE.STAGNANT as RdmRiskType, reqId: 2, reqNo: 'XQ202609250003', title: '門店列表新增「停業風險」標籤列', status: RDM_STATUS.DEVELOPING, submitterName: '孫小紅', handler: '周建平', days: 84 },
     ]),
     board: {
       columns: [
@@ -1427,34 +1430,43 @@ export function mockPrdDraft(reqId: number): RdmPrdDraft {
   }
 }
 
-/** 风险摘要演示（结构化要点来自 mock 需求） */
-export function mockRiskSummary(days: number): RdmRiskSummary {
-  const window = Math.min(Math.max(days, 7), 90)
-  const risky = requirements.filter(r => r.overdueFlag || r.blockedFlag || r.status === RDM_STATUS.POOL
-    || r.status === RDM_STATUS.INTAKE_PENDING).slice(0, 8)
-  const blocked = risky.filter(r => r.blockedFlag).length
-  const overdue = risky.filter(r => r.overdueFlag).length
-  const unassigned = risky.filter(r => r.status === RDM_STATUS.POOL).length
-  const maxStayDays = risky.reduce((max, r) => Math.max(max, Math.round((r.stayHours ?? 0) / 24)), 0)
+/** 风险摘要演示（按「当前状态停留 ≥ N 天」筛选，与后端 riskList 同一语义） */
+export function mockRiskSummary(minStayDays: number): RdmRiskSummary {
+  const stay = Math.min(Math.max(minStayDays, 0), 90)
+  const risky = requirements
+    .map(r => ({ r, days: Math.round((r.stayHours ?? 0) / 24) }))
+    .filter(({ r, days }) => (r.overdueFlag || r.blockedFlag || r.status === RDM_STATUS.POOL
+      || r.status === RDM_STATUS.INTAKE_PENDING || days >= 7)
+      // 与真接口一致：仅看卡得足够久的
+      && days >= stay)
+    .slice(0, 8)
+    .map(({ r, days }) => ({ r, days }))
+  const rows = risky.map(({ r }) => r)
+  const blocked = rows.filter(r => r.blockedFlag).length
+  const overdue = rows.filter(r => r.overdueFlag).length
+  const unassigned = rows.filter(r => r.status === RDM_STATUS.POOL).length
+  const maxStayDays = risky.reduce((max, { days }) => Math.max(max, days), 0)
   const highlights = [
     ...(blocked ? [`阻塞 ${blocked} 條，需先清理依賴與阻塞原因`] : []),
     ...(overdue ? [`逾期 ${overdue} 條，最久已停留 ${maxStayDays} 天`] : []),
     ...(unassigned ? [`無主需求 ${unassigned} 條，待技術負責人分發`] : []),
   ]
   return {
-    days: window,
+    days: stay,
     narrative: highlights.length
-      ? `近 ${window} 天共有 ${risky.length} 條需求需管理動作：${highlights.join('；')}。`
-      : `近 ${window} 天沒有逾期或阻塞需求。`,
+      ? (stay > 0
+        ? `停留滿 ${stay} 天以上的風險共 ${rows.length} 條：${highlights.join('；')}。`
+        : `當前 ${rows.length} 條需求需要管理動作：${highlights.join('；')}。`)
+      : (stay > 0 ? `沒有停留滿 ${stay} 天的風險需求。` : '當前沒有需要管理動作的風險需求。'),
     aiUsed: false,
     highlights,
-    topRisks: risky.map(r => ({
+    topRisks: risky.map(({ r, days }) => ({
       reqId: r.id,
       reqNo: r.reqNo,
       title: r.title,
       status: r.status,
       handler: r.currentHandler ?? r.pmName ?? '待分配',
-      days: Math.round((r.stayHours ?? 0) / 24),
+      days,
       riskType: r.blockedFlag ? RDM_RISK_TYPE.BLOCKED
         : r.overdueFlag ? RDM_RISK_TYPE.OVERDUE
         : r.status === RDM_STATUS.POOL ? RDM_RISK_TYPE.UNASSIGNED : RDM_RISK_TYPE.STAGNANT,

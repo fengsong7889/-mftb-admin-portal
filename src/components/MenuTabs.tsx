@@ -216,6 +216,24 @@ const SUB_PAGE_NAME: Record<string, string> = {
   '/oa-purchase-request': '採購申請',
   '/order-detail': '訂單詳情',
   '/promotion-order-manage': '訂單管理',
+  /*
+   * 產研協同（RDM）子页与已从菜单退役的路由：这些路径在后端菜单树里查不到，
+   * 不兜底就会退成 slug（页签实际出现过「rdm submit」、「rdm query」）。
+   * 菜单收敛后「提交需求/產品需求處理/交付中需求/需求查询」都不再是菜单项，
+   * 但路由本身可达（表单页与旧链接重定向），所以必须在这里给名字。
+   */
+  '/rdm-submit': '提交需求',
+  '/rdm-query': '需求查詢',
+  '/rdm-product': '需求清單',
+  '/rdm-delivery-req': '需求清單',
+  '/rdm-detail': '需求詳情',
+  '/rdm-assign': '分配產品經理',
+  '/rdm-prd': '編寫 PRD',
+  '/rdm-review': '需求評審',
+  '/rdm-change': '需求變更申請',
+  '/rdm-task': '研發任務',
+  '/rdm-iteration-form': '迭代表單',
+  '/rdm-acceptance-form': '需求驗收',
   '/store-data-config': '門店數據配置',
   '/translation-manage': '翻譯工作台',
 }

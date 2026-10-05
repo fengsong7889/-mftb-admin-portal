@@ -84,13 +84,19 @@ public class RdmDashboardVO {
         private Long delivered;
     }
 
-    /** 风险条目 */
+    /**
+     * 风险条目。
+     * <p>它是全局唯一的风险行形（由 RdmAnalyticsService.riskList 产出），
+     * 总看板、风险中心页与 AI 摘要共用；status 必须带上，
+     * 否则风险中心页要么自己再拼一次查询（口径漂移），要么只能显示“卡在不知道哪一步”。
+     */
     @Data
     public static class Risk {
         private String riskType;
         private Long reqId;
         private String reqNo;
         private String title;
+        private String status;
         private String submitterName;
         private String handler;
         private Long days;

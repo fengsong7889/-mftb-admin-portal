@@ -438,7 +438,7 @@ export default function RequirementDetail() {
             key={`${detail.id}-${detail.status}`}
             reqId={detail.id}
             status={detail.status}
-            editable={hasPermission('rdm-product:edit') || hasPermission('rdm-delivery-board:edit')}
+            editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')}
           />
 
           {/* 流转时间轴 */}

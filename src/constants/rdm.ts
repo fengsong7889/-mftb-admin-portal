@@ -479,6 +479,8 @@ export const RDM_ACTION_OPTIONAL_FIELDS: Partial<Record<RdmAction, RdmActionFiel
 export const RDM_SCOPE = {
   MINE: 'mine',
   TODO: 'todo',
+  /** 待我審批：审批人只存在于 OA 审批任务表，与 todo（PM/验收人/研发负责人）不是同一口径 */
+  APPROVING: 'approving',
   POOL: 'pool',
   PRODUCT: 'product',
   DELIVERY: 'delivery',
@@ -490,6 +492,7 @@ export type RdmScope = (typeof RDM_SCOPE)[keyof typeof RDM_SCOPE]
 export const RDM_SCOPE_LABEL: Record<RdmScope, string> = {
   [RDM_SCOPE.MINE]: '我提的需求',
   [RDM_SCOPE.TODO]: '待我處理',
+  [RDM_SCOPE.APPROVING]: '待我審批',
   [RDM_SCOPE.POOL]: '需求池·待分配',
   [RDM_SCOPE.PRODUCT]: '我負責的產品需求',
   [RDM_SCOPE.DELIVERY]: '研發交付中',
@@ -522,6 +525,7 @@ export type RdmSourceChannel = (typeof RDM_SOURCE_CHANNEL)[keyof typeof RDM_SOUR
 export const RDM_SCOPE_DEFAULT_STATUS: Record<RdmScope, RdmStatus | undefined> = {
   [RDM_SCOPE.MINE]: undefined,
   [RDM_SCOPE.TODO]: undefined,
+  [RDM_SCOPE.APPROVING]: undefined,
   [RDM_SCOPE.POOL]: RDM_STATUS.POOL,
   [RDM_SCOPE.PRODUCT]: undefined,
   [RDM_SCOPE.DELIVERY]: undefined,
@@ -800,12 +804,19 @@ export const RDM_ITERATION_TYPE_COLOR: Record<RdmIterationType, string> = {
   [RDM_ITERATION_TYPE.HOTFIX]: '#FF4D4F',
 }
 
-/** 需求菜单 key（后端权限门控与前端路由受控清单共用；rdm-delivery / rdm-dashboard 为一级分组，其余为叶子菜单） */
+/**
+ * 需求菜单 key（后端权限门控与前端路由受控清单共用）。
+ * <p>rdm-dashboard / rdm-efficiency / rdm-delivery / rdm-config-group 为一级分组，其余为叶子菜单。
+ * <p>v3.7 菜单收敛：不再列 rdm-submit（提交需求降为表单路由）、rdm-product、rdm-delivery-req；
+ * 同时补上上一轮新增但漏登记的三个菜单 key（风险中心、效能与产出分组、部门与人员产出）。
+ * <p>v3.10：rdm-query（需求查询）已并回 rdm-intake —— 分配权必然蕴含全量可见权，
+ * 两者同属分配侧窄权限，不该拆成两个窄权限菜单各自维护。
+ */
 export const RDM_MENU_KEYS = [
-  'rdm-dashboard', 'rdm-dashboard-board', 'rdm-dashboard-quality', 'rdm-dashboard-version', 'rdm-dashboard-report',
-  'rdm-dashboard-score', 'rdm-dashboard-trend',
-  'rdm-workbench', 'rdm-submit', 'rdm-requirement', 'rdm-intake',
-  'rdm-product', 'rdm-delivery', 'rdm-delivery-board', 'rdm-delivery-iteration', 'rdm-delivery-req',
+  'rdm-dashboard', 'rdm-dashboard-board', 'rdm-dashboard-risk', 'rdm-dashboard-quality', 'rdm-dashboard-version', 'rdm-dashboard-report',
+  'rdm-efficiency', 'rdm-dashboard-score', 'rdm-dashboard-trend', 'rdm-efficiency-output',
+  'rdm-workbench', 'rdm-requirement', 'rdm-intake',
+  'rdm-delivery', 'rdm-delivery-board', 'rdm-delivery-iteration',
   'rdm-acceptance', 'rdm-config-group',
   'rdm-config-status', 'rdm-config-routing', 'rdm-config-sla', 'rdm-config-score',
 ] as const
@@ -1028,3 +1039,23 @@ export const RDM_METRIC_DIM_LABEL: Record<RdmMetricDim, string> = {
   [RDM_METRIC_DIM.PERSON]: '個人',
   [RDM_METRIC_DIM.PM]: '產品經理',
 }
+
+/**
+ * 需求终态：已进入结果、不再需要人跟催。
+ * <p>看板列「已駁回 / 已歸檔」与列表催办按钮共用这一份口径，
+ * 避免两个视图对「这条还要不要动」判断不一致。
+ */
+export const RDM_TERMINAL_STATUS: RdmStatus[] = [
+  RDM_STATUS.RELEASED,
+  RDM_STATUS.VERIFIED,
+  RDM_STATUS.CLOSED,
+  RDM_STATUS.REJECTED,
+  RDM_STATUS.INTAKE_REJECTED,
+]
+
+/**
+ * 看板视图单次拉取上限。
+ * <p>看板是按列铺开、不做翻页，所以一次要拿够；但不能无限拿
+ * （卡片带阶段条与 Tooltip，DOM 量随条数线性增长）。超限由页面显式提示截断。
+ */
+export const RDM_KANBAN_SIZE = 100

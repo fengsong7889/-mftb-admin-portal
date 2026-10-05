@@ -113,6 +113,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 (int) PageResult.normalizePage(query.getPage() == null ? 1 : query.getPage()),
                 (int) PageResult.normalizeSize(query.getSize() == null ? 10 : query.getSize()));
         var wrapper = query.toWrapper(unrestricted ? null : (current == null ? null : current.getId()));
+        // 待我審批需要 join OA 审批任务表才能定出审批人，LambdaQueryWrapper 表达不了：先取 id 再收敛
+        if (RdmConstants.SCOPE_APPROVING.equals(query.getScope())) {
+            List<Long> approvingIds = approvingRequirementIds(current);
+            if (approvingIds.isEmpty()) {
+                return new PageResult<>(List.<RdmRequirementVO>of(), 0L);
+            }
+            wrapper.in(RdmRequirement::getId, approvingIds);
+        }
         Page<RdmRequirement> result = requirementMapper.selectPage(page, wrapper);
         Map<String, String> stageOf = configService.stageMap();
         List<RdmRequirementVO> records = result.getRecords().stream()
@@ -128,6 +136,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         Map<String, Long> counts = new LinkedHashMap<>();
         counts.put(RdmConstants.SCOPE_MINE, countByScope(RdmConstants.SCOPE_MINE, userId));
         counts.put(RdmConstants.SCOPE_TODO, countByScope(RdmConstants.SCOPE_TODO, userId));
+        // 审批待办不在需求表的任何人字段上，只能走 OA 口径（与工作台待办组共用同一个方法）
+        counts.put(RdmConstants.SCOPE_APPROVING, (long) approvingRequirementIds(current).size());
         counts.put(RdmConstants.SCOPE_POOL, countByScope(RdmConstants.SCOPE_POOL, userId));
         counts.put(RdmConstants.SCOPE_PRODUCT, countByScope(RdmConstants.SCOPE_PRODUCT, userId));
         counts.put(RdmConstants.SCOPE_DELIVERY, countByScope(RdmConstants.SCOPE_DELIVERY, userId));
@@ -845,43 +855,52 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         vo.setIdentity(identity);
 
         List<RdmWorkbenchVO.TodoGroup> groups = new ArrayList<>();
-        List<RdmRequirementVO> intakeTodo = intakeTodoFor(current, stageOf);
-        if (!intakeTodo.isEmpty()) {
+        // 待办计数一律取与清单 Tab 相同的口径（countByScope / approvingRequirementIds），
+        // 展示用的 list 只取前 20 条；两套算法各算各的就会让工作台与列表的数字对不上。
+        Long scopeUserId = unrestricted ? null : userId;
+        List<Long> approvingIds = approvingRequirementIds(current);
+        if (!approvingIds.isEmpty()) {
             groups.add(new RdmWorkbenchVO.TodoGroup("intake", "需求審批（我是審批人）",
-                    "審批通過後進入需求池", (long) intakeTodo.size(), intakeTodo));
+                    "審批通過後進入需求池", (long) approvingIds.size(), toVOs(approvingIds, stageOf)));
         }
         if (unrestricted || canDispatch(current)) {
             List<RdmRequirementVO> pool = listByStatus(RdmConstants.STATUS_POOL, stageOf);
             if (!pool.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("pool", "需求池待分配（我是技術負責人）",
-                        "分配產品經理後進入受理", (long) pool.size(), pool));
+                        "分配產品經理後進入受理", countByScope(RdmConstants.SCOPE_POOL, scopeUserId), pool));
             }
         }
         if (userId != null) {
             List<RdmRequirementVO> mine = listByColumn(RdmRequirement::getAssigneePmUserId, userId, stageOf);
             if (!mine.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("product", "我負責的產品需求（我是產品經理）",
-                        "需盡快給出受理結論與排期", (long) mine.size(), mine));
+                        "需盡快給出受理結論與排期", countByScope(RdmConstants.SCOPE_PRODUCT, scopeUserId), mine));
             }
             List<RdmRequirementVO> toAccept = listAcceptanceTodo(userId, stageOf);
             if (!toAccept.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("acceptance", "待我驗收（我是業務驗收人）",
-                        "驗收通過後才可確認上線", (long) toAccept.size(), toAccept));
+                        "驗收通過後才可確認上線", countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId), toAccept));
             }
         }
         vo.setTodos(groups);
 
         RdmWorkbenchVO.Stats stats = new RdmWorkbenchVO.Stats();
-        stats.setMineTotal(userId == null ? 0L : requirementMapper.selectCount(
-                new LambdaQueryWrapper<RdmRequirement>().eq(RdmRequirement::getSubmitterUserId, userId)));
+        stats.setMineTotal(countByScope(RdmConstants.SCOPE_MINE, scopeUserId));
         stats.setMineProgress(userId == null ? 0L : requirementMapper.selectCount(
                 new LambdaQueryWrapper<RdmRequirement>().eq(RdmRequirement::getSubmitterUserId, userId)
                         .notIn(RdmRequirement::getStatus, List.of(RdmConstants.STATUS_CLOSED,
                                 RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_VERIFIED))));
         stats.setTodoTotal((long) groups.stream().mapToInt(g -> g.getTotal().intValue()).sum());
-        stats.setOverdueTotal(requirementMapper.selectCount(new LambdaQueryWrapper<RdmRequirement>()
-                .eq(RdmRequirement::getOverdueFlag, 1)));
-        stats.setToAcceptTotal((long) (userId == null ? 0 : listAcceptanceTodo(userId, stageOf).size()));
+        /*
+         * 逾期预警必须与列表共用同一数据范围。
+         * <p>原先这里无条件 count(overdue_flag=1)，任何员工打开工作台看到的是全公司逾期总数：
+         * 既泄露了跨部门规模，又和自己点进去看到的条数对不上。
+         * 走 RdmRequirementQuery.toWrapper 可保证与非管理视角的 relatedOnly 收敛一字不差。
+         */
+        RdmRequirementQuery overdueQuery = new RdmRequirementQuery();
+        overdueQuery.setOverdueOnly(true);
+        stats.setOverdueTotal(requirementMapper.selectCount(overdueQuery.toWrapper(scopeUserId)));
+        stats.setToAcceptTotal(countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId));
         stats.setDeliveredTotal(userId == null ? 0L : requirementMapper.selectCount(
                 new LambdaQueryWrapper<RdmRequirement>().eq(RdmRequirement::getSubmitterUserId, userId)
                         .in(RdmRequirement::getStatus, List.of(RdmConstants.STATUS_RELEASED,
@@ -902,50 +921,47 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 pm.setActiveCount(configService.countActiveByPm(pm.getUserId()));
             }
         }
-        // 分发矩阵之外，持有「产品需求处理」菜单的员工也是可选受理人（避免矩阵未配时无候选人）
+        // 分发矩阵之外，「需求清单」持 edit（受理/PRD/评审）的员工也是可选受理人（避免矩阵未配时无候选人）。
+        // 故意不用 view：菜单收敛后 view 是全员都有的宽权限，拿它筛候选人会把所有人扫进 PM 下拉。
         userMapper.selectList(new LambdaQueryWrapper<SysUser>()
                         .eq(SysUser::getDeleted, 0).last("LIMIT 200"))
                 .stream()
                 .filter(u -> u.getId() != null && !byUser.containsKey(u.getId()))
-                .filter(u -> permissionService.hasPermission(u, RdmConstants.MENU_PRODUCT, "view"))
+                .filter(u -> permissionService.hasPermission(u, RdmConstants.MENU_REQUIREMENT, "edit"))
                 .limit(30)
                 .forEach(u -> byUser.put(u.getId(), toPm(u)));
         return new ArrayList<>(byUser.values());
     }
 
+    /**
+     * 需求可针对的菜单候选：系统 → 可导航页面（两级，前端 Cascader 也只渲染两级）。
+     * <p>选取标准是「能不能真的导航到这个页面」（path 非空且启用），而不是按菜单层级硬编码。
+     * <p>原实现遇到 {@code parent_id IS NULL} 就 continue，而 RDM 菜单拍平后
+     * 需求工作台/需求清單/需求池·分配/需求驗收 这些主入口全都是一级菜单且自带 path，
+     * 导致用户提需求时根本选不到它们（而拍平后的分组节点无 path，它们的二级子菜单反而会被当成顶级展示）。
+     * <p>按 path 筛还能自然避免把“不可点的分组容器”当成需求目标。
+     */
     @Override
     public List<RdmOptionVO.MenuNode> menuTree() {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT m.menu_key, m.name, m.system_code, s.name AS system_name, m.parent_id, m.id "
+                "SELECT m.menu_key, m.name, m.system_code, s.name AS system_name "
                         + "FROM sys_menu m LEFT JOIN sys_system s ON s.code = m.system_code AND s.deleted = 0 "
-                        + "WHERE m.deleted = 0 AND m.status = 1 AND m.type IN (1, 2) "
+                        + "WHERE m.deleted = 0 AND m.status = 1 AND m.path IS NOT NULL AND m.path != '' "
                         + "ORDER BY m.system_code, m.sort_order, m.id");
         Map<String, RdmOptionVO.MenuNode> systems = new LinkedHashMap<>();
-        Map<Long, String> menuKeyByParent = new LinkedHashMap<>();
         for (Map<String, Object> row : rows) {
             String systemCode = (String) row.get("system_code");
-            if (!StringUtils.hasText(systemCode)) {
+            String menuKey = (String) row.get("menu_key");
+            if (!StringUtils.hasText(systemCode) || !StringUtils.hasText(menuKey)) {
                 continue;
             }
+            // 系统名缺失时用 code 兜底：否则前端会渲染出一个空白可选系统（实测曾出现 code=portal 空节点）
+            String systemName = (String) row.get("system_name");
             RdmOptionVO.MenuNode sys = systems.computeIfAbsent(systemCode,
-                    code -> new RdmOptionVO.MenuNode(code, (String) row.get("system_name"), new ArrayList<>()));
-            Long parentId = row.get("parent_id") == null ? null : ((Number) row.get("parent_id")).longValue();
-            if (parentId == null) {
-                continue;
-            }
-            menuKeyByParent.put(((Number) row.get("id")).longValue(), (String) row.get("menu_key"));
-            if (menuKeyByParent.containsKey(parentId)) {
-                // 二级菜单作为系统下的叶子（三级及更深归到其二级父菜单同名，原型阶段够用）
-                String parentKey = menuKeyByParent.get(parentId);
-                if (!sys.getChildren().stream().anyMatch(n -> n.getKey().equals(parentKey))) {
-                    sys.getChildren().add(new RdmOptionVO.MenuNode(parentKey, nameOfMenu(rows, parentId), new ArrayList<>()));
-                }
-            } else {
-                RdmOptionVO.MenuNode top = new RdmOptionVO.MenuNode((String) row.get("menu_key"),
-                        (String) row.get("name"), new ArrayList<>());
-                // 顶级目录的子菜单挂到该目录下
-                sys.getChildren().add(top);
-            }
+                    code -> new RdmOptionVO.MenuNode(code, StringUtils.hasText(systemName) ? systemName : code, new ArrayList<>()));
+            String menuName = (String) row.get("name");
+            sys.getChildren().add(new RdmOptionVO.MenuNode(menuKey,
+                    StringUtils.hasText(menuName) ? menuName : menuKey, new ArrayList<>()));
         }
         return new ArrayList<>(systems.values());
     }
@@ -999,7 +1015,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
     }
 
-    /** 是否能看到全部需求（超管、PMO/导出权持有者、技术负责人） */
+    /**
+     * 是否能看到全部需求（不被「与自己相关」收敛）。
+     * <p>口径就一条：有没有分配侧的授权（需求池的 view，含持有 edit 的人）。
+     * 全量可见与分配权同属一个窄权限菜单，因为看不到单子就分不出去。
+     * <p>不再把 rdm-requirement 的 export / delete 当全量凭证：那等于“能导出 Excel 就能浏览
+     * 全公司需求”，而这个菜单是人人可看的宽权限。实查开发库除 admin 外无人持有它们的
+     * export/delete，所以移除这两条不会让任何人丢掉既有可见范围。
+     */
     private boolean canSeeAll(SysUser current) {
         if (operatorResolver.isAdmin(current)) {
             return true;
@@ -1007,8 +1030,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (current == null) {
             return false;
         }
-        return permissionService.hasPermission(current, "rdm-requirement", "export")
-                || permissionService.hasPermission(current, "rdm-requirement", "delete")
+        return permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "view")
                 || canDispatch(current);
     }
 
@@ -1058,7 +1080,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (current != null && permissionService.hasPermission(current, MENU_DISPATCHER, "edit")) {
             roles.add("技術負責人");
         }
-        if (current != null && permissionService.hasPermission(current, RdmConstants.MENU_PRODUCT, "edit")) {
+        if (current != null && permissionService.hasPermission(current, RdmConstants.MENU_REQUIREMENT, "edit")) {
             roles.add("產品經理");
         }
         if (current != null && permissionService.hasPermission(current, RdmConstants.MENU_ACCEPTANCE, "create")) {
@@ -1439,24 +1461,37 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 .stream().map(r -> RdmRequirementVO.from(r, stageOf)).toList();
     }
 
-    /** 待我审批：从 OA 待审任务反查（审批人字段存「姓名(工号)」，兼容仅存工号/姓名） */
-    private List<RdmRequirementVO> intakeTodoFor(SysUser current, Map<String, String> stageOf) {
+    /**
+     * 待我審批的需求 id（准入审批走 OA，审批人在 biz_oa_approval_task 里；
+     * 审批人字段存「姓名(工号)」，所以同时兼容仅存工号/姓名的历史数据）。
+     * <p>这是「待我審批」的唯一口径：工作台待办组与需求清单的 approving 视角都走它。
+     * 之前工作台用这个 OA 口径、清单 scope=todo 用需求表的 PM/验收人/研发负责人字段，
+     * 审批人在工作台看到 3 条、点「查看全部」进到列表是空的 —— 动线断在这儿。
+     * <p>故意不加 LIMIT：count 要真实总数，展示截断由调用方做。
+     * <p>包内可见以便单测直接验证判定口径。
+     */
+    List<Long> approvingRequirementIds(SysUser current) {
         if (current == null) {
             return List.of();
         }
-        List<Long> ids = jdbcTemplate.queryForList(
+        return jdbcTemplate.queryForList(
                 "SELECT r.id FROM rdm_requirement r "
                         + "JOIN biz_oa_request o ON o.flow_no = r.intake_flow_no AND o.deleted = 0 AND o.flow_status = 'pending' "
                         + "JOIN biz_oa_approval_task t ON t.request_id = o.id AND t.task_status = 'pending' "
                         + "WHERE r.deleted = 0 AND r.status = 'intake_pending' "
                         + "AND (t.approver LIKE ? OR t.approver LIKE ? OR t.approver LIKE ?) "
-                        + "ORDER BY r.updated_at DESC LIMIT 20",
+                        + "ORDER BY r.updated_at DESC",
                 Long.class, "%" + current.getName() + "%", "%" + current.getEmpId() + "%",
                 "%" + current.getUsername() + "%");
+    }
+
+    /** 按 id 列表映射成 VO（工作台只展示前 20 条） */
+    private List<RdmRequirementVO> toVOs(List<Long> ids, Map<String, String> stageOf) {
         if (ids.isEmpty()) {
             return List.of();
         }
-        return requirementMapper.selectBatchIds(ids).stream().map(r -> RdmRequirementVO.from(r, stageOf)).toList();
+        return requirementMapper.selectBatchIds(ids.stream().limit(20).toList()).stream()
+                .map(r -> RdmRequirementVO.from(r, stageOf)).toList();
     }
 
     private RdmRequirementVO.SlaInfo buildSla(RdmRequirement req) {
@@ -1536,11 +1571,6 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         List<String> names = jdbcTemplate.queryForList(
                 "SELECT name FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1", String.class, menuKey);
         return names.isEmpty() ? null : names.get(0);
-    }
-
-    private String nameOfMenu(List<Map<String, Object>> rows, Long menuId) {
-        return rows.stream().filter(r -> r.get("id") != null && ((Number) r.get("id")).longValue() == menuId)
-                .map(r -> (String) r.get("name")).findFirst().orElse(null);
     }
 
     private String systemName(String systemCode) {

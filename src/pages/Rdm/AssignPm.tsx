@@ -38,8 +38,14 @@ export default function AssignPm() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  /** 分配完回到来源视角（需求池 / 交付中台账），不回列表页第一屏 */
-  const backPath = searchParams.get('from') === 'requirement' ? '/rdm-requirement' : '/rdm-intake'
+  /**
+   * 分配完回到来源入口（back 由列表页带完整路径 + 视角过来，所以需求池回来需求池、清单回来清单）。
+   * <p>只接受站内相对路径：拒绝 `//` 开头的协议相对地址，避免外部站点被拼进 navigate。
+   */
+  const backParam = searchParams.get('back')
+  const backPath = backParam && backParam.startsWith('/') && !backParam.startsWith('//')
+    ? backParam
+    : '/rdm-requirement'
 
   const load = useCallback(async () => {
     if (ids.length === 0) {
@@ -183,7 +189,9 @@ export default function AssignPm() {
       <div className="rdm-form-section">
         <div className="rdm-form-section-title">
           <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><SendOutlined /></span>
-          被分配的需求（{rows.length}）
+          {/* 加载中先按“要分配几条”计数，否则进入页面的瞬间会显示「被分配的需求（0）」，
+              让人误以为没选中任何需求 */}
+          被分配的需求（{loading ? ids.length : rows.length}）
         </div>
         <Table<RdmRequirementDetail>
           rowKey="id"

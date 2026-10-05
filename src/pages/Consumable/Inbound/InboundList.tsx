@@ -208,10 +208,12 @@ export default function InboundList() {
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建入庫單</Button>
+
           <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建入庫單</Button>
             {configComponent}
           </Space>
+        
         </div>
       </div>
 

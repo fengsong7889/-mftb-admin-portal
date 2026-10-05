@@ -42,7 +42,8 @@ export default function IterationPlan() {
   const { hasPermission } = useAuth()
   const [rows, setRows] = useState<RdmIterationItem[]>([])
   const [loading, setLoading] = useState(true)
-  const canEdit = hasPermission('rdm-delivery-iteration:edit') || hasPermission('rdm-product:edit')
+  // 菜单收敛后「產品需求處理」已退役，它的 edit 平移到需求清单；仍查退役 key 会让有编辑权的人也按不动
+  const canEdit = hasPermission('rdm-delivery-iteration:edit') || hasPermission('rdm-requirement:edit')
 
   const load = useCallback(async () => {
     setLoading(true)
