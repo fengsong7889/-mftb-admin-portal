@@ -217,22 +217,18 @@ const SUB_PAGE_NAME: Record<string, string> = {
   '/order-detail': '訂單詳情',
   '/promotion-order-manage': '訂單管理',
   /*
-   * 產研協同（RDM）子页与已从菜单退役的路由：这些路径在后端菜单树里查不到，
-   * 不兜底就会退成 slug（页签实际出现过「rdm submit」、「rdm query」）。
-   * 菜单收敛后「提交需求/產品需求處理/交付中需求/需求查询」都不再是菜单项，
-   * 但路由本身可达（表单页与旧链接重定向），所以必须在这里给名字。
+   * 產研協同（RDM）的详情/独立表单页：这些路由本就没有菜单记录，
+   * 不兜底就会退成 slug（深度测试实测到页签显示「rdm submit」）。
+   * <p>只列详情页与独立表单页：门禁（check:menu）限制本表条目数且禁止“菜单名副本”，
+   * 所以退役菜单（rdm-query / rdm-product / rdm-delivery-req）的名字不往这里塞——
+   * 它们的旧地址本来就重定向到存活页，页签会归到目标页名下。
    */
   '/rdm-submit': '提交需求',
-  '/rdm-query': '需求查詢',
-  '/rdm-product': '需求清單',
-  '/rdm-delivery-req': '需求清單',
   '/rdm-detail': '需求詳情',
   '/rdm-assign': '分配產品經理',
   '/rdm-prd': '編寫 PRD',
   '/rdm-review': '需求評審',
   '/rdm-change': '需求變更申請',
-  '/rdm-task': '研發任務',
-  '/rdm-iteration-form': '迭代表單',
   '/rdm-acceptance-form': '需求驗收',
   '/store-data-config': '門店數據配置',
   '/translation-manage': '翻譯工作台',
