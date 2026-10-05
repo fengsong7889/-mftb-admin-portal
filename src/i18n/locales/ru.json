@@ -3,6 +3,12 @@
     "title": "Корпоративный портал",
     "appCenter": "Центр приложений",
     "artwork": {
+      "rdmSubmit": "Заявка",
+      "rdmIntake": "Согласование",
+      "rdmDispatch": "Назначение",
+      "rdmProduct": "Дизайн",
+      "rdmDelivery": "Разработка",
+      "rdmAcceptance": "Релиз",
       "searching": "Поиск совпадений",
       "searchMatched": "Совпадение найдено",
       "hrMatching": "Подбор отдела для сотрудника",

@@ -366,6 +366,37 @@ export default function HotSearchConfig() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
+  /** 輪播漸變色徽章（图片模式展示） */
+  const renderMarqueeBadge = (v: string, record: HotSearchRecord, opts: { fontSize: number; emojiL: string; emojiR: string; textFn: (v: string) => string }) => {
+    if (record.displayMode !== 'image' || !record.hasImage) return null
+    const gradientMap: Record<number, string> = {
+      1003: 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)',
+      1005: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+      1007: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+      1009: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+    }
+    const bgGradient = gradientMap[record.id] || 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)'
+    const text = opts.textFn(v)
+    return (
+      <div style={{
+        width: 100, height: 20, borderRadius: 10, overflow: 'hidden', position: 'relative',
+        boxShadow: '0 2px 6px rgba(232, 114, 12, 0.25)', background: bgGradient,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          animation: 'marquee 6s linear infinite', whiteSpace: 'nowrap',
+          color: '#FFFFFF', fontSize: opts.fontSize, fontWeight: 500,
+        }}>
+          <span style={{ fontSize: opts.fontSize + 1 }}>{opts.emojiL}</span>
+          <span>{text}</span>
+          <span style={{ fontSize: opts.fontSize + 1 }}>{opts.emojiR}</span>
+          <span>{text}</span>
+        </div>
+      </div>
+    )
+  }
+
   const columns: TableColumnsType<HotSearchRecord> = [
     { title: t('hotSearchConfig.colId'), dataIndex: 'id', key: 'id', width: 90, render: (v: number) => `#${v}` },
     { 
@@ -383,54 +414,8 @@ export default function HotSearchConfig() {
       key: 'word', 
       width: 180, 
       render: (v: string, record: HotSearchRecord) => {
-        // 图片模式展示 - 轮播文字+表情
-        if (record.displayMode === 'image' && record.hasImage) {
-          // 根据ID使用不同的渐变色
-          const gradientMap: Record<number, string> = {
-            1003: 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)', // 红色-橙色
-            1005: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)', // 紫色
-            1007: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', // 绿色
-            1009: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)', // 橙黄色
-          }
-          const bgGradient = gradientMap[record.id] || 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)'
-          
-          return (
-            <div 
-              style={{
-                width: 100,
-                height: 20,
-                borderRadius: 10,
-                overflow: 'hidden',
-                position: 'relative',
-                boxShadow: '0 2px 6px rgba(232, 114, 12, 0.25)',
-                background: bgGradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 8px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  animation: 'marquee 6s linear infinite',
-                  whiteSpace: 'nowrap',
-                  color: '#FFFFFF',
-                  fontSize: 10,
-                  fontWeight: 500,
-                }}
-              >
-                <span style={{ fontSize: 11 }}>🔥</span>
-                <span>{v.replace(/\p{Extended_Pictographic}/gu, '').trim()}</span>
-                <span style={{ fontSize: 11 }}>⭐</span>
-                <span>{v.replace(/\p{Extended_Pictographic}/gu, '').trim()}</span>
-              </div>
-            </div>
-          )
-        }
-        // 文字模式展示
+        const badge = renderMarqueeBadge(v, record, { fontSize: 10, emojiL: '🔥', emojiR: '⭐', textFn: (t) => t.replace(/\p{Extended_Pictographic}/gu, '').trim() })
+        if (badge) return badge
         return v
       }
     },
@@ -440,54 +425,8 @@ export default function HotSearchConfig() {
       key: 'wordEn', 
       width: 180, 
       render: (v: string, record: HotSearchRecord) => {
-        // 图片模式展示 - 轮播文字+表情
-        if (record.displayMode === 'image' && record.hasImage) {
-          // 根据ID使用不同的渐变色
-          const gradientMap: Record<number, string> = {
-            1003: 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)', // 红色-橙色
-            1005: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)', // 紫色
-            1007: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', // 绿色
-            1009: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)', // 橙黄色
-          }
-          const bgGradient = gradientMap[record.id] || 'linear-gradient(135deg, #DC2626 0%, #E8720C 100%)'
-          
-          return (
-            <div 
-              style={{
-                width: 100,
-                height: 20,
-                borderRadius: 10,
-                overflow: 'hidden',
-                position: 'relative',
-                boxShadow: '0 2px 6px rgba(232, 114, 12, 0.25)',
-                background: bgGradient,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 8px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  animation: 'marquee 6s linear infinite',
-                  whiteSpace: 'nowrap',
-                  color: '#FFFFFF',
-                  fontSize: 9,
-                  fontWeight: 500,
-                }}
-              >
-                <span style={{ fontSize: 10 }}>🎉</span>
-                <span>{v || 'Deal'}</span>
-                <span style={{ fontSize: 10 }}>🎊</span>
-                <span>{v || 'Deal'}</span>
-              </div>
-            </div>
-          )
-        }
-        // 文字模式展示
+        const badge = renderMarqueeBadge(v, record, { fontSize: 9, emojiL: '🎉', emojiR: '🎊', textFn: (t) => t || 'Deal' })
+        if (badge) return badge
         return v || '-'
       }
     },

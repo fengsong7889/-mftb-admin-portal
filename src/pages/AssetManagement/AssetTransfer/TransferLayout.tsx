@@ -1,8 +1,18 @@
+/**
+ * 资产调拨模块的共享页面容器（页头 / 分节卡片 / 错误提示）。
+ * 注意本模块是真实业务页面，与 AssetReturn、AssetClaim 下的 Preview* 预览组件无关。
+ *
+ * 样式全部内联：与 AssetClaim/ClaimLayout 同功能但写法不一致（那边靠 className，样式
+ * 指向 claim-module.css）。调拨页若直接沿用领用模块的 class，会造成“改领用样式
+ * 调拨跟着变”的隐式耦合，因此改为自带内联样式。两套实现确实重复，后续合并时
+ * 应下沉到 src/components 并统一走设计令牌。
+ */
 import type { ReactNode } from 'react'
 import { Alert, Button } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
+/** 带顶部渐变条的表单页头；disabled 用于提交进行中禁止返回，避免页面跳走后丢失响应 */
 export function TransferPageHeader({ title, onBack, disabled }: { title: string; onBack: () => void; disabled?: boolean }) {
   const { t } = useTranslation()
   return <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -16,6 +26,7 @@ export function TransferPageHeader({ title, onBack, disabled }: { title: string;
   </div>
 }
 
+/** 分节卡片。tone 只影响图标底色（蓝=资产信息、橙=调拨信息、紫=预留），不改变布局 */
 export function TransferSection({ title, icon, tone = 'blue', children }: {
   title: string; icon: ReactNode; tone?: 'blue' | 'orange' | 'purple'; children: ReactNode
 }) {
@@ -30,6 +41,7 @@ export function TransferSection({ title, icon, tone = 'blue', children }: {
   </div>
 }
 
+/** 接口错误提示条；传了 retry 才渲染重试按钮。无错误时返回 null，调用方可直接堆叠多个 */
 export function TransferError({ error, retry }: { error?: string; retry?: () => void }) {
   const { t } = useTranslation()
   return error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }}

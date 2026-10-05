@@ -10,7 +10,12 @@ import {
 } from '@ant-design/icons'
 import { Line, Column, Pie, Area } from '@ant-design/charts'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import {
+  createTerminalOptions, createRegionOptions,
+  brandOptions,
+  trendAnimationConfig, pieLabelConfig, pieInteractions, columnLabelLayout,
+  reportTablePagination, reportTableCommonProps,
+} from '../_shared/report-utils'
 
 const { RangePicker } = DatePicker
 
@@ -96,24 +101,8 @@ const trendConfig = {
   xField: 'date',
   yField: 'value',
   seriesField: 'type',
-  smooth: true,
-  animation: {
-    appear: {
-      animation: 'path-in',
-      duration: 1000,
-    },
-  },
   color: ['#1890ff', '#52c41a', '#fa8c16'],
-  legend: {
-    position: 'top' as const,
-  },
-  tooltip: {
-    showMarkers: false,
-  },
-  point: {
-    size: 3,
-    shape: 'circle',
-  },
+  ...trendAnimationConfig,
 }
 
 const promotionPieConfig = {
@@ -121,15 +110,8 @@ const promotionPieConfig = {
   angleField: 'value',
   colorField: 'type',
   radius: 0.8,
-  label: {
-    type: 'outer' as const,
-    content: '{name} {percentage}%',
-  },
-  interactions: [
-    {
-      type: 'element-active',
-    },
-  ],
+  label: pieLabelConfig,
+  interactions: pieInteractions,
   color: ['#f5222d', '#fa8c16', '#1890ff'],
   legend: {
     position: 'bottom' as const,
@@ -145,11 +127,7 @@ const timeSlotColumnConfig = {
   color: ['#1890ff', '#52c41a'],
   label: {
     position: 'middle' as const,
-    layout: [
-      { type: 'interval-adjust-position' },
-      { type: 'interval-hide-overlap' },
-      { type: 'adjust-color' },
-    ],
+    layout: columnLabelLayout,
   },
   legend: {
     position: 'top' as const,
@@ -183,11 +161,7 @@ const brandColumnConfig = {
   color: ['#1890ff', '#52c41a', '#fa8c16'],
   label: {
     position: 'middle' as const,
-    layout: [
-      { type: 'interval-adjust-position' },
-      { type: 'interval-hide-overlap' },
-      { type: 'adjust-color' },
-    ],
+    layout: columnLabelLayout,
   },
   legend: {
     position: 'top' as const,
@@ -231,19 +205,8 @@ export default function HotSearchReport() {
     },
   ]
 
-  const terminalOptions = [
-    { label: t('common.all'), value: 'all' },
-    { label: t('dict.terminal.app'), value: 'app' },
-    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
-    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
-    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
-  ]
-
-  const regionOptions = [
-    { label: t('common.all'), value: 'all' },
-    { label: t('dict.region.macau'), value: 'macau' },
-    { label: t('dict.region.taipa'), value: 'taipa' },
-  ]
+  const terminalOptions = createTerminalOptions(t)
+  const regionOptions = createRegionOptions(t)
 
   const promotionTypeOptions = [
     { label: t('common.all'), value: 'all' },
@@ -388,17 +351,8 @@ export default function HotSearchReport() {
           <Table<ReportData>
             columns={applyConfig(columns)}
             dataSource={mockData}
-            pagination={{
-              total: mockData.length,
-              pageSize: 10,
-              showTotal: (total) => t('common.total', { count: total }),
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              defaultPageSize: 10,
-              showQuickJumper: true,
-            }}
-            size="middle"
-            bordered={false}
+            pagination={reportTablePagination(mockData.length, t)}
+            {...reportTableCommonProps}
             scroll={{ x: 1500 }}
           />
         </Card>

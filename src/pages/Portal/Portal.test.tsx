@@ -417,8 +417,24 @@ describe('场景区分与低干扰动效', () => {
     await i18n.changeLanguage(lang)
     const copy = resources[lang].portal.artwork
     expect(Object.keys(copy).sort()).toEqual(Object.keys(en.portal.artwork).sort())
-    const { container } = render(<>{['search', 'iam', 'eam', 'hr', 'oa', 'translation', 'ads', 'merchant', 'seller', 'platform'].map(code => <SystemArtwork key={code} code={code} />)}</>)
+    const { container } = render(<>{['search', 'iam', 'eam', 'hr', 'oa', 'translation', 'ads', 'merchant', 'seller', 'platform', 'rdm'].map(code => <SystemArtwork key={code} code={code} />)}</>)
     for (const text of Object.values(copy)) expect(container).toHaveTextContent(text)
+  })
+
+  it('產研協同静态构图包含六个阶段站点、驳回回路与挂起支路', () => {
+    const { container } = render(<SystemArtwork code="rdm" name="產研協同系統" />)
+    const image = container.querySelector('svg[data-scene="rdm"]')!
+    expect(image).toHaveAttribute('data-motion', 'idle')
+    // 静态构图只保留阶段标签（六个站点），交互动效才点亮站点与验收章
+    expect(image.querySelectorAll('text')).toHaveLength(6)
+    for (let index = 0; index < 6; index += 1) expect(image.querySelector(`.portal-rdm-stage-${index}`)).toHaveAttribute('opacity', '0')
+    expect(image.querySelector('.portal-rdm-halo')).toHaveClass('portal-art-motion')
+    expect(image.querySelector('.portal-rdm-delivered')).toHaveAttribute('opacity', '0')
+    expect(image).toHaveTextContent(zh.portal.artwork.rdmSubmit)
+    expect(image).toHaveTextContent(zh.portal.artwork.rdmAcceptance)
+    // 驳回（红）与挂起（琥珀）两条支路静态可见，不占用主线节拍
+    expect(image.querySelector('path[stroke="#FF4D4F"]')).toBeInTheDocument()
+    expect(image.querySelector('circle[stroke="#FA8C16"]')).toBeInTheDocument()
   })
 
   it.each([

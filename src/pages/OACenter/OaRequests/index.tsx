@@ -38,6 +38,8 @@ const APPROVAL_TYPE_I18N: Record<string, string> = {
   gift: 'approvalCenter.typeGift',
   ai_access: 'oaRequests.aiAccessType',
   oa_purchase: 'oaRequests.typePurchase',
+  rdm_intake: 'oaRequests.typeRdmIntake',
+  rdm_change: 'oaRequests.typeRdmChange',
   hr_onboard: 'hrLifecycle.typeOnboard',
   hr_regular: 'hrLifecycle.typeRegular',
   hr_transfer: 'hrLifecycle.typeTransfer',
@@ -53,6 +55,9 @@ const FLOW_TAG_COLOR: Record<string, string> = {
   gift: '#722ED1',
   ai_access: '#1677FF',
   oa_purchase: '#FA8C16',
+  // 產研需求类走主品牌橙（RDM 单据与广告业务单据要一眼分得开）
+  rdm_intake: '#E8720C',
+  rdm_change: '#E8720C',
 }
 
 /** 流程類型 → 流程名稱前綴（用於「流程名稱」列） */
@@ -76,11 +81,16 @@ const FLOW_NAME_PREFIX: Record<string, string> = {
   // 漏登记会直接裸露 processCode（曾缺 hr_renew / hr_certificate）
   hr_renew: '合同續簽',
   hr_certificate: '證明開具',
+  // 需求准入/变更审批由 RDM 发起，漏登记会让审批人在列表里看到裸英文 processCode
+  rdm_intake: '需求準入',
+  rdm_change: '需求變更',
 }
 
 /** 流程標籤短標籤（列表 Tag 用，與表單頁 FLOW_TAG_LABEL 保持一致） */
 const FLOW_TAG_LABEL: Record<string, string> = {
   oa_purchase: '採購',
+  rdm_intake: '準入',
+  rdm_change: '變更',
 }
 
 /** 流程狀態 → Tag 顏色 */
@@ -121,6 +131,8 @@ const PROCESS_TO_TYPE: Record<string, string> = {
   oa_purchase: 'oa_purchase',
   oa_seal: 'oa_seal',
   oa_general: 'oa_general',
+  rdm_intake: 'rdm_intake',
+  rdm_change: 'rdm_change',
 }
 
 /* ==================== 類型 ==================== */

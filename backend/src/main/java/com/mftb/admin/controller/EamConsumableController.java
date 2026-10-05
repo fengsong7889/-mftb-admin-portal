@@ -40,18 +40,21 @@ public class EamConsumableController {
         return Result.success(consumableService.itemOptions());
     }
 
+    /** 耗材档案详情 */
     @GetMapping("/items/{id}")
     @RequirePermission(menu = "consumable-item")
     public Result<EamConsumableItemVO> itemDetail(@PathVariable long id) {
         return Result.success(consumableService.itemDetail(id));
     }
 
+    /** 新建耗材档案（编码生成与唯一性校验在 Service 内） */
     @PostMapping("/items")
     @RequirePermission(menu = "consumable-item", action = "create")
     public Result<Long> createItem(@RequestBody EamConsumableItemSaveDTO dto) {
         return Result.success(consumableService.createItem(dto));
     }
 
+    /** 编辑耗材档案；校验后直接覆盖字段，dto.status 非空时一并改状态（当前不做单据引用限制） */
     @PutMapping("/items/{id}")
     @RequirePermission(menu = "consumable-item", action = "edit")
     public Result<Void> updateItem(@PathVariable long id, @RequestBody EamConsumableItemSaveDTO dto) {
@@ -59,6 +62,7 @@ public class EamConsumableController {
         return Result.success();
     }
 
+    /** 设置耗材档案状态；body.status 必须为 enabled 或 disabled，非法值会被后端拒绝 */
     @PutMapping("/items/{id}/status")
     @RequirePermission(menu = "consumable-item", action = "edit")
     public Result<Void> toggleItemStatus(@PathVariable long id, @RequestBody Map<String, String> body) {
@@ -66,6 +70,7 @@ public class EamConsumableController {
         return Result.success();
     }
 
+    /** 删除耗材档案；仍有库存时拒绝删除，提示先清零或改为停用 */
     @DeleteMapping("/items/{id}")
     @RequirePermission(menu = "consumable-item", action = "delete")
     public Result<Void> deleteItem(@PathVariable long id) {

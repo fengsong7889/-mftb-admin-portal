@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Button, Upload, message, InputNumber, Tag, Table, ConfigProvider, Modal, type UploadFile } from 'antd'
+import { Form, Input, Select, Button, message, InputNumber, Tag, Table, ConfigProvider, Modal, type UploadFile } from 'antd'
 import {
   ArrowLeftOutlined,
   SendOutlined,
-  UploadOutlined,
-  FileImageOutlined,
-  FilePdfOutlined,
   AccountBookOutlined,
   FileProtectOutlined,
   EditOutlined,
@@ -22,27 +19,17 @@ import { fetchFinAccounts, fetchFinDebts, submitMergeApply } from '../../api/fin
 import type { FinAccount, MergeApplyPayload } from '../../api/finance'
 import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
 import type { OptionItem } from '../../api/types'
-import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
+import { isWorkflowEnabled } from '../../utils/workflowEnabled'
 import BrandTag from '../../components/BrandTag'
-import { useCountUp } from '../../hooks/useCountUp'
-
-function AnimatedNumber({ value, suffix = '', prefix = '' }: { value: number; suffix?: string; prefix?: string }) {
-  const animated = useCountUp(value)
-  return <>{prefix}{animated.toLocaleString()}{suffix}</>
-}
+import { AnimatedNumber, accountStatusMap } from './components/shared'
+import CertificateUploader from './components/CertificateUploader'
+import SuccessModal from './components/SuccessModal'
 
 /** 品牌選項（labelKey 為 i18n key） */
 const brandOptions = [
   { labelKey: 'accountBalance.brandFlashBee', value: 'flashBee' },
   { label: 'mFood', value: 'mFood' },
 ]
-
-/** 賬戶狀態文案/顏色映射（labelKey 為 i18n key） */
-const accountStatusMap: Record<string, { labelKey: string; color: string }> = {
-  normal: { labelKey: 'accountBalance.statusNormal', color: 'green' },
-  frozen: { labelKey: 'accountBalance.statusFrozen', color: 'red' },
-  mergeFrozen: { labelKey: 'accountBalance.statusMergeFrozen', color: 'orange' },
-}
 
 /** 從門店選項文案末尾提取門店編碼，如「珠海前山分店(MD00007)」-> MD00007 */
 function storeCodeOf(label: string): string {
@@ -72,7 +59,6 @@ export default function MergeAdd() {
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
-  const [countdown, setCountdown] = useState(5)
 
   /** 同品牌推廣金賬戶列表（註銷集團選項/餘額/狀態均由此派生） */
   const [accounts, setAccounts] = useState<FinAccount[]>([])
@@ -157,18 +143,6 @@ export default function MergeAdd() {
   const targetGroupOptions = (sourceBrand && sourceGroupId)
     ? allAccounts.filter(a => a.groupId !== sourceGroupId).map(toTargetOption)
     : []
-
-  /** 提交成功倒計時 */
-  useEffect(() => {
-    if (!successVisible) return
-    if (countdown <= 0) {
-      setSuccessVisible(false)
-      navigate('/account-balance')
-      return
-    }
-    const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [successVisible, countdown, navigate])
 
   /** 添加償還門店行（直接添加空行） */
   const handleAddRepayRow = () => {
@@ -293,7 +267,6 @@ export default function MergeAdd() {
             }
             const flowNo = await submitMergeApply(payload)
             setSubmittedFlowNo(flowNo)
-            setCountdown(5)
             // 等待確認彈窗完全關閉後再顯示成功彈窗
             setTimeout(() => setSuccessVisible(true), 350)
           } catch (err) {
@@ -310,60 +283,6 @@ export default function MergeAdd() {
       setSubmitting(false)
     }
   }
-
-  /** 文件上傳校驗 */
-  const beforeUpload = (file: File) => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
-    if (!validTypes.includes(file.type)) { message.error(t('accountBalance.onlyFormatError')); return Upload.LIST_IGNORE }
-    if (file.size > 5 * 1024 * 1024) { message.error(t('accountBalance.fileSizeExceed')); return Upload.LIST_IGNORE }
-    return false
-  }
-
-  /** 渲染文件列表 */
-  const renderFileList = () => (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-      {certificateFiles.map((file) => (
-        <div key={file.uid} style={{
-          width: 88, height: 88, border: '1px solid #e8e8e8', borderRadius: 8,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          position: 'relative', background: '#fafafa',
-        }}>
-          {file.name?.endsWith('.pdf')
-            ? <FilePdfOutlined style={{ fontSize: 28, color: '#E53935' }} />
-            : <FileImageOutlined style={{ fontSize: 28, color: '#1976D2' }} />
-          }
-          <span style={{ fontSize: 10, color: '#999', marginTop: 4, maxWidth: 76, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {file.name}
-          </span>
-          <Button type="text" size="small" danger
-            style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => setCertificateFiles(certificateFiles.filter(f => f.uid !== file.uid))}
-          >×</Button>
-        </div>
-      ))}
-      {certificateFiles.length < 5 && (
-        <Upload accept=".png,.jpg,.jpeg,.pdf" showUploadList={false} beforeUpload={beforeUpload}
-          onChange={(info) => {
-            if (info.file.status !== 'removed') {
-              setCertificateFiles([...certificateFiles, { uid: info.file.uid, name: info.file.name }])
-            }
-          }}
-        >
-          <div style={{
-            width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa', transition: 'all 0.3s',
-          }}
-            onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
-            onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
-          >
-            <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>{t('accountBalance.upload')}</span>
-          </div>
-        </Upload>
-      )}
-    </div>
-  )
 
   /** 償還門店表格列 */
   const repayColumns = [
@@ -638,7 +557,7 @@ export default function MergeAdd() {
             <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>
           </div>
           <Form.Item label={t('accountBalance.relatedVoucher')} required style={{ marginBottom: 0 }}>
-            {renderFileList()}
+            <CertificateUploader files={certificateFiles} setFiles={setCertificateFiles} />
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
               {t('accountBalance.voucherLimitHint')}
             </div>
@@ -668,40 +587,7 @@ export default function MergeAdd() {
       </div>
 
       {/* ====== 提交成功彈窗 ====== */}
-      {successVisible && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 12, padding: '32px 28px', width: 400, textAlign: 'center',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-          }}>
-            <div style={{
-              width: 64, height: 64, margin: '0 auto 20px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #52C41A, #73D13D)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
-            }}>
-              <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
-            </div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>{t('accountBalance.submitSuccessTitle')}</h3>
-            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
-                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
-              )}
-              {isDirectExec(submittedFlowNo)
-                ? '✅ 已直接執行合併（未經審批）'
-                : t('accountBalance.submitSuccessDesc')
-              }
-            </p>
-            <Button type="primary" size="large" onClick={() => navigate('/account-balance')}
-              style={{ minWidth: 120, height: 40, borderRadius: 8 }}>
-              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
-            </Button>
-          </div>
-        </div>
-      )}
+      <SuccessModal visible={successVisible} flowNo={submittedFlowNo} onBack={() => navigate('/account-balance')} />
     </div>
   )
 }

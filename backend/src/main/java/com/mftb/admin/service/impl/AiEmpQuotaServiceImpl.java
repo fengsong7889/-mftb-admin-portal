@@ -20,6 +20,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 员工/岗位与角色额度策略的读写实现，契约见 {@link AiEmpQuotaService}。岗位策略与角色策略各有一套 list/get/save/delete/toggle，落在两张表上。
+ * <p>
+ * 事务边界：savePosQuota, deletePosQuota, togglePosQuotaStatus, saveRoleQuota, deleteRoleQuota, toggleRoleQuotaStatus 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：AiEmpQuotaPolicyMapper, AiRoleQuotaPolicyMapper, BizSeqService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

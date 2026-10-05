@@ -519,6 +519,72 @@ body {
   40%, 85% { transform: rotate(180deg); }
 }
 
+/* 產研協同流水线：光环沿波段每 13% 跳一站，站点与轨道进度同步点亮，末站验收后火箭上线。 */
+@keyframes portalRdmHalo {
+  0% { transform: translate(0, 0); opacity: 0; }
+  6%, 12% { transform: translate(0, 0); opacity: 1; }
+  14%, 19% { transform: translate(42px, -20px); }
+  27%, 32% { transform: translate(84px, 0); }
+  40%, 45% { transform: translate(126px, -20px); }
+  53%, 58% { transform: translate(168px, 0); }
+  66%, 86% { transform: translate(210px, -20px); opacity: 1; }
+  92%, 100% { transform: translate(210px, -20px); opacity: 0; }
+}
+@keyframes portalRdmPulse {
+  0%, 100% { opacity: 0.14; transform: scale(0.94); }
+  50% { opacity: 0.46; transform: scale(1); }
+}
+@keyframes portalRdmLaunch {
+  0%, 70% { transform: translate(0, 0); opacity: 0; }
+  74% { transform: translate(2px, -6px); opacity: 1; }
+  86% { transform: translate(12px, -34px); opacity: 1; }
+  92%, 100% { transform: translate(16px, -44px); opacity: 0; }
+}
+@keyframes portalRdmTrack {
+  0%, 6% { stroke-dashoffset: 1; opacity: 1; }
+  14%, 19% { stroke-dashoffset: 0.8; }
+  27%, 32% { stroke-dashoffset: 0.6; }
+  40%, 45% { stroke-dashoffset: 0.4; }
+  53%, 58% { stroke-dashoffset: 0.2; }
+  66%, 88% { stroke-dashoffset: 0; opacity: 1; }
+  94%, 100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes portalRdmStageFirst {
+  0% { opacity: 0; }
+  2%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmStageSecond {
+  0%, 10% { opacity: 0; }
+  14%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmStageThird {
+  0%, 23% { opacity: 0; }
+  27%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmStageFourth {
+  0%, 36% { opacity: 0; }
+  40%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmStageFifth {
+  0%, 49% { opacity: 0; }
+  53%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmStageSixth {
+  0%, 62% { opacity: 0; }
+  66%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+@keyframes portalRdmDelivered {
+  0%, 70% { opacity: 0; }
+  76%, 86% { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+
 /* 隐藏 InputNumber 上下箭头，释放内部空间 */
 .no-spinner-input .ant-input-number-handler-wrap {
   display: none !important;

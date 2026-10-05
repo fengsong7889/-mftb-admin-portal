@@ -20,11 +20,23 @@ public interface SysHrDictService {
     /** 按 dictType+code 取名称，找不到返回原 code（用于把已存的 code 回显为中文） */
     String getNameByCode(String dictType, String code);
 
+    /**
+     * 新增字典项，返回新建 id。dictType / code / name 三项均必填，
+     * 且 (dictType, code) 组合必须唯一。
+     */
     Long create(SysHrDict dict);
 
+    /**
+     * 修改字典项（id 不存在时报错）。
+     * <p>
+     * ⚠️ 与 {@link SysPurchaseCompanyService#update} 不同，本方法**不重校验 code 唯一性**，
+     * 编辑时可以把 code 改到与同类型另一项重复。
+     */
     void update(Long id, SysHrDict dict);
 
+    /** 启停字典项；状态值仅接受 0/1，其他值报错 */
     void updateStatus(Long id, Integer status);
 
+    /** 删除字典项；只校项是否存在，不校是否仍被员工档案引用 */
     void delete(Long id);
 }

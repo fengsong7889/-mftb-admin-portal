@@ -1,3 +1,13 @@
+/**
+ * 资产验收/退料模块的共享展示组件集。
+ *
+ * ⚠️ 本模块处于「第一阶段界面预览」阶段：页面内的单据全是演示数据，操作只在当前
+ * 会话内存生效，刷新即重置，不会写入真实资产或业务数据（PreviewShell 的顶部 Alert
+ * 就是向用户声明这一点）。因此不要直接把这里的交互当成已接通的后端行为。
+ *
+ * 页头与分节容器复用 AssetClaim/ClaimLayout，保证领用、退料、验收三个流程视觉一致。
+ * 文案以繁体为主，与当前默认语言 zh-TW 对齐。
+ */
 import { useRef, useState, type ReactNode } from 'react'
 import { Alert, Button, Descriptions, Empty, Image, Result, Select, Tag, Upload } from 'antd'
 import { FileTextOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
@@ -8,6 +18,7 @@ import type { Evidence } from './returnPreview'
 import '../AssetClaim/index.css'
 import './index.css'
 
+/** 预览页外壳：统一包上 content-area 容器与「演示数据」声明条 */
 export function PreviewShell({ children }: { children: ReactNode }) {
   return <div className="content-area claim-module return-module">
     <Alert className="claim-notice" type="info" showIcon message="第一階段 · 界面交互預覽"
@@ -28,6 +39,8 @@ export function PreviewFooter({ onBack, onSubmit, busy, label = '預覽登記結
   const { t } = useTranslation()
   return <div className="form-footer"><Button disabled={busy} onClick={onBack}>{t('common.cancel')}</Button><Button type="primary" icon={<SaveOutlined />} loading={busy} onClick={onSubmit}>{label}</Button></div>
 }
+/** 状态标签调色板：白名单硬编码在此处，命中则绿/红，未命中一律给 processing；
+ *  value 不在 meta 中时显示「未知狀態」而不是留空白，避免新状态上线时界面无提示地误导用户 */
 export function PreviewTag({ value, meta }: { value?: string; meta: Record<string, string> }) {
   const color = value && ['normal', 'completed', 'paid', 'idle', 'returned', 'waived', 'exception_closed'].includes(value) ? 'success'
     : value && ['lost', 'damaged', 'overdue', 'refund_pending'].includes(value) ? 'error' : 'processing'
@@ -38,6 +51,7 @@ export function PreviewAudit({ operator, updatedAt }: { operator: string; update
     { key: 'operator', label: '最後更新人', children: operator }, { key: 'time', label: '最後更新時間', children: updatedAt },
   ]} /></ReturnSection>
 }
+/** 预览页的编辑权限：管理员或持有该菜单 edit 权限才可操作 */
 export function useFlowPermission(menu: string) {
   const { user, hasPermission } = useAuth()
   return { canEdit: user?.role === 'admin' || hasPermission(`${menu}:edit`), operator: user?.name || '當前驗收操作人' }
@@ -51,6 +65,8 @@ export function PreviewSelect({ value, onChange, options, disabled, placeholder 
     onSearch={setSearch} filterOption={false} options={options.filter(o => o.label.toLowerCase().includes(search.toLowerCase())).slice(0, 20)}
     notFoundContent="暫無匹配的演示數據" />
 }
+/** 本地图片凭证选取：只转 dataURL 存在内存里，不上传服务器（预览阶段无存储后端）。
+ *  reading 用 ref 而非 state：FileReader 是异步的，需要立即拦下拖拽多选带来的并发读。 */
 export function EvidencePicker({ value = [], onChange }: { value?: Evidence[]; onChange?: (files: Evidence[]) => void }) {
   const [error, setError] = useState<string>()
   const [busy, setBusy] = useState(false)

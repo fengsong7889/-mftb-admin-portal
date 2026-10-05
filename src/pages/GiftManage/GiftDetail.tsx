@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button, Space, Input, Select, Table, Modal, Form, InputNumber, message } from 'antd'
-import type { TableColumnsType, TablePaginationConfig } from 'antd'
+import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -16,11 +14,16 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import type { GiftRecordItem } from '../../api/gift'
 import { fetchGiftRecords, deductGiftDays } from '../../api/gift'
-import type { MerchantGroupItem } from '../../api/merchantGroup'
-import { fetchAllMerchantGroups } from '../../api/merchantGroup'
-import type { StoreItem } from '../../api/store'
-import { fetchStoresByGroup } from '../../api/store'
 import { getApprovalRecords } from '../../utils/approvalStore'
+import {
+  createAdTypeOptions, createAdTypeMap,
+  brandOptions,
+  useGroupStoreSearch,
+  createHandleTableChange, createHandleExport,
+  renderGroupInfoColumn, renderStoreInfoColumn, renderBrandColumn,
+  renderRemainingDaysColumn,
+} from './components/shared'
+import GiftSearchFields from './components/GiftSearchFields'
 
 export default function GiftDetail() {
   const { t } = useTranslation('giftDetail')
@@ -29,22 +32,8 @@ export default function GiftDetail() {
   const { hasPermission } = useAuth()
 
   /** 廣告類型 */
-  const adTypeOptions = [
-    { label: t('common:all'), value: '' },
-    { label: t('adTypeNewStore'), value: 'new_store' },
-    { label: t('adTypeRevival'), value: 'revival' },
-    { label: t('adTypeExclusive'), value: 'exclusive' },
-    { label: t('adTypeGold'), value: 'gold' },
-    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
-  ]
-
-  const adTypeMap: Record<string, string> = {
-    new_store: t('adTypeNewStore'),
-    revival: t('adTypeRevival'),
-    exclusive: t('adTypeExclusive'),
-    gold: t('adTypeGold'),
-    popular_merchant: t('adTypePopularMerchant'),
-  }
+  const adTypeOptions = createAdTypeOptions(t)
+  const adTypeMap = createAdTypeMap(t)
   const [form] = Form.useForm()
   const [deductModalVisible, setDeductModalVisible] = useState(false)
   const [currentRecord, setCurrentRecord] = useState<GiftRecordItem | null>(null)
@@ -66,14 +55,15 @@ export default function GiftDetail() {
   const [adType, setAdType] = useState('')
 
   // 搜索条件（表单暂存）
-  const [searchGroupId, setSearchGroupId] = useState<number | undefined>()
-  const [searchStoreId, setSearchStoreId] = useState<number | undefined>()
   const [searchBrand, setSearchBrand] = useState('')
   const [searchAdType, setSearchAdType] = useState('')
 
-  // 集团/门店下拉
-  const [groups, setGroups] = useState<MerchantGroupItem[]>([])
-  const [stores, setStores] = useState<StoreItem[]>([])
+  // 集团/门店级联搜索
+  const {
+    searchGroupId, setSearchGroupId,
+    searchStoreId, setSearchStoreId,
+    groups, stores,
+  } = useGroupStoreSearch()
 
   // 審批中的贈送申請數（TG 流程為本地記錄，列表加載時同步刷新）
   const [pendingGiftCount, setPendingGiftCount] = useState(0)
@@ -87,25 +77,6 @@ export default function GiftDetail() {
   const handleGoApproval = () => {
     navigate('/approval-center?approvalType=gift')
   }
-
-  // 加载集团下拉
-  useEffect(() => {
-    fetchAllMerchantGroups()
-      .then(setGroups)
-      .catch(() => {})
-  }, [])
-
-  // 当搜索集团变化时加载门店下拉
-  useEffect(() => {
-    if (searchGroupId) {
-      fetchStoresByGroup(searchGroupId)
-        .then(setStores)
-        .catch(() => setStores([]))
-    } else {
-      setStores([])
-    }
-    setSearchStoreId(undefined)
-  }, [searchGroupId])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -151,9 +122,8 @@ export default function GiftDetail() {
     setPage(1)
   }
 
-  const handleExport = () => {
-    message.success(t('common:exportDev'))
-  }
+  const handleExport = createHandleExport(t)
+  const handleTableChange = createHandleTableChange(setPage, setSize)
 
   const handleViewDetail = (record: GiftRecordItem) => {
     // 列表按门店+广告类型聚合，明细页以 storeId+adType 加载逐笔记录
@@ -198,11 +168,6 @@ export default function GiftDetail() {
     }
   }
 
-  const handleTableChange = (pagination: TablePaginationConfig) => {
-    setPage(pagination.current || 1)
-    setSize(pagination.pageSize || 10)
-  }
-
   const handleSelectChange = (keys: React.Key[], rows: GiftRecordItem[]) => {
     setSelectedRowKeys(keys)
     setSelectedRows(rows)
@@ -213,30 +178,20 @@ export default function GiftDetail() {
       title: t('colGroupInfo'),
       key: 'groupInfo',
       width: 160,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupCode || record.groupId}</span>
-          <span>{record.groupName}</span>
-        </Space>
-      ),
+      render: (_, record) => renderGroupInfoColumn(record.groupCode, record.groupId, record.groupName),
     },
     {
       title: t('colStoreInfo'),
       key: 'storeInfo',
       width: 160,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeCode || record.storeId}</span>
-          <span>{record.storeName}</span>
-        </Space>
-      ),
+      render: (_, record) => renderStoreInfoColumn(record.storeCode, record.storeId, record.storeName),
     },
     {
       title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (brand: string) => <BrandTag value={brand} />,
+      render: (brand: string) => renderBrandColumn(brand),
     },
     {
       title: t('colAdType'),
@@ -250,11 +205,7 @@ export default function GiftDetail() {
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
-      render: (days: number) => (
-        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} {t('dayUnit')}
-        </span>
-      ),
+      render: (days: number) => renderRemainingDaysColumn(days, t),
     },
     {
       title: t('common:action'),
@@ -296,57 +247,15 @@ export default function GiftDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="groupInfo" label={t('searchGroupIdName')}>
-            <Select
-              placeholder={t('searchGroupIdPlaceholder')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={searchGroupId}
-              onChange={setSearchGroupId}
-              options={groups.map(g => ({
-                label: `${g.groupCode} - ${g.groupName}`,
-                value: g.id,
-              }))}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="storeInfo" label={t('searchStoreIdName')}>
-            <Select
-              placeholder={t('searchStoreIdPlaceholder')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={searchStoreId}
-              onChange={setSearchStoreId}
-              disabled={!searchGroupId}
-              options={stores.map(s => ({
-                label: `${s.storeCode} - ${s.storeName}`,
-                value: s.id,
-              }))}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="brand" label={t('common:brand')}>
-            <Select
-              placeholder={t('common:all')}
-              allowClear
-              options={brandOptions}
-              value={searchBrand || undefined}
-              onChange={(v) => setSearchBrand(v || '')}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="adType" label={t('colAdType')}>
-            <Select
-              placeholder={t('common:all')}
-              allowClear
-              options={adTypeOptions}
-              value={searchAdType || undefined}
-              onChange={(v) => setSearchAdType(v || '')}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+          <GiftSearchFields
+            searchGroupId={searchGroupId} setSearchGroupId={setSearchGroupId}
+            searchStoreId={searchStoreId} setSearchStoreId={setSearchStoreId}
+            groups={groups} stores={stores}
+            searchBrand={searchBrand} setSearchBrand={setSearchBrand}
+            brandOptions={brandOptions}
+            searchAdType={searchAdType} setSearchAdType={setSearchAdType}
+            adTypeOptions={adTypeOptions}
+          />
 
           <Form.Item className="search-actions">
             <Space>

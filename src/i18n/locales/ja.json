@@ -3,6 +3,12 @@
     "title": "企業ポータル",
     "appCenter": "アプリケーションセンター",
     "artwork": {
+      "rdmSubmit": "申請",
+      "rdmIntake": "承認",
+      "rdmDispatch": "割り当て",
+      "rdmProduct": "設計",
+      "rdmDelivery": "開発",
+      "rdmAcceptance": "リリース",
       "searching": "一致する情報を検索中",
       "searchMatched": "検索結果が見つかりました",
       "hrMatching": "社員情報と部署を照合中",

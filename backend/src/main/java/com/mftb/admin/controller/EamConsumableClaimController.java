@@ -29,6 +29,7 @@ public class EamConsumableClaimController {
         return Result.success(claimService.page(query));
     }
 
+    /** 领用单详情（管理视角，需 consumable-claim 菜单权） */
     @GetMapping("/{id}")
     @RequirePermission(menu = "consumable-claim")
     public Result<EamConsumableClaimVO> detail(@PathVariable long id) {
@@ -57,6 +58,7 @@ public class EamConsumableClaimController {
         return Result.success(claimService.myClaims(query));
     }
 
+    /** 本人领用单详情；登录即可不加菜单权，归属由 Service 核对，与上方管理端 detail 的权限口径不同 */
     @GetMapping("/my/{id}")
     public Result<EamConsumableClaimVO> myDetail(@PathVariable long id) {
         return Result.success(claimService.myDetail(id));

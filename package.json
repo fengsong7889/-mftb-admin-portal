@@ -17,7 +17,11 @@
     "secret-scan": "node scripts/secret-scan.mjs",
     "check:menu": "node scripts/check-menu-consistency.mjs",
     "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "verify": "npm run lint && npm run typecheck && npm run check:menu && npm run secret-scan && npm run test:run",
+    "verify:backend": "cd backend && bash restart-service.sh --rebuild",
+    "restart:backend": "cd backend && bash restart-service.sh --rebuild",
+    "restart:backend:fast": "cd backend && bash restart-service.sh --fast"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
@@ -69,6 +73,7 @@
     "gh-pages": "^6.3.0",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
+    "opencc-js": "^1.4.2",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.65.0",
     "vercel": "^54.11.1",

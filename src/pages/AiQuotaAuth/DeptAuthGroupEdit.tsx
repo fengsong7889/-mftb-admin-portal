@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, Switch, Tag, Tree, Select, message, Spin, Tooltip } from 'antd'
+import { Button, Form, Input, Switch, Tag, Tree, Select, message, Tooltip } from 'antd'
 import type { TreeDataNode } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, TeamOutlined, EyeOutlined, PoweroffOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { TeamOutlined, EyeOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   fetchModels,
   fetchDeptOptions,
@@ -14,6 +14,7 @@ import {
   type ModelConfigItem,
   type DeptAuthGroupDetail,
 } from '../../api'
+import { EditPageHeader, SectionCard, StatusConfigSection, FormFooter, LoadingSpinner, BasicInfoFormSection } from './components'
 import { useTranslation } from 'react-i18next'
 
 /* ────────────────── 能力常量 ────────────────── */
@@ -278,78 +279,33 @@ export default function DeptAuthGroupEdit() {
     .reduce((s, d) => s + d.employeeCount, 0)
 
   if (loading && !models.length && !isEdit) {
-    return (
-      <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" />
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
     <div className="content-area">
-      {/* 頁面頭部（全局統一：橙色頂條 + 橙色返回按鈕） */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
-                height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>{t('common.back')}</Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {t(isEdit ? 'aiQuotaAuth.editModelAuthDept' : 'aiQuotaAuth.addModelAuthDept')}
-            </h2>
-          </div>
-        </div>
-      </div>
+      {/* 頁面頭部 */}
+      <EditPageHeader
+        title={t(isEdit ? 'aiQuotaAuth.editModelAuthDept' : 'aiQuotaAuth.addModelAuthDept')}
+        onBack={handleBack}
+      />
 
       <Form form={form} layout="vertical">
         {/* ═══ 分区 1：基础信息 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="name" label={t('aiQuotaAuth.strategyNameCol')} rules={[{ required: true, message: t('aiQuotaAuth.strategyNameRequired') }]}>
-              <Input placeholder={t('aiQuotaAuth.strategyNamePh3')} maxLength={50} />
-            </Form.Item>
-            <Form.Item name="description" label={t('aiQuotaAuth.descLabel')}>
-              <Input placeholder={t('aiQuotaAuth.descPh')} maxLength={200} allowClear />
-            </Form.Item>
-          </div>
-        </div>
+        <BasicInfoFormSection namePlaceholder={t('aiQuotaAuth.strategyNamePh3')} descPlaceholder={t('aiQuotaAuth.descPh')} />
 
-        {/* ═══ 分区 2：适用部门（树状 + 编码 + 编码搜索） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptSection')}</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTreeTag')}</Tag>
-            <Tooltip title={t('aiQuotaAuth.deptAuthGroupTooltip')}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.transferWithCode')}</span>
-            </Tooltip>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
+        {/* ═══ 分区 2：适用部门 ═══ */}
+        <SectionCard
+          header={{
+            icon: <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+            iconBg: '#e6f7ff',
+            title: t('aiQuotaAuth.applicableDeptSection'),
+            tag: t('aiQuotaAuth.transferTreeTag'),
+            tagColor: 'blue',
+            note: t('aiQuotaAuth.transferWithCode'),
+            tooltip: t('aiQuotaAuth.deptAuthGroupTooltip'),
+          }}
+        >
 
           {/* 穿梭框：左側樹結構 + 右側已選列表 */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
@@ -486,21 +442,20 @@ export default function DeptAuthGroupEdit() {
               </div>
             </div>
           </div>
-        </div>
+        </SectionCard>
 
-        {/* ═══ 分区 3：模型授权配置（用户自行添加） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.modelAuthConfig')}</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
-            <Tooltip title={t('aiQuotaAuth.modelAuthTooltip')}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.addModelAsNeeded')}</span>
-            </Tooltip>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
+        {/* ═══ 分区 3：模型授权配置 ═══ */}
+        <SectionCard
+          header={{
+            icon: <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />,
+            iconBg: '#f9f0ff',
+            title: t('aiQuotaAuth.modelAuthConfig'),
+            tag: t('aiQuotaAuth.editableTag'),
+            tagColor: 'purple',
+            note: t('aiQuotaAuth.addModelAsNeeded'),
+            tooltip: t('aiQuotaAuth.modelAuthTooltip'),
+          }}
+        >
 
           {/* 數據不出域：開啟後僅可授權私有化部署模型 */}
           <div style={{
@@ -604,42 +559,14 @@ export default function DeptAuthGroupEdit() {
           <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
             {t('aiQuotaAuth.authorizedCount', { count: modelAuths.length })}
           </div>
-        </div>
+        </SectionCard>
 
         {/* ═══ 分区 4：状态配置 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusSection')}</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
-          <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
-            <Form.Item
-              name="status"
-              label={t('aiQuotaAuth.statusLabel2')}
-              valuePropName="checked"
-              getValueFromEvent={(checked) => checked ? 1 : 0}
-              getValueProps={(value) => ({ checked: value === 1 })}
-              style={{ marginBottom: 0 }}
-              initialValue={1}
-              extra={t('aiQuotaAuth.statusExtraDept')}
-            >
-              <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
-            </Form.Item>
-          </div>
-        </div>
+        <StatusConfigSection extra={t('aiQuotaAuth.statusExtraDept')} />
       </Form>
 
       {/* 底部操作按鈕 */}
-      <div className="form-footer">
-        <Button onClick={handleBack}>{t('common.cancel')}</Button>
-        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          {t('common.save')}
-        </Button>
-      </div>
+      <FormFooter onCancel={handleBack} onSave={handleSave} saving={saving} />
     </div>
   )
 }

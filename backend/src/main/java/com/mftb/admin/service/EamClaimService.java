@@ -42,6 +42,11 @@ public interface EamClaimService {
 
     /** 个人领用列表（当前登录用户） */
     PageResult<EamClaimVO> myClaims(EamClaimQuery query);
+
+    /**
+     * 个人领用详情。服务端校该记录属于当前登录用户，<b>非本人直接拒 403</b>（僅可查看本人領用），
+     * 不是靠查询条件过滤掉别人记录的软隔离。
+     */
     EamClaimVO myDetail(long id);
 
     /** 个人领用统计（仅统计当前登录用户本人记录，登录即可，不需要领用管理菜单权限） */

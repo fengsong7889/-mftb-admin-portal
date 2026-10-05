@@ -42,6 +42,7 @@ public class HrPerfController {
 
     // ==================== 周期 ====================
 
+    /** 考核周期分页列表，支持按状态与名称关键字过滤 */
     @GetMapping("/cycles")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN)
     public Result<PageResult<HrPerfCycleVO>> cycles(
@@ -52,18 +53,21 @@ public class HrPerfController {
         return Result.success(hrPerfService.pageCycles(page, size, status, keyword));
     }
 
+    /** 新建考核周期（Service 内 id 传 null 即为新增） */
     @PostMapping("/cycles")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "create")
     public Result<HrPerfCycleVO> createCycle(@Valid @RequestBody HrPerfCycleSaveDTO dto) {
         return Result.success("週期已保存", hrPerfService.saveCycle(null, dto));
     }
 
+    /** 编辑考核周期 */
     @PutMapping("/cycles/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "edit")
     public Result<HrPerfCycleVO> updateCycle(@PathVariable Long id, @Valid @RequestBody HrPerfCycleSaveDTO dto) {
         return Result.success("週期已保存", hrPerfService.saveCycle(id, dto));
     }
 
+    /** 周期状态流转：草稿→发布→关闭；仅已发布周期可撤回为草稿 */
     @PostMapping("/cycles/{id}/status")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "edit")
     public Result<Void> changeCycleStatus(@PathVariable Long id, @RequestParam String status) {
@@ -73,6 +77,7 @@ public class HrPerfController {
 
     // ==================== 模板 ====================
 
+    /** 考核模板分页列表 */
     @GetMapping("/templates")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN)
     public Result<PageResult<HrPerfTemplateVO>> templates(
@@ -82,18 +87,21 @@ public class HrPerfController {
         return Result.success(hrPerfService.pageTemplates(page, size, keyword));
     }
 
+    /** 考核模板详情（含维度与等级配置） */
     @GetMapping("/templates/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN)
     public Result<HrPerfTemplateVO> template(@PathVariable Long id) {
         return Result.success(hrPerfService.getTemplate(id));
     }
 
+    /** 新建考核模板 */
     @PostMapping("/templates")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "create")
     public Result<HrPerfTemplateVO> createTemplate(@Valid @RequestBody HrPerfTemplateSaveDTO dto) {
         return Result.success("模板已保存", hrPerfService.saveTemplate(null, dto));
     }
 
+    /** 编辑考核模板 */
     @PutMapping("/templates/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "edit")
     public Result<HrPerfTemplateVO> updateTemplate(@PathVariable Long id,
@@ -124,12 +132,14 @@ public class HrPerfController {
         return Result.success(hrPerfService.previewLaunch(dto));
     }
 
+    /** 正式发起考核计划：为范围内员工生成考核单（发起前先看 /plans/preview 的命中人数） */
     @PostMapping("/plans")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN, action = "create")
     public Result<HrPerfPlanVO> launchPlan(@Valid @RequestBody HrPerfPlanLaunchDTO dto) {
         return Result.success("考核計劃已發起", hrPerfService.launchPlan(dto));
     }
 
+    /** 考核计划分页列表，可按所属周期与状态过滤 */
     @GetMapping("/plans")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN)
     public Result<PageResult<HrPerfPlanVO>> plans(
@@ -140,6 +150,7 @@ public class HrPerfController {
         return Result.success(hrPerfService.pagePlans(page, size, cycleId, status));
     }
 
+    /** 考核计划详情 */
     @GetMapping("/plans/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_ADMIN)
     public Result<HrPerfPlanVO> plan(@PathVariable Long id) {
@@ -167,6 +178,7 @@ public class HrPerfController {
 
     // ==================== 评分工作台 ====================
 
+    /** 评分工作台：只查当前登录评估人名下的考核单，不返回全量数据 */
     @GetMapping("/reviews")
     @RequirePermission(menu = HrPerfConstants.MENU_REVIEW)
     public Result<PageResult<HrPerfAssessmentVO>> reviews(
@@ -179,6 +191,7 @@ public class HrPerfController {
 
     // ==================== 考核单与评分（管理端与工作台共用） ====================
 
+    /** 考核单详情；管理端、校准、员工自助都可读，故用 anyOf 任一放行 */
     @GetMapping("/assessments/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_REVIEW,
             anyOf = {HrPerfConstants.MENU_ADMIN, HrPerfConstants.MENU_CALIBRATION, HrPerfConstants.MENU_SELF})
@@ -186,6 +199,7 @@ public class HrPerfController {
         return Result.success(hrPerfService.getAssessment(id));
     }
 
+    /** 提交评分（自评与上级评分共用同一入口，角色差异由 Service 内裁决） */
     @PostMapping("/assessments/{id}/score")
     @RequirePermission(menu = HrPerfConstants.MENU_REVIEW, action = "edit",
             anyOf = {HrPerfConstants.MENU_SELF, HrPerfConstants.MENU_ADMIN, HrPerfConstants.MENU_CALIBRATION})
@@ -194,6 +208,7 @@ public class HrPerfController {
         return Result.success("評分已保存", hrPerfService.submitScore(id, dto));
     }
 
+    /** 改派评估人（仅人事校准入口可用） */
     @PostMapping("/assessments/{id}/evaluator")
     @RequirePermission(menu = HrPerfConstants.MENU_CALIBRATION, action = "edit")
     public Result<Void> reassign(@PathVariable Long id, @RequestParam Long evaluatorUserId) {
@@ -203,6 +218,7 @@ public class HrPerfController {
 
     // ==================== 校准与整批确认 ====================
 
+    /** 校准工作台：分页查询待校准考核单，可按所属计划过滤 */
     @GetMapping("/calibration")
     @RequirePermission(menu = HrPerfConstants.MENU_CALIBRATION)
     public Result<PageResult<HrPerfAssessmentVO>> calibration(
@@ -214,6 +230,7 @@ public class HrPerfController {
         return Result.success(hrPerfService.pageCalibration(page, size, planId, status, keyword));
     }
 
+    /** 校准改判：得分或等级至少填一项且理由必填；已随计划提交审批的考核单不可改判 */
     @PostMapping("/assessments/{id}/calibrate")
     @RequirePermission(menu = HrPerfConstants.MENU_CALIBRATION, action = "edit")
     public Result<HrPerfAssessmentVO> calibrate(@PathVariable Long id,
@@ -223,6 +240,7 @@ public class HrPerfController {
         return Result.success("校準已登記", hrPerfService.calibrate(id, score, grade, reason));
     }
 
+    /** 整批提交确认：全部考核单评分完成后发起 OA 审批；等级分布超编时可勾选例外放行并填写理由 */
     @PostMapping("/plans/{id}/submit-confirm")
     @RequirePermission(menu = HrPerfConstants.MENU_CALIBRATION, action = "edit")
     public Result<HrPerfPlanVO> submitConfirm(

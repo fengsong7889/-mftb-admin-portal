@@ -96,20 +96,28 @@ export const fetchLeaveRequests = (params: {
   /** 只看本人（員工自助页）：服务端强制收敛，人事角色打开也只看自己 */
   mineOnly?: boolean
 }) => request.get<unknown, PageResult<LeaveRequestItem>>('/hr/leave', { params })
+/** 查询：GET /hr/leave/stats */
 export const fetchLeaveStats = (mineOnly?: boolean) =>
   request.get<unknown, Record<string, number>>('/hr/leave/stats', { params: { mineOnly: mineOnly || undefined } })
+/** 查询：GET /hr/leave/{id} */
 export const fetchLeaveDetail = (id: number) =>
   request.get<unknown, LeaveRequestItem>(`/hr/leave/${id}`)
+/** 保存：POST /hr/leave */
 export const saveLeaveDraft = (data: LeaveRequestPayload) =>
   request.post<unknown, LeaveRequestItem>('/hr/leave', data)
+/** 修改：PUT /hr/leave/{id} */
 export const updateLeaveRequest = (id: number, data: LeaveRequestPayload) =>
   request.put<unknown, LeaveRequestItem>(`/hr/leave/${id}`, data)
+/** 提交：POST /hr/leave/{id}/submit */
 export const submitLeaveRequest = (id: number) =>
   request.post<unknown, LeaveRequestItem>(`/hr/leave/${id}/submit`)
+/** 取消：POST /hr/leave/{id}/cancel */
 export const cancelLeaveRequest = (id: number) =>
   request.post<unknown, void>(`/hr/leave/${id}/cancel`)
+/** 删除：DELETE /hr/leave/{id} */
 export const deleteLeaveRequest = (id: number) =>
   request.delete<unknown, void>(`/hr/leave/${id}`)
+/** 查询：GET /hr/leave/employee-options */
 export const fetchLeaveEmployeeOptions = (keyword?: string) =>
   request.get<unknown, LeaveEmployeeOption[]>('/hr/leave/employee-options', {
     params: { keyword: keyword || undefined },
@@ -121,8 +129,10 @@ export const fetchLeaveBalances = (params: {
   /** 只看本人（員工自助页） */
   mineOnly?: boolean
 }) => request.get<unknown, PageResult<LeaveBalance>>('/hr/leave/balances', { params })
+/** 保存：POST /hr/leave/balances */
 export const saveLeaveBalance = (data: Partial<LeaveBalance>) =>
   request.post<unknown, LeaveBalance>('/hr/leave/balances', data)
+/** 删除：DELETE /hr/leave/balances/{id} */
 export const deleteLeaveBalance = (id: number) =>
   request.delete<unknown, void>(`/hr/leave/balances/${id}`)
 export const batchInitBalances = (params: { year: number; leaveType: string; totalDays: number; userIds?: number[] }) =>

@@ -20,11 +20,15 @@ public interface SysPurchaseCompanyService {
     /** 按 ID 取公司全称（快照/回显用），不存在返回空串 */
     String getNameById(Long id);
 
+    /** 新增购买公司，返回新建 id；code 与 name 必填，code 全局唯一 */
     long create(SysPurchaseCompany company);
 
+    /** 修改购买公司（id 不存在时报错）；改了 code 时会重校唯一性（排除自身） */
     void update(Long id, SysPurchaseCompany company);
 
+    /** 启停购买公司；id 不存在时报错（不像字典那边会校验 status 只能 0/1） */
     void updateStatus(Long id, Integer status);
 
+    /** 删除购买公司；只校是否存在，<b>不校是否仍被耗材/资产档案引用</b> */
     void delete(Long id);
 }

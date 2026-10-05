@@ -21,6 +21,7 @@ import { fetchAdAlgorithms, fetchAdSignboardInventory, placeAdSignboardOrder } f
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
 import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY } from '../Recommend/constants'
+import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 金字招牌廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_SIGNBOARD = 'golden_signboard'
@@ -115,32 +116,6 @@ function getTagDisplayText(
 
   // 熱門/人氣/好評：「{region}{category}{label}店鋪」
   return `${region}${category}${labelCfg.label}店鋪`
-}
-
-/** 最長可購買天數（默認值，查詢後從後端獲取） */
-const MAX_BUY_DAYS = 180
-/** 待開售日期每日放票時間 */
-const PRESALE_OPEN_HOUR = 10
-function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
-  return date.startOf('day').subtract(sellableDays, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
-}
-
-/** 月份選擇器每頁展示數 */
-const MONTHS_PER_PAGE = 6
-
-/** 解析梯度折扣 JSON */
-function parseDayTiers(json?: string): Array<{ minDays: number; discount: number }> {
-  if (!json) return []
-  try {
-    const arr = JSON.parse(json)
-    if (!Array.isArray(arr)) return []
-    return (arr as Array<{ minDays?: number; discount?: number }>)
-      .filter(t => t && Number(t.minDays) > 0 && Number(t.discount) > 0)
-      .map(t => ({ minDays: Number(t.minDays), discount: Number(t.discount) }))
-      .sort((a, b) => a.minDays - b.minDays)
-  } catch {
-    return []
-  }
 }
 
 /** 標籤定價信息（從銷售定價配置加載） */
@@ -1374,29 +1349,12 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
         </div>
       )}
 
-      {/* 待開售日期提醒彈窗（同人氣商家） */}
-      <Modal
-        title={<Space><span style={{ fontSize: 18 }}>⏳</span><span style={{ color: '#1890ff', fontWeight: 600 }}>待開售</span></Space>}
-        open={!!presaleInfo}
-        onCancel={() => setPresaleInfo(null)}
-        footer={[<Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>知道了</Button>]}
-        width={420}
-      >
-        {presaleInfo && (
-          <div style={{ padding: '8px 0' }}>
-            <div style={{
-              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
-              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>開售時間：</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
-            </div>
-            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              每日 {PRESALE_OPEN_HOUR}:00 開放購買後 {sellableDays} 天內的日期
-            </p>
-          </div>
-        )}
-      </Modal>
+      {/* 待開售日期提醒彈窗 */}
+      <PickerPresaleInfoModal
+        presaleInfo={presaleInfo}
+        onClose={() => setPresaleInfo(null)}
+        hintContent={`每日 ${PRESALE_OPEN_HOUR}:00 開放購買後 ${sellableDays} 天內的日期`}
+      />
 
       {/* 支付確認彈窗（按標籤維度展示明細 + 結算區） */}
       <Modal
@@ -1482,49 +1440,16 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
       </Modal>
 
       {/* 支付成功彈窗 */}
-      <Modal
-        title="購買成功"
-        open={isSuccessModalVisible}
-        onCancel={() => setIsSuccessModalVisible(false)}
-        footer={[
-          <Button key="view" type="primary" onClick={handleViewOrder}>查看訂單</Button>,
-          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#E8720C', borderColor: '#E8720C', color: '#fff' }}>繼續選購</Button>,
-        ]}
-        width={400}
-      >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>恭喜！購買成功</p>
-          <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8 }}>
-            {paidPaymentMode === 'mixed' && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 32 }}>
-                <div>
-                  <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣推廣金</p>
-                  <p style={{ fontSize: 30, fontWeight: 700, color: '#E8720C', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
-                </div>
-                {paidGiftDays > 0 && (
-                  <div>
-                    <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已用贈送天數</p>
-                    <p style={{ fontSize: 30, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} 天</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {paidPaymentMode === 'promo' && (
-              <>
-                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已扣推廣金</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
-              </>
-            )}
-            {paidPaymentMode === 'gift' && (
-              <>
-                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>已用贈送天數</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} 天</p>
-              </>
-            )}
-          </div>
-        </div>
-      </Modal>
+      <PickerPaymentSuccessModal
+        visible={isSuccessModalVisible}
+        onClose={() => setIsSuccessModalVisible(false)}
+        onViewOrder={handleViewOrder}
+        onContinuePurchase={handleContinuePurchase}
+        paidAmount={paidPromoAmount}
+        paidGiftDays={paidGiftDays}
+        paidPaymentMode={paidPaymentMode}
+        successMessage="恭喜！購買成功"
+      />
     </div>
   )
 }

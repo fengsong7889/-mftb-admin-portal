@@ -13,6 +13,12 @@ import java.util.List;
 @Mapper
 public interface EamInventoryItemMapper extends BaseMapper<EamInventoryItem> {
 
+    /**
+     * 按 id 加行锁读取盘点明细。
+     * <p>
+     * 与其他 selectForUpdate 不同，本句**不带 deleted=0**（该表无逻辑删除列），
+     * 因此已删行依然会被锁住。
+     */
     @Select("SELECT * FROM biz_eam_inventory_item WHERE id = #{id} FOR UPDATE")
     EamInventoryItem selectForUpdate(@Param("id") long id);
 

@@ -101,6 +101,7 @@ public class EamClaimController {
         return Result.success();
     }
 
+    /** 本人领用单详情；同样不加菜单权限注解，归属由 Service 核对，不能当成管理端入口用 */
     @GetMapping("/my/{id}")
     public Result<EamClaimVO> myDetail(@PathVariable long id) {
         return Result.success(claimService.myDetail(id));

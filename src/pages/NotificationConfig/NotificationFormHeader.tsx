@@ -1,7 +1,13 @@
+/**
+ * 通知配置模块的表单页头与卡片基础样式。
+ * notificationCardStyle 导出给本模块的新增/编辑/详情页共用，保证分节卡片外观一致。
+ * ⚠️ 页头渐变样式与 AccountBalance/FormPageHeader 等处重复，参见那边文件头的合并提醒。
+ */
 import { Button } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 
+/** 本模块分节卡片的统一容器样式（白底 + 8px 圆角 + 浅边框） */
 export const notificationCardStyle = {
   borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
   border: '1px solid #e8eaed', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',

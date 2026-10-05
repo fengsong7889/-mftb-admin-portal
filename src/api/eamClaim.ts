@@ -110,6 +110,7 @@ export interface ClaimEvent {
   createdAt: string
 }
 
+/** 查询：GET /eam/claims/{id}/events */
 export async function fetchClaimEvents(claimId: number): Promise<ClaimEvent[]> {
   try {
     return await request.get<unknown, ClaimEvent[]>(`/eam/claims/${claimId}/events`)
@@ -177,10 +178,12 @@ export function fetchMyClaimStats(): Promise<ClaimStatsData> {
   return request.get<unknown, ClaimStatsData>('/eam/claims/my/stats', { headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 查询：GET /eam/claims/my/{id} */
 export function fetchMyClaim(id: number): Promise<ClaimRow> {
   return request.get<unknown, ClaimRow>(`/eam/claims/my/${id}`)
 }
 
+/** 签署：POST /eam/claims/my/sign */
 export function signMyClaim(claimId: number, signatureImage: string): Promise<void> {
   return request.post<unknown, void>('/eam/claims/my/sign', { claimId, signatureImage })
 }

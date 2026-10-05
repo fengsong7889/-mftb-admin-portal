@@ -18,6 +18,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 部门 AI 额度策略的读写实现，契约与字段覆盖语义见 {@link AiDeptQuotaService}。
+ * <p>
+ * 事务边界：saveDeptQuota, deleteDeptQuota, toggleDeptQuotaStatus 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：AiDeptQuotaPolicyMapper, BizSeqService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

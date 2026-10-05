@@ -12,6 +12,12 @@ import org.springframework.util.StringUtils;
 
 import java.util.Map;
 
+/**
+ * AI 通知外部投递日志的实现，契约见 {@link AiDeliveryLogService}。record 属于旁路审计写入，不参与业务事务。
+ * <p>
+ * 协作依赖：AiDeliveryLogMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

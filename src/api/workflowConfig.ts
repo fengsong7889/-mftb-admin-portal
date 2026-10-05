@@ -67,6 +67,7 @@ export interface RoleOption {
   code: string
 }
 
+/** 查询：GET /workflow-config/role-options */
 export async function fetchWorkflowRoleOptions(): Promise<RoleOption[]> {
   try {
     return await request.get<unknown, RoleOption[]>('/workflow-config/role-options', {

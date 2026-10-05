@@ -14,6 +14,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * AI 会话执行事件的落库实现，契约见 {@link AiConversationEventService}。
+ * <p>
+ * 协作依赖：AiConversationEventMapper, ObjectMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

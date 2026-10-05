@@ -10,6 +10,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * MCP 工具广场与已安装清单的实现，契约见 {@link McpToolService}。仅依赖单个 Mapper，无事务方法（安装/卸载为单表写入）。
+ * <p>
+ * 协作依赖：McpToolMapper。
+ */
+
 @Service
 @RequiredArgsConstructor
 public class McpToolServiceImpl implements McpToolService {

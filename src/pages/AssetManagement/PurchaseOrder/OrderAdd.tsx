@@ -6,317 +6,29 @@
  * - 供应商分组卡片：收货方式、预计收货日期、快递单号（条件显示）
  * - 明细通过弹窗编辑（分类 → 资产品牌 → 资产名称 → 参数），统一采购申请风格
  */
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Button, Form, Input, InputNumber, DatePicker, Row, Col, Table, Space, Spin, message,
-  Modal, Tag, Select, TreeSelect,
+  Tag, Select,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   ArrowLeftOutlined, SaveOutlined, ShoppingCartOutlined, PlusOutlined, DeleteOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import {
-  createPurchaseOrder, fetchModelList, fetchCategoryList, fetchBrandList,
-  fetchAllParamTypes, fetchParamValuesByType,
-  fetchSuppliersDropdown, fetchSupplierContacts, syncSupplierContact,
-  type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
-  type AssetModel, type AssetCategory, type AssetBrand,
-  type ParamType, type ParamField,
-  type SupplierDropdownItem, type SupplierContactItem,
+  createPurchaseOrder, syncSupplierContact,
+  type PurchaseOrderItem,
 } from '../../../api/eam'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
 import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
-
-/* ==================== 分类树（TreeSelect） ==================== */
-
-interface CategoryTreeNode {
-  value: number
-  title: string
-  code: string
-  children?: CategoryTreeNode[]
-}
-
-function buildCategoryTree(list: AssetCategory[]): CategoryTreeNode[] {
-  const nodeMap = new Map<number, CategoryTreeNode>()
-  list.forEach((c) => {
-    nodeMap.set(c.id, { value: c.id, title: c.name, code: c.code, children: [] })
-  })
-  const roots: CategoryTreeNode[] = []
-  list.forEach((c) => {
-    const node = nodeMap.get(c.id)!
-    if (c.parentId && nodeMap.has(c.parentId)) {
-      nodeMap.get(c.parentId)!.children!.push(node)
-    } else {
-      roots.push(node)
-    }
-  })
-  return roots
-}
-
-/* ==================== 明细编辑弹窗 ==================== */
-
-interface ItemRow {
-  key: string
-  categoryId?: number
-  categoryName?: string
-  categoryCode?: string
-  brandId?: number
-  brandName?: string
-  modelId?: number
-  modelName?: string
-  params?: Record<string, string>
-  purchaseType?: 'purchase' | 'lease'
-  qty: number
-  price: number
-  confirmedPrice?: number
-}
-
-interface ItemEditModalProps {
-  open: boolean
-  editing: ItemRow | null
-  categories: AssetCategory[]
-  brands: AssetBrand[]
-  models: AssetModel[]
-  onOk: (row: ItemRow) => void
-  onCancel: () => void
-}
-
-function ItemEditModal({ open, editing, categories, brands, models, onOk, onCancel }: ItemEditModalProps) {
-  const [form] = Form.useForm<ItemRow>()
-  const { t } = useTranslation()
-
-  const [selectedCategoryCode, setSelectedCategoryCode] = useState<string | undefined>()
-  const [selectedBrandId, setSelectedBrandId] = useState<number | undefined>()
-  const [selectedModel, setSelectedModel] = useState<AssetModel | undefined>()
-  const [paramTypes, setParamTypes] = useState<ParamType[]>([])
-  const [paramValuesMap, setParamValuesMap] = useState<Record<string, string[]>>({})
-
-  const categoryTree = useMemo(
-    () => buildCategoryTree(categories.filter((c) => c.status === 'enabled')),
-    [categories],
-  )
-  const filteredBrands = useMemo(
-    () => selectedCategoryCode ? brands.filter((b) => b.categoryCode === selectedCategoryCode) : [],
-    [brands, selectedCategoryCode],
-  )
-  const filteredModels = useMemo(
-    () => models.filter((m) => {
-      if (!selectedCategoryCode) return false
-      const codeMatch = m.categoryCode === selectedCategoryCode || m.categoryCode.startsWith(`${selectedCategoryCode}-`)
-      const brandMatch = selectedBrandId ? m.brandId === selectedBrandId : true
-      return codeMatch && brandMatch
-    }),
-    [models, selectedCategoryCode, selectedBrandId],
-  )
-  // 從參數庫 API 加載參數模板（biz_eam_param_type 表）
-  const paramTemplate: ParamField[] = useMemo(() => {
-    if (!selectedModel) return []
-    return paramTypes
-      .filter((p) => p.categoryCode === selectedModel.categoryCode && p.status === 'enabled')
-      .sort((a, b) => a.sort - b.sort)
-      .map((p) => ({
-        key: p.code,
-        label: p.name,
-        type: p.valueType === 'number' ? 'number' : p.valueType === 'select' ? 'select' : 'text',
-        unit: p.unit || undefined,
-        options: p.valueType === 'select' ? (paramValuesMap[p.code] || []) : undefined,
-      }))
-  }, [paramTypes, selectedModel, paramValuesMap])
-
-  // 加載參數庫數據（弹窗打開時）
-  useEffect(() => {
-    if (!open) return
-    let alive = true
-    fetchAllParamTypes().then((list) => {
-      if (alive) setParamTypes(list)
-    }).catch(() => {})
-    return () => { alive = false }
-  }, [open])
-
-  // select 類型參數的 code 列表（穩定字符串）：paramTemplate 的 useMemo 依賴 paramValuesMap，
-  // 若直接以 paramTemplate 為依賴，本 effect 內 setParamValuesMap 會使 paramTemplate 產生新引用 →
-  // effect 再次觸發 → 無限循環請求。改為依賴值穩定的 code 字符串可斷環。
-  const selectParamKeys = useMemo(
-    () => paramTemplate.filter((p) => p.type === 'select').map((p) => p.key).join(','),
-    [paramTemplate],
-  )
-
-  // 為 select 類型參數加載可選值
-  useEffect(() => {
-    const keys = selectParamKeys ? selectParamKeys.split(',') : []
-    if (keys.length === 0) return
-    let alive = true
-    Promise.all(
-      keys.map((key) =>
-        fetchParamValuesByType(key)
-          .then((vals) => ({ key, values: vals.filter((v) => v.status === 'enabled').sort((a, b) => a.sort - b.sort).map((v) => v.value) }))
-          .catch(() => ({ key, values: [] })),
-      ),
-    ).then((results) => {
-      if (!alive) return
-      const map: Record<string, string[]> = {}
-      results.forEach((r) => { map[r.key] = r.values })
-      setParamValuesMap(map)
-    })
-    return () => { alive = false }
-  }, [selectParamKeys])
-
-  useEffect(() => {
-    if (open && editing) {
-      form.setFieldsValue(editing)
-      const cat = editing.categoryName ? categories.find((c) => c.id === editing.categoryId) : undefined
-      setSelectedCategoryCode(cat?.code)
-      setSelectedBrandId(editing.brandId)
-      setSelectedModel(editing.modelId ? models.find((m) => m.id === editing.modelId) : undefined)
-    } else if (open) {
-      form.resetFields()
-      form.setFieldsValue({ qty: 1, price: 0 })
-      setSelectedCategoryCode(undefined)
-      setSelectedBrandId(undefined)
-      setSelectedModel(undefined)
-      setParamValuesMap({})
-    }
-  }, [open, editing, form, categories, models])
-
-  const handleCategoryChange = (categoryId: number) => {
-    const cat = categories.find((c) => c.id === categoryId)
-    setSelectedCategoryCode(cat?.code)
-    setSelectedBrandId(undefined)
-    setSelectedModel(undefined)
-    form.setFieldsValue({ brandId: undefined, modelId: undefined, params: {} })
-  }
-
-  const handleBrandChange = (brandId: number) => {
-    setSelectedBrandId(brandId)
-    setSelectedModel(undefined)
-    form.setFieldsValue({ modelId: undefined })
-  }
-
-  const handleModelChange = (modelId: number) => {
-    const m = models.find((x) => x.id === modelId)
-    setSelectedModel(m)
-  }
-
-  const handleOk = async () => {
-    try {
-      const v = await form.validateFields()
-      const cat = categories.find((c) => c.id === v.categoryId)
-      const brand = brands.find((b) => b.id === v.brandId)
-      const model = models.find((m) => m.id === v.modelId)
-      onOk({
-        ...v,
-        key: editing?.key || `item_${Date.now()}`,
-        categoryName: cat?.name,
-        categoryCode: cat?.code,
-        brandName: brand?.brandZh,
-        modelName: model ? `${model.brandZh} ${model.name}`.trim() : undefined,
-      })
-    } catch { /* antd validates */ }
-  }
-
-  return (
-    <Modal
-      title={editing ? t('asset.editAssetTitle') : t('asset.addAssetTitle')}
-      open={open}
-      onOk={handleOk}
-      onCancel={onCancel}
-      okText={t('common.confirm')}
-      cancelText={t('common.cancel')}
-      width={680}
-      centered
-    >
-      <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label={t('asset.colCategory')} name="categoryId" rules={[{ required: true, message: t('asset.warnSelectCategory') }]}>
-              <TreeSelect treeData={categoryTree} placeholder={t('asset.phSelectCategory')} allowClear treeDefaultExpandAll
-                showSearch treeNodeFilterProp="title" onChange={handleCategoryChange} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label={t('asset.colBrand')} name="brandId" rules={[{ required: true, message: t('asset.warnSelectAssetBrand') }]}>
-              <Select placeholder={selectedCategoryCode ? t('asset.phSelectBrand') : t('asset.phSelectCategoryFirst')} showSearch optionFilterProp="label"
-                disabled={!selectedCategoryCode} onChange={handleBrandChange}
-                options={filteredBrands.map((b) => ({ label: b.brandZh, value: b.id }))} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label={t('asset.colAssetName')} name="modelId" rules={[{ required: true, message: t('asset.warnSelectAssetName') }]}>
-              <Select placeholder={selectedBrandId ? t('asset.phSelectAsset') : t('asset.phSelectBrandFirst')} showSearch optionFilterProp="label"
-                disabled={!selectedBrandId} onChange={handleModelChange}
-                options={filteredModels.map((m) => ({
-                  label: m.name, value: m.id,
-                }))} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* 參數信息 */}
-        {selectedModel && paramTemplate.length > 0 && (
-          <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 16px', marginBottom: 16, border: '1px solid #f0f0f0' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>{t('asset.paramInfoTitle')}</div>
-            <Row gutter={12}>
-              {paramTemplate.map((p) => (
-                <Col span={8} key={p.key}>
-                  <Form.Item label={<span style={{ fontSize: 13 }}>{p.label}{p.unit ? ` (${p.unit})` : ''}</span>}
-                    name={['params', p.key]} style={{ marginBottom: 8 }}>
-                    {p.type === 'select' ? (
-                      <Select placeholder={t('asset.phParamSelect', { name: p.label })} allowClear
-                        options={p.options?.map((o) => ({ label: o, value: o })) || []} />
-                    ) : (
-                      <Input placeholder={t('asset.phParamInput', { name: p.label })} allowClear />
-                    )}
-                  </Form.Item>
-                </Col>
-              ))}
-            </Row>
-          </div>
-        )}
-
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label={t('asset.purchaseType')} name="purchaseType" rules={[{ required: true, message: t('asset.warnSelectPurchaseType') }]}>
-              <Select placeholder={t('asset.phSelect')} options={[
-                { label: t('asset.purchaseTypePurchase'), value: 'purchase' }, { label: t('asset.purchaseTypeLease'), value: 'lease' },
-              ]} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label={t('asset.colQty')} name="qty" rules={[{ required: true, message: t('asset.warnInputQty') }]}>
-              <InputNumber style={{ width: '100%' }} min={1} />
-            </Form.Item>
-          </Col>
-        </Row>
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label={t('asset.confirmedPrice')} name="confirmedPrice">
-              <InputNumber style={{ width: '100%' }} min={0} precision={2}
-                addonBefore="MOP" placeholder={t('asset.phConfirmedPrice')} />
-            </Form.Item>
-          </Col>
-        </Row>
-      </Form>
-    </Modal>
-  )
-}
+import {
+  usePurchaseOrderForm, ItemEditModal, groupSubtotal, grandTotal, showReceiveDate, showTrackingNo,
+  type DeliveryMethod,
+} from './components'
 
 /* ==================== 類型 ==================== */
-
-type DeliveryMethod = 'self_pickup' | 'supplier_delivery' | 'express'
-
-interface SupplierGroupForm {
-  supplier: string
-  supplierId?: number
-  contact?: string
-  contactPhone?: string
-  orderDate?: Dayjs
-  trackingNo?: string
-  deliveryMethod?: DeliveryMethod
-  expectedReceiveDate?: Dayjs
-}
 
 interface GlobalFormValues {
   purchaser: string
@@ -333,251 +45,78 @@ export default function OrderAdd() {
   const watchedBrand = Form.useWatch('brand', form)
   const { numericOptions, codeHint, labelMap } = useCompanyBrand()
 
-  /* ----- 基礎数据 ----- */
-  const [categories, setCategories] = useState<AssetCategory[]>([])
-  const [brands, setBrands] = useState<AssetBrand[]>([])
-  const [models, setModels] = useState<AssetModel[]>([])
-  const [dataLoading, setDataLoading] = useState(false)
+  /* ----- 共用 Hook ----- */
+  const {
+    categories, brands, models, dataLoading,
+    employees, empLoading, selectedEmp, setSelectedEmp, handleEmpSearch,
+    supplierOptions, supplierLoading, handleSupplierSearch, handleSupplierChange,
+    groupContacts, autoFilledContact, handleContactChange, handleContactManualInput,
+    supplierGroups, handleAddGroup, handleRemoveGroup, updateGroup,
+    modalOpen, setModalOpen, editingItem, handleOpenAddModal, handleOpenEditModal, handleModalOk, handleRemoveItem,
+    paramNameMap,
+  } = usePurchaseOrderForm()
 
-  // 員工搜索
-  const [employees, setEmployees] = useState<EmployeeItem[]>([])
-  const [empLoading, setEmpLoading] = useState(false)
-  const [selectedEmp, setSelectedEmp] = useState<EmployeeItem | null>(null)
-
-  // 供应商下拉列表
-  const [supplierOptions, setSupplierOptions] = useState<SupplierDropdownItem[]>([])
-  const [supplierLoading, setSupplierLoading] = useState(false)
-  // 每个分组的联系人（key=groupId）
-  const [groupContacts, setGroupContacts] = useState<Record<string, SupplierContactItem[]>>({})
-  // 跟踪自动带入的联系人（key=groupId，值为自动带入时的联系人姓名）
-  const [autoFilledContact, setAutoFilledContact] = useState<Record<string, string>>({})
-
-  // 供应商分组
-  const [supplierGroups, setSupplierGroups] = useState<PurchaseOrderSupplierGroup[]>([
-    { id: `sg_${Date.now()}`, supplier: '', items: [] },
-  ])
-
-  // 加載供應商下拉列表
-  useEffect(() => {
-    fetchSuppliersDropdown().then(setSupplierOptions).catch(() => {})
-  }, [])
-
-  // 参数编码 → 参数名称映射
-  const [paramNameMap, setParamNameMap] = useState<Map<string, string>>(new Map())
-  useEffect(() => {
-    fetchAllParamTypes().then((list) => {
-      const map = new Map<string, string>()
-      list.forEach((p: ParamType) => { map.set(p.code, p.name) })
-      setParamNameMap(map)
-    }).catch(() => {})
-  }, [])
-
-  // 明细彈窗
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalGroupId, setModalGroupId] = useState('')
-  const [editingItem, setEditingItem] = useState<ItemRow | null>(null)
-
-  // 加載基礎数据
-  useEffect(() => {
-    setDataLoading(true)
-    const safeFetch = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch(() => fallback)
-    Promise.allSettled([
-      safeFetch(fetchModelList({ size: 9999 }), { records: [], total: 0 }),
-      safeFetch(fetchCategoryList(), []),
-      safeFetch(fetchBrandList(), []),
-    ]).then(([r1, r2, r3]) => {
-      if (r1.status === 'fulfilled') setModels(r1.value.records || [])
-      if (r2.status === 'fulfilled') setCategories(r2.value)
-      if (r3.status === 'fulfilled') setBrands(r3.value)
-    }).finally(() => setDataLoading(false))
-  }, [])
-
-  // 員工搜索
-  const handleEmpSearch = useCallback((keyword: string) => {
-    setEmpLoading(true)
-    fetchEmployees({ page: 1, size: 30, keyword: keyword || undefined, employmentStatus: 'active' })
-      .then((res) => setEmployees(res.records || []))
-      .catch(() => {})
-      .finally(() => setEmpLoading(false))
-  }, [])
-
-  useEffect(() => { handleEmpSearch('') }, [handleEmpSearch])
-
+  /* ----- 員工選擇（需同步更新 form 中的部門字段） ----- */
   const handleEmpChange = (empId: string) => {
     const emp = employees.find((e) => e.empId === empId)
     setSelectedEmp(emp || null)
     form.setFieldsValue({ department: emp?.department || '' })
   }
 
-  const handleSupplierSearch = (keyword: string) => {
-    setSupplierLoading(true)
-    fetchSuppliersDropdown(keyword || undefined)
-      .then(setSupplierOptions)
-      .catch(() => {})
-      .finally(() => setSupplierLoading(false))
-  }
-
-  /** 選擇供應商後自動帶入聯繫人 */
-  const handleSupplierChange = async (groupId: string, supplierId: number) => {
-    const opt = supplierOptions.find((s) => s.id === supplierId)
-    if (!opt) return
-    // 更新供应商名称
-    updateGroup(groupId, { supplier: opt.name, supplierId: opt.id })
-    // 拉取联系人
+  /* ----- 提交 ----- */
+  const handleSubmit = async () => {
     try {
-      const contacts = await fetchSupplierContacts(supplierId)
-      setGroupContacts((prev) => ({ ...prev, [groupId]: contacts }))
-      if (contacts.length > 0) {
-        const first = contacts[0]
-        updateGroup(groupId, {
-          contact: first.contactName,
-          contactPhone: first.contactPhone,
-        })
-        setAutoFilledContact((prev) => ({ ...prev, [groupId]: first.contactName }))
-      } else {
-        updateGroup(groupId, { contact: '', contactPhone: '' })
-        setAutoFilledContact((prev) => {
-          const next = { ...prev }
-          delete next[groupId]
-          return next
-        })
+      const v = await form.validateFields()
+      if (!selectedEmp) { message.warning(t('asset.warnSelectPurchaser')); return }
+      const emptyItems = supplierGroups.filter((g) => g.items.length === 0)
+      if (emptyItems.length > 0) { message.warning(t('asset.warnEmptyGroupItems')); return }
+      setSubmitting(true)
+
+      const total = grandTotal(supplierGroups)
+
+      await createPurchaseOrder({
+        reqId: 0,
+        supplier: supplierGroups[0]?.supplier || '',
+        amount: total,
+        deliveryDate: '',
+        purchaser: selectedEmp?.name || v.purchaser || undefined,
+        department: selectedEmp?.department || undefined,
+        brand: v.brand,
+        remark: v.remark?.trim() || undefined,
+        items: [],
+        supplierGroups: supplierGroups.map((g) => ({
+          ...g,
+          supplier: g.supplier.trim(),
+          contact: g.contact?.trim() || undefined,
+          contactPhone: g.contactPhone?.trim() || undefined,
+          orderDate: g.orderDate || undefined,
+          trackingNo: g.trackingNo?.trim() || undefined,
+        })),
+      })
+
+      // 同步手動錄入的聯繫人到供應商管理
+      const syncPromises: Promise<void>[] = []
+      for (const g of supplierGroups) {
+        if (!g.supplierId) continue
+        const contactName = g.contact?.trim()
+        const contactPhone = g.contactPhone?.trim()
+        if (!contactName || !contactPhone) continue
+        if (autoFilledContact[g.id] !== contactName) {
+          syncPromises.push(syncSupplierContact(g.supplierId, contactName, contactPhone).catch(() => {}))
+        }
       }
-    } catch {
-      setGroupContacts((prev) => ({ ...prev, [groupId]: [] }))
+      await Promise.all(syncPromises)
+
+      message.success(t('asset.poCreateSuccess'))
+      navigate('/purchase-order')
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message) message.error(e.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  /** 選擇聯繫人後自動帶出電話 */
-  const handleContactChange = (groupId: string, contactName: string) => {
-    const contacts = groupContacts[groupId] || []
-    const matched = contacts.find((c) => c.contactName === contactName)
-    updateGroup(groupId, {
-      contact: contactName,
-      contactPhone: matched?.contactPhone || '',
-    })
-    // 通过下拉选择的联系人视为自动带入
-    if (matched) {
-      setAutoFilledContact((prev) => ({ ...prev, [groupId]: contactName }))
-    }
-  }
-
-  /** 手動輸入聯繫人姓名（清除自动带入标记） */
-  const handleContactManualInput = (groupId: string, value: string) => {
-    updateGroup(groupId, { contact: value })
-    setAutoFilledContact((prev) => {
-      const next = { ...prev }
-      delete next[groupId]
-      return next
-    })
-  }
-
-  /* ----- 供应商分组操作 ----- */
-  const handleAddGroup = () => {
-    setSupplierGroups((prev) => [
-      ...prev,
-      { id: `sg_${Date.now()}`, supplier: '', items: [] },
-    ])
-  }
-
-  const handleRemoveGroup = (groupId: string) => {
-    Modal.confirm({
-      title: t('asset.deleteConfirmTitle'),
-      content: t('asset.warnDeleteGroup'),
-      okText: t('common.confirm'),
-      okButtonProps: { danger: true },
-      cancelText: t('common.cancel'),
-      onOk: () => setSupplierGroups((prev) => prev.filter((g) => g.id !== groupId)),
-    })
-  }
-
-  const updateGroup = (groupId: string, patch: Partial<SupplierGroupForm>) => {
-    setSupplierGroups((prev) => prev.map((g) => {
-      if (g.id !== groupId) return g
-      const next = { ...g }
-      if (patch.supplier !== undefined) next.supplier = patch.supplier
-      if (patch.supplierId !== undefined) next.supplierId = patch.supplierId
-      if (patch.contact !== undefined) next.contact = patch.contact
-      if (patch.contactPhone !== undefined) next.contactPhone = patch.contactPhone
-      if (patch.orderDate !== undefined) next.orderDate = patch.orderDate ? patch.orderDate.format('YYYY-MM-DD') : undefined
-      if (patch.trackingNo !== undefined) next.trackingNo = patch.trackingNo
-      if (patch.deliveryMethod !== undefined) next.deliveryMethod = patch.deliveryMethod
-      if (patch.expectedReceiveDate !== undefined) {
-        next.expectedReceiveDate = patch.expectedReceiveDate ? patch.expectedReceiveDate.format('YYYY-MM-DD') : undefined
-      }
-      return next
-    }))
-  }
-
-  /* ----- 明细彈窗操作 ----- */
-  const handleOpenAddModal = (groupId: string) => {
-    setModalGroupId(groupId)
-    setEditingItem(null)
-    setModalOpen(true)
-  }
-
-  const handleOpenEditModal = (groupId: string, item: PurchaseOrderItem) => {
-    setModalGroupId(groupId)
-    setEditingItem({
-      key: item.key || `item_${Date.now()}`,
-      categoryId: item.categoryId,
-      categoryName: item.categoryName,
-      categoryCode: item.categoryCode,
-      brandId: item.brandId,
-      brandName: item.brandName,
-      modelId: item.modelId,
-      modelName: item.modelName,
-      params: item.params,
-      purchaseType: item.purchaseType,
-      qty: item.qty,
-      price: item.price,
-      confirmedPrice: item.confirmedPrice,
-    })
-    setModalOpen(true)
-  }
-
-  const handleModalOk = (row: ItemRow) => {
-    setSupplierGroups((prev) => prev.map((g) => {
-      if (g.id !== modalGroupId) return g
-      const existIdx = g.items.findIndex((it) => it.key === row.key)
-      const poItem: PurchaseOrderItem = {
-        key: row.key,
-        categoryId: row.categoryId,
-        categoryName: row.categoryName,
-        categoryCode: row.categoryCode,
-        brandId: row.brandId,
-        brandName: row.brandName,
-        modelId: row.modelId,
-        modelName: row.modelName,
-        params: row.params,
-        purchaseType: row.purchaseType,
-        qty: row.qty,
-        price: row.price,
-        confirmedPrice: row.confirmedPrice,
-        receivedQty: 0,
-      }
-      if (existIdx >= 0) {
-        const items = [...g.items]
-        items[existIdx] = poItem
-        return { ...g, items }
-      }
-      return { ...g, items: [...g.items, poItem] }
-    }))
-    setModalOpen(false)
-  }
-
-  const handleRemoveItem = (groupId: string, rowKey: string) => {
-    setSupplierGroups((prev) => prev.map((g) => {
-      if (g.id !== groupId) return g
-      return { ...g, items: g.items.filter((it) => it.key !== rowKey) }
-    }))
-  }
-
-  /** 计算分组小计 */
-  const groupSubtotal = (group: PurchaseOrderSupplierGroup) =>
-    group.items.reduce((s, it) => s + (it.confirmedPrice || it.price) * it.qty, 0)
-
-  /** 计算总计 */
-  const grandTotal = supplierGroups.reduce((s, g) => s + groupSubtotal(g), 0)
+  const handleCancel = () => navigate('/purchase-order')
 
   /* ----- 明细展示表格列 ----- */
   const itemColumns = useCallback((groupId: string): TableColumnsType<PurchaseOrderItem> => [
@@ -624,66 +163,9 @@ export default function OrderAdd() {
         </Space>
       ),
     },
-  ], [paramNameMap, t])
+  ], [paramNameMap, t, handleOpenEditModal, handleRemoveItem])
 
-  /* ----- 提交 ----- */
-  const handleSubmit = async () => {
-    try {
-      const v = await form.validateFields()
-      if (!selectedEmp) { message.warning(t('asset.warnSelectPurchaser')); return }
-      const emptyItems = supplierGroups.filter((g) => g.items.length === 0)
-      if (emptyItems.length > 0) { message.warning(t('asset.warnEmptyGroupItems')); return }
-      setSubmitting(true)
-
-      await createPurchaseOrder({
-        reqId: 0,
-        supplier: supplierGroups[0]?.supplier || '',
-        amount: grandTotal,
-        deliveryDate: '',
-        // 統一提交姓名（下拉選的是工號，與「開始採購」及自動建單口徑一致）
-        purchaser: selectedEmp?.name || v.purchaser || undefined,
-        department: selectedEmp?.department || undefined,
-        brand: v.brand,
-        remark: v.remark?.trim() || undefined,
-        items: [],
-        supplierGroups: supplierGroups.map((g) => ({
-          ...g,
-          supplier: g.supplier.trim(),
-          contact: g.contact?.trim() || undefined,
-          contactPhone: g.contactPhone?.trim() || undefined,
-          orderDate: g.orderDate || undefined,
-          trackingNo: g.trackingNo?.trim() || undefined,
-        })),
-      })
-
-      // 同步手動錄入的聯繫人到供應商管理
-      const syncPromises: Promise<void>[] = []
-      for (const g of supplierGroups) {
-        if (!g.supplierId) continue
-        const contactName = g.contact?.trim()
-        const contactPhone = g.contactPhone?.trim()
-        if (!contactName || !contactPhone) continue
-        // 如果是手动输入的（非自动带入），则同步到供应商联系人
-        if (autoFilledContact[g.id] !== contactName) {
-          syncPromises.push(syncSupplierContact(g.supplierId, contactName, contactPhone).catch(() => {}))
-        }
-      }
-      await Promise.all(syncPromises)
-
-      message.success(t('asset.poCreateSuccess'))
-      navigate('/purchase-order')
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message) message.error(e.message)
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleCancel = () => navigate('/purchase-order')
-
-  /** 根據收貨方式判斷字段顯示 */
-  const showReceiveDate = (dm?: DeliveryMethod) => dm === 'supplier_delivery' || dm === 'express'
-  const showTrackingNo = (dm?: DeliveryMethod) => dm === 'express'
+  const total = grandTotal(supplierGroups)
 
   return (
     <Spin spinning={dataLoading}>
@@ -744,7 +226,7 @@ export default function OrderAdd() {
             </Col>
             <Col span={8}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {total.toLocaleString()}</div>
             </Col>
           </Row>
           <Row gutter={24}>
@@ -847,7 +329,7 @@ export default function OrderAdd() {
               <Col span={6}>
                 <Form.Item label={t('asset.labelOrderDate')}>
                   <DatePicker value={group.orderDate ? dayjs(group.orderDate) : undefined}
-                    onChange={(d) => updateGroup(group.id, { orderDate: d || undefined })}
+                    onChange={(d) => updateGroup(group.id, { orderDate: d ? d.format('YYYY-MM-DD') : undefined })}
                     disabledDate={(d) => d.isAfter(dayjs(), 'day')}
                     style={{ width: '100%' }} placeholder={t('asset.phSelectOrderDate')} />
                 </Form.Item>
@@ -870,18 +352,18 @@ export default function OrderAdd() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                {showReceiveDate(group.deliveryMethod) && (
+                {showReceiveDate(group.deliveryMethod as DeliveryMethod | undefined) && (
                   <Form.Item label={t('asset.labelExpectedDate')}>
                     <DatePicker
                       value={group.expectedReceiveDate ? dayjs(group.expectedReceiveDate) : undefined}
-                      onChange={(d) => updateGroup(group.id, { expectedReceiveDate: d || undefined })}
+                      onChange={(d) => updateGroup(group.id, { expectedReceiveDate: d ? d.format('YYYY-MM-DD') : undefined })}
                       style={{ width: '100%' }} placeholder={t('asset.phSelectExpectedDate')}
                     />
                   </Form.Item>
                 )}
               </Col>
               <Col span={6}>
-                {showTrackingNo(group.deliveryMethod) && (
+                {showTrackingNo(group.deliveryMethod as DeliveryMethod | undefined) && (
                   <Form.Item label={t('asset.labelTrackingNo')}>
                     <Input value={group.trackingNo}
                       onChange={(e) => updateGroup(group.id, { trackingNo: e.target.value })}

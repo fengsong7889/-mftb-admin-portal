@@ -21,6 +21,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 资产赔付实现，契约见 {@link EamCompensationService}。赔付单可从归还处置流程派生（createFromDispose）或直接登记（createDirect），定责/免赔/收款/复核均为独立事务方法。
+ * <p>
+ * 事务边界：create, createFromDispose, createDirect, setLiability, waive, addPayment, review, markLossRecoveryReview 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamCompensationMapper, EamCompensationPaymentMapper, EamCompensationReviewMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

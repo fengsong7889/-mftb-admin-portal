@@ -101,6 +101,8 @@ const typeTitleMapKeys: Record<string, string> = {
   gift: 'approvalDetail.typeTitleGift',
   ai_access: 'approvalDetail.typeTitleAiAccess',
   oa_purchase: 'approvalDetail.typeTitlePurchase',
+  rdm_intake: 'approvalDetail.typeTitleRdmIntake',
+  rdm_change: 'approvalDetail.typeTitleRdmChange',
 }
 
 /** 流程狀態映射（i18n key，value 為英文枚舉碼） */

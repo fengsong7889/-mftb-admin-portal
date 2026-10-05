@@ -191,6 +191,87 @@ function mergeReviewRules(rules: OrganicScoreRule[]): OrganicScoreRule[] {
   return result
 }
 
+/** 區域梯度配置校驗（PLT_03 / PLT_04 共用） */
+function validateRegionTiers(
+  tiers: ScoreTier[] | undefined,
+  scoreLabel: string,
+): boolean {
+  if (!tiers || tiers.length === 0) {
+    message.warning('請至少配置一個梯度')
+    return true
+  }
+  for (let i = 0; i < tiers.length; i++) {
+    if (!tiers[i].threshold || tiers[i].threshold <= 0) {
+      message.warning(`第 ${i + 1} 個梯度請輸入訂單量閾值`)
+      return true
+    }
+    if (tiers[i].score === undefined || tiers[i].score === null) {
+      message.warning(`第 ${i + 1} 個梯度請輸入${scoreLabel}`)
+      return true
+    }
+  }
+  return false
+}
+
+/** 按次計罰規則校驗（STB_06 ~ STB_09 共用） */
+function validateDeductionRule(values: RuleFormValues): boolean {
+  if (!values.statDays || values.statDays <= 0) {
+    message.warning('請配置統計天數')
+    return true
+  }
+  if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
+    message.warning('請配置每單扣分分值')
+    return true
+  }
+  return false
+}
+
+/** 規則類型標籤配置（消除渲染區重複 if-else） */
+const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
+  COM_01: { color: 'orange', label: '倍數梯度計分' },
+  COM_02: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_03: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_04: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_05: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_06: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_07: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_09: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  COM_10: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_02: { color: 'purple', label: '四檔狀態計分' },
+  STB_03: { color: 'purple', label: '雙檔評價計分' },
+  STB_04: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_05: { color: 'purple', label: '時間窗口對比' },
+  STB_06: { color: 'purple', label: '按次計罰' },
+  STB_07: { color: 'purple', label: '按次計罰' },
+  STB_08: { color: 'purple', label: '按次計罰' },
+  STB_09: { color: 'purple', label: '按次計罰' },
+  STB_ACT: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  PLT_01: { color: 'blue', label: '距離衰減' },
+  PLT_02A: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  PLT_03: { color: 'purple', label: '梯度扶持計分' },
+  PLT_04: { color: 'purple', label: '梯度降權計分' },
+}
+
+/** 按次計罰規則配置（STB_06 ~ STB_09 共用，消除重複面板 JSX） */
+const DEDUCTION_RULES_CONFIG: Record<string, { label: string; editLabel: string; defaultPerOrder: number; note: string }> = {
+  STB_06: { label: '統計天數內每拒絕一單', editLabel: '每拒絕一單扣分', defaultPerOrder: 80, note: '備注：統計天數含當天，商家當天拒絕接單即即時扣分' },
+  STB_07: { label: '統計天數內每超時一單', editLabel: '每超時一單扣分', defaultPerOrder: 70, note: '備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分' },
+  STB_08: { label: '統計天數內每取消一單', editLabel: '每取消一單扣分', defaultPerOrder: 80, note: '備注：統計天數含當天，商家當天取消訂單即即時扣分' },
+  STB_09: { label: '統計天數內每超時一單', editLabel: '每超時一單扣分', defaultPerOrder: 60, note: '備注：統計天數含當天，商家當天超時接單即即時扣分' },
+}
+
+/** 區域切換 Segmented 選項（PLT_03/PLT_04 共用，消除重複 JSX） */
+const REGION_SEGMENT_OPTIONS = REGION_KEYS.map(k => ({
+  value: k,
+  label: (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
+      {REGION_LABELS[k]}
+    </span>
+  ),
+}))
+
 /**
  * 自然流量算法參數配置：3 個維度的商家評分規則。
  * 自然流量不售賣坑位，商家靠綜合得分高低較量排名。
@@ -612,21 +693,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           }
         }
       } else {
-        const tiers: ScoreTier[] = values.tiers || []
-        if (tiers.length === 0) {
-          message.warning('請至少配置一個梯度')
-          return
-        }
-        for (let i = 0; i < tiers.length; i++) {
-          if (!tiers[i].threshold || tiers[i].threshold <= 0) {
-            message.warning(`第 ${i + 1} 個梯度請輸入訂單量閾值`)
-            return
-          }
-          if (tiers[i].score === undefined || tiers[i].score === null) {
-            message.warning(`第 ${i + 1} 個梯度請輸入減分分數`)
-            return
-          }
-        }
+        if (validateRegionTiers(values.tiers, '減分分數')) return
       }
     }
     // STB_05 出餐速度校驗：統計天數 + 超均值扣分
@@ -642,50 +709,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
         return
       }
     }
-    // STB_06 拒絕接單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STB_06') {
-      if (!values.statDays || values.statDays <= 0) {
-        message.warning('請配置統計天數')
-        return
-      }
-      if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
-        message.warning('請配置每單扣分分值')
-        return
-      }
-    }
-    // STB_07 出餐超時校驗：統計天數 + 每單扣分
-    if (ruleId === 'STB_07') {
-      if (!values.statDays || values.statDays <= 0) {
-        message.warning('請配置統計天數')
-        return
-      }
-      if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
-        message.warning('請配置每單扣分分值')
-        return
-      }
-    }
-    // STB_08 取消訂單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STB_08') {
-      if (!values.statDays || values.statDays <= 0) {
-        message.warning('請配置統計天數')
-        return
-      }
-      if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
-        message.warning('請配置每單扣分分值')
-        return
-      }
-    }
-    // STB_09 超時接單校驗：統計天數 + 每單扣分
-    if (ruleId === 'STB_09') {
-      if (!values.statDays || values.statDays <= 0) {
-        message.warning('請配置統計天數')
-        return
-      }
-      if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
-        message.warning('請配置每單扣分分值')
-        return
-      }
-    }
+    // STB_06 ~ STB_09 按次計罰校驗：統計天數 + 每單扣分
+    if (validateDeductionRule(values as RuleFormValues)) return
     // PLT_01 距離衰減校驗：滿分 + 衰減係數
     if (ruleId === 'PLT_01') {
       if (values.score === undefined || values.score < 0) {
@@ -1258,50 +1283,21 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                     <div className="organic-score-toolbar">
                       {!isEditingInline && (
                         <>
-                          {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'COM_01') && (
-                            <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
-                              {(rule.id === 'COM_02')
-                                ? '固定加分'
-                                : (rule.mode === ScoreMode.COUPON_INTENSITY)
-                                  ? '力度計分'
-                                  : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10' || rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'PLT_02A' || rule.id === 'STB_ACT')
-                                  ? (rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '動態加分' : '固定加分')
-                                  : MODE_LABEL[rule.mode]}
-                            </Tag>
-                          )}
-                          {rule.id === 'STB_02' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>四檔狀態計分</Tag>
-                          )}
-                          {rule.id === 'STB_03' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>雙檔評價計分</Tag>
-                          )}
-                          {rule.id === 'PLT_03' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>梯度扶持計分</Tag>
-                          )}
-                          {rule.id === 'PLT_04' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>梯度降權計分</Tag>
-                          )}
-                          {rule.id === 'STB_05' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>時間窗口對比</Tag>
-                          )}
-                          {rule.id === 'STB_06' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
-                          )}
-                          {rule.id === 'STB_07' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
-                          )}
-                          {rule.id === 'STB_08' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
-                          )}
-                          {rule.id === 'STB_09' && (
-                            <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>按次計罰</Tag>
-                          )}
-                          {rule.id === 'PLT_01' && (
-                            <Tag color="blue" style={{ fontSize: 11, margin: 0 }}>距離衰減</Tag>
-                          )}
-                          {rule.id === 'COM_01' && (
-                            <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>倍數梯度計分</Tag>
-                          )}
+                          {/* 規則類型標籤（配置驅動，消除重複 if-else） */}
+                          {(() => {
+                            const tagEntry = RULE_TYPE_TAG_CONFIG[rule.id]
+                            if (tagEntry) {
+                              // COM_03~COM_10/STB_01/STB_04/PLT_02A/STB_ACT 根據 mode 動態切換標籤
+                              const isDynamic = rule.mode === ScoreMode.AMOUNT_MULTIPLIER
+                                && ['COM_03','COM_04','COM_05','COM_06','COM_07','COM_09','COM_10','STB_01','STB_04','PLT_02A','STB_ACT'].includes(rule.id)
+                              return <Tag color={tagEntry.color} style={{ fontSize: 11, margin: 0 }}>{isDynamic ? '動態加分' : tagEntry.label}</Tag>
+                            }
+                            return (
+                              <Tag color={SCORE_MODE_COLOR[rule.mode]} style={{ fontSize: 11, margin: 0 }}>
+                                {MODE_LABEL[rule.mode]}
+                              </Tag>
+                            )
+                          })()}
 
 
                           {/* 最後更新信息（只讀模式） */}
@@ -1487,15 +1483,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   value={activeRegion}
                                   disabled={false}
                                   onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
-                                  options={REGION_KEYS.map(k => ({
-                                    value: k,
-                                    label: (
-                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
-                                        {REGION_LABELS[k]}
-                                      </span>
-                                    ),
-                                  }))}
+                                  options={REGION_SEGMENT_OPTIONS}
                                   style={{ background: '#f0f0f0' }}
                                 />
                               </div>
@@ -1545,15 +1533,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   value={activeRegion}
                                   disabled={false}
                                   onChange={val => setPlt04Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
-                                  options={REGION_KEYS.map(k => ({
-                                    value: k,
-                                    label: (
-                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
-                                        {REGION_LABELS[k]}
-                                      </span>
-                                    ),
-                                  }))}
+                                  options={REGION_SEGMENT_OPTIONS}
                                   style={{ background: '#f0f0f0' }}
                                 />
                               </div>
@@ -1600,10 +1580,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STB_06 拒絕接單自定義只讀顯示 */}
-                        {rule.id === 'STB_06' && (() => {
+                        {/* STB_06 ~ STB_09 按次計罰規則只讀顯示（配置驅動） */}
+                        {DEDUCTION_RULES_CONFIG[rule.id] && (() => {
+                          const cfg = DEDUCTION_RULES_CONFIG[rule.id]
                           const days = rule.statDays || 7
-                          const perOrder = rule.deductionPerOrder || 80
+                          const perOrder = rule.deductionPerOrder || cfg.defaultPerOrder
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -1612,67 +1593,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
                                 </div>
                               </div>
-                              <ScoreRow label="統計天數內每拒絕一單" score={perOrder} kind="deduction" />
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天拒絕接單即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_07 出餐超時自定義只讀顯示 */}
-                        {rule.id === 'STB_07' && (() => {
-                          const days = rule.statDays || 7
-                          const perOrder = rule.deductionPerOrder || 70
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（不含當天）
-                                </div>
-                              </div>
-                              <ScoreRow label="統計天數內每超時一單" score={perOrder} kind="deduction" />
-                              <div className="organic-score-note">
-                                備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_08 取消訂單自定義只讀顯示 */}
-                        {rule.id === 'STB_08' && (() => {
-                          const days = rule.statDays || 7
-                          const perOrder = rule.deductionPerOrder || 80
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
-                                </div>
-                              </div>
-                              <ScoreRow label="統計天數內每取消一單" score={perOrder} kind="deduction" />
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天取消訂單即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_09 超時接單自定義只讀顯示 */}
-                        {rule.id === 'STB_09' && (() => {
-                          const days = rule.statDays || 7
-                          const perOrder = rule.deductionPerOrder || 60
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
-                                </div>
-                              </div>
-                              <ScoreRow label="統計天數內每超時一單" score={perOrder} kind="deduction" />
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天超時接單即即時扣分
-                              </div>
+                              <ScoreRow label={cfg.label} score={perOrder} kind="deduction" />
+                              <div className="organic-score-note">{cfg.note}</div>
                             </div>
                           )
                         })()}
@@ -1863,15 +1785,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   value={activeRegion}
                                   disabled={false}
                                   onChange={val => setPlt03Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
-                                  options={REGION_KEYS.map(k => ({
-                                    value: k,
-                                    label: (
-                                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
-                                        {REGION_LABELS[k]}
-                                      </span>
-                                    ),
-                                  }))}
+                                  options={REGION_SEGMENT_OPTIONS}
                                   style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
                                 />
                                 {/* 區域配置卡片 */}
@@ -2222,15 +2136,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               <Segmented
                                 value={activeRegion}
                                 onChange={val => setPlt04Region(prev => ({ ...prev, [rule.id]: val as RegionKey }))}
-                                options={REGION_KEYS.map(k => ({
-                                  value: k,
-                                  label: (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 8px' }}>
-                                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: REGION_COLORS[k].primary, display: 'inline-block' }} />
-                                      {REGION_LABELS[k]}
-                                    </span>
-                                  ),
-                                }))}
+                                options={REGION_SEGMENT_OPTIONS}
                                 style={{ background: '#f0f0f0', alignSelf: 'flex-start' }}
                               />
                               {/* 區域配置卡片 */}
@@ -2353,10 +2259,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             </div>
                           )
                         })()}
-                        {/* STB_06 拒絕接單自定義編輯 */}
-                        {rule.id === 'STB_06' && (() => {
+                        {/* STB_06 ~ STB_09 按次計罰規則編輯面板（配置驅動） */}
+                        {DEDUCTION_RULES_CONFIG[rule.id] && (() => {
+                          const cfg = DEDUCTION_RULES_CONFIG[rule.id]
                           const days = (form as any).statDays ?? 7
-                          const perOrder = (form as any).deductionPerOrder ?? 80
+                          const perOrder = (form as any).deductionPerOrder ?? cfg.defaultPerOrder
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -2372,108 +2279,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                 </div>
                               </div>
                               <div className="organic-score-edit-tier">
-                                <span className="organic-score-edit-tier__label">每拒絕一單扣分</span>
+                                <span className="organic-score-edit-tier__label">{cfg.editLabel}</span>
                                 <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
                                 <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
                                   addonAfter="分/單" placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 80 } }) as any)} />
+                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? cfg.defaultPerOrder } }) as any)} />
                               </div>
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天拒絕接單即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_07 出餐超時自定義編輯 */}
-                        {rule.id === 'STB_07' && (() => {
-                          const days = (form as any).statDays ?? 7
-                          const perOrder = (form as any).deductionPerOrder ?? 70
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                                  <InputNumber
-                                    value={days}
-                                    min={1} max={365} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 7 } }) as any)}
-                                  />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（不含當天）</span>
-                                </div>
-                              </div>
-                              <div className="organic-score-edit-tier">
-                                <span className="organic-score-edit-tier__label">每超時一單扣分</span>
-                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
-                                <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
-                                  addonAfter="分/單" placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 70 } }) as any)} />
-                              </div>
-                              <div className="organic-score-note">
-                                備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_08 取消訂單自定義編輯 */}
-                        {rule.id === 'STB_08' && (() => {
-                          const days = (form as any).statDays ?? 7
-                          const perOrder = (form as any).deductionPerOrder ?? 80
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                                  <InputNumber
-                                    value={days}
-                                    min={1} max={365} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 7 } }) as any)}
-                                  />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
-                                </div>
-                              </div>
-                              <div className="organic-score-edit-tier">
-                                <span className="organic-score-edit-tier__label">每取消一單扣分</span>
-                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
-                                <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
-                                  addonAfter="分/單" placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 80 } }) as any)} />
-                              </div>
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天取消訂單即即時扣分
-                              </div>
-                            </div>
-                          )
-                        })()}
-                        {/* STB_09 超時接單自定義編輯 */}
-                        {rule.id === 'STB_09' && (() => {
-                          const days = (form as any).statDays ?? 7
-                          const perOrder = (form as any).deductionPerOrder ?? 60
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                                  <InputNumber
-                                    value={days}
-                                    min={1} max={365} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 7 } }) as any)}
-                                  />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
-                                </div>
-                              </div>
-                              <div className="organic-score-edit-tier">
-                                <span className="organic-score-edit-tier__label">每超時一單扣分</span>
-                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
-                                <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
-                                  addonAfter="分/單" placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? 60 } }) as any)} />
-                              </div>
-                              <div className="organic-score-note">
-                                備注：統計天數含當天，商家當天超時接單即即時扣分
-                              </div>
+                              <div className="organic-score-note">{cfg.note}</div>
                             </div>
                           )
                         })()}

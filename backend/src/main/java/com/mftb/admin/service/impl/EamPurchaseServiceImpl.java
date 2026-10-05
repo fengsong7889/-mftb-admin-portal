@@ -38,6 +38,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 采购订单实现，契约见 {@link EamPurchaseService}。订单可由采购申请转单（createOrderFromRequest），执行信息更新与删除均带事务。
+ * <p>
+ * 事务边界：createOrder, updateOrderExec, deleteOrder, createOrderFromRequest 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamPurchaseOrderMapper, EamPurchaseOrderItemMapper, EamInboundBatchMapper, EamPurchaseRequestMapper, OaRequestMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

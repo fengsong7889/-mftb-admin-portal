@@ -91,6 +91,10 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final HrCertificateCallbackService hrCertificateCallbackService;
     /** 績效考核整批确认回调 */
     private final HrPerfCallbackService hrPerfCallbackService;
+    /** 需求准入审批回调：通过→进需求池，驳回→退回提出人 */
+    private final com.mftb.admin.service.RdmIntakeCallbackService rdmIntakeCallbackService;
+    /** 需求变更审批回调：通过→计变更次数并按需回填排期，驳回→变更单退回 */
+    private final com.mftb.admin.service.RdmChangeCallbackService rdmChangeCallbackService;
 
     /* ==================== 查询 ==================== */
 
@@ -792,6 +796,24 @@ public class OaRequestServiceImpl implements OaRequestService {
                 }
             }
 
+            // 需求准入：审批全部通过 → 需求进入需求池（回调失败不回滚审批，下次可重试）
+            if (rdmIntakeCallbackService.isIntakeProcess(request.getProcessCode())) {
+                try {
+                    rdmIntakeCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("需求准入審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
+            // 需求变更：审批全部通过 → 回写变更单并计需求变更次数（同上，失败不回滚审批）
+            if (rdmChangeCallbackService.isChangeProcess(request.getProcessCode())) {
+                try {
+                    rdmChangeCallbackService.onFlowApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("需求變更審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+            }
+
             // 钉钉通知：流程全部通过，通知发起人
             try {
                 String text = String.format("### ✅ 流程审批通过\n\n"
@@ -904,6 +926,24 @@ public class OaRequestServiceImpl implements OaRequestService {
                 hrPerfCallbackService.onFlowRejected(flowNo);
             } catch (Exception e) {
                 log.error("績效確認駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
+        // 需求准入：驳回→需求退回提出人，可修改后重提（回传驳回理由便于业务理解）
+        if (rdmIntakeCallbackService.isIntakeProcess(request.getProcessCode())) {
+            try {
+                rdmIntakeCallbackService.onFlowRejected(flowNo, reason);
+            } catch (Exception e) {
+                log.error("需求准入駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
+        // 需求变更：驳回→变更单退回申请人，需求保持原状
+        if (rdmChangeCallbackService.isChangeProcess(request.getProcessCode())) {
+            try {
+                rdmChangeCallbackService.onFlowRejected(flowNo, reason);
+            } catch (Exception e) {
+                log.error("需求變更駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
             }
         }
 

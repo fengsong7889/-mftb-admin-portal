@@ -10,7 +10,12 @@ import {
 } from '@ant-design/icons'
 import { Line, Column, Pie } from '@ant-design/charts'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import {
+  createTerminalOptions, createRegionOptions,
+  brandOptions,
+  trendAnimationConfig, pieLabelConfig, pieInteractions, columnLabelLayout,
+  reportTablePagination, reportTableCommonProps,
+} from '../_shared/report-utils'
 
 const { RangePicker } = DatePicker
 
@@ -86,24 +91,8 @@ const trendConfig = {
   xField: 'date',
   yField: 'value',
   seriesField: 'type',
-  smooth: true,
-  animation: {
-    appear: {
-      animation: 'path-in',
-      duration: 1000,
-    },
-  },
   color: ['#1890ff', '#52c41a'],
-  legend: {
-    position: 'top' as const,
-  },
-  tooltip: {
-    showMarkers: false,
-  },
-  point: {
-    size: 3,
-    shape: 'circle',
-  },
+  ...trendAnimationConfig,
 }
 
 const sourcePieConfig = {
@@ -111,15 +100,8 @@ const sourcePieConfig = {
   angleField: 'value',
   colorField: 'type',
   radius: 0.8,
-  label: {
-    type: 'outer' as const,
-    content: '{name} {percentage}',
-  },
-  interactions: [
-    {
-      type: 'element-active',
-    },
-  ],
+  label: pieLabelConfig,
+  interactions: pieInteractions,
   color: ['#fa8c16', '#722ed1'],
   legend: {
     position: 'bottom' as const,
@@ -135,11 +117,7 @@ const brandColumnConfig = {
   color: ['#1890ff', '#52c41a'],
   label: {
     position: 'middle' as const,
-    layout: [
-      { type: 'interval-adjust-position' },
-      { type: 'interval-hide-overlap' },
-      { type: 'adjust-color' },
-    ],
+    layout: columnLabelLayout,
   },
   legend: {
     position: 'top' as const,
@@ -178,19 +156,8 @@ export default function HintReport() {
     { title: t('hintReport.colJumpCount'), dataIndex: 'jumpCount', key: 'jumpCount', width: 100, align: 'right' as const, sorter: true },
   ]
 
-  const terminalOptions = [
-    { label: t('common.all'), value: 'all' },
-    { label: t('dict.terminal.app'), value: 'app' },
-    { label: t('dict.terminal.wechatMini'), value: 'wechatMini' },
-    { label: t('dict.terminal.mpayMini'), value: 'mpayMini' },
-    { label: t('dict.terminal.wechatH5'), value: 'wechatH5' },
-  ]
-
-  const regionOptions = [
-    { label: t('common.all'), value: 'all' },
-    { label: t('dict.region.macau'), value: 'macau' },
-    { label: t('dict.region.taipa'), value: 'taipa' },
-  ]
+  const terminalOptions = createTerminalOptions(t)
+  const regionOptions = createRegionOptions(t)
 
   const hintTypeOptions = [
     { label: t('common.all'), value: 'all' },
@@ -321,17 +288,8 @@ export default function HintReport() {
           <Table<ReportData>
             columns={applyConfig(columns)}
             dataSource={mockData}
-            pagination={{
-              total: mockData.length,
-              pageSize: 10,
-              showTotal: (total) => t('common.total', { count: total }),
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              defaultPageSize: 10,
-              showQuickJumper: true,
-            }}
-            size="middle"
-            bordered={false}
+            pagination={reportTablePagination(mockData.length, t)}
+            {...reportTableCommonProps}
             scroll={{ x: 1300 }}
           />
         </Card>

@@ -1,13 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, Tag, Button, message, Tabs } from 'antd'
-import {
-  ArrowLeftOutlined,
-  ShoppingCartOutlined,
-  OrderedListOutlined,
-} from '@ant-design/icons'
+import { Card, message, Tabs } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlgorithmType, AppType, ALGO_CARD_COLOR_MAP } from '../Recommend/constants'
+import { AlgorithmType, AppType } from '../Recommend/constants'
 import { useCardOrder } from '../../hooks/useCardOrder'
 import DateTimeGrid from '../AdSales/DateTimeGrid'
 import DayPicker from '../AdSales/DayPicker'
@@ -20,20 +15,9 @@ import {
   type RecommendTypeConfig,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-
-// 各 Tab 展示的卡片默认类型顺序
-const DELIVERY_CARD_TYPES: AlgorithmType[] = [
-  AlgorithmType.INVINCIBLE_STAR,
-  AlgorithmType.HOT_REVIVE_AD,
-  AlgorithmType.NEW_STORE_AD,
-  AlgorithmType.TRAFFIC_AD,
-  AlgorithmType.POPULAR_MERCHANT_KA,
-  AlgorithmType.GOLDEN_SIGNBOARD,
-]
-const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
-  AlgorithmType.INVINCIBLE_STAR,
-  AlgorithmType.HOT_REVIVE_AD,
-]
+import { DELIVERY_CARD_TYPES, GROUP_BUY_CARD_TYPES } from '../_shared/ad-promotion/adPromotionConstants'
+import { AdPromotionCardList } from '../_shared/ad-promotion/AdPromotionCardList'
+import { AdPromotionPageHeader } from '../_shared/ad-promotion/AdPromotionPageHeader'
 
 // 根据URL参数计算初始状态
 const getInitialState = (_searchParams: URLSearchParams) => {
@@ -81,70 +65,25 @@ export default function PromotionSalesConfig() {
     setCurrentStep(0)
   }
 
+  // URL 构建辅助函数
+  const buildOrderUrl = (typeName: string) =>
+    `/promotion-order-manage?type=${encodeURIComponent(typeName)}`
+  const buildCardUrl = (name: string) =>
+    `/promotion-order-manage?type=${encodeURIComponent(name)}`
+
   return (
     <div className="content-area">
       {/* 页面标题 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {currentStep >= 1 && (
-              <>
-                <Button type="primary" icon={<ArrowLeftOutlined />}
-                  onClick={handleGoBack}
-                  style={{
-                    backgroundColor: '#E8720C', borderColor: '#E8720C',
-                    borderRadius: 8, height: 36, padding: '0 16px',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }}>{t('common:back')}</Button>
-                <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-              </>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-                {currentStep >= 1 && selectedAlgorithmType
-                  ? t('buyAd')
-                  : t('adSalesTitle')}
-              </h2>
-              {currentStep >= 1 && selectedAlgorithmType && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '3px 12px', background: '#FFF7E6',
-                  border: '1px solid #FFD591', borderRadius: 4,
-                  fontSize: 13, color: '#E8720C', fontWeight: 500,
-                }}>
-                  <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.icon}</span>
-                  {RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name}
-                </div>
-              )}
-            </div>
-          </div>
-          {currentStep >= 1 && (
-            <Button type="primary" icon={<OrderedListOutlined />}
-              onClick={() => {
-                const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''
-                navigate(`/promotion-order-manage?type=${encodeURIComponent(typeName)}`)
-              }}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 18px',
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>{t('viewOrders')}</Button>
-          )}
-        </div>
-      </div>
+      <AdPromotionPageHeader
+        currentStep={currentStep}
+        selectedAlgorithmType={selectedAlgorithmType}
+        onGoBack={handleGoBack}
+        onViewOrders={() => {
+          const typeName = RECOMMEND_TYPE_CONFIGS.find(c => c.type === selectedAlgorithmType)?.name || ''
+          navigate(buildOrderUrl(typeName))
+        }}
+        t={t}
+      />
 
       {/* Step 1: 选择推荐类型 */}
       {currentStep === 0 && (
@@ -157,120 +96,31 @@ export default function PromotionSalesConfig() {
                 key: 'delivery',
                 label: t('deliveryTab'),
                 children: (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: 16,
-                  }}>
-                    {deliveryCardOrder.sortCards(
-                      RECOMMEND_TYPE_CONFIGS.filter(config => DELIVERY_CARD_TYPES.includes(config.type)),
-                      config => config.type,
-                    ).map(config => (
-                      <div
-                        key={config.type}
-                        className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
-                        onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
-                        style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
-                        {...deliveryCardOrder.getDragProps(config.type)}
-                      >
-                        <div className="algo-card-inner">
-                          <div className="algo-card-icon">{config.icon}</div>
-                          <h3 className="algo-card-title">{config.name}</h3>
-                          <p className="algo-card-desc">{config.description}</p>
-                          <div className="algo-card-tag">
-                            {!config.enabled && (
-                              <Tag color="default">{t('comingSoon')}</Tag>
-                            )}
-                            {config.enabled && (
-                              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                                <Button
-                                  size="small"
-                                  icon={<OrderedListOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
-                                  }}
-                                >
-                                  {t('viewOrders')}
-                                </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<ShoppingCartOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleGoToPurchase(config)
-                                  }}
-                                >
-                                  {t('buyAd')}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <AdPromotionCardList
+                    configs={RECOMMEND_TYPE_CONFIGS.filter(config => DELIVERY_CARD_TYPES.includes(config.type))}
+                    cardOrder={deliveryCardOrder}
+                    selectedAlgorithmType={selectedAlgorithmType}
+                    onCardClick={(config) => navigate(buildCardUrl(config.name))}
+                    onViewOrders={(config) => navigate(buildCardUrl(config.name))}
+                    onBuy={handleGoToPurchase}
+                    t={t}
+                  />
                 ),
               },
               {
                 key: 'groupBuy',
                 label: t('groupBuyTab'),
                 children: (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: 16,
-                  }}>
-                    {groupBuyCardOrder.sortCards(
-                      RECOMMEND_TYPE_CONFIGS.filter(config => GROUP_BUY_CARD_TYPES.includes(config.type)),
-                      config => config.type,
-                    ).map(config => (
-                      <div
-                        key={config.type}
-                        className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
-                        onClick={() => navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)}
-                        style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
-                        {...groupBuyCardOrder.getDragProps(config.type)}
-                      >
-                        <div className="algo-card-inner">
-                          <div className="algo-card-icon">{config.icon}</div>
-                          <h3 className="algo-card-title">{config.name}</h3>
-                          <p className="algo-card-desc">{config.description}</p>
-                          <div className="algo-card-tag">
-                            {!config.enabled && (
-                              <Tag color="default">{t('comingSoon')}</Tag>
-                            )}
-                            {config.enabled && (
-                              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                                <Button
-                                  size="small"
-                                  icon={<OrderedListOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    navigate(`/promotion-order-manage?type=${encodeURIComponent(config.name)}`)
-                                  }}
-                                >
-                                  {t('viewOrders')}
-                                </Button>
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  icon={<ShoppingCartOutlined />}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleGoToPurchase(config)
-                                  }}
-                                >
-                                  {t('buyAd')}
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <AdPromotionCardList
+                    configs={RECOMMEND_TYPE_CONFIGS.filter(config => GROUP_BUY_CARD_TYPES.includes(config.type))}
+                    cardOrder={groupBuyCardOrder}
+                    selectedAlgorithmType={selectedAlgorithmType}
+                    onCardClick={(config) => navigate(buildCardUrl(config.name))}
+                    onViewOrders={(config) => navigate(buildCardUrl(config.name))}
+                    onBuy={handleGoToPurchase}
+                    t={t}
+                    gap={12}
+                  />
                 ),
               },
             ]}

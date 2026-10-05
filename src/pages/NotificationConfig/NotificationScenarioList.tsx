@@ -1,3 +1,14 @@
+/**
+ * 通知场景列表（通知配置页的第二个 Tab）。
+ *
+ * 数据策略：场景由后端预定义、数量少且不会分页，所以一次全量拉回，名称筛选与
+ * 按应用过滤都在前端完成（filtered），不走后端分页。
+ * appId 来自 URL，用于从应用列表点“场景”跳转时自动只看绑定到该应用的场景。
+ *
+ * 开关的禁用条件只看“当前已停用且不具备启用条件（未绑定或绑定应用已停用）”的行，
+ * 目的是不允许把一个注定发不出去的场景直接打开；已启用的行始终允许关闭。
+ * 与表单页一样，列表开关只改 enabled，不能在此改绑定关系。
+ */
 import { useState } from 'react'
 import { Alert, Button, Form, Input, Modal, Space, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -16,8 +27,10 @@ export default function NotificationScenarioList() {
   const canEdit = hasPermission('notification-config:edit')
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  // 跨 Tab 联动过滤：不传则看全部
   const appId = params.get('appId')
   const [form] = Form.useForm<{ name?: string }>()
+  // name 只在表单提交时写回，保证输入过程中不逐字符重排表格
   const [name, setName] = useState('')
   const { data, loading, failed, reload } = useNotificationList(fetchNotificationScenarios)
   const filtered = data.filter(item => (!appId || String(item.appId) === appId) && item.name.includes(name))
@@ -39,11 +52,14 @@ export default function NotificationScenarioList() {
     { title: t('notificationApp.status'), key: 'enabled', width: 100, render: (_, row) => <Switch checked={row.enabled}
       checkedChildren="啟用" unCheckedChildren="停用" disabled={!canEdit || loading || (!row.enabled && (!row.appId || !row.appEnabled))}
       onChange={enabled => handleToggle(row, enabled)} /> },
+    // 生效 = 场景启用 AND 绑定应用也启用；任一不成立都只是“看起来开了但发不出去”，
+    // 因此四档分别文案，避免用单一布尔开关误导运维
     { title: t('notificationApp.deliveryStatus'), key: 'effective', width: 130, render: (_, row) => <Tag color={row.enabled && row.appEnabled ? 'success' : 'default'}>
       {t(!row.appId ? 'notificationApp.unbound' : !row.enabled ? 'notificationApp.scenarioDisabled' : !row.appEnabled ? 'notificationApp.appDisabled' : 'notificationApp.active')}</Tag> },
     { title: t('notificationApp.updatedAt'), key: 'updatedAt', dataIndex: 'updatedAt', width: 170 },
     { title: t('notificationApp.actions'), key: 'action', fixed: 'right', width: 130, render: (_, row) =>
       <Space size={0} split={<span className="action-split">|</span>}>
+        {/* key 可能含特殊字符，拼 URL 前必须转义 */}
         <Button type="link" size="small" onClick={() => navigate(`/notification-scenario-form?key=${encodeURIComponent(row.key)}&mode=detail`)}>{t('notificationApp.detail')}</Button>
         {canEdit && <Button type="link" size="small" onClick={() => navigate(`/notification-scenario-form?key=${encodeURIComponent(row.key)}`)}>{t('notificationApp.edit')}</Button>}
       </Space> },

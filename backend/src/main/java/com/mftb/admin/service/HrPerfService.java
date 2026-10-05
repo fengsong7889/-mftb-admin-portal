@@ -26,8 +26,14 @@ public interface HrPerfService {
 
     // ==================== 周期 ====================
 
+    /** 周期分页（周期管理菜单 view）；keyword 命中周期名称或周期编码 */
     PageResult<HrPerfCycleVO> pageCycles(long page, long size, String status, String keyword);
 
+    /**
+     * 新建或保存周期：id 为空走 create 权限，否则走 edit 权限。
+     * <p>
+     * 服务端必验三项：周期类型合法、结束日不早于开始日、code 全局唯一（编辑时排除自身）。
+     */
     HrPerfCycleVO saveCycle(Long id, HrPerfCycleSaveDTO dto);
 
     /** 发布周期：仅已发布周期可发起计划 */
@@ -35,8 +41,10 @@ public interface HrPerfService {
 
     // ==================== 模板 ====================
 
+    /** 模板分页（周期管理菜单 view） */
     PageResult<HrPerfTemplateVO> pageTemplates(long page, long size, String keyword);
 
+    /** 模板详情（含指标与等级方案），周期管理菜单 view */
     HrPerfTemplateVO getTemplate(Long id);
 
     /** 保存模板：指标与等级方案整体替换，权重合计须等于 weightSum */
@@ -56,8 +64,10 @@ public interface HrPerfService {
     /** 发起计划：生成考核单与打分明细，并按部门负责人唯一命中自动指派评估人 */
     HrPerfPlanVO launchPlan(HrPerfPlanLaunchDTO dto);
 
+    /** 计划分页（周期管理菜单 view）；cycleId 与 status 可选过滤 */
     PageResult<HrPerfPlanVO> pagePlans(long page, long size, Long cycleId, String status);
 
+    /** 计划详情（周期管理菜单 view） */
     HrPerfPlanVO getPlan(Long id);
 
     /** 计划内考核单清单（台账视图，供计划进度页使用，周期管理或校准菜单均可） */
@@ -79,6 +89,11 @@ public interface HrPerfService {
 
     // ==================== 校准与确认 ====================
 
+    /**
+     * 校准列表（走校准菜单 view，不是周期管理菜单）。可按 planId 与考核单状态过滤，
+     * keyword 命中员工姓名 / 工号 / 需求单号；除此之外不预置任何状态过滤，
+     * “哪些单子该出现在校准页”由前端传入的 status 决定。
+     */
     PageResult<HrPerfAssessmentVO> pageCalibration(long page, long size, Long planId, String status, String keyword);
 
     /** 校准改判：分数与等级可改，改判必须写理由 */
@@ -95,7 +110,17 @@ public interface HrPerfService {
 
     // ==================== 员工自助 ====================
 
+    /**
+     * 我的考核列表（自助菜单 view），只查 user_id = 当前人的记录。
+     * <p>
+     * 已确认的行连同结果一起下发（不裁剪），口径必须与 {@link #getMyAssessment} 一致，
+     * 否则会出现“详情能看到结果、列表永远为空”的矛盾。
+     */
     PageResult<HrPerfAssessmentVO> pageMyAssessments(long page, long size, String status);
 
+    /**
+     * 我的考核详情（自助菜单 view）。先校归属：非本人直接拒给越权错误；
+     * 未走完整批审批确认前，按本人可见范围裁剪敏感字段。
+     */
     HrPerfAssessmentVO getMyAssessment(Long id);
 }

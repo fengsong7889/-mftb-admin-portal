@@ -13,6 +13,41 @@ import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, PO
 import { fetchRoles, type RoleItem } from '../../api/role'
 import { fetchEmployees, type EmployeeItem } from '../../api/employee'
 
+/** 额度配置表單字段（職位/角色兩種額度共用） */
+const QuotaFormFields = ({ t }: { t: (key: string) => string }) => (
+  <>
+    <Divider orientation="left">{t('aiQuotaAuth.quotaConfigDivider')}</Divider>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <Form.Item name="period" label={t('aiQuotaAuth.quotaPeriodLabel')} rules={[{ required: true }]}>
+        <Select options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} />
+      </Form.Item>
+      <Form.Item name="quotaType" label={t('aiQuotaAuth.quotaTypeLabel')} rules={[{ required: true }]}>
+        <Select options={Object.entries(QUOTA_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
+      </Form.Item>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
+        <InputNumber style={{ width: '100%' }} min={1} />
+      </Form.Item>
+      <Form.Item name="currency" label={t('aiQuotaAuth.currencyLabel')} rules={[{ required: true }]}>
+        <Select options={[{ value: 'CNY', label: t('aiQuotaAuth.cnyOption') }, { value: 'USD', label: t('aiQuotaAuth.usdOption') }]} />
+      </Form.Item>
+    </div>
+    <Form.Item name="softThreshold" label={t('aiQuotaAuth.softThresholdLabel')} rules={[{ required: true }]}>
+      <Radio.Group options={[{ value: 60, label: '60%' }, { value: 80, label: '80%' }, { value: 90, label: '90%' }]} />
+    </Form.Item>
+    <Form.Item name="overLimitAction" label={t('aiQuotaAuth.overLimitLabel')} rules={[{ required: true }]}>
+      <Radio.Group>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <Radio value="reject">{t('aiQuotaAuth.overLimitReject')}</Radio>
+          <Radio value="approve">{t('aiQuotaAuth.overLimitApprove')}</Radio>
+          <Radio value="downgrade">{t('aiQuotaAuth.overLimitDowngrade')}</Radio>
+        </div>
+      </Radio.Group>
+    </Form.Item>
+  </>
+)
+
 /**
  * 员工额度控制 - 按职位和角色两种授权方式融合页
  * Tab1 按职位额度：以「规则」维度按职级序列 + 职级批量配置额度（如 M序列 R3+ 日限额 10000 tokens）
@@ -330,36 +365,7 @@ export default function AiEmpQuotaControl() {
             </Form.Item>
           </div>
 
-          <Divider orientation="left">{t('aiQuotaAuth.quotaConfigDivider')}</Divider>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="period" label={t('aiQuotaAuth.quotaPeriodLabel')} rules={[{ required: true }]}>
-              <Select options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} />
-            </Form.Item>
-            <Form.Item name="quotaType" label={t('aiQuotaAuth.quotaTypeLabel')} rules={[{ required: true }]}>
-              <Select options={Object.entries(QUOTA_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
-            </Form.Item>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
-              <InputNumber style={{ width: '100%' }} min={1} />
-            </Form.Item>
-            <Form.Item name="currency" label={t('aiQuotaAuth.currencyLabel')} rules={[{ required: true }]}>
-              <Select options={[{ value: 'CNY', label: t('aiQuotaAuth.cnyOption') }, { value: 'USD', label: t('aiQuotaAuth.usdOption') }]} />
-            </Form.Item>
-          </div>
-          <Form.Item name="softThreshold" label={t('aiQuotaAuth.softThresholdLabel')} rules={[{ required: true }]}>
-            <Radio.Group options={[{ value: 60, label: '60%' }, { value: 80, label: '80%' }, { value: 90, label: '90%' }]} />
-          </Form.Item>
-          <Form.Item name="overLimitAction" label={t('aiQuotaAuth.overLimitLabel')} rules={[{ required: true }]}>
-            <Radio.Group>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <Radio value="reject">{t('aiQuotaAuth.overLimitReject')}</Radio>
-                <Radio value="approve">{t('aiQuotaAuth.overLimitApprove')}</Radio>
-                <Radio value="downgrade">{t('aiQuotaAuth.overLimitDowngrade')}</Radio>
-              </div>
-            </Radio.Group>
-          </Form.Item>
+          <QuotaFormFields t={t} />
           <Form.Item name="description" label={t('aiQuotaAuth.descCol')}>
             <Input.TextArea rows={2} placeholder={t('aiQuotaAuth.descPh')} maxLength={200} showCount />
           </Form.Item>
@@ -637,36 +643,7 @@ export default function AiEmpQuotaControl() {
             />
           </Form.Item>
 
-          <Divider orientation="left">{t('aiQuotaAuth.quotaConfigDivider')}</Divider>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="period" label={t('aiQuotaAuth.quotaPeriodLabel')} rules={[{ required: true }]}>
-              <Select options={Object.entries(QUOTA_PERIOD_LABEL).map(([value, label]) => ({ value, label }))} />
-            </Form.Item>
-            <Form.Item name="quotaType" label={t('aiQuotaAuth.quotaTypeLabel')} rules={[{ required: true }]}>
-              <Select options={Object.entries(QUOTA_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
-            </Form.Item>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
-              <InputNumber style={{ width: '100%' }} min={1} />
-            </Form.Item>
-            <Form.Item name="currency" label={t('aiQuotaAuth.currencyLabel')} rules={[{ required: true }]}>
-              <Select options={[{ value: 'CNY', label: t('aiQuotaAuth.cnyOption') }, { value: 'USD', label: t('aiQuotaAuth.usdOption') }]} />
-            </Form.Item>
-          </div>
-          <Form.Item name="softThreshold" label={t('aiQuotaAuth.softThresholdLabel')} rules={[{ required: true }]}>
-            <Radio.Group options={[{ value: 60, label: '60%' }, { value: 80, label: '80%' }, { value: 90, label: '90%' }]} />
-          </Form.Item>
-          <Form.Item name="overLimitAction" label={t('aiQuotaAuth.overLimitLabel')} rules={[{ required: true }]}>
-            <Radio.Group>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <Radio value="reject">{t('aiQuotaAuth.overLimitReject')}</Radio>
-                <Radio value="approve">{t('aiQuotaAuth.overLimitApprove')}</Radio>
-                <Radio value="downgrade">{t('aiQuotaAuth.overLimitDowngrade')}</Radio>
-              </div>
-            </Radio.Group>
-          </Form.Item>
+          <QuotaFormFields t={t} />
           <div style={{ fontSize: 12, color: '#8C8C8C', background: '#FAFAFA', padding: '8px 12px', borderRadius: 6 }}>
             {t('aiQuotaAuth.roleQuotaNote')}
           </div>

@@ -23,6 +23,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 资产交接实现，契约见 {@link EamHandoverService}。交接单含明细行，登记与取消都在事务内。
+ * <p>
+ * 事务边界：register, cancel 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamHandoverMapper, EamHandoverItemMapper, EamAssetMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

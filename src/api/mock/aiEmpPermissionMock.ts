@@ -3,115 +3,12 @@
  * 列表頁 + 詳情頁共用，後續對接後端 API 時替換
  */
 import dayjs from 'dayjs'
+import type { PermissionSource, QuotaStatus, EmpModelPermission, EmpQuotaGrant, EmpPermissionSummary } from '../empPermission'
+import { SOURCE_LABEL, SOURCE_TAG_COLOR, QUOTA_STATUS_LABEL, QUOTA_STATUS_COLOR, calcQuotaStatus } from '../empPermission'
 
-/* ══════════ 類型定義 ══════════ */
-
-/** 授權來源 */
-export type PermissionSource = 'department' | 'position' | 'role' | 'approval'
-
-/** 授權來源標籤 */
-export const SOURCE_LABEL: Record<PermissionSource, string> = {
-  department: '部門配置',
-  position: '職位配置',
-  role: '角色配置',
-  approval: '審批授予',
-}
-
-/** 授權來源 Tag 顏色 */
-export const SOURCE_TAG_COLOR: Record<PermissionSource, string> = {
-  department: 'blue',
-  position: 'purple',
-  role: 'cyan',
-  approval: 'orange',
-}
-
-/** 額度狀態 */
-export type QuotaStatus = 'normal' | 'exhausted' | 'frozen'
-
-/** 額度狀態標籤 */
-export const QUOTA_STATUS_LABEL: Record<QuotaStatus, string> = {
-  normal: '正常',
-  exhausted: '已用完',
-  frozen: '凍結',
-}
-
-/** 額度狀態 Tag 顏色 */
-export const QUOTA_STATUS_COLOR: Record<QuotaStatus, string> = {
-  normal: 'success',
-  exhausted: 'error',
-  frozen: 'default',
-}
-
-/** 模型權限項（單個模型對某員工的授權信息） */
-export interface EmpModelPermission {
-  modelId: number
-  modelName: string
-  source: PermissionSource
-  /** 來源描述（如「技術部策略」「M5+ 職位策略」「申請單 AI202609070001」） */
-  sourceDesc: string
-  /** 能力開關 */
-  visionSupport: boolean
-  functionCalling: boolean
-  jsonMode: boolean
-  streaming: boolean
-  thinkingMode: boolean
-  /** 狀態：1=啟用 0=已禁用 */
-  status: number
-  /** 授權時間 */
-  grantedAt: string
-}
-
-/** 額度記錄項 */
-export interface EmpQuotaGrant {
-  id: number
-  source: PermissionSource
-  sourceDesc: string
-  quotaType: 'token' | 'request'
-  quotaValue: number
-  quotaPeriod: 'daily' | 'monthly'
-  usedValue: number
-  effectiveType: 'permanent' | 'temporary'
-  effectiveAt: string
-  expireAt: string | null
-  overLimitAction: 'reject' | 'approve' | 'downgrade' | null
-  status: number
-  createdAt: string
-}
-
-/** 員工權限聚合記錄（列表頁一行） */
-export interface EmpPermissionSummary {
-  employeeId: number
-  employeeName: string
-  empId: string
-  department: string
-  /** 末級部門 ID（用於樹形篩選） */
-  deptId: number
-  position: string
-  /** 職級（如 R3, M5） */
-  jobLevel: string
-  /** 可用模型數 */
-  modelCount: number
-  /** 模型權限列表（詳情頁用） */
-  modelPermissions: EmpModelPermission[]
-  /** 額度記錄列表 */
-  quotaGrants: EmpQuotaGrant[]
-  /** 最後更新人（審批流程則記錄最後審批節點操作人） */
-  lastUpdatedBy: string
-  /** 最後更新時間 */
-  lastUpdatedAt: string
-}
-
-/* ══════════ 額度狀態計算 ══════════ */
-
-/** 根據額度記錄計算員工額度狀態 */
-export function calcQuotaStatus(grants: EmpQuotaGrant[]): QuotaStatus {
-  if (!grants.length) return 'frozen'
-  const active = grants.filter((g) => g.status === 1)
-  if (!active.length) return 'frozen'
-  const allExhausted = active.every((g) => g.usedValue >= g.quotaValue)
-  if (allExhausted) return 'exhausted'
-  return 'normal'
-}
+// Re-export for consumers that import from this file
+export type { PermissionSource, QuotaStatus, EmpModelPermission, EmpQuotaGrant, EmpPermissionSummary }
+export { SOURCE_LABEL, SOURCE_TAG_COLOR, QUOTA_STATUS_LABEL, QUOTA_STATUS_COLOR, calcQuotaStatus }
 
 /* ══════════ Mock 數據 ══════════ */
 

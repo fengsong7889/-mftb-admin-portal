@@ -76,18 +76,25 @@ export interface CertificatePayload {
 
 export const fetchCertificates = (params: { page: number; size: number; status?: string; keyword?: string }) =>
   request.get<unknown, PageResult<CertificateItem>>('/hr/certificate', { params })
+/** 查询：GET /hr/certificate/stats */
 export const fetchCertificateStats = () =>
   request.get<unknown, Record<string, number>>('/hr/certificate/stats')
+/** 查询：GET /hr/certificate/{id} */
 export const fetchCertificateDetail = (id: number) =>
   request.get<unknown, CertificateItem>(`/hr/certificate/${id}`)
+/** 保存：POST /hr/certificate */
 export const saveCertificateDraft = (data: CertificatePayload) =>
   request.post<unknown, CertificateItem>('/hr/certificate', data)
+/** 修改：PUT /hr/certificate/{id} */
 export const updateCertificate = (id: number, data: CertificatePayload) =>
   request.put<unknown, CertificateItem>(`/hr/certificate/${id}`, data)
+/** 提交：POST /hr/certificate/{id}/submit */
 export const submitCertificate = (id: number) =>
   request.post<unknown, CertificateItem>(`/hr/certificate/${id}/submit`)
+/** 取消：POST /hr/certificate/{id}/cancel */
 export const cancelCertificate = (id: number) =>
   request.post<unknown, void>(`/hr/certificate/${id}/cancel`)
+/** 删除：DELETE /hr/certificate/{id} */
 export const deleteCertificate = (id: number) =>
   request.delete<unknown, void>(`/hr/certificate/${id}`)
 
@@ -114,8 +121,10 @@ export interface CertificateIssuePayload {
 /** 证明开具台账（人事视角，跨员工；需 hr-certificate 菜单） */
 export const fetchCertificateLedger = (params: CertificateLedgerQuery) =>
   request.get<unknown, PageResult<CertificateItem>>('/hr/certificate/ledger', { params })
+/** 查询：GET /hr/certificate/ledger/stats */
 export const fetchCertificateLedgerStats = () =>
   request.get<unknown, Record<string, number>>('/hr/certificate/ledger/stats')
+/** 发放：POST /hr/certificate/{id}/issue */
 export const issueCertificate = (id: number, data: CertificateIssuePayload) =>
   request.post<unknown, CertificateItem>(`/hr/certificate/${id}/issue`, data)
 

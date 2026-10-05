@@ -54,6 +54,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * EAM 基础数据实现：分类 / 品牌 / 型号 / 位置 / 参数类型与取值 / 配件 / 供应商 / 资产标签统一由本类承载，契约见 {@link EamBasicDataService}。
+ * <p>
+ * 协作依赖：EamCategoryMapper, EamBrandMapper, EamModelMapper, EamLocationMapper, EamParamTypeMapper, EamParamValueMapper, EamSupplierMapper, EamAssetTagMapper, JdbcTemplate。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

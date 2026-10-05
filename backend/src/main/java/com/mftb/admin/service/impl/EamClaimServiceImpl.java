@@ -30,6 +30,14 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 资产领用实现，契约见 {@link EamClaimService}。领用与签署状态分两个维度记录，token 形式的自助签署走 signByToken。
+ * <p>
+ * 事务边界：register, sign, signByToken, cancel 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamClaimMapper, EamClaimEvidenceMapper, EamClaimEventMapper, EamAssetMapper, EamReturnService, DingTalkAppService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

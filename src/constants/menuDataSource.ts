@@ -208,6 +208,33 @@ export const keyToPath: Record<string, string> = {
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
   'consumable-alert':     '/consumable-alert',
+  // 產研協同（RDM）—— M0 原型菜单（前端补挂，M1 由 sys_menu 种子接管后保留同一 key/path）
+  'rdm-workbench':        '/rdm-workbench',
+  'rdm-submit':           '/rdm-submit',
+  'rdm-requirement':      '/rdm-requirement',
+  'rdm-intake':           '/rdm-intake',
+  'rdm-product':          '/rdm-product',
+  'rdm-acceptance':       '/rdm-acceptance',
+  // 需求總看板已升为一级分组：分组折叠态跳转指向首个子页，交付看板/質量/追溯/周报各自成菜单
+  'rdm-dashboard':          '/rdm-dashboard',
+  'rdm-dashboard-board':    '/rdm-dashboard',
+  'rdm-dashboard-quality':  '/rdm-quality',
+  'rdm-dashboard-version':  '/rdm-version-trace',
+  'rdm-dashboard-report':   '/rdm-weekly-report',
+  'rdm-dashboard-score':     '/rdm-score',
+  'rdm-dashboard-trend':     '/rdm-metric-trend',
+  // 需求配置为分组目录，折叠态跳转指向首个子页（与其他一级分组同法）
+  // 研發交付已升为一级分组：分组折叠态跳转指向首个子页（与 rdm-config-group 同法）
+  'rdm-delivery':            '/rdm-delivery',
+  'rdm-delivery-board':      '/rdm-delivery',
+  'rdm-delivery-iteration':  '/rdm-iteration',
+  'rdm-delivery-req':        '/rdm-delivery-req',
+  // 需求配置为分组目录，折叠态跳转指向首个子页（与其他一级分组同法）
+  'rdm-config-group':     '/rdm-config-status',
+  'rdm-config-status':    '/rdm-config-status',
+  'rdm-config-routing':   '/rdm-config-routing',
+  'rdm-config-sla':       '/rdm-config-sla',
+  'rdm-config-score':     '/rdm-score-rule',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -226,6 +253,18 @@ Object.entries(keyToPath).forEach(([key, path]) => {
 })
 // 字典表单为 hr-dict 菜单的子页面（非独立菜单），归入 hr-dict 供侧边栏高亮/标签名/离线过滤使用
 pathToKey['/hr-dict-edit'] = 'hr-dict'
+// RDM 詳情/驗收表單/交付子頁歸入對應菜單，供側邊欄高亮與標籤名使用
+pathToKey['/rdm-detail'] = 'rdm-requirement'
+pathToKey['/rdm-acceptance-form'] = 'rdm-acceptance'
+// 交付中需求台账、迭代排期已升为独立子菜单（由 keyToPath 反向映射）；任务/迭代表单仍为子页
+pathToKey['/rdm-task'] = 'rdm-delivery-board'
+// 分配产品经理独立页：后端 batch-assign 校 rdm-intake 的 edit，此处归属保持一致
+pathToKey['/rdm-assign'] = 'rdm-intake'
+pathToKey['/rdm-iteration-form'] = 'rdm-delivery-iteration'
+// 需求↔版本追溯、交付周报、產出積分、效能量趨勢均已升为看板子菜单（由 keyToPath 反向映射）；PRD/评审/变更仍为子页
+pathToKey['/rdm-prd'] = 'rdm-product'
+pathToKey['/rdm-review'] = 'rdm-product'
+pathToKey['/rdm-change'] = 'rdm-requirement'
 // 入转调离表单/详情为各菜单子页面（非独立菜单），归入各自列表菜单
 pathToKey['/hr-onboarding-form'] = 'hr-onboarding'
 pathToKey['/hr-onboarding-detail'] = 'hr-onboarding'

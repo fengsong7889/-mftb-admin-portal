@@ -23,6 +23,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 资产借用实现，契约见 {@link EamBorrowService}。管理端与员工自助（my* 系列）共用一套表。
+ * <p>
+ * 事务边界：register, renew, cancel 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamBorrowMapper, EamAssetMapper, BizSeqService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

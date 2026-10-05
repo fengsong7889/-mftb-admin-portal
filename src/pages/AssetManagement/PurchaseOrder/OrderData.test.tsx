@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OrderDetail from './OrderDetail'
 import OrderEdit from './OrderEdit'
-import { fetchAllParamTypes, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchSuppliersDropdown, type PurchaseOrder } from '../../../api/eam'
+import { fetchAllParamTypes, fetchBrandList, fetchCategoryList, fetchModelList, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchSuppliersDropdown, type PurchaseOrder } from '../../../api/eam'
 import { fetchEmployees } from '../../../api/employee'
 
 vi.mock('../../../api/eam')
@@ -50,6 +50,11 @@ beforeEach(() => {
   vi.mocked(fetchAllParamTypes).mockResolvedValue([])
   vi.mocked(fetchSuppliersDropdown).mockResolvedValue([])
   vi.mocked(fetchEmployees).mockResolvedValue({ records: [], total: 0 })
+  // 编辑表单挂载时会并行拉基础数据（分类/品牌/型号）；api/eam 被整体自动 mock 后这些方法返回 undefined，
+  // safeFetch 的 .catch 会直接抛 TypeError，故必须补上返回 Promise 的桩数据
+  vi.mocked(fetchCategoryList).mockResolvedValue([])
+  vi.mocked(fetchBrandList).mockResolvedValue([])
+  vi.mocked(fetchModelList).mockResolvedValue({ records: [], total: 0 })
 })
 
 describe('采购订单品牌与流程编号展示', () => {

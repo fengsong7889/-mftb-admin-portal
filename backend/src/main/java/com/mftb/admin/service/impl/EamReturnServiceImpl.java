@@ -28,6 +28,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 资产归还与验收处置实现，契约见 {@link EamReturnService}。归还来源含领用与借用；处置（dispose）会按实物流向派生赔付单与送修单、回写遗失单状态与资产状态，因此依赖面广，改动前需确认各下游服务的约束。
+ * <p>
+ * 事务边界：register, dispose, recover 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamReturnMapper, EamClaimMapper, EamBorrowMapper, EamAssetMapper, EamScrapMapper, EamCompensationService, EamRepairService, EamLossService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

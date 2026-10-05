@@ -17,6 +17,14 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * AI 工具执行授权策略与执行审计的实现，契约见 {@link AiToolPolicyService}。除 save 外其余方法不开事务（含只读查询与单条日志写入）。
+ * <p>
+ * 事务边界：save 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：AiToolPolicyMapper, AiToolExecLogMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

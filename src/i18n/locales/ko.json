@@ -3,6 +3,12 @@
     "title": "기업 포털",
     "appCenter": "애플리케이션 센터",
     "artwork": {
+      "rdmSubmit": "제출",
+      "rdmIntake": "승인",
+      "rdmDispatch": "배정",
+      "rdmProduct": "설계",
+      "rdmDelivery": "개발",
+      "rdmAcceptance": "배포",
       "searching": "일치하는 정보 검색 중",
       "searchMatched": "검색 매칭 성공",
       "hrMatching": "직원 정보와 부서 매칭 중",

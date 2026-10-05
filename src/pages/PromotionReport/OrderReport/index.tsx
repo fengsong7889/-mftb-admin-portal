@@ -27,6 +27,7 @@ import {
 } from '../types'
 import { mockOrderReports, mockTimeSlotReports, mockDailyTrends } from '../mockData'
 import '../index.css'
+import { ReportFilterSelect } from '../shared'
 
 const { RangePicker } = DatePicker
 
@@ -389,59 +390,35 @@ export default function PromotionReportOrder() {
             />
           </div>
           {canViewAllBrands && (
-            <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
-              <Select
-                placeholder={t('common.all')}
-                allowClear
-                value={app}
-                onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
-                  value: Number(value),
-                  label: appLabel(Number(value) as ReportApp),
-                }))}
-              />
-            </div>
+            <ReportFilterSelect
+              label={t('promotionReport.brand')}
+              value={app}
+              onChange={setApp}
+              labelMap={REPORT_APP_LABEL}
+              labelFn={appLabel}
+            />
           )}
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={channel}
-              onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: channelLabel(Number(value) as ReportChannel),
-              }))}
-            />
-          </div>
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.region')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={region}
-              onChange={setRegion}
-              options={Object.entries(REPORT_REGION_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: regionLabel(Number(value) as ReportRegion),
-              }))}
-            />
-          </div>
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.adStatus')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={adStatus}
-              onChange={setAdStatus}
-              options={Object.entries(REPORT_AD_STATUS_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: adStatusLabel(Number(value) as ReportAdStatus).label,
-              }))}
-            />
-          </div>
+          <ReportFilterSelect
+            label={t('promotionReport.channel')}
+            value={channel}
+            onChange={setChannel}
+            labelMap={REPORT_CHANNEL_LABEL}
+            labelFn={channelLabel}
+          />
+          <ReportFilterSelect
+            label={t('promotionReport.region')}
+            value={region}
+            onChange={setRegion}
+            labelMap={REPORT_REGION_LABEL}
+            labelFn={regionLabel}
+          />
+          <ReportFilterSelect
+            label={t('promotionReport.adStatus')}
+            value={adStatus}
+            onChange={setAdStatus}
+            labelMap={REPORT_AD_STATUS_LABEL as unknown as Record<string, string>}
+            labelFn={(v) => adStatusLabel(v).label}
+          />
           <div style={{ flex: '0 0 auto', paddingTop: 26 }}>
             <Space>
               <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>

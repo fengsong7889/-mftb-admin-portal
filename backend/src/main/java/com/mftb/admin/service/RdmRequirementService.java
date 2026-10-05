@@ -1,0 +1,72 @@
+package com.mftb.admin.service;
+
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.RdmAcceptanceDTO;
+import com.mftb.admin.dto.RdmAcceptanceVO;
+import com.mftb.admin.dto.RdmOptionVO;
+import com.mftb.admin.dto.RdmRequirementCreateDTO;
+import com.mftb.admin.dto.RdmRequirementQuery;
+import com.mftb.admin.dto.RdmRequirementVO;
+import com.mftb.admin.dto.RdmTransitionDTO;
+import com.mftb.admin.dto.RdmWorkbenchVO;
+import com.mftb.admin.entity.RdmComment;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * RDM 需求服务（提交 / 审批 / 分配 / 受理 / 交付流转 / 验收 / 工作台）
+ */
+public interface RdmRequirementService {
+
+    /** 需求分页列表（按登录人身份收敛数据范围） */
+    PageResult<RdmRequirementVO> page(RdmRequirementQuery query);
+
+    /** 各视角 Tab 数量 */
+    Map<String, Long> scopeCounts();
+
+    /** 需求详情（含关联对象、角色、时间轴、评论、附件、审批节点、SLA、可执行动作） */
+    RdmRequirementVO detail(Long id);
+
+    /** 提交需求（mode=draft 存草稿），返回需求视图 */
+    RdmRequirementVO create(RdmRequirementCreateDTO dto);
+
+    /** 修改需求（仅草稿/准入驳回态） */
+    RdmRequirementVO update(Long id, RdmRequirementCreateDTO dto);
+
+    /** 撤回为草稿 */
+    RdmRequirementVO withdraw(Long id);
+
+    /** 状态流转（按 rdm_transition 校验角色与必填字段） */
+    RdmRequirementVO transition(Long id, RdmTransitionDTO dto);
+
+    /** 批量分配产品经理 */
+    int batchAssign(List<Long> ids, Long pmUserId);
+
+    /** 添加沟通记录 */
+    RdmComment addComment(Long id, String content, Boolean internal);
+
+    /** 催办（通知当前处理人） */
+    void urge(Long id);
+
+    /** 提交业务验收结论 */
+    void submitAcceptance(Long id, RdmAcceptanceDTO dto);
+
+    /**
+     * 历次验收记录（含逐条用例）——M3 返工链路展示与一次通过率口径用。
+     * <p>按验收时间正序返回，attempt 为当时冻结的第几次验收序号。
+     */
+    List<RdmAcceptanceVO> acceptanceHistory(Long id);
+
+    /** 工作台待办聚合 */
+    RdmWorkbenchVO workbench();
+
+    /** 产品经理候选（含在途负载） */
+    List<RdmOptionVO.ProductManager> productManagers();
+
+    /** 系统 → 菜单 级联树 */
+    List<RdmOptionVO.MenuNode> menuTree();
+
+    /** 菜单下的功能点候选 */
+    List<RdmOptionVO.FunctionPoint> functionPoints(String menuKey);
+}

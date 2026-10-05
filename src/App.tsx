@@ -259,6 +259,33 @@ const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
 const WorkflowDetail = lazy(() => import('./pages/WorkflowConfig/WorkflowDetail'))
 
+// 產研協同（RDM）：需求全生命周期管理
+const RdmWorkbench = lazy(() => import('./pages/Rdm/Workbench'))
+const RdmRequirementSubmit = lazy(() => import('./pages/Rdm/RequirementSubmit'))
+const RdmRequirementList = lazy(() => import('./pages/Rdm/RequirementList'))
+const RdmRequirementDetail = lazy(() => import('./pages/Rdm/RequirementDetail'))
+const RdmProductBoard = lazy(() => import('./pages/Rdm/ProductBoard'))
+const RdmDeliveryBoard = lazy(() => import('./pages/Rdm/DeliveryBoard'))
+const RdmTaskForm = lazy(() => import('./pages/Rdm/TaskForm'))
+const RdmAssignPm = lazy(() => import('./pages/Rdm/AssignPm'))
+const RdmIterationPlan = lazy(() => import('./pages/Rdm/IterationPlan'))
+const RdmIterationForm = lazy(() => import('./pages/Rdm/IterationForm'))
+const RdmPrdForm = lazy(() => import('./pages/Rdm/PrdForm'))
+const RdmReviewForm = lazy(() => import('./pages/Rdm/ReviewForm'))
+const RdmChangeForm = lazy(() => import('./pages/Rdm/ChangeForm'))
+const RdmQualityBoard = lazy(() => import('./pages/Rdm/QualityBoard'))
+const RdmVersionTrace = lazy(() => import('./pages/Rdm/VersionTrace'))
+const RdmWeeklyReport = lazy(() => import('./pages/Rdm/WeeklyReport'))
+const RdmScoreBoard = lazy(() => import('./pages/Rdm/ScoreBoard'))
+const RdmMetricTrend = lazy(() => import('./pages/Rdm/MetricTrend'))
+const RdmScoreRuleConfig = lazy(() => import('./pages/Rdm/Config/ScoreRuleConfig'))
+const RdmAcceptanceList = lazy(() => import('./pages/Rdm/AcceptanceList'))
+const RdmAcceptanceForm = lazy(() => import('./pages/Rdm/AcceptanceForm'))
+const RdmDashboard = lazy(() => import('./pages/Rdm/Dashboard'))
+const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
+const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
+const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
+
 const { Content } = Layout
 
 /** 页面加载中指示器 */
@@ -530,6 +557,35 @@ function AuthenticatedLayout() {
               <Route path="/oa-requests" element={<OaRequests />} />
               <Route path="/process-center" element={<ProcessCenter />} />
               <Route path="/oa-purchase-request" element={<OaPurchaseRequest />} />
+              {/* 產研協同（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
+              <Route path="/rdm-workbench" element={<RdmWorkbench />} />
+              <Route path="/rdm-submit" element={<RdmRequirementSubmit />} />
+              <Route path="/rdm-requirement" element={<RdmRequirementList />} />
+              <Route path="/rdm-intake" element={<RdmRequirementList scope="pool" switchable={false} />} />
+              <Route path="/rdm-detail" element={<RdmRequirementDetail />} />
+              <Route path="/rdm-product" element={<RdmProductBoard />} />
+              <Route path="/rdm-delivery" element={<RdmDeliveryBoard />} />
+              <Route path="/rdm-delivery-req" element={<RdmRequirementList scope="delivery" switchable={false} />} />
+              <Route path="/rdm-task" element={<RdmTaskForm />} />
+              {/* 分配产品经理：独立页（取代需求池弹窗），权限跟 rdm-intake 的 edit */}
+              <Route path="/rdm-assign" element={<RdmAssignPm />} />
+              <Route path="/rdm-iteration" element={<RdmIterationPlan />} />
+              <Route path="/rdm-iteration-form" element={<RdmIterationForm />} />
+              <Route path="/rdm-prd" element={<RdmPrdForm />} />
+              <Route path="/rdm-review" element={<RdmReviewForm />} />
+              <Route path="/rdm-change" element={<RdmChangeForm />} />
+              <Route path="/rdm-acceptance" element={<RdmAcceptanceList />} />
+              <Route path="/rdm-acceptance-form" element={<RdmAcceptanceForm />} />
+              <Route path="/rdm-dashboard" element={<RdmDashboard />} />
+              <Route path="/rdm-quality" element={<RdmQualityBoard />} />
+              <Route path="/rdm-version-trace" element={<RdmVersionTrace />} />
+              <Route path="/rdm-weekly-report" element={<RdmWeeklyReport />} />
+              <Route path="/rdm-score" element={<RdmScoreBoard />} />
+              <Route path="/rdm-metric-trend" element={<RdmMetricTrend />} />
+              <Route path="/rdm-score-rule" element={<RdmScoreRuleConfig />} />
+              <Route path="/rdm-config-status" element={<RdmConfigStatus />} />
+              <Route path="/rdm-config-routing" element={<RdmConfigRouting />} />
+              <Route path="/rdm-config-sla" element={<RdmConfigSla />} />
               {/* 物資管理（EAM 完整路由）*/}
               <Route path="/asset-list"       element={<AssetList />} />
               <Route path="/asset-add"        element={<AssetAdd />} />

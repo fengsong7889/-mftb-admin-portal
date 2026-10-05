@@ -2,195 +2,26 @@ import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Popover, TreeSelect } from 'antd'
 import BrandTag from '../../components/BrandTag'
-import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup, type LabelDateGroup } from '../../api/adPromotion'
-import dayjs from 'dayjs'
-const { RangePicker } = DatePicker
+import { fetchAdOrders } from '../../api/adPromotion'
 import {
   SearchOutlined,
   ExportOutlined,
-  ArrowLeftOutlined,
-  ShoppingCartOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { AlgorithmType } from '../Recommend/constants'
+import { AppType, RecommendChannel, Region } from '../Recommend/constants'
+import {
+  OrderStatus,
+  RecommendType,
+  type BaseOrderItem,
+  toBaseOrderItem,
+  usePromotionOrderLabels,
+  PromotionOrderPageHeader,
+  createPurchaseContentRenderer,
+} from '../_shared/promotion-order'
 
-// 订单状态枚举
-enum OrderStatus {
-  PENDING_PROMOTION = 1,
-  PROMOTING = 2,
-  PROMOTED = 3,
-  REFUNDED = 4,
-  CANCELLED = 5,
-}
-
-// 品牌枚举
-enum AppType {
-  SHANFENG = 1,
-  MFOOD = 2,
-}
-
-// 业务频道枚举
-enum RecommendChannel {
-  DELIVERY = 2,
-  GROUP_BUY = 3,
-  SUPERMARKET = 4,
-}
-
-// 商圈枚举（与地圖規劃商圈数据一致）
-enum Region {
-  KOKSAA = 1,         // 黑沙環區
-  COSTA = 2,          // 高士德區
-  SANMA = 3,          // 新馬路區
-  SANWONG = 4,        // 新皇朝區
-  HKM = 5,            // 港珠澳區
-  FAHUA = 6,          // 花城市區
-  AIRPORT = 7,        // 北安機場
-  LHOTEL = 8,         // 左酒店區
-  RHOTEL = 9,         // 右酒店區
-  UM = 10,            // 澳大專區
-  HACS = 11,          // 黑沙灘區
-}
-
-// 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致）
-type RecommendType = AlgorithmType
-const RecommendType = AlgorithmType
-
-// 推薦類型中文名（URL 參數協議：AdSales 跳轉時傳入中文名，與語言無關）
-const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
-  [RecommendType.INVINCIBLE_STAR]: '無敵星星',
-  [RecommendType.HOT_REVIVE_AD]: '盤活復蘇',
-  [RecommendType.NEW_STORE_AD]: '新店廣告',
-  [RecommendType.TRAFFIC_AD]: '投流廣告',
-  [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
-  [RecommendType.GOLDEN_SIGNBOARD]: '金字招牌',
-}
-
-const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
-  [RecommendType.INVINCIBLE_STAR]: '⭐',
-  [RecommendType.HOT_REVIVE_AD]: '🔥',
-  [RecommendType.NEW_STORE_AD]: '🏪',
-  [RecommendType.TRAFFIC_AD]: '📊',
-  [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
-  [RecommendType.GOLDEN_SIGNBOARD]: '🏅',
-}
-
-const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {
-  [RecommendType.INVINCIBLE_STAR]: 'gold',
-  [RecommendType.HOT_REVIVE_AD]: 'green',
-  [RecommendType.NEW_STORE_AD]: 'blue',
-  [RecommendType.TRAFFIC_AD]: 'purple',
-}
-
-/** 金字招牌標籤類型 → 中文翻譯映射 */
-const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
-  hot: { label: '熱門', icon: '🔥', color: '#FF4D4F' },
-  popular: { label: '人氣', icon: '👑', color: '#FAAD14' },
-  sales: { label: '銷量', icon: '📈', color: '#1890FF' },
-  rating: { label: '好評', icon: '⭐', color: '#52C41A' },
-  repurchase: { label: '復購', icon: '🔄', color: '#722ED1' },
-  favorites: { label: '收藏', icon: '❤️', color: '#EB2F96' },
-  customers: { label: '顧客數', icon: '👥', color: '#13C2C2' },
-}
-
-// 订单接口定义
-interface OrderItem {
-  id: string
-  orderNo: string
-  promotionName: string
-  app: AppType
-  channel: RecommendChannel
-  region: Region | Region[]  // 所屬商圈（無敵星星可能有多個）
-  recommendType: RecommendType
-  slotPosition: number
-  groupId: string             // 集團ID
-  groupName: string           // 集團名稱
-  storeId: string             // 門店ID
-  storeName: string           // 門店名稱
-  mealSlots: string[]       // 無敵星星：購買時段
-  dateSlots?: DateSlotGroup[] // 無敵星星：按日期分組的購買時段
-  purchaseDays?: string[]    // 盤活復蘇/金字招牌：購買日期列表
-  labelDates?: LabelDateGroup[] // 金字招牌：按標籤分組的購買日期
-  purchaseDate: string
-  originalPrice: number
-  discountPrice: number
-  actualPrice: number
-  discountAmount?: number    // 定價折扣
-  giftDays?: number          // 贈送天數抵扣
-  giftAmount?: number        // 贈送抵扣金額
-  status: OrderStatus
-  orderTime: string
-  payTime?: string
-  /** 数据来源：api=后端真实数据 mock=演示数据 */
-  source?: 'api' | 'mock'
-}
-
-/** 后端订单 → 列表行（id 使用订单号，与详情页跳转对齐） */
-function toOrderItem(vo: AdOrder): OrderItem {
-  const channelMap: Record<number, RecommendChannel> = {
-    2: RecommendChannel.DELIVERY,
-    3: RecommendChannel.SUPERMARKET,
-    4: RecommendChannel.GROUP_BUY,
-  }
-  // 後端 LocalDateTime 統一序列化為毫秒時間戳，兼容字符串/數字兩種格式
-  const fmt = (t?: string | number) => {
-    if (t == null || t === '') return ''
-    if (typeof t === 'number') return dayjs(t).format('YYYY-MM-DD HH:mm:ss')
-    return String(t).replace('T', ' ').slice(0, 19)
-  }
-  // 所屬商圈: 後端由訂單明細去重聚合返回
-  const regions = (vo.regions || []).map(r => r as Region)
-  // 購買時段: 餐段 key → 中文名稱
-  const MEAL_SLOT_CN: Record<string, string> = {
-    breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
-  }
-  const mealSlots = (vo.mealSlots || []).map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s)
-  // 按日期分組時段：後端返回每個日期對應的時段列表
-  const dateSlots = vo.dateSlots?.map(g => ({
-    region: g.region,
-    date: g.date,
-    slots: g.slots.map(s => MEAL_SLOT_CN[s] || MEAL_SLOT_TIME_LABEL[s] || s),
-  }))
-  // 購買日期: 無敵星星和盤活復蘇均傳遞日期列表
-  const hasNoMealSlots = (vo.mealSlots || []).length === 0
-  const isDayBasedType = vo.algoType === 3 || vo.algoType === 13
-  const isStarType = vo.algoType === 1
-  const purchaseDays = (isDayBasedType && hasNoMealSlots) || isStarType
-    ? ((vo.purchaseDays && vo.purchaseDays.length > 0)
-        ? vo.purchaseDays
-        : isDayBasedType ? Array.from({ length: vo.itemCount || 0 }, () => '') : undefined)
-    : undefined
-  return {
-    id: vo.orderNo,
-    orderNo: vo.orderNo,
-    promotionName: vo.algoName,
-    app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
-    channel: channelMap[vo.channel ?? 2] ?? RecommendChannel.DELIVERY,
-    region: regions.length === 1 ? regions[0] : regions,
-    recommendType: vo.algoType as RecommendType,
-    slotPosition: 0,
-    groupId: vo.groupCode,
-    groupName: vo.groupName || '-',
-    storeId: vo.storeCode || '-',
-    storeName: vo.storeName || '-',
-    mealSlots,
-    dateSlots,
-    purchaseDays,
-    labelDates: vo.labelDates,
-    purchaseDate: fmt(vo.orderTime).slice(0, 10),
-    originalPrice: vo.originalAmount,
-    discountPrice: vo.originalAmount - vo.discountAmount,
-    actualPrice: vo.actualAmount,
-    discountAmount: vo.discountAmount,
-    giftDays: vo.giftDays ?? undefined,
-    giftAmount: vo.giftAmount ?? undefined,
-    status: vo.status as OrderStatus,
-    orderTime: fmt(vo.orderTime),
-    payTime: vo.payTime ? fmt(vo.payTime) : undefined,
-    source: 'api',
-  }
-}
+const { RangePicker } = DatePicker
 
 export default function PromotionOrderManage() {
   const navigate = useNavigate()
@@ -199,98 +30,23 @@ export default function PromotionOrderManage() {
   const orderType = searchParams.get('type') || ''
   const fromSource = searchParams.get('from') || ''
 
-  // 枚舉標籤（依賴 t，定義在組件內以便響應語言切換）
-  const statusLabel = (v: OrderStatus) => {
-    const map: Partial<Record<OrderStatus, { label: string; color: string }>> = {
-      [OrderStatus.PENDING_PROMOTION]: { label: t('promotionOrderManage.statusPending'), color: 'blue' },
-      [OrderStatus.PROMOTING]: { label: t('promotionOrderManage.statusPromoting'), color: 'green' },
-      [OrderStatus.PROMOTED]: { label: t('promotionOrderManage.statusPromoted'), color: 'purple' },
-      [OrderStatus.REFUNDED]: { label: t('promotionOrderManage.statusRefunded'), color: 'orange' },
-      [OrderStatus.CANCELLED]: { label: t('promotionOrderManage.statusCancelled'), color: 'red' },
-    }
-    return map[v] || { label: String(v), color: 'default' }
-  }
-  const appLabel = (v: AppType) => (v === AppType.SHANFENG ? t('common.flashBee') : 'mFood')
-  const channelLabel = (v: RecommendChannel) => ({
-    [RecommendChannel.DELIVERY]: t('promotionOrderManage.chDelivery'),
-    [RecommendChannel.GROUP_BUY]: t('promotionOrderManage.chGroupBuy'),
-    [RecommendChannel.SUPERMARKET]: t('promotionOrderManage.chSupermarket'),
-  }[v])
-  const regionLabel = (v: Region) => {
-    const map: Record<number, string> = {
-      [Region.KOKSAA]: t('promotionOrderManage.regionKoksaa'),
-      [Region.COSTA]: t('promotionOrderManage.regionCosta'),
-      [Region.SANMA]: t('promotionOrderManage.regionSanma'),
-      [Region.SANWONG]: t('promotionOrderManage.regionSanwong'),
-      [Region.HKM]: t('promotionOrderManage.regionHkm'),
-      [Region.FAHUA]: t('promotionOrderManage.regionFahua'),
-      [Region.AIRPORT]: t('promotionOrderManage.regionAirport'),
-      [Region.LHOTEL]: t('promotionOrderManage.regionLhotel'),
-      [Region.RHOTEL]: t('promotionOrderManage.regionRhotel'),
-      [Region.UM]: t('promotionOrderManage.regionUm'),
-      [Region.HACS]: t('promotionOrderManage.regionHacs'),
-    }
-    return map[v] || String(v)
-  }
-  const recommendTypeLabel = (v: RecommendType) => {
-    const map: Partial<Record<RecommendType, string>> = {
-      [RecommendType.INVINCIBLE_STAR]: t('promotionReport.recTypeInvincibleStar'),
-      [RecommendType.HOT_REVIVE_AD]: t('promotionReport.recTypeHotRevive'),
-      [RecommendType.NEW_STORE_AD]: t('promotionReport.recTypeNewStore'),
-      [RecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
-      [RecommendType.POPULAR_MERCHANT_KA]: t('promotionOrderManage.recTypePopular'),
-      [RecommendType.GOLDEN_SIGNBOARD]: t('promotionOrderManage.recTypeGoldenSignboard'),
-    }
-    return map[v] || String(v)
-  }
-
-  // 商圈樹形數據（title 依賴 t，定義在組件內）
-  const regionTreeData = [
-    {
-      value: 'macau_area',
-      title: t('promotionOrderManage.areaMacau'),
-      selectable: true,
-      children: [
-        { value: Region.KOKSAA, title: t('promotionOrderManage.regionKoksaa') },
-        { value: Region.COSTA, title: t('promotionOrderManage.regionCosta') },
-        { value: Region.SANMA, title: t('promotionOrderManage.regionSanma') },
-        { value: Region.SANWONG, title: t('promotionOrderManage.regionSanwong') },
-        { value: Region.HKM, title: t('promotionOrderManage.regionHkm') },
-      ],
-    },
-    {
-      value: 'taipa_area',
-      title: t('promotionOrderManage.areaTaipa'),
-      selectable: true,
-      children: [
-        { value: Region.FAHUA, title: t('promotionOrderManage.regionFahua') },
-        { value: Region.AIRPORT, title: t('promotionOrderManage.regionAirport') },
-        { value: Region.LHOTEL, title: t('promotionOrderManage.regionLhotel') },
-        { value: Region.RHOTEL, title: t('promotionOrderManage.regionRhotel') },
-        { value: Region.UM, title: t('promotionOrderManage.regionUm') },
-        { value: Region.HACS, title: t('promotionOrderManage.regionHacs') },
-      ],
-    },
-  ]
-
-  // URL 參數為中文類型名（AdSales 傳入）或數字枚舉值，反查枚舉值用於過濾
-  const orderTypeKey = useMemo(() => {
-    // 先嘗試作為數字枚舉值直接使用
-    const numVal = Number(orderType)
-    if (!isNaN(numVal) && Object.values(RecommendType).includes(numVal)) {
-      return numVal as RecommendType
-    }
-    // 再嘗試按中文名匹配
-    const entry = Object.entries(RECOMMEND_TYPE_LABEL).find(([, label]) => label === orderType)
-    return entry ? (Number(entry[0]) as RecommendType) : undefined
-  }, [orderType])
+  // 使用共享 Hook 獲取標籤函數和商圈樹
+  const {
+    statusLabel,
+    appLabel,
+    channelLabel,
+    regionLabel,
+    recommendTypeLabel,
+    regionTreeData,
+    orderTypeKey,
+  } = usePromotionOrderLabels(orderType)
 
   // 订单数据：直接调用后端 API
-  const [orders, setOrders] = useState<OrderItem[]>([])
+  const [orders, setOrders] = useState<BaseOrderItem[]>([])
   const loadOrders = () => {
     fetchAdOrders({ page: 1, size: 200 })
       .then(res => {
-        const rows = (res.records ?? []).map(toOrderItem)
+        const rows = (res.records ?? []).map(toBaseOrderItem)
         setOrders(rows)
       })
       .catch(() => {})
@@ -373,7 +129,7 @@ export default function PromotionOrderManage() {
   ])
 
   // 表格列定义
-  const columns: ColumnsType<OrderItem> = [
+  const columns: ColumnsType<BaseOrderItem> = [
     {
       title: t('promotionOrderManage.colOrderNo'),
       dataIndex: 'orderNo',
@@ -474,195 +230,7 @@ export default function PromotionOrderManage() {
       title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
       width: orderType === '金字招牌' ? 320 : 140,
-      render: (_, record) => {
-        // 金字招牌：展示標籤 + 日期（最多3個標籤，超出 +X 弹窗）
-        if (orderType === '金字招牌' || record.recommendType === RecommendType.GOLDEN_SIGNBOARD) {
-          if (record.labelDates && record.labelDates.length > 0) {
-            const MAX_LABELS = 3
-            const visibleLabels = record.labelDates.slice(0, MAX_LABELS)
-            const hiddenLabels = record.labelDates.slice(MAX_LABELS)
-            const hiddenCount = hiddenLabels.length
-            // 弹窗：展示所有標籤的完整日期
-            const allLabelsContent = (
-              <Space direction="vertical" size={8}>
-                {record.labelDates.map((lg, li) => {
-                  const cfg = SIGNBOARD_LABEL_CN[lg.label]
-                  return (
-                    <div key={li}>
-                      <div style={{ marginBottom: 4 }}>
-                        <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {cfg?.label || lg.label}</Tag>
-                      </div>
-                      <Space wrap size={4}>
-                        {lg.dates.map((d, di) => (
-                          <Tag key={di} color="green" style={{ margin: 0 }}>{d}</Tag>
-                        ))}
-                      </Space>
-                    </div>
-                  )
-                })}
-              </Space>
-            )
-            return (
-              <Space direction="vertical" size={2}>
-                {visibleLabels.map((lg, li) => {
-                  const cfg = SIGNBOARD_LABEL_CN[lg.label]
-                  const firstDate = lg.dates[0]
-                  const moreCount = lg.dates.length - 1
-                  const allDatesContent = (
-                    <Space direction="vertical" size={4}>
-                      {lg.dates.map((d, di) => (
-                        <Tag key={di} color="green" style={{ margin: 0 }}>{d}</Tag>
-                      ))}
-                    </Space>
-                  )
-                  return (
-                    <div key={li} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {cfg?.label || lg.label}</Tag>
-                      {firstDate && (
-                        <span style={{ fontSize: 12, color: '#595959' }}>{firstDate}</span>
-                      )}
-                      {moreCount > 0 && (
-                        <Popover
-                          content={allDatesContent}
-                          title={`${cfg?.label || lg.label} 全部日期`}
-                          trigger="click"
-                          placement="bottomLeft"
-                        >
-                          <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{moreCount}日期</span>
-                        </Popover>
-                      )}
-                    </div>
-                  )
-                })}
-                {hiddenCount > 0 && (
-                  <Popover content={allLabelsContent} title="全部標籤日期" trigger="click" placement="bottomLeft">
-                    <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{hiddenCount}</span>
-                  </Popover>
-                )}
-              </Space>
-            )
-          }
-          return <span style={{ color: '#bfbfbf' }}>-</span>
-        }
-        if (orderType === '盤活復蘇' || record.recommendType === RecommendType.HOT_REVIVE_AD) {
-          // 盤活復蘇：只展示天數+日期
-          if (record.purchaseDays && record.purchaseDays.length > 0) {
-            const days = record.purchaseDays.length
-            const hasDates = record.purchaseDays.some(d => !!d)
-            const first = record.purchaseDays[0]
-            const last = record.purchaseDays[record.purchaseDays.length - 1]
-            return (
-              <Space direction="vertical" size={2}>
-                <Tag color="green" style={{ margin: 0 }}>{t('promotionOrderManage.daysUnit', { count: days })}</Tag>
-                {hasDates && (
-                  <span style={{ fontSize: 12, color: '#595959' }}>
-                    {first} ~ {last}
-                  </span>
-                )}
-              </Space>
-            )
-          }
-          return <span style={{ color: '#bfbfbf' }}>-</span>
-        }
-        // 無敵星星：去重時段展示（最多3行），面板按商圈→日期→時段層級展示
-        if (record.dateSlots && record.dateSlots.length > 0) {
-          // 收集所有不重複時段，並記錄每個時段出現的日期
-          const slotDateMap = new Map<string, string[]>()
-          record.dateSlots.forEach(g => {
-            g.slots.forEach(slot => {
-              if (!slotDateMap.has(slot)) slotDateMap.set(slot, [])
-              if (!slotDateMap.get(slot)!.includes(g.date)) {
-                slotDateMap.get(slot)!.push(g.date)
-              }
-            })
-          })
-          const allSlots = Array.from(slotDateMap.entries()) // [[slot, [dates]]]
-          const MAX_SHOW = 3
-          const visibleSlots = allSlots.slice(0, MAX_SHOW)
-          const hiddenSlots = allSlots.slice(MAX_SHOW)
-          const hiddenCount = hiddenSlots.length
-
-          // 面板內容：按商圈→日期→時段層級展示
-          const regionGroupMap = new Map<number, { dates: Map<string, string[]> }>()
-          record.dateSlots.forEach(g => {
-            const r = g.region ?? 0
-            if (!regionGroupMap.has(r)) {
-              regionGroupMap.set(r, { dates: new Map() })
-            }
-            const group = regionGroupMap.get(r)!
-            if (!group.dates.has(g.date)) {
-              group.dates.set(g.date, [])
-            }
-            g.slots.forEach(slot => {
-              if (!group.dates.get(g.date)!.includes(slot)) {
-                group.dates.get(g.date)!.push(slot)
-              }
-            })
-          })
-          const panelContent = (
-            <Space direction="vertical" size={12}>
-              {Array.from(regionGroupMap.entries()).map(([regionVal, group]) => {
-                const regionName = regionVal > 0
-                  ? regionLabel(regionVal as Region)
-                  : (Array.isArray(record.region)
-                      ? record.region.map(r => regionLabel(r)).join('、')
-                      : regionLabel(record.region as Region))
-                return (
-                  <div key={regionVal}>
-                    <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: '#262626' }}>
-                      {regionName}
-                    </div>
-                    {Array.from(group.dates.entries()).map(([date, slots]) => (
-                      <div key={date} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, color: '#595959', minWidth: 90 }}>{date}</span>
-                        <Space size={4}>
-                          {slots.map((slot, si) => (
-                            <Tag key={si} color="blue" style={{ margin: 0 }}>{slot}</Tag>
-                          ))}
-                        </Space>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </Space>
-          )
-
-          return (
-            <Space direction="vertical" size={2}>
-              {visibleSlots.map(([slot, dates], i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Tag color="blue" style={{ margin: 0 }}>{slot}</Tag>
-                  <Popover content={panelContent} title={t('promotionOrderManage.allSlots')} trigger="click" placement="bottomLeft">
-                    <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>{dates[0]}</span>
-                  </Popover>
-                  {dates.length > 1 && (
-                    <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{dates.length - 1}</span>
-                  )}
-                </div>
-              ))}
-              {hiddenCount > 0 && (
-                <Popover content={panelContent} title={t('promotionOrderManage.allSlots')} trigger="click" placement="bottomLeft">
-                  <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{hiddenCount}</span>
-                </Popover>
-              )}
-            </Space>
-          )
-        }
-        // 降級：無 dateSlots 時展示 mealSlots
-        if (record.mealSlots && record.mealSlots.length > 0) {
-          return (
-            <Space direction="vertical" size={2}>
-              {record.mealSlots.map((slot, index) => (
-                <Tag key={index} color="blue" style={{ margin: 0 }}>
-                  {slot}
-                </Tag>
-              ))}
-            </Space>
-          )
-        }
-        return <span style={{ color: '#bfbfbf' }}>-</span>
-      },
+      render: createPurchaseContentRenderer({ t, orderType, regionLabel }),
     },
     {
       title: t('promotionOrderManage.colOrderAmount'),
@@ -776,54 +344,14 @@ export default function PromotionOrderManage() {
   return (
     <div className="content-area">
       {/* 页面标题 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/ad-sales')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>{t('common.back')}</Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('promotionOrderManage.orderListTitle')}</h2>
-              {orderType && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '3px 12px', background: '#FFF7E6',
-                  border: '1px solid #FFD591', borderRadius: 4,
-                  fontSize: 13, color: '#E8720C', fontWeight: 500,
-                }}>
-                  {orderTypeKey !== undefined && <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_ICON[orderTypeKey]}</span>}
-                  {orderTypeKey !== undefined ? recommendTypeLabel(orderTypeKey) : orderType}
-                </div>
-              )}
-            </div>
-          </div>
-          <Button type="primary" icon={<ShoppingCartOutlined />}
-            onClick={() => navigate(`/ad-sales?type=${encodeURIComponent(orderType)}`)}
-            style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C',
-              borderRadius: 8, height: 36, padding: '0 18px',
-              boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-            }}>{t('promotionOrderManage.buyAd')}</Button>
-        </div>
-      </div>
+      <PromotionOrderPageHeader
+        t={t}
+        orderType={orderType}
+        orderTypeKey={orderTypeKey}
+        recommendTypeLabel={recommendTypeLabel}
+        onBack={() => navigate('/ad-sales')}
+        onBuyAd={() => navigate(`/ad-sales?type=${encodeURIComponent(orderType)}`)}
+      />
 
       {/* 搜索区域 */}
       <div className="search-section">

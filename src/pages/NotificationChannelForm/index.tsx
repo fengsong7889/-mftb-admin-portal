@@ -10,6 +10,7 @@ const SCENARIO_OPTIONS = [
   { value: 'general', label: '通用通知' },
   { value: 'oa_approval', label: 'OA審批通知' },
   { value: 'ai_assistant', label: 'AI助手通知' },
+  { value: 'rdm', label: '產研需求通知' },
 ]
 
 /** 平台选项 */

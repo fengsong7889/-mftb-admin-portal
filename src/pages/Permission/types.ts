@@ -858,6 +858,108 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  // ── 產研協同（RDM）需求全生命周期 ──
+  'rdm-center': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-workbench': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-submit': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+  ],
+  'rdm-requirement': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-intake': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-product': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-board': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-iteration': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-req': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-acceptance': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+  ],
+  'rdm-dashboard': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-board': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-quality': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-version': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-dashboard-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-score': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-dashboard-trend': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-config-score': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-group': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-config-status': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-routing': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-sla': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
 }
 
 /** 获取菜单的功能操作（优先后端 sys_menu.actions 真值源，空时回退前端静态映射） */
@@ -1238,6 +1340,29 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // OA中心
   'oa-requests',
   'workflow-config',
+  // 產研協同（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
+  'rdm-workbench',
+  'rdm-submit',
+  'rdm-requirement',
+  'rdm-intake',
+  'rdm-product',
+  'rdm-delivery',
+  'rdm-delivery-board',
+  'rdm-delivery-iteration',
+  'rdm-delivery-req',
+  'rdm-acceptance',
+  'rdm-dashboard',
+  'rdm-dashboard-board',
+  'rdm-dashboard-quality',
+  'rdm-dashboard-version',
+  'rdm-dashboard-report',
+  'rdm-dashboard-score',
+  'rdm-dashboard-trend',
+  'rdm-config-score',
+  'rdm-config-group',
+  'rdm-config-status',
+  'rdm-config-routing',
+  'rdm-config-sla',
   // 智能中心 (AI)
   'ai-model-provider',
   'ai-model-list',
@@ -1449,6 +1574,35 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // OA中心
   '/oa-requests': 'oa-requests',
   '/workflow-config': 'workflow-config',
+  // 產研協同（RDM）—— 子页（详情/验收表单/研发交付）归入其列表菜单
+  '/rdm-workbench': 'rdm-workbench',
+  '/rdm-submit': 'rdm-submit',
+  '/rdm-requirement': 'rdm-requirement',
+  '/rdm-intake': 'rdm-intake',
+  '/rdm-delivery': 'rdm-delivery-board',
+  '/rdm-delivery-req': 'rdm-delivery-req',
+  '/rdm-task': 'rdm-delivery-board',
+  // 分配产品经理独立页：与后端 batch-assign 的鉴权菜单一致
+  '/rdm-assign': 'rdm-intake',
+  '/rdm-iteration': 'rdm-delivery-iteration',
+  '/rdm-iteration-form': 'rdm-delivery-iteration',
+  '/rdm-prd': 'rdm-product',
+  '/rdm-review': 'rdm-product',
+  '/rdm-change': 'rdm-requirement',
+  '/rdm-product': 'rdm-product',
+  '/rdm-acceptance': 'rdm-acceptance',
+  '/rdm-acceptance-form': 'rdm-acceptance',
+  '/rdm-detail': 'rdm-requirement',
+  '/rdm-dashboard': 'rdm-dashboard-board',
+  '/rdm-quality': 'rdm-dashboard-quality',
+  '/rdm-version-trace': 'rdm-dashboard-version',
+  '/rdm-weekly-report': 'rdm-dashboard-report',
+  '/rdm-score': 'rdm-dashboard-score',
+  '/rdm-metric-trend': 'rdm-dashboard-trend',
+  '/rdm-score-rule': 'rdm-config-score',
+  '/rdm-config-status': 'rdm-config-status',
+  '/rdm-config-routing': 'rdm-config-routing',
+  '/rdm-config-sla': 'rdm-config-sla',
   // AI 智能中心（拆分后）
   '/ai-model-provider': 'ai-model-provider',
   '/ai-model-list': 'ai-model-list',

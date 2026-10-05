@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Tag, Spin, Progress, Tooltip, message } from 'antd'
+import { Button, Tag, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { TeamOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../../../components/DetailPageHeader'
-import AnimatedNumber from '../../../components/AnimatedNumber'
 import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '../../../api'
 import { fetchDeptQuotaDetail, type DeptQuotaVO } from '../../../api/deptQuota'
 import {
@@ -13,13 +12,11 @@ import {
   quotaText,
   usedText,
   QUOTA_PERIOD_LABEL,
-  QUOTA_TYPE_LABEL,
-  QUOTA_TYPE_UNIT,
-  OVER_LIMIT_ACTION_LABEL,
   OVER_LIMIT_TAG,
-  ALLOCATE_MODE_LABEL,
   CURRENCY_SYMBOL,
+  QUOTA_TYPE_UNIT,
 } from './deptQuotaStore'
+import { LoadingSpinner, SectionCard, UsageOverviewSection, BasicInfoDetailSection, QuotaConfigDetailSection } from '../components'
 
 const PERIOD_KEYS: Record<string, string> = { daily: 'periodDaily', monthly: 'periodMonthly' }
 const TYPE_KEYS: Record<string, string> = { token: 'typeToken', cost: 'typeCost', request: 'typeRequest' }
@@ -70,11 +67,7 @@ export default function DeptQuotaDetail() {
   const handleBack = () => navigate('/ai-dept-quota')
 
   if (loading) {
-    return (
-      <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" />
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (!policy) {
@@ -120,72 +113,33 @@ export default function DeptQuotaDetail() {
         menuKey="ai-dept-quota"
       />
 
-      {/* ═══ 分区 1：用量概览（數據指標統計卡標準 12.1 + 用量進度） ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.usageOverview')}</span>
-          <Tag color="green">{t('aiQuotaAuth.quotaPeriodReset', { period: t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || '')) })}</Tag>
-          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        </div>
-
-        <div key={policy.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#E6F7FF', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>
-              <AnimatedNumber value={policy.usedValue} prefix={valuePrefix} />
-            </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
-          </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}>
-              <AnimatedNumber value={policy.quotaValue} prefix={valuePrefix} />
-            </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
-          </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: pctBg, border: `1px solid ${pctColor}22`, transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: pctColor }}>
-              <AnimatedNumber value={pct} suffix="%" />
-            </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
-          </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>
-              <AnimatedNumber value={policy.totalEmployeeCount} suffix={t('aiQuotaAuth.animatedPersonSuffix')} />
-            </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.coverEmpCount')}</div>
-          </div>
-        </div>
-
-        {/* 用量進度條（直觀呈現消耗與軟提醒閾值） */}
-        <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: pctColor }}>{pct}%</span>
-          </div>
-          <Progress percent={Math.min(pct, 100)} strokeColor={pctColor} showInfo={false} size={['100%', 14]} style={{ marginBottom: 12 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
-            <span style={{ color: '#595959' }}>
-              {t('aiQuotaAuth.usedLabel')} <strong style={{ color: pctColor }}>{usedText(policy)}</strong> · {t('aiQuotaAuth.quotaLimitLabel2')} {quotaText(policy)}
-            </span>
-            <span style={{ color: '#8C8C8C' }}>
-              {t('aiQuotaAuth.softAlertLabel')} {policy.softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? '#52C41A' : '#FF4D4F' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong>
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* ═══ 分区 1：用量概览 ═══ */}
+      <UsageOverviewSection
+        usedValue={policy.usedValue}
+        quotaValue={policy.quotaValue}
+        percent={pct}
+        percentColor={pctColor}
+        percentBg={pctBg}
+        totalEmployeeCount={policy.totalEmployeeCount}
+        valuePrefix={valuePrefix}
+        unitLabel={unitLabel}
+        softThreshold={policy.softThreshold}
+        quotaText={quotaText(policy)}
+        usedText={usedText(policy)}
+        remaining={remaining}
+        periodTag={t('aiQuotaAuth.quotaPeriodReset', { period: t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || '')) })}
+      />
 
       {/* ═══ 分区 2：适用部门 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptTitle')}</span>
-          <Tag color="blue">{t('aiQuotaAuth.deptCountLabel', { count: policy.deptNames.length })}</Tag>
-          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        </div>
+      <SectionCard
+        header={{
+          icon: <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+          iconBg: '#e6f7ff',
+          title: t('aiQuotaAuth.applicableDeptTitle'),
+          tag: t('aiQuotaAuth.deptCountLabel', { count: policy.deptNames.length }),
+          tagColor: 'blue',
+        }}
+      >
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {policy.deptNames.map((name) => {
             const d = deptOptions.find((x) => x.deptName === name)
@@ -203,77 +157,28 @@ export default function DeptQuotaDetail() {
             <span style={{ marginLeft: 8, color: '#8C8C8C' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
           )}
         </div>
-      </div>
+        </SectionCard>
 
       {/* ═══ 分区 3：额度配置 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FundOutlined style={{ fontSize: 14, color: '#E8720C' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.quotaConfigTitle')}</span>
-          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px 16px' }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.allocateMethod')}</div>
-            <Tag color={policy.allocateMode === 'per_capita' ? 'blue' : 'default'}>{t('aiQuotaAuth.' + (ALLOC_KEYS[policy.allocateMode] || ''))}</Tag>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || ''))}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (TYPE_KEYS[policy.quotaType] || ''))}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div>
-            <div style={{ fontSize: 14, color: '#E8720C', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaText(policy)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div>
-            <div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{policy.softThreshold}%</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div>
-            <Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{t('aiQuotaAuth.' + (OVER_LIMIT_KEYS[policy.overLimitAction] || ''))}</Tag>
-            <div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div>
-          </div>
-          {policy.overLimitAction === 'downgrade' && (
-            <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelName ?? (policy.downgradeModelId ? t('aiQuotaAuth.modelIdRef', { id: policy.downgradeModelId }) : '-')}</div>
-            </div>
-          )}
-        </div>
-      </div>
+      <QuotaConfigDetailSection
+        allocateModeTag={<Tag color={policy.allocateMode === 'per_capita' ? 'blue' : 'default'}>{t('aiQuotaAuth.' + (ALLOC_KEYS[policy.allocateMode] || ''))}</Tag>}
+        periodLabel={t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || ''))}
+        quotaTypeLabel={t('aiQuotaAuth.' + (TYPE_KEYS[policy.quotaType] || ''))}
+        quotaValueText={quotaText(policy)}
+        softThreshold={policy.softThreshold}
+        overLimitTag={<Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{t('aiQuotaAuth.' + (OVER_LIMIT_KEYS[policy.overLimitAction] || ''))}</Tag>}
+        downgradeModelText={policy.overLimitAction === 'downgrade' ? (downgradeModelName ?? (policy.downgradeModelId ? t('aiQuotaAuth.modelIdRef', { id: policy.downgradeModelId }) : '-')) : undefined}
+      />
 
       {/* ═══ 分区 4：基础信息 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
-          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-          {([
-            { label: t('aiQuotaAuth.strategyNameCol'), value: policy.name },
-            { label: t('aiQuotaAuth.descLabel'), value: policy.description || '-' },
-            { label: t('aiQuotaAuth.statusCol'), value: policy.status === 1 ? t('aiQuotaAuth.enableText') : t('aiQuotaAuth.disableText') },
-            { label: t('aiQuotaAuth.lastUpdatedByCol'), value: policy.updatedBy ?? '-' },
-            { label: t('aiQuotaAuth.createdAtCol'), value: policy.createdAt ?? '-' },
-            { label: t('aiQuotaAuth.updatedAtCol'), value: policy.updatedAt ?? '-' },
-          ] as Array<{ label: string; value: string }>).map((item) => (
-            <div key={item.label}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <BasicInfoDetailSection
+        name={policy.name}
+        description={policy.description}
+        status={policy.status}
+        updatedBy={policy.updatedBy}
+        createdAt={policy.createdAt}
+        updatedAt={policy.updatedAt}
+      />
     </div>
   )
 }

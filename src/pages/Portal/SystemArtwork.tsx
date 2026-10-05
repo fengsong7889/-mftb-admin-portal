@@ -5,6 +5,7 @@ import { feature, mesh } from 'topojson-client'
 import type { GeometryCollection, Topology } from 'topojson-specification'
 import worldSource from 'world-atlas/countries-110m.json?raw'
 import { getPortalSystemKey, type PortalSystemKey } from '../../constants/portalSystems'
+import { RDM_STAGE, RDM_STAGE_LABEL, RDM_STAGE_ORDER, type RdmStage } from '../../constants/rdm'
 
 /** 自绘业务场景，不依赖外链；状态文案随门户语言切换。 */
 function Sheet({ x, y, width = 104, height = 112 }: { x: number; y: number; width?: number; height?: number }) {
@@ -119,6 +120,173 @@ function AssetScene() {
       <path d="M91 150h7" stroke="currentColor" strokeWidth="1.5" />
     </g>
   </g>
+}
+
+/**
+ * 流水线站点符号：每个阶段一个语义图形，让卡片一眼读出「需求从提交走到上线」。
+ * 图形绘制在站点圆心局部坐标内（约 ±8 用户单位），描边继承 currentColor，
+ * 未点亮时由场景提供橙色描边，点亮后外层把 color 覆盖为白色复用同一份图形。
+ */
+function StageGlyph({ stage }: { stage: RdmStage }) {
+  switch (stage) {
+    // 提交需求：把需求单从托盘推上去
+    case RDM_STAGE.SUBMIT:
+      return <path d="M-7 3v4h14V3M0 1V-7m-4 4 4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    // 需求審批：单据上的审批通过标记
+    case RDM_STAGE.INTAKE:
+      return (
+        <g fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M-5-7h6l4 4v10H-5Zm6 0v4h4" />
+          <path d="m-2 2 2 2 4-5" />
+        </g>
+      )
+    // 分配受理：落到受理人身上
+    case RDM_STAGE.DISPATCH:
+      return (
+        <g fill="none" stroke="currentColor" strokeWidth="1.8">
+          <circle cy="-4" r="3" />
+          <path d="M-6 6a6 6 0 0 1 12 0" />
+        </g>
+      )
+    // 設計評審：PRD 原型线框
+    case RDM_STAGE.PRODUCT:
+      return (
+        <g fill="none" stroke="currentColor" strokeWidth="1.8">
+          <rect x="-7" y="-6" width="14" height="12" rx="2" />
+          <path d="M-7-1h14M-1-1v7" />
+        </g>
+      )
+    // 研發測試：代码括号
+    case RDM_STAGE.DELIVERY:
+      return <path d="M-3-5-8 0-3 5m6-10 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    // 驗收上線：火箭发布
+    default:
+      return (
+        <g fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M0-8c3 3 4 6 4 9H-4c0-3 1-6 4-9Zm0 10v5" />
+          <circle cy="-2" r="1.3" />
+        </g>
+      )
+  }
+}
+
+/**
+ * 產研協同场景：需求流水线。
+ * 业务方提需求后最想知道「我的需求到哪一步了」，因此按系统内 6 个生命周期阶段
+ * 画成一条上下起伏的波段轨道：需求池排队入池 → 光环逐站跳动、轨道逐段铺开 →
+ * 审批站点分出「驳回」回路退回需求池，分配受理站点分出「挂起」短支路（搁置不推进）→
+ * 末站验收盖章并火箭上线。
+ * 阶段名直接取 constants/rdm.ts 的权威文案，保证与系统内的叫法完全一致。
+ */
+const RDM_STATIONS = [
+  { x: 58, y: 112 },
+  { x: 100, y: 92 },
+  { x: 142, y: 112 },
+  { x: 184, y: 92 },
+  { x: 226, y: 112 },
+  { x: 268, y: 92 },
+] as const
+/** 贯穿 6 个站点的平滑波段（每段水平切线入站，站点落在波峰波谷上） */
+const RDM_TRACK = 'M58 112C72 112 86 92 100 92S128 112 142 112S170 92 184 92S212 112 226 112S254 92 268 92'
+/** 站点文案走门户 artwork 语言包；缺键时回落 RDM 权威繁中常量，不会渲染出裸 key */
+const RDM_STAGE_ARTWORK_KEYS: Record<RdmStage, string> = {
+  [RDM_STAGE.SUBMIT]: 'rdmSubmit',
+  [RDM_STAGE.INTAKE]: 'rdmIntake',
+  [RDM_STAGE.DISPATCH]: 'rdmDispatch',
+  [RDM_STAGE.PRODUCT]: 'rdmProduct',
+  [RDM_STAGE.DELIVERY]: 'rdmDelivery',
+  [RDM_STAGE.ACCEPTANCE]: 'rdmAcceptance',
+}
+
+function RdmPipelineScene() {
+  const { t } = useTranslation()
+  return (
+    <g className="portal-rdm-scene">
+      {/* 需求池：业务需求排队进入流水线，入池路径用流动虚线 */}
+      <circle cx="28" cy="52" r="17" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+      <g opacity="0.5" fill="none" stroke="currentColor" strokeWidth="1.4">
+        <rect x="19" y="42" width="13" height="9" rx="2" />
+        <rect x="24" y="52" width="13" height="9" rx="2" />
+      </g>
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M32 68Q40 90 49 103"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.45"
+        strokeWidth="1.6"
+        strokeDasharray="3 5"
+      />
+
+      {/* 驳回支路：審批不通过的需求退回需求池，不占用主线节拍 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M91 83C76 58 62 48 46 52"
+        fill="none"
+        stroke="#FF4D4F"
+        strokeOpacity="0.8"
+        strokeWidth="1.6"
+        strokeDasharray="4 5"
+      />
+      <path d="m44 52 6-3.5v7Z" fill="#FF4D4F" opacity="0.8" />
+
+      {/* 挂起支路：分配受理阶段可搁置（ON_HOLD），虚线通向死胡同的暂停牌，不回到主线 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M142 99C142 82 152 72 158 68"
+        fill="none"
+        stroke="#FA8C16"
+        strokeOpacity="0.75"
+        strokeWidth="1.6"
+        strokeDasharray="3 5"
+      />
+      <circle cx="164" cy="60" r="10" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
+      <path d="M161 55.5v9m6-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
+
+      {/* 轨道：底色是完整链路，橙色进度随推进逐段铺开 */}
+      <path d={RDM_TRACK} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="4" />
+      <path
+        className="portal-art-motion portal-rdm-track"
+        pathLength={1}
+        d={RDM_TRACK}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+
+      {RDM_STAGE_ORDER.map((stage, index) => {
+        const station = RDM_STATIONS[index]
+        return <g key={stage}>
+          <circle cx={station.x} cy={station.y} r="13" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+          <g transform={`translate(${station.x} ${station.y})`} opacity="0.6"><StageGlyph stage={stage} /></g>
+          <g className={`portal-art-motion portal-rdm-stage-${index}`} opacity="0">
+            <circle cx={station.x} cy={station.y} r="13" fill="currentColor" />
+            <g transform={`translate(${station.x} ${station.y})`} color="#fff"><StageGlyph stage={stage} /></g>
+          </g>
+          {/* 波段让相邻站点分居上下两行，同行标签间距 84，长词无需压缩即可容纳，多语言读数更自然 */}
+          <text x={station.x} y={station.y + 26} textAnchor="middle" fontSize="10" fontWeight="600" fill="currentColor">
+            {t(`portal.artwork.${RDM_STAGE_ARTWORK_KEYS[stage]}`, RDM_STAGE_LABEL[stage])}
+          </text>
+        </g>
+      })}
+
+      {/* 当前处理站点：光环沿波段逐站跳动 */}
+      <g className="portal-art-motion portal-rdm-halo">
+        <circle cx="58" cy="112" r="16" fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.55" />
+        <circle className="portal-art-motion portal-rdm-pulse" cx="58" cy="112" r="19" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+      </g>
+
+      {/* 交付上线：末站火箭升空，旁边盖验收通过章 */}
+      <g className="portal-art-motion portal-rdm-launch" opacity="0">
+        <path d="M265 100l-4 8m13-7 3 8" fill="none" stroke="#F59432" strokeWidth="1.6" />
+        <g transform="translate(272 86) scale(1.25)" color="#E8720C"><StageGlyph stage={RDM_STAGE.ACCEPTANCE} /></g>
+      </g>
+      <g className="portal-art-motion portal-rdm-delivered" opacity="0">
+        <circle cx="252" cy="74" r="7.5" fill="#52C41A" stroke="#fff" strokeWidth="2" />
+        <path d="m248.5 74 2.5 2.5 4.5-5" fill="none" stroke="#fff" strokeWidth="1.8" />
+      </g>
+    </g>
+  )
 }
 
 function ArtworkText({ label, x, y, width = 120 }: { label: string; x: number; y: number; width?: number }) {
@@ -411,6 +579,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
     </>
   ),
   eam: <AssetScene />,
+  rdm: <RdmPipelineScene />,
   oa: (
     <>
       <path d="M72 40h176" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />

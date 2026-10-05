@@ -35,6 +35,7 @@ public class HrPerfReportController {
 
     // ==================== 结果台账 ====================
 
+    /** 绩效结果台账概览（按周期或计划聚合的等级分布与统计） */
     @GetMapping("/report")
     @RequirePermission(menu = HrPerfConstants.MENU_LEDGER)
     public Result<HrPerfReportVO> report(
@@ -84,6 +85,7 @@ public class HrPerfReportController {
         return Result.success(hrPerfReportService.distributionGap(id));
     }
 
+    /** 校准改判流水分页；审核台账与校准菜单任一可读 */
     @GetMapping("/calibration-logs")
     @RequirePermission(menu = HrPerfConstants.MENU_AUDIT,
             anyOf = {HrPerfConstants.MENU_LEDGER, HrPerfConstants.MENU_CALIBRATION})
@@ -107,6 +109,7 @@ public class HrPerfReportController {
 
     // ==================== 申诉处理（HR 侧） ====================
 
+    /** 申诉列表（HR 侧处理视角，可按计划/状态过滤） */
     @GetMapping("/appeals")
     @RequirePermission(menu = HrPerfConstants.MENU_APPEAL)
     public Result<PageResult<HrPerfAppealVO>> appeals(
@@ -118,6 +121,7 @@ public class HrPerfReportController {
         return Result.success(hrPerfReportService.pageAppeals(page, size, planId, status, keyword));
     }
 
+    /** 申诉详情；菜单层 anyOf 允许自助入口访问，真实边界在 Service：非 HR 且非申诉人本人直接拒绝 */
     @GetMapping("/appeals/{id}")
     @RequirePermission(menu = HrPerfConstants.MENU_APPEAL, anyOf = HrPerfConstants.MENU_SELF)
     public Result<HrPerfAppealVO> appeal(@PathVariable Long id) {

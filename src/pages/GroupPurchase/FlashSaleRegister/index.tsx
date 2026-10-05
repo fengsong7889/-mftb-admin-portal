@@ -23,6 +23,7 @@ import {
   FLASH_PRICE_TYPE,
   MAX_PURCHASE_PRESETS,
 } from '../../../constants/flashSale'
+import { useFlashSalePage, flashSalePaginationConfig } from '../components/shared'
 
 /** 编辑/新增弹窗的阶梯行 */
 interface TierFormRow {
@@ -41,9 +42,6 @@ export default function FlashSaleRegister() {
   const [editForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<FlashSaleRegisterVO[]>([])
-  const [periods, setPeriods] = useState<FlashSalePeriod[]>([])
-  const [periodNo, setPeriodNo] = useState<number | undefined>(undefined)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 })
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [importVisible, setImportVisible] = useState(false)
   const [editVisible, setEditVisible] = useState(false)
@@ -52,16 +50,10 @@ export default function FlashSaleRegister() {
   const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
   const [tierRows, setTierRows] = useState<TierFormRow[]>([])
 
-  /** 加载期数下拉 */
-  const fetchPeriods = useCallback(async () => {
-    try {
-      const list = await fetchFlashSalePeriods()
-      setPeriods(list)
-      return list
-    } catch {
-      return [] as FlashSalePeriod[]
-    }
-  }, [])
+  const {
+    periods, periodNo, pagination, setPagination,
+    initPeriods, handlePeriodChange, handleTableChange, handleExport, showImportResult,
+  } = useFlashSalePage()
 
   /** 加载列表 */
   const fetchList = useCallback(async (page = 1, pageSize = 10, overridePeriod?: number) => {
@@ -87,39 +79,23 @@ export default function FlashSaleRegister() {
   }, [form, periodNo, t])
 
   useEffect(() => {
-    fetchPeriods().then(list => {
-      const latest = list[0]?.periodNo
-      setPeriodNo(latest)
-      fetchList(1, 10, latest)
-    })
+    initPeriods((latest) => fetchList(1, 10, latest))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** 期数切换 */
+  const onPeriodChange = (value: number) => {
+    handlePeriodChange(value, fetchList, pagination.pageSize)
+  }
+
+  /** 表格分頁變化 */
+  const onTableChange = (pag: { current?: number; pageSize?: number }) => {
+    handleTableChange(pag, fetchList)
+  }
 
   /** 查询 */
   const handleSearch = () => {
     fetchList(1, pagination.pageSize)
-  }
-
-  /** 重置 */
-  const handleReset = () => {
-    form.resetFields()
-    fetchList(1, pagination.pageSize)
-  }
-
-  /** 期数切换 */
-  const handlePeriodChange = (value: number) => {
-    setPeriodNo(value)
-    fetchList(1, pagination.pageSize, value)
-  }
-
-  /** 分页变化 */
-  const handleTableChange = (pag: { current?: number; pageSize?: number }) => {
-    fetchList(pag.current, pag.pageSize)
-  }
-
-  /** 导出 */
-  const handleExport = () => {
-    message.info('导出功能开发中...')
   }
 
   /** 搜索门店下拉 */
@@ -231,9 +207,9 @@ export default function FlashSaleRegister() {
     }
     const result = await importFlashSaleRegisters(periodNo, parsed.registerRows)
     if (result.errors.length > 0) {
-      message.warning(`導入完成：成功 ${result.successCount} 條，失敗 ${result.errors.length} 條（${result.errors[0].reason}）`)
+      showImportResult(result.successCount, result.errors.length, result.errors[0].reason)
     } else {
-      message.success(`導入成功 ${result.successCount} 條`)
+      showImportResult(result.successCount, 0)
     }
     fetchList(1, pagination.pageSize)
   }
@@ -362,7 +338,7 @@ export default function FlashSaleRegister() {
           <Form.Item name="periodNo" label="期數">
             <Select
               value={periodNo}
-              onChange={handlePeriodChange}
+              onChange={onPeriodChange}
               options={periods.map(p => ({ label: `第${p.periodNo}期`, value: p.periodNo }))}
             />
           </Form.Item>
@@ -381,7 +357,7 @@ export default function FlashSaleRegister() {
           <Form.Item className="search-actions">
             <Space>
               <Button type="primary" icon={<SearchOutlined />} htmlType="submit">{t('common.search')}</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); fetchList(1, pagination.pageSize) }}>重置</Button>
             </Space>
           </Form.Item>
         </Form>
@@ -410,13 +386,8 @@ export default function FlashSaleRegister() {
         rowKey="id"
         rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
         loading={loading}
-        pagination={{
-          ...pagination,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total) => `共 ${total} 條`,
-        }}
-        onChange={handleTableChange}
+        pagination={flashSalePaginationConfig(pagination)}
+        onChange={onTableChange}
         scroll={{ x: 1700 }}
         size="middle"
       />

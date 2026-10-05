@@ -1,6 +1,6 @@
 /** 门户展示映射只选择文案与插画，不参与系统准入或导航判断。 */
 const PORTAL_SYSTEM_KEYS = [
-  'ads', 'merchant', 'search', 'finance', 'ai', 'hr', 'eam', 'oa', 'iam', 'platform',
+  'ads', 'merchant', 'search', 'finance', 'ai', 'hr', 'eam', 'rdm', 'oa', 'iam', 'platform',
   'merchantWorkbench', 'translation',
 ] as const
 
@@ -15,6 +15,7 @@ export const PORTAL_SYSTEM_ICONS: Record<PortalSystemKey, string> = {
   ai: 'RobotOutlined',
   hr: 'TeamOutlined',
   eam: 'InboxOutlined',
+  rdm: 'ProjectOutlined',
   oa: 'SolutionOutlined',
   iam: 'SafetyCertificateOutlined',
   platform: 'SettingOutlined',

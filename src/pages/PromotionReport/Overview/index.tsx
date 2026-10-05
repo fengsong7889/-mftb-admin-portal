@@ -22,6 +22,7 @@ import {
 } from '../types'
 import { mockOverviewMetrics, mockRecommendTypeCompare } from '../mockData'
 import '../index.css'
+import { ReportFilterSelect } from '../shared'
 
 const { RangePicker } = DatePicker
 
@@ -81,47 +82,29 @@ export default function PromotionReportOverview() {
               style={{ width: '100%' }}
             />
           </div>
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.recommendType')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={recommendType}
-              onChange={setRecommendType}
-              options={Object.entries(REPORT_RECOMMEND_TYPE_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: recommendTypeLabel(Number(value) as ReportRecommendType),
-              }))}
-            />
-          </div>
+          <ReportFilterSelect
+            label={t('promotionReport.recommendType')}
+            value={recommendType}
+            onChange={setRecommendType}
+            labelMap={REPORT_RECOMMEND_TYPE_LABEL}
+            labelFn={recommendTypeLabel}
+          />
           {canViewAllBrands && (
-            <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
-              <Select
-                placeholder={t('common.all')}
-                allowClear
-                value={app}
-                onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
-                  value: Number(value),
-                  label: appLabel(Number(value) as ReportApp),
-                }))}
-              />
-            </div>
-          )}
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={channel}
-              onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: channelLabel(Number(value) as ReportChannel),
-              }))}
+            <ReportFilterSelect
+              label={t('promotionReport.brand')}
+              value={app}
+              onChange={setApp}
+              labelMap={REPORT_APP_LABEL}
+              labelFn={appLabel}
             />
-          </div>
+          )}
+          <ReportFilterSelect
+            label={t('promotionReport.channel')}
+            value={channel}
+            onChange={setChannel}
+            labelMap={REPORT_CHANNEL_LABEL}
+            labelFn={channelLabel}
+          />
         </form>
       </div>
 

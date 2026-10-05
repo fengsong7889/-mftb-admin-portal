@@ -27,6 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 资产送修实现，契约见 {@link EamRepairService}。维修单可由归还处置流程派生，完成送修时会联动资产生命周期。
+ * <p>
+ * 事务边界：create, finish, update, delete, createFromDispose 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamRepairMapper, EamAssetMapper, EamReturnMapper, EamAssetLifecycleService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

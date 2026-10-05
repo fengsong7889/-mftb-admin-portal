@@ -34,6 +34,7 @@ import {
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
+import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 人氣商家廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_POPULAR = 'popular_merchant'
@@ -203,21 +204,6 @@ const SALE_SKINS: SaleSkin[] = [
   },
 ]
 
-/** 解析梯度折扣 JSON（同盤活復蘇 parseDayTiers：過濾 + 類型轉換 + 按 minDays 升序排序） */
-function parseDayTiers(json?: string): Array<{ minDays: number; discount: number }> {
-  if (!json) return []
-  try {
-    const arr = JSON.parse(json)
-    if (!Array.isArray(arr)) return []
-    return (arr as Array<{ minDays?: number; discount?: number }>)
-      .filter(t => t && Number(t.minDays) > 0 && Number(t.discount) > 0)
-      .map(t => ({ minDays: Number(t.minDays), discount: Number(t.discount) }))
-      .sort((a, b) => a.minDays - b.minDays)
-  } catch {
-    return []
-  }
-}
-
 /** 梯度折扣（同銷售定價配置） */
 const DISCOUNT_TIERS = [
   { minDays: 7, discount: 95 },
@@ -225,17 +211,6 @@ const DISCOUNT_TIERS = [
   { minDays: 30, discount: 85 },
 ]
 
-/** 最長可購買天數（滾動窗口，超出即為待開售日期） */
-const MAX_BUY_DAYS = 180
-/** 待開售日期每日放票時間（同盤活復蘇，火車票式滾動開售） */
-const PRESALE_OPEN_HOUR = 10
-/** 待開售日期的開售時間（提前 sellableDays 天、於 PRESALE_OPEN_HOUR 點開售） */
-function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
-  return date.startOf('day').subtract(sellableDays, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
-}
-
-/** 月份選擇器每頁展示數（超出用上下頁按鈕切換） */
-const MONTHS_PER_PAGE = 6
 
 /** 人氣商家定價選項（從銷售定價配置加載，value=算法ID） */
 /** 皮膚配色兜底（後端庫存僅含名稱+價格，視覺配色以此兜底） */
@@ -1501,83 +1476,22 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       </Modal>
 
       {/* 支付成功彈窗 */}
-      <Modal
-        title={t('purchaseSuccess')} open={isSuccessModalVisible} onCancel={() => setIsSuccessModalVisible(false)}
-        footer={[
-          <Button key="view" type="primary" onClick={handleViewOrder}>{t('viewOrder')}</Button>,
-          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>{t('continueBuy')}</Button>,
-        ]}
-        width={400}
-      >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>{t('skinPurchaseSuccess')}</p>
-          <div style={{ background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)', padding: '20px 16px', borderRadius: 8 }}>
-            {/* 混合支付：同時展示推廣金花費和贈送天數 */}
-            {paidPaymentMode === 'mixed' && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 32 }}>
-                <div>
-                  <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
-                  <p style={{ fontSize: 30, fontWeight: 700, color: '#E8720C', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
-                </div>
-                {paidGiftDays > 0 && (
-                  <div>
-                    <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
-                    <p style={{ fontSize: 30, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitCount')}</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {/* 僅推廣金支付 */}
-            {paidPaymentMode === 'promo' && (
-              <>
-                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('deductedPromo')}</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>${paidPromoAmount}</p>
-              </>
-            )}
-            {/* 僅贈送天數抵扣 */}
-            {paidPaymentMode === 'gift' && (
-              <>
-                <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>{t('usedGiftPromoDays')}</p>
-                <p style={{ fontSize: 36, fontWeight: 700, color: '#fa541c', margin: 0, lineHeight: 1.2 }}>{paidGiftDays} {t('dayUnitCount')}</p>
-              </>
-            )}
-          </div>
-        </div>
-      </Modal>
+      <PickerPaymentSuccessModal
+        visible={isSuccessModalVisible}
+        onClose={() => setIsSuccessModalVisible(false)}
+        onViewOrder={handleViewOrder}
+        onContinuePurchase={handleContinuePurchase}
+        paidAmount={paidPromoAmount}
+        paidGiftDays={paidGiftDays}
+        paidPaymentMode={paidPaymentMode}
+        successMessage={t('skinPurchaseSuccess')}
+      />
 
-      {/* 待開售日期提醒彈窗（同盤活復蘇規範） */}
-      <Modal
-        title={
-          <Space>
-            <span style={{ fontSize: 18 }}>⏳</span>
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
-          </Space>
-        }
-        open={!!presaleInfo}
-        onCancel={() => setPresaleInfo(null)}
-        footer={[
-          <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
-            {t('gotIt')}
-          </Button>
-        ]}
-        width={420}
-      >
-        {presaleInfo && (
-          <div style={{ padding: '8px 0' }}>
-            <div style={{
-              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
-              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
-            </div>
-            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
-            </p>
-          </div>
-        )}
-      </Modal>
+      {/* 待開售日期提醒彈窗 */}
+      <PickerPresaleInfoModal
+        presaleInfo={presaleInfo}
+        onClose={() => setPresaleInfo(null)}
+      />
     </div>
   )
 }

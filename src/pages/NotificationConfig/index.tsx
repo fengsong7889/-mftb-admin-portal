@@ -16,6 +16,7 @@ const PRESET_SCENARIOS: Record<string, string> = {
   general: '通用通知',
   oa_approval: 'OA審批通知',
   ai_assistant: 'AI助手通知',
+  rdm: '產研需求通知',
 }
 
 /** 场景标签颜色 */
@@ -23,6 +24,7 @@ const SCENARIO_COLORS: Record<string, string> = {
   general: 'default',
   oa_approval: 'processing',
   ai_assistant: 'purple',
+  rdm: 'orange',
 }
 
 const STATUS_OPTIONS = [

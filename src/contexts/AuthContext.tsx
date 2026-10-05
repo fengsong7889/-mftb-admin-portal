@@ -34,6 +34,16 @@ export interface UserInfo {
   }
 }
 
+/**
+ * 权限条目的动作列表（与后端 PermissionServiceImpl.merge 同一口径）。
+ * <p>历史本地角色数据/降级返回可能不带 actions（后端 non_null 序列化会直接省略 null 字段），
+ * 直接读 `p.actions.length` 会在每个页面的权限守卫里抛 TypeError，造成“全部页面都渲染异常”；
+ * 后端语义是 actions 为空视为仅 view，前端必须一致地兼容，不能靠它报错。
+ */
+function permissionActions(p: MenuPermission): string[] {
+  return Array.isArray(p.actions) && p.actions.length > 0 ? p.actions : ['view']
+}
+
 interface AuthContextType {
   isAuthenticated: boolean
   user: UserInfo | null
@@ -450,7 +460,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const hasAccessibleSystems = (mappedUser.accessibleSystems?.length ?? 0) > 0
       const fallbackPath = resolveFirstAccessiblePath(
         mappedUser.role === 'admin',
-        (key) => mappedUser.permissions?.some(p => p.menuKey === key && p.actions.length > 0) ?? false,
+        (key) => mappedUser.permissions?.some(p => p.menuKey === key && permissionActions(p).length > 0) ?? false,
       )
       const redirectPath = hasAccessibleSystems || mappedUser.role === 'admin' ? '/portal' : fallbackPath
       return { success: true, redirectPath }
@@ -537,11 +547,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 'menuKey:action' 格式：校验指定菜单的指定操作
     if (permission.includes(':')) {
       const [menuKey, action] = permission.split(':')
-      return menuPermissions.some(p => p.menuKey === menuKey && p.actions.includes(action))
+      return menuPermissions.some(p => p.menuKey === menuKey && permissionActions(p).includes(action))
     }
 
     if (menuPermissions.length > 0) {
-      return menuPermissions.some(p => p.actions.includes(permission))
+      return menuPermissions.some(p => permissionActions(p).includes(permission))
     }
 
     // guest 只有查看权限，没有编辑权限
@@ -557,7 +567,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user.role === 'admin') return true
     // 未接入权限校验的原型菜单：所有登录用户可访问
     if (!CONTROLLED_MENU_KEYS.includes(menuKey)) return true
-    return getUserMenuPermissions().some(p => p.menuKey === menuKey && p.actions.length > 0)
+    return getUserMenuPermissions().some(p => p.menuKey === menuKey && permissionActions(p).length > 0)
   }, [user, getUserMenuPermissions])
 
   /** 数据权限检查方法 */

@@ -1,8 +1,25 @@
+/**
+ * 领用统计卡片（四张）。
+ *
+ * 两种口径：列表页看全局（第一张为「涉及员工」），员工详情页传 personal 看个人
+ * —— 个人视角下员工数恒为 1 没有信息量，所以同一张卡改成展示「本人资产记录」，
+ * 值取在用 + 已归还。
+ *
+ * data 缺省时显示 — 而不是 0：— 代指尚未加载或加载失败，0 会被读成“确实没有”，
+ * 两者语义必须区分。调用方在报错时传 data=undefined 就走同一分支。
+ */
 import { AuditOutlined, CheckCircleOutlined, InboxOutlined, TeamOutlined } from '@ant-design/icons'
 import AnimatedNumber from '../../../components/AnimatedNumber'
 import type { ClaimStatsData } from './claimViewTypes'
 
-interface Props { data?: ClaimStatsData; scopeKey?: string; personal?: boolean }
+interface Props {
+  data?: ClaimStatsData
+  /** 统计口径标识（列表页传筛选项快照，详情页传 employeeId）。用作 React key，
+   *  口径一变就整组重挂载，让 AnimatedNumber 从 0 重新跑计数动画，视觉上明确告知已刷新 */
+  scopeKey?: string
+  /** 个人视角：第一张卡换为本人资产记录数 */
+  personal?: boolean
+}
 
 export default function ClaimStats({ data, scopeKey, personal = false }: Props) {
   const items = [

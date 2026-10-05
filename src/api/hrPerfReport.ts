@@ -124,20 +124,25 @@ export interface PerfReportFilter {
 /* ---------- 结果台账 ---------- */
 export const fetchPerfReport = (params: PerfReportFilter) =>
   request.get<unknown, PerfReport>('/hr/perf/report', { params })
+/** 查询：GET /hr/perf/report/rows */
 export const fetchPerfReportRows = (params: PerfReportFilter & {
   page: number; size: number; deptName?: string; grade?: string; keyword?: string
 }) => request.get<unknown, PageResult<PerfAssessment>>('/hr/perf/report/rows', { params })
+/** 查询：GET /hr/perf/report/count */
 export const fetchPerfReportCount = (params: PerfReportFilter) =>
   request.get<unknown, number>('/hr/perf/report/count', { params })
+/** 查询：GET /hr/perf/report/departments */
 export const fetchPerfReportDepartments = (params: PerfReportFilter) =>
   request.get<unknown, string[]>('/hr/perf/report/departments', { params })
 
 /* ---------- 强制分布与留痕 ---------- */
 export const fetchDistributionGap = (planId: number) =>
   request.get<unknown, PerfGradeCount[]>(`/hr/perf/plans/${planId}/distribution-gap`)
+/** 查询：GET /hr/perf/calibration-logs */
 export const fetchCalibrationLogs = (params: {
   page: number; size: number; planId?: number; assessmentId?: number; action?: string; keyword?: string
 }) => request.get<unknown, PageResult<PerfCalibrationLog>>('/hr/perf/calibration-logs', { params })
+/** 查询：GET /hr/perf/assessments/{id}/calibration-logs */
 export const fetchAssessmentCalibrationLogs = (assessmentId: number) =>
   request.get<unknown, PerfCalibrationLog[]>(`/hr/perf/assessments/${assessmentId}/calibration-logs`)
 
@@ -145,8 +150,10 @@ export const fetchAssessmentCalibrationLogs = (assessmentId: number) =>
 export const fetchPerfAppeals = (params: {
   page: number; size: number; planId?: number; status?: string; keyword?: string
 }) => request.get<unknown, PageResult<PerfAppeal>>('/hr/perf/appeals', { params })
+/** 查询：GET /hr/perf/appeals/{id} */
 export const fetchPerfAppeal = (id: number) =>
   request.get<unknown, PerfAppeal>(`/hr/perf/appeals/${id}`)
+/** 处理：POST /hr/perf/appeals/{id}/handle */
 export const handlePerfAppeal = (id: number, status: string, conclusion?: string) =>
   request.post<unknown, PerfAppeal>(`/hr/perf/appeals/${id}/handle`, null, {
     params: { status, conclusion: conclusion || undefined },

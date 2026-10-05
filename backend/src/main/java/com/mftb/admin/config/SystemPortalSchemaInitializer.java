@@ -424,6 +424,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 {SystemCode.AI.code(),       "AI 管理系統",    "AI Hub",            "模型、配额、授权、MCP、审计、能耗",          "RobotOutlined",             50},
                 {SystemCode.HR.code(),       "HR 系統",        "Human Resources",   "员工、组织、职位、员工动态",                 "TeamOutlined",              60},
                 {SystemCode.EAM.code(),      "物資管理系統",   "EAM",               "资产、耗材、采购、库存、盘点",               "InboxOutlined",             70},
+                {SystemCode.RDM.code(),      "產研協同系統", "R&D Collaboration", "需求提交、审批、分配、研发交付、验收上线与产出看板", "ProjectOutlined",           75},
                 {SystemCode.OA.code(),       "OA 系統",        "OA",                "流程中心、流程事项、审批配置、员工自助",     "SolutionOutlined",          80},
                 {SystemCode.IAM.code(),      "權限中心",       "IAM",               "角色、功能授权、数据授权、菜单配置",         "SafetyCertificateOutlined", 90},
                 {SystemCode.PLATFORM.code(), "平台配置",       "Platform",          "通知、多语言、规则、版本、翻译工作台",       "SettingOutlined",          100},
@@ -449,6 +450,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
         updateMenuSystem(SystemCode.AI.code(),       List.of("ai-assistant"));
         updateMenuSystem(SystemCode.HR.code(),       List.of("hr"));
         updateMenuSystem(SystemCode.EAM.code(),      List.of("asset-management"));
+        updateMenuSystem(SystemCode.RDM.code(),      List.of("rdm-center"));
         updateMenuSystem(SystemCode.OA.code(),       List.of("oa-center"));
         updateMenuSystem(SystemCode.IAM.code(),      List.of("permission"));
         updateMenuSystem(SystemCode.PLATFORM.code(), List.of("system-config", "i18n-center"));

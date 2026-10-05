@@ -138,12 +138,14 @@ export interface NotificationScenarioPayload {
   enabled: boolean
 }
 
+/** 查询：GET /notification-apps */
 export function fetchNotificationApps(params?: NotificationAppQuery, signal?: AbortSignal): Promise<AppNotificationConfig[]> {
   return request.get<unknown, AppNotificationConfig[]>('/notification-apps', {
     params, signal, headers: { [SILENT_HEADER]: '1' },
   })
 }
 
+/** 查询：GET /notification-apps/{id} */
 export function fetchAppConfig(id: number, signal?: AbortSignal): Promise<AppNotificationConfig> {
   // 读取失败由页内错误态和重试按钮承接，卸载取消不弹出全局错误。
   return request.get<unknown, AppNotificationConfig>(`/notification-apps/${id}`, {
@@ -151,15 +153,18 @@ export function fetchAppConfig(id: number, signal?: AbortSignal): Promise<AppNot
   })
 }
 
+/** 保存：POST /notification-apps */
 export async function saveAppConfig(data: AppNotificationConfigPayload, id?: number): Promise<void> {
   if (id === undefined) await request.post('/notification-apps', data)
   else await request.put(`/notification-apps/${id}`, data)
 }
 
+/** 切换状态：PATCH /notification-apps/{id}/toggle */
 export function toggleNotificationApp(id: number, enabled: boolean): Promise<void> {
   return request.patch(`/notification-apps/${id}/toggle`, { enabled })
 }
 
+/** 删除：DELETE /notification-apps/{id} */
 export function deleteNotificationApp(id: number): Promise<void> {
   return request.delete(`/notification-apps/${id}`)
 }
@@ -169,12 +174,14 @@ export function testAppConnection(id: number): Promise<void> {
   return request.post(`/notification-apps/${id}/test`)
 }
 
+/** 查询：GET /notification-apps/scenarios */
 export function fetchNotificationScenarios(signal?: AbortSignal): Promise<NotificationScenario[]> {
   return request.get<unknown, NotificationScenario[]>('/notification-apps/scenarios', {
     signal, headers: { [SILENT_HEADER]: '1' },
   })
 }
 
+/** 保存：PUT /notification-apps/scenarios/{id} */
 export function saveNotificationScenario(key: string, data: NotificationScenarioPayload): Promise<void> {
   return request.put(`/notification-apps/scenarios/${encodeURIComponent(key)}`, data)
 }

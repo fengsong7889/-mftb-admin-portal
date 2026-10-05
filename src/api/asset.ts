@@ -353,6 +353,7 @@ export async function fetchAssetList(params?: AssetListQuery): Promise<PageResul
 
 export type AssetStatusCounts = Record<AssetStatus | 'all', number>
 
+/** 查询：GET /eam/assets/status-counts */
 export function fetchAssetStatusCounts(params?: AssetListQuery): Promise<AssetStatusCounts> {
   return request.get<unknown, AssetStatusCounts>('/eam/assets/status-counts', { params: assetQueryParams(params) })
 }
@@ -535,6 +536,7 @@ export interface TransferRegistration {
   remark?: string
 }
 
+/** 调用：POST /eam/transfers */
 export function transferAsset(data: TransferRegistration): Promise<number> {
   return request.post<unknown, number>('/eam/transfers', data)
 }
@@ -548,18 +550,23 @@ export interface TransferOptions {
   categories: TransferCategory[]
   brands: TransferBrand[]
 }
+/** 查询：GET /eam/transfers/options */
 export function fetchTransferOptions(): Promise<TransferOptions> {
   return request.get<unknown, TransferOptions>('/eam/transfers/options')
 }
+/** 查询：GET /eam/transfers/employees */
 export function fetchTransferEmployees(keyword?: string): Promise<TransferEmployee[]> {
   return request.get<unknown, TransferEmployee[]>('/eam/transfers/employees', { params: { keyword } })
 }
+/** 查询：GET /eam/transfers/candidates */
 export function fetchTransferCandidates(params: AssetListQuery): Promise<PageResult<AssetItem>> {
   return request.get<unknown, PageResult<AssetItem>>('/eam/transfers/candidates', { params })
 }
+/** 查询：GET /eam/transfers/assets/{id} */
 export function fetchTransferAsset(id: number): Promise<AssetItem> {
   return request.get<unknown, AssetItem>(`/eam/transfers/assets/${id}`)
 }
+/** 取消：POST /eam/transfers/{id}/cancel */
 export function cancelTransfer(id: number, reason: string): Promise<void> {
   return request.post<unknown, void>(`/eam/transfers/${id}/cancel`, { reason })
 }

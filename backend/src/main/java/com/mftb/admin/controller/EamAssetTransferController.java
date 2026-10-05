@@ -28,24 +28,28 @@ public class EamAssetTransferController {
     private final EamAssetTransferService transferService;
     private final EamTransferLookup lookup;
 
+    /** 可调拨资产分页：按调拨场景筛出当前可变更归属的资产 */
     @GetMapping("/candidates")
     @RequirePermission(menu = MENU)
     public Result<PageResult<EamAssetVO>> candidates(@ModelAttribute EamAssetQuery query) {
         return Result.success(transferService.candidates(query));
     }
 
+    /** 单件待调拨资产详情（调拨表单头部信息） */
     @GetMapping("/assets/{id}")
     @RequirePermission(menu = MENU)
     public Result<EamAssetVO> asset(@PathVariable long id) {
         return Result.success(transferService.candidate(id));
     }
 
+    /** 调拨页下拉数据源（仓库位置等选项） */
     @GetMapping("/options")
     @RequirePermission(menu = MENU)
     public Result<EamTransferOptionsVO> options() {
         return Result.success(lookup.options());
     }
 
+    /** 可选接收人列表；归在 edit 动作下，因为返回内容会暴露员工姓名/部门 */
     @GetMapping("/employees")
     @RequirePermission(menu = MENU, action = "edit")
     public Result<List<EamTransferOptionsVO.EmployeeOption>> employees(@RequestParam(required = false) String keyword) {

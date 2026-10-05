@@ -24,6 +24,7 @@ public class ConsumableBasicDataController {
 
     /* ===== 分类 ===== */
 
+    /** 耗材分类列表（可按编码/名称关键字过滤），约束见 {@link ConsumableBasicDataService} */
     @GetMapping("/categories")
     @RequirePermission(menu = "consumable-category")
     public Result<List<ConsumableCategoryVO>> listCategories(
@@ -37,12 +38,14 @@ public class ConsumableBasicDataController {
         return Result.success(basicDataService.listCategories(null));
     }
 
+    /** 新建耗材分类（编码在统一表内全局唯一） */
     @PostMapping("/categories")
     @RequirePermission(menu = "consumable-category", action = "create")
     public Result<Long> createCategory(@RequestBody ConsumableCategorySaveDTO dto) {
         return Result.success(basicDataService.createCategory(dto));
     }
 
+    /** 编辑耗材分类 */
     @PutMapping("/categories/{id}")
     @RequirePermission(menu = "consumable-category", action = "edit")
     public Result<Void> updateCategory(@PathVariable long id, @RequestBody ConsumableCategorySaveDTO dto) {
@@ -50,6 +53,7 @@ public class ConsumableBasicDataController {
         return Result.success();
     }
 
+    /** 删除耗材分类；有子分类时会被后端拒绝 */
     @DeleteMapping("/categories/{id}")
     @RequirePermission(menu = "consumable-category", action = "delete")
     public Result<Void> deleteCategory(@PathVariable long id) {
@@ -57,6 +61,7 @@ public class ConsumableBasicDataController {
         return Result.success();
     }
 
+    /** 启停耗材分类（无入参，服务端在 enabled/disabled 之间自行取反） */
     @PutMapping("/categories/{id}/status")
     @RequirePermission(menu = "consumable-category", action = "edit")
     public Result<Void> toggleCategoryStatus(@PathVariable long id) {
@@ -66,6 +71,7 @@ public class ConsumableBasicDataController {
 
     /* ===== 品牌 ===== */
 
+    /** 品牌列表；categoryType 传 null 时后端默认只返回 CONSUMABLE（并非全部），详见 {@link ConsumableBasicDataService#listBrands} */
     @GetMapping("/brands")
     @RequirePermission(menu = "consumable-brand")
     public Result<List<ConsumableBrandVO>> listBrands(
@@ -85,12 +91,14 @@ public class ConsumableBasicDataController {
         return Result.success(consumable);
     }
 
+    /** 新建品牌 */
     @PostMapping("/brands")
     @RequirePermission(menu = "consumable-brand", action = "create")
     public Result<Long> createBrand(@RequestBody ConsumableBrandSaveDTO dto) {
         return Result.success(basicDataService.createBrand(dto));
     }
 
+    /** 编辑品牌 */
     @PutMapping("/brands/{id}")
     @RequirePermission(menu = "consumable-brand", action = "edit")
     public Result<Void> updateBrand(@PathVariable long id, @RequestBody ConsumableBrandSaveDTO dto) {
@@ -98,6 +106,7 @@ public class ConsumableBasicDataController {
         return Result.success();
     }
 
+    /** 删除品牌（当前未校验是否仍被耗材档案引用） */
     @DeleteMapping("/brands/{id}")
     @RequirePermission(menu = "consumable-brand", action = "delete")
     public Result<Void> deleteBrand(@PathVariable long id) {
@@ -105,12 +114,14 @@ public class ConsumableBasicDataController {
         return Result.success();
     }
 
+    /** 品牌详情 */
     @GetMapping("/brands/{id}")
     @RequirePermission(menu = "consumable-brand")
     public Result<ConsumableBrandVO> brandDetail(@PathVariable long id) {
         return Result.success(basicDataService.getBrandDetail(id));
     }
 
+    /** 启停品牌（无入参，服务端在 enabled/disabled 之间自行取反） */
     @PutMapping("/brands/{id}/status")
     @RequirePermission(menu = "consumable-brand", action = "edit")
     public Result<Void> toggleBrandStatus(@PathVariable long id) {

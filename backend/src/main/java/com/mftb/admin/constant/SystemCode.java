@@ -22,6 +22,8 @@ public enum SystemCode {
     AI("ai"),
     HR("hr"),
     EAM("eam"),
+    /** 產研協同系統（RDM）：需求從提交、審批、分配、受理、研發、驗收到上線的全生命周期管理 */
+    RDM("rdm"),
     OA("oa"),
     IAM("iam"),
     PLATFORM("platform"),

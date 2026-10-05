@@ -214,32 +214,41 @@ export interface PerfEvaluatorOption {
 /* ---------- 周期 ---------- */
 export const fetchPerfCycles = (params: { page: number; size: number; status?: string; keyword?: string }) =>
   request.get<unknown, PageResult<PerfCycle>>('/hr/perf/cycles', { params })
+/** 新增：POST /hr/perf/cycles */
 export const createPerfCycle = (data: PerfCycle) =>
   request.post<unknown, PerfCycle>('/hr/perf/cycles', data)
+/** 修改：PUT /hr/perf/cycles/{id} */
 export const updatePerfCycle = (id: number, data: PerfCycle) =>
   request.put<unknown, PerfCycle>(`/hr/perf/cycles/${id}`, data)
+/** 调用：POST /hr/perf/cycles/{id}/status */
 export const changePerfCycleStatus = (id: number, status: string) =>
   request.post<unknown, void>(`/hr/perf/cycles/${id}/status`, null, { params: { status } })
 
 /* ---------- 模板 ---------- */
 export const fetchPerfTemplates = (params: { page: number; size: number; keyword?: string }) =>
   request.get<unknown, PageResult<PerfTemplate>>('/hr/perf/templates', { params })
+/** 查询：GET /hr/perf/templates/{id} */
 export const fetchPerfTemplate = (id: number) =>
   request.get<unknown, PerfTemplate>(`/hr/perf/templates/${id}`)
+/** 新增：POST /hr/perf/templates */
 export const createPerfTemplate = (data: PerfTemplatePayload) =>
   request.post<unknown, PerfTemplate>('/hr/perf/templates', data)
+/** 修改：PUT /hr/perf/templates/{id} */
 export const updatePerfTemplate = (id: number, data: PerfTemplatePayload) =>
   request.put<unknown, PerfTemplate>(`/hr/perf/templates/${id}`, data)
 
 /* ---------- 计划 ---------- */
 export const fetchPerfScopeOptions = () =>
   request.get<unknown, PerfScopeOptions>('/hr/perf/scope-options')
+/** 预览：POST /hr/perf/plans/preview */
 export const previewPerfLaunch = (data: PerfPlanLaunchPayload) =>
   request.post<unknown, PerfLaunchPreview>('/hr/perf/plans/preview', data)
+/** 发起：POST /hr/perf/plans */
 export const launchPerfPlan = (data: PerfPlanLaunchPayload) =>
   request.post<unknown, PerfPlan>('/hr/perf/plans', data)
 export const fetchPerfPlans = (params: { page: number; size: number; cycleId?: number; status?: string }) =>
   request.get<unknown, PageResult<PerfPlan>>('/hr/perf/plans', { params })
+/** 查询：GET /hr/perf/plans/{id} */
 export const fetchPerfPlan = (id: number) =>
   request.get<unknown, PerfPlan>(`/hr/perf/plans/${id}`)
 /** 计划内考核单清单（台账视图） */
@@ -260,12 +269,16 @@ export const fetchPlanGrades = (planId: number) =>
 /* ---------- 评分工作台与考核单 ---------- */
 export const fetchMyReviews = (params: { page: number; size: number; status?: string; keyword?: string }) =>
   request.get<unknown, PageResult<PerfAssessment>>('/hr/perf/reviews', { params })
+/** 查询：GET /hr/perf/assessments/{id} */
 export const fetchPerfAssessment = (id: number) =>
   request.get<unknown, PerfAssessment>(`/hr/perf/assessments/${id}`)
+/** 提交：POST /hr/perf/assessments/{id}/score */
 export const submitPerfScore = (id: number, data: PerfScorePayload) =>
   request.post<unknown, PerfAssessment>(`/hr/perf/assessments/${id}/score`, data)
+/** 改派：POST /hr/perf/assessments/{id}/evaluator */
 export const reassignEvaluator = (id: number, evaluatorUserId: number) =>
   request.post<unknown, void>(`/hr/perf/assessments/${id}/evaluator`, null, { params: { evaluatorUserId } })
+/** 查询：GET /hr/perf/evaluator-options */
 export const fetchEvaluatorOptions = (keyword?: string) =>
   request.get<unknown, PerfEvaluatorOption[]>('/hr/perf/evaluator-options', {
     params: { keyword: keyword || undefined },
@@ -281,6 +294,7 @@ export const calibratePerfAssessment = (id: number, params: { score?: number; gr
 /* ---------- 员工自助 ---------- */
 export const fetchMyAssessments = (params: { page: number; size: number; status?: string }) =>
   request.get<unknown, PageResult<PerfAssessment>>('/hr/perf/my', { params })
+/** 查询：GET /hr/perf/my/{id} */
 export const fetchMyAssessment = (id: number) =>
   request.get<unknown, PerfAssessment>(`/hr/perf/my/${id}`)
 

@@ -133,6 +133,7 @@ export interface ExecLogRow {
   createdAt: string
 }
 
+/** 查询：GET /ai/tool-policy/exec-logs */
 export async function fetchExecLogs(params: {
   page?: number
   size?: number

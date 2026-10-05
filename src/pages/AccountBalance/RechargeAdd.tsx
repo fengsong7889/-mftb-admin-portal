@@ -1,12 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Form, Input, Select, Radio, Button, Upload, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, Modal, type UploadFile } from 'antd'
+import { Form, Input, Select, Radio, Button, message, InputNumber, Tag, Tooltip, Table, Switch, ConfigProvider, Modal, type UploadFile } from 'antd'
 import {
-  ArrowLeftOutlined,
   SendOutlined,
-  UploadOutlined,
-  FileImageOutlined,
-  FilePdfOutlined,
   AccountBookOutlined,
   DollarOutlined,
   FileProtectOutlined,
@@ -22,7 +18,12 @@ import type { RechargeApplyPayload } from '../../api/finance'
 import { fetchStoreBdOptions, fetchStoresByGroupCode } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import type { OptionItem } from '../../api/types'
-import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
+import { isWorkflowEnabled } from '../../utils/workflowEnabled'
+import { amountToChinese } from './components/shared'
+import CertificateUploader from './components/CertificateUploader'
+import SuccessModal from './components/SuccessModal'
+import SectionCard from './components/SectionCard'
+import FormPageHeader from './components/FormPageHeader'
 
 /** 集團选项 */
 const groupOptions = [
@@ -57,39 +58,6 @@ interface DeductStoreRow {
   amount: number
 }
 
-/** 数字金额转中文大写 */
-function amountToChinese(num: number): string {
-  if (!num || num <= 0) return ''
-  const digits = ['零', '壹', '貳', '叁', '肆', '伍', '陸', '柒', '捌', '玖']
-  const units = ['', '拾', '佰', '仟']
-  const bigUnits = ['', '萬', '億']
-  const intPart = Math.floor(num)
-  const decPart = Math.round((num - intPart) * 100)
-  const jiao = Math.floor(decPart / 10)
-  const fen = decPart % 10
-
-  let result = ''
-  const intStr = String(intPart)
-  const groups: number[][] = []
-  for (let i = intStr.length; i > 0; i -= 4) {
-    groups.unshift(intStr.slice(Math.max(0, i - 4), i).split('').map(Number))
-  }
-  groups.forEach((group, gi) => {
-    let groupStr = ''
-    let zeroFlag = false
-    group.forEach((d, di) => {
-      if (d === 0) { zeroFlag = true; return }
-      if (zeroFlag) { groupStr += '零'; zeroFlag = false }
-      groupStr += digits[d] + units[group.length - 1 - di]
-    })
-    if (groupStr) result += groupStr + bigUnits[groups.length - 1 - gi]
-  })
-  result += '元'
-  if (jiao > 0) result += digits[jiao] + '角'
-  if (fen > 0) result += digits[fen] + '分'
-  return result
-}
-
 export default function RechargeAdd() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -119,7 +87,6 @@ export default function RechargeAdd() {
   const [successVisible, setSuccessVisible] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedFlowNo, setSubmittedFlowNo] = useState('')
-  const [countdown, setCountdown] = useState(5)
   /** 翻譯後的選項 */
   const tActualPayOptions = actualPayOptions.map(o => ({ label: t(o.labelKey), value: o.value }))
   const tBusinessChannelMap = useMemo(() => {
@@ -182,18 +149,6 @@ export default function RechargeAdd() {
     const diff = virtualAmount - actualTotal
     return diff > 0 ? diff : 0
   }, [virtualAmount, actualTotal])
-
-  // 提交成功彈窗倒計時
-  useEffect(() => {
-    if (!successVisible) return
-    if (countdown <= 0) {
-      setSuccessVisible(false)
-      navigate(backTarget)
-      return
-    }
-    const timer = setTimeout(() => setCountdown(c => c - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [successVisible, countdown, navigate])
 
   /** 新增扣款門店行（直接添加空行，用户随时编辑） */
   const handleAddDeductRow = () => {
@@ -364,7 +319,6 @@ export default function RechargeAdd() {
             }
             const flowNo = await submitRechargeApply(payload)
             setSubmittedFlowNo(flowNo)
-            setCountdown(5)
             // 等待確認彈窗完全關閉後再顯示成功彈窗
             setTimeout(() => setSuccessVisible(true), 350)
           } catch (err) {
@@ -382,104 +336,14 @@ export default function RechargeAdd() {
     }
   }
 
-  /** 文件上传前校验 */
-  const beforeUpload = (file: File) => {
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
-    if (!validTypes.includes(file.type)) {
-      message.error(t('accountBalance.onlyFormatError'))
-      return Upload.LIST_IGNORE
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      message.error(t('accountBalance.fileSizeExceed'))
-      return Upload.LIST_IGNORE
-    }
-    return false
-  }
-
-  /** 渲染文件列表 */
-  const renderFileList = (files: UploadFile[], setFiles: (f: UploadFile[]) => void) => (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-      {files.map((file) => (
-        <div key={file.uid} style={{
-          width: 88, height: 88, border: '1px solid #e8e8e8', borderRadius: 8,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          position: 'relative', background: '#fafafa',
-        }}>
-          {file.name?.endsWith('.pdf')
-            ? <FilePdfOutlined style={{ fontSize: 28, color: '#E53935' }} />
-            : <FileImageOutlined style={{ fontSize: 28, color: '#1976D2' }} />
-          }
-          <span style={{ fontSize: 10, color: '#999', marginTop: 4, maxWidth: 76, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {file.name}
-          </span>
-          <Button type="text" size="small" danger
-            style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ff4d4f', color: '#fff', fontSize: 12, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => setFiles(files.filter(f => f.uid !== file.uid))}
-          >×</Button>
-        </div>
-      ))}
-      {files.length < 5 && (
-        <Upload
-          accept=".png,.jpg,.jpeg,.pdf"
-          showUploadList={false}
-          beforeUpload={beforeUpload}
-          onChange={(info) => {
-            if (info.file.status !== 'removed') {
-              setFiles([...files, { uid: info.file.uid, name: info.file.name }])
-            }
-          }}
-        >
-          <div style={{
-            width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa',
-            transition: 'all 0.3s',
-          }}
-            onMouseEnter={e => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
-            onMouseLeave={e => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
-          >
-            <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
-            <span>{t('accountBalance.upload')}</span>
-          </div>
-        </Upload>
-      )}
-    </div>
-  )
-
   return (
     <div className="content-area">
       {/* 页面标题栏 */}
-      <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
-        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
-          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
-        }} />
-        <div style={{
-          padding: '16px 24px', display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <Button type="primary" icon={<ArrowLeftOutlined />}
-              onClick={goBack}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
-                borderRadius: 8, height: 36, padding: '0 16px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>{t('common:back')}</Button>
-            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('accountBalance.rechargePageTitle')}</h2>
-              <Tag style={{ fontSize: 11, color: '#52C41A', borderColor: '#52C41A' }}>{t('accountBalance.rechargeApplyTag')}</Tag>
-            </div>
-          </div>
-        </div>
-      </div>
+      <FormPageHeader
+        title={t('accountBalance.rechargePageTitle')}
+        tag={<Tag style={{ fontSize: 11, color: '#52C41A', borderColor: '#52C41A' }}>{t('accountBalance.rechargeApplyTag')}</Tag>}
+        onBack={goBack}
+      />
 
       <Form form={form} layout="vertical"
         initialValues={{
@@ -492,14 +356,7 @@ export default function RechargeAdd() {
         }}
       >
         {/* 基础信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AccountBookOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.basicInfo')}</span>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
+        <SectionCard icon={<AccountBookOutlined style={{ fontSize: 14, color: '#1890ff' }} />} title={t('accountBalance.basicInfo')}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
             <Form.Item label={t('common:colGroupId')} name="groupId" rules={[{ required: true, message: t('accountBalance.selectGroup') }]}>
               {isFromProcessCenter ? (
@@ -547,18 +404,15 @@ export default function RechargeAdd() {
               </Radio.Group>
             </Form.Item>
           </div>
-        </div>
+        </SectionCard>
 
         {/* 充值金额 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.rechargeAmountSection')}</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.amountConfigTag')}</Tag>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
+        <SectionCard
+          icon={<DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          iconBg="#fff7e6" iconColor="#fa8c16"
+          title={t('accountBalance.rechargeAmountSection')}
+          tag={<Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.amountConfigTag')}</Tag>}
+        >
 
           {/* 虛擬賬戶充值 + 歸屬BD 並排 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px', marginBottom: 16 }}>
@@ -820,43 +674,33 @@ export default function RechargeAdd() {
               </div>
             </>
           )}
-        </div>
+        </SectionCard>
 
         {/* 凭证上传 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.relatedVoucher')}</span>
-            <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.voucherUploadTag')}</Tag>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>
-          </div>
+        <SectionCard
+          icon={<FileProtectOutlined style={{ fontSize: 14, color: '#722ed1' }} />}
+          iconBg="#f9f0ff" iconColor="#722ed1"
+          title={t('accountBalance.relatedVoucher')}
+          tag={<Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('accountBalance.voucherUploadTag')}</Tag>}
+          extraEnd={<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('accountBalance.supportFormat')}</span>}
+        >
           <Form.Item label={t('accountBalance.contractVoucher')} required>
-            {renderFileList(contractFiles, setContractFiles)}
+            <CertificateUploader files={contractFiles} setFiles={setContractFiles} />
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
               {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
 
           <Form.Item label={t('accountBalance.paymentVoucher')} required style={{ marginBottom: 0 }}>
-            {renderFileList(paymentFiles, setPaymentFiles)}
+            <CertificateUploader files={paymentFiles} setFiles={setPaymentFiles} />
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>
               {t('accountBalance.voucherLimitHint')}
             </div>
           </Form.Item>
-        </div>
+        </SectionCard>
 
         {/* 备注信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('accountBalance.remarkInfo')}</span>
-            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          </div>
+        <SectionCard icon={<EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />} title={t('accountBalance.remarkInfo')}>
           <Form.Item name="remark" style={{ marginBottom: 0 }}>
             <Input.TextArea
               rows={4}
@@ -866,7 +710,7 @@ export default function RechargeAdd() {
               style={{ borderRadius: 8 }}
             />
           </Form.Item>
-        </div>
+        </SectionCard>
       </Form>
 
       {/* 底部操作按鈕（取消/提交申請） */}
@@ -877,51 +721,7 @@ export default function RechargeAdd() {
         </Button>
       </div>
 
-      {/* ====== 提交成功彈窗 ====== */}
-      {successVisible && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.45)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 1000,
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 12, padding: '32px 28px',
-            width: 400, textAlign: 'center',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
-          }}>
-            <div style={{
-              width: 64, height: 64, margin: '0 auto 20px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #52C41A, #73D13D)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(82,196,26,0.3)',
-            }}>
-              <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
-            </div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-              {t('accountBalance.submitSuccessTitle')}
-            </h3>
-            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
-              {submittedFlowNo && !isDirectExec(submittedFlowNo) && (
-                <>{t('accountBalance.flowNoLabel')}<span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span><br /></>
-              )}
-              {isDirectExec(submittedFlowNo)
-                ? '✅ 已直接充值到賬（未經審批）'
-                : t('accountBalance.submitSuccessDesc')
-              }
-            </p>
-            <Button
-              type="primary"
-              size="large"
-              onClick={() => navigate('/account-balance')}
-              style={{ minWidth: 120, height: 40, borderRadius: 8 }}
-            >
-              {t('accountBalance.backToList')}{countdown > 0 && ` (${countdown}s)`}
-            </Button>
-          </div>
-        </div>
-      )}
+      <SuccessModal visible={successVisible} flowNo={submittedFlowNo} onBack={goBack} />
     </div>
   )
 }

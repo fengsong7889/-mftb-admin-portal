@@ -27,9 +27,20 @@ public interface EmployeeContractService {
     /** 合同到期预警汇总（P0）：各分桶数量 + 最近到期明细 */
     ContractExpirySummaryVO expirySummary(int days);
 
+    /**
+     * 新增员工合同，要求合同编号/类型/开始日期非空。
+     * <p>
+     * 服务端会强制把传入的 id 置 null，并将 userId 改写为方法第一个参数，
+     * 所以调用方无法靠传 id 或 body.userId 越权写入他人合同。
+     */
     EmpContract create(Long userId, EmpContract contract);
 
+    /**
+     * 修改员工合同。先校该 id 确实属于 userId（requireOwned），
+     * 然后逐字段拷贝白名单列，<b>不是全量覆盖</b>：未列入的字段保持库中原值。
+     */
     EmpContract update(Long userId, Long id, EmpContract contract);
 
+    /** 删除员工合同；同样先过 requireOwned 归属校验，不可跨人删除 */
     void delete(Long userId, Long id);
 }

@@ -28,6 +28,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * 遗失与找回实现，契约见 {@link EamLossService}。遗失单可由归还流程派生；recover/inspect/writeOff 都会回写资产状态，其中 recover 还会触发赔付复核（markLossRecoveryReview）。
+ * <p>
+ * 事务边界：create, update, recover, inspect, writeOff, addEvent, createFromReturn, updateStatusByReturnId 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamLossMapper, EamLossEventMapper, EamAssetMapper, EamClaimMapper, EamBorrowMapper, EamReturnMapper, EamScrapMapper, EamCompensationMapper, EamCompensationService。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

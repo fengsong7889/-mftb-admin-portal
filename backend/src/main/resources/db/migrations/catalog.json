@@ -636,6 +636,200 @@
       ],
       "status": "ACTIVE",
       "comment": "P1 績效考核 M2 菜单 v1.0 的修正：菜单名“申诉登記”是简体，改“申訴登記”。upsert 自愈分支故意不改 name（要保留菜单配置页的自定义名），所以额外发一条只匹配旧默认名的定向 UPDATE；同时登记本域新动作 REASSIGN（改派评估人也入留痕，因为“谁来打分”同样需要事后追责）。全流程幂等，取代 hr:performance-report-menu:v1.0。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v1.0",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "產研協同系統（RDM）菜单种子：新建一级目录 rdm-center(system_code=rdm) + 7 个业务菜单（rdm-workbench/rdm-submit/rdm-requirement/rdm-intake/rdm-product/rdm-acceptance/rdm-dashboard）+ 配置分组 rdm-config-group（狀態與流轉/分發矩陣/SLA 與逾期）。同步补 admin 角色菜单授权与 rdm 系统准入（sys_role_system/sys_department_system 按菜单授权反推），否则严管模式下 PermissionAspect 会按系统准入拦截。upsert 每次启动重放自愈，后置校验菜单存在+归属+启用+admin 授权齐备才记版本。参考 SQL：203_rdm_menu_seed.sql。 取代原因见 v2.0：一级目录 rdm-center 被取消，其下菜单全部上升一级。",
+      "supersededBy": "rdm:menu-seed:v2.0"
+    },
+    {
+      "versionKey": "rdm:schema:v1.0",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM 需求全生命周期 M1 结构：建 12 张 rdm_ 表（需求主表/关联对象/参与角色/状态流水/沟通/附件/验收单/状态定义/流转规则/分发矩阵/SLA/通知留痕），并种子 23 个状态、32 条流转规则、10 条 SLA、XQ+XQYS 编号规则、rdm_intake 准入流程与流程配置行。DDL 只存 classpath 脚本 204_rdm_core_tables.sql 一份（backend/sql 下为参考副本）；applyOnce 带后置校验（表齐+种子数量达标），失败不记版本、下次启动重试。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.1",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM 附件/截图列扩到 MEDIUMTEXT：上传接口沿用 EAM 照片口径返回 Base64 Data URL（5MB 上限 → base64 约 6.8MB），VARCHAR(500)/TEXT(64KB) 会静默截断。ALTER MODIFY 可重复执行；后置校验 information_schema.COLUMNS.DATA_TYPE=mediumtext，未达标不记版本。DDL 存 205_rdm_attachment_mediumtext.sql。"
+    },
+    {
+      "versionKey": "rdm:access-grant:v1.0",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmAccessGrantInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v1.0",
+        "iam:employee-self-service-role:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM 全员基线授权：给内置角色 employee_self_service 授 rdm-workbench/rdm-submit/rdm-requirement/rdm-acceptance + rdm 系统准入，否则统一门户下普通员工看不到提需求入口（与 HR ESS 同法）。刻意不自动授需求池分配/产品处理/研发交付/需求配置——产研职能须由管理员在授权中心按角色勾选，避免按角色名猜测匹配造成越权。角色不存在时告警跳过，下次启动自愈；每次启动重放。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v2.0",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "RDM 菜单结构拍平：取消一级目录 rdm-center，7 个业务菜单 + 需求配置分组全部上升为一级菜单(sort 16..23)，需求配置三个叶子仍为其二级子菜单。退役旧目录走软删(status=0, deleted=1)并清理 sys_role_menu/sys_department_menu 残留授权，避免空目录挂在侧边栏；upsert 先改挂父子、再退役旧目录（顺序不可反，否则子菜单未提升时校验会拒）。后置校验补齐：旧目录必须已退役、顶级菜单 parent_id 必须为 NULL。取代 rdm:menu-seed:v1.0。 取代原因见 v3.0：按管理视角重排一级菜单顺序与命名并补齐研发交付环节。",
+      "supersededBy": "rdm:menu-seed:v3.0"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.0",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "RDM 菜单分类调整（管理员视角）：一级顺序改为 需求總看板(16) → 需求工作台(17) → 提交需求(18) → 需求台賬(19) → 需求池·分配(20) → 產品需求處理(21) → 研發交付(22) → 需求驗收(23) → 需求配置(24，下挂狀態與流轉/分發矩陣/SLA 與逾期)。顶部先给管理者看结果，其余严格按需求生命周期动线；新增此前缺失的 rdm-delivery 一级菜单（研发侧看交付中需求），改名走仅匹配旧默认名的定向 UPDATE（不覆盖菜单配置页自定义名）。后置校验：旧名不得残留、rdm-delivery 必须存在且启用。取代 rdm:menu-seed:v2.0。 取代原因见 v3.1：M2 研发交付工作台上线后 rdm-delivery 的 component 需对齐真实页面。",
+      "supersededBy": "rdm:menu-seed:v3.1"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.1",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.2"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "研发交付菜单语义对齐：rdm-delivery 从「交付中需求列表（复用 RequirementList）」改为「研发交付工作台（DeliveryBoard：我的任务 + 进度/工时上报）」，路径保持 /rdm-delivery 不变以免冲击已有授权与收藏；component 走仅匹配旧默认值的定向 UPDATE（不覆盖管理员自定义），后置校验断言 component 已不为 RequirementList。取代 rdm:menu-seed:v3.0。 取代原因见 v3.2：迭代排期需要独立菜单入口，rdm-delivery 升为一级分组。",
+      "supersededBy": "rdm:menu-seed:v3.2"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.2",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.2"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "研發交付升为一级分组（与「需求配置」同法），下挂三个二级菜单：rdm-delivery-board(交付工作台,/rdm-delivery) / rdm-delivery-iteration(迭代排期,/rdm-iteration) / rdm-delivery-req(交付中需求,/rdm-delivery-req)。关键：菜单 key 变化后必须做**授权继承**，把旧 rdm-delivery 上的 sys_role_menu/sys_department_menu 原样复制到三个子菜单（用 INSERT IGNORE 而非 ON DUPLICATE KEY UPDATE，避免每次启动重放刷掉管理员自定义）；否则升级当日会出现“超管能看到、普通研发点开是空白”。同时定向将旧 rdm-delivery 行的 path/component 置 NULL（否则侧边栏分组与子菜单出现两个入口）。后置校验：rdm-delivery 必须无 path、三个子菜单必须存在启用且归属正确。取代 rdm:menu-seed:v3.1。 取代原因见 v3.3：M3 质量口径/版本追溯/交付周报需要同样的分组化处理。",
+      "supersededBy": "rdm:menu-seed:v3.3"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.3",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.2"
+      ],
+      "status": "SUPERSEDED",
+      "comment": "需求總看板升为一级分组，下挂四个二级菜单：rdm-dashboard-board(交付看板,/rdm-dashboard) / rdm-dashboard-quality(質量口徑,/rdm-quality) / rdm-dashboard-version(版本追溯,/rdm-version-trace) / rdm-dashboard-report(交付週報,/rdm-weekly-report)，让 M3 交付的质量/追溯/周报不再只靠页内按钮发现。授权继承不再写死 rdm-delivery，改为 GROUP_GRANT_INHERIT 声明表（只包含本次发生 key 拆分的分组；rdm-config-group 子菜单 key 未变，进去反而会给仅有目录权的角色多发出子页权）；demoteToGroup/inheritGroupGrants 参数化复用 v3.2 已验证的 INSERT IGNORE 继承语义。后置校验参数化：两个分组均必须无 path，五个子菜单必须存在启用且归属正确。同时看板类接口的 @RequirePermission 从 rdm-dashboard 改挂对应子菜单 key。取代 rdm:menu-seed:v3.2。 取代原因见 v3.4：M4 产出积分与效能量趋势需要自己的菜单入口。",
+      "supersededBy": "rdm:menu-seed:v3.4"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.4",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:menu-seed-v44",
+        "core:system-portal:v1.0",
+        "rdm:schema:v1.4"
+      ],
+      "status": "ACTIVE",
+      "comment": "M4 菜单位：看板分组新增 rdm-dashboard-score(產出積分,/rdm-score) 与 rdm-dashboard-trend(效能量趨勢,/rdm-metric-trend)，需求配置分组新增 rdm-config-score(積分規則,/rdm-score-rule)。积分会被引用进绩效，所以不挂在交付看板里也不给泛看板权直接访问。GROUP_GRANT_INHERIT 只追加本次新增的三个叶子（rdm-config-status/routing/sla 三个已存在子菜单绝不加进来，否则每次启动重放会给仅有目录权的角色多补子页权限——权限只减不增）。积分规则采 VIEW_EDIT（配规则=改所有人的分），看板/趋势按各自动作集。取代 rdm:menu-seed:v3.3。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.2",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.1"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM M2 结构：建 rdm_prd（L2 产品需求，支持逐级拆解）/ rdm_review（需求・研发・UI・测试四类评审）/ rdm_iteration（迭代与版本排期）/ rdm_work_task（L3 执行任务与计划·实际工时）/ rdm_change_request（需求变更申请，走 OA 审批）5 张表；种子 PRD/RV/RT/XC 四条编号规则与 rdm_change 变更审批流程定义+流程配置行。DDL 只在 classpath 脚本 206_rdm_delivery_tables.sql 存一份（backend/sql 下为参考副本）；applyOnce 带后置校验（表齐+编号规则齐+变更流程齐）。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.3",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.2"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM M3 交付与验收增强：建 rdm_acceptance_case（逐条验收用例：预期/实际/结论/缺陷严重度）；rdm_acceptance 加 attempt（第几次验收，>1 即返工复验，冻结在当时序号而不是事后 count）/ test_env / defect_count / follow_up_req_id+no（有条件通过自动转出的后续需求）；rdm_requirement 加 parent_req_id/parent_req_no 衍源链（不复用 source_channel，那列表达提交端，混用会让渠道统计失真）与 version_no 反查索引。DDL 只在 classpath 脚本 207_rdm_acceptance_case.sql 存一份（backend/sql 下为参考副本）；applyOnce 逐列实查 information_schema，缺列即抛异常不记版本（ADD COLUMN 静默失败会让写入报未知列）。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.4",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.3"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM M4 产出积分与效能量：建 rdm_score_rule（版本化规则，uk=rule_code+version，含 alloc_mode/max_scorable_roles/quality_floor）、rdm_score_record（流水，**uk=req_id+user_id+role_code+period_code** 保证重算幂等不产生双份分，并快照当期因子与规则版本以供申诉复算）、rdm_metric_snapshot（日快照，uk=stat_date+dim_type+dim_id）；hr_perf_score_item 加 suggested_score/suggested_source/suggested_at 建“建议值通道”（不复用 self_score/supervisor_score，那两列是人工评 价语义，混写会导致校准环节分不清责任）。关键：ADD COLUMN 不可重复执行，所以绩效 三列不进脚本而由 Java 先查 information_schema 再条件添加（脚本中途失败时 CREATE TABLE 已自提交，重跑会撞 duplicate column）。DDL 只在 classpath 脚本 208_rdm_score_tables.sql 存一份；后置校验：三表齐 + BASE 现行规则已种子 + 三个建議值列齐备 。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.5",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.4"
+      ],
+      "status": "ACTIVE",
+      "comment": "修正 v1.4 留下结构缺陷：rdm_metric_snapshot.dim_id 原允许 NULL，而 MySQL 唯一索引不约束 NULL，uk_rdm_metric_day 对 COMPANY 维度形同虚设，快照回填重复执行会长重复行（实查 2026-10-04 有两行 COMPANY，趋势页同一天画两个数据点）。本迁移：先按 (stat_date,dim_type,COALESCE(dim_id,0)) 去重，再将 NULL 归零，最后 MODIFY 为 NOT NULL DEFAULT 0。COMPANY 统一用常量 RdmConstants.COMPANY_DIM_ID=0 占位，写入端与趋势读取端共用（读取端原来用 dim_id IS NULL 选 COMPANY，不改会直接查空）。快照表是纯派生缓存（job 可按日期重算），所以此处破例允许 DELETE 去重并在脚本里写明不得作为业务表先例。后置校验：IS_NULLABLE=NO + 无 NULL 残留行 + 无重复快照日。脚本 209_rdm_snapshot_dim_id.sql。"
     }
   ]
 }

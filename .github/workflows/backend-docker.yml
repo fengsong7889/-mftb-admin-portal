@@ -7,6 +7,11 @@ on:
       - 'backend/**'
       - '.github/workflows/backend-docker.yml'
       - 'scripts/**'
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-docker.yml'
   workflow_dispatch:
 
 permissions:
@@ -59,6 +64,7 @@ jobs:
           echo "✅ 迁移资源完整性校验通过"
 
   build-and-push:
+    if: github.event_name == 'push'
     needs: test
     runs-on: ubuntu-latest
     outputs:
@@ -102,13 +108,19 @@ jobs:
   #   SEALOS_KUBECONFIG      : Sealos 集群 kubeconfig 文件內容
   #   SEALOS_DEPLOYMENT      : 後端 Deployment 名稱（預設 mftb-admin-backend）
   #   SEALOS_NAMESPACE       : K8s namespace（預設 mftb-admin）
+  #   VERIFY_BASE_URL        : 驗收目標基址，如 https://mftb-admin-api.cloud.sealos.io
+  #   VERIFY_USER            : 驗收帳號（最小權限專用帳號）
+  #   VERIFY_PASS            : 驗收帳號密碼
   # 如未配置 SEALOS_KUBECONFIG，該步驟自動跳過，不影響鏡像構建。
   deploy:
+    if: github.event_name == 'push'
     needs: build-and-push
     runs-on: ubuntu-latest
     env:
       HAS_SEALOS: ${{ secrets.SEALOS_KUBECONFIG != '' && 'true' || 'false' }}
     steps:
+      - uses: actions/checkout@v5
+
       - name: Skip if no kubeconfig
         if: env.HAS_SEALOS != 'true'
         run: echo "SEALOS_KUBECONFIG not configured, skipping deploy"
@@ -142,3 +154,15 @@ jobs:
             -n ${NAMESPACE} --timeout=180s
 
           echo "✅ 部署完成：${DEPLOYMENT} @ ${IMAGE_TAG}"
+
+      # ── 部署後驗收：就緒探針 + 關鍵業務接口，任一失敗即中止作業 ──
+      - name: Post-deploy verification
+        if: env.HAS_SEALOS == 'true'
+        env:
+          BASE_URL:    ${{ secrets.VERIFY_BASE_URL }}
+          VERIFY_USER: ${{ secrets.VERIFY_USER }}
+          VERIFY_PASS: ${{ secrets.VERIFY_PASS }}
+          BUILD_TAG:   ${{ needs.build-and-push.outputs.image_tag }}
+        run: |
+          echo "→ 執行部署驗收腳本..."
+          bash scripts/verify-deploy.sh

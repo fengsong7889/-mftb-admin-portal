@@ -1,10 +1,25 @@
+/**
+ * 全局吉祥物（蜜蜂宠物）的表情图层组件。
+ *
+ * 文件名 PikachuFace 是早期命名遗留，实际渲染的是蜜蜂形象（闪峰宠物），
+ * 改名的收益低于牵连三个调用方的风险，故保留原名，在此说明避免误解。
+ *
+ * 结构分两层：底图 PNG（身体/翅膀/手脚）由 CSS 关键帧驱动摆动，本组件只负责
+ * 在其上叠加一层 SVG 五官。这样新增表情只需在 FaceExpression 加一个 case，
+ * 不用重新出图，也不会影响身体动画。
+ *
+ * 调用方：UserMenu（头像下拉）、PetMascot（右下角互动宠物）、Home（工作台）。
+ */
 import mascotImage from '../assets/mascot-uploaded-bee.png'
 
 interface PikachuFaceProps {
+  /** 表情标识，取值须落在 expressionSet 内；传入未知值会静默回退为 happy */
   expression: string
+  /** 渲染宽度（px）。高度按 1.58 倍推算，与底图的宽高比保持一致 */
   size?: number
 }
 
+// 白名单而非枚举：表情值由调用方硬编码传入，越界时宁可回退也不要渲染出空白五官
 const expressionSet = new Set([
   'happy',
   'thinking',
@@ -20,6 +35,7 @@ const expressionSet = new Set([
   'hungry',
 ])
 
+/** 按表情标识绘制对应的 SVG 五官；happy 与未匹配到的值走同一默认分支 */
 function FaceExpression({ expression }: { expression: string }) {
   switch (expression) {
     case 'thinking':

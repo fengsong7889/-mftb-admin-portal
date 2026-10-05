@@ -12,19 +12,10 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import type { Dayjs } from 'dayjs'
 import { fetchAdAlgorithms, fetchAdNewStoreInventory, placeAdNewStoreOrder } from '../../api/adPromotion'
 import type { AdNewStoreInventoryVO } from '../../api/adPromotion'
 import { fetchStores } from '../../api/store'
-import { useCountUp } from '../../hooks/useCountUp'
-
-// WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
-
-/* ---- 動畫數字組件 ---- */
-function AnimatedNumber({ value, suffix }: { value: number; suffix?: string }) {
-  const animated = useCountUp(value)
-  return <>{animated.toLocaleString()}{suffix && <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 2 }}>{suffix}</span>}</>
-}
+import { useNewStoreCalendar, AnimatedNumber } from '../_shared/ad-promotion/useNewStoreCalendar'
 
 // algorithm/store/BD options from backend
 
@@ -50,8 +41,6 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
   const [loading, setLoading] = useState(false)
   const [_submitting, setSubmitting] = useState(false)
 
-  const [selectedDates, setSelectedDates] = useState<string[]>([])
-  const [currentMonth, setCurrentMonth] = useState<Dayjs>(dayjs())
   const [isConfirmModalVisible, setIsConfirmModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
   const [lastSubmitDays, setLastSubmitDays] = useState(0)
@@ -82,6 +71,10 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
   }, [inventory])
 
   const queriedStoreName = inventory?.storeName || queriedStoreCode
+
+  // 日历选择逻辑（共享 Hook）
+  const calendar = useNewStoreCalendar(giftInfo?.expireDate)
+  const { selectedDates, setSelectedDates, currentMonth, setCurrentMonth, months, calendarGrid, isDateSelectable, getCellStyle, datesByMonth } = calendar
 
   // 品牌变更处理：清空已选算法、门店、BD
   const handleBrandChange = (value: string | null) => {
@@ -142,8 +135,8 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
     if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
     if (!searchStoreCode) { message.warning(t('selectStore')); return }
     setQueriedStoreCode(searchStoreCode)
-    setSelectedDates([])
-    setCurrentMonth(dayjs())
+    calendar.setSelectedDates([])
+    calendar.setCurrentMonth(dayjs())
     setHasSearched(true)
     setLoading(true)
     try {
@@ -160,60 +153,12 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
     setSearchAlgorithm(null); setSearchBrand(null)
     setSearchStoreCode(null); setSearchBD(null)
     setQueriedStoreCode(null); setQueriedGroupCode(null)
-    setSelectedDates([]); setInventory(null)
+    calendar.setSelectedDates([]); setInventory(null)
     setHasSearched(false)
   }
 
-  // 可选日期范围：今天 → 赠送有效期止
-  const rangeStart = dayjs().startOf('day')
-  const rangeEnd = giftInfo ? dayjs(giftInfo.expireDate).startOf('day') : rangeStart
-
-  // 可选月份列表（用于月份切换器）
-  const months = useMemo(() => {
-    if (!giftInfo) return []
-    const result: Dayjs[] = []
-    let current = rangeStart.startOf('month')
-    while (current.isBefore(rangeEnd) || current.isSame(rangeEnd, 'month')) {
-      result.push(current)
-      current = current.add(1, 'month')
-    }
-    return result
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [giftInfo?.expireDate])
-
-  // 生成当前月份的日历网格
-  const calendarGrid = useMemo(() => {
-    const year = currentMonth.year()
-    const month = currentMonth.month()
-    const firstDay = dayjs(new Date(year, month, 1))
-    const lastDay = dayjs(new Date(year, month + 1, 0))
-    const firstDayOfWeek = firstDay.day()
-    const daysInMonth = lastDay.date()
-
-    const weeks: (Dayjs | null)[][] = []
-    let currentWeek: (Dayjs | null)[] = []
-
-    for (let i = 0; i < firstDayOfWeek; i++) { currentWeek.push(null) }
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = dayjs(new Date(year, month, day))
-      currentWeek.push(date)
-      if (currentWeek.length === 7) { weeks.push(currentWeek); currentWeek = [] }
-    }
-    if (currentWeek.length > 0) {
-      while (currentWeek.length < 7) { currentWeek.push(null) }
-      weeks.push(currentWeek)
-    }
-    return weeks
-  }, [currentMonth])
-
-  // 日期是否在可选范围内（今天 → 有效期止）
-  const isDateSelectable = (date: Dayjs | null) => {
-    if (!date) return false
-    return !date.isBefore(rangeStart) && !date.isAfter(rangeEnd)
-  }
-
   // 切换日期选择（选择数量不可超过剩余赠送天数）
-  const handleDateClick = (date: Dayjs | null) => {
+  const handleDateClick = (date: import('dayjs').Dayjs | null) => {
     if (!date || !giftInfo) return
     if (!isDateSelectable(date)) { message.warning(t('dateNotInGiftPeriod')); return }
     const dateStr = date.format('YYYY-MM-DD')
@@ -227,22 +172,6 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
     }
     setSelectedDates([...selectedDates, dateStr].sort())
   }
-
-  const handleClearSelected = () => setSelectedDates([])
-
-  // 按月分组已选日期
-  const datesByMonth = useMemo(() => {
-    const grouped: Record<string, number[]> = {}
-    selectedDates.forEach(dateStr => {
-      const date = dayjs(dateStr)
-      const monthKey = date.format('YYYY-MM')
-      if (!grouped[monthKey]) grouped[monthKey] = []
-      grouped[monthKey].push(date.date())
-    })
-    return Object.entries(grouped)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, days]) => ({ month, days: days.sort((a, b) => a - b) }))
-  }, [selectedDates])
 
   // 提交订单：打开确认弹窗
   const handleSubmitOrder = () => {
@@ -275,21 +204,15 @@ export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }
     }
   }
 
+  const handleClearSelected = () => setSelectedDates([])
+
   const handleViewOrder = () => {
     setIsSuccessModalVisible(false)
     navigate(`/promotion-order-manage?type=${encodeURIComponent('新店廣告')}&from=ad-sales`)
   }
   const handleContinuePurchase = () => { setIsSuccessModalVisible(false); message.success(t('continueSelectDays')) }
 
-  // 获取日历单元格样式
-  const getCellStyle = (date: Dayjs | null) => {
-    if (!date) return { background: '#fafafa', cursor: 'default', border: '1px solid #e8e8e8' }
-    const selectable = isDateSelectable(date)
-    if (!selectable) return { background: '#f5f5f5', cursor: 'not-allowed', border: '1px solid #e8e8e8', color: '#bfbfbf' }
-    const isSelected = selectedDates.includes(date.format('YYYY-MM-DD'))
-    if (isSelected) return { background: '#f6ffed', cursor: 'pointer', border: '2px solid #52c41a', color: '#52c41a', fontWeight: 600 }
-    return { background: '#fff', cursor: 'pointer', border: '1px solid #e8e8e8', color: '#333' }
-  }
+  // 获取日历单元格样式已由共享 Hook 提供
 
   return (
     <div>

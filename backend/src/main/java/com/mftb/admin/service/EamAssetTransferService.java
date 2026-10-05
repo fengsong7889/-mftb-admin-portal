@@ -14,7 +14,13 @@ import com.mftb.admin.dto.EamAssetQuery;
  * 与交接（批量人A→人B）互补，是台账归属部门变更的合法通道之一。
  */
 public interface EamAssetTransferService {
+    /**
+     * 可调拨资产分页。会**无条件把 query.status 改成 in_use**，调用方传其他状态无效；
+     * 每行额外补充 transferable 与 transferBlockedReason（是否可调拨及原因）。
+     */
     PageResult<EamAssetVO> candidates(EamAssetQuery query);
+
+    /** 单件调拨候选详情；不限状态（因此可能拿到不可调拨的资产），仅补齐可调拨判定字段 */
     EamAssetVO candidate(long id);
 
     /** 分页查询调拨记录 */

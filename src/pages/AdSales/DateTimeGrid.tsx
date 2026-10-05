@@ -33,21 +33,31 @@ import {
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccounts } from '../../api/finance'
+import {
+  REGION_LIST,
+  BACKEND_TO_UI_BRAND,
+  UI_TO_BACKEND_BRAND,
+  MOCK_STORES,
+  STORE_OPTIONS,
+  BD_OPTIONS,
+  DEFAULT_MULTI_SLOT_DISCOUNT_TIERS,
+  PRESALE_OPEN_HOUR,
+  getSellableDays,
+  isPresaleDate,
+  getPresaleOpenTime,
+  parseDiscountTiers,
+} from '../_shared/ad-promotion/gridConstants'
+import DateStrip from '../_shared/ad-promotion/DateStrip'
+import { useDateTimeGridCommon, type GridCartItem } from '../_shared/ad-promotion/useDateTimeGridCommon'
+import {
+  ConflictModal,
+  SuccessModal,
+  SoldOutModal,
+  PresaleInfoModal,
+} from '../_shared/ad-promotion/GridModals'
 
-interface CartItem {
-  key: string
-  date: string
-  region: Region           // 商圈
-  regionName: string       // 商圈名称
-  mealSlot: string
-  mealSlotKey: string    // 餐段时段 key（breakfast/lunch/afternoon/dinner/supper）
-  timeSlots: number[]
-  originalPrice: number  // 原价
-  salePrice: number      // 售价
-  storeId: string        // 店铺ID
-  storeName: string      // 店铺名称
-  lockTime: number       // 锁定时间戳（毫秒）
-}
+// 使用共享的 GridCartItem 类型，mealSlotKey 在 AdSales 中始终提供
+type CartItem = GridCartItem
 
 /** 组合商圈接口 */
 interface RegionCombination {
@@ -84,24 +94,6 @@ interface DateTimeGridProps {
   storeMode?: boolean
 }
 
-/** Mock数据 - 店铺列表（含BD信息） */
-const MOCK_STORES = [
-  { id: '10001', name: '威尼斯人酒店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10002', name: '皇朝廣場店', bd: 'bd-002', bdName: '李娜' },
-  { id: '10003', name: '黑馬仕美食街', bd: 'bd-003', bdName: '王強' },
-  { id: '10004', name: '新葡京旗艦店', bd: 'bd-001', bdName: '張偉' },
-  { id: '10005', name: '官也街老店', bd: 'bd-004', bdName: '劉敏' },
-]
-
-/** 店铺下拉选项（展示ID） */
-const STORE_OPTIONS = MOCK_STORES.map(s => ({
-  label: `${s.name}（ID：${s.id}）`,
-  value: s.id,
-  name: s.name,
-  bd: s.bd,
-  bdName: s.bdName,
-}))
-
 /** 算法 → 品牌映射（选择算法后自动带出品牌） */
 const _ALGORITHM_BRAND_MAP: Record<string, string> = {
   invincible_star: 'shanfeng',
@@ -126,91 +118,11 @@ const ALGORITHM_REFUND_CONFIG: Record<string, boolean> = {
   search_algo: true,       // 搜索算法：允许退款
 }
 
-/** BD选项 */
-const BD_OPTIONS = [
-  { label: '張偉', value: 'bd-001' },
-  { label: '李娜', value: 'bd-002' },
-  { label: '王強', value: 'bd-003' },
-  { label: '劉敏', value: 'bd-004' },
-]
-
-/** 默认多时段折扣梯度（演示配置，真实数据由定价配置覆盖） */
-const DEFAULT_MULTI_SLOT_DISCOUNT_TIERS = [
-  { minSlots: 10, discount: 80, label: '8折' },
-  { minSlots: 8, discount: 85, label: '85折' },
-  { minSlots: 5, discount: 90, label: '9折' },
-  { minSlots: 3, discount: 95, label: '95折' },
-]
-
-/** 后端品牌 → 前端品牌值（flashBee=閃蜂 mFood=mFood） */
-const BACKEND_TO_UI_BRAND: Record<string, string> = { flashBee: 'shanfeng', mFood: 'mfood' }
-/** 前端品牌值 → 后端品牌 */
-const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
-
-/** 解析定价配置的多时段梯度折扣 JSON（后端 discount=95 表示 95 折） */
-function parseDiscountTiers(json?: string): Array<{ minSlots: number; discount: number; label: string }> {
-  if (!json) return []
-  try {
-    const arr = JSON.parse(json)
-    if (!Array.isArray(arr)) return []
-    return (arr as Array<{ minSlots?: number; discount?: number }>)
-      .filter(t => t && Number(t.minSlots) > 0 && Number(t.discount) > 0)
-      .map(t => ({ minSlots: Number(t.minSlots), discount: Number(t.discount), label: `${Number(t.discount) > 10 ? Number(t.discount) / 10 : Number(t.discount)}折` }))
-      .sort((a, b) => b.minSlots - a.minSlots)
-  } catch {
-    return []
-  }
-}
-
 // MEAL_TIME_SLOTS 定义移入组件内部以使用 t() 翻譯 labels
 // 在组件内部通过 useMemo 创建
 
-/** 商圈列表（表格行）—— name 仅作 fallback，实际展示用组件内翻译 */
-const REGION_LIST = [
-  { key: Region.KOKSAA, name: '黑沙環區' },
-  { key: Region.COSTA, name: '高士德區' },
-  { key: Region.SANMA, name: '新馬路區' },
-  { key: Region.SANWONG, name: '新皇朝區' },
-  { key: Region.HKM, name: '港珠澳區' },
-  { key: Region.FAHUA, name: '花城市區' },
-  { key: Region.AIRPORT, name: '北安機場' },
-  { key: Region.LHOTEL, name: '左酒店區' },
-  { key: Region.RHOTEL, name: '右酒店區' },
-  { key: Region.UM, name: '澳大專區' },
-  { key: Region.HACS, name: '黑沙灘區' },
-  // 珠海區域
-  { key: Region.GONGBEI, name: '拱北區域' },
-  { key: Region.HENGQIN, name: '橫琴區域' },
-]
-
-// WEEKDAY_LABELS 移入组件内部以使用 t() 翻譯
-
 /** 时段锁定时长（秒），从规则配置动态读取 */
 const DEFAULT_LOCK_SECONDS = 60
-
-/** 可售天数（含当天），超出该窗口即为待开售日期：盘活复苏 180 天，其他类型 12 天 */
-const REVIVE_SELLABLE_DAYS = 180
-const DEFAULT_SELLABLE_DAYS = 12
-/** 开售时间（每日该时点放出新一天的可购买日期，火车票式） */
-const PRESALE_OPEN_HOUR = 10
-
-/** 根据算法类型取可售天数 */
-function getSellableDays(algorithmType: AlgorithmType): number {
-  return algorithmType === AlgorithmType.HOT_REVIVE_AD ? REVIVE_SELLABLE_DAYS : DEFAULT_SELLABLE_DAYS
-}
-
-/** 计算某日期相对今天的天数偏移（今天=0） */
-function getDayOffset(date: Dayjs): number {
-  return date.startOf('day').diff(dayjs().startOf('day'), 'day')
-}
-/** 是否为待开售日期（超出可售窗口，暂不可购买） */
-function isPresaleDate(date: Dayjs, sellableDays: number): boolean {
-  return getDayOffset(date) >= sellableDays
-}
-/** 待开售日期的开售时间（提前 sellableDays 天、于 PRESALE_OPEN_HOUR 点开售） */
-function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
-  return date.startOf('day').subtract(sellableDays - 1, 'day').hour(PRESALE_OPEN_HOUR).minute(0).second(0)
-}
 
 export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridProps) {
   const { t } = useTranslation('adSales')
@@ -252,77 +164,78 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     REGION_LIST.map(r => ({ ...r, name: REGION_NAME_MAP[Number(r.key)] || r.name })),
   [REGION_NAME_MAP])
 
-  const [selectedDates, setSelectedDates] = useState<Dayjs[]>([])
-  const [activeDate, setActiveDate] = useState<Dayjs | null>(null) // 当前查看的日期
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null)
-  const [selectedCells, setSelectedCells] = useState<Array<{date: string; regionKey: Region | string; mealSlotKey: string}>>([])
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [_selectedRegion, _setSelectedRegion] = useState<Region | string | undefined>(undefined)
-  const [_selectedCombination, _setSelectedCombination] = useState<number | undefined>(undefined)
-  const [_regionMode, _setRegionMode] = useState<'single' | 'combination'>('single')
-  const pageSize = 7
-  const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
-  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
-  const [isSoldOutModalVisible, setIsSoldOutModalVisible] = useState(false)
-  const [soldOutDetails, setSoldOutDetails] = useState<Array<{date: string; regionName: string; mealSlot: string}>>([])
-  const [_selectedStore, _setSelectedStore] = useState<string | undefined>(undefined)
-  const [currentTime, setCurrentTime] = useState(Date.now())
 
-  // 倒计时：每秒更新当前时间
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
 
-  // 自动释放过期锁定（60秒后）；若支付弹窗打开中，自动关闭弹窗并刷新数据
-  useEffect(() => {
-    const expiredItems = cartItems.filter(item => currentTime - item.lockTime >= LOCK_DURATION_MS)
-    if (expiredItems.length > 0) {
-      setCartItems(prev => prev.filter(item => currentTime - item.lockTime < LOCK_DURATION_MS))
-      expiredItems.forEach(item => {
-        message.info(`${item.date} ${item.regionName} ${item.mealSlot} ${t('lockExpired')}`)
-      })
-      // 支付确认弹窗打开时，锁定已过期 → 关闭弹窗，刷新库存与余额，让用户重新获取最新数据
-      if (isPaymentModalVisible) {
-        setIsPaymentModalVisible(false)
-        const apiId = searchAlgorithm ? algorithmMetaMap[searchAlgorithm]?.apiId : undefined
-        const store = searchStoreName ? storeMap[searchStoreName] : undefined
-        if (apiId && store) {
-          fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
-          loadMerchantBalance(store.groupCode, searchBrand)
-        }
-      }
+  // ===== 真实接口接线 =====
+  // 算法下拉（無敵星星加载真实算法库数据，value=算法ID）
+  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [algorithmMetaMap, setAlgorithmMetaMap] = useState<Record<string, { apiId: number }>>({})
+  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
+  // 门店下拉（真实门店，value=storeCode）
+  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string; name?: string }>>(STORE_OPTIONS)
+  const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
+  const [bdOptions, setBdOptions] = useState(BD_OPTIONS)
+  // 真实库存（查询后加载：格子售罄状态 + 预售窗口 + 折扣梯度）
+  const [inventoryData, setInventoryData] = useState<AdInventoryVO | null>(null)
+
+  // 可售天数（AdSales 使用真实预售天数）
+  const sellableDays = inventoryData ? inventoryData.presaleDays : getSellableDays(inventoryItem.algorithmType)
+
+  // 生成所有日期列表（从当天开始，不展示已过去的日期）
+  const allDates = useMemo(() => {
+    const availableStart = dayjs(inventoryItem.availableStartDate)
+    const today = dayjs().startOf('day')
+    // 起始日期取当天和可购买起始日期的较晚者
+    const startDate = today.isAfter(availableStart) ? today : availableStart
+    // 真实库存：预售窗口 + 7 天待开售展示；否则用库存项的可购窗口
+    const endDate = inventoryData
+      ? today.add(inventoryData.presaleDays + 6, 'day')
+      : dayjs(inventoryItem.availableEndDate)
+    const dates: Dayjs[] = []
+    
+    let current = startDate
+    while (current <= endDate) {
+      dates.push(current)
+      current = current.add(1, 'day')
     }
-  }, [currentTime, cartItems, isPaymentModalVisible])
+    return dates
+  }, [inventoryItem.availableStartDate, inventoryItem.availableEndDate, inventoryData])
 
-  // 初始化：加载门店下拉
-  useEffect(() => {
-    // 真实门店数据（含集团编码与归属BD）
-    fetchStores({ page: 1, size: 100 }).then(res => {
-      if (res.records.length === 0) return
-      const map: Record<string, StoreItem> = {}
-      const options = res.records.map(s => {
-        map[s.storeCode] = s
-        return { label: `${s.storeName}（ID：${s.storeCode}）`, value: s.storeCode, name: s.storeName }
-      })
-      setStoreOptions(options)
-      setStoreMap(map)
-    }).catch(() => {})
-  }, [])
+  // 使用共享 hook 管理状态和逻辑
+  const common = useDateTimeGridCommon({
+    lockDurationSeconds: LOCK_DURATION_SECONDS,
+    sellableDays,
+    mealTimeSlots: MEAL_TIME_SLOTS,
+    translatedRegionList,
+    multiSlotTiers: [],
+    allDates,
+  })
 
-  // 查询条件状态
-  const [searchBrand, setSearchBrand] = useState<string | null>(null)
-  const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
-  const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
-  const [searchBD, setSearchBD] = useState<string | null>(null)
-  const [hasSearched, setHasSearched] = useState(false)
-  const [isConflictModalVisible, setIsConflictModalVisible] = useState(false)
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
-  // 预售日期提醒弹窗
-  const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
+  // 解构常用值
+  const {
+    selectedDates, setSelectedDates, setActiveDate, hoveredDate, setHoveredDate,
+    selectedCells, setSelectedCells,
+    cartItems, setCartItems, hasCartItems,
+    currentPage, setCurrentPage, pageSize, totalPages, dateList,
+    isPaymentModalVisible, setIsPaymentModalVisible,
+    isSuccessModalVisible, setIsSuccessModalVisible,
+    isSoldOutModalVisible, setIsSoldOutModalVisible,
+    soldOutDetails, setSoldOutDetails,
+    isConflictModalVisible, setIsConflictModalVisible,
+    pendingAction, setPendingAction,
+    presaleInfo, setPresaleInfo,
+    searchBrand, setSearchBrand,
+    searchAlgorithm, setSearchAlgorithm,
+    searchStoreName, setSearchStoreName,
+    searchBD, setSearchBD,
+    hasSearched, setHasSearched,
+    currentTime,
+    handleDateClick, handleConfirmSwitch, handleCancelSwitch, autoSelectFirstDate,
+  } = common
+
+  const activeDate = common.activeDate
+  const activeDateStr = common.activeDateStr
+
   const [currentAlgorithmRefundEnabled, setCurrentAlgorithmRefundEnabled] = useState<boolean | null>(null)
 
   // 真实算法下拉（無敵星星加载真实算法库数据，value=算法ID）
@@ -361,17 +274,19 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchBrand, searchStoreName])
 
-  // ===== 真实接口接线 =====
-  // 算法下拉（無敵星星加载真实算法库数据，value=算法ID）
-  const [algorithmOptions, setAlgorithmOptions] = useState<Array<{ label: string; value: string }>>([])
-  const [algorithmMetaMap, setAlgorithmMetaMap] = useState<Record<string, { apiId: number }>>({})
-  const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
-  // 门店下拉（真实门店，value=storeCode）
-  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string; name?: string }>>(STORE_OPTIONS)
-  const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
-  const [bdOptions, setBdOptions] = useState(BD_OPTIONS)
-  // 真实库存（查询后加载：格子售罄状态 + 预售窗口 + 折扣梯度）
-  const [inventoryData, setInventoryData] = useState<AdInventoryVO | null>(null)
+  // AdSales 特定：自动释放过期锁定时的额外逻辑（关闭支付弹窗、刷新库存）
+  useEffect(() => {
+    const expiredItems = cartItems.filter(item => Date.now() - item.lockTime >= LOCK_DURATION_MS)
+    if (expiredItems.length > 0 && isPaymentModalVisible) {
+      setIsPaymentModalVisible(false)
+      const apiId = searchAlgorithm ? algorithmMetaMap[searchAlgorithm]?.apiId : undefined
+      const store = searchStoreName ? storeMap[searchStoreName] : undefined
+      if (apiId && store) {
+        fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+        loadMerchantBalance(store.groupCode, searchBrand)
+      }
+    }
+  }, [cartItems, isPaymentModalVisible, searchAlgorithm, searchStoreName, searchBrand])
   // 多时段折扣梯度（默认演示配置，查询后由定价配置覆盖）—— label 由翻译生成
   const [multiSlotTiers, setMultiSlotTiers] = useState(() =>
     DEFAULT_MULTI_SLOT_DISCOUNT_TIERS.map(tier => ({ ...tier, label: `${tier.discount > 10 ? tier.discount / 10 : tier.discount}${t('discountUnit')}` }))
@@ -380,13 +295,8 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const [paying, setPaying] = useState(false)
 
   // 可售天数：真实库存以预售天数为准，否则盘活复苏 180 天、其他 12 天
-  const sellableDays = inventoryData ? inventoryData.presaleDays : getSellableDays(inventoryItem.algorithmType)
 
-  // 当前活动日期的字符串
-  const activeDateStr = activeDate?.format('YYYY-MM-DD') || ''
 
-  // 检查购物车是否有加购数据
-  const hasCartItems = cartItems.length > 0
 
   // 真实格子索引：date|region|mealSlot → 格子
   const realCellMap = useMemo(() => {
@@ -436,7 +346,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const cartSlotDiscountedPrice = (item: CartItem): number => {
     const covered = new Set(cartItems.filter(i => i.date === item.date && i.region === item.region).map(i => i.mealSlotKey))
     const fullDayCovered = MEAL_TIME_SLOTS.every(m => covered.has(m.key))
-    return Math.round(item.originalPrice * slotDiscountFactor(item.region, item.mealSlotKey, fullDayCovered)) / 100
+    return Math.round(item.originalPrice * slotDiscountFactor(item.region, item.mealSlotKey || '', fullDayCovered)) / 100
   }
 
   // 购物车结算：先时段折扣，再按总时段个数梯度折上折（与后端计价一致）
@@ -535,24 +445,6 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     applyStoreBd(value)
   }
 
-  // 确认切换（清空已选）
-  const handleConfirmSwitch = () => {
-    setIsConflictModalVisible(false)
-    if (pendingAction) {
-      pendingAction()
-      setPendingAction(null)
-    }
-    // 清空购物车
-    setCartItems([])
-    setHasSearched(false)
-    message.success(t('adSales.clearedTimeReselect'))
-  }
-
-  // 取消切换
-  const handleCancelSwitch = () => {
-    setIsConflictModalVisible(false)
-    setPendingAction(null)
-  }
 
   // 查询：必须选择算法名称（品牌已自动带出）、门店名称
   const handleSearch = async () => {
@@ -625,7 +517,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
           groupCode: store.groupCode,
           storeCode: store.storeCode,
           bdEmpId: searchBD || undefined,
-          cells: cartItems.map(item => ({ bizDate: item.date, region: Number(item.region), mealSlot: item.mealSlotKey })),
+          cells: cartItems.map(item => ({ bizDate: item.date, region: Number(item.region), mealSlot: item.mealSlotKey || '' })),
         })
         setIsPaymentModalVisible(false)
         setCartItems([])
@@ -687,33 +579,8 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     message.success(t('adSales.continueBuy'))
   }
 
-  // 生成所有日期列表（从当天开始，不展示已过去的日期）
-  const allDates = useMemo(() => {
-    const availableStart = dayjs(inventoryItem.availableStartDate)
-    const today = dayjs().startOf('day')
-    // 起始日期取当天和可购买起始日期的较晚者
-    const startDate = today.isAfter(availableStart) ? today : availableStart
-    // 真实库存：预售窗口 + 7 天待开售展示；否则用库存项的可购窗口
-    const endDate = inventoryData
-      ? today.add(inventoryData.presaleDays + 6, 'day')
-      : dayjs(inventoryItem.availableEndDate)
-    const dates: Dayjs[] = []
-    
-    let current = startDate
-    while (current <= endDate) {
-      dates.push(current)
-      current = current.add(1, 'day')
-    }
-    return dates
-  }, [inventoryItem.availableStartDate, inventoryItem.availableEndDate, inventoryData])
 
-  // 当前页的日期列表
-  const dateList = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    return allDates.slice(startIndex, startIndex + pageSize)
-  }, [allDates, currentPage])
 
-  const totalPages = Math.ceil(allDates.length / pageSize)
 
   // 单个时段价格（使用固定总时段数48，不随选择变化）
   const _slotPrice = useMemo(() => {
@@ -770,25 +637,6 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     return pricePerSlot * availableSlots
   }
 
-  // 点击日期（单选切换：点击新日期取消之前的选中）
-  const handleDateClick = (date: Dayjs) => {
-    // 预售日期：暂不可购买，弹窗提示开售时间
-    if (isPresaleDate(date, sellableDays)) {
-      setPresaleInfo({
-        date: date.format('YYYY-MM-DD'),
-        weekday: WEEKDAY_LABELS[date.day()],
-        openTime: getPresaleOpenTime(date, sellableDays).format(t('presaleDateFormat')),
-      })
-      return
-    }
-    const dateStr = date.format('YYYY-MM-DD')
-    setSelectedDates(prev => {
-      const exists = prev.some(d => d.format('YYYY-MM-DD') === dateStr)
-      if (exists) return prev.filter(d => d.format('YYYY-MM-DD') !== dateStr)
-      return [date]
-    })
-    setActiveDate(date)
-  }
 
   // 计算某日期下的折扣（按格子数，每个格子=1个时段）
   const getDateDiscount = (dateStr: string) => {
@@ -885,28 +733,11 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       </div>
 
       {/* 购物车冲突提醒弹窗 */}
-      <Modal
-        title={t('switchConfirmTitle')}
-        open={isConflictModalVisible}
-        onOk={handleConfirmSwitch}
+      <ConflictModal
+        visible={isConflictModalVisible}
+        onConfirm={handleConfirmSwitch}
         onCancel={handleCancelSwitch}
-        okText={t('switchConfirmOk')}
-        cancelText={t('common:cancel')}
-        okButtonProps={{ danger: true }}
-      >
-        <div style={{ padding: '8px 0' }}>
-          <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
-            {t('switchWarnLine1')}
-          </p>
-          <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
-            {t('switchWarnLine2')}
-          </p>
-          <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
-            <li>{t('switchOption1')}</li>
-            <li>{t('switchOption2')}</li>
-          </ul>
-        </div>
-      </Modal>
+      />
 
       {!hasSearched ? (
         <Card bodyStyle={{ padding: '48px 24px' }}>
@@ -931,76 +762,19 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
           bodyStyle={{ padding: '16px 20px' }}
           style={{ flex: 1 }}
         >
-          {/* 12306风格日期选择器 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Button
-              size="small"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            >
-              ◀
-            </Button>
-            <div style={{ flex: 1, display: 'flex', gap: 4, padding: '4px 0' }}>
-              {dateList.map(date => {
-                const dateStr = date.format('YYYY-MM-DD')
-                const isSelected = selectedDates.some(d => d.format('YYYY-MM-DD') === dateStr)
-                const isToday = dateStr === dayjs().format('YYYY-MM-DD')
-                const isHovered = hoveredDate === dateStr
-                const presale = isPresaleDate(date, sellableDays)
-                return (
-                  <div
-                    key={dateStr}
-                    onClick={() => handleDateClick(date)}
-                    onMouseEnter={() => setHoveredDate(dateStr)}
-                    onMouseLeave={() => setHoveredDate(null)}
-                    style={{
-                      flex: 1,
-                      padding: '6px 4px',
-                      borderRadius: 6,
-                      border: presale
-                        ? '1px dashed #d9d9d9'
-                        : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                      background: presale
-                        ? '#fafafa'
-                        : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : isToday ? '#f6ffed' : '#fff',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}
-                  >
-                    {selectedCells.some(c => c.date === dateStr) && (
-                      <div style={{
-                        position: 'absolute', top: 2, right: 2,
-                        width: 8, height: 8, borderRadius: '50%',
-                        background: '#ff4d4f',
-                        animation: 'dotPulse 1.5s ease-in-out infinite',
-                      }} />
-                    )}
-                    <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                      {date.format('MM-DD')}
-                    </span>
-                    {presale ? (
-                      <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
-                    ) : (
-                      <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
-                        {isToday ? t('today') : WEEKDAY_LABELS[date.day()]}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <Button
-              size="small"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            >
-              ▶
-            </Button>
-          </div>
+          <DateStrip
+            dateList={dateList}
+            selectedDates={selectedDates}
+            activeDate={activeDate}
+            hoveredDate={hoveredDate}
+            sellableDays={sellableDays}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            selectedCells={selectedCells}
+            onDateClick={handleDateClick}
+            onHover={setHoveredDate}
+            onPageChange={setCurrentPage}
+          />
 
           {/* 表格 - 仅展示 activeDate */}
         {!activeDate ? (
@@ -1417,7 +1191,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                               algoId: lockApiId,
                               groupCode: lockStore.groupCode,
                               storeCode: lockStore.storeCode,
-                              cells: finalItems.map(fi => ({ bizDate: fi.item.date, region: Number(fi.item.region), mealSlot: fi.item.mealSlotKey })),
+                              cells: finalItems.map(fi => ({ bizDate: fi.item.date, region: Number(fi.item.region), mealSlot: fi.item.mealSlotKey || '' })),
                             }).catch(() => {
                               message.error(t('slotLockedByOthers'))
                               setCartItems(prev => prev.filter(item => !finalItems.some(fi => fi.item.key === item.key)))
@@ -1543,7 +1317,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                           algoId: unlockApiId,
                           groupCode: unlockStore.groupCode,
                           storeCode: unlockStore.storeCode,
-                          cells: [{ bizDate: record.date, region: Number(record.region), mealSlot: record.mealSlotKey }],
+                          cells: [{ bizDate: record.date, region: Number(record.region), mealSlot: record.mealSlotKey || '' }],
                         }).catch(() => {})
                       }
                       setCartItems(prev => prev.filter(item => item.key !== record.key))
@@ -1708,127 +1482,27 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       </Modal>
 
       {/* 支付成功弹窗 */}
-      <Modal
-        title={t('purchaseSuccess')}
-        open={isSuccessModalVisible}
-        onCancel={() => setIsSuccessModalVisible(false)}
-        footer={[
-          <Button key="view" type="primary" onClick={handleViewOrder}>
-            {t('viewOrder')}
-          </Button>,
-          <Button key="continue" onClick={handleContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>
-            {t('continueBuy')}
-          </Button>,
-        ]}
-        width={400}
-      >
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>
-            {t('successMessage')}
-          </p>
-          <div style={{ 
-            background: 'linear-gradient(135deg, #fff7e6 0%, #ffe58f 100%)',
-            padding: '20px 16px',
-            borderRadius: 8,
-            marginBottom: 16,
-          }}>
-            <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>
-              {t('deductedPromo')}
-            </p>
-            <p style={{ 
-              fontSize: 36, 
-              fontWeight: 700, 
-              color: '#fa541c',
-              margin: 0,
-              lineHeight: 1.2,
-            }}>
-              ${lastPaidAmount > 0 ? lastPaidAmount : '--'}
-            </p>
-          </div>
-        </div>
-      </Modal>
+      <SuccessModal
+        visible={isSuccessModalVisible}
+        onClose={() => setIsSuccessModalVisible(false)}
+        onViewOrder={handleViewOrder}
+        onContinuePurchase={handleContinuePurchase}
+        paidAmount={lastPaidAmount > 0 ? lastPaidAmount : '--'}
+      />
 
       {/* 时段售罄提醒弹窗 */}
-      <Modal
-        title={
-          <Space>
-            <span style={{ fontSize: 18 }}>⚠️</span>
-            <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{t('partialSoldOut')}</span>
-          </Space>
-        }
-        open={isSoldOutModalVisible}
-        onCancel={() => setIsSoldOutModalVisible(false)}
-        footer={[
-          <Button key="ok" type="primary" onClick={() => setIsSoldOutModalVisible(false)} style={{ background: '#fa8c16', borderColor: '#fa8c16', minWidth: 100 }}>
-            {t('gotIt')}
-          </Button>
-        ]}
-        width={460}
-      >
-        <div style={{ padding: '8px 0' }}>
-          <p style={{ fontSize: 14, color: '#262626', marginBottom: 12, lineHeight: 1.6 }}>
-            {t('soldOutExplain')}
-          </p>
-          <div style={{ 
-            background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8, 
-            padding: '12px 16px', marginBottom: 16, maxHeight: 200, overflowY: 'auto',
-          }}>
-            {soldOutDetails.map((item, idx) => (
-              <div key={idx} style={{ 
-                display: 'flex', alignItems: 'center', gap: 8, 
-                padding: '6px 0', 
-                borderBottom: idx < soldOutDetails.length - 1 ? '1px dashed #ffccc7' : 'none',
-              }}>
-                <span style={{ fontSize: 13, color: '#ff4d4f' }}>✕</span>
-                <span style={{ fontSize: 13, color: '#595959' }}>
-                  <span style={{ fontWeight: 600, color: '#262626' }}>{item.date}</span>
-                  {' · '}
-                  <span style={{ color: '#722ed1' }}>{item.regionName}</span>
-                  {' · '}
-                  <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>{item.mealSlot}</Tag>
-                </span>
-              </div>
-            ))}
-          </div>
-          <p style={{ fontSize: 13, color: '#ff4d4f', margin: 0, fontWeight: 500 }}>
-            ⏰ 剩餘時段已為您鎖定，請在 <span style={{ fontWeight: 700, fontSize: 16, color: '#ff4d4f', background: '#fff2f0', padding: '1px 6px', borderRadius: 4, border: '1px solid #ffccc7' }}>{LOCK_DURATION_SECONDS >= 60 ? `${LOCK_DURATION_SECONDS / 60} 分鐘內` : `${LOCK_DURATION_SECONDS} 秒內`}</span> 完成支付，逾期系統將自動釋放鎖定時段供其他商家選購。
-          </p>
-        </div>
-      </Modal>
+      <SoldOutModal
+        visible={isSoldOutModalVisible}
+        onClose={() => setIsSoldOutModalVisible(false)}
+        details={soldOutDetails}
+        lockDurationSeconds={LOCK_DURATION_SECONDS}
+      />
 
       {/* 預售日期提醒弹窗（火车票式：提示何时開售） */}
-      <Modal
-        title={
-          <Space>
-            <span style={{ fontSize: 18 }}>⏳</span>
-            <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
-          </Space>
-        }
-        open={!!presaleInfo}
-        onCancel={() => setPresaleInfo(null)}
-        footer={[
-          <Button key="ok" type="primary" onClick={() => setPresaleInfo(null)} style={{ minWidth: 100 }}>
-            {t('gotIt')}
-          </Button>,
-        ]}
-        width={420}
-      >
-        {presaleInfo && (
-          <div style={{ padding: '8px 0' }}>
-            <div style={{
-              background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
-              padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{presaleInfo.openTime}</span>
-            </div>
-            <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
-              {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
-            </p>
-          </div>
-        )}
-      </Modal>
+      <PresaleInfoModal
+        info={presaleInfo}
+        onClose={() => setPresaleInfo(null)}
+      />
     </div>
   )
 }

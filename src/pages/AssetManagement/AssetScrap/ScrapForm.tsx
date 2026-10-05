@@ -17,9 +17,16 @@ import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
 import DetailPageHeader from '../../../components/DetailPageHeader'
 import BrandTag from '../../../components/BrandTag'
-import { fetchAssetDetail, fetchAssetList, createScrapRecord, fetchRepairApplicantOptions, type AssetItem, type AssetStatus, type RepairApplicantOption } from '../../../api/asset'
+import { fetchAssetDetail, createScrapRecord, fetchRepairApplicantOptions, type AssetItem, type RepairApplicantOption } from '../../../api/asset'
 import AssetParameters from '../../../components/AssetParameters'
 import type { OptionItem } from '../../../api/types'
+import {
+  ASSET_STATUS_COLOR,
+  detailCardStyle,
+  SectionTitle,
+  getAssetStatusLabel,
+  useAssetSearch,
+} from '../components/shared'
 
 interface Props {
   /** 從資產台賬跳轉時傳入（form 模式） */
@@ -45,49 +52,38 @@ const DISPOSE_OPTIONS = [
   { label: '銷毀', value: 'destroy' },
 ]
 
-/** 資產狀態 → 標籤顏色 */
-const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {
-  idle: 'default', in_use: 'success', in_repair: 'processing', scrapped: 'error',
-  lost: 'warning', pending_inspection: 'blue', pending_disposal: 'orange', written_off: 'default',
-}
-
 /** 格式化員工顯示：姓名（工號） */
 const formatEmployee = (emp: RepairApplicantOption) => emp.empNo
   ? `${emp.empName}（${emp.empNo}）`
   : emp.empName
 
-/** 模块卡片统一样式 */
-const detailCardStyle: React.CSSProperties = {
-  borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-}
-
-/** 卡片标题 */
-function SectionTitle({ icon, iconBg, title, tag }: { icon: React.ReactNode; iconBg: string; title: string; tag?: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {icon}
-      </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
-      {tag}
-      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-    </div>
-  )
-}
-
 export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
   const [submitting, setSubmitting] = useState(false)
-  const [asset, setAsset] = useState<AssetItem | null>(null)
-  const [assetLoading, setAssetLoading] = useState(false)
 
   /* ----- create 模式：Select 下拉选资产 ----- */
   const isCreateMode = !propAssetId
-  const [assetSelectOptions, setAssetSelectOptions] = useState<AssetItem[]>([])
-  const [assetSelectLoading, setAssetSelectLoading] = useState(false)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  const {
+    asset, setAsset, assetLoading,
+    assetSelectOptions, assetSelectLoading,
+    loadAsset, loadInitialAssets, handleAssetSearch, handleAssetSelect: baseAssetSelect,
+  } = useAssetSearch()
+
+  /** 下拉选择资产（ScrapForm 版本：需重置表单） */
+  const handleAssetSelect = useCallback(async (selectedAssetId: number | undefined) => {
+    if (!selectedAssetId) {
+      setAsset(null)
+      form.resetFields()
+      return
+    }
+    await baseAssetSelect(selectedAssetId)
+    form.setFieldsValue({ residualValue: 0 })
+    if (asset?.status === 'scrapped') {
+      message.warning('該資產已報廢')
+    }
+  }, [form, baseAssetSelect, asset])
 
   /* ----- 经办人下拉搜索 ----- */
   const [handlerOptions, setHandlerOptions] = useState<OptionItem[]>([])
@@ -126,72 +122,23 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
   }, [loadInitialHandlers])
 
   /** 加载初始资产列表 */
-  const loadInitialAssets = useCallback(async () => {
-    if (assetSelectOptions.length > 0) return
-    setAssetSelectLoading(true)
-    try {
-      const res = await fetchAssetList({ status: 'all', page: 1, size: 50 })
-      setAssetSelectOptions(res.records.filter((a) => a.status !== 'scrapped'))
-    } catch {
-      setAssetSelectOptions([])
-    } finally {
-      setAssetSelectLoading(false)
-    }
-  }, [assetSelectOptions.length])
-
-  /** 资产远程搜索（300ms 防抖） */
-  const handleAssetSearch = useCallback((keyword: string) => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    if (!keyword) { loadInitialAssets(); return }
-    searchTimerRef.current = setTimeout(async () => {
-      setAssetSelectLoading(true)
-      try {
-        const res = await fetchAssetList({ keyword, status: 'all', page: 1, size: 50 })
-        setAssetSelectOptions(res.records.filter((a) => a.status !== 'scrapped'))
-      } catch {
-        setAssetSelectOptions([])
-      } finally {
-        setAssetSelectLoading(false)
-      }
-    }, 300)
+  const loadInitialAssetsWrapper = useCallback(async () => {
+    await loadInitialAssets()
   }, [loadInitialAssets])
 
-  /** 下拉选择资产 */
-  const handleAssetSelect = useCallback(async (selectedAssetId: number | undefined) => {
-    if (!selectedAssetId) {
-      setAsset(null)
-      form.resetFields()
-      return
-    }
-    setAssetLoading(true)
-    try {
-      const detail = await fetchAssetDetail(selectedAssetId)
-      setAsset(detail)
-      form.setFieldsValue({ residualValue: 0 })
-      if (detail.status === 'scrapped') {
-        message.warning('該資產已報廢')
-      }
-    } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : t('asset.queryFailed'))
-    } finally {
-      setAssetLoading(false)
-    }
-  }, [form, t])
+  /** 资产远程搜索（300ms 防抖） */
+  const handleAssetSearchWrapper = useCallback((keyword: string) => {
+    handleAssetSearch(keyword)
+  }, [handleAssetSearch])
 
   /** form 模式：从 propAssetId 加载资产 */
   useEffect(() => {
     if (!isCreateMode && propAssetId) {
-      setAssetLoading(true)
-      fetchAssetDetail(propAssetId).then((data) => {
-        setAsset(data)
+      loadAsset(propAssetId).then(() => {
         form.setFieldsValue({ residualValue: 0 })
-        if (data.status === 'scrapped') {
-          message.warning('該資產已報廢')
-        }
-      }).catch((err: Error) => message.error(err.message))
-        .finally(() => setAssetLoading(false))
+      })
     }
-  }, [isCreateMode, propAssetId, form])
+  }, [isCreateMode, propAssetId, form, loadAsset])
 
   const handleSubmit = async () => {
     if (!asset) return
@@ -251,9 +198,7 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
             icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
             iconBg="#e6f7ff"
             title="資產信息"
-            tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{
-              asset.status === 'idle' ? '閒置' : asset.status === 'in_use' ? '使用中' : asset.status === 'in_repair' ? '維修中' : asset.status === 'scrapped' ? '已報廢' : asset.status === 'lost' ? '遺失' : asset.status === 'pending_inspection' ? '待驗收' : '已核銷'
-            }</Tag> : undefined}
+            tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{getAssetStatusLabel(asset.status)}</Tag> : undefined}
           />
 
           {isCreateMode && (
@@ -267,8 +212,8 @@ export default function ScrapForm({ assetId: propAssetId, onBack, onCreated }: P
                 allowClear
                 showSearch
                 filterOption={false}
-                onSearch={handleAssetSearch}
-                onFocus={loadInitialAssets}
+                onSearch={handleAssetSearchWrapper}
+                onFocus={loadInitialAssetsWrapper}
                 onChange={handleAssetSelect}
                 loading={assetSelectLoading}
                 value={asset?.id}

@@ -1,12 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button, DatePicker, Form, Select, Space, Table, message, Modal } from 'antd'
 import dayjs from 'dayjs'
-import type { TableColumnsType, TablePaginationConfig } from 'antd'
+import type { TableColumnsType } from 'antd'
+import { handleTableChangeFactory, renderTimestamp, renderValOrDash, SearchFormActions, ListActionSection, createPagination } from './components/shared'
 import {
-  SearchOutlined,
-  ReloadOutlined,
-  PlusOutlined,
-  ExportOutlined,
 } from '@ant-design/icons'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -206,10 +203,7 @@ export default function StoreList() {
     message.success(t('common:exportSuccess'))
   }
 
-  const handleTableChange = (pagination: TablePaginationConfig) => {
-    setPage(pagination.current || 1)
-    setSize(pagination.pageSize || 10)
-  }
+  const handleTableChange = handleTableChangeFactory(setPage, setSize)
 
   const handleSelectChange = (keys: React.Key[], rows: StoreItem[]) => {
     setSelectedRowKeys(keys)
@@ -281,7 +275,7 @@ export default function StoreList() {
       key: 'address',
       width: 240,
       ellipsis: true,
-      render: (val: string) => val || '-',
+      render: renderValOrDash,
     },
     {
       title: t('colBindBd'),
@@ -298,21 +292,21 @@ export default function StoreList() {
       dataIndex: 'updatedBy',
       key: 'updatedBy',
       width: 120,
-      render: (val: string) => val || '-',
+      render: renderValOrDash,
     },
     {
       title: t('colUpdatedAt'),
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
-      render: (val: number) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
+      render: renderTimestamp,
     },
     {
       title: t('colCreatedAt'),
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 180,
-      render: (val: number) => val ? dayjs(val).format('YYYY-MM-DD HH:mm:ss') : '-',
+      render: renderTimestamp,
     },
     {
       title: t('common:action'),
@@ -385,32 +379,17 @@ export default function StoreList() {
             <RangePicker format="YYYY-MM-DD" placeholder={[t('common:startDate'), t('common:endDate')]} allowClear />
           </Form.Item>
           <Form.Item>
-            <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                {t('common:search')}
-              </Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                {t('common:reset')}
-              </Button>
-            </div>
+            <SearchFormActions onSearch={handleSearch} onReset={handleReset} />
           </Form.Item>
         </Form>
       </div>
 
       {/* 操作區 */}
-      <div className="action-section">
-        <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>
-            {t('common:export')}
-          </Button>
-        </div>
-        <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            {t('common:add')}
-          </Button>
-          {configComponent}
-        </div>
-      </div>
+      <ListActionSection
+        onExport={handleExport}
+        onAdd={handleAdd}
+        configComponent={configComponent}
+      />
 
       {/* 表格 */}
       <Table
@@ -425,14 +404,7 @@ export default function StoreList() {
           columnWidth: 40,
           fixed: true,
         }}
-        pagination={{
-          current: page,
-          pageSize: size,
-          total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (total) => t('common:total', { count: total }),
-        }}
+        pagination={createPagination(t, page, size, total)}
         scroll={{ x: 1600 }}
       />
 

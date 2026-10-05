@@ -27,6 +27,14 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 资产台账读写实现，契约与各项业务约束见 {@link EamAssetService}。create/update/delete 带事务；资产编号生成与唯一性兜底（捕获 DuplicateKeyException）在本类内完成。
+ * <p>
+ * 事务边界：create, update, delete 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：EamAssetMapper, EamInboundBatchMapper, BizSeqService, JdbcTemplate。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

@@ -320,22 +320,27 @@ export function fetchConsumableItemOptions() {
   return request.get<unknown, ConsumableItem[]>('/eam/consumables/items/options')
 }
 
+/** 查询：GET /eam/consumables/items/{id} */
 export function fetchConsumableItemDetail(id: number) {
   return request.get<unknown, ConsumableItem>(`/eam/consumables/items/${id}`)
 }
 
+/** 新增：POST /eam/consumables/items */
 export function createConsumableItem(data: ConsumableItemSave) {
   return request.post<unknown, number>('/eam/consumables/items', data)
 }
 
+/** 修改：PUT /eam/consumables/items/{id} */
 export function updateConsumableItem(id: number, data: ConsumableItemSave) {
   return request.put<unknown, void>(`/eam/consumables/items/${id}`, data)
 }
 
+/** 切换状态：PUT /eam/consumables/items/{id}/status */
 export function toggleConsumableItemStatus(id: number, status: 'enabled' | 'disabled') {
   return request.put<unknown, void>(`/eam/consumables/items/${id}/status`, { status })
 }
 
+/** 删除：DELETE /eam/consumables/items/{id} */
 export function deleteConsumableItem(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/items/${id}`)
 }
@@ -353,10 +358,12 @@ export function fetchConsumableStock(params?: {
   return request.get<unknown, ConsumableStock[]>('/eam/consumables/stock', { params })
 }
 
+/** 调用：POST /eam/consumables/inbound */
 export function inboundConsumable(data: ConsumableInbound) {
   return request.post<unknown, void>('/eam/consumables/inbound', data)
 }
 
+/** 查询：GET /eam/consumables/txns */
 export function fetchConsumableTxns(params?: { itemId?: number; locationId?: number; limit?: number }) {
   return request.get<unknown, ConsumableTxn[]>('/eam/consumables/txns', { params })
 }
@@ -383,6 +390,7 @@ export interface ConsumableTxnStats {
   netQty: number
 }
 
+/** 查询：GET /eam/consumables/txns/stats */
 export function fetchConsumableTxnStats(params?: {
   itemCode?: string
   itemName?: string
@@ -412,14 +420,17 @@ export function fetchConsumableClaims(params?: {
   return request.get<unknown, PageResult<ConsumableClaim>>('/eam/consumables/claims', { params })
 }
 
+/** 查询：GET /eam/consumables/claims/{id} */
 export function fetchConsumableClaimDetail(id: number) {
   return request.get<unknown, ConsumableClaim>(`/eam/consumables/claims/${id}`)
 }
 
+/** 查询：GET /eam/consumables/claims/my */
 export function fetchMyConsumableClaims(params?: { page?: number; size?: number; status?: string }) {
   return request.get<unknown, PageResult<ConsumableClaim>>('/eam/consumables/claims/my', { params })
 }
 
+/** 查询：GET /eam/consumables/claims/my/{id} */
 export function fetchMyConsumableClaimDetail(id: number) {
   return request.get<unknown, ConsumableClaim>(`/eam/consumables/claims/my/${id}`)
 }
@@ -437,18 +448,22 @@ export function fetchMyConsumableClaimStats(): Promise<ConsumableClaimStats> {
   return request.get<unknown, ConsumableClaimStats>('/eam/consumables/claims/my/stats', { headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 提交：POST /eam/consumables/claims/my */
 export function submitConsumableClaim(data: ConsumableClaimSave) {
   return request.post<unknown, number>('/eam/consumables/claims/my', data)
 }
 
+/** 审批：POST /eam/consumables/claims/approve */
 export function approveConsumableClaim(data: { claimId: number; pass: boolean; remark?: string }) {
   return request.post<unknown, void>('/eam/consumables/claims/approve', data)
 }
 
+/** 发放：POST /eam/consumables/claims/{id}/issue */
 export function issueConsumableClaim(id: number) {
   return request.post<unknown, void>(`/eam/consumables/claims/${id}/issue`)
 }
 
+/** 取消：POST /eam/consumables/claims/{id}/cancel */
 export function cancelConsumableClaim(id: number, reason?: string) {
   return request.post<unknown, void>(`/eam/consumables/claims/${id}/cancel`, { reason })
 }
@@ -465,18 +480,22 @@ export function fetchConsumableCategoryOptions() {
   return request.get<unknown, ConsumableCategory[]>('/eam/consumables/basic/categories/options')
 }
 
+/** 新增：POST /eam/consumables/basic/categories */
 export function createConsumableCategory(data: Partial<ConsumableCategory>) {
   return request.post<unknown, number>('/eam/consumables/basic/categories', data)
 }
 
+/** 修改：PUT /eam/consumables/basic/categories/{id} */
 export function updateConsumableCategory(id: number, data: Partial<ConsumableCategory>) {
   return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}`, data)
 }
 
+/** 删除：DELETE /eam/consumables/basic/categories/{id} */
 export function deleteConsumableCategory(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/basic/categories/${id}`)
 }
 
+/** 切换状态：PUT /eam/consumables/basic/categories/{id}/status */
 export function toggleConsumableCategoryStatus(id: number) {
   return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}/status`)
 }
@@ -491,22 +510,27 @@ export function fetchConsumableBrandOptions() {
   return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands/options')
 }
 
+/** 新增：POST /eam/consumables/basic/brands */
 export function createConsumableBrand(data: Partial<ConsumableBrand>) {
   return request.post<unknown, number>('/eam/consumables/basic/brands', data)
 }
 
+/** 修改：PUT /eam/consumables/basic/brands/{id} */
 export function updateConsumableBrand(id: number, data: Partial<ConsumableBrand>) {
   return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}`, data)
 }
 
+/** 删除：DELETE /eam/consumables/basic/brands/{id} */
 export function deleteConsumableBrand(id: number) {
   return request.delete<unknown, void>(`/eam/consumables/basic/brands/${id}`)
 }
 
+/** 查询：GET /eam/consumables/basic/brands/{id} */
 export function fetchConsumableBrandDetail(id: number) {
   return request.get<unknown, ConsumableBrand>(`/eam/consumables/basic/brands/${id}`)
 }
 
+/** 切换状态：PUT /eam/consumables/basic/brands/{id}/status */
 export function toggleConsumableBrandStatus(id: number) {
   return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}/status`)
 }
@@ -550,6 +574,7 @@ export interface ConsumableReturnSave {
   reason?: string
 }
 
+/** 查询：GET /eam/consumables/returns */
 export function fetchConsumableReturns(params?: {
   page?: number; size?: number; itemCode?: string; itemName?: string
   returnNo?: string; applicantName?: string; startTime?: string; endTime?: string
@@ -557,6 +582,7 @@ export function fetchConsumableReturns(params?: {
   return request.get<unknown, PageResult<ConsumableReturn>>('/eam/consumables/returns', { params })
 }
 
+/** 新增：POST /eam/consumables/returns */
 export function createConsumableReturn(data: ConsumableReturnSave) {
   return request.post<unknown, number>('/eam/consumables/returns', data)
 }
@@ -593,6 +619,7 @@ export interface ConsumableAdjustSave {
   reason?: string
 }
 
+/** 查询：GET /eam/consumables/adjusts */
 export function fetchConsumableAdjusts(params?: {
   page?: number; size?: number; itemCode?: string; itemName?: string
   adjustNo?: string; direction?: string; startTime?: string; endTime?: string
@@ -600,6 +627,7 @@ export function fetchConsumableAdjusts(params?: {
   return request.get<unknown, PageResult<ConsumableAdjust>>('/eam/consumables/adjusts', { params })
 }
 
+/** 新增：POST /eam/consumables/adjusts */
 export function createConsumableAdjust(data: ConsumableAdjustSave) {
   return request.post<unknown, number>('/eam/consumables/adjusts', data)
 }
@@ -634,6 +662,7 @@ export interface ConsumableTransferSave {
   qty: number
 }
 
+/** 查询：GET /eam/consumables/transfers */
 export function fetchConsumableTransfers(params?: {
   page?: number; size?: number; itemCode?: string; itemName?: string
   transferNo?: string; startTime?: string; endTime?: string
@@ -641,6 +670,7 @@ export function fetchConsumableTransfers(params?: {
   return request.get<unknown, PageResult<ConsumableTransfer>>('/eam/consumables/transfers', { params })
 }
 
+/** 新增：POST /eam/consumables/transfers */
 export function createConsumableTransfer(data: ConsumableTransferSave) {
   return request.post<unknown, number>('/eam/consumables/transfers', data)
 }
@@ -697,6 +727,7 @@ export interface ConsumableInboundOrderSave {
   items: { itemId: number; locationId?: number; qty: number; unitPrice: number }[]
 }
 
+/** 查询：GET /eam/consumables/inbound-orders */
 export function fetchConsumableInboundOrders(params?: {
   page?: number; size?: number; inboundNo?: string; inboundType?: string
   companyBrand?: number; purchaseCompanyId?: number; startTime?: string; endTime?: string
@@ -704,10 +735,12 @@ export function fetchConsumableInboundOrders(params?: {
   return request.get<unknown, PageResult<ConsumableInboundOrder>>('/eam/consumables/inbound-orders', { params })
 }
 
+/** 查询：GET /eam/consumables/inbound-orders/{id} */
 export function fetchConsumableInboundOrderDetail(id: number) {
   return request.get<unknown, ConsumableInboundOrder>(`/eam/consumables/inbound-orders/${id}`)
 }
 
+/** 新增：POST /eam/consumables/inbound-orders */
 export function createConsumableInboundOrder(data: ConsumableInboundOrderSave) {
   return request.post<unknown, number>('/eam/consumables/inbound-orders', data)
 }
@@ -793,22 +826,27 @@ export interface ConsumableItemStat {
   stockAmount: number
 }
 
+/** 查询：GET /eam/consumables/report/summary */
 export function fetchConsumableReportSummary(params?: ConsumableReportQuery) {
   return request.get<unknown, ConsumableReportSummary>('/eam/consumables/report/summary', { params })
 }
 
+/** 查询：GET /eam/consumables/report/by-company */
 export function fetchConsumableReportByCompany(params?: ConsumableReportQuery) {
   return request.get<unknown, ConsumableCompanyStat[]>('/eam/consumables/report/by-company', { params })
 }
 
+/** 查询：GET /eam/consumables/report/by-dept */
 export function fetchConsumableReportByDept(params?: ConsumableReportQuery) {
   return request.get<unknown, ConsumableDeptStat[]>('/eam/consumables/report/by-dept', { params })
 }
 
+/** 查询：GET /eam/consumables/report/by-applicant */
 export function fetchConsumableReportByApplicant(params?: ConsumableReportQuery) {
   return request.get<unknown, ConsumableApplicantStat[]>('/eam/consumables/report/by-applicant', { params })
 }
 
+/** 查询：GET /eam/consumables/report/by-item */
 export function fetchConsumableReportByItem(params?: ConsumableReportQuery) {
   return request.get<unknown, ConsumableItemStat[]>('/eam/consumables/report/by-item', { params })
 }

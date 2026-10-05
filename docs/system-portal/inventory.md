@@ -19,6 +19,7 @@
 | `ai` | AI 管理系統 | AI Hub | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
 | `hr` | HR 系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
 | `eam` | 物資管理系統 | EAM | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
+| `rdm` | 產研協同系統 | R&D Collaboration | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
 | `oa` | OA 系統 | OA | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
 | `iam` | 權限中心 | IAM | `SafetyCertificateOutlined` | 90 | 角色、功能授权、数据授权、菜单配置、账号安全 |
 | `platform` | 平台配置 | Platform | `SettingOutlined` | 100 | 通知、多语言、规则、版本、翻译工作台 |
@@ -50,6 +51,10 @@
 | `group-purchase` | 團購管理 | `ads` | 团购/秒杀归 ads（广告与推广） |
 | `hr` | 集團人事(HR) | `hr` |  |
 | `asset-management` | 物資管理 | `eam` |  |
+| `rdm-dashboard` … `rdm-acceptance` | 需求總看板 / 需求工作台 / 提交需求 / 需求台賬 / 需求池·分配 / 產品需求處理 / 研發交付 / 需求驗收 | `rdm` | 8 个一级菜单，sort 16..23：顶部先给管理者看结果，其余按需求生命周期动线排列；其中「需求總看板」与「研發交付」已升为分组。由 `RdmMenuInitializer` 种子创建（v3.3 看板升分组，v3.2 研发交付升分组，v3.0 分类调整，v2.0 已拍平，旧 `rdm-center` 已软删退役） |
+| `rdm-delivery` 及其子菜单 | 研發交付 | `rdm` | 一级**分组**（type=1、无 path），下挂三个二级菜单：`rdm-delivery-board`（交付工作台，/rdm-delivery）、`rdm-delivery-iteration`（迭代排期，/rdm-iteration）、`rdm-delivery-req`（交付中需求，/rdm-delivery-req）。非菜单子页：`/rdm-task`→board，`/rdm-iteration-form`→iteration，`/rdm-prd`与`/rdm-review`→`rdm-product`，`/rdm-change`→`rdm-requirement`。菜单 key 变更时由 v3.2 迁移把旧 `rdm-delivery` 上的 `sys_role_menu`/`sys_department_menu` 以 INSERT IGNORE 继承到子菜单（否则非超管升级当日点开为空） |
+| `rdm-dashboard` 及其子菜单 | 需求總看板 | `rdm` | 一级**分组**（type=1、无 path），下挂六个二级菜单：`rdm-dashboard-board`（交付看板）、`rdm-dashboard-quality`（質量口徑）、`rdm-dashboard-version`（版本追溯）、`rdm-dashboard-report`（交付週報）、`rdm-dashboard-score`（產出積分，v3.4）、`rdm-dashboard-trend`（效能量趨勢，v3.4）。看板类接口（/analytics/*、/score/*）按子菜单 key 鉴权，不挂分组 key |
+| `rdm-config-group` | 需求配置 | `rdm` | 一级分组（sort 24），下挂四个二级菜单：`rdm-config-status`/`rdm-config-routing`/`rdm-config-sla`/`rdm-config-score`（積分規則，v3.4 新增，采 VIEW_EDIT：配规则等于改所有人的分） |
 | `oa-center` | OA中心 | `oa` |  |
 | `permission` | 權限管理 | `iam` |  |
 | `system-config` | 系統配置 | `platform` |  |

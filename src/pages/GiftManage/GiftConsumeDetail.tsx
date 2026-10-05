@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Button, Space, Input, Select, Table, Form, message, Tag, DatePicker, Tooltip } from 'antd'
-import type { TableColumnsType, TablePaginationConfig } from 'antd'
+import { Button, Space, Input, Select, Table, Form, message, DatePicker, Tooltip } from 'antd'
+import type { TableColumnsType } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
 import {
   SearchOutlined,
   ReloadOutlined,
@@ -14,28 +12,19 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import type { GiftConsumeItem } from '../../api/gift'
 import { fetchGiftConsume } from '../../api/gift'
-import type { MerchantGroupItem } from '../../api/merchantGroup'
-import { fetchAllMerchantGroups } from '../../api/merchantGroup'
-import type { StoreItem } from '../../api/store'
-import { fetchStoresByGroup } from '../../api/store'
 import dayjs from 'dayjs'
+import {
+  createAdTypeOptions, createAdTypeMap,
+  createTradeTypeOptions, createTradeTypeMap,
+  brandOptions,
+  useGroupStoreSearch,
+  createHandleTableChange, createHandleExport,
+  renderGroupInfoColumn, renderStoreInfoColumn, renderBrandColumn,
+  renderAdTypeColumn, renderTradeTypeColumn, renderRemainingDaysColumn,
+} from './components/shared'
+import GiftSearchFields from './components/GiftSearchFields'
 
 const { RangePicker } = DatePicker
-
-const adTypeColorMap: Record<string, string> = {
-  new_store: '#52C41A',
-  revival: '#E8720C',
-  exclusive: '#722ED1',
-  gold: '#FAAD14',
-  popular_merchant: '#1890FF',
-}
-
-const tradeTypeColorMap: Record<string, string> = {
-  ad_purchase: 'orange',
-  ad_refund: 'green',
-  manual_deduct: 'red',
-  auto_expire: 'default',
-}
 
 export default function GiftConsumeDetail() {
   // 菜单权限：gift-consume-detail
@@ -44,38 +33,12 @@ export default function GiftConsumeDetail() {
   const [form] = Form.useForm()
 
   /** 廣告類型 */
-  const adTypeOptions = [
-    { label: t('common:all'), value: '' },
-    { label: t('adTypeNewStore'), value: 'new_store' },
-    { label: t('adTypeRevival'), value: 'revival' },
-    { label: t('adTypeExclusive'), value: 'exclusive' },
-    { label: t('adTypeGold'), value: 'gold' },
-    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
-  ]
-
-  const adTypeMap: Record<string, string> = {
-    new_store: t('adTypeNewStore'),
-    revival: t('adTypeRevival'),
-    exclusive: t('adTypeExclusive'),
-    gold: t('adTypeGold'),
-    popular_merchant: t('adTypePopularMerchant'),
-  }
+  const adTypeOptions = createAdTypeOptions(t)
+  const adTypeMap = createAdTypeMap(t)
 
   /** 交易類型 */
-  const tradeTypeOptions = [
-    { label: t('common:all'), value: '' },
-    { label: t('tradeTypePurchase'), value: 'ad_purchase' },
-    { label: t('tradeTypeRefund'), value: 'ad_refund' },
-    { label: t('tradeTypeDeduct'), value: 'manual_deduct' },
-    { label: t('tradeTypeExpire'), value: 'auto_expire' },
-  ]
-
-  const tradeTypeMap: Record<string, string> = {
-    ad_purchase: t('tradeTypePurchase'),
-    ad_refund: t('tradeTypeRefund'),
-    manual_deduct: t('tradeTypeDeduct'),
-    auto_expire: t('tradeTypeExpire'),
-  }
+  const tradeTypeOptions = createTradeTypeOptions(t)
+  const tradeTypeMap = createTradeTypeMap(t)
   const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [dataSource, setDataSource] = useState<GiftConsumeItem[]>([])
@@ -95,8 +58,6 @@ export default function GiftConsumeDetail() {
   }>({})
 
   // 搜索条件（表单暂存）
-  const [searchGroupId, setSearchGroupId] = useState<number | undefined>()
-  const [searchStoreId, setSearchStoreId] = useState<number | undefined>()
   const [searchBrand, setSearchBrand] = useState('')
   const [searchAdType, setSearchAdType] = useState('')
   const [searchTradeType, setSearchTradeType] = useState('')
@@ -105,28 +66,12 @@ export default function GiftConsumeDetail() {
   const [searchAlgorithmId, setSearchAlgorithmId] = useState('')
   const [searchDateRange, setSearchDateRange] = useState<[string, string] | null>(null)
 
-  // 集团/门店下拉
-  const [groups, setGroups] = useState<MerchantGroupItem[]>([])
-  const [stores, setStores] = useState<StoreItem[]>([])
-
-  // 加载集团下拉
-  useEffect(() => {
-    fetchAllMerchantGroups()
-      .then(setGroups)
-      .catch(() => {})
-  }, [])
-
-  // 当搜索集团变化时加载门店下拉
-  useEffect(() => {
-    if (searchGroupId) {
-      fetchStoresByGroup(searchGroupId)
-        .then(setStores)
-        .catch(() => setStores([]))
-    } else {
-      setStores([])
-    }
-    setSearchStoreId(undefined)
-  }, [searchGroupId])
+  // 集团/门店级联搜索
+  const {
+    searchGroupId, setSearchGroupId,
+    searchStoreId, setSearchStoreId,
+    groups, stores,
+  } = useGroupStoreSearch()
 
   /** 从贈送明細頁點擊「查看明細」進入時，自動帶入贈送ID */
   useEffect(() => {
@@ -188,14 +133,8 @@ export default function GiftConsumeDetail() {
     setPage(1)
   }
 
-  const handleExport = () => {
-    message.success(t('common:exportDev'))
-  }
-
-  const handleTableChange = (pagination: TablePaginationConfig) => {
-    setPage(pagination.current || 1)
-    setSize(pagination.pageSize || 10)
-  }
+  const handleExport = createHandleExport(t)
+  const handleTableChange = createHandleTableChange(setPage, setSize)
 
   const handleSelectChange = (keys: React.Key[], rows: GiftConsumeItem[]) => {
     setSelectedRowKeys(keys)
@@ -207,59 +146,34 @@ export default function GiftConsumeDetail() {
       title: t('colGroupInfo'),
       key: 'groupInfo',
       width: 160,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupCode || record.groupId}</span>
-          <span>{record.groupName}</span>
-        </Space>
-      ),
+      render: (_, record) => renderGroupInfoColumn(record.groupCode, record.groupId, record.groupName),
     },
     {
       title: t('colStoreInfo'),
       key: 'storeInfo',
       width: 160,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeCode || record.storeId}</span>
-          <span>{record.storeName}</span>
-        </Space>
-      ),
+      render: (_, record) => renderStoreInfoColumn(record.storeCode, record.storeId, record.storeName),
     },
     {
       title: t('common:brand'),
       dataIndex: 'brand',
       key: 'brand',
       width: 100,
-      render: (brand: string) => <BrandTag value={brand} />,
+      render: (brand: string) => renderBrandColumn(brand),
     },
     {
       title: t('colAdType'),
       dataIndex: 'adType',
       key: 'adType',
       width: 110,
-      render: (adType: string) => (
-        <Tag style={{
-          background: `${adTypeColorMap[adType] || '#E8720C'}15`,
-          color: adTypeColorMap[adType] || '#E8720C',
-          border: `1px solid ${adTypeColorMap[adType] || '#E8720C'}40`,
-          fontSize: 12,
-          padding: '1px 8px',
-          borderRadius: 4,
-        }}>
-          {adTypeMap[adType] || adType}
-        </Tag>
-      ),
+      render: (adType: string) => renderAdTypeColumn(adType, adTypeMap),
     },
     {
       title: t('colTradeType'),
       dataIndex: 'tradeType',
       key: 'tradeType',
       width: 120,
-      render: (type: string) => (
-        <Tag color={tradeTypeColorMap[type] || 'default'}>
-          {tradeTypeMap[type] || type}
-        </Tag>
-      ),
+      render: (type: string) => renderTradeTypeColumn(type, tradeTypeMap),
     },
     {
       title: t('colBalanceChange'),
@@ -321,11 +235,7 @@ export default function GiftConsumeDetail() {
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
-      render: (days: number) => (
-        <span style={{ color: days > 0 ? '#52C41A' : '#8C8C8C', fontWeight: days > 0 ? 600 : 400 }}>
-          {days} {t('dayUnit')}
-        </span>
-      ),
+      render: (days: number) => renderRemainingDaysColumn(days, t),
     },
     {
       title: t('colRemark'),
@@ -366,57 +276,15 @@ export default function GiftConsumeDetail() {
       {/* 搜索區域 */}
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
-          <Form.Item name="groupInfo" label={t('searchGroupIdName')}>
-            <Select
-              placeholder={t('searchGroupIdPlaceholder')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={searchGroupId}
-              onChange={setSearchGroupId}
-              options={groups.map(g => ({
-                label: `${g.groupCode} - ${g.groupName}`,
-                value: g.id,
-              }))}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="storeInfo" label={t('searchStoreIdName')}>
-            <Select
-              placeholder={t('searchStoreIdPlaceholder')}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={searchStoreId}
-              onChange={setSearchStoreId}
-              disabled={!searchGroupId}
-              options={stores.map(s => ({
-                label: `${s.storeCode} - ${s.storeName}`,
-                value: s.id,
-              }))}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="brand" label={t('common:brand')}>
-            <Select
-              placeholder={t('common:all')}
-              allowClear
-              options={brandOptions}
-              value={searchBrand || undefined}
-              onChange={(v) => setSearchBrand(v || '')}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
-          <Form.Item name="adType" label={t('colAdType')}>
-            <Select
-              placeholder={t('common:all')}
-              allowClear
-              options={adTypeOptions}
-              value={searchAdType || undefined}
-              onChange={(v) => setSearchAdType(v || '')}
-              style={{ width: '100%' }}
-            />
-          </Form.Item>
+          <GiftSearchFields
+            searchGroupId={searchGroupId} setSearchGroupId={setSearchGroupId}
+            searchStoreId={searchStoreId} setSearchStoreId={setSearchStoreId}
+            groups={groups} stores={stores}
+            searchBrand={searchBrand} setSearchBrand={setSearchBrand}
+            brandOptions={brandOptions}
+            searchAdType={searchAdType} setSearchAdType={setSearchAdType}
+            adTypeOptions={adTypeOptions}
+          />
           <Form.Item name="tradeType" label={t('colTradeType')}>
             <Select
               placeholder={t('common:all')}

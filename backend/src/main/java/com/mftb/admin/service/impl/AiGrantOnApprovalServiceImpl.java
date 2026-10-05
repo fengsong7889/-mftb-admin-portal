@@ -25,6 +25,14 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 审批通过后兑现 AI 授权的实现，契约见 {@link AiGrantOnApprovalService}。整个 grant 在单事务内完成，靠 ai_grant_log 的 flow_no 唯一约束做幂等。
+ * <p>
+ * 事务边界：grant 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
+ * <p>
+ * 协作依赖：SysUserMapper, AiEmployeeAuthMapper, AiQuotaOverrideMapper, AiGrantLogMapper。
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

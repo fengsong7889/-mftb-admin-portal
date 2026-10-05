@@ -261,6 +261,8 @@
 .portal-card-artwork[data-scene='merchant'] .portal-art-motion,
 .portal-card-artwork[data-scene='merchantWorkbench'] .portal-art-motion,
 .portal-card-artwork[data-scene='platform'] .portal-art-motion { animation-duration: 8s; }
+.portal-card-artwork[data-scene='rdm'] .portal-art-motion { animation-duration: 12s; }
+.portal-card-artwork[data-scene='rdm'] .portal-art-flow { animation-duration: 3s; }
 
 .portal-card-artwork .portal-art-typing {
   transform-box: fill-box;
@@ -391,6 +393,32 @@
 .portal-card-artwork .portal-config-packet { animation-name: portalConfigPacket; }
 .portal-card-artwork .portal-config-published { animation-name: portalConfigPublished; }
 .portal-card-artwork .portal-config-gear { animation-name: portalConfigGear; transform-origin: 0 0; }
+
+/* 需求流水线：光环跳站、轨道铺开与站点点亮共用同一节拍，末站盖验收章并火箭上线。 */
+.portal-card-artwork .portal-rdm-halo {
+  animation-name: portalRdmHalo;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+.portal-card-artwork[data-scene='rdm'] .portal-rdm-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalRdmPulse;
+  animation-duration: 2.4s;
+  animation-timing-function: ease-in-out;
+}
+.portal-card-artwork .portal-rdm-launch { animation-name: portalRdmLaunch; }
+.portal-card-artwork .portal-rdm-track {
+  stroke-dasharray: 1;
+  animation-name: portalRdmTrack;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.portal-card-artwork .portal-rdm-stage-0 { animation-name: portalRdmStageFirst; }
+.portal-card-artwork .portal-rdm-stage-1 { animation-name: portalRdmStageSecond; }
+.portal-card-artwork .portal-rdm-stage-2 { animation-name: portalRdmStageThird; }
+.portal-card-artwork .portal-rdm-stage-3 { animation-name: portalRdmStageFourth; }
+.portal-card-artwork .portal-rdm-stage-4 { animation-name: portalRdmStageFifth; }
+.portal-card-artwork .portal-rdm-stage-5 { animation-name: portalRdmStageSixth; }
+.portal-card-artwork .portal-rdm-delivered { animation-name: portalRdmDelivered; }
 
 /* 默认及移出时撤销动画并恢复完整静态构图，再移入从头播放。 */
 .portal-card-artwork[data-motion='idle'] .portal-art-motion,

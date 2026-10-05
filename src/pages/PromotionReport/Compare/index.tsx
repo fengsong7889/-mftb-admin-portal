@@ -18,6 +18,7 @@ import {
   REPORT_REGION_LABEL,
   REPORT_RECOMMEND_TYPE_COLOR,
 } from '../types'
+import { ReportFilterSelect } from '../shared'
 import { mockRecommendTypeCompare, mockDailyTrends } from '../mockData'
 import '../index.css'
 
@@ -272,46 +273,28 @@ export default function PromotionReportCompare() {
             />
           </div>
           {canViewAllBrands && (
-            <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-              <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.brand')}</label>
-              <Select
-                placeholder={t('common.all')}
-                allowClear
-                value={app}
-                onChange={setApp}
-                options={Object.entries(REPORT_APP_LABEL).map(([value]) => ({
-                  value: Number(value),
-                  label: appLabel(Number(value) as ReportApp),
-                }))}
-              />
-            </div>
+            <ReportFilterSelect
+              label={t('promotionReport.brand')}
+              value={app}
+              onChange={setApp}
+              labelMap={REPORT_APP_LABEL}
+              labelFn={appLabel}
+            />
           )}
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.channel')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={channel}
-              onChange={setChannel}
-              options={Object.entries(REPORT_CHANNEL_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: channelLabel(Number(value) as ReportChannel),
-              }))}
-            />
-          </div>
-          <div style={{ flex: '0 0 calc(25% - 9px)' }}>
-            <label style={{ display: 'block', marginBottom: 4, color: '#666' }}>{t('promotionReport.region')}</label>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              value={region}
-              onChange={setRegion}
-              options={Object.entries(REPORT_REGION_LABEL).map(([value]) => ({
-                value: Number(value),
-                label: regionLabel(Number(value) as ReportRegion),
-              }))}
-            />
-          </div>
+          <ReportFilterSelect
+            label={t('promotionReport.channel')}
+            value={channel}
+            onChange={setChannel}
+            labelMap={REPORT_CHANNEL_LABEL}
+            labelFn={channelLabel}
+          />
+          <ReportFilterSelect
+            label={t('promotionReport.region')}
+            value={region}
+            onChange={setRegion}
+            labelMap={REPORT_REGION_LABEL}
+            labelFn={regionLabel}
+          />
         </form>
       </div>
 

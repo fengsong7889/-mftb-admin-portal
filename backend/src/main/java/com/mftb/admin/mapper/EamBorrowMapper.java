@@ -11,9 +11,11 @@ import org.apache.ibatis.annotations.Update;
 @Mapper
 public interface EamBorrowMapper extends BaseMapper<EamBorrow> {
 
+    /** 按 id 加行锁读取借用单（含 deleted=0 过滤；必须在事务内调用） */
     @Select("SELECT * FROM biz_eam_borrow WHERE id = #{id} AND deleted = 0 FOR UPDATE")
     EamBorrow selectForUpdate(@Param("id") long id);
 
+    /** 某资产上处于活跃状态的借用单数（active + overdue）；用于判定资产能否被再次占用 */
     @Select("SELECT COUNT(*) FROM biz_eam_borrow WHERE asset_id = #{assetId} AND status IN ('active','overdue') AND deleted = 0")
     long countActiveByAsset(@Param("assetId") long assetId);
 

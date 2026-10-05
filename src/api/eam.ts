@@ -721,6 +721,7 @@ export async function fetchCategoryList(params?: { bizType?: string; keyword?: s
   }))
 }
 
+/** 新增：POST /eam/basic/categories */
 export async function createCategory(data: Omit<AssetCategory, 'id'>): Promise<number> {
   return request.post<unknown, number>('/eam/basic/categories', {
     ...data,
@@ -728,16 +729,19 @@ export async function createCategory(data: Omit<AssetCategory, 'id'>): Promise<n
   })
 }
 
+/** 修改：PUT /eam/basic/categories/{id} */
 export async function updateCategory(id: number, data: Partial<AssetCategory>): Promise<void> {
   const payload: Record<string, unknown> = { ...data }
   if (data.paramTemplate) payload.paramTemplate = JSON.stringify(data.paramTemplate)
   await request.put(`/eam/basic/categories/${id}`, payload)
 }
 
+/** 删除：DELETE /eam/basic/categories/{id} */
 export async function deleteCategory(id: number): Promise<void> {
   await request.delete(`/eam/basic/categories/${id}`)
 }
 
+/** 切换状态：PUT /eam/basic/categories/{id}/toggle */
 export async function toggleCategoryStatus(id: number): Promise<void> {
   await request.put(`/eam/basic/categories/${id}/toggle`)
 }
@@ -753,18 +757,22 @@ export interface BrandQuery {
   updatedAtEnd?: string
 }
 
+/** 查询：GET /eam/basic/brands */
 export async function fetchBrandList(params?: BrandQuery): Promise<AssetBrand[]> {
     return await request.get<unknown, AssetBrand[]>('/eam/basic/brands', { params, headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 新增：POST /eam/basic/brands */
 export async function createBrand(data: Omit<AssetBrand, 'id' | 'createdAt' | 'updatedAt'>): Promise<number> {
     return await request.post<unknown, number>('/eam/basic/brands', data)
 }
 
+/** 修改：PUT /eam/basic/brands/{id} */
 export async function updateBrand(id: number, data: Partial<AssetBrand>): Promise<void> {
     await request.put(`/eam/basic/brands/${id}`, data)
 }
 
+/** 删除：DELETE /eam/basic/brands/{id} */
 export async function deleteBrand(id: number): Promise<void> {
     await request.delete(`/eam/basic/brands/${id}`)
 }
@@ -775,18 +783,22 @@ export async function fetchModelList(params?: ModelQuery): Promise<PageResult<As
     return await request.get<unknown, PageResult<AssetModel>>('/eam/basic/models', { params, headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 查询：GET /eam/basic/models/{id} */
 export async function fetchModelDetail(id: number): Promise<AssetModel> {
     return await request.get<unknown, AssetModel>(`/eam/basic/models/${id}`)
 }
 
+/** 新增：POST /eam/basic/models */
 export async function createModel(data: Omit<AssetModel, 'id' | 'createdAt'>): Promise<number> {
     return await request.post<unknown, number>('/eam/basic/models', data)
 }
 
+/** 修改：PUT /eam/basic/models/{id} */
 export async function updateModel(id: number, data: Partial<AssetModel>): Promise<void> {
     await request.put(`/eam/basic/models/${id}`, data)
 }
 
+/** 删除：DELETE /eam/basic/models/{id} */
 export async function deleteModel(id: number): Promise<void> {
     await request.delete(`/eam/basic/models/${id}`)
 }
@@ -797,14 +809,17 @@ export async function fetchLocationList(params?: { name?: string; code?: string;
   return await request.get<unknown, AssetLocation[]>('/eam/basic/locations', { params, headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 新增：POST /eam/basic/locations */
 export async function createLocation(data: Omit<AssetLocation, 'id'>): Promise<number> {
     return await request.post<unknown, number>('/eam/basic/locations', data)
 }
 
+/** 修改：PUT /eam/basic/locations/{id} */
 export async function updateLocation(id: number, data: Partial<AssetLocation>): Promise<void> {
     await request.put(`/eam/basic/locations/${id}`, data)
 }
 
+/** 删除：DELETE /eam/basic/locations/{id} */
 export async function deleteLocation(id: number): Promise<void> {
     await request.delete(`/eam/basic/locations/${id}`)
 }
@@ -1114,6 +1129,7 @@ export async function createPurchaseOrder(data: Omit<PurchaseOrder, 'id' | 'poNo
   return await request.post<unknown, number>('/eam/purchase', data)
 }
 
+/** 修改：PUT /eam/purchase/{id} */
 export function updatePurchaseOrder(id: number, data: Partial<PurchaseOrder>): Promise<void> {
   return request.put<unknown, void>(`/eam/purchase/${id}`, data)
 }
@@ -1210,6 +1226,7 @@ export interface InboundCreateData {
   requestKey?: string
 }
 
+/** 新增：POST /eam/inbound */
 export function createInboundBatch(data: InboundCreateData): Promise<InboundBatch> {
   // 编号、数量和来源快照统一由后端事务生成，不在浏览器预创建资产。
   return request.post<unknown, InboundBatch>('/eam/inbound', data)
@@ -1421,6 +1438,7 @@ export interface HandoverListParams {
   assetKeyword?: string
 }
 
+/** 查询：GET /eam/handovers */
 export async function fetchHandoverList(params?: HandoverListParams): Promise<PageResult<HandoverRecord>> {
   const res = await request.get<unknown, PageResult<HandoverRecord>>('/eam/handovers', {
     params: {
@@ -1589,39 +1607,48 @@ export async function fetchParamTypeList(params?: ParamTypeQuery & { categoryCod
   return await request.get<unknown, PageResult<ParamType>>('/eam/basic/param-types', { params, headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 查询全部：GET /eam/basic/param-types */
 export async function fetchAllParamTypes(): Promise<ParamType[]> {
   const res = await request.get<unknown, PageResult<ParamType>>('/eam/basic/param-types', { params: { size: 9999 }, headers: { [SILENT_HEADER]: '1' } })
   return res.records || []
 }
 
+/** 查询：GET /eam/basic/param-types/{id}/values */
 export async function fetchParamValuesByType(paramTypeCode: string): Promise<ParamValue[]> {
   return await request.get<unknown, ParamValue[]>(`/eam/basic/param-types/${paramTypeCode}/values`, { headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 查询全部：GET /eam/basic/param-values */
 export async function fetchAllParamValues(): Promise<ParamValue[]> {
   return await request.get<unknown, ParamValue[]>('/eam/basic/param-values', { headers: { [SILENT_HEADER]: '1' } })
 }
 
+/** 新增：POST /eam/basic/param-types */
 export async function createParamType(data: Omit<ParamType, 'id'>): Promise<ParamType> {
   return await request.post<unknown, ParamType>('/eam/basic/param-types', data)
 }
 
+/** 修改：PUT /eam/basic/param-types/{id} */
 export async function updateParamType(id: number, data: Partial<ParamType>): Promise<ParamType> {
   return await request.put<unknown, ParamType>(`/eam/basic/param-types/${id}`, data)
 }
 
+/** 删除：DELETE /eam/basic/param-types/{id} */
 export async function deleteParamType(id: number): Promise<void> {
   await request.delete(`/eam/basic/param-types/${id}`)
 }
 
+/** 新增：POST /eam/basic/param-values */
 export async function createParamValue(data: Omit<ParamValue, 'id'>): Promise<ParamValue> {
   return await request.post<unknown, ParamValue>('/eam/basic/param-values', data)
 }
 
+/** 修改：PUT /eam/basic/param-values/{id} */
 export async function updateParamValue(id: number, data: Partial<ParamValue>): Promise<ParamValue> {
   return await request.put<unknown, ParamValue>(`/eam/basic/param-values/${id}`, data)
 }
 
+/** 删除：DELETE /eam/basic/param-values/{id} */
 export async function deleteParamValue(id: number): Promise<void> {
   await request.delete(`/eam/basic/param-values/${id}`)
 }
