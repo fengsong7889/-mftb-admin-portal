@@ -74,7 +74,7 @@ class RdmSimilarServiceTest {
         stubRows(List.of(row(9L, "XQ202609200009", "推薦報表支持自定義時間區間導出",
                 "uat_pending", "张晓琳", "可自選起止日期")));
 
-        var result = service.findSimilar("推薦報表支持自定義時間區間導出", "希望支持自定義時間區間", null, "张晓琳");
+        var result = service.findSimilar("推薦報表支持自定義時間區間導出", "希望支持自定義時間區間", null, "张晓琳", true);
 
         assertTrue(result.getDuplicateSuspect(), "同名且在途应判疑似重复");
         assertEquals(1.0, result.getItems().get(0).getSimilarity(), 0.0001);
@@ -83,13 +83,37 @@ class RdmSimilarServiceTest {
         assertFalse(result.getItems().get(0).getMatchedTerms().isEmpty(), "命中词必须可见，不能只给一个黑箱分数");
     }
 
+    /**
+     * 数据范围（阶段 0 欠账 SEC-05）：无处理权限的人查到的别人需求必须隐去可识别字段，
+     * 但仍要能提示“疑似重复”，否则查重功能对普通员工等于没有。
+     */
+    @Test
+    @DisplayName("无明细权限时隐去他人需求标题与编号，但保留重复提示")
+    void masksOtherPeoplesDetailsWithoutAccess() {
+        stubRows(List.of(row(9L, "XQ202609200009", "推薦報表支持自定義時間區間導出",
+                "uat_pending", "王五", "可自選起止日期")));
+
+        var open = service.findSimilar("推薦報表支持自定義時間區間導出", null, null, "张晓琳", false);
+
+        assertEquals(1, open.getItems().size());
+        var masked = open.getItems().get(0);
+        assertTrue(masked.getReqNo() == null, "编号不能泄露");
+        assertTrue(masked.getSubmitDeptName() == null, "部门不能泄露");
+        assertTrue(masked.getPmName() == null, "负责人不能泄露");
+        assertFalse(masked.getTitle().contains("推薦報表"), "标题不能原文返回");
+        assertTrue(open.getDuplicateSuspect(), "隐去明细不影响拦重复");
+
+        var full = service.findSimilar("推薦報表支持自定義時間區間導出", null, null, "张晓琳", true);
+        assertEquals("XQ202609200009", full.getItems().get(0).getReqNo(), "处理岗仍应看到明细");
+    }
+
     @Test
     @DisplayName("终态需求只作参考，不判重复")
     void finishedRequirementIsNotDuplicate() {
         stubRows(List.of(row(8L, "XQ202601010001", "推薦報表支持自定義時間區間導出",
                 "released", "王大衛", "可自選起止日期")));
 
-        var result = service.findSimilar("推薦報表支持自定義時間區間導出", null, null, "张晓琳");
+        var result = service.findSimilar("推薦報表支持自定義時間區間導出", null, null, "张晓琳", true);
 
         assertFalse(result.getDuplicateSuspect(), "已上线的历史需求不该拦住新需求");
         assertEquals(1, result.getItems().size(), "仍要作为相似参考展示");
@@ -102,7 +126,7 @@ class RdmSimilarServiceTest {
         stubRows(List.of(row(7L, "XQ202609180007", "門店列表新增停業風險標籤列",
                 "developing", "孫小紅", "列表展示風險標籤")));
 
-        var result = service.findSimilar("團購活動庫存同步延遲", null, null, "李娜");
+        var result = service.findSimilar("團購活動庫存同步延遲", null, null, "李娜", true);
 
         assertTrue(result.getItems().isEmpty(), "不相关时不应硬凑候选: " + result.getItems());
         assertFalse(result.getDuplicateSuspect());
@@ -111,7 +135,7 @@ class RdmSimilarServiceTest {
     @Test
     @DisplayName("标题过短时不查重（两字标题会命中一堆误报）")
     void tooShortTitleSkipped() {
-        var result = service.findSimilar("報表", null, null, "张晓琳");
+        var result = service.findSimilar("報表", null, null, "张晓琳", true);
         assertTrue(result.getItems().isEmpty());
         assertFalse(result.getDuplicateSuspect());
     }

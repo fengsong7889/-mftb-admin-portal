@@ -16,6 +16,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.util.BizSeqService;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +51,9 @@ class RdmTransitionGuardTest {
 
     private OperatorResolver operatorResolver;
     private PermissionService permissionService;
+    private RdmRequirementMapper requirementMapper;
     private com.mftb.admin.mapper.RdmRequirementRoleMapper roleMapper;
+    private RdmAccessGuard accessGuard;
     private RdmRequirementServiceImpl service;
 
     @BeforeEach
@@ -57,10 +61,14 @@ class RdmTransitionGuardTest {
         operatorResolver = mock(OperatorResolver.class);
         permissionService = mock(PermissionService.class);
         roleMapper = mock(com.mftb.admin.mapper.RdmRequirementRoleMapper.class);
+        requirementMapper = mock(RdmRequirementMapper.class);
         // 默认无参与人记录（避免拆箱 null），相关与否由主数据字段判定
         when(roleMapper.selectCount(any())).thenReturn(0L);
+        // 数据范围与角色口径已收到 RdmAccessGuard，它必须与需求服务用同一套 mock，
+        // 否则测试里“可见/无权”的结论与真实调用链不是一个口径
+        accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper);
         service = new RdmRequirementServiceImpl(
-                mock(RdmRequirementMapper.class), mock(RdmRequirementTargetMapper.class),
+                requirementMapper, mock(RdmRequirementTargetMapper.class),
                 roleMapper, mock(RdmStatusLogMapper.class),
                 mock(RdmCommentMapper.class), mock(RdmAttachmentMapper.class),
                 mock(RdmAcceptanceMapper.class), mock(com.mftb.admin.mapper.RdmAcceptanceCaseMapper.class),
@@ -69,7 +77,10 @@ class RdmTransitionGuardTest {
                 operatorResolver, mock(RdmConfigService.class),
                 mock(RdmNotifyService.class), mock(OaRequestService.class),
                 mock(com.mftb.admin.service.RdmIntakeCallbackService.class),
-                permissionService, mock(JdbcTemplate.class));
+                permissionService, mock(JdbcTemplate.class), accessGuard,
+                mock(com.mftb.admin.service.RdmIntakePolicyService.class),
+                mock(com.mftb.admin.service.RdmIntakeRoundService.class),
+                mock(com.mftb.admin.service.RdmReleaseService.class));
     }
 
     private static SysUser user(long id, String empId, String name) {
@@ -101,25 +112,40 @@ class RdmTransitionGuardTest {
     void adminBypassesRoleGuard() {
         SysUser admin = user(1L, "MF00001", "馮宋");
         when(operatorResolver.isAdmin(admin)).thenReturn(true);
-        assertTrue(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), admin, null));
+        assertTrue(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), admin, Set.of()));
     }
 
     @Test
-    @DisplayName("角色命中允许列表才可推进，未命中一律拒绝")
+    @DisplayName("角色命中允许列表才可推进，未命中一律拒")
     void roleMustBeAllowed() {
         SysUser pm = user(2L, "MF00002", "陳雅婷");
         SysUser qa = user(3L, "MF00003", "黃嘉欣");
         when(operatorResolver.isAdmin(any())).thenReturn(false);
-        assertTrue(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), pm, RdmConstants.ROLE_PM));
-        assertFalse(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), qa, RdmConstants.ROLE_QA));
+        assertTrue(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), pm, Set.of(RdmConstants.ROLE_PM)));
+        assertFalse(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), qa, Set.of(RdmConstants.ROLE_QA)));
+    }
+
+    /**
+     * 兼任者必须拿到其合法角色的并集。
+     * <p>回归场景：提出人兼验收人时，单角色 findFirst 会按写入顺序返 SUBMITTER，
+     * 只允许 ACCEPTOR 的交付确认动作就被误拒。
+     */
+    @Test
+    @DisplayName("多角色中任一命中即放行（兼任者不被写入顺序误拒）")
+    void anyHitRoleAllowsTransition() {
+        SysUser submitter = user(20L, "MF00020", "林小明");
+        when(operatorResolver.isAdmin(submitter)).thenReturn(false);
+        assertTrue(service.canPerform(
+                rule(List.of(RdmConstants.ROLE_ACCEPTOR), List.of()), submitter,
+                Set.of(RdmConstants.ROLE_SUBMITTER, RdmConstants.ROLE_ACCEPTOR)));
     }
 
     @Test
-    @DisplayName("未登录或规则未配角色时拒绝（不得 fail-open）")
+    @DisplayName("未登录或规则未配角色时拒（不得 fail-open）")
     void failClosedWhenContextMissing() {
         when(operatorResolver.isAdmin(any())).thenReturn(false);
-        assertFalse(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), null, RDM_STATUS_ACCEPTED));
-        assertFalse(service.canPerform(rule(List.of(), List.of()), user(2L, "MF00002", "陳雅婷"), RdmConstants.ROLE_PM));
+        assertFalse(service.canPerform(rule(List.of(RdmConstants.ROLE_PM), List.of()), null, Set.of(RDM_STATUS_ACCEPTED)));
+        assertFalse(service.canPerform(rule(List.of(), List.of()), user(2L, "MF00002", "陳雅婷"), Set.of(RdmConstants.ROLE_PM)));
     }
 
     @Test
@@ -129,7 +155,7 @@ class RdmTransitionGuardTest {
         when(operatorResolver.isAdmin(techLead)).thenReturn(false);
         when(permissionService.hasPermission(techLead, RdmConstants.MENU_INTAKE, "edit")).thenReturn(true);
         RdmConfigVO.Transition dispatch = rule(List.of(RdmConstants.ROLE_DISPATCHER), List.of("pm"));
-        assertTrue(service.canPerform(dispatch, techLead, null));
+        assertTrue(service.canPerform(dispatch, techLead, Set.of()));
     }
 
     @Test
