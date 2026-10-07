@@ -23,7 +23,7 @@ export interface ApprovalTimelineItem {
 
 /** 审批详情数据 */
 export interface ApprovalDetailData {
-  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift' | 'ai_access' | 'oa_purchase'
+  approvalType: 'recharge' | 'deduct' | 'transfer' | 'merge' | 'gift' | 'ai_access' | 'oa_purchase' | 'rdm_intake' | 'rdm_change'
   applicant: string
   applyDate: string
   flowNo: string

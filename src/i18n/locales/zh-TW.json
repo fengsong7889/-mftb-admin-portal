@@ -9181,6 +9181,8 @@
     "indicatorTypeCompetency": "能力",
     "indicatorTypeAttitude": "態度",
     "indicatorTypeCompliance": "合規",
+    "indicatorTypeRdmOutput": "產出（RDM）",
+    "suggestedScore": "系統建議值",
     "workbenchScopeTip": "只列出由我擔任評估人的考核單",
     "reviewKeywordPlaceholder": "姓名/工號",
     "selfScopeTip": "僅顯示本人的考核單",

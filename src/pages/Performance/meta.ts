@@ -82,8 +82,10 @@ export const INDICATOR_TYPE_LABEL_KEY: Record<string, string> = {
   COMPETENCY: 'hrPerf.indicatorTypeCompetency',
   ATTITUDE: 'hrPerf.indicatorTypeAttitude',
   COMPLIANCE: 'hrPerf.indicatorTypeCompliance',
+  // 產研协同貢獻分通道：RDM 绩效建议推送时按此类型匹配考核单指标（v2.4 同步写入字典）
+  RDM_OUTPUT: 'hrPerf.indicatorTypeRdmOutput',
 }
-export const INDICATOR_TYPE_ORDER: string[] = ['RESULT', 'COMPETENCY', 'ATTITUDE', 'COMPLIANCE']
+export const INDICATOR_TYPE_ORDER: string[] = ['RESULT', 'COMPETENCY', 'ATTITUDE', 'COMPLIANCE', 'RDM_OUTPUT']
 
 /** 计划进度看板的阶段列（顺序即流程顺序，field 对应 PerfPlan 上的人数统计字段） */
 export const PLAN_STAGES: Array<{ field: keyof PerfPlan; labelKey: string }> = [

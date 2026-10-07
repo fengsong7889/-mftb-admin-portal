@@ -787,3 +787,342 @@
   color: #CF1322;
   white-space: nowrap;
 }
+
+/* ========== 工作台：我的提交追踪 / 需要我补充 ========== */
+
+/* 六段阶段条（业务视角）：颜色语义固定 绿=已过、橙=当前、灰=未开始 */
+.rdm-track-steps {
+  display: flex;
+  align-items: flex-start;
+  margin: 8px 0 4px;
+  max-width: 620px;
+}
+
+.rdm-track-step {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 连接线从上一个点画到当前点，首段不画 */
+.rdm-track-step::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: -50%;
+  width: 100%;
+  height: 1px;
+  background: #D9D9D9;
+}
+
+.rdm-track-step:first-child::before {
+  display: none;
+}
+
+.rdm-track-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #D9D9D9;
+}
+
+.rdm-track-label {
+  font-size: 11px;
+  color: #8C8C8C;
+  white-space: nowrap;
+}
+
+.rdm-track-step.done .rdm-track-dot {
+  background: #52C41A;
+}
+
+.rdm-track-step.done::before {
+  background: #52C41A;
+}
+
+.rdm-track-step.done .rdm-track-label {
+  color: #595959;
+}
+
+.rdm-track-step.current .rdm-track-dot {
+  background: #E8720C;
+  box-shadow: 0 0 0 3px rgba(232, 114, 12, 0.18);
+}
+
+.rdm-track-step.current .rdm-track-label {
+  color: #E8720C;
+  font-weight: 600;
+}
+
+.rdm-track-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.rdm-track-item:last-child {
+  border-bottom: none;
+}
+
+.rdm-need-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.rdm-need-item:last-child {
+  border-bottom: none;
+}
+
+.rdm-need-reason {
+  font-size: 12px;
+  color: #AD4E00;
+  line-height: 1.6;
+  margin-top: 2px;
+}
+
+/* ========== 提交需求：需求对象行 / 审批要求只读卡 ========== */
+
+/* 一条需求可以打多个入口，所以每个对象自成一块，视觉上与外层卡片拉开层级 */
+.rdm-target-row {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px 16px 8px;
+  margin-bottom: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-target-row:hover {
+  border-color: #FFE7D1;
+}
+
+.rdm-target-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
+}
+
+/* 审批要求：暖橙面板只做告知，不提供可操作控件（避免把准入决定交给提交人） */
+.rdm-approval-card {
+  background: #FFF7F0;
+  border: 1px solid #FFE7D1;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 4px;
+}
+
+.rdm-approval-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #AD4E00;
+}
+
+.rdm-approval-card-body {
+  font-size: 12px;
+  color: #AD4E00;
+  line-height: 1.8;
+  margin-top: 6px;
+}
+
+/* ========== 详情页：当前等待与下一步 / 审批判断 ========== */
+.rdm-next-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-left: 3px solid #E8720C;
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-next-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+}
+
+.rdm-next-label {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+.rdm-next-value {
+  font-size: 13px;
+  color: #262626;
+  font-weight: 500;
+}
+
+.rdm-next-item.warn .rdm-next-value {
+  color: #D46B08;
+}
+
+.rdm-next-item.danger .rdm-next-value {
+  color: #CF1322;
+  font-weight: 600;
+}
+
+.rdm-judge-list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.9;
+}
+
+.rdm-judge-list b {
+  color: #262626;
+}
+
+/* ========== 准入策略：规则模拟结果 ========== */
+.rdm-sim-result {
+  margin-top: 12px;
+  background: #FAFBFC;
+  border: 1px dashed #e8eaed;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.rdm-sim-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.rdm-sim-steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.9;
+}
+
+/* ========== 分配页：产品经理候选卡片 ========== */
+.rdm-pm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.rdm-pm-card {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-pm-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #FFE7D1;
+}
+
+.rdm-pm-card.active {
+  border-color: #E8720C;
+  box-shadow: 0 0 0 2px rgba(232, 114, 12, 0.12);
+}
+
+.rdm-pm-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rdm-pm-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.rdm-pm-card-load {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #8C8C8C;
+  margin: 8px 0 6px;
+}
+
+.rdm-pm-card-reason {
+  font-size: 12px;
+  color: #595959;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+/* ========== 节点计划页（阶段 3） ========== */
+
+/* 一个节点一块：四套日期 + 负责人 + 状态都在同一视线内，避免表格横向滚动时看不见基线 */
+.rdm-milestone-row {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px 16px 16px;
+  margin-bottom: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-milestone-row:hover {
+  border-color: #FFE7D1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-milestone-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.rdm-milestone-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* ========== 甘特与负载视图（阶段 5） ========== */
+
+/* 甘特图横向滚动：纵向跟随页面，保证长任务列表不被压缩 */
+.rdm-gantt-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 4px 12px;
+}
+
+/* 负载热力格：一格一人一天，颜色深浅即强度 */
+.rdm-load-cell {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: default;
+}

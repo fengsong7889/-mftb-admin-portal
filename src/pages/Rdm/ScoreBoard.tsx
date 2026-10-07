@@ -23,6 +23,9 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
+/** 阶段 6：页内展开预算、HR 建议与指标口径（不新建路由，避开菜单页名兜底表上限） */
+import GovernancePanel from './components/GovernancePanel'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchScoreBoard,
   pushScoreToPerf,
@@ -90,6 +93,7 @@ function ScoreTracePanel({ records }: { records: RdmScoreRecord[] }) {
 
 export default function ScoreBoard() {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [data, setData] = useState<RdmScoreBoardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [periodCode, setPeriodCode] = useState<string>()
@@ -408,6 +412,12 @@ export default function ScoreBoard() {
           locale={{ emptyText: '還沒有積分流水，可點「按當前規則重算」生成' }}
         />
       </div>
+
+      {/* 阶段 6：预算超限、人工复核的绩效建议、指标口径字典 */}
+      <GovernancePanel
+        periodCode={periodCode ?? data?.period.code}
+        editable={hasPermission('rdm-config-score:edit') || hasPermission('rdm-dashboard-score:edit')}
+      />
 
       <div className="rdm-tip-card">
         口徑說明：只對實際參與產出的角色（產品/研發負責人/開發/UI/測試/項目經理/技術負責人）計分，

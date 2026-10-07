@@ -5,16 +5,18 @@
  * 验收标准会直接成为业务验收页的检查项来源（写不清 = 验收扯皮）。
  */
 import { useEffect, useState } from 'react'
-import { Alert, Button, Input, Modal, Select, Space, message } from 'antd'
-import { BulbOutlined, SaveOutlined } from '@ant-design/icons'
+import { Alert, Button, Checkbox, Input, Modal, Select, Space, Tag, message } from 'antd'
+import { BulbOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchDeliverySummary,
+  fetchPrdSnapshots,
   fetchRequirementDetail,
   generatePrdDraft,
   savePrd,
   type RdmPrdItem,
+  type RdmPrdSnapshotItem,
 } from '../../api/rdm'
 import { RDM_PRD_STATUS_LABEL, type RdmPrdStatus } from '../../constants/rdm'
 import './index.css'
@@ -35,6 +37,15 @@ export default function PrdForm() {
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; expectResult?: string | null } | null>(null)
   const [siblings, setSiblings] = useState<RdmPrdItem[]>([])
   const [saving, setSaving] = useState(false)
+  /**
+   * 当前 PRD 状态（阶段 3）：评审中/已通过的定稿内容不可原地改，
+   * 否则会出现「开发按新版做、验收按旧版查」。
+   */
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null)
+  const [newVersion, setNewVersion] = useState(false)
+  const [changeReason, setChangeReason] = useState('')
+  /** 定稿快照（版本链）：让「谁在哪一版上批过」看得见 */
+  const [snapshots, setSnapshots] = useState<RdmPrdSnapshotItem[]>([])
   /** AI 草稿生成中与提示（草稿只进表单，不自动保存） */
   const [aiLoading, setAiLoading] = useState(false)
   const [aiNotice, setAiNotice] = useState<{ text: string; ok: boolean } | null>(null)
@@ -47,6 +58,9 @@ export default function PrdForm() {
     prototypeUrl: '',
     contentRich: '',
   })
+
+  /** 定稿（评审中/已通过）且未勾选以新版本修改 → 表单只读 */
+  const isLocked = currentStatus === 'reviewing' || currentStatus === 'approved'
 
   useEffect(() => {
     if (!reqId) return
@@ -64,6 +78,10 @@ export default function PrdForm() {
       setSiblings(summary.prds.filter(p => p.id !== prdId))
       const current = summary.prds.find(p => p.id === prdId)
       if (current) {
+        setCurrentStatus(current.status)
+        if (prdId) {
+          fetchPrdSnapshots(prdId).then(setSnapshots).catch(() => setSnapshots([]))
+        }
         setForm({
           title: current.title,
           parentPrdId: current.parentPrdId ?? undefined,
@@ -155,6 +173,14 @@ export default function PrdForm() {
   /** 确认后才落库 */
   const submitPrd = async (advance: boolean) => {
     if (!reqId) return
+    if (isLocked && !newVersion) {
+      message.warning('該 PRD 已定稿，請先勾選「以新版本修改」')
+      return
+    }
+    if (newVersion && !changeReason.trim()) {
+      message.warning('以新版本修改必須填寫變更原因')
+      return
+    }
     setSaving(true)
     try {
       await savePrd({
@@ -168,8 +194,10 @@ export default function PrdForm() {
         prototypeUrl: form.prototypeUrl,
         contentRich: form.contentRich,
         advanceRequirement: advance,
+        newVersion: newVersion || undefined,
+        changeReason: newVersion ? changeReason.trim() : undefined,
       })
-      message.success(prdId ? 'PRD 已更新' : 'PRD 已保存')
+      message.success(prdId ? (newVersion ? '已存為新版本草稿' : 'PRD 已更新') : 'PRD 已保存')
       navigate(`/rdm-detail?id=${reqId}`)
     } catch {
       message.error('保存失敗，請重試')
@@ -201,6 +229,64 @@ export default function PrdForm() {
         />
       )}
 
+      {/*
+        定稿不可原地改（阶段 3）：评审中/已通过的正文已经是评审结论与验收标准的事实，
+        要改只能开新版本，原版与当时的评审记录一起留着。
+      */}
+      {isLocked && (
+        <Alert
+          type="warning"
+          showIcon
+          icon={<LockOutlined />}
+          style={{ marginBottom: 16 }}
+          message={`本版 PRD 已${currentStatus === 'approved' ? '評審通過' : '進入評審'}，內容已凍結`}
+          description={(
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <span>需要修改請勾選下方「以新版本修改」：新版本会生成一份草稿并保留原版，开发与验收才不会各认一版。</span>
+              <Checkbox checked={newVersion} onChange={e => setNewVersion(e.target.checked)}>
+                以新版本修改
+              </Checkbox>
+              {newVersion && (
+                <Input.TextArea
+                  rows={2}
+                  placeholder="變更原因（必填，會寫進版本鏈）"
+                  value={changeReason}
+                  onChange={e => setChangeReason(e.target.value)}
+                  maxLength={200}
+                  showCount
+                />
+              )}
+            </Space>
+          )}
+        />
+      )}
+
+      {snapshots.length > 0 && (
+        <div className="rdm-card" style={{ marginBottom: 16 }}>
+          <div className="rdm-card-title">
+            版本鏈（定稿快照）
+            <span className="rdm-card-title-split" />
+            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>共 {snapshots.length} 次定稿</span>
+          </div>
+          {snapshots.map(s => (
+            <div key={s.id} className="rdm-delivery-row">
+              <Tag color={s.conclusion === 'passed' ? 'success' : 'error'} style={{ margin: 0 }}>{s.versionNo}</Tag>
+              <span className="rdm-delivery-row-main">
+                {s.title}
+                <div className="rdm-delivery-row-desc">
+                  {s.conclusion === 'passed' ? '評審通過' : '評審退回'}
+                  {s.reviewerNames ? ` · 評審 ${s.reviewerNames}` : ''}
+                  {s.snapshotTime ? ` · ${s.snapshotTime}` : ''}
+                  {s.conclusionDesc ? ` · ${s.conclusionDesc}` : ''}
+                </div>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 定稿且未勾选新版本时整块禁用：不让人改完才发现提交不了 */}
+      <fieldset disabled={isLocked && !newVersion} style={{ border: 'none', padding: 0, margin: 0, minWidth: 0 }}>
       <div className="rdm-form-section">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Space size={8} wrap>
@@ -270,6 +356,7 @@ export default function PrdForm() {
           </LabeledField>
         </Space>
       </div>
+      </fieldset>
 
       <div className="form-footer">
         <Button onClick={() => navigate(-1)}>取消</Button>

@@ -38,14 +38,18 @@ import {
 } from '../../api/rdm'
 import {
   RDM_ACCEPT_RESULT,
+  RDM_ACCEPT_STAGE,
+  RDM_ACCEPT_STAGE_LABEL,
   RDM_CASE_RESULT,
   RDM_CASE_RESULT_LABEL,
   RDM_DEFECT_SEVERITY,
   RDM_DEFECT_SEVERITY_LABEL,
+  RDM_PRD_STATUS,
   RDM_TEST_ENV_LABEL,
   RDM_STATUS_LABEL,
   RDM_STATUS,
   type RdmAcceptResult,
+  type RdmAcceptStage,
   type RdmStatus,
   type RdmTestEnv,
 } from '../../constants/rdm'
@@ -109,7 +113,15 @@ export default function AcceptanceForm() {
     setHistory(records)
     // 用例默认来自 PRD 验收标准；没有 PRD 时退回需求原始期望，保证验收有对照物
     const summary = await fetchDeliverySummary(id).catch(() => null)
-    const fromPrd = (summary?.prds ?? []).flatMap(p => splitCriteria(p.acceptanceCriteria))
+    const prds = summary?.prds ?? []
+    /*
+     * 验收标准只取「最新定稿版本」那一份：同一需求的 v1.0/v1.1 里 AC 大量同名，
+     * 扁平合并会导入成倍重复的用例（端到端实测：6 条 AC 变成 20 条，前 9 行与后 9 行完全重复）。
+     * 开发中的新版本不算依据 —— 未经评审的改动不该提前进入验收项。
+     */
+    const finalized = prds.filter(p => p.status === RDM_PRD_STATUS.APPROVED)
+    const sourcePrd = finalized.length ? finalized[finalized.length - 1] : prds[prds.length - 1]
+    const fromPrd = [...new Set(splitCriteria(sourcePrd?.acceptanceCriteria))]
     setPrdCriteria(fromPrd)
     const fallback = splitCriteria(data?.expectResult)
     const seeds = fromPrd.length ? fromPrd : fallback.length ? fallback : [data?.title ?? '需求功能可用']
@@ -122,15 +134,26 @@ export default function AcceptanceForm() {
   /** 用例统计与结论约束统一走纯函数层（与后端落库同一套规则） */
   const stat = useMemo(() => statCases(cases), [cases])
 
-  /** 第几次验收（attempt），>1 说明本轮是返工后的复验 */
-  const attempt = history.length + 1
+  /**
+   * 验收阶段（阶段 4）：由状态推导，与后端 resolveAcceptanceStage 同一口径。
+   * <p>上线前预验收回答“质量能不能上线”，上线后业务验收回答“上线后真解决了吗”，
+   * 后者才是 1-5 分满意度的正式口径。
+   */
+  const stage = detail?.status === RDM_STATUS.UAT_PENDING || detail?.status === RDM_STATUS.TEST_PASSED
+    ? RDM_ACCEPT_STAGE.PRE_RELEASE
+    : detail?.status === RDM_STATUS.RELEASED || detail?.status === RDM_STATUS.VERIFIED
+      ? RDM_ACCEPT_STAGE.POST_RELEASE
+      : null
+  const isPostRelease = stage === RDM_ACCEPT_STAGE.POST_RELEASE
 
   /**
    * 是否处于可提交验收的状态。
-   * <p>后端会拒非「待業務驗收」的提交（已上线/已归档/已退回开发都不能直接写结论），
-   * 但只靠后端拦会让验收人填完一整页才报错，所以页面先把状态说清。
+   * <p>后端会拒其他状态的提交，但只靠后端拦会让验收人填完一整页才报错，页面先把状态说清。
    */
-  const canAccept = detail?.status === RDM_STATUS.UAT_PENDING
+  const canAccept = stage !== null
+
+  /** 第几次验收（attempt）：按阶段各自计数，与后端 nextAcceptanceAttempt 一致 */
+  const attempt = history.filter(h => (h.stage ?? RDM_ACCEPT_STAGE.PRE_RELEASE) === stage).length + 1
 
   /** 结论可选性：由用例结果反向决定，避免把「有條件通過」当成绕过缺陷的后门 */
   const resultDisabled = useMemo(() => ({
@@ -156,8 +179,11 @@ export default function AcceptanceForm() {
   /** 提交前校验（顺序：表单校验 → 二次确认 → 调接口） */
   const validate = (): boolean => {
     // 满意度不预选后必须真由验收人给分，否则质量因子会退化成常量
-    if (result !== RDM_ACCEPT_RESULT.FAIL && !score) {
-      message.warning('請給出交付滿意度評分（驗收通過/有條件通過必須打分）')
+    // 上线后业务验收无论结论如何都必须打分（目标⑦：强制 1-5 分）
+    if ((isPostRelease || result !== RDM_ACCEPT_RESULT.FAIL) && !score) {
+      message.warning(isPostRelease
+        ? '上線後業務驗收必須給 1-5 分滿意度評分'
+        : '請給出交付滿意度評分（驗收通過/有條件通過必須打分）')
       return false
     }
     const error = validateAcceptance({
@@ -179,7 +205,7 @@ export default function AcceptanceForm() {
   const handleSubmit = () => {
     if (!canAccept) {
       // 不因状态而隐藏入口时，至少要说清为什么不能交，不能让用户填完一整页才被后端拒
-      message.warning('該需求不在「待業務驗收」狀態，無法提交驗收結論')
+      message.warning('該需求當前狀態不接受驗收結論（上線前在「待業務驗收」，上線後在「已上線/已驗證」）')
       return
     }
     if (!validate()) return
@@ -192,7 +218,7 @@ export default function AcceptanceForm() {
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>需求編號：</span><b>{detail?.reqNo}</b></div>
           <div className="confirm-info-row"><span>需求標題：</span><b>{detail?.title}</b></div>
-          <div className="confirm-info-row"><span>本次驗收：</span><b>第 {attempt} 次{attempt > 1 ? '（返工復驗）' : ''}</b></div>
+          <div className="confirm-info-row"><span>本次驗收：</span><b>{RDM_ACCEPT_STAGE_LABEL[stage as RdmAcceptStage] ?? '-'} 第 {attempt} 次{attempt > 1 ? '（返工復驗）' : ''}</b></div>
           <div className="confirm-info-row"><span>驗收環境：</span><b>{envLabel}</b></div>
           <div className="confirm-info-row"><span>驗收結論：</span><b>{label}</b></div>
           <div className="confirm-info-row"><span>用例：</span><b>{stat.passed}/{stat.total} 通過，缺陷 {stat.defects} 個（致命/嚴重 {stat.blocking}）</b></div>
@@ -201,8 +227,11 @@ export default function AcceptanceForm() {
           {result === RDM_ACCEPT_RESULT.CONDITIONAL && createFollowUp && (
             <div className="confirm-info-row"><span>轉後續需求：</span><b>{followUpTitle}</b></div>
           )}
-          {result === RDM_ACCEPT_RESULT.FAIL && (
+          {result === RDM_ACCEPT_RESULT.FAIL && !isPostRelease && (
             <div className="confirm-info-row"><span>狀態影響：</span><b>需求退回「開發中」並通知研發負責人</b></div>
+          )}
+          {result === RDM_ACCEPT_RESULT.FAIL && isPostRelease && (
+            <div className="confirm-info-row"><span>狀態影響：</span><b>已上線不退狀態，必須轉後續需求承接遺留問題</b></div>
           )}
         </div>
       ),
@@ -220,8 +249,12 @@ export default function AcceptanceForm() {
             opinion: opinion || undefined,
             testEnv,
             cases: cases.flatMap(c => (c.result ? [{ ...c, title: c.title.trim(), result: c.result }] : [])),
-            createFollowUp: result === RDM_ACCEPT_RESULT.CONDITIONAL ? createFollowUp : undefined,
-            followUpTitle: result === RDM_ACCEPT_RESULT.CONDITIONAL && createFollowUp ? followUpTitle.trim() : undefined,
+            // 上线后不通过必须转后续需求（后端同样强制），勾选项在界面上直接锁定避免反复报错
+            createFollowUp: result === RDM_ACCEPT_RESULT.CONDITIONAL || (isPostRelease && result === RDM_ACCEPT_RESULT.FAIL)
+              ? true
+              : undefined,
+            followUpTitle: (result === RDM_ACCEPT_RESULT.CONDITIONAL || (isPostRelease && result === RDM_ACCEPT_RESULT.FAIL))
+              && followUpTitle.trim() ? followUpTitle.trim() : undefined,
           })
           message.success('驗收結論已提交')
           navigate(`/rdm-detail?id=${id}`)

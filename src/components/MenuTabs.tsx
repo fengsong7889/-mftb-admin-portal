@@ -229,6 +229,7 @@ const SUB_PAGE_NAME: Record<string, string> = {
   '/rdm-prd': '編寫 PRD',
   '/rdm-review': '需求評審',
   '/rdm-change': '需求變更申請',
+  '/rdm-milestone': '節點計劃',
   '/rdm-acceptance-form': '需求驗收',
   '/store-data-config': '門店數據配置',
   '/translation-manage': '翻譯工作台',

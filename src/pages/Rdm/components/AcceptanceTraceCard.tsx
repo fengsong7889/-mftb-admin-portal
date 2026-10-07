@@ -24,6 +24,8 @@ import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_RESULT_COLOR,
   RDM_ACCEPT_RESULT_LABEL,
+  RDM_ACCEPT_STAGE,
+  RDM_ACCEPT_STAGE_LABEL,
   RDM_TEST_ENV_LABEL,
   type RdmAcceptResult,
   type RdmTestEnv,
@@ -79,6 +81,34 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
       : []
 
   const reworkCount = records.filter(r => r.result === RDM_ACCEPT_RESULT.FAIL).length
+  /*
+   * 阶段 4：上线前预验收与上线后业务验收分开展示。
+   * 混在一起时，“满分”可能是上线前的预验分数，而不是业务方真的认可上线后的效果。
+   */
+  const postRecords = records.filter(r => r.stage === RDM_ACCEPT_STAGE.POST_RELEASE)
+  const preRecords = records.filter(r => r.stage !== RDM_ACCEPT_STAGE.POST_RELEASE)
+
+  /** 一组验收记录（同一阶段内按时间正序） */
+  const renderRecords = (list: RdmAcceptanceRecord[]) => list.map(r => (
+    <div key={r.id} className="rdm-acceptance-history">
+      <ResultTag result={r.result} />
+      <span className="rdm-acceptance-history-main">
+        <span style={{ color: '#262626' }}>第 {r.attempt} 次{r.acceptorName ? ` · ${r.acceptorName}` : ''}</span>
+        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+          {r.acceptTime ? dayjs(r.acceptTime).format('YYYY-MM-DD HH:mm') : ''}
+          {r.testEnv ? ` · ${RDM_TEST_ENV_LABEL[r.testEnv as RdmTestEnv] ?? r.testEnv}` : ''}
+          {r.caseTotal != null ? ` · 用例 ${r.casePass ?? 0}/${r.caseTotal}` : ''}
+          {r.score != null ? ` · 滿意度 ${r.score}/5` : ''}
+        </div>
+        {(r.issues || r.opinion) && (
+          <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{r.issues ?? r.opinion}</div>
+        )}
+        {r.followUpReqNo && (
+          <div style={{ fontSize: 12, color: '#1890FF', marginTop: 2 }}>遺留事項已轉：{r.followUpReqNo}</div>
+        )}
+      </span>
+    </div>
+  ))
 
   return (
     <div className="rdm-card">
@@ -99,26 +129,21 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
         </div>
       )}
 
-      {records.map(r => (
-        <div key={r.id} className="rdm-acceptance-history">
-          <ResultTag result={r.result} />
-          <span className="rdm-acceptance-history-main">
-            <span style={{ color: '#262626' }}>第 {r.attempt} 次{r.acceptorName ? ` · ${r.acceptorName}` : ''}</span>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>
-              {r.acceptTime ? dayjs(r.acceptTime).format('YYYY-MM-DD HH:mm') : ''}
-              {r.testEnv ? ` · ${RDM_TEST_ENV_LABEL[r.testEnv as RdmTestEnv] ?? r.testEnv}` : ''}
-              {r.caseTotal != null ? ` · 用例 ${r.casePass ?? 0}/${r.caseTotal}` : ''}
-              {r.score != null ? ` · 滿意度 ${r.score}/5` : ''}
-            </div>
-            {(r.issues || r.opinion) && (
-              <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{r.issues ?? r.opinion}</div>
-            )}
-            {r.followUpReqNo && (
-              <div style={{ fontSize: 12, color: '#1890FF', marginTop: 2 }}>遺留事項已轉：{r.followUpReqNo}</div>
-            )}
-          </span>
+      {records.length > 0 && postRecords.length > 0 && (
+        <div style={{ fontSize: 12, color: '#52C41A', fontWeight: 600, margin: '4px 0 6px' }}>
+          {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.POST_RELEASE]}
+          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>正式满意度口径</span>
         </div>
-      ))}
+      )}
+      {renderRecords(postRecords)}
+
+      {records.length > 0 && preRecords.length > 0 && (
+        <div style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 600, margin: '10px 0 6px' }}>
+          {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.PRE_RELEASE]}
+          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>不計入正式满意度</span>
+        </div>
+      )}
+      {renderRecords(preRecords)}
 
       <Space size={8} wrap style={{ marginTop: records.length > 0 ? 10 : 4 }}>
         <Button

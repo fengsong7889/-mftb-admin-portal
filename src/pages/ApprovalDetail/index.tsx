@@ -57,7 +57,7 @@ import { useTranslation } from 'react-i18next'
 import type { EmployeeItem } from '../../api/employee'
 import type { DepartmentItem } from '../../api/department'
 import type { RoleItem } from '../../api/role'
-import { mockDetails, toDetailData, buildAiAccessTimeline, str, num } from './approvalDetailUtils'
+import { mockDetails, toDetailData, buildAiAccessTimeline, str } from './approvalDetailUtils'
 import type { ApprovalTimelineItem, ApprovalDetailData } from './approvalDetailUtils'
 
 /** AI 申請詳情（從 biz_oa_request.formData 解析） */
@@ -104,6 +104,15 @@ const typeTitleMapKeys: Record<string, string> = {
   rdm_intake: 'approvalDetail.typeTitleRdmIntake',
   rdm_change: 'approvalDetail.typeTitleRdmChange',
 }
+
+/**
+ * 走 OA 统一引擎（biz_oa_request）的流程类型。
+ * <p>这些类型不在 biz_fin_approval 里：一旦落到财务分支，页面会降级成充值 mock，
+ * 审批人既看不到内容也没有同意/驳回入口（RDM 需求准入/变更单实测如此）。
+ */
+const OA_ENGINE_TYPES: string[] = ['oa_purchase', 'rdm_intake', 'rdm_change']
+const isOaEngineType = (t?: string) => !!t && OA_ENGINE_TYPES.includes(t)
+const isRdmFlowType = (t?: string) => t === 'rdm_intake' || t === 'rdm_change'
 
 /** 流程狀態映射（i18n key，value 為英文枚舉碼） */
 const flowStatusLabelMapKeys: Record<string, string> = {
@@ -281,8 +290,15 @@ export default function ApprovalDetail() {
   /** 授權草稿：第二節點優先讀取第一節點保存的 draftGrant */
   const [grantDraft, setGrantDraft] = useState<AiGrantDraft | null>(null)
 
-  /** 審批類型以記錄為準（未加載到時回退 URL 參數） */
-  const type = data.approvalType || urlType
+  /**
+   * 審批類型判定：URL 明说是 OA 引擎類（採購/RDM 准入/變更/AI 申請）時以 URL 為準。
+   * <p>原先写 `data.approvalType || urlType`，而初始 data 来自 fallback/mock，
+   * 它的 approvalType 是 'recharge' —— RDM 变更单会被反向判成充值单，
+   * 详情填假数据不说，通过/驳回还会打到财务接口（深度测试实测：审批流程不存在）。
+   */
+  const type = (urlType && (isOaEngineType(urlType) || urlType === 'ai_access'))
+    ? urlType
+    : (data.approvalType || urlType)
   /** 僅審批中的流程可通過/駁回 */
   const isPending = data.flowStatus === 'pending'
   /** 是否已有審批人通過（有則不允許撤銷） */
@@ -323,10 +339,10 @@ export default function ApprovalDetail() {
       if (!flowNo) return
       // AI 申請存在於 biz_oa_request 表，不在 biz_fin_approval 中，跳過財務審批查詢避免「審批流程不存在」報錯
       // 採購申請同樣不在 biz_fin_approval 中，跳過避免降级到充值 mock 數據
-      if (type === 'ai_access' || type === 'oa_purchase') {
-        // oa_purchase 完整詳情由後續 effect 從後端拉取；後端數據已載入則不再用 fallback 覆蓋，
+      if (type === 'ai_access' || isOaEngineType(type)) {
+        // oa_purchase 完整详情由后续 effect 從後端拉取；後端數據已載入则不再用 fallback 覆蓋，
         // 避免 refReady 異步就緒後本 effect 重跑把 draft 空數據蓋回（刷新後詳情空白、無法審批）。
-        if (type === 'oa_purchase' && oaLoadedFlowNoRef.current === flowNo) return
+        if (isOaEngineType(type) && oaLoadedFlowNoRef.current === flowNo) return
         if (!cancelled) setData(fallbackDetail())
         return
       }
@@ -482,6 +498,40 @@ export default function ApprovalDetail() {
     return () => { cancelled = true }
   }, [type, flowNo, aiRequestId, data.applicant])
 
+  /** RDM 准入/变更单：从 OA 统一接口取申请人、时间与流转记录，绝不查财务表 */
+  useEffect(() => {
+    if (!isRdmFlowType(type) || !flowNo) return
+    let cancelled = false
+    fetchOaRequestDetail(flowNo)
+      .then((oaVo: OaRequestVO) => {
+        if (cancelled) return
+        oaLoadedFlowNoRef.current = flowNo
+        const fd = (oaVo.formData || {}) as Record<string, unknown>
+        const reason = [fd.reason, fd.changeReason, fd.change_reason, fd.description]
+          .find(v => typeof v === 'string' && v) as string | undefined
+        setData(prev => ({
+          ...prev,
+          // 流程号与凭证也必须以详情为准：初始 fallback 是充值 mock，
+          // 不覆写就会在 RDM 单子上透出 CZ 单号与假附件（复验实测）。
+          flowNo: oaVo.flowNo || prev.flowNo,
+          documents: [],
+          applicant: oaVo.applicant || prev.applicant,
+          applyDate: oaVo.applyTime || prev.applyDate,
+          flowStatus: (oaVo.flowStatus as typeof prev.flowStatus) || prev.flowStatus,
+          notes: reason || prev.notes,
+          hasRevoke: oaVo.flowStatus === 'pending',
+          timeline: [
+            { node: 'created', time: oaVo.applyTime || '', approver: oaVo.applicant || '--', status: 'submitted' as const, comment: '' },
+            ...(oaVo.currentNodeName
+              ? [{ node: oaVo.currentNodeName, time: '', approver: oaVo.currentApprover || '--', status: 'pending' as const, comment: '' }]
+              : []),
+          ],
+        }))
+      })
+      .catch(() => { /* 後端不可用时保留基础展示，不降级到充值字段 */ })
+    return () => { cancelled = true }
+  }, [type, flowNo])
+
   /** 採購申請：從後端拉取詳情數據（申請人、申請日期、採購明細等） */
   useEffect(() => {
     if (type !== 'oa_purchase' || !flowNo) return
@@ -616,11 +666,16 @@ export default function ApprovalDetail() {
           }
           // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批；OA 採購走 OA 審批 API
           const isFrontendFlow = type === 'gift' || type === 'ai_access'
-          const result = type === 'oa_purchase'
+          const oaApproved = isOaEngineType(type)
+          const result = oaApproved
             ? ((await approveOaRequest(flowNo, approvalComment)), null)
             : isFrontendFlow
               ? approveCurrentNode(flowNo)
               : await approveFinApproval(flowNo)
+          if (oaApproved) {
+            // OA 引擎类接口无节点信息可回，不补提示就只剩页面跳转，用户不知道到底批成没有
+            message.success(t('approvalCenter.approveSuccess'))
+          }
           if (result) {
             message.success(result.finished
               ? t('approvalDetail.approveFinished', {
@@ -629,7 +684,7 @@ export default function ApprovalDetail() {
                 })
               : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode }))
           }
-          const isOaFlow = type === 'oa_purchase' || type === 'ai_access'
+          const isOaFlow = isOaEngineType(type) || type === 'ai_access'
           navigate(isOaFlow ? '/oa-requests' : '/approval-center')
         } catch (err) {
           // 無審批權限（403）或審批即授權事務失敗等業務校驗失敗，展示後端給出的具體原因
@@ -668,20 +723,20 @@ export default function ApprovalDetail() {
        */
       if (type === 'ai_access' && data.aiRequestId) {
         await rejectOaRequest(flowNo, rejectReason)
-      } else if (type === 'oa_purchase') {
+      } else if (isOaEngineType(type)) {
         await rejectOaRequest(flowNo, rejectReason)
       }
       const isFrontendFlow = type === 'gift' || type === 'ai_access'
       const rejectedNode = isFrontendFlow
         ? rejectCurrentNode(flowNo, rejectReason)
-        : type === 'oa_purchase'
+        : isOaEngineType(type)
           ? null
           : (await rejectFinApproval(flowNo, rejectReason), null)
       message.success(rejectedNode
         ? t('approvalDetail.rejectDone', { nodeName: rejectedNode })
         : t('approvalCenter.rejectSuccess'))
       setShowRejectModal(false)
-      const isOaFlow = type === 'oa_purchase' || type === 'ai_access'
+      const isOaFlow = isOaEngineType(type) || type === 'ai_access'
       navigate(isOaFlow ? '/oa-requests' : '/approval-center')
     } catch (err) {
       message.error((err as Error)?.message || t('approvalDetail.rejectFailed'))
@@ -703,7 +758,7 @@ export default function ApprovalDetail() {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
       } else if (type === 'gift') {
         updateApprovalRecord(flowNo, { flowStatus: 'cancelled' })
-      } else if (type === 'oa_purchase') {
+      } else if (isOaEngineType(type)) {
         await cancelOaRequest(flowNo)
       } else {
         await cancelFinApproval(flowNo)
@@ -726,7 +781,7 @@ export default function ApprovalDetail() {
 
   const handleDeleteConfirm = async () => {
     // 後端記錄：調用撤銷 API 刪除
-    if ((type === 'oa_purchase' || type === 'ai_access') && flowNo) {
+    if ((isOaEngineType(type) || type === 'ai_access') && flowNo) {
       try {
         await cancelOaRequest(flowNo)
       } catch { /* API 失敗仍刪除本地記錄 */ }
@@ -857,8 +912,8 @@ export default function ApprovalDetail() {
         title={typeTitleMapKeys[type] ? t(typeTitleMapKeys[type]) : type}
         tags={
           <>
-            {type === 'oa_purchase' || type === 'ai_access'
-              ? <Tag color={type === 'oa_purchase' ? 'orange' : 'blue'} style={{ margin: 0 }}>{type === 'oa_purchase' ? '採購' : 'AI申請'}</Tag>
+            {isOaEngineType(type) || type === 'ai_access'
+              ? <Tag color={type === 'oa_purchase' ? 'orange' : 'blue'} style={{ margin: 0 }}>{typeTitleMapKeys[type ?? ''] ? t(typeTitleMapKeys[type ?? '']) : (type === 'oa_purchase' ? '採購' : 'AI申請')}</Tag>
               : <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>}
             <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
             <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
@@ -908,7 +963,7 @@ export default function ApprovalDetail() {
                 <span className="approval-info-value">{data.flowNo}</span>
               </div>
               {/* 第二行：所屬公司、服務部門、職位 */}
-              {type === 'ai_access' || type === 'oa_purchase' ? (
+              {type === 'ai_access' || isOaEngineType(type) ? (
                 <>
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('aiApply.company')}</span>

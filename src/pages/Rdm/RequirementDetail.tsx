@@ -8,7 +8,7 @@
  * 3. 业务验收动作走独立验收页，不在详情页内做弹窗表单。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Input, Modal, Rate, Select, Space, Tag, Timeline, Tooltip, message } from 'antd'
+import { AutoComplete, Button, DatePicker, Input, Modal, Rate, Select, Space, Tag, Timeline, Tooltip, message } from 'antd'
 import {
   AimOutlined,
   AuditOutlined,
@@ -28,7 +28,10 @@ import { useAuth } from '../../contexts/AuthContext'
 import RequirementStageBar from './components/RequirementStageBar'
 import AcceptanceTraceCard from './components/AcceptanceTraceCard'
 import DeliveryPanel from './components/DeliveryPanel'
+/** 阶段 4：上线前的发布放行闸门（与上线后业务验收分成两块） */
+import ReleasePanel from './components/ReleasePanel'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
+import { fetchVersionHistory } from '../../api/versionHistory'
 import {
   addComment,
   fetchIterations,
@@ -54,6 +57,7 @@ import {
   RDM_REQ_TYPE_LABEL,
   RDM_ROLE_LABEL,
   RDM_STATUS,
+  RDM_ACCEPTANCE_OPEN_STATUS,
   RDM_STATUS_LABEL,
   type RdmAction,
   type RdmActionField,
@@ -68,8 +72,12 @@ import './index.css'
 
 const { TextArea } = Input
 
-/** 可选上线版本（原型：真实数据来自 sys_version_history） */
-const VERSION_OPTIONS = ['2.9.0', '2.10.0', '2.11.0'].map(v => ({ value: v, label: v }))
+/**
+ * 可选上线版本：来自 sys_version_history（之前硬编码三个号，
+ * 真实版本对不上时会让人无法关联，而放行单的版本字段又要求匹配）。
+ * 用 AutoComplete 而不是 Select：版本可能刚建还没进列表，不能把人锁在下拉里。
+ */
+const VERSION_FALLBACK_HINT = '無發布版本記錄，可直接輸入版本號（與放行單里的版本一致才能上線）'
 
 /** 审批节点状态文案 */
 const APPROVAL_STATUS_LABEL: Record<string, { text: string; color: string }> = {
@@ -98,38 +106,50 @@ export default function RequirementDetail() {
   /** 满意度不预置 5 分：预置后「必填满意度」校验永远提前满足，等于代理业务方打分 */
   const [score, setScore] = useState<number | undefined>()
   const [pmUserId, setPmUserId] = useState<number>()
+  /** 可关联的上线版本（来自 sys_version_history） */
+  const [versionOptions, setVersionOptions] = useState<{ value: string; label: string }[]>([])
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
-    const [data, trans, pms, iters] = await Promise.all([
+    const [data, trans, pms, iters, versions] = await Promise.all([
       fetchRequirementDetail(id),
       fetchTransitions(),
       fetchProductOptions(),
       fetchIterations(),
+      // 版本列表拉不到不能阻断详情页：AutoComplete 仍可手工输入
+      fetchVersionHistory({ page: 1, size: 20 }).catch(() => null),
     ])
     setDetail(data)
     setTransitions(trans)
     setPmOptions(pms)
     setIterations(iters)
+    setVersionOptions((versions?.records ?? []).map(v => ({
+      value: v.versionNo,
+      label: v.releaseDate ? `${v.versionNo}（${v.releaseDate.slice(0, 10)}）` : v.versionNo,
+    })))
   }, [id])
 
   useEffect(() => { void load() }, [load])
 
   /**
-   * 当前可执行动作：后端 allowedActions 为权威（已按 rdm_transition + 角色守卫算好）；
-   * 后端不可用降级时，再按本地流转表与状态推导，保证 mock 演示可走通。
+   * 后端下发的可执行动作。数组存在就以后端为准，**空数组也算**：
+   * 空的含义是「你这个角色在这个状态下没有可做的事」，
+   * 而 `detail?.allowedActions?.length` 这种写法会把「无权」当成「字段缺失」，
+   * 回退到本地流转表后反而将分配/验收/归档按钮摆给无关角色（点了才被后端拒）。
    */
+  const serverActions = detail?.allowedActions
   const availableActions = useMemo(() => {
-    if (detail?.allowedActions?.length) {
-      return detail.allowedActions.map(a => ({
+    if (serverActions) {
+      return serverActions.map(a => ({
         key: a.actionCode,
         actionCode: a.actionCode as RdmAction,
         actionName: a.actionName || RDM_ACTION_LABEL[a.actionCode as RdmAction] || a.actionCode,
         requiredFields: (a.requiredFields ?? []) as RdmActionField[],
       }))
     }
+    // 只有字段缺失（后端降级/历史数据）才按本地流转表推导，用于原型演示
     const seen = new Set<string>()
     return transitions
       .filter(t => {
@@ -143,7 +163,7 @@ export default function RequirementDetail() {
         actionName: t.actionName || RDM_ACTION_LABEL[t.actionCode as RdmAction] || t.actionCode,
         requiredFields: (RDM_ACTION_REQUIRED_FIELDS[t.actionCode as RdmAction] ?? []) as RdmActionField[],
       }))
-  }, [transitions, detail])
+  }, [serverActions, transitions, detail])
 
   const requiredFields: RdmActionField[] = useMemo(() => {
     if (!activeAction) return []
@@ -240,8 +260,10 @@ export default function RequirementDetail() {
       setActiveAction(null)
       setRemark(''); setPlanDate(null); setPromisedDate(null); setVersionNo(undefined); setPmUserId(undefined); setIterationCode(undefined)
       await load()
-    } catch {
-      message.error('流轉失敗，請重試')
+    } catch (err) {
+      // 必须透传后端真实文案：流转失败往往是业务闸门（未放行/版本不符），
+      // 给一句「请重试」会让人反复点同一个被拒的动作
+      message.error(err instanceof Error && err.message ? err.message : '流轉失敗，請重試')
     } finally {
       setSaving(false)
     }
@@ -278,6 +300,9 @@ export default function RequirementDetail() {
     ? `已在「${RDM_STATUS_LABEL[detail.status as RdmStatus] ?? detail.status}」停留 ${Math.max(Math.round(detail.stayHours / 24), 1)} 天`
     : undefined
 
+  // 审批动作只能由当前节点的审批人执行（后端代理给 OA 裁决），按钮不能对谁都亮
+  const canActIntake = availableActions.some(a => a.actionCode === 'approve_intake' || a.actionCode === 'reject_intake')
+
   return (
     <div className="content-area">
       {/* ── 头部 ── */}
@@ -295,14 +320,16 @@ export default function RequirementDetail() {
         extra={
           <Space>
             <Button icon={<BellOutlined />} onClick={handleUrge}>催辦</Button>
-            {detail.status === RDM_STATUS.UAT_PENDING && (
+            {RDM_ACCEPTANCE_OPEN_STATUS.includes(detail.status) && (
               <Button
                 type="primary"
                 icon={<CheckCircleOutlined />}
                 onClick={() => navigate(`/rdm-acceptance-form?id=${detail.id}`)}
                 style={{ backgroundColor: '#52C41A', borderColor: '#52C41A' }}
               >
-                業務驗收
+                {detail.status === RDM_STATUS.RELEASED || detail.status === RDM_STATUS.VERIFIED
+                  ? '業務驗收（已上線）'
+                  : '業務驗收'}
               </Button>
             )}
           </Space>
@@ -312,6 +339,52 @@ export default function RequirementDetail() {
       {/* ── 阶段进度条（全角色统一心智） ── */}
       <div className="rdm-card">
         <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} hint={stageHint} />
+      </div>
+
+      {/*
+        当前等待与下一步：把「谁欠谁一个动作」放在首屏。
+        详情页原本把当前处理人、承诺时间、阻塞原因平铺在基本信息 12 个格子里，
+        真正要「今天做什麼」的人得先扫一遍才能找到答案。
+      */}
+      <div className="rdm-next-bar">
+        <div className="rdm-next-item">
+          <span className="rdm-next-label">當前處理人</span>
+          <span className="rdm-next-value">{detail.currentHandler ?? '待分配'}</span>
+        </div>
+        <div className="rdm-next-item">
+          <span className="rdm-next-label">你的下一步</span>
+          <span className="rdm-next-value">
+            {availableActions.length > 0
+              ? `可執行「${availableActions[0].actionName}」${availableActions.length > 1 ? `等 ${availableActions.length} 個動作` : ''}`
+              : (serverActions
+                ? '你在此狀態無可執行動作，等相關處理人推進'
+                : '當前狀態無可執行動作')}
+          </span>
+        </div>
+        <div className="rdm-next-item">
+          <span className="rdm-next-label">承諾時間</span>
+          <span className="rdm-next-value">
+            PRD {detail.promisedPrdDate ?? '-'} / 上線 {detail.planReleaseDate ?? detail.expectDate ?? '-'}
+          </span>
+        </div>
+        {detail.blockedFlag && (
+          <div className="rdm-next-item warn">
+            <span className="rdm-next-label">阻塞</span>
+            <span className="rdm-next-value">{detail.blockedReason ?? '已標記阻塞，未填原因'}</span>
+          </div>
+        )}
+        {detail.overdueFlag && (
+          <div className="rdm-next-item danger">
+            <span className="rdm-next-label">逾期</span>
+            <span className="rdm-next-value">已超出本階段時效，需調整排期或说明原因</span>
+          </div>
+        )}
+        {detail.rejectReason && (
+          <div className="rdm-next-item warn">
+            <span className="rdm-next-label">最新駁回理由</span>
+            <span className="rdm-next-value">{detail.rejectReason}</span>
+          </div>
+        )}
       </div>
 
       <div className="rdm-detail-grid">
@@ -441,6 +514,15 @@ export default function RequirementDetail() {
             editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')}
           />
 
+          {/* 发布放行：上线前的质量闸门，裁决人与上线后的业务验收人分开 */}
+          <ReleasePanel
+            key={`gate-${detail.id}-${detail.status}`}
+            reqId={detail.id}
+            status={detail.status}
+            flowVersion={detail.flowVersion}
+            editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')}
+          />
+
           {/* 流转时间轴 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
@@ -533,6 +615,52 @@ export default function RequirementDetail() {
             </div>
           )}
 
+          {/*
+            准入审批视角：审批人先看到「我该判断什么」，再看到三个动作分别意味着什么。
+            退回补充是设计中的动作，但需要后端新增 return_supplement 流转（阶段 2B），
+            所以现在置灰 + 标记待接入，而不是先摆一个能骗过界面的按钮。
+          */}
+          {detail.status === RDM_STATUS.INTAKE_PENDING && (
+            <div className="rdm-card">
+              <div className="rdm-card-title">
+                <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><AuditOutlined /></span>
+                審批判斷
+                <span className="rdm-card-title-split" />
+              </div>
+              <ul className="rdm-judge-list">
+                <li><b>是否必要</b>：要解的业务问题是否真实存在、影响面多大</li>
+                <li><b>范围是否清楚</b>：期望结果能否逐条验收，有没有把方案当成需求</li>
+                <li><b>是否重复</b>：同部门同菜单是否已有在途或已交付的同类需求</li>
+              </ul>
+              <Space size={8} wrap style={{ marginTop: 4 }}>
+                <Button
+                  size="small"
+                  type="primary"
+                  disabled={!canActIntake}
+                  onClick={() => setActiveAction('approve_intake')}
+                >
+                  審批通過
+                </Button>
+                <Tooltip title="退回补充：需求回到提出人补料，不计为驳回；需要后端新增 return_supplement 流转（阶段 2B 接通）">
+                  <Button size="small" disabled>退回補充 <Tag style={{ margin: '0 0 0 4px' }}>待接入</Tag></Button>
+                </Tooltip>
+                <Button
+                  size="small"
+                  danger
+                  disabled={!canActIntake}
+                  onClick={() => setActiveAction('reject_intake')}
+                >
+                  審批駁回
+                </Button>
+              </Space>
+              {!canActIntake && (
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+                  你不在当前审批节点（或前序节点尚未审完），动作已置灰；可点下方「前往審批單」查看完整链路。
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 操作面板 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
@@ -541,7 +669,11 @@ export default function RequirementDetail() {
               <span className="rdm-card-title-split" />
             </div>
             {availableActions.length === 0 && (
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>當前狀態無可執行動作（已歸檔或等待他人處理）</div>
+              <div className="rdm-empty-hint">
+                {serverActions
+                  ? '当前状态下你的角色没有可执行动作，需求正在等下一位处理人；如确需变更，由对方执行或走需求变更。'
+                  : '当前状态无可执行动作（已归档或等待他人处理）'}
+              </div>
             )}
             <Space size={8} wrap>
               {availableActions.map(t => {
@@ -591,7 +723,19 @@ export default function RequirementDetail() {
                     <DatePicker style={{ width: '100%' }} placeholder="復審日期 *" value={holdUntil} onChange={setHoldUntil} />
                   )}
                   {requiredFields.includes('versionNo') && (
-                    <Select style={{ width: '100%' }} placeholder="關聯上線版本 *" value={versionNo} onChange={setVersionNo} options={VERSION_OPTIONS} />
+                    <>
+                      <AutoComplete
+                        style={{ width: '100%' }}
+                        placeholder="關聯上線版本 *"
+                        value={versionNo}
+                        onChange={v => setVersionNo(typeof v === 'string' ? v : undefined)}
+                        options={versionOptions}
+                        filterOption={(input, option) => (option?.label ?? '').includes(input)}
+                      />
+                      {versionOptions.length === 0 && (
+                        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{VERSION_FALLBACK_HINT}</div>
+                      )}
+                    </>
                   )}
                   {/* 选填但有入口：不选迭代就进不了产能对账与按迭代的周报 */}
                   {optionalFields.includes('iteration') && (
@@ -666,8 +810,22 @@ export default function RequirementDetail() {
               <div style={{ fontSize: 12, color: '#8C8C8C' }}>
                 {detail.intakeFlowNo
                   ? '審批節點載入中，可點「前往審批單」到 OA 審批中心處理。'
-                  : '該需求未啟用準入審批（或由管理員直送需求池），無需審批即可推進。'}
+                  : (detail.needApproval === 0
+                    ? '本輪按準入策略免審直送技術部（裁定依據見下方命中鏈路）。'
+                    : '本單尚未發起準入審批（草稿或未經提交）。')}
               </div>
+            )}
+            {/* 2B：把「凭哪条策略、哪个版本、第几轮」直接放在审批区，免审不再是无法解释的结论 */}
+            {(detail.intakePolicyName || detail.intakeRoundNo) && (
+              <div style={{ fontSize: 12, color: '#595959', margin: '2px 0 8px' }}>
+                命中策略：{detail.intakePolicyName || '默認策略'}（版本 {detail.intakePolicyVersion || 'v1'}）
+                {detail.intakeRoundNo ? ` · 第 ${detail.intakeRoundNo} 輪提交` : ''}
+              </div>
+            )}
+            {detail.intakeExplain && detail.intakeExplain.length > 0 && (
+              <ul className="rdm-judge-list">
+                {detail.intakeExplain.map((line, idx) => <li key={idx}>{line}</li>)}
+              </ul>
             )}
             {detail.approvalNodes.map((node, idx) => {
               const meta = APPROVAL_STATUS_LABEL[node.status] ?? { text: node.status, color: 'default' }

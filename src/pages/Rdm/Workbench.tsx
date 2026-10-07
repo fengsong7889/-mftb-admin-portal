@@ -13,6 +13,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CodeOutlined,
+  ExclamationCircleOutlined,
   FileAddOutlined,
   InboxOutlined,
   RightOutlined,
@@ -24,8 +25,16 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchWorkbench, type RdmWorkbenchData } from '../../api/rdm'
-import { RDM_STATUS_LABEL, type RdmStatus } from '../../constants/rdm'
+import { fetchRequirementPage, fetchWorkbench, type RdmRequirementRow, type RdmWorkbenchData } from '../../api/rdm'
+import {
+  RDM_SCOPE,
+  RDM_STAGE_LABEL,
+  RDM_STAGE_ORDER,
+  RDM_STATUS,
+  RDM_STATUS_LABEL,
+  RDM_STATUS_STAGE,
+  type RdmStatus,
+} from '../../constants/rdm'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import './index.css'
 
@@ -59,16 +68,69 @@ const TODO_ICON: Record<string, { icon: React.ReactNode; color: string; bg: stri
   acceptance: { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED' },
 }
 
+/**
+ * 提出人自己还得再动一次手的状态。
+ * <p>口径只从提出人视角列：草稿是没提交完，intake_rejected / rejected 是被打回要改，
+ * on_hold 是产品暂缓但要提出人确认是否还做。技术侧的评审/开发等待不该出现在这里，
+ * 否则业务方会以为球还在自己手上。
+ */
+const SUBMITTER_ACTION_STATUS: string[] = [
+  RDM_STATUS.DRAFT,
+  RDM_STATUS.INTAKE_REJECTED,
+  RDM_STATUS.REJECTED,
+  RDM_STATUS.ON_HOLD,
+]
+
+/** 上面每个状态该配一句「现在轮到你做什么」，只写状态名等于没提示 */
+const SUBMITTER_ACTION_HINT: Record<string, string> = {
+  [RDM_STATUS.DRAFT]: '仍是草稿，補充內容後提交才会開始流轉',
+  [RDM_STATUS.INTAKE_REJECTED]: '准入審批被駁回，修改後可重新提交',
+  [RDM_STATUS.REJECTED]: '產品駁回了需求，可查看理由後決定是否重開',
+  [RDM_STATUS.ON_HOLD]: '需求被挂起暂缓，確認是否仍需推進',
+}
+
+/**
+ * 六段进度（业务视角的折叠阶段）。
+ * <p>为什么用状态反查阶段而不直接读接口 stage：草稿/驳回这类状态下 stage 可能为空，
+ * 直接渲染会出现「一格都不亮」的进度条，业务方就以为需求没提交成功。
+ */
+function StageTrack({ status }: { status: string }) {
+  const stage = RDM_STATUS_STAGE[status as RdmStatus]
+  const currentIndex = stage ? RDM_STAGE_ORDER.indexOf(stage) : -1
+  const finished = status === RDM_STATUS.CLOSED
+  return (
+    <div className="rdm-track-steps">
+      {RDM_STAGE_ORDER.map((step, idx) => {
+        const cls = finished || idx < currentIndex ? 'done' : idx === currentIndex ? 'current' : 'todo'
+        return (
+          <div key={step} className={`rdm-track-step ${cls}`} title={RDM_STAGE_LABEL[step]}>
+            <span className="rdm-track-dot" />
+            <span className="rdm-track-label">{RDM_STAGE_LABEL[step]}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function RdmWorkbench() {
   const navigate = useNavigate()
   const { hasMenuPermission } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
+  /** 我提的需求（含草稿与被驳回的），走列表接口 scope=mine，与待办分区不同口径 */
+  const [mineRows, setMineRows] = useState<RdmRequirementRow[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setData(await fetchWorkbench())
+      // 两个只读接口任一失败都不应把整页打成空白，所以提交列表单独兜底
+      const [wb, mine] = await Promise.all([
+        fetchWorkbench(),
+        fetchRequirementPage({ page: 1, size: 6, scope: RDM_SCOPE.MINE }).catch(() => null),
+      ])
+      setData(wb)
+      setMineRows(mine?.records ?? [])
     } catch {
       message.error('工作台數據載入失敗')
     } finally {
@@ -87,6 +149,9 @@ export default function RdmWorkbench() {
 
   const { identity, stats, todos } = data
   const recentActivity = data.recentActivity ?? []
+  // 需要我补充：从我的提交里按提出人可动作的状态过滤，并把原因带上（无原因就不堵人）
+  const needAction = mineRows.filter(r => SUBMITTER_ACTION_STATUS.includes(String(r.status)))
+  const tracking = mineRows.filter(r => !SUBMITTER_ACTION_STATUS.includes(String(r.status)))
 
   return (
     <div className="content-area">
@@ -147,6 +212,49 @@ export default function RdmWorkbench() {
         />
       </div>
 
+      {/* ── 需要我补充（提出人阻塞项，排在待办分区之前：球在我手上就先看到）── */}
+      {needAction.length > 0 && (
+        <div className="rdm-card" style={{ marginBottom: 16 }}>
+          <div className="rdm-card-title">
+            <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><ExclamationCircleOutlined /></span>
+            需要我補充
+            <Tag color="red" style={{ margin: 0 }}>{needAction.length}</Tag>
+            <span className="rdm-todo-hint">這些需求在等提出人補内容或做決定，不處理會停在原地</span>
+            <span className="rdm-card-title-split" />
+            <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+              查看全部 <RightOutlined style={{ fontSize: 11 }} />
+            </Button>
+          </div>
+          {needAction.map(row => (
+            <div key={row.id} className="rdm-need-item">
+              <div className="rdm-todo-item-main">
+                <div
+                  className="rdm-todo-item-title"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/rdm-detail?id=${row.id}`)}
+                >
+                  {row.title}
+                </div>
+                <div className="rdm-need-reason">
+                  {SUBMITTER_ACTION_HINT[String(row.status)] ?? '需求等待提出人處理'}
+                  {row.rejectReason ? `｜理由：${row.rejectReason}` : ''}
+                </div>
+                <div className="rdm-todo-item-meta">
+                  <span>{row.reqNo}</span>
+                  {row.stayHours != null && row.stayHours > 24 && (
+                    <span style={{ color: '#D46B08' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
+                  )}
+                </div>
+              </div>
+              <StatusTag status={row.status} overdue={row.overdueFlag ?? false} />
+              <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${row.id}`)}>
+                去處理
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── 待办分区（按角色渲染，空组自动隐藏） ── */}
       {todos.filter(g => g.total > 0).map(group => {
         const meta = TODO_ICON[group.key] ?? { icon: <InboxOutlined />, color: '#8C8C8C', bg: '#F5F5F5' }
@@ -201,6 +309,53 @@ export default function RdmWorkbench() {
           </div>
         )
       })}
+
+      {/* ── 我的提交追踪（业务方最关心：到哪一步、谁在跟、什么时候给）── */}
+      <div className="rdm-card" style={{ marginBottom: 16 }}>
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RocketOutlined /></span>
+          我的提交追蹤
+          <span className="rdm-todo-hint">只看到自己提的需求，進展與責任人一目了然</span>
+          <span className="rdm-card-title-split" />
+          <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+            查看全部 <RightOutlined style={{ fontSize: 11 }} />
+          </Button>
+        </div>
+        {tracking.length === 0 ? (
+          <div className="rdm-empty-hint">
+            目前沒有正在推進的需求。
+            <Button type="link" size="small" onClick={() => navigate('/rdm-submit')}>現在提一個需求</Button>
+          </div>
+        ) : tracking.map(row => (
+          <div key={row.id} className="rdm-track-item">
+            <div className="rdm-todo-item-main">
+              <div
+                className="rdm-todo-item-title"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/rdm-detail?id=${row.id}`)}
+              >
+                {row.title}
+              </div>
+              <StageTrack status={String(row.status)} />
+              <div className="rdm-todo-item-meta">
+                <span>{row.reqNo}</span>
+                <span>當前處理人：{row.currentHandler || RDM_STATUS_LABEL[row.status as RdmStatus] || '-'}</span>
+                {row.promisedPrdDate && <span>承諾 PRD：{row.promisedPrdDate}</span>}
+                {row.planReleaseDate && <span>計劃上線：{row.planReleaseDate}</span>}
+                {row.expectDate && <span>業務期望：{row.expectDate}</span>}
+                {typeof row.progress === 'number' && row.progress > 0 && <span>研發進度 {row.progress}%</span>}
+              </div>
+            </div>
+            <Space size={6}>
+              <PriorityTag priority={row.priority} />
+              <StatusTag status={row.status} overdue={row.overdueFlag ?? false} />
+            </Space>
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${row.id}`)}>
+              詳情
+            </Button>
+          </div>
+        ))}
+      </div>
 
       {/* ── 最近动态（仅在有意义数据时展示） ── */}
       {recentActivity.length > 0 && (

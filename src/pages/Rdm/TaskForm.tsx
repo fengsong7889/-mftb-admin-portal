@@ -45,6 +45,8 @@ export default function TaskForm() {
   const [form] = Form.useForm<FormValues>()
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string } | null>(null)
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
+  /** 负责人显示名：表单值只有 userId，确认框光靠 id 没法核对派给了谁 */
+  const [ownerLabel, setOwnerLabel] = useState<string>()
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -71,6 +73,9 @@ export default function TaskForm() {
           ? [dayjs(task.planStartDate), dayjs(task.planFinishDate)] : undefined,
         iterationCode: task.iterationCode ?? undefined,
       })
+      if (task.ownerName) {
+        setOwnerLabel(task.ownerEmpNo ? `${task.ownerName}（${task.ownerEmpNo}）` : task.ownerName)
+      }
     }).catch(() => message.error('任務資訊載入失敗'))
   }, [reqId, taskId, form])
 
@@ -90,7 +95,8 @@ export default function TaskForm() {
       return
     }
     const values = await form.validateFields()
-    const ownerText = values.owner ? String(values.owner) : '未指派'
+    // 确认框不能只贴一个裸 userId：PM 看到「負责人：41」无法核对派给了谁
+    const ownerText = ownerLabel ?? (values.owner ? `未匹配姓名（#${values.owner}）` : '未指派')
     Modal.confirm({
       title: taskId ? '確認保存任務？' : '確認創建並指派任務？',
       className: 'custom-confirm-modal',
@@ -174,11 +180,19 @@ export default function TaskForm() {
               placeholder="輸入姓名/工號搜索在職員工"
               fetchOptions={fetchOwnerOptions}
               initialOptions={ownerOptions}
+              onChange={(_, label) => setOwnerLabel(label)}
               style={{ width: 320 }}
             />
           </Form.Item>
           <Space size={16} wrap>
-            <Form.Item label="計劃工時（小時）" name="planHours">
+            <Form.Item
+              label="計劃工時（小時）"
+              name="planHours"
+              rules={[{
+                type: 'number', min: 0, max: 999,
+                message: '計劃工時必須在 0-999 人時之間',
+              }]}
+            >
               <InputNumber min={0} step={1} style={{ width: 150 }} placeholder="例：16" />
             </Form.Item>
             <Form.Item label="計劃起止" name="planRange">

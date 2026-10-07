@@ -1,7 +1,13 @@
 /* ========== 闪峰蜜蜂宠物悬浮组件 ========== */
 .pet-mascot-wrapper {
   position: fixed;
-  z-index: 9999;
+  /*
+   * 层级必须低于 antd 弹层（DatePicker/Select 面板 1050、Modal/Drawer 1000）。
+   * 之前是 9999：宠物浮在日期面板上方并吞掉「下个月」这类点击，
+   * 用户点面板却跳到宠物链接的页面，影响全站所有日期录入（端到端实测）。
+   * 900 仍高于正常正文，但不会遮住任何弹层；弹层出现时宠物退到背后也更符合预期。
+   */
+  z-index: 900;
   cursor: grab;
   user-select: none;
   display: flex;

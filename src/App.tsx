@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
-import { Layout, Spin } from 'antd'
+import { Layout, Spin, Modal } from 'antd'
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ensureLanguageBundle, getSavedLanguage } from './i18n'
@@ -273,6 +273,8 @@ const RdmIterationForm = lazy(() => import('./pages/Rdm/IterationForm'))
 const RdmPrdForm = lazy(() => import('./pages/Rdm/PrdForm'))
 const RdmReviewForm = lazy(() => import('./pages/Rdm/ReviewForm'))
 const RdmChangeForm = lazy(() => import('./pages/Rdm/ChangeForm'))
+/** 阶段 3：五节点计划与基线冻结（一屏要录 5×4 套时间，所以是独立页） */
+const RdmMilestonePlan = lazy(() => import('./pages/Rdm/MilestonePlan'))
 const RdmQualityBoard = lazy(() => import('./pages/Rdm/QualityBoard'))
 const RdmVersionTrace = lazy(() => import('./pages/Rdm/VersionTrace'))
 const RdmWeeklyReport = lazy(() => import('./pages/Rdm/WeeklyReport'))
@@ -581,6 +583,8 @@ function AuthenticatedLayout() {
               <Route path="/rdm-prd" element={<RdmPrdForm />} />
               <Route path="/rdm-review" element={<RdmReviewForm />} />
               <Route path="/rdm-change" element={<RdmChangeForm />} />
+              {/* 节点计划：受理后的五节点承诺与基线冻结 */}
+              <Route path="/rdm-milestone" element={<RdmMilestonePlan />} />
               <Route path="/rdm-acceptance" element={<RdmAcceptanceList />} />
               <Route path="/rdm-acceptance-form" element={<RdmAcceptanceForm />} />
               <Route path="/rdm-dashboard" element={<RdmDashboard />} />
@@ -687,6 +691,15 @@ function AuthenticatedLayout() {
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
+
+  /*
+   * 路由切换时关掉命令式确认框（Modal.confirm）。
+   * 否则在旧页面发起、失败后保留的确认框会悬浮在新页面上（z-index 2000 + 全视口遮罩），
+   * 把整个新页面遮住，用户只能刷新才能继续干活。
+   */
+  useEffect(() => {
+    Modal.destroyAll()
+  }, [location.pathname])
 
   // 公開頁面（免登錄，不套後台佈局）：
   // - /m/... 掃碼查看資產標籤

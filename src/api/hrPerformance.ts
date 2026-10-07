@@ -150,6 +150,12 @@ export interface PerfScoreItem {
   indicatorName: string
   weight: number
   targetValue?: string | null
+  /** 系统建议分（由 RDM 產研协同绩效建议推送写入，撤回后为空） */
+  suggestedScore?: number | null
+  /** 建议值来源（如 RDM） */
+  suggestedSource?: string | null
+  /** 建议值写入时间 */
+  suggestedAt?: string | null
   selfScore?: number | null
   supervisorScore?: number | null
   finalScore?: number | null

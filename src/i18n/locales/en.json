@@ -9180,6 +9180,8 @@
     "indicatorTypeCompetency": "Competency",
     "indicatorTypeAttitude": "Attitude",
     "indicatorTypeCompliance": "Compliance",
+    "indicatorTypeRdmOutput": "RDM Output",
+    "suggestedScore": "Suggested Value",
     "workbenchScopeTip": "Only forms where I am the evaluator",
     "reviewKeywordPlaceholder": "Name or employee id",
     "selfScopeTip": "Only your own assessment forms",

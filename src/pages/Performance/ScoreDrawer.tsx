@@ -127,6 +127,20 @@ export default function ScoreDrawer({ open, assessmentId, mode, onClose, onChang
         title: t('hrPerf.weight'), dataIndex: 'weight', key: 'weight', width: 80,
         render: (v: number) => `${v}`,
       },
+      {
+        /*
+         * 系统建议值列：RDM 绩效建议推送只写这一列（建议通道），
+         * 自评/主管评/最终分仍由 HR 校准。没有这一列 HR 就无法核对
+         * “推了多少”与“撤回后是否真清空”（阶段 6 端到端实测）。
+         */
+        title: t('hrPerf.suggestedScore'), dataIndex: 'suggestedScore', key: 'suggestedScore', width: 140,
+        render: (v: number | null, row) => (v == null ? '-' : (
+          <span>
+            {v}
+            {row.suggestedSource ? <Tag style={{ margin: '0 0 0 6px' }}>{row.suggestedSource}</Tag> : null}
+          </span>
+        )),
+      },
     ]
     if (mode !== 'self') {
       base.push({

@@ -41,6 +41,8 @@ import {
   fetchRequirementPage,
   fetchScopeCounts,
   fetchProductOptions,
+  claimRequirement,
+  submitRequirement,
   urgeRequirement,
   withdrawRequirement,
   type RdmRequirementRow,
@@ -55,6 +57,7 @@ import {
   RDM_SCOPE,
   RDM_SCOPE_LABEL,
   RDM_STATUS,
+  RDM_ACCEPTANCE_OPEN_STATUS,
   RDM_STATUS_LABEL,
   RDM_TERMINAL_STATUS,
   type RdmScope,
@@ -93,8 +96,17 @@ const EXECUTION_SCOPES: RdmScope[] = [
   RDM_SCOPE.DELIVERY,
 ]
 
-/** 可撤回的状态（草稿/待审批） */
-const WITHDRAWABLE: string[] = [RDM_STATUS.DRAFT, RDM_STATUS.INTAKE_PENDING]
+/**
+ * 可撤回的状态：只有「待审批」。
+ * <p>以前把草稿也算进去，草稿行会顶着一个必被服务端拒的「撤回」按钮（服务端只允许 intake_pending）。
+ */
+const WITHDRAWABLE: string[] = [RDM_STATUS.INTAKE_PENDING]
+
+/**
+ * 提出人可自助提交的状态：草稿与准入驳回。
+ * <p>走 /rdm/requirement/{id}/submit（只要求 create），不占用通用流转的 edit 产品处理权。
+ */
+const SELF_SUBMITTABLE: string[] = [RDM_STATUS.DRAFT, RDM_STATUS.INTAKE_REJECTED]
 
 /**
  * 列表筛选条件。
@@ -153,7 +165,7 @@ export default function RequirementList({
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
 
   // 视角单一数据源是 URL；菜单入口只给默认值。非法值（手改地址栏）退回默认视角，
   // 不能让页面停在查不到数据的条件上
@@ -181,6 +193,42 @@ export default function RequirementList({
    * 修掉的“无分配权也看到分配按钮”重新引进来。
    */
   const canDispatch = hasPermission('rdm-intake:edit')
+
+  /**
+   * 认领资格只认受理权（rdm-requirement:edit）。
+   * <p>不要求分配权：否则产品经理只能等着被分配，需求池就会堆成无人认领的积压区。
+   */
+  const canClaim = hasPermission('rdm-requirement:edit')
+
+  /** 认领：服务端条件更新保证只有一人成功，抢到前必须二次确认 */
+  const handleClaim = (row: RdmRequirementRow) => {
+    Modal.confirm({
+      title: '確認認領該需求？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>需求編號：</span><b>{row.reqNo}</b></div>
+          <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
+          <div className="confirm-info-row">
+            <span>認領後：</span><b>你成為受理人，需求離開需求池並通知提出人；若已被他人搶先，會提示失敗</b>
+          </div>
+        </div>
+      ),
+      okText: '確認認領',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await claimRequirement(row.id)
+          message.success('已認領該需求')
+          void load()
+        } catch (err) {
+          message.error(err instanceof Error && err.message ? err.message : '認領失敗，請刷新後重試')
+          throw err
+        }
+      },
+    })
+  }
 
   /** 看板按列铺开、不翻页，所以一次拉固定上限；表格走分页 */
   const querySize = view === 'kanban' ? RDM_KANBAN_SIZE : size
@@ -256,6 +304,41 @@ export default function RequirementList({
       // 催办是静默请求，不在这里说就等于点了没反应
       message.error(err instanceof Error && err.message ? err.message : '催辦失敗，請重試')
     }
+  }
+
+  /**
+   * 自助提交 / 修改后重提：先二次确认再调接口。
+   * <p>提交会真正发起准入审批（服务端同事务创建本轮准入单），所以必须可确认，不能点了就走。
+   */
+  const handleSelfSubmit = (row: RdmRequirementRow) => {
+    const resubmit = row.status === RDM_STATUS.INTAKE_REJECTED
+    Modal.confirm({
+      title: resubmit ? '確認重新提交該需求？' : '確認提交該需求？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>需求編號：</span><b>{row.reqNo}</b></div>
+          <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
+          <div className="confirm-info-row">
+            <span>提交後：</span>
+            <b>{resubmit ? '发起新的一轮准入审批（旧单已终态，不会沿用）' : '进入准入审批，由上级或指定人审批后送達技术部'}</b>
+          </div>
+        </div>
+      ),
+      okText: '確認提交',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await submitRequirement(row.id)
+          message.success(resubmit ? '已重新提交，等待审批' : '已提交，等待审批')
+          void load()
+        } catch (err) {
+          message.error(err instanceof Error && err.message ? err.message : '提交失敗，請重試')
+          throw err
+        }
+      },
+    })
   }
 
   /**
@@ -409,6 +492,12 @@ export default function RequirementList({
         const status = r.status as RdmStatus
         const assignable = canDispatch && status === RDM_STATUS.POOL
         const actions: React.ReactNode[] = []
+        // 无人认领的池内需求才提供认领，已分配的单走「改派」
+        if (canClaim && status === RDM_STATUS.POOL && !r.pmName) {
+          actions.push(
+            <Button key="claim" type="link" size="small" onClick={() => handleClaim(r)}>認領</Button>,
+          )
+        }
         if (assignable) {
           actions.push(
             <Button key="assign" type="link" size="small"
@@ -427,12 +516,21 @@ export default function RequirementList({
             <Button key="withdraw" type="link" size="small" danger onClick={() => handleWithdraw(r)}>撤回</Button>,
           )
         }
-        if (status === RDM_STATUS.UAT_PENDING) {
+        // 自助提交只对提出人本人开（服务端同样会拒），否则列表上会出现点了必报错的按钮
+        if (SELF_SUBMITTABLE.includes(r.status) && !!user?.empId && r.submitterEmpNo === user.empId) {
+          actions.push(
+            <Button key="submit" type="link" size="small" onClick={() => handleSelfSubmit(r)}>
+              {r.status === RDM_STATUS.INTAKE_REJECTED ? '重提' : '提交'}
+            </Button>,
+          )
+        }
+        if (RDM_ACCEPTANCE_OPEN_STATUS.includes(status)) {
           actions.push(
             <Button key="accept" type="link" size="small" style={{ color: '#52C41A' }}
               onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}`)}
             >
-              驗收
+              {/* 与详情页同一文案：已上线后的验收是正式业务验收，不是上线前预验 */}
+              {status === RDM_STATUS.RELEASED || status === RDM_STATUS.VERIFIED ? '業務驗收（已上線）' : '驗收'}
             </Button>,
           )
         }

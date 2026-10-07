@@ -1,15 +1,20 @@
 /**
- * 分发矩阵配置 —— 业务域 / 菜单 / 部门 → 默认产品经理
+ * 需求路由配置 —— 一条需求提交后的两个分叉都在这里配
  *
- * 作用：需求提交时按此矩阵自动推荐（或直接分配）产品经理，
- * 避免业务方「不知道产品是谁」以及技术负责人凭记忆分派。
- * 采用行内编辑（新增行直接落到表格），不使用弹窗承载表单。
+ * 两个 Tab 各管一个分叉，但它们是同一条判断链的上游与下游：
+ * - 准入策略（要不要先审批）：按部门/角色/系统/类型决定这条需求是否先送上级或指定人；
+ * - 分发矩阵（谁来受理）：按系统/菜单/部门/类型推荐或默认分配产品经理。
+ *
+ * 为什么合并到一页而不是拆两个菜单：两边用的是同一套匹配维度（部门/系统/类型），
+ * 拆开后管理员要在两个地方对齐条件，很容易配成互相冲突的两套规则。
+ * 采用行内编辑（新增行直接落到表格），不使用弹窗承载表单（AGENTS.md §9.1）。
  */
 import { useEffect, useState } from 'react'
-import { Button, Input, Select, Space, Table, Tag, message } from 'antd'
+import { Button, Input, Select, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
 import StatusSwitch from '../components/StatusSwitch'
+import AdmitPolicyPanel from './AdmitPolicyPanel'
 import { fetchProductOptions, fetchRoutingRules, saveRoutingRule, type RdmProductOption, type RdmRoutingRow } from '../../../api/rdm'
 import '../index.css'
 
@@ -21,7 +26,8 @@ const SCOPE_OPTIONS = [
   { value: 'TYPE', label: '按需求類型' },
 ]
 
-export default function RoutingConfig() {
+/** 分发矩阵（受理侧）：本文件只铺表格，准入侧见 AdmitPolicyPanel */
+function RoutingMatrix() {
   const [rows, setRows] = useState<RdmRoutingRow[]>([])
   const [pmOptions, setPmOptions] = useState<RdmProductOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -161,7 +167,7 @@ export default function RoutingConfig() {
   ]
 
   return (
-    <div className="content-area">
+    <>
       <div className="action-section">
         <div className="action-section-left">
           <Tag color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', borderRadius: 6 }}>
@@ -182,6 +188,25 @@ export default function RoutingConfig() {
         dataSource={rows}
         pagination={false}
         scroll={{ x: 1180 }}
+      />
+    </>
+  )
+}
+
+/**
+ * 页面容器：两个分叉各占一个 Tab。
+ * <p>默认落在分发矩阵：它是现有管理员熟悉的那个「分發矩陣」菜单，
+ * 准入策略是新增能力，不能一进来就把老习惯的落点据掉。
+ */
+export default function RoutingConfig() {
+  return (
+    <div className="content-area">
+      <Tabs
+        defaultActiveKey="routing"
+        items={[
+          { key: 'routing', label: '分發矩陣（誰來受理）', children: <RoutingMatrix /> },
+          { key: 'admit', label: '准入策略（要不要先審批）', children: <AdmitPolicyPanel /> },
+        ]}
       />
     </div>
   )

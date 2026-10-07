@@ -2,7 +2,8 @@
  * 产研需求管理（RDM）API
  *
  * 后端对应 RdmRequirementController 等（/api/rdm/**）。
- * 后端不可用时降级到本地 Mock 数据（src/api/mock/rdmMock），便于界面先行验证。
+ * 读接口在后端不可用时降级到本地 Mock 数据（src/api/mock/rdmMock），便于界面先行验证；
+ * 写接口默认绝不降级（见 canMockWrite）。
  */
 import request, { isBackendUnavailable, SILENT_HEADER } from './request'
 import type { PageResult } from './employee'
@@ -61,6 +62,20 @@ import {
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
+/**
+ * RDM 本地演示开关（默认关）。
+ * <p>读接口降级无副作用，离线也能评审界面；写接口不行：真实写入失败被换成 mock 成功，
+ * 用户会看到「已提交/已分配/已验收」而服务端一条记录都没落，这种假成功比报错更难发现
+ *（实测曾靠它把“页面走得通”误当成“后端链路正常”）。
+ * <p>演示环境需显式设 `VITE_RDM_DEMO=1`；它不是业务开关，不能用来掩盖后端故障。
+ */
+const DEMO_WRITE = (import.meta.env.VITE_RDM_DEMO as string | undefined) === '1'
+
+/** 写请求是否允许降级到 mock：仅演示模式 + 后端确实不可用 */
+function canMockWrite(err: unknown): boolean {
+  return DEMO_WRITE && isBackendUnavailable(err)
+}
+
 /* ==================== 类型定义 ==================== */
 
 /** 需求列表行 */
@@ -97,6 +112,22 @@ export interface RdmRequirementRow {
   acceptanceScore?: number | null
   /** 当前状态停留小时数（逾期/风险判定依据） */
   stayHours?: number | null
+  /**
+   * 流程版本：1=历史记录（无五节点计划/PRD 定稿快照/工时明细），2=新链路。
+   * <p>发布闸门的检查项会据此跳过不适用的新口径，界面需要跟同一口径显示。
+   */
+  flowVersion?: number | null
+  /** 当前准入轮次（服务端裁决快照，与 rdm_intake_round 对齐） */
+  intakeRoundNo?: number | null
+  /** 本轮是否需审批（服务端裁决；1=需要 0=已命中免审策略） */
+  needApproval?: number | null
+  /** 本轮准入裁决: FORCE_APPROVE/APPROVE/EXEMPT */
+  intakeMode?: string | null
+  /** 命中策略名称/版本：免审也要能解释「凭什么是免审」 */
+  intakePolicyName?: string | null
+  intakePolicyVersion?: string | null
+  /** 命中链路（逐行展示） */
+  intakeExplain?: string[] | null
   updatedAt?: string | null
 }
 
@@ -371,6 +402,105 @@ export interface RdmWorkbenchData {
   recentActivity?: RdmTimelineNode[]
 }
 
+/**
+ * 准入策略（阶段 2B）
+ * <p>接口对应 RdmConfigController 的 /intake-policy；裁决、模拟、冲突拦截全部在服务端，
+ * 前端只负责配置与解释展示，不能自己算「要不要审批」。
+ */
+
+/** 准入动作：强制需审批 / 需审批 / 免审直送 */
+export type RdmIntakeMode = 'FORCE_APPROVE' | 'APPROVE' | 'EXEMPT'
+
+export const RDM_INTAKE_MODE_LABEL: Record<RdmIntakeMode, string> = {
+  FORCE_APPROVE: '強制需審批',
+  APPROVE: '需審批',
+  EXEMPT: '免審直送技術部',
+}
+
+export const RDM_INTAKE_MODE_COLOR: Record<RdmIntakeMode, string> = {
+  FORCE_APPROVE: 'error',
+  APPROVE: 'processing',
+  EXEMPT: 'success',
+}
+
+/** 准入策略（rdm_intake_policy） */
+export interface RdmIntakePolicy {
+  id?: number
+  name: string
+  mode: RdmIntakeMode
+  scopeDepts: string[]
+  includeSubDept?: boolean
+  scopeRoles: string[]
+  scopeSystems: string[]
+  scopeReqTypes: string[]
+  approvalNodes: string[]
+  dispatcherUserId?: number | null
+  dispatcherName?: string | null
+  priority: number
+  effectiveFrom: string
+  effectiveTo?: string | null
+  version?: string
+  enabled: boolean
+  remark?: string | null
+}
+
+/** 一次准入裁决结果（与提交时写进需求的快照同源） */
+export interface RdmIntakeDecision {
+  needApproval: boolean
+  mode: RdmIntakeMode
+  policyId?: number | null
+  policyName?: string | null
+  policyVersion?: string | null
+  approvalNodes: string[]
+  dispatcherUserId?: number | null
+  dispatcherName?: string | null
+  explain: string[]
+  abnormal?: boolean
+  fallback?: boolean
+}
+
+/**
+ * 准入策略列表。
+ * <p>故意不做读降级：这是「谁能跳过公司准入」的安全配置，
+ * 拿一份本地样例冒充真实策略比报错更危险（会让人误以为已经配好了）。
+ */
+export async function fetchIntakePolicies(): Promise<RdmIntakePolicy[]> {
+  return request.get<unknown, RdmIntakePolicy[]>('/rdm/config/intake-policy', SILENT)
+}
+
+/** 保存准入策略（同优先级条件重叠、需审批无节点都会被服务端拒） */
+export async function saveIntakePolicy(policy: RdmIntakePolicy): Promise<RdmIntakePolicy[]> {
+  try {
+    return await request.post<unknown, RdmIntakePolicy[]>('/rdm/config/intake-policy', policy, SILENT)
+  } catch (err) {
+    if (canMockWrite(err)) return []
+    throw err
+  }
+}
+
+/** 删除准入策略（逻辑删，已发生轮次仍按快照保留命中策略与版本） */
+export async function deleteIntakePolicy(id: number): Promise<RdmIntakePolicy[]> {
+  try {
+    return await request.delete<unknown, RdmIntakePolicy[]>(`/rdm/config/intake-policy/${id}`, SILENT)
+  } catch (err) {
+    if (canMockWrite(err)) return []
+    throw err
+  }
+}
+
+/**
+ * 准入规则模拟（不写库）。
+ * <p>提交页的「審批要求（由系統判定）」与配置页的规则模拟共用本接口，
+ * 保证界面展示与提交后真实落库的裁决是同一口径；不做降级，否则展示会变成假的。
+ */
+export async function simulateIntake(body: {
+  empNo?: string
+  reqType?: string
+  systemCode?: string
+}): Promise<RdmIntakeDecision> {
+  return request.post<unknown, RdmIntakeDecision>('/rdm/config/intake-policy/simulate', body, SILENT)
+}
+
 /** 分发矩阵行 */
 export interface RdmRoutingRow {
   id: number
@@ -571,9 +701,18 @@ export async function createRequirement(form: RdmRequirementForm, mode: 'draft' 
   try {
     return await request.post<unknown, RdmRequirementRow>('/rdm/requirement', { ...form, mode }, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockCreateRequirement(form)
+    if (canMockWrite(err)) return mockCreateRequirement(form)
     throw err
   }
+}
+
+/**
+ * 提出人自助提交 / 修改后重提（服务端按当前状态选 submit 或 resubmit）。
+ * <p>不走通用流转接口：那个入口要求 rdm-requirement:edit（产品处理权），
+ * 员工只该拿到 create 就能提交自己的需求。
+ */
+export async function submitRequirement(id: number, remark?: string): Promise<RdmRequirementRow> {
+  return request.post<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/submit`, { remark: remark || undefined })
 }
 
 /** 修改需求（仅草稿/驳回态可改） */
@@ -586,7 +725,7 @@ export async function transitionRequirement(id: number, form: RdmTransitionForm)
   try {
     return await request.post<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/transition`, form, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) {
+    if (canMockWrite(err)) {
       const mapped: Partial<RdmRequirementRow> = {}
       if (form.remark) mapped.rejectReason = form.remark
       if (form.planDate) mapped.planReleaseDate = form.planDate
@@ -604,7 +743,7 @@ export async function batchAssign(ids: number[], pm: { userId: number; name: str
   try {
     return await request.post<unknown, void>('/rdm/requirement/batch-assign', { ids, pmUserId: pm.userId, pmName: pm.name }, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) {
+    if (canMockWrite(err)) {
       mockBatchAssign(ids, pm.name)
       return
     }
@@ -612,12 +751,26 @@ export async function batchAssign(ids: number[], pm: { userId: number; name: str
   }
 }
 
+/**
+ * 产品经理自需求池认领。
+ * <p>服务端用条件更新保证只有一人抢成功，抢不到会回错文，界面上必须当成失败处理。
+ */
+export async function claimRequirement(id: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/requirement/${id}/claim`, {}, SILENT)
+}
+
+/** 改派产品经理（旧受理人保留历史贡献，仅失去本单操作资格） */
+export async function reassignPm(id: number, pm: { userId: number; name: string }, reason?: string): Promise<void> {
+  return request.post<unknown, void>(`/rdm/requirement/${id}/reassign`,
+    { pmUserId: pm.userId, pmName: pm.name, remark: reason }, SILENT)
+}
+
 /** 添加评论 */
 export async function addComment(id: number, content: string, internal = false) {
   try {
     return await request.post<unknown, RdmCommentItem>(`/rdm/requirement/${id}/comment`, { content, internal }, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockAddComment(id, content)
+    if (canMockWrite(err)) return mockAddComment(id, content)
     throw err
   }
 }
@@ -627,7 +780,7 @@ export async function urgeRequirement(id: number) {
   try {
     return await request.post<unknown, void>(`/rdm/requirement/${id}/urge`, {}, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return
+    if (canMockWrite(err)) return
     throw err
   }
 }
@@ -641,7 +794,7 @@ export async function withdrawRequirement(id: number): Promise<void> {
   try {
     await request.post<unknown, void>(`/rdm/requirement/${id}/withdraw`, {}, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) {
+    if (canMockWrite(err)) {
       mockWithdrawRequirement(id)
       return
     }
@@ -654,7 +807,7 @@ export async function submitAcceptance(id: number, form: RdmAcceptanceForm) {
   try {
     return await request.post<unknown, void>(`/rdm/requirement/${id}/acceptance`, form, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) {
+    if (canMockWrite(err)) {
       mockTransition(id, form.result === RDM_ACCEPT_RESULT.FAIL ? RDM_ACTION.UAT_FAIL : RDM_ACTION.RELEASE, {
         acceptanceResult: form.result,
         acceptanceScore: form.score,
@@ -683,7 +836,7 @@ export async function saveRoutingRule(rowData: RdmRoutingRow): Promise<RdmRoutin
   try {
     return await request.post<unknown, RdmRoutingRow[]>('/rdm/config/routing', rowData, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockSaveRoutingRule(rowData)
+    if (canMockWrite(err)) return mockSaveRoutingRule(rowData)
     throw err
   }
 }
@@ -703,7 +856,7 @@ export async function saveSlaConfig(row: RdmSlaRow): Promise<RdmSlaRow[]> {
   try {
     return await request.put<unknown, RdmSlaRow[]>('/rdm/config/sla', row, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockSaveSla(row)
+    if (canMockWrite(err)) return mockSaveSla(row)
     throw err
   }
 }
@@ -713,7 +866,7 @@ export async function setTransitionEnabled(id: number, enabled: boolean): Promis
   try {
     return await request.put<unknown, RdmTransitionRow[]>(`/rdm/config/transition/${id}/enabled?enabled=${enabled}`, {}, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockSetTransitionEnabled(id, enabled)
+    if (canMockWrite(err)) return mockSetTransitionEnabled(id, enabled)
     throw err
   }
 }
@@ -723,7 +876,7 @@ export async function setStatusEnabled(code: string, enabled: boolean): Promise<
   try {
     return await request.put<unknown, RdmStatusDefRow[]>(`/rdm/config/status/${code}/enabled?enabled=${enabled}`, {}, SILENT)
   } catch (err) {
-    if (isBackendUnavailable(err)) return mockSetStatusEnabled(code, enabled)
+    if (canMockWrite(err)) return mockSetStatusEnabled(code, enabled)
     throw err
   }
 }
@@ -792,7 +945,8 @@ export async function uploadAttachment(file: File): Promise<RdmUploadResult> {
       dataUrl: res.dataUrl,
     }
   } catch (err) {
-    if (isBackendUnavailable(err)) return readFileLocally(file)
+    // 真实上传失败不能回退成本地 Base64 并提示成功：那会让需求带上一个服务端根本不存在的主图
+    if (canMockWrite(err)) return readFileLocally(file)
     throw err
   }
 }
@@ -858,6 +1012,8 @@ export interface RdmTaskItem {
   progress?: number | null
   planHours?: number | null
   actualHours?: number | null
+  /** 实际工时是否已填报（缺报不等于 0） */
+  actualHoursReported?: boolean | null
   planStartDate?: string | null
   planFinishDate?: string | null
   actualStartTime?: string | null
@@ -914,13 +1070,72 @@ export interface RdmDeliverySummary {
   tasks: RdmTaskItem[]
   reviews: RdmReviewItem[]
   changes: RdmChangeItem[]
+  /** 五节点计划（阶段 3） */
+  milestones?: RdmMilestoneItem[]
   taskTotal?: number
   taskDone?: number
   taskBlocked?: number
   overallProgress?: number
   planHoursTotal?: number
   actualHoursTotal?: number
+  /** 已完成但未填报工时的任务数（缺报不默认为 0） */
+  unreportedHoursTasks?: number
   hoursByType?: { name: string; value: number }[]
+}
+
+/** 里程碑节点（初步计划/已批准基线/当前预测/实际） */
+export interface RdmMilestoneItem {
+  id?: number
+  code: string
+  name: string
+  ownerUserId?: number | null
+  ownerName?: string | null
+  preliminaryDate?: string | null
+  baselineDate?: string | null
+  forecastDate?: string | null
+  actualDate?: string | null
+  status?: string
+  naReason?: string | null
+  sortOrder?: number
+  /** 相对基线的偏差天数（正数=晚于基线） */
+  slipDays?: number | null
+  /** 基线已冻结：初步计划不可再改，只能改预测 */
+  baselineLocked?: boolean
+}
+
+/** 里程碑节点表单行 */
+export interface RdmMilestoneForm {
+  code: string
+  name?: string
+  ownerUserId?: number | null
+  preliminaryDate?: string
+  forecastDate?: string
+  status?: string
+  naReason?: string
+}
+
+/** 工时明细行 */
+export interface RdmWorkLogItem {
+  id: number
+  taskId: number
+  userId: number
+  userName?: string | null
+  workDate: string
+  hours: number
+  remark?: string | null
+  updatedBy?: string | null
+}
+
+/** PRD 定稿快照 */
+export interface RdmPrdSnapshotItem {
+  id: number
+  prdId: number
+  versionNo: string
+  title?: string | null
+  conclusion?: string | null
+  conclusionDesc?: string | null
+  reviewerNames?: string | null
+  snapshotTime?: string | null
 }
 
 /** PRD 表单 */
@@ -935,6 +1150,10 @@ export interface RdmPrdForm {
   contentRich?: string
   prototypeUrl?: string
   advanceRequirement?: boolean
+  /** 已定稿的 PRD 只能以此方式修改（开新版本） */
+  newVersion?: boolean
+  /** 版本变更原因（newVersion 时必填） */
+  changeReason?: string
 }
 
 /** 任务表单 */
@@ -1033,6 +1252,420 @@ export function deleteTask(id: number) {
   return request.delete<unknown, void>(`/rdm/delivery/task/${id}`)
 }
 
+/* ── 阶段 3：里程碑与定稿快照 ── */
+
+/** 五节点计划 */
+export async function fetchMilestones(reqId: number): Promise<RdmMilestoneItem[]> {
+  try {
+    return await request.get<unknown, RdmMilestoneItem[]>(`/rdm/delivery/requirement/${reqId}/milestones`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 保存节点计划（已冻结基线后只能改预测） */
+export function saveMilestones(reqId: number, list: RdmMilestoneForm[]) {
+  return request.put<unknown, RdmMilestoneItem[]>(`/rdm/delivery/requirement/${reqId}/milestones`, list)
+}
+
+/** 冻结基线 */
+export function freezeMilestones(reqId: number) {
+  return request.post<unknown, RdmMilestoneItem[]>(`/rdm/delivery/requirement/${reqId}/milestones/freeze`, {})
+}
+
+/** PRD 定稿快照（版本链） */
+export async function fetchPrdSnapshots(prdId: number): Promise<RdmPrdSnapshotItem[]> {
+  try {
+    return await request.get<unknown, RdmPrdSnapshotItem[]>(`/rdm/delivery/prd/${prdId}/snapshots`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 填报工时明细（服务端仅允许任务负责人本人，同日多次会累加） */
+export function saveWorkLogs(taskId: number, logs: { workDate: string; hours: number; remark?: string }[]) {
+  return request.post<unknown, RdmWorkLogItem[]>(`/rdm/delivery/task/${taskId}/work-logs`, logs)
+}
+
+/* ── 阶段 4：发布放行（上线前质量闸门） ── */
+
+/** 单项检查结果 */
+export interface RdmReleaseCheck {
+  code: string
+  label: string
+  /** 是否阻断上线 */
+  blocking?: boolean | null
+  passed?: boolean | null
+  /** 已被豁免（必须留理由） */
+  waived?: boolean | null
+  /** 旧流程（V1）跳过，不参与新口径考核 */
+  skipped?: boolean | null
+  reason?: string | null
+}
+
+/** 放行单（含检查项快照） */
+export interface RdmReleaseGate {
+  id?: number
+  releaseNo?: string
+  reqId: number
+  roundNo?: number
+  env?: string
+  versionNo?: string | null
+  planTime?: string | null
+  status?: string
+  blockingCount?: number
+  releasable?: boolean
+  summary?: string | null
+  applicantName?: string | null
+  applyTime?: string | null
+  gateName?: string | null
+  decideTime?: string | null
+  expireAt?: string | null
+  expired?: boolean
+  checks?: RdmReleaseCheck[]
+}
+
+/** 放行单表单 */
+export interface RdmReleaseForm {
+  env?: string
+  versionNo?: string
+  planTime?: string
+  waivedCodes?: string[]
+  waiveReason?: string
+}
+
+/** 检查项实时预览（不落库） */
+export async function fetchReleaseCheck(reqId: number): Promise<RdmReleaseGate | null> {
+  try {
+    return await request.get<unknown, RdmReleaseGate>(`/rdm/release/requirement/${reqId}/check`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 放行单历史 */
+export async function fetchReleases(reqId: number): Promise<RdmReleaseGate[]> {
+  try {
+    return await request.get<unknown, RdmReleaseGate[]>(`/rdm/release/requirement/${reqId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 发起放行单 */
+export function applyRelease(reqId: number, form: RdmReleaseForm) {
+  return request.post<unknown, RdmReleaseGate>(`/rdm/release/requirement/${reqId}/apply`, form)
+}
+
+/** 放行 / 驳回 */
+export function decideRelease(id: number, form: { passed: boolean; summary?: string }) {
+  return request.post<unknown, RdmReleaseGate>(`/rdm/release/${id}/decide`, form)
+}
+
+/* ── 阶段 5：依赖、甘特与负载 ── */
+
+/** 甘特条（一个任务） */
+export interface RdmScheduleBar {
+  taskId: number
+  taskNo?: string | null
+  title: string
+  taskType?: string | null
+  status?: string | null
+  progress?: number | null
+  ownerUserId?: number | null
+  ownerName?: string | null
+  ownerMissing?: boolean | null
+  planHours?: number | null
+  actualHours?: number | null
+  planStartDate?: string | null
+  planFinishDate?: string | null
+  earliestStart?: string | null
+  earliestFinish?: string | null
+  latestStart?: string | null
+  latestFinish?: string | null
+  slackDays?: number | null
+  critical?: boolean | null
+  durationDays?: number | null
+  actualStartTime?: string | null
+  actualFinishTime?: string | null
+  overdue?: boolean | null
+  predecessors?: number[]
+}
+
+/** 需求排程（甘特数据源） */
+export interface RdmSchedulePlan {
+  reqId: number
+  reqNo?: string | null
+  title?: string | null
+  status?: string | null
+  windowStart?: string | null
+  windowEnd?: string | null
+  workingDays?: number | null
+  /** 历史脏数据成环：不给关键路径结论 */
+  cyclic?: boolean | null
+  criticalPath?: number[]
+  forecastFinish?: string | null
+  bars: RdmScheduleBar[]
+  links: { id: number; predTaskId: number; succTaskId: number; depType?: string | null; lagDays?: number | null }[]
+  milestones?: RdmScheduleMilestone[]
+}
+
+/** 里程碑菱形（与阶段 3 节点同一口径） */
+export interface RdmScheduleMilestone {
+  code: string
+  name?: string | null
+  ownerName?: string | null
+  preliminaryDate?: string | null
+  baselineDate?: string | null
+  forecastDate?: string | null
+  actualDate?: string | null
+  status?: string | null
+  slipDays?: number | null
+}
+
+/** 依赖行 */
+export interface RdmScheduleDependency {
+  id: number
+  reqId: number
+  predTaskId: number
+  predTaskTitle?: string | null
+  succTaskId: number
+  succTaskTitle?: string | null
+  depType?: string | null
+  lagDays?: number | null
+  createdBy?: string | null
+}
+
+/** 单日负载 */
+export interface RdmWorkloadDay {
+  day: string
+  capacity?: number | null
+  planned?: number | null
+  actual?: number | null
+  leave?: boolean | null
+  weekend?: boolean | null
+  overloaded?: boolean | null
+}
+
+/** 一人负载 */
+export interface RdmWorkloadPerson {
+  userId: number
+  userName?: string | null
+  empNo?: string | null
+  totalCapacity?: number | null
+  totalPlanned?: number | null
+  totalActual?: number | null
+  utilization?: number | null
+  overloadedDays?: number | null
+  reqCount?: number | null
+  days: RdmWorkloadDay[]
+}
+
+/** 资源负载 */
+export interface RdmWorkload {
+  from: string
+  to: string
+  selfOnly?: boolean | null
+  people: RdmWorkloadPerson[]
+}
+
+/** 工作日历条目 */
+export interface RdmCalendarItem {
+  id?: number
+  userId: number
+  userName?: string | null
+  day: string
+  dayType: string
+  availableHours?: number | null
+  reason?: string | null
+}
+
+/** 需求排程（甘特 + 关键路径） */
+export async function fetchSchedulePlan(reqId: number): Promise<RdmSchedulePlan | null> {
+  try {
+    return await request.get<unknown, RdmSchedulePlan>(`/rdm/schedule/requirement/${reqId}/plan`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 需求下的依赖列表 */
+export async function fetchDependencies(reqId: number): Promise<RdmScheduleDependency[]> {
+  try {
+    return await request.get<unknown, RdmScheduleDependency[]>(`/rdm/schedule/requirement/${reqId}/dependencies`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 新增依赖（成环会被服务端拒绝） */
+export function addDependency(form: { reqId: number; predTaskId: number; succTaskId: number; lagDays?: number }) {
+  return request.post<unknown, RdmScheduleDependency>('/rdm/schedule/dependencies', form)
+}
+
+/** 删除依赖 */
+export function removeDependency(id: number) {
+  return request.delete<unknown, void>(`/rdm/schedule/dependencies/${id}`)
+}
+
+/** 资源负载 */
+export async function fetchWorkload(params?: { from?: string; to?: string; userId?: number }): Promise<RdmWorkload | null> {
+  try {
+    return await request.get<unknown, RdmWorkload>('/rdm/schedule/workload', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 某人的工作日历例外 */
+export async function fetchCalendar(userId?: number): Promise<RdmCalendarItem[]> {
+  try {
+    return await request.get<unknown, RdmCalendarItem[]>('/rdm/schedule/calendar', { params: { userId }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 保存工作日历（请假/加班/自定义容量） */
+export function saveCalendar(form: {
+  userId?: number
+  days?: { day: string; dayType: string; availableHours?: number; reason?: string }[]
+  removeDays?: string[]
+}) {
+  return request.post<unknown, RdmCalendarItem[]>('/rdm/schedule/calendar', form)
+}
+
+/* ── 阶段 6：指标字典、快照重算、预算与 HR 建议 ── */
+
+/** 单条指标定义（口径唯一出处，后端 constant/RdmMetricCatalog） */
+export interface RdmMetricDefinition {
+  code: string
+  name: string
+  formula: string
+  source: string
+  /** 是否可按历史时间回算 */
+  recomputeable: boolean
+  caveat?: string | null
+  group?: string | null
+}
+
+/** 贡献分预算（含实时占用） */
+export interface RdmScoreBudgetItem {
+  id?: number
+  periodCode: string
+  deptId?: number | null
+  deptName?: string | null
+  scoreBudget: number
+  warningRatio?: number | null
+  remark?: string | null
+  used?: number | null
+  usedRatio?: number | null
+  warning?: boolean | null
+  over?: boolean | null
+  updatedBy?: string | null
+  updatedAt?: string | null
+}
+
+/** HR 绩效建议行 */
+export interface RdmHrSuggestionItem {
+  id: number
+  periodCode: string
+  userId: number
+  empNo?: string | null
+  userName?: string | null
+  deptId?: number | null
+  deptName?: string | null
+  totalScore: number
+  recordCount?: number | null
+  deliveredCount?: number | null
+  avgAcceptanceScore?: number | null
+  firstPassCount?: number | null
+  budgetUsedRatio?: number | null
+  overBudget?: boolean | null
+  ruleVersion?: number | null
+  status: string
+  reviewerName?: string | null
+  reviewTime?: string | null
+  reviewRemark?: string | null
+  pushedAt?: string | null
+  generatedAt?: string | null
+  actionable?: boolean | null
+  blockedReason?: string | null
+}
+
+/** 指标字典 */
+export async function fetchMetricCatalog(): Promise<RdmMetricDefinition[]> {
+  try {
+    return await request.get<unknown, RdmMetricDefinition[]>('/rdm/analytics/metrics', SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 重算快照（口径变更后刷历史） */
+export function recomputeSnapshot(from: string, to: string) {
+  return request.post<unknown, number>('/rdm/analytics/snapshot/recompute', null, { params: { from, to } })
+}
+
+/** 周期预算与占用 */
+export async function fetchScoreBudgets(periodCode?: string): Promise<RdmScoreBudgetItem[]> {
+  try {
+    return await request.get<unknown, RdmScoreBudgetItem[]>('/rdm/governance/budgets', { params: { periodCode }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 保存预算 */
+export function saveScoreBudget(form: Partial<RdmScoreBudgetItem>) {
+  return request.post<unknown, RdmScoreBudgetItem>('/rdm/governance/budget', form)
+}
+
+/** 删除预算 */
+export function deleteScoreBudget(id: number) {
+  return request.delete<unknown, void>(`/rdm/governance/budget/${id}`)
+}
+
+/** HR 建议清单 */
+export async function fetchHrSuggestions(params?: { periodCode?: string; status?: string; deptId?: number }): Promise<RdmHrSuggestionItem[]> {
+  try {
+    return await request.get<unknown, RdmHrSuggestionItem[]>('/rdm/governance/suggestions', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 从积分流水聚合建议 */
+export function generateHrSuggestions(periodCode?: string) {
+  return request.post<unknown, number>('/rdm/governance/suggestions/generate', null, { params: { periodCode } })
+}
+
+/** 复核建议（确认/驳回） */
+export function reviewHrSuggestion(id: number, form: { confirmed: boolean; remark?: string }) {
+  return request.post<unknown, RdmHrSuggestionItem>(`/rdm/governance/suggestions/${id}/review`, form)
+}
+
+/** 推送已确认的建议 */
+export function pushHrSuggestions(periodCode?: string) {
+  return request.post<unknown, number>('/rdm/governance/push', null, { params: { periodCode } })
+}
+
+/** 撤回已推送的建议 */
+export function withdrawHrSuggestion(id: number, reason: string) {
+  return request.post<unknown, RdmHrSuggestionItem>(`/rdm/governance/suggestions/${id}/withdraw`, null, { params: { reason } })
+}
+
 /** 保存 PRD */
 export function savePrd(form: RdmPrdForm) {
   return request.post<unknown, RdmPrdItem>('/rdm/delivery/prd', form)
@@ -1083,6 +1716,8 @@ export interface RdmAcceptanceRecord {
   acceptorName?: string | null
   testEnv?: string | null
   result: string
+  /** 验收阶段：pre_release 上线前预验收 / post_release 上线后业务验收 */
+  stage?: string | null
   score?: number | null
   caseTotal?: number | null
   casePass?: number | null

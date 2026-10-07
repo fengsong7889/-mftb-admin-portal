@@ -24,7 +24,6 @@ import dayjs from 'dayjs'
 import {
   decideReview,
   fetchDeliverySummary,
-  reportTask,
   type RdmChangeItem,
   type RdmDeliverySummary,
   type RdmPrdItem,
@@ -42,7 +41,6 @@ import {
   RDM_REVIEW_CONCLUSION_COLOR,
   RDM_REVIEW_CONCLUSION_LABEL,
   RDM_REVIEW_TYPE_LABEL,
-  RDM_TASK_ACTION,
   RDM_TASK_STATUS,
   RDM_TASK_STATUS_COLOR,
   RDM_TASK_STATUS_LABEL,
@@ -100,21 +98,15 @@ export default function DeliveryPanel({ reqId, status, editable }: DeliveryPanel
 
   /** summary 每次刷新都是新对象，先固定 tasks 引用，避开下游 useMemo 失效 */
   const tasks = useMemo(() => summary?.tasks ?? [], [summary])
+  /** 五节点计划（阶段 3）：随 summary 一次性拿回来，不再单开一次请求 */
+  const milestones = useMemo(() => summary?.milestones ?? [], [summary])
   const blockedTasks = useMemo(() => tasks.filter(t => t.status === RDM_TASK_STATUS.BLOCKED), [tasks])
 
-  /** 行内上报任务（详情页只做「完成」这一最高频动作，其余回研发交付工作台） */
-  const handleFinishTask = useCallback(async (task: RdmTaskItem) => {
-    setSaving(true)
-    try {
-      await reportTask(task.id, { action: RDM_TASK_ACTION.DONE, progress: 100 })
-      message.success(`任務「${task.title}」已完成`)
-      await load()
-    } catch {
-      message.error('操作失敗，請重試')
-    } finally {
-      setSaving(false)
-    }
-  }, [load])
+  /**
+   * 任务完成不再在详情页一键上报（阶段 3）：服务端现在要求「完成必须带交付说明」，
+   * 在这里静默发送只会拿到一个无证据的 100%，反而让人以为交付已确认。
+   * 统一去研发交付工作台上报，那里有说明与工时的录入位。
+   */
 
   /** 录入评审结论（通过/退回），评审是状态流转闸门，必须由评审人显式点选 */
   const handleReviewDecision = async (review: RdmReviewItem, passed: boolean) => {
@@ -171,7 +163,10 @@ export default function DeliveryPanel({ reqId, status, editable }: DeliveryPanel
       render: (_, r) => (
         <Space size={6}>
           <Progress percent={r.progress ?? 0} size="small" style={{ width: 62 }} />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.actualHours ?? 0}/{r.planHours ?? '-'}h</span>
+          {/* 缺报不等于 0：把未填报当成 0 会同时做假负载与估时偏差 */}
+          <span style={{ fontSize: 12, color: r.actualHoursReported ? '#8C8C8C' : '#FA8C16' }}>
+            {r.actualHoursReported ? `${r.actualHours ?? 0}/${r.planHours ?? '-'}h` : `未填報 / ${r.planHours ?? '-'}h`}
+          </span>
         </Space>
       ),
     },
@@ -187,7 +182,7 @@ export default function DeliveryPanel({ reqId, status, editable }: DeliveryPanel
           )}
           {canManage && r.status === RDM_TASK_STATUS.DOING && (
             <>
-              <Button type="link" size="small" style={{ color: '#52C41A' }} loading={saving} onClick={() => handleFinishTask(r)}>標記完成</Button>
+              <Button type="link" size="small" style={{ color: '#52C41A' }} onClick={() => navigate('/rdm-delivery')}>去上報完成</Button>
               <span className="action-split">|</span>
             </>
           )}
@@ -200,9 +195,59 @@ export default function DeliveryPanel({ reqId, status, editable }: DeliveryPanel
         </Space>
       ),
     },
-  ], [canManage, reqId, navigate, saving, handleFinishTask])
+  ], [canManage, reqId, navigate])
 
   const items = [
+    {
+      key: 'milestone',
+      /*
+       * 节点计划排在第一页：PM 打开「交付过程」最先要回答的是「承诺过什么时间」，
+       * 而不是已经拆了多少任务。基线一旦冻结，下游改期不会影响这个对比。
+       */
+      label: `節點計劃（${milestones.length}）`,
+      children: milestones.length === 0
+        ? (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            <EmptyHint text="尚未規劃五個關鍵節點（評審/設計/研發啟動/開發完成/上線）。受理需求後先排初步計劃，評審通過再凍結基線。" />
+            {canManage && (
+              <Button size="small" type="primary" onClick={() => navigate(`/rdm-milestone?reqId=${reqId}`)}>規劃節點</Button>
+            )}
+          </Space>
+        )
+        : (
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            {milestones.map(m => (
+              <div key={m.code} className="rdm-delivery-row">
+                <Tag color={m.baselineLocked ? 'purple' : m.status === 'done' ? 'success' : m.status === 'not_applicable' ? 'default' : 'processing'} style={{ margin: 0 }}>
+                  {m.name}
+                </Tag>
+                <span className="rdm-delivery-row-main">
+                  <span style={{ fontSize: 13 }}>
+                    初步 {m.preliminaryDate ?? '-'}
+                    {' · 基線 '}{m.baselineDate ?? '未凍結'}
+                    {' · 預測 '}{m.forecastDate ?? '-'}
+                    {m.actualDate ? ` · 實際 ${m.actualDate}` : ''}
+                  </span>
+                  {typeof m.slipDays === 'number' && (
+                    <Tag color={m.slipDays > 0 ? 'error' : 'success'} style={{ margin: '0 0 0 8px' }}>
+                      {m.slipDays > 0 ? `晚 ${m.slipDays} 天` : '按時'}
+                    </Tag>
+                  )}
+                  <div className="rdm-delivery-row-desc">
+                    {m.ownerName ? `負責人：${m.ownerName}` : '負責人：未指定'}
+                    {m.naReason ? ` · 不適用原因：${m.naReason}` : ''}
+                  </div>
+                </span>
+              </div>
+            ))}
+            {canManage && (
+              <Button size="small" onClick={() => navigate(`/rdm-milestone?reqId=${reqId}`)}>
+                {milestones.some(m => !m.baselineLocked) ? '規劃 / 凍結基線' : '調整預測'}
+              </Button>
+            )}
+          </Space>
+        ),
+    },
     {
       key: 'task',
       label: `研發任務（${tasks.length}）`,

@@ -19,6 +19,9 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import GanttChart from './components/GanttChart'
+import WorkloadPanel from './components/WorkloadPanel'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchMyTasks,
   reportTask,
@@ -48,8 +51,18 @@ const VIEW_OPTIONS = [
   { label: '全部', value: 'all' },
 ]
 
+/** 视图模式（阶段 5）：任务列表 / 甘特与关键路径 / 资源负载 */
+const MODE_OPTIONS = [
+  { label: '任務列表', value: 'task' },
+  { label: '甘特與關鍵路徑', value: 'gantt' },
+  { label: '資源負載', value: 'load' },
+]
+
 export default function DeliveryBoard() {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
+  /** 三个视图共用一个页面：新建路由会撞 MenuTabs 的非菜单页名兜底表上限（已达 20/20） */
+  const [mode, setMode] = useState('task')
   const [view, setView] = useState('open')
   const [rows, setRows] = useState<RdmTaskItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -157,7 +170,10 @@ export default function DeliveryBoard() {
       render: (_, r) => (
         <Space size={6}>
           <Progress percent={r.progress ?? 0} size="small" style={{ width: 66 }} />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.actualHours ?? 0}/{r.planHours ?? '-'}h</span>
+          {/* 缺报不等于 0：本工作台是研发看自己负载的地方，显示 0 会被当成“这活没花时间” */}
+          <span style={{ fontSize: 12, color: r.actualHoursReported ? '#8C8C8C' : '#FA8C16' }}>
+            {r.actualHoursReported ? `${r.actualHours ?? 0}/${r.planHours ?? '-'}h` : `未填報 / ${r.planHours ?? '-'}h`}
+          </span>
         </Space>
       ),
     },
@@ -203,7 +219,12 @@ export default function DeliveryBoard() {
   return (
     <div className="content-area">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-        <Segmented value={view} onChange={v => setView(v as string)} options={VIEW_OPTIONS} />
+        <Space size={12} wrap>
+          <Segmented value={mode} onChange={v => setMode(v as string)} options={MODE_OPTIONS} />
+          {mode === 'task' && (
+            <Segmented value={view} onChange={v => setView(v as string)} options={VIEW_OPTIONS} />
+          )}
+        </Space>
         <Space size={8} wrap>
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
           <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
@@ -212,6 +233,12 @@ export default function DeliveryBoard() {
         </Space>
       </div>
 
+      {mode === 'gantt' && <GanttChart editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')} />}
+
+      {mode === 'load' && <WorkloadPanel />}
+
+      {mode !== 'task' ? null : (
+      <>
       <div style={{ marginBottom: 16 }}>
         <StatCards
           animationKey={view}
@@ -230,7 +257,7 @@ export default function DeliveryBoard() {
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message="任務開始/完成會自動聯動需求狀態（如設計全部完成→轉開發、測試完成→轉業務驗收）；實際工時用於產出量化與績效對接，請如實填報。"
+        message="任務全部完成後，需求才會沿當前狀態可走的路徑聯動（需求尚在排期/設計階段時不會直接跳到驗收，必須先在需求詳情逐段流轉）；實際工時用於產出量化與績效對接，請如實填報。"
       />
 
       <Table<RdmTaskItem>
@@ -272,6 +299,8 @@ export default function DeliveryBoard() {
         }}
         pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }}
       />
+      </>
+      )}
     </div>
   )
 }

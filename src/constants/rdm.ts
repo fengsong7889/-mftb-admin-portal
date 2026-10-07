@@ -597,6 +597,7 @@ export const RDM_RISK_COLOR: Record<RdmRiskType, string> = {
 export const RDM_TASK_TYPE = {
   DESIGN: 'design',
   FRONTEND: 'frontend',
+  APP: 'app',
   BACKEND: 'backend',
   QA: 'qa',
   DATA: 'data',
@@ -606,6 +607,7 @@ export type RdmTaskType = (typeof RDM_TASK_TYPE)[keyof typeof RDM_TASK_TYPE]
 export const RDM_TASK_TYPE_LABEL: Record<RdmTaskType, string> = {
   [RDM_TASK_TYPE.DESIGN]: 'UI 設計',
   [RDM_TASK_TYPE.FRONTEND]: '前端開發',
+  [RDM_TASK_TYPE.APP]: 'APP 開發',
   [RDM_TASK_TYPE.BACKEND]: '後端開發',
   [RDM_TASK_TYPE.QA]: '測試',
   [RDM_TASK_TYPE.DATA]: '數據',
@@ -614,9 +616,120 @@ export const RDM_TASK_TYPE_LABEL: Record<RdmTaskType, string> = {
 export const RDM_TASK_TYPE_COLOR: Record<RdmTaskType, string> = {
   [RDM_TASK_TYPE.DESIGN]: '#EB2F96',
   [RDM_TASK_TYPE.FRONTEND]: '#1890FF',
+  [RDM_TASK_TYPE.APP]: '#FA8C16',
   [RDM_TASK_TYPE.BACKEND]: '#722ED1',
   [RDM_TASK_TYPE.QA]: '#13C2C2',
   [RDM_TASK_TYPE.DATA]: '#52C41A',
+}
+
+/**
+ * 五节点计划（阶段 3）：产品受理时要规划的五个关键时间。
+ * <p>与后端 RdmMilestone.CODE_* 一一对应；这里的顺序就是详情页与节点规划页的展示顺序，
+ * 也是阶段 5 甘特图的里程碑行顺序，不得在两处各自维护一份。
+ */
+export const RDM_MILESTONE_NODES = [
+  { code: 'PRD_REVIEW', label: '需求評審' },
+  { code: 'DESIGN_DONE', label: '設計完成' },
+  { code: 'DEV_START', label: '研發啟動' },
+  { code: 'DEV_DONE', label: '開發完成' },
+  { code: 'RELEASE', label: '上線交付' },
+] as const
+
+export type RdmMilestoneCode = (typeof RDM_MILESTONE_NODES)[number]['code']
+
+/** 节点状态：待完成 / 已完成 / 不适用（不适用必须写原因，否则等于没盘这个环节） */
+export const RDM_MILESTONE_STATUS = {
+  PENDING: 'pending',
+  DONE: 'done',
+  NOT_APPLICABLE: 'not_applicable',
+} as const
+export type RdmMilestoneStatus = (typeof RDM_MILESTONE_STATUS)[keyof typeof RDM_MILESTONE_STATUS]
+
+export const RDM_MILESTONE_STATUS_LABEL: Record<RdmMilestoneStatus, string> = {
+  [RDM_MILESTONE_STATUS.PENDING]: '待完成',
+  [RDM_MILESTONE_STATUS.DONE]: '已完成',
+  [RDM_MILESTONE_STATUS.NOT_APPLICABLE]: '不適用',
+}
+
+/**
+ * 验收阶段（阶段 4）：与后端 RdmConstants.ACCEPT_STAGE_* 对应。
+ * <p>两件事必须分开看：上线前预验收回答“质量能不能上线”，
+ * 上线后业务验收回答“上线后是否真解决了业务问题”（1-5 分以此为口径）。
+ */
+export const RDM_ACCEPT_STAGE = {
+  PRE_RELEASE: 'pre_release',
+  POST_RELEASE: 'post_release',
+} as const
+export type RdmAcceptStage = (typeof RDM_ACCEPT_STAGE)[keyof typeof RDM_ACCEPT_STAGE]
+
+export const RDM_ACCEPT_STAGE_LABEL: Record<RdmAcceptStage, string> = {
+  [RDM_ACCEPT_STAGE.PRE_RELEASE]: '上線前預驗收',
+  [RDM_ACCEPT_STAGE.POST_RELEASE]: '上線後業務驗收',
+}
+
+/**
+ * 可提交验收结论的状态（与后端 resolveAcceptanceStage 一一对应）。
+ * <p>入口不收敛到这一处就会出现“列表能点、详情页看不到”的口径漂移。
+ */
+export const RDM_ACCEPTANCE_OPEN_STATUS: string[] = [
+  'test_passed', 'uat_pending', 'released', 'verified',
+]
+
+/** 发布放行单状态（与后端 RdmRelease.STATUS_* 对应） */
+export const RDM_RELEASE_STATUS = {
+  PENDING: 'pending',
+  PASSED: 'passed',
+  REJECTED: 'rejected',
+  REVOKED: 'revoked',
+} as const
+export type RdmReleaseStatus = (typeof RDM_RELEASE_STATUS)[keyof typeof RDM_RELEASE_STATUS]
+
+export const RDM_RELEASE_STATUS_LABEL: Record<RdmReleaseStatus, string> = {
+  [RDM_RELEASE_STATUS.PENDING]: '待裁決',
+  [RDM_RELEASE_STATUS.PASSED]: '已准許上線',
+  [RDM_RELEASE_STATUS.REJECTED]: '已駁回',
+  [RDM_RELEASE_STATUS.REVOKED]: '已作廢',
+}
+
+export const RDM_RELEASE_STATUS_COLOR: Record<RdmReleaseStatus, string> = {
+  [RDM_RELEASE_STATUS.PENDING]: 'processing',
+  [RDM_RELEASE_STATUS.PASSED]: 'success',
+  [RDM_RELEASE_STATUS.REJECTED]: 'error',
+  [RDM_RELEASE_STATUS.REVOKED]: 'default',
+}
+
+/** 发布环境（与后端 normalizeEnv 一致） */
+export const RDM_RELEASE_ENV_LABEL: Record<string, string> = {
+  prod: '生產環境',
+  pre: '預發布環境',
+  uat: '驗收環境',
+}
+
+/**
+ * HR 绩效建议状态（阶段 6，与后端 RdmHrSuggestion.STATUS_* 对应）。
+ * <p>只能单向流转：draft → confirmed → pushed，pushed 之后只能撤回；
+ * 已推送的建议不允许原地改分，那等于绕过 HR 校准通道改考核。
+ */
+export const RDM_SUGGESTION_STATUS = {
+  DRAFT: 'draft',
+  CONFIRMED: 'confirmed',
+  PUSHED: 'pushed',
+  WITHDRAWN: 'withdrawn',
+} as const
+export type RdmSuggestionStatus = (typeof RDM_SUGGESTION_STATUS)[keyof typeof RDM_SUGGESTION_STATUS]
+
+export const RDM_SUGGESTION_STATUS_LABEL: Record<RdmSuggestionStatus, string> = {
+  [RDM_SUGGESTION_STATUS.DRAFT]: '待復核',
+  [RDM_SUGGESTION_STATUS.CONFIRMED]: '已確認',
+  [RDM_SUGGESTION_STATUS.PUSHED]: '已推送',
+  [RDM_SUGGESTION_STATUS.WITHDRAWN]: '已撤回',
+}
+
+export const RDM_SUGGESTION_STATUS_COLOR: Record<RdmSuggestionStatus, string> = {
+  [RDM_SUGGESTION_STATUS.DRAFT]: 'processing',
+  [RDM_SUGGESTION_STATUS.CONFIRMED]: 'warning',
+  [RDM_SUGGESTION_STATUS.PUSHED]: 'success',
+  [RDM_SUGGESTION_STATUS.WITHDRAWN]: 'default',
 }
 
 /** 任务状态 */
@@ -1059,3 +1172,19 @@ export const RDM_TERMINAL_STATUS: RdmStatus[] = [
  * （卡片带阶段条与 Tooltip，DOM 量随条数线性增长）。超限由页面显式提示截断。
  */
 export const RDM_KANBAN_SIZE = 100
+
+/**
+ * 可冻结五节点基线的需求状态（前端唯一来源）。
+ * <p>必须与后端 RdmDeliveryServiceImpl.BASELINE_FREEZE_STATUS 一字不差：前端曾经只判
+ * 「评审通过」，而正常动线是先排期再冻结基线，结果排期之后按钮永远消失，
+ * 需求只能带着「基线未冻结」的豁免上线（阶段 4 端到端实测 D1）。
+ * 两边各写一份迟早会再漂移，所以判定收敛到这个函数并由单测钉住。
+ */
+export const RDM_BASELINE_FREEZE_STATUS: string[] = [
+  RDM_STATUS.REVIEW_PASSED, RDM_STATUS.SCHEDULED, RDM_STATUS.DESIGNING, RDM_STATUS.DEVELOPING,
+]
+
+/** 基线冻结入口是否可用（列表页/详情页/节点计划页共用同一判断） */
+export function canFreezeBaseline(status?: string | null): boolean {
+  return !!status && RDM_BASELINE_FREEZE_STATUS.includes(status)
+}

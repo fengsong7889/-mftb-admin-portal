@@ -5,7 +5,7 @@ import type { OptionItem } from '../api/types'
 interface RemoteSearchSelectProps {
   /** 受控值（由 Form.Item 注入） */
   value?: string
-  onChange?: (value?: string) => void
+  onChange?: (value?: string, label?: string) => void
   placeholder?: string
   /** 远程搜索：空关键字时返回默认选项 */
   fetchOptions: (keyword: string) => Promise<OptionItem[]>
@@ -86,7 +86,11 @@ export default function RemoteSearchSelect({
   return (
     <Select
       value={value}
-      onChange={onChange}
+      onChange={(next, option) => {
+        // 把选中项的 label 一起回传：确认弹窗只拿 id 会显示成「#41」这种裸数字
+        const matched = Array.isArray(option) ? undefined : (option as { label?: string } | undefined)?.label
+        onChange?.(next, typeof matched === 'string' ? matched : mergedOptions.find(o => o.value === next)?.label)
+      }}
       placeholder={placeholder}
       style={style}
       showSearch
