@@ -43,6 +43,15 @@ public class RdmRequirementVO {
     /* ── 流转责任链 ── */
     private String intakeFlowNo;
     private Integer needApproval;
+    /** 当前准入轮次（与 rdm_intake_round.round_no 对齐） */
+    private Integer intakeRoundNo;
+    /** 本轮准入裁决模式: FORCE_APPROVE/APPROVE/EXEMPT */
+    private String intakeMode;
+    /** 命中策略名称与版本（免审也要能解释「凭什么是免审」） */
+    private String intakePolicyName;
+    private String intakePolicyVersion;
+    /** 命中链路（逐行展示，配置页与详情页共用） */
+    private java.util.List<String> intakeExplain;
     private String dispatcherName;
     private String distributeTime;
     private Long assigneePmUserId;
@@ -81,6 +90,12 @@ public class RdmRequirementVO {
     private String acceptanceResult;
     private Integer acceptanceScore;
     private String acceptanceTime;
+
+    /**
+     * 流程版本（阶段 4）：1=历史记录（无五节点/定稿快照/工时明细），2=新链路。
+     * <p>界面靠它区分“真的没做”与“那个年代还没这个要求”，避免把存量需求误判为不合格。
+     */
+    private Integer flowVersion;
 
     private String updatedAt;
 
@@ -317,6 +332,11 @@ public class RdmRequirementVO {
         vo.setSubmitTime(DateTimeUtils.format(r.getSubmitTime()));
         vo.setIntakeFlowNo(r.getIntakeFlowNo());
         vo.setNeedApproval(r.getNeedApproval());
+        vo.setIntakeRoundNo(r.getIntakeRoundNo());
+        vo.setIntakeMode(r.getIntakeMode());
+        vo.setIntakePolicyName(r.getIntakePolicyName());
+        vo.setIntakePolicyVersion(r.getIntakePolicyVersion());
+        vo.setIntakeExplain(splitLines(r.getIntakeExplain()));
         vo.setDispatcherName(r.getDispatcherName());
         vo.setDistributeTime(DateTimeUtils.format(r.getDistributeTime()));
         vo.setAssigneePmUserId(r.getAssigneePmUserId());
@@ -344,6 +364,7 @@ public class RdmRequirementVO {
         vo.setChangeCount(r.getChangeCount());
         vo.setAcceptorName(r.getAcceptorName());
         vo.setAcceptanceResult(r.getAcceptanceResult());
+        vo.setFlowVersion(r.getFlowVersion() == null ? 1 : r.getFlowVersion());
         vo.setAcceptanceScore(r.getAcceptanceScore());
         vo.setAcceptanceTime(DateTimeUtils.format(r.getAcceptanceTime()));
         vo.setUpdatedAt(DateTimeUtils.format(r.getUpdatedAt()));
@@ -351,5 +372,16 @@ public class RdmRequirementVO {
             vo.setStayHours(Duration.between(r.getStatusEnterTime(), LocalDateTime.now()).toHours());
         }
         return vo;
+    }
+
+    /** 将准入命中链路拆成可逐行展示的列表；空值归一为空列表，前端不用再判 null */
+    private static java.util.List<String> splitLines(String text) {
+        if (text == null || text.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(text.split("\n"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 }

@@ -653,31 +653,6 @@
       "supersededBy": "rdm:menu-seed:v2.0"
     },
     {
-      "versionKey": "rdm:schema:v1.0",
-      "module": "rdm",
-      "phase": "MODULE_STRUCTURE",
-      "executionType": "JAVA",
-      "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": [
-        "core:schema-v10",
-        "core:system-portal:v1.0"
-      ],
-      "status": "ACTIVE",
-      "comment": "RDM 需求全生命周期 M1 结构：建 12 张 rdm_ 表（需求主表/关联对象/参与角色/状态流水/沟通/附件/验收单/状态定义/流转规则/分发矩阵/SLA/通知留痕），并种子 23 个状态、32 条流转规则、10 条 SLA、XQ+XQYS 编号规则、rdm_intake 准入流程与流程配置行。DDL 只存 classpath 脚本 204_rdm_core_tables.sql 一份（backend/sql 下为参考副本）；applyOnce 带后置校验（表齐+种子数量达标），失败不记版本、下次启动重试。"
-    },
-    {
-      "versionKey": "rdm:schema:v1.1",
-      "module": "rdm",
-      "phase": "MODULE_STRUCTURE",
-      "executionType": "JAVA",
-      "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": [
-        "rdm:schema:v1.0"
-      ],
-      "status": "ACTIVE",
-      "comment": "RDM 附件/截图列扩到 MEDIUMTEXT：上传接口沿用 EAM 照片口径返回 Base64 Data URL（5MB 上限 → base64 约 6.8MB），VARCHAR(500)/TEXT(64KB) 会静默截断。ALTER MODIFY 可重复执行；后置校验 information_schema.COLUMNS.DATA_TYPE=mediumtext，未达标不记版本。DDL 存 205_rdm_attachment_mediumtext.sql。"
-    },
-    {
       "versionKey": "rdm:access-grant:v1.0",
       "module": "rdm",
       "phase": "MENU_SEED",
@@ -894,6 +869,31 @@
       "comment": "基线菜单集合跟随菜单收敛（rdm:menu-seed:v3.7）。不再授已退役的 rdm-submit，“全员能提需求”改为 rdm-requirement 的 [view,create]，与 RETIRED_MENU_MERGE 从提交需求平移过来的动作一致。这一步必须同时递增版本：因为 RdmAccessGrantInitializer 在菜单未就绪时会抛异常（rdm-submit 已被软删，查不到就会“RDM 菜单未就绪”），只改常量不改版本的话，已记账 v1.0 的环境仍会在新代码下启动失败。verify 遍历 BASELINE_MENUS 自动跟随，无需另改断言。取代 rdm:access-grant:v1.0。"
     },
     {
+      "versionKey": "rdm:schema:v1.0",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM 需求全生命周期 M1 结构：建 12 张 rdm_ 表（需求主表/关联对象/参与角色/状态流水/沟通/附件/验收单/状态定义/流转规则/分发矩阵/SLA/通知留痕），并种子 23 个状态、32 条流转规则、10 条 SLA、XQ+XQYS 编号规则、rdm_intake 准入流程与流程配置行。DDL 只存 classpath 脚本 204_rdm_core_tables.sql 一份（backend/sql 下为参考副本）；applyOnce 带后置校验（表齐+种子数量达标），失败不记版本、下次启动重试。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.1",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "RDM 附件/截图列扩到 MEDIUMTEXT：上传接口沿用 EAM 照片口径返回 Base64 Data URL（5MB 上限 → base64 约 6.8MB），VARCHAR(500)/TEXT(64KB) 会静默截断。ALTER MODIFY 可重复执行；后置校验 information_schema.COLUMNS.DATA_TYPE=mediumtext，未达标不记版本。DDL 存 205_rdm_attachment_mediumtext.sql。"
+    },
+    {
       "versionKey": "rdm:schema:v1.2",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",
@@ -940,6 +940,128 @@
       ],
       "status": "ACTIVE",
       "comment": "修正 v1.4 留下结构缺陷：rdm_metric_snapshot.dim_id 原允许 NULL，而 MySQL 唯一索引不约束 NULL，uk_rdm_metric_day 对 COMPANY 维度形同虚设，快照回填重复执行会长重复行（实查 2026-10-04 有两行 COMPANY，趋势页同一天画两个数据点）。本迁移：先按 (stat_date,dim_type,COALESCE(dim_id,0)) 去重，再将 NULL 归零，最后 MODIFY 为 NOT NULL DEFAULT 0。COMPANY 统一用常量 RdmConstants.COMPANY_DIM_ID=0 占位，写入端与趋势读取端共用（读取端原来用 dim_id IS NULL 选 COMPANY，不改会直接查空）。快照表是纯派生缓存（job 可按日期重算），所以此处破例允许 DELETE 去重并在脚本里写明不得作为业务表先例。后置校验：IS_NULLABLE=NO + 无 NULL 残留行 + 无重复快照日。脚本 209_rdm_snapshot_dim_id.sql。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.6",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.5"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 2B 准入治理结构：建 rdm_intake_policy（准入策略：mode=FORCE_APPROVE/APPROVE/EXEMPT、部门/角色/系统/需求类型条件、含下级开关、审批节点、默认分派责任人、优先级、生效区间、版本、停用默认）与 rdm_intake_round（审批轮次：uk=req_id+round_no 保证一轮一条不覆盖；flow_no 唯一索引只对非空值生效，免审轮次 NULL 不互斥；留存命中链路、策略版本与内容快照供事后审计）；rdm_requirement 新增 intake_round_no/intake_policy_id/intake_policy_name/intake_policy_version/intake_mode/intake_explain/intent_pm_user_id/intent_pm_name 八列——需求主表若不存当前轮次与命中版本，回调就只能凭 flowNo 反查，旧单迟到回调会直接推动已经重提的新轮次。ADD COLUMN 不可重复执行，八列由 Java 逐列先查 information_schema 再条件添加（失败抛出、不记版本、下次启动重试）。DDL 只在 classpath 脚本 210_rdm_intake_policy.sql 存一份，backend/sql 下同名文件为参考副本。后置校验：两表存在 + 八列齐备。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.7",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.6"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 2C 可靠通知结构：把 rdm_notify_log 从「发完记一笔」升级为投递队列（队列与留痕同表，避开两张表必然漂移）。新增 scenario/title/content/at_mobiles（没载荷无法重发）、attempts/next_retry_at（退避重试 1分/5分/30分/2小时/6小时，共 5 次）、channel_name（记录真正受理的渠道）；send_status 语义改为 pending/sent/failed/abandoned/skipped。背景：旧实现调用 @Async void 发送后立即记 success，而 SLA 又用 success 做 24 小时去重，等于「渠道没受理」的提醒被本身记录的 success 抑制一整天。索引 idx_rdm_notify_due(send_status,next_retry_at) 由 STATISTICS 先查再建（MySQL 8 无 CREATE INDEX IF NOT EXISTS）。七个列逐列先查 information_schema 再添加，失败抛出且不记版本；后置校验七列 + 索引均就绪。无脚本文件，DDL 全在 Java 常量。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.8",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.7"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 3 计划与交付事实结构：建 rdm_milestone（五个关键节点各一行，含初步计划/已批准基线/当前预测/实际完成四套日期 + 负责人 + 不适用原因；uk=req_id+code 保证一个节点只有一份计划）、rdm_work_log（按人按工作日的工时明细，uk=task_id+user_id+work_date，任务上的 actual_hours 改为它的汇总，不再允许代填与自动补 1 工日）、rdm_prd_snapshot（评审通过即冻结一版正文/功能清单/验收标准，结论绑定版本，改内容必须走新版本）。为什么不在需求主表继续加日期列：五节点×四套时间会变成 20 个列，也无处记录节点负责人与不适用原因。DDL 只在 classpath 脚本 212_rdm_milestone_worklog.sql 存一份，backend/sql 下同名文件为参考副本（全 CREATE TABLE IF NOT EXISTS，幂等）。后置校验：三表存在 + 两张表的业务唯一键就位。"
+    },
+    {
+      "versionKey": "rdm:schema:v1.9",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.8"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 4 上线闸门与验收分离：建 rdm_release（发布放行单，一次上线一行，存检查项快照/放行人/有效期/驳回理由；checks_json 存快照而不是实时计算，因为事后规则变了不能让当时的放行变成违规）；rdm_acceptance 新增 stage（pre_release 上线前预验收 / post_release 上线后业务验收，原有一列分不清两次事实，预验收会污染正式满意度口径）；rdm_requirement 新增 flow_version（1=历史记录无五节点/定稿快照/工时明细，2=新链路；拿新口径卡存量会把历史记录全算成未做准备）。轮次唯一键 uk_rdm_acceptance_attempt(req_id,stage,attempt) 仅在存量无重号时创建，否则跳过并告警（直接加键会让应用启动失败）。classpath 脚本 213_rdm_release_gate.sql，backend/sql 下同名参考副本；两列逐列先查再加，失败抛出且不记版本；后置校验 rdm_release 表 + 两列就绪。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.0",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.9"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 5 排程结构：建 rdm_task_dependency（任务依赖有向边，uk=pred_task_id+succ_task_id 保证同一条边不会写两份把拓扑排序带坑；首期只支持 FS + lag 工作日偏移，独立表而不是逗号字段是因为环检测与拓扑必须按边索引查询）、rdm_work_calendar（按人按日可用工时，uk=user_id+day；日历按人不按全局，否则有人请假、有人周末支援上线时算出的关键路径与负载对具体的人全错）。DDL 只在 classpath 脚本 214_rdm_schedule_dependency.sql 存一份，backend/sql 下为参考副本（全 CREATE TABLE IF NOT EXISTS，幂等）。无列变更。后置校验：两表存在 + 两个业务唯一键就位（索引由 STATISTICS 先查后验）。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.1",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v2.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 6 绩效治理结构：建 rdm_score_budget（周期×部门的贡献分预算上限与预警阈值，uk=period_code+dept_id，dept_id=0 表示全员兜底；预算只做超限预警不自动折算——自动折算会让一个人的分数取决于同部门其他人产出，那不再是他的贡献）、rdm_hr_suggestion（HR 绩效建议：由 rdm_score_record 流水聚合出 draft，PMO 人工复核后 confirmed，再 pushed 到考核单 suggested_* 通道，pushed 后只能 withdraw 并清空建议值；uk=period_code+user_id 保证重算不会给同一人长多条；breakdown_json/rule_version 保留可申诉的复算依据）。同阶段代码修正：快照 SQL 全参数化并修 DEPT/PM 维度 change_count 参数个数不一致（该缺陷会让部门与 PM 快照整体失败）、overdue 改为用计划/实际上线日回算的当日逾期存量（不再用会被流转清零的 overdue_flag）、uat_fail 不再重复 +rejectCount、积分流水补齐 dept_id/dept_name 快照。DDL 只在 classpath 脚本 215_rdm_score_budget.sql 存一份，backend/sql 下为参考副本。后置校验：两表存在 + 两个业务唯一键就位。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.2",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v2.1"
+      ],
+      "status": "ACTIVE",
+      "comment": "阶段 4 补结（浏览器端到端测试发现的 P0，发布放行链路 100% 不可用）：一、rdm_release 补 applicant_emp_no 列——实体 RdmRelease.applicantEmpNo 存在但 213 建表 DDL 没有这一列，MyBatis-Plus 生成未知列导致 GET /release/requirement/{id} 直接「數據庫操作異常」，进而上线动作被 DB 异常吞掉而不是报「上線前必須先通過發布放行」；事已至此不能回头改已记为已应用的 v1.9 列清单（已跑过的库永远不会补列），故开 v2.2 专项 ALTER（逐列先查再加）。二、补 sys_biz_seq_rule 的 rdm_release 种子（FZ + YYYYMMDD + 4 位，与 rdm_acceptance/rdm_prd 同构）：代码里误用大写 RDM_RELEASE 且无任何种子，发起放行必报「編號生成規則未配置或已停用」；同时把常量改为小写 rdm_release。三、213 脚本同步补列与种子，空库安装也能一次到位。后置校验：列存在 + 规则行存在且 status=1，缺一即启动失败（不允许带着断链的上线闸门对外服务）。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.3",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v2.1"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "216_rdm_suggestion_ratio_widen.sql"
+      ],
+      "intent": "v2.3 补丁：放宽 rdm_hr_suggestion.budget_used_ratio 到 DECIMAL(9,2)",
+      "author": "RDM 阶段 6 深度测试修复",
+      "ticket": "rdm-stage6-e2e",
+      "appliedAt": "2026-10-07T00:00:00Z",
+      "comment": "深度测试实测缺陷：该列原为 DECIMAL(5,2)，最大只能存 999.99；预算上限 5 分而部门实际产出 214.78 分时占用为 4295.60，写回预算标记处报 Data truncation: Out of range，整条「聚合绩效建议」失败，阶段 6 治理链路 100% 不可用。占用倍数天然可能很大（预算设得过小、跨人汇总、历史数据），因此扩到 DECIMAL(9,2)，并在代码侧对写回值做截断兜底。DDL 只在 classpath 脚本 216_rdm_suggestion_ratio_widen.sql 存一份，backend/sql 下为参考副本（MODIFY COLUMN 可重复执行）。后置校验：读 information_schema 的 COLUMN_TYPE 必须是 decimal(9,2)。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.4",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v2.1"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "217_hr_indicator_type_rdm_output.sql"
+      ],
+      "intent": "v2.4 补丁：把 RDM_OUTPUT 注册进 PERF_INDICATOR_TYPE 指标字典",
+      "author": "RDM 阶段 6 深度测试修复",
+      "ticket": "rdm-stage6-e2e",
+      "appliedAt": "2026-10-07T00:00:00Z",
+      "comment": "跨模块断链：RdmConstants.INDICATOR_TYPE_RDM_OUTPUT 是推送建议时匹配考核单指标的条件（hr_perf_indicator.indicator_type），但字典 PERF_INDICATOR_TYPE 只有 RESULT/COMPETENCY/ATTITUDE/COMPLIANCE，前端模板下拉也没有该项，HR 无法在界面上建出 RDM 产出指标，「推送已确认建议」必然失败，阶段 6 的建议通道形同虚设。同批前端改动：Performance/meta.ts 的 INDICATOR_TYPE_ORDER/LABEL_KEY 增 RDM_OUTPUT，zh-TW/en 增 hrPerf.indicatorTypeRdmOutput。后置校验：字典项必须存在且未删除。"
     }
   ]
 }

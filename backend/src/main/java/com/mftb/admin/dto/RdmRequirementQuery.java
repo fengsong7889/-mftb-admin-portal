@@ -50,15 +50,27 @@ public class RdmRequirementQuery {
             RdmConstants.STATUS_INTEGRATION, RdmConstants.STATUS_TESTING, RdmConstants.STATUS_TEST_PASSED);
 
     /**
-     * 构造查询条件。
-     * <p>数据范围硬约束：传入 {@code currentUserId}（非管理视角）时，不论 scope 为何，
-     * 都只能看到「与自己相关」的需求（提出人 / 產品經理 / 研發負責人 / 驗收人）。
-     * 菜单授权可以铺得宽（全公司都要能提需求），跨部门可见性只能靠这条防线，
-     * 不能靠前端不渲染按钮来保障。
+     * 构造查询条件（默认按相关人收敛）。
      *
      * @param currentUserId 当前登录人ID（null 表示不受限：超管 / PMO / 技术负责人）
      */
     public LambdaQueryWrapper<RdmRequirement> toWrapper(Long currentUserId) {
+        return toWrapper(currentUserId, true);
+    }
+
+    /**
+     * 构造查询条件。
+     * <p>数据范围硬约束：传入 {@code currentUserId}（非管理视角）且 {@code relatedOnly} 时，
+     * 不论 scope 为何，都只能看到「与自己相关」的需求（提出人 / 產品經理 / 研發負責人 / 驗收人）。
+     * 菜单授权可以铺得宽（全公司都要能提需求），跨部门可见性只能靠这条防线，
+     * 不能靠前端不渲染按钮来保障。
+     *
+     * @param currentUserId 当前登录人ID（null 表示不受限）
+     * @param relatedOnly   是否收敛到与自己相关。「待我審批」必须传 false：
+     *                      审批人的关联关系只存在于 OA 审批任务表，不在需求表的人员字段上，
+     *                      收敛后会永远只能命中自己提的单；调用方必须用审批待办 id 集合接住范围。
+     */
+    public LambdaQueryWrapper<RdmRequirement> toWrapper(Long currentUserId, boolean relatedOnly) {
         LambdaQueryWrapper<RdmRequirement> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(reqType)) {
             wrapper.eq(RdmRequirement::getReqType, reqType);
@@ -85,7 +97,7 @@ public class RdmRequirementQuery {
                     .or().like(RdmRequirement::getSubmitterName, kw));
         }
         applyScope(wrapper, currentUserId);
-        if (currentUserId != null) {
+        if (currentUserId != null && relatedOnly) {
             applyRelatedOnly(wrapper, currentUserId);
         }
         wrapper.orderByDesc(RdmRequirement::getUpdatedAt).orderByDesc(RdmRequirement::getId);
@@ -124,6 +136,10 @@ public class RdmRequirementQuery {
             }
             case RdmConstants.SCOPE_ALL -> {
                 // 全部需求：仅 PMO/超管可用，服务层已按菜单权限门控，此处不再收敛
+            }
+            case RdmConstants.SCOPE_APPROVING -> {
+                // 待我审批：范围由服务层拿 OA 待办 id 后以 in(...) 收敛，这里不加人员字段条件；
+                // 一旦落到 default 分支，审批人就只会看到自己提的单，造成计数与列表不一致
             }
             default -> {
                 if (currentUserId != null) {

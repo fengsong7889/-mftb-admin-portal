@@ -59,7 +59,11 @@ public final class RdmConstants {
     public static final String ACTION_APPROVE_INTAKE = "approve_intake";
     public static final String ACTION_REJECT_INTAKE = "reject_intake";
     public static final String ACTION_DISPATCH = "dispatch";
+    /** 产品经理自需求池认领（原子抢单，不走通用流转入口） */
+    public static final String ACTION_CLAIM = "claim";
     public static final String ACTION_REASSIGN = "reassign";
+    /** 改派：换受理人但保留旧受理人的历史参与与贡献 */
+    public static final String ACTION_REASSIGN_PM = "reassign_pm";
     public static final String ACTION_START_EVALUATE = "start_evaluate";
     public static final String ACTION_PRD_START = "prd_start";
     public static final String ACTION_REVIEW_START = "review_start";
@@ -121,6 +125,25 @@ public final class RdmConstants {
     public static final String ACCEPT_CONDITIONAL = "conditional";
     public static final String ACCEPT_FAIL = "fail";
 
+    /**
+     * 验收阶段（阶段 4）：上线前预验收。
+     * <p>验的是「质量能不能上线」，结论不写入正式满意度口径。
+     */
+    public static final String ACCEPT_STAGE_PRE = "pre_release";
+
+    /**
+     * 验收阶段（阶段 4）：上线后业务验收。
+     * <p>验的是「上线后是否真的解决了业务问题」，1-5 分满意度以此为口径。
+     */
+    public static final String ACCEPT_STAGE_POST = "post_release";
+
+    /** 交付满意度评分区间（业务验收必填，不允许以「忘了打分」的名义交空值） */
+    public static final int SCORE_MIN = 1;
+    public static final int SCORE_MAX = 5;
+
+    /** 发布放行单有效期（天）：过期必须重新过闸，防止一次放行管 forever */
+    public static final int RELEASE_VALID_DAYS = 7;
+
     /* ==================== 业务编码 ==================== */
 
     /** 需求准入审批流程编码（对应 biz_oa_process.process_code / biz_workflow_config.flow_type） */
@@ -167,6 +190,9 @@ public final class RdmConstants {
     public static final String EVENT_STATUS_CHANGED = "STATUS_CHANGED";
     public static final String EVENT_ACCEPT_TODO = "ACCEPT_TODO";
     public static final String EVENT_ACCEPT_DONE = "ACCEPT_DONE";
+
+    /** 事件：发布放行（发起/放行/驳回均用此事件，接收人按动作区分） */
+    public static final String EVENT_RELEASE_GATE = "RELEASE_GATE";
     public static final String EVENT_SLA_WARN = "SLA_WARN";
     public static final String EVENT_SLA_OVERDUE = "SLA_OVERDUE";
     public static final String EVENT_URGE = "URGE";

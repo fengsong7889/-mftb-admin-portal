@@ -27,6 +27,13 @@ public class RdmDeliveryDTO {
         private String prototypeUrl;
         /** 拆成子 PRD 后是否把父需求推进到「PRD设计中」 */
         private Boolean advanceRequirement;
+        /**
+         * 已定稿的 PRD 要改内容时必须走新版本：前端传 true 才会复制一份新草稿，
+         * 避免「评审通过的内容还能原地改」让开发、验收各自认一版。
+         */
+        private Boolean newVersion;
+        /** 版本变更原因（newVersion=true 时必填，写进版本链） */
+        private String changeReason;
     }
 
     /** 发起评审 */
@@ -57,7 +64,7 @@ public class RdmDeliveryDTO {
         private Long id;
         private Long reqId;
         private Long prdId;
-        /** design/frontend/backend/qa/data */
+        /** design/frontend/app/backend/qa/data */
         private String taskType;
         private String title;
         private String content;
@@ -66,6 +73,32 @@ public class RdmDeliveryDTO {
         private String planStartDate;
         private String planFinishDate;
         private String iterationCode;
+    }
+
+    /** 里程碑节点（五节点计划/基线） */
+    @Data
+    public static class Milestone {
+        /** PRD_REVIEW/DESIGN_DONE/DEV_START/DEV_DONE/RELEASE */
+        private String code;
+        private String name;
+        private Long ownerUserId;
+        /** yyyy-MM-dd：初步计划 */
+        private String preliminaryDate;
+        /** yyyy-MM-dd：当前预测（改期只动它，基线不覆盖） */
+        private String forecastDate;
+        /** pending/done/not_applicable */
+        private String status;
+        /** 不适用原因（status=not_applicable 时必填） */
+        private String naReason;
+    }
+
+    /** 工时明细（按人按工作日一条） */
+    @Data
+    public static class WorkLog {
+        /** yyyy-MM-dd */
+        private String workDate;
+        private BigDecimal hours;
+        private String remark;
     }
 
     /** 任务进度/工时上报 */

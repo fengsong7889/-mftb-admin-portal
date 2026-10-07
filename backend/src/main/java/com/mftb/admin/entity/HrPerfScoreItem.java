@@ -36,6 +36,19 @@ public class HrPerfScoreItem {
     /** 权重快照 */
     private BigDecimal weight;
 
+    /**
+     * 系统建议分：由 RDM 產研协同绩效建议推送写入，HR 校准前仅作参考值。
+     * <p>此前只有裸 SQL 在写这三列、实体没有对应字段，导致考核单界面无法核对
+     * 「RDM 推了多少 / 撤回后是否真清空」（阶段 6 端到端实测）。
+     */
+    private BigDecimal suggestedScore;
+
+    /** 建议值来源（如 RDM） */
+    private String suggestedSource;
+
+    /** 建议值写入时间 */
+    private LocalDateTime suggestedAt;
+
     /** 完成情况/实际值 */
     private String targetValue;
 

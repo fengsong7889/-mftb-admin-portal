@@ -76,6 +76,11 @@ public class RdmDeliveryVO {
         private Integer progress;
         private BigDecimal planHours;
         private BigDecimal actualHours;
+        /**
+         * 实际工时是否已填报。旧实现会在完成时自动补 1 工日，
+         * 那个自造数字会把估时偏差与负载核算一起做假，现在改为显式标记缺报。
+         */
+        private Boolean actualHoursReported;
         private String planStartDate;
         private String planFinishDate;
         private String actualStartTime;
@@ -96,6 +101,8 @@ public class RdmDeliveryVO {
         private List<Task> tasks = new ArrayList<>();
         private List<Review> reviews = new ArrayList<>();
         private List<Change> changes = new ArrayList<>();
+        /** 五节点计划与基线（阶段 3） */
+        private List<Milestone> milestones = new ArrayList<>();
         private Integer taskTotal;
         private Integer taskDone;
         private Integer taskBlocked;
@@ -104,6 +111,55 @@ public class RdmDeliveryVO {
         private BigDecimal actualHoursTotal;
         /** 按任务类型分组的工时（用于研发/设计/测试投入分析） */
         private List<NameValue> hoursByType = new ArrayList<>();
+        /** 完成但未填报工时的任务数（缺报不能藏起来，否则产能对账看着很干净） */
+        private Integer unreportedHoursTasks;
+    }
+
+    /** 里程碑节点（计划/基线/预测/实际） */
+    @Data
+    public static class Milestone {
+        private Long id;
+        private String code;
+        private String name;
+        private Long ownerUserId;
+        private String ownerName;
+        private String preliminaryDate;
+        private String baselineDate;
+        private String forecastDate;
+        private String actualDate;
+        private String status;
+        private String naReason;
+        private Integer sortOrder;
+        /** 相对基线的偏差天数（正数=晚于基线；无基线时为空） */
+        private Integer slipDays;
+        /** 已冻结基线：不允许再改初步计划，只能改预测并留变更原因 */
+        private Boolean baselineLocked;
+    }
+
+    /** 工时明细行 */
+    @Data
+    public static class WorkLog {
+        private Long id;
+        private Long taskId;
+        private Long userId;
+        private String userName;
+        private String workDate;
+        private BigDecimal hours;
+        private String remark;
+        private String updatedBy;
+    }
+
+    /** PRD 定稿快照 */
+    @Data
+    public static class PrdSnapshot {
+        private Long id;
+        private Long prdId;
+        private String versionNo;
+        private String title;
+        private String conclusion;
+        private String conclusionDesc;
+        private String reviewerNames;
+        private String snapshotTime;
     }
 
     /** 迭代 */

@@ -33,6 +33,9 @@ public class RdmAcceptanceVO {
     /** 结论: pass/conditional/fail */
     private String result;
 
+    /** 验收阶段: pre_release 上线前预验收 / post_release 上线后业务验收（阶段 4） */
+    private String stage;
+
     /** 交付满意度 1-5 */
     private Integer score;
 
@@ -85,6 +88,7 @@ public class RdmAcceptanceVO {
         vo.setAcceptorName(a.getAcceptorName());
         vo.setTestEnv(a.getTestEnv());
         vo.setResult(a.getResult());
+        vo.setStage(a.getStage() == null ? "pre_release" : a.getStage());
         vo.setScore(a.getScore());
         vo.setCaseTotal(a.getCaseTotal());
         vo.setCasePass(a.getCasePass());

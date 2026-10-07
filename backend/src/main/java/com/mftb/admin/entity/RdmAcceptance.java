@@ -38,6 +38,13 @@ public class RdmAcceptance {
     private String result;
 
     /**
+     * 验收阶段（阶段 4）：pre_release 上线前预验收 / post_release 上线后业务验收。
+     * <p>两次事实必须分开：预验收验的是“质量能不能上线”，
+     * 业务验收验的是“上线后是否解决了我的问题”，合成一条会让满意度分数无法归因。
+     */
+    private String stage;
+
+    /**
      * 第几次验收（1=首次，>1=返工复验）。
      * <p>冻结在当时序号而不是查历史条数反推：事后补录或修订会让「一次通过率」飘移。
      */

@@ -76,6 +76,12 @@ public class HrPerfAssessmentVO {
         private String indicatorName;
         private BigDecimal weight;
         private String targetValue;
+        /** 系统建议分（RDM 推送写入，供 HR 校准参考；撤回后为空） */
+        private BigDecimal suggestedScore;
+        /** 建议值来源（如 RDM） */
+        private String suggestedSource;
+        /** 建议值写入时间 */
+        private LocalDateTime suggestedAt;
         private BigDecimal selfScore;
         private BigDecimal supervisorScore;
         private BigDecimal finalScore;

@@ -65,11 +65,29 @@ public class RdmRequirement {
     /** 提交时间（草稿为空） */
     private LocalDateTime submitTime;
 
-    /** 是否需要准入审批: 1=需要 0=免审 */
+    /** 是否需要准入审批: 1=需要 0=免审（服务端准入策略裁决结果，不取客户端参数） */
     private Integer needApproval;
 
-    /** 关联 OA 准入流程编号 */
+    /** 关联 OA 准入流程编号（当前轮次的单号；旧轮单号留在 rdm_intake_round） */
     private String intakeFlowNo;
+
+    /** 当前准入轮次序号（空=未发起过）；回调靠它认出「迟到的旧轮结果」 */
+    private Integer intakeRoundNo;
+
+    /** 本轮命中的准入策略ID（空=内置默认策略） */
+    private Long intakePolicyId;
+
+    /** 命中策略名称快照 */
+    private String intakePolicyName;
+
+    /** 命中策略版本快照：规则后来改了也不影响这一轮的结论 */
+    private String intakePolicyVersion;
+
+    /** 本轮准入裁决: FORCE_APPROVE/APPROVE/EXEMPT */
+    private String intakeMode;
+
+    /** 命中链路说明（为什么免审/为什么要审，事后审计用） */
+    private String intakeExplain;
 
     /** 分发人（技术负责人）ID */
     private Long dispatcherUserId;
@@ -88,6 +106,12 @@ public class RdmRequirement {
 
     /** 产品经理姓名快照 */
     private String assigneePmName;
+
+    /** 提交时指定的产品经理ID（意向）：需审批时先存意向，审批通过后再生效为受理人 */
+    private Long intentPmUserId;
+
+    /** 指定产品经理姓名快照 */
+    private String intentPmName;
 
     /** 产品受理时间 */
     private LocalDateTime acceptTime;
@@ -133,6 +157,13 @@ public class RdmRequirement {
 
     /** 是否逾期 */
     private Integer overdueFlag;
+
+    /**
+     * 流程版本（阶段 4）：1=历史记录（五节点计划/PRD 定稿快照/工时明细之前建的），2=新链路。
+     * <p>存在理由：拿新口径去卡存量需求，会把历史记录全算成「未做验收准备」，
+     * 与真实质量无关；发布闸门的检查项必须按版本区分要求。
+     */
+    private Integer flowVersion;
 
     /** 挂起复审日期 */
     private LocalDate onHoldUntil;
