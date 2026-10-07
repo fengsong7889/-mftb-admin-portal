@@ -92,6 +92,19 @@ public class RdmRequirementController {
         return Result.success(requirementService.withdraw(id));
     }
 
+    /**
+     * 提出人自助提交 / 修改后重提（只要求 create）。
+     * <p>为什么不开到通用流转接口上：那个入口要求 {@code rdm-requirement:edit}，
+     * 而 edit 是需求侧处理权（受理/PRD/评审/变更）；让员工为了提交自己的草稿去拿 edit，
+     * 等于把产品处理权一并授出去。服务端仍会校资源归属与状态机角色。
+     */
+    @PostMapping("/requirement/{id}/submit")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create")
+    public Result<RdmRequirementVO> selfSubmit(@PathVariable Long id,
+                                               @RequestBody(required = false) RdmTransitionDTO dto) {
+        return Result.success("需求已提交", requirementService.selfSubmit(id, dto));
+    }
+
     /** 状态流转 */
     @PostMapping("/requirement/{id}/transition")
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-intake", "rdm-acceptance"})
@@ -105,6 +118,25 @@ public class RdmRequirementController {
     public Result<Integer> batchAssign(@RequestBody BatchAssignRequest request) {
         return Result.success("分配完成",
                 requirementService.batchAssign(request.ids(), request.pmUserId()));
+    }
+
+    /**
+     * 产品经理自需求池认领。
+     * <p>权限上只要受理权（rdm-requirement:edit），服务端会再校在职/资格与原子抢单，
+     * 不要求分配权——否则产品PM 只能等技术负责人分配。
+     */
+    @PostMapping("/requirement/{id}/claim")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit",
+            anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_DELIVERY_BOARD})
+    public Result<RdmRequirementVO> claim(@PathVariable Long id) {
+        return Result.success("已認領該需求", requirementService.claim(id));
+    }
+
+    /** 改派产品经理（只有分配侧授权可用；旧受理人保留历史贡献） */
+    @PostMapping("/requirement/{id}/reassign")
+    @RequirePermission(menu = RdmConstants.MENU_INTAKE, action = "edit")
+    public Result<RdmRequirementVO> reassign(@PathVariable Long id, @RequestBody RdmTransitionDTO dto) {
+        return Result.success("已改派", requirementService.reassignPm(id, dto));
     }
 
     /** 添加沟通记录 */

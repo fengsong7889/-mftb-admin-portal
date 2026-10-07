@@ -56,6 +56,8 @@ public class RdmAssistantService {
     private final RdmRequirementMapper requirementMapper;
     private final RdmPrdMapper prdMapper;
     private final RdmCommentMapper commentMapper;
+    /** 需求级访问守卫：AI 草稿会把需求正文送给模型，必须先过资源归属 */
+    private final RdmAccessGuard accessGuard;
     private final LlmChannelRouter channelRouter;
     private final AiMyCenterService myCenterService;
     private final LlmUsageService llmUsageService;
@@ -85,6 +87,8 @@ public class RdmAssistantService {
         if (req == null) {
             throw new BusinessException("需求不存在或已刪除");
         }
+        // 不收数据范围的话，任何持菜单 edit 的人都能凭 id 把别人需求的正文送进大模型（既是越权读，也是数据外流）
+        accessGuard.requireDeliveryWriter(reqId, "生成 PRD 草稿");
         RdmAssistantVO.PrdDraft draft = new RdmAssistantVO.PrdDraft();
         draft.setReqId(req.getId());
         draft.setTitle(req.getTitle());

@@ -2,6 +2,7 @@ package com.mftb.admin.config;
 
 import com.mftb.admin.constant.SystemCode;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -9,9 +10,12 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * RDM 全员基线授权：让全公司各部门员工都能在门户里看到并进入「產研協同」提需求。
@@ -83,21 +87,58 @@ public class RdmAccessGrantInitializer implements CommandLineRunner {
             return;
         }
         int granted = 0;
+        int widened = 0;
         for (Long roleId : roleIds) {
             for (Map.Entry<String, Long> entry : menuIds.entrySet()) {
-                jdbcTemplate.update(
-                        "INSERT INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?) "
-                                + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
-                        roleId, entry.getValue(), BASELINE_MENUS.get(entry.getKey()));
-                granted++;
+                String baseline = BASELINE_MENUS.get(entry.getKey());
+                String existing = jdbcTemplate.queryForList(
+                                "SELECT actions FROM sys_role_menu WHERE role_id = ? AND menu_id = ? LIMIT 1",
+                                String.class, roleId, entry.getValue())
+                        .stream().findFirst().orElse(null);
+                if (existing == null) {
+                    jdbcTemplate.update("INSERT INTO sys_role_menu (role_id, menu_id, actions) VALUES (?, ?, ?)",
+                            roleId, entry.getValue(), baseline);
+                    granted++;
+                    continue;
+                }
+                /*
+                 * 只补基线缺的动作，绝不覆盖已有动作。
+                 * <p>以前写的是 ON DUPLICATE KEY UPDATE actions = VALUES(actions)：基线每次启动重放，
+                 * 等于管理员在「授權中心」给产品角色勾上的 edit/export 下次重启就被抹回 view/create，
+                 * 而且 verify() 只查授权行存在、不查动作，这种掉权限完全不会有提示。
+                 */
+                String union = unionActions(existing, baseline);
+                if (union != null) {
+                    jdbcTemplate.update("UPDATE sys_role_menu SET actions = ? WHERE role_id = ? AND menu_id = ?",
+                            union, roleId, entry.getValue());
+                    widened++;
+                }
             }
             // 系统准入：基线角色也要有 rdm，否则严管模式下菜单会被系统级判定拦下
             jdbcTemplate.update("INSERT IGNORE INTO sys_role_system (role_id, system_code) VALUES (?, ?)",
                     roleId, SystemCode.RDM.code());
         }
         permissionService.evictAll();
-        log.info("RDM 基線授權完成: roles={}, 菜单授权={} 条, menus={}",
-                roleIds.size(), granted, BASELINE_MENUS.keySet());
+        log.info("RDM 基線授權完成: roles={}, 新建={} 条, 补动作={} 条, menus={}",
+                roleIds.size(), granted, widened, BASELINE_MENUS.keySet());
+    }
+
+    /**
+     * 基线动作并入已有动作；没有新增时返回 null（调用方据此避开无意义的写入）。
+     * <p>存量 actions 不是合法 JSON 时不猜也不覆写，保留原值交由授权中心修正，
+     * 避免把一个手工配置过的权限行当成脏数据洗掉。
+     */
+    private String unionActions(String existingJson, String baselineJson) {
+        Set<String> merged = new LinkedHashSet<>();
+        try {
+            merged.addAll(JsonUtils.parseStringList(existingJson));
+        } catch (RuntimeException e) {
+            log.warn("RDM 基線授權：存量 actions 不是合法 JSON，保留原值不合并: {}", existingJson);
+            return null;
+        }
+        int before = merged.size();
+        merged.addAll(JsonUtils.parseStringList(baselineJson));
+        return merged.size() == before ? null : JsonUtils.toJson(new ArrayList<>(merged));
     }
 
     private void verify() {

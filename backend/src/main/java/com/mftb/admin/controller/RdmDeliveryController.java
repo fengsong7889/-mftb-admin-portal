@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,6 +46,45 @@ public class RdmDeliveryController {
     @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
     public Result<List<RdmDeliveryVO.Prd>> prds(@PathVariable Long reqId) {
         return Result.success(deliveryService.listPrds(reqId));
+    }
+
+    /* ── 阶段 3：里程碑与工时明细 ── */
+
+    /** 五节点计划（初步/基线/预测/实际） */
+    @GetMapping("/requirement/{reqId}/milestones")
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    public Result<List<RdmDeliveryVO.Milestone>> milestones(@PathVariable Long reqId) {
+        return Result.success(deliveryService.milestones(reqId));
+    }
+
+    /** 保存节点计划（已冻结基线后只能改预测） */
+    @PutMapping("/requirement/{reqId}/milestones")
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    public Result<List<RdmDeliveryVO.Milestone>> saveMilestones(@PathVariable Long reqId,
+                                                                @RequestBody List<RdmDeliveryDTO.Milestone> list) {
+        return Result.success("節點計劃已保存", deliveryService.saveMilestones(reqId, list));
+    }
+
+    /** 冻结基线（评审通过、估时确认后执行一次） */
+    @PostMapping("/requirement/{reqId}/milestones/freeze")
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    public Result<List<RdmDeliveryVO.Milestone>> freezeMilestones(@PathVariable Long reqId) {
+        return Result.success("基線已凍結", deliveryService.freezeMilestoneBaseline(reqId));
+    }
+
+    /** PRD 定稿快照（版本链） */
+    @GetMapping("/prd/{id}/snapshots")
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    public Result<List<RdmDeliveryVO.PrdSnapshot>> prdSnapshots(@PathVariable Long id) {
+        return Result.success(deliveryService.prdSnapshots(id));
+    }
+
+    /** 填报工时明细（仅任务负责人本人） */
+    @PostMapping("/task/{id}/work-logs")
+    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    public Result<List<RdmDeliveryVO.WorkLog>> saveWorkLogs(@PathVariable Long id,
+                                                            @RequestBody List<RdmDeliveryDTO.WorkLog> logs) {
+        return Result.success("工時已登記", deliveryService.saveWorkLogs(id, logs));
     }
 
     /** 新增/编辑 PRD */

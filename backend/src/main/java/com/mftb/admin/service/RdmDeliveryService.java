@@ -70,4 +70,25 @@ public interface RdmDeliveryService {
 
     /** 发起变更申请（走 OA 审批） */
     RdmDeliveryVO.Change applyChange(RdmDeliveryDTO.Change dto);
+
+    /* ── 阶段 3：里程碑计划与工时明细 ── */
+
+    /** 五节点计划（初步/基线/预测/实际） */
+    List<RdmDeliveryVO.Milestone> milestones(Long reqId);
+
+    /**
+     * 保存初步计划或调整预测。
+     * <p>基线一旦冻结就不允许再改 preliminary/baseline，只能改 forecast；
+     * 否则按时率会变成「自己改考卷自己得高分」。
+     */
+    List<RdmDeliveryVO.Milestone> saveMilestones(Long reqId, List<RdmDeliveryDTO.Milestone> list);
+
+    /** 冻结基线（评审通过、各角色估时确认后执行） */
+    List<RdmDeliveryVO.Milestone> freezeMilestoneBaseline(Long reqId);
+
+    /** 填报工时明细：只允许任务负责人本人，任务上的实际工时是本表汇总 */
+    List<RdmDeliveryVO.WorkLog> saveWorkLogs(Long taskId, List<RdmDeliveryDTO.WorkLog> logs);
+
+    /** PRD 定稿快照（版本链） */
+    List<RdmDeliveryVO.PrdSnapshot> prdSnapshots(Long prdId);
 }

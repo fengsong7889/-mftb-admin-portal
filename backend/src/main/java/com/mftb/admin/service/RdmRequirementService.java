@@ -37,11 +37,34 @@ public interface RdmRequirementService {
     /** 撤回为草稿 */
     RdmRequirementVO withdraw(Long id);
 
+    /**
+     * 提出人自助提交 / 修改后重提。
+     * <p>为什么要独立命令而不是复用通用流转接口：通用流转要求 {@code rdm-requirement:edit}，
+     * 而那个权覆盖受理/PRD/评审等需求侧处理动作；为了「能提交自己的草稿」而开 edit，
+     * 等于把产品处理权一并授出去。本方法只要求 create，且仅提出人本人可用。
+     * <p>草稿走 submit、准入驳回后重提走 resubmit，按当前状态命中的流转规则选择。
+     */
+    RdmRequirementVO selfSubmit(Long id, RdmTransitionDTO dto);
+
     /** 状态流转（按 rdm_transition 校验角色与必填字段） */
     RdmRequirementVO transition(Long id, RdmTransitionDTO dto);
 
     /** 批量分配产品经理 */
     int batchAssign(List<Long> ids, Long pmUserId);
+
+    /**
+     * 产品经理认领需求池里的需求。
+     * <p>原子抢单：用条件更新（status=pool 且尚无受理人）保证同一条需求只有一人抢成功，
+     * 不靠「先查后改」的读后写（那个在并发下会两人都看到无人认领）。
+     */
+    RdmRequirementVO claim(Long id);
+
+    /**
+     * 改派产品经理（技术负责人/PMO）。
+     * <p>旧受理人的参与角色只置为失效、不删除，保留他的历史贡献与可追溯时间轴；
+     * 条件更新同样保证两人同时改派时只有一个成功。
+     */
+    RdmRequirementVO reassignPm(Long id, RdmTransitionDTO dto);
 
     /** 添加沟通记录 */
     RdmComment addComment(Long id, String content, Boolean internal);

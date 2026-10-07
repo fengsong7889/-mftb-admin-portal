@@ -188,15 +188,18 @@ public class RdmScoreService {
                 .ge(start != null, RdmRequirement::getActualReleaseDate, start)
                 .le(end != null, RdmRequirement::getActualReleaseDate, end));
         int count = 0;
+        // 部门快照缓存：一次重算内同一人只查一次，既不拿 N+1 拖死任务，也不让部门看板拿到空归属
+        Map<Long, Object[]> deptCache = new LinkedHashMap<>();
         for (RdmRequirement req : delivered) {
-            count += scoreOneRequirement(req, code, params, rule, maxRoles);
+            count += scoreOneRequirement(req, code, params, rule, maxRoles, deptCache);
         }
         log.info("積分重算完成: period={}, 需求數={}, 流水數={}, ruleVersion={}", code, delivered.size(), count, rule.getVersion());
         return count;
     }
 
     /** 单条需求按参与角色出分（超出角色上限的部分按系数取前 N，并留警告日志） */
-    private int scoreOneRequirement(RdmRequirement req, String periodCode, Params params, RdmScoreRule rule, int maxRoles) {
+    private int scoreOneRequirement(RdmRequirement req, String periodCode, Params params, RdmScoreRule rule,
+                                    int maxRoles, Map<Long, Object[]> deptCache) {
         List<RdmRequirementRole> members = roleMapper.selectList(new LambdaQueryWrapper<RdmRequirementRole>()
                 .eq(RdmRequirementRole::getReqId, req.getId())
                 .eq(RdmRequirementRole::getIsActive, 1));
@@ -243,7 +246,7 @@ public class RdmScoreService {
             if (result.finalScore().signum() <= 0) {
                 continue;
             }
-            upsertScoreRecord(req, periodCode, member, result, rule, onTime, lateDays, firstPass);
+            upsertScoreRecord(req, periodCode, member, result, rule, onTime, lateDays, firstPass, deptCache);
             written++;
         }
         return written;
@@ -272,28 +275,55 @@ public class RdmScoreService {
 
     /** 流水幂等写入：唯一键冲突时覆盖分数与因子，但保留已推送状态（避免重算抹掉推送记录） */
     private void upsertScoreRecord(RdmRequirement req, String periodCode, RdmRequirementRole member,
-                                   Result result, RdmScoreRule rule, boolean onTime, int lateDays, boolean firstPass) {
+                                   Result result, RdmScoreRule rule, boolean onTime, int lateDays, boolean firstPass,
+                                   Map<Long, Object[]> deptCache) {
         String signature = operatorResolver.operatorSignature(operatorResolver.currentUser());
-        jdbcTemplate.update(
-                "INSERT INTO rdm_score_record (req_id, user_id, emp_no, user_name, dept_id, dept_name, role_code, "
-                        + "period_code, score, base_score, type_factor, priority_factor, on_time_factor, quality_factor, "
-                        + "role_factor, breakdown_json, rule_version, complexity, req_type, priority, on_time, late_days, "
-                        + "rework_count, acceptance_score, first_pass, push_status, calculated_at, created_by, updated_by, deleted) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),?,?,0) "
-                        + "ON DUPLICATE KEY UPDATE score = VALUES(score), base_score = VALUES(base_score), "
-                        + "type_factor = VALUES(type_factor), priority_factor = VALUES(priority_factor), "
-                        + "on_time_factor = VALUES(on_time_factor), quality_factor = VALUES(quality_factor), "
-                        + "role_factor = VALUES(role_factor), breakdown_json = VALUES(breakdown_json), "
-                        + "rule_version = VALUES(rule_version), on_time = VALUES(on_time), late_days = VALUES(late_days), "
-                        + "rework_count = VALUES(rework_count), acceptance_score = VALUES(acceptance_score), "
-                        + "first_pass = VALUES(first_pass), calculated_at = NOW(), updated_by = VALUES(updated_by), deleted = 0",
+        Object[] dept = deptOf(deptCache, member.getUserId());
+        String sql = "INSERT INTO rdm_score_record (req_id, user_id, emp_no, user_name, dept_id, dept_name, role_code, "
+                + "period_code, score, base_score, type_factor, priority_factor, on_time_factor, quality_factor, "
+                + "role_factor, breakdown_json, rule_version, complexity, req_type, priority, on_time, late_days, "
+                + "rework_count, acceptance_score, first_pass, push_status, calculated_at, created_by, updated_by, deleted) "
+                // 30 列 = 26 個參數 + calculated_at=NOW() + 2 個簽名 + deleted=0（曾经多写一个 ? 导致运行期才爆）
+                + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),?,?,0) "
+                + "ON DUPLICATE KEY UPDATE score = VALUES(score), base_score = VALUES(base_score), "
+                + "type_factor = VALUES(type_factor), priority_factor = VALUES(priority_factor), "
+                + "on_time_factor = VALUES(on_time_factor), quality_factor = VALUES(quality_factor), "
+                + "role_factor = VALUES(role_factor), breakdown_json = VALUES(breakdown_json), "
+                + "rule_version = VALUES(rule_version), on_time = VALUES(on_time), late_days = VALUES(late_days), "
+                + "rework_count = VALUES(rework_count), acceptance_score = VALUES(acceptance_score), "
+                + "first_pass = VALUES(first_pass), calculated_at = NOW(), updated_by = VALUES(updated_by), deleted = 0";
+        Object[] args = new Object[]{
                 req.getId(), member.getUserId(), member.getEmpNo(), member.getEmpName(),
-                null, null, member.getRoleCode(), periodCode,
+                // 部门必须落快照：它是 HR 按部门汇总的唯一归属依据，存 NULL 会让部门看板整块空掉
+                dept[0], dept[1], member.getRoleCode(), periodCode,
                 result.finalScore(), bd(result.base()), bd(result.typeFactor()), bd(result.priorityFactor()),
                 bd(result.onTimeFactor()), bd(result.qualityFactor()), bd(result.roleFactor()),
-                toJson(result), rule.getVersion(), req.getComplexity(), req.getReqType(), req.getPriority(),
+                toJson(result), rule.getVersion(), blankToOther(req.getComplexity(), "simple"), req.getReqType(), req.getPriority(),
                 onTime ? 1 : 0, lateDays, nz(req.getReworkCount()), req.getAcceptanceScore(),
-                firstPass ? 1 : 0, RdmConstants.PUSH_NONE, signature, signature);
+                firstPass ? 1 : 0, RdmConstants.PUSH_NONE, signature, signature};
+        jdbcTemplate.update(com.mftb.admin.util.SqlArgs.requireArgCount(sql, args), args);
+    }
+
+    /** 未评估复杂度的需求按 simple 计分：不让整条重算因一个空字段挂接，但也不能让它静默变成 0 分 */
+    private static String blankToOther(String value, String fallback) {
+        return org.springframework.util.StringUtils.hasText(value) ? value : fallback;
+    }
+
+    /** 人员部门快照（同人只查库一次）：{deptId, deptName}，查不到时两个 null */
+    private Object[] deptOf(Map<Long, Object[]> cache, Long userId) {
+        if (userId == null) {
+            return new Object[]{null, null};
+        }
+        return cache.computeIfAbsent(userId, id -> {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT u.department_id AS dept_id, d.name AS dept_name FROM sys_user u "
+                            + "LEFT JOIN sys_department d ON d.id = u.department_id AND d.deleted = 0 "
+                            + "WHERE u.deleted = 0 AND u.id = ? LIMIT 1", id);
+            if (rows.isEmpty()) {
+                return new Object[]{null, null};
+            }
+            return new Object[]{rows.get(0).get("dept_id"), rows.get(0).get("dept_name")};
+        });
     }
 
     /** 产出看板（排名 + 部门对比 + 流水） */

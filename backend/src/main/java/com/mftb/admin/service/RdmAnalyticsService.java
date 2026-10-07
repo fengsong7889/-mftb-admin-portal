@@ -170,8 +170,13 @@ public class RdmAnalyticsService {
         s.setAcceptedTotal((int) acceptedTotal);
         s.setFirstPassRate(acceptedTotal == 0 ? 0 : round(firstPass / (double) acceptedTotal));
 
+        /*
+         * 满意度只统计上线后的正式业务验收（口径字典里 budget/output_score 同一口径）。
+         * 不过滤会让“上线前预验的 4 分”当成正式满意度，部门排名跟着失真。
+         */
         s.setAvgScore(round(orZero(toDouble(jdbcTemplate.queryForObject(
-                "SELECT AVG(score) FROM rdm_acceptance WHERE deleted = 0 AND score IS NOT NULL", Double.class)))));
+                "SELECT AVG(CASE WHEN stage = 'post_release' THEN score END) FROM rdm_acceptance "
+                        + "WHERE deleted = 0 AND score IS NOT NULL", Double.class)))));
         s.setReworkTotal((int) count("SELECT COALESCE(SUM(rework_count), 0) FROM rdm_requirement WHERE deleted = 0"));
         s.setDefectTotal((int) count("SELECT COUNT(*) FROM rdm_acceptance_case WHERE deleted = 0 AND result <> 'pass'"));
         s.setMajorDefectCount((int) count("SELECT COUNT(*) FROM rdm_acceptance_case "
@@ -185,7 +190,7 @@ public class RdmAnalyticsService {
         List<RdmQualityVO.NameValue> list = new ArrayList<>();
         for (Map<String, Object> row : jdbcTemplate.queryForList(
                 "SELECT score, COUNT(*) AS cnt FROM rdm_acceptance WHERE deleted = 0 AND score IS NOT NULL "
-                        + "GROUP BY score ORDER BY score")) {
+                        + "AND stage = 'post_release' GROUP BY score ORDER BY score")) {
             list.add(new RdmQualityVO.NameValue(toLong(row.get("score")) + " 分", toLong(row.get("cnt"))));
         }
         return list;
@@ -236,7 +241,9 @@ public class RdmAnalyticsService {
                         + " SUM(CASE WHEN t.fail_cnt = 0 THEN 1 ELSE 0 END) AS first_pass, "
                         + " AVG(t.avg_score) AS avg_score, SUM(t.defects) AS defects "
                         + "FROM (SELECT req_id, SUM(CASE WHEN result = 'fail' THEN 1 ELSE 0 END) AS fail_cnt, "
-                        + "             AVG(score) AS avg_score, SUM(COALESCE(defect_count, 0)) AS defects "
+                        // 一次通过率算全部验收事实，平均分只取上线后的正式业务验收（与口径字典一致）
+                        + "             AVG(CASE WHEN stage = 'post_release' THEN score END) AS avg_score, "
+                        + "             SUM(COALESCE(defect_count, 0)) AS defects "
                         + "      FROM rdm_acceptance WHERE deleted = 0 GROUP BY req_id) t "
                         + "JOIN rdm_requirement r ON r.id = t.req_id AND r.deleted = 0 "
                         + "GROUP BY dept_name ORDER BY accepted DESC")) {

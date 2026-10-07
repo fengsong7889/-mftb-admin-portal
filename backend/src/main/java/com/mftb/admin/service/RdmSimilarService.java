@@ -50,8 +50,10 @@ public class RdmSimilarService {
      * @param expectText   期望结果/描述正文，可为空
      * @param excludeId    编辑场景下排除自身
      * @param currentUser  当前登录人姓名，用于判断“自己重复提同一件事”
+     * @param fullAccess   是否有权看别人需求明细（管理岗或可分派的需求处理岗）
      */
-    public RdmAssistantVO.SimilarResult findSimilar(String title, String expectText, Long excludeId, String currentUser) {
+    public RdmAssistantVO.SimilarResult findSimilar(String title, String expectText, Long excludeId,
+                                                   String currentUser, boolean fullAccess) {
         RdmAssistantVO.SimilarResult result = new RdmAssistantVO.SimilarResult();
         result.setQueryTitle(title);
         result.setMethod("中文二元组 + 西文分詞的 Dice 相似係數（標題 0.75 / 期望 0.25，同提出人 +0.08），非大模型結果");
@@ -86,7 +88,7 @@ public class RdmSimilarService {
             if (overall < MIN_SCORE) {
                 continue;
             }
-            items.add(buildItem(row, Math.min(overall, 1.0), titleTokens, sameSubmitter));
+            items.add(buildItem(row, Math.min(overall, 1.0), titleTokens, sameSubmitter, fullAccess));
         }
         items.sort(Comparator.comparingDouble(RdmAssistantVO.SimilarItem::getSimilarity).reversed());
         List<RdmAssistantVO.SimilarItem> top = items.size() > TOP_N ? new ArrayList<>(items.subList(0, TOP_N)) : items;
@@ -97,7 +99,7 @@ public class RdmSimilarService {
     }
 
     private RdmAssistantVO.SimilarItem buildItem(Map<String, Object> row, double score,
-                                                  Set<String> queryTokens, boolean sameSubmitter) {
+                                                  Set<String> queryTokens, boolean sameSubmitter, boolean fullAccess) {
         RdmAssistantVO.SimilarItem item = new RdmAssistantVO.SimilarItem();
         item.setReqId(((Number) row.get("id")).longValue());
         item.setReqNo((String) row.get("req_no"));
@@ -113,6 +115,20 @@ public class RdmSimilarService {
         item.setMatchedTerms(matchedTerms(queryTokens, (String) row.get("title")));
         item.setSameSubmitter(sameSubmitter);
         item.setInProgress(!FINISHED_STATUS.contains(String.valueOf(row.get("status"))));
+        if (!fullAccess && !sameSubmitter) {
+            /*
+             * 数据范围收敛（阶段 0 欠账）：普通员工的需求清单只看得到自己的，
+             * 如果查重能把别人在途需求的标题/编号/部门/负责人列出来，
+             * 等于开了一个绕过列表范围的全库浏览入口。查重本身不需要明细：
+             * 保留相似度与在途状态足以提醒“可能是重复”，隐去可识别字段。
+             */
+            item.setReqNo(null);
+            item.setTitle("（無權查看明細，僅提示存在相似在途需求）");
+            item.setSubmitDeptName(null);
+            item.setPmName(null);
+            item.setSubmitTime(null);
+            item.setMatchedTerms(List.of());
+        }
         return item;
     }
 

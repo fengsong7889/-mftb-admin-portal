@@ -36,10 +36,14 @@ public class RdmAssistantController {
     private final RdmSimilarService similarService;
     private final AiKillSwitchService killSwitchService;
     private final OperatorResolver operatorResolver;
+    /** 数据范围判定：查重对任何人可用，但明细只能给看得到别人需求的人 */
+    private final com.mftb.admin.service.RdmAccessGuard accessGuard;
 
     /**
-     * 相似需求查重：提单前拦重复，任何人可查（只读，且是脱敏前的最小字段集）。
-     * <p>不看菜单权限：普通业务员工在提交页就要能用，否则这个功能等于没有。
+     * 相似需求查重：提单前拦重复，任何人可查。
+     * <p>“任何人可查”不等于“任何人可看明细”：普通员工的需求清单只能看自己的，
+     * 如果查重能把别人在途需求的标题/编号/部门列出来，等于开了绕过列表范围的全库入口；
+     * 所以无处理权限的人只拿到相似度与在途标记，明细列隐去。
      */
     @GetMapping("/similar")
     @Operation(summary = "相似需求查重（确定性算法，非大模型）")
@@ -47,7 +51,13 @@ public class RdmAssistantController {
                                                         @RequestParam(required = false) String expectText,
                                                         @RequestParam(required = false) Long excludeId) {
         return Result.success(similarService.findSimilar(title, expectText, excludeId,
-                operatorResolver.currentOperatorName()));
+                operatorResolver.currentOperatorName(), similarFullAccess()));
+    }
+
+    /** 管理岗或可分派的需求处理岗才能看到别人需求的明细 */
+    private boolean similarFullAccess() {
+        var current = operatorResolver.currentUser();
+        return accessGuard.canSeeAll(current) || accessGuard.canDispatch(current);
     }
 
     /** PRD 草稿生成（产品经理视角，结果需人工确认后才保存） */

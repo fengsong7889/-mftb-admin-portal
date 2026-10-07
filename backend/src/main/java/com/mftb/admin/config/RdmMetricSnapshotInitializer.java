@@ -1,5 +1,6 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,9 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
 
     /** 首次启动回填天数 */
     private static final int BACKFILL_DAYS = 90;
+
+    /** 手工重算的单次上限（天）：口径修复后需要能把历史刷回来，但不能一次报十年 */
+    private static final int RECOMPUTE_MAX_DAYS = 180;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -98,33 +102,52 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
 
     /** 单个维度某天的快照写入 */
     private void upsert(String dimType, Long dimId, String dimName, LocalDate day) {
-        // COMPANY 是全局维度，不存在归属对象。注意两个易错点：
-        // 1) “是否加归属条件”必须由 dimType 判定，不能拿 dimId==null 当标志（否则无法用 0 占位）；
-        // 2) dim_id 必须落 0 而不是 NULL：MySQL 唯一索引不约束 NULL，
-        //    存 NULL 会让 uk_rdm_metric_day 形同虚设，回填重复跑就长重复行（实测 10-04 出现两行）。
+        // COMPANY 是全局维度，不存在归属对象。两个易错点（都踩过）：
+        // 1) dim_id 必须落 0 而不是 NULL：MySQL 唯一索引不约束 NULL，存 NULL 会让回填重复跑长重复行；
+        // 2) 归属条件必须用占位符：把 dimId 拼进 SQL 不仅违反规范，还会让参数个数与 ? 数不一致
+        //    （历史缺陷：change_count 查询在 DEPT/PM 维度多传一个参数，部门与 PM 快照整体失败）。
         boolean global = RdmConstants.DIM_COMPANY.equals(dimType);
         Long storedDimId = global ? RdmConstants.COMPANY_DIM_ID : dimId;
-        String scope = global ? "" : " AND " + scopeColumn(dimType) + " = " + dimId;
-        Map<String, Object> row = jdbcTemplate.queryForList(
-                        "SELECT "
-                                // 注：MySQL 的 TIMESTAMP(x, INTERVAL n DAY) 是语法错误（1064），必须用 DATE_ADD
-                                + " SUM(CASE WHEN submit_time < DATE_ADD(?, INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS req_total, "
-                                + " SUM(CASE WHEN DATE(submit_time) = ? THEN 1 ELSE 0 END) AS submitted, "
-                                + " SUM(CASE WHEN DATE(accept_time) = ? THEN 1 ELSE 0 END) AS accepted, "
-                                + " SUM(CASE WHEN actual_release_date = ? THEN 1 ELSE 0 END) AS released, "
-                                + " SUM(CASE WHEN actual_release_date = ? AND overdue_flag = 1 THEN 1 ELSE 0 END) AS overdue, "
-                                + " AVG(CASE WHEN DATE(submit_time) = ? AND accept_time IS NOT NULL AND submitter_user_id IS NOT NULL "
-                                + "      THEN TIMESTAMPDIFF(HOUR, submit_time, accept_time) END) AS avg_response_hours, "
-                                + " AVG(CASE WHEN actual_release_date = ? AND accept_time IS NOT NULL "
-                                + "      THEN (CASE WHEN actual_release_date >= DATE(accept_time) THEN DATEDIFF(actual_release_date, DATE(accept_time)) END) END) AS avg_delivery_days, "
-                                + " AVG(CASE WHEN actual_release_date = ? THEN "
-                                + "      CASE WHEN plan_release_date IS NULL THEN NULL "
-                                + "           WHEN actual_release_date <= plan_release_date THEN 1 ELSE 0 END END) AS on_time_rate, "
-                                + " AVG(CASE WHEN DATE(submit_time) = ? THEN "
-                                + "      CASE WHEN reject_count > 0 THEN 1 ELSE 0 END END) AS reject_rate, "
-                                + " SUM(CASE WHEN DATE(accept_time) = ? THEN COALESCE(rework_count, 0) ELSE 0 END) AS rework_count "
-                                + "FROM rdm_requirement WHERE deleted = 0" + scope,
-                        day, day, day, day, day, day, day, day, day, day)
+        String scope = global ? "" : " AND " + scopeColumn(dimType) + " = ?";
+
+        List<Object> args = new ArrayList<>();
+        StringBuilder select = new StringBuilder("SELECT ");
+        // 注：MySQL 的 TIMESTAMP(x, INTERVAL n DAY) 是语法错误（1064），必须用 DATE_ADD
+        select.append("SUM(CASE WHEN submit_time < DATE_ADD(?, INTERVAL 1 DAY) THEN 1 ELSE 0 END) AS req_total, ");
+        args.add(day);
+        select.append("SUM(CASE WHEN DATE(submit_time) = ? THEN 1 ELSE 0 END) AS submitted, ");
+        args.add(day);
+        select.append("SUM(CASE WHEN DATE(accept_time) = ? THEN 1 ELSE 0 END) AS accepted, ");
+        args.add(day);
+        select.append("SUM(CASE WHEN actual_release_date = ? THEN 1 ELSE 0 END) AS released, ");
+        args.add(day);
+        /*
+         * overdue 定为「当日逾期存量」而不是「当日上线且被标为逾期」：
+         * overdue_flag 会在每次状态流转时被清零（transitionInternal 统一 setOverdueFlag(0)），
+         * 拿它算历史某天的存量必然失真。存量用计划上线日与实际上线日回算，事实时间可重放。
+         */
+        select.append("SUM(CASE WHEN plan_release_date IS NOT NULL AND plan_release_date < ? "
+                + "AND (actual_release_date IS NULL OR actual_release_date > ?) THEN 1 ELSE 0 END) AS overdue, ");
+        args.add(day);
+        args.add(day);
+        select.append("AVG(CASE WHEN DATE(submit_time) = ? AND accept_time IS NOT NULL AND submitter_user_id IS NOT NULL "
+                + "     THEN TIMESTAMPDIFF(HOUR, submit_time, accept_time) END) AS avg_response_hours, ");
+        args.add(day);
+        select.append("AVG(CASE WHEN actual_release_date = ? AND accept_time IS NOT NULL "
+                + "     THEN (CASE WHEN actual_release_date >= DATE(accept_time) THEN DATEDIFF(actual_release_date, DATE(accept_time)) END) END) AS avg_delivery_days, ");
+        args.add(day);
+        select.append("AVG(CASE WHEN actual_release_date = ? THEN "
+                + "     CASE WHEN plan_release_date IS NULL THEN NULL WHEN actual_release_date <= plan_release_date THEN 1 ELSE 0 END END) AS on_time_rate, ");
+        args.add(day);
+        select.append("AVG(CASE WHEN DATE(submit_time) = ? THEN CASE WHEN reject_count > 0 THEN 1 ELSE 0 END END) AS reject_rate, ");
+        args.add(day);
+        select.append("SUM(CASE WHEN DATE(accept_time) = ? THEN COALESCE(rework_count, 0) ELSE 0 END) AS rework_count ");
+        args.add(day);
+        select.append("FROM rdm_requirement WHERE deleted = 0").append(scope);
+        if (!global) {
+            args.add(dimId);
+        }
+        Map<String, Object> row = jdbcTemplate.queryForList(requireArgCount(select.toString(), args.toArray()), args.toArray())
                 .stream().findFirst().orElse(Map.of());
 
         // 一次通过率来自验收记录（事实表），可安全回算；COMPANY 维度不加归属条件
@@ -141,13 +164,21 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
             fpArgs.add(dimId);
         }
         fpSql.append(" GROUP BY a.req_id) t");
-        Double firstPass = jdbcTemplate.queryForObject(fpSql.toString(), Double.class, fpArgs.toArray());
-        Integer changes = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM rdm_change_request c JOIN rdm_requirement r ON r.id = c.req_id AND r.deleted = 0 "
-                        + "WHERE c.deleted = 0 AND DATE(c.created_at) = ?" + scope,
-                Integer.class, concat(global, day, dimId));
+        Double firstPass = jdbcTemplate.queryForObject(
+                requireArgCount(fpSql.toString(), fpArgs.toArray()), Double.class, fpArgs.toArray());
 
-        jdbcTemplate.update(
+        // 变更数同样按维度归属：参数列表与占位符个数逐条对齐，不再拼 dimId
+        List<Object> changeArgs = new ArrayList<>();
+        changeArgs.add(day);
+        if (!global) {
+            changeArgs.add(dimId);
+        }
+        String changeSql = requireArgCount(
+                "SELECT COUNT(*) FROM rdm_change_request c JOIN rdm_requirement r ON r.id = c.req_id AND r.deleted = 0 "
+                        + "WHERE c.deleted = 0 AND DATE(c.created_at) = ?" + scope, changeArgs.toArray());
+        Integer changes = jdbcTemplate.queryForObject(changeSql, Integer.class, changeArgs.toArray());
+
+        String insertSql = requireArgCount(
                 "INSERT INTO rdm_metric_snapshot (stat_date, dim_type, dim_id, dim_name, req_total, submitted, accepted, "
                         + "released, overdue, avg_response_hours, avg_delivery_days, on_time_rate, reject_rate, "
                         + "first_pass_rate, rework_count, change_count, created_by, updated_by, deleted) "
@@ -158,7 +189,14 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
                         + "on_time_rate = VALUES(on_time_rate), reject_rate = VALUES(reject_rate), "
                         + "first_pass_rate = VALUES(first_pass_rate), rework_count = VALUES(rework_count), "
                         + "change_count = VALUES(change_count), updated_by = VALUES(updated_by), deleted = 0",
-                day, dimType, storedDimId, dimName,
+                new Object[]{day, dimType, storedDimId, dimName,
+                        intOf(row.get("req_total")), intOf(row.get("submitted")), intOf(row.get("accepted")),
+                        intOf(row.get("released")), intOf(row.get("overdue")),
+                        row.get("avg_response_hours"), row.get("avg_delivery_days"),
+                        row.get("on_time_rate"), row.get("reject_rate"), firstPass,
+                        intOf(row.get("rework_count")), changes == null ? 0 : changes,
+                        "system", "system"});
+        jdbcTemplate.update(insertSql, day, dimType, storedDimId, dimName,
                 intOf(row.get("req_total")), intOf(row.get("submitted")), intOf(row.get("accepted")),
                 intOf(row.get("released")), intOf(row.get("overdue")),
                 row.get("avg_response_hours"), row.get("avg_delivery_days"),
@@ -176,6 +214,21 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
         };
     }
 
+    /**
+     * 占位符与参数个数必须一致。
+     * <p>历史缺陷正是把 dimId 拼进 SQL 后仍按「带占位符」传参，DEPT/PM 维度快照整体失败，
+     * 对外只表现为「部门看板没数据」。宁可在写之前抛出，也不要静默少算一个维度。
+     */
+    static String requireArgCount(String sql, Object[] args) {
+        long marks = sql.chars().filter(c -> c == '?').count();
+        int given = args == null ? 0 : args.length;
+        if (marks != given) {
+            throw new IllegalStateException("快照 SQL 占位符 " + marks + " 個但傳了 " + given
+                    + " 個參數，帰属維度会整体失败：" + sql.substring(0, Math.min(120, sql.length())));
+        }
+        return sql;
+    }
+
     private long snapshotCount() {
         Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM rdm_metric_snapshot WHERE deleted = 0", Long.class);
         return count == null ? 0 : count;
@@ -185,9 +238,29 @@ public class RdmMetricSnapshotInitializer implements CommandLineRunner {
         return value == null ? null : ((Number) value).longValue();
     }
 
-    /** 全局维度只有日期一个参数 */
-    private static Object[] concat(boolean global, LocalDate day, Long dimId) {
-        return global ? new Object[]{day} : new Object[]{day, dimId};
+    /**
+     * 手工重算指定区间的快照（口径变更后刷历史用）。
+     * <p>只给管理岗开的运维入口：快照是看板与绩效建议的数据源，谁都能改等于口径可以被静默改写。
+     */
+    public int recompute(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw new BusinessException("請選擇重算的起止日期");
+        }
+        if (from.isAfter(to)) {
+            throw new BusinessException("開始日期不能晚於結束日期");
+        }
+        if (from.plusDays(RECOMPUTE_MAX_DAYS).isBefore(to)) {
+            throw new BusinessException("單次重算最多覆蓋 " + RECOMPUTE_MAX_DAYS + " 天");
+        }
+        final int[] touched = {0};
+        runWithLock(() -> {
+            for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+                snapshotDay(cursor);
+                touched[0]++;
+            }
+            log.info("RDM 效能量快照已重算: {} 至 {}，共 {} 天", from, to, touched[0]);
+        });
+        return touched[0];
     }
 
     private static int intOf(Object value) {

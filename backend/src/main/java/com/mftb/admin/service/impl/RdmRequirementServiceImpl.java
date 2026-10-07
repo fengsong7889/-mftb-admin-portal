@@ -11,6 +11,7 @@ import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
 import com.mftb.admin.dto.RdmConfigVO;
 import com.mftb.admin.dto.RdmOptionVO;
+import com.mftb.admin.dto.RdmIntakeVO;
 import com.mftb.admin.dto.RdmRequirementCreateDTO;
 import com.mftb.admin.dto.RdmRequirementQuery;
 import com.mftb.admin.dto.RdmRequirementVO;
@@ -38,9 +39,13 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmIntakeCallbackService;
+import com.mftb.admin.service.RdmIntakePolicyService;
+import com.mftb.admin.service.RdmIntakeRoundService;
 import com.mftb.admin.service.RdmNotifyService;
+import com.mftb.admin.service.RdmReleaseService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
@@ -61,6 +66,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -102,6 +108,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     private final RdmIntakeCallbackService intakeCallbackService;
     private final PermissionService permissionService;
     private final JdbcTemplate jdbcTemplate;
+    /** 需求级访问守卫：数据范围与动作资格的唯一口径（交付子资源也回这里反查校验） */
+    private final RdmAccessGuard accessGuard;
+    /** 准入策略裁决：要不要审批、走哪条链、由谁分派 */
+    private final RdmIntakePolicyService intakePolicyService;
+    /** 准入审批轮次：每轮独立留痕，旧轮回调不能推动新轮 */
+    private final RdmIntakeRoundService intakeRoundService;
+    /** 阶段 4：上线前的发布放行闸门（只在 release/uat_fail/reopen 三个动作上介入） */
+    private final RdmReleaseService releaseService;
 
     /* ==================== 查询 ==================== */
 
@@ -112,7 +126,11 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         Page<RdmRequirement> page = new Page<>(
                 (int) PageResult.normalizePage(query.getPage() == null ? 1 : query.getPage()),
                 (int) PageResult.normalizeSize(query.getSize() == null ? 10 : query.getSize()));
-        var wrapper = query.toWrapper(unrestricted ? null : (current == null ? null : current.getId()));
+        // 「待我審批」的关联关系在 OA 审批任务表里，不在需求表的四个人员字段上；
+        // 这一视角不按 relatedOnly 收敛，改由下面的审批待办 id 集合决定范围，
+        // 否则审批人只会看到自己提的单，出现「待办计数 3 条、点进去空列表」。
+        boolean relatedOnly = !RdmConstants.SCOPE_APPROVING.equals(query.getScope());
+        var wrapper = query.toWrapper(unrestricted ? null : (current == null ? null : current.getId()), relatedOnly);
         // 待我審批需要 join OA 审批任务表才能定出审批人，LambdaQueryWrapper 表达不了：先取 id 再收敛
         if (RdmConstants.SCOPE_APPROVING.equals(query.getScope())) {
             List<Long> approvingIds = approvingRequirementIds(current);
@@ -170,7 +188,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
         List<RdmRequirementRole> roles = listRoles(id);
         vo.setRoles(roles.stream().map(RdmRequirementVO.RoleMember::from).toList());
-        vo.setMyRole(resolveMyRole(roles, current, req));
+        vo.setMyRole(resolveMyRole(req, current));
 
         // 时间轴按正序展示（最早在上），当前状态节点尚未关闭，停留时长按实时计算
         List<RdmStatusLog> logs = statusLogMapper.selectList(new LambdaQueryWrapper<RdmStatusLog>()
@@ -206,7 +224,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
 
         vo.setSla(buildSla(req));
-        vo.setAllowedActions(allowedActions(req, current, roles));
+        vo.setAllowedActions(allowedActions(req, current));
         return vo;
     }
 
@@ -241,16 +259,28 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         req.setProgress(0);
         req.setBlockedFlag(0);
         req.setOverdueFlag(0);
+        // 新建需求走新链路（五节点/定稿快照/工时明细）；存量记录保持 flow_version=1，
+        // 否则发布闸门会把历史记录一律算成「未做验收准备」
+        req.setFlowVersion(2);
         req.setRejectCount(0);
         req.setReopenCount(0);
         req.setReworkCount(0);
         req.setChangeCount(0);
-        req.setNeedApproval(draft ? 1 : (Boolean.FALSE.equals(dto.getNeedApproval()) ? 0 : 1));
+        // 受理意向：指定 PM 只回答「谁来做」，不回答「要不要审」；要不要审由服务端准入策略裁决
+        SysUser pm = dto.getPmUserId() == null ? null : userMapper.selectById(dto.getPmUserId());
+        if (pm != null) {
+            requirePmEligible(pm);
+        }
+        RdmIntakeVO.Decision decision = draft ? null : intakePolicyService.decide(current, dto.getReqType(), firstSystemCode(dto));
+        req.setNeedApproval(draft ? 1 : (decision != null && decision.isNeedApproval() ? 1 : 0));
         req.setCreatedBy(operatorResolver.operatorSignature(current));
         req.setUpdatedBy(req.getCreatedBy());
 
-        // 受理路径：指定 PM 时进「已分配·待受理」，否则进需求池等技术负责人分配
-        SysUser pm = dto.getPmUserId() == null ? null : userMapper.selectById(dto.getPmUserId());
+        // 意向 PM 先落库：需审批时不能直接写受理人，审批通过后再生效（否则「提单人指定人就跳过准入」）
+        if (pm != null) {
+            req.setIntentPmUserId(pm.getId());
+            req.setIntentPmName(pm.getName());
+        }
         SysUser acceptor = dto.getAcceptorUserId() == null ? current : userMapper.selectById(dto.getAcceptorUserId());
         req.setAcceptorUserId(acceptor == null ? current.getId() : acceptor.getId());
         req.setAcceptorName(acceptor == null ? current.getName() : acceptor.getName());
@@ -268,6 +298,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             req.setStatus(RdmConstants.STATUS_POOL);
             req.setSubmitTime(LocalDateTime.now());
         }
+        applyIntakeDecision(req, decision);
         req.setStatusEnterTime(LocalDateTime.now());
         req.setCurrentHandlerName(computeHandler(req, pm));
         requirementMapper.insert(req);
@@ -277,8 +308,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         saveInitialRoles(req, current, pm, acceptor, dto.getCcUserIds());
         appendStatusLog(req, null, current, RdmConstants.ACTION_SUBMIT, draft ? "保存草稿" : "需求已提交");
 
-        if (!draft && req.getNeedApproval() == 1) {
-            submitIntakeFlow(req, current);
+        if (!draft) {
+            openIntakeRound(req, decision, current);
         }
         notifyOnCreate(req, pm);
         log.info("需求已創建: reqNo={}, status={}, submitter={}", req.getReqNo(), req.getStatus(), req.getSubmitterName());
@@ -322,8 +353,125 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (!RdmConstants.STATUS_INTAKE_PENDING.equals(req.getStatus())) {
             throw new BusinessException("僅「待審批」的需求可撤回");
         }
-        transitionInternal(req, RdmConstants.ACTION_WITHDRAW, null, current, null);
+        String flowNo = req.getIntakeFlowNo();
+        transitionInternal(req, RdmConstants.ACTION_WITHDRAW, null, current,
+                accessGuard.activeRoles(req.getId(), current));
+        /*
+         * 撤回必须同时收口 OA 侧：只改 RDM 状态会留下「需求已回草稿、审批单还挂在待办」的双轨不一致。
+         * 不吞异常：撤销失败就整个撤回失败（事务回滚），不能让用户看到「已撤回」而审批人手上还有单。
+         */
+        if (StringUtils.hasText(flowNo)) {
+            try {
+                oaRequestService.cancel(flowNo);
+            } catch (RuntimeException e) {
+                throw new BusinessException("准入單撤銷失敗，需求未撤回：" + e.getMessage());
+            }
+            intakeRoundService.withdrawRound(req.getId(), flowNo, req.getUpdatedBy());
+            req.setIntakeFlowNo(null);
+            requirementMapper.updateById(req);
+        }
         return RdmRequirementVO.from(req, configService.stageMap());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO selfSubmit(Long id, RdmTransitionDTO dto) {
+        RdmRequirement req = requireRequirement(id);
+        SysUser current = operatorResolver.currentUser();
+        // 只能动自己的单：菜单 create 是全部门都有的宽权限，不叠资源归属就等于能替别人提交
+        requireOwner(req, current, "提交");
+        requireVisible(req, current, "提交");
+        String actionCode = resolveSelfSubmitAction(req.getStatus());
+        transitionInternal(req, actionCode, dto, current, accessGuard.activeRoles(id, current));
+        /*
+         * 提交/重提都重新裁决一次：人员调岗、策略改版后不能沿用上一轮的结论；
+         * 同时开启新一轮并发起本轮准入单，否则会出现「界面待审批、OA 没有待办」。
+         */
+        RdmIntakeVO.Decision decision = intakePolicyService.decide(current, req.getReqType(), reqSystemCode(req));
+        req.setNeedApproval(decision.isNeedApproval() ? 1 : 0);
+        applyIntakeDecision(req, decision);
+        req.setSubmitTime(LocalDateTime.now());
+        req.setCurrentHandlerName(computeHandler(req, null));
+        requirementMapper.updateById(req);
+        openIntakeRound(req, decision, current);
+        return RdmRequirementVO.from(req, configService.stageMap());
+    }
+
+    /** 提出人可自助提交的状态：草稿走 submit，准入驳回走 resubmit，其余一律拒 */
+    private String resolveSelfSubmitAction(String status) {
+        if (RdmConstants.STATUS_DRAFT.equals(status)) {
+            return RdmConstants.ACTION_SUBMIT;
+        }
+        if (RdmConstants.STATUS_INTAKE_REJECTED.equals(status)) {
+            return RdmConstants.ACTION_RESUBMIT;
+        }
+        throw new BusinessException("只有草稿或准入駁回的需求可由提出人提交，當前狀態：" + labelOf(status));
+    }
+
+    /** 把裁决结果写成需求上的快照列（免审也要写，否则事后无法解释「这单为什么没走审批」） */
+    private void applyIntakeDecision(RdmRequirement req, RdmIntakeVO.Decision decision) {
+        if (decision == null) {
+            return;
+        }
+        req.setIntakePolicyId(decision.getPolicyId());
+        req.setIntakePolicyName(decision.getPolicyName());
+        req.setIntakePolicyVersion(decision.getPolicyVersion());
+        req.setIntakeMode(decision.getMode());
+        req.setIntakeExplain(decision.getExplain() == null || decision.getExplain().isEmpty()
+                ? null : String.join("\n", decision.getExplain()));
+    }
+
+    /**
+     * 开启一轮准入：先清旧单号，再按裁决发起本轮准入单，最后登记轮次。
+     * <p>旧单号必须清：驳回后重提若沿用已终态的旧单，本轮在 OA 里没有待办，需求会永久停在待审批。
+     */
+    private void openIntakeRound(RdmRequirement req, RdmIntakeVO.Decision decision, SysUser operator) {
+        req.setIntakeFlowNo(null);
+        req.setIntakeRoundNo(null);
+        requirementMapper.updateById(req);
+        if (decision != null && decision.isNeedApproval()) {
+            submitIntakeFlow(req, operator);
+        }
+        int roundNo = intakeRoundService.startRound(req.getId(), decision, req.getSubmitDeptId(), req.getSubmitDeptName(),
+                req.getSubmitterUserId(), req.getSubmitterName(), req.getIntakeFlowNo(), contentSnapshot(req),
+                req.getUpdatedBy());
+        req.setIntakeRoundNo(roundNo);
+        requirementMapper.updateById(req);
+    }
+
+    /** 本轮内容快照：只存能证明「审批的是哪一版」的最小集合，不复制正文 */
+    private String contentSnapshot(RdmRequirement req) {
+        return req.getTitle() + " | 類型 " + req.getReqType() + " | 優先級 " + req.getPriority();
+    }
+
+    /** 需求主定位系统（准入策略的系统维度用） */
+    private String reqSystemCode(RdmRequirement req) {
+        return targetMapper.selectList(new LambdaQueryWrapper<RdmRequirementTarget>()
+                        .eq(RdmRequirementTarget::getReqId, req.getId())
+                        .orderByAsc(RdmRequirementTarget::getSortOrder).last("LIMIT 1"))
+                .stream().findFirst().map(RdmRequirementTarget::getSystemCode).orElse(null);
+    }
+
+    private static String firstSystemCode(RdmRequirementCreateDTO dto) {
+        if (dto.getTargets() == null) {
+            return null;
+        }
+        return dto.getTargets().stream().map(RdmRequirementCreateDTO.Target::getSystemCode)
+                .filter(StringUtils::hasText).findFirst().orElse(null);
+    }
+
+    /**
+     * 产品经理资格校验：在职启用 + 具备需求侧处理权（rdm-requirement:edit）。
+     * <p>不能只校「用户存在」：把需求分给无受理权的人，他会收到待办却点不动任何动作。
+     */
+    private void requirePmEligible(SysUser pm) {
+        if (pm.getStatus() != null && pm.getStatus() == 0) {
+            throw new BusinessException("指定的產品經理已離職或停用，請改選其他人或提交技術部分配");
+        }
+        if (!permissionService.hasPermission(pm, RdmConstants.MENU_REQUIREMENT, "edit")) {
+            throw new BusinessException("指定的員工「" + pm.getName()
+                    + "」當前無產品經理受理權限，請先在授權中心配置或改提交技術部分配");
+        }
     }
 
     /* ==================== 流转 ==================== */
@@ -345,7 +493,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             return actIntakeApproval(req, dto,
                     RdmConstants.ACTION_APPROVE_INTAKE.equals(dto.getActionCode()));
         }
-        transitionInternal(req, dto.getActionCode(), dto, current, resolveMyRole(listRoles(id), current, req));
+        transitionInternal(req, dto.getActionCode(), dto, current, accessGuard.activeRoles(id, current));
         return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
     }
 
@@ -366,7 +514,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             log.warn("需求無准入單，審批动作退回状态机直改: reqNo={}, operator={}", req.getReqNo(),
                     current == null ? null : current.getUsername());
             transitionInternal(req, dto.getActionCode(), dto, current,
-                    resolveMyRole(listRoles(req.getId()), current, req));
+                    accessGuard.activeRoles(req.getId(), current));
             return latestVO(req.getId());
         }
 
@@ -408,15 +556,15 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     /**
      * 执行一次流转：配置校验 → 角色校验 → 必填校验 → 业务字段回填 → 流水落库 → 通知。
      *
-     * @param myRole 当前人在该需求上的角色（null 时按管理岗兜底）
+     * @param myRoles 当前人在该需求上的全部有效角色（空集时按管理岗兜底）
      */
     private void transitionInternal(RdmRequirement req, String actionCode, RdmTransitionDTO dto,
-                                    SysUser current, String myRole) {
+                                    SysUser current, Set<String> myRoles) {
         RdmConfigVO.Transition rule = configService.findTransition(req.getStatus(), actionCode);
         if (rule == null) {
             throw new BusinessException("當前狀態「" + labelOf(req.getStatus()) + "」不允許執行該操作，請刷新後重試");
         }
-        if (!canPerform(rule, current, myRole)) {
+        if (!canPerform(rule, current, myRoles)) {
             throw new BusinessException("您沒有權限執行「" + rule.getActionName() + "」");
         }
         applyRequiredGuard(rule, dto);
@@ -431,6 +579,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             if (pm == null) {
                 throw new BusinessException("請選擇產品經理");
             }
+            // 分配同样要过资格门：否则可以把需求塞给离职或无受理权的人
+            requirePmEligible(pm);
             applyPm(req, pm, actor);
             upsertRole(req.getId(), pm, RdmConstants.ROLE_PM);
         }
@@ -462,19 +612,33 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             }
             case RdmConstants.ACTION_UAT_FAIL -> {
                 req.setReworkCount(value(req.getReworkCount()) + 1);
-                req.setRejectCount(value(req.getRejectCount()) + 1);
+                /*
+                 * 这里不再重复 +rejectCount：上面的通用分支已经对包含 reject/fail 的动作计过一次驳回，
+                 * 再加一次就是一次验收不通过抬高两倍的驳回率（目标：驳回率只反映“被拒次数”）。
+                 */
+                // 返工后旧的放行单作废：拿着返工前的结论上线等于没进过闸门
+                releaseService.revokeOpenGates(req.getId(), "验收不通过退回返工");
             }
             case RdmConstants.ACTION_RELEASE -> {
+                // 上线前置闸门：没有已放行、未过期且版本匹配的放行单就不允许上線
+                // （检查项全由服务端算，不拿“菜单有 edit 权”当成质量合格）
+                releaseService.requireValidPass(req.getId(), dto == null ? null : dto.getVersionNo());
                 req.setVersionNo(dto == null ? null : dto.getVersionNo());
                 req.setActualReleaseDate(LocalDate.now());
             }
             case RdmConstants.ACTION_VERIFY -> {
                 if (dto != null && dto.getScore() != null) {
+                    if (dto.getScore() < RdmConstants.SCORE_MIN || dto.getScore() > RdmConstants.SCORE_MAX) {
+                        throw new BusinessException("满意度評分必須在 1-5 分之間");
+                    }
                     req.setAcceptanceScore(dto.getScore());
                 }
                 req.setAcceptanceTime(now);
             }
-            case RdmConstants.ACTION_REOPEN -> req.setReopenCount(value(req.getReopenCount()) + 1);
+            case RdmConstants.ACTION_REOPEN -> {
+                req.setReopenCount(value(req.getReopenCount()) + 1);
+                releaseService.revokeOpenGates(req.getId(), "需求已重开，旧放行结论不再沿用");
+            }
             default -> {
                 if (dto != null && dto.getProgress() != null) {
                     req.setProgress(dto.getProgress());
@@ -492,6 +656,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         requirementMapper.updateById(req);
 
         closeOpenStatusLog(req.getId(), now, isOverdue(req));
+        markMilestoneActual(req.getId(), actionCode, now, operatorResolver.operatorSignature(actor));
         appendStatusLog(req, fromStatus, actor, actionCode, dto == null ? null : dto.getRemark());
 
         notifyOnTransition(req, rule, actor);
@@ -518,13 +683,124 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             }
             RdmTransitionDTO dto = new RdmTransitionDTO();
             dto.setPmUserId(pmUserId);
-            transitionInternal(req, RdmConstants.ACTION_DISPATCH, dto, current, null);
+            transitionInternal(req, RdmConstants.ACTION_DISPATCH, dto, current, Set.of());
             count++;
         }
         if (count == 0) {
             throw new BusinessException("所選需求已不在需求池，請刷新後重試");
         }
         return count;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO claim(Long id) {
+        RdmRequirement req = requireRequirement(id);
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        // 认领人必须自己就有受理资格：否则抢到了单也推不动任何动作
+        requirePmEligible(current);
+        String signature = operatorResolver.operatorSignature(current);
+        /*
+         * 原子抢单：条件里带 status=pool 与「尚无受理人」，两个 PM 同时点只有一个人拿到 1 行。
+         * 分发人列不动：自认领没有技术负责人参与，写自己进去会误导责任归属。
+         */
+        int taken = jdbcTemplate.update(
+                "UPDATE rdm_requirement SET status = ?, assignee_pm_user_id = ?, assignee_pm_emp_no = ?, "
+                        + "assignee_pm_name = ?, current_handler_name = ?, distribute_time = now(), "
+                        + "status_enter_time = now(), overdue_flag = 0, updated_by = ? "
+                        + "WHERE id = ? AND deleted = 0 AND status = ? "
+                        + "AND (assignee_pm_user_id IS NULL OR assignee_pm_user_id = 0)",
+                RdmConstants.STATUS_ASSIGNED, current.getId(), current.getEmpId(), current.getName(),
+                current.getName(), signature, id, RdmConstants.STATUS_POOL);
+        if (taken == 0) {
+            throw new BusinessException("該需求已被他人認領或狀態已變更，請刷新後重試");
+        }
+        RdmRequirement claimed = requireRequirement(id);
+        upsertRole(id, current, RdmConstants.ROLE_PM);
+        appendStatusLog(claimed, RdmConstants.STATUS_POOL, current, RdmConstants.ACTION_CLAIM,
+                "產品經理自需求池認領：" + current.getName());
+        notifyService.notifyUserIds(RdmConstants.EVENT_ASSIGNED, claimed,
+                List.of(claimed.getSubmitterUserId()), "需求已由產品經理認領",
+                "### 🙋 需求已被認領\n\n- **編號**: " + claimed.getReqNo() + "\n- **標題**: " + claimed.getTitle()
+                        + "\n- **受理人**: " + current.getName() + "\n\n後續由他與你確認範圍與排期。");
+        log.info("需求已被認領: reqNo={}, pm={}", claimed.getReqNo(), current.getName());
+        return RdmRequirementVO.from(claimed, configService.stageMap());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO reassignPm(Long id, RdmTransitionDTO dto) {
+        RdmRequirement req = requireRequirement(id);
+        SysUser current = operatorResolver.currentUser();
+        if (!operatorResolver.isAdmin(current) && !accessGuard.canDispatch(current)) {
+            throw new BusinessException("只有技術負責人/項目經理可改派產品經理");
+        }
+        if (dto == null || dto.getPmUserId() == null) {
+            throw new BusinessException("請選擇改派後的產品經理");
+        }
+        if (RdmConstants.STATUS_POOL.equals(req.getStatus())) {
+            throw new BusinessException("需求池內的單請用「分配」，改派只用於已受理的單");
+        }
+        SysUser target = userMapper.selectById(dto.getPmUserId());
+        if (target == null) {
+            throw new BusinessException("產品經理不存在或已停用");
+        }
+        requirePmEligible(target);
+        Long previousPm = req.getAssigneePmUserId();
+        if (Objects.equals(previousPm, target.getId())) {
+            throw new BusinessException("該需求已由該產品經理受理，無需改派");
+        }
+        String reason = StringUtils.hasText(dto.getRemark()) ? dto.getRemark().trim() : "未說明原因";
+        String signature = operatorResolver.operatorSignature(current);
+        // CAS：以旧受理人为条件，两人同时改派时只有一个成功
+        int moved = jdbcTemplate.update(
+                "UPDATE rdm_requirement SET assignee_pm_user_id = ?, assignee_pm_emp_no = ?, assignee_pm_name = ?, "
+                        + "current_handler_name = ?, distribute_time = now(), dispatcher_user_id = ?, dispatcher_name = ?, "
+                        + "updated_by = ? WHERE id = ? AND deleted = 0 AND IFNULL(assignee_pm_user_id, 0) = ?",
+                target.getId(), target.getEmpId(), target.getName(), target.getName(),
+                current.getId(), current.getName(), signature, id, previousPm == null ? 0L : previousPm);
+        if (moved == 0) {
+            throw new BusinessException("需求受理人已變更，請刷新後重試");
+        }
+        /*
+         * 旧受理人的参与角色只置为失效、不删除：他做过的评估、写过的评论、该得的贡献
+         * 不能因为一次改派被抹掉，否则绩效口径会变成「谁最后接手算谁」。
+         */
+        deactivateRole(id, previousPm, RdmConstants.ROLE_PM);
+        upsertRole(id, target, RdmConstants.ROLE_PM);
+        RdmRequirement reassigned = requireRequirement(id);
+        appendStatusLog(reassigned, req.getStatus(), current, RdmConstants.ACTION_REASSIGN_PM,
+                "改派產品經理：" + (StringUtils.hasText(req.getAssigneePmName()) ? req.getAssigneePmName() : "未指定")
+                        + " → " + target.getName() + "；原因：" + reason);
+        List<Long> notice = new ArrayList<>();
+        if (previousPm != null) {
+            notice.add(previousPm);
+        }
+        notice.add(target.getId());
+        if (reassigned.getSubmitterUserId() != null) {
+            notice.add(reassigned.getSubmitterUserId());
+        }
+        notifyService.notifyUserIds(RdmConstants.EVENT_ASSIGNED, reassigned, notice, "需求已改派",
+                "### 🔁 需求已改派\n\n- **編號**: " + reassigned.getReqNo() + "\n- **標題**: " + reassigned.getTitle()
+                        + "\n- **新受理人**: " + target.getName() + "\n- **操作人**: "
+                        + (current == null ? "-" : current.getName()) + "\n- **原因**: " + reason
+                        + "\n\n舊受理人已失去本單操作資格，歷史貢獻仍保留。");
+        log.info("需求已改派: reqNo={}, {} -> {}, operator={}", reassigned.getReqNo(), previousPm,
+                target.getId(), signature);
+        return RdmRequirementVO.from(reassigned, configService.stageMap());
+    }
+
+    /** 把某人当前的参与角色置为失效（不物理删，保留历史贡献与可追溯时间轴） */
+    private void deactivateRole(Long reqId, Long userId, String roleCode) {
+        if (reqId == null || userId == null || !StringUtils.hasText(roleCode)) {
+            return;
+        }
+        jdbcTemplate.update(
+                "UPDATE rdm_requirement_role SET is_active = 0 WHERE req_id = ? AND user_id = ? AND role_code = ? "
+                        + "AND is_active = 1 AND deleted = 0", reqId, userId, roleCode);
     }
 
     /* ==================== 沟通 / 催办 / 验收 ==================== */
@@ -574,11 +850,26 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     public void submitAcceptance(Long id, RdmAcceptanceDTO dto) {
         RdmRequirement req = requireRequirement(id);
         SysUser current = operatorResolver.currentUser();
-        if (!RdmConstants.STATUS_UAT_PENDING.equals(req.getStatus())) {
-            throw new BusinessException("僅「待業務驗收」的需求可提交驗收結論");
-        }
+        requireVisible(req, current, "提交驗收結論");
+        // 阶段 4：上线前预验收（uat_pending）与上线后业务验收（released/verified）是两件事实，
+        // 阶段由当前状态推导，不接受客户端传值——否则可以把预验结果冒充正式满意度
+        String stage = resolveAcceptanceStage(req.getStatus());
+        boolean postRelease = RdmConstants.ACCEPT_STAGE_POST.equals(stage);
+        // 持有 rdm-acceptance:create 只代表能用验收功能，不代表可替别人的业务方签字
+        requireAcceptor(req, current);
         if (!StringUtils.hasText(dto.getResult())) {
             throw new BusinessException("請選擇驗收結論");
+        }
+        /*
+         * 目标⑦：上线后业务验收必须打分。不打分就不能进后续统计，
+         * 也不能靠“忘了填”交空值；预验收阶段可不打，但给了就必须是 1-5。
+         */
+        if (postRelease && dto.getScore() == null) {
+            throw new BusinessException("上線後業務驗收必須給 1-5 分满意度評分");
+        }
+        if (dto.getScore() != null
+                && (dto.getScore() < RdmConstants.SCORE_MIN || dto.getScore() > RdmConstants.SCORE_MAX)) {
+            throw new BusinessException("满意度評分必須在 " + RdmConstants.SCORE_MIN + "-" + RdmConstants.SCORE_MAX + " 分之間");
         }
         boolean failed = RdmConstants.ACCEPT_FAIL.equals(dto.getResult());
         boolean conditional = RdmConstants.ACCEPT_CONDITIONAL.equals(dto.getResult());
@@ -618,10 +909,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             }
         }
 
-        // attempt 存当时序号：事后补录或修订不得改变已有记录的「第几次验收」
-        Long prior = acceptanceMapper.selectCount(
-                new LambdaQueryWrapper<RdmAcceptance>().eq(RdmAcceptance::getReqId, id));
-        int attempt = (prior == null ? 0 : prior.intValue()) + 1;
+        // attempt 按阶段各自计数；取最大号+1 而不是数条数，事后补录不会改变已有记录的「第几次验收」
+        int attempt = nextAcceptanceAttempt(id, stage);
 
         RdmAcceptance acceptance = new RdmAcceptance();
         acceptance.setAcceptNo(bizSeqService.next(SEQ_ACCEPTANCE));
@@ -630,6 +919,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         acceptance.setAcceptorEmpNo(current == null ? null : current.getEmpId());
         acceptance.setAcceptorName(current == null ? req.getAcceptorName() : current.getName());
         acceptance.setResult(dto.getResult());
+        acceptance.setStage(stage);
         acceptance.setAttempt(attempt);
         acceptance.setTestEnv(dto.getTestEnv());
         acceptance.setScore(dto.getScore());
@@ -645,16 +935,40 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
         saveAcceptanceCases(acceptance, req, cases, current);
 
-        req.setAcceptanceResult(dto.getResult());
-        req.setAcceptanceScore(dto.getScore());
-        req.setAcceptanceTime(acceptance.getAcceptTime());
+        // 只有上线后的业务验收才写需求上的正式口径字段；预验收结论留在验收单里，
+        // 否则一次预验与一次正式验会互相覆盖，满意度与按时率口径就分不清
+        if (postRelease) {
+            req.setAcceptanceResult(dto.getResult());
+            req.setAcceptanceScore(dto.getScore());
+            req.setAcceptanceTime(acceptance.getAcceptTime());
+        }
 
-        // 不通过：退回研发并计返工；通过/有条件通过：保持待验收，由 PM 确认上线
-        if (failed) {
+        // 上线前不通过：退回研发并计返工（同时作废在途放行单）
+        if (failed && !postRelease) {
             RdmTransitionDTO trans = new RdmTransitionDTO();
             trans.setRemark(dto.getIssues());
             requirementMapper.updateById(req);
-            transitionInternal(req, RdmConstants.ACTION_UAT_FAIL, trans, current, RdmConstants.ROLE_ACCEPTOR);
+            // 这里必须传当前人的真实角色：以前写死 ROLE_ACCEPTOR 等于自己给自己发通行证，
+            // 角色守卫在这里形同失效（验收人身份已由方法入口的 requireAcceptor 裁决）
+            transitionInternal(req, RdmConstants.ACTION_UAT_FAIL, trans, current,
+                    accessGuard.activeRoles(req.getId(), current));
+            return;
+        }
+
+        // 上线后业务验收不通过：上线是既成事实，不能靠“退回研发”抹掉，
+        // 只能强制转后续需求，让遗留问题进入承接队列而不是口头约定
+        if (failed) {
+            if (!Boolean.TRUE.equals(dto.getCreateFollowUp())) {
+                throw new BusinessException("已上線需求驗收不通過，必須勾選「轉為後續需求」，讓遺留問題有人承接");
+            }
+            RdmRequirement followUp = createFollowUpRequirement(req, acceptance, dto, current);
+            if (followUp != null) {
+                acceptance.setFollowUpReqId(followUp.getId());
+                acceptance.setFollowUpReqNo(followUp.getReqNo());
+                acceptanceMapper.updateById(acceptance);
+            }
+            requirementMapper.updateById(req);
+            notifyPostReleaseFailure(req, acceptance, current);
             return;
         }
 
@@ -669,6 +983,55 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
         requirementMapper.updateById(req);
         notifyAcceptanceResult(req, acceptance, current);
+    }
+
+    /** 上线后业务验收不通过的通知：不能发“请执行上线交付”这种与事实相反的话术 */
+    private void notifyPostReleaseFailure(RdmRequirement req, RdmAcceptance acceptance, SysUser current) {
+        Set<Long> receivers = new LinkedHashSet<>();
+        if (req.getAssigneePmUserId() != null) {
+            receivers.add(req.getAssigneePmUserId());
+        }
+        if (req.getDevOwnerUserId() != null) {
+            receivers.add(req.getDevOwnerUserId());
+        }
+        if (receivers.isEmpty()) {
+            return;
+        }
+        String text = "### ⚠️ 上線後業務驗收不通過\n\n- **編號**: " + req.getReqNo()
+                + "\n- **標題**: " + req.getTitle()
+                + "\n- **第幾次業務驗收**: " + value(acceptance.getAttempt())
+                + "\n- **評分**: " + (acceptance.getScore() == null ? "-" : acceptance.getScore() + " / 5")
+                + "\n- **問題**: " + (StringUtils.hasText(acceptance.getIssues()) ? acceptance.getIssues() : "-")
+                + (StringUtils.hasText(acceptance.getFollowUpReqNo())
+                        ? "\n- **已轉後續需求**: " + acceptance.getFollowUpReqNo() : "")
+                + "\n\n需求已上線，不退回開發狀態；請在新需求里承接遗留问题。";
+        notifyService.notifyUserIds(RdmConstants.EVENT_ACCEPT_TODO, req, new ArrayList<>(receivers),
+                "上線後驗收不通過：" + req.getReqNo(), text);
+    }
+
+    /**
+     * 根据当前状态推导验收阶段。
+     * <p>不接受客户端传 stage：否则可以把上线前的预验结果写成正式业务验收。
+     */
+    private static String resolveAcceptanceStage(String status) {
+        if (RdmConstants.STATUS_UAT_PENDING.equals(status) || RdmConstants.STATUS_TEST_PASSED.equals(status)) {
+            return RdmConstants.ACCEPT_STAGE_PRE;
+        }
+        if (RdmConstants.STATUS_RELEASED.equals(status) || RdmConstants.STATUS_VERIFIED.equals(status)) {
+            return RdmConstants.ACCEPT_STAGE_POST;
+        }
+        throw new BusinessException("当前階段還不能提交驗收結論（上線前預驗收在「待業務驗收」，上線後業務驗收在「已上線/已驗證」）");
+    }
+
+    /** 同一阶段的下一个轮次号（取最大+1，逻辑删除的旧行照样占号，不会重现重号） */
+    private int nextAcceptanceAttempt(Long reqId, String stage) {
+        List<RdmAcceptance> history = acceptanceMapper.selectList(new LambdaQueryWrapper<RdmAcceptance>()
+                .eq(RdmAcceptance::getReqId, reqId)
+                .eq(RdmAcceptance::getStage, stage)
+                .orderByDesc(RdmAcceptance::getAttempt)
+                .last("LIMIT 1"));
+        return history.isEmpty() || history.get(0).getAttempt() == null
+                ? 1 : history.get(0).getAttempt() + 1;
     }
 
     /** 落验收用例明细（数量与结论已在提交前校验） */
@@ -809,7 +1172,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
     @Override
     public List<RdmAcceptanceVO> acceptanceHistory(Long id) {
-        requireRequirement(id);
+        // 验收历史含缺陷与意见，必须与详情同口径收敛：只按菜单权放行会让人凭 id 读到别部门的结论
+        requireVisible(requireRequirement(id), operatorResolver.currentUser(), "查看驗收歷史");
         List<RdmAcceptance> records = acceptanceMapper.selectList(
                 new LambdaQueryWrapper<RdmAcceptance>()
                         .eq(RdmAcceptance::getReqId, id)
@@ -1024,51 +1388,31 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
      * export/delete，所以移除这两条不会让任何人丢掉既有可见范围。
      */
     private boolean canSeeAll(SysUser current) {
-        if (operatorResolver.isAdmin(current)) {
-            return true;
-        }
-        if (current == null) {
-            return false;
-        }
-        return permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "view")
-                || canDispatch(current);
+        return accessGuard.canSeeAll(current);
     }
 
     /**
      * 单条需求的可见性守卫（防水平越权）。
-     * <p>列表已按相关人收敛，详情/评论/催办必须走同一口径，
-     * 否则只要猜到一个 id 就能读到别部门的需求内容。
+     * <p>口径已在 {@link RdmAccessGuard} 集中，本方法只是保留需求服务侧的既有入口（含单测）。
      * <p>包内可见以便单测直接验证判定口径。
      */
     void requireVisible(RdmRequirement req, SysUser current, String action) {
-        if (canSeeAll(current) || isRelated(req, current)) {
-            return;
-        }
-        throw new BusinessException("您與該需求無關，無法" + action);
+        accessGuard.requireVisible(req, current, action);
     }
 
-    /** 登录人与该需求是否直接相关（提出/负责/研发/验收/抄送/参与） */
+    /** 业务验收人守卫：只有指定的验收人（缺省即提出人）能出验收结论 */
+    private void requireAcceptor(RdmRequirement req, SysUser current) {
+        accessGuard.requireAcceptor(req, current, "提交驗收結論");
+    }
+
+    /** 登录人与该需求是否直接相关（提出/负责/研发/验收/分配/参与） */
     private boolean isRelated(RdmRequirement req, SysUser current) {
-        if (current == null) {
-            return false;
-        }
-        Long userId = current.getId();
-        if (userId.equals(req.getSubmitterUserId()) || userId.equals(req.getAssigneePmUserId())
-                || userId.equals(req.getDevOwnerUserId()) || userId.equals(req.getAcceptorUserId())) {
-            return true;
-        }
-        return roleMapper.selectCount(new LambdaQueryWrapper<RdmRequirementRole>()
-                .eq(RdmRequirementRole::getReqId, req.getId())
-                .eq(RdmRequirementRole::getUserId, userId)
-                .eq(RdmRequirementRole::getIsActive, 1)) > 0;
+        return accessGuard.isRelated(req, current);
     }
 
     /** 是否可分发需求（技术负责人） */
     private boolean canDispatch(SysUser current) {
-        if (operatorResolver.isAdmin(current)) {
-            return true;
-        }
-        return current != null && permissionService.hasPermission(current, MENU_DISPATCHER, "edit");
+        return accessGuard.canDispatch(current);
     }
 
     private List<String> describeRoles(SysUser current, boolean unrestricted) {
@@ -1128,35 +1472,23 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 RdmConstants.ROLE_QA, RdmConstants.ROLE_DESIGNER, RdmConstants.ROLE_PMO).contains(r.getRoleCode()));
     }
 
-    /** 当前人在该需求上的角色：优先取参与角色表，其次按主数据字段推断 */
-    private String resolveMyRole(List<RdmRequirementRole> roles, SysUser current, RdmRequirement req) {
-        if (current == null) {
-            return null;
-        }
-        return roles.stream()
-                .filter(r -> current.getId().equals(r.getUserId()))
-                .map(RdmRequirementRole::getRoleCode)
-                .findFirst()
-                .orElseGet(() -> {
-                    if (current.getId().equals(req.getSubmitterUserId())) {
-                        return RdmConstants.ROLE_SUBMITTER;
-                    }
-                    if (current.getId().equals(req.getAssigneePmUserId())) {
-                        return RdmConstants.ROLE_PM;
-                    }
-                    if (current.getId().equals(req.getAcceptorUserId())) {
-                        return RdmConstants.ROLE_ACCEPTOR;
-                    }
-                    return null;
-                });
+    /**
+     * 详情页展示的「我的角色」：取有效角色集合的首项。
+     * <p>权限判定一律用集合（activeRoles），不看这个单值：以前用 findFirst 的单角色做守卫，
+     * 提出人兼验收人（或兼产品经理）时会按写入顺序被当成 SUBMITTER，
+     * 导致只允许 ACCEPTOR 的交付确认动作误拒真验收人。
+     */
+    private String resolveMyRole(RdmRequirement req, SysUser current) {
+        return accessGuard.activeRoles(req == null ? null : req.getId(), current)
+                .stream().findFirst().orElse(null);
     }
 
     /**
-     * 角色守卫：超管放行；否则要求登录人在该需求上的角色出现在允许列表里。
-     * <p>fail-closed：未拿到当前用户或规则未配角色时一律拒绝，避免“谁拿到入口都能推”。
+     * 角色守卫：超管放行；否则要求登录人在该需求上的任一有效角色出现在允许列表里。
+     * <p>fail-closed：未拿到当前用户或规则未配角色时一律拒，避免“谁拿到入口都能推”。
      * <p>包内可见以便 {@code RdmTransitionGuardTest} 直接验证判定口径。
      */
-    boolean canPerform(RdmConfigVO.Transition rule, SysUser current, String myRole) {
+    boolean canPerform(RdmConfigVO.Transition rule, SysUser current, Set<String> myRoles) {
         if (operatorResolver.isAdmin(current)) {
             return true;
         }
@@ -1167,7 +1499,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (allowed == null || allowed.isEmpty()) {
             return false;
         }
-        if (StringUtils.hasText(myRole) && allowed.contains(myRole)) {
+        if (myRoles != null && myRoles.stream().anyMatch(allowed::contains)) {
             return true;
         }
         // 分配类动作按菜单授权兜底：持有需求池编辑权即视为技术负责人
@@ -1306,7 +1638,37 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 .orderByAsc(RdmRequirementRole::getId));
     }
 
-    /** 关闭尚未离开当前状态的流水（回填停留时长），再插入新流水 */
+    /**
+     * 动作 → 已完成的关键节点：流转发生时要回写这些节点的实成日。
+     * <p>不写就只剩人工计划与基线，偏差与按时率永远算不出来
+     * （深度测试实测：需求已上线但五个节点全部仍为 pending）。
+     * <p>UI 完成轉開發 同时算“研發啟動”已完成：进入开发中就意味着研发已经开工，
+     * 否则状态机里没有独立的 dev_start 动作时这个节点会永远空洞（端到端实测 D4）。
+     */
+    private static final Map<String, List<String>> ACTION_MILESTONE = Map.of(
+            RdmConstants.ACTION_REVIEW_PASS, List.of(com.mftb.admin.entity.RdmMilestone.CODE_PRD_REVIEW),
+            RdmConstants.ACTION_DESIGN_DONE, List.of(com.mftb.admin.entity.RdmMilestone.CODE_DESIGN_DONE,
+                    com.mftb.admin.entity.RdmMilestone.CODE_DEV_START),
+            RdmConstants.ACTION_DEV_START, List.of(com.mftb.admin.entity.RdmMilestone.CODE_DEV_START),
+            RdmConstants.ACTION_DEV_DONE, List.of(com.mftb.admin.entity.RdmMilestone.CODE_DEV_DONE),
+            RdmConstants.ACTION_RELEASE, List.of(com.mftb.admin.entity.RdmMilestone.CODE_RELEASE));
+
+    /** 节点完成事实回填：已有实成日时不覆盖，重复流转不会改掉历史 */
+    private void markMilestoneActual(Long reqId, String actionCode, LocalDateTime at, String signature) {
+        List<String> codes = ACTION_MILESTONE.get(actionCode);
+        if (codes == null) {
+            return;
+        }
+        for (String code : codes) {
+            jdbcTemplate.update(
+                    "UPDATE rdm_milestone SET actual_date = ?, status = 'done', "
+                            + "forecast_date = COALESCE(forecast_date, ?), updated_by = ? "
+                            + "WHERE req_id = ? AND code = ? AND deleted = 0 AND actual_date IS NULL",
+                    at.toLocalDate(), at.toLocalDate(), signature, reqId, code);
+        }
+    }
+
+    /** 记录一条状态流水（与 closeOpenStatusLog 成对调用，前者回填停留时长） */
     private void appendStatusLog(RdmRequirement req, String fromStatus, SysUser actor, String actionCode, String remark) {
         RdmStatusLog log = new RdmStatusLog();
         log.setReqId(req.getId());
@@ -1315,7 +1677,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         log.setActionCode(actionCode);
         log.setOperatorUserId(actor == null ? null : actor.getId());
         log.setOperatorName(actor == null ? "system" : actor.getName());
-        log.setOperatorRole(resolveMyRole(listRoles(req.getId()), actor, req));
+        log.setOperatorRole(resolveMyRole(req, actor));
         log.setRemark(remark);
         log.setEnterTime(req.getStatusEnterTime() == null ? LocalDateTime.now() : req.getStatusEnterTime());
         log.setIsOverdue(0);
@@ -1513,13 +1875,12 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return sla;
     }
 
-    private List<RdmRequirementVO.AllowedAction> allowedActions(RdmRequirement req, SysUser current,
-                                                                List<RdmRequirementRole> roles) {
-        String myRole = resolveMyRole(roles, current, req);
+    private List<RdmRequirementVO.AllowedAction> allowedActions(RdmRequirement req, SysUser current) {
+        Set<String> myRoles = accessGuard.activeRoles(req.getId(), current);
         List<RdmRequirementVO.AllowedAction> list = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (RdmConfigVO.Transition rule : configService.transitionsFrom(req.getStatus())) {
-            if (!canPerform(rule, current, myRole) || !seen.add(rule.getActionCode())) {
+            if (!canPerform(rule, current, myRoles) || !seen.add(rule.getActionCode())) {
                 continue;
             }
             RdmRequirementVO.AllowedAction action = new RdmRequirementVO.AllowedAction();
