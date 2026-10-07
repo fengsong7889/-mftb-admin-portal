@@ -264,6 +264,7 @@ const RdmWorkbench = lazy(() => import('./pages/Rdm/Workbench'))
 const RdmRequirementSubmit = lazy(() => import('./pages/Rdm/RequirementSubmit'))
 const RdmRequirementList = lazy(() => import('./pages/Rdm/RequirementList'))
 const RdmRequirementPool = lazy(() => import('./pages/Rdm/RequirementPool'))
+const RdmRequirementIntake = lazy(() => import('./pages/Rdm/RequirementIntake'))
 const RdmRequirementDetail = lazy(() => import('./pages/Rdm/RequirementDetail'))
 const RdmDeliveryBoard = lazy(() => import('./pages/Rdm/DeliveryBoard'))
 const RdmTaskForm = lazy(() => import('./pages/Rdm/TaskForm'))
@@ -569,6 +570,8 @@ function AuthenticatedLayout() {
                   产品需求处理/交付中需求已作为纯数据切片删除，旧地址保留重定向，
                   避免存量收藏、钉钉通知、已发出去的分享链接坏掉 */}
               <Route path="/rdm-intake" element={<RdmRequirementPool />} />
+              {/* 提交需求（业务侧）：我的提交 + 待我審批；从需求池拆出，不携带分配权 */}
+              <Route path="/rdm-intake-approval" element={<RdmRequirementIntake />} />
               {/* 需求查询已并回需求池（分配权必然蕴含可见权，不该拆成两个窄权限菜单） */}
               <Route path="/rdm-query" element={<Navigate to="/rdm-intake" replace />} />
               <Route path="/rdm-detail" element={<RdmRequirementDetail />} />

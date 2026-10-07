@@ -212,6 +212,10 @@ export const keyToPath: Record<string, string> = {
   'rdm-workbench':        '/rdm-workbench',
   'rdm-requirement':      '/rdm-requirement',
   'rdm-intake':           '/rdm-intake',
+  // v3.11 拆分：一级分组「需求池」折叠态跳转指向首个子页（与 rdm-efficiency 同法）；
+  // 二级「提交需求」是业务侧入口（我的提交 + 待我審批）
+  'rdm-pool-group':       '/rdm-intake-approval',
+  'rdm-intake-approval':  '/rdm-intake-approval',
   'rdm-acceptance':       '/rdm-acceptance',
   // 需求總看板已升为一级分组：分组折叠态跳转指向首个子页，交付看板/質量/追溯/周报各自成菜单
   'rdm-dashboard':          '/rdm-dashboard',

@@ -856,6 +856,23 @@
       "comment": "退役 v3.8/v3.9 建的 rdm-query（需求查询），把全量可见并回 rdm-intake：canSeeAll 现在认 rdm-intake:view 加 canDispatch，不再认 rdm-query，也不再把 rdm-requirement 的 export/delete 当全量凭证。上一轮拆分的目的（把数据范围从功能动作解绑）价值保留，但落点错了：分配权必然蕴含可见权（看不到单子就分不出去），两者拆成两个窄权限菜单只会让管理员同步维护两份授权。rdm-query 的授权按同动作平移到 rdm-intake（RETIRED_MENU_MERGE 新增一行，view/export 原样搬，不新增动作；实查开发库只有 admin 持有它，且 admin 靠代码直通）。同时前端把视角 Tab 集合下沉为调用方传入：需求池给「待分配/待我審批/全部需求」+跨部门筛选（它是审批与分配环节的总台），需求清单只留「我提的/待我處理/我負責的產品/研發交付中」执行侧四片——清单不该出现审批切片，因为动线是提出→審批→进池→分配→才到执行。verify 改为断言 rdm-intake 同时持有 edit 与 view（缺 view 时需求池只读到自己的单子，界面不报错但永远筛不出待分配全貌），并把菜单名繁体断言移到 rdm-intake 上常驻。取代 rdm:menu-seed:v3.9。"
     },
     {
+      "versionKey": "rdm:menu-seed:v3.11",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.10"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "拆分「需求池·分配」为一级分组需求池下的两个二级菜单：提交需求（业务侧提交+待我审批）与需求管理（分配侧）",
+      "author": "菜单结构调整",
+      "ticket": "rdm-menu-split",
+      "appliedAt": "2026-10-07T00:00:00Z",
+      "comment": "原本一页里塞「待分配 / 待我審批 / 全部需求」三个视角，但审批人（提出人的主管或公司高层）与分配人（技术负责人/产品经理）不是同一批角色：高层进这页会误入分配区，PM 每天看到与自己无关的审批列。落地方式：新建目录菜单 rdm-pool-group（需求池，type=1 无 path/component，图标 ContainerOutlined）+ 新叶子 rdm-intake-approval（提交需求，/rdm-intake-approval，图标 SendOutlined，只授 view）；现有 rdm-intake 改名「需求管理」并挂到该分组下 —— 它的 menuKey/path/actions 全部不变，因为 rdm-intake 是 canSeeAll(view) 与全系统唯一分配权(edit) 的锚点，被 12 处服务端引用与存量 sys_role_menu/sys_department_menu 绑定，换键就得做授权平移且既可能降权也可能扩权。改名走 RENAMES（仅命中旧默认名，用户在菜单配置里自定义过的名字不被覆盖）。新菜单默认只授 admin，其他角色/部门由授权中心显式配置。后置校验：rdm-intake 名为需求管理且同时持有 view/edit、rdm-intake-approval 名为提交需求且 admin 持有 view、rdm-pool-group 必须是无 path/component 的目录（带 path 的分组会在侧边栏退化成可点叶子）。取代 rdm:menu-seed:v3.10。"
+    },
+    {
       "versionKey": "rdm:access-grant:v1.1",
       "module": "rdm",
       "phase": "MENU_SEED",

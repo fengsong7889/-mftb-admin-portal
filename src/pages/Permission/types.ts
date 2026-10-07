@@ -872,7 +872,16 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'export', label: '導出' },
   ],
-  // 需求池：分配侧窄权限菜单。view 就是全量可见（canSeeAll 认它），edit 就是分配权
+  // v3.11 拆分：「需求池」升为一级分组，下挂提交需求（业务侧）与需求管理（分配侧）
+  'rdm-pool-group': [
+    { key: 'view', label: '查看' },
+  ],
+  // 提交需求：提出人看自己的单 + 审批人处理待审。只给 view：
+  // 审批动作由服务端按「OA 当前审批人=我」收敛，分配权仍只在 rdm-intake:edit
+  'rdm-intake-approval': [
+    { key: 'view', label: '查看' },
+  ],
+  // 需求管理（旧名需求池·分配）：分配侧窄权限菜单。view 就是全量可见（canSeeAll 认它），edit 就是分配权
   'rdm-intake': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
@@ -1346,6 +1355,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 產研協同（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
   'rdm-workbench',
   'rdm-requirement',
+  'rdm-pool-group',
+  'rdm-intake-approval',
   'rdm-intake',
   'rdm-delivery',
   'rdm-delivery-board',
@@ -1584,6 +1595,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/rdm-submit': 'rdm-requirement',
   '/rdm-requirement': 'rdm-requirement',
   '/rdm-intake': 'rdm-intake',
+  // 提交需求（业务侧提交 + 待我審批）：拆自需求池，不携带分配权
+  '/rdm-intake-approval': 'rdm-intake-approval',
   // 需求查询已并回需求池；旧地址仍可达（重定向），所以映射到 rdm-intake 而不是删掉
   '/rdm-query': 'rdm-intake',
   '/rdm-delivery': 'rdm-delivery-board',

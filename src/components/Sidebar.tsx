@@ -84,6 +84,8 @@ import {
   DollarOutlined, // 额度策略
   UnlockOutlined, // 員工AI權額管理
   InboxOutlined, // 物资管理一级菜单
+  ContainerOutlined, // 需求池一级分组（v3.11 拆分，图标全局唯一）
+  SendOutlined, // 提交需求（v3.11 从需求池拆出的业务侧菜单）
   AppstoreAddOutlined, // 资产入库
   UserAddOutlined, // 资产领用/归还
   UserDeleteOutlined, // 離職管理
@@ -576,6 +578,10 @@ const keyToIcon: Record<string, ReactNode> = {
   'rdm-workbench':    <DashboardOutlined />,
   'rdm-requirement':  <FileTextOutlined />,
   'rdm-intake':       <InboxOutlined />,
+  // v3.11 拆分：一级分组「需求池」用 Container、二级「提交需求」用 Send，
+  // 两个图标在本项目菜单里此前未被占用（菜单图标必须全局唯一）
+  'rdm-pool-group':   <ContainerOutlined />,
+  'rdm-intake-approval': <SendOutlined />,
   'rdm-delivery':     <NodeIndexOutlined />,
   'rdm-delivery-board': <RocketOutlined />,
   'rdm-delivery-iteration': <ScheduleOutlined />,

@@ -924,11 +924,14 @@ export const RDM_ITERATION_TYPE_COLOR: Record<RdmIterationType, string> = {
  * 同时补上上一轮新增但漏登记的三个菜单 key（风险中心、效能与产出分组、部门与人员产出）。
  * <p>v3.10：rdm-query（需求查询）已并回 rdm-intake —— 分配权必然蕴含全量可见权，
  * 两者同属分配侧窄权限，不该拆成两个窄权限菜单各自维护。
+ * <p>v3.11：「需求池·分配」拆为一级分组 rdm-pool-group（需求池）下的两个二级菜单：
+ * rdm-intake-approval（提交需求，业务侧提交 + 待我審批）与 rdm-intake（需求管理，分配侧）。
+ * 拆分只改显示名与层级，rdm-intake 的 key/path/actions 全部不变，以免动到 12 处服务端权限锚点与存量授权。
  */
 export const RDM_MENU_KEYS = [
   'rdm-dashboard', 'rdm-dashboard-board', 'rdm-dashboard-risk', 'rdm-dashboard-quality', 'rdm-dashboard-version', 'rdm-dashboard-report',
   'rdm-efficiency', 'rdm-dashboard-score', 'rdm-dashboard-trend', 'rdm-efficiency-output',
-  'rdm-workbench', 'rdm-requirement', 'rdm-intake',
+  'rdm-workbench', 'rdm-requirement', 'rdm-pool-group', 'rdm-intake-approval', 'rdm-intake',
   'rdm-delivery', 'rdm-delivery-board', 'rdm-delivery-iteration',
   'rdm-acceptance', 'rdm-config-group',
   'rdm-config-status', 'rdm-config-routing', 'rdm-config-sla', 'rdm-config-score',

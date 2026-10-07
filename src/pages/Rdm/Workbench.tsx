@@ -51,13 +51,15 @@ const TODO_ROUTE: Record<string, string> = {
 }
 
 /**
- * 审批待办的落点：有需求池授权的人落池内的「待我審批」视角；
- * <p>准入审批人常常是申请人的上级主管，不是产品总监 —— 他们未必持有 rdm-intake 授权，
+ * 审批待办的落点：有「提交需求」菜单授权的人落该页的「待我審批」视角；
+ * <p>准入审批人常常是申请人的上级主管，不是产品总监 —— 他们未必持有分配侧授权，
  * 把所有人都固定落需求池会让他们点「查看全部」直接进不来。这类人走 OA 中心的待我审批，
  * 那边本来就是审批的单一事实源（准入审批已接 OA 回调）。
+ * <p>v3.11 菜单拆分后必须改认 rdm-intake-approval：「待我審批」视角已从需求池整块移走，
+ * 再跳 /rdm-intake?scope=approving 会落在一个没有对应页签的视角上。
  */
-function intakeTodoRoute(canOpenPool: boolean): string {
-  return canOpenPool ? '/rdm-intake?scope=approving' : '/oa-requests'
+function intakeTodoRoute(canOpenApproval: boolean): string {
+  return canOpenApproval ? '/rdm-intake-approval?scope=approving' : '/oa-requests'
 }
 
 /** 待办分组图标与主色 */
@@ -267,7 +269,7 @@ export default function RdmWorkbench() {
                 <Tag color={group.total > 0 ? 'orange' : 'default'} style={{ margin: 0 }}>{group.total}</Tag>
                 <span className="rdm-todo-hint">{group.hint}</span>
               </div>
-              <Button type="link" size="small" onClick={() => navigate(TODO_ROUTE[group.key] ?? intakeTodoRoute(hasMenuPermission('rdm-intake')))}>
+              <Button type="link" size="small" onClick={() => navigate(TODO_ROUTE[group.key] ?? intakeTodoRoute(hasMenuPermission('rdm-intake-approval')))}>
                 查看全部 <RightOutlined style={{ fontSize: 11 }} />
               </Button>
             </div>

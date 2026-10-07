@@ -45,7 +45,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>为什么递增而不是改 v3.8/v3.9：本轮退役了一个已入库的菜单并改变了 canSeeAll 的口径，
      * 复用旧 key 会让已记账环境留着 rdm-query 菜单、而代码已不再认它的全量权。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.10";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.11";
     private static final String ADMIN_ROLE_CODE = "admin";
     /** 被取消的旧一级目录（软删，保留回滚能力） */
     private static final String LEGACY_ROOT_KEY = "rdm-center";
@@ -97,12 +97,19 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-workbench", "需求工作台", "Requirement Workbench", "/rdm-workbench", "RdmWorkbench", "HistoryOutlined", "2", "18", null, VIEW_ONLY},
             {"rdm-requirement", "需求清單", "Requirement List", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "19", null, LIST_ACTIONS},
             /*
-             * 需求池是分配与审批环节的总台（预选 pool 视角，页面内带待分配/待我審批/全部需求三个视角）。
-             * <p>全量可见与分配权都锁在这个窄权限菜单上：看不到单子就分不出去，两者天然同侧；
-             * 而台账 rdm-requirement 是“人人可看”的宽权限，两者分开才不会“给个查看权就顺带看到全公司需求”。
-             * 页面实现与需求清单共用（只是换一组视角 Tab 与筛选条件）。
+             * v3.11：拆「需求池·分配」为一级分组下的两个二级菜单，让提出/审批侧与分配侧各得其所。
+             * <p>原本一页里塞「待分配 / 待我審批 / 全部需求」三个视角，但审批人（提出人的主管或高层）
+             * 与分配人（技术负责人/PM）不是同一批角色：高层会误入分配区，PM 每天看到无关的审批列。
+             * <p>关键约束：rdm-intake 这个 menuKey 是 canSeeAll（view）与分配权（edit）的锚点，
+             * 被 12 处服务端引用与存量 sys_role_menu/sys_department_menu 授权记录绑定，
+             * 所以只改显示名与层级位置（upsert 会对齐 parent_id，alignSeedSorts 会对齐排序），
+             * key/path/actions 一律不动 —— 不这样就得做授权平移，既有降权也有扩权风险。
+             * 新菜单 rdm-intake-approval 只给 view：审批动作由服务端按「OA 当前审批人=我」收敛，
+             * 分配动作仍只认 rdm-intake:edit，本菜单不携分配权。
              */
-            {"rdm-intake", "需求池·分配", "Requirement Pool", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "20", null, FULL_ACTIONS},
+            {"rdm-pool-group", "需求池", "Requirement Pool", null, null, "ContainerOutlined", "1", "20", null, VIEW_ONLY},
+            {"rdm-intake-approval", "提交需求", "Submit & Approval", "/rdm-intake-approval", "RequirementIntake", "SendOutlined", "2", "1", "rdm-pool-group", VIEW_ONLY},
+            {"rdm-intake", "需求管理", "Requirement Pool", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "2", "rdm-pool-group", FULL_ACTIONS},
             // 研發交付是研发侧唯一有明确子环节的区域，升为一级分组（与「需求配置」同法）
             {"rdm-delivery", "研發交付", "R&D Delivery", null, null, "NodeIndexOutlined", "1", "23", null, VIEW_ONLY},
             {"rdm-delivery-board", "交付工作台", "Delivery Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
@@ -121,7 +128,9 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 台账→清单：两个历史默认名都要覆盖，否则自定义过名字的不动、没改过的也改不过来
             {"rdm-requirement", "需求清單", "需求台賬"},
             {"rdm-requirement", "需求清單", "我的需求"},
-            {"rdm-intake", "需求池·分配", "需求池/分配"},
+            // v3.11 拆分：需求池不再兼任审批总台，改名「需求管理」并挂进「需求池」分组
+            {"rdm-intake", "需求管理", "需求池·分配"},
+            {"rdm-intake", "需求管理", "需求池/分配"},
     };
 
     /**
@@ -193,6 +202,12 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-dashboard-report", "4", "5"},
             {"rdm-dashboard-score", "5", "1"},
             {"rdm-dashboard-trend", "6", "2"},
+            /*
+             * v3.11：rdm-intake 从顶级（sort 20）改挂到 rdm-pool-group 下，成为分组内第二项。
+             * 它跟父分组同用了 20，虽不影响组内排序（1 在前、20 在后），但同一层里留个 20 会让后续
+             * 插入子项时没有空位，所以按旧默认值对齐为 2（管理员自定义过排序则不动）。
+             */
+            {"rdm-intake", "20", "2"},
     };
 
     /**
@@ -767,8 +782,27 @@ public class RdmMenuInitializer implements CommandLineRunner {
         assertAdminHoldsAction(RdmConstants.MENU_INTAKE, "edit");
         assertAdminHoldsAction(RdmConstants.MENU_INTAKE, "view");
         assertAdminHoldsAction("rdm-requirement", "create");
+        assertAdminHoldsAction("rdm-intake-approval", "view");
         // 菜单名对用户直接可见，必须真的是繁体默认名（上一轮连错两次，断言常驻而不是靠人工复查）
-        assertMenuNameEquals(RdmConstants.MENU_INTAKE, "需求池·分配");
+        assertMenuNameEquals(RdmConstants.MENU_INTAKE, "需求管理");
+        assertMenuNameEquals("rdm-intake-approval", "提交需求");
+        // 分组必须是真正的目录：带 path 的“分组”会在侧边栏变成可点叶子，两层结构退化
+        assertIsDirectoryGroup("rdm-pool-group");
+    }
+
+    /** 断言菜单是一级分组（type=1、无 path、无 component） */
+    private void assertIsDirectoryGroup(String menuKey) {
+        List<java.util.Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT type, path, component FROM sys_menu WHERE menu_key = ? AND deleted = 0", menuKey);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException(menuKey + " 分组菜单不存在，无法校验结构");
+        }
+        java.util.Map<String, Object> row = rows.get(0);
+        int type = ((Number) row.get("type")).intValue();
+        if (type != 1 || row.get("path") != null || row.get("component") != null) {
+            throw new IllegalStateException(menuKey + " 应是无 path/component 的一级分组，实际 type="
+                    + type + ", path=" + row.get("path") + ", component=" + row.get("component"));
+        }
     }
 
     /** 断言菜单的默认名已落地为期望值（用于验证改名真的生效） */
