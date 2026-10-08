@@ -126,6 +126,15 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final String VERSION_INDICATOR_TYPE = "rdm:schema:v2.4";
     private static final String INDICATOR_TYPE_SCRIPT = "217_hr_indicator_type_rdm_output.sql";
+
+    /**
+     * 阶段 6 补丁（生产核查发现）：考核单建议分列宽窄于来源列。
+     * <p>推送把 rdm_hr_suggestion.total_score DECIMAL(12,2) 原值写进
+     * hr_perf_score_item.suggested_score（实查 DECIMAL(6,2)，上限 9999.99），
+     * 贡献分一大就 Out of range——与 budget_used_ratio(v2.3) 同一类缺陷。
+     */
+    private static final String VERSION_SUGGESTED_FIX = "rdm:schema:v2.5";
+    private static final String SUGGESTED_FIX_SCRIPT = "218_rdm_suggested_score_widen.sql";
     private static final String[][] RELEASE_FIX_COLUMNS = {
             {"rdm_release", "applicant_emp_no",
                     "ALTER TABLE rdm_release ADD COLUMN applicant_emp_no VARCHAR(32) DEFAULT NULL "
@@ -248,6 +257,38 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_RELEASE_FIX, this::doReleaseFixMigrate, this::verifyReleaseFix);
         versionTracker.applyOnce(VERSION_RATIO_FIX, this::doRatioFixMigrate, this::verifyRatioFix);
         versionTracker.applyOnce(VERSION_INDICATOR_TYPE, this::doIndicatorTypeMigrate, this::verifyIndicatorType);
+        versionTracker.applyOnce(VERSION_SUGGESTED_FIX, this::doSuggestedFixMigrate, this::verifySuggestedFix);
+    }
+
+    private void doSuggestedFixMigrate() {
+        int executed = executeScript(SUGGESTED_FIX_SCRIPT);
+        log.info("RDM v2.5 补丁脚本已执行: {} 条语句（{}）", executed, SUGGESTED_FIX_SCRIPT);
+    }
+
+    /**
+     * 不只验“已扩列”，而是验“写入列与来源列仍同精度”。
+     * <p>扩到同精度后溢出在结构上不可能发生，所以不再加永远不会命中的截断兜底；
+     * 一旦有人再把任一侧改窄，启动就大声失败，而不是等到推送报 Out of range。
+     */
+    private void verifySuggestedFix() {
+        String target = columnType("hr_perf_score_item", "suggested_score");
+        String source = columnType("rdm_hr_suggestion", "total_score");
+        if (target == null || source == null) {
+            throw new IllegalStateException("RDM v2.5 核验失败：建议分或来源分列不存在（target="
+                    + target + ", source=" + source + "）");
+        }
+        if (!target.equalsIgnoreCase(source)) {
+            throw new IllegalStateException("RDM v2.5 核验失败：hr_perf_score_item.suggested_score(" + target
+                    + ") 与来源 rdm_hr_suggestion.total_score(" + source + ") 精度不一致，推送会溢出");
+        }
+    }
+
+    /** 读真实列类型（以 information_schema 为准，不凭建表 SQL 推断） */
+    private String columnType(String table, String column) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                String.class, table, column);
     }
 
     private void doIndicatorTypeMigrate() {

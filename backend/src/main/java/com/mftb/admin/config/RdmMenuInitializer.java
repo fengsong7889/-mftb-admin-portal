@@ -783,9 +783,10 @@ public class RdmMenuInitializer implements CommandLineRunner {
         assertAdminHoldsAction(RdmConstants.MENU_INTAKE, "view");
         assertAdminHoldsAction("rdm-requirement", "create");
         assertAdminHoldsAction("rdm-intake-approval", "view");
-        // 菜单名对用户直接可见，必须真的是繁体默认名（上一轮连错两次，断言常驻而不是靠人工复查）
-        assertMenuNameEquals(RdmConstants.MENU_INTAKE, "需求管理");
-        assertMenuNameEquals("rdm-intake-approval", "提交需求");
+        // 菜单名只提醒不阻断：名字是「菜单配置」里允许自定义的运维项，
+        // 拿它当启动门禁会让一次正常改名把服务改崩（结构类断言仍保持硬失败）
+        warnIfMenuNameDiffers(RdmConstants.MENU_INTAKE, "需求管理");
+        warnIfMenuNameDiffers("rdm-intake-approval", "提交需求");
         // 分组必须是真正的目录：带 path 的“分组”会在侧边栏变成可点叶子，两层结构退化
         assertIsDirectoryGroup("rdm-pool-group");
     }
@@ -805,15 +806,22 @@ public class RdmMenuInitializer implements CommandLineRunner {
         }
     }
 
-    /** 断言菜单的默认名已落地为期望值（用于验证改名真的生效） */
-    private void assertMenuNameEquals(String menuKey, String expectedName) {
+    /**
+     * 菜单默认名与期望不一致时只告警。
+     * <p>改名原因有两个：RENAMES 故意不覆盖管理员自定义名（那是用户的权利）；
+     * 而本方法原先是抛异常，等于把“在菜单配置里改了个名字”变成下次启动直接失败、
+     * 就绪探针 DOWN。名字错不会造成数据或权限后果，所以降级为 warn；
+     * 真正的结构不变量（分组必须是目录、分配权必须在原位）仍由其他断言硬拦。
+     */
+    private void warnIfMenuNameDiffers(String menuKey, String expectedName) {
         List<String> names = jdbcTemplate.queryForList(
                 "SELECT name FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, menuKey);
         if (names.isEmpty()) {
             throw new IllegalStateException(menuKey + " 菜单不存在，无法校验名称");
         }
         if (!expectedName.equals(names.get(0))) {
-            throw new IllegalStateException(menuKey + " 菜单名应为「" + expectedName + "」，实际「" + names.get(0) + "」");
+            log.warn("菜单 {} 当前名为「{}」（种子默认名「{}」）：若为管理员自定义则无需处理，"
+                    + "若种子默认名已落错请检查 RENAMES 旧名条目", menuKey, names.get(0), expectedName);
         }
     }
 

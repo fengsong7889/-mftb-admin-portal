@@ -1079,6 +1079,25 @@
       "ticket": "rdm-stage6-e2e",
       "appliedAt": "2026-10-07T00:00:00Z",
       "comment": "跨模块断链：RdmConstants.INDICATOR_TYPE_RDM_OUTPUT 是推送建议时匹配考核单指标的条件（hr_perf_indicator.indicator_type），但字典 PERF_INDICATOR_TYPE 只有 RESULT/COMPETENCY/ATTITUDE/COMPLIANCE，前端模板下拉也没有该项，HR 无法在界面上建出 RDM 产出指标，「推送已确认建议」必然失败，阶段 6 的建议通道形同虚设。同批前端改动：Performance/meta.ts 的 INDICATOR_TYPE_ORDER/LABEL_KEY 增 RDM_OUTPUT，zh-TW/en 增 hrPerf.indicatorTypeRdmOutput。后置校验：字典项必须存在且未删除。"
+    },
+    {
+      "versionKey": "rdm:schema:v2.5",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v2.4"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "218_rdm_suggested_score_widen.sql"
+      ],
+      "intent": "v2.5 补丁：hr_perf_score_item.suggested_score 扩到 DECIMAL(12,2)，与来源列同精度",
+      "author": "生产上线前只读核查",
+      "ticket": "rdm-prod-precheck",
+      "appliedAt": "2026-10-08T00:00:00Z",
+      "comment": "生产核查（scripts/prod-menu-precheck.sql）发现的同类缺陷：RDM 绩效建议推送把 rdm_hr_suggestion.total_score DECIMAL(12,2) 原值写入 hr_perf_score_item.suggested_score，而该列实查为 DECIMAL(6,2)（上限 9999.99），个人周期贡献分一旦超过就抛 Data truncation: Out of range —— 与 v2.3 的 budget_used_ratio 完全同源：列宽按分数不会大的直觉设定，且只在有真实数据时才暴露。开发库与生产库实查均为 decimal(6,2)，趁生产 score_records=0（代价为零）先扩列。后置校验不写死等于 decimal(12,2)，而是断言写入列与来源列 COLUMN_TYPE 相同：扩到同精度后溢出在结构上不可能发生，因此不再加永远不会命中的截断兜底（那会把两列再次漂移的真实风险藏起来），改窄任一侧时启动即大声失败。DDL 只在 classpath 脚本 218_rdm_suggested_score_widen.sql 存一份，backend/sql 下为参考副本（MODIFY COLUMN 可重复执行）。"
     }
   ]
 }
