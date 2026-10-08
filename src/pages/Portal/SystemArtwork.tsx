@@ -171,23 +171,31 @@ function StageGlyph({ stage }: { stage: RdmStage }) {
 }
 
 /**
- * 產研協同场景：需求流水线。
- * 业务方提需求后最想知道「我的需求到哪一步了」，因此按系统内 6 个生命周期阶段
- * 画成一条上下起伏的波段轨道：需求池排队入池 → 光环逐站跳动、轨道逐段铺开 →
- * 审批站点分出「驳回」回路退回需求池，分配受理站点分出「挂起」短支路（搁置不推进）→
- * 末站验收盖章并火箭上线。
+ * 產研協同场景：需求交付看板，提供两种风格（门户面板可切换）。
+ * A「看板流水線」：面板 + 泳道 + 需求池 + 交付速率图 + 底部产出节奏条；
+ * B「甘特看板」：同一套流水线上移，顶部换为看板三列，底部换为甘特阶梯条。
+ * 业务方提需求后最想知道「我的需求到哪一步了」，所以主体始终是一条逐站推进的波段轨道：
+ * 需求池排队入池 → 光环逐站跳动、轨道逐段铺开 → 审批站点分出「驳回」回路退回需求池，
+ * 分配受理站点分出「挂起」短支路（搁置不推进）→ 末站盖验收通过章并火箭上线。
+ * 光环位移是相对量（每站 +42/-20），所以两版只改变整体上下偏移，共用 global.css 的 12 秒节拍。
+ * 火箭、验收章、站点填充、光环属于动画层（未悬停不显示），因此静态层必须自己填满画布。
  * 阶段名直接取 constants/rdm.ts 的权威文案，保证与系统内的叫法完全一致。
  */
-const RDM_STATIONS = [
-  { x: 58, y: 112 },
-  { x: 100, y: 92 },
-  { x: 142, y: 112 },
-  { x: 184, y: 92 },
-  { x: 226, y: 112 },
-  { x: 268, y: 92 },
-] as const
-/** 贯穿 6 个站点的平滑波段（每段水平切线入站，站点落在波峰波谷上） */
-const RDM_TRACK = 'M58 112C72 112 86 92 100 92S128 112 142 112S170 92 184 92S212 112 226 112S254 92 268 92'
+const RDM_STATION_X = [58, 100, 142, 184, 226, 268] as const
+/** 波段站点：偶数站在下轨，奇数站在上轨；dx/dy 用于整组平移，站距 42/-20 不变所以节拍不变 */
+function rdmStations(dy: number, dx = 0) {
+  return RDM_STATION_X.map((x, index) => ({ x: x + dx, y: (index % 2 === 0 ? 112 : 92) + dy }))
+}
+/** 由站点生成平滑波段（每段水平切线入站），与原手写路径等价 */
+function rdmTrack(stations: { x: number; y: number }[]) {
+  const [first, second] = stations
+  let path = `M${first.x} ${first.y}C${first.x + 14} ${first.y} ${second.x - 14} ${second.y} ${second.x} ${second.y}`
+  for (let index = 2; index < stations.length; index += 1) {
+    const point = stations[index]
+    path += `S${point.x - 14} ${point.y} ${point.x} ${point.y}`
+  }
+  return path
+}
 /** 站点文案走门户 artwork 语言包；缺键时回落 RDM 权威繁中常量，不会渲染出裸 key */
 const RDM_STAGE_ARTWORK_KEYS: Record<RdmStage, string> = {
   [RDM_STAGE.SUBMIT]: 'rdmSubmit',
@@ -198,64 +206,71 @@ const RDM_STAGE_ARTWORK_KEYS: Record<RdmStage, string> = {
   [RDM_STAGE.ACCEPTANCE]: 'rdmAcceptance',
 }
 
-function RdmPipelineScene() {
-  const { t } = useTranslation()
+/** 看板面板外壳：窗口栏 + 标题胶囊 + 泳道，两版共用 */
+function RdmBoardFrame({ laneBottom }: { laneBottom: number }) {
+  const lane = `v${laneBottom - 38}`
   return (
-    <g className="portal-rdm-scene">
-      {/* 需求池：业务需求排队进入流水线，入池路径用流动虚线 */}
-      <circle cx="28" cy="52" r="17" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
-      <g opacity="0.5" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <rect x="19" y="42" width="13" height="9" rx="2" />
-        <rect x="24" y="52" width="13" height="9" rx="2" />
+    <g>
+      <rect x="14" y="14" width="292" height="148" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.18" />
+      <path d="M14 24a10 10 0 0 1 10-10h272a10 10 0 0 1 10 10v10H14Z" fill="currentColor" opacity="0.1" />
+      <g fill="currentColor">
+        <circle cx="26" cy="23" r="2.2" opacity="0.5" />
+        <circle cx="34" cy="23" r="2.2" opacity="0.35" />
+        <circle cx="42" cy="23" r="2.2" opacity="0.25" />
+        <rect x="54" y="19.5" width="56" height="7" rx="3.5" opacity="0.2" />
+        <rect x="268" y="19.5" width="28" height="7" rx="3.5" opacity="0.3" />
       </g>
+      <path d="M14 34h292" stroke="currentColor" strokeOpacity="0.14" />
+      <path
+        d={`M86 38${lane}M128 38${lane}M170 38${lane}M212 38${lane}M254 38${lane}`}
+        stroke="currentColor"
+        strokeOpacity="0.07"
+      />
+    </g>
+  )
+}
+
+/** 需求池：排队中的需求单，入池路径用流动虚线 */
+function RdmRequestPool({ x, y, inflow }: { x: number; y: number; inflow: string }) {
+  return (
+    <g>
+      <rect x={x} y={y} width="48" height="42" rx="6" fill="currentColor" opacity="0.08" />
+      <rect x={x + 6} y={y + 6} width="36" height="9" rx="2.5" fill="#fff" stroke="currentColor" strokeOpacity="0.38" />
+      <rect x={x + 6} y={y + 19} width="36" height="9" rx="2.5" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x={x + 6} y={y + 32} width="22" height="6" rx="3" fill="currentColor" opacity="0.26" />
       <path
         className="portal-art-motion portal-art-flow"
-        d="M32 68Q40 90 49 103"
+        d={inflow}
         fill="none"
         stroke="currentColor"
         strokeOpacity="0.45"
         strokeWidth="1.6"
         strokeDasharray="3 5"
       />
+    </g>
+  )
+}
 
-      {/* 驳回支路：審批不通过的需求退回需求池，不占用主线节拍 */}
-      <path
-        className="portal-art-motion portal-art-flow"
-        d="M91 83C76 58 62 48 46 52"
-        fill="none"
-        stroke="#FF4D4F"
-        strokeOpacity="0.8"
-        strokeWidth="1.6"
-        strokeDasharray="4 5"
-      />
-      <path d="m44 52 6-3.5v7Z" fill="#FF4D4F" opacity="0.8" />
-
-      {/* 挂起支路：分配受理阶段可搁置（ON_HOLD），虚线通向死胡同的暂停牌，不回到主线 */}
-      <path
-        className="portal-art-motion portal-art-flow"
-        d="M142 99C142 82 152 72 158 68"
-        fill="none"
-        stroke="#FA8C16"
-        strokeOpacity="0.75"
-        strokeWidth="1.6"
-        strokeDasharray="3 5"
-      />
-      <circle cx="164" cy="60" r="10" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
-      <path d="M161 55.5v9m6-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
-
+/** 轨道 + 六个站点 + 阶段标签 + 当前站光环，两版共用 */
+function RdmFlow({ dy, dx = 0 }: { dy: number; dx?: number }) {
+  const { t } = useTranslation()
+  const stations = rdmStations(dy, dx)
+  const track = rdmTrack(stations)
+  const [origin] = stations
+  return (
+    <g>
       {/* 轨道：底色是完整链路，橙色进度随推进逐段铺开 */}
-      <path d={RDM_TRACK} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="4" />
+      <path d={track} fill="none" stroke="currentColor" strokeOpacity="0.16" strokeWidth="4" />
       <path
         className="portal-art-motion portal-rdm-track"
         pathLength={1}
-        d={RDM_TRACK}
+        d={track}
         fill="none"
         stroke="currentColor"
         strokeWidth="4"
       />
-
       {RDM_STAGE_ORDER.map((stage, index) => {
-        const station = RDM_STATIONS[index]
+        const station = stations[index]
         return <g key={stage}>
           <circle cx={station.x} cy={station.y} r="13" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
           <g transform={`translate(${station.x} ${station.y})`} opacity="0.6"><StageGlyph stage={stage} /></g>
@@ -269,22 +284,171 @@ function RdmPipelineScene() {
           </text>
         </g>
       })}
-
       {/* 当前处理站点：光环沿波段逐站跳动 */}
       <g className="portal-art-motion portal-rdm-halo">
-        <circle cx="58" cy="112" r="16" fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.55" />
-        <circle className="portal-art-motion portal-rdm-pulse" cx="58" cy="112" r="19" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+        <circle cx={origin.x} cy={origin.y} r="16" fill="none" stroke="currentColor" strokeWidth="2" strokeOpacity="0.55" />
+        <circle className="portal-art-motion portal-rdm-pulse" cx={origin.x} cy={origin.y} r="19" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+      </g>
+    </g>
+  )
+}
+
+/** 上线段：尾迹与星点静态常驻（未悬停也要填满角落），火箭本体只在动画里点火升空 */
+function RdmLaunch({ trail, sparks, rocket }: {
+  trail: string
+  sparks: readonly (readonly [number, number])[]
+  rocket: { x: number; y: number }
+}) {
+  return (
+    <g>
+      <path d={trail} fill="none" stroke="#F59432" strokeOpacity="0.5" strokeWidth="1.4" strokeDasharray="3 4" />
+      <g fill="#F59432" opacity="0.45">
+        {sparks.map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.8" />)}
+      </g>
+      <path d="M296 34l1.6 3.4 3.4 1.6-3.4 1.6-1.6 3.4-1.6-3.4-3.4-1.6 3.4-1.6Z" fill="currentColor" opacity="0.4" />
+      <g className="portal-art-motion portal-rdm-launch" opacity="0">
+        <g transform={`translate(${rocket.x} ${rocket.y})`}>
+          <path d="M0-10c4.6 3.2 5.8 8.6 4.4 14l-3 2.4h-2.8l-3-2.4C-5.8-1.4-4.6-6.8 0-10Z" fill="#E8720C" />
+          <circle cy="-2.4" r="2" fill="#fff" />
+          <path d="M-4.2 4-8 9l3.6-1.2M4.2 4 8 9l-3.6-1.2" fill="#F59432" />
+          <path d="M-1.8 9h3.6L0 17Z" fill="#FA8C16" opacity="0.9" />
+        </g>
+      </g>
+    </g>
+  )
+}
+
+/** 验收通过章：只在流程走到末站时盖上，静态不占位，避免误读成「已完成」 */
+function RdmDeliveredStamp({ x, y }: { x: number; y: number }) {
+  return (
+    <g className="portal-art-motion portal-rdm-delivered" opacity="0">
+      <circle cx={x} cy={y} r="8.5" fill="#52C41A" stroke="#fff" strokeWidth="1.8" />
+      <path d={`m${x - 4} ${y} 2.8 2.8 5.2-5.6`} fill="none" stroke="#fff" strokeWidth="1.8" />
+    </g>
+  )
+}
+
+/** 风格 A：看板流水线（顶部交付速率图 + 底部产出节奏条） */
+function RdmPipelineScene() {
+  return (
+    <g className="portal-rdm-scene">
+      <RdmBoardFrame laneBottom={142} />
+      <RdmRequestPool x={20} y={42} inflow="M44 86q6 16 12 22" />
+
+      {/* 驳回支路：審批不通过的需求退回需求池，不占用主线节拍 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M92 82C78 66 68 60 62 60"
+        fill="none"
+        stroke="#FF4D4F"
+        strokeOpacity="0.8"
+        strokeWidth="1.6"
+        strokeDasharray="4 5"
+      />
+      <path d="m60 60 6.5-4v8Z" fill="#FF4D4F" opacity="0.8" />
+
+      {/* 挂起支路：分配受理阶段可搁置（ON_HOLD），虚线通向死胡同的暂停牌 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M142 98c0-16 6-28 10-36"
+        fill="none"
+        stroke="#FA8C16"
+        strokeOpacity="0.75"
+        strokeWidth="1.6"
+        strokeDasharray="3 5"
+      />
+      <circle cx="158" cy="52" r="11" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
+      <path d="M154.5 47.5v9m7-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
+
+      {/* 交付速率图：填满顶部中右区，给右侧火箭轨迹让位 */}
+      <rect x="196" y="36" width="62" height="32" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <path d="M203 62h48" stroke="currentColor" strokeOpacity="0.18" />
+      <g fill="currentColor" opacity="0.16">
+        <rect x="205" y="53" width="6" height="9" rx="2" />
+        <rect x="216" y="49" width="6" height="13" rx="2" />
+        <rect x="227" y="55" width="6" height="7" rx="2" />
+        <rect x="238" y="47" width="6" height="15" rx="2" />
+      </g>
+      <path d="M205 56 219 50 233 53 249 43" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="249" cy="43" r="2.2" fill="currentColor" />
+
+      <RdmFlow dy={0} />
+      <RdmDeliveredStamp x={246} y={80} />
+      <RdmLaunch trail="M276 88q10-16 12-32" sparks={[[282, 74], [288, 60]]} rocket={{ x: 272, y: 96 }} />
+
+      {/* 底部产出节奏条：压住下沿留白，读作交付进度 */}
+      <rect x="20" y="146" width="164" height="7" rx="3.5" fill="currentColor" opacity="0.12" />
+      <rect x="20" y="146" width="112" height="7" rx="3.5" fill="currentColor" opacity="0.55" />
+      <path d="M132 146v7" stroke="#fff" strokeWidth="1.4" />
+      <rect x="194" y="146" width="34" height="7" rx="3.5" fill="currentColor" opacity="0.28" />
+      <rect x="234" y="146" width="34" height="7" rx="3.5" fill="currentColor" opacity="0.5" />
+      <rect x="274" y="146" width="26" height="7" rx="3.5" fill="currentColor" opacity="0.72" />
+    </g>
+  )
+}
+
+/** 风格 B：甘特看板（流水线上移 14，顶部看板三列，底部甘特阶梯条） */
+function RdmGanttScene() {
+  return (
+    <g className="portal-rdm-scene">
+      <RdmBoardFrame laneBottom={124} />
+      <RdmRequestPool x={20} y={34} inflow="M44 78q8 8 16 14" />
+
+      {/* 驳回支路：审毕退回需求池 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M98 68C86 56 76 54 68 54"
+        fill="none"
+        stroke="#FF4D4F"
+        strokeOpacity="0.8"
+        strokeWidth="1.6"
+        strokeDasharray="4 5"
+      />
+      <path d="m66 54 6.5-4v8Z" fill="#FF4D4F" opacity="0.8" />
+
+      {/* 挂起支路 */}
+      <path
+        className="portal-art-motion portal-art-flow"
+        d="M148 84c0-14 8-24 14-30"
+        fill="none"
+        stroke="#FA8C16"
+        strokeOpacity="0.75"
+        strokeWidth="1.6"
+        strokeDasharray="3 5"
+      />
+      <circle cx="168" cy="46" r="11" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
+      <path d="M164.5 41.5v9m7-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
+
+      {/* 看板三列：待办 → 進行中 → 已交付；整体左移避开末站圆 */}
+      <g>
+        <rect x="184" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
+        <rect x="208" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
+        <rect x="232" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
+        <g fill="#fff" stroke="currentColor" strokeOpacity="0.3">
+          <rect x="187" y="38" width="14" height="6" rx="2" />
+          <rect x="187" y="47" width="14" height="6" rx="2" />
+          <rect x="187" y="56" width="14" height="6" rx="2" />
+          <rect x="211" y="38" width="14" height="6" rx="2" />
+          <rect x="211" y="47" width="14" height="6" rx="2" />
+          <rect x="235" y="38" width="14" height="6" rx="2" />
+        </g>
+        <circle cx="242" cy="60" r="5.5" fill="#52C41A" opacity="0.9" />
+        <path d="m239.4 60 1.9 1.9 3.4-3.8" fill="none" stroke="#fff" strokeWidth="1.4" />
       </g>
 
-      {/* 交付上线：末站火箭升空，旁边盖验收通过章 */}
-      <g className="portal-art-motion portal-rdm-launch" opacity="0">
-        <path d="M265 100l-4 8m13-7 3 8" fill="none" stroke="#F59432" strokeWidth="1.6" />
-        <g transform="translate(272 86) scale(1.25)" color="#E8720C"><StageGlyph stage={RDM_STAGE.ACCEPTANCE} /></g>
-      </g>
-      <g className="portal-art-motion portal-rdm-delivered" opacity="0">
-        <circle cx="252" cy="74" r="7.5" fill="#52C41A" stroke="#fff" strokeWidth="2" />
-        <path d="m248.5 74 2.5 2.5 4.5-5" fill="none" stroke="#fff" strokeWidth="1.8" />
-      </g>
+      <RdmFlow dy={-14} dx={6} />
+      <RdmDeliveredStamp x={252} y={84} />
+      <RdmLaunch trail="M284 74q10-14 12-26" sparks={[[290, 62], [295, 50]]} rocket={{ x: 280, y: 82 }} />
+
+      {/* 甘特阶梯：需求从受理到上线的时间跨度 */}
+      <path d="M20 158h280" stroke="currentColor" strokeOpacity="0.16" />
+      <path d="M90 158v-4M160 158v-4M230 158v-4" stroke="currentColor" strokeOpacity="0.12" />
+      <rect x="20" y="132" width="200" height="6" rx="3" fill="currentColor" opacity="0.5" />
+      <rect x="44" y="141" width="168" height="6" rx="3" fill="currentColor" opacity="0.36" />
+      <rect x="70" y="150" width="128" height="6" rx="3" fill="currentColor" opacity="0.24" />
+      <rect x="228" y="132" width="30" height="6" rx="3" fill="currentColor" opacity="0.28" />
+      <rect x="264" y="132" width="30" height="6" rx="3" fill="currentColor" opacity="0.18" />
+      <rect x="228" y="141" width="66" height="6" rx="3" fill="currentColor" opacity="0.22" />
     </g>
   )
 }
@@ -709,7 +873,15 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   ),
 }
 
-export default function SystemArtwork({ code, name = '', active = false }: { code: string; name?: string; active?: boolean }) {
+/** 门户插画风格：目前只有產研協同提供两套构图，其他系统忽略该参数。 */
+export type PortalArtworkStyle = 'pipeline' | 'gantt'
+
+export default function SystemArtwork({ code, name = '', active = false, style = 'pipeline' }: {
+  code: string
+  name?: string
+  active?: boolean
+  style?: PortalArtworkStyle
+}) {
   const id = useId()
   const imageRef = useRef<SVGSVGElement>(null)
   const [motion, setMotion] = useState({ playing: false, reduced: false })
@@ -759,7 +931,14 @@ export default function SystemArtwork({ code, name = '', active = false }: { cod
       <rect width="320" height="190" fill={`url(#${id}-light)`} />
       <path d="M30 169h260" stroke="currentColor" strokeOpacity="0.12" />
       <ellipse cx="162" cy="168" rx="102" ry="7" fill="currentColor" opacity="0.06" />
-      <g strokeLinecap="round" strokeLinejoin="round">{scene === 'translation' ? <TranslationScene playing={playback === 'running'} /> : scenes[scene]}</g>
+      <g strokeLinecap="round" strokeLinejoin="round">
+        {scene === 'translation'
+          ? <TranslationScene playing={playback === 'running'} />
+          /* 只有 rdm 有第二套构图；data-scene 仍报 rdm，场景识别与样式选择器保持不变 */
+          : scene === 'rdm' && style === 'gantt'
+            ? <RdmGanttScene />
+            : scenes[scene]}
+      </g>
       <circle cx="286" cy="91" r="3" fill="currentColor" opacity="0.2" />
       <path d="M34 100h8m-4-4v8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
     </svg>

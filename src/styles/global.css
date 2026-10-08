@@ -157,6 +157,12 @@ body {
   100% { transform: translateX(350%); }
 }
 
+/* 门户横幅励志语：每 5 秒换一条时的淡入上浮，幅度极小不抢视线 */
+@keyframes portalQuoteIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* 门户业务插画：只动局部，长停顿、低幅度，不干扰卡片阅读。 */
 @keyframes portalSignalBreathe {
   0%, 100% { opacity: 0.4; }

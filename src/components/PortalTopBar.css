@@ -1,6 +1,8 @@
 /* 独立门户顶栏：只保留企业入口身份，与业务系统内的 HeaderBar 分离。 */
 
 .portal-top-bar.ant-layout-header {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   height: auto;
@@ -8,8 +10,22 @@
   flex-shrink: 0;
   padding: 0;
   line-height: normal;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* 底部品牌渐变条复用全局 headerGradientShift，与表单页头部顶条保持同一语言 */
+.portal-top-bar.ant-layout-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
 }
 
 .portal-top-bar-inner {
@@ -19,10 +35,10 @@
   flex-wrap: wrap;
   gap: 12px 16px;
   width: 100%;
-  max-width: 1480px;
+  max-width: 1920px;
   min-height: 64px;
   margin: 0 auto;
-  padding: 12px 24px;
+  padding: 12px 40px;
   box-sizing: border-box;
 }
 
@@ -90,9 +106,9 @@
 
 /* 用户区由 UserMenu 统一渲染（复用 header-user-info 系列样式），门户不再维护单独样式。 */
 
-/* 门户占满独立内容区，覆盖业务页面通用的外边距。 */
+/* 门户占满独立内容区，覆盖业务页面通用的外边距；浅灰画布让白色卡片墙有层次。 */
 .app-content.app-content-portal {
   margin: 0;
   padding: 0;
-  background: #fff;
+  background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
 }
