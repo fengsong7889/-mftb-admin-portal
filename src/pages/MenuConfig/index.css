@@ -1,0 +1,198 @@
+/* 菜单配置：左系统列表 + 右系统内菜单树工作台（配色取 UI 规范 §A.1 设计令牌） */
+
+/* 顶部边界提示：说明「系统名称不可人工修改」，避免管理员满界面找改名入口 */
+.menucfg-notice {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.menucfg-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.menucfg-workbench {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 360px;
+}
+
+/* ────── 左侧系统列表 ────── */
+.menucfg-sys-panel {
+  width: 208px;
+  flex-shrink: 0;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.menucfg-sys-panel-title {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #595959;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.menucfg-sys-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 640px;
+}
+
+.menucfg-sys-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #262626;
+  border-left: 3px solid transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menucfg-sys-item:hover {
+  background: #fafafa;
+}
+
+/* 选中态：品牌橙浅底 + 左侧 3px 指示条（与侧边栏/授权中心选中语言一致） */
+.menucfg-sys-item--active {
+  background: #fff7f0;
+  border-left-color: #e8720c;
+  color: #e8720c;
+  font-weight: 500;
+}
+
+.menucfg-sys-item--active:hover {
+  background: #fff7f0;
+}
+
+.menucfg-sys-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 菜单数量角标 */
+.menucfg-sys-count {
+  font-size: 11px;
+  color: #8c8c8c;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+.menucfg-sys-item--active .menucfg-sys-count {
+  color: #e8720c;
+  background: #ffe7d1;
+}
+
+/* ────── 右侧主面板 ────── */
+.menucfg-main {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.menucfg-main-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.menucfg-main-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.menucfg-main-sub {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 操作项靠右成组，搜索框固定宽度避免被拉伸破坏对齐 */
+.menucfg-main-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.menucfg-search {
+  width: 220px;
+}
+
+.menucfg-search-icon {
+  color: #bfbfbf;
+}
+
+.menucfg-table .ant-table-cell {
+  vertical-align: middle;
+}
+
+/* ────── 单元格文案 ────── */
+.menucfg-name {
+  font-size: 13px;
+  color: #262626;
+}
+
+/* 一级菜单（系统入口目录）：名称同样可改，仅加粗以区分层级 */
+.menucfg-name--top {
+  font-weight: 600;
+  color: #262626;
+}
+
+.menucfg-name-en {
+  font-size: 12px;
+  color: #595959;
+}
+
+.menucfg-code {
+  font-size: 12px;
+  color: #595959;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.menucfg-code--key {
+  color: #722ed1;
+  background: transparent;
+  padding: 0;
+}
+
+.menucfg-icon {
+  font-size: 15px;
+  color: #595959;
+}
+
+.menucfg-muted {
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+.menucfg-type-tag {
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 0;
+}

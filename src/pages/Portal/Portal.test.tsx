@@ -90,7 +90,7 @@ beforeEach(async () => {
 })
 
 describe('门户场景卡片与授权边界', () => {
-  it('上图下文、无英文副标题，全部十二种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
+  it('上图下文、无英文副标题，全部十三种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
     const { container } = mount()
     const card = await screen.findByRole('button', { name: '財務系統 · 進入系統' })
     expect(card.querySelector('.portal-card-cover > svg[data-scene="finance"]')).toBeInTheDocument()
@@ -103,7 +103,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(card.querySelector('.portal-card-body .anticon')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(11)
+    expect(cards).toHaveLength(12)
     cards.forEach(button => {
       expect(button).toBeEnabled()
       expect(button).toHaveClass('is-locked')
@@ -116,7 +116,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
     const scenes = Array.from(container.querySelectorAll('[data-scene]'), image => image.getAttribute('data-scene'))
-    expect(new Set(scenes).size).toBe(12)
+    expect(new Set(scenes).size).toBe(13)
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
@@ -140,7 +140,7 @@ describe('门户场景卡片与授权边界', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
     expect(document.querySelector('[data-testid="system-route"]')).toBeNull()
-    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(11)
+    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(12)
     expect(localStorage.getItem('current_system_code')).toBeNull()
     expect(loadSystemNavigation).not.toHaveBeenCalled()
   })
@@ -160,7 +160,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.noSystem)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(12)
+    expect(cards).toHaveLength(13)
     cards.forEach(button => expect(button).toHaveClass('is-locked'))
   })
 

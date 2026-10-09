@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { fetchPortalContext, type PortalSystem } from '../api/portal'
 import { useCurrentSystem } from '../hooks/useCurrentSystem'
 import { renderMenuIcon } from './MenuIcon'
-import { getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
+import { getPortalSystemKey, getSystemDisplayName, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
 import './SystemSwitcher.css'
 
 /** 图标以门户接口配置为准；未登记或缺失时回退该系统默认图标，保证列表每项都有图标。 */
@@ -32,7 +32,7 @@ function resolveSystemIcon(system: PortalSystem): ReactNode {
 }
 
 export default function SystemSwitcher() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
   const navigate = useNavigate()
   const [systems, setSystems] = useState<PortalSystem[]>([])
@@ -67,7 +67,7 @@ export default function SystemSwitcher() {
           icon: resolveSystemIcon(s),
           label: (
             <div className="system-switcher-item">
-              <span className="system-switcher-item-name">{t(`portal.systems.${getPortalSystemKey(s.code, s.name) ?? s.code}.name`, { defaultValue: s.name })}</span>
+              <span className="system-switcher-item-name">{getSystemDisplayName(t, s, i18n.language)}</span>
             </div>
           ),
         })),
@@ -80,7 +80,7 @@ export default function SystemSwitcher() {
       label: t('portal.backToPortal'),
     })
     return items
-  }, [systems, t])
+  }, [systems, t, i18n.language])
 
   const handleClick: MenuProps['onClick'] = ({ key }) => {
     if (key === '__portal') {
@@ -94,7 +94,7 @@ export default function SystemSwitcher() {
   }
 
   const triggerLabel = currentSystem
-    ? t(`portal.systems.${getPortalSystemKey(currentSystem.code, currentSystem.name) ?? currentSystem.code}.name`, { defaultValue: currentSystem.name })
+    ? getSystemDisplayName(t, currentSystem, i18n.language)
     : t('portal.selectSystem')
 
   return (

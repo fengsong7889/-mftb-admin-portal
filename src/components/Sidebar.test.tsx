@@ -200,13 +200,11 @@ describe('Sidebar 系统首页与 AI 导航', () => {
   it('AI 服务端导航展示模型菜单，未授权项隐藏，业务页面可返回首页', async () => {
     writeCurrentSystemCode('ai')
     mockDeniedMenuKeys.add('ai-conversation-audit')
-    mockSystemNavigation = { tree: [{
-      id: 1, parentId: null, menuKey: 'ai-assistant', name: '智能中心(AI)',
-      type: 1, status: 1, sort: 1, systemCode: 'ai', children: [
-        { id: 2, parentId: 1, menuKey: 'ai-model-list', name: '模型接入', type: 2, status: 1, sort: 1 },
-        { id: 3, parentId: 1, menuKey: 'ai-conversation-audit', name: '對話審計', type: 2, status: 1, sort: 2 },
-      ],
-    }], loaded: true }
+    // v45: ai-assistant 包装目录已退役，AI 菜单直接以顶级进入导航
+    mockSystemNavigation = { tree: [
+      { id: 2, parentId: null, menuKey: 'ai-model-list', name: '模型接入', type: 2, status: 1, sort: 1, systemCode: 'ai' },
+      { id: 3, parentId: null, menuKey: 'ai-conversation-audit', name: '對話審計', type: 2, status: 1, sort: 2, systemCode: 'ai' },
+    ], loaded: true }
     renderSidebar()
 
     expect(screen.queryByText('智能中心(AI)')).not.toBeInTheDocument()
@@ -220,21 +218,20 @@ describe('Sidebar 系统首页与 AI 导航', () => {
 })
 
 describe('Sidebar 分系统目录提升', () => {
-  const financeTree: MenuVO[] = [{
-    id: 1, parentId: null, menuKey: 'finance', name: '財務管理', type: 1, status: 1, sort: 1, systemCode: 'finance', children: [
-      { id: 2, parentId: 1, menuKey: 'promotion', name: '推廣金管理', type: 2, status: 1, sort: 1, children: [
-        { id: 3, parentId: 2, menuKey: 'account-balance', name: '賬戶餘額', type: 2, status: 1, sort: 1 },
-      ] },
-      { id: 4, parentId: 1, menuKey: 'merchant-reconcile', name: '商戶通對賬', type: 2, status: 1, sort: 2, children: [
-        { id: 5, parentId: 4, menuKey: 'writeoff-reconcile', name: '核銷對賬', type: 2, status: 1, sort: 1 },
-      ] },
-      { id: 6, parentId: 1, menuKey: 'approval', name: '審批管理', type: 2, status: 1, sort: 3, children: [
-        { id: 7, parentId: 6, menuKey: 'approval-center', name: '審批中心', type: 2, status: 1, sort: 1 },
-      ] },
-    ],
-  }]
+  // v45: finance 包装目录已退役，三个业务分组直接是 finance 顶级菜单，各自带叶子
+  const financeTree: MenuVO[] = [
+    { id: 2, parentId: null, menuKey: 'promotion', name: '推廣金管理', type: 1, status: 1, sort: 1, systemCode: 'finance', children: [
+      { id: 3, parentId: 2, menuKey: 'account-balance', name: '賬戶餘額', type: 2, status: 1, sort: 1 },
+    ] },
+    { id: 4, parentId: null, menuKey: 'merchant-reconcile', name: '商戶通對賬', type: 1, status: 1, sort: 2, systemCode: 'finance', children: [
+      { id: 5, parentId: 4, menuKey: 'writeoff-reconcile', name: '核銷對賬', type: 2, status: 1, sort: 1 },
+    ] },
+    { id: 6, parentId: null, menuKey: 'approval', name: '審批管理', type: 1, status: 1, sort: 3, systemCode: 'finance', children: [
+      { id: 7, parentId: 6, menuKey: 'approval-center', name: '審批中心', type: 2, status: 1, sort: 1 },
+    ] },
+  ]
 
-  it.each([true, false])('财务导航 loaded=%s 时三级目录提升为二级，保持顺序和路由高亮', async (loaded) => {
+  it.each([true, false])('财务导航 loaded=%s 时顶级分组保持顺序与路由高亮，不再出现已退役的財務管理', async (loaded) => {
     writeCurrentSystemCode('finance')
     setMenuState(financeTree, 'online')
     mockSystemNavigation = { tree: financeTree, loaded }
@@ -252,25 +249,44 @@ describe('Sidebar 分系统目录提升', () => {
     expect(screen.getByTestId('current-path')).toHaveTextContent('/account-balance')
   })
 
+  // v45: 包装目录已在后端退役，前端不再做任何展平；这里锁定「业务菜单就是顶级」。
+  // 同时保留 scopeMenusToSystem 的真实职责：父级属于其他系统时，用子节点顶替父级。
   it.each([
-    ['merchant', 'merchant_group', 'store-list'], ['seller', 'seller-center', 'promotion-sales-config'],
-    ['search', 'search', 'word-segmentation'], ['ai', 'ai-assistant', 'ai-model-list'],
-    ['hr', 'hr', 'employee-management'], ['eam', 'asset-management', 'asset-list'],
-    ['oa', 'oa-center', 'process-center'], ['iam', 'permission', 'role-management'],
-    ['platform', 'system-config', 'rule-config'], ['i18n', 'i18n-center', 'i18n-language'],
-  ])('%s 去除旧包装目录，原二级菜单直接可点击', async (systemCode, wrapper, key) => {
+    ['merchant', 'store-list'], ['seller', 'promotion-sales-config'],
+    ['search', 'word-segmentation'], ['ai', 'ai-model-list'],
+    ['hr', 'employee-management'], ['eam', 'asset-list'],
+    ['oa', 'process-center'], ['iam', 'role-management'],
+    ['platform', 'rule-config'], ['i18n', 'i18n-language'],
+  ])('%s 的业务菜单以顶级直接可点击', async (systemCode, key) => {
     writeCurrentSystemCode(systemCode)
     const tree: MenuVO[] = [{
-      id: 1, parentId: null, menuKey: wrapper, name: '旧包装目录', systemCode, type: 1, status: 1, sort: 1,
-      children: [{ id: 2, parentId: 1, menuKey: key, name: '业务入口', type: 2, status: 1, sort: 1 }],
+      id: 2, parentId: null, menuKey: key, name: '业务入口', systemCode, type: 2, status: 1, sort: 1,
     }]
     setMenuState(tree, 'online')
     mockSystemNavigation = { tree, loaded: true }
     const { container } = renderSidebar()
-    expect(screen.queryByText('旧包装目录')).not.toBeInTheDocument()
     expect(container.querySelectorAll('.sidebar-menu > li')).toHaveLength(2)
     fireEvent.click(await screen.findByRole('menuitem', { name: /业务入口/ }))
     expect(screen.getByTestId('current-path').textContent).toBe(keyToPath[key])
+  })
+
+  it('父级属于其他系统时，本系统子菜单顶替父级展示（跨系统归属不被壳吞掉）', async () => {
+    // 菜单配置归 iam，但历史上物理挂在 platform 的树下；退役 system-config 壳后
+    // 仍要能在 iam 视图看到它，同时 iam 视图不能漏出 platform 自己的菜单。
+    writeCurrentSystemCode('iam')
+    const tree: MenuVO[] = [{
+      id: 1, parentId: null, menuKey: 'platform-root', name: '平台配置父级', systemCode: 'platform', type: 1, status: 1, sort: 1,
+      children: [
+        { id: 2, parentId: 1, menuKey: 'menu-config', name: '菜單配置', type: 2, status: 1, sort: 1, systemCode: 'iam' },
+        { id: 3, parentId: 1, menuKey: 'rule-config', name: '規則總覽', type: 2, status: 1, sort: 2, systemCode: 'platform' },
+      ],
+    }]
+    setMenuState(tree, 'online')
+    mockSystemNavigation = { tree, loaded: true }
+    renderSidebar()
+    expect(await screen.findByRole('menuitem', { name: /菜單配置/ })).toBeInTheDocument()
+    expect(screen.queryByText('平台配置父级')).not.toBeInTheDocument()
+    expect(screen.queryByText('規則總覽')).not.toBeInTheDocument()
   })
 
   it('授权后仅剩一个分组时仍保留分组，停用的包装目录不展示子项', () => {
@@ -282,6 +298,7 @@ describe('Sidebar 分系统目录提升', () => {
     expect(container.querySelectorAll('.sidebar-menu > li')).toHaveLength(2)
     expect(screen.getByText('推廣金管理')).toBeInTheDocument()
     expect(screen.queryByText('商戶通對賬')).not.toBeInTheDocument()
+    // 停用的顶级分组不得漏出其叶子
     mockSystemNavigation = { tree: [{ ...financeTree[0], status: 0 }], loaded: true }
     rerender(<MemoryRouter><Sidebar collapsed={false} /></MemoryRouter>)
     expect(screen.getAllByRole('menuitem')).toHaveLength(1)
@@ -300,16 +317,15 @@ describe('Sidebar 分系统目录提升', () => {
   })
 
   it('商家工作台同时展示原购买入口和报表分组，直达报表保持 seller 归属', async () => {
-    const tree: MenuVO[] = [{
-      id: 1, parentId: null, menuKey: 'seller-center', name: '工作台包装', type: 1, status: 1, sort: 1, systemCode: 'seller', children: [
-        { id: 2, parentId: 1, menuKey: 'promotion-sales-config', name: '店鋪隨心推', type: 2, status: 1, sort: 1 },
-        { id: 3, parentId: 1, menuKey: 'promotion-report-group', name: '報表分析', type: 2, status: 1, sort: 2, children: [
-          { id: 4, parentId: 3, menuKey: 'promotion-report-overview', name: '數據概覽', type: 2, status: 1, sort: 1 },
-          { id: 5, parentId: 3, menuKey: 'promotion-report-order', name: '訂單效果報表', type: 2, status: 1, sort: 2 },
-          { id: 6, parentId: 3, menuKey: 'promotion-report-compare', name: '推薦類型對比', type: 2, status: 1, sort: 3 },
-        ] },
-      ],
-    }]
+    // v45: seller-center 包装目录已退役，购买入口与报表分组直接是 seller 顶级菜单
+    const tree: MenuVO[] = [
+      { id: 2, parentId: null, menuKey: 'promotion-sales-config', name: '店鋪隨心推', type: 2, status: 1, sort: 1, systemCode: 'seller' },
+      { id: 3, parentId: null, menuKey: 'promotion-report-group', name: '報表分析', type: 1, status: 1, sort: 2, systemCode: 'seller', children: [
+        { id: 4, parentId: 3, menuKey: 'promotion-report-overview', name: '數據概覽', type: 2, status: 1, sort: 1 },
+        { id: 5, parentId: 3, menuKey: 'promotion-report-order', name: '訂單效果報表', type: 2, status: 1, sort: 2 },
+        { id: 6, parentId: 3, menuKey: 'promotion-report-compare', name: '推薦類型對比', type: 2, status: 1, sort: 3 },
+      ] },
+    ]
     setMenuState(tree, 'online')
     mockSystemNavigation = { tree, loaded: true }
     const { container } = renderSidebar('/promotion-report-order')
@@ -322,12 +338,11 @@ describe('Sidebar 分系统目录提升', () => {
   })
 
   it.each([true, false])('导航 loaded=%s 时排除跨系统子项，按真实归属显示', async (loaded) => {
-    const tree: MenuVO[] = [{
-      id: 1, parentId: null, menuKey: 'system-config', name: '系統配置', type: 1, status: 1, sort: 1, systemCode: 'platform', children: [
-        { id: 2, parentId: 1, menuKey: 'rule-config', name: '規則配置', type: 2, status: 1, sort: 1 },
-        { id: 3, parentId: 1, menuKey: 'menu-config', name: '菜單配置', type: 2, status: 1, sort: 2, systemCode: 'iam' },
-      ],
-    }]
+    // v45: system-config 壳已退役，規則配置(platform) 與菜單配置(iam) 本就是各自系统的顶级菜单
+    const tree: MenuVO[] = [
+      { id: 2, parentId: null, menuKey: 'rule-config', name: '規則配置', type: 2, status: 1, sort: 1, systemCode: 'platform' },
+      { id: 3, parentId: null, menuKey: 'menu-config', name: '菜單配置', type: 2, status: 1, sort: 2, systemCode: 'iam' },
+    ]
     writeCurrentSystemCode('platform')
     setMenuState(tree, 'online')
     mockSystemNavigation = { tree, loaded }
@@ -357,9 +372,8 @@ describe('广告系统与商家工作台切换隔离', () => {
     { id: 1, parentId: null, menuKey: 'merchant_promotion', name: '商家推廣工具', type: 1, status: 1, sort: 1, systemCode: 'ads', children: [
       { id: 2, parentId: 1, menuKey: 'ad-sales', name: '廣告銷售', type: 2, status: 1, sort: 1 },
     ] },
-    { id: 3, parentId: null, menuKey: 'seller-center', name: '商家工作台', type: 1, status: 1, sort: 2, systemCode: 'seller', children: [
-      { id: 4, parentId: 3, menuKey: 'promotion-report-order', name: '訂單效果報表', type: 2, status: 1, sort: 1 },
-    ] },
+    // v45: seller-center 壳已退役，商家报表直接是 seller 顶级菜单
+    { id: 4, parentId: null, menuKey: 'promotion-report-order', name: '訂單效果報表', type: 2, status: 1, sort: 2, systemCode: 'seller' },
   ]
 
   beforeEach(() => {
@@ -553,11 +567,14 @@ describe('Sidebar 菜单真值来源', () => {
 
     const { container } = renderSidebar()
 
-    // 离线清单内的顶级菜单（搜索管理：完全未接后端 API）照常展示
-    await waitFor(() => expect(screen.getByText('搜索管理')).toBeInTheDocument())
+    // v45: 离线清单已按扁平结构登记——「搜索管理」壳退役后是五个搜索分组直接顶级
+    await waitFor(() => expect(screen.getByText('搜索配置')).toBeInTheDocument())
+    expect(screen.getByText('搜索引導')).toBeInTheDocument()
+    expect(screen.getByText('報表統計')).toBeInTheDocument()
     // 推廣報表仍在离线清单内；实验沙盘已依赖后端，不再离线展示
-    await waitFor(() => expect(screen.getByText('推廣報表')).toBeInTheDocument())
-    expect(screen.getAllByRole('menuitem')).toHaveLength(2)
+    expect(screen.getByText('推廣報表')).toBeInTheDocument()
+    expect(screen.queryByText('搜索管理')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('menuitem')).toHaveLength(6)
     expect(screen.queryByText('流量沙盤')).not.toBeInTheDocument()
     expect(screen.queryByText('實驗沙盤')).not.toBeInTheDocument()
     // 已对接后端的模块不展示

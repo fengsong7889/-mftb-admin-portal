@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next'
+
 /** 门户展示映射只选择文案与插画，不参与系统准入或导航判断。 */
 const PORTAL_SYSTEM_KEYS = [
   'ads', 'merchant', 'search', 'finance', 'ai', 'hr', 'eam', 'rdm', 'oa', 'iam', 'platform',
@@ -32,4 +34,29 @@ export function getPortalSystemKey(code: string, name: string): PortalSystemKey 
   if (known) return known
   if (/平台|platform|system[-_ ]?(?:config|settings)/i.test(identity)) return 'platform'
   return null
+}
+
+/** 系统名称展示的最小数据来源（sys_system 目录 / 门户上下文 / 授权快照均满足）。 */
+export interface SystemNameSource {
+  code: string
+  name: string
+  nameEn?: string | null
+}
+
+/**
+ * 全局唯一的系统名称取名入口。
+ * <p>为什么必须统一：门户卡片、侧边栏品牌、系统切换器、首页、授权中心历史上各自取名，
+ * 有的直接读 `sys_system.name`，有的走 `portal.systems.*.name` 语言包，导致同一系统在
+ * 不同界面显示成「HR 系統 / 人力資源系統」两套名字。所有界面一律经此函数取名，
+ * 语言包为真值，`sys_system` 仅提供语言包缺失时的兜底与自定义系统的原始名。
+ * @param language 当前界面语言；非中文时优先用英文名列兜底，避免中文兜底混进外语界面
+ */
+export function getSystemDisplayName(
+  t: TFunction,
+  system: SystemNameSource,
+  language?: string,
+): string {
+  const key = getPortalSystemKey(system.code, system.name) ?? system.code
+  const fallback = (language && !language.startsWith('zh') && system.nameEn) || system.name
+  return t(`portal.systems.${key}.name`, { defaultValue: fallback })
 }

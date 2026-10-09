@@ -3,10 +3,12 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.PermissionDeniedException;
 import com.mftb.admin.dto.MenuRequest;
 import com.mftb.admin.dto.MenuVO;
 import com.mftb.admin.entity.SysMenu;
 import com.mftb.admin.mapper.SysMenuMapper;
+import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.service.MenuService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
@@ -20,10 +22,12 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -74,6 +78,7 @@ public class MenuServiceImpl implements MenuService {
     @Override
     @Transactional
     public MenuVO create(MenuRequest request) {
+        requireSuperAdmin("新增菜單");
         validateParent(request.getParentId(), null);
         requireMenuKeyUnique(request.getMenuKey(), null);
         SysMenu menu = new SysMenu();
@@ -100,6 +105,8 @@ public class MenuServiceImpl implements MenuService {
     @Transactional
     public MenuVO update(Long id, MenuRequest request) {
         SysMenu menu = requireMenu(id);
+        // 守卫必须在写之前：非内置超管只允许改菜单名称，结构字段一律拒绝
+        requireNameOnlyChange(menu, request);
         validateParent(request.getParentId(), id);
         requireMenuKeyUnique(request.getMenuKey(), id);
 
@@ -138,6 +145,7 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     public void updateStatus(Long id, Integer status) {
+        requireSuperAdmin("啟用/停用菜單");
         SysMenu menu = requireMenu(id);
         menu.setStatus(status);
         menu.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -149,6 +157,7 @@ public class MenuServiceImpl implements MenuService {
     @Override
     @Transactional
     public void delete(Long id) {
+        requireSuperAdmin("刪除菜單");
         requireMenu(id);
         Long childCount = sysMenuMapper.selectCount(
                 new LambdaQueryWrapper<SysMenu>().eq(SysMenu::getParentId, id));
@@ -158,6 +167,85 @@ public class MenuServiceImpl implements MenuService {
         sysMenuMapper.deleteById(id);
         // 删除后历史菜单授权失效，同样递增 revision
         permissionService.evictAll();
+    }
+
+    /**
+     * 内置超管判定。菜单结构变更（Key / 上级 / 路径 / 类型 / 图标 / 排序 / 状态 / 新增 / 删除）
+     * 只允许内置 admin 角色执行。
+     * <p>为什么必须在服务端做：前端隐藏「高級設置」入口只是防误点，不是安全边界——
+     * 直接调 PUT /api/menus/{id} 就能绕过。菜单 Key 是 sys_role_menu 的授权锚点，
+     * 改错一个字符会让该菜单的存量授权整体失效。
+     */
+    private void requireSuperAdmin(String action) {
+        SysUser user = operatorResolver.currentUser();
+        if (!operatorResolver.isAdmin(user)) {
+            throw new PermissionDeniedException("menu-config", action);
+        }
+    }
+
+    /**
+     * 非内置超管编辑菜单时，除名称外的结构字段必须与库中现值完全一致。
+     * <p>前端行内改名会把整条记录原样回传（含 menuKey/path/actions 等），
+     * 因此这里逐字段比对：只有真正漂移的字段才拒绝，避免把「没改」误判成「改了」。
+     * <p>sort / status 传 null 表示「不修改」（沿用 update 语句的条件 set 语义），不计入漂移。
+     */
+    private void requireNameOnlyChange(SysMenu existing, MenuRequest request) {
+        SysUser user = operatorResolver.currentUser();
+        if (operatorResolver.isAdmin(user)) {
+            return;
+        }
+        List<String> drifted = new ArrayList<>();
+        if (!trimmedEqual(existing.getMenuKey(), request.getMenuKey())) {
+            drifted.add("菜單 Key");
+        }
+        if (!Objects.equals(existing.getParentId(), normalizeParentId(request.getParentId()))) {
+            drifted.add("上級菜單");
+        }
+        if (!blankEqual(existing.getPath(), request.getPath())) {
+            drifted.add("路由路徑");
+        }
+        if (!blankEqual(existing.getComponent(), request.getComponent())) {
+            drifted.add("前端組件");
+        }
+        if (!blankEqual(existing.getIcon(), request.getIcon())) {
+            drifted.add("圖標");
+        }
+        if (!Objects.equals(existing.getType(), request.getType())) {
+            drifted.add("菜單類型");
+        }
+        if (request.getSort() != null && !Objects.equals(existing.getSort(), request.getSort())) {
+            drifted.add("排序");
+        }
+        if (request.getStatus() != null && !Objects.equals(existing.getStatus(), request.getStatus())) {
+            drifted.add("狀態");
+        }
+        if (!sameActions(existing.getActions(), request.getActions())) {
+            drifted.add("可用操作");
+        }
+        if (!drifted.isEmpty()) {
+            throw new BusinessException("僅超級管理員可修改菜單結構字段：" + String.join("、", drifted)
+                    + "；普通管理員僅可修改菜單名稱");
+        }
+    }
+
+    /** null 安全的首尾空白比较（menuKey 等入库前会 trim） */
+    private boolean trimmedEqual(String stored, String incoming) {
+        return Objects.equals(stored == null ? null : stored.trim(),
+                incoming == null ? null : incoming.trim());
+    }
+
+    /** 空串与 null 视为等值：前端「清空」与「未传」在库里都是 NULL */
+    private boolean blankEqual(String stored, String incoming) {
+        String left = StringUtils.hasText(stored) ? stored.trim() : null;
+        String right = StringUtils.hasText(incoming) ? incoming.trim() : null;
+        return Objects.equals(left, right);
+    }
+
+    /** 动作集合比较：顺序无关，库里存的是 JSON 数组文本 */
+    private boolean sameActions(String storedJson, List<String> incoming) {
+        Set<String> storedSet = new HashSet<>(JsonUtils.parseStringList(storedJson));
+        Set<String> incomingSet = incoming == null ? Set.of() : new HashSet<>(incoming);
+        return storedSet.equals(incomingSet);
     }
 
     /** 构建菜单树, 父菜单在前、同级按 sort 排序 */

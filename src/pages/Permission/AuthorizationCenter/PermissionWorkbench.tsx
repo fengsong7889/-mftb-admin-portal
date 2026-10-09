@@ -35,6 +35,7 @@ import {
   fetchDepartmentOverview,
 } from '../../../api/authorizationCenter'
 import { translateMenuName } from '../../../i18n/menuNameEn'
+import { getSystemDisplayName } from '../../../constants/portalSystems'
 import { invalidateSystemNavigation } from '../../../hooks/useSystemNavigation'
 
 /** 目标类型：与后端 SystemAuthorizationService.TARGET_* 常量一致 */
@@ -121,7 +122,7 @@ function toPayload(draft: SystemDraft, expectedRevision?: number): SystemAuthori
 }
 
 export default function PermissionWorkbench() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   /** t 引用随语言包刷新，仅用于提示文案；用 ref 避免成为 effect 依赖触发重复拉取 */
   const tRef = useRef(t)
   tRef.current = t
@@ -497,6 +498,15 @@ export default function PermissionWorkbench() {
 
   /** 当前系统的树/勾选/动作面板数据 */
   const activeDraft = activeSystem ? draftBySystem[activeSystem] : undefined
+  /** 系统名称统一走全局取名入口，避免与门户/侧边栏不一致（历史上这里直读 sys_system.name） */
+  const systemDisplayName = useCallback(
+    (sys: SystemCatalogItem) => getSystemDisplayName(t, sys, i18n.language),
+    [t, i18n.language],
+  )
+  const activeSystemName = useMemo(() => {
+    const current = systems.find((s) => s.code === activeSystem)
+    return current ? systemDisplayName(current) : (activeSystem ?? '')
+  }, [systems, activeSystem, systemDisplayName])
   const systemTree = useMemo(
     () => (activeSystem ? pickSystemTree(menuTree, activeSystem) : []),
     [menuTree, activeSystem],
@@ -615,7 +625,7 @@ export default function PermissionWorkbench() {
                           ? t('authorizationCenter.onAccess', '准入')
                           : t('authorizationCenter.offAccess', '禁止')}
                       />
-                      <span className="authz-sys-name">{sys.name}</span>
+                      <span className="authz-sys-name">{systemDisplayName(sys)}</span>
                       {draft && Object.keys(draft.actionsByMenu).length > 0 ? (
                         <span className="authz-sys-count">{Object.keys(draft.actionsByMenu).length}</span>
                       ) : null}
@@ -643,9 +653,7 @@ export default function PermissionWorkbench() {
               ) : (
                 <>
                   <div className="authz-detail-header">
-                    <span className="authz-detail-title">
-                      {systems.find((s) => s.code === activeSystem)?.name ?? activeSystem}
-                    </span>
+                    <span className="authz-detail-title">{activeSystemName}</span>
                     <span className="authz-access-switch">
                       <span className="authz-field-label">{t('authorizationCenter.access', '系統准入')}</span>
                       <Switch

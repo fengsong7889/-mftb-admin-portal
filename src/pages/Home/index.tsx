@@ -8,7 +8,7 @@ import { useMenu } from '../../contexts/MenuContext'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
 import { useSystemNavigation } from '../../hooks/useSystemNavigation'
-import { getPortalSystemKey } from '../../constants/portalSystems'
+import { getSystemDisplayName } from '../../constants/portalSystems'
 import { renderMenuIcon } from '../../components/MenuIcon'
 import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
@@ -169,10 +169,7 @@ export default function Home() {
     return () => { cancelled = true }
   }, [user?.username])
 
-  const getSystemName = (system: PortalSystem) => t(
-    `portal.systems.${getPortalSystemKey(system.code, system.name) ?? system.code}.name`,
-    { defaultValue: (!i18nInstance.language.startsWith('zh') && system.nameEn) || system.name },
-  )
+  const getSystemName = (system: PortalSystem) => getSystemDisplayName(t, system, i18nInstance.language)
   const currentSystem = systems.find((system) => system.code === currentSystemCode)
   const systemName = currentSystemCode
     ? getSystemName(currentSystem ?? { code: currentSystemCode, name: currentSystemCode })

@@ -21,55 +21,54 @@ export interface OfflineMenuNode {
 }
 
 export const OFFLINE_MENUS: OfflineMenuNode[] = [
+  // v45: 「搜索管理」(search) 包装目录已随一级包装目录整体退役，五个搜索分组直接顶级。
   {
-    key: 'search',
-    label: '搜索管理',
+    key: 'search-config-new',
+    label: '搜索配置',
     systemCode: 'search',
     children: [
-      {
-        key: 'search-config-new',
-        label: '搜索配置',
-        children: [
-          { key: 'global-config', label: '全局配置' },
-          { key: 'channel-strategy', label: '維度策略' },
-        ],
-      },
-      {
-        key: 'search-guide',
-        label: '搜索引導',
-        children: [
-          { key: 'hint-config', label: '底紋配置' },
-          // 熱搜配置已接入 fetchAdAlgorithms/fetchStores，停服时不展示
-          { key: 'search-weight-config', label: '權重干預' },
-        ],
-      },
-      {
-        key: 'search-library',
-        label: '搜索詞庫',
-        children: [
-          { key: 'word-segmentation', label: '分詞詞庫' },
-          { key: 'synonym-config', label: '同義詞庫' },
-          { key: 'hot-search-library', label: '熱搜詞庫' },
-          { key: 'stop-words', label: '停用詞庫' },
-        ],
-      },
-      {
-        key: 'search-verify-group',
-        label: '效果校驗',
-        children: [
-          { key: 'search-verify', label: '搜索校驗' },
-          { key: 'hint-verify', label: '底紋校驗' },
-          { key: 'hot-search-verify', label: '熱搜校驗' },
-        ],
-      },
-      {
-        key: 'report',
-        label: '報表統計',
-        children: [
-          { key: 'hint-report', label: '底紋報表' },
-          { key: 'hot-search-report', label: '熱搜報表' },
-        ],
-      },
+      { key: 'global-config', label: '全局配置' },
+      { key: 'channel-strategy', label: '維度策略' },
+    ],
+  },
+  {
+    key: 'search-guide',
+    label: '搜索引導',
+    systemCode: 'search',
+    children: [
+      { key: 'hint-config', label: '底紋配置' },
+      // 熱搜配置已接入 fetchAdAlgorithms/fetchStores，停服时不展示
+      { key: 'search-weight-config', label: '權重干預' },
+    ],
+  },
+  {
+    key: 'search-library',
+    label: '搜索詞庫',
+    systemCode: 'search',
+    children: [
+      { key: 'word-segmentation', label: '分詞詞庫' },
+      { key: 'synonym-config', label: '同義詞庫' },
+      { key: 'hot-search-library', label: '熱搜詞庫' },
+      { key: 'stop-words', label: '停用詞庫' },
+    ],
+  },
+  {
+    key: 'search-verify-group',
+    label: '效果校驗',
+    systemCode: 'search',
+    children: [
+      { key: 'search-verify', label: '搜索校驗' },
+      { key: 'hint-verify', label: '底紋校驗' },
+      { key: 'hot-search-verify', label: '熱搜校驗' },
+    ],
+  },
+  {
+    key: 'report',
+    label: '報表統計',
+    systemCode: 'search',
+    children: [
+      { key: 'hint-report', label: '底紋報表' },
+      { key: 'hot-search-report', label: '熱搜報表' },
     ],
   },
   // ── 推廣報表（纯前端 mock，未接入后端业务 API） ──

@@ -211,6 +211,10 @@
         "name": "Asset Management",
         "description": "Manage the full lifecycle of assets, supplies, purchasing and inventory."
       },
+      "rdm": {
+        "name": "R&D Collaboration",
+        "description": "Submit, approve, assign and deliver requirements, with acceptance and output dashboards."
+      },
       "oa": {
         "name": "Office Collaboration",
         "description": "Collaborate efficiently with requests, approvals and employee self-service."
@@ -5321,7 +5325,33 @@
     "btnMoveUp": "Move Up",
     "btnMoveDown": "Move Down",
     "tooltipMoveUp": "Move Up",
-    "tooltipMoveDown": "Move Down"
+    "tooltipMoveDown": "Move Down",
+    "noticeTitle": "System names on the left are maintained by the platform; menu names at any level can be edited",
+    "noticeDesc": "Business system names follow a single source of truth across the portal, sidebar, system switcher and authorization center and are not editable manually. Menu names at any level can be renamed freely; structural changes (menu key, route path, parent, type, sort) live in Advanced Settings and are restricted to super admins.",
+    "noSystem": "No configurable business system",
+    "noMenuInSystem": "No menu in this system",
+    "nodeCount": "{{count}} menu node(s)",
+    "nodeCountFiltered": "{{shown}} of {{total}} menu node(s) matched",
+    "btnAdvanced": "Advanced",
+    "discardTitle": "Discard unsaved menu name changes?",
+    "discardContent": "You have unsaved menu name changes; switching system will discard them.",
+    "nameUnchanged": "Menu name is unchanged",
+    "topLevelMenuEntry": "Top-level menu (system entry)",
+    "formIncomplete": "Please complete the required fields",
+    "confirmDeleteTitle": "Delete this menu?",
+    "confirmDeleteHasChildren": "This menu still has children; delete them first.",
+    "confirmDeleteContent": "Grants on “{{name}}” will be revoked and this cannot be undone.",
+    "deleteSuccess": "Menu deleted",
+    "noAdvancedPermission": "No access to Advanced Settings",
+    "noAdvancedPermissionDesc": "Structural changes (menu key, route path, parent, type) are restricted to super admins. Regular admins can rename menus in the menu list.",
+    "menuNotFound": "Menu not found; it may have been deleted",
+    "advancedAddTitle": "Add Menu · Advanced Settings",
+    "advancedEditTitle": "Edit Menu · Advanced Settings",
+    "structureWarningTitle": "Structural change warning",
+    "structureWarningDesc": "Changing the menu key revokes all existing grants on this menu; changing the parent moves it in navigation. Confirm before saving.",
+    "menuKeyAnchorHint": "The menu key is the authorization anchor; changing it revokes existing grants on this menu",
+    "buttonTypeHint": "Button type is not shown in the sidebar",
+    "basicInfoSection": "Basic Info"
   },
   "roleManagement": {
     "colName": "Role Name",

@@ -146,6 +146,7 @@ const FlashSaleStats = lazy(() => import('./pages/GroupPurchase/FlashSaleStats')
 const FlashSalePrice = lazy(() => import('./pages/GroupPurchase/FlashSalePrice'))
 // 系統配置
 const MenuConfig = lazy(() => import('./pages/MenuConfig'))
+const MenuAdvancedForm = lazy(() => import('./pages/MenuConfig/MenuAdvancedForm'))
 const TranslationManage = lazy(() => import('./pages/TranslationManage'))
 // 多语言管理（i18n-center 独立模块）
 const I18nWorkbench = lazy(() => import('./pages/I18nCenter/Workbench'))
@@ -497,6 +498,8 @@ function AuthenticatedLayout() {
               <Route path="/map-planning" element={<MapPlanning />} />
               {/* 系統配置 */}
               <Route path="/menu-config" element={<MenuConfig />} />
+              {/* 菜单结构变更（仅超管）：与日常的「改菜单名称」分离，避免误触改 Key 导致存量授权失效 */}
+              <Route path="/menu-config/setting" element={<MenuAdvancedForm />} />
               <Route path="/translation-manage" element={<TranslationManage />} />
               {/* 多语言管理（i18n-center 独立模块） */}
               <Route path="/i18n-center/workbench" element={<I18nWorkbench />} />

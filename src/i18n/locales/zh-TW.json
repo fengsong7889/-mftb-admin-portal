@@ -211,6 +211,10 @@
         "name": "物資管理系統",
         "description": "資產、耗材、採購與庫存的全生命週期管理"
       },
+      "rdm": {
+        "name": "產研協同系統",
+        "description": "需求提交、審批、分配、研發交付、驗收上線與產出看板"
+      },
       "oa": {
         "name": "協同辦公系統",
         "description": "流程申請、事項審批與員工自助，高效協作"
@@ -5202,7 +5206,33 @@
     "btnMoveUp": "上移",
     "btnMoveDown": "下移",
     "tooltipMoveUp": "上移",
-    "tooltipMoveDown": "下移"
+    "tooltipMoveDown": "下移",
+    "noticeTitle": "左側系統名稱由平台統一維護，右側菜單名稱不限層級均可修改",
+    "noticeDesc": "業務系統名稱在全部界面（企業門戶 / 側邊欄 / 系統切換器 / 授權中心）保持單一真值，不開放人工修改。右側選單樹無論一級入口還是下級選單，都可自由修改菜單名稱；選單 Key、路由路徑、上級、類型、排序等結構變更收在「高級設置」，僅超級管理員可操作。",
+    "noSystem": "尚無可配置的業務系統",
+    "noMenuInSystem": "該系統下暫無菜單",
+    "nodeCount": "共 {{count}} 個菜單節點",
+    "nodeCountFiltered": "篩選後 {{shown}} / 共 {{total}} 個菜單節點",
+    "btnAdvanced": "高級設置",
+    "discardTitle": "放棄未保存的菜單名稱修改？",
+    "discardContent": "當前有尚未保存的菜單名稱修改，切換系統後將丟棄。",
+    "nameUnchanged": "菜單名稱未發生變化",
+    "topLevelMenuEntry": "頂級菜單（系統入口）",
+    "formIncomplete": "請檢查表單填寫是否完整",
+    "confirmDeleteTitle": "確認刪除菜單？",
+    "confirmDeleteHasChildren": "該菜單下仍有子菜單，需先刪除全部子菜單。",
+    "confirmDeleteContent": "刪除後「{{name}}」的存量授權將一併失效，且不可恢復。",
+    "deleteSuccess": "菜單已刪除",
+    "noAdvancedPermission": "無權限進入高級設置",
+    "noAdvancedPermissionDesc": "菜單 Key、路由路徑、上級、類型等結構變更僅超級管理員可操作；如需調整請聯繫管理員，普通管理員可在「菜單配置」列表內修改菜單名稱。",
+    "menuNotFound": "未找到該菜單，可能已被刪除",
+    "advancedAddTitle": "新增菜單 · 高級設置",
+    "advancedEditTitle": "編輯菜單 · 高級設置",
+    "structureWarningTitle": "結構變更提醒",
+    "structureWarningDesc": "修改菜單 Key 會使該菜單的存量授權全部失效，需重新授權；修改上級菜單會改變導航歸屬。請確認後再保存。",
+    "menuKeyAnchorHint": "菜單 Key 是授權錨點，修改後該菜單存量授權將失效",
+    "buttonTypeHint": "按鈕類型不參與側邊欄展示",
+    "basicInfoSection": "基礎信息"
   },
   "roleManagement": {
     "colName": "角色名稱",

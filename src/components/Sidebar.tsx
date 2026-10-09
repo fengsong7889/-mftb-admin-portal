@@ -14,7 +14,7 @@ import {
 import { useSystemNavigation } from '../hooks/useSystemNavigation'
 import type { MenuVO } from '../api/menu'
 import { fetchPortalContext, type PortalSystem } from '../api/portal'
-import { getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
+import { getPortalSystemKey, getSystemDisplayName, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
 import { keyToPath, pathToKey } from '../constants/menuDataSource'
 import type { OfflineMenuNode } from '../constants/offlineMenus'
@@ -616,30 +616,6 @@ function scopeMenusToSystem(menus: MenuVO[], systemCode: string, inherited: stri
   })
 }
 
-/** 只去掉拆分系统前的包装目录，不能因授权后仅剩一个业务分组就继续展平。 */
-const SYSTEM_WRAPPER_KEYS: Record<string, readonly string[]> = {
-  merchant: ['merchant_group'],
-  seller: ['seller-center'],
-  search: ['search'],
-  finance: ['finance'],
-  ai: ['ai-assistant'],
-  hr: ['hr'],
-  eam: ['asset-management'],
-  oa: ['oa-center'],
-  iam: ['permission'],
-  platform: ['system-config', 'i18n-center'],
-  i18n: ['i18n-center'],
-}
-
-function promoteSystemMenus(items: MenuItem[], systemCode: string | null): MenuItem[] {
-  const wrappers = systemCode ? SYSTEM_WRAPPER_KEYS[systemCode] : undefined
-  if (!wrappers) return items
-  return items.flatMap((item) => {
-    if (!item || !wrappers.includes(String(item.key))) return [item]
-    return (item as MenuItem & { children?: MenuItem[] }).children ?? []
-  })
-}
-
 /** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
 const HIDDEN_MENU_KEYS = new Set([
   'ai-access-request', // AI 使用申請：功能入口已整合至智能中心其他菜單
@@ -716,10 +692,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   const currentSystem = systems.find(system => system.code === currentSystemCode)
   const systemKey = getPortalSystemKey(currentSystemCode ?? '', currentSystem?.name ?? '')
+  /** 系统名称统一走全局取名入口，保证与门户/切换器/首页同一真值 */
   const systemName = currentSystemCode
-    ? t(`portal.systems.${systemKey ?? currentSystemCode}.name`, {
-      defaultValue: (!i18nInstance.language.startsWith('zh') && currentSystem?.nameEn) || currentSystem?.name || currentSystemCode,
-    })
+    ? getSystemDisplayName(t, { code: currentSystemCode, name: currentSystem?.name ?? currentSystemCode, nameEn: currentSystem?.nameEn }, i18nInstance.language)
     : t('portal.title')
   const brandTitle = `MFTB${i18nInstance.language.startsWith('zh') ? '' : ' '}${systemName.replace(/^MFTB\s*/i, '')}`
   const systemIcon = renderMenuIcon(currentSystem?.icon)
@@ -751,7 +726,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     const withSystemHome = (items: MenuItem[]): MenuItem[] => currentSystemCode
       ? [
         { key: 'home', icon: <HomeOutlined />, label: translateMenuName('home', '首頁', 'Home') },
-        ...promoteSystemMenus(items, currentSystemCode).filter((item) => item?.key !== 'home'),
+        ...items.filter((item) => item?.key !== 'home'),
       ]
       : items
     if (currentSystemCode && systemNavigation.loaded) {

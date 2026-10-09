@@ -21,6 +21,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 数据初始化器: 启动时自动执行字段迁移与内置账号迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
@@ -89,8 +92,21 @@ public class DataInitializer implements CommandLineRunner {
     //      新建「採購與供應」分組整合採購鏈（採購執行+驗收入庫+供應商管理）；
     //      「基礎配置」改名「基礎數據」；耗材管理排序提前至 sort=2
     // v44: 規則配置拆分——新增「規則中心」目录(rule-center) + 廣告銷售/贈送管理/系統安全/算法配置/編號生成 5 個子菜單，
-    //      舊 rule-config 保留並改名「規則總覽」；将存量 rule-config 角色/部门授权笛卡尔复制到新子菜單与 asset-basic。
-    private static final String V_MENU_SEED = "core:menu-seed-v44";
+    //      舊 rule-config 保留並改名「規則總覽」；将存量 rule-config 角色/部门 授权笛卡尔复制到新子菜單与 asset-basic。
+    // v45: 退役「拆分系统前的一级包装目录」——12 个壳菜单不再种子化，其子菜单直接挂顶级（见 RETIRED_SYSTEM_WRAPPERS）。
+    private static final String V_MENU_SEED = "core:menu-seed-v45";
+    
+    /**
+     * 已退役的一级包装目录（拆分业务系统前的壳）。
+     * <p>系统视图上线后侧边栏与导航剪枝完全按 {@code sys_menu.system_code} 裁剪，这层壳
+     * 没有任何运行时职责；以前靠前端 Sidebar 的 SYSTEM_WRAPPER_KEYS 硬编码展平来掩盖，
+     * 导致「菜单配置」里能看到、进入系统却看不到的幽灵一级目录。现统一物理删除，
+     * 子菜单提升为一级，侧边栏展示顺序不变。
+     */
+    private static final List<String> RETIRED_SYSTEM_WRAPPERS = List.of(
+            "merchant_group", "promotion_tool", "seller-center", "search", "finance",
+            "ai-assistant", "hr", "asset-management", "oa-center", "permission",
+            "system-config", "i18n-center");
 
     @Override
     public void run(String... args) {
@@ -171,11 +187,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         migrateDeptCodeToBM();
         resetPasswordIfNeeded("MF00001", "111222");
         ensureDeptAdSalesPermission();
-        ensureAssetManagementMenu();
         fixAssetMenuGrouping();
         // v40: 菜单真值自愈（每次启动幂等）——名称正名/繁体化、空目录清理、sort 唯一化、
         //      icon 与 name_en 回填。必须晚于种子化与各分组初始化器, 否则会被其默认值覆盖
         reconcileMenuMasterData();
+        // v45: 退役一级包装目录。必须晚于种子化与 reconcileMenuMasterData（后者靠父级继承
+        //      回填 system_code，壳在时才能给子菜单传归属），否则子菜单会丢系统归属。
+        retireSystemWrapperDirectories();
         // 英文名称仅补空, 开销为若干条 UPDATE, 每次启动执行以保证新增菜单不缺英文名
         seedMenuEnglishNames();
         // v32: 广告格子占用计数器建表+自愈式回填 (防并发超卖, 与订单明细同事务维护)
@@ -2198,29 +2216,23 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 全量删除重建会丢失归属，且门户的一次性迁移不会再为新 ID 回填。
 
         // key -> [name, parentKey|null, sort]
+        // v45: 不再种子化「拆分系统前的一级包装目录」（merchant_group / search / finance /
+        //      ai-assistant / hr / asset-management / oa-center / permission / system-config /
+        //      i18n-center / promotion_tool / seller-center）。系统视图已按 sys_menu.system_code
+        //      裁剪，这层壳没有任何运行时职责，只会让「菜单配置」出现进入系统后根本不展示的
+        //      幽灵一级目录。它们的子菜单直接提升为一级，存量库由 retireSystemWrapperDirectories() 清理。
         Map<String, String[]> menus = new LinkedHashMap<>();
         // ── 顶级菜单 ──
         menus.put("home",                new String[]{"首頁",            null,  "1"});
-        menus.put("merchant_group",      new String[]{"商戶集團管理",     null,  "2"});
         menus.put("merchant_promotion",  new String[]{"商家推廣工具",      null,  "3"});
-        menus.put("promotion_tool",      new String[]{"推廣通",           null,  "4"});
-        menus.put("search",              new String[]{"搜索管理",          null,  "5"});
-        menus.put("finance",             new String[]{"財務管理",          null,  "6"});
-        menus.put("ai-assistant",        new String[]{"智能中心(AI)",     null,  "7"});
         menus.put("group-purchase",      new String[]{"團購管理",          null,  "8"});
-        menus.put("hr",                  new String[]{"集團人事(HR)",      null,  "9"});
         // v44: 組織管理提升为独立一级菜单（集团组织架构域），后续可扩组织架构/编制
         menus.put("org-center",          new String[]{"組織管理",          null,  "10"});
         // v45: 員工自助独立一级域（员工本人视角，与人事管理员视角的 hr 域分开授权）
         menus.put("ess-center",          new String[]{"員工自助",          null,  "11"});
-        menus.put("asset-management",    new String[]{"物資管理",          null,  "11"});
-        menus.put("oa-center",           new String[]{"OA中心",            null,  "12"});
-        menus.put("permission",          new String[]{"權限管理",          null,  "13"});
-        menus.put("system-config",       new String[]{"系統配置",          null,  "14"});
-        menus.put("i18n-center",         new String[]{"多語言管理",          null,  "15"});
-        // ── 商户集团管理 ──
-        menus.put("merchant-group-list", new String[]{"集團管理",         "merchant_group",     "1"});
-        menus.put("store-list",          new String[]{"門店管理",         "merchant_group",     "2"});
+        // ── 商户集团管理（原 merchant_group 壳已退役，直接一级）──
+        menus.put("merchant-group-list", new String[]{"集團管理",         null,     "1"});
+        menus.put("store-list",          new String[]{"門店管理",         null,     "2"});
         // ── 商家推广工具 ──
         menus.put("promotion-dashboard", new String[]{"數據看板",         "merchant_promotion", "1"});
         menus.put("promotion-algorithm", new String[]{"算法庫",           "merchant_promotion", "2"});
@@ -2239,63 +2251,63 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // ── 商家推广工具 > 赠送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
         menus.put("gift-consume-detail", new String[]{"消費明細",         "gift-manage",        "2"});
-        // ── 推广通 ──
-        menus.put("promotion-sales-config", new String[]{"店鋪推廣",     "promotion_tool",     "1"});
-        menus.put("promotion-report-group", new String[]{"報表分析",     "promotion_tool",     "2"});
+        // ── 商家工作台（原 promotion_tool / seller-center 壳均已退役，直接一级）──
+        menus.put("promotion-sales-config", new String[]{"店鋪隨心推",     null,     "1"});
+        menus.put("promotion-report-group", new String[]{"報表分析",     null,     "2"});
         menus.put("promotion-report-overview", new String[]{"數據概覽",  "promotion-report-group", "1"});
         menus.put("promotion-report-order", new String[]{"訂單效果報表", "promotion-report-group", "2"});
         menus.put("promotion-report-compare", new String[]{"推薦類型對比", "promotion-report-group", "3"});
-        // ── 搜索管理 ──
-        menus.put("search-config-new",   new String[]{"搜索配置",         "search",             "1"});
+        // ── 搜索運營系統（原 search 壳已退役）──
+        menus.put("search-config-new",   new String[]{"搜索配置",         null,             "1"});
         menus.put("global-config",       new String[]{"全局配置",         "search-config-new",  "1"});
         menus.put("channel-strategy",    new String[]{"維度策略",         "search-config-new",  "2"});
-        menus.put("search-guide",        new String[]{"搜索引導",         "search",             "2"});
+        menus.put("search-guide",        new String[]{"搜索引導",         null,             "2"});
         menus.put("hint-config",         new String[]{"底紋配置",         "search-guide",       "1"});
         menus.put("hot-search-config",   new String[]{"熱搜配置",         "search-guide",       "2"});
         menus.put("search-weight-config", new String[]{"權重干預",       "search-guide",       "3"});
-        menus.put("search-library",      new String[]{"搜索詞庫",         "search",             "3"});
+        menus.put("search-library",      new String[]{"搜索詞庫",         null,             "3"});
         menus.put("word-segmentation",   new String[]{"分詞詞庫",         "search-library",     "1"});
         menus.put("synonym-config",      new String[]{"同義詞庫",         "search-library",     "2"});
         menus.put("hot-search-library",  new String[]{"熱搜詞庫",         "search-library",     "3"});
         menus.put("stop-words",          new String[]{"停用詞庫",         "search-library",     "4"});
-        menus.put("search-verify-group", new String[]{"效果校驗",         "search",             "4"});
+        menus.put("search-verify-group", new String[]{"效果校驗",         null,             "4"});
         menus.put("search-verify",       new String[]{"搜索校驗",         "search-verify-group", "1"});
         menus.put("hint-verify",         new String[]{"底紋校驗",         "search-verify-group", "2"});
         menus.put("hot-search-verify",   new String[]{"熱搜校驗",         "search-verify-group", "3"});
-        menus.put("report",              new String[]{"報表統計",          "search",             "5"});
+        menus.put("report",              new String[]{"報表統計",          null,             "5"});
         menus.put("hint-report",         new String[]{"底紋報表",         "report",             "1"});
         menus.put("hot-search-report",   new String[]{"熱搜報表",         "report",             "2"});
-        // ── 财务管理 ──
-        menus.put("promotion",           new String[]{"推廣金管理",       "finance",            "1"});
+        // ── 財務系統（原 finance 壳已退役）──
+        menus.put("promotion",           new String[]{"推廣金管理",       null,            "1"});
         menus.put("account-balance",     new String[]{"賬戶餘額",         "promotion",          "1"});
         menus.put("consume-risk",        new String[]{"消費風控",         "promotion",          "4"});
         menus.put("batch-query",         new String[]{"批次查詢",         "promotion",          "2"});
         menus.put("detail-query",        new String[]{"明細查詢",         "promotion",          "3"});
-        menus.put("merchant-reconcile",  new String[]{"商戶通對賬",       "finance",            "2"});
+        menus.put("merchant-reconcile",  new String[]{"商戶通對賬",       null,            "2"});
         menus.put("writeoff-reconcile",  new String[]{"充消對賬",         "merchant-reconcile", "1"});
         menus.put("debt-reconcile",      new String[]{"欠款對賬",         "merchant-reconcile", "2"});
-        menus.put("approval",            new String[]{"審批管理",          "finance",            "3"});
+        menus.put("approval",            new String[]{"審批管理",          null,            "3"});
         menus.put("approval-center",     new String[]{"審批中心",         "approval",           "1"});
-        // ── 智能中心 (AI)：拆分二级菜单（模型管理、授权与配额） ──
-        menus.put("ai-models",            new String[]{"模型管理",      "ai-assistant",    "1"});
+        // ── 人工智能管理系統（原 ai-assistant 壳已退役，二级菜单提升为一级）──
+        menus.put("ai-models",            new String[]{"模型管理",      null,    "1"});
         menus.put("ai-model-provider",    new String[]{"模型供應商",    "ai-models",       "1"});
         menus.put("ai-model-list",        new String[]{"模型接入",      "ai-models",       "2"});
         // AI 授权与配额：模型授权管理 / 配额管理 升级二级菜单（直挂智能中心）
-        menus.put("ai-auth-manage",       new String[]{"模型授权管理", "ai-assistant",    "2"});
+        menus.put("ai-auth-manage",       new String[]{"模型授权管理", null,    "2"});
         menus.put("ai-dept-model-auth",   new String[]{"部门模型权控",       "ai-auth-manage",    "1"});
         menus.put("ai-emp-model-auth",    new String[]{"员工模型权控",       "ai-auth-manage",    "2"});
-        menus.put("ai-quota-manage",      new String[]{"配额管理",           "ai-assistant",    "3"});
+        menus.put("ai-quota-manage",      new String[]{"配额管理",           null,    "3"});
         menus.put("ai-dept-quota",        new String[]{"部门额度",           "ai-quota-manage",   "1"});
         menus.put("ai-emp-quota",         new String[]{"员工额度",           "ai-quota-manage",   "2"});
-        menus.put("ai-operation-auth",   new String[]{"AI 操作授權",     "ai-assistant",       "5"});
-        menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     "ai-assistant",       "6"});
+        menus.put("ai-operation-auth",   new String[]{"AI 操作授權",     null,       "5"});
+        menus.put("ai-energy-billing",   new String[]{"能耗與賬單",     null,       "6"});
         menus.put("ai_usage_stats",      new String[]{"能耗統計",       "ai-energy-billing",  "1"});
         menus.put("ai_energy_detail",    new String[]{"能耗明細",       "ai-energy-billing",  "2"});
-        menus.put("ai-mcp-service",      new String[]{"MCP 服務",       "ai-assistant",       "7"});
-        menus.put("ai-emp-permission",   new String[]{"員工AI權額管理",     "ai-assistant",       "4"});
+        menus.put("ai-mcp-service",      new String[]{"MCP 服務",       null,       "7"});
+        menus.put("ai-emp-permission",   new String[]{"員工AI權額管理",     null,       "4"});
         // 与 102_ai_access_request_menu.sql 同源：并入主种子，防止 '%ai%' 清理后独立初始化器不重跑导致菜单丢失
-        menus.put("ai-access-request",   new String[]{"AI 使用申請",    "ai-assistant",      "10"});
-        menus.put("ai-conversation-audit", new String[]{"对话审计",     "ai-assistant",       "8"});
+        menus.put("ai-access-request",   new String[]{"AI 使用申請",    null,      "10"});
+        menus.put("ai-conversation-audit", new String[]{"对话审计",     null,       "8"});
         // ── 团购管理 ──
         menus.put("group-purchase-dashboard", new String[]{"秒殺數據總覽",     "group-purchase",      "1"});
         menus.put("flash-sale-register", new String[]{"秒殺商品登記",     "group-purchase",      "2"});
@@ -2307,9 +2319,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v44: 入转调离四菜单收入「入轉調離」分组，其余按「員工檔案/基礎配置」归类，
         //      避免 hr 下 10 个二级菜单平铺（存量库迁移见 migrateHrMenuGroupsV44）
         //      組織/職位 属组织与职务主数据，与字典/合同一样归入「基礎配置」，員工檔案只留员工个人记录
-        menus.put("hr-profile",          new String[]{"員工檔案",         "hr",                 "1"});
-        menus.put("hr-lifecycle",        new String[]{"入轉調離",         "hr",                 "2"});
-        menus.put("hr-config",           new String[]{"基礎配置",         "hr",                 "3"});
+        menus.put("hr-profile",          new String[]{"員工檔案",         null,                 "1"});
+        menus.put("hr-lifecycle",        new String[]{"入轉調離",         null,                 "2"});
+        menus.put("hr-config",           new String[]{"基礎配置",         null,                 "3"});
         menus.put("employee-management", new String[]{"員工管理",         "hr-profile",         "1"});
         menus.put("login-log",           new String[]{"員工動態",         "hr-profile",         "2"});
         // v45: 假期域两菜单（请假单 + 额度台账）
@@ -2331,14 +2343,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("ess-requests",        new String[]{"我的申請單據",      "ess-center",         "2"});
         menus.put("ess-profile",         new String[]{"我的檔案",         "ess-center",         "3"});
         menus.put("ess-certificate",     new String[]{"證明開具",         "ess-center",         "4"});
-        // ── 物资管理（EAM 分组子菜单）──
-        // 二级直达菜单（无分组）
-        menus.put("asset-dashboard",    new String[]{"資產看板",         "asset-management",   "1"});
+        // ── 物資管理系統（原 asset-management 壳已退役，分组直接一级）──
+        menus.put("asset-dashboard",    new String[]{"資產看板",         null,   "1"});
         // 二级分组
-        menus.put("consumable-ops",    new String[]{"耗材管理",         "asset-management",   "2"});
-        menus.put("asset-flow-ops",    new String[]{"資產運營",         "asset-management",   "3"});
-        menus.put("eam-procurement",   new String[]{"採購與供應",       "asset-management",   "4"});
-        menus.put("asset-basic",       new String[]{"基礎數據",         "asset-management",   "5"});
+        menus.put("consumable-ops",    new String[]{"耗材管理",         null,   "2"});
+        menus.put("asset-flow-ops",    new String[]{"資產運營",         null,   "3"});
+        menus.put("eam-procurement",   new String[]{"採購與供應",       null,   "4"});
+        menus.put("asset-basic",       new String[]{"基礎數據",         null,   "5"});
         // 三级菜单 → 采购与供应
         menus.put("purchase-order",     new String[]{"採購執行",         "eam-procurement",    "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "eam-procurement",    "2"});
@@ -2362,41 +2373,47 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-location",     new String[]{"倉庫管理",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         menus.put("asset-tag",          new String[]{"資產標籤",         "asset-basic",        "5"});
-        // ── OA中心 ──
-        menus.put("process-center",     new String[]{"流程中心",         "oa-center",         "1"});
-        menus.put("oa-requests",        new String[]{"流程事項",         "oa-center",         "2"});
-        menus.put("workflow-config",     new String[]{"流程配置",         "oa-center",         "3"});
-        // ── 权限管理 ──
-        menus.put("role-management",     new String[]{"角色管理",         "permission",         "1"});
-        menus.put("function-permission", new String[]{"功能授權",         "permission",         "2"});
-        menus.put("data-permission",     new String[]{"數據授權",         "permission",         "3"});
-        // ── 系统配置 ──
-        menus.put("menu-config",         new String[]{"菜單配置",         "system-config",      "1"});
-        menus.put("translation-manage",  new String[]{"翻譯工作台",         "i18n-center",        "1"});
-        // ── 多语言管理（i18n-center 子菜单）──
-        menus.put("i18n-language",       new String[]{"語言管理",           "i18n-center",        "2"});
-        menus.put("i18n-import-export",  new String[]{"導入導出",           "i18n-center",        "3"});
-        menus.put("i18n-mt-engine",      new String[]{"機翻引擎",           "i18n-center",        "4"});
-        menus.put("i18n-dashboard",      new String[]{"翻譯統計",           "i18n-center",        "5"});
+        // ── 協同辦公系統（原 oa-center 壳已退役）──
+        menus.put("process-center",     new String[]{"流程中心",         null,         "1"});
+        menus.put("oa-requests",        new String[]{"流程事項",         null,         "2"});
+        menus.put("workflow-config",     new String[]{"流程配置",         null,         "3"});
+        // ── 權限中心（原 permission 壳已退役）──
+        menus.put("authorization-center", new String[]{"授權中心",       null,         "0"});
+        menus.put("role-management",     new String[]{"角色管理",         null,         "1"});
+        menus.put("function-permission", new String[]{"功能授權",         null,         "2"});
+        menus.put("data-permission",     new String[]{"數據授權",         null,         "3"});
+        // ── 平台配置 / 權限中心（原 system-config 壳已退役；菜單配置属 iam 治理面）──
+        menus.put("menu-config",         new String[]{"菜單配置",         null,      "6"});
+        menus.put("translation-manage",  new String[]{"翻譯工作台",         null,        "1"});
+        // ── 翻譯中心（原 i18n-center 壳已退役）──
+        menus.put("i18n-language",       new String[]{"語言管理",           null,        "2"});
+        menus.put("i18n-import-export",  new String[]{"導入導出",           null,        "3"});
+        menus.put("i18n-mt-engine",      new String[]{"機翻引擎",           null,        "4"});
+        menus.put("i18n-dashboard",      new String[]{"翻譯統計",           null,        "5"});
         // v44: 規則配置拆分为「規則中心」目录 + 5 個版塊子菜單（可分角色獨立維護）；舊 rule-config 保留為「規則總覽」
-        menus.put("rule-config",         new String[]{"規則總覽",         "system-config",      "2"});
-        menus.put("rule-center",         new String[]{"規則中心",           "system-config",      "3"});
+        menus.put("rule-config",         new String[]{"規則總覽",         null,      "2"});
+        menus.put("rule-center",         new String[]{"規則中心",           null,      "3"});
         menus.put("rule-ad-sales",       new String[]{"廣告銷售規則",     "rule-center",        "1"});
         menus.put("rule-gift",           new String[]{"贈送管理規則",     "rule-center",        "2"});
         menus.put("rule-security",       new String[]{"系統安全規則",     "rule-center",        "3"});
         menus.put("rule-algorithm",      new String[]{"算法配置規則",     "rule-center",        "4"});
         menus.put("rule-seq",            new String[]{"編號生成規則",     "rule-center",        "5"});
-        menus.put("version-history",    new String[]{"版本管理",         "system-config",      "4"});
-        menus.put("notification-config", new String[]{"通知渠道配置",     "system-config",      "5"});
+        menus.put("version-history",    new String[]{"版本管理",         null,      "4"});
+        menus.put("notification-config", new String[]{"通知渠道配置",     null,      "5"});
 
-        // 商家工作台已拆分时，旧菜单种子重跑也不能把购买入口和报表挂回广告系统。
-        if (queryMenuIdByKey("seller-center") != null) {
-            menus.get("promotion-sales-config")[1] = "seller-center";
-            menus.get("promotion-report-group")[1] = "seller-center";
-        }
+        // 商家工作台拆分后购买入口与报表归 seller 系统，顶级菜单归属由
+        // SystemPortalSchemaInitializer#backfillTopLevelMenuSystem 的静态映射统一维护。
 
         int created = 0;
         int updated = 0;
+        // 菜单类型按「种子结构里是否被子菜单引用」推导：退役包装目录后，一级菜单既可能是
+        // 真页面（如 集團管理/門店管理，type=2 可直达），也可能是分组目录（如 搜索配置，type=1）。
+        // 沿用旧的「顶级一律 type=1」会把可直达页面降级成目录，
+        // 导致 pickFirstEntryPath / 系统首页取不到入口路径。
+        Set<String> directoryKeys = menus.values().stream()
+                .map(definition -> definition[1])
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         for (Map.Entry<String, String[]> entry : menus.entrySet()) {
             String menuKey = entry.getKey();
             String name = entry.getValue()[0];
@@ -2451,16 +2468,17 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             // 清理同 menu_key 的软删除残留记录，避免唯一键 uk_menu_key 冲突
             jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", menuKey);
 
+            int type = directoryKeys.contains(menuKey) ? 1 : 2;
             if (parentId != null) {
                 jdbcTemplate.update(
                         "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, status, deleted) "
-                                + "VALUES (?, ?, ?, 2, ?, 1, 0)",
-                        parentId, menuKey, name, sort);
+                                + "VALUES (?, ?, ?, ?, ?, 1, 0)",
+                        parentId, menuKey, name, type, sort);
             } else {
                 jdbcTemplate.update(
                         "INSERT INTO sys_menu (parent_id, menu_key, name, type, sort_order, status, deleted) "
-                                + "VALUES (NULL, ?, ?, 1, ?, 1, 0)",
-                        menuKey, name, sort);
+                                + "VALUES (NULL, ?, ?, ?, ?, 1, 0)",
+                        menuKey, name, type, sort);
             }
             created++;
         }
@@ -2543,69 +2561,43 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     /**
-     * 确保「物资管理」一级菜单及其子菜单在数据库中存在（幂等）。
-     * 防止 seedSystemMenus 版本已固化但数据库被回滚/手动删除导致菜单丢失。
+     * v45: 物理退役一级包装目录（每次启动幂等自愈）。
+     * <p>做三件事，顺序不可颠倒：先把子菜单提升为顶级（保留 type/sort/system_code，
+     * 侧边栏展示顺序不变），再清授权引用，最后连软删除残留一并物理删除。
+     * <p>为什么物理删除而不是软删：{@code uk_menu_key} 是全局唯一索引，软删残留会让
+     * 种子/初始化器后续重建同 key 菜单时撞唯一键（v44 生产事故模式）。
      */
-    private void ensureAssetManagementMenu() {
-        if (queryMenuIdByKey("asset-management") != null) {
-            return;
-        }
-        log.info("检测到物资管理菜单缺失，开始重建...");
-        // 一级菜单：物资管理
-        jdbcTemplate.update(
-                "INSERT INTO sys_menu (parent_id, menu_key, name, icon, type, sort_order, actions, status, updated_by, deleted) "
-                        + "VALUES (NULL, 'asset-management', '物資管理', 'InboxOutlined', 1, 10, '[\"view\"]', 1, 'system', 0)");
-        Long parentId = queryMenuIdByKey("asset-management");
-        if (parentId == null) return;
-        // 二级子菜单
-        String[][] children = {
-                {"asset-list",      "資產台賬",   "AppstoreOutlined",    "1"},
-                {"asset-add",       "資產入庫",   "AppstoreAddOutlined", "2"},
-                {"asset-claim",     "領用資產",   "UserAddOutlined",     "3"},
-                {"asset-transfer",  "資產轉移",   "SwapOutlined",        "4"},
-                {"asset-return",    "歸還資產",   "RollbackOutlined",    "5"},
-                {"asset-scrap",     "報廢資產",   "DeleteOutlined",      "6"},
-                {"asset-repair",    "資產維修",   "ToolOutlined",        "7"},
-                {"asset-inventory", "盤點資產",   "AuditOutlined",       "8"},
-        };
-        String actions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
-        for (String[] child : children) {
-            jdbcTemplate.update(
-                    "INSERT INTO sys_menu (parent_id, menu_key, name, path, component, icon, type, sort_order, actions, status, updated_by, deleted) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, 2, ?, ?, 1, 'system', 0)",
-                    parentId, child[0], child[1], "/" + child[0], child[0], child[2],
-                    Integer.parseInt(child[3]), actions);
-        }
-        // 为 admin 角色补齐授权
-        Long adminRoleId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class);
-        if (adminRoleId != null) {
-            String adminActions = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
-            jdbcTemplate.update(
-                    "INSERT INTO sys_role_menu (role_id, menu_id, actions) "
-                            + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = 'asset-management' AND m.deleted = 0 "
-                            + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
-                    adminRoleId, adminActions);
-            for (String[] child : children) {
-                jdbcTemplate.update(
-                        "INSERT INTO sys_role_menu (role_id, menu_id, actions) "
-                                + "SELECT ?, m.id, ? FROM sys_menu m WHERE m.menu_key = ? AND m.deleted = 0 "
-                                + "ON DUPLICATE KEY UPDATE actions = VALUES(actions)",
-                        adminRoleId, adminActions, child[0]);
+    private void retireSystemWrapperDirectories() {
+        for (String wrapperKey : RETIRED_SYSTEM_WRAPPERS) {
+            List<Long> ids = jdbcTemplate.queryForList(
+                    "SELECT id FROM sys_menu WHERE menu_key = ?", Long.class, wrapperKey);
+            if (ids.isEmpty()) {
+                continue;
+            }
+            for (Long id : ids) {
+                int promoted = jdbcTemplate.update(
+                        "UPDATE sys_menu SET parent_id = NULL, updated_by = 'system' "
+                                + "WHERE parent_id = ? AND deleted = 0", id);
+                int roleGrants = jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", id);
+                int deptGrants = jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", id);
+                int removed = jdbcTemplate.update("DELETE FROM sys_menu WHERE id = ?", id);
+                log.info("退役一级包装目录 {} (id={}): 提升子菜单 {} 个, 清理授权 角色{}条/部门{}条, 删除菜单 {} 行",
+                        wrapperKey, id, promoted, roleGrants, deptGrants, removed);
             }
         }
-        log.info("物资管理菜单重建完成");
     }
 
     /**
      * v44: 集团人事菜单分组化——在 hr 下建 員工檔案/入轉調離/基礎配置 三个二级分组，
      * 把原本平铺的 10 个二级菜单归类；分组为纯结构节点（不进前端受控清单，
      * 叶子菜单授权不变即可见），因此仅需保证 admin 授权回填。
+     * <p>v45 起 hr 壳已退役，新库由种子直接建顶级分组，此处早退即可。
      */
     private void migrateHrMenuGroupsV44() {
         Long hrId = queryMenuIdByKey("hr");
         if (hrId == null) {
-            throw new IllegalStateException("父级菜单 hr 不存在，无法分组人事菜单");
+            log.info("hr 包装目录已退役，人事分组由种子直接建为顶级，跳过 v44 分组迁移");
+            return;
         }
         String[][] groups = {
                 {"hr-profile", "員工檔案", "FolderOutlined", "Employee Profile"},
@@ -2739,10 +2731,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     private void applyTopLevelMenuSortV44() {
         // v46: 績效考核一级域插在组织管理之后、員工自助之前（不列入则与 ess-center 同为 sort=11，顺序不稳定）
         // v47: 績效台賬一级域（M2）紧跟绩效执行域，不入列就会被 ess-center 等同默认排序挤乱
-        String[] topOrder = {"home", "merchant_group", "merchant_promotion", "promotion_tool", "search",
-                "finance", "ai-assistant", "group-purchase", "hr", "org-center", "perf-center",
-                "perf-report-center", "ess-center",
-                "asset-management", "oa-center", "permission", "system-config", "i18n-center"};
+        // v45: 包装目录已退役，不再列 topOrder；被提升的菜单沿用其组内 sort（1..N），
+        //      在各系统独立视图下与退役前的侧边栏顺序一致。
+        String[] topOrder = {"home", "merchant_promotion", "group-purchase",
+                "org-center", "perf-center", "perf-report-center", "ess-center"};
         for (int i = 0; i < topOrder.length; i++) {
             jdbcTemplate.update(
                     "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
@@ -2917,16 +2909,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 + "WHERE menu_key = 'promotion-order-manage' AND deleted = 0 AND status = 0");
     
         // 5. 同父排序唯一化（历史 sort 冲突导致菜单顺序不稳定）
-        applyMenuSort("asset-management", "asset-dashboard", "consumable-ops", "asset-flow-ops",
-                "eam-procurement", "asset-basic");
+        // v45: asset-management / system-config / hr / i18n-center / promotion_tool 壳已退役，
+        //      其子菜单已是顶级，组内 sort 保持 1..N 即可，不再按壳排序。
         applyMenuSort("asset-flow-ops", "asset-list", "asset-claim", "asset-borrow",
                 "asset-return", "asset-transfer-list", "asset-handover",
                 "asset-repair", "asset-compensation", "asset-scrap", "asset-inventory", "asset-flow");
-        applyMenuSort("system-config", "menu-config", "rule-config", "rule-center", "version-history", "notification-config");
         // v42: 集团人事子菜单排序唯一化（字典維護/合同台賬 紧跟员工管理）
         // v43: 入转调离四菜单插在员工管理之后
-        // v44: hr 一级下只露出三个分组，叶子在分组内排序
-        applyMenuSort("hr", "hr-profile", "hr-lifecycle", "hr-config");
+        // v44: 入转调离四菜单收入「入轉調離」分组；分组本身已提升为顶级，只排组内叶子
+        //      （排序统一在下方 ensureMenuParent 之后执行，避免归属未修正时排错）
         // v44: 分组归属自愈——一次性迁移 applyOnce 已记版本不再重跑，其后调整过的
         //      父子关系（如 職位管理 由 員工檔案 移到 基礎配置）必须在此兜住
         ensureMenuParent("hr-profile", "employee-management", "login-log", "hr-leave", "hr-leave-quota",
@@ -2965,9 +2956,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // org-structure 英文名定向修正（旧值为 Organization，与新一级域 org-center 撞名）
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Department Structure', updated_by = 'system' "
                 + "WHERE menu_key = 'org-structure' AND deleted = 0 AND name_en = 'Organization'");
-        applyMenuSort("i18n-center", "translation-manage", "i18n-language", "i18n-import-export",
-                "i18n-mt-engine", "i18n-dashboard");
-        applyMenuSort("promotion_tool", "promotion-sales-config", "promotion-report-group");
+        // v45: i18n-center 壳已退役，翻譯中心五个顶级菜单沿用组内 sort 1..5
         applyMenuSort("merchant_promotion", "promotion-dashboard", "promotion-algorithm", "promotion-slot-config",
                 "promotion-waterfall", "gift-manage", "ad-sales", "promotion-word-library", "traffic-sandbox");
     

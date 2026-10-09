@@ -1,490 +1,370 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
-import { Table, Button, Input, Tag, Space, message, Modal, Form, Select, Switch, AutoComplete } from 'antd'
+/**
+ * 菜单配置：按「业务系统 → 该系统菜单树」维护菜单名称。
+ *
+ * 设计约束（与平台约定一致，不得随意放开）：
+ *  1. 只有左侧的业务系统名称由平台统一维护（sys_system + portal.systems.*.name 语言包），
+ *     本页面不提供任何修改系统名称的入口；历史上「授权中心 / 门户 / 侧边栏」各自取名导致
+ *     同一系统出现两套名字，现在一律经 getSystemDisplayName 取名。
+ *  2. 右侧菜单树不论层级（一级入口目录 / 二级 / 三级 / 按钮）均可自由修改菜单名称。
+ *  3. 菜单 Key / 路由路径 / 类型 / 上级 / 图标 / 新增 / 删除 / 排序属于结构变更：改 Key 会让该菜单的
+ *     全部存量授权失效，因此收进「高级设置」独立页且仅内置超管可见（服务端另有守卫）。
+ *
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, Button, Empty, Form, Input, Modal, Space, Spin, Switch, Table, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import type { Key } from 'react'
 import {
-  SearchOutlined,
-  ReloadOutlined,
-  PlusOutlined,
-  ExportOutlined,
   ExpandAltOutlined,
+  ExportOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
   ShrinkOutlined,
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { fetchMenuTree, updateMenu, updateMenuStatus } from '../../api/menu'
+import type { MenuVO } from '../../api/menu'
+import { fetchSystemsCatalog, type SystemCatalogItem } from '../../api/systemAuthorization'
+import { getSystemDisplayName } from '../../constants/portalSystems'
+import { useAuth } from '../../contexts/AuthContext'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchMenuTree, createMenu, updateMenu, updateMenuStatus } from '../../api/menu'
-import type { MenuVO, MenuPayload } from '../../api/menu'
-import { renderMenuIcon, getMenuIconOptions } from '../../components/MenuIcon'
+import { renderMenuIcon } from '../../components/MenuIcon'
+import './index.css'
 
-/** ────── 类型定义 ────── */
-interface MenuItem {
-  id: string
-  parentId: string
-  name: string           // 中文名称
-  nameEn: string         // 英文名称（非中文语言下菜单展示的真值）
-  menuKey: string        // 后台英文 Key
-  path: string           // 路由路径
-  icon: string           // 图标名称
-  type: 'directory' | 'menu' | 'button'  // 类型：目录/菜单/按钮
-  sortOrder: number      // 排序
-  status: 'enabled' | 'disabled'  // 状态
-  children?: MenuItem[]
-}
-
-/** ────── 前后端类型映射 ────── */
-const TYPE_TO_NUM: Record<string, number> = { directory: 1, menu: 2, button: 3 }
-const NUM_TO_TYPE: Record<number, string> = { 1: 'directory', 2: 'menu', 3: 'button' }
-const STATUS_TO_NUM: Record<string, number> = { enabled: 1, disabled: 0 }
-const NUM_TO_STATUS: Record<number, string> = { 1: 'enabled', 0: 'disabled' }
+/** Portal 哨兵系统：个人工作台入口，不作为可配置的业务系统展示 */
+const PORTAL_SENTINEL = 'portal'
 
 /** ────── 类型常量 ────── */
-const MENU_TYPE_COLOR: Record<string, string> = {
-  directory: 'blue',
-  menu: 'green',
-  button: 'orange',
+const MENU_TYPE_COLOR: Record<number, string> = { 1: 'blue', 2: 'green', 3: 'orange' }
+
+/** 表格行：直接复用后端 MenuVO，children 保持树形结构交给 Table 渲染 */
+type MenuRow = MenuVO
+
+/** 一级菜单（系统入口目录）：名称仍可修改，仅加粗展示以区分层级 */
+function isTopLevelRow(row: MenuVO): boolean {
+  return row.parentId == null
 }
 
-/** ────── 后端 VO → 前端 MenuItem 转换 ────── */
-const voToItem = (vo: MenuVO): MenuItem => ({
-  id: String(vo.id),
-  parentId: vo.parentId != null ? String(vo.parentId) : '0',
-  name: vo.name,
-  nameEn: vo.nameEn || '',
-  menuKey: vo.menuKey,
-  path: vo.path || '',
-  icon: vo.icon || '',
-  type: (NUM_TO_TYPE[vo.type] || 'menu') as MenuItem['type'],
-  sortOrder: vo.sort ?? 0,
-  status: (NUM_TO_STATUS[vo.status] || 'enabled') as MenuItem['status'],
-  children: vo.children?.map(voToItem),
-})
-
-/** ────── 前端 MenuItem → 后端 Payload 转换 ────── */
-const itemToPayload = (item: MenuItem, parentId?: string): MenuPayload => ({
-  parentId: parentId != null ? Number(parentId) : (item.parentId !== '0' ? Number(item.parentId) : null),
-  menuKey: item.menuKey,
-  name: item.name,
-  nameEn: item.nameEn || undefined,
-  path: item.path || undefined,
-  icon: item.icon || undefined,
-  type: TYPE_TO_NUM[item.type] ?? 2,
-  sort: item.sortOrder,
-  status: STATUS_TO_NUM[item.status] ?? 1,
-})
-
-/** ────── 扁平化树数据 ────── */
-const flattenTree = (data: MenuItem[]): MenuItem[] => {
-  const result: MenuItem[] = []
-  data.forEach((item) => {
-    result.push(item)
-    if (item.children?.length) {
-      result.push(...flattenTree(item.children))
-    }
-  })
-  return result
+/** 按系统裁剪菜单树：叶子菜单的 system_code 由后端回填，与顶级一致，因此可整棵裁剪 */
+function pickSystemTree(nodes: MenuVO[], systemCode: string): MenuVO[] {
+  return nodes
+    .filter((node) => node.systemCode === systemCode)
+    .map((node) => ({
+      ...node,
+      children: node.children ? pickSystemTree(node.children, systemCode) : undefined,
+    }))
 }
 
-/** 从树结构中查找指定菜单的真实父 ID（保证子菜单编辑时 parentId 不丢失） */
-const findRealParentId = (items: MenuItem[], targetId: string, parentItemId?: string): string | undefined => {
-  for (const item of items) {
-    if (item.id === targetId) return parentItemId
-    if (item.children) {
-      const found = findRealParentId(item.children, targetId, item.id)
-      if (found !== undefined) return found
-    }
+/** 统计系统内菜单数量（含目录/按钮，与列表可见范围一致） */
+function countNodes(nodes: MenuVO[]): number {
+  return nodes.reduce((sum, node) => sum + 1 + (node.children?.length ? countNodes(node.children) : 0), 0)
+}
+
+/** 关键词命中的节点及其全部祖先都要保留，否则深层菜单会因父级未命中而整棵消失 */
+function filterTree(nodes: MenuVO[], keyword: string): MenuVO[] {
+  if (!keyword) return nodes
+  const walk = (list: MenuVO[]): MenuVO[] => list
+    .map((node) => ({ ...node, children: node.children ? walk(node.children) : undefined }))
+    .filter((node) => {
+      const selfMatch = node.name.toLowerCase().includes(keyword)
+        || node.menuKey.toLowerCase().includes(keyword)
+        || (node.path ?? '').toLowerCase().includes(keyword)
+      return selfMatch || (node.children?.length ?? 0) > 0
+    })
+  return walk(nodes)
+}
+
+/** 收集树中全部节点 id，供「展开全部」使用 */
+function collectIds(nodes: MenuVO[], out: string[] = []): string[] {
+  for (const node of nodes) {
+    out.push(String(node.id))
+    if (node.children?.length) collectIds(node.children, out)
   }
-  return undefined
+  return out
 }
 
-/** ────── 主组件 ────── */
 export default function MenuConfig() {
-  const { t } = useTranslation()
-  const [data, setData] = useState<MenuItem[]>([])
+  const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  /** 内置超管才能进入高级设置；服务端会再校验一次，前端隐藏只是避免误点 */
+  const isSuperAdmin = user?.role === 'admin'
 
-  /** 菜單類型標籤（依賴 t，定義在組件內以便響應語言切換） */
-  const TYPE_LABEL: Record<string, string> = {
-    directory: t('menuConfig.typeDirectory'),
-    menu: t('menuConfig.typeMenu'),
-    button: t('menuConfig.typeButton'),
-  }
-  const TYPE_OPTIONS = [
-    { label: t('menuConfig.typeDirectory'), value: 'directory' },
-    { label: t('menuConfig.typeMenu'), value: 'menu' },
-    { label: t('menuConfig.typeButton'), value: 'button' },
-  ]
-  const [loading, setLoading] = useState(false)
-  const [editingKey, setEditingKey] = useState<string | null>(null)
-  const [editForm] = Form.useForm()
+  const [systems, setSystems] = useState<SystemCatalogItem[]>([])
+  const [menuTree, setMenuTree] = useState<MenuVO[]>([])
+  const [activeSystem, setActiveSystem] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [keyword, setKeyword] = useState('')
+  const [searchValue, setSearchValue] = useState('')
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
-  const [searchText, setSearchText] = useState('')
   const [allExpanded, setAllExpanded] = useState(false)
-  const [searchForm] = Form.useForm()
+  /** 行内编辑：一次只编辑一行，保存走单条原子写，避免批量写覆盖他人改动 */
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [nameForm] = Form.useForm<{ name: string; nameEn?: string }>()
 
-  // 新增/编辑弹窗
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editing, setEditing] = useState<MenuItem | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [modalForm] = Form.useForm()
-
-  // 行勾选（导出用）
-  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
-  const [selectedRows, setSelectedRows] = useState<MenuItem[]>([])
-
-  /** 当前弹窗选择的图标（用于预览） */
-  const currentIcon = Form.useWatch('icon', modalForm)
-
-  /** 加载菜单数据 */
-  const loadData = useCallback(async () => {
+  /** 初次加载：系统目录 + 全量菜单树 */
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    try {
-      const tree = await fetchMenuTree()
-      setData(tree.map(voToItem))
-    } finally {
-      setLoading(false)
-    }
+    Promise.all([fetchSystemsCatalog(), fetchMenuTree()])
+      .then(([sysList, tree]) => {
+        if (cancelled) return
+        const configurable = (sysList ?? []).filter((s) => s.code !== PORTAL_SENTINEL)
+        setSystems(configurable)
+        setMenuTree(tree ?? [])
+        setActiveSystem((prev) => prev ?? configurable[0]?.code ?? null)
+      })
+      .catch(() => {
+        // 错误提示由请求层统一处理
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
   }, [])
 
-  /** 初始化加载 */
-  useEffect(() => { loadData() }, [loadData])
+  const reload = useCallback(async () => {
+    const tree = await fetchMenuTree()
+    setMenuTree(tree ?? [])
+  }, [])
 
-  /** 获取所有菜单 key */
-  const allKeys = useMemo(() => {
-    const keys: string[] = []
-    const walk = (items: MenuItem[]) => {
-      items.forEach((item) => {
-        keys.push(item.id)
-        if (item.children) walk(item.children)
-      })
+  /** 系统名称统一走全局取名入口，保证与门户/侧边栏/授权中心一致 */
+  const systemNameOf = useCallback(
+    (sys: SystemCatalogItem) => getSystemDisplayName(t, sys, i18n.language),
+    [t, i18n.language],
+  )
+
+  /** 各系统菜单数量（左侧角标） */
+  const menuCountBySystem = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const sys of systems) {
+      map.set(sys.code, countNodes(pickSystemTree(menuTree, sys.code)))
     }
-    walk(data)
-    return keys
-  }, [data])
+    return map
+  }, [systems, menuTree])
 
-  /** 展开全部 / 收起全部 */
-  const handleToggleExpandAll = useCallback(() => {
+  const activeSystemName = useMemo(() => {
+    const current = systems.find((s) => s.code === activeSystem)
+    return current ? systemNameOf(current) : (activeSystem ?? '')
+  }, [systems, activeSystem, systemNameOf])
+
+  /** 当前系统全量节点数（不受筛选影响）；与筛选后的可见数分开标注，避免误导总数 */
+  const systemTotalCount = menuCountBySystem.get(activeSystem ?? '') ?? 0
+
+  /** 当前系统 + 关键词过滤后的树 */
+  const treeData = useMemo(() => {
+    const scoped = activeSystem ? pickSystemTree(menuTree, activeSystem) : []
+    return filterTree(scoped, keyword.trim().toLowerCase())
+  }, [menuTree, activeSystem, keyword])
+
+  const allRowKeys = useMemo(() => collectIds(treeData), [treeData])
+
+  /** 切换系统：清空行内编辑与过滤，避免把上一个系统的编辑态带过来 */
+  const handleSelectSystem = (code: string) => {
+    if (code === activeSystem) return
+    if (editingId != null) {
+      Modal.confirm({
+        title: t('menuConfig.discardTitle'),
+        content: t('menuConfig.discardContent'),
+        okText: t('common.confirm'),
+        cancelText: t('common.cancel'),
+        okButtonProps: { danger: true },
+        onOk: () => {
+          setEditingId(null)
+          nameForm.resetFields()
+          setActiveSystem(code)
+          setKeyword('')
+          setSearchValue('')
+          setExpandedKeys([])
+          setAllExpanded(false)
+        },
+      })
+      return
+    }
+    setActiveSystem(code)
+    setKeyword('')
+    setSearchValue('')
+    setExpandedKeys([])
+    setAllExpanded(false)
+  }
+
+  const handleToggleExpandAll = () => {
     if (allExpanded) {
       setExpandedKeys([])
       setAllExpanded(false)
     } else {
-      setExpandedKeys(allKeys)
+      setExpandedKeys(allRowKeys)
       setAllExpanded(true)
     }
-  }, [allExpanded, allKeys])
-
-  /** 搜索过滤 */
-  const filteredData = useMemo(() => {
-    if (!searchText.trim()) return data
-    const keyword = searchText.trim().toLowerCase()
-    const matchKeys = new Set<string>()
-    const walk = (items: MenuItem[], parents: string[] = []) => {
-      items.forEach((item) => {
-        const isMatch = item.name.toLowerCase().includes(keyword)
-          || item.menuKey.toLowerCase().includes(keyword)
-          || item.path.toLowerCase().includes(keyword)
-        if (isMatch) {
-          matchKeys.add(item.id)
-          parents.forEach((p) => matchKeys.add(p))
-        }
-        if (item.children) {
-          walk(item.children, [...parents, item.id])
-        }
-      })
-    }
-    walk(data)
-    const filter = (items: MenuItem[]): MenuItem[] => {
-      return items
-        .filter((item) => matchKeys.has(item.id))
-        .map((item) => ({
-          ...item,
-          children: item.children ? filter(item.children) : undefined,
-        }))
-    }
-    return filter(data)
-  }, [data, searchText])
-
-  /** 查询 */
-  const handleSearch = () => {
-    const values = searchForm.getFieldsValue()
-    setSearchText(values.keyword?.trim() || '')
   }
 
-  /** 重置 */
+  const handleSearch = () => setKeyword(searchValue.trim())
+
   const handleReset = () => {
-    searchForm.resetFields()
-    setSearchText('')
+    setSearchValue('')
+    setKeyword('')
   }
 
-  /** 开始行内编辑 */
-  const handleEdit = (record: MenuItem) => {
-    editForm.setFieldsValue({
-      name: record.name,
-      path: record.path,
-      status: record.status,
-    })
-    setEditingKey(record.id)
+  /** 一级菜单不再特殊锁定：平台只锁左侧系统名称，右侧任意层级菜单都可改名 */
+
+  const handleStartEdit = (row: MenuRow) => {
+    nameForm.setFieldsValue({ name: row.name, nameEn: row.nameEn ?? '' })
+    setEditingId(row.id)
   }
 
-  /** 保存行内编辑 */
-  const handleSave = async (id: string) => {
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    nameForm.resetFields()
+  }
+
+  /** 仅提交名称字段，其余字段原样回传，避免 update 接口把 actions/component 等结构字段清空 */
+  const handleSaveName = async (row: MenuRow) => {
+    let values: { name: string; nameEn?: string }
     try {
-      const values = await editForm.validateFields()
-      // 找到当前行数据
-      const findItem = (items: MenuItem[]): MenuItem | undefined => {
-        for (const item of items) {
-          if (item.id === id) return item
-          if (item.children) {
-            const found = findItem(item.children)
-            if (found) return found
-          }
-        }
-        return undefined
-      }
-      const record = findItem(data)
-      if (!record) return
-      const updated = { ...record, ...values }
-      // 从树结构中查找真实父 ID，防止子菜单编辑名称后 parent_id 被清空
-      const realParentId = findRealParentId(data, id)
-      await updateMenu(Number(id), itemToPayload(updated, realParentId))
-      message.success(t('menuConfig.saveSuccess'))
-      setEditingKey(null)
-      loadData()
+      values = await nameForm.validateFields()
     } catch {
-      // validation failed or API error
-    }
-  }
-
-  /** 取消行内编辑 */
-  const handleCancel = () => {
-    setEditingKey(null)
-    editForm.resetFields()
-  }
-
-  /** 上移/下移 */
-  const handleMove = async (id: string, direction: 'up' | 'down') => {
-    // 找到同级列表
-    const findSiblings = (items: MenuItem[]): MenuItem[] | null => {
-      for (const item of items) {
-        if (item.children) {
-          const idx = item.children.findIndex((c) => c.id === id)
-          if (idx !== -1) return item.children
-          const deeper = findSiblings(item.children)
-          if (deeper) return deeper
-        }
-      }
-      // 检查顶层
-      const topIdx = items.findIndex((c) => c.id === id)
-      if (topIdx !== -1) return items
-      return null
-    }
-    const siblings = findSiblings(data)
-    if (!siblings) return
-    const idx = siblings.findIndex((i) => i.id === id)
-    const targetIdx = direction === 'up' ? idx - 1 : idx + 1
-    if (targetIdx < 0 || targetIdx >= siblings.length) {
-      message.warning(direction === 'up' ? t('menuConfig.moveFirst') : t('menuConfig.moveLast'))
       return
     }
-    // 交换排序
-    const current = siblings[idx]
-    const target = siblings[targetIdx]
+    const trimmed = values.name.trim()
+    if (trimmed === row.name && (values.nameEn?.trim() ?? '') === (row.nameEn ?? '')) {
+      message.info(t('menuConfig.nameUnchanged'))
+      setEditingId(null)
+      return
+    }
+    setSaving(true)
     try {
-      await updateMenu(Number(current.id), { ...itemToPayload(current, findRealParentId(data, current.id)), sort: target.sortOrder })
-      await updateMenu(Number(target.id), { ...itemToPayload(target, findRealParentId(data, target.id)), sort: current.sortOrder })
-      message.success(direction === 'up' ? t('menuConfig.movedUp') : t('menuConfig.movedDown'))
-      loadData()
+      await updateMenu(row.id, {
+        parentId: row.parentId,
+        menuKey: row.menuKey,
+        name: trimmed,
+        nameEn: values.nameEn?.trim() || undefined,
+        path: row.path || undefined,
+        component: row.component || undefined,
+        icon: row.icon || undefined,
+        type: row.type,
+        sort: row.sort,
+        actions: row.actions ?? undefined,
+        status: row.status,
+      })
+      message.success(t('menuConfig.updateSuccess'))
+      setEditingId(null)
+      await reload()
     } catch {
-      // API error
+      // 错误提示由请求层统一处理，保留编辑态供用户重试
+    } finally {
+      setSaving(false)
     }
   }
 
-  /** 切换状态（带确认弹窗） */
-  const handleToggleStatus = (record: MenuItem) => {
-    const newStatus = record.status === 'enabled' ? 'disabled' : 'enabled'
-    const actionText = newStatus === 'enabled' ? t('common.enable') : t('common.disable')
+  /** 启用/停用：状态开关必须先二次确认（UI 规范 §B.8） */
+  const handleToggleStatus = (row: MenuRow) => {
+    const enable = row.status !== 1
+    const actionText = enable ? t('common.enable') : t('common.disable')
     Modal.confirm({
       title: t('menuConfig.confirmToggle', { action: actionText }),
-      content: t('menuConfig.confirmToggleContent', { action: actionText, name: record.name }),
+      content: t('menuConfig.confirmToggleContent', { action: actionText, name: row.name }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        await updateMenuStatus(Number(record.id), STATUS_TO_NUM[newStatus])
-        message.success(t('menuConfig.toggleSuccess', { action: actionText, name: record.name }))
-        loadData()
+        await updateMenuStatus(row.id, enable ? 1 : 0)
+        message.success(t('menuConfig.toggleSuccess', { action: actionText, name: row.name }))
+        await reload()
       },
     })
   }
 
-  /** 新增菜单 */
-  const handleCreate = () => {
-    setEditing(null)
-    modalForm.resetFields()
-    modalForm.setFieldsValue({ type: 'menu', status: 'enabled' })
-    setModalVisible(true)
-  }
-
-  /** 打开弹窗编辑（完整字段，含图标修改） */
-  const handleOpenModalEdit = (record: MenuItem) => {
-    setEditing(record)
-    modalForm.setFieldsValue({
-      name: record.name,
-      nameEn: record.nameEn,
-      menuKey: record.menuKey,
-      path: record.path,
-      parentId: record.parentId,
-      type: record.type,
-      icon: record.icon,
-      sortOrder: record.sortOrder,
-      status: record.status,
-    })
-    setModalVisible(true)
-  }
-
-  /** 弹窗提交 */
-  const handleModalSubmit = async () => {
-    try {
-      const values = await modalForm.validateFields()
-      setSubmitting(true)
-      const payload: MenuPayload = {
-        parentId: values.parentId === '0' || values.parentId === 0 ? null : Number(values.parentId),
-        menuKey: values.menuKey,
-        name: values.name,
-        nameEn: values.nameEn || undefined,
-        path: values.path || undefined,
-        icon: values.icon || undefined,
-        type: TYPE_TO_NUM[values.type] ?? 2,
-        sort: values.sortOrder ? Number(values.sortOrder) : 0,
-        status: values.status === 'enabled' ? 1 : 0,
-      }
-      if (editing) {
-        await updateMenu(Number(editing.id), payload)
-        message.success(t('menuConfig.updateSuccess'))
-      } else {
-        await createMenu(payload)
-        message.success(t('menuConfig.createSuccess'))
-      }
-      setModalVisible(false)
-      loadData()
-    } catch {
-      // validation failed or API error
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  /** 导出（优先导出勾选数据，未勾选时导出当前列表全部） */
-  const handleExport = () => {
-    const source = selectedRows.length > 0 ? selectedRows : filteredData
-    const allItems = flattenTree(source)
-    if (allItems.length === 0) {
-      message.warning(t('menuConfig.noDataToExport'))
+  /** 同级交换 sort；一级菜单不参与排序（结构顺序由平台维护） */
+  const handleMove = async (row: MenuRow, direction: 'up' | 'down') => {
+    const siblings = findSiblings(menuTree, row.id)
+    if (!siblings) return
+    const index = siblings.findIndex((s) => s.id === row.id)
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= siblings.length) {
+      message.warning(direction === 'up' ? t('menuConfig.moveFirst') : t('menuConfig.moveLast'))
       return
     }
-    const headers = [t('menuConfig.colSort'), t('menuConfig.colNameZh'), t('menuConfig.colMenuKey'), t('menuConfig.colPath'), t('menuConfig.colIcon'), t('menuConfig.colType'), t('menuConfig.colStatus')]
-    const rows = allItems.map((item) => [
-      item.sortOrder,
-      item.name,
-      item.menuKey,
-      item.path || '-',
-      item.icon,
-      TYPE_LABEL[item.type],
-      item.status === 'enabled' ? t('common.enable') : t('common.disable'),
-    ])
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${t('menuConfig.pageTitle')}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    message.success(`${t('menuConfig.exportSuccess', { count: allItems.length })}${selectedRows.length > 0 ? t('menuConfig.exportSelected') : ''}`)
+    const current = siblings[index]
+    const target = siblings[targetIndex]
+    try {
+      await updateMenu(current.id, toPayload(current, target.sort))
+      await updateMenu(target.id, toPayload(target, current.sort))
+      message.success(direction === 'up' ? t('menuConfig.movedUp') : t('menuConfig.movedDown'))
+      await reload()
+    } catch {
+      // 错误提示由请求层统一处理
+    }
   }
 
-  /** 行勾选变化 */
-  const handleRowSelectChange = (keys: Key[], rows: MenuItem[]) => {
-    setSelectedRowKeys(keys)
-    setSelectedRows(rows)
-  }
-
-  /** 判断是否在行内编辑中 */
-  const isEditing = (record: MenuItem) => record.id === editingKey
-
-  /** 表格列定义 */
-  const columns: ColumnsType<MenuItem> = [
-    {
-      title: t('menuConfig.colSort'),
-      dataIndex: 'sortOrder',
-      key: 'sortOrder',
-      width: 70,
-      align: 'center',
-      render: (sort: number) => (
-        <span style={{ color: '#8C8C8C', fontSize: 13 }}>{sort}</span>
-      ),
-    },
+  const columns: ColumnsType<MenuRow> = [
     {
       title: t('menuConfig.colNameZh'),
       dataIndex: 'name',
       key: 'name',
-      width: 200,
-      render: (name: string, record) => {
-        if (isEditing(record)) {
+      width: 220,
+      render: (name: string, row) => {
+        if (editingId === row.id) {
           return (
             <Form.Item name="name" style={{ margin: 0 }} rules={[{ required: true, message: t('menuConfig.menuNameRequired') }]}>
-              <Input size="small" placeholder={t('menuConfig.namePlaceholder')} style={{ width: 160 }} />
+              <Input size="small" placeholder={t('menuConfig.namePlaceholder')} maxLength={50} />
             </Form.Item>
           )
         }
         return (
-          <span style={{ fontWeight: record.type === 'directory' ? 600 : 400, color: '#262626' }}>
-            {name}
-          </span>
+          <span className={`menucfg-name${isTopLevelRow(row) ? ' menucfg-name--top' : ''}`}>{name}</span>
         )
       },
     },
     {
-      title: t('menuConfig.colPath'),
-      dataIndex: 'path',
-      key: 'path',
+      title: t('menuConfig.menuNameEn'),
+      dataIndex: 'nameEn',
+      key: 'nameEn',
       width: 200,
-      render: (path: string, record) => {
-        if (isEditing(record)) {
+      render: (nameEn: string | undefined, row) => {
+        if (editingId === row.id) {
           return (
-            <Form.Item name="path" style={{ margin: 0 }}>
-              <Input size="small" placeholder="/path" style={{ width: 160 }} />
+            <Form.Item name="nameEn" style={{ margin: 0 }}>
+              <Input size="small" placeholder={t('menuConfig.menuNameEnPlaceholder')} maxLength={100} />
             </Form.Item>
           )
         }
-        return path ? (
-          <code style={{ fontSize: 12, color: '#595959', background: '#F5F5F5', padding: '2px 6px', borderRadius: 4 }}>{path}</code>
-        ) : (
-          <span style={{ color: '#BFBFBF' }}>—</span>
-        )
+        return nameEn
+          ? <span className="menucfg-name-en">{nameEn}</span>
+          : <span className="menucfg-muted">—</span>
       },
     },
     {
       title: t('menuConfig.colMenuKey'),
       dataIndex: 'menuKey',
       key: 'menuKey',
-      width: 180,
-      render: (key: string) => (
-        <code style={{ fontSize: 12, color: '#722ED1' }}>{key}</code>
-      ),
+      width: 190,
+      render: (key: string) => <code className="menucfg-code menucfg-code--key">{key}</code>,
+    },
+    {
+      title: t('menuConfig.colPath'),
+      dataIndex: 'path',
+      key: 'path',
+      width: 200,
+      render: (path: string | undefined) => (path
+        ? <code className="menucfg-code">{path}</code>
+        : <span className="menucfg-muted">—</span>),
     },
     {
       title: t('menuConfig.colIcon'),
       dataIndex: 'icon',
       key: 'icon',
-      width: 200,
-      render: (icon: string) => {
+      width: 170,
+      render: (icon: string | undefined) => {
         const node = renderMenuIcon(icon)
         return node ? (
           <Space size={8}>
-            <span style={{ fontSize: 15, color: '#595959' }}>{node}</span>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{icon}</span>
+            <span className="menucfg-icon">{node}</span>
+            <span className="menucfg-muted">{icon}</span>
           </Space>
-        ) : (
-          <span style={{ fontSize: 12, color: '#BFBFBF' }}>{icon || '—'}</span>
-        )
+        ) : <span className="menucfg-muted">—</span>
       },
     },
     {
@@ -493,221 +373,248 @@ export default function MenuConfig() {
       key: 'type',
       width: 80,
       align: 'center',
-      render: (type: string) => {
-        return <Tag color={MENU_TYPE_COLOR[type] || 'default'} style={{ borderRadius: 4, fontSize: 12 }}>{TYPE_LABEL[type]}</Tag>
-      },
+      render: (type: number) => (
+        <Tag color={MENU_TYPE_COLOR[type] ?? 'default'} className="menucfg-type-tag">
+          {type === 1 ? t('menuConfig.typeDirectory') : type === 2 ? t('menuConfig.typeMenu') : t('menuConfig.typeButton')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('menuConfig.colSort'),
+      dataIndex: 'sort',
+      key: 'sort',
+      width: 70,
+      align: 'center',
+      render: (sort: number) => <span className="menucfg-muted">{sort}</span>,
     },
     {
       title: t('menuConfig.colStatus'),
       dataIndex: 'status',
       key: 'status',
-      width: 80,
+      width: 90,
       align: 'center',
-      render: (_: unknown, record: MenuItem) => (
+      render: (_: unknown, row) => (
         <Switch
-          checked={record.status === 'enabled'}
+          checked={row.status === 1}
           checkedChildren="啟用"
           unCheckedChildren="停用"
-          onChange={() => handleToggleStatus(record)}
+          onChange={() => handleToggleStatus(row)}
         />
       ),
     },
     {
       title: t('menuConfig.colAction'),
       key: 'action',
-      width: 260,
+      width: 230,
       align: 'center',
       fixed: 'right',
-      render: (_: unknown, record) => {
-        if (isEditing(record)) {
+      render: (_: unknown, row) => {
+        if (editingId === row.id) {
           return (
             <Space size={0} split={<span className="action-split">|</span>}>
-              <Button type="link" size="small" onClick={() => handleSave(record.id)}>{t('menuConfig.btnSave')}</Button>
-              <Button type="link" size="small" onClick={handleCancel}>{t('menuConfig.btnCancel')}</Button>
+              <Button type="link" size="small" loading={saving} onClick={() => handleSaveName(row)}>{t('menuConfig.btnSave')}</Button>
+              <Button type="link" size="small" onClick={handleCancelEdit}>{t('menuConfig.btnCancel')}</Button>
             </Space>
           )
         }
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
-            <Button type="link" size="small" onClick={() => handleEdit(record)}>{t('menuConfig.btnEdit')}</Button>
-            <Button type="link" size="small" onClick={() => handleOpenModalEdit(record)}>{t('menuConfig.btnSettings')}</Button>
-            <Button type="link" size="small" onClick={() => handleMove(record.id, 'up')}>{t('menuConfig.btnMoveUp')}</Button>
-            <Button type="link" size="small" onClick={() => handleMove(record.id, 'down')}>{t('menuConfig.btnMoveDown')}</Button>
+            <Button type="link" size="small" onClick={() => handleStartEdit(row)}>{t('menuConfig.btnEdit')}</Button>
+            {isSuperAdmin ? (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => navigate(`/menu-config/setting?id=${row.id}&system=${encodeURIComponent(activeSystem ?? '')}`)}
+              >
+                {/* 高级设置=结构字段（Key/路径/上级/类型/图标），仅超管可见 */}
+                {t('menuConfig.btnAdvanced')}
+              </Button>
+            ) : null}
+            {isSuperAdmin ? (
+              <>
+                <Button type="link" size="small" onClick={() => handleMove(row, 'up')}>{t('menuConfig.btnMoveUp')}</Button>
+                <Button type="link" size="small" onClick={() => handleMove(row, 'down')}>{t('menuConfig.btnMoveDown')}</Button>
+              </>
+            ) : null}
           </Space>
         )
       },
     },
   ]
 
-  /** 列字段配置 */
+  /** 列字段配置（列表页强制规范） */
   const columnMeta = columns.map((col) => ({ key: col.key as string, title: (col.title ?? '') as string }))
   const { configComponent, applyConfig } = useColumnConfig('menu-config', columnMeta, [
+    { key: 'name', visible: true, locked: 'head' },
     { key: 'action', visible: true, locked: 'tail' },
   ])
 
-  /** 展开配置 */
-  const expandConfig = {
-    expandedRowKeys: expandedKeys.length > 0 ? expandedKeys : undefined,
-    onExpandedRowsChange: (keys: readonly Key[]) => {
-      const strKeys = keys.map(String)
-      setExpandedKeys(strKeys)
-      setAllExpanded(strKeys.length === allKeys.length)
-    },
+  /** 导出当前系统内的全部节点（平铺，保留层级路径便于人工核对） */
+  const handleExport = () => {
+    if (treeData.length === 0) {
+      message.warning(t('menuConfig.noDataToExport'))
+      return
+    }
+    const headers = [t('menuConfig.colNameZh'), t('menuConfig.menuNameEn'), t('menuConfig.colMenuKey'), t('menuConfig.colPath'), t('menuConfig.colIcon'), t('menuConfig.colType'), t('menuConfig.colSort'), t('menuConfig.colStatus')]
+    const rows: (string | number)[][] = []
+    const walk = (nodes: MenuVO[], prefix: string[]) => {
+      for (const node of nodes) {
+        rows.push([
+          [...prefix, node.name].join(' / '),
+          node.nameEn ?? '',
+          node.menuKey,
+          node.path ?? '',
+          node.icon ?? '',
+          node.type === 1 ? t('menuConfig.typeDirectory') : node.type === 2 ? t('menuConfig.typeMenu') : t('menuConfig.typeButton'),
+          node.sort,
+          node.status === 1 ? t('common.enable') : t('common.disable'),
+        ])
+        if (node.children?.length) walk(node.children, [...prefix, node.name])
+      }
+    }
+    walk(treeData, [])
+    const csv = [headers.join(','), ...rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${t('menuConfig.pageTitle')}_${activeSystemName}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success(t('menuConfig.exportSuccess', { count: rows.length }))
   }
 
   return (
     <div className="content-area">
-      {/* 搜索区 */}
-      <div className="search-section">
-        <Form form={searchForm} layout="inline">
-          <Form.Item label={t('menuConfig.searchLabel')}>
-            <Input
-              placeholder={t('menuConfig.searchPlaceholder')}
-              allowClear
-              onPressEnter={handleSearch}
-            />
-          </Form.Item>
-          <Form.Item label={t('menuConfig.searchType')}>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              options={TYPE_OPTIONS}
-            />
-          </Form.Item>
-          <Form.Item label={t('menuConfig.searchStatus')}>
-            <Select
-              placeholder={t('common.all')}
-              allowClear
-              options={[
-                { label: t('common.enable'), value: 'enabled' },
-                { label: t('common.disable'), value: 'disabled' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item>
-            <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                {t('common.search')}
-              </Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                {t('common.reset')}
-              </Button>
+      {/* 顶部提示：把「系统名称不可人工修改」的边界直接写在界面上，避免管理员到处找入口 */}
+      <Alert
+        className="menucfg-notice"
+        type="info"
+        showIcon
+        message={t('menuConfig.noticeTitle')}
+        description={t('menuConfig.noticeDesc')}
+      />
+
+      {loading ? (
+        <div className="menucfg-loading"><Spin size="large" /></div>
+      ) : systems.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('menuConfig.noSystem')} />
+      ) : (
+        <div className="menucfg-workbench">
+          {/* 左：系统列表（与授权中心同一交互与取名口径） */}
+          <div className="menucfg-sys-panel">
+            <div className="menucfg-sys-panel-title">{t('authorizationCenter.systemsSection', '業務系統')}</div>
+            <div className="menucfg-sys-list">
+              {systems.map((sys) => {
+                const count = menuCountBySystem.get(sys.code) ?? 0
+                return (
+                  <div
+                    key={sys.code}
+                    className={`menucfg-sys-item${sys.code === activeSystem ? ' menucfg-sys-item--active' : ''}`}
+                    onClick={() => handleSelectSystem(sys.code)}
+                  >
+                    <span className="menucfg-sys-name">{systemNameOf(sys)}</span>
+                    <span className="menucfg-sys-count">{count}</span>
+                  </div>
+                )
+              })}
             </div>
-          </Form.Item>
-        </Form>
-      </div>
+          </div>
 
-      {/* 操作区 */}
-      <div className="action-section">
-        <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
-          {selectedRowKeys.length > 0 && (
-            <span style={{ fontSize: 12, color: '#8C8C8C', alignSelf: 'center' }}>
-              {t('menuConfig.selectedCount', { count: selectedRowKeys.length })}
-            </span>
-          )}
-          <Button
-            icon={allExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />}
-            onClick={handleToggleExpandAll}
-          >
-            {allExpanded ? t('menuConfig.collapseAll') : t('menuConfig.expandAll')}
-          </Button>
+          {/* 右：当前系统菜单树 */}
+          <div className="menucfg-main">
+            <div className="menucfg-main-header">
+              <span className="menucfg-main-title">{activeSystemName}</span>
+              <span className="menucfg-main-sub">
+                {keyword
+                  ? t('menuConfig.nodeCountFiltered', { shown: allRowKeys.length, total: systemTotalCount })
+                  : t('menuConfig.nodeCount', { count: systemTotalCount })}
+              </span>
+              <div className="menucfg-main-actions">
+                <Input
+                  className="menucfg-search"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
+                  onPressEnter={handleSearch}
+                  placeholder={t('menuConfig.searchPlaceholder')}
+                  allowClear
+                  prefix={<SearchOutlined className="menucfg-search-icon" />}
+                />
+                <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
+                <Button
+                  icon={allExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />}
+                  onClick={handleToggleExpandAll}
+                  disabled={treeData.length === 0}
+                >
+                  {allExpanded ? t('menuConfig.collapseAll') : t('menuConfig.expandAll')}
+                </Button>
+                <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
+                {isSuperAdmin ? (
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => navigate(`/menu-config/setting?system=${encodeURIComponent(activeSystem ?? '')}`)}
+                  >
+                    {t('common.add')}
+                  </Button>
+                ) : null}
+                {configComponent}
+              </div>
+            </div>
+
+            <Form form={nameForm} component={false}>
+              <Table<MenuRow>
+                key={activeSystem ?? 'none'}
+                className="menucfg-table"
+                columns={applyConfig(columns)}
+                dataSource={treeData}
+                rowKey={(row) => String(row.id)}
+                pagination={false}
+                size="middle"
+                scroll={{ x: 1400 }}
+                expandable={{
+                  expandedRowKeys: expandedKeys,
+                  onExpandedRowsChange: (keys) => {
+                    const strKeys = keys.map(String)
+                    setExpandedKeys(strKeys)
+                    setAllExpanded(strKeys.length >= allRowKeys.length && allRowKeys.length > 0)
+                  },
+                }}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('menuConfig.noMenuInSystem')} /> }}
+              />
+            </Form>
+          </div>
         </div>
-        <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-            {t('common.add')}
-          </Button>
-          {configComponent}
-        </div>
-      </div>
-
-      {/* 表格 */}
-      <Form form={editForm} component={false}>
-        <Table<MenuItem>
-          columns={applyConfig(columns)}
-          dataSource={filteredData}
-          rowKey="id"
-          pagination={false}
-          size="middle"
-          scroll={{ x: 1100 }}
-          loading={loading}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: handleRowSelectChange,
-          }}
-          {...expandConfig}
-        />
-      </Form>
-
-      {/* 新增菜单弹窗 */}
-      <Modal
-        title={editing ? t('menuConfig.editTitle') : t('menuConfig.addTitle')}
-        open={modalVisible}
-        onOk={handleModalSubmit}
-        onCancel={() => setModalVisible(false)}
-        confirmLoading={submitting}
-        okText={t('common.save')}
-        cancelText={t('common.cancel')}
-        width={520}
-        destroyOnClose
-      >
-        <Form form={modalForm} layout="vertical">
-          <Form.Item name="name" label={t('menuConfig.menuName')} rules={[{ required: true, message: t('menuConfig.menuNameRequired') }]}>
-            <Input placeholder={t('menuConfig.menuNamePlaceholder')} allowClear maxLength={50} />
-          </Form.Item>
-          <Form.Item name="nameEn" label={t('menuConfig.menuNameEn')}>
-            <Input placeholder={t('menuConfig.menuNameEnPlaceholder')} allowClear maxLength={100} />
-          </Form.Item>
-          <Form.Item name="menuKey" label={t('menuConfig.menuKey')} rules={[{ required: true, message: t('menuConfig.menuKeyRequired') }]}>
-            <Input placeholder={t('menuConfig.menuKeyPlaceholder')} allowClear maxLength={100} disabled={!!editing} />
-          </Form.Item>
-          <Form.Item name="path" label={t('menuConfig.routePath')}>
-            <Input placeholder={t('menuConfig.routePathPlaceholder')} allowClear maxLength={200} />
-          </Form.Item>
-          <Form.Item name="parentId" label={t('menuConfig.parentMenu')} rules={[{ required: true, message: t('menuConfig.parentMenuRequired') }]}>
-            <Select placeholder={t('menuConfig.parentMenuPlaceholder')} allowClear>
-              <Select.Option value="0">{t('menuConfig.topLevelMenu')}</Select.Option>
-              {flattenTree(data)
-                .filter((item) => item.type !== 'button')
-                .map((item) => (
-                  <Select.Option key={item.id} value={item.id}>
-                    {item.name}
-                  </Select.Option>
-                ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="type" label={t('menuConfig.menuType')} rules={[{ required: true, message: t('menuConfig.menuTypeRequired') }]}>
-            <Select placeholder={t('menuConfig.menuTypePlaceholder')} options={TYPE_OPTIONS} />
-          </Form.Item>
-          <Form.Item
-            name="icon"
-            label={t('menuConfig.iconLabel')}
-            extra={currentIcon ? (
-              <Space size={6} style={{ marginTop: 4 }}>
-                <span style={{ fontSize: 15, color: '#595959' }}>{renderMenuIcon(currentIcon) ?? <span style={{ fontSize: 12, color: '#FF4D4F' }}>{t('menuConfig.iconUnknown')}</span>}</span>
-                <span style={{ fontSize: 12, color: '#8C8C8C' }}>{currentIcon}</span>
-              </Space>
-            ) : null}
-          >
-            <AutoComplete
-              placeholder={t('menuConfig.iconExtra')}
-              allowClear
-              showSearch
-              filterOption={(input, option) => String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
-              options={getMenuIconOptions()}
-            />
-          </Form.Item>
-          <Form.Item name="sortOrder" label={t('menuConfig.sortLabel')}>
-            <Input placeholder={t('menuConfig.sortPlaceholder')} allowClear />
-          </Form.Item>
-          <Form.Item name="status" label={t('menuConfig.statusLabel')} valuePropName="checked"
-            getValueFromEvent={(checked: boolean) => checked ? 'enabled' : 'disabled'}
-            getValueProps={(value: string) => ({ checked: value === 'enabled' })}
-          >
-            <Switch checkedChildren="啟用" unCheckedChildren="停用" />
-          </Form.Item>
-        </Form>
-      </Modal>
+      )}
     </div>
   )
+}
+
+/** 把后端 VO 原样转成提交载荷，只覆盖需要变更的字段（防止结构字段被清空） */
+function toPayload(row: MenuVO, sort?: number) {
+  return {
+    parentId: row.parentId,
+    menuKey: row.menuKey,
+    name: row.name,
+    nameEn: row.nameEn || undefined,
+    path: row.path || undefined,
+    component: row.component || undefined,
+    icon: row.icon || undefined,
+    type: row.type,
+    sort: sort ?? row.sort,
+    actions: row.actions ?? undefined,
+    status: row.status,
+  }
+}
+
+/** 在树中定位某节点的同级列表，供上移/下移交换排序 */
+function findSiblings(nodes: MenuVO[], id: number): MenuVO[] | null {
+  const topIndex = nodes.findIndex((n) => n.id === id)
+  if (topIndex !== -1) return nodes
+  for (const node of nodes) {
+    if (!node.children?.length) continue
+    const found = findSiblings(node.children, id)
+    if (found) return found
+  }
+  return null
 }

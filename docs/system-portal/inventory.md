@@ -34,30 +34,43 @@
 
 ---
 
-## 2. 现有 14 个顶级菜单 → 系统归属映射
+## 2. 顶级菜单 → 系统归属映射
 
-来源：`backend/.../DataInitializer.java#seedSystemMenus` 顶级菜单段落。
+来源：`backend/.../DataInitializer.java#seedSystemMenus` 顶级菜单段落，
+以及 `SystemPortalSchemaInitializer#backfillTopLevelMenuSystem`（v45 起按「顶级菜单 → 系统」逐条登记）。
+
+> **v45 结构变更：一级包装目录已全部退役。**
+> `merchant_group` / `promotion_tool` / `seller-center` / `search` / `finance` / `ai-assistant` /
+> `hr` / `asset-management` / `oa-center` / `permission` / `system-config` / `i18n-center` 这 12 个
+> 「拆分业务系统前的壳」已从 `sys_menu` 物理删除，其子菜单提升为顶级。
+> 原因：系统视图上线后侧边栏与 `/portal/systems/{code}/navigation` 完全按 `sys_menu.system_code` 裁剪，
+> 这层壳没有任何运行时职责；过去靠前端 `Sidebar.SYSTEM_WRAPPER_KEYS` 硬编码展平来隐藏，
+> 导致「菜单配置」里能看到、进入系统却根本不展示的幽灵一级目录。前端展平逻辑已同步删除。
+> 退役清单的代码真值：`DataInitializer.RETIRED_SYSTEM_WRAPPERS`；
+> 幂等自愈：`DataInitializer#retireSystemWrapperDirectories()`（每次启动）；
+> 参考 SQL：`backend/sql/219_retire_system_wrapper_menus.sql`；
+> 核验脚本：`python3 scripts/check-ghost-top-menus.py`（期望「幽灵一级目录 0 个」）。
 
 | 现有顶级菜单 key | 中文 | 归属 SystemCode | 备注 |
 |---|---|---|---|
 | `home` | 首頁 | `portal`（公共） | 迁移为个人工作台 |
-| `merchant_group` | 商戶集團管理 | `merchant` |  |
+| ~~`merchant_group`~~ | 商戶集團管理 | `merchant` | **v45 已物理删除** — v45 已退役；子菜单 `merchant-group-list`（集團管理）、`store-list`（門店管理）提升为顶级 |
 | `merchant_promotion` | 商家推廣工具 | `ads` |  |
 | `promotion_tool` | 推廣通 | `ads` | v199 拆分后成为空壳目录，启用子项迁完后由启动自愈置 `status=0`；店铺随心推实际归属见下行 |
 | `seller-center` | 商家工作台 | `seller` | v199 新增一级目录，承接 `promotion-sales-config`（購買入口）与 `promotion-report-group`（報表分析） |
-| `search` | 搜索管理 | `search` |  |
-| `finance` | 財務管理 | `finance` |  |
-| `ai-assistant` | 智能中心(AI) | `ai` |  |
+| ~~`search`~~ | 搜索管理 | `search` | **v45 已物理删除** — v45 已退役；搜索配置/搜索引導/搜索詞庫/效果校驗/報表統計 提升为顶级 |
+| ~~`finance`~~ | 財務管理 | `finance` | **v45 已物理删除** — v45 已退役；推廣金管理/商戶通對賬/審批管理 提升为顶级 |
+| ~~`ai-assistant`~~ | 智能中心(AI) | `ai` | **v45 已物理删除** — v45 已退役；9 个 AI 菜单提升为顶级，归属锚点见 `SystemPortalSchemaInitializer.AI_TOP_LEVEL_MENUS` |
 | `group-purchase` | 團購管理 | `ads` | 团购/秒杀归 ads（广告与推广） |
-| `hr` | 集團人事(HR) | `hr` |  |
-| `asset-management` | 物資管理 | `eam` |  |
+| ~~`hr`~~ | 集團人事(HR) | `hr` | **v45 已物理删除** — v45 已退役；員工檔案/入轉調離/基礎配置 提升为顶级 |
+| ~~`asset-management`~~ | 物資管理 | `eam` | **v45 已物理删除** — v45 已退役；資產看板/耗材管理/資產運營/採購與供應/基礎數據 提升为顶级 |
 | `rdm-dashboard` … `rdm-acceptance` | 需求總看板 / 需求工作台 / 提交需求 / 需求台賬 / 需求池·分配 / 產品需求處理 / 研發交付 / 需求驗收 | `rdm` | 8 个一级菜单，sort 16..23：顶部先给管理者看结果，其余按需求生命周期动线排列；其中「需求總看板」与「研發交付」已升为分组。由 `RdmMenuInitializer` 种子创建（v3.3 看板升分组，v3.2 研发交付升分组，v3.0 分类调整，v2.0 已拍平，旧 `rdm-center` 已软删退役） |
 | `rdm-delivery` 及其子菜单 | 研發交付 | `rdm` | 一级**分组**（type=1、无 path），下挂三个二级菜单：`rdm-delivery-board`（交付工作台，/rdm-delivery）、`rdm-delivery-iteration`（迭代排期，/rdm-iteration）、`rdm-delivery-req`（交付中需求，/rdm-delivery-req）。非菜单子页：`/rdm-task`→board，`/rdm-iteration-form`→iteration，`/rdm-prd`与`/rdm-review`→`rdm-product`，`/rdm-change`→`rdm-requirement`。菜单 key 变更时由 v3.2 迁移把旧 `rdm-delivery` 上的 `sys_role_menu`/`sys_department_menu` 以 INSERT IGNORE 继承到子菜单（否则非超管升级当日点开为空） |
 | `rdm-dashboard` 及其子菜单 | 需求總看板 | `rdm` | 一级**分组**（type=1、无 path），下挂六个二级菜单：`rdm-dashboard-board`（交付看板）、`rdm-dashboard-quality`（質量口徑）、`rdm-dashboard-version`（版本追溯）、`rdm-dashboard-report`（交付週報）、`rdm-dashboard-score`（產出積分，v3.4）、`rdm-dashboard-trend`（效能量趨勢，v3.4）。看板类接口（/analytics/*、/score/*）按子菜单 key 鉴权，不挂分组 key |
 | `rdm-config-group` | 需求配置 | `rdm` | 一级分组（sort 24），下挂四个二级菜单：`rdm-config-status`/`rdm-config-routing`/`rdm-config-sla`/`rdm-config-score`（積分規則，v3.4 新增，采 VIEW_EDIT：配规则等于改所有人的分） |
-| `oa-center` | OA中心 | `oa` |  |
-| `permission` | 權限管理 | `iam` |  |
-| `system-config` | 系統配置 | `platform` |  |
+| ~~`oa-center`~~ | OA中心 | `oa` | **v45 已物理删除** — v45 已退役；流程中心/流程事項/流程配置 提升为顶级 |
+| ~~`permission`~~ | 權限管理 | `iam` | **v45 已物理删除** — v45 已退役；授權中心/角色管理/數據授權 提升为顶级 |
+| ~~`system-config`~~ | 系統配置 | `platform` | **v45 已物理删除** — v45 已退役；規則總覽/規則中心/版本管理/通知渠道配置 提升为顶级。`menu-config`（菜單配置）归 `iam` 治理面，不随 platform |
 | `i18n-center` | 多語言管理 | `platform` |  |
 
 ## 3. 叶子菜单归属规则

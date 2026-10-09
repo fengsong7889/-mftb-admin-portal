@@ -199,6 +199,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/hr-perf-plan-detail': { fixed: 'i18n:hrPerf.planDetailTitle' },
   '/hr-perf-template': { fixed: 'i18n:hrPerf.templateLedgerTitle' },
   '/hr-contract-renew-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
+  // 菜单配置·高级设置（仅超管）：同一页按 ?id 区分新增/編輯，标题与页面 H2 一致
+  '/menu-config/setting': { add: '新增菜單 · 高級設置', edit: '編輯菜單 · 高級設置' },
 }
 
 /**
@@ -344,6 +346,7 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/ai-operation-auth-edit',
   '/hr-dict-edit',
   '/purchase-order',
+  '/menu-config/setting',
 ])
 
 /** Tab 路径：特定路径保留 query string 以区分新增/编辑 */

@@ -11,7 +11,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** 隔离内存库验证商家工作台拆分：菜单换父级、子树归属改写、准入反推补授与幂等自愈。 */
+/**
+ * 隔离内存库验证商家工作台拆分：入口提升为顶级、子树归属改写、准入反推补授与幂等自愈。
+ * <p>v45: seller-center 包装目录已退役，本用例同时锁定「不得复活壳」这一约束。
+ */
 class SellerWorkbenchMenuInitializerTest {
 
     private static final String VERSION = SystemPortalSchemaInitializer.V_SELLER_WORKBENCH;
@@ -59,27 +62,29 @@ class SellerWorkbenchMenuInitializerTest {
     }
 
     @Test
-    void movesPurchaseAndReportsToSellerCenterAndDerivesAccess() {
+    void promotesPurchaseAndReportsToSellerTopLevelAndDerivesAccess() {
         initializer.ensureSellerWorkbench();
 
-        Long sellerCenterId = jdbc.queryForObject(
-                "SELECT id FROM sys_menu WHERE menu_key = 'seller-center'", Long.class);
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center' "
-                + "AND parent_id IS NULL AND type = 1 AND system_code = 'seller' AND status = 1 AND deleted = 0", Integer.class));
-        // 购买入口与报表组双双换父级挂到 seller-center 下，ID 与既有授权保留
+        // v45: seller-center 包装目录已退役，ensureSellerWorkbench 不得再创建它
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center'", Integer.class));
+        // 购买入口与报表分析组双双提升为 seller 系统的顶级菜单，ID 与既有授权保留
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key IN "
-                + "('promotion-sales-config', 'promotion-report-group') AND parent_id = ? AND system_code = 'seller'",
-                Integer.class, sellerCenterId));
-        // 子树归属强制跟随（含显式 ads 与 NULL 归属的报表叶子）
+                + "('promotion-sales-config', 'promotion-report-group') "
+                + "AND parent_id IS NULL AND system_code = 'seller' AND deleted = 0", Integer.class));
+        // 子树归属强制跟随（含显式 ads 与 NULL 归属的报表叶子），层级仍指向报表分析组
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key IN "
                 + "('promotion-report-overview', 'promotion-report-order') AND system_code = 'seller'", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu c JOIN sys_menu p ON c.parent_id = p.id "
+                + "WHERE c.menu_key IN ('promotion-report-overview', 'promotion-report-order') "
+                + "AND p.menu_key = 'promotion-report-group'", Integer.class));
         // 准入反推：ops 角色与部门 7 补授 seller；finance 侧不误伤
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE role_id = 2 AND system_code = 'seller'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_department_system WHERE dept_id = 7 AND system_code = 'seller'", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE system_code = 'finance'", Integer.class));
-        // admin 补授目录 view
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_menu WHERE role_id = 1 AND menu_id = ? "
-                + "AND actions = '[\"view\"]'", Integer.class, sellerCenterId));
+        // admin 对两个顶级入口补授 view（原来授在壳上，壳退役后必须落到真实入口）
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_menu rm JOIN sys_menu m ON m.id = rm.menu_id "
+                + "WHERE rm.role_id = 1 AND rm.actions = '[\"view\"]' AND m.menu_key IN "
+                + "('promotion-sales-config', 'promotion-report-group')", Integer.class));
         // 版本已记录
         assertTrue(tracker.isApplied(VERSION));
     }
@@ -87,25 +92,26 @@ class SellerWorkbenchMenuInitializerTest {
     @Test
     void rerunIsIdempotentAndHealsDrift() {
         initializer.ensureSellerWorkbench();
-        Long sellerCenterId = jdbc.queryForObject("SELECT id FROM sys_menu WHERE menu_key = 'seller-center'", Long.class);
 
-        // 模拟菜单配置页误把购买入口挂回广告目录
+        // 模拟菜单配置页误把购买入口挂回广告旧目录
         jdbc.update("UPDATE sys_menu SET parent_id = 1, system_code = 'ads' WHERE menu_key = 'promotion-sales-config'");
         initializer.ensureSellerWorkbench();
 
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center'", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'promotion-sales-config' "
-                + "AND parent_id = ? AND system_code = 'seller'", Integer.class, sellerCenterId));
+                + "AND parent_id IS NULL AND system_code = 'seller'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE role_id = 2 AND system_code = 'seller'", Integer.class));
     }
 
     @Test
-    void clearsSoftDeletedTombstoneBeforeCreate() {
-        // uk_menu_key 全局唯一：软删残留会挡建表路径（v44 生产事故模式）
+    void doesNotResurrectRetiredSellerCenterTombstone() {
+        // 退役壳的软删残留不得被重建复活（uk_menu_key 全局唯一，复活会让幽灵目录重回菜单配置）
         jdbc.execute("INSERT INTO sys_menu (menu_key, name, deleted) VALUES ('seller-center', '残留', 1)");
         initializer.ensureSellerWorkbench();
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE deleted = 1 AND menu_key LIKE 'seller-center%'", Integer.class));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 0", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 1", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'seller-center' AND deleted = 0", Integer.class));
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_key IN "
+                + "('promotion-sales-config', 'promotion-report-group') AND parent_id IS NULL AND system_code = 'seller'", Integer.class));
     }
 
     @Test
@@ -121,7 +127,10 @@ class SellerWorkbenchMenuInitializerTest {
 
         initializer.reconcileTranslationSystem();
 
-        assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE id IN (100, 101, 102) AND system_code = 'i18n'", Integer.class));
+        // v45: i18n-center 壳(id=100)已退役，归属自愈只作用于五个顶级入口及其后代；
+        //      壳本身与无关的 system-config(id=103) 都不被追溯。
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE id IN (101, 102) AND system_code = 'i18n'", Integer.class));
+        assertEquals("platform", jdbc.queryForObject("SELECT system_code FROM sys_menu WHERE id = 100", String.class));
         assertEquals("platform", jdbc.queryForObject("SELECT system_code FROM sys_menu WHERE id = 103", String.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_role_system WHERE role_id = 2 AND system_code = 'i18n'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sys_department_system WHERE dept_id = 7 AND system_code = 'i18n'", Integer.class));

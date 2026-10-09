@@ -1568,6 +1568,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/data-permission': 'data-permission',
   // 系統配置
   '/menu-config': 'menu-config',
+  '/menu-config/setting': 'menu-config',
   '/translation-manage': 'translation-manage',
   '/i18n-center/workbench': 'translation-manage',
   '/i18n-center/language': 'i18n-language',

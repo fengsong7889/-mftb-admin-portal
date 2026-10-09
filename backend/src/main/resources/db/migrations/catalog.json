@@ -66,8 +66,20 @@
       "dependencies": [
         "core:schema-v10"
       ],
-      "status": "ACTIVE",
+      "status": "SUPERSEDED", "supersededBy": "core:menu-seed-v45",
       "comment": "v44: 規則配置拆分——新增 rule-center 目录 + rule-ad-sales/rule-gift/rule-security/rule-algorithm/rule-seq 五子菜单（平台配置系统），旧 rule-config 保留改名「規則總覽」；splitRuleConfigMenus 幂等复制存量 rule-config 角色/部门授权至新子菜单与 asset-basic，回填 system_code=platform。"
+    },
+    {
+      "versionKey": "core:menu-seed-v45",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "comment": "v45: 退役一级包装目录（merchant_group/promotion_tool/seller-center/search/finance/ai-assistant/hr/asset-management/oa-center/permission/system-config/i18n-center）。seedSystemMenus 不再种子化这 12 个壳，其子菜单 parent 改为顶级；菜单类型改按『是否被子引用』推导；retireSystemWrapperDirectories() 每次启动幂等地把子菜单提升为顶级、清理壳的角色/部门授权并物理删除壳行（含软删残留，避免 uk_menu_key 撞唯一键）。SystemPortalSchemaInitializer 的 seller 校验与顶级归属表同步改为扁平结构。"
     },
     {
       "versionKey": "core:hr-menu-groups-v44",

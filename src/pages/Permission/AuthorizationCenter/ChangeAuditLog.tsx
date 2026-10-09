@@ -20,7 +20,8 @@ import {
   AUDIT_CHANGE_TYPES,
   type PermissionAuditItem,
 } from '../../../api/authorizationCenter'
-import { fetchSystemsCatalog } from '../../../api/systemAuthorization'
+import { fetchSystemsCatalog, type SystemCatalogItem } from '../../../api/systemAuthorization'
+import { getSystemDisplayName } from '../../../constants/portalSystems'
 import { translateMenuName } from '../../../i18n/menuNameEn'
 
 const { RangePicker } = DatePicker
@@ -173,7 +174,7 @@ function PermList({ perms, menuNames }: { perms: SnapshotPerm[]; menuNames: Menu
 }
 
 export default function ChangeAuditLog() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [searchForm] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -183,8 +184,13 @@ export default function ChangeAuditLog() {
   const [pageSize, setPageSize] = useState(20)
   const [roleOptions, setRoleOptions] = useState<Array<{ value: number; label: string }>>([])
   const [deptOptions, setDeptOptions] = useState<Array<{ value: number; label: string }>>([])
+  /** 系统目录原始数据；展示名由全局取名入口按当前语言派生 */
+  const [systemCatalog, setSystemCatalog] = useState<SystemCatalogItem[]>([])
   /** 系统编码 → 展示名（审计列表“業務系統”列用） */
-  const [systemNameMap, setSystemNameMap] = useState<Record<string, string>>({})
+  const systemNameMap = useMemo(
+    () => Object.fromEntries(systemCatalog.map((s) => [s.code, getSystemDisplayName(t, s, i18n.language) || s.code])),
+    [systemCatalog, t, i18n.language],
+  )
   /** 菜单 key → 展示名（审计 diff 快照里的 menuKey 翻译用） */
   const [menuNames, setMenuNames] = useState<MenuNameMap>({})
 
@@ -194,7 +200,7 @@ export default function ChangeAuditLog() {
       .then(([roles, depts, sysList, tree]) => {
         setRoleOptions((roles ?? []).map((r) => ({ value: r.id, label: `${r.name} (${r.code ?? r.id})` })))
         setDeptOptions((depts ?? []).map((d) => ({ value: d.id, label: d.name })))
-        setSystemNameMap(Object.fromEntries((sysList ?? []).map((s) => [s.code, s.name || s.code])))
+        setSystemCatalog(sysList ?? [])
         const names: MenuNameMap = {}
         const walk = (nodes: MenuVO[]) => {
           for (const n of nodes) {

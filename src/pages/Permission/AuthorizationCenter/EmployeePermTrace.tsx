@@ -14,12 +14,13 @@ import { fetchPermissionTrace } from '../../../api/authorizationCenter'
 import type { EmpPermissionTrace, TraceMenu } from '../../../api/authorizationCenter'
 import { ACTION_LABEL_MAP } from '../types'
 import { translateMenuName } from '../../../i18n/menuNameEn'
+import { getSystemDisplayName } from '../../../constants/portalSystems'
 
 /** 未归属系统菜单的分组 key */
 const UNGROUPED = '__ungrouped__'
 
 export default function EmployeePermTrace() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [employeeOptions, setEmployeeOptions] = useState<Array<{ value: number; label: string }>>([])
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
@@ -69,14 +70,14 @@ export default function EmployeePermTrace() {
     return () => { cancelled = true }
   }, [selectedUserId])
 
-  /** 系统编码 → 名称（准入列表优先，缺失时回落编码本身） */
+  /** 系统编码 → 名称（准入列表优先，缺失时回落编码本身）；统一走全局取名入口避免与门户不一致 */
   const systemNameMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const s of trace?.systems ?? []) {
-      map.set(s.code, s.name || s.code)
+      map.set(s.code, getSystemDisplayName(t, s, i18n.language) || s.code)
     }
     return map
-  }, [trace])
+  }, [trace, t, i18n.language])
 
   /** 菜单按归属系统分组（保持后端返回顺序：系统 sort + 菜单 sort） */
   const groupedMenus = useMemo(() => {

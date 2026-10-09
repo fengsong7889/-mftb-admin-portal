@@ -21,14 +21,16 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
-import { getPortalSystemKey } from '../../constants/portalSystems'
+import { getPortalSystemKey, getSystemDisplayName } from '../../constants/portalSystems'
 import { useAuth } from '../../contexts/AuthContext'
 import AnimatedNumber from '../../components/AnimatedNumber'
 import SystemArtwork, { type PortalArtworkStyle } from './SystemArtwork'
 import './index.css'
 
 /**
- * 前端界面确认阶段的展示目录，与 SystemPortalSchemaInitializer 的十个业务系统对齐。
+ * 前端界面确认阶段的展示目录，与 SystemPortalSchemaInitializer.seedSystems 的业务系统逐行对齐。
+ * 名称必须与 `sys_system.name` 完全一致（展示时还会再过一层 portal.systems.*.name 语言包），
+ * 否则未授权卡片与已授权卡片、授权中心会出现同名系统不同写法。
  * 全量目录接口目前仅权限管理员可用，暂不在门户调用；后续接入门户专用目录接口。
  * 此目录只用于展示未授权系统，不参与授权判断，不能据此放行入口。
  * 新增文案待 i18n 解耦后重构。
@@ -54,11 +56,11 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '賬戶餘額、批次、明細、對賬、審批中心', icon: 'AccountBookOutlined',
   },
   {
-    code: 'ai', name: 'AI 管理系統', nameEn: 'AI Hub',
+    code: 'ai', name: '人工智能管理系統', nameEn: 'Artificial Intelligence',
     description: '模型、配額、授權、MCP、審計、能耗', icon: 'RobotOutlined',
   },
   {
-    code: 'hr', name: 'HR 系統', nameEn: 'Human Resources',
+    code: 'hr', name: '人力資源系統', nameEn: 'Human Resources',
     description: '員工、組織、職位、員工動態', icon: 'TeamOutlined',
   },
   {
@@ -66,7 +68,11 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '資產、耗材、採購、庫存、盤點', icon: 'InboxOutlined',
   },
   {
-    code: 'oa', name: 'OA 系統', nameEn: 'OA',
+    code: 'rdm', name: '產研協同系統', nameEn: 'R&D Collaboration',
+    description: '需求提交、審批、分配、研發交付、驗收上線與產出看板', icon: 'ProjectOutlined',
+  },
+  {
+    code: 'oa', name: '協同辦公系統', nameEn: 'Office Collaboration',
     description: '流程中心、流程事項、審批配置、員工自助', icon: 'SolutionOutlined',
   },
   {
@@ -353,7 +359,7 @@ export default function Portal() {
     return {
       ...system,
       artworkName: system.name,
-      name: t(`portal.systems.${translationKey}.name`, { defaultValue: system.name }),
+      name: getSystemDisplayName(t, system, i18n.language),
       description: t(`portal.systems.${translationKey}.description`, { defaultValue: system.description ?? '' }),
     }
   }
