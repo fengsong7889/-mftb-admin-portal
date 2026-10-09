@@ -6,13 +6,14 @@
  *  2. 右侧主体为可勾选菜单树（checkStrictly：勾选=授予该菜单，默认 view；
  *     不做父→子级联，避免"给分组授予入口"被放大成全子菜单越权）；
  *  3. 选中菜单节点后在右列「功能操作」面板微调动作；取消 view 即撤销该菜单授权；
- *  4. 快捷操作：全选菜单 / 清空本系统；dirty 系统红点 + 「保存全部變更」串行链式
+ *  4. 快捷操作：全选菜单（仅查看）/ 授予全部功能 / 清空本系统；单菜单动作面板提供
+ *     「全選」复选框一次勾选该菜单全部功能；dirty 系统红点 + 「保存全部變更」串行链式
  *     传递最新全局 revision；冲突失败保留草稿不静默丢弃。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Checkbox, Empty, Modal, Select, Space, Spin, Switch, Tag, Tree, message } from 'antd'
+import { Alert, Button, Checkbox, Empty, Modal, Select, Space, Spin, Switch, Tag, Tooltip, Tree, message } from 'antd'
 import type { DataNode } from 'antd/es/tree'
-import { CopyOutlined, SaveOutlined } from '@ant-design/icons'
+import { CopyOutlined, InfoCircleOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { MenuPermission } from '../types'
 import { getMenuActions } from '../types'
@@ -345,6 +346,105 @@ export default function PermissionWorkbench() {
       }
       return { ...prev, [systemCode]: { ...draft, actionsByMenu: next } }
     })
+    message.info(t('authorizationCenter.selectAllMenusResult',
+      '已勾選 {{count}} 個菜單，僅授予「查看」權限', { count: visibleKeys.size }))
+  }
+
+  /**
+   * 「僅查看」同样先二次确认：两个批量入口的交互保持对称，用户不必去记
+   * 「哪个要点确认、哪个点了就生效」。确认框里必须写明「只给查看、不含增删改」，
+   * 否则与「全部權限」的确认框长得一样，反而重新制造了本次要消除的误解。
+   */
+  const confirmSelectAllMenus = (systemCode: string, visibleKeys: Set<string>) => {
+    if (visibleKeys.size === 0) return
+    Modal.confirm({
+      title: t('authorizationCenter.selectAllMenusConfirmTitle', '確認僅授予查看權限？'),
+      className: 'custom-confirm-modal',
+      // 默认 confirm 宽 416px，「權限深度：」这类标签会被挤到换行；这里放宽并配合 nowrap 标签
+      width: 520,
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row">
+            <span className="authz-confirm-label">
+              {t('authorizationCenter.grantAllActionsConfirmMenus', '影響菜單：')}
+            </span>
+            <span className="authz-confirm-value">{visibleKeys.size}</span>
+          </div>
+          <div className="confirm-info-row">
+            <span className="authz-confirm-label">
+              {t('authorizationCenter.grantAllActionsConfirmScope', '權限深度：')}
+            </span>
+            {/*
+              * 深度必须一眼可辨：绿色加粗只说「僅查看」，被排除的动作降级为灰色小字。
+              * 整句同色同粗时，用户分不清这是「只给查看」还是「全给」——正是本次要消除的误解。
+              */}
+            <span className="authz-confirm-depth">
+              <strong className="authz-depth-safe">
+                {t('authorizationCenter.selectAllMenusConfirmScopeValue', '僅「查看」')}
+              </strong>
+              <span className="authz-depth-detail">
+                {t('authorizationCenter.selectAllMenusConfirmScopeDetail',
+                  '不含新增／編輯／刪除／導入／導出')}
+              </span>
+            </span>
+          </div>
+        </div>
+      ),
+      okText: t('authorizationCenter.selectAllMenusConfirmOk', '確認勾選'),
+      cancelText: t('common.cancel', '取消'),
+      onOk: () => handleSelectAllMenus(systemCode, visibleKeys),
+    })
+  }
+
+  /** 批量提权属于放大权限，必须先二次确认并列出真实影响面（UI 规范 §B.3） */
+  const confirmGrantAll = (systemCode: string, nodes: MenuVO[]) => {
+    const plan = describeGrantPlan(nodes)
+    if (plan.menus === 0) return
+    Modal.confirm({
+      title: t('authorizationCenter.grantAllActionsConfirmTitle', '確認授予全部權限？'),
+      className: 'custom-confirm-modal',
+      width: 520,
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row">
+            <span className="authz-confirm-label">
+              {t('authorizationCenter.grantAllActionsConfirmMenus', '影響菜單：')}
+            </span>
+            <span className="authz-confirm-value">{plan.menus}</span>
+          </div>
+          <div className="confirm-info-row">
+            <span className="authz-confirm-label">
+              {t('authorizationCenter.grantAllActionsConfirmActions', '授予功能項：')}
+            </span>
+            <span className="authz-confirm-value">{plan.actions}</span>
+          </div>
+          <div className="confirm-info-row">
+            <span className="authz-confirm-label">
+              {t('authorizationCenter.grantAllActionsConfirmScope', '權限深度：')}
+            </span>
+            {/* 与「僅查看」确认框反向配色：红色警示这是提权动作，具体动作列表降级灰字 */}
+            <span className="authz-confirm-depth">
+              <strong className="authz-depth-full">
+                {t('authorizationCenter.grantAllActionsConfirmScopeValue', '全部功能')}
+              </strong>
+              <span className="authz-depth-detail">
+                {t('authorizationCenter.grantAllActionsConfirmScopeDetail',
+                  '新增／編輯／刪除／導入／導出')}
+              </span>
+            </span>
+          </div>
+        </div>
+      ),
+      okText: t('authorizationCenter.grantAllActionsConfirmOk', '確認授予'),
+      cancelText: t('common.cancel', '取消'),
+      onOk: () => {
+        handleGrantAllActions(systemCode, nodes)
+        message.success(t('authorizationCenter.grantAllActionsResult',
+          '已為 {{menus}} 個菜單授予全部功能權限，請記得保存', { menus: plan.menus }))
+      },
+    })
   }
 
   /** 快捷操作：清空本系统全部菜单授权（不动准入开关） */
@@ -355,6 +455,74 @@ export default function PermissionWorkbench() {
       return { ...prev, [systemCode]: { ...draft, actionsByMenu: {} } }
     })
     setSelectedMenuKey(null)
+  }
+
+  /**
+   * 快捷操作：一键勾选/取消「当前菜单」的全部功能动作。
+   * <p>取消全部等价于撤销该菜单授权（与取消 view 的语义一致），因此直接删除条目。
+   */
+  const handleSetAllActions = (systemCode: string, menuKey: string, available: string[], checked: boolean) => {
+    setDraftBySystem((prev) => {
+      const draft = prev[systemCode]
+      if (!draft) return prev
+      const next: Record<string, string[]> = { ...draft.actionsByMenu }
+      if (checked) {
+        // view 是所有动作的前提（取消 view 即撤销整菜单授权），勾选时强制补齐
+        next[menuKey] = Array.from(new Set(['view', ...available]))
+      } else {
+        delete next[menuKey]
+      }
+      return { ...prev, [systemCode]: { ...draft, actionsByMenu: next } }
+    })
+  }
+
+  /**
+   * 统计「全部菜单 × 全部功能」的实际影响面，供二次确认与结果提示展示。
+   * <p>必须与 handleGrantAllActions 用同一套判定（分组目录只算 view），
+   * 否则确认框里报的数字和真正写入的不一致，反而制造新的误解。
+   */
+  const describeGrantPlan = useCallback((nodes: MenuVO[]) => {
+    let menus = 0
+    let actions = 0
+    const walk = (list: MenuVO[]) => {
+      for (const node of list) {
+        if (node.menuKey) {
+          const isDirectory = !!node.children?.length && !node.path
+          menus += 1
+          actions += isDirectory ? 1 : 1 + getMenuActions(node.menuKey, node.actions ?? null)
+            .map((a) => a.key).filter((k) => k !== 'view').length
+        }
+        if (node.children?.length) walk(node.children)
+      }
+    }
+    walk(nodes)
+    return { menus, actions }
+  }, [])
+
+  /**
+   * 快捷操作：为本系统全部可见菜单一次性授予其可用功能。
+   * <p>分组目录（有子节点且自身无路由）只授予 view——它本身没有可授权的功能动作，
+   * 授予 create/delete 之类的噪声动作会让变更审计看起来像越权。
+   */
+  const handleGrantAllActions = (systemCode: string, nodes: MenuVO[]) => {
+    setDraftBySystem((prev) => {
+      const draft = prev[systemCode]
+      if (!draft) return prev
+      const next: Record<string, string[]> = { ...draft.actionsByMenu }
+      const walk = (list: MenuVO[]) => {
+        for (const node of list) {
+          if (node.menuKey) {
+            const isDirectory = !!node.children?.length && !node.path
+            next[node.menuKey] = isDirectory
+              ? ['view']
+              : Array.from(new Set(['view', ...getMenuActions(node.menuKey, node.actions ?? null).map((a) => a.key)]))
+          }
+          if (node.children?.length) walk(node.children)
+        }
+      }
+      walk(nodes)
+      return { ...prev, [systemCode]: { ...draft, actionsByMenu: next } }
+    })
   }
 
   /**
@@ -535,6 +703,11 @@ export default function PermissionWorkbench() {
   const selectedAvailable = selectedNode
     ? getMenuActions(selectedNode.menuKey, selectedNode.actions ?? null)
     : []
+  /** 「全選」复选框状态：全选/半选/未选，用于一次勾选当前菜单的全部功能 */
+  const selectedActionKeys = useMemo(() => new Set(selectedActions ?? []), [selectedActions])
+  const allActionsChecked = selectedAvailable.length > 0
+    && selectedAvailable.every((a) => selectedActionKeys.has(a.key))
+  const someActionsChecked = selectedAvailable.some((a) => selectedActionKeys.has(a.key))
   /** 目录分组（有子节点且自身无路由 path）：仅作结构层级，不提供可授权的功能动作 */
   const isDirectoryNode = !!selectedNode?.children?.length && !selectedNode.path
 
@@ -667,13 +840,43 @@ export default function PermissionWorkbench() {
                       <span className="authz-revoke-hint">{REVOKE_HINT}</span>
                     ) : null}
                     <span className="authz-quick-actions">
-                      <Button
-                        size="small"
-                        disabled={!activeDraft.systemAccess || systemVisibleKeys.size === 0}
-                        onClick={() => handleSelectAllMenus(activeSystem!, systemVisibleKeys)}
-                      >
-                        {t('authorizationCenter.selectAllMenus', '全選菜單')}
-                      </Button>
+                      {/*
+                        * 批量授权：两个按钮的作用范围相同（本系统全部可见菜单），差别只在「授予多深」。
+                        * 历史上它们叫「全選菜單 / 授予全部功能」且并排同款，用户普遍误以为
+                        * 全選菜單就等于给了全部权限，因此这里把「深度」写进名称，并用
+                        * 中性描边 / 品牌主色实心 + 盾牌图标拉开视觉权重，提权侧再补二次确认。
+                        */}
+                      <span className="authz-batch-grant">
+                        <span className="authz-batch-grant-label">
+                          {t('authorizationCenter.batchGrantLabel', '批量授權')}
+                          <Tooltip title={t('authorizationCenter.batchGrantTip',
+                            '「僅查看」只開放頁面進入；「全部權限」會一併授予新增/編輯/刪除/導入/導出，請按需選擇。')}>
+                            <InfoCircleOutlined className="authz-batch-grant-info" />
+                          </Tooltip>
+                        </span>
+                        <Tooltip title={t('authorizationCenter.selectAllMenusHint',
+                          '勾選本系統全部菜單，僅授予「查看」權限；已授權的菜單保留其原有動作。')}>
+                          <Button
+                            size="small"
+                            disabled={!activeDraft.systemAccess || systemVisibleKeys.size === 0}
+                            onClick={() => confirmSelectAllMenus(activeSystem!, systemVisibleKeys)}
+                          >
+                            {t('authorizationCenter.selectAllMenus', '全部菜單 · 僅查看')}
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title={t('authorizationCenter.grantAllActionsHint',
+                          '勾選本系統全部菜單，並為每個菜單授予其全部可用功能；分組目錄僅授予查看。')}>
+                          <Button
+                            size="small"
+                            type="primary"
+                            icon={<SafetyCertificateOutlined />}
+                            disabled={!activeDraft.systemAccess || systemVisibleKeys.size === 0}
+                            onClick={() => confirmGrantAll(activeSystem!, systemTree)}
+                          >
+                            {t('authorizationCenter.grantAllActions', '全部菜單 · 全部權限')}
+                          </Button>
+                        </Tooltip>
+                      </span>
                       <Button
                         size="small"
                         danger
@@ -759,6 +962,22 @@ export default function PermissionWorkbench() {
                             </>
                           ) : (
                             <div className="authz-action-list">
+                              {/* 全选：菜单功能动辄 6~8 项，逐个勾选成本过高，提供一次全选/全清 */}
+                              <Checkbox
+                                className="authz-action-select-all"
+                                checked={allActionsChecked}
+                                indeterminate={someActionsChecked && !allActionsChecked}
+                                disabled={!activeDraft.systemAccess || selectedAvailable.length === 0}
+                                onChange={(e) => handleSetAllActions(
+                                  activeSystem!,
+                                  selectedMenuKey,
+                                  selectedAvailable.map((a) => a.key),
+                                  e.target.checked,
+                                )}
+                              >
+                                {t('authorizationCenter.selectAllActions', '本菜單全部功能')}
+                              </Checkbox>
+                              <div className="authz-action-list-divider" />
                               {selectedAvailable.map((action) => (
                                 <Checkbox
                                   key={action.key}

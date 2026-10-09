@@ -277,6 +277,20 @@
   color: #595959;
 }
 
+/* 功能操作面板的「全選」行：批量入口，与下方逐项微调在视觉上分层 */
+.authz-action-list .authz-action-select-all {
+  font-size: 13px;
+  font-weight: 500;
+  color: #262626;
+}
+
+/* 全选行与逐项动作之间的分隔线 */
+.authz-action-list-divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 2px 0;
+}
+
 /* ── 员工权限透视 ── */
 
 .authz-trace-picker {
@@ -364,4 +378,74 @@
     border-top: 1px solid #f0f0f0;
     padding-top: 12px;
   }
+}
+
+/* 批量授权组：两个按钮作用范围相同、只差「授予多深」，绑成一组并与右侧「清空」视觉分开；
+   组名用弱色小字 + 说明图标，避免与操作按钮抢权重 */
+.authz-batch-grant {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  margin-right: 4px;
+  border-right: 1px solid #f0f0f0;
+}
+
+.authz-batch-grant-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.authz-batch-grant-info {
+  font-size: 12px;
+  color: #bfbfbf;
+  cursor: help;
+  transition: color 0.2s;
+}
+
+.authz-batch-grant-info:hover {
+  color: #e8720c;
+}
+
+/* 批量授权确认框：标签定宽不换行（默认 confirm 宽 416 会把「權限深度：」挤成两行） */
+.custom-confirm-modal .authz-confirm-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-width: 88px;
+  color: #8c8c8c;
+  font-size: 13px;
+}
+
+.custom-confirm-modal .authz-confirm-value {
+  color: #262626;
+  font-weight: 600;
+}
+
+/* 权限深度：主词加粗着色，动作明细降为灰字，让「只给查看」与「全给」一眼可辨 */
+.custom-confirm-modal .authz-confirm-depth {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.custom-confirm-modal .authz-depth-safe {
+  color: #52c41a;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.custom-confirm-modal .authz-depth-full {
+  color: #ff4d4f;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.custom-confirm-modal .authz-depth-detail {
+  color: #8c8c8c;
+  font-size: 12px;
 }
