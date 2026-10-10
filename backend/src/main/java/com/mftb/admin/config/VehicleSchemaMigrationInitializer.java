@@ -121,6 +121,11 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     private static final String[][] REQUIRED_INDEXES = {
             {"biz_vehicle_use", "uk_vehicle_use_reservation",
                     "ADD UNIQUE KEY uk_vehicle_use_reservation (active_reservation_vehicle)"},
+            // 超时未还统计：status IN ('in_use','to_confirm') AND planned_end < NOW()。
+            // 已有的 idx_vehicle_use_status 第二列是 planned_start，定不住 planned_end，
+            // 待办统计改成服务端出数后这条 COUNT 每次进页面都要跑，必须能走索引区间
+            {"biz_vehicle_use", "idx_vehicle_use_overdue",
+                    "ADD INDEX idx_vehicle_use_overdue (status, planned_end)"},
     };
 
     private static final String[] SEQ_RULES = {

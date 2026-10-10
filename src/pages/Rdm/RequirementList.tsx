@@ -40,6 +40,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
   fetchRequirementPage,
   fetchScopeCounts,
+  fetchRequirementStats,
   fetchProductOptions,
   claimRequirement,
   submitRequirement,
@@ -183,6 +184,8 @@ export default function RequirementList({
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
   const [counts, setCounts] = useState<Record<string, number>>({})
+  /** 看板信号卡（服务端统计结果） */
+  const [stats, setStats] = useState<Record<string, number>>({})
   const [selectedKeys, setSelectedKeys] = useState<number[]>([])
   const [filters, setFilters] = useState<RequirementFilters>({})
 
@@ -257,6 +260,21 @@ export default function RequirementList({
   useEffect(() => {
     fetchScopeCounts().then(setCounts).catch(() => setCounts({}))
   }, [activeScope])
+
+  /**
+   * 看板信号卡：服务端按当前筛选条件出数，只在看板视图下取。
+   *
+   * 以前是对已加载的 rows 做 filter().length，而看板一次只拉 RDM_KANBAN_SIZE 条，
+   * 需求一多四个数字就永远停在上限，看起来像「逾期只有 60 条」。
+   */
+  useEffect(() => {
+    if (view !== 'kanban') return
+    let alive = true
+    fetchRequirementStats({ scope: activeScope, ...filters })
+      .then(s => { if (alive) setStats(s) })
+      .catch(() => { if (alive) setStats({}) })
+    return () => { alive = false }
+  }, [view, activeScope, filters])
 
   /** 切换视角：写回 URL（而不是另存一份 state），否则刷新就丢，也无法从工作台深链带进来 */
   const switchScope = (key: string) => {
@@ -551,13 +569,13 @@ export default function RequirementList({
     ? { selectedRowKeys: selectedKeys, onChange: (keys: React.Key[]) => setSelectedKeys(keys as number[]) }
     : undefined
 
-  /** 看板信号卡：按当前视角已加载的行统计（与看板列同一数据源，不另拉一份） */
-  const kanbanStats = useMemo(() => {
-    const overdue = rows.filter(r => r.overdueFlag).length
-    const toAccept = rows.filter(r => r.status === RDM_STATUS.UAT_PENDING).length
-    const pool = rows.filter(r => r.status === RDM_STATUS.POOL).length
-    return { total: rows.length, overdue, toAccept, pool }
-  }, [rows])
+  /** 看板信号卡数据：服务端口径，缺失时显示 0 而不是回退到本页行数 */
+  const kanbanStats = {
+    total: stats.total ?? 0,
+    overdue: stats.overdue ?? 0,
+    toAccept: stats.toAccept ?? 0,
+    pool: stats.pool ?? 0,
+  }
 
   return (
     <div className="content-area">

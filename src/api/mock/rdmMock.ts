@@ -606,6 +606,22 @@ export function mockScopeCounts(): Record<string, number> {
   }
 }
 
+/**
+ * 看板信号卡统计的离线兜底。
+ *
+ * 从 mockListRequirements 的结果上算，保证 mock 下卡片口径与列表口径仍然一致；
+ * mock 没有 deptId/pmUserId/overdueOnly 这些参数，只能近似。
+ */
+export function mockRequirementStats(params: Parameters<typeof mockListRequirements>[0]): Record<string, number> {
+  const rows = mockListRequirements(params)
+  return {
+    total: rows.length,
+    overdue: rows.filter(r => r.overdueFlag).length,
+    toAccept: rows.filter(r => r.status === RDM_STATUS.UAT_PENDING).length,
+    pool: rows.filter(r => r.status === RDM_STATUS.POOL).length,
+  }
+}
+
 export function mockGetRequirement(id: number): RdmRequirementDetail | null {
   const base = requirements.find(r => r.id === id)
   if (!base) return null

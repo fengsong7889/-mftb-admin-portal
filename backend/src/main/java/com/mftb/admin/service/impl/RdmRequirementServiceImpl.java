@@ -170,6 +170,65 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return requirementMapper.selectCount(q.toWrapper(userId));
     }
 
+    /**
+     * 看板信号卡统计：与列表共用同一套条件构造，口径不可能分叉。
+     *
+     * <p>以前看板卡是对已加载的行做 filter().length 算的，而看板一次只拉固定上限条数，
+     * 需求一多卡片数字就永远停在上限值——用户看到「逾期 60」而实际 200，会错判风险。
+     */
+    @Override
+    public Map<String, Long> stats(RdmRequirementQuery query) {
+        SysUser current = operatorResolver.currentUser();
+        boolean unrestricted = canSeeAll(current);
+        Long userId = unrestricted ? null : (current == null ? null : current.getId());
+        boolean approvingScope = RdmConstants.SCOPE_APPROVING.equals(query.getScope());
+        // 待我審批的 id 集合只算一次、四个指标共用：每算一个指标重查一轮 OA 太浪费
+        List<Long> approvingIds = approvingScope ? approvingRequirementIds(current) : null;
+        Map<String, Long> counts = new LinkedHashMap<>();
+        if (approvingScope && approvingIds.isEmpty()) {
+            counts.put("total", 0L);
+            counts.put("overdue", 0L);
+            counts.put("toAccept", 0L);
+            counts.put("pool", 0L);
+            return counts;
+        }
+        counts.put("total", countStatsSubset(query, userId, approvingIds, q -> { }));
+        counts.put("overdue", countStatsSubset(query, userId, approvingIds, q -> q.setOverdueOnly(true)));
+        counts.put("toAccept", countStatsSubset(query, userId, approvingIds,
+                q -> q.setStatus(RdmConstants.STATUS_UAT_PENDING)));
+        counts.put("pool", countStatsSubset(query, userId, approvingIds,
+                q -> q.setStatus(RdmConstants.STATUS_POOL)));
+        return counts;
+    }
+
+    /** 复制一份查询条件再叠加单个指标的条件，避免四个指标互相污染 */
+    private long countStatsSubset(RdmRequirementQuery base, Long userId, List<Long> approvingIds,
+                                  java.util.function.Consumer<RdmRequirementQuery> tweak) {
+        RdmRequirementQuery q = copyFiltersForStats(base);
+        tweak.accept(q);
+        // 与 page() 保持同一收敛规则：待我審批的关联关系在 OA 任务表上，不按 relatedOnly 收敛
+        boolean relatedOnly = !RdmConstants.SCOPE_APPROVING.equals(q.getScope());
+        var wrapper = q.toWrapper(userId, relatedOnly);
+        if (approvingIds != null) {
+            wrapper.in(RdmRequirement::getId, approvingIds);
+        }
+        Long n = requirementMapper.selectCount(wrapper);
+        return n == null ? 0L : n;
+    }
+
+    private static RdmRequirementQuery copyFiltersForStats(RdmRequirementQuery src) {
+        RdmRequirementQuery q = new RdmRequirementQuery();
+        q.setScope(src.getScope());
+        q.setKeyword(src.getKeyword());
+        q.setReqType(src.getReqType());
+        q.setPriority(src.getPriority());
+        q.setStatus(src.getStatus());
+        q.setDeptId(src.getDeptId());
+        q.setPmUserId(src.getPmUserId());
+        q.setOverdueOnly(src.getOverdueOnly());
+        return q;
+    }
+
     @Override
     public RdmRequirementVO detail(Long id) {
         RdmRequirement req = requireRequirement(id);

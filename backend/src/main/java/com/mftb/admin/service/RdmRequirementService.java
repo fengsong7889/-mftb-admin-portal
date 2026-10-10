@@ -25,6 +25,14 @@ public interface RdmRequirementService {
     /** 各视角 Tab 数量 */
     Map<String, Long> scopeCounts();
 
+    /**
+     * 看板信号卡统计（total/overdue/toAccept/pool）。
+     *
+     * <p>接与列表同一份查询条件，不能由前端对已加载的行自己数：
+     * 看板只拉固定上限条数，数字会永远停在上限值。
+     */
+    Map<String, Long> stats(RdmRequirementQuery query);
+
     /** 需求详情（含关联对象、角色、时间轴、评论、附件、审批节点、SLA、可执行动作） */
     RdmRequirementVO detail(Long id);
 

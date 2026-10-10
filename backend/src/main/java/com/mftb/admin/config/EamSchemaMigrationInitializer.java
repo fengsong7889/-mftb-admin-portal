@@ -74,6 +74,41 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce("eam:schema-v32-fix-written-off-asset", this::fixWrittenOffAssetLedger);
         versionTracker.applyOnce("eam:schema-v33-inventory-v2", this::upgradeInventoryV2);
         versionTracker.applyOnce("eam:schema-v34-asset-lifecycle", this::applyAssetLifecycleSchema);
+        versionTracker.applyOnce("eam:schema-v35-claim-summary-index",
+                this::addClaimSummaryIndex, this::verifyClaimSummaryIndex);
+    }
+
+    /**
+     * v35: 领用员工汇总查询的覆盖索引。
+     *
+     * <p>领用汇总从「全表加载 + Java 分组」改成 SQL 聚合 + 服务端分页后，
+     * 查询形式是 {@code WHERE deleted=0 AND employee_id IN (...) GROUP BY employee_id}
+     * 并对 status/signature_status/claim_date 做条件求和。原有三个单列索引
+     * （idx_employee/idx_status/idx_signature）只能定住 employee_id，其余列全部回表，
+     * 领用记录一多聚合仍会退化成大范围随机 IO。
+     * <p>本索引把参与过滤与聚合的列全收进去，让 GROUP BY 走索引概扫（index-only）。
+     */
+    private void addClaimSummaryIndex() {
+        log.info("开始执行 v35 迁移：领用汇总覆盖索引 ...");
+        addIndexSafe("biz_eam_claim", "idx_claim_emp_summary",
+                "employee_id, deleted, status, signature_status, claim_date");
+    }
+
+    /** 后置校验：索引确实存在才算迁移成功，否则不记版本、下次启动重试 */
+    private void verifyClaimSummaryIndex() {
+        if (!indexExists("biz_eam_claim", "idx_claim_emp_summary")) {
+            throw new IllegalStateException("biz_eam_claim.idx_claim_emp_summary 索引未就绪，"
+                    + "领用汇总聚合会回表扫全量，请检查库账号是否有 ALTER 权限");
+        }
+    }
+
+    /** 按 INDEX_NAME 判断索引是否存在（与 MySQL 的 information_schema.STATISTICS 对齐） */
+    private boolean indexExists(String table, String indexName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, indexName);
+        return count != null && count > 0;
     }
 
     /**

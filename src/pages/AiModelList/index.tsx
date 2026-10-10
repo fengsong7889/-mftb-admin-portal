@@ -241,12 +241,27 @@ export default function AiModelList() {
 
   /* ── 編輯 / 詳情：跳轉到獨立頁面 ── */
 
-  /* ── 統計卡 ── */
+  /* ── 統計卡 ──
+   * 口径必须跟随当前查询条件：卡片放在搜索区下方就是要展示「筛出来的这批」的构成，
+   * 用未过滤的 models/providers 算会让用户改完条件后看到数字不变，误以为条件没生效。
+   */
   const stats = [
-    { label: '已接入模型', value: <AnimatedNumber value={connectedModelCount} />, icon: <ApiOutlined />, color: '#52C41A', bg: '#F6FFED' },
-    { label: '全部模型', value: <AnimatedNumber value={models.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
-    { label: '供應商數', value: <AnimatedNumber value={providers.length} />, icon: <span>🏢</span>, color: '#E8720C', bg: '#FFF7E6' },
-    { label: '視覺模型', value: <AnimatedNumber value={models.filter((m) => m.visionSupport === 1).length} />, icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF' },
+    {
+      label: '已接入模型',
+      value: <AnimatedNumber value={filteredModels.filter((m) => m.providerId && connectedProviderIds.has(m.providerId)).length} />,
+      icon: <ApiOutlined />, color: '#52C41A', bg: '#F6FFED',
+    },
+    { label: '全部模型', value: <AnimatedNumber value={filteredModels.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+    {
+      label: '涉及供應商',
+      value: <AnimatedNumber value={new Set(filteredModels.map((m) => m.providerId).filter(Boolean)).size} />,
+      icon: <span>🏢</span>, color: '#E8720C', bg: '#FFF7E6',
+    },
+    {
+      label: '視覺模型',
+      value: <AnimatedNumber value={filteredModels.filter((m) => m.visionSupport === 1).length} />,
+      icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF',
+    },
   ]
 
   /* ── 列字段配置 ── */

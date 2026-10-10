@@ -330,15 +330,19 @@ export default function TranslationManage() {
 
   const tCategories = useMemo(() => CATEGORIES.map(c => ({ value: c.value, label: t(c.labelKey) })), [t])
 
-  /* 统计 */
+  /* 统计
+   * 口径跟随当前筛选（分类/完善状态/关键字）：卡片在搜索区下方，
+   * 用未过滤的 data 算会让改条件后数字不变，看起来像筛选失效。
+   * 「語言數」是语言字典规模，不受字段筛选影响，保留全局口径。
+   */
   const stats = useMemo(() => {
-    const total = data.length
-    const complete = data.filter(f =>
+    const total = filteredData.length
+    const complete = filteredData.filter(f =>
       languages.every(l => f.translations[l.code]?.trim())
     ).length
     const incomplete = total - complete
     return { total, complete, incomplete }
-  }, [data, languages])
+  }, [filteredData, languages])
 
   /* 字段名称重复温和提示（不拦截，仅提醒） */
   const addFieldName = Form.useWatch('description', addFieldForm)
@@ -839,8 +843,11 @@ export default function TranslationManage() {
         </Form>
       </div>
 
-      {/* 统计卡片 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
+      {/* 统计卡片（条件变化时重新触发计数动画） */}
+      <div
+        key={`${filterCategory ?? 'all'}-${filterStatus ?? 'all'}-${searchKey ?? ''}`}
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}
+      >
         {[
           { label: t('translationManage:statTotalFields'), value: stats.total, color: '#1890FF', bgColor: '#E6F7FF' },
           { label: t('translationManage:statComplete'), value: stats.complete, color: '#52C41A', bgColor: '#F6FFED', icon: <CheckCircleOutlined /> },

@@ -55,6 +55,13 @@ public class RdmRequirementController {
         return Result.success(requirementService.scopeCounts());
     }
 
+    /** 看板信号卡统计：接与列表同一组查询条件，口径跟随筛选 */
+    @GetMapping("/requirement/stats")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    public Result<Map<String, Long>> stats(RdmRequirementQuery query) {
+        return Result.success(requirementService.stats(query));
+    }
+
     /** 需求详情 */
     @GetMapping("/requirement/{id}")
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})

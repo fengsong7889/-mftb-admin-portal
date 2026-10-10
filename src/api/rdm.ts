@@ -49,6 +49,7 @@ import {
   mockSetStatusEnabled,
   mockSetTransitionEnabled,
   mockScopeCounts,
+  mockRequirementStats,
   mockSlaConfigs,
   mockStatusDefs,
   mockTransitions,
@@ -616,6 +617,23 @@ export async function fetchScopeCounts(): Promise<Record<string, number>> {
     return await request.get<unknown, Record<string, number>>('/rdm/requirement/scope-counts', SILENT)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockScopeCounts()
+    throw err
+  }
+}
+
+/**
+ * 看板信号卡统计（total/overdue/toAccept/pool）。
+ *
+ * 必须把列表的查询条件一起传上去：看板一次只拉固定上限条数，
+ * 在前端对已加载的行做 filter().length 会把数字锁死在上限值。
+ */
+export async function fetchRequirementStats(
+  query: Omit<RdmRequirementQuery, 'page' | 'size'>,
+): Promise<Record<string, number>> {
+  try {
+    return await request.get<unknown, Record<string, number>>('/rdm/requirement/stats', { params: query, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return mockRequirementStats(query)
     throw err
   }
 }
