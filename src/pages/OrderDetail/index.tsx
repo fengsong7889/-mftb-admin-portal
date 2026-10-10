@@ -19,7 +19,8 @@ import {
 } from '../../api/adPromotion'
 import { AlgorithmType, REGION_LABEL_KEY } from '../Recommend/constants'
 import { BIZ_CHANNEL } from '../../constants/bizChannel'
-import { loadTrafficPricing } from '../AdSales/types'
+import { type TrafficChannelPricing } from '../AdSales/types'
+import { loadTrafficChannelPricing } from '../_shared/ad-promotion/trafficPricing'
 import { useCountUp } from '../../hooks/useCountUp'
 import AnimatedNumber from '../../components/AnimatedNumber'
 import { OrderStatus, AppType, RecommendChannel, RecommendType, MEAL_SLOT_LABEL, RECOMMEND_TYPE_ICON, ORDER_CHANNEL_TO_TRAFFIC_BIZ, getStageIndex, getStageTime, parseCancelFeeTiers, parseDiscountTiers, parseDayDiscountTiers } from './orderUtils'
@@ -249,6 +250,17 @@ export default function OrderDetail() {
     return null
   }, [order])
 
+  /** 投流廣告：退款口徑（手續費比例 / 是否允許退款）取自後端頻道定價配置 */
+  const [trafficChannelPricing, setTrafficChannelPricing] = useState<TrafficChannelPricing[]>([])
+  useEffect(() => {
+    if (order?.recommendType !== RecommendType.TRAFFIC_AD) return
+    let cancelled = false
+    loadTrafficChannelPricing()
+      .then(list => { if (!cancelled) setTrafficChannelPricing(list) })
+      .catch(() => { if (!cancelled) setTrafficChannelPricing([]) })
+    return () => { cancelled = true }
+  }, [order])
+
   if (!order) {
     return (
       <div className="content-area" style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -406,7 +418,8 @@ export default function OrderDetail() {
     const consumed = (order.promoData ?? []).reduce((s, d) => s + d.impressions, 0)
     const remaining = Math.max(0, purchased - consumed)
     const unitPrice = purchased > 0 ? order.actualPrice / purchased : 0
-    const channelPricing = loadTrafficPricing().find(p => p.bizChannel === ORDER_CHANNEL_TO_TRAFFIC_BIZ[order.channel])
+    const channelPricing = trafficChannelPricing.find(
+      p => p.bizChannel === ORDER_CHANNEL_TO_TRAFFIC_BIZ[order.channel])
     const feePercent = channelPricing?.refundFeePercent ?? 0
     const grossRefund = Math.round(remaining * unitPrice * 100) / 100
     const feeAmount = Math.round(grossRefund * feePercent) / 100

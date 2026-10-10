@@ -328,7 +328,7 @@ export const mockOrders: OrderItem[] = [
   // ── TODO: 投流广告订单（与订单列表 mock 对應，樣式调試用），確認后刪除 ──
   {
     id: 'DDLL202609010001', orderNo: 'DDLL202609010001',
-    algorithmId: 'SFLL20260818008', promotionName: '投流广告·精準曝光',
+    algorithmId: 'SFTL20260818008', promotionName: '投流广告·精準曝光',
     app: AppType.SHANFENG, channel: RecommendChannel.DELIVERY, region: 1,
     recommendType: RecommendType.TRAFFIC_AD, slotPosition: 0,
     groupId: 'G1001', groupName: '澳门張记牛雜', storeId: 'M1001', storeName: '新馬路店', storeAddress: '',
@@ -341,7 +341,7 @@ export const mockOrders: OrderItem[] = [
   },
   {
     id: 'DDLL202609010002', orderNo: 'DDLL202609010002',
-    algorithmId: 'SFLL20260818008', promotionName: '投流广告·精準曝光',
+    algorithmId: 'SFTL20260818008', promotionName: '投流广告·精準曝光',
     app: AppType.MFOOD, channel: RecommendChannel.SUPERMARKET, region: 6,
     recommendType: RecommendType.TRAFFIC_AD, slotPosition: 0,
     groupId: 'G1002', groupName: '氹仔貓山王榴蓮甜品', storeId: 'M1002', storeName: '氹仔官也街店', storeAddress: '',

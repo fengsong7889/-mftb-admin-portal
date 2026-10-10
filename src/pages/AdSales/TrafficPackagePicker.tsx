@@ -11,12 +11,13 @@ import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import {
   type TrafficPackageTier,
   type TrafficPackageOrder,
-  loadTrafficPricing,
+  type TrafficChannelPricing,
   findLadderUnitPrice,
   calcCustomAmount,
   saveTrafficOrder,
   MOCK_TRAFFIC_MERCHANTS,
 } from './types'
+import { loadTrafficChannelPricing } from '../_shared/ad-promotion/trafficPricing'
 
 /** 投流廣告廣告類型標識（規則配置/贈送管理一致） */
 const GIFT_AD_TYPE_TRAFFIC = 'traffic_ad'
@@ -37,8 +38,8 @@ const BD_OPTIONS = [
 export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
   const navigate = useNavigate()
-  // 僅展示啟用中的頻道定價（停用頻道停止售賣）
-  const pricing = useMemo(() => loadTrafficPricing().filter(p => p.status !== 'disabled'), [])
+  // 僅展示啟用中的頻道定價（停用頻道停止售賣）：真值來自後端 biz_ad_pricing_traffic
+  const [pricing, setPricing] = useState<TrafficChannelPricing[]>([])
   /** 業務頻道 i18n 標籤映射 */
   const BIZ_CHANNEL_I18N_MAP: Record<string, string> = {
     [BIZ_CHANNEL.FOOD_DELIVERY]: t('bizChannelFoodDelivery'),
@@ -52,7 +53,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const [algorithmOptions, setAlgorithmOptions] = useState<AdAlgorithm[]>([])
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
-  const [bizChannel, setBizChannel] = useState<string>(() => pricing[0]?.bizChannel ?? BIZ_CHANNEL.FOOD_DELIVERY)
+  const [bizChannel, setBizChannel] = useState<string>(BIZ_CHANNEL.FOOD_DELIVERY)
   const [hasSearched, setHasSearched] = useState(false)
 
   /* ── 選購狀態（預設檔位與自定義數量同屏展示，二者互斥選擇） ── */
@@ -83,6 +84,22 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
       .catch(() => { /* 算法庫不可用時允許跳過 */ })
   }, [])
 
+  /* ── 載入頻道定價配置（僅啟用中：停用頻道停止售賣） ── */
+  useEffect(() => {
+    let cancelled = false
+    loadTrafficChannelPricing({ status: 1 })
+      // 後端按 id 倒序返回，這裡按業務頻道升序排，保證默認落在美食外賣
+      .then(list => { if (!cancelled) setPricing([...list].sort((a, b) => a.bizChannel.localeCompare(b.bizChannel))) })
+      .catch(() => { if (!cancelled) setPricing([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  /* 默認落到第一個有定價配置的頻道（後端可能只配置了部分頻道） */
+  useEffect(() => {
+    if (pricing.length === 0) return
+    if (!pricing.some(p => p.bizChannel === bizChannel)) setBizChannel(pricing[0].bizChannel)
+  }, [pricing, bizChannel])
+
   /* ── 查詢 / 重置 ── */
   const handleSearch = () => {
     if (!storeMode && !searchStoreName) {
@@ -112,7 +129,9 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   }
 
   /* ── 計價 ── */
-  const current = pricing.find(p => p.bizChannel === bizChannel)
+  // 投流定價按「算法 × 業務頻道」存儲：選定算法時必須命中該算法在該頻道的定價
+  const current = pricing.find(p => p.bizChannel === bizChannel
+    && (searchAlgorithm == null || p.algoId === searchAlgorithm))
   const onSaleTiers = (current?.tiers ?? []).filter(tier => tier.onSale).sort((a, b) => a.sort - b.sort)
   const selectedTier: TrafficPackageTier | null = onSaleTiers.find(tier => tier.id === selectedTierId) ?? null
 

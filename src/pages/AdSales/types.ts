@@ -23,7 +23,6 @@ export {
   type TrafficPriceLadderRow,
   type TrafficChannelPricing,
   generateDefaultTrafficPricing,
-  loadTrafficPricing,
   findLadderUnitPrice,
   calcCustomAmount,
 } from '../_shared/ad-promotion/types'

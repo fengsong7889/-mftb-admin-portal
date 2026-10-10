@@ -362,6 +362,14 @@ export interface TrafficPriceLadderRow {
 
 /** 單個業務頻道的定價配置 */
 export interface TrafficChannelPricing {
+  /** 後端計價主鍵（biz_ad_pricing_traffic.id，新增未保存時為空） */
+  pricingId?: number
+  /** 定價編號（後端按編號生成規則 config_pricing_traffic 生成，如 DJTL20260812000） */
+  pricingNo?: string
+  /** 關聯算法ID（投流定價按「算法 × 業務頻道」唯一） */
+  algoId?: number
+  /** 所屬品牌: flashBee / mFood */
+  brand?: string
   bizChannel: BizChannelValue
   tiers: TrafficPackageTier[]
   ladder: TrafficPriceLadderRow[]
@@ -373,9 +381,12 @@ export interface TrafficChannelPricing {
   refundFeePercent?: number         // 退款手續費比例（%）：手續費 = 退款金額 × 比例，0 = 免費退
 }
 
-const TRAFFIC_PRICING_STORAGE_KEY = 'traffic-package-pricing'
-
-/** 生成 3 個業務頻道的默認定價配置（與銷售定價頁一致） */
+/**
+ * 生成 3 個業務頻道的默認定價配置。
+ * <p>
+ * 僅作「新增投流定價」表單的初始值（與後端 AdPromotionDataInitializer 的種子數據一致），
+ * 不再落 localStorage：定價配置的真值已收斂到後端 biz_ad_pricing_traffic。
+ */
 export function generateDefaultTrafficPricing(): TrafficChannelPricing[] {
   return [
     {
@@ -436,34 +447,6 @@ export function generateDefaultTrafficPricing(): TrafficChannelPricing[] {
       refundFeePercent: 0,
     },
   ]
-}
-
-/** 讀取定價配置（優先 localStorage，無則默認） */
-export function loadTrafficPricing(): TrafficChannelPricing[] {
-  try {
-    const raw = localStorage.getItem(TRAFFIC_PRICING_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as TrafficChannelPricing[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch { /* 解析失敗回退默認配置 */ }
-  return generateDefaultTrafficPricing()
-}
-
-/** 保存定價配置到 localStorage（同時記錄保存時間，供定價列表展示） */
-export function saveTrafficPricing(pricing: TrafficChannelPricing[]): void {
-  localStorage.setItem(TRAFFIC_PRICING_STORAGE_KEY, JSON.stringify(pricing))
-  localStorage.setItem(`${TRAFFIC_PRICING_STORAGE_KEY}-saved-at`, new Date().toISOString())
-}
-
-/** 讀取定價配置最近保存時間（未保存過返回 '-'） */
-export function loadTrafficPricingSavedAt(): string {
-  const raw = localStorage.getItem(`${TRAFFIC_PRICING_STORAGE_KEY}-saved-at`)
-  if (!raw) return '-'
-  const d = new Date(raw)
-  if (Number.isNaN(d.getTime())) return '-'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 /** 按購買數量查找命中的階梯單價 */

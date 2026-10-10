@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { Button, Space, Input, Select, Table, Modal, Form, InputNumber, message } from 'antd'
+import { Button, Space, Input, Table, Modal, Form, InputNumber, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -248,6 +248,7 @@ export default function GiftDetail() {
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
           <GiftSearchFields
+            t={t}
             searchGroupId={searchGroupId} setSearchGroupId={setSearchGroupId}
             searchStoreId={searchStoreId} setSearchStoreId={setSearchStoreId}
             groups={groups} stores={stores}

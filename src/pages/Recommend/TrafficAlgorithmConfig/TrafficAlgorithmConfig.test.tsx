@@ -55,7 +55,7 @@ function mountConfig(props: Omit<HarnessProps, 'bind'> = {}) {
   return { ...view, get form() { return form }, get controller() { return controller } }
 }
 const fixture = (params: Record<string, unknown> = {}): AdAlgorithm => ({
-  id: 7, algoCode: 'SFLL0007', algoName: '午餐投流', algoType: 15, brand: 'flashBee', updatedBy: '测试运营',
+  id: 7, algoCode: 'SFTL0007', algoName: '午餐投流', algoType: 15, brand: 'flashBee', updatedBy: '测试运营',
   params: JSON.stringify({ ...readTrafficParams({}), consistencyCheckInterval: 10, ...params }),
 })
 

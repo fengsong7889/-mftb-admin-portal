@@ -1,12 +1,18 @@
 /**
  * GiftManage 共享搜索表單欄位 — GiftConsumeDetail / GiftDetail 共用
+ *
+ * 翻譯函數由父組件傳入：本組件的 key 分屬 giftDetail / giftConsumeDetail 兩個 ns，
+ * 若在此處用無 ns 的 useTranslation() 查不到翻譯，界面會直接顯示原始 key。
  */
 import { Form, Select } from 'antd'
-import { useTranslation } from 'react-i18next'
 import type { MerchantGroupItem } from '../../../api/merchantGroup'
 import type { StoreItem } from '../../../api/store'
 
+type TFn = (key: string) => string
+
 interface GiftSearchFieldsProps {
+  /** 父組件綁定自身 ns 的翻譯函數 */
+  t: TFn
   searchGroupId: number | undefined
   setSearchGroupId: (v: number | undefined) => void
   searchStoreId: number | undefined
@@ -22,8 +28,8 @@ interface GiftSearchFieldsProps {
 }
 
 export default function GiftSearchFields(props: GiftSearchFieldsProps) {
-  const { t } = useTranslation()
   const {
+    t,
     searchGroupId, setSearchGroupId, searchStoreId, setSearchStoreId,
     groups, stores,
     searchBrand, setSearchBrand, brandOptions,

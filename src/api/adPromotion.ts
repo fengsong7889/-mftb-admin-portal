@@ -1100,6 +1100,135 @@ export function deleteAdSignboardPricing(id: number) {
   return request.delete<unknown, void>(`/ad/pricing/signboard/${id}`, SILENT)
 }
 
+/* ==================== 投流廣告 - 計價配置（銷售定價） ==================== */
+
+/** 投流廣告預設檔位（流量包套餐，與後端 AdPricingTrafficVO.TierItem 對齊） */
+export interface AdTrafficTier {
+  id?: number
+  /** 檔位名稱 */
+  tierName: string
+  /** 曝光次數 */
+  impressions: number
+  /** 套餐價格（MOP） */
+  price: number
+  /** 有效期（天）— 已停用：流量包消耗完畢即退出 */
+  validityDays?: number
+  /** 是否上架: 1=上架 2=下架 */
+  onSale?: number
+  sort?: number
+  /** 折扣開關: 1=開啟 0=關閉 */
+  discountEnabled?: number
+  /** 折扣（折，如 8.5 = 85折） */
+  discount?: number
+  /** 折扣時間模式: unlimited=不限時間 limited=限定時間 */
+  discountTimeMode?: string
+  /** 折扣活動開始日期 YYYY-MM-DD */
+  discountStartDate?: string
+  /** 折扣活動結束日期 YYYY-MM-DD */
+  discountEndDate?: string
+}
+
+/** 投流廣告階梯單價行（自定義曝光數量計價，maxQty=0 表示無上限） */
+export interface AdTrafficLadderRow {
+  id?: number
+  minQty: number
+  maxQty?: number
+  /** 單次曝光單價（MOP） */
+  unitPrice: number
+}
+
+/** 投流廣告計價配置（與後端 AdPricingTrafficVO 對齊） */
+export interface AdPricingTraffic {
+  id?: number
+  /** 定價編號（按編號生成規則 config_pricing_traffic 生成，如 DJTL20260812000） */
+  pricingNo?: string
+  algoId: number
+  algoName?: string
+  brand?: string
+  /** 業務頻道: 1=美食外賣 2=超市百貨 3=團購到店 */
+  bizChannel: number
+  /** 自定義購買最低起購量（曝光次數） */
+  customMinQty?: number
+  /** 自定義購買步長（曝光次數） */
+  customStep?: number
+  /** 退款開關: 1=允許退款 2=不允許 */
+  refundEnabled?: number
+  /** 退款手續費比例（%） */
+  refundFeePercent?: number
+  /** 服務狀態: 1=啟用 2=停用（停用後該頻道流量包停止售賣） */
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  tiers?: AdTrafficTier[]
+  ladder?: AdTrafficLadderRow[]
+}
+
+/** 投流廣告計價配置新增/編輯請求（後端整體替換 tiers 與 ladder） */
+export interface AdPricingTrafficRequest {
+  algoId: number
+  algoName?: string
+  brand?: string
+  bizChannel: number
+  customMinQty?: number
+  customStep?: number
+  refundEnabled?: number
+  refundFeePercent?: number
+  status?: number
+  remark?: string
+  tiers: AdTrafficTier[]
+  ladder: AdTrafficLadderRow[]
+}
+
+/** 投流廣告計價配置查詢參數 */
+export interface AdPricingTrafficQuery {
+  page?: number
+  size?: number
+  algoId?: number
+  brand?: string
+  bizChannel?: number
+  status?: number
+}
+
+/** 投流廣告計價配置分頁查詢 */
+export function fetchAdTrafficPricingList(params: AdPricingTrafficQuery) {
+  return request.get<unknown, AdPageResult<AdPricingTraffic>>('/ad/pricing/traffic', { params, ...SILENT })
+}
+
+/** 投流廣告計價配置詳情（含預設檔位 + 階梯單價） */
+export function fetchAdTrafficPricingDetail(id: number) {
+  return request.get<unknown, AdPricingTraffic>(`/ad/pricing/traffic/${id}`, SILENT)
+}
+
+/** 按算法+業務頻道查詢啟用中的計價配置（購買頁載入定價用） */
+export function fetchAdTrafficPricingActive(algoId: number, bizChannel?: number) {
+  return request.get<unknown, AdPricingTraffic>('/ad/pricing/traffic/active', {
+    params: { algoId, bizChannel },
+    ...SILENT,
+  })
+}
+
+/** 新增投流廣告計價配置（同一算法同一業務頻道僅一條） */
+export function createAdTrafficPricing(data: AdPricingTrafficRequest) {
+  return request.post<unknown, AdPricingTraffic>('/ad/pricing/traffic', data, SILENT)
+}
+
+/** 編輯投流廣告計價配置 */
+export function updateAdTrafficPricing(id: number, data: AdPricingTrafficRequest) {
+  return request.put<unknown, AdPricingTraffic>(`/ad/pricing/traffic/${id}`, data, SILENT)
+}
+
+/** 投流廣告計價配置啟用/停用 */
+export function updateAdTrafficPricingStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/pricing/traffic/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除投流廣告計價配置 */
+export function deleteAdTrafficPricing(id: number) {
+  return request.delete<unknown, void>(`/ad/pricing/traffic/${id}`, SILENT)
+}
+
 /* ==================== 金字招牌 - 庫存 & 下單 ==================== */
 
 /** 金字招牌庫存格子 */

@@ -130,13 +130,16 @@ const payMethodLabelMapKeys: Record<string, string> = {
   mixed: 'approvalDetail.payMethodMixed',
   revenue: 'approvalDetail.payMethodRevenue',
 }
-/** 廣告類型映射（i18n key，value 為英文枚舉碼） */
+/** 廣告類型映射（i18n key，value 為廣告類型枚舉碼；ka 為 popular_merchant 的歷史碼，僅供存量數據兜底） */
 const giftAdTypeLabelMapKeys: Record<string, string> = {
   new_store: 'approvalDetail.giftAdTypeNewStore',
   revival: 'approvalDetail.giftAdTypeRevival',
   exclusive: 'approvalDetail.giftAdTypeExclusive',
   gold: 'approvalDetail.giftAdTypeGold',
-  ka: 'approvalDetail.giftAdTypeKa',
+  popular_merchant: 'approvalDetail.giftAdTypePopularMerchant',
+  ka: 'approvalDetail.giftAdTypePopularMerchant',
+  golden_signboard: 'approvalDetail.giftAdTypeGoldenSignboard',
+  traffic_ad: 'approvalDetail.giftAdTypeTrafficAd',
 }
 /** 扣款方式映射（i18n key，value 為英文枚舉碼） */
 const deductMethodLabelMapKeys: Record<string, string> = {

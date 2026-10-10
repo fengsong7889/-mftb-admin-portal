@@ -13,12 +13,18 @@ import { fetchStoresByGroup } from '../../../api/store'
 
 /* ──────────── 常量 ──────────── */
 
+/**
+ * 廣告類型顏色映射。
+ * 鍵為後端存儲的廣告類型代碼，exclusive/gold/ka 為歷史代碼（僅用於存量數據渲染兜底）。
+ */
 export const adTypeColorMap: Record<string, string> = {
   new_store: '#52C41A',
   revival: '#E8720C',
   exclusive: '#722ED1',
   gold: '#FAAD14',
   popular_merchant: '#1890FF',
+  golden_signboard: '#D48806',
+  traffic_ad: '#13C2C2',
 }
 
 export const tradeTypeColorMap: Record<string, string> = {
@@ -32,21 +38,34 @@ export const tradeTypeColorMap: Record<string, string> = {
 
 type TFn = (key: string) => string
 
-export const createAdTypeOptions = (t: TFn) => [
-  { label: t('common:all'), value: '' },
+/**
+ * 可贈送的廣告類型選項（新增贈送表單、列表篩選共用）。
+ * 必須與後端 BizSeqService.giftRuleKey 支持的類型一一對應，否則選了就無法生成贈送ID。
+ */
+export const createGiftAdTypeOptions = (t: TFn) => [
   { label: t('adTypeNewStore'), value: 'new_store' },
   { label: t('adTypeRevival'), value: 'revival' },
-  { label: t('adTypeExclusive'), value: 'exclusive' },
-  { label: t('adTypeGold'), value: 'gold' },
   { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
+  { label: t('adTypeGoldenSignboard'), value: 'golden_signboard' },
+  { label: t('adTypeTrafficAd'), value: 'traffic_ad' },
 ]
 
+/** 搜索篩選用：在可贈送類型前補「全部」 */
+export const createAdTypeOptions = (t: TFn) => [
+  { label: t('common:all'), value: '' },
+  ...createGiftAdTypeOptions(t),
+]
+
+/** 廣告類型代碼 → 顯示名（含歷史代碼 exclusive/gold/ka，保證存量數據不退化為原始碼） */
 export const createAdTypeMap = (t: TFn): Record<string, string> => ({
   new_store: t('adTypeNewStore'),
   revival: t('adTypeRevival'),
   exclusive: t('adTypeExclusive'),
   gold: t('adTypeGold'),
   popular_merchant: t('adTypePopularMerchant'),
+  golden_signboard: t('adTypeGoldenSignboard'),
+  traffic_ad: t('adTypeTrafficAd'),
+  ka: t('adTypePopularMerchant'),
 })
 
 export const createTradeTypeOptions = (t: TFn) => [

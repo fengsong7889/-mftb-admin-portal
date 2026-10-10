@@ -82,6 +82,57 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 遗失编号 (YS) + 报废编号 (BF) 规则种子 */
     private static final String V_INIT_EAM_LOSS_SCRAP_RULE = "seq:init-v17";
 
+    /**
+     * 增量版本: 投流廣告算法ID前綴 SFLL → SFTL（規則 + 序號沿用 + 存量編號回填），
+     * 并把 5 个广告定价规则统一登记到「銷售定價」菜单（前端「編號生成規則」按 biz_menu 归类）。
+     */
+    private static final String V_INIT_TRAFFIC_ALGO_PREFIX = "seq:init-v18";
+
+    /** 投流廣告算法ID规则 key（BizSeqService.algoRuleKey(15)） */
+    private static final String RULE_ALGO_TRAFFIC = "algo_traffic";
+
+    /** 投流廣告算法ID旧前缀（已废弃，仅作存量迁移依据） */
+    private static final String TRAFFIC_ALGO_OLD_PREFIX = "SFLL";
+
+    /** 投流廣告算法ID现行前缀（投流拼音首字母，与其它 SFX* 系列算法前缀同构） */
+    private static final String TRAFFIC_ALGO_PREFIX = "SFTL";
+
+    /** 銷售定價规则的「所属菜单」文案，必须与前端 ruleConfig.tsx 的 menu 完全一致 */
+    private static final String PRICING_BIZ_MENU = "銷售定價";
+
+    /** 销售定价 5 个广告定价规则：rule_key / rule_name / prefix（序号统一 3 位、日期 YYYYMMDD） */
+    private static final String[][] PRICING_RULES = {
+            {"config_pricing_star", "無敵星星定價", "DJWD"},
+            {"config_pricing_hot", "人氣商家定價", "DJRQ"},
+            {"config_pricing_revive", "盤活復蘇定價", "DJPH"},
+            {"config_pricing_signboard", "金字招牌定價", "DJZP"},
+            {"config_pricing_traffic", "投流廣告定價", "DJTL"},
+    };
+
+    /**
+     * 增量版本: 贈送ID口径收口——补齐金字招牌/投流廣告的赠送ID规则，并把存量不符合现行格式的
+     * 赠送ID按创建日期重新取号（消费流水快照同步），同时清理旧生成器遗留的孤儿计数行。
+     */
+    private static final String V_INIT_GIFT_AD_TYPE_RULES = "seq:init-v19";
+
+    /** 推廣贈送规则的「所属菜单」文案，必须与前端菜单名完全一致 */
+    private static final String GIFT_BIZ_MENU = "推廣贈送";
+
+    /** 赠送ID 5 个广告类型规则：rule_key / rule_name / prefix（序号统一 4 位、日期 YYYYMMDD） */
+    private static final String[][] GIFT_RULES = {
+            {"gift_new_store", "新店廣告贈送ID", "XDZS"},
+            {"gift_popular", "人氣商家贈送ID", "RQZS"},
+            {"gift_revive", "盤活復蘇贈送ID", "PHZS"},
+            {"gift_signboard", "金字招牌贈送ID", "JZZS"},
+            {"gift_traffic", "投流廣告贈送ID", "TLZS"},
+    };
+
+    /** 现行赠送ID格式：5 个前缀 + YYYYMMDD + 4 位序号 */
+    private static final String GIFT_ID_PATTERN = "^(XDZS|PHZS|RQZS|JZZS|TLZS)[0-9]{12}$";
+
+    /** 旧赠送ID生成器的前缀（已无对应规则，其序号计数属孤儿行，需清理） */
+    private static final String LEGACY_GIFT_SEQ_PREFIX = "GZ";
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -141,6 +192,10 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         });
         versionTracker.applyOnce(V_INIT_EAM_MENU_LABEL_UNIFY, this::normalizeEamRuleBizMenu);
         versionTracker.applyOnce(V_INIT_EAM_LOSS_SCRAP_RULE, this::seedEamLossScrapRules);
+        versionTracker.applyOnce(V_INIT_TRAFFIC_ALGO_PREFIX,
+                this::migrateTrafficAlgoPrefixAndPricingMenu, this::verifyTrafficAlgoPrefixAndPricingMenu);
+        versionTracker.applyOnce(V_INIT_GIFT_AD_TYPE_RULES,
+                this::seedGiftRulesAndNormalizeGiftIds, this::verifyGiftRulesAndGiftIds);
     }
 
     /**
@@ -201,7 +256,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 {"algo_star", "無敵星星算法ID", "算法庫", "SFWD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_new_store", "新店廣告算法ID", "算法庫", "SFXD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_revive", "盤活復蘇算法ID", "算法庫", "SFPH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"algo_traffic", "流量廣告算法ID", "算法庫", "SFLL", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"algo_traffic", "投流廣告算法ID", "算法庫", TRAFFIC_ALGO_PREFIX, "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_popular", "人氣商家算法ID", "算法庫", "SFRQ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_exclusive", "獨家商家算法ID", "算法庫", "SFDJ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_guess", "猜你喜歡算法ID", "算法庫", "SFXH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
@@ -216,14 +271,16 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 {"ad_order_revive", "盤活復蘇訂單", "廣告銷售", "DDPH", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_traffic", "流量廣告訂單", "廣告銷售", "DDLL", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_popular", "人氣商家訂單", "廣告銷售", "DDRQ", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"config_pricing_star", "無敵星星定價", "廣告銷售", "DJWD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"config_pricing_hot", "人氣商家定價", "廣告銷售", "DJRQ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"config_pricing_revive", "盤活復蘇定價", "廣告銷售", "DJPH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"config_pricing_signboard", "金字招牌定價", "廣告銷售", "DJZP", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
-                {"config_pricing_traffic", "投流廣告定價", "廣告銷售", "DJTL", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_star", "無敵星星定價", PRICING_BIZ_MENU, "DJWD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_hot", "人氣商家定價", PRICING_BIZ_MENU, "DJRQ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_revive", "盤活復蘇定價", PRICING_BIZ_MENU, "DJPH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_signboard", "金字招牌定價", PRICING_BIZ_MENU, "DJZP", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"config_pricing_traffic", "投流廣告定價", PRICING_BIZ_MENU, "DJTL", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_new_store", "新店廣告贈送ID", "推廣贈送", "XDZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_popular", "人氣商家贈送ID", "推廣贈送", "RQZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"gift_revive", "盤活復蘇贈送ID", "推廣贈送", "PHZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"gift_signboard", "金字招牌贈送ID", "推廣贈送", "JZZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"gift_traffic", "投流廣告贈送ID", "推廣贈送", "TLZS", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"batch_recharge", "充值批次", "批次查詢", "CZPC", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"batch_transfer", "轉賬批次", "批次查詢", "ZZPC", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"batch_merge", "合併批次", "批次查詢", "HBPC", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
@@ -720,6 +777,227 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
             log.info("已写入/修正遗失 + 报废编号规则种子数据 (YS/BF + YYYYMMDD + 4位)");
             bizSeqService.refreshRules();
         }
+    }
+
+    /**
+     * 投流廣告算法ID前綴 SFLL → SFTL + 銷售定價編號規則登記補全 (seq:init-v18)。
+     * <p>
+     * 前缀是编号的业务语义（投流 → SFTL，旧 SFLL 是「流量」拼写），因此除了改规则行，还必须：
+     * 1) 沿用 sys_biz_seq 旧前缀计数，否则切换后同日序号从 000 重起会重号；
+     * 2) 回填已生成的算法编号与订单快照，否则算法下拉（value=algoCode）与存量订单对不上；
+     * 3) upsert 5 个广告定价规则，保证「銷售定價」菜单下每个广告定价都能在「編號生成規則」查到依据。
+     * 全部语句幂等，重复执行无副作用。
+     */
+    private void migrateTrafficAlgoPrefixAndPricingMenu() {
+        // 前缀唯一键（uk_seq_rule_prefix）冲突时只跳过改名并 loudly 记录，不抛异常：
+        // 本方法在 CommandLineRunner 内执行，抛异常会导致容器反复重启。
+        Integer occupied = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ? AND rule_key <> ?",
+                Integer.class, TRAFFIC_ALGO_PREFIX, RULE_ALGO_TRAFFIC);
+        int algoRule = 0;
+        int seqCarried = 0;
+        int algoCodes = 0;
+        int orderCodes = 0;
+        if (occupied != null && occupied > 0) {
+            log.error("編號規則前綴 {} 已被其它規則佔用, 跳過 algo_traffic 前綴改名(需人工處理)", TRAFFIC_ALGO_PREFIX);
+        } else {
+            algoRule = upsertRule(RULE_ALGO_TRAFFIC, "投流廣告算法ID", "算法庫", TRAFFIC_ALGO_PREFIX,
+                    "YYYYMMDD", 3, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+            seqCarried = carryOverSeqCounter(TRAFFIC_ALGO_OLD_PREFIX, TRAFFIC_ALGO_PREFIX);
+            algoCodes = renameCodePrefix("biz_ad_algorithm", "algo_code",
+                    TRAFFIC_ALGO_OLD_PREFIX, TRAFFIC_ALGO_PREFIX);
+            orderCodes = renameCodePrefix("biz_ad_order", "algo_code",
+                    TRAFFIC_ALGO_OLD_PREFIX, TRAFFIC_ALGO_PREFIX);
+        }
+        int pricingRules = 0;
+        for (String[] r : PRICING_RULES) {
+            pricingRules += upsertRule(r[0], r[1], PRICING_BIZ_MENU, r[2],
+                    "YYYYMMDD", 3, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+        }
+        log.info("投流廣告編號規則遷移: 算法ID規則 {} 行 / 序號沿用 {} 行 / 算法編號回填 {} 行 / 訂單快照回填 {} 行 / 銷售定價規則 {} 行",
+                algoRule, seqCarried, algoCodes, orderCodes, pricingRules);
+        bizSeqService.refreshRules();
+    }
+
+    /**
+     * 迁移后置校验：只断言确定性的「销售定价 5 条规则已登记归位」。
+     * <p>
+     * 前缀切换结果不在这里硬断言：它可能因前缀唯一键冲突被主动跳过，硬断言会让启动
+     * 反复失败；该情况由任务内的 log.error 暴露并交人工处理。
+     */
+    private void verifyTrafficAlgoPrefixAndPricingMenu() {
+        Integer trafficOk = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = ? AND prefix = ?",
+                Integer.class, RULE_ALGO_TRAFFIC, TRAFFIC_ALGO_PREFIX);
+        if (trafficOk == null || trafficOk == 0) {
+            log.warn("algo_traffic 前綴當前不是 {}, 請到「規則中心 → 編號生成規則」核對", TRAFFIC_ALGO_PREFIX);
+        }
+        Integer pricingOk = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key IN ('config_pricing_star', 'config_pricing_hot',"
+                        + " 'config_pricing_revive', 'config_pricing_signboard', 'config_pricing_traffic') "
+                        + "AND biz_menu = ? AND status = 1",
+                Integer.class, PRICING_BIZ_MENU);
+        if (pricingOk == null || pricingOk != PRICING_RULES.length) {
+            throw new IllegalStateException("銷售定價編號規則未全部登記到「" + PRICING_BIZ_MENU + "」菜單: 實際 " + pricingOk + " 條");
+        }
+    }
+
+    /**
+     * 赠送ID口径收口 (seq:init-v19)。
+     * <p>
+     * 「新增赠送」可选的广告类型中，金字招牌与投流廣告此前既没有赠送ID编号规则、也无法生成赠送ID，
+     * 而这两个模块的下单逻辑又确实在按 adType 查赠送天数抵扣，导致赠送能力断链。
+     * 本迁移把 5 个赠送ID规则全部登记到「推廣贈送」菜单，并把存量不符合现行格式的赠送ID
+     * 按创建日期重新取号（消费流水的赠送ID快照一并同步），最后清理旧生成器遗留的孤儿计数行。
+     * 全部语句幂等，重复执行无副作用。
+     */
+    private void seedGiftRulesAndNormalizeGiftIds() {
+        for (String[] r : GIFT_RULES) {
+            // 前缀唯一键（uk_seq_rule_prefix）冲突时 upsert 会误改到占用该前缀的其它规则，必须先挡住：
+            // 本方法在 CommandLineRunner 内执行，抛异常会导致容器反复重启，故跳过并 loudly 记录交人工处理。
+            Integer occupied = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ? AND rule_key <> ?",
+                    Integer.class, r[2], r[0]);
+            if (occupied != null && occupied > 0) {
+                log.error("編號規則前綴 {} 已被其它規則佔用, 跳過 {} 規則登記(需人工處理)", r[2], r[0]);
+                continue;
+            }
+            upsertRule(r[0], r[1], GIFT_BIZ_MENU, r[2], "YYYYMMDD", 4, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+        }
+        // 新增规则必须先失效规则缓存，否则 BizSeqService.next() 会认为规则未配置
+        bizSeqService.refreshRules();
+        int renamed = normalizeLegacyGiftIds();
+        int orphanSeqRows = dropOrphanGiftSeqCounter();
+        log.info("贈送ID口徑收口: 規則 {} 條 / 存量贈送ID回填 {} 筆 / 孤兒計數清理 {} 行",
+                GIFT_RULES.length, renamed, orphanSeqRows);
+    }
+
+    /**
+     * 存量赠送ID按现行规则重新取号，并同步消费流水快照。
+     * 广告类型无对应编号规则时跳过并告警（不猜测前缀，避免造出错号）。
+     */
+    private int normalizeLegacyGiftIds() {
+        if (!tableExists("biz_gift_record")) {
+            return 0;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, gift_id, ad_type, created_at FROM biz_gift_record "
+                        + "WHERE gift_id IS NULL OR gift_id NOT REGEXP '" + GIFT_ID_PATTERN + "' ORDER BY id");
+        int renamed = 0;
+        for (Map<String, Object> row : rows) {
+            Long id = ((Number) row.get("id")).longValue();
+            String oldCode = (String) row.get("gift_id");
+            String adType = (String) row.get("ad_type");
+            String ruleKey = BizSeqService.giftRuleKey(adType);
+            if (ruleKey == null) {
+                log.warn("贈送ID回填跳過: 記錄 {} 的廣告類型 {} 無對應編號規則（gift_id={}），請人工核對", id, adType, oldCode);
+                continue;
+            }
+            String newCode = bizSeqService.next(ruleKey, toLocalDate(row.get("created_at")));
+            jdbcTemplate.update("UPDATE biz_gift_record SET gift_id = ? WHERE id = ?", newCode, id);
+            // 流水快照按外键同步（旧数据 gift_id 可能为 NULL，按快照值匹配会漏行）
+            if (tableExists("biz_gift_consume")) {
+                jdbcTemplate.update("UPDATE biz_gift_consume SET gift_id = ? WHERE gift_record_id = ?", newCode, id);
+            }
+            renamed++;
+            log.info("贈送ID回填: {} → {}（記錄 {}，廣告類型 {}）", oldCode, newCode, id, adType);
+        }
+        return renamed;
+    }
+
+    /** 清理旧赠送ID生成器遗留的序号计数行（仅当已无任何规则使用该前缀，避免误删在用计数） */
+    private int dropOrphanGiftSeqCounter() {
+        if (!tableExists("sys_biz_seq")) {
+            return 0;
+        }
+        Integer inUse = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ?", Integer.class, LEGACY_GIFT_SEQ_PREFIX);
+        if (inUse != null && inUse > 0) {
+            return 0;
+        }
+        return jdbcTemplate.update("DELETE FROM sys_biz_seq WHERE prefix = ?", LEGACY_GIFT_SEQ_PREFIX);
+    }
+
+    /**
+     * 迁移后置校验：5 条赠送ID规则已登记归位，且可映射广告类型的存量赠送ID都已符合现行格式。
+     * 校验失败不记版本、下次启动重试。
+     */
+    private void verifyGiftRulesAndGiftIds() {
+        Integer ruleOk = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key IN ('gift_new_store','gift_popular','gift_revive',"
+                        + " 'gift_signboard','gift_traffic') AND biz_menu = ? AND status = 1",
+                Integer.class, GIFT_BIZ_MENU);
+        if (ruleOk == null || ruleOk != GIFT_RULES.length) {
+            throw new IllegalStateException("贈送ID編號規則未全部登記到「" + GIFT_BIZ_MENU + "」菜單: 實際 " + ruleOk + " 條");
+        }
+        if (!tableExists("biz_gift_record")) {
+            return;
+        }
+        Integer legacy = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_gift_record WHERE ad_type IN ('new_store','revival','popular_merchant','ka',"
+                        + "'golden_signboard','traffic_ad') AND (gift_id IS NULL OR gift_id NOT REGEXP '"
+                        + GIFT_ID_PATTERN + "')",
+                Integer.class);
+        if (legacy != null && legacy > 0) {
+            throw new IllegalStateException("仍有 " + legacy + " 筆存量贈送ID不符合現行格式，未回填完成");
+        }
+    }
+
+    /** 按 rule_key 幂等写入/修正编号规则（前缀、日期格式、序号位数、所属菜单一并覆盖） */
+    private int upsertRule(String ruleKey, String ruleName, String bizMenu, String prefix,
+                           String dateFormat, int seqLength, int seqStart, String remark) {
+        return jdbcTemplate.update(
+                "INSERT INTO sys_biz_seq_rule "
+                        + "(rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?) "
+                        + "ON DUPLICATE KEY UPDATE "
+                        + "rule_name = VALUES(rule_name), biz_menu = VALUES(biz_menu), prefix = VALUES(prefix), "
+                        + "date_format = VALUES(date_format), seq_length = VALUES(seq_length), "
+                        + "seq_start = VALUES(seq_start), remark = VALUES(remark), status = VALUES(status)",
+                ruleKey, ruleName, bizMenu, prefix, dateFormat, seqLength, seqStart, remark);
+    }
+
+    /**
+     * 前缀改名后沿用旧前缀的序号计数（同 date_key 取较大值），避免新前缀从 000 起重号。
+     * 逐行处理而非批量 UPDATE...JOIN：MySQL 同表子查询限制下更稳，且序号行数量级极小。
+     */
+    private int carryOverSeqCounter(String oldPrefix, String newPrefix) {
+        if (!tableExists("sys_biz_seq")) {
+            return 0;
+        }
+        List<Map<String, Object>> oldRows = jdbcTemplate.queryForList(
+                "SELECT date_key, current_value FROM sys_biz_seq WHERE prefix = ?", oldPrefix);
+        int moved = 0;
+        for (Map<String, Object> row : oldRows) {
+            String dateKey = (String) row.get("date_key");
+            int oldValue = ((Number) row.get("current_value")).intValue();
+            // queryForList 而非 queryForObject：新前綴尚未計數時無行，queryForObject 會拋 EmptyResult
+            List<Integer> current = jdbcTemplate.queryForList(
+                    "SELECT current_value FROM sys_biz_seq WHERE prefix = ? AND date_key = ?",
+                    Integer.class, newPrefix, dateKey);
+            Integer newValue = current.isEmpty() ? null : current.get(0);
+            if (newValue == null) {
+                moved += jdbcTemplate.update(
+                        "UPDATE sys_biz_seq SET prefix = ? WHERE prefix = ? AND date_key = ?",
+                        newPrefix, oldPrefix, dateKey);
+            } else if (oldValue > newValue) {
+                moved += jdbcTemplate.update(
+                        "UPDATE sys_biz_seq SET current_value = ? WHERE prefix = ? AND date_key = ?",
+                        oldValue, newPrefix, dateKey);
+            }
+        }
+        return moved;
+    }
+
+    /** 存量业务编号前缀改名（表/列不存在时跳过，返回回填行数） */
+    private int renameCodePrefix(String table, String column, String oldPrefix, String newPrefix) {
+        if (!tableExists(table) || !columnExists(table, column)) {
+            return 0;
+        }
+        return jdbcTemplate.update(
+                "UPDATE " + table + " SET " + column + " = CONCAT('" + newPrefix + "', SUBSTRING(" + column + ", "
+                        + (oldPrefix.length() + 1) + ")) WHERE " + column + " LIKE ?",
+                oldPrefix + "%");
     }
 
     /** 表不存在时跳过（表由各自脚本/初始化器创建），列不存在时追加 */

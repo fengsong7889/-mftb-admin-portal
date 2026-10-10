@@ -47,7 +47,7 @@ function mountPage(query: string, destinations: string[] = []) {
 beforeEach(() => {
   vi.clearAllMocks()
   api.fetch.mockResolvedValue({
-    id: 7, algoCode: 'SFLL0007', algoName: '实际父页面投流', algoType: 15, brand: 'flashBee',
+    id: 7, algoCode: 'SFTL0007', algoName: '实际父页面投流', algoType: 15, brand: 'flashBee',
     params: JSON.stringify({ ...readTrafficParams({}), consistencyCheckInterval: 15, statusRest: true }),
   })
   api.create.mockResolvedValue({ id: 8 })

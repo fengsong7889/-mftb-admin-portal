@@ -134,6 +134,30 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "seq:init-v18",
+      "module": "seq",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "dependencies": [
+        "seq:init-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "投流廣告編號規則修正：algo_traffic 前綴 SFLL→SFTL（規則 upsert + sys_biz_seq 計數沿用防重號 + biz_ad_algorithm/biz_ad_order 存量編號回填），並把 5 個廣告定價規則（DJWD/DJRQ/DJPH/DJZP/DJTL）統一登記到「銷售定價」菜單，使銷售定價菜單的每個廣告定價都能在「規則中心→編號生成規則」查到依據。附后置校驗，失敗不記版本、下次啟動重試。參考 SQL: sql/224_traffic_algo_prefix_sftl.sql"
+    },
+    {
+      "versionKey": "seq:init-v19",
+      "module": "seq",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "dependencies": [
+        "seq:init-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "贈送ID口徑收口：登記 5 條贈送ID編號規則（新店 XDZS/人氣 RQZS/盤活 PHZS/金字招牌 JZZS/投流廣告 TLZS）到「推廣贈送」菜單，使「新增贈送」可選廣告類型與後端 BizSeqService.giftRuleKey、各銷售模組 GIFT_AD_TYPE 完全對齊（此前金字招牌/投流廣告無規則，贈送能力斷鏈）；同時把 biz_gift_record 存量不符合現行格式的 gift_id 按創建日期重新取號，同步 biz_gift_consume 快照，並清理舊生成器殘留的 GZ 孤兒計數行。附后置校驗，失敗不記版本、下次啟動重試。參考 SQL: sql/226_gift_ad_type_seq_rules.sql"
+    },
+    {
       "versionKey": "eam:schema-v1",
       "module": "eam",
       "phase": "MODULE_STRUCTURE",

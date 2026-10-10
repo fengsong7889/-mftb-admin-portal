@@ -1,5 +1,6 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.config.migration.ContractRegistry;
 import com.mftb.admin.config.migration.ContractSpec;
@@ -40,6 +41,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
     private final MigrationLock migrationLock;
+    private final BizSeqService bizSeqService;
 
     @Override
     public void run(String... args) {
@@ -73,7 +75,104 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
                 versionTracker.applyOnce("adpromo:hot-skin-discount-v1.0",
                         this::ensureHotDiscountColumns, this::verifyHotDiscountColumns));
+        seedTrafficPricingIfAbsent();
     }
+
+    /** 投流廣告固定算法类型（algo_type=15，與 BizSeqService.algoRuleKey 一致） */
+    private static final int TRAFFIC_ALGO_TYPE = 15;
+
+    /** 投流廣告種子操作人標識（與其它預置數據一致，便於與運營自建配置區分） */
+    private static final String TRAFFIC_SEED_OPERATOR = "系統";
+
+    /**
+     * 投流廣告默認定價種子（一個算法 × 3 個業務頻道）。
+     * <p>
+     * 銷售定價列表已改走後端 biz_ad_pricing_traffic，而該表在接後端之前從未寫入過，
+     * 不補種會導致列表直接空掉。用「表內無任何行（含軟刪）」作為條件，每次啟動判一次：
+     * 一旦有數據就不再重播（軟刪行仍計入 COUNT，不會讓用戶刪掉的配置復活），
+     * 同時避免「投流算法晚於本次部署才建立」時被 applyOnce 永久漏種。
+     * 屬數據種子而非結構遷移，失敗僅記错並下次啟動重試，不阻斷啟動。
+     */
+    private void seedTrafficPricingIfAbsent() {
+        try {
+            if (!tableExists("biz_ad_pricing_traffic")) {
+                return;
+            }
+            Integer existing = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_ad_pricing_traffic", Integer.class);
+            if (existing != null && existing > 0) {
+                return;
+            }
+            List<Map<String, Object>> algos = jdbcTemplate.queryForList(
+                    "SELECT id, algo_name, brand FROM biz_ad_algorithm "
+                            + "WHERE algo_type = ? AND deleted = 0 ORDER BY id LIMIT 1",
+                    TRAFFIC_ALGO_TYPE);
+            if (algos.isEmpty()) {
+                log.info("投流廣告定價種子跳過: 尚無 algo_type={} 算法", TRAFFIC_ALGO_TYPE);
+                return;
+            }
+            Map<String, Object> algo = algos.get(0);
+            Long algoId = ((Number) algo.get("id")).longValue();
+            String algoName = (String) algo.get("algo_name");
+            String brand = (String) algo.get("brand");
+            for (TrafficPricingSeed seed : TRAFFIC_PRICING_SEEDS) {
+                seedOneTrafficPricing(seed, algoId, algoName, brand);
+            }
+            log.info("投流廣告定價種子完成: {} 個業務頻道（算法 id={} code/name={})", 
+                    TRAFFIC_PRICING_SEEDS.size(), algoId, algoName);
+        } catch (Exception e) {
+            log.error("投流廣告定價種子失敗(下次啟動重試): {}", e.getMessage(), e);
+        }
+    }
+
+    /** 写入單個頻道的定價主表 + 檔位子表 + 階梯單價子表（定價編號走 BizSeqService，與規則中樞一致） */
+    private void seedOneTrafficPricing(TrafficPricingSeed seed, Long algoId, String algoName, String brand) {
+        String pricingNo = bizSeqService.next(BizSeqService.RULE_PRICING_TRAFFIC);
+        jdbcTemplate.update(
+                "INSERT INTO biz_ad_pricing_traffic "
+                        + "(pricing_no, algo_id, algo_name, brand, biz_channel, custom_min_qty, custom_step, "
+                        + "refund_enabled, refund_fee_percent, status, remark, updated_by, deleted) "
+                        + "VALUES (?, ?, ?, ?, ?, 100, 100, 1, 0, 1, ?, ?, 0)",
+                pricingNo, algoId, algoName, brand, seed.bizChannel(),
+                "系統預置流量包定價", TRAFFIC_SEED_OPERATOR);
+        Long pricingId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        for (int i = 0; i < seed.tierNames().length; i++) {
+            jdbcTemplate.update(
+                    "INSERT INTO biz_ad_pricing_traffic_tier "
+                            + "(pricing_id, tier_name, impressions, price, on_sale, sort, discount_enabled, "
+                            + "discount_time_mode, deleted) VALUES (?, ?, ?, ?, 1, ?, 0, 'unlimited', 0)",
+                    pricingId, seed.tierNames()[i], seed.impressions()[i],
+                    new BigDecimal(seed.prices()[i]), i + 1);
+        }
+        for (int i = 0; i < seed.ladderMins().length; i++) {
+            int minQty = Integer.parseInt(seed.ladderMins()[i]);
+            int maxQty = i < seed.ladderMins().length - 1
+                    ? Integer.parseInt(seed.ladderMins()[i + 1]) - 1 : 0;
+            jdbcTemplate.update(
+                    "INSERT INTO biz_ad_pricing_traffic_ladder "
+                            + "(pricing_id, min_qty, max_qty, unit_price, sort, deleted) VALUES (?, ?, ?, ?, ?, 0)",
+                    pricingId, minQty, maxQty, new BigDecimal(seed.ladderPrices()[i]), i + 1);
+        }
+    }
+
+    /** 投流廣告默認定價（與歷史前端默認值一致：3 檔套餐 + 3 段階梯單價） */
+    private record TrafficPricingSeed(int bizChannel, String[] tierNames, int[] impressions,
+                                      String[] prices, String[] ladderMins, String[] ladderPrices) {
+    }
+
+    private static final List<TrafficPricingSeed> TRAFFIC_PRICING_SEEDS = List.of(
+            new TrafficPricingSeed(1,
+                    new String[] {"體驗包", "成長包", "爆款包"}, new int[] {1000, 5000, 10000},
+                    new String[] {"200", "900", "1600"}, new String[] {"1", "1000", "5000"},
+                    new String[] {"0.25", "0.20", "0.16"}),
+            new TrafficPricingSeed(2,
+                    new String[] {"體驗包", "成長包", "爆款包"}, new int[] {1000, 5000, 10000},
+                    new String[] {"180", "800", "1450"}, new String[] {"1", "1000", "5000"},
+                    new String[] {"0.22", "0.18", "0.15"}),
+            new TrafficPricingSeed(3,
+                    new String[] {"體驗包", "成長包", "爆款包"}, new int[] {1000, 5000, 10000},
+                    new String[] {"220", "990", "1760"}, new String[] {"1", "1000", "5000"},
+                    new String[] {"0.28", "0.22", "0.18"}));
 
     private void ensureHotDiscountColumns() {
         log.info("开始迁移人气商家大小图折扣结构");

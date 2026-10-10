@@ -112,7 +112,7 @@ const ALGO_TYPE_PREFIX: Partial<Record<AlgorithmType, string>> = {
   [AlgorithmType.INVINCIBLE_STAR]: 'SFWD',
   [AlgorithmType.NEW_STORE_AD]: 'SFXD',
   [AlgorithmType.HOT_REVIVE_AD]: 'SFPH',
-  [AlgorithmType.TRAFFIC_AD]: 'SFLL',
+  [AlgorithmType.TRAFFIC_AD]: 'SFTL',
   [AlgorithmType.POPULAR_MERCHANT_KA]: 'SFRQ',
   [AlgorithmType.ORGANIC_TRAFFIC]: 'SFZR',
   [AlgorithmType.BRAND_MERCHANT]: 'SFPP',
@@ -140,7 +140,7 @@ const ALGO_POOL: SandboxAlgorithm[] = [
   { algoCode: 'SFJZ20260818005', algoName: '金字招牌-全澳對比', algoType: AlgorithmType.GOLDEN_SIGNBOARD, status: ServiceStatus.ENABLED, slotCount: 3, recallDimension: RecallDimension.COMMERCIAL, rankingStage: RankingStage.RERANK, bidMode: BidMode.CPM },
   { algoCode: 'SFPP20260818006', algoName: '品牌商家-KA專屬位', algoType: AlgorithmType.BRAND_MERCHANT, status: ServiceStatus.ENABLED, slotCount: 2, recallDimension: RecallDimension.MERCHANT, rankingStage: RankingStage.RERANK, bidMode: BidMode.CPM },
   { algoCode: 'SFZR20260818007', algoName: '自然流量-綜合計分排序', algoType: AlgorithmType.ORGANIC_TRAFFIC, status: ServiceStatus.ENABLED, slotCount: 20, recallDimension: RecallDimension.PLATFORM, rankingStage: RankingStage.FINE, bidMode: BidMode.CPC },
-  { algoCode: 'SFLL20260818008', algoName: '流量廣告-泛曝光', algoType: AlgorithmType.TRAFFIC_AD, status: ServiceStatus.ENABLED, slotCount: 3, recallDimension: RecallDimension.PLATFORM, rankingStage: RankingStage.COARSE, bidMode: BidMode.CPM },
+  { algoCode: 'SFTL20260818008', algoName: '流量廣告-泛曝光', algoType: AlgorithmType.TRAFFIC_AD, status: ServiceStatus.ENABLED, slotCount: 3, recallDimension: RecallDimension.PLATFORM, rankingStage: RankingStage.COARSE, bidMode: BidMode.CPM },
   // ── 以下為未上線算法：僅在沙盤推演模式下可選 ──
   { algoCode: 'SFWD20260901009', algoName: '無敵星星-氹仔加權試驗', algoType: AlgorithmType.INVINCIBLE_STAR, status: ServiceStatus.DISABLED, slotCount: 4, recallDimension: RecallDimension.USER, rankingStage: RankingStage.RERANK, bidMode: BidMode.OCPC },
   { algoCode: 'SFRQ20260901010', algoName: '人氣商家-出餐速度優先', algoType: AlgorithmType.POPULAR_MERCHANT_KA, status: ServiceStatus.DISABLED, slotCount: 3, recallDimension: RecallDimension.ITEM, rankingStage: RankingStage.FINE, bidMode: BidMode.CPC },

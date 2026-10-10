@@ -3,7 +3,7 @@
  * 共享类型从 _shared/ad-promotion/types 重导出，本文件无独有项
  */
 
-// 重导出所有共享类型（saveTrafficPricing / loadTrafficPricingSavedAt 已包含在共享模块中）
+// 重导出所有共享类型（投流定價真值已收斂到後端，載入函數見 _shared/ad-promotion/trafficPricing）
 export {
   TimeSlotStatus,
   TIME_SLOT_COLORS,
@@ -23,9 +23,6 @@ export {
   type TrafficPriceLadderRow,
   type TrafficChannelPricing,
   generateDefaultTrafficPricing,
-  loadTrafficPricing,
-  saveTrafficPricing,
-  loadTrafficPricingSavedAt,
   findLadderUnitPrice,
   calcCustomAmount,
 } from '../_shared/ad-promotion/types'

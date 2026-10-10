@@ -61,6 +61,10 @@ public class BizSeqService {
     public static final String RULE_GIFT_POPULAR = "gift_popular";
     /** 盘活复苏赠送ID */
     public static final String RULE_GIFT_REVIVE = "gift_revive";
+    /** 金字招牌赠送ID */
+    public static final String RULE_GIFT_SIGNBOARD = "gift_signboard";
+    /** 投流广告赠送ID */
+    public static final String RULE_GIFT_TRAFFIC = "gift_traffic";
     /** 充值批次 */
     public static final String RULE_BATCH_RECHARGE = "batch_recharge";
     /** 转账批次 */
@@ -282,7 +286,14 @@ public class BizSeqService {
         };
     }
 
-    /** 按广告类型取赠送ID规则 key */
+    /**
+     * 按广告类型取赠送ID规则 key。
+     * <p>
+     * 这里的类型集合必须等于「新增赠送」界面可选的广告类型集合（前端 shared.tsx
+     * createGiftAdTypeOptions），也必须覆盖各广告销售模块的 GIFT_AD_TYPE 常量，
+     * 否则该类型的赠送无法生成赠送ID、赠送天数抵扣也永远为 0。
+     * 人气商家前端统一用 popular_merchant，ka 为历史代码兼容别名。
+     */
     public static String giftRuleKey(String adType) {
         if (adType == null) {
             return null;
@@ -290,7 +301,9 @@ public class BizSeqService {
         return switch (adType) {
             case "new_store" -> RULE_GIFT_NEW_STORE;
             case "revival" -> RULE_GIFT_REVIVE;
-            case "ka" -> RULE_GIFT_POPULAR;
+            case "popular_merchant", "ka" -> RULE_GIFT_POPULAR;
+            case "golden_signboard" -> RULE_GIFT_SIGNBOARD;
+            case "traffic_ad" -> RULE_GIFT_TRAFFIC;
             default -> null;
         };
     }

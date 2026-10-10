@@ -12,6 +12,7 @@ import { createGiftRecord } from '../../api/gift'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import { getBrandLabel } from '../../constants/brand'
 import BrandTag from '../../components/BrandTag'
+import { createGiftAdTypeOptions } from './components/shared'
 
 const { TextArea } = Input
 
@@ -29,12 +30,8 @@ export default function GiftAdd() {
   const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
 
-  /** 廣告類型（新店廣告、盤活復蘇、人氣商家） */
-  const adTypeOptions = [
-    { label: t('adTypeNewStore'), value: 'new_store' },
-    { label: t('adTypeRevival'), value: 'revival' },
-    { label: t('adTypePopularMerchant'), value: 'popular_merchant' },
-  ]
+  /** 廣告類型（與列表篩選、後端贈送ID編號規則共用同一份類型口徑） */
+  const adTypeOptions = createGiftAdTypeOptions(t)
   const [successVisible, setSuccessVisible] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const [submitting, setSubmitting] = useState(false)
@@ -298,7 +295,7 @@ export default function GiftAdd() {
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
                 {isGiftMode ? t('giftAdDays') : t('addGift')}
               </h2>
-              <Tag style={{ fontSize: 11, color: '#722ED1', borderColor: '#722ED1' }}>{t('approvalCenter.typeGift')}</Tag>
+              <Tag style={{ fontSize: 11, color: '#722ED1', borderColor: '#722ED1' }}>{t('approvalCenter:typeGift')}</Tag>
               {isGiftMode && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,

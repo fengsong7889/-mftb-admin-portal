@@ -82,7 +82,7 @@ export default function PromotionOrderManage() {
   const mockTrafficOrder: BaseOrderItem = {
     id: 'DDLL202609010001',
     orderNo: 'DDLL202609010001',
-    algorithmId: 'SFLL20260818008',
+    algorithmId: 'SFTL20260818008',
     promotionName: '投流廣告·精準曝光',
     app: AppType.SHANFENG,
     channel: RecommendChannel.DELIVERY,
@@ -115,7 +115,7 @@ export default function PromotionOrderManage() {
   const mockTrafficOrderCustom: BaseOrderItem = {
     id: 'DDLL202609010002',
     orderNo: 'DDLL202609010002',
-    algorithmId: 'SFLL20260818008',
+    algorithmId: 'SFTL20260818008',
     promotionName: '投流廣告·精準曝光',
     app: AppType.MFOOD,
     channel: RecommendChannel.SUPERMARKET,

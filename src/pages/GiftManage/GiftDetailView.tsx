@@ -23,20 +23,13 @@ import { fetchGiftRecordDetail, fetchGiftRecordsByStore, deductGiftDays } from '
 import { fillGiftApprovalNoFallback } from '../../utils/approvalStore'
 import { getSystemRuleValue } from '../../hooks/useSystemRules'
 import { useCountUp } from '../../hooks/useCountUp'
+import { adTypeColorMap, createAdTypeMap } from './components/shared'
 
 const { RangePicker } = DatePicker
 
 function AnimatedNumber({ value }: { value: number }) {
   const animated = useCountUp(value)
   return <>{animated.toLocaleString()}</>
-}
-
-const adTypeColorMap: Record<string, string> = {
-  new_store: '#52C41A',
-  revival: '#E8720C',
-  exclusive: '#722ED1',
-  gold: '#FAAD14',
-  popular_merchant: '#1890FF',
 }
 
 const IMG_FALLBACK =
@@ -102,13 +95,7 @@ export default function GiftDetailView() {
   const storeIdParam = searchParams.get('storeId')
   const adTypeParam = searchParams.get('adType')
 
-  const adTypeMap: Record<string, string> = {
-    new_store: t('adTypeNewStore'),
-    revival: t('adTypeRevival'),
-    exclusive: t('adTypeExclusive'),
-    gold: t('adTypeGold'),
-    popular_merchant: t('adTypePopularMerchant'),
-  }
+  const adTypeMap: Record<string, string> = createAdTypeMap(t)
 
   const [loading, setLoading] = useState(true)
   const [merchantInfo, setMerchantInfo] = useState<{

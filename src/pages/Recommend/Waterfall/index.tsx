@@ -19,23 +19,21 @@ import {
   ALGO_CARD_COLOR_MAP,
 } from '../constants'
 import type { WaterfallSlotConfig } from '../types'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdAlgorithm } from '../../../api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdAlgorithm } from '../../../api/adPromotion'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useCardOrder } from '../../../hooks/useCardOrder'
-import { loadTrafficPricing, saveTrafficPricing, loadTrafficPricingSavedAt } from '../../PromotionSalesConfig/types'
-import { BIZ_CHANNEL } from '../../../constants/bizChannel'
 
-/** 投流廣告：定價配置業務頻道碼 → 列表行業務頻道值 */
-const TRAFFIC_CHANNEL_TO_BIZ: Record<string, string> = {
-  [BIZ_CHANNEL.FOOD_DELIVERY]: 'food',
-  [BIZ_CHANNEL.SUPERMARKET]: 'supermarket',
-  [BIZ_CHANNEL.GROUP_BUY]: 'groupBuy',
+/** 投流廣告：後端業務頻道碼(1/2/3) → 列表行業務頻道值 */
+const TRAFFIC_CODE_TO_BIZ: Record<number, string> = {
+  1: 'food',
+  2: 'supermarket',
+  3: 'groupBuy',
 }
-/** 列表行業務頻道值 → 定價配置業務頻道碼 */
-const BIZ_TO_TRAFFIC_CHANNEL: Record<string, string> = {
-  food: BIZ_CHANNEL.FOOD_DELIVERY,
-  supermarket: BIZ_CHANNEL.SUPERMARKET,
-  groupBuy: BIZ_CHANNEL.GROUP_BUY,
+/** 投流廣告：後端業務頻道碼 → 展示頁面（與列表行業務頻道同義，供列表篩選複用） */
+const TRAFFIC_CODE_TO_CHANNEL: Record<number, RecommendChannel> = {
+  1: RecommendChannel.DELIVERY,
+  2: RecommendChannel.SUPERMARKET,
+  3: RecommendChannel.GROUP_BUY,
 }
 
 /** 各業務類型（tab）對應的廣告類型列表 */
@@ -79,6 +77,31 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.GOLD_AD]: 'gold',
   [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
   [AlgorithmType.PRODUCT_PROMO]: 'red',
+}
+
+/** 投流廣告計價配置 → 定價列表行（業務頻道來自 bizChannel 而非展示頁面 channel） */
+const toTrafficPricingRow = (vo: AdPricingTraffic): WaterfallSlotConfig => {
+  const code = vo.bizChannel ?? 1
+  return {
+    id: -(vo.id ?? 0),
+    adId: `TL${String(vo.id ?? 0).padStart(6, '0')}`,
+    pricingNo: vo.pricingNo,
+    promotionName: vo.algoName || '-',
+    app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+    channel: (TRAFFIC_CODE_TO_CHANNEL[code] ?? RecommendChannel.DELIVERY) as RecommendChannel,
+    bizChannel: TRAFFIC_CODE_TO_BIZ[code] ?? 'food',
+    slotPosition: 0,
+    algorithmId: vo.algoId,
+    algorithmName: vo.algoName || '-',
+    algorithmType: AlgorithmType.TRAFFIC_AD,
+    merchantLimit: 'unlimited',
+    regionLimit: 'unlimited',
+    status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
+    updatedBy: vo.updatedBy || '-',
+    updatedAt: vo.updatedAt ? dayjs(vo.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-',
+    createdAt: vo.createdAt ? dayjs(vo.createdAt).format('YYYY-MM-DD HH:mm:ss') : '-',
+    source: 'api',
+  }
 }
 
 /** 後端計價配置 → 定價列表行（按來源設置算法類型） */
@@ -183,34 +206,7 @@ export default function Waterfall() {
   const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
-  /** 生成投流廣告定價列表行（每個業務頻道一行，數據來源為本地流量包定價配置） */
-  const buildTrafficPricingRows = (): WaterfallSlotConfig[] => {
-    const savedAt = loadTrafficPricingSavedAt()
-    return loadTrafficPricing().map((cp, idx) => {
-      const biz = TRAFFIC_CHANNEL_TO_BIZ[cp.bizChannel] ?? 'food'
-      return {
-        id: 900 + idx,
-        pricingNo: `TP${String(idx + 1).padStart(6, '0')}`,
-        promotionName: `${ALGORITHM_TYPE_LABEL[AlgorithmType.TRAFFIC_AD]}・${BIZ_CHANNEL_LABEL[biz] ?? biz}`,
-        app: AppType.SHANFENG,
-        channel: RecommendChannel.DELIVERY,
-        bizChannel: biz,
-        slotPosition: 0,
-        algorithmId: AlgorithmType.TRAFFIC_AD,
-        algorithmName: ALGORITHM_TYPE_LABEL[AlgorithmType.TRAFFIC_AD],
-        algorithmType: AlgorithmType.TRAFFIC_AD,
-        merchantLimit: 'unlimited' as const,
-        regionLimit: 'unlimited' as const,
-        status: cp.status === 'disabled' ? ServiceStatus.DISABLED : ServiceStatus.ENABLED,
-        updatedBy: '-',
-        updatedAt: savedAt,
-        createdAt: savedAt,
-        source: 'mock' as const,
-      }
-    })
-  }
-
-  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌并行拉取后合并 + 投流广告本地配置）+ 算法列表 */
+  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌 + 投流广告五路并行拉取后合并）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
@@ -218,16 +214,17 @@ export default function Waterfall() {
       fetchAdRevivePricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
       fetchAdHotPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingHot[], total: 0 })),
       fetchAdSignboardPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
+      fetchAdTrafficPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingTraffic[], total: 0 })),
       fetchAdAlgorithms({ page: 1, size: 500 }).catch(() => ({ records: [] as AdAlgorithm[], total: 0 })),
     ])
-      .then(([starRes, reviveRes, hotRes, signboardRes, algoRes]) => {
+      .then(([starRes, reviveRes, hotRes, signboardRes, trafficRes, algoRes]) => {
         if (!mounted) return
         const list = [
           ...(starRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.INVINCIBLE_STAR)),
           ...(reviveRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.HOT_REVIVE_AD)),
           ...(hotRes.records ?? []).map(vo => toPricingRow(vo as unknown as AdPricingStar, AlgorithmType.POPULAR_MERCHANT_KA)),
           ...(signboardRes.records ?? []).map(vo => toPricingRow({ ...vo, presaleDays: vo.presaleDays ?? 0 } as AdPricingStar, AlgorithmType.GOLDEN_SIGNBOARD)),
-          ...buildTrafficPricingRows(),
+          ...(trafficRes.records ?? []).map(toTrafficPricingRow),
         ]
         setDataList(list)
         // 缓存全量算法列表（排除金字招牌，只需标签不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
@@ -243,7 +240,6 @@ export default function Waterfall() {
         }
       })
     return () => { mounted = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 业务频道选项（根据业务类型过滤）
@@ -388,6 +384,8 @@ export default function Waterfall() {
               await deleteAdHotPricing(-record.id)
             } else if (record.algorithmType === AlgorithmType.GOLDEN_SIGNBOARD) {
               await deleteAdSignboardPricing(-record.id)
+            } else if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
+              await deleteAdTrafficPricing(-record.id)
             } else {
               await deleteAdPricing(-record.id)
             }
@@ -414,19 +412,6 @@ export default function Waterfall() {
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       onOk: async () => {
-        // 投流廣告：頻道級啟停（寫回定價配置的 status 字段）
-        if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
-          const target = BIZ_TO_TRAFFIC_CHANNEL[record.bizChannel ?? '']
-          if (target) {
-            const nextStatus = newStatus === ServiceStatus.ENABLED ? 'enabled' as const : 'disabled' as const
-            const next = loadTrafficPricing().map(cp => cp.bizChannel === target ? { ...cp, status: nextStatus } : cp)
-            saveTrafficPricing(next)
-          }
-          setDataList(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
-          setFilteredData(prev => prev.map(item => item.id === record.id ? { ...item, status: newStatus } : item))
-          message.success(t('waterfall.toggleSuccess', { action: actionText }))
-          return
-        }
         if (record.source === 'api') {
           try {
             if (record.algorithmType === AlgorithmType.HOT_REVIVE_AD) {
@@ -435,6 +420,8 @@ export default function Waterfall() {
               await updateAdHotPricingStatus(-record.id, newStatus)
             } else if (record.algorithmType === AlgorithmType.GOLDEN_SIGNBOARD) {
               await updateAdSignboardPricingStatus(-record.id, newStatus)
+            } else if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
+              await updateAdTrafficPricingStatus(-record.id, newStatus)
             } else {
               await updateAdPricingStatus(-record.id, newStatus)
             }
@@ -555,16 +542,14 @@ export default function Waterfall() {
           >
             {t('common.edit')}
           </Button>
-          {record.algorithmType !== AlgorithmType.TRAFFIC_AD && (
-            <Button 
-              type="link" 
-              size="small" 
-              danger
-              onClick={() => handleDelete(record)}
-            >
-              {t('common.delete')}
-            </Button>
-          )}
+          <Button 
+            type="link" 
+            size="small" 
+            danger
+            onClick={() => handleDelete(record)}
+          >
+            {t('common.delete')}
+          </Button>
         </Space>
       ),
     },

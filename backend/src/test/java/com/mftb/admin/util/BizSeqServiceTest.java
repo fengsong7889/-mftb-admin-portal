@@ -64,7 +64,11 @@ class BizSeqServiceTest {
     void giftRuleKey_knownTypes() {
         assertEquals("gift_new_store", BizSeqService.giftRuleKey("new_store"));
         assertEquals("gift_revive", BizSeqService.giftRuleKey("revival"));
+        // 前端新增赠送传 popular_merchant, ka 为历史代码, 两者都要能生成赠送ID
+        assertEquals("gift_popular", BizSeqService.giftRuleKey("popular_merchant"));
         assertEquals("gift_popular", BizSeqService.giftRuleKey("ka"));
+        assertEquals("gift_signboard", BizSeqService.giftRuleKey("golden_signboard"));
+        assertEquals("gift_traffic", BizSeqService.giftRuleKey("traffic_ad"));
     }
 
     @Test

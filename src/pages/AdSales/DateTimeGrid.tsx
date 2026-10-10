@@ -37,9 +37,6 @@ import {
   REGION_LIST,
   BACKEND_TO_UI_BRAND,
   UI_TO_BACKEND_BRAND,
-  MOCK_STORES,
-  STORE_OPTIONS,
-  BD_OPTIONS,
   DEFAULT_MULTI_SLOT_DISCOUNT_TIERS,
   PRESALE_OPEN_HOUR,
   getSellableDays,
@@ -172,9 +169,9 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const [algorithmMetaMap, setAlgorithmMetaMap] = useState<Record<string, { apiId: number }>>({})
   const [_algorithmBrandOverrides, setAlgorithmBrandOverrides] = useState<Record<string, string>>({})
   // 门店下拉（真实门店，value=storeCode）
-  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string; name?: string }>>(STORE_OPTIONS)
+  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
   const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
-  const [bdOptions, setBdOptions] = useState(BD_OPTIONS)
+  const [bdOptions, setBdOptions] = useState<Array<{ label: string; value: string }>>([])
   // 真实库存（查询后加载：格子售罄状态 + 预售窗口 + 折扣梯度）
   const [inventoryData, setInventoryData] = useState<AdInventoryVO | null>(null)
 
@@ -273,6 +270,38 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchBrand, searchStoreName])
+
+  // 真实门店下拉：加载门店列表（含集团编码与已绑定BD），选择品牌后按品牌过滤
+  useEffect(() => {
+    const backendBrand = searchBrand ? UI_TO_BACKEND_BRAND[searchBrand] : undefined
+    fetchStores({ page: 1, size: 500 })
+      .then(res => {
+        const stores = (res.records ?? []).filter(s => {
+          if (!backendBrand) return true
+          // 未配置品牌的门店不隐藏，避免门店数据缺失导致无法查询
+          if (!s.brand) return true
+          return s.brand.split(',').some(b => b.trim() === backendBrand)
+        })
+        const map: Record<string, StoreItem> = {}
+        const options = stores.map(s => {
+          map[s.storeCode] = s
+          return { label: `${s.storeName}（ID：${s.storeCode}）`, value: s.storeCode }
+        })
+        setStoreOptions(options)
+        setStoreMap(map)
+      })
+      .catch(() => { /* 静默：下拉保持为空，查询时会提示先选择门店 */ })
+  }, [searchBrand])
+
+  // 品牌切换后已选门店不在当前品牌门店范围内时清空（含带出的BD）
+  useEffect(() => {
+    if (!searchStoreName || Object.keys(storeMap).length === 0) return
+    if (!storeMap[searchStoreName]) {
+      setSearchStoreName(null)
+      setSearchBD(null)
+      setBdOptions([])
+    }
+  }, [storeMap, searchStoreName, setSearchStoreName, setSearchBD])
 
   // AdSales 特定：自动释放过期锁定时的额外逻辑（关闭支付弹窗、刷新库存）
   useEffect(() => {
@@ -386,18 +415,11 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     }
   }
 
-  // 门店变更时带出归属BD
+  // 门店变更时带出归属BD（真实门店已绑定的BD列表）
   const applyStoreBd = (value: string | null) => {
-    const store = value ? storeMap[value] : undefined
-    const bdList = store?.bdList ?? []
-    if (bdList.length > 0) {
-      setBdOptions(bdList.map(bd => ({ label: bd.bdName || bd.bdEmpId, value: bd.bdEmpId })))
-      setSearchBD(bdList[0].bdEmpId)
-    } else {
-      const mock = MOCK_STORES.find(s => s.id === value)
-      setBdOptions(BD_OPTIONS)
-      setSearchBD(mock ? mock.bd : null)
-    }
+    const bdList = value ? (storeMap[value]?.bdList ?? []) : []
+    setBdOptions(bdList.map(bd => ({ label: bd.bdName || bd.bdEmpId, value: bd.bdEmpId })))
+    setSearchBD(bdList[0]?.bdEmpId ?? null)
   }
 
   // 取算法对应的品牌（真实算法优先，其次 mock 映射）——目前未使用，保留供后续扩展
@@ -490,7 +512,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     setHasSearched(false)
     setInventoryData(null)
     setAlgorithmOptions([])
-    setBdOptions(BD_OPTIONS)
+    setBdOptions([])
   }
   
   // 商家推廣金餘額：null = 尚未取到（未選門店/無權限/後端不可用），展示 '--'
@@ -1136,7 +1158,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                               originalPrice,
                               salePrice,
                               storeId: searchStoreName || '',
-                              storeName: searchStoreName ? (storeMap[searchStoreName]?.storeName || storeOptions.find(s => s.value === searchStoreName)?.name || '') : '',
+                              storeName: searchStoreName ? (storeMap[searchStoreName]?.storeName || '') : '',
                               lockTime: Date.now(),
                             }
                           })

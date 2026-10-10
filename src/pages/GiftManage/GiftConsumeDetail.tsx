@@ -277,6 +277,7 @@ export default function GiftConsumeDetail() {
       <div className="search-section">
         <Form form={form} layout="inline" style={{ width: '100%' }}>
           <GiftSearchFields
+            t={t}
             searchGroupId={searchGroupId} setSearchGroupId={setSearchGroupId}
             searchStoreId={searchStoreId} setSearchStoreId={setSearchStoreId}
             groups={groups} stores={stores}
