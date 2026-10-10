@@ -246,7 +246,7 @@ export default function PromotionSlotConfigSlots() {
           okText: t('common:confirm'),
           cancelText: t('common:cancel'),
           onOk: () => {
-            setDraft(prev => prev ? { ...prev, fixedSlots: prev.fixedSlots.map(s => s.position === pos ? { ...s, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, status: 1 as WaterfallStatus } : s).sort((a, b) => a.position - b.position) } : prev)
+            setDraft(prev => prev ? { ...prev, fixedSlots: prev.fixedSlots.map(s => s.position === pos ? { ...s, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, stock: currentResource.stock, status: 1 as WaterfallStatus } : s).sort((a, b) => a.position - b.position) } : prev)
           },
         })
       } else {
@@ -258,7 +258,7 @@ export default function PromotionSlotConfigSlots() {
     // 同一门店/商品不能重复固定到多个启用坑位
     const dup = draft.fixedSlots.find(s => s.itemId === currentResource.id)
     if (dup) { message.error(t('promotionSlotConfig:duplicateResource', { pos: dup.position })); return }
-    const added: FixedContentSlot = { position: pos, contentType, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, status: 1 }
+    const added: FixedContentSlot = { position: pos, contentType, itemId: currentResource.id, itemName: currentResource.name, brand: currentResource.brand, categoryId: currentResource.categoryId, stock: currentResource.stock, status: 1 }
     setDraft(prev => prev ? { ...prev, fixedSlots: [...prev.fixedSlots, added].sort((a, b) => a.position - b.position) } : prev)
   }
 
@@ -356,7 +356,7 @@ export default function PromotionSlotConfigSlots() {
           isContentMode ? t('promotionSlotConfig:resourceSelectSection') : t('promotionSlotConfig:algoSelectSection'),
         )}
         {isContentMode ? (
-          <div>
+          <div style={{ display: 'grid', gridTemplateColumns: contentType === 'product' ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)', gap: 16 }}>
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
                 <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
@@ -378,6 +378,26 @@ export default function PromotionSlotConfigSlots() {
                 options={resourceOptions.map(r => ({ label: `${r.name}（${r.id}）`, value: r.id }))}
                 disabled={readOnly || !brand}
               />
+            </div>
+            {/* 库存：仅商品展示，选择商品后自动展示剩余库存（0=已售罄，未定义=不限） */}
+            {contentType === 'product' && (
+              <div>
+                <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('promotionSlotConfig:colStock')}</div>
+                <div style={{ minHeight: 32, display: 'flex', alignItems: 'center' }}>
+                  {currentResource ? (
+                    currentResource.stock == null
+                      ? <span style={{ color: '#8C8C8C' }}>{t('promotionSlotConfig:stockUnlimited')}</span>
+                      : <span style={{ fontSize: 14, fontWeight: 600, color: currentResource.stock === 0 ? '#FF4D4F' : '#52C41A' }}>{currentResource.stock}</span>
+                  ) : <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectResourceFirst')}</span>}
+                </div>
+              </div>
+            )}
+            {/* 所属品牌：选择门店/商品后自动展示对应品牌（与算法选择界面一致） */}
+            <div>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('common:brand')}</div>
+              <div style={{ minHeight: 32, display: 'flex', alignItems: 'center' }}>
+                {currentResource?.brand ? <BrandTag value={currentResource.brand} /> : <span style={{ color: '#bfbfbf' }}>{t('promotionSlotConfig:selectResourceFirst')}</span>}
+              </div>
             </div>
           </div>
         ) : (

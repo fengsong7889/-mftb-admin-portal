@@ -516,16 +516,67 @@
   height: 100%;
 }
 
-.portal-card-artwork[data-scene='merchantWorkbench'] {
-  color: #1890FF;
+/*
+ * 系统卡片色调：以插画场景（data-scene）为唯一真源，一系统一色。
+ * 之前按 data-system 配色的写法会漏掉 code 与场景名不一致的系统（如 seller → merchantWorkbench），
+ * 造成商户/店铺/搜索三张卡同为蓝色、同组并排时无法一眼分辨。
+ * 取色只复用项目已有色值（侧边栏业务域语义色 + AntD 标准色阶），不引入新色。
+ */
+
+/* 營銷與商家增長：同组四张卡必须色相互斥，ads 保持品牌橙不动 */
+.portal-card-artwork[data-scene='ads'] {
+  color: #E8720C; /* 品牌橙：算法投流是核心营收 */
 }
 
-.portal-card-artwork[data-scene='translation'] {
-  color: #722ED1;
+.portal-card-artwork[data-scene='merchant'] {
+  color: #13C2C2; /* 青绿：BD 拓店与地图规划 */
+}
+
+.portal-card-artwork[data-scene='merchantWorkbench'] {
+  color: #FAAD14; /* 金：商家自助经营与收益，与同组 ads 亮橙拉开明度差 */
+}
+
+.portal-card-artwork[data-scene='search'] {
+  color: #2F54EB; /* 电光蓝：检索与词库策略，比 HR 的用户蓝更冷 */
+}
+
+/* 經營與資產支撐 */
+.portal-card-artwork[data-scene='finance'] {
+  color: #52C41A; /* 绿：资金与对账 */
+}
+
+.portal-card-artwork[data-scene='eam'] {
+  color: #D46B08; /* 深橙棕：物资设备的工业感，与本场景暖色构件自洽 */
+}
+
+/* 組織與協同辦公 */
+.portal-card-artwork[data-scene='hr'] {
+  color: #1890FF; /* 用户蓝：对齐侧边栏 */
+}
+
+.portal-card-artwork[data-scene='oa'] {
+  color: #FA8C16; /* 琥珀：流程发起与审批 */
+}
+
+.portal-card-artwork[data-scene='rdm'] {
+  color: #EB2F96; /* 洋红：研发交付与上线发布 */
+}
+
+/* 智能與平台治理 */
+.portal-card-artwork[data-scene='ai'] {
+  color: #722ED1; /* 紫：AI 能力 */
+}
+
+.portal-card-artwork[data-scene='iam'] {
+  color: #001529; /* 墨：权限与账号安全，深色庄重 */
 }
 
 .portal-card-artwork[data-scene='platform'] {
-  color: #595959;
+  color: #595959; /* 灰：平台配置底座 */
+}
+
+.portal-card-artwork[data-scene='translation'] {
+  color: #08979C; /* 深青：地球与多语言，与同组 AI 紫拉开 */
 }
 
 .portal-card-artwork .portal-art-motion {
@@ -680,22 +731,54 @@
 .portal-card-artwork .portal-access-door-left { animation-name: portalAccessDoorLeft; }
 .portal-card-artwork .portal-access-door-right { animation-name: portalAccessDoorRight; }
 
-.portal-card-artwork .portal-ads-match { animation-name: portalAdsMatch; }
-.portal-card-artwork .portal-ads-stream { animation-name: portalDataFlow; animation-timing-function: linear; }
-.portal-card-artwork .portal-ads-cursor { animation-name: portalAdsCursor; }
-.portal-card-artwork .portal-ads-click {
+/* 广告推荐：人群圈选 → 竞价打分排序 → Top1 入首坑 → 曝光回流，共用 8 秒时钟 */
+.portal-card-artwork .portal-ads-target { animation-name: portalAdsTarget; }
+.portal-card-artwork .portal-ads-tag { animation-name: portalAdsTag; }
+.portal-card-artwork .portal-ads-intake { animation-name: portalAdsIntake; animation-timing-function: linear; }
+.portal-card-artwork .portal-ads-scan { animation-name: portalAdsScan; }
+.portal-card-artwork .portal-ads-lead { animation-name: portalAdsLead; }
+.portal-card-artwork .portal-ads-promote { animation-name: portalAdsPromote; }
+.portal-card-artwork .portal-ads-slot { animation-name: portalAdsSlot; }
+.portal-card-artwork .portal-ads-heart {
   transform-box: fill-box;
   transform-origin: center;
-  animation-name: portalAdsClick;
+  animation-name: portalAdsHeart;
 }
-.portal-card-artwork .portal-ads-growth,
+.portal-card-artwork .portal-ads-feed { animation-name: portalAdsFeed; }
+.portal-card-artwork .portal-ads-loop { animation-name: portalAdsLoop; }
+.portal-card-artwork .portal-ads-result { animation-name: portalAdsResult; }
+/* 模型架构版专用：逐层点亮，*-late 用正延迟让上层比下层晚一拍进入 */
+.portal-card-artwork .portal-ads-token {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalAdsToken;
+}
+.portal-card-artwork .portal-ads-cell { animation-name: portalAdsCell; }
+.portal-card-artwork .portal-ads-edge { stroke-dasharray: 1; animation-name: portalAdsEdge; }
+.portal-card-artwork .portal-ads-edge-late { animation-delay: 1.2s; }
+.portal-card-artwork .portal-ads-node { animation-name: portalAdsNode; }
+.portal-card-artwork .portal-ads-node-late { animation-delay: 0.9s; }
+.portal-card-artwork .portal-ads-head { animation-name: portalAdsHead; }
+.portal-card-artwork .portal-ads-bar {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation-name: portalAdsBar;
+}
+.portal-card-artwork .portal-ads-formula { animation-name: portalAdsFormula; }
+.portal-card-artwork .portal-ads-formula-mid { animation-delay: 0.9s; }
+.portal-card-artwork .portal-ads-formula-high { animation-delay: 1.8s; }
+.portal-card-artwork .portal-ads-learn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalAdsLearn;
+  animation-timing-function: linear;
+}
 .portal-card-artwork .portal-merchant-metric,
 .portal-card-artwork .portal-order-growth {
   transform-box: fill-box;
   transform-origin: center bottom;
   animation-name: portalBusinessGrowth;
 }
-.portal-card-artwork .portal-ads-result,
 .portal-card-artwork .portal-merchant-summary { animation-name: portalBusinessResult; }
 .portal-card-artwork .portal-merchant-route { stroke-dasharray: 1; animation-name: portalMerchantLink; }
 .portal-card-artwork .portal-merchant-pin-0 { animation-name: portalMerchantPinFirst; }
@@ -754,26 +837,6 @@
 .portal-card-artwork[data-motion='idle'] .portal-art-static,
 .portal-card-artwork[data-reduced-motion='true'] .portal-art-static { opacity: 1; }
 .portal-card-artwork[data-motion='paused'] .portal-art-motion { animation-play-state: paused; }
-
-.portal-card[data-system='merchant'] .portal-card-cover,
-.portal-card[data-system='search'] .portal-card-cover,
-.portal-card[data-system='hr'] .portal-card-cover {
-  color: #1890FF;
-}
-
-.portal-card[data-system='ai'] .portal-card-cover,
-.portal-card[data-system='iam'] .portal-card-cover {
-  color: #722ED1;
-}
-
-.portal-card[data-system='finance'] .portal-card-cover,
-.portal-card[data-system='oa'] .portal-card-cover {
-  color: #52C41A;
-}
-
-.portal-card[data-system='platform'] .portal-card-cover {
-  color: #595959;
-}
 
 .portal-card-lock {
   position: absolute;

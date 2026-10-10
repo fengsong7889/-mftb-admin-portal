@@ -36,7 +36,7 @@ import {
   type AdReviveInventoryCell,
 } from '../../../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../../../api/store'
-import { fetchFinAccounts } from '../../../../api/finance'
+import { fetchFinAccountBalance } from '../../../../api/finance'
 import { fetchGiftAvailableDays } from '../../../../api/gift'
 import { usePaymentRule } from '../../../../hooks/usePaymentRule'
 import { getSystemRuleValue } from '../../../../hooks/useSystemRules'
@@ -351,11 +351,9 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
         setSelectedDates([])
         setCartItems([])
         const backendBrand = UI_TO_BACKEND_BRAND[searchBrand] || searchBrand
-        fetchFinAccounts({ groupId: store?.groupCode, brand: backendBrand, page: 1, size: 10 })
-          .then(res => {
-            const acc = (res.records ?? [])[0]
-            setMerchantBalance(acc ? Number(acc.virtualBalance) : null)
-          }).catch(() => setMerchantBalance(null))
+        // 餘額口徑舆後端下單校驗一致：有回應就照實顯示（無賬戶記錄=0），只有一個取不到才置 null 顯示 '--'
+        fetchFinAccountBalance(store?.groupCode, backendBrand)
+          .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
       })
       .catch(err => message.error(err instanceof Error ? err.message : t('inventoryQueryFailed')))
   }
@@ -485,11 +483,8 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
       setIsSuccessModalVisible(true)
       fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
       if (store) {
-        fetchFinAccounts({ groupId: store.groupCode, brand: UI_TO_BACKEND_BRAND[searchBrand || ''] || searchBrand || undefined, page: 1, size: 10 })
-          .then(res => {
-            const acc = (res.records ?? [])[0]
-            setMerchantBalance(acc ? Number(acc.virtualBalance) : null)
-          }).catch(() => {})
+        fetchFinAccountBalance(store.groupCode, UI_TO_BACKEND_BRAND[searchBrand || ''] || searchBrand)
+          .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
         fetchGiftAvailableDays(store.id, GIFT_AD_TYPE).then(setGiftDaysBalance).catch(() => {})
       }
     } catch (err) {

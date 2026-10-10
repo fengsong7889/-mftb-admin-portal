@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.dto.FinAccountBalanceVO;
 import com.mftb.admin.dto.FinAccountQuery;
 import com.mftb.admin.dto.FinAccountVO;
 import com.mftb.admin.dto.PageResult;
@@ -56,6 +57,18 @@ public class FinAccountServiceImpl implements FinAccountService {
                 : accountMapper.selectDerivedPage(query.getGroupId(), query.getGroupName(),
                         query.getBrand(), query.getStatus(), authorizedGroups, offset, query.getSize());
         return new PageResult<>(records, total);
+    }
+
+    @Override
+    public FinAccountBalanceVO getBalance(String groupCode, String brand) {
+        // 与下单链路 AdSales*ServiceImpl#requireGroupAccess 同源：数据权限不含该集团时同样拒绝，
+        // 避免「看得到余额却下不了单」的口径不一致；前端按失败处理为 '--'
+        Set<String> authorizedGroups = dataScopeService.resolveAuthorizedGroupCodes();
+        if (authorizedGroups != null && !authorizedGroups.contains(groupCode)) {
+            throw new BusinessException("無權訪問該商家集團");
+        }
+        // 只读：不建户、不改状态；无记录时由 VO 归一为 exists=false + 余额 0
+        return FinAccountBalanceVO.of(groupCode, brand, findByGroupBrand(groupCode, brand));
     }
 
     @Override

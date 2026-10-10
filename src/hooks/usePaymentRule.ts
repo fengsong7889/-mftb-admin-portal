@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSystemRuleValue } from './useSystemRules'
-import { getSystemConfig, updateSystemConfig } from '../api/systemConfig'
+import { getSystemConfigSilent, updateSystemConfig } from '../api/systemConfig'
 
 /** 支付方式模式（4 種互斥） */
 export type PaymentMode = 'promo_only' | 'gift_only' | 'mixed' | 'switchable'
@@ -39,10 +39,9 @@ export function syncPaymentModeToBackend(adType: string, mode: PaymentMode): Pro
 /** 從後端讀取指定廣告類型的支付模式（失敗時回退本地） */
 export async function fetchPaymentMode(adType?: string): Promise<PaymentMode> {
   const t = adType || 'revival'
-  try {
-    const res = await getSystemConfig(`payment_mode_${t}`)
-    if (res && isValidPaymentMode(res.value)) return res.value
-  } catch { /* 後端不可用 → 回退本地 */ }
+  // 靜默讀取：本 Hook 已有本地降級，無權限/後端不可用時不該再彈全局錯誤打擾下單流程
+  const value = await getSystemConfigSilent(`payment_mode_${t}`)
+  if (isValidPaymentMode(value)) return value
   return getPaymentMode(t)
 }
 

@@ -1,4 +1,73 @@
 {
+  "consumable": {
+    "queryFailed": "查詢失敗",
+    "exportEmpty": "暫無數據可導出",
+    "exportSuccess": "導出成功",
+    "totalQty": "總數量",
+    "remark": "備註",
+    "statusPending": "待發放",
+    "statusApproved": "待出庫",
+    "statusRejected": "已駁回",
+    "statusIssued": "已出庫",
+    "statusCancelled": "已撤銷",
+    "claimNo": "領用單號",
+    "claimApplicant": "申請人",
+    "claimDepartment": "所屬部門",
+    "claimReason": "領用事由",
+    "claimKinds": "品類數",
+    "claimAppliedAt": "申請時間",
+    "phClaimNo": "單號",
+    "phApplicant": "申請人姓名",
+    "phDepartment": "全部部門",
+    "claimTabMine": "我的領用",
+    "claimBtnNew": "耗材領用",
+    "claimIssue": "發放",
+    "claimRevoke": "撤銷",
+    "issueTitle": "確認發放？",
+    "issueOk": "確認發放",
+    "issueNote": "發放後按移動加權均價扣減庫存並結轉實際成本，不可撤銷。",
+    "issueSuccess": "已發放，庫存已扣減",
+    "issueFailed": "發放失敗",
+    "revokeTitle": "確認撤銷該領用單？",
+    "revokeOk": "確認撤銷",
+    "revokeReasonPh": "撤銷原因（選填）",
+    "revokeSuccess": "已撤銷",
+    "revokeFailed": "撤銷失敗",
+    "inboundNo": "入庫單號",
+    "inboundType": "入庫類型",
+    "purchaseCompany": "購買公司",
+    "supplier": "供應商",
+    "inboundLineCount": "明細行數",
+    "inboundTotalAmount": "總金額",
+    "inboundBizDate": "入庫日期",
+    "phInboundNo": "入庫單號",
+    "phDate": "選擇日期",
+    "typePurchase": "採購入庫",
+    "typeManual": "手工入庫",
+    "typeInit": "期初建賬",
+    "inboundBtnNew": "新建入庫單",
+    "inboundDetailTitle": "入庫單詳情",
+    "inboundCreateSuccess": "入庫單創建成功",
+    "inboundCreateFailed": "創建失敗",
+    "inboundItemCode": "耗材編碼",
+    "inboundItemName": "名稱",
+    "inboundSpec": "規格",
+    "inboundWarehouse": "倉庫",
+    "inboundQty": "數量",
+    "inboundUnitPrice": "單價",
+    "inboundAmount": "金額",
+    "brandRequired": "請選擇所屬品牌",
+    "companyRequired": "請選擇購買公司",
+    "itemRequired": "請選耗材",
+    "qtyRequired": "數量",
+    "priceRequired": "單價",
+    "linesRequired": "至少添加一條入庫明細",
+    "supplierPh": "供應商名稱（選填）",
+    "remarkPh": "備註（選填）",
+    "itemPh": "耗材",
+    "createOk": "確認創建",
+    "addLine": "添加明細"
+  },
   "myAssets": {
     "tabClaim": "固定資產領用",
     "tabBorrow": "借用",
@@ -176,11 +245,11 @@
     "logout": "退出登錄",
     "systems": {
       "merchantWorkbench": {
-        "name": "商家工作台",
-        "description": "門店經營、訂單處理與營業數據，一站式商家工作空間"
+        "name": "店鋪經營系統",
+        "description": "門店經營、訂單處理與營業數據，一站式商家自運空間"
       },
       "translation": {
-        "name": "翻譯中心",
+        "name": "翻譯管理系統",
         "description": "多語言翻譯、語料維護與品質校驗，連接全球業務"
       },
       "ads": {
@@ -196,11 +265,11 @@
         "description": "管理搜索詞庫、引導策略與效果分析"
       },
       "finance": {
-        "name": "財務系統",
+        "name": "財務結算系統",
         "description": "賬戶資金、收支明細與財務對賬，盡在掌握"
       },
       "ai": {
-        "name": "人工智能管理系統",
+        "name": "人工智能系統",
         "description": "統一管理智能模型、使用配額與安全審計"
       },
       "hr": {
@@ -220,12 +289,12 @@
         "description": "流程申請、事項審批與員工自助，高效協作"
       },
       "iam": {
-        "name": "權限中心",
+        "name": "權限管理系統",
         "description": "統一配置角色、功能與數據權限，守護訪問安全"
       },
       "platform": {
-        "name": "平台配置",
-        "description": "集中管理通知、多語言、業務規則與版本配置"
+        "name": "平台支撐系統",
+        "description": "集中管理通知渠道、業務規則與版本配置"
       }
     }
   },
@@ -2734,7 +2803,12 @@
   "versionUpdate": {
     "title": "新版本已發布",
     "desc": "系統已更新到最新版本，刷新頁面即可獲取新功能與修復。",
-    "reload": "立即刷新"
+    "reload": "立即刷新",
+    "pending": "新版本待刷新",
+    "current": "當前版本",
+    "latest": "最新版本",
+    "snooze": "稍後再說",
+    "refreshHint": "刷新後仍會回到當前頁面，未保存的表單內容可能丟失。"
   },
   "guard": {
     "403Sub": "抱歉，您沒有訪問該菜單的權限，請聯繫管理員到「功能授權」為您的角色或部門授權",
@@ -3124,14 +3198,6 @@
     "greetingAfternoon": "下午好",
     "greetingEvening": "晚上好",
     "greetingPartner": "夥伴",
-    "quotes": [
-      "每一個偉大的事業，都從一個勇敢的開始出發。",
-      "行動是治癒恐懼的良藥，猶豫拖延將不斷滋養恐懼。",
-      "把簡單的事做好就是不簡單，把平凡的事做好就是不平凡。",
-      "今天的努力是明天的伏筆，現在的付出是未來的禮物。",
-      "不怕慢，只怕站；持續前進，終將抵達。",
-      "機會總是留給有準備的人，而你正在準備。"
-    ],
     "aiTitle": "AI 智能助手",
     "aiBeta": "內測模式",
     "aiBetaTip": "當前處於內測階段，AI 助手回答結果僅供參考，請結合實際業務數據自行核驗後使用。",
@@ -4572,7 +4638,7 @@
     "moveSuccess": "已將「{{name}}」移動至 {{pos}}號位",
     "editPosConfig": "編輯{{pos}}號位配置",
     "addPosConfig": "新增坑位配置",
-    "addEditPosConfig": "新增/編輯坑位配置",
+    "addEditPosConfig": "算法坑位配置",
     "addEditBtn": "新增/編輯",
     "algoSelectSection": "算法選擇",
     "posConfigSection": "展示位配置",
@@ -4618,15 +4684,15 @@
     "overallSortHint": "作用於分類自動補齊的內容：綜合得分、銷量由高到低，距離由近到遠；固定坑位不受影響。預覽使用模擬指標，實際距離以用戶位置為準。",
     "sourceAlgorithm": "算法提供",
     "sourceCustom": "自定義",
-    "storeCategories": "門店分類",
-    "productCategories": "商品分類",
+    "storeCategories": "門店類目",
+    "productCategories": "商品類目",
     "sourceHint_algorithm": "選擇算法並分配坑位，其餘位置由自然流量算法補齊。",
     "sourceHint_category": "按系統分類自動補齊內容，也可手動固定指定門店或商品。",
     "sourceHint_custom": "以手動選擇或批量導入的內容為主，分類兜底可選。",
     "optionalFallback": "選填",
     "requiredFallback": "必填",
-    "selectStoreCategories": "請選擇門店分類（可多選）",
-    "selectProductCategories": "請選擇商品分類（可多選）",
+    "selectStoreCategories": "請選擇門店類目（可多選）",
+    "selectProductCategories": "請選擇商品類目（可多選）",
     "customFallbackHint": "可選：未配置固定內容的位置由所選分類補齊；留空時僅展示自定義內容。",
     "groupBuyAlgorithmHint": "必填，僅可選擇所屬品牌下、團購到店頻道的自然流量算法，用於補齊未配置的坑位。",
     "channelAlgorithmHint": "必填，僅可選擇所屬品牌與當前業務頻道的自然流量算法，用於補齊未配置的坑位。",
@@ -4666,10 +4732,15 @@
     "categoryFallbackRequired": "請至少選擇一個兜底分類",
     "matchedCount": "當前匹配內容：{{count}} 個",
     "fixedContentSlots": "固定內容坑位",
+    "fixedDisplayContent": "固定展示內容配置",
     "noFixedSlot": "暫無固定內容，點擊「新增/編輯」配置坑位",
     "colStore": "門店名稱",
     "colProduct": "商品名稱",
+    "colStoreId": "門店ID",
+    "colProductId": "商品ID",
     "colItemId": "內容ID",
+    "colStock": "剩餘庫存",
+    "stockUnlimited": "不限",
     "colCategory": "所屬分類",
     "previewHintGroupBuy": "預覽按所選佈局展示固定內容與分類補位（模擬數據）",
     "previewHintDelivery": "僅預覽已配置坑位，未配置坑位展示自然流量數據",

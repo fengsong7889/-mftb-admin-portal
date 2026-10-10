@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.dto.FinAccountBalanceVO;
 import com.mftb.admin.dto.FinAccountQuery;
 import com.mftb.admin.dto.FinAccountVO;
 import com.mftb.admin.dto.PageResult;
@@ -15,6 +16,12 @@ public interface FinAccountService {
 
     /** 账户余额分页查询（以集团×品牌派生，集团有对应品牌门店才展示） */
     PageResult<FinAccountVO> page(FinAccountQuery query);
+
+    /**
+     * 下单页专用：按「集团 + 品牌」只读单个账户余额。
+     * <p>不建户、不改状态；无账户记录时 exists=false 且余额为 0（与下单校验口径一致）。
+     */
+    FinAccountBalanceVO getBalance(String groupCode, String brand);
 
     /** 冻结账户 */
     void freeze(String groupId, String brand);

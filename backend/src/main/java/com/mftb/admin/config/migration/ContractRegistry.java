@@ -29,7 +29,71 @@ public class ContractRegistry {
         combined.add(permAuditLogContract());
         // HR 入转调离：审批回调办理链路的关键写入表，启动自愈保证不因迁移漏执行而缺表
         combined.add(hrLifecycleRequestContract());
+        // 自然流量評分規則：生產缺 multiplier_tiers/threshold_score/region_configs 導致規則列表查詢 500
+        combined.add(organicScoreRuleContract());
         return combined;
+    }
+
+    /**
+     * 自然流量評分規則表結構契約。
+     * <p>
+     * 事故背景：{@code backend/sql/135_136_organic_com01_full.sql} / {@code 137_organic_plt03_region_configs.sql}
+     * 僅是參考文檔未接入自動執行，而 {@code OrganicScoreDataInitializer} 的補列步驟被
+     * {@code organic:columns-v1} 版本門控（生產早已記為成功不再重跑），導致生產庫長期缺
+     * {@code multiplier_tiers} / {@code threshold_score} / {@code region_configs} 三列，
+     * MyBatis-Plus 按實體全字段 SELECT 直接拋 BadSqlGrammarException（Unknown column in 'field list'）。
+     * 故登記為每次啟動自癒的關鍵結構；建表 DDL 與 {@code resources/23_organic_score.sql} 保持同構並補齊三列。
+     */
+    public static ContractSpec organicScoreRuleContract() {
+        return new ContractSpec(
+                "organic-score-rule",
+                "biz_organic_score_rule",
+                "CREATE TABLE IF NOT EXISTS biz_organic_score_rule ("
+                        + "id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主鍵', "
+                        + "rule_code VARCHAR(50) NOT NULL COMMENT '規則編碼', "
+                        + "dimension INT NOT NULL COMMENT '所屬維度: 1=商業 2=店鋪 4=平台', "
+                        + "name VARCHAR(100) NOT NULL COMMENT '規則名稱', "
+                        + "description VARCHAR(500) DEFAULT '' COMMENT '計分說明', "
+                        + "mode INT NOT NULL COMMENT '計分方式', "
+                        + "score INT NOT NULL DEFAULT 0 COMMENT '分值', "
+                        + "prerequisites VARCHAR(500) DEFAULT NULL COMMENT '前提條件', "
+                        + "stat_days INT DEFAULT NULL COMMENT '統計天數', "
+                        + "stat_days_total INT DEFAULT NULL COMMENT '歷史基線天數', "
+                        + "stat_days_recent INT DEFAULT NULL COMMENT '近期對比天數', "
+                        + "range_scores JSON DEFAULT NULL COMMENT '配送範圍分層分數 JSON', "
+                        + "time_range_scores JSON DEFAULT NULL COMMENT '分時段配送範圍分數 JSON', "
+                        + "tiers JSON DEFAULT NULL COMMENT '梯度檔位 JSON', "
+                        + "condition_items JSON DEFAULT NULL COMMENT '條件計分項 JSON', "
+                        + "calc_cycle VARCHAR(20) DEFAULT NULL COMMENT '計算周期', "
+                        + "calc_interval_hours DECIMAL(5,2) DEFAULT NULL COMMENT '定時監控間隔小時數', "
+                        + "peak_time_ranges JSON DEFAULT NULL COMMENT '高峰時段定義 JSON', "
+                        + "deduction_per_order INT DEFAULT NULL COMMENT '每單固定扣分', "
+                        + "decay_coefficient DECIMAL(10,4) DEFAULT NULL COMMENT '衰減係數', "
+                        + "blocked_merchants JSON DEFAULT NULL COMMENT '屏蔽商家列表 JSON', "
+                        + "activity_items JSON DEFAULT NULL COMMENT '活動加分配置 JSON', "
+                        + "multiplier_tiers TEXT DEFAULT NULL COMMENT '倍數梯度計分配置 JSON', "
+                        + "threshold_score INT DEFAULT NULL COMMENT '門檻≤客單價時固定加分', "
+                        + "region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON', "
+                        + "status INT NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用', "
+                        + "builtin TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否系統內置', "
+                        + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序號', "
+                        + "updated_by VARCHAR(50) DEFAULT NULL COMMENT '最後更新人', "
+                        + "deleted INT NOT NULL DEFAULT 0 COMMENT '邏輯刪除', "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間', "
+                        + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                        + "PRIMARY KEY (id), "
+                        + "UNIQUE KEY uk_rule_code (rule_code), "
+                        + "KEY idx_dimension (dimension), "
+                        + "KEY idx_status (status)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='自然流量評分規則配置'",
+                List.of(
+                        new ContractSpec.ColumnSpec("multiplier_tiers",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN multiplier_tiers TEXT DEFAULT NULL COMMENT '倍數梯度計分配置 JSON（僅 COM_01）'"),
+                        new ContractSpec.ColumnSpec("threshold_score",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN threshold_score INT DEFAULT NULL COMMENT '門檻≤客單價時固定加分（僅 COM_01）'"),
+                        new ContractSpec.ColumnSpec("region_configs",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON（PLT_03/PLT_04 共用）'")
+                ));
     }
 
     /** HR 入转调离单据表结构契约（与 {@code HrLifecycleSchemaInitializer} 同构，建表即可，无列级自愈）。 */

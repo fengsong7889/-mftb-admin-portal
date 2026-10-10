@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, Switch, Tabs } from 'antd'
+import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, Switch, Tabs, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import BrandTag from '../../components/BrandTag'
@@ -29,8 +29,7 @@ export default function PromotionSlotConfig() {
   const [loading, setLoading] = useState(false)
   /** 搜索条件快照（驱动客户端过滤重算，避免在依赖数组里调用 getFieldsValue） */
   const [searchValues, setSearchValues] = useState<Record<string, unknown>>({})
-  /** 算法筛选选项 + 编码->频道映射（业务线推断用） */
-  const [algoOptions, setAlgoOptions] = useState<{ label: string; value: number }[]>([])
+  /** 算法编码->频道映射（业务线推断用） */
   const algoChannelByCodeRef = useRef<Record<string, number>>({})
 
   /** 加载算法库：构建 algoCode->channel 映射，供业务线推断 */
@@ -40,21 +39,20 @@ export default function PromotionSlotConfig() {
         const map: Record<string, number> = {}
         for (const a of res.records ?? []) { if (a.algoCode) map[a.algoCode] = a.channel ?? 0 }
         algoChannelByCodeRef.current = map
-        setAlgoOptions((res.records ?? []).map(a => ({ label: a.algoName, value: a.id as number })))
       })
-      .catch(() => { /* 保留空选项 */ })
+      .catch(() => { /* 保留空映射 */ })
   }, [])
 
   /** 加载列表：一次性拉取后端全量（大分页）+ 本地团购策略，统一归类后再筛选/分页 */
   const loadingRef = useRef(false)
-  const load = useCallback(async (algoId?: number) => {
+  const load = useCallback(async () => {
     if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
     try {
       let serverViews: WaterfallListView[] = []
       try {
-        const res = await fetchWaterfallList({ page: 1, size: 1000, algoId })
+        const res = await fetchWaterfallList({ page: 1, size: 1000 })
         serverViews = mergeServerToStrategies(res?.records ?? [], algoChannelByCodeRef.current)
       } catch (apiErr) {
         if (isBackendUnavailable(apiErr)) { message.warning(t('promotionSlotConfig:backendUnavailable')) }
@@ -79,7 +77,12 @@ export default function PromotionSlotConfig() {
     const v = searchValues as {
       strategyCode?: string; strategyName?: string; brand?: string
       status?: number; bizChannel?: WaterfallBizChannel
+      updatedBy?: string; updatedAt?: [dayjs.Dayjs, dayjs.Dayjs] | null
     }
+    const [updatedFromRaw, updatedToRaw] = v.updatedAt ?? [null, null]
+    // 日期范围仅选到天：起始归零到 00:00，结束补足到 23:59:59.999
+    const updatedFrom = updatedFromRaw ? updatedFromRaw.startOf('day') : null
+    const updatedTo = updatedToRaw ? updatedToRaw.endOf('day') : null
     return allMerged.filter(item => {
       if (item.businessType !== activeBiz) return false
       if (v.strategyCode && !(item.strategyCode || '').toLowerCase().includes(String(v.strategyCode).toLowerCase())) return false
@@ -87,6 +90,14 @@ export default function PromotionSlotConfig() {
       if (v.brand && item.brand !== v.brand) return false
       if (v.status && item.status !== v.status) return false
       if (v.bizChannel && item.bizChannel !== v.bizChannel) return false
+      if (v.updatedBy && !(item.updatedBy || '').toLowerCase().includes(String(v.updatedBy).toLowerCase())) return false
+      if ((updatedFrom || updatedTo) && item.updatedAt) {
+        const ts = dayjs(item.updatedAt).valueOf()
+        if (updatedFrom && ts < updatedFrom.valueOf()) return false
+        if (updatedTo && ts > updatedTo.valueOf()) return false
+      } else if (updatedFrom || updatedTo) {
+        return false
+      }
       return true
     })
   }, [allMerged, activeBiz, searchValues])
@@ -95,9 +106,7 @@ export default function PromotionSlotConfig() {
 
   const handleSearch = () => {
     setPage(1)
-    const v = searchForm.getFieldsValue()
-    setSearchValues(v)
-    load(v.algoId)
+    setSearchValues(searchForm.getFieldsValue())
   }
   const handleReset = () => { searchForm.resetFields(); setPage(1); setSearchValues({}); load() }
 
@@ -224,20 +233,21 @@ export default function PromotionSlotConfig() {
             <Input placeholder={t('promotionSlotConfig.placeholderWaterfallName')} allowClear />
           </Form.Item>
           <Form.Item label={t('common.colBrand')} name="brand">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 120 }} options={[{ label: t('common.flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
+            <Select placeholder={t('common.all')} allowClear options={[{ label: t('common.flashBee'), value: 'flashBee' }, { label: 'mFood', value: 'mFood' }]} />
           </Form.Item>
           {isDelivery && (
             <Form.Item label={t('promotionSlotConfig.colBizChannel')} name="bizChannel">
-              <Select placeholder={t('common.all')} allowClear style={{ width: 140 }} options={BIZ_CHANNEL_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value }))} />
-            </Form.Item>
-          )}
-          {isDelivery && (
-            <Form.Item label={t('promotionSlotConfig.colAlgorithmName')} name="algoId">
-              <Select placeholder={t('promotionSlotConfig.placeholderSelectAlgorithm')} allowClear showSearch style={{ width: 220 }} optionFilterProp="label" options={algoOptions} />
+              <Select placeholder={t('common.all')} allowClear options={BIZ_CHANNEL_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value }))} />
             </Form.Item>
           )}
           <Form.Item label={t('common.colStatus')} name="status">
-            <Select placeholder={t('common.all')} allowClear style={{ width: 100 }} options={[{ label: t('common.enable'), value: 1 }, { label: t('common.disable'), value: 2 }]} />
+            <Select placeholder={t('common.all')} allowClear options={[{ label: t('common.enable'), value: 1 }, { label: t('common.disable'), value: 2 }]} />
+          </Form.Item>
+          <Form.Item label={t('promotionSlotConfig.colLastUpdater')} name="updatedBy">
+            <Input placeholder={t('promotionSlotConfig.placeholderUpdater')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('promotionSlotConfig.colLastUpdateTime')} name="updatedAt">
+            <DatePicker.RangePicker allowClear format="YYYY-MM-DD" style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">

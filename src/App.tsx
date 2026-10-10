@@ -251,6 +251,11 @@ const AssetTransferList = lazy(() => import('./pages/AssetManagement/AssetTransf
 const AssetHandover = lazy(() => import('./pages/AssetManagement/AssetHandover'))
 // EAM 變更歷史
 const AssetFlow = lazy(() => import('./pages/AssetManagement/AssetFlow'))
+// 用車管理（階段 A 前端原型，歸屬 OA 系統，數據為記憶體演示）
+const VehicleFiles = lazy(() => import('./pages/VehicleManagement/VehicleFiles'))
+const MyVehicleUse = lazy(() => import('./pages/VehicleManagement/MyVehicleUse'))
+const VehicleDispatch = lazy(() => import('./pages/VehicleManagement/VehicleDispatch'))
+const VehicleLedger = lazy(() => import('./pages/VehicleManagement/VehicleLedger'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
 const AssetTagView = lazy(() => import('./pages/AssetTagView'))
 // 資產領用簽署頁（釘釘工作通知直達，令牌免登，不含後台佈局）
@@ -308,7 +313,7 @@ function PageLoading() {
 function AuthenticatedLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
-  const { updateAvailable } = useVersionCheck()
+  const { updateAvailable, current: currentVersion, latest: latestVersion } = useVersionCheck()
 
   // 登錄態首次掛載（含刷新恢復）：按持久化語言拉取數據庫語言包，
   // 否則 ja/ko/ru 的動態翻譯（業務字段/菜單名）刷新後丟失回退英文
@@ -331,7 +336,7 @@ function AuthenticatedLayout() {
             </RouteErrorBoundary>
           </Content>
         </Layout>
-        <VersionUpdateNotification updateAvailable={updateAvailable} />
+        <VersionUpdateNotification updateAvailable={updateAvailable} current={currentVersion} latest={latestVersion} />
       </Layout>
     )
   }
@@ -671,6 +676,28 @@ function AuthenticatedLayout() {
               <Route path="/asset-handover/detail" element={<AssetHandover />} />
               {/* EAM 變更歷史 */}
               <Route path="/asset-flow"       element={<AssetFlow />} />
+              {/* 用車管理（階段 B1）：子视图由模块内部按 pathname 片段切换，
+                  但路由必须逐条显式注册——ROUTE_MENU_KEY_MAP 的门禁按精确路径前缀校验，
+                  splat(/*）不被识别，而且与项目内 asset-claim 等现有约定不一致 */}
+              <Route path="/vehicle-files" element={<VehicleFiles />} />
+              <Route path="/vehicle-files/add" element={<VehicleFiles />} />
+              <Route path="/vehicle-files/edit" element={<VehicleFiles />} />
+              <Route path="/vehicle-files/detail" element={<VehicleFiles />} />
+              <Route path="/vehicle-files/qualification" element={<VehicleFiles />} />
+              <Route path="/my-vehicle-use" element={<MyVehicleUse />} />
+              <Route path="/my-vehicle-use/apply" element={<MyVehicleUse />} />
+              <Route path="/my-vehicle-use/detail" element={<MyVehicleUse />} />
+              <Route path="/vehicle-dispatch" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/assign" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/direct" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/depart" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/return" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/confirm" element={<VehicleDispatch />} />
+              <Route path="/vehicle-dispatch/detail" element={<VehicleDispatch />} />
+              <Route path="/vehicle-ledger" element={<VehicleLedger />} />
+              <Route path="/vehicle-ledger/detail" element={<VehicleLedger />} />
+              <Route path="/vehicle-ledger/correct" element={<VehicleLedger />} />
+              <Route path="/vehicle-ledger/backfill" element={<VehicleLedger />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />
@@ -688,7 +715,7 @@ function AuthenticatedLayout() {
         </Content>
       </Layout>
       <PetMascot />
-      <VersionUpdateNotification updateAvailable={updateAvailable} />
+      <VersionUpdateNotification updateAvailable={updateAvailable} current={currentVersion} latest={latestVersion} />
     </Layout>
   )
 }

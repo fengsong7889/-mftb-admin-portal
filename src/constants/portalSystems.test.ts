@@ -8,21 +8,23 @@ import { getSystemDisplayName } from './portalSystems'
  * 出现过「HR 系統 / 人力資源系統」两套名字并存。本表以企业门户为唯一真值，
  * 任何一处改名都必须同步 `sys_system` 种子与 5 个语言包，否则此用例失败。
  * key = sys_system.code（i18n 归一化前的原始编码）。
+ * <p>命名规范（2026-10 统一）：每个独立系统一律「4字域名 + 系統」= 6 字，
+ * 不再混用「中心 / 工作台 / 配置」——那类后缀属菜单级语义，会把系统降级成菜单。
  */
 const AUTHORITATIVE_NAMES: Record<string, string> = {
   ads: '廣告推薦系統',
   merchant: '商戶運營系統',
-  seller: '商家工作台',
+  seller: '店鋪經營系統',
   search: '搜索運營系統',
-  finance: '財務系統',
-  ai: '人工智能管理系統',
+  finance: '財務結算系統',
+  ai: '人工智能系統',
   hr: '人力資源系統',
   eam: '物資管理系統',
   rdm: '產研協同系統',
   oa: '協同辦公系統',
-  iam: '權限中心',
-  platform: '平台配置',
-  i18n: '翻譯中心',
+  iam: '權限管理系統',
+  platform: '平台支撐系統',
+  i18n: '翻譯管理系統',
 }
 
 const LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru'] as const
@@ -36,6 +38,13 @@ describe('系统名称全局统一（以企业门户为准）', () => {
     for (const [code, expected] of Object.entries(AUTHORITATIVE_NAMES)) {
       // 故意传入数据库里的旧名称，验证语言包优先于 sys_system.name
       expect(getSystemDisplayName(i18n.getFixedT('zh-TW'), { code, name: `${code} 旧名` })).toBe(expected)
+    }
+  })
+
+  it('命名规范：全部系统以「系統」结尾且固定 6 字，不得回退到中心/工作台/配置等菜单级后缀', () => {
+    for (const [code, name] of Object.entries(AUTHORITATIVE_NAMES)) {
+      expect(name, `系统 ${code} 的名称必须以「系統」结尾`).toMatch(/系統$/)
+      expect([...name].length, `系统 ${code}「${name}」必须统一为 6 字域名+系統`).toBe(6)
     }
   })
 
@@ -61,7 +70,7 @@ describe('系统名称全局统一（以企业门户为准）', () => {
 
   it('翻译中心编码别名（i18n / translation）归一到同一套文案', () => {
     const t = i18n.getFixedT('zh-TW')
-    expect(getSystemDisplayName(t, { code: 'i18n', name: '翻譯中心' })).toBe('翻譯中心')
-    expect(getSystemDisplayName(t, { code: 'translation', name: '翻譯中心' })).toBe('翻譯中心')
+    expect(getSystemDisplayName(t, { code: 'i18n', name: '翻譯管理系統' })).toBe('翻譯管理系統')
+    expect(getSystemDisplayName(t, { code: 'translation', name: '翻譯管理系統' })).toBe('翻譯管理系統')
   })
 })

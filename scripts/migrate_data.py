@@ -1,24 +1,42 @@
 #!/usr/bin/env python3
 # 将 SQLPub 生产库 (mysql3.sqlpub.com) 数据全量迁移到阿里云 RDS
-# 用法: python3 migrate_data.py <源库密码>
+#
+# 凭据一律不写入仓库（历史版本曾内置 RDS 明文密码，已移除）：
+#   源库：host/user 可用环境变量覆盖，密码作为命令行第 1 个参数传入
+#   目标库：必需环境变量 RDS_HOST / RDS_USER / RDS_PASSWORD
+# 用法:
+#   export RDS_HOST=... RDS_USER=... RDS_PASSWORD=...
+#   python3 migrate_data.py <源库密码>
+import os
 import sys
 import time
 import pymysql
 
-SRC = dict(
-    host='mysql3.sqlpub.com', port=3308, user='fengsong_mftb',
-    charset='utf8mb4', connect_timeout=30,
-)
-DST = dict(
-    host='rm-bp1wo7870dr30e5rpzo.mysql.rds.aliyuncs.com', port=3306,
-    user='fengsong_admin', password='Feng@9510',
-    database='fengsong', charset='utf8mb4', connect_timeout=30,
-)
 DB = 'fengsong'
 BATCH = 500  # 每批写入行数
 
+
+def require_env(key):
+    """读取必需环境变量；缺失即退出，不得回退到内置凭据。"""
+    val = (os.environ.get(key) or '').strip()
+    if not val:
+        sys.exit(f'❌ 缺少环境变量 {key}；凭据不得写入仓库，请 export 后重试')
+    return val
+
+
+SRC = dict(
+    host=os.environ.get('SRC_HOST', 'mysql3.sqlpub.com'), port=3308,
+    user=os.environ.get('SRC_USER', 'fengsong_mftb'),
+    charset='utf8mb4', connect_timeout=30,
+)
+DST = dict(
+    host=require_env('RDS_HOST'), port=int(os.environ.get('RDS_PORT', '3306')),
+    user=require_env('RDS_USER'), password=require_env('RDS_PASSWORD'),
+    database=DB, charset='utf8mb4', connect_timeout=30,
+)
+
 if len(sys.argv) < 2:
-    sys.exit('用法: python3 migrate_data.py <源库密码>')
+    sys.exit('用法: 先 export RDS_HOST/RDS_USER/RDS_PASSWORD，再执行 python3 migrate_data.py <源库密码>')
 SRC['password'] = sys.argv[1]
 SRC['database'] = DB
 

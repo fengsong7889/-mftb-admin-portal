@@ -1,5 +1,6 @@
 package com.mftb.admin.constant;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -85,6 +86,27 @@ public final class RuleConfigKeyRegistry {
             return MENU_GIFT;
         }
         return null;
+    }
+
+    /**
+     * 版塊菜單 → 運行時消費方菜單（僅 view 回退）。
+     * <p>
+     * 「廣告銷售-購買廣告」下單頁需讀取支付方式規則（{@code payment_mode_*}）決定現金/贈送抵扣呈現，
+     * 但該 key 歸屬的 {@code rule-ad-sales} 是平台配置系統的規則維護菜單，不該成為下單的前置權限。
+     * 故對這些版塊的只讀請求允許持消費方菜單（如 {@code ad-sales}）者讀取；寫入（edit）一律不走回退。
+     */
+    private static final Map<String, String> RUNTIME_READER_MENU = Map.of(
+            MENU_AD_SALES, "ad-sales"
+    );
+
+    /**
+     * 解析規則版塊的運行時只讀消費方菜單。
+     *
+     * @param ownerMenu {@link #resolveOwnerMenu(String)} 的結果
+     * @return 可回退的消費方菜單 key；無登記返回 {@code null}
+     */
+    public static String resolveRuntimeReaderMenu(String ownerMenu) {
+        return ownerMenu == null ? null : RUNTIME_READER_MENU.get(ownerMenu);
     }
 
     /**

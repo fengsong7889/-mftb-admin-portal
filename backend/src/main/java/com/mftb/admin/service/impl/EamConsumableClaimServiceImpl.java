@@ -50,6 +50,7 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
     private final EamConsumableTxnMapper txnMapper;
     private final EamLocationMapper locationMapper;
     private final SysUserMapper userMapper;
+    private final SysDepartmentMapper departmentMapper;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -57,16 +58,7 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
 
     @Override
     public PageResult<EamConsumableClaimVO> page(EamConsumableClaimQuery query) {
-        LambdaQueryWrapper<EamConsumableClaim> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(query.getKeyword())) {
-            String kw = query.getKeyword().trim();
-            wrapper.and(w -> w.like(EamConsumableClaim::getClaimNo, kw)
-                    .or().like(EamConsumableClaim::getApplicantName, kw)
-                    .or().like(EamConsumableClaim::getReason, kw));
-        }
-        if (StringUtils.hasText(query.getStatus())) wrapper.eq(EamConsumableClaim::getStatus, query.getStatus());
-        if (query.getApplicantId() != null) wrapper.eq(EamConsumableClaim::getApplicantId, query.getApplicantId());
-        wrapper.orderByDesc(EamConsumableClaim::getId);
+        LambdaQueryWrapper<EamConsumableClaim> wrapper = buildPageWrapper(query);
 
         Page<EamConsumableClaim> page = claimMapper.selectPage(
                 new Page<>(PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize())),
@@ -77,6 +69,49 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         List<EamConsumableClaimVO> records = rows.stream()
                 .map(c -> toVO(c, itemMap.getOrDefault(c.getId(), List.of()))).toList();
         return new PageResult<>(records, page.getTotal());
+    }
+
+    /**
+     * 列表查询条件构建（抽出以便单测断言下推的 SQL 片段）。
+     * <p>部门筛选按部门树展开为 IN，选父部门能看到下级部门的领用单，与员工列表同口径。
+     */
+    LambdaQueryWrapper<EamConsumableClaim> buildPageWrapper(EamConsumableClaimQuery query) {
+        LambdaQueryWrapper<EamConsumableClaim> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(query.getKeyword())) {
+            String kw = query.getKeyword().trim();
+            wrapper.and(w -> w.like(EamConsumableClaim::getClaimNo, kw)
+                    .or().like(EamConsumableClaim::getApplicantName, kw)
+                    .or().like(EamConsumableClaim::getReason, kw));
+        }
+        if (StringUtils.hasText(query.getClaimNo())) wrapper.like(EamConsumableClaim::getClaimNo, query.getClaimNo().trim());
+        if (StringUtils.hasText(query.getApplicantName())) wrapper.like(EamConsumableClaim::getApplicantName, query.getApplicantName().trim());
+        if (query.getDepartmentId() != null) wrapper.in(EamConsumableClaim::getDepartmentId, collectDeptAndDescendants(query.getDepartmentId()));
+        if (StringUtils.hasText(query.getStatus())) wrapper.eq(EamConsumableClaim::getStatus, query.getStatus());
+        if (query.getApplicantId() != null) wrapper.eq(EamConsumableClaim::getApplicantId, query.getApplicantId());
+        wrapper.orderByDesc(EamConsumableClaim::getId);
+        return wrapper;
+    }
+
+    /** 收集指定部门及其全部子孙部门 ID（查询父部门时同时命中下级部门领用单） */
+    private List<Long> collectDeptAndDescendants(Long rootId) {
+        List<SysDepartment> all = departmentMapper.selectList(new LambdaQueryWrapper<>());
+        Map<Long, List<Long>> childMap = new HashMap<>();
+        for (SysDepartment d : all) {
+            if (d.getParentId() != null) {
+                childMap.computeIfAbsent(d.getParentId(), k -> new ArrayList<>()).add(d.getId());
+            }
+        }
+        List<Long> ids = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
+        Deque<Long> stack = new ArrayDeque<>();
+        stack.push(rootId);
+        while (!stack.isEmpty()) {
+            Long cur = stack.pop();
+            if (!visited.add(cur)) continue;
+            ids.add(cur);
+            for (Long child : childMap.getOrDefault(cur, List.of())) stack.push(child);
+        }
+        return ids;
     }
 
     @Override
@@ -176,6 +211,8 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         claim.setApplicantName(StringUtils.hasText(applicant.getName()) ? applicant.getName() : applicant.getUsername());
         claim.setApplicantEmpId(nullToEmpty(applicant.getEmpId()));
         claim.setDepartment(nullToEmpty(applicant.getDepartment()));
+        // 承担部门 ID 必须同时落库：列表按部门筛选与出库流水成本归集都依赖这一列，只存名称快照无法精确筛选
+        claim.setDepartmentId(applicant.getDepartmentId());
         claim.setCompanyBrand(brand);
         claim.setPurchaseCompanyId(company);
         claim.setPurchaseCompany(companyName);

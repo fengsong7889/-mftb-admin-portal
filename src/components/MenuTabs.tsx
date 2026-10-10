@@ -163,6 +163,22 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   // 页面说明（页面标题含动态页面名，取静态主体）
   '/page-description-editor': { fixed: '編輯界面說明' },
   '/page-prd-view': { fixed: '界面需求說明' },
+  // 用車管理子頁面：不登記的話會全部退化到父菜單名，一個「用車辦理」能堆出 6 個同名標籤
+  '/vehicle-ledger/detail': { fixed: '用車詳情' },
+  '/vehicle-ledger/correct': { fixed: '授權更正' },
+  '/vehicle-ledger/backfill': { fixed: '事後補錄' },
+  '/vehicle-dispatch/detail': { fixed: '用車辦理詳情' },
+  '/vehicle-dispatch/assign': { fixed: '安排車輛與駕駛人' },
+  '/vehicle-dispatch/direct': { fixed: '授權直接登記' },
+  '/vehicle-dispatch/depart': { fixed: '出車登記' },
+  '/vehicle-dispatch/return': { fixed: '歸還登記' },
+  '/vehicle-dispatch/confirm': { fixed: '歸還確認' },
+  '/my-vehicle-use/apply': { fixed: '申請用車' },
+  '/my-vehicle-use/detail': { fixed: '我的用車詳情' },
+  '/vehicle-files/detail': { fixed: '車輛詳情' },
+  '/vehicle-files/add': { fixed: '新增車輛檔案' },
+  '/vehicle-files/edit': { fixed: '編輯車輛檔案' },
+  '/vehicle-files/qualification': { fixed: '新增駕駛資格核驗' },
   // 采购执行（?mode=add/edit → 与页面 H2 标题同一 i18n key；?id=X → 詳情）
   '/purchase-order': { modeParam: 'mode', modeMap: { add: 'i18n:asset.addPoTitle', edit: 'i18n:asset.editPoTitle' }, detailFixed: 'i18n:eam.purchaseOrderDetailTitle' },
   // 資產管理（EAM）子页面 —— 与页面标题（H2 / DetailPageHeader）一致；页面标题含动态单号/员工名时取静态主体

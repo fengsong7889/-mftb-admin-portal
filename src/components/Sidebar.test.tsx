@@ -113,11 +113,11 @@ describe('Sidebar 系统品牌', () => {
   it('切换系统和折叠时图标跟随当前系统；语言切换同步更新名称', async () => {
     writeCurrentSystemCode('finance')
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [
-      { code: 'finance', name: '財務系統', icon: 'AccountBookOutlined' },
+      { code: 'finance', name: '財務結算系統', icon: 'AccountBookOutlined' },
       { code: 'hr', name: '人力資源系統', icon: 'TeamOutlined' },
     ], superAdmin: false })
     const { container, rerender } = renderSidebar()
-    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('MFTB財務系統'))
+    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('MFTB財務結算系統'))
     act(() => writeCurrentSystemCode('hr'))
     await waitFor(() => expect(container.querySelector('.sidebar-system-icon .anticon-team')).toBeInTheDocument())
     expect(container.querySelector('.sidebar-logo')).toHaveTextContent(`MFTB${zh.portal.systems.hr.name}`)
@@ -136,7 +136,7 @@ describe('Sidebar 系统品牌', () => {
     }], 'online')
     vi.mocked(fetchPortalContext).mockRejectedValueOnce(new Error('网络错误'))
     const { container } = renderSidebar('/account-balance')
-    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('MFTB財務系統'))
+    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('MFTB財務結算系統'))
     expect(container.querySelector('.sidebar-system-icon .anticon-account-book')).toBeInTheDocument()
   })
 
@@ -316,7 +316,7 @@ describe('Sidebar 分系统目录提升', () => {
     expect(await screen.findByRole('menuitem', { name: /廣告銷售/ })).toBeInTheDocument()
   })
 
-  it('商家工作台同时展示原购买入口和报表分组，直达报表保持 seller 归属', async () => {
+  it('店鋪經營系統同时展示原购买入口和报表分组，直达报表保持 seller 归属', async () => {
     // v45: seller-center 包装目录已退役，购买入口与报表分组直接是 seller 顶级菜单
     const tree: MenuVO[] = [
       { id: 2, parentId: null, menuKey: 'promotion-sales-config', name: '店鋪隨心推', type: 2, status: 1, sort: 1, systemCode: 'seller' },
@@ -354,7 +354,7 @@ describe('Sidebar 分系统目录提升', () => {
     expect(screen.queryByText('規則配置')).not.toBeInTheDocument()
   })
 
-  it('离线报表只归属商家工作台，不在广告或财务系统复活', async () => {
+  it('离线报表只归属店鋪經營系統，不在广告或财务系统复活', async () => {
     setMenuState(null, 'offline')
     writeCurrentSystemCode('ads')
     renderSidebar()
@@ -367,7 +367,7 @@ describe('Sidebar 分系统目录提升', () => {
   })
 })
 
-describe('广告系统与商家工作台切换隔离', () => {
+describe('广告系统与店鋪經營系統切换隔离', () => {
   const tree: MenuVO[] = [
     { id: 1, parentId: null, menuKey: 'merchant_promotion', name: '商家推廣工具', type: 1, status: 1, sort: 1, systemCode: 'ads', children: [
       { id: 2, parentId: 1, menuKey: 'ad-sales', name: '廣告銷售', type: 2, status: 1, sort: 1 },
@@ -380,7 +380,7 @@ describe('广告系统与商家工作台切换隔离', () => {
     setMenuState(tree, 'online')
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [
       { code: 'ads', name: '廣告推薦系統', icon: 'AimOutlined' },
-      { code: 'seller', name: '商家工作台', icon: 'ShoppingOutlined' },
+      { code: 'seller', name: '店鋪經營系統', icon: 'ShoppingOutlined' },
     ], superAdmin: false })
   })
 
@@ -401,7 +401,7 @@ describe('广告系统与商家工作台切换隔离', () => {
 
   it('从商家报表经顶部选择广告系统，首页和侧栏同步，刷新后仍是广告系统', async () => {
     const view = renderSwitchFlow('/promotion-report-order')
-    await waitFor(() => expect(view.container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('商家工作台'))
+    await waitFor(() => expect(view.container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('店鋪經營系統'))
     fireEvent.click(view.container.querySelector('.system-switcher-trigger')!)
     fireEvent.click(await screen.findByRole('menuitem', { name: /廣告推薦系統/ }))
     await waitFor(() => expect(screen.getByTestId('current-path').textContent).toBe('/'))
@@ -414,7 +414,7 @@ describe('广告系统与商家工作台切换隔离', () => {
     expect(readCurrentSystemCode()).toBe('ads')
   })
 
-  it('保留商家工作台历史选择时，门户广告卡片仍进入广告系统', async () => {
+  it('保留店鋪經營系統历史选择时，门户广告卡片仍进入广告系统', async () => {
     writeCurrentSystemCode('seller')
     const { container } = renderSwitchFlow('/portal')
     fireEvent.click(await screen.findByRole('button', { name: /廣告推薦系統.*進入系統/ }))
@@ -428,16 +428,16 @@ describe('广告系统与商家工作台切换隔离', () => {
     ['ShoppingOutlined', '.anticon-shopping'],
     ['', '.anticon-shop'],
     ['UnregisteredIcon', '.anticon-shop'],
-  ])('商家工作台图标 %s 正常渲染或兜底，选中项无右箭头', async (icon, selector) => {
+  ])('店鋪經營系統图标 %s 正常渲染或兜底，选中项无右箭头', async (icon, selector) => {
     writeCurrentSystemCode('seller')
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [
-      { code: 'seller', name: '商家工作台', icon },
+      { code: 'seller', name: '店鋪經營系統', icon },
       { code: 'custom', name: '自定义系统', icon: 'UnregisteredIcon' },
     ], superAdmin: false })
     const { container } = renderSwitchFlow('/')
-    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('商家工作台'))
+    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('店鋪經營系統'))
     fireEvent.click(container.querySelector('.system-switcher-trigger')!)
-    const seller = await screen.findByRole('menuitem', { name: /商家工作台/ })
+    const seller = await screen.findByRole('menuitem', { name: /店鋪經營系統/ })
     expect(seller.querySelector(selector)).toBeInTheDocument()
     expect(seller).toHaveClass('ant-dropdown-menu-item-selected')
     expect(seller.querySelector('.anticon-right')).not.toBeInTheDocument()

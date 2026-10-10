@@ -343,17 +343,17 @@ class SystemPortalSchemaInitializerTest {
         Map<String, String> authoritative = Map.ofEntries(
                 Map.entry("ads", "廣告推薦系統"),
                 Map.entry("merchant", "商戶運營系統"),
-                Map.entry("seller", "商家工作台"),
+                Map.entry("seller", "店鋪經營系統"),
                 Map.entry("search", "搜索運營系統"),
-                Map.entry("finance", "財務系統"),
-                Map.entry("ai", "人工智能管理系統"),
+                Map.entry("finance", "財務結算系統"),
+                Map.entry("ai", "人工智能系統"),
                 Map.entry("hr", "人力資源系統"),
                 Map.entry("eam", "物資管理系統"),
                 Map.entry("rdm", "產研協同系統"),
                 Map.entry("oa", "協同辦公系統"),
-                Map.entry("iam", "權限中心"),
-                Map.entry("platform", "平台配置"),
-                Map.entry("i18n", "翻譯中心"));
+                Map.entry("iam", "權限管理系統"),
+                Map.entry("platform", "平台支撐系統"),
+                Map.entry("i18n", "翻譯管理系統"));
         assertEquals(authoritative.size(),
                 jdbc.queryForObject("SELECT COUNT(*) FROM sys_system WHERE deleted = 0", Integer.class));
         authoritative.forEach((code, name) -> assertEquals(name,

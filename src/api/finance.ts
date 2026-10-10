@@ -46,6 +46,29 @@ export function fetchFinAccounts(params: FinAccountQuery) {
   return request.get<unknown, FinPageResult<FinAccount>>('/fin/accounts', { params, ...SILENT })
 }
 
+/** 下單頁推廣金餘額（單個集團 + 單個品牌） */
+export interface FinAccountBalance {
+  groupId: string
+  brand?: string
+  /** 賬戶記錄是否存在：false = 尚未產生充值/轉入記錄，餘額按 0 呈現（與後端下單校驗口徑一致） */
+  exists: boolean
+  virtualBalance: number
+  /** normal/frozen/mergeFrozen/cancelled；無賬戶記錄時為 null */
+  status?: string
+}
+
+/**
+ * 查詢單個集團+品牌的推廣金餘額（購買廣告頁專用，對應後端 /fin/accounts/balance）。
+ * <p>靜默請求，無權限/無數據權限/後端不可用一律返回 null —— 調用方據此顯示 '--'，
+ * 不得當成「餘額為 0」而阻擋下單（真實扣款由後端下單鏈路 requireSufficientBalance 兜底）。
+ */
+export function fetchFinAccountBalance(groupId?: string | null, brand?: string | null): Promise<FinAccountBalance | null> {
+  if (!groupId || !brand) return Promise.resolve(null)
+  return request
+    .get<unknown, FinAccountBalance>('/fin/accounts/balance', { params: { groupId, brand }, ...SILENT })
+    .catch(() => null)
+}
+
 /** 凍結賬戶（賬戶按集團+品牌隔離） */
 export function freezeFinAccount(groupId: string, brand: string) {
   return request.put<unknown, void>(`/fin/accounts/${groupId}/freeze`, null, { params: { brand }, ...SILENT })

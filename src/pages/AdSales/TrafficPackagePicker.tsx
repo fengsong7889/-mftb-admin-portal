@@ -63,7 +63,8 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const [deliverySlot, setDeliverySlot] = useState<'business' | 'allday'>('business')
   const [confirmOpen, setConfirmOpen] = useState(false)
   // Mock數據 - 商家推廣金餘額（同其它購買頁）
-  const [merchantBalance, setMerchantBalance] = useState(15800)
+  // 商家推廣金餘額：本頁尚未接入門店/集團上下文, 未取到時一律顯示 '--', 不得用假餘額誤導下單判斷
+  const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
 
   /* ── 支付方式（與金字招牌/人氣商家/盤活復蘇結算區一致） ── */
   // Mock數據 - 贈送天數餘額（門店為 Mock 數據，暫用固定值展示）
@@ -165,7 +166,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
         message.error('贈送天數餘額不足，無法全額抵扣')
         return
       }
-    } else if (payableAmount > merchantBalance) {
+    } else if (merchantBalance != null && payableAmount > merchantBalance) {
       message.error('推廣金餘額不足，請充值後再試')
       return
     }
@@ -189,7 +190,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
     }
     saveTrafficOrder(order)
     // Mock：扣減推廣金餘額（贈送天數抵扣部分不扣推廣金）
-    if (payableAmount > 0) setMerchantBalance(prev => Math.round((prev - payableAmount) * 100) / 100)
+    if (payableAmount > 0) setMerchantBalance(prev => (prev == null ? null : Math.round((prev - payableAmount) * 100) / 100))
     setConfirmOpen(false)
     message.success(t('trafficOrderSuccess'))
     navigate('/promotion-order-manage?type=投流廣告&from=ad-sales')
@@ -483,7 +484,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   alignItems: 'center',
                 }}>
                   <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
                 </div>
               )}
               {/* 贈送天數餘額 */}

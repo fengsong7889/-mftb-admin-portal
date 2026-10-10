@@ -19,7 +19,7 @@ import { fetchGiftAvailableDays } from '../../api/gift'
 import { usePaymentRule } from '../../hooks/usePaymentRule'
 import { fetchAdAlgorithms, fetchAdSignboardInventory, placeAdSignboardOrder } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccounts } from '../../api/finance'
+import { fetchFinAccountBalance } from '../../api/finance'
 import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY } from '../Recommend/constants'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
@@ -161,7 +161,8 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   const [excludedWeekdays, setExcludedWeekdays] = useState<number[]>([])
   // 待開售提醒彈窗
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
-  const [merchantBalance, setMerchantBalance] = useState<number>(0)
+  /** 推廣金餘額：null = 未取到（無權限/無數據權限/後端不可用），展示 '--' 且跳過前端預校驗 */
+  const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
 
@@ -328,13 +329,10 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
     setLabelDates({})
     setActiveDateLabel(null)
 
-    // 推廣金餘額
-    const backendBrand = searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand
-    fetchFinAccounts({ groupId: groupCode, brand: backendBrand, page: 1, size: 10 })
-      .then(res => {
-        const acc = (res.records ?? [])[0]
-        setMerchantBalance(acc ? Number(acc.virtualBalance) : 0)
-      }).catch(() => setMerchantBalance(0))
+    // 推廣金餘額：取不到時保持 null 顯示 '--', 不得降為 0 而誤擋下單
+    const balanceBrand = searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand
+    fetchFinAccountBalance(groupCode, balanceBrand)
+      .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
 
     // 贈送天數餘額
     const storeIdNum = store?.id ?? 0
@@ -529,12 +527,13 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   const handlePayment = () => {
     if (selectedLabels.length === 0) { message.warning('請至少選擇一個標籤'); return }
     if (totalDaysAll === 0) { message.warning(t('selectDatesInCalendar')); return }
+    // 餘額未取到（null）時跳過前端預校驗, 真實扣款由後端下單鏈路兜底
     if (!mixedPayment && activeMode === 'promo') {
-      if (payableAmount > merchantBalance) { message.error('推廣金餘額不足，請充值後再試'); return }
+      if (merchantBalance != null && payableAmount > merchantBalance) { message.error('推廣金餘額不足，請充值後再試'); return }
     } else if (!mixedPayment && activeMode === 'gift') {
       if (giftDaysBalance < totalDaysAll) { message.error('贈送天數餘額不足，無法抵扣'); return }
     } else if (mixedPayment) {
-      if (payableAmount > merchantBalance) { message.error('推廣金餘額不足，請充值後再試'); return }
+      if (merchantBalance != null && payableAmount > merchantBalance) { message.error('推廣金餘額不足，請充值後再試'); return }
     }
     setIsPaymentModalVisible(true)
   }
@@ -564,7 +563,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
       setPaidGiftDays(effectiveGiftDays)
       setPaidPromoAmount(payableAmount)
       setPaidPaymentMode(mixedPayment ? 'mixed' : activeMode)
-      setMerchantBalance(prev => prev - payableAmount)
+      setMerchantBalance(prev => (prev == null ? null : prev - payableAmount))
       setIsSuccessModalVisible(true)
     } catch (err) {
       message.error(err instanceof Error ? err.message : '下單失敗，請稍後重試')
@@ -1268,7 +1267,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
               {(mixedPayment || activeMode === 'promo') && (
                 <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>推廣金餘額</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
                 </div>
               )}
               {/* 贈送天數餘額 */}

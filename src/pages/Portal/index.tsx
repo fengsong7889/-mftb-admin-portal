@@ -9,7 +9,7 @@
  * 整体版式参考企业门户通行做法（顶部横幅 + 概览指标 + 业务域分组应用墙 + 指引带），
  * 分组与筛选只做视觉归类，授权判定仍以门户接口返回为唯一依据。
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button, Empty, Input, Modal, Spin, Tabs } from 'antd'
 import {
   AccountBookOutlined, AppstoreOutlined, ControlOutlined, DeploymentUnitOutlined,
@@ -20,6 +20,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
 import { getPortalSystemKey, getSystemDisplayName } from '../../constants/portalSystems'
 import { useAuth } from '../../contexts/AuthContext'
@@ -29,10 +30,10 @@ import './index.css'
 
 /**
  * 前端界面确认阶段的展示目录，与 SystemPortalSchemaInitializer.seedSystems 的业务系统逐行对齐。
- * 名称必须与 `sys_system.name` 完全一致（展示时还会再过一层 portal.systems.*.name 语言包），
- * 否则未授权卡片与已授权卡片、授权中心会出现同名系统不同写法。
  * 全量目录接口目前仅权限管理员可用，暂不在门户调用；后续接入门户专用目录接口。
  * 此目录只用于展示未授权系统，不参与授权判断，不能据此放行入口。
+ * 名称必须与 `sys_system.name` 完全一致（展示时还会再过一层 portal.systems.*.name 语言包），
+ * 否则未授权卡片与已授权卡片、授权中心会出现同名系统不同写法。
  * 新增文案待 i18n 解耦后重构。
  */
 const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
@@ -45,18 +46,18 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '商戶集團、門店、門店數據、地圖規劃', icon: 'ShopOutlined',
   },
   {
-    code: 'seller', name: '商家工作台',
+    code: 'seller', name: '店鋪經營系統',
   },
   {
     code: 'search', name: '搜索運營系統', nameEn: 'Search Ops',
     description: '搜索詞庫、引導、策略、校驗、報表', icon: 'SearchOutlined',
   },
   {
-    code: 'finance', name: '財務系統', nameEn: 'Finance',
+    code: 'finance', name: '財務結算系統', nameEn: 'Finance & Settlement',
     description: '賬戶餘額、批次、明細、對賬、審批中心', icon: 'AccountBookOutlined',
   },
   {
-    code: 'ai', name: '人工智能管理系統', nameEn: 'Artificial Intelligence',
+    code: 'ai', name: '人工智能系統', nameEn: 'Artificial Intelligence',
     description: '模型、配額、授權、MCP、審計、能耗', icon: 'RobotOutlined',
   },
   {
@@ -76,15 +77,15 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '流程中心、流程事項、審批配置、員工自助', icon: 'SolutionOutlined',
   },
   {
-    code: 'iam', name: '權限中心', nameEn: 'IAM',
+    code: 'iam', name: '權限管理系統', nameEn: 'IAM',
     description: '角色、功能授權、數據授權、菜單配置', icon: 'SafetyCertificateOutlined',
   },
   {
-    code: 'platform', name: '平台配置', nameEn: 'Platform',
-    description: '通知、多語言、規則、版本、翻譯工作台', icon: 'SettingOutlined',
+    code: 'platform', name: '平台支撐系統', nameEn: 'Platform',
+    description: '通知渠道、規則、版本', icon: 'SettingOutlined',
   },
   {
-    code: 'i18n', name: '翻譯中心',
+    code: 'i18n', name: '翻譯管理系統',
   },
 ]
 
@@ -161,8 +162,21 @@ function greetingOf(hour: number): { key: string; fallback: string } {
 /** 视图模型：artworkName 固定为接口返回的原始名称，保证插画场景不随界面语言漂移。 */
 type ViewSystem = PortalSystem & { artworkName: string }
 
-/** 插画风格候选：產研協同提供两套构图，进页时随机抽一套，不给员工做选择。 */
-const ARTWORK_STYLES: readonly PortalArtworkStyle[] = ['pipeline', 'gantt']
+/** 插画构图候选：目前產研協同与广告推荐各自提供两套，进门户时逐档轮换，不给员工做选择。 */
+const ARTWORK_STYLES: readonly PortalArtworkStyle[] = ['primary', 'alternate']
+/** 只记录上次实际展示的档位；与业务导航状态（current_system_code 等）分开，不互相覆盖。 */
+const ARTWORK_STYLE_KEY = 'portal_artwork_style'
+
+/**
+ * 取下一档构图：随机抽会让员工连续几次进门户看到同一套（两套时概率 50%），
+ * 改成按上次展示结果往后推一档，就能保证每次重进或刷新都换一套。
+ * 这里只读不写：渲染必须保持无副作用，否则 StrictMode 双调用会一次推进两档。
+ */
+function nextArtworkStyle(): PortalArtworkStyle {
+  const shown = localStorage.getItem(ARTWORK_STYLE_KEY)
+  const index = ARTWORK_STYLES.findIndex(style => style === shown)
+  return ARTWORK_STYLES[(index + 1) % ARTWORK_STYLES.length]
+}
 
 /**
  * 横幅日期时间行：24 小时制时钟 + 今天日期胶囊。
@@ -190,65 +204,12 @@ function PortalDateTime() {
 }
 
 /**
- * 横幅励志语：语料全部来自语言包 `portal.quotes` 数组（繁中/英/日/韩/俄各一套 30 条）。
- * 轮换间隔 5 秒，一轮 30 条走完才会重洗，约 2.5 分钟内不会看到重复。
+ * 横幅励志语：语料与轮播逻辑统一收敛到 `hooks/useMotivationQuote`，
+ * 与个系统首页横幅共用语言包 `portal.quotes` 同一数据源。
  */
-const QUOTE_ROTATE_MS = 5000
-
-/** Fisher-Yates 洗牌，返回一轮不重复的下标顺序。 */
-function shuffledOrder(size: number): number[] {
-  const order = Array.from({ length: size }, (_, index) => index)
-  for (let index = order.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(Math.random() * (index + 1))
-    ;[order[index], order[swap]] = [order[swap], order[index]]
-  }
-  return order
-}
-
-/** 从牌堆取下一条；牌堆空了就重洗，并保证新轮首条不与上一条相同。 */
-function drawQuote(deck: number[], size: number, previous: number): number {
-  if (deck.length === 0) {
-    const order = shuffledOrder(size)
-    if (order[0] === previous && order.length > 1) {
-      ;[order[0], order[order.length - 1]] = [order[order.length - 1], order[0]]
-    }
-    deck.push(...order)
-  }
-  return deck.shift() ?? 0
-}
-
-/**
- * 读取当前语言的励志语数组。
- * returnObjects 让 i18next 直接返回数组，语言包缺该键时由 fallbackLng（英文）兜底；
- * 数据库翻译包只会写入扁平字符串，因此必须校验类型，非数组则视为无语料。
- */
-function useMotivationQuotes(): string[] {
-  const { t } = useTranslation()
-  // 不做 memo：30 条字符串的过滤开销极低，而直接求值可保证语言切换后一定拿到新语料
-  const raw = t('portal.quotes', { returnObjects: true }) as unknown
-  return Array.isArray(raw)
-    ? raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : []
-}
-
-/**
- * 励志语轮播：独立组件自持 5 秒定时器，与时钟同理避免拖整页重渲染。
- * 父级以语言为 key 重挂载，切换语言时牌堆与文案同步重置。
- */
-function PortalMotivationQuote({ quotes }: { quotes: readonly string[] }) {
+function PortalMotivationQuote() {
   const { i18n } = useTranslation()
-  const deck = useRef<number[]>([])
-  const [index, setIndex] = useState(() => drawQuote(deck.current, quotes.length, -1))
-
-  useEffect(() => {
-    if (quotes.length < 2) return undefined
-    const timer = window.setInterval(() => {
-      setIndex((current) => drawQuote(deck.current, quotes.length, current))
-    }, QUOTE_ROTATE_MS)
-    return () => window.clearInterval(timer)
-  }, [quotes.length])
-
-  const text = quotes.length > 0 ? quotes[index % quotes.length] : ''
+  const { text, index } = useRotatingMotivationQuote()
   if (!text) return null
   // 中文与日文用直角引号，其他语言不加装饰符号，分隔竖线已足够标识
   const wrapped = /^(zh|ja)/.test(i18n.language) ? `「${text}」` : text
@@ -279,12 +240,12 @@ export default function Portal() {
   const [activeTab, setActiveTab] = useState('authorized')
   const [domain, setDomain] = useState('all')
   /**
-   * 插画风格随机抽一次：Portal 是路由级组件，登录进入与每次从系统内返回门户都会重新挂载，
-   * 所以懒初始化恰好等价于「每次回到门户重新随机」，不写本地存储也不固定偏好。
+   * 插画构图逐档轮换：Portal 是路由级组件，登录进入、从系统内返回门户与刷新页面都会重新挂载，
+   * 所以懒初始化恰好等价于「每次回到门户换一套」；只记住上一档是什么，不存员工偏好也不提供开关。
    */
-  const [artworkStyle] = useState<PortalArtworkStyle>(
-    () => ARTWORK_STYLES[Math.floor(Math.random() * ARTWORK_STYLES.length)],
-  )
+  const [artworkStyle] = useState<PortalArtworkStyle>(nextArtworkStyle)
+  /** 落盘放到挂载后，保证持久化的值就是本次真正看到的构图；重复写入同一个值，对 StrictMode 重挂载也幂等。 */
+  useEffect(() => { localStorage.setItem(ARTWORK_STYLE_KEY, artworkStyle) }, [artworkStyle])
 
   /** 授权结果完全使用后端响应；区分请求失败和成功返回空列表。 */
   const load = useCallback(async () => {
@@ -313,9 +274,7 @@ export default function Portal() {
   /** 横幅问候与页脚年份只取挂载时刻，避免每分钟重渲染打断卡片插画的悬停播放。 */
   const now = useMemo(() => new Date(), [])
   const greeting = greetingOf(now.getHours())
-  /** 励志语语料来自语言包并跟随界面语言，切换语言时整块重挂载重置牌堆。 */
-  const motivationQuotes = useMotivationQuotes()
-
+  /** 励志语语料与轮播由公共 Hook 提供，与首页横幅共用同一数据源。 */
   /** 概览指标全部来自已有数据，不伪造待办/消息类无来源数字。 */
   const totalSystemCount = useMemo(
     () => new Set([...PORTAL_SYSTEM_CATALOG.map((system) => system.code), ...systems.map((system) => system.code)]).size,
@@ -518,7 +477,7 @@ export default function Portal() {
                   empId: user?.empId ? t('portal.greetingEmpIdSuffix', '（{{empId}}）', { empId: user.empId }) : '',
                 })}
               </span>
-              <PortalMotivationQuote key={i18n.language} quotes={motivationQuotes} />
+              <PortalMotivationQuote key={i18n.language} />
             </div>
           </div>
           <div className="portal-hero-right">

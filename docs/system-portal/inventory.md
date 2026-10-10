@@ -7,22 +7,28 @@
 
 ---
 
-## 1. 系统清单（11 个业务系统 + 1 个公共入口）
+## 1. 系统清单（13 个业务系统 + 1 个公共入口）
+
+> **命名规范（2026-10 统一）**：中文显示名一律「4字域名 + 系統」= 6 字，全部以「系統」结尾。
+> 不再混用「中心 / 工作台 / 配置」——那类后缀属菜单级语义，会把独立系统降级成菜单。
+> 真值唯一定义处：`SystemPortalSchemaInitializer#seedSystems()`（每次启动幂等刷回 `sys_system`），
+> 必须逐字等于 `src/i18n/locales/zh-TW.json` 与 `en.json` 的 `portal.systems.<key>`。
 
 | SystemCode | 中文显示 | 英文名 | 图标 key | 排序 | 说明 |
 |---|---|---|---|---|---|
-| `ads` | 廣告推薦系統 | Ads & Recommendation | `AimOutlined` | 10 | 广告销售 / 商家推广 / 团购秒杀（店铺随心推已迁出） |
-| `merchant` | 商戶運營系統 | Merchant Ops | `ShopOutlined` | 20 | 商户集团、门店、门店数据、地图规划 |
-| `seller` | 商家工作台 | Merchant Workbench | `ShopOutlined` | 25 | 店铺随心推购买入口与推广报表（v199 从 ads 拆出） |
-| `search` | 搜索運營系統 | Search Ops | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
-| `finance` | 財務系統 | Finance | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
-| `ai` | AI 管理系統 | AI Hub | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
-| `hr` | HR 系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
-| `eam` | 物資管理系統 | EAM | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
+| `ads` | 廣告推薦系統 | Advertising & Recommendations | `AimOutlined` | 10 | 广告销售 / 商家推广 / 团购秒杀（店铺随心推已迁出） |
+| `merchant` | 商戶運營系統 | Merchant Operations | `ShopOutlined` | 20 | 商户集团、门店、门店数据、地图规划（内部 BD/运营侧） |
+| `seller` | 店鋪經營系統 | Store Operations | `ShopOutlined` | 25 | 店铺随心推购买入口与推广报表（商家自助侧，v199 从 ads 拆出） |
+| `search` | 搜索運營系統 | Search Operations | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
+| `finance` | 財務結算系統 | Finance & Settlement | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
+| `ai` | 人工智能系統 | Artificial Intelligence | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
+| `hr` | 人力資源系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
+| `eam` | 物資管理系統 | Asset Management | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
 | `rdm` | 產研協同系統 | R&D Collaboration | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
-| `oa` | OA 系統 | OA | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
-| `iam` | 權限中心 | IAM | `SafetyCertificateOutlined` | 90 | 角色、功能授权、数据授权、菜单配置、账号安全 |
-| `platform` | 平台配置 | Platform | `SettingOutlined` | 100 | 通知、多语言、规则、版本、翻译工作台 |
+| `oa` | 協同辦公系統 | Office Collaboration | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
+| `iam` | 權限管理系統 | Access Control | `SafetyCertificateOutlined` | 90 | 角色、功能授权、数据授权、菜单配置、账号安全 |
+| `platform` | 平台支撐系統 | Platform Support | `SettingOutlined` | 100 | 通知渠道、规则中心、版本管理 |
+| `i18n` | 翻譯管理系統 | Translation Management | `GlobalOutlined` | 110 | 翻译工作台、语言管理、导入导出、机翻引擎、翻译统计 |
 
 **门户公共入口（不属于任一业务系统）：**
 

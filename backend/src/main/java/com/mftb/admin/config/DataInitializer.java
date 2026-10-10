@@ -2349,7 +2349,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("consumable-ops",    new String[]{"耗材管理",         null,   "2"});
         menus.put("asset-flow-ops",    new String[]{"資產運營",         null,   "3"});
         menus.put("eam-procurement",   new String[]{"採購與供應",       null,   "4"});
-        menus.put("asset-basic",       new String[]{"基礎數據",         null,   "5"});
+        menus.put("asset-basic",       new String[]{"基礎數據",         null,   "6"});
         // 三级菜单 → 采购与供应
         menus.put("purchase-order",     new String[]{"採購執行",         "eam-procurement",    "1"});
         menus.put("asset-inbound",      new String[]{"驗收入庫",         "eam-procurement",    "2"});
@@ -2790,7 +2790,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         if (consumableOpsId != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE id = ?", consumableOpsId);
         if (flowOpsId       != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE id = ?", flowOpsId);
         if (procurementId   != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE id = ?", procurementId);
-        if (basicId         != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 5 WHERE id = ?", basicId);
+        if (basicId         != null) jdbcTemplate.update("UPDATE sys_menu SET sort_order = 6 WHERE id = ?", basicId);
 
         // 4. 确保采购订单存在并挂在采购与供应下
         if (procurementId != null) {

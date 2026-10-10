@@ -176,8 +176,11 @@ describe('团购瀑布流表单和路由往返', () => {
       const search = await screen.findByRole('combobox', { name: '選擇門店' })
       expect(screen.queryByRole('button', { name: /批量導入/ })).not.toBeInTheDocument()
       expect(screen.queryByText('所屬分類')).not.toBeInTheDocument()
-      expect(screen.queryByText('所屬品牌')).not.toBeInTheDocument()
+      // 所屬品牌為只讀聯動項：未選內容時為占位文案，選中門店後自動帶出品牌
+      const brandItem = screen.getByText('所屬品牌').parentElement!
+      expect(within(brandItem).getByText('請先選擇內容')).toBeInTheDocument()
       await selectOption(search, id)
+      expect(within(brandItem).getByText('閃蜂')).toBeInTheDocument()
       fireEvent.keyDown(screen.getByRole('button', { name: `${pos}號位` }), { key: 'Enter' })
       fireEvent.click(screen.getByRole('button', { name: /應用並返回/ }))
       await screen.findByRole('button', { name: /批量導入/ })

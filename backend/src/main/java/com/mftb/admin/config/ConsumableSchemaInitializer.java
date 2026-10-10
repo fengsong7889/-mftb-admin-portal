@@ -34,6 +34,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     private static final String V_DROP_UNIT_TABLE = "consumable:drop-unit-table-v1";
     /** 所属品牌 + 购买公司 + 成本/归属快照 + 业务单据表 + 购买公司字典（一次性大迁移） */
     private static final String V_BRAND_COMPANY = "consumable:brand-company-v1";
+    /** 领用单承担部门 ID 回填（一次性）：提交时未写入 department_id，按部门筛选必然落空 */
+    private static final String V_CLAIM_DEPT_BACKFILL = "consumable:claim-dept-backfill-v1.0";
     static final String V_RETIRE_LEGACY_MENUS = "consumable:retire-legacy-menus-v1.0";
     private static final String LEGACY_MENU_FILTER =
             "menu_key IN ('consumable-category', 'consumable-brand', 'consumable-unit')";
@@ -48,6 +50,8 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
         versionTracker.applyOnce(V_CONSUMABLE_REFACTOR, this::migrateRefactor);
         // 耗材改造：所属品牌 + 购买公司 + 成本/归属快照 + 入库/退料/调整/调拨单据表 + 购买公司字典
         versionTracker.applyOnce(V_BRAND_COMPANY, this::migrateBrandCompany);
+        // 存量领用单回填承担部门 ID（必须在 brand-company 迁移补出 department_id 列之后）
+        versionTracker.applyOnce(V_CLAIM_DEPT_BACKFILL, this::backfillClaimDepartmentId, this::verifyClaimDepartmentId);
         // 每次启动均修正排序（v41 菜单重组后，耗材管理排在資產看板之後 sort=2，两个业务线入口对称）
         jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'consumable-ops' AND deleted = 0 AND sort_order != 2");
         // 补种子：出入库流水菜单（v3，幂等）
@@ -90,6 +94,33 @@ public class ConsumableSchemaInitializer implements CommandLineRunner {
     private void dropLegacyUnitTable() {
         jdbcTemplate.execute("DROP TABLE IF EXISTS biz_consumable_unit");
         log.info("已删除废弃的计量单位字典表 biz_consumable_unit（单位改为产品/耗材文本属性）");
+    }
+
+    /**
+     * 回填存量领用单的承担部门 ID。
+     * <p>submit() 历史上只写部门名称快照，department_id 一直为 NULL，导致按部门筛选与
+     * 出库流水的成本归集（txn.department_id）都失去依据。此处按申请人当前部门一次性补齐，
+     * 不触碰 updated_at（该列 ON UPDATE CURRENT_TIMESTAMP，否则会把历史单据的最后更新时间改写成迁移时间）。
+     */
+    private void backfillClaimDepartmentId() {
+        log.info("开始回填耗材领用单承担部门 ID ...");
+        int affected = jdbcTemplate.update(
+                "UPDATE biz_eam_consumable_claim c "
+                        + "JOIN sys_user u ON u.id = c.applicant_id "
+                        + "SET c.department_id = u.department_id, c.updated_by = 'system', c.updated_at = c.updated_at "
+                        + "WHERE c.department_id IS NULL AND u.department_id IS NOT NULL");
+        log.info("耗材领用单承担部门 ID 回填完成：{} 条", affected);
+    }
+
+    /** 后置校验：不存在「申请人有部门但领用单无部门 ID」的残留，否则下次启动重试 */
+    private void verifyClaimDepartmentId() {
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_eam_consumable_claim c "
+                        + "JOIN sys_user u ON u.id = c.applicant_id "
+                        + "WHERE c.department_id IS NULL AND u.department_id IS NOT NULL", Integer.class);
+        if (remaining == null || remaining != 0) {
+            throw new IllegalStateException("耗材领用单承担部门 ID 未回填完成，剩余 " + remaining + " 条");
+        }
     }
 
     /** 每次启动确保「耗材領用」菜单存在并挂回耗材管理分组（仅修补缺失, 不覆盖人工改名） */

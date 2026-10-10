@@ -33,7 +33,7 @@ import {
   type AdHotQuote,
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccounts } from '../../api/finance'
+import { fetchFinAccountBalance } from '../../api/finance'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 人氣商家廣告類型標識（與後端一致） */
@@ -253,7 +253,8 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const [excludedWeekdays, setExcludedWeekdays] = useState<number[]>([])
   // 待開售提醒彈窗（同盤活復蘇規範）
   const [presaleInfo, setPresaleInfo] = useState<{ date: string; weekday: string; openTime: string } | null>(null)
-  const [merchantBalance, setMerchantBalance] = useState<number>(0)
+  /** 推廣金餘額：null = 未取到（無權限/無數據權限/後端不可用），展示 '--' 且跳過前端預校驗 */
+  const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false)
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false)
 
@@ -589,13 +590,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
         setSkinModeFilter(inv.cells.length > 0 && inv.cells.every(cell => getInventorySkinMode(cell) === 'large') ? 'large' : 'small')
         setSelectedSkinId(null)
         setCustomDates([])
-        // 推廣金餘額（集團+品牌）
+        // 推廣金餘額（集團+品牌）：取不到時保持 null 顯示 '--', 不得降為 0 而誤擋下單
         const backendBrand = searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand
-        fetchFinAccounts({ groupId: store?.groupCode, brand: backendBrand, page: 1, size: 10 })
-          .then(res => {
-            const acc = (res.records ?? [])[0]
-            setMerchantBalance(acc ? Number(acc.virtualBalance) : 0)
-          }).catch(() => setMerchantBalance(0))
+        fetchFinAccountBalance(store?.groupCode, backendBrand)
+          .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
       })
       .catch(err => message.error(err instanceof Error ? err.message : t('inventoryQueryFailed')))
   }
@@ -658,10 +656,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       message.error(t('quoteFailed', { defaultValue: '金額計算失敗，請重試' }))
       return
     }
-    // 校驗餘額是否充足
+    // 校驗餘額是否充足（merchantBalance 為 null 時表示未取到餘額，跳過前端預校驗，交由後端下單校驗兜底）
     if (!mixedPayment && activeMode === 'promo') {
       // 單獨使用推廣金：全額需推廣金覆蓋
-      if (basePriceSummary.sale > merchantBalance) {
+      if (merchantBalance != null && basePriceSummary.sale > merchantBalance) {
         message.error('推廣金餘額不足，請充值後再試')
         return
       }
@@ -678,7 +676,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       }
     } else if (mixedPayment) {
       // 混合支付：抵扣後應付金額不得超過推廣金餘額
-      if (priceSummary.payable > merchantBalance) {
+      if (merchantBalance != null && priceSummary.payable > merchantBalance) {
         message.error('推廣金餘額不足，請充值後再試')
         return
       }
@@ -706,13 +704,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
       // 使用訂單實際金額更新展示，而非本地估算
       setPaidPromoAmount(orderResp?.actualAmount ?? priceSummary.payable)
       setPaidPaymentMode(mixedPayment ? 'mixed' : activeMode)
-      // 刷新餘額（從服務端獲取最新值，而非本地減扣）
-      const backendBrand = (searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand) || undefined
-      fetchFinAccounts({ groupId: store?.groupCode, brand: backendBrand, page: 1, size: 10 })
-        .then(res => {
-          const acc = (res.records ?? [])[0]
-          setMerchantBalance(acc ? Number(acc.virtualBalance) : 0)
-        }).catch(() => setMerchantBalance(0))
+      // 刷新餘額（從服務端獲取最新值，而非本地減扣）；取不到時回到 '--'
+      const balanceBrand = searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand
+      fetchFinAccountBalance(store?.groupCode, balanceBrand)
+        .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
       setIsSuccessModalVisible(true)
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('orderFailed'))
@@ -1176,7 +1171,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
               {(mixedPayment || activeMode === 'promo') && (
                 <div style={{ padding: '12px 16px', marginBottom: 12, background: 'linear-gradient(135deg, #E8720C 0%, #F39C12 100%)', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>{t('promoBalance')}</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>${merchantBalance.toLocaleString()}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
                 </div>
               )}
               {/* 贈送天數抵扣：橙色橫幅 */}

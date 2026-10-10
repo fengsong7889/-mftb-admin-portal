@@ -20,7 +20,7 @@ const financeMenu: MenuVO = { id: 1, parentId: null, menuKey: 'finance-entry', n
 const adsMenu: MenuVO = { ...financeMenu, id: 2, menuKey: 'ads-entry', name: '廣告測試菜單', path: '/ads-entry', systemCode: 'ads' }
 const menus = [financeMenu, adsMenu]
 const systems = [
-  { code: 'finance', name: '財務系統' },
+  { code: 'finance', name: '財務結算系統' },
   { code: 'ads', name: '廣告推薦系統' },
   { code: 'ai', name: 'AI 智能中心' },
 ]
@@ -172,9 +172,9 @@ describe('系统首页 AI 助手区域', () => {
 
   it('建议问题仅填入输入框，不自动请求 AI 或执行业务', async () => {
     mount()
-    const question = await screen.findByRole('button', { name: '介紹財務系統的常用功能' })
+    const question = await screen.findByRole('button', { name: '介紹財務結算系統的常用功能' })
     fireEvent.click(question)
-    expect(screen.getByDisplayValue('介紹財務系統的常用功能')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('介紹財務結算系統的常用功能')).toBeInTheDocument()
     expect(sendAgentMessage).not.toHaveBeenCalled()
   })
 })

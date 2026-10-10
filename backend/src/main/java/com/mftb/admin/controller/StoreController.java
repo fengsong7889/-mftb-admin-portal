@@ -37,9 +37,13 @@ public class StoreController {
     private final StoreService storeService;
     private final StoreDataConfigService storeDataConfigService;
 
-    /** 分页查询门店（集团ID/名称、门店ID/名称、资产品牌、业务频道、最后更新人、最后更新时间、创建时间） */
+    /**
+     * 分页查询门店（集团ID/名称、门店ID/名称、资产品牌、业务频道、最后更新人、最后更新时间、创建时间）
+     * <p>只读查询，除門店管理外还被「廣告銷售-購買廣告」各選擇頁（人氣商家/金字招牌/新店/盤活復蘇）
+     * 用於門店檢索下拉，故對 store-list 權限不足時回退校驗 ad-sales 查看權限（OR 語義，默認仍拒絕）。
+     */
     @GetMapping
-    @RequirePermission(menu = "store-list")
+    @RequirePermission(menu = "store-list", anyOf = "ad-sales")
     public Result<PageResult<StoreVO>> list(StoreQuery query) {
         return Result.success(storeService.list(query));
     }

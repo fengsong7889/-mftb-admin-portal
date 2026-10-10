@@ -387,7 +387,7 @@ const DETAILS: Record<number, Partial<RdmRequirementDetail>> = {
       {
         anchorType: 'PAGE' as unknown as RdmAnchorType,
         systemCode: 'finance',
-        systemName: '財務系統',
+        systemName: '財務結算系統',
         menuKey: 'writeoff-reconcile',
         menuName: '核銷對賬',
         anchorName: '詳情頁附件區',
@@ -431,7 +431,7 @@ const MENU_TREE: RdmMenuTreeNode[] = [
   },
   {
     key: 'finance',
-    title: '財務系統',
+    title: '財務結算系統',
     children: [
       { key: 'account-balance', title: '賬戶餘額' },
       { key: 'writeoff-reconcile', title: '核銷對賬' },
@@ -482,7 +482,7 @@ const PM_OPTIONS: RdmProductOption[] = [
 
 const ROUTING_ROWS: RdmRoutingRow[] = [
   { id: 1, scopeType: 'SYSTEM', scopeValue: 'ads', scopeName: '廣告推薦系統', pmUserId: 9005, pmName: '陳雅婷', backupPmName: '蘇婉晴', loadCapacity: 8, activeCount: 5, priority: 1, enabled: true },
-  { id: 2, scopeType: 'SYSTEM', scopeValue: 'finance', scopeName: '財務系統', pmUserId: 9005, pmName: '陳雅婷', loadCapacity: 8, activeCount: 5, priority: 2, enabled: true },
+  { id: 2, scopeType: 'SYSTEM', scopeValue: 'finance', scopeName: '財務結算系統', pmUserId: 9005, pmName: '陳雅婷', loadCapacity: 8, activeCount: 5, priority: 2, enabled: true },
   { id: 3, scopeType: 'SYSTEM', scopeValue: 'eam', scopeName: '物資管理系統', pmUserId: 9012, pmName: '林志豪', loadCapacity: 8, activeCount: 7, priority: 3, enabled: true },
   { id: 4, scopeType: 'DEPT', scopeValue: '9002', scopeName: '集团人事處', pmUserId: 9012, pmName: '林志豪', loadCapacity: 8, activeCount: 7, priority: 4, enabled: true },
   { id: 5, scopeType: 'MENU', scopeValue: 'hot-search-library', scopeName: '熱搜詞庫', pmUserId: 9013, pmName: '蘇婉晴', loadCapacity: 8, activeCount: 3, priority: 5, enabled: false },

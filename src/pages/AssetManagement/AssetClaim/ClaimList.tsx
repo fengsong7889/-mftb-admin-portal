@@ -123,7 +123,6 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
 
   return (
     <>
-      <ClaimStats data={error ? undefined : data?.stats} scopeKey={JSON.stringify(filters)} />
       {error && <Alert type="error" showIcon message={error} className="claim-notice" />}
       {/* ====== 搜索區 ====== */}
       <div className="search-section">
@@ -144,6 +143,9 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
           </Form.Item>
         </Form>
       </div>
+
+      {/* ====== 统计卡（按 UI 规范置于搜索区之后，保证卡片数据与搜索条件一致） ====== */}
+      <ClaimStats data={error ? undefined : data?.stats} scopeKey={JSON.stringify(filters)} />
 
       {/* ====== 操作區 ====== */}
       <div className="action-section">

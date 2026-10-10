@@ -18,12 +18,26 @@ def project_root():
 
 
 def load_db_env():
-    root = project_root()
-    src = open(os.path.join(root, 'backend', 'run-local.sh'), encoding='utf-8').read()
+    """凭据来源优先级：进程环境变量 → backend/.env.local（已 gitignore）。
+
+    早期版本从 backend/run-local.sh 正则抽取凭据，现已失效：凭据已从脚本移出。
+    """
+    env_local = os.path.join(project_root(), 'backend', '.env.local')
+    text = ''
+    if os.path.exists(env_local):
+        text = open(env_local, encoding='utf-8').read()
 
     def pick(key):
-        m = re.search(r"^export\s+%s=['\"]?(.*?)['\"]?\s*$" % key, src, re.M)
+        val = os.environ.get(key)
+        if val:
+            return val
+        m = re.search(r"^(?:export\s+)?%s=['\"]?(.*?)['\"]?\s*$" % key, text, re.M)
         return m.group(1) if m else None
+
+    missing = [k for k in ('DB_URL', 'DB_USERNAME', 'DB_PASSWORD') if not pick(k)]
+    if missing:
+        sys.exit('❌ 缺少数据库环境变量：%s\n   请配置 backend/.env.local（参考 backend/.env.local.example）'
+                 % ', '.join(missing))
 
     url, user, pwd = pick('DB_URL'), pick('DB_USERNAME'), pick('DB_PASSWORD')
     jdbc = url.split('jdbc:mysql://')[1]

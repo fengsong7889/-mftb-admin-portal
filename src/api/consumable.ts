@@ -414,8 +414,13 @@ export function fetchConsumableAlerts(params?: {
 
 /* ==================== 领用 ==================== */
 
+/**
+ * 领用单分页查询（管理视角）
+ * claimNo/applicantName/departmentId 为精确筛选条件，需后端 Query 支持
+ */
 export function fetchConsumableClaims(params?: {
   page?: number; size?: number; keyword?: string; status?: string; applicantId?: number
+  claimNo?: string; applicantName?: string; departmentId?: number
 }) {
   return request.get<unknown, PageResult<ConsumableClaim>>('/eam/consumables/claims', { params })
 }
@@ -425,8 +430,11 @@ export function fetchConsumableClaimDetail(id: number) {
   return request.get<unknown, ConsumableClaim>(`/eam/consumables/claims/${id}`)
 }
 
-/** 查询：GET /eam/consumables/claims/my */
-export function fetchMyConsumableClaims(params?: { page?: number; size?: number; status?: string }) {
+/** 查询：GET /eam/consumables/claims/my（支持与管理视图相同的筛选条件） */
+export function fetchMyConsumableClaims(params?: {
+  page?: number; size?: number; status?: string
+  claimNo?: string; applicantName?: string; departmentId?: number
+}) {
   return request.get<unknown, PageResult<ConsumableClaim>>('/eam/consumables/claims/my', { params })
 }
 
@@ -468,71 +476,22 @@ export function cancelConsumableClaim(id: number, reason?: string) {
   return request.post<unknown, void>(`/eam/consumables/claims/${id}/cancel`, { reason })
 }
 
-/* ==================== 基础数据 API（分类 / 品牌 / 计量单位） ==================== */
-
-/** 耗材分类列表 */
-export function fetchConsumableCategories(keyword?: string) {
-  return request.get<unknown, ConsumableCategory[]>('/eam/consumables/basic/categories', { params: { keyword } })
-}
+/* ==================== 基础数据下拉源（分类 / 品牌） ==================== */
+/*
+ * 只提供耗材档案/预警页要用的下拉数据源。
+ * 耗材分类与品牌的增删改已统一到资产域「分類庫」(asset-category) 与「品牌產品庫」(asset-model)，
+ * 那两个页面按 bizType=CONSUMABLE 读写同一张统一表；后端曾另开一套写接口（无前端调用方、
+ * 且校验弱于资产侧，如删除品牌不检查引用），已作为同表双入口收敛删除，不得在此重新加回。
+ */
 
 /** 耗材分类下拉选项 */
 export function fetchConsumableCategoryOptions() {
   return request.get<unknown, ConsumableCategory[]>('/eam/consumables/basic/categories/options')
 }
 
-/** 新增：POST /eam/consumables/basic/categories */
-export function createConsumableCategory(data: Partial<ConsumableCategory>) {
-  return request.post<unknown, number>('/eam/consumables/basic/categories', data)
-}
-
-/** 修改：PUT /eam/consumables/basic/categories/{id} */
-export function updateConsumableCategory(id: number, data: Partial<ConsumableCategory>) {
-  return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}`, data)
-}
-
-/** 删除：DELETE /eam/consumables/basic/categories/{id} */
-export function deleteConsumableCategory(id: number) {
-  return request.delete<unknown, void>(`/eam/consumables/basic/categories/${id}`)
-}
-
-/** 切换状态：PUT /eam/consumables/basic/categories/{id}/status */
-export function toggleConsumableCategoryStatus(id: number) {
-  return request.put<unknown, void>(`/eam/consumables/basic/categories/${id}/status`)
-}
-
-/** 耗材品牌列表 */
-export function fetchConsumableBrands(categoryType?: string, keyword?: string) {
-  return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands', { params: { categoryType, keyword } })
-}
-
 /** 耗材品牌下拉选项（只返回 CONSUMABLE + BOTH） */
 export function fetchConsumableBrandOptions() {
   return request.get<unknown, ConsumableBrand[]>('/eam/consumables/basic/brands/options')
-}
-
-/** 新增：POST /eam/consumables/basic/brands */
-export function createConsumableBrand(data: Partial<ConsumableBrand>) {
-  return request.post<unknown, number>('/eam/consumables/basic/brands', data)
-}
-
-/** 修改：PUT /eam/consumables/basic/brands/{id} */
-export function updateConsumableBrand(id: number, data: Partial<ConsumableBrand>) {
-  return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}`, data)
-}
-
-/** 删除：DELETE /eam/consumables/basic/brands/{id} */
-export function deleteConsumableBrand(id: number) {
-  return request.delete<unknown, void>(`/eam/consumables/basic/brands/${id}`)
-}
-
-/** 查询：GET /eam/consumables/basic/brands/{id} */
-export function fetchConsumableBrandDetail(id: number) {
-  return request.get<unknown, ConsumableBrand>(`/eam/consumables/basic/brands/${id}`)
-}
-
-/** 切换状态：PUT /eam/consumables/basic/brands/{id}/status */
-export function toggleConsumableBrandStatus(id: number) {
-  return request.put<unknown, void>(`/eam/consumables/basic/brands/${id}/status`)
 }
 
 /* ==================== 退料 ==================== */

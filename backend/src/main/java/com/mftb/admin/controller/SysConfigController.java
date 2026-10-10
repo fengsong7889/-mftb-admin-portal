@@ -33,6 +33,8 @@ import java.util.Map;
  * 规则菜单拆分后，读写按 config key 归属的版塊菜單（{@link RuleConfigKeyRegistry}）动态鉴权，
  * 替代旧的静态 {@code menu="rule-config"} 单菜单鉴权，避免持有任一版块即可改全部规则。
  * 无法归类的 key 回退要求旧 {@code rule-config} 菜单权限，保持既有其它消费方（如 UI 偏好）行为不变。
+ * 例外：{@link RuleConfigKeyRegistry#resolveRuntimeReaderMenu(String)} 登记的版块，其 view 请求允许由
+ * 運行時消費方菜單（如廣告銷售下單頁讀 payment_mode_*）放行，避免把規則維護權限當成下單的前置條件。
  */
 @RestController
 @RequestMapping("/api/sys-config")
@@ -41,6 +43,9 @@ public class SysConfigController {
 
     /** 无法归类 key 的兜底所需菜单（保持拆分前行为） */
     private static final String LEGACY_MENU = "rule-config";
+
+    /** 只讀動作（僅此動作允許運行時消費方回退鑒權） */
+    private static final String VIEW = "view";
 
     private final SysConfigService sysConfigService;
     private final PermissionService permissionService;
@@ -124,9 +129,17 @@ public class SysConfigController {
         SysUser user = currentUser();
         String owner = RuleConfigKeyRegistry.resolveOwnerMenu(key);
         String requiredMenu = owner != null ? owner : LEGACY_MENU;
-        if (!permissionService.hasPermission(user, requiredMenu, action)) {
-            throw new PermissionDeniedException(requiredMenu, action);
+        if (permissionService.hasPermission(user, requiredMenu, action)) {
+            return;
         }
+        // 只讀回退：下單頁等運行時消費方讀 payment_mode_* 時, 不因缺規則維護菜單而被拒
+        if (VIEW.equals(action)) {
+            String readerMenu = RuleConfigKeyRegistry.resolveRuntimeReaderMenu(owner);
+            if (readerMenu != null && permissionService.hasPermission(user, readerMenu, VIEW)) {
+                return;
+            }
+        }
+        throw new PermissionDeniedException(requiredMenu, action);
     }
 
     private SysUser currentUser() {

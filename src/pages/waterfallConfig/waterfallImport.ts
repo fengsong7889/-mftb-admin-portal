@@ -91,7 +91,7 @@ export function resolveWaterfallImport(
     if (usedIds.has(row.itemId)) issues.push({ ...row, code: 'existingId' })
     usedPositions.add(row.position)
     usedIds.add(row.itemId)
-    slots.push({ position: row.position, contentType, itemId: item.id, itemName: item.name, brand: item.brand, categoryId: item.categoryId, status: 1 })
+    slots.push({ position: row.position, contentType, itemId: item.id, itemName: item.name, brand: item.brand, categoryId: item.categoryId, stock: item.stock, status: 1 })
   }
   return { slots: issues.length ? [] : [...existing, ...slots].sort((a, b) => a.position - b.position), issues }
 }

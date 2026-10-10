@@ -32,7 +32,7 @@ import {
   type AdInventoryVO,
 } from '../../api/adPromotion'
 import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccounts } from '../../api/finance'
+import { fetchFinAccountBalance } from '../../api/finance'
 import {
   REGION_LIST,
   BACKEND_TO_UI_BRAND,
@@ -361,15 +361,12 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     return { totalOriginal, slotDiscounted, slotDiscountAmount: Math.round((totalOriginal - slotDiscounted) * 100) / 100, tier, totalFinal }
   }
 
-  // 查询推广金账户余额（集团+品牌，后端不可用时保留演示余额）
+  // 查询推广金账户余额（集团+品牌）：取不到一律置 null 展示 '--', 不再保留演示余额以免误读
   const loadMerchantBalance = (groupCode?: string, uiBrand?: string | null) => {
     const backendBrand = uiBrand ? UI_TO_BACKEND_BRAND[uiBrand] : undefined
     if (!groupCode || !backendBrand) return
-    fetchFinAccounts({ groupId: groupCode, brand: backendBrand })
-      .then(res => {
-        if (res && res.records.length > 0) setMerchantBalance(res.records[0].virtualBalance)
-      })
-      .catch(() => {})
+    fetchFinAccountBalance(groupCode, backendBrand)
+      .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
   }
 
   // 算法变更时刷新退款开关与折扣梯度（来自启用中的定价配置）
@@ -496,8 +493,8 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     setBdOptions(BD_OPTIONS)
   }
   
-  // Mock数据 - 商家推广金余额
-  const [merchantBalance, setMerchantBalance] = useState(15800)
+  // 商家推廣金餘額：null = 尚未取到（未選門店/無權限/後端不可用），展示 '--'
+  const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
 
   // 点击订单支付
   const handlePayment = () => {
@@ -552,8 +549,8 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       totalAmount += discount ? Math.round(subtotal * discount.discount / 100) : subtotal
     })
     
-    // 扣除推广金余额
-    setMerchantBalance(prev => prev - totalAmount)
+    // 扣除推广金余额（尚未取到余额时保持 null，不用假数据做减法）
+    setMerchantBalance(prev => (prev == null ? null : prev - totalAmount))
     setLastPaidAmount(totalAmount)
     
     // 关闭支付弹窗
@@ -1355,7 +1352,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
               fontWeight: 700, 
               color: '#fff',
             }}>
-              ${merchantBalance.toLocaleString()}
+              {merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}
             </span>
           </div>
 

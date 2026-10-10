@@ -37,8 +37,13 @@ Thumbs.db
 # Local dev tools (JDK, Maven, etc.)
 .local/
 
-# Qoder repowiki
-.qoder/
+# Qoder 本地工作区（repowiki / logs / temp / backup 等）默认不入库，
+# 但 .qoder/rules/ 下的强制开发规范必须随仓库共享（AGENTS.md 直接引用它们）。
+# 必须写成 `.qoder/*` 而不是 `.qoder/`：父目录被整体忽略时，git 不会进入该目录，
+# 下方的 `!` 重新包含规则将永远不生效。
+.qoder/*
+!.qoder/rules/
+!.qoder/rules/**
 
 # Screenshots (optional - uncomment to exclude)
 # *.png
@@ -50,3 +55,7 @@ docs/verify_*.png
 
 # Dev-only login bypass scripts (security risk if deployed)
 quick-login-hack.js
+
+# Python 字节码（scripts/*.py 运维脚本编译产物）
+__pycache__/
+*.pyc

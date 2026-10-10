@@ -18,6 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 推广广告订单接口（订单查询 + 退款）
+ * <p>
+ * 权限锚点用 {@code promotion-sales-config}（店鋪隨心推）而非「訂單管理」：
+ * 后者（menuKey {@code promotion-order-manage}）已从 sys_menu 退役，只剩一个同名前端路由
+ * {@code /promotion-order-manage}，而 {@code ROUTE_MENU_KEY_MAP} 已把该路由归到
+ * {@code promotion-sales-config}。若注解仍挂在退役 key 上，就会出现「页面守卫放行、
+ * 接口全部 403」的前后端口径分裂，非超管完全看不到订单列表。
  */
 @RestController
 @RequestMapping("/api/ad/orders")
@@ -29,7 +35,7 @@ public class AdOrderController {
 
     /** 订单分页查询 */
     @GetMapping
-    @RequirePermission(menu = "promotion-order-manage")
+    @RequirePermission(menu = "promotion-sales-config")
     public Result<PageResult<AdOrderVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
@@ -46,14 +52,14 @@ public class AdOrderController {
 
     /** 订单详情（含明细） */
     @GetMapping("/{orderNo}")
-    @RequirePermission(menu = "promotion-order-manage")
+    @RequirePermission(menu = "promotion-sales-config")
     public Result<AdOrderDetailVO> detail(@PathVariable String orderNo) {
         return Result.success(orderService.detail(orderNo));
     }
 
     /** 退款 */
     @PostMapping("/{orderNo}/refund")
-    @RequirePermission(menu = "promotion-order-manage", action = "edit")
+    @RequirePermission(menu = "promotion-sales-config", action = "edit")
     public Result<AdOrderDetailVO> refund(@PathVariable String orderNo) {
         if (!rateLimiter.tryAcquire("ad:refund", 5, 60_000L)) {
             throw new BusinessException("退款操作過於頻繁，請稍後再試");
@@ -63,7 +69,7 @@ public class AdOrderController {
 
     /** 取消订单 */
     @PostMapping("/{orderNo}/cancel")
-    @RequirePermission(menu = "promotion-order-manage", action = "edit")
+    @RequirePermission(menu = "promotion-sales-config", action = "edit")
     public Result<AdOrderDetailVO> cancel(@PathVariable String orderNo) {
         if (!rateLimiter.tryAcquire("ad:cancel", 5, 60_000L)) {
             throw new BusinessException("取消操作過於頻繁，請稍後再試");

@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useMenu } from '../../contexts/MenuContext'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
+import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useSystemNavigation } from '../../hooks/useSystemNavigation'
 import { getSystemDisplayName } from '../../constants/portalSystems'
 import { renderMenuIcon } from '../../components/MenuIcon'
@@ -193,7 +194,6 @@ export default function Home() {
   const menusError = currentSystemCode
     ? !!systemNavigation.error
     : menuStatus === 'offline' || menuStatus === 'error'
-  const [quoteIndex, setQuoteIndex] = useState(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   /* ── 多会话状态 ── */
@@ -584,11 +584,8 @@ export default function Home() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [])
 
-  /** 勵志語錄（每 10 秒輪播） */
-  const motivationalQuotes = [
-    t('home.quotes.0'), t('home.quotes.1'), t('home.quotes.2'),
-    t('home.quotes.3'), t('home.quotes.4'), t('home.quotes.5'),
-  ]
+  /** 勵志語錄：與企業門戶橫幅共用公共 Hook 與 `portal.quotes` 同一語料源 */
+  const { text: motivationQuote, index: quoteIndex } = useRotatingMotivationQuote()
 
   /** 引擎模式 → 展示文案（手動模式顯示真實模型名） */
   const engineModeLabel = (mode: LlmEngineMode): string => {
@@ -618,14 +615,6 @@ export default function Home() {
     { icon: <ThunderboltOutlined />, text: t('home.quickQ2') },
     { icon: <LineChartOutlined />, text: t('home.quickQ3') },
   ]
-
-  /** 勵志語錄每 10 秒輪播 */
-  useEffect(() => {
-    const qTimer = setInterval(() => {
-      setQuoteIndex((i) => (i + 1) % motivationalQuotes.length)
-    }, 10000)
-    return () => clearInterval(qTimer)
-  }, [motivationalQuotes.length])
 
   /** 消息自动滚动 */
   useEffect(() => {
@@ -1184,7 +1173,7 @@ export default function Home() {
           </div>
           <div className="home-greeting-text">
             <h2>{getGreeting(currentTime.getHours(), t)}，{(!i18nInstance.language?.startsWith('zh') ? chineseNameToPinyinEnglish(user?.name || '') : user?.name) || t('home.greetingPartner')} {t('home.partnerEmoji')}</h2>
-            <p className="home-greeting-quote" key={quoteIndex}>{motivationalQuotes[quoteIndex]}</p>
+            {motivationQuote && <p className="home-greeting-quote" key={quoteIndex}>{motivationQuote}</p>}
           </div>
         </div>
         <div className="home-greeting-right">

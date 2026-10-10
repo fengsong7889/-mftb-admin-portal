@@ -1,0 +1,259 @@
+/* 版本更新强提示：颜色全部取项目设计令牌
+   （主色 #E8720C、hover #F59432、浅橙 #FFB347、暖橙面板 #FFF7F0 + 边框 #FFE7D1、
+     文本 #262626 / #595959 / #8C8C8C、中性边框 #D9D9D9 / #f0f0f0）。
+   动效复用 global.css 已注册的 keyframes：nodeBreath（图标呼吸）、
+   progressShimmer（头部扫光）、statusPulse（胶囊脉冲光环）、pageFadeIn（入场）。 */
+
+/* 通知容器由 antd 生成，这里抹掉它自己的内边距与阴影，视觉全部交给卡片本体 */
+.version-update-notice .ant-notification-notice-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.version-update-card {
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #FFE7D1;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(232, 114, 12, 0.24);
+  animation: pageFadeIn 0.35s ease-out;
+}
+
+/* ---------- 头部：品牌橙渐变 + 呼吸图标 + NEW 徽章 + 扫光 ---------- */
+
+.version-update-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  overflow: hidden;
+  background: linear-gradient(120deg, #E8720C 0%, #F59432 58%, #FFB347 100%);
+  color: #fff;
+}
+
+.version-update-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 18px;
+  animation: nodeBreath 1.8s ease-in-out infinite;
+}
+
+.version-update-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.version-update-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+}
+
+.version-update-subtitle {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.92;
+}
+
+.version-update-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border-radius: 10px;
+  background: #fff;
+  color: #E8720C;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+
+.version-update-sweep {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 28%;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff, rgba(255, 255, 255, 0));
+  animation: progressShimmer 2.4s linear infinite;
+}
+
+/* ---------- 正文：版本对照 + 说明 + 操作 ---------- */
+
+.version-update-body {
+  padding: 14px 16px 16px;
+}
+
+.version-update-versions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.version-update-version {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #FAFAFA;
+  border: 1px solid #f0f0f0;
+}
+
+.version-update-version.is-latest {
+  background: #FFF7F0;
+  border-color: #FFE7D1;
+}
+
+.version-update-version-label {
+  display: block;
+  font-size: 11px;
+  color: #8C8C8C;
+}
+
+.version-update-version code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #262626;
+}
+
+.version-update-version.is-latest code {
+  color: #E8720C;
+}
+
+.version-update-version-time {
+  display: block;
+  font-size: 11px;
+  color: #8C8C8C;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.version-update-arrow {
+  flex-shrink: 0;
+  color: #E8720C;
+  font-size: 13px;
+}
+
+.version-update-desc {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #595959;
+}
+
+.version-update-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 0 0 14px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8C8C8C;
+}
+
+.version-update-hint > .anticon {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.version-update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.version-update-later.ant-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border-color: #D9D9D9;
+  color: #595959;
+  font-size: 13px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.version-update-later.ant-btn:hover {
+  border-color: #E8720C;
+  color: #E8720C;
+}
+
+.version-update-reload.ant-btn {
+  height: 36px;
+  min-width: 116px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: #E8720C;
+  border-color: #E8720C;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(232, 114, 12, 0.35);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.version-update-reload.ant-btn:hover {
+  transform: translateY(-1px);
+  background: #F59432;
+  border-color: #F59432;
+  box-shadow: 0 6px 16px rgba(232, 114, 12, 0.45);
+}
+
+.version-update-reload.ant-btn:active {
+  transform: translateY(0);
+}
+
+/* ---------- 稍后再说后的常驻胶囊：提示不能因为关掉弹卡就彻底消失 ---------- */
+
+.version-update-pill {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(120deg, #E8720C, #F59432);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(232, 114, 12, 0.4);
+  animation: pageFadeIn 0.35s ease-out;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.version-update-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(232, 114, 12, 0.5);
+}
+
+.version-update-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  animation: statusPulse 1.6s ease-out infinite;
+}

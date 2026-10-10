@@ -66,7 +66,8 @@
       "dependencies": [
         "core:schema-v10"
       ],
-      "status": "SUPERSEDED", "supersededBy": "core:menu-seed-v45",
+      "status": "SUPERSEDED",
+      "supersededBy": "core:menu-seed-v45",
       "comment": "v44: 規則配置拆分——新增 rule-center 目录 + rule-ad-sales/rule-gift/rule-security/rule-algorithm/rule-seq 五子菜单（平台配置系统），旧 rule-config 保留改名「規則總覽」；splitRuleConfigMenus 幂等复制存量 rule-config 角色/部门授权至新子菜单与 asset-basic，回填 system_code=platform。"
     },
     {
@@ -160,6 +161,18 @@
       ],
       "status": "ACTIVE",
       "comment": "独立下线耗材分类、品牌、计量单位三个旧菜单，仅停用并软删除菜单；附后置校验，每次启动修复复活记录，不重跑 EAM v8 或修改业务表。"
+    },
+    {
+      "versionKey": "consumable:claim-dept-backfill-v1.0",
+      "module": "consumable",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "consumableSchemaInitializer",
+      "dependencies": [
+        "consumable:schema-v1.0"
+      ],
+      "status": "ACTIVE",
+      "comment": "耗材领用单承担部门 ID 回填：submit() 历史上只写部门名称快照，department_id 一直为 NULL，导致列表按部门筛选必然落空、出库流水 txn.department_id 的成本归集也失去依据。按申请人当前部门 JOIN sys_user 一次性补齐，显式写 c.updated_at = c.updated_at 阻止 ON UPDATE CURRENT_TIMESTAMP 把历史单据的最后更新时间改成迁移时间。后置校验：不存在「申请人有部门但领用单无部门 ID」的残留。执行顺序必须在 consumable:brand-company-v1（补出 department_id 列，该历史一次性迁移尚未登记）之后，由初始化器 run() 内的调用顺序保证；参考副本 backend/sql/222_eam_consumable_claim_dept_backfill.sql。"
     },
     {
       "versionKey": "adpromo:09_ad_promotion.sql:v1",
@@ -1110,6 +1123,37 @@
       "ticket": "rdm-prod-precheck",
       "appliedAt": "2026-10-08T00:00:00Z",
       "comment": "生产核查（scripts/prod-menu-precheck.sql）发现的同类缺陷：RDM 绩效建议推送把 rdm_hr_suggestion.total_score DECIMAL(12,2) 原值写入 hr_perf_score_item.suggested_score，而该列实查为 DECIMAL(6,2)（上限 9999.99），个人周期贡献分一旦超过就抛 Data truncation: Out of range —— 与 v2.3 的 budget_used_ratio 完全同源：列宽按分数不会大的直觉设定，且只在有真实数据时才暴露。开发库与生产库实查均为 decimal(6,2)，趁生产 score_records=0（代价为零）先扩列。后置校验不写死等于 decimal(12,2)，而是断言写入列与来源列 COLUMN_TYPE 相同：扩到同精度后溢出在结构上不可能发生，因此不再加永远不会命中的截断兜底（那会把两列再次漂移的真实风险藏起来），改窄任一侧时启动即大声失败。DDL 只在 classpath 脚本 218_rdm_suggested_score_widen.sql 存一份，backend/sql 下为参考副本（MODIFY COLUMN 可重复执行）。"
+    },
+    {
+      "versionKey": "vehicle:schema:v1.0",
+      "module": "vehicle",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "vehicleSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "220_vehicle_core_tables.sql"
+      ],
+      "intent": "用车管理 B1 底座：7 张 biz_vehicle* 表（车辆档案/用车单/行程/驾驶资格/可用部门/管理人员/审计事件）+ 4 条编号规则",
+      "author": "Qoder",
+      "ticket": "vehicle-mgmt-b1",
+      "comment": "DDL 只在 classpath 资源 220_vehicle_core_tables.sql 存一份，backend/sql/ 下为参考副本。后置校验钉住三件事：表存在、关键唯一键就位（软删感知生成列唯一键 + 幂等键 + 活动行程占用唯一键）、编号规则就绪——缺任一都会在并发或重跑时长出重复事实，或在建单时报「編號生成規則未配置」。跨模块引用（sys_user/sys_department/biz_eam_asset）只建索引不建 FK：这三张表有历史软删与脏数据，加 FK 会让启动失败；新表之间用 FK 硬约束。"
+    },
+    {
+      "versionKey": "vehicle:menu:v1.0",
+      "module": "vehicle",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "vehicleSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "vehicle:schema:v1.0"
+      ],
+      "intent": "物資管理下新增二級分組「車輛管理」+ 4 个业务菜单，system_code 显式写 eam，并补 admin 角色授权",
+      "author": "Qoder",
+      "ticket": "vehicle-mgmt-b1",
+      "comment": "分组取 sort_order=6（末位）：DataInitializer.fixAssetMenuGrouping 每次启动硬设 耗材(2)/资产运营(3)/采购(4)/基础数据(5)，占 3~5 会在下次启动被顶掉。system_code 必须显式写入——SystemPortalSchemaInitializer.propagateSystemToDescendants 在 @Order(15) 只跑一次，早于本初始化器 @Order(32) 插入菜单，留 NULL 会让门户导航剪枝与系统准入落到未定义行为。后置校验除存在性外还钉住父级与 system_code，父级错挂会让菜单静默出现在别的系统树里。"
     }
   ]
 }

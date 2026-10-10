@@ -2,6 +2,7 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.FinAccountBalanceVO;
 import com.mftb.admin.dto.FinAccountQuery;
 import com.mftb.admin.dto.FinAccountVO;
 import com.mftb.admin.dto.PageResult;
@@ -32,6 +33,17 @@ public class FinAccountController {
     @RequirePermission(menu = "account-balance")
     public Result<PageResult<FinAccountVO>> page(FinAccountQuery query) {
         return Result.success(finAccountService.page(query));
+    }
+
+    /**
+     * 下單頁推廣金餘額（只讀單個集團+品牌）。
+     * <p>廣告銷售（購買廣告）需展示並預校驗商戶推廣金餘額，因此對只讀回退開放 ad-sales；
+     * 僅返回單個組合且受數據權限约束，列表接口 {@code GET /fin/accounts} 仍只對賬戶餘額菜單開放。
+     */
+    @GetMapping("/balance")
+    @RequirePermission(menu = "account-balance", anyOf = "ad-sales")
+    public Result<FinAccountBalanceVO> balance(@RequestParam String groupId, @RequestParam String brand) {
+        return Result.success(finAccountService.getBalance(groupId, brand));
     }
 
     /** 冻结账户（按集团+品牌） */

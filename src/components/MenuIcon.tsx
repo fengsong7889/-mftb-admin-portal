@@ -35,6 +35,12 @@ import {
   AccountBookOutlined,
   FileSearchOutlined,
   AuditOutlined,
+  // 用車管理菜单图标（後端 sys_menu.icon 同名的注册，缺一处菜单就不渲染）
+  CarOutlined,
+  TruckOutlined,
+  CarryOutOutlined,
+  CompassOutlined,
+  LoginOutlined,
   CheckCircleOutlined,
   TeamOutlined,
   UserOutlined,
@@ -247,6 +253,12 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'ControlOutlined': ControlOutlined,
   // 物资管理菜单图标
   'InboxOutlined': InboxOutlined,
+  // 用車管理（物資管理下的「車輛管理」分组）
+  'CarOutlined': CarOutlined,
+  'TruckOutlined': TruckOutlined,
+  'CarryOutOutlined': CarryOutOutlined,
+  'CompassOutlined': CompassOutlined,
+  'LoginOutlined': LoginOutlined,
   'UserAddOutlined': UserAddOutlined,
   'UserDeleteOutlined': UserDeleteOutlined,
   'PartitionOutlined': PartitionOutlined,

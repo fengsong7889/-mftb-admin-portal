@@ -28,6 +28,13 @@ import {
   FileSearchOutlined,
   SwapOutlined,
   AuditOutlined,
+  // 用車管理兜底图标：必须与後端 sys_menu.icon 完全一致，
+  // 否则 check:menu 会报「缺少与 X 一致的 Sidebar 兜底图标」
+  CarOutlined,
+  TruckOutlined,
+  CarryOutOutlined,
+  CompassOutlined,
+  LoginOutlined,
   CheckCircleOutlined,
   DatabaseOutlined,
   ScissorOutlined,
@@ -569,6 +576,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-loss':       <SearchOutlined />,
   'asset-inventory':  <AuditOutlined />,
   'param-library':    <DatabaseOutlined />,
+  // 用車管理（物資管理下的「車輛管理」分组）
+  'vehicle-management': <CarOutlined />,
+  'vehicle-files':    <TruckOutlined />,
+  'vehicle-dispatch': <CarryOutOutlined />,
+  'vehicle-ledger':   <CompassOutlined />,
+  'my-vehicle-use':   <LoginOutlined />,
   'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,

@@ -453,10 +453,23 @@ function RdmGanttScene() {
   )
 }
 
+/**
+ * 胶囊文案：先按自然宽度渲染并实测，超出胶囊宽度才压缩。
+ * 压缩只用 lengthAdjust="spacing"（调字距），禁止 spacingAndGlyphs——
+ * 后者会横向缩放字形，导致中文等宽字形被纵向压扁。
+ */
 function ArtworkText({ label, x, y, width = 120 }: { label: string; x: number; y: number; width?: number }) {
   const { t } = useTranslation()
   const text = t(`portal.artwork.${label}`)
-  return <text x={x} y={y} textAnchor="middle" fontSize="12" fontWeight="600" fill="currentColor" textLength={Math.min(width, Array.from(text).length * 12)} lengthAdjust="spacingAndGlyphs">{text}</text>
+  const textRef = useRef<SVGTextElement>(null)
+  const [naturalWidth, setNaturalWidth] = useState(0)
+  useEffect(() => {
+    const node = textRef.current
+    if (!node) return
+    try { setNaturalWidth(node.getBBox().width) } catch { /* jsdom 等环境不支持 getBBox 时保持自然渲染 */ }
+  }, [text])
+  const compressed = naturalWidth > width
+  return <text ref={textRef} x={x} y={y} textAnchor="middle" fontSize="12" fontWeight="600" fill="currentColor" textLength={compressed ? width : undefined} lengthAdjust={compressed ? 'spacing' : undefined}>{text}</text>
 }
 
 /** 用裁切逐字揭示，避免定时器触发整张卡片重渲染；每个实例使用独立 SVG 标识。 */
@@ -603,6 +616,247 @@ function Storefront({ x, y }: { x: number; y: number }) {
   </g>
 }
 
+/** 排序面板里的候选商家角标：单檐店铺，尺寸只有 13×12，只描形状不带文字。 */
+function MerchantGlyph({ x, y, opacity = 1 }: { x: number; y: number; opacity?: number }) {
+  return <g transform={`translate(${x} ${y})`} opacity={opacity}>
+    <path d="M0 12V3.4h13V12Z" fill="none" stroke="currentColor" strokeWidth="1.4" />
+    <path d="M-1.5 3.4 1.2 0h9.6l2.7 3.4Z" fill="currentColor" />
+  </g>
+}
+
+/** 数学记号统一用衬线斜体，公式与变量跨语言中性，不走 i18n 也不会被多语言排版压扁。 */
+function MathText({ x, y, children, size = 8, opacity = 0.85, anchor = 'start', className }: {
+  x: number; y: number; children: string; size?: number; opacity?: number; anchor?: 'start' | 'middle' | 'end'; className?: string
+}) {
+  return <text className={className} x={x} y={y} textAnchor={anchor} fontSize={size} fontFamily="Georgia, 'Times New Roman', serif" fontStyle="italic" fill="currentColor" opacity={opacity}>{children}</text>
+}
+
+/**
+ * 广告推荐场景一（业务链路版）：把算法投流画成可读懂的四拍——
+ * ① 圈定精准人群（画像 + 偏好特征）② 引擎按 eCPM 公式竞价打分排序
+ * ③ 胜出商家进入用户 APP 首屏坑位 ④ 曝光点击回流，按梯度公式更新权重。
+ * 静态层必须自带完整可读构图，动画层只在悬停时按 8 秒节拍逐拍点亮。
+ */
+function AdsTrafficScene() {
+  /** 排序行几何：y 为行顶，width 为该商家的竞价得分条长度。 */
+  const rankRows = [
+    { rank: 1, y: 56, width: 40 },
+    { rank: 2, y: 80, width: 24 },
+    { rank: 3, y: 104, width: 13 },
+  ]
+  /** 偏好标签：碗（口味）、杯（品类）、定位（距离），只画图形不带文字，避免多语言挤压。 */
+  const interestTags = [
+    { x: 10, y: 24, width: 30, glyph: <><path d="M16 34a7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M23 28v-2" stroke="currentColor" strokeWidth="1.4" /></> },
+    { x: 46, y: 14, width: 30, glyph: <path d="M55 25.5v-7h10l-1.6 7Z" fill="none" stroke="currentColor" strokeWidth="1.4" /> },
+    { x: 54, y: 122, width: 32, glyph: <path d="M65 133.5a5 5 0 1 1 10 0l-5-4Z" fill="none" stroke="currentColor" strokeWidth="1.4" /> },
+  ]
+  return (
+    <g className="portal-ads-scene">
+      {/* ① 人群定向：虚线圈住目标客群，圈外灰点表示未被选中的人群 */}
+      <ellipse cx="50" cy="86" rx="38" ry="30" fill="none" stroke="currentColor" strokeWidth="1.4" strokeDasharray="5 5" strokeOpacity="0.4" />
+      <ellipse className="portal-art-motion portal-ads-target" cx="50" cy="86" rx="38" ry="30" fill="none" stroke="#E8720C" strokeWidth="2" strokeDasharray="240" opacity="0" />
+      <g fill="currentColor">
+        <circle cx="24" cy="84" r="5.5" opacity="0.5" /><path d="M16 98v-3a8 8 0 0 1 16 0v3Z" opacity="0.5" />
+        <circle cx="76" cy="86" r="5.5" opacity="0.4" /><path d="M68 99v-3a8 8 0 0 1 16 0v3Z" opacity="0.4" />
+        <circle cx="33" cy="62" r="3" opacity="0.28" /><circle cx="68" cy="64" r="3" opacity="0.28" />
+        <circle cx="50" cy="74" r="9" /><path d="M34 100v-5a16 16 0 0 1 32 0v5Z" />
+      </g>
+      {interestTags.map((tag, index) => <g key={index} className="portal-art-motion portal-ads-tag">
+        <rect x={tag.x} y={tag.y} width={tag.width} height="15" rx="7.5" fill="#fff" stroke="currentColor" strokeWidth="1.3" />
+        {tag.glyph}
+      </g>)}
+      <path d="M25 39l5 15M61 29l-5 25M70 122l-4-8" fill="none" stroke="currentColor" strokeOpacity="0.28" strokeWidth="1.2" strokeDasharray="3 3" />
+
+      {/* ② 算法引擎：面板顶部直接写竞价公式，扫描线逐行评估，底部给出率曲线 */}
+      <rect x="104" y="34" width="86" height="118" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+      <path d="M104 52h86" stroke="currentColor" strokeOpacity="0.15" />
+      <g transform="translate(112 38)" fill="currentColor" stroke="currentColor" strokeWidth="1.3">
+        <circle cx="2" cy="6" r="2" /><circle cx="12" cy="1" r="2" fill="none" /><circle cx="12" cy="11" r="2" fill="none" />
+        <path d="M3.6 5 10.4 1.8M3.6 7l6.8 3.2" fill="none" />
+      </g>
+      <MathText x={130} y={47}>eCPM=bid×pCTR</MathText>
+      {rankRows.map((row, index) => <g key={row.rank}>
+        <rect x="110" y={row.y} width="74" height="22" rx="4" fill="currentColor" opacity={0.12 - index * 0.04} />
+        <MerchantGlyph x={114} y={row.y + 5} opacity={1 - index * 0.55} />
+        <rect x="132" y={row.y + 8} width={row.width} height="6" rx="3" fill="currentColor" opacity={1 - index * 0.55} />
+        {index === 0
+          ? <><circle cx="176" cy={row.y + 11} r="6.5" fill="#E8720C" /><text x="176" y={row.y + 14.2} textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#fff">1</text></>
+          : <><circle cx="176" cy={row.y + 11} r="6.5" fill="none" stroke="currentColor" strokeOpacity={0.3 - index * 0.05} /><text x="176" y={row.y + 14.2} textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" opacity={0.45 - index * 0.15}>{row.rank}</text></>}
+      </g>)}
+      {/* 特征加权求和→过激活函数得到预估点击率 */}
+      <MathText x={112} y={133} size={7.5} opacity={0.6}>score=Σwᵢfᵢ(x)</MathText>
+      <path d="M112 149h24" stroke="currentColor" strokeOpacity="0.2" />
+      <path d="M113 148q8 0 10-5t10-5h3" fill="none" stroke="currentColor" strokeOpacity="0.6" strokeWidth="1.4" />
+      <MathText x={141} y={146} size={7.5} opacity={0.7}>p=σ(z)</MathText>
+      <rect className="portal-art-motion portal-ads-scan" x="110" y="54" width="74" height="2" rx="1" fill="#E8720C" opacity="0" />
+      <rect className="portal-art-motion portal-ads-lead" x="108" y="54" width="78" height="26" rx="6" fill="none" stroke="#E8720C" strokeWidth="2" opacity="0" />
+
+      {/* ③ 用户 APP 首屏：首坑为已匹配的商家美食，下方为待刷新的信息流 */}
+      <rect x="208" y="20" width="92" height="144" rx="13" fill="currentColor" />
+      <rect x="214" y="28" width="80" height="128" rx="7" fill="#fff" />
+      <path d="M244 24h20" stroke="#fff" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
+      <g className="portal-art-motion portal-ads-feed">
+        <rect x="220" y="34" width="48" height="8" rx="4" fill="currentColor" opacity="0.16" />
+        <circle cx="284" cy="38" r="3.4" fill="currentColor" opacity="0.3" />
+        <rect x="220" y="48" width="68" height="34" rx="4" fill="#FFF7F0" stroke="currentColor" strokeOpacity="0.35" />
+        <rect x="224" y="52" width="26" height="26" rx="3" fill="currentColor" opacity="0.16" />
+        <path d="M229 66a8 8 0 0 1 16 0Z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M254 56h28m-28 9h18" stroke="currentColor" strokeWidth="3.5" strokeOpacity="0.5" />
+        <rect x="220" y="88" width="68" height="26" rx="4" fill="currentColor" opacity="0.07" />
+        <rect x="224" y="92" width="18" height="18" rx="3" fill="currentColor" opacity="0.13" />
+        <path d="M246 96h32m-32 8h20" stroke="currentColor" strokeWidth="3.5" strokeOpacity="0.2" />
+        <rect x="220" y="120" width="68" height="26" rx="4" fill="currentColor" opacity="0.05" />
+        <rect x="224" y="124" width="18" height="18" rx="3" fill="currentColor" opacity="0.1" />
+        <path d="M246 128h32m-32 8h15" stroke="currentColor" strokeWidth="3.5" strokeOpacity="0.15" />
+        <rect x="244" y="150" width="24" height="3" rx="1.5" fill="currentColor" opacity="0.25" />
+      </g>
+      <rect className="portal-art-motion portal-ads-slot" x="217" y="45" width="74" height="40" rx="7" fill="none" stroke="#E8720C" strokeWidth="2.2" opacity="0" />
+      <g className="portal-art-motion portal-ads-heart" opacity="0">
+        <circle cx="286" cy="48" r="7.5" fill="#E8720C" />
+        <path d="M286 51.8c-2.9-2-4.2-3.3-4.2-4.8a2 2 0 0 1 4.2-1 2 2 0 0 1 4.2 1c0 1.5-1.3 2.8-4.2 4.8Z" fill="#fff" />
+      </g>
+
+      {/* ④ 链路与回流：人群入模、Top1 出模入首坑、曝光数据回流调权 */}
+      <path d="M88 80q8-6 16-5" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.6" strokeDasharray="4 4" />
+      <path className="portal-art-motion portal-ads-intake" d="M88 80q8-6 16-5" fill="none" stroke="#E8720C" strokeWidth="1.8" strokeDasharray="4 4" opacity="0" />
+      <path d="M190 66q9-4 18-3" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.6" strokeDasharray="4 4" />
+      <path className="portal-art-motion portal-ads-intake" d="M190 66q9-4 18-3" fill="none" stroke="#E8720C" strokeWidth="1.8" strokeDasharray="4 4" opacity="0" />
+      <g className="portal-art-motion portal-ads-promote" opacity="0">
+        <rect x="186" y="60" width="18" height="12" rx="3" fill="#E8720C" />
+        <path d="M189 64h12m-12 4h7" stroke="#fff" strokeWidth="2" />
+      </g>
+      <path d="M224 158c-24 12-54 10-72-4" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="1.5" strokeDasharray="4 4" />
+      <path className="portal-art-motion portal-ads-loop" d="M224 158c-24 12-54 10-72-4" fill="none" stroke="#E8720C" strokeWidth="1.6" strokeDasharray="4 4" opacity="0.2" />
+      <path d="M152 154l-1-6m1 6 5-3" fill="none" stroke="currentColor" strokeOpacity="0.4" strokeWidth="1.5" />
+      {/* 回流不是装饰：弧线上标梯度下降公式，表示曝光点击样本回流后重算权重 */}
+      <g className="portal-art-motion portal-ads-loop">
+        <rect x="163" y="156" width="50" height="13" rx="3" fill="#fff" opacity="0.92" />
+        <MathText x={188} y={165.5} size={8} anchor="middle" opacity={0.9}>w←w−η∇L</MathText>
+      </g>
+      <g className="portal-art-motion portal-ads-result" opacity="0">
+        <rect x="84" y="6" width="122" height="24" rx="8" fill="#fff" />
+        <ArtworkText label="recommendMatched" x={145} y={22} width={110} />
+      </g>
+    </g>
+  )
+}
+
+/**
+ * 广告推荐场景二（模型架构版）：按论文里的模型结构图画法，自下而上分层——
+ * 特征 token → 向量化 → 双层交互网络（全连接交叉边）→ 多目标预估头 → 打分柱，
+ * 右侧落到用户首屏坑位。左侧公式带逐层给出信息熵、embedding、线性打分、
+ * softmax、sigmoid 与梯度更新，表达「精准推荐是一串可推导的数学」。
+ */
+function AdsModelScene() {
+  /** 四个特征列：用户/商家/菜品/距离，每列 = 一个 token + 它自己的 embedding 向量。 */
+  const columns = [98, 134, 170, 206]
+  /** 交互网络下层与 embedding 对齐，上层错开位置，使全连接边形成交叉网。 */
+  const upper = [116, 152, 188]
+  /** 每个预估头上的特征重性柱（高度即权重，类比论文里的多属性分布图）。 */
+  const barHeights = [8, 14, 20, 6]
+  /** 层间全连接：把 from 层每个节点到 to 层每个节点合并成一条 path，整批一次描出。 */
+  const links = (from: number[], to: number[], y1: number, y2: number) =>
+    from.map(fx => to.map(tx => `M${fx} ${y1}L${tx} ${y2}`).join('')).join('')
+  return (
+    <g className="portal-ads-scene portal-ads-model">
+      {/* 左侧公式带：从下到上对应五个层，数学记号跨语言中性 */}
+      <MathText x={62} y={157} anchor="end" className="portal-art-motion portal-ads-formula">H=−Σp·log p</MathText>
+      <MathText x={62} y={133} anchor="end" className="portal-art-motion portal-ads-formula">e=x·E</MathText>
+      <MathText x={62} y={100} anchor="end" className="portal-art-motion portal-ads-formula portal-ads-formula-mid">z=W·h+b</MathText>
+      <MathText x={62} y={66} anchor="end" className="portal-art-motion portal-ads-formula portal-ads-formula-high">α=softmax(z)</MathText>
+      <MathText x={62} y={44} anchor="end" className="portal-art-motion portal-ads-formula portal-ads-formula-high">pCTR=σ(z)</MathText>
+
+      {/* 层间交叉边：先画边再画节点，节点白底盖住线头，留出干净的层级感 */}
+      <path className="portal-art-motion portal-ads-edge" pathLength={1} d={links(columns, columns, 142, 115)} fill="none" stroke="currentColor" strokeOpacity="0.5" />
+      <path className="portal-art-motion portal-ads-edge portal-ads-edge-late" pathLength={1} d={links(columns, upper, 101, 91)} fill="none" stroke="currentColor" strokeOpacity="0.5" />
+      <path className="portal-art-motion portal-ads-edge portal-ads-edge-late" pathLength={1} d={links(upper, upper, 77, 71)} fill="none" stroke="currentColor" strokeOpacity="0.5" />
+      {/* 交互网络层虚线框：表示参数共享的多层结构 */}
+      <rect x="80" y="74" width="142" height="44" rx="9" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="4 4" />
+
+      {/* 一号层：特征输入 + 向量化 */}
+      {columns.map((cx, index) => <g key={cx}>
+        <g className="portal-art-motion portal-ads-cell">
+          <rect x={cx - 10} y="124" width="20" height="5" rx="1.5" fill="currentColor" opacity="0.6" />
+          <rect x={cx - 10} y="130.5" width="20" height="5" rx="1.5" fill="currentColor" opacity="0.4" />
+          <rect x={cx - 10} y="137" width="20" height="5" rx="1.5" fill="currentColor" opacity="0.25" />
+        </g>
+        <g className="portal-art-motion portal-ads-token">
+          <circle cx={cx} cy="154" r="11" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+          {index === 0 && <g fill="currentColor"><circle cx={cx} cy="151" r="3" /><path d={`M${cx - 5} 159a5 5 0 0 1 10 0Z`} /></g>}
+          {index === 1 && <g fill="none" stroke="currentColor" strokeWidth="1.2"><path d={`M${cx - 5} 159v-6h10v6Z`} /><path d={`M${cx - 6} 153l2-3h8l2 3`} /></g>}
+          {index === 2 && <g fill="none" stroke="currentColor" strokeWidth="1.2"><path d={`M${cx - 5} 156a5 5 0 0 1 10 0Z`} /><path d={`M${cx} 149v-2`} /></g>}
+          {index === 3 && <g fill="none" stroke="currentColor" strokeWidth="1.2"><path d={`M${cx} 159l-4-5a4 4 0 1 1 8 0Z`} /><circle cx={cx} cy="153.5" r="1.4" /></g>}
+        </g>
+      </g>)}
+
+      {/* 二号层：双层交互网络 */}
+      {columns.map(cx => <g key={`l${cx}`} className="portal-art-motion portal-ads-node">
+        <ellipse cx={cx} cy="108" rx="12" ry="7" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+        <ellipse cx={cx} cy="108" rx="6" ry="3.2" fill="currentColor" opacity="0.35" />
+      </g>)}
+      {upper.map(cx => <g key={`u${cx}`} className="portal-art-motion portal-ads-node portal-ads-node-late">
+        <ellipse cx={cx} cy="84" rx="12" ry="7" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+        <ellipse cx={cx} cy="84" rx="6" ry="3.2" fill="currentColor" opacity="0.35" />
+      </g>)}
+
+      {/* 三号层：多目标预估头（三路并行）与对应的打分柱 */}
+      {upper.map((cx, index) => <g key={`h${cx}`}>
+        <g className="portal-art-motion portal-ads-head">
+          <rect x={cx - 16} y="58" width="32" height="13" rx="6.5" fill="#fff" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.75" />
+          {[-8, 0, 8].map(offset => <circle key={offset} cx={cx + offset} cy="64.5" r="2.6" fill="currentColor" />)}
+        </g>
+        <g className="portal-art-motion portal-ads-bar">
+          {barHeights.map((height, bar) => <rect
+            key={height}
+            x={cx - 15 + bar * 6.5}
+            y={56 - height}
+            width="5"
+            height={height}
+            rx="1.5"
+            fill="currentColor"
+            opacity={index === 1 && bar === 2 ? 0.95 : 0.5}
+          />)}
+        </g>
+      </g>)}
+
+      {/* 场景出口：胜出商家进入用户首屏，下方为待刷新坑位 */}
+      <path className="portal-art-motion portal-ads-intake" d="M200 40q18-4 32 6" fill="none" stroke="#E8720C" strokeWidth="1.8" strokeDasharray="4 4" opacity="0" />
+      <MathText x={238} y={30} size={8} opacity={0.9}>eCPM=bid×pCTR</MathText>
+      <g className="portal-ads-cards">
+        <rect x="238" y="36" width="74" height="32" rx="4" fill="#FFF7F0" stroke="currentColor" strokeOpacity="0.4" />
+        <rect x="242" y="40" width="24" height="24" rx="3" fill="currentColor" opacity="0.18" />
+        <path d="M247 54a7 7 0 0 1 14 0Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M272 42h30m-30 9h19" stroke="currentColor" strokeWidth="3.5" strokeOpacity="0.55" />
+        <rect x="238" y="74" width="74" height="24" rx="4" fill="currentColor" opacity="0.08" />
+        <rect x="242" y="78" width="16" height="16" rx="3" fill="currentColor" opacity="0.14" />
+        <path d="M262 82h34m-34 7h22" stroke="currentColor" strokeWidth="3" strokeOpacity="0.22" />
+        <rect x="238" y="104" width="74" height="24" rx="4" fill="currentColor" opacity="0.06" />
+        <rect x="242" y="108" width="16" height="16" rx="3" fill="currentColor" opacity="0.11" />
+        <path d="M262 112h34m-34 7h16" stroke="currentColor" strokeWidth="3" strokeOpacity="0.16" />
+      </g>
+      <rect className="portal-art-motion portal-ads-slot" x="235" y="33" width="80" height="38" rx="7" fill="none" stroke="#E8720C" strokeWidth="2.2" opacity="0" />
+      <g className="portal-art-motion portal-ads-heart" opacity="0">
+        <circle cx="308" cy="38" r="7" fill="#E8720C" />
+        <path d="M308 41.5c-2.7-1.9-3.9-3-3.9-4.4a1.85 1.85 0 0 1 3.9-.9 1.85 1.85 0 0 1 3.9.9c0 1.4-1.2 2.5-3.9 4.4Z" fill="#fff" />
+      </g>
+
+      {/* 在线学习：曝光点击回流后按梯度公式更新层间权重 */}
+      <path d="M300 128v8q0 8-12 8h-22" fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.4" strokeDasharray="4 4" />
+      <g className="portal-art-motion portal-ads-learn" opacity="0.7">
+        <circle cx="250" cy="148" r="9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeDasharray="10 6" />
+        <path d="M250 137l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      </g>
+      <MathText x={263} y={151} size={8} opacity={0.85}>w←w−η∇L</MathText>
+
+      {/* 结果胶囊：与链路版共用同一文案，保证两套构图都能独立收尾 */}
+      <g className="portal-art-motion portal-ads-result" opacity="0">
+        <rect x="100" y="6" width="122" height="24" rx="8" fill="#fff" />
+        <ArtworkText label="recommendMatched" x={161} y={22} width={110} />
+      </g>
+    </g>
+  )
+}
+
 const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   finance: (
     <>
@@ -664,31 +918,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       </g>
     </>
   ),
-  ads: (
-    <>
-      <rect x="176" y="24" width="105" height="140" rx="12" fill="currentColor" />
-      <rect x="182" y="32" width="93" height="123" rx="8" fill="#fff" />
-      <path d="M210 38h36" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-      {[55, 87, 119].map((y, index) => <g key={y}>
-        <rect x="188" y={y} width="80" height="26" rx="5" fill="currentColor" opacity="0.08" />
-        <circle cx="202" cy={y + 13} r="8" fill="currentColor" opacity={index === 1 ? 0.9 : 0.3} />
-        <path d={`M218 ${y + 9}h39m-39 8h26`} stroke="currentColor" strokeOpacity="0.35" strokeWidth="3" />
-      </g>)}
-      <rect className="portal-art-motion portal-ads-match" x="187" y="86" width="82" height="28" rx="5" fill="none" stroke="#E8720C" strokeWidth="2" opacity="0" />
-      <path className="portal-art-motion portal-ads-stream" d="M143 66q20-22 37-6M145 92h35m-33 24 30 13" fill="none" stroke="#E8720C" strokeWidth="2" strokeDasharray="3 6" />
-      <g transform="rotate(-15 103 105)">
-        <path d="m70 111 10 40h18l-7-42" fill="currentColor" />
-        <path d="M64 82h30l53-28v85l-53-28H64Z" fill="#fff" stroke="currentColor" strokeWidth="3" />
-        <path d="m94 82 53-28v85l-53-28Z" fill="currentColor" opacity="0.2" />
-        <rect x="56" y="81" width="23" height="31" rx="7" fill="currentColor" />
-        <path d="M147 60v74m13-59 16-10m-16 33h20m-20 18 16 10" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
-      </g>
-      <path className="portal-art-motion portal-ads-cursor" d="m245 96 1 24 7-7 7 9 5-4-7-9 10-3Z" fill="#001529" stroke="#fff" strokeWidth="1.5" />
-      <circle className="portal-art-motion portal-ads-click" cx="245" cy="96" r="12" fill="none" stroke="#E8720C" strokeWidth="3" opacity="0" />
-      {[0, 1, 2].map(index => <rect key={index} className="portal-art-motion portal-ads-growth" x={110 + index * 17} y={150 - index * 9} width="11" height={16 + index * 9} rx="3" fill="#52C41A" />)}
-      <g className="portal-art-motion portal-ads-result" opacity="0"><rect x="47" y="18" width="110" height="26" rx="8" fill="#fff" /><ArtworkText label="recommendMatched" x={102} y={36} width={98} /></g>
-    </>
-  ),
+  ads: <AdsTrafficScene />,
   ai: (
     <>
       <path d="M89 76H61V45h37m133 30h30V43h-28M85 129H56v25h41m133-26h31v25h-29" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" fill="none" />
@@ -844,8 +1074,9 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <rect x="54" y="50" width="158" height="90" rx="4" fill="#fff" />
       <path d="M35 153h196l-11 12H47Z" fill="currentColor" opacity="0.3" />
       <rect x="69" y="86" width="65" height="42" rx="3" fill="currentColor" opacity="0.1" />
-      <path d="m66 84 8-20h55l8 20Z" fill="#E8720C" />
-      {[0, 1, 2, 3].map(index => <path key={index} d={`M${66 + index * 18} 84h18v5a9 9 0 0 1-18 0Z`} fill={index % 2 ? '#FFF7F0' : '#E8720C'} />)}
+      {/* 店铺雨棚跟系统身份色走，不写死品牌橙；否则金色卡里夹一块橙色，与广告推荐卡又读成同族 */}
+      <path d="m66 84 8-20h55l8 20Z" fill="currentColor" />
+      {[0, 1, 2, 3].map(index => <path key={index} d={`M${66 + index * 18} 84h18v5a9 9 0 0 1-18 0Z`} fill={index % 2 ? '#fff' : 'currentColor'} />)}
       <rect x="81" y="103" width="18" height="25" rx="2" fill="currentColor" opacity="0.4" />
       <rect x="107" y="103" width="18" height="14" rx="2" fill="#fff" />
       <path d="M153 72h41m-41 10h25" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
@@ -873,10 +1104,19 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   ),
 }
 
-/** 门户插画风格：目前只有產研協同提供两套构图，其他系统忽略该参数。 */
-export type PortalArtworkStyle = 'pipeline' | 'gantt'
+/** 门户插画构图风格：同一系统可提供两套构图，进门户时随机抽一套；用不区分主次的语义名，方便更多系统接入。 */
+export type PortalArtworkStyle = 'primary' | 'alternate'
 
-export default function SystemArtwork({ code, name = '', active = false, style = 'pipeline' }: {
+/**
+ * 拥有两套构图的系统：风格参数只对这里登记的场景生效，其余场景一律走 scenes。
+ * 新增变体只换内部构图，data-scene 不变，场景识别与样式选择器保持稳定。
+ */
+const variantScenes: Partial<Record<PortalSystemKey | 'generic', (style: PortalArtworkStyle) => ReactNode>> = {
+  rdm: style => (style === 'alternate' ? <RdmGanttScene /> : <RdmPipelineScene />),
+  ads: style => (style === 'alternate' ? <AdsModelScene /> : <AdsTrafficScene />),
+}
+
+export default function SystemArtwork({ code, name = '', active = false, style = 'primary' }: {
   code: string
   name?: string
   active?: boolean
@@ -934,10 +1174,8 @@ export default function SystemArtwork({ code, name = '', active = false, style =
       <g strokeLinecap="round" strokeLinejoin="round">
         {scene === 'translation'
           ? <TranslationScene playing={playback === 'running'} />
-          /* 只有 rdm 有第二套构图；data-scene 仍报 rdm，场景识别与样式选择器保持不变 */
-          : scene === 'rdm' && style === 'gantt'
-            ? <RdmGanttScene />
-            : scenes[scene]}
+          /* 有两套构图的系统按随机风格切换，其余场景直接取静态构图 */
+          : variantScenes[scene]?.(style) ?? scenes[scene]}
       </g>
       <circle cx="286" cy="91" r="3" fill="currentColor" opacity="0.2" />
       <path d="M34 100h8m-4-4v8" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />

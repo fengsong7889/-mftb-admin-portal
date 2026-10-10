@@ -433,18 +433,100 @@ body {
   0%, 67%, 99%, 100% { transform: translateX(0); }
   76%, 91% { transform: translateX(25px); }
 }
-@keyframes portalAdsMatch {
-  0%, 15%, 100% { opacity: 0; }
-  25%, 86% { opacity: 1; }
+/* 门户广告推荐场景：人群圈选 → 算法竞价打分排序 → Top1 入首屏坑位 → 曝光回流调权。 */
+@keyframes portalAdsTarget {
+  0% { stroke-dashoffset: 240; opacity: 0; }
+  14%, 78% { stroke-dashoffset: 0; opacity: 1; }
+  92%, 100% { stroke-dashoffset: 0; opacity: 0; }
 }
-@keyframes portalAdsCursor {
-  0%, 12%, 100% { transform: translate(28px, 25px); }
-  36%, 80% { transform: translate(0, 0); }
+@keyframes portalAdsTag {
+  0%, 6% { opacity: 0.35; }
+  16%, 40% { opacity: 1; }
+  52%, 100% { opacity: 0.35; }
 }
-@keyframes portalAdsClick {
-  0%, 38%, 65%, 100% { opacity: 0; transform: scale(0.35); }
-  44% { opacity: 1; transform: scale(0.6); }
-  60% { opacity: 0; transform: scale(1.8); }
+@keyframes portalAdsIntake {
+  0% { stroke-dashoffset: 0; opacity: 0.25; }
+  18%, 46% { opacity: 1; }
+  100% { stroke-dashoffset: -32; opacity: 0.25; }
+}
+@keyframes portalAdsScan {
+  0%, 26% { transform: translateY(0); opacity: 0; }
+  32% { opacity: 0.9; }
+  54% { transform: translateY(78px); opacity: 0.9; }
+  60%, 100% { transform: translateY(78px); opacity: 0; }
+}
+@keyframes portalAdsLead {
+  0%, 44% { opacity: 0; }
+  54%, 84% { opacity: 1; }
+  94%, 100% { opacity: 0; }
+}
+@keyframes portalAdsPromote {
+  0%, 50% { transform: translate(0, 0); opacity: 0; }
+  58% { opacity: 1; }
+  72%, 82% { transform: translate(26px, -8px); opacity: 1; }
+  92%, 100% { transform: translate(26px, -8px); opacity: 0; }
+}
+@keyframes portalAdsSlot {
+  0%, 64%, 100% { opacity: 0; }
+  74%, 92% { opacity: 1; }
+}
+@keyframes portalAdsHeart {
+  0%, 68%, 100% { opacity: 0; transform: scale(0.4); }
+  78%, 92% { opacity: 1; transform: scale(1); }
+}
+@keyframes portalAdsFeed {
+  0%, 68% { transform: translateY(0); }
+  78%, 88% { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+@keyframes portalAdsLoop {
+  0%, 74% { opacity: 0.2; }
+  84%, 96% { opacity: 0.95; }
+  100% { opacity: 0.2; }
+}
+@keyframes portalAdsResult {
+  0%, 72%, 100% { opacity: 0; }
+  80%, 94% { opacity: 1; }
+}
+/* 模型架构版：自下而上逐层点亮，层间全连接边整体一次描出，公式带跟随本层亮起 */
+@keyframes portalAdsToken {
+  0%, 2% { opacity: 0.25; transform: scale(0.82); }
+  12%, 82% { opacity: 1; transform: scale(1); }
+  94%, 100% { opacity: 0.25; transform: scale(0.82); }
+}
+@keyframes portalAdsCell {
+  0%, 8% { opacity: 0.12; }
+  20%, 82% { opacity: 1; }
+  92%, 100% { opacity: 0.12; }
+}
+@keyframes portalAdsEdge {
+  0%, 14% { stroke-dashoffset: 1; opacity: 0.15; }
+  34%, 84% { stroke-dashoffset: 0; opacity: 1; }
+  94%, 100% { stroke-dashoffset: 0; opacity: 0.15; }
+}
+@keyframes portalAdsNode {
+  0%, 24% { opacity: 0.3; }
+  38%, 84% { opacity: 1; }
+  92%, 100% { opacity: 0.3; }
+}
+@keyframes portalAdsHead {
+  0%, 40% { opacity: 0.3; }
+  52%, 86% { opacity: 1; }
+  94%, 100% { opacity: 0.3; }
+}
+@keyframes portalAdsBar {
+  0%, 50% { transform: scaleY(0.1); }
+  64%, 88% { transform: scaleY(1); }
+  96%, 100% { transform: scaleY(0.1); }
+}
+@keyframes portalAdsFormula {
+  0%, 6% { opacity: 0.3; }
+  22%, 86% { opacity: 1; }
+  96%, 100% { opacity: 0.3; }
+}
+@keyframes portalAdsLearn {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 @keyframes portalBusinessGrowth {
   0%, 40%, 100% { transform: scaleY(0.35); }

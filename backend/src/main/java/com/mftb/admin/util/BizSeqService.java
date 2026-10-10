@@ -136,6 +136,18 @@ public class BizSeqService {
     /** EAM 报废编号 */
     public static final String RULE_EAM_SCRAP = "eam_scrap";
 
+    /* ==================== 用车管理（EAM 车辆域） ==================== */
+
+    /** 车辆编号：VH + 6 位全局自增（车辆稳定身份，车牌可换） */
+    public static final String RULE_VEHICLE = "vehicle";
+    /**
+     * 用车单号：YC + YYYYMMDD + 4 位。审批用车 / 直接登记 / 事后补录**共用这一条规则**。
+     *
+     * <p>不按来源拆前缀是刻意的：多条规则各自计数时，只要前缀相同就会在同一天各自
+     * 从 0001 开起而撞单号唯一键；来源区分由 biz_vehicle_use.source 与界面「來源」列承担。
+     */
+    public static final String RULE_VEHICLE_USE = "vehicle_use";
+
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）
      * 已迁移至 sys_company_brand 表动态查询，此方法仅作 fallback。

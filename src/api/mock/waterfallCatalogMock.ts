@@ -39,6 +39,8 @@ export interface MockCatalogItem {
   originPrice?: number
   distance?: string
   deliveryTime?: string
+  /** 剩余库存（仅商品；undefined 表示不限库存） */
+  stock?: number
 }
 
 /** 门店分类 */
@@ -71,9 +73,9 @@ const ITEMS: MockCatalogItem[] = [
   { id: 'SM1001', name: '閃蜂生鮮超市（示例）', contentType: 'store', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_sc_fresh', enabled: true, score: 95, sales: 3800, monthlySales: 800, distanceMeters: 500, image: '🛒' },
   { id: 'SM1002', name: '閃蜂便利百貨（示例）', contentType: 'store', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_sc_daily', enabled: true, score: 90, sales: 4200, monthlySales: 900, distanceMeters: 300, image: '🏪' },
   { id: 'SM1003', name: 'mFood 生鮮超市（示例）', contentType: 'store', channel: 'supermarket', brand: 'mFood', categoryId: 'sm_sc_fresh', enabled: true, score: 92, sales: 3600, distanceMeters: 800, image: '🛒' },
-  { id: 'SP1001', name: '新鮮蘋果 1kg（示例）', contentType: 'product', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_pc_fruit', enabled: true, score: 94, monthlySales: 600, distanceMeters: 500, price: 28, image: '🍎' },
-  { id: 'SP1002', name: '家庭裝紙巾（示例）', contentType: 'product', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_pc_daily', enabled: true, score: 88, monthlySales: 1200, distanceMeters: 300, price: 19, image: '🧻' },
-  { id: 'SP1003', name: 'mFood 新鮮蔬菜（示例）', contentType: 'product', channel: 'supermarket', brand: 'mFood', categoryId: 'sm_pc_fruit', enabled: true, score: 91, monthlySales: 700, distanceMeters: 800, price: 15, image: '🥬' },
+  { id: 'SP1001', name: '新鮮蘋果 1kg（示例）', contentType: 'product', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_pc_fruit', enabled: true, score: 94, monthlySales: 600, distanceMeters: 500, price: 28, stock: 120, image: '🍎' },
+  { id: 'SP1002', name: '家庭裝紙巾（示例）', contentType: 'product', channel: 'supermarket', brand: 'flashBee', categoryId: 'sm_pc_daily', enabled: true, score: 88, monthlySales: 1200, distanceMeters: 300, price: 19, stock: 0, image: '🧻' },
+  { id: 'SP1003', name: 'mFood 新鮮蔬菜（示例）', contentType: 'product', channel: 'supermarket', brand: 'mFood', categoryId: 'sm_pc_fruit', enabled: true, score: 91, monthlySales: 700, distanceMeters: 800, price: 15, stock: 45, image: '🥬' },
   // 火鍋門店
   { id: 'MD1001', name: '撈撈灰·徐州風味肉醬米線(南灣店)', contentType: 'store', brand: 'flashBee', categoryId: 'sc_hotpot', enabled: true, rating: 4.6, monthlySales: 1196, image: '🍲', distance: '720m', deliveryTime: '22分鐘' },
   { id: 'MD1002', name: '重慶老火鍋·澳門總店（氹仔區金牌性價比火鍋食店·澳門人最愛食的海鮮火鍋）', contentType: 'store', brand: 'flashBee', categoryId: 'sc_hotpot', enabled: true, rating: 4.8, monthlySales: 880, image: '🌶️', distance: '1.2km', deliveryTime: '30分鐘' },
@@ -89,12 +91,12 @@ const ITEMS: MockCatalogItem[] = [
   { id: 'MD4001', name: '全澳西餐銷量第1名·威尼斯西餐廳', contentType: 'store', brand: 'flashBee', categoryId: 'sc_west', enabled: true, rating: 4.9, monthlySales: 3200, image: '🍝', distance: '600m', deliveryTime: '26分鐘' },
   // 空分類無資源
   // 团购商品
-  { id: 'GD9001', name: '【火鍋】雙人海鮮火鍋套餐（含飲品任選）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: true, rating: 4.7, monthlySales: 560, price: 299, originPrice: 458, image: '🍲' },
+  { id: 'GD9001', name: '【火鍋】雙人海鮮火鍋套餐（含飲品任選）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: true, rating: 4.7, monthlySales: 560, price: 299, originPrice: 458, stock: 88, image: '🍲' },
   { id: 'GD9002', name: '【19店通用】100元代金券（新花城超級市場）【新】', contentType: 'product', brand: 'flashBee', categoryId: 'pc_voucher', enabled: true, monthlySales: 242, price: 97, originPrice: 100, image: '🎫' },
-  { id: 'GD9003', name: '招牌暴打檸檬茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.5, monthlySales: 1196, price: 26.1, originPrice: 29, image: '🧋' },
-  { id: 'GD9004', name: '五星酒店自助晚餐·雙人套餐（含酒水暢飲·週末節假日通用·限時特惠搶購價）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_buffet', enabled: true, rating: 4.8, monthlySales: 320, price: 599, originPrice: 899, image: '🍽️' },
-  { id: 'GD9005', name: '【已下架】下午茶套餐(失效示例)', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: false, monthlySales: 0, price: 88, originPrice: 128, image: '🍰' },
-  { id: 'GD9006', name: '烤糖粉粿奶茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.6, monthlySales: 630, price: 26.1, originPrice: 29, image: '🧋' },
+  { id: 'GD9003', name: '招牌暴打檸檬茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.5, monthlySales: 1196, price: 26.1, originPrice: 29, stock: 200, image: '🧋' },
+  { id: 'GD9004', name: '五星酒店自助晚餐·雙人套餐（含酒水暢飲·週末節假日通用·限時特惠搶購價）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_buffet', enabled: true, rating: 4.8, monthlySales: 320, price: 599, originPrice: 899, stock: 12, image: '🍽️' },
+  { id: 'GD9005', name: '【已下架】下午茶套餐(失效示例)', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: false, monthlySales: 0, price: 88, originPrice: 128, stock: 0, image: '🍰' },
+  { id: 'GD9006', name: '烤糖粉粿奶茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.6, monthlySales: 630, price: 26.1, originPrice: 29, stock: 150, image: '🧋' },
 ]
 
 const CATEGORY_MAP = new Map(CATEGORIES.map(c => [c.id, c]))

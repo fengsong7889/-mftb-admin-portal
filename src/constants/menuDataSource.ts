@@ -240,6 +240,15 @@ export const keyToPath: Record<string, string> = {
   'rdm-config-routing':   '/rdm-config-routing',
   'rdm-config-sla':       '/rdm-config-sla',
   'rdm-config-score':     '/rdm-score-rule',
+  // 用車管理（階段 B1）—— 歸屬物資管理系統（EAM）的顶级分组「車輛管理」。
+  // 職責邊界：車輛檔案/辦理/台賬/維護等業務菜單全部在 EAM；OA 側只保留流程定義
+  // （biz_oa_process: vehicle_use）、審批待辦與流程中心一張跳轉入口卡，不承載任何
+  // 用車業務頁面——與 consumable-claim（業務頁在 EAM，流程中心只放 route）同法。
+  // 菜单真值已由 VehicleSchemaMigrationInitializer 写入 sys_menu（system_code=eam）。
+  'vehicle-files':        '/vehicle-files',
+  'my-vehicle-use':       '/my-vehicle-use',
+  'vehicle-dispatch':     '/vehicle-dispatch',
+  'vehicle-ledger':       '/vehicle-ledger',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -296,6 +305,23 @@ pathToKey['/hr-perf-plan'] = 'hr-perf-admin'
 pathToKey['/hr-perf-plan-form'] = 'hr-perf-admin'
 pathToKey['/hr-perf-plan-detail'] = 'hr-perf-admin'
 pathToKey['/hr-perf-template'] = 'hr-perf-admin'
+
+// 用車管理子页（新增/编辑/详情/登记表单）均为各菜单的子页面，非独立菜单
+pathToKey['/vehicle-files/add'] = 'vehicle-files'
+pathToKey['/vehicle-files/edit'] = 'vehicle-files'
+pathToKey['/vehicle-files/detail'] = 'vehicle-files'
+pathToKey['/vehicle-files/qualification'] = 'vehicle-files'
+pathToKey['/my-vehicle-use/apply'] = 'my-vehicle-use'
+pathToKey['/my-vehicle-use/detail'] = 'my-vehicle-use'
+pathToKey['/vehicle-dispatch/assign'] = 'vehicle-dispatch'
+pathToKey['/vehicle-dispatch/direct'] = 'vehicle-dispatch'
+pathToKey['/vehicle-dispatch/depart'] = 'vehicle-dispatch'
+pathToKey['/vehicle-dispatch/return'] = 'vehicle-dispatch'
+pathToKey['/vehicle-dispatch/confirm'] = 'vehicle-dispatch'
+pathToKey['/vehicle-dispatch/detail'] = 'vehicle-dispatch'
+pathToKey['/vehicle-ledger/detail'] = 'vehicle-ledger'
+pathToKey['/vehicle-ledger/correct'] = 'vehicle-ledger'
+pathToKey['/vehicle-ledger/backfill'] = 'vehicle-ledger'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -369,6 +395,8 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'asset-claim', 'asset-borrow', 'asset-return', 'asset-transfer-list',
   'asset-handover', 'asset-repair', 'asset-loss', 'asset-compensation', 'asset-scrap',
   'asset-flow', 'asset-inventory',
+  // 用車管理（B1 已接真实 /api/vehicle/*，不再是前端原型，必须登记为已接入后端）
+  'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use',
   // EAM 採購
   'purchase-order', 'purchase-request',
   // 耗材管理

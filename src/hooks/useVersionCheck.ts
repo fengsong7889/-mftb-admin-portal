@@ -1,17 +1,27 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { BUILD_TIME } from '../build-meta'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { BUILD_TIME, COMMIT_HASH } from '../build-meta'
+
+/** 版本标识：commit 短哈希 + 构建时间，用于在更新提示里做具体对照 */
+export interface VersionInfo {
+  hash: string
+  buildTime: string
+}
 
 /** 版本检测返回结果 */
 interface VersionCheckResult {
   /** 是否发现新版本 */
   updateAvailable: boolean
+  /** 当前页面已加载的版本 */
+  current: VersionInfo
+  /** 服务端最新版本；未检测到前为 null */
+  latest: VersionInfo | null
   /** 手动触发一次检测 */
   checkNow: () => void
 }
 
 /**
  * 定期拉取 server 上的 version.json，与构建时嵌入的时间戳对比，
- * 发现不一致时标记有新版本可用。
+ * 发现不一致时标记有新版本可用，并把两边的版本号一并交给提示组件展示。
  *
  * - 仅在已登录状态下启用（由调用方控制挂载时机）
  * - 首次检测延迟 60 秒，之后每 5 分钟检测一次
@@ -20,9 +30,11 @@ interface VersionCheckResult {
  */
 export default function useVersionCheck(): VersionCheckResult {
   const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [latest, setLatest] = useState<VersionInfo | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval>>()
 
   const currentBuildTime = BUILD_TIME
+  const current = useMemo(() => ({ hash: COMMIT_HASH, buildTime: BUILD_TIME }), [])
 
   const check = useCallback(async () => {
     if (!currentBuildTime) return
@@ -34,6 +46,7 @@ export default function useVersionCheck(): VersionCheckResult {
       if (!res.ok) return
       const data = await res.json()
       if (data.buildTime && data.buildTime !== currentBuildTime) {
+        setLatest({ hash: data.commitHash ?? '—', buildTime: String(data.buildTime) })
         setUpdateAvailable(true)
         // 检测到新版本后停止轮询，避免重复提示
         if (timerRef.current) clearInterval(timerRef.current)
@@ -63,5 +76,5 @@ export default function useVersionCheck(): VersionCheckResult {
     check()
   }, [check])
 
-  return { updateAvailable, checkNow }
+  return { updateAvailable, current, latest, checkNow }
 }

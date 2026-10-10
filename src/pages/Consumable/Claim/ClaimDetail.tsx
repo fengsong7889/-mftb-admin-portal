@@ -5,6 +5,7 @@
  * 操作按状态与权限渲染：pending→审批；approved→出库；pending/approved→撤销
  */
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Descriptions, Table, Tag, Input, Modal, message, Space, Spin } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
@@ -13,7 +14,7 @@ import {
   type ConsumableClaim, type ConsumableClaimItem,
 } from '../../../api/consumable'
 import { useAuth } from '../../../contexts/AuthContext'
-import { CLAIM_STATUS_LABEL, CLAIM_STATUS_COLOR, type ClaimStatus } from './constants'
+import { CLAIM_STATUS_LABEL_KEY, CLAIM_STATUS_COLOR, type ClaimStatus } from './constants'
 
 interface Props {
   id: number
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function ClaimDetail({ id, onBack }: Props) {
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const [loading, setLoading] = useState(false)
   const [claim, setClaim] = useState<ConsumableClaim | null>(null)
@@ -149,7 +151,7 @@ export default function ClaimDetail({ id, onBack }: Props) {
           >返回</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#262626' }}>耗材領用詳情</h2>
-          <Tag color={CLAIM_STATUS_COLOR[status]}>{CLAIM_STATUS_LABEL[status]}</Tag>
+          <Tag color={CLAIM_STATUS_COLOR[status]}>{t(CLAIM_STATUS_LABEL_KEY[status])}</Tag>
         </div>
         <Space>
           {canManage && status === 'pending' && (

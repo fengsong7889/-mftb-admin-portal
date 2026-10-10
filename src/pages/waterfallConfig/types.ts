@@ -66,6 +66,8 @@ export interface FixedContentSlot {
   brand?: string
   categoryId?: string
   categoryName?: string
+  /** 剩余库存（仅商品快照；undefined 表示不限库存） */
+  stock?: number
   status: WaterfallStatus
 }
 

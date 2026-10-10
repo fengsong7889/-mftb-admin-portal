@@ -101,7 +101,9 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
-  // 店鋪推廣（推廣通）
+  // 店鋪推廣（推廣通）：「訂單管理」（promotion-order-manage）菜单已退役，
+  // 其路由 /promotion-order-manage 与后端 AdOrderController 均已归到本菜单授权，
+  // 因此本菜单必须保留 edit（退款/取消订单接口需要）
   'promotion-sales-config': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
@@ -541,6 +543,47 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
+  // ── AI 菜单动作集（与后端 @RequirePermission 实测集一致）──
+  // 未在此表登记的菜单会回退成全部 8 个通用动作（導入/啟用 等无关项），必须逐菜单补齐
+  'ai-model-provider': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-model-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-dept-model-auth': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-model-auth': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 部门/员工额度：额度为策略调整，无「新增入口」，新增由覆盖规则表单承担（后端只有 edit/delete）
+  'ai-dept-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
   // AI 能耗管理：能耗統計 / 能耗明細（刪除無用的能耗管控）→ 
   'ai_usage_stats': [
     { key: 'view', label: '查看' },
@@ -746,6 +789,10 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'export', label: '導出' },
   ],
   // 物資管理
+  // 資產看板：纯展示页，无导出/无编辑入口
+  'asset-dashboard': [
+    { key: 'view', label: '查看' },
+  ],
   'asset-list': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '入庫' },
@@ -772,6 +819,34 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'create', label: '發起' },
     { key: 'export', label: '導出' },
+  ],
+  // 變更歷史（流轉流水）：只读台账，仅导出
+  'asset-flow': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // ── 用車管理（action key 严格对齐后端的 view/create/edit/export，
+  // 授权直接登记复用 create、补录复用 ledger 的 create、更正复用 edit，
+  // 不自定义动作名，否则 PermissionDeniedException 无法给出可读提示）──
+  'vehicle-files': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增/核驗資格' },
+    { key: 'edit', label: '編輯/狀態/開關' },
+    { key: 'export', label: '導出' },
+  ],
+  'vehicle-dispatch': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '安排/出還車/確認/直接登記' },
+  ],
+  'vehicle-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '事後補錄' },
+    { key: 'edit', label: '授權更正' },
+    { key: 'export', label: '導出' },
+  ],
+  'my-vehicle-use': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起申請' },
   ],
   // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
   'asset-claim': [
@@ -842,9 +917,54 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   // ── 僅查看 / 系統配置 / OA / AI ──
   'consumable-stock-txn': [
     { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // ── 耗材管理（action 集與後端 EamConsumable*Controller @RequirePermission 對齊）──
+  'consumable-ops': [
+    { key: 'view', label: '查看' },
+  ],
+  'consumable-dashboard': [
+    { key: 'view', label: '查看' },
+  ],
+  'consumable-item': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-inbound': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '入庫' },
+  ],
+  'consumable-stock': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '調整' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-alert': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 耗材領用：員工自助提單 + 管理側審核，無刪除以保留領用留痕
+  'consumable-claim': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '領用申請' },
+    { key: 'edit', label: '審核' },
+    { key: 'export', label: '導出' },
   ],
   'process-center': [
     { key: 'view', label: '查看' },
+  ],
+  // 流程事項：員工發起申請單 + 本人撤銷/改單（後端 oa-requests 只有 view/create/edit）
+  'oa-requests': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起' },
+    { key: 'edit', label: '撤銷/催辦' },
   ],
   'ai-conversation-audit': [
     { key: 'view', label: '查看' },
@@ -1397,6 +1517,12 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'asset-repair',
   'asset-loss',
   'asset-inventory',
+  // 用車管理（後端已按菜单鉴权，必须同步纳入受控；否则「看得见菜单但接口 403」，
+  // 或反过来接口已控而菜单对所有人可见）
+  'vehicle-files',
+  'vehicle-dispatch',
+  'vehicle-ledger',
+  'my-vehicle-use',
   // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
   'asset-claim',
   'asset-borrow',
@@ -1657,6 +1783,26 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/asset-transfer/detail': 'asset-transfer-list',
   '/asset-transfer/cancel': 'asset-transfer-list',
   '/asset-inventory': 'asset-inventory',
+  // 用車管理（子页归属各自菜单；详情/登记/更正都是同一菜单下的独立页）
+  '/vehicle-files': 'vehicle-files',
+  '/vehicle-files/add': 'vehicle-files',
+  '/vehicle-files/edit': 'vehicle-files',
+  '/vehicle-files/detail': 'vehicle-files',
+  '/vehicle-files/qualification': 'vehicle-files',
+  '/vehicle-dispatch': 'vehicle-dispatch',
+  '/vehicle-dispatch/assign': 'vehicle-dispatch',
+  '/vehicle-dispatch/direct': 'vehicle-dispatch',
+  '/vehicle-dispatch/depart': 'vehicle-dispatch',
+  '/vehicle-dispatch/return': 'vehicle-dispatch',
+  '/vehicle-dispatch/confirm': 'vehicle-dispatch',
+  '/vehicle-dispatch/detail': 'vehicle-dispatch',
+  '/vehicle-ledger': 'vehicle-ledger',
+  '/vehicle-ledger/detail': 'vehicle-ledger',
+  '/vehicle-ledger/correct': 'vehicle-ledger',
+  '/vehicle-ledger/backfill': 'vehicle-ledger',
+  '/my-vehicle-use': 'my-vehicle-use',
+  '/my-vehicle-use/apply': 'my-vehicle-use',
+  '/my-vehicle-use/detail': 'my-vehicle-use',
   // 領用管理（子路由歸屬 asset-claim 菜單）
   '/asset-claim': 'asset-claim',
   '/asset-claim/add': 'asset-claim',

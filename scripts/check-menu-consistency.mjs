@@ -15,7 +15,9 @@
  *   3. 受控菜单（CONTROLLED_MENU_KEYS）必须可路由，且不能是目录 key
  *   4. 路由守卫映射（ROUTE_MENU_KEY_MAP）中的路径必须已在 App.tsx 注册
  *   5. 后端种子里的叶子菜单必须有前端路由映射（新增菜单忘配 keyToPath 时立刻失败）
- *   6. 禁止回归：Sidebar 不得再声明整棵静态菜单树；MenuTabs 名称兜底表条目数不得超过上限
+ *   6. 后端种子里的叶子菜单必须在 MENU_ACTIONS_MAP 登记功能操作集（否则授权中心
+ *      「功能操作」面板会回退成全部 8 个通用动作，把導入/啟用 等无关项授予出去）
+ *   7. 禁止回归：Sidebar 不得再声明整棵静态菜单树；MenuTabs 名称兜底表条目数不得超过上限
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -63,6 +65,10 @@ const controlledKeys = controlledBlock
 
 const routeMapBlock = permTypes.match(/const ROUTE_MENU_KEY_MAP[^=]*= \{([\s\S]*?)\n\}/)
   ?? permTypes.match(/ROUTE_MENU_KEY_MAP[^\n]*\n[\s\S]*?\{([\s\S]*?)\n\}/)
+const menuActionsBlock = permTypes.match(/export const MENU_ACTIONS_MAP[^=]*= \{([\s\S]*?)\n\}/)
+const menuActionKeys = new Set(menuActionsBlock
+  ? [...menuActionsBlock[1].matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])
+  : (fail('未能解析 MENU_ACTIONS_MAP（结构变更请同步更新 scripts/check-menu-consistency.mjs）'), []))
 const appRoutes = new Set(
   [...read('src/App.tsx').matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]),
 )
@@ -230,7 +236,17 @@ for (const key of seedLeafKeys) {
   }
 }
 
-// ────────── 校验 6：种子默认名与离线清单快照名一致（避免离线时看到旧名） ──────────
+// ────────── 校验 6：叶子菜单必须登记功能操作集 ──────────
+// 后端 sys_menu.actions 大多未回填（主种子不写 actions），授权中心「功能操作」面板实际取
+// MENU_ACTIONS_MAP；缺失即回退成全部 8 个通用动作，会把導入/啟用 等无关动作授予出去。
+for (const key of [...seedLeafKeys, ...domainSeedMenus.map((m) => m.key)]) {
+  if (!menuActionKeys.has(key)) {
+    fail(`菜单 ${key}「${seedNames[key] || ''}」未在 MENU_ACTIONS_MAP 登记功能操作集, `
+      + '授权中心将回退展示全部通用动作（按后端 @RequirePermission 实际动作补齐）')
+  }
+}
+
+// ────────── 校验 7：种子默认名与离线清单快照名一致（避免离线时看到旧名） ──────────
 for (const [key, label] of Object.entries(offlineLabelByKeys)) {
   if (seedNames[key] && seedNames[key] !== label) {
     warn(`离线菜单 ${key} 名称快照「${label}」与后端种子默认名「${seedNames[key]}」不一致`
@@ -238,6 +254,7 @@ for (const [key, label] of Object.entries(offlineLabelByKeys)) {
   }
 }
 
+// ────────── 校验 8：域初始化器菜单（导航/页面/后端/权限/图标）──────────
 // 域菜单同时检查导航、页面、后端连接、权限和两级图标，不再只检查主初始化器。
 for (const { key, name, path, icon, file } of domainSeedMenus) {
   const label = `${file}: ${key}「${name}」`
@@ -256,7 +273,8 @@ for (const { key, name, path, icon, file } of domainSeedMenus) {
 console.log('菜单一致性检查')
 console.log(`  域初始化器菜单声明 ${domainSeedMenus.length} 条（含导航、权限、图标检查）`)
 console.log(`  后端种子菜单 ${seedKeys.length} 条 / 前端路由映射 ${Object.keys(keyToPath).length} 条 / `
-  + `离线菜单 ${offlineKeys.length} 条 / 受控菜单 ${controlledKeys.length} 条`)
+  + `离线菜单 ${offlineKeys.length} 条 / 受控菜单 ${controlledKeys.length} 条 / `
+  + `功能操作登记 ${menuActionKeys.size} 条`)
 console.log(`  已接入后端 API 的菜单 ${backendIntegratedMenuKeys.size} 条`)
 for (const w of warnings) console.log(`⚠  ${w}`)
 for (const f of failures) console.error(`✗  ${f}`)

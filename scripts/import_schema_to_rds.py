@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 # 将 fengsong_schema.sql 导入阿里云 RDS（表结构迁移）
-# 用法: python3 import_schema_to_rds.py <RDS密码>
+#
+# 目标库端点与账号不得写入仓库，必需环境变量 RDS_HOST / RDS_USER
+# 用法: export RDS_HOST=... RDS_USER=... && python3 import_schema_to_rds.py <RDS密码>
+import os
 import sys
 import pymysql
 
-HOST = 'rm-bp1wo7870dr30e5rpzo.mysql.rds.aliyuncs.com'
-PORT = 3306
-USER = 'fengsong_admin'
+HOST = (os.environ.get('RDS_HOST') or '').strip()
+PORT = int(os.environ.get('RDS_PORT', '3306'))
+USER = (os.environ.get('RDS_USER') or '').strip()
 SQL_FILE = '/Users/yangjingjing/Desktop/fengsong_schema.sql'
+
+_missing = [k for k, v in (('RDS_HOST', HOST), ('RDS_USER', USER)) if not v]
+if _missing:
+    sys.exit('❌ 缺少环境变量：%s；凭据与库端点不得写入仓库，请 export 后重试'
+             % ', '.join(_missing))
 
 if len(sys.argv) < 2:
     sys.exit('用法: python3 import_schema_to_rds.py <RDS密码>')

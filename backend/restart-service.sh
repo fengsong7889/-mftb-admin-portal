@@ -38,7 +38,48 @@ JAR_PATH="target/mftb-admin.jar"
 LOG_FILE="backend-service.log"
 PID_FILE=".backend.pid"
 
-# ── 环境变量（与 run-local.sh 保持一致）──
+# ── 本地环境变量文件（含凭据，已 gitignore，禁止提交）──
+ENV_LOCAL="$SCRIPT_DIR/.env.local"
+
+# source .env.local：set -a 使其中的变量自动 export，供 java 子进程继承
+load_env_file() {
+    if [ -f "$ENV_LOCAL" ]; then
+        set -a
+        # shellcheck source=/dev/null
+        . "$ENV_LOCAL"
+        set +a
+    fi
+}
+
+# 运行时必需变量校验：缺失即 fail-fast，本脚本不得内置任何凭据默认值
+require_runtime_env() {
+    local missing=()
+    if [ -z "${DB_URL:-}" ]; then missing+=("DB_URL"); fi
+    if [ -z "${DB_USERNAME:-}" ]; then missing+=("DB_USERNAME"); fi
+    if [ -z "${DB_PASSWORD:-}" ]; then missing+=("DB_PASSWORD"); fi
+    if [ -z "${JWT_SECRET:-}" ]; then missing+=("JWT_SECRET"); fi
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${RED}❌ 缺少必需环境变量：${missing[*]}${NC}"
+        echo -e "${YELLOW}   本脚本不再内置凭据默认值，请配置本地环境变量文件：${NC}"
+        echo -e "     cp \"$SCRIPT_DIR/.env.local.example\" \"$ENV_LOCAL\""
+        echo -e "     编辑 $ENV_LOCAL 填入实际值（该文件已被 gitignore，禁止提交）"
+        echo -e "   或先在 shell 中 export 上述变量后重试。"
+        exit 1
+    fi
+
+    # HS256 密钥不足 32 字节会导致登录接口 500，启动前拦截
+    if [ ${#JWT_SECRET} -lt 32 ]; then
+        echo -e "${RED}❌ JWT_SECRET 长度不足 32 字节（当前 ${#JWT_SECRET}），不足以支撑 HS256 签名${NC}"
+        echo -e "${YELLOW}   请在 $ENV_LOCAL 中替换为更长的随机值${NC}"
+        exit 1
+    fi
+
+    # 非敏感项保留安全默认值
+    export LOG_LEVEL="${LOG_LEVEL:-info}"
+}
+
+# ── 环境变量（JDK/Maven 探测 + 从 .env.local 加载凭据）──
 setup_env() {
     # 优先使用已设置的 JAVA_HOME，其次尝试系统查找，最后回退到项目本地 JDK
     if [ -z "$JAVA_HOME" ]; then
@@ -63,12 +104,8 @@ setup_env() {
         export PATH="$HOME/apache-maven-3.9.6/bin:$JAVA_HOME/bin:$PATH"
     fi
 
-    # 数据库连接（与 run-local.sh 一致，连接远程开发库）
-    export DB_URL="${DB_URL:-jdbc:mysql://mysql3.sqlpub.com:3308/fengsong?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&socketTimeout=15000&connectTimeout=10000}"
-    export DB_USERNAME="${DB_USERNAME:-fengsong_mftb}"
-    export DB_PASSWORD="${DB_PASSWORD:-bBMzwCsHPYDhi4my}"
-    export JWT_SECRET="${JWT_SECRET:-mftb-local-dev-secret-key-2024-sha256-secure-enough-for-hs384}"
-    export LOG_LEVEL="${LOG_LEVEL:-info}"
+    load_env_file
+    require_runtime_env
 }
 
 # ── 停止现有服务 ──

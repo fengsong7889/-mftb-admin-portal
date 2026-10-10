@@ -6,9 +6,10 @@
  * 操作：查看明細
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Table, Input, Select, DatePicker, Tag, message, Space, Form, Modal, Descriptions } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import {
   fetchConsumableInboundOrders, fetchConsumableInboundOrderDetail,
@@ -30,13 +31,15 @@ interface InboundFilters {
   createTime?: Dayjs | null
 }
 
-const INBOUND_TYPE_MAP: Record<string, { label: string; color: string }> = {
-  in_purchase: { label: '採購入庫', color: 'blue' },
-  in_manual: { label: '手工入庫', color: 'green' },
-  in_init: { label: '期初建賬', color: 'default' },
+/** 入库类型 → i18n 文案 key + Tag 颜色 */
+const INBOUND_TYPE_MAP: Record<string, { labelKey: string; color: string }> = {
+  in_purchase: { labelKey: 'consumable.typePurchase', color: 'blue' },
+  in_manual: { labelKey: 'consumable.typeManual', color: 'green' },
+  in_init: { labelKey: 'consumable.typeInit', color: 'default' },
 }
 
 export default function InboundList() {
+  const { t } = useTranslation()
   const [form] = Form.useForm<InboundFilters>()
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<ConsumableInboundOrder[]>([])
@@ -65,11 +68,11 @@ export default function InboundList() {
       setRows(res.records)
       setTotal(res.total)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '查詢失敗')
+      message.error(e instanceof Error ? e.message : t('consumable.queryFailed'))
     } finally {
       setLoading(false)
     }
-  }, [page, size])
+  }, [page, size, t])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -102,43 +105,45 @@ export default function InboundList() {
       setDetailData(data)
       setDetailVisible(true)
     } catch (e: unknown) {
-      message.error(e instanceof Error ? e.message : '查詢詳情失敗')
+      message.error(e instanceof Error ? e.message : t('consumable.queryFailed'))
     }
   }
 
+  /* ── 列定义（title 跟随当前语言） ── */
   const columns: TableColumnsType<ConsumableInboundOrder> = [
-    { title: '入庫單號', dataIndex: 'inboundNo', key: 'inboundNo', width: 170, render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span> },
-    { title: '入庫類型', dataIndex: 'inboundType', key: 'inboundType', width: 100,
-      render: (v: string) => { const t = INBOUND_TYPE_MAP[v]; return t ? <Tag color={t.color}>{t.label}</Tag> : v } },
-    { title: '所屬品牌', dataIndex: 'companyBrandName', key: 'companyBrandName', width: 100, render: (v: string) => v || '-' },
-    { title: '購買公司', dataIndex: 'purchaseCompany', key: 'purchaseCompany', width: 150, ellipsis: true, render: (v: string) => v || '-' },
-    { title: '供應商', dataIndex: 'supplierName', key: 'supplierName', width: 130, ellipsis: true, render: (v: string) => v || '-' },
-    { title: '明細行數', key: 'lineCount', width: 90, align: 'right', render: (_: unknown, r) => r.items?.length ?? 0 },
-    { title: '總數量', dataIndex: 'totalQty', key: 'totalQty', width: 90, align: 'right' },
-    { title: '總金額', dataIndex: 'totalAmount', key: 'totalAmount', width: 120, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
-    { title: '入庫日期', dataIndex: 'bizDate', key: 'bizDate', width: 110, render: (v: string) => v || '-' },
-    { title: '創建人', dataIndex: 'createdBy', key: 'createdBy', width: 100, render: (v: string) => v || '-' },
-    { title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 165, render: (v: string) => v || '-' },
-    { title: '操作', key: 'action', width: 80, fixed: 'right' as const,
+    { title: t('consumable.inboundNo'), dataIndex: 'inboundNo', key: 'inboundNo', width: 170, render: (v: string) => <span style={{ fontFamily: 'monospace' }}>{v}</span> },
+    { title: t('consumable.inboundType'), dataIndex: 'inboundType', key: 'inboundType', width: 100,
+      render: (v: string) => { const meta = INBOUND_TYPE_MAP[v]; return meta ? <Tag color={meta.color}>{t(meta.labelKey)}</Tag> : v } },
+    { title: t('common.colBrand'), dataIndex: 'companyBrandName', key: 'companyBrandName', width: 100, render: (v: string) => v || '-' },
+    { title: t('consumable.purchaseCompany'), dataIndex: 'purchaseCompany', key: 'purchaseCompany', width: 150, ellipsis: true, render: (v: string) => v || '-' },
+    { title: t('consumable.supplier'), dataIndex: 'supplierName', key: 'supplierName', width: 130, ellipsis: true, render: (v: string) => v || '-' },
+    { title: t('consumable.inboundLineCount'), key: 'lineCount', width: 90, align: 'right', render: (_: unknown, r) => r.items?.length ?? 0 },
+    { title: t('consumable.totalQty'), dataIndex: 'totalQty', key: 'totalQty', width: 90, align: 'right' },
+    { title: t('consumable.inboundTotalAmount'), dataIndex: 'totalAmount', key: 'totalAmount', width: 120, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+    { title: t('consumable.inboundBizDate'), dataIndex: 'bizDate', key: 'bizDate', width: 110, render: (v: string) => v || '-' },
+    { title: t('common.colCreator'), dataIndex: 'createdBy', key: 'createdBy', width: 100, render: (v: string) => v || '-' },
+    { title: t('common.colCreateTime'), dataIndex: 'createdAt', key: 'createdAt', width: 165, render: (v: string) => v || '-' },
+    { title: t('common.colAction'), key: 'action', width: 80, fixed: 'right' as const,
       render: (_: unknown, r: ConsumableInboundOrder) => (
-        <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(r.id)}>詳情</Button>
+        <Button type="link" size="small" onClick={() => handleViewDetail(r.id)}>{t('common.detail')}</Button>
       ) },
   ]
 
+  /* ── 列字段配置（key 保持穩定以免影響已保存的列配置） ── */
   const columnMeta = useMemo(() => [
-    { key: 'inboundNo', title: '入庫單號' },
-    { key: 'inboundType', title: '入庫類型' },
-    { key: 'companyBrandName', title: '所屬品牌' },
-    { key: 'purchaseCompany', title: '購買公司' },
-    { key: 'supplierName', title: '供應商' },
-    { key: 'lineCount', title: '明細行數' },
-    { key: 'totalQty', title: '總數量' },
-    { key: 'totalAmount', title: '總金額' },
-    { key: 'bizDate', title: '入庫日期' },
-    { key: 'createdBy', title: '創建人' },
-    { key: 'createdAt', title: '創建時間' },
-    { key: 'action', title: '操作' },
-  ], [])
+    { key: 'inboundNo', title: t('consumable.inboundNo') },
+    { key: 'inboundType', title: t('consumable.inboundType') },
+    { key: 'companyBrandName', title: t('common.colBrand') },
+    { key: 'purchaseCompany', title: t('consumable.purchaseCompany') },
+    { key: 'supplierName', title: t('consumable.supplier') },
+    { key: 'lineCount', title: t('consumable.inboundLineCount') },
+    { key: 'totalQty', title: t('consumable.totalQty') },
+    { key: 'totalAmount', title: t('consumable.inboundTotalAmount') },
+    { key: 'bizDate', title: t('consumable.inboundBizDate') },
+    { key: 'createdBy', title: t('common.colCreator') },
+    { key: 'createdAt', title: t('common.colCreateTime') },
+    { key: 'action', title: t('common.colAction') },
+  ], [t])
 
   const { configComponent, applyConfig } = useColumnConfig('consumable-inbound', columnMeta, [
     { key: 'action', visible: true, locked: 'tail' },
@@ -164,13 +169,13 @@ export default function InboundList() {
         })),
       }
       await createConsumableInboundOrder(dto)
-      message.success('入庫單創建成功')
+      message.success(t('consumable.inboundCreateSuccess'))
       setCreateVisible(false)
       createForm.resetFields()
       loadData()
     } catch (e: unknown) {
       if (e && typeof e === 'object' && 'errorFields' in e) return // form validation
-      message.error(e instanceof Error ? e.message : '創建失敗')
+      message.error(e instanceof Error ? e.message : t('consumable.inboundCreateFailed'))
     }
   }
 
@@ -178,28 +183,28 @@ export default function InboundList() {
     <>
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="入庫單號" name="inboundNo">
-            <Input placeholder="入庫單號" allowClear onPressEnter={handleSearch} />
+          <Form.Item label={t('consumable.inboundNo')} name="inboundNo">
+            <Input placeholder={t('consumable.phInboundNo')} allowClear onPressEnter={handleSearch} />
           </Form.Item>
-          <Form.Item label="入庫類型" name="inboundType">
-            <Select placeholder="全部" allowClear style={{ width: 120 }}
-              options={[{ label: '採購入庫', value: 'in_purchase' }, { label: '手工入庫', value: 'in_manual' }, { label: '期初建賬', value: 'in_init' }]} />
+          <Form.Item label={t('consumable.inboundType')} name="inboundType">
+            <Select placeholder={t('common.all')} allowClear
+              options={Object.entries(INBOUND_TYPE_MAP).map(([value, meta]) => ({ label: t(meta.labelKey), value }))} />
           </Form.Item>
-          <Form.Item label="所屬品牌" name="companyBrand">
-            <Select placeholder="全部" allowClear style={{ width: 120 }}
+          <Form.Item label={t('common.colBrand')} name="companyBrand">
+            <Select placeholder={t('common.all')} allowClear
               options={brandOptions.map(b => ({ label: b.label, value: b.value as number }))} />
           </Form.Item>
-          <Form.Item label="購買公司" name="purchaseCompanyId">
-            <Select placeholder="全部" allowClear style={{ width: 150 }}
+          <Form.Item label={t('consumable.purchaseCompany')} name="purchaseCompanyId">
+            <Select placeholder={t('common.all')} allowClear
               options={purchaseCompanies.map(c => ({ label: c.name, value: c.id }))} />
           </Form.Item>
-          <Form.Item label="創建時間" name="createTime">
-            <DatePicker placeholder="選擇日期" />
+          <Form.Item label={t('common.colCreateTime')} name="createTime">
+            <DatePicker placeholder={t('consumable.phDate')} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -208,12 +213,8 @@ export default function InboundList() {
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>新建入庫單</Button>
-
-          <Space>
-            {configComponent}
-          </Space>
-        
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>{t('consumable.inboundBtnNew')}</Button>
+          {configComponent}
         </div>
       </div>
 
@@ -226,35 +227,37 @@ export default function InboundList() {
         pagination={{
           current: page, pageSize: size, total,
           showSizeChanger: true, showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 條`,
+          showTotal: (n) => t('common.total', { count: n }),
           onChange: (p, s) => { setPage(p); setSize(s) },
         }}
       />
 
       {/* 详情弹窗 */}
-      <Modal title="入庫單詳情" open={detailVisible} onCancel={() => setDetailVisible(false)} footer={null} width={800}>
+      <Modal title={t('consumable.inboundDetailTitle')} open={detailVisible} onCancel={() => setDetailVisible(false)} footer={null} width={800}>
         {detailData && (
           <>
             <Descriptions column={3} size="small">
-              <Descriptions.Item label="入庫單號">{detailData.inboundNo}</Descriptions.Item>
-              <Descriptions.Item label="入庫類型">{INBOUND_TYPE_MAP[detailData.inboundType]?.label ?? detailData.inboundType}</Descriptions.Item>
-              <Descriptions.Item label="所屬品牌">{detailData.companyBrandName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="購買公司">{detailData.purchaseCompany || '-'}</Descriptions.Item>
-              <Descriptions.Item label="供應商">{detailData.supplierName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="入庫日期">{detailData.bizDate || '-'}</Descriptions.Item>
-              <Descriptions.Item label="總數量">{detailData.totalQty}</Descriptions.Item>
-              <Descriptions.Item label="總金額">MOP {(detailData.totalAmount ?? 0).toFixed(2)}</Descriptions.Item>
-              <Descriptions.Item label="備註">{detailData.remark || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.inboundNo')}>{detailData.inboundNo}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.inboundType')}>
+                {INBOUND_TYPE_MAP[detailData.inboundType] ? t(INBOUND_TYPE_MAP[detailData.inboundType].labelKey) : detailData.inboundType}
+              </Descriptions.Item>
+              <Descriptions.Item label={t('common.colBrand')}>{detailData.companyBrandName || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.purchaseCompany')}>{detailData.purchaseCompany || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.supplier')}>{detailData.supplierName || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.inboundBizDate')}>{detailData.bizDate || '-'}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.totalQty')}>{detailData.totalQty}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.inboundTotalAmount')}>MOP {(detailData.totalAmount ?? 0).toFixed(2)}</Descriptions.Item>
+              <Descriptions.Item label={t('consumable.remark')}>{detailData.remark || '-'}</Descriptions.Item>
             </Descriptions>
             <Table
               columns={[
-                { title: '耗材編碼', dataIndex: 'itemCode', key: 'itemCode', width: 100 },
-                { title: '名稱', dataIndex: 'itemName', key: 'itemName', width: 150 },
-                { title: '規格', dataIndex: 'spec', key: 'spec', width: 120 },
-                { title: '倉庫', dataIndex: 'locationName', key: 'locationName', width: 100 },
-                { title: '數量', dataIndex: 'qty', key: 'qty', width: 80, align: 'right' },
-                { title: '單價', dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
-                { title: '金額', dataIndex: 'amount', key: 'amount', width: 110, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+                { title: t('consumable.inboundItemCode'), dataIndex: 'itemCode', key: 'itemCode', width: 100 },
+                { title: t('consumable.inboundItemName'), dataIndex: 'itemName', key: 'itemName', width: 150 },
+                { title: t('consumable.inboundSpec'), dataIndex: 'spec', key: 'spec', width: 120 },
+                { title: t('consumable.inboundWarehouse'), dataIndex: 'locationName', key: 'locationName', width: 100 },
+                { title: t('consumable.inboundQty'), dataIndex: 'qty', key: 'qty', width: 80, align: 'right' },
+                { title: t('consumable.inboundUnitPrice'), dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
+                { title: t('consumable.inboundAmount'), dataIndex: 'amount', key: 'amount', width: 110, align: 'right', render: (v?: number) => `MOP ${(v ?? 0).toFixed(2)}` },
               ]}
               dataSource={detailData.items}
               rowKey="id"
@@ -267,50 +270,53 @@ export default function InboundList() {
       </Modal>
 
       {/* 新建入库单弹窗 */}
-      <Modal title="新建入庫單" open={createVisible} onCancel={() => setCreateVisible(false)}
-        onOk={handleCreate} okText="確認創建" width={700}>
+      <Modal title={t('consumable.inboundBtnNew')} open={createVisible} onCancel={() => setCreateVisible(false)}
+        onOk={handleCreate} okText={t('consumable.createOk')} width={700}>
         <Form form={createForm} layout="vertical">
-          <Form.Item label="所屬品牌" name="companyBrand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
-            <Select placeholder="請選擇" options={brandOptions.map(b => ({ label: b.label, value: b.value as number }))} />
+          <Form.Item label={t('common.colBrand')} name="companyBrand" rules={[{ required: true, message: t('consumable.brandRequired') }]}>
+            <Select placeholder={t('common.placeholderSelect')} options={brandOptions.map(b => ({ label: b.label, value: b.value as number }))} />
           </Form.Item>
-          <Form.Item label="購買公司" name="purchaseCompanyId" rules={[{ required: true, message: '請選擇購買公司' }]}>
-            <Select placeholder="請選擇" options={purchaseCompanies.map(c => ({ label: c.name, value: c.id }))} />
+          <Form.Item label={t('consumable.purchaseCompany')} name="purchaseCompanyId" rules={[{ required: true, message: t('consumable.companyRequired') }]}>
+            <Select placeholder={t('common.placeholderSelect')} options={purchaseCompanies.map(c => ({ label: c.name, value: c.id }))} />
           </Form.Item>
-          <Form.Item label="入庫類型" name="inboundType" initialValue="in_manual">
-            <Select options={[{ label: '手工入庫', value: 'in_manual' }, { label: '期初建賬', value: 'in_init' }]} />
+          <Form.Item label={t('consumable.inboundType')} name="inboundType" initialValue="in_manual">
+            <Select options={[
+              { label: t('consumable.typeManual'), value: 'in_manual' },
+              { label: t('consumable.typeInit'), value: 'in_init' },
+            ]} />
           </Form.Item>
-          <Form.Item label="供應商" name="supplierName">
-            <Input placeholder="供應商名稱（選填）" />
+          <Form.Item label={t('consumable.supplier')} name="supplierName">
+            <Input placeholder={t('consumable.supplierPh')} />
           </Form.Item>
-          <Form.Item label="入庫日期" name="bizDate">
+          <Form.Item label={t('consumable.inboundBizDate')} name="bizDate">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="備註" name="remark">
-            <Input.TextArea rows={2} placeholder="備註（選填）" />
+          <Form.Item label={t('consumable.remark')} name="remark">
+            <Input.TextArea rows={2} placeholder={t('consumable.remarkPh')} />
           </Form.Item>
-          <Form.List name="items" rules={[{ validator: async (_, items) => { if (!items || items.length === 0) throw new Error('至少添加一條入庫明細') } }]}>
+          <Form.List name="items" rules={[{ validator: async (_, items) => { if (!items || items.length === 0) throw new Error(t('consumable.linesRequired')) } }]}>
             {(fields, { add, remove }, { errors }) => (
               <>
                 {fields.map((field) => (
                   <Space key={field.key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
-                    <Form.Item {...field} name={[field.name, 'itemId']} rules={[{ required: true, message: '請選耗材' }]} style={{ marginBottom: 0 }}>
-                      <Select placeholder="耗材" style={{ width: 180 }} showSearch optionFilterProp="label"
+                    <Form.Item {...field} name={[field.name, 'itemId']} rules={[{ required: true, message: t('consumable.itemRequired') }]} style={{ marginBottom: 0 }}>
+                      <Select placeholder={t('consumable.itemPh')} style={{ width: 180 }} showSearch optionFilterProp="label"
                         options={itemOptions.map(i => ({ label: `${i.itemCode} ${i.name}`, value: i.id }))} />
                     </Form.Item>
                     <Form.Item {...field} name={[field.name, 'locationId']} style={{ marginBottom: 0 }}>
-                      <Select placeholder="倉庫" style={{ width: 120 }} allowClear showSearch optionFilterProp="label"
+                      <Select placeholder={t('consumable.inboundWarehouse')} style={{ width: 120 }} allowClear showSearch optionFilterProp="label"
                         options={locationOptions.map(l => ({ label: l.name, value: l.id }))} />
                     </Form.Item>
-                    <Form.Item {...field} name={[field.name, 'qty']} rules={[{ required: true, message: '數量' }]} style={{ marginBottom: 0 }}>
-                      <Input type="number" placeholder="數量" style={{ width: 80 }} />
+                    <Form.Item {...field} name={[field.name, 'qty']} rules={[{ required: true, message: t('consumable.qtyRequired') }]} style={{ marginBottom: 0 }}>
+                      <Input type="number" placeholder={t('consumable.inboundQty')} style={{ width: 80 }} />
                     </Form.Item>
-                    <Form.Item {...field} name={[field.name, 'unitPrice']} rules={[{ required: true, message: '單價' }]} style={{ marginBottom: 0 }}>
-                      <Input type="number" placeholder="單價" style={{ width: 100 }} />
+                    <Form.Item {...field} name={[field.name, 'unitPrice']} rules={[{ required: true, message: t('consumable.priceRequired') }]} style={{ marginBottom: 0 }}>
+                      <Input type="number" placeholder={t('consumable.inboundUnitPrice')} style={{ width: 100 }} />
                     </Form.Item>
-                    <Button type="text" danger onClick={() => remove(field.name)}>刪除</Button>
+                    <Button type="text" danger onClick={() => remove(field.name)}>{t('common.delete')}</Button>
                   </Space>
                 ))}
-                <Button type="dashed" onClick={() => add()} block style={{ marginBottom: 8 }}>+ 添加明細</Button>
+                <Button type="dashed" onClick={() => add()} block style={{ marginBottom: 8 }}>+ {t('consumable.addLine')}</Button>
                 <Form.ErrorList errors={errors} />
               </>
             )}

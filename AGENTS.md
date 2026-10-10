@@ -49,15 +49,25 @@ npm run test:run
 # 测试覆盖率
 npm run test:coverage
 
+# 影响域验证（日常主档位，只跑受影响的测试，见 .qoder/rules/edit-verification.md）
+npm run check:affected          # 仅分析并打印推荐命令
+npm run test:affected           # 分析并执行（lint + typecheck + 受影响前后端测试）
+node scripts/affected-tests.mjs --run --files src/pages/Xxx/foo.ts   # 精确指定本次编辑
+
 # 安全扫描（检测硬编码凭据）
 npm run secret-scan
+
+# UI 规范门禁（列表页统计卡片必须在搜索区下方，见 §E.8）
+npm run check:stat-order
 ```
 
 ## 关键约束
 
 1. **安装必须使用 `--legacy-peer-deps`**：项目存在 peer dependency 冲突，不加此参数安装会失败。
 2. **类型检查**：`tsconfig.json` 启用 `strict: true`，CI 使用 `build:strict`（`tsc && vite build`）执行类型检查。
-3. **环境变量**：Mock 认证凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`。
+3. **环境变量**：前端 Mock 凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`；
+   后端运行时凭据（`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`）统一放 `backend/.env.local`（已 gitignore），
+   参考 `backend/.env.local.example`。**任何受版本控制的文件禁止写入明文凭据**，由 `npm run secret-scan` 拦截。
 4. **路径别名**：`@/` 映射到 `src/`，在 `tsconfig.json` 和 `vite.config.ts` 中同步配置。
 
 ## 项目结构
@@ -85,7 +95,7 @@ src/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + test + secret-scan（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + stat-card-order + test + secret-scan（任一失败中止部署）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试
@@ -125,10 +135,10 @@ src/
 | 规则文件 | 触发条件 | 内容摘要 |
 |---------|---------|---------|
 | `backend-restart.md` | 启动/重启/停止后端服务 | 后端重启策略、命令选择、验证方法 |
-| `edit-verification.md` | 编辑代码后 | 编辑后验证命令（typecheck/lint/compile/test） |
+| `edit-verification.md` | 编辑代码后 | 分级影响域验证：L0（变更文件 lint + 增量 typecheck）/ L1（只跑受影响测试）/ L2（提交推送前全量，共享层改动强制升档） |
 | `frontend-coding-standards.md` | 编写前端代码 | 架构设计、TypeScript 规范、命名风格、组件库版本 |
 | `backend-sql-migration.md` | 编写后端 SQL 或迁移代码 | MySQL 方言约束、迁移文件管理、Java 迁移代码规范、就绪门禁 |
-| `frontend-ui-design-spec.md` | 涉及前端界面开发 | 设计令牌、交互样式、新增/编辑/详情/列表界面规范、反馈提醒、i18n、注释、菜单图标、样式架构、UI 检查清单、禁止清单 |
+| `frontend-ui-design-spec.md` | 涉及前端界面开发 | 设计令牌、交互样式、新增/编辑/详情/列表界面规范、**列表页统计卡片位置（§E.8）**、反馈提醒、i18n、注释、菜单图标、样式架构、UI 检查清单、禁止清单 |
 | `security-architecture-quality.md` | 前后端开发 | 安全元规则、总原则、开发工作流、前后端规范、数据库设计、API 契约、测试门禁、完成定义、禁止清单、检查清单 |
 | `business-data-dictionary.md` | 涉及业务枚举值 | 系统级枚举常量（品牌、业务类型、状态等） |
 | `efficient-dev-mode.md` | 涉及界面调整 | 高效开发模式（两阶段交付：先 UI 后 i18n/后端/数据库） |
@@ -178,6 +188,36 @@ AI 禁止：
 - 未评估新增依赖。
 - 日志打印敏感信息。
 - 错误返回堆栈、SQL、内部路径。
+- **列表页把统计卡片放在搜索区上方**（见下方「列表页统计卡片位置」）。
+
+---
+
+## 列表页统计卡片位置（前端 UI 强制规范）
+
+> 详细规则：`.qoder/rules/frontend-ui-design-spec.md` §E.8；卡片视觉样式：§B.7。
+> 背景：历史上部分菜单（如领用资产、用车台账、用车办理）把统计卡片放在搜索区上方，
+> 导致用户先看到未过滤的全量数字、改条件后数字才变，容易误读。已统一修正。
+
+**所有带搜索/筛选区的列表菜单，固定自上而下顺序：**
+
+```tsx
+<div className="content-area">
+  {/* 加载失败 / 页面说明横幅 */}
+  <div className="search-section">{/* 查询条件 */}</div>
+  {/* 统计卡片 —— 必须在搜索区下方 */}
+  <div className="action-section">{/* 导出 / 新增 / 列配置 */}</div>
+  <Table ... />
+</div>
+```
+
+**强制约束：**
+1. 统计卡片必须在 `.search-section` **之后**、`.action-section` **之前**；禁止置于搜索区上方，也禁止插在操作区与表格之间。
+2. 卡片口径必须跟随搜索条件：取数时传入当前 filters，禁止单独发一次不带条件的统计请求。
+3. 条件变更时通过容器 `key`（口径快照）重新触发计数动画。
+4. `<Alert type="error">`（加载失败）与 `<Alert type="info">`（页面说明）横幅仍留在搜索区上方，它们不属于统计卡片。
+5. 参考实现：`src/pages/Consumable/Report/index.tsx`（消耗统计）。
+
+自检：`npm run check:stat-order` 扫描列表页，统计卡片渲染在搜索区之前则报告并阻断。
 
 ---
 

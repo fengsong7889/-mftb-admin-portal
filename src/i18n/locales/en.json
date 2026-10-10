@@ -1,4 +1,73 @@
 {
+  "consumable": {
+    "queryFailed": "Query failed",
+    "exportEmpty": "No data to export",
+    "exportSuccess": "Exported",
+    "totalQty": "Total Qty",
+    "remark": "Remark",
+    "statusPending": "Pending Issue",
+    "statusApproved": "Pending Outbound",
+    "statusRejected": "Rejected",
+    "statusIssued": "Issued",
+    "statusCancelled": "Cancelled",
+    "claimNo": "Claim No.",
+    "claimApplicant": "Applicant",
+    "claimDepartment": "Department",
+    "claimReason": "Reason",
+    "claimKinds": "Item Types",
+    "claimAppliedAt": "Applied At",
+    "phClaimNo": "Claim no.",
+    "phApplicant": "Applicant name",
+    "phDepartment": "All departments",
+    "claimTabMine": "My Claims",
+    "claimBtnNew": "New Claim",
+    "claimIssue": "Issue",
+    "claimRevoke": "Revoke",
+    "issueTitle": "Confirm issue?",
+    "issueOk": "Confirm Issue",
+    "issueNote": "Issuing deducts stock at the moving average cost and settles the actual cost. It cannot be revoked.",
+    "issueSuccess": "Issued, stock deducted",
+    "issueFailed": "Issue failed",
+    "revokeTitle": "Cancel this claim?",
+    "revokeOk": "Confirm",
+    "revokeReasonPh": "Cancellation reason (optional)",
+    "revokeSuccess": "Cancelled",
+    "revokeFailed": "Cancel failed",
+    "inboundNo": "Inbound No.",
+    "inboundType": "Inbound Type",
+    "purchaseCompany": "Purchase Company",
+    "supplier": "Supplier",
+    "inboundLineCount": "Lines",
+    "inboundTotalAmount": "Total Amount",
+    "inboundBizDate": "Inbound Date",
+    "phInboundNo": "Inbound no.",
+    "phDate": "Select date",
+    "typePurchase": "Purchase Inbound",
+    "typeManual": "Manual Inbound",
+    "typeInit": "Opening Balance",
+    "inboundBtnNew": "New Inbound",
+    "inboundDetailTitle": "Inbound Order Detail",
+    "inboundCreateSuccess": "Inbound order created",
+    "inboundCreateFailed": "Create failed",
+    "inboundItemCode": "Item Code",
+    "inboundItemName": "Name",
+    "inboundSpec": "Spec",
+    "inboundWarehouse": "Warehouse",
+    "inboundQty": "Qty",
+    "inboundUnitPrice": "Unit Price",
+    "inboundAmount": "Amount",
+    "brandRequired": "Please select a brand",
+    "companyRequired": "Please select a purchase company",
+    "itemRequired": "Please select a consumable",
+    "qtyRequired": "Qty",
+    "priceRequired": "Unit price",
+    "linesRequired": "Add at least one inbound line",
+    "supplierPh": "Supplier name (optional)",
+    "remarkPh": "Remark (optional)",
+    "itemPh": "Consumable",
+    "createOk": "Create",
+    "addLine": "Add line"
+  },
   "myAssets": {
     "tabClaim": "Asset Claims",
     "tabBorrow": "Borrowings",
@@ -176,11 +245,11 @@
     "logout": "Sign out",
     "systems": {
       "merchantWorkbench": {
-        "name": "Merchant Workspace",
-        "description": "A dedicated workspace for store operations, orders and business insights."
+        "name": "Store Operations",
+        "description": "Self-service store operations, orders and business insights for merchants."
       },
       "translation": {
-        "name": "Translation Center",
+        "name": "Translation Management",
         "description": "Connect global teams with multilingual translation, terminology and quality checks."
       },
       "ads": {
@@ -196,7 +265,7 @@
         "description": "Manage search vocabulary, guidance strategies and performance insights."
       },
       "finance": {
-        "name": "Finance",
+        "name": "Finance & Settlement",
         "description": "Stay on top of account funds, transactions and financial reconciliation."
       },
       "ai": {
@@ -224,8 +293,8 @@
         "description": "Secure access with centralized roles, feature permissions and data permissions."
       },
       "platform": {
-        "name": "Platform Configuration",
-        "description": "Configure notifications, languages, business rules and releases centrally."
+        "name": "Platform Support",
+        "description": "Configure notification channels, business rules and releases centrally."
       }
     }
   },
@@ -2853,7 +2922,12 @@
   "versionUpdate": {
     "title": "New Version Available",
     "desc": "The system has been updated. Refresh the page to get the latest features and fixes.",
-    "reload": "Refresh Now"
+    "reload": "Refresh Now",
+    "pending": "Update ready",
+    "current": "Current version",
+    "latest": "Latest version",
+    "snooze": "Later",
+    "refreshHint": "Refreshing returns you to this page; unsaved form input may be lost."
   },
   "guard": {
     "403Sub": "Sorry, you don't have permission to access this menu. Please ask the administrator to authorize your role or department in \"Function Authorization\"",
@@ -3243,14 +3317,6 @@
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
     "greetingPartner": "Partner",
-    "quotes": [
-      "Every great endeavor begins with a brave start.",
-      "Action is the cure for fear; hesitation only feeds it.",
-      "Doing simple things well is not simple; doing ordinary things well is not ordinary.",
-      "Today's effort is tomorrow's legacy; today's dedication is tomorrow's gift.",
-      "Slow is fine, standing still is not; keep moving, you will arrive.",
-      "Opportunity favors the prepared — and you are preparing."
-    ],
     "aiTitle": "AI Assistant",
     "aiBeta": "Beta",
     "aiBetaTip": "This feature is in internal beta. AI assistant responses are for reference only; please verify against actual business data before use.",
@@ -4691,7 +4757,7 @@
     "moveSuccess": "Moved \"{{name}}\" to slot {{pos}}",
     "editPosConfig": "Edit Slot {{pos}} Config",
     "addPosConfig": "Add Slot Config",
-    "addEditPosConfig": "Add/Edit Slot Config",
+    "addEditPosConfig": "Algorithm Slot Config",
     "addEditBtn": "Add/Edit",
     "algoSelectSection": "Algorithm Selection",
     "posConfigSection": "Slot Position Config",
@@ -4785,10 +4851,15 @@
     "categoryFallbackRequired": "Please select at least one fallback category",
     "matchedCount": "Matched content: {{count}}",
     "fixedContentSlots": "Fixed Content Slots",
+    "fixedDisplayContent": "Fixed Display Content Configuration",
     "noFixedSlot": "No fixed content. Click Add/Edit to configure slots",
     "colStore": "Store Name",
     "colProduct": "Product Name",
+    "colStoreId": "Store ID",
+    "colProductId": "Product ID",
     "colItemId": "Content ID",
+    "colStock": "Remaining Stock",
+    "stockUnlimited": "Unlimited",
     "colCategory": "Category",
     "previewHintGroupBuy": "Preview shows fixed content and category fill-in by layout (mock data)",
     "previewHintDelivery": "Only configured slots are previewed; unconfigured slots show organic traffic data",

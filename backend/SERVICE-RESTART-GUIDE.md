@@ -147,7 +147,7 @@ cd backend && mvn package -DskipTests
 
 # 常见原因：
 # - JDK 版本不对（必须是 17）
-# - Maven 不在 PATH（脚本已配置 $HOME/apache-maven-3.9.6）
+# - Maven 不在 PATH（脚本按 .local/ → ~/Library/apache-maven-3.9.9 → ~/apache-maven-3.9.6 → PATH 顺序探测）
 # - 依赖下载失败（网络问题）
 ```
 
@@ -172,6 +172,26 @@ grep -E '(初始化|迁移|就绪|失败)' backend/backend-service.log
 # 如果本次修改未生效，说明 JAR 是旧的，需要 --rebuild
 bash restart-service.sh --rebuild
 ```
+
+### 5.4 提示「缺少必需环境变量」
+
+`restart-service.sh` / `run-local.sh` / `restart-after-migration.sh` **不再内置任何凭据默认值**，
+凭据统一来自 `backend/.env.local`（已 gitignore，禁止提交）或当前 shell 环境变量。
+
+新机器 / 新克隆首次启动：
+
+```bash
+cd backend
+cp .env.local.example .env.local
+# 编辑 .env.local 填入 DB_URL / DB_USERNAME / DB_PASSWORD / JWT_SECRET
+bash restart-service.sh --rebuild
+```
+
+必填项：`DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`JWT_SECRET`（HS256 要求 ≥ 32 字节，脚本会启动前拦截）；
+`LOG_LEVEL` 可省略，默认 info。
+
+安全约束：任何受版本控制的文件（脚本 / 配置 / 文档）都不得出现明文口令，
+`npm run secret-scan` 会扫描 `backend/`、`scripts/`、`.github/` 并对命中项脱敏输出。
 
 ---
 

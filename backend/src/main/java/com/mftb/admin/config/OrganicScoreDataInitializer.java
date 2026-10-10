@@ -22,6 +22,12 @@ import java.util.Map;
  *    该脚本会删除旧编码规则，对已是新格式的数据重复执行会把用户修改过的启停状态/分值重置为默认值
  * 3. 执行种子脚本（23_organic_score.sql）INSERT IGNORE 插入新格式数据
  * 4. 执行清理脚本（52_cleanup_tmp_organic_rules.sql）清理临时编码
+ * <p>
+ * <b>新增列注意事项</b>：{@link #NEW_COLUMNS} 的补列步骤被 {@code organic:columns-v1} 版本门控，
+ * 生产已记为成功后再往该表追加条目<b>不会</b>重新执行（历史事故：multiplier_tiers 等三列漏建导致
+ * 规则列表查询 500）。本表关键结构已登记到
+ * {@link com.mftb.admin.config.migration.ContractRegistry#organicScoreRuleContract()} 每次启动自愈，
+ * 后续给 {@code biz_organic_score_rule} 加列必须同步登记契约（并递增契约列清单）。
  */
 @Slf4j
 @Component

@@ -53,6 +53,17 @@ class RuleConfigKeyRegistryTest {
     }
 
     @Test
+    @DisplayName("廣告銷售版塊只讀回退到消費方菜單 ad-sales, 其它版塊無回退")
+    void runtimeReaderMenuOnlyForAdSales() {
+        assertEquals("ad-sales", RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_AD_SALES));
+        assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_GIFT));
+        assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_SECURITY));
+        assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(null));
+        // 回退以歸屬菜單為鍵, 不認識未知菜單
+        assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu("unknown-menu"));
+    }
+
+    @Test
     @DisplayName("支付方式編輯器 4 個互斥布爾 key 為本地专用, 不落庫")
     void localOnlyPaymentBooleans() {
         assertTrue(RuleConfigKeyRegistry.isLocalOnly("payment_revival_promo_only"));

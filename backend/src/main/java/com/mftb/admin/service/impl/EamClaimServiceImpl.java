@@ -55,6 +55,7 @@ public class EamClaimServiceImpl implements EamClaimService {
     private final DingTalkAppService dingTalkAppService;
     private final com.mftb.admin.service.NotificationAppService notificationAppService;
     private final SysConfigMapper sysConfigMapper;
+    private final com.mftb.admin.service.EamTransferLookup departmentLookup;
 
     private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled", "transferred");
 
@@ -113,52 +114,39 @@ public class EamClaimServiceImpl implements EamClaimService {
 
     @Override
     public PageResult<EamClaimEmployeeSummaryVO> employeeSummary(EamClaimQuery query) {
-        // 先查全部符合条件的领用记录（不在 SQL 層按關鍵字過濾，因為關鍵字需匹配員工姓名/工號/部門，在 Java 層處理）
-        List<EamClaim> allClaims = claimMapper.selectList(queryWrapperNoKeyword(query));
-        // 按 employee_id 分组
-        Map<Long, List<EamClaim>> grouped = allClaims.stream()
-                .collect(Collectors.groupingBy(EamClaim::getEmployeeId));
-
-        List<EamClaimEmployeeSummaryVO> summaries = new ArrayList<>();
-        for (Map.Entry<Long, List<EamClaim>> entry : grouped.entrySet()) {
-            Long empId = entry.getKey();
-            List<EamClaim> claims = entry.getValue();
-            SysUser user = userMapper.selectById(empId);
-            if (user == null) continue;
-
-            EamClaimEmployeeSummaryVO vo = new EamClaimEmployeeSummaryVO();
-            vo.setEmployeeId(empId);
-            vo.setEmpNo(user.getEmpId());
-            vo.setEmpName(user.getName() != null ? user.getName() : user.getUsername());
-            vo.setDepartmentId(user.getDepartmentId());
-            vo.setDepartment(user.getDepartment());
-            vo.setClaimedCount(claims.stream().filter(c -> "claimed".equals(c.getStatus())).count());
-            vo.setReturnedCount(claims.stream().filter(c -> "returned".equals(c.getStatus())).count());
-            vo.setPendingCount(claims.stream().filter(c ->
-                    "pending_signature".equals(c.getStatus()) && "pending".equals(c.getSignatureStatus())).count());
-            // 代办领用落库为 status=claimed + signatureStatus=proxy_pending，故仅按 signatureStatus 判定
-            vo.setProxyPendingCount(claims.stream().filter(c ->
-                    "claimed".equals(c.getStatus()) && "proxy_pending".equals(c.getSignatureStatus())).count());
-            vo.setLastClaimDate(claims.stream()
-                    .map(c -> c.getClaimDate() != null ? c.getClaimDate().toString() : null)
-                    .filter(Objects::nonNull)
-                    .max(String::compareTo).orElse(null));
-            summaries.add(vo);
+        // 部门是树形的：选中父部门要连子部门一起算，与组织树的点选语义一致。
+        // 解析只在这里做一次，统计卡走同一个 helper，两边不会分叉。
+        Collection<Long> employeeIds = null;
+        if (query.getDepartmentId() != null) {
+            employeeIds = employeeIdsInDepartment(query.getDepartmentId());
+            if (employeeIds.isEmpty()) {
+                // 部门下没有在职员工：直接空页，不能退化成「不外滤 = 全量」
+                return new PageResult<>(List.of(), 0L);
+            }
         }
-        // 按关键字过滤
-        if (hasText(query.getKeyword())) {
-            String kw = query.getKeyword().trim().toLowerCase();
-            summaries = summaries.stream()
-                    .filter(s -> (s.getEmpName() != null && s.getEmpName().toLowerCase().contains(kw))
-                            || (s.getEmpNo() != null && s.getEmpNo().toLowerCase().contains(kw))
-                            || (s.getDepartment() != null && s.getDepartment().toLowerCase().contains(kw)))
-                    .toList();
+        String keyword = hasText(query.getKeyword()) ? query.getKeyword().trim() : null;
+        Page<EamClaimEmployeeSummaryVO> page = new Page<>(
+                PageResult.normalizePage(query.getPage()), PageResult.normalizeSize(query.getSize()));
+        var result = claimMapper.selectEmployeeSummaryPage(page, keyword, employeeIds);
+        return new PageResult<>(result.getRecords(), result.getTotal());
+    }
+
+    /**
+     * 某部门（含子部门）的员工 id 集合。
+     *
+     * <p>领用表上没有 department_id，只能经由员工表收敛。以前注释写着
+     * 「由 employeeSummary Java 層按員工部門過濾」，但实际两处都没过滤，
+     * 导致「所在部門」是个选了没反应的死条件——这里把它真正接上。
+     */
+    private Collection<Long> employeeIdsInDepartment(Long departmentId) {
+        Set<Long> deptIds = departmentLookup.departmentIds(departmentId);
+        if (deptIds.isEmpty()) {
+            return List.of();
         }
-        // 手动分页
-        int total = summaries.size();
-        int from = (int) PageResult.normalizeSize(query.getSize()) * ((int) PageResult.normalizePage(query.getPage()) - 1);
-        int to = Math.min(from + (int) PageResult.normalizeSize(query.getSize()), total);
-        return new PageResult<>(from < total ? summaries.subList(from, to) : List.of(), (long) total);
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .select(SysUser::getId)
+                        .in(SysUser::getDepartmentId, deptIds))
+                .stream().map(SysUser::getId).toList();
     }
 
     @Override
@@ -710,7 +698,16 @@ public class EamClaimServiceImpl implements EamClaimService {
         LambdaQueryWrapper<EamClaim> w = new LambdaQueryWrapper<>();
         w.eq(hasText(q.getStatus()), EamClaim::getStatus, q.getStatus());
         w.eq(q.getEmployeeId() != null, EamClaim::getEmployeeId, q.getEmployeeId());
-        // 注意：departmentId 不在 biz_eam_claim 表中，由 employeeSummary Java 層按員工部門過濾
+        // 部门过滤：领用表没有 department_id，经由员工表收敛到部门（含子部门）的员工。
+        // 之前这个参数从前端传上来但后端根本没用它，选了部门列表与统计卡都不会变。
+        if (q.getDepartmentId() != null) {
+            Collection<Long> deptEmpIds = employeeIdsInDepartment(q.getDepartmentId());
+            if (deptEmpIds.isEmpty()) {
+                // 部门下没有员工：结果必须为空，不能因为拿不到 id 就放行全量
+                return w.apply("1 = 0");
+            }
+            w.in(EamClaim::getEmployeeId, deptEmpIds);
+        }
         if (Boolean.TRUE.equals(q.getPendingSignature())) {
             w.in(EamClaim::getStatus, "pending_signature", "claimed")
                     .in(EamClaim::getSignatureStatus, "pending", "proxy_pending");

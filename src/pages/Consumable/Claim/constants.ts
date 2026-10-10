@@ -3,13 +3,20 @@
  */
 export type ClaimStatus = 'pending' | 'approved' | 'rejected' | 'issued' | 'cancelled'
 
-export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
-  pending: '待發放',
-  approved: '待出庫',
-  rejected: '已駁回',
-  issued: '已出庫',
-  cancelled: '已撤銷',
+/**
+ * 状态 → i18n 文案 key（列表/详情统一走 t() 渲染，避免多处维护语言文案）
+ * 文案定义在 src/i18n/locales/{zh-TW,en}.json 的 consumable 段
+ */
+export const CLAIM_STATUS_LABEL_KEY: Record<ClaimStatus, string> = {
+  pending: 'consumable.statusPending',
+  approved: 'consumable.statusApproved',
+  rejected: 'consumable.statusRejected',
+  issued: 'consumable.statusIssued',
+  cancelled: 'consumable.statusCancelled',
 }
+
+/** 状态下拉选项顺序（Select options 按此顺序渲染） */
+export const CLAIM_STATUS_ORDER: ClaimStatus[] = ['pending', 'approved', 'rejected', 'issued', 'cancelled']
 
 /** antd Tag 颜色 */
 export const CLAIM_STATUS_COLOR: Record<ClaimStatus, string> = {

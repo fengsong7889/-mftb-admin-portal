@@ -32,6 +32,8 @@ jobs:
         run: npm run typecheck
       - name: Menu Consistency
         run: npm run check:menu
+      - name: Stat Card Order
+        run: npm run check:stat-order
       - name: Secret Scan
         run: npm run secret-scan
       - name: Test

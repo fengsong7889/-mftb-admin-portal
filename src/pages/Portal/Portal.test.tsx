@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { I18nextProvider, useTranslation } from 'react-i18next'
@@ -39,7 +40,7 @@ vi.mock('../../i18n', async importOriginal => ({
   ensureLanguageBundle: vi.fn().mockResolvedValue(undefined),
 }))
 
-const finance: PortalSystem = { code: 'finance', name: '財務系統', nameEn: 'Old finance subtitle', description: '旧描述' }
+const finance: PortalSystem = { code: 'finance', name: '財務結算系統', nameEn: 'Old finance subtitle', description: '旧描述' }
 const resources = { en, 'zh-TW': zh, ja, ko, ru }
 const configuredLanguages: LanguageVO[] = [
   { id: 1, code: 'zh-TW', name: '繁體中文', flag: '🇹🇼' },
@@ -92,9 +93,9 @@ beforeEach(async () => {
 describe('门户场景卡片与授权边界', () => {
   it('上图下文、无英文副标题，全部十三种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
     const { container } = mount()
-    const card = await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     expect(card.querySelector('.portal-card-cover > svg[data-scene="finance"]')).toBeInTheDocument()
-    expect(card.querySelector('.portal-card-body .portal-card-title')).toHaveTextContent('財務系統')
+    expect(card.querySelector('.portal-card-body .portal-card-title')).toHaveTextContent('財務結算系統')
     expect(card.querySelector('.portal-card-desc')).toHaveTextContent(zh.portal.systems.finance.description)
     expect(screen.queryByText(finance.nameEn!)).not.toBeInTheDocument()
     expect(container.querySelector('.portal-card-title-en')).toBeNull()
@@ -122,7 +123,7 @@ describe('门户场景卡片与授权边界', () => {
 
   it('未授权卡片点击弹出申请弹窗，确认申请进入流程中心', async () => {
     mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     fireEvent.click(screen.getByRole('button', { name: /協同辦公系統/ }))
     const dialog = await screen.findByRole('dialog')
@@ -133,7 +134,7 @@ describe('门户场景卡片与授权边界', () => {
 
   it('申请弹窗取消只关闭弹窗，不进入系统也不切换当前系统', async () => {
     mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     fireEvent.click(screen.getByRole('button', { name: /協同辦公系統/ }))
     const dialog = await screen.findByRole('dialog')
@@ -151,7 +152,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.loadError)).toBeInTheDocument()
     expect(container.querySelector('.portal-card')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /重\s*試/ }))
-    expect(await screen.findByRole('button', { name: '財務系統 · 進入系統' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })).toBeEnabled()
   })
 
   it('成功返回空权限时不放行目录卡片', async () => {
@@ -182,7 +183,7 @@ describe('每个系统统一进入自身首页', () => {
   it('从授权卡片进入首页，不依赖首个业务菜单接口', async () => {
     vi.mocked(loadSystemNavigation).mockRejectedValue(new Error('导航暂不可用'))
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: '財務系統 · 進入系統' }))
+    fireEvent.click(await screen.findByRole('button', { name: '財務結算系統 · 進入系統' }))
     expect(await screen.findByTestId('system-route')).toHaveTextContent('/:zh-TW')
     expect(localStorage.getItem('current_system_code')).toBe('finance')
     expect(loadSystemNavigation).not.toHaveBeenCalled()
@@ -192,7 +193,7 @@ describe('每个系统统一进入自身首页', () => {
     localStorage.setItem('current_system_code', 'finance')
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [finance, { code: 'ads', name: '廣告推薦系統' }], superAdmin: false })
     const { container } = mount('/account-balance')
-    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務系統'))
+    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務結算系統'))
     fireEvent.click(container.querySelector('.system-switcher-trigger')!)
     const name = i18n.t(`portal.systems.${code}.name`)
     fireEvent.click(await screen.findByRole('menuitem', { name: new RegExp(name) }))
@@ -210,7 +211,7 @@ describe('场景区分与低干扰动效', () => {
       { code: 'custom-language', name: '翻译中心' },
     ], superAdmin: false })
     const { container } = mount()
-    await screen.findByRole('button', { name: '商家工作台 · 進入系統' })
+    await screen.findByRole('button', { name: '店鋪經營系統 · 進入系統' })
     expect(Array.from(container.querySelectorAll('[data-scene]'), node => node.getAttribute('data-scene')))
       .toEqual(['merchantWorkbench', 'platform', 'translation'])
     const scenes = Array.from(container.querySelectorAll('svg[data-scene]'))
@@ -218,8 +219,8 @@ describe('场景区分与低干扰动效', () => {
     for (const scene of scenes) expect(scene.querySelector('.portal-art-motion')).toBeInTheDocument()
     expect(container.querySelector('.portal-card-body .anticon')).toBeNull()
     await act(async () => { await i18n.changeLanguage('en') })
-    expect(screen.getByRole('button', { name: 'Merchant Workspace · Enter system' })).toHaveTextContent(en.portal.systems.merchantWorkbench.description)
-    expect(screen.getByRole('button', { name: 'Translation Center · Enter system' })).toHaveTextContent(en.portal.systems.translation.description)
+    expect(screen.getByRole('button', { name: 'Store Operations · Enter system' })).toHaveTextContent(en.portal.systems.merchantWorkbench.description)
+    expect(screen.getByRole('button', { name: 'Translation Management · Enter system' })).toHaveTextContent(en.portal.systems.translation.description)
     expect(Array.from(container.querySelectorAll('[data-scene]'), node => node.getAttribute('data-scene')))
       .toEqual(['merchantWorkbench', 'platform', 'translation'])
   })
@@ -261,7 +262,7 @@ describe('场景区分与低干扰动效', () => {
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [finance, { code: 'search', name: '搜索運營系統' }], superAdmin: false })
     const { container, unmount } = mount()
-    const financeCard = await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    const financeCard = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     const searchCard = screen.getByRole('button', { name: /搜索運營.*進入系統/ })
     const financeShell = financeCard.closest('.portal-card-shell')!
     const searchShell = searchCard.closest('.portal-card-shell')!
@@ -278,7 +279,7 @@ describe('场景区分与低干扰动效', () => {
     fireEvent.pointerEnter(financeShell, { pointerType: 'mouse' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
-    const lockedCard = within(screen.getByRole('tabpanel')).getByRole('button', { name: /權限中心/ })
+    const lockedCard = within(screen.getByRole('tabpanel')).getByRole('button', { name: /權限管理系統/ })
     expect(lockedCard).toHaveClass('is-locked')
     fireEvent.pointerEnter(lockedCard.closest('.portal-card-shell')!, { pointerType: 'mouse' })
     expect(lockedCard.querySelector('svg[data-scene]')).toHaveAttribute('data-motion', 'running')
@@ -287,13 +288,13 @@ describe('场景区分与低干扰动效', () => {
     expect(localStorage.getItem('current_system_code')).toBeNull()
     unmount()
     const refreshed = mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     expect(refreshed.container.querySelector('[data-motion="running"]')).toBeNull()
   })
 
   it('触摸不会滞留播放，指针取消和搜索也清除悬停', async () => {
     const { container } = mount()
-    const card = await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     const shell = card.closest('.portal-card-shell')!
     fireEvent.pointerEnter(shell, { pointerType: 'touch' })
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
@@ -362,7 +363,7 @@ describe('场景区分与低干扰动效', () => {
     ['hr', ['.portal-hr-profile', '.portal-hr-match-path', '.portal-hr-member', '.portal-hr-welcome']],
     ['oa', ['.portal-workflow-paper', '.portal-workflow-stage-2', '.portal-office-signature', '.portal-office-archived']],
     ['translation', ['.portal-globe-land', '.portal-globe-meridian', '.portal-globe-greeting']],
-    ['ads', ['.portal-ads-match', '.portal-ads-cursor', '.portal-ads-growth']],
+    ['ads', ['.portal-ads-target', '.portal-ads-intake', '.portal-ads-scan', '.portal-ads-lead', '.portal-ads-promote', '.portal-ads-slot', '.portal-ads-heart', '.portal-ads-loop', '.portal-ads-result']],
     ['merchant', ['.portal-merchant-route', '.portal-merchant-pin-2', '.portal-merchant-metric']],
     ['merchantWorkbench', ['.portal-order-receipt', '.portal-order-stamp', '.portal-order-done']],
     ['platform', ['.portal-config-slider-0', '.portal-config-packet', '.portal-config-node-2']],
@@ -372,6 +373,52 @@ describe('场景区分与低干扰动效', () => {
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
     if (code === 'finance') expect(container.querySelector('.portal-finance-display')).toHaveTextContent('ROI=F/PV')
     if (code === 'translation') expect(container.querySelectorAll('.portal-globe-greeting')).toHaveLength(1)
+  })
+
+  it('广告推荐场景画的是算法投流链路：人群定向、竞价排序、首屏坑位与曝光回流', () => {
+    const { container } = render(<SystemArtwork code="ads" name="廣告推薦系統" />)
+    const image = container.querySelector('svg[data-scene="ads"]')!
+    expect(image).toHaveAttribute('data-motion', 'idle')
+    // 静态层必须自行讲完故事：定向圈、三个偏好标签、三行竞价排序、首屏信息流在静止态都要可见
+    expect(image.querySelector('.portal-ads-scene ellipse')).toBeInTheDocument()
+    expect(image.querySelectorAll('.portal-ads-tag')).toHaveLength(3)
+    expect(image.querySelectorAll('.portal-ads-scene text')).toHaveLength(8)
+    expect(image.querySelector('.portal-ads-feed')).toBeInTheDocument()
+    // 引擎面板顶部写竞价公式，底部写激活函数，回流弧线写梯度更新公式
+    expect(image).toHaveTextContent('eCPM=bid×pCTR')
+    expect(image).toHaveTextContent('p=σ(z)')
+    expect(image).toHaveTextContent('w←w−η∇L')
+    // 结果性元素只在悬停播放时出现
+    for (const selector of ['.portal-ads-target', '.portal-ads-intake', '.portal-ads-scan', '.portal-ads-lead', '.portal-ads-promote', '.portal-ads-slot', '.portal-ads-heart', '.portal-ads-result']) {
+      expect(image.querySelector(selector)).toHaveAttribute('opacity', '0')
+    }
+    // 旧的喇叭/鼠标点击构图不得残留，否则语义又退回「打广告」
+    expect(image.querySelector('.portal-ads-match, .portal-ads-cursor, .portal-ads-click, .portal-ads-growth')).toBeNull()
+    expect(image).toHaveTextContent(zh.portal.artwork.recommendMatched)
+  })
+
+  it('广告推荐第二套构图把推荐面画成分层模型，逐层标公式且与链路版共用结果文案', () => {
+    const { container } = render(<SystemArtwork code="ads" name="廣告推薦系統" style="alternate" />)
+    const image = container.querySelector('svg[data-scene="ads"]')!
+    // data-scene 不变，随机切换构图不影响场景识别与样式选择器
+    expect(image).toHaveAttribute('data-scene', 'ads')
+    // 四层结构：特征 token → embedding → 双层交互网络 → 多目标预估头与打分柱
+    expect(image.querySelectorAll('.portal-ads-token')).toHaveLength(4)
+    expect(image.querySelectorAll('.portal-ads-cell')).toHaveLength(4)
+    expect(image.querySelectorAll('.portal-ads-node')).toHaveLength(7)
+    expect(image.querySelectorAll('.portal-ads-edge')).toHaveLength(3)
+    expect(image.querySelectorAll('.portal-ads-head')).toHaveLength(3)
+    expect(image.querySelectorAll('.portal-ads-bar')).toHaveLength(3)
+    // 左侧公式带逐层对应，公式是数学记号所以不随界面语言变化
+    for (const formula of ['H=−Σp·log p', 'e=x·E', 'z=W·h+b', 'α=softmax(z)', 'pCTR=σ(z)', 'eCPM=bid×pCTR', 'w←w−η∇L']) {
+      expect(image).toHaveTextContent(formula)
+    }
+    // 静止态只保留结构，坑位高亮与结果文案仍由悬停触发
+    for (const selector of ['.portal-ads-slot', '.portal-ads-heart', '.portal-ads-result', '.portal-ads-intake']) {
+      expect(image.querySelector(selector)).toHaveAttribute('opacity', '0')
+    }
+    // 两套构图共用同一文案，随机展示不会漏掉多语言断言
+    expect(image).toHaveTextContent(zh.portal.artwork.recommendMatched)
   })
 
   it('物资场景展示设备归属和耗材领用，不再包含仓储扫码；悬停播放后移出复位', async () => {
@@ -401,6 +448,41 @@ describe('场景区分与低干扰动效', () => {
     expect(image).toHaveAttribute('data-motion', 'running')
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
+  })
+
+  it('每个系统插画场景都有专属卡片色调，同组系统不得只靠颜色区分', () => {
+    // 色调是纯 CSS（以 data-scene 为唯一真源），这里直接解析样式表做回归门禁，防止后续新增系统又共用一个色
+    const css = readFileSync('src/pages/Portal/index.css', 'utf8')
+    const tones = new Map<string, string>()
+    for (const [, scene, color] of css.matchAll(/\.portal-card-artwork\[data-scene='(\w+)'\]\s*\{\s*color:\s*(#[\dA-Fa-f]{6})/g)) tones.set(scene, color)
+    expect([...tones.keys()].sort()).toEqual([
+      'ads', 'ai', 'eam', 'finance', 'hr', 'iam', 'merchant', 'merchantWorkbench', 'oa', 'platform', 'rdm', 'search', 'translation',
+    ].sort())
+    expect(new Set(tones.values()).size).toBe(tones.size)
+    // 营销与商家增长组内四张卡并排展示，色相必须彼此互斥
+    expect(new Set(['ads', 'search', 'merchant', 'merchantWorkbench'].map(scene => tones.get(scene)))).toHaveLength(4)
+  })
+
+  it('每次进入门户轮换一档插画构图，连续两次不会看到同一风格', async () => {
+    vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [{ code: 'ads', name: '廣告推薦系統' }], superAdmin: false })
+    localStorage.removeItem('portal_artwork_style')
+    // 广告推荐两套构图用各自专属元素识别：链路版有定向圈，模型版有特征 token
+    const layoutOf = (container: HTMLElement) => container.querySelector('.portal-card-artwork[data-scene="ads"] .portal-ads-token')
+      ? 'model'
+      : container.querySelector('.portal-card-artwork[data-scene="ads"] .portal-ads-target') ? 'traffic' : 'none'
+    const open = async (container: HTMLElement) => {
+      await screen.findByRole('button', { name: '廣告推薦系統 · 進入系統' })
+      return layoutOf(container)
+    }
+    const first = mount()
+    expect(await open(first.container)).toBe('traffic')
+    first.unmount()
+    const second = mount()
+    expect(await open(second.container)).toBe('model')
+    second.unmount()
+    const third = mount()
+    expect(await open(third.container)).toBe('traffic')
+    third.unmount()
   })
 
   it('重复场景的裁切标识独立，所有裁切引用均存在', () => {
@@ -582,21 +664,21 @@ describe('门户多语言与系统继承', () => {
 
   it('通过顶栏切换语言后立即更新卡片，进入真实系统顶栏且刷新恢复同一语言', async () => {
     const { unmount, container } = mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     await selectLanguage('日本語')
     const card = await screen.findByRole('button', { name: `${ja.portal.systems.finance.name} · ${ja.portal.enter}` })
     expect(localStorage.getItem('app_language')).toBe('ja')
     expect(ensureLanguageBundle).toHaveBeenCalledWith('ja')
     fireEvent.click(card)
     expect(await screen.findByTestId('system-route')).toHaveTextContent('/:ja')
-    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務管理'))
+    await waitFor(() => expect(container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務決済システム'))
     expect(container.querySelector('.header-right')).toHaveTextContent('日本語')
     expect(localStorage.getItem('current_system_code')).toBe('finance')
     unmount()
     await i18n.changeLanguage(getSavedLanguage())
     const refreshed = mount('/')
     expect(await screen.findByTestId('system-route')).toHaveTextContent('/:ja')
-    await waitFor(() => expect(refreshed.container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務管理'))
+    await waitFor(() => expect(refreshed.container.querySelector('.system-switcher-trigger-label')).toHaveTextContent('財務決済システム'))
     refreshed.unmount()
     mount()
     expect(await screen.findByRole('button', { name: `${ja.portal.systems.finance.name} · ${ja.portal.enter}` })).toBeInTheDocument()
@@ -605,7 +687,7 @@ describe('门户多语言与系统继承', () => {
 
   it('国家独立持久化，不改变当前语言；重新挂载恢复国家', async () => {
     const { unmount } = mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.mouseDown(screen.getByRole('combobox', { name: '國家' }))
     fireEvent.change(screen.getByRole('combobox', { name: '國家' }), { target: { value: '日本' } })
     fireEvent.click(await screen.findByText('🇯🇵 日本', { selector: '.ant-select-item-option-content' }))
@@ -614,7 +696,7 @@ describe('门户多语言与系统继承', () => {
     unmount()
     mount()
     expect(screen.getByRole('combobox', { name: '國家' }).closest('.ant-select')).toHaveTextContent('日本')
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
   })
 
   it('慢语言包不会阻塞进入系统，也不会把后来的语言切回旧语言', async () => {
@@ -622,20 +704,20 @@ describe('门户多语言与系统继承', () => {
     const pending = new Promise<void>(resolve => { finish = resolve })
     vi.mocked(ensureLanguageBundle).mockReturnValueOnce(pending)
     mount()
-    await screen.findByRole('button', { name: '財務系統 · 進入系統' })
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     await selectLanguage('日本語')
     expect(screen.getByRole('button', { name: `${ja.portal.systems.finance.name} · ${ja.portal.enter}` })).toBeEnabled()
     await selectLanguage('English')
     await act(async () => { finish(); await pending })
     expect(i18n.language).toBe('en')
     expect(getSavedLanguage()).toBe('en')
-    expect(screen.getByRole('button', { name: 'Finance · Enter system' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Finance & Settlement · Enter system' })).toBeInTheDocument()
   })
 
   it('后端语言包的英文兜底不会覆盖已翻译的门户名称', async () => {
     injectTranslationBundle('ja', { 'portal.systems.finance.name': 'Finance' })
     await i18n.changeLanguage('ja')
-    expect(i18n.t('portal.systems.finance.name')).toBe('財務管理')
-    expect(i18n.t('portal:systems.finance.name')).toBe('財務管理')
+    expect(i18n.t('portal.systems.finance.name')).toBe('財務決済システム')
+    expect(i18n.t('portal:systems.finance.name')).toBe('財務決済システム')
   })
 })
