@@ -669,6 +669,10 @@ export interface ConsumableInboundOrder {
   remark?: string
   createdBy?: string
   createdAt?: string
+  /** 最后更新人（详情页「最后更新」footer 依赖） */
+  updatedBy?: string
+  /** 最后更新时间 */
+  updatedAt?: string
   items: ConsumableInboundItem[]
   totalQty: number
   totalAmount?: number

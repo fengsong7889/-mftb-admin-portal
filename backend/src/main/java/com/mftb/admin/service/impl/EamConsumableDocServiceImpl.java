@@ -560,6 +560,8 @@ public class EamConsumableDocServiceImpl implements EamConsumableDocService {
         vo.setRemark(inbound.getRemark());
         vo.setCreatedBy(inbound.getCreatedBy());
         vo.setCreatedAt(inbound.getCreatedAt() == null ? null : inbound.getCreatedAt().format(DT_FMT));
+        vo.setUpdatedBy(inbound.getUpdatedBy());
+        vo.setUpdatedAt(inbound.getUpdatedAt() == null ? null : inbound.getUpdatedAt().format(DT_FMT));
         // 明细
         List<EamConsumableInboundItem> items = inboundItemMapper.selectList(
                 new LambdaQueryWrapper<EamConsumableInboundItem>().eq(EamConsumableInboundItem::getInboundId, inbound.getId()));

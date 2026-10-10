@@ -22,6 +22,10 @@ public class EamConsumableInboundVO {
     private String remark;
     private String createdBy;
     private String createdAt;
+    /** 最后更新人（详情页「最后更新」footer 必需） */
+    private String updatedBy;
+    /** 最后更新时间（已格式化为 yyyy-MM-dd HH:mm:ss） */
+    private String updatedAt;
     /** 入库明细 */
     private List<EamConsumableInboundItemVO> items;
     /** 入库总数量（合计） */
