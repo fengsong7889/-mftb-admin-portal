@@ -170,3 +170,25 @@ export const LICENSE_CLASS_OPTIONS = [
   { value: 'B2', label: 'B2' },
   { value: 'C1', label: 'C1' },
 ]
+
+/* ==================== 车身形式 / 能源类型（与后端 VehicleConstants 取值集合一致） ==================== */
+
+/** 车身形式：原来叫「车型」是错的——5系/7系 是车系，轿车/SUV 是车身形式 */
+export const BODY_TYPE_LABEL: Record<string, string> = {
+  sedan: '轎車', suv: 'SUV', mpv: 'MPV', van: '商務車', bus: '客車', pickup: '皮卡', coupe: '跑車',
+}
+export const BODY_TYPE_OPTIONS = Object.entries(BODY_TYPE_LABEL).map(([value, label]) => ({ value, label }))
+
+export const ENERGY_TYPE_LABEL: Record<string, string> = {
+  petrol: '汽油', diesel: '柴油', hybrid: '油電混合', phev: '插電式混合動力', ev: '純電',
+}
+export const ENERGY_TYPE_OPTIONS = Object.entries(ENERGY_TYPE_LABEL).map(([value, label]) => ({ value, label }))
+
+/** 插电混动与纯电上 8 位新能源号牌，其余上 7 位普通号牌 */
+export const NEW_ENERGY_TYPES = ['phev', 'ev']
+
+export const MASTER_STATUS_LABEL: Record<string, string> = { enabled: '啟用', disabled: '停用' }
+
+/** 内地车牌省份简称（与后端 VehiclePlateRules.PROVINCE_ABBREVIATIONS 同一份） */
+export const PROVINCE_ABBREVIATIONS
+  = '京津冀晋蒙辽吉黑沪苏浙皖闽赣鲁豫鄂湘粤桂琼渝川贵云藏陕甘青宁新使领学警挂'

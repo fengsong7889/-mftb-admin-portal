@@ -3,7 +3,7 @@ package com.mftb.admin.constant;
 import java.util.Set;
 
 /**
- * RDM（產研協同）需求全生命周期常量。
+ * RDM（產研交付）需求全生命周期常量。
  * <p>
  * 与 {@code rdm_status_def.code} / {@code rdm_transition.action_code} /
  * {@code rdm_requirement_role.role_code} 保持同一套编码；

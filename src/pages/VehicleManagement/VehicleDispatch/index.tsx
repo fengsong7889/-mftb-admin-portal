@@ -31,7 +31,7 @@ import {
   type DirectRegisterFormValues, type VehicleFile, type VehicleUseOrder,
 } from '../vehicleTypes'
 import VehicleUseDetail from '../VehicleUseDetail'
-import DispatchList from './DispatchList'
+import DispatchList, { type DispatchFilters } from './DispatchList'
 import DispatchAssignForm from './DispatchAssignForm'
 import DirectRegisterForm from './DirectRegisterForm'
 import TripRegisterForm from './TripRegisterForm'
@@ -74,14 +74,23 @@ export default function VehicleDispatch() {
   const [error, setError] = useState<string>()
   const [reload, setReload] = useState(0)
 
-  /* 列表查询状态全部交给服务端：Tab=group、车辆=plateNo、分页=page/size */
+  /* 列表查询状态全部交给服务端：Tab=group、查询条件=filters、分页=page/size */
   const [tab, setTab] = useState<string>(USE_STATUS.TO_ASSIGN)
-  const [plateFilter, setPlateFilter] = useState<string | undefined>()
+  const [filters, setFilters] = useState<DispatchFilters>({})
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
 
-  /** 统计卡与列表共用的筛选条件（不含 group/分页）：卡片必须是「当前筛选下」的待办数 */
-  const statFilters = useMemo(() => ({ scope: 'dispatch', plateNo: plateFilter }), [plateFilter])
+  /** 统计卡与列表共用的筛选条件（不含 group/分页）：卡片必须是「当前筛选下」的 待办数 */
+  const statFilters = useMemo(() => ({
+    scope: 'dispatch',
+    useNo: filters.useNo,
+    status: filters.status,
+    plateNo: filters.plateNo,
+    driverName: filters.driverName,
+    requesterName: filters.requesterName,
+    fromDate: filters.fromDate,
+    toDate: filters.toDate,
+  }), [filters])
 
   const recordId = parseId(searchParams.get('id'))
   const back = useCallback(() => navigate('/vehicle-dispatch'), [navigate])
@@ -106,7 +115,7 @@ export default function VehicleDispatch() {
       })
       .catch(e => { if (alive) setError(e instanceof Error ? e.message : '加載失敗') })
       .finally(() => { if (alive) setLoading(false) })
-  }, [view, reload, tab, plateFilter, page, size, statFilters])
+  }, [view, reload, tab, filters, page, size, statFilters])
 
   useEffect(() => {
     let alive = true
@@ -197,7 +206,7 @@ export default function VehicleDispatch() {
         <Result
           status="403" title="無辦理權限"
           subTitle="你沒有可辦理的車輛任務，請聯繫管理員按車輛分配管理範圍。"
-          extra={<Button onClick={back}>返回待办</Button>}
+          extra={<Button onClick={back}>返回待辦</Button>}
         />
       </div>
     )
@@ -283,8 +292,8 @@ export default function VehicleDispatch() {
         canDirectRegister={canDirectRegister}
         tab={tab}
         onTabChange={next => { setTab(next); setPage(1) }}
-        plateFilter={plateFilter}
-        onPlateChange={next => { setPlateFilter(next); setPage(1) }}
+        filters={filters}
+        onFiltersChange={next => { setFilters(next); setPage(1) }}
         page={page}
         size={size}
         onPageChange={(nextPage, nextSize) => {

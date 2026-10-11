@@ -25,6 +25,8 @@ public final class VehicleConstants {
     public static final String MENU_DISPATCH = "vehicle-dispatch";
     public static final String MENU_LEDGER = "vehicle-ledger";
     public static final String MENU_MY_USE = "my-vehicle-use";
+    /** 车辆参数库（挂在「基礎數據」下，供车辆档案逐级选择） */
+    public static final String MENU_MASTER = "vehicle-master-data";
 
     public static final String ACTION_VIEW = "view";
     public static final String ACTION_CREATE = "create";
@@ -168,6 +170,38 @@ public final class VehicleConstants {
     public static final String EVENT_CORRECT = "correct";
     public static final String EVENT_CONFIG_CHANGE = "config_change";
     public static final String EVENT_QUAIL_VERIFY = "qual_verify";
+
+    /* ==================== 车身形式与能源类型 ==================== */
+
+    /** 与 221 表的 CHECK 约束取值集合一致；两侧不一致会让合法值在入库时被数据库拒掉 */
+    public static final java.util.Set<String> BODY_TYPES = java.util.Set.of(
+            "sedan", "suv", "mpv", "van", "bus", "pickup", "coupe");
+
+    /**  petrol/diesel/hybrid 上 7 位普通牌；phev/ev 上 8 位新能源牌 */
+    public static final java.util.Set<String> ENERGY_TYPES = java.util.Set.of(
+            "petrol", "diesel", "hybrid", "phev", "ev");
+
+    public static final java.util.Set<String> NEW_ENERGY_TYPES = java.util.Set.of("phev", "ev");
+
+    public static final java.util.Set<String> MASTER_STATUSES = java.util.Set.of("enabled", "disabled");
+
+    /** 车身形式的繁体展示名：与前端 vehicleMeta 保持一致，台账/列表直接展示后端值 */
+    public static final java.util.Map<String, String> BODY_TYPE_LABEL = java.util.Map.ofEntries(
+            java.util.Map.entry("sedan", "轎車"),
+            java.util.Map.entry("suv", "SUV"),
+            java.util.Map.entry("mpv", "MPV"),
+            java.util.Map.entry("van", "商務車"),
+            java.util.Map.entry("bus", "客車"),
+            java.util.Map.entry("pickup", "皮卡"),
+            java.util.Map.entry("coupe", "跑車"));
+
+    /** 能源类型的繁体展示名 */
+    public static final java.util.Map<String, String> ENERGY_TYPE_LABEL = java.util.Map.ofEntries(
+            java.util.Map.entry("petrol", "汽油"),
+            java.util.Map.entry("diesel", "柴油"),
+            java.util.Map.entry("hybrid", "油電混合"),
+            java.util.Map.entry("phev", "插電式混合動力"),
+            java.util.Map.entry("ev", "純電"));
 
     /* ==================== 编号规则前缀映射 ==================== */
 

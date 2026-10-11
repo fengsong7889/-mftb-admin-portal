@@ -174,7 +174,7 @@
       "growthDesc": "Ad delivery, store operations and search conversion",
       "biz": "Finance & Asset Support",
       "bizDesc": "Accounts, reconciliation, assets and consumables",
-      "org": "People & Collaboration",
+      "org": "People & Approvals",
       "orgDesc": "HR, approvals and R&D delivery",
       "govern": "AI & Platform Governance",
       "governDesc": "AI capabilities, authorization and platform settings",
@@ -284,11 +284,11 @@
         "description": "Manage the full lifecycle of assets, supplies, purchasing and inventory."
       },
       "rdm": {
-        "name": "R&D Collaboration",
+        "name": "R&D Delivery",
         "description": "Submit, approve, assign and deliver requirements, with acceptance and output dashboards."
       },
       "oa": {
-        "name": "Office Collaboration",
+        "name": "Workflow Approval",
         "description": "Collaborate efficiently with requests, approvals and employee self-service."
       },
       "iam": {
@@ -2703,7 +2703,13 @@
     "regionTag": "[Region]",
     "bizTag": "[Biz]",
     "copy": "Copy",
-    "pleaseSelect": "Please select"
+    "pleaseSelect": "Please select",
+    "serverError": "Server error, please retry later",
+    "requestFailed": "Request failed",
+    "networkError": "Network error",
+    "noPermission": "You don't have permission for this action. Please contact an administrator.",
+    "apiNotFound": "Endpoint or resource not found (404): {{path}}. Check the request path, whether the resource exists, and whether the backend version is up to date.",
+    "sessionExpired": "Session expired, please sign in again"
   },
   "country": {
     "china": "China",
@@ -3774,7 +3780,8 @@
     "accountDisabledTitle": "Account Disabled",
     "accountDisabledDesc": "Your account has been disabled by an administrator. Please contact the administrator to restore access.",
     "accountDisabledOk": "Got it",
-    "backendUnavailable": "Cannot reach the backend service. Some menus and data are unavailable — please check the service or sign in again."
+    "backendUnavailable": "Cannot reach the backend service. Some menus and data are unavailable — please check the service or sign in again.",
+    "captchaRequiredHint": "For account safety, a slider captcha is required on the next sign-in after repeated failures"
   },
   "sidebar": {
     "offlineMenuTip": "Backend unavailable: offline menus only, server wins once restored",
@@ -9516,5 +9523,19 @@
     "revisedNo": "No",
     "appealSubmit": "Submit Appeal",
     "actionReassign": "Evaluator Reassigned"
+  },
+  "auth": {
+    "kickedTitle": "Account signed in on another device",
+    "kickedDesc": "Your account has been signed in on another device, so this device has been signed out.",
+    "kickedIp": "Sign-in IP: ",
+    "kickedLocation": "Sign-in location: ",
+    "kickedAdvice": "If this was not you, please change your password promptly.",
+    "forceOfflineTitle": "Forced sign-out",
+    "forceOfflineDesc": "You were signed out by the following operator. Contact them if in doubt:",
+    "operator": "Operator: ",
+    "empNo": "Employee ID: ",
+    "disabledTitle": "Account disabled",
+    "disabledDesc": "Your account has been disabled by an administrator. Contact an administrator to restore it.",
+    "iKnow": "Got it"
   }
 }

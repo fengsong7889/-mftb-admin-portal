@@ -5,8 +5,9 @@
  * 明细为动态行（耗材 + 数量 + 出库仓库），提交前 custom-confirm-modal 二次确认
  * 支持管理员/物资部代员工领用（选择领用人），也支持员工自己领用
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Button, Form, Input, InputNumber, Select, Modal, message, Space } from 'antd'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemOptions, submitConsumableClaim, type ConsumableItem,
@@ -159,7 +160,7 @@ export default function ClaimForm({ onBack }: Props) {
             </Form.Item>
           </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
-            <Input placeholder="選填" allowClear maxLength={200} />
+            <RemarkTextArea />
           </Form.Item>
         </div>
 

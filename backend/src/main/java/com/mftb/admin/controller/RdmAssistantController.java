@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 產研協同（RDM）AI 辅助接口（M4+）。
+ * 產研交付（RDM）AI 辅助接口（M4+）。
  *
  * <p>三个能力按可信度分层，刻意不是一套统一入口：
  * <ul>

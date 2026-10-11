@@ -14,6 +14,7 @@ import com.mftb.admin.entity.SysTranslation;
 import com.mftb.admin.mapper.SysLanguageMapper;
 import com.mftb.admin.mapper.SysTranslationMapper;
 import com.mftb.admin.service.TranslationService;
+import com.ibm.icu.text.Transliterator;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,6 +80,10 @@ public class TranslationServiceImpl implements TranslationService {
 
     /** MyMemory 最大重试次数 */
     private static final int MAX_RETRIES = 2;
+
+    /** 繁→简转换器（ICU4J，线程安全） */
+    private static final Transliterator TRAD_TO_SIMP =
+            Transliterator.getInstance("Traditional-Simplified");
 
     /** MyMemory 账号 email（配置后可提升额度至 50000 字符/天） */
     @org.springframework.beans.factory.annotation.Value("${translation.mymemory.email:}")
@@ -315,6 +320,17 @@ public class TranslationServiceImpl implements TranslationService {
                 if (FALLBACK_ZH.equals(lang)) continue;
                 // 只填充空缺
                 if (StringUtils.hasText(translations.get(lang))) continue;
+
+                // zh-CN: 直接使用 ICU4J 繁→简转换，不调用 MyMemory API（速度快、无配额限制、质量高）
+                if ("zh-CN".equals(lang)) {
+                    String simplified = convertToSimplifiedChinese(sourceText);
+                    if (StringUtils.hasText(simplified)) {
+                        translations.put(lang, simplified);
+                        changed = true;
+                        totalFilled++;
+                    }
+                    continue;
+                }
 
                 // 配额检查
                 if (dailyCharUsed.get() >= DAILY_CHAR_LIMIT) {
@@ -581,9 +597,59 @@ public class TranslationServiceImpl implements TranslationService {
 
     /**
      * 判断目标语言是否为 CJK 语言（与繁中共用汉字，翻译结果可能与源文本相同）
-     * 包含日文 (ja) 和韩文 (ko)；英文、俄文等非 CJK 语言返回 false
+     * 包含日文 (ja)、韩文 (ko) 和简体中文 (zh-CN)；英文、俄文等非 CJK 语言返回 false
      */
     private boolean isCJKTargetLang(String langCode) {
-        return "ja".equalsIgnoreCase(langCode) || "ko".equalsIgnoreCase(langCode);
+        return "ja".equalsIgnoreCase(langCode)
+                || "ko".equalsIgnoreCase(langCode)
+                || "zh-CN".equalsIgnoreCase(langCode);
+    }
+
+    /**
+     * 繁体中文 → 简体中文转换（基于 ICU4J Transliterator）
+     * <p>
+     * 用于 zh-CN 机翻：直接本地转换，不调用 MyMemory API，
+     * 速度快、无配额限制、质量高（覆盖 Unicode 全部繁简映射）。
+     *
+     * @param traditional 繁体中文文本
+     * @return 简体中文文本
+     */
+    public String convertToSimplifiedChinese(String traditional) {
+        if (!StringUtils.hasText(traditional)) return traditional;
+        return TRAD_TO_SIMP.transliterate(traditional);
+    }
+
+    /**
+     * 回填所有缺失的 zh-CN 翻译：从 zh-TW 源文本通过 ICU4J 繁→简转换生成。
+     * 由 TranslationDataInitializer 在启动时调用，幂等（只填充空缺）。
+     *
+     * @return 本次回填的记录数
+     */
+    public int backfillZhCn() {
+        // 查询所有缺少 zh-CN 但有 zh-TW 的记录
+        List<SysTranslation> entities = translationMapper.selectList(
+                new LambdaQueryWrapper<SysTranslation>()
+                        .isNotNull(SysTranslation::getTranslationsJson)
+                        .notLike(SysTranslation::getTranslationsJson, "\"zh-CN\""));
+
+        int filled = 0;
+        for (SysTranslation entity : entities) {
+            Map<String, String> translations = readJson(entity.getTranslationsJson());
+            // 已有 zh-CN 则跳过
+            if (StringUtils.hasText(translations.get("zh-CN"))) continue;
+            // 取 zh-TW 源文本
+            String sourceText = firstNonBlank(translations.get(FALLBACK_ZH), entity.getFieldName());
+            if (!StringUtils.hasText(sourceText)) continue;
+
+            String simplified = convertToSimplifiedChinese(sourceText);
+            if (StringUtils.hasText(simplified)) {
+                translations.put("zh-CN", simplified);
+                entity.setTranslationsJson(writeJson(translations));
+                entity.setUpdatedBy("backfill-zh-CN");
+                translationMapper.updateById(entity);
+                filled++;
+            }
+        }
+        return filled;
     }
 }

@@ -42,6 +42,8 @@ vi.mock('../../i18n', async importOriginal => ({
 
 const finance: PortalSystem = { code: 'finance', name: '財務結算系統', nameEn: 'Old finance subtitle', description: '旧描述' }
 const resources = { en, 'zh-TW': zh, ja, ko, ru }
+/** 有静态 JSON 兆底的语言（zh-CN 由数据库 bundle 动态注入，无静态 JSON） */
+const STATIC_LANGUAGES = (SUPPORTED_LANGUAGES as readonly string[]).filter(l => l in resources) as Array<Exclude<(typeof SUPPORTED_LANGUAGES)[number], 'zh-CN'>>
 const configuredLanguages: LanguageVO[] = [
   { id: 1, code: 'zh-TW', name: '繁體中文', flag: '🇹🇼' },
   { id: 2, code: 'en', name: 'English', flag: '🇺🇸' },
@@ -125,9 +127,9 @@ describe('门户场景卡片与授权边界', () => {
     mount()
     await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
-    fireEvent.click(screen.getByRole('button', { name: /協同辦公系統/ }))
+    fireEvent.click(screen.getByRole('button', { name: /流程審批系統/ }))
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent('您尚未獲得「協同辦公系統」的使用權限')
+    expect(dialog).toHaveTextContent('您尚未獲得「流程審批系統」的使用權限')
     fireEvent.click(within(dialog).getByRole('button', { name: /我要申請|申請/ }))
     await waitFor(() => expect(screen.getByTestId('system-route')).toHaveTextContent('/process-center'))
   })
@@ -136,7 +138,7 @@ describe('门户场景卡片与授权边界', () => {
     mount()
     await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
-    fireEvent.click(screen.getByRole('button', { name: /協同辦公系統/ }))
+    fireEvent.click(screen.getByRole('button', { name: /流程審批系統/ }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
@@ -495,7 +497,7 @@ describe('场景区分与低干扰动效', () => {
     }
   })
 
-  it.each(SUPPORTED_LANGUAGES)('%s 场景状态文案完整且跟随界面语言', async lang => {
+  it.each(STATIC_LANGUAGES)('%s 场景状态文案完整且跟随界面语言', async lang => {
     await i18n.changeLanguage(lang)
     const copy = resources[lang].portal.artwork
     expect(Object.keys(copy).sort()).toEqual(Object.keys(en.portal.artwork).sort())
@@ -503,8 +505,8 @@ describe('场景区分与低干扰动效', () => {
     for (const text of Object.values(copy)) expect(container).toHaveTextContent(text)
   })
 
-  it('產研協同静态构图包含六个阶段站点、驳回回路与挂起支路', () => {
-    const { container } = render(<SystemArtwork code="rdm" name="產研協同系統" />)
+  it('產研交付静态构图包含六个阶段站点、驳回回路与挂起支路', () => {
+    const { container } = render(<SystemArtwork code="rdm" name="產研交付系統" />)
     const image = container.querySelector('svg[data-scene="rdm"]')!
     expect(image).toHaveAttribute('data-motion', 'idle')
     // 静态构图只保留阶段标签（六个站点），交互动效才点亮站点与验收章
@@ -636,7 +638,7 @@ describe('门户多语言与系统继承', () => {
     expect(screen.getByRole('combobox', { name: 'Language' }).closest('.ant-select')).toHaveTextContent('English')
   })
 
-  it.each(SUPPORTED_LANGUAGES)('%s 的门户文案完整且可按当前语言搜索', async lang => {
+  it.each(STATIC_LANGUAGES)('%s 的门户文案完整且可按当前语言搜索', async lang => {
     await i18n.changeLanguage(lang)
     const copy = resources[lang].portal
     expect(Object.keys(copy).sort()).toEqual(Object.keys(en.portal).sort())

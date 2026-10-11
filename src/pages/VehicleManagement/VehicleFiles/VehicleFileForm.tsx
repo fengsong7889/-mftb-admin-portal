@@ -5,13 +5,19 @@
  * 校验口径：前端只做 UX 校验（必填、区间、格式），后端 B1 必须重验车牌唯一、
  * 法人主体存在、EAM 资产可关联、有效期合法。
  */
-import { useEffect, useState } from 'react'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, TreeSelect } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Switch, TreeSelect, message } from 'antd'
 import {
   CarOutlined, DatabaseOutlined, SaveOutlined, SafetyCertificateOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { VEHICLE_STATUS_LABEL, VEHICLE_STATUS_OPTIONS, VEHICLE_TYPE_OPTIONS } from '../vehicleMeta'
+import {
+  BODY_TYPE_OPTIONS, ENERGY_TYPE_OPTIONS, VEHICLE_STATUS_LABEL, VEHICLE_STATUS_OPTIONS,
+} from '../vehicleMeta'
+import { fetchBrands, fetchModels, fetchSeries, type BrandVO, type ModelVO, type SeriesVO } from '../../../api/vehicleMaster'
+import RemarkTextArea from '../../../components/RemarkTextArea'
+import { validatePlate } from '../vehicleRules'
+import { PROVINCE_ABBREVIATIONS } from '../vehicleMeta'
 import { VEHICLE_STATUS, type VehicleFile, type VehicleFileFormValues } from '../vehicleTypes'
 import { usePurchaseCompanies, useVehicleDeptTree } from '../vehicleOptions'
 import {
@@ -23,7 +29,11 @@ import {
  * 单独开一个类型而不是把 form 直接声明为 VehicleFileFormValues，
  * 是为了避免用 as 掩盖真实运行时形状（会导致提交时静默存错类型）。
  */
-type FormState = Omit<VehicleFileFormValues, 'insuranceValidUntil' | 'inspectionValidUntil'>
+/** 内地牌分段录入的两个字段只在界面存在，提交前合成 plateNo 后剔除 */
+type FormState = Omit<VehicleFileFormValues, 'insuranceValidUntil' | 'inspectionValidUntil'> & {
+  province?: string
+  plateBody?: string
+}
   & { insuranceValidUntil?: Dayjs; inspectionValidUntil?: Dayjs }
 
 interface Props {
@@ -48,6 +58,13 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
       plateNo: record.plateNo,
       registerRegion: record.registerRegion,
       vehicleType: record.vehicleType,
+      // 主数据与车身/能源必须一并回填：漏填会让编辑保存时把这些字段当“未选”提交为空，
+      // 后端按全量覆盖就把品牌/车系/年款/车身形式清空（F6 根因）
+      brandId: record.brandId,
+      seriesId: record.seriesId,
+      modelId: record.modelId,
+      bodyType: record.bodyType,
+      energyType: record.energyType,
       vin: record.vin,
       eamAssetNo: record.eamAssetNo,
       seatCount: record.seatCount,
@@ -89,15 +106,99 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
     form.setFieldValue('allowDirectRegister', true)
   }
 
+  /* ==================== 车辆参数库级联 ==================== */
+
+  const [brands, setBrands] = useState<BrandVO[]>([])
+  const [seriesOptions, setSeriesOptions] = useState<SeriesVO[]>([])
+  const [modelOptions, setModelOptions] = useState<ModelVO[]>([])
+  const watchedRegion = Form.useWatch('registerRegion', form)
+  const watchedBrandId = Form.useWatch('brandId', form)
+  const watchedSeriesId = Form.useWatch('seriesId', form)
+  const watchedEnergy = Form.useWatch('energyType', form)
+  const watchedProvince = Form.useWatch('province', form)
+  const watchedPlateNo = Form.useWatch('plateNo', form)
+  const watchedPlateBody = Form.useWatch('plateBody', form)
+  const mainland = watchedRegion === '中國內地'
+
+  useEffect(() => {
+    let alive = true
+    void fetchBrands().then(b => { if (alive) setBrands(b) }).catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  // 品牌变了才重拉车系：不依赖 seriesId，否则选完车系会把下拉再刷一遍
+  useEffect(() => {
+    if (watchedBrandId == null) { setSeriesOptions([]); return }
+    let alive = true
+    void fetchSeries(watchedBrandId).then(x => { if (alive) setSeriesOptions(x) }).catch(() => {})
+    return () => { alive = false }
+  }, [watchedBrandId])
+
+  useEffect(() => {
+    if (watchedSeriesId == null) { setModelOptions([]); return }
+    let alive = true
+    void fetchModels(watchedSeriesId).then(x => { if (alive) setModelOptions(x) }).catch(() => {})
+    return () => { alive = false }
+  }, [watchedSeriesId])
+
+  /**
+   * 选到车系就带出车身形式与能源类型。
+   *
+   * 覆盖规则：只在用户没手工改过时覆盖？不必——车系就是这两项的真值来源，
+   * 手工覆盖反而会让"同一车系的车"在统计里分裂成两类，所以这里直接覆盖。
+   */
+  const onSeriesChange = (seriesId?: number) => {
+    const hit = seriesOptions.find(x => x.id === seriesId)
+    if (!hit) return
+    const patch: Record<string, unknown> = { bodyType: hit.bodyType, energyType: hit.energyType }
+    // 座位数只在没填过时补默认，避免覆盖已录入的真实核定载客
+    if (!form.getFieldValue('seatCount')) patch.seatCount = hit.seatCount
+    form.setFieldsValue(patch)
+  }
+
+  /**
+   * 车牌实时校验。
+   *
+   * 依赖必须走 useWatch：用 form.getFieldValue 当依赖不会触发重算，
+   * 结果是用户改完牌体，红字提示仍停留在上一次的判断——比没有提示更糟。
+   */
+  const plateBlockers = useMemo(() => {
+    const composed = mainland
+      ? `${watchedProvince ?? ''}${watchedPlateBody ?? ''}`
+      : (watchedPlateNo ?? '')
+    if (!composed) return []
+    return validatePlate(composed, mainland ? watchedEnergy : null)
+  }, [mainland, watchedProvince, watchedPlateBody, watchedPlateNo, watchedEnergy])
+
   const handleSubmit = async () => {
     let raw: FormState
     try {
       raw = await form.validateFields()
-    } catch {
-      return // antd 已在字段下方提示，不双弹
+    } catch (err) {
+      // antd 已在字段下方标红，不双弹；手动校验流程补滚动定位到首个错误字段（§F.4）
+      const firstField = (err as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0]?.name
+      if (firstField) form.scrollToField(firstField, { behavior: 'smooth', block: 'center' })
+      return
+    }
+    // 内地牌由「省份简称 + 牌体」两段录入，提交前合成完整车牌：唯一键与展示仍是一列
+    const plateNo = raw.registerRegion === '中國內地'
+      ? `${raw.province ?? ''}${raw.plateBody ?? ''}`
+      : (raw.plateNo ?? '')
+    const plateError = validatePlate(plateNo, raw.registerRegion === '中國內地' ? raw.energyType : null)[0]
+    if (plateError) {
+      message.warning(plateError.message)
+      return
+    }
+    if (raw.registerRegion === '中國內地' && raw.plateBody) {
+      const body = String(raw.plateBody).toUpperCase()
+      if (!/^[A-Z][A-Z0-9]{4,6}$/.test(body)) {
+        message.warning('車牌主體應為「1位字母 + 5~6位字母數字」，如 B12345（新能源）/ B12345（燃油）')
+        return
+      }
     }
     const values: VehicleFileFormValues = {
       ...raw,
+      plateNo,
       insuranceValidUntil: raw.insuranceValidUntil?.format('YYYY-MM-DD'),
       inspectionValidUntil: raw.inspectionValidUntil?.format('YYYY-MM-DD'),
     }
@@ -117,32 +218,82 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
         {/* ====== 基础信息 ====== */}
         <VehicleSection icon={<CarOutlined />} title="基礎信息">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item
-              label="車牌號碼" name="plateNo" rules={[{ required: true, message: '請輸入車牌號碼' }]}
-              extra="同一登記地區內唯一；換牌需保留歷史車牌快照"
-            >
-              <Input placeholder="如 MT-88-01" maxLength={20} />
-            </Form.Item>
             <Form.Item label="登記地區" name="registerRegion" rules={[{ required: true, message: '請選擇登記地區' }]}>
-              <Select options={[{ value: '澳門', label: '澳門' }, { value: '中國內地', label: '中國內地' }, { value: '香港', label: '香港' }]} />
+              <Select
+                options={[{ value: '澳門', label: '澳門' }, { value: '中國內地', label: '中國內地' }, { value: '香港', label: '香港' }]}
+                onChange={() => form.setFieldsValue({ plateNo: undefined, province: undefined, plateBody: undefined })}
+              />
             </Form.Item>
-            <Form.Item label="車型" name="vehicleType" rules={[{ required: true, message: '請選擇車型' }]}>
-              <Select options={VEHICLE_TYPE_OPTIONS} placeholder="請選擇車型" />
+            {mainland ? (
+              <>
+                <Form.Item label="車牌號碼（省份簡稱）" name="province" rules={[{ required: true, message: '請選擇省份簡稱' }]}>
+                  <Select
+                    showSearch optionFilterProp="label" placeholder="如 粵 / 京"
+                    options={Array.from(PROVINCE_ABBREVIATIONS).map(ch => ({ value: ch, label: ch }))}
+                  />
+                </Form.Item>
+                <Form.Item label="車牌號碼（主體）" name="plateBody" rules={[{ required: true, message: '請填寫車牌主體' }]}
+                  extra={watchedEnergy === 'ev' || watchedEnergy === 'phev'
+                    ? '新能源連省份共 8 位'
+                    : '燃油連省份共 7 位'}>
+                  <Input placeholder="如 B12345" maxLength={8} style={{ textTransform: 'uppercase' }} />
+                </Form.Item>
+              </>
+            ) : (
+              <Form.Item
+                label="車牌號碼" name="plateNo" rules={[{ required: true, message: '請輸入車牌號碼' }]}
+                extra={plateBlockers.length
+                  ? <span style={{ color: '#FF4D4F' }}>{plateBlockers[0].message}</span>
+                  : '同一登記地區內唯一'}
+              >
+                <Input placeholder="如 MT-88-01 / MX-12-34" maxLength={20} style={{ textTransform: 'uppercase' }} />
+              </Form.Item>
+            )}
+            <Form.Item label="車輛品牌" name="brandId">
+              <Select
+                allowClear showSearch optionFilterProp="label" placeholder="請選擇品牌"
+                options={brands.map(b => ({ value: b.id, label: b.brandName }))}
+                onChange={() => form.setFieldsValue({ seriesId: undefined, modelId: undefined })}
+              />
             </Form.Item>
-            <Form.Item label="VIN / 底盤號" name="vin" extra="可選，不作為業務身份">
+            <Form.Item label="車系" name="seriesId" extra={watchedBrandId == null ? '先選品牌' : undefined}>
+              <Select
+                allowClear showSearch optionFilterProp="label" placeholder={watchedBrandId == null ? '請先選擇品牌' : '請選擇車系'}
+                disabled={watchedBrandId == null}
+                options={seriesOptions.map(x => ({ value: x.id, label: x.seriesName }))}
+                onChange={onSeriesChange}
+              />
+            </Form.Item>
+            <Form.Item label="年款車型" name="modelId" extra={watchedSeriesId == null ? '先選車系' : undefined}>
+              <Select
+                allowClear showSearch optionFilterProp="label" placeholder={watchedSeriesId == null ? '請先選擇車系' : '請選擇年款車型'}
+                disabled={watchedSeriesId == null}
+                options={modelOptions.map(x => ({
+                  value: x.id, label: x.yearLabel ? `${x.yearLabel} ${x.modelName}` : x.modelName,
+                }))}
+              />
+            </Form.Item>
+            {/* 車身類型由车系带出：原「車型」字段名不准确，5系/7系 属车系，轿车/SUV 属车身形式 */}
+            <Form.Item label="車身類型" name="bodyType" rules={[{ required: true, message: '請選擇車身類型' }]}>
+              <Select options={BODY_TYPE_OPTIONS} placeholder="請選擇車身類型" />
+            </Form.Item>
+            <Form.Item label="能源類型" name="energyType" rules={[{ required: true, message: '請選擇能源類型' }]}>
+              <Select options={ENERGY_TYPE_OPTIONS} placeholder="請選擇能源類型" />
+            </Form.Item>
+            <Form.Item label="VIN / 底盤號" name="vin">
               <Input placeholder="選填" maxLength={30} />
             </Form.Item>
             <Form.Item
               label="核定載客（含駕駛人）" name="seatCount"
               rules={[{ required: true, message: '請輸入核定載客人數' }]}
-              extra="用車人數超過此值將被拒絕"
+              extra="超員將被拒絕"
             >
               <InputNumber min={1} max={60} style={{ width: '100%' }} placeholder="如 7" />
             </Form.Item>
             <Form.Item
               label="當前里程（km）" name="currentOdometer"
               rules={[{ required: true, message: '請輸入當前里程' }]}
-              extra="取上次確認的結束里程，作為出車起始里程默認值"
+              extra="出車起始里程默認值"
             >
               <InputNumber min={0} step={1} style={{ width: '100%' }} placeholder="如 42180" />
             </Form.Item>
@@ -155,11 +306,10 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
             <Form.Item
               label="所屬法人" name="ownerCompanyId"
               rules={[{ required: true, message: '請選擇所屬法人' }]}
-              extra="與公司品牌是兩個獨立維度"
             >
               <Select options={companies.options} placeholder="請選擇法人主體" showSearch optionFilterProp="label" />
             </Form.Item>
-            <Form.Item label="公司品牌" name="companyBrand" rules={[{ required: true, message: '請選擇公司品牌' }]}>
+            <Form.Item label="所屬品牌" name="companyBrand" rules={[{ required: true, message: '請選擇所屬品牌' }]}>
               <Select options={[{ value: 1, label: '閃蜂' }, { value: 2, label: 'mFood' }]} placeholder="請選擇品牌" />
             </Form.Item>
             <Form.Item
@@ -173,7 +323,7 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
             </Form.Item>
             <Form.Item
               label="可使用部門" name="allowedDeptIds"
-              extra="顯式授權部門；一期不隱式繼承子部門"
+              extra="不含子部門"
               style={{ gridColumn: 'span 2' }}
             >
               <TreeSelect
@@ -181,7 +331,7 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
                 placeholder="可選擇多個部門" allowClear
               />
             </Form.Item>
-            <Form.Item label="EAM 資產編號" name="eamAssetNo" extra="可選；採購入庫後可回填">
+            <Form.Item label="EAM 資產編號" name="eamAssetNo">
               <Input placeholder="如 TB-ZC-000128" maxLength={40} />
             </Form.Item>
           </div>
@@ -195,24 +345,25 @@ export default function VehicleFileForm({ record, loading = false, saving, onSub
             </Form.Item>
             <Form.Item
               label="保險有效期" name="insuranceValidUntil"
-              extra="未錄入或已過期的車輛禁止新出車"
+              extra="過期禁止出車"
             >
               <DatePicker style={{ width: '100%' }} placeholder="選擇日期" />
             </Form.Item>
             <Form.Item
               label="檢驗（年檢）有效期" name="inspectionValidUntil"
-              extra="未錄入或已過期的車輛禁止新出車"
+              extra="過期禁止出車"
             >
               <DatePicker style={{ width: '100%' }} placeholder="選擇日期" />
             </Form.Item>
             <Form.Item
               label="授權直接登記" name="allowDirectRegister" valuePropName="checked"
-              extra="僅授權車管可不經審批登記出車，需填寫原因"
+              extra="開啟需填原因"
             >
               <Switch checked={allowDirect} checkedChildren="啟用" unCheckedChildren="停用" onChange={handleDirectChange} />
             </Form.Item>
-            <Form.Item label="備註" name="remark" style={{ gridColumn: 'span 2' }}>
-              <Input.TextArea rows={1} maxLength={200} placeholder="選填" />
+            {/* 備註獨占整行 + 統一尺寸：見 RemarkTextArea 的尺寸依據說明 */}
+            <Form.Item label="備註" name="remark" style={{ gridColumn: '1 / -1' }}>
+              <RemarkTextArea />
             </Form.Item>
           </div>
           {record && (

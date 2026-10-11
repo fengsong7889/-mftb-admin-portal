@@ -109,6 +109,13 @@
             <version>1.0.2</version>
         </dependency>
 
+        <!-- ICU4J：繁简中文转换（TranslationServiceImpl 机翻 zh-CN 使用） -->
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+            <version>74.2</version>
+        </dependency>
+
         <!-- SpringDoc OpenAPI (Swagger) -->
         <dependency>
             <groupId>org.springdoc</groupId>

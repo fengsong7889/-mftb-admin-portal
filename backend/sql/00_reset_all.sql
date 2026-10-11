@@ -558,7 +558,7 @@ CREATE TABLE `biz_ad_algorithm` (
 CREATE TABLE `biz_ad_order` (
 
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `order_no` varchar(64) NOT NULL COMMENT '订单编号: GD + 年月日 + 4位自增',
+  `order_no` varchar(64) NOT NULL COMMENT '订单编号: 按编号生成规则 ad_order_* 生成（DDxx + 年月日 + 4位自增序号，如 DDXD202608120000）',
   `algo_type` tinyint NOT NULL COMMENT '算法类型快照',
   `algo_id` bigint NOT NULL COMMENT '算法ID (关联 biz_ad_algorithm.id)',
   `algo_name` varchar(128) DEFAULT NULL COMMENT '算法名称快照',

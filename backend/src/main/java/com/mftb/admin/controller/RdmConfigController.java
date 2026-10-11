@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 產研協同（RDM）配置接口：状态机、流转规则、SLA、分发矩阵、准入策略。
+ * 產研交付（RDM）配置接口：状态机、流转规则、SLA、分发矩阵、准入策略。
  * <p>读取沿用需求相关菜单共享（看到需求即可理解流转规则），写入需「状态與流轉」编辑权。
  * <p>准入策略的写入额外要求分配侧授权：它能让人免掉公司准入审批，影响面比改一个状态名大得多。
  */

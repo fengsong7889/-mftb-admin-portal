@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Modal, message } from 'antd'
 import i18n from 'i18next'
 import { useNavigate } from 'react-router-dom'
@@ -143,6 +144,8 @@ async function resolveIpLocation(ip: string): Promise<string> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
+  // 三个会话失效弹窗的文案走 i18n：平台默认语言是繁中，硬编码简体属于文案违规
+  const { t } = useTranslation()
   // 从 localStorage 初始化登录状态
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const saved = localStorage.getItem('is_authenticated')
@@ -467,6 +470,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : '登錄失敗'
       // 账号被停用时返回特定标记，由登录页弹窗展示
+      // 注意：这里比对的是**后端返回的原始文案**（不是界面展示串），所以不能跟着 i18n 改；
+      // 长期应改成后端返回业务码。详见 forceOffline/停用判定依赖文案的脆弱性
       const isAccountDisabled = msg.includes('账号已被停用') || msg.includes('已被禁用')
       // 后端业务码（1005 = 需先完成滑块安全验证）
       const code = (err as { code?: number }).code
@@ -597,7 +602,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         closable={false}
         maskClosable={false}
         cancelButtonProps={{ style: { display: 'none' } }}
-        okText="我知道了"
+        okText={t('auth.iKnow')}
         onOk={() => {
           setConflictInfo(null)
           clearAuthState()
@@ -611,10 +616,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
           <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-            账号已在其他设备登录
+            {t('auth.kickedTitle')}
           </h3>
           <p style={{ fontSize: 14, color: '#595959', marginBottom: 16 }}>
-            您的账号已在另一台设备上登录，当前设备已被强制下线。
+            {t('auth.kickedDesc')}
           </p>
           {conflictInfo && (
             <div style={{
@@ -626,17 +631,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               color: '#595959',
             }}>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: '#8C8C8C' }}>登录 IP：</span>
+                <span style={{ color: '#8C8C8C' }}>{t('auth.kickedIp')}</span>
                 <span style={{ color: '#262626', fontWeight: 500 }}>{conflictInfo.loginIp || '-'}</span>
               </div>
               <div>
-                <span style={{ color: '#8C8C8C' }}>登录地点：</span>
+                <span style={{ color: '#8C8C8C' }}>{t('auth.kickedLocation')}</span>
                 <span style={{ color: '#262626', fontWeight: 500 }}>{conflictInfo.loginLocation || '-'}</span>
               </div>
             </div>
           )}
           <p style={{ fontSize: 12, color: '#8C8C8C', marginTop: 16, marginBottom: 0 }}>
-            如非本人操作，请及时修改密码
+            {t('auth.kickedAdvice')}
           </p>
         </div>
       </Modal>
@@ -648,7 +653,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         closable={false}
         maskClosable={false}
         cancelButtonProps={{ style: { display: 'none' } }}
-        okText="我知道了"
+        okText={t('auth.iKnow')}
         onOk={() => {
           setForceLogoutInfo(null)
           clearAuthState()
@@ -662,10 +667,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
           <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-            账号已被强制下线
+            {t('auth.forceOfflineTitle')}
           </h3>
           <p style={{ fontSize: 14, color: '#595959', marginBottom: 16 }}>
-            您的账号已被以下操作人强制下线，如有疑问请联系操作人：
+            {t('auth.forceOfflineDesc')}
           </p>
           {forceLogoutInfo && (
             <div style={{
@@ -678,11 +683,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               border: '1px solid #FFD591',
             }}>
               <div style={{ marginBottom: 6 }}>
-                <span style={{ color: '#8C8C8C' }}>操作人：</span>
+                <span style={{ color: '#8C8C8C' }}>{t('auth.operator')}</span>
                 <span style={{ color: '#262626', fontWeight: 500 }}>{forceLogoutInfo.operatorName || '-'}</span>
               </div>
               <div>
-                <span style={{ color: '#8C8C8C' }}>工号：</span>
+                <span style={{ color: '#8C8C8C' }}>{t('auth.empNo')}</span>
                 <span style={{ color: '#262626', fontWeight: 500 }}>{forceLogoutInfo.operatorEmpId || '-'}</span>
               </div>
             </div>
@@ -697,7 +702,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         closable={false}
         maskClosable={false}
         cancelButtonProps={{ style: { display: 'none' } }}
-        okText="我知道了"
+        okText={t('auth.iKnow')}
         onOk={() => {
           setAccountDisabled(false)
           clearAuthState()
@@ -711,10 +716,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🚫</div>
           <h3 style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
-            账号已被停用
+            {t('auth.disabledTitle')}
           </h3>
           <p style={{ fontSize: 14, color: '#595959', marginBottom: 0 }}>
-            您的账号已被管理员停用，如需恢复请联系管理员。
+            {t('auth.disabledDesc')}
           </p>
         </div>
       </Modal>

@@ -164,7 +164,7 @@ export default function RdmWorkbench() {
             <div className="rdm-hero-title">
               <RocketOutlined style={{ color: '#E8720C' }} />
               需求工作台
-              <Tag color="orange" style={{ margin: 0 }}>產研協同</Tag>
+              <Tag color="orange" style={{ margin: 0 }}>產研交付</Tag>
             </div>
             <div className="rdm-hero-sub">
               {identity.name}

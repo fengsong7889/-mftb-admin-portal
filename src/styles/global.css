@@ -607,7 +607,7 @@ body {
   40%, 85% { transform: rotate(180deg); }
 }
 
-/* 產研協同流水线：光环沿波段每 13% 跳一站，站点与轨道进度同步点亮，末站验收后火箭上线。 */
+/* 產研交付流水线：光环沿波段每 13% 跳一站，站点与轨道进度同步点亮，末站验收后火箭上线。 */
 @keyframes portalRdmHalo {
   0% { transform: translate(0, 0); opacity: 0; }
   6%, 12% { transform: translate(0, 0); opacity: 1; }

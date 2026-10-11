@@ -52,6 +52,15 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     private static final String VERSION_SCHEMA = "vehicle:schema:v1.0";
     private static final String SCHEMA_SCRIPT = "220_vehicle_core_tables.sql";
 
+    /** v1.0：车辆参数库（品牌/车系/年款车型）三表 + 「車輛參數庫」菜单 */
+    private static final String VERSION_MASTER = "vehicle:master:v1.0";
+    private static final String MASTER_SCRIPT = "221_vehicle_master_data.sql";
+
+    /** 车辆参数库菜单：挂在「基礎數據」下，与其他主数据同处一个分组，便于统一维护 */
+    private static final String MENU_MASTER = "vehicle-master-data";
+    private static final String MASTER_MENU_PARENT = "asset-basic";
+    private static final String ACTIONS_MASTER = "[\"view\",\"create\",\"edit\"]";
+
     /** v1.1：車輛管理分组 + 4 个业务菜单 + admin 授权 */
     private static final String VERSION_MENU = "vehicle:menu:v1.0";
 
@@ -63,6 +72,13 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final int MENU_TYPE_LEAF = 2;
 
+    /**
+     * v1.0 脚本负责建的 7 张表。
+     *
+     * <p>故意不含车辆参数库三表：verifySchema 由 applyOnce(VERSION_SCHEMA) 在建表后立刻执行，
+     * 而三表要等 applyOnce(VERSION_MASTER) 才建；把它们写进这里会让全新库在启动时
+     * 报「表未就绪」而直接起不来。参数库三表由 verifyMaster 自己校验。
+     */
     private static final String[] TABLES = {
             "biz_vehicle", "biz_vehicle_use", "biz_vehicle_trip",
             "biz_vehicle_driver_qualification", "biz_vehicle_use_department",
@@ -79,6 +95,9 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_vehicle", "uk_vehicle_active_asset"},
             {"biz_vehicle_use", "uk_vehicle_use_no"},
             {"biz_vehicle_use", "uk_vehicle_use_request"},
+            {"biz_vehicle_brand", "uk_vehicle_brand_name"},
+            {"biz_vehicle_series", "uk_vehicle_series_brand_name"},
+            {"biz_vehicle_model", "uk_vehicle_model_series_name_year"},
             {"biz_vehicle_use", "uk_vehicle_use_reservation"},
             {"biz_vehicle_trip", "uk_vehicle_trip_use"},
             {"biz_vehicle_trip", "uk_vehicle_trip_active_vehicle"},
@@ -104,6 +123,16 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
             // 实体声明了 backfillEntryAt 但初版 DDL 漏建，浏览器端到端测试里“能写不能读”
             // （写入时 null 被省略、读取时列不存在直接报错），此类漂移必须列入启动必验集
             {"biz_vehicle_trip", "backfill_entry_at"},
+            // 车辆档案接入参数库的 5 个新列：实体加了字段而 DDL/库里没有，
+            // 表现就是「能写不能读」——写入时 null 被 MyBatis 省略，读取时按列名拼 SELECT 直接报错
+            {"biz_vehicle", "brand_id"},
+            {"biz_vehicle", "series_id"},
+            {"biz_vehicle", "model_id"},
+            {"biz_vehicle", "body_type"},
+            {"biz_vehicle", "energy_type"},
+            {"biz_vehicle", "brand_name"},
+            {"biz_vehicle", "series_name"},
+            {"biz_vehicle", "model_name"},
     };
 
     /**
@@ -114,6 +143,14 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
      * 先查后加能让两种情况收敛到同一结构。
      */
     private static final String[][] REQUIRED_ADDED_COLUMNS = {
+            {"biz_vehicle", "brand_id", "ADD COLUMN brand_id BIGINT NULL COMMENT '车辆品牌 ID' AFTER company_brand"},
+            {"biz_vehicle", "series_id", "ADD COLUMN series_id BIGINT NULL COMMENT '车系 ID' AFTER brand_id"},
+            {"biz_vehicle", "model_id", "ADD COLUMN model_id BIGINT NULL COMMENT '年款车型 ID' AFTER series_id"},
+            {"biz_vehicle", "body_type", "ADD COLUMN body_type VARCHAR(20) NULL COMMENT '車身形式' AFTER model_id"},
+            {"biz_vehicle", "energy_type", "ADD COLUMN energy_type VARCHAR(20) NULL COMMENT '能源類型：petrol/diesel/hybrid/phev/ev' AFTER body_type"},
+            {"biz_vehicle", "brand_name", "ADD COLUMN brand_name VARCHAR(60) NULL COMMENT '品牌名称快照' AFTER energy_type"},
+            {"biz_vehicle", "series_name", "ADD COLUMN series_name VARCHAR(80) NULL COMMENT '车系名称快照' AFTER brand_name"},
+            {"biz_vehicle", "model_name", "ADD COLUMN model_name VARCHAR(120) NULL COMMENT '年款车型名称快照' AFTER series_name"},
             {"biz_vehicle_trip", "backfill_entry_at",
                     "ADD COLUMN backfill_entry_at DATETIME NULL COMMENT '事后补录时的系统登记时间；正常流程为 NULL' AFTER flags"},
     };
@@ -177,12 +214,31 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     public void run(String... args) {
         versionTracker.applyOnce(VERSION_SCHEMA, this::doSchemaMigrate, this::verifySchema);
         versionTracker.applyOnce(VERSION_MENU, this::doMenuMigrate, this::verifyMenus);
+        versionTracker.applyOnce(VERSION_MASTER, this::doMasterMigrate, this::verifyMaster);
         // 幂等修复与必验列必须放在 applyOnce 外面：版本已记录的库会整体跳过 task，
         // 如果把补列写在 task 里，新加的列在任何跑过 v1.0 的环境上永远不生效
         // （本轮端到端测试就是这么踩到 biz_vehicle_trip.backfill_entry_at 漏建的）。
         repairSchema();
         verifyColumns();
         syncSeqRules();
+        syncMenuSort();
+    }
+
+    /**
+     * 每次启动同步「車輛管理」与「基礎數據」的排序（互换位置）。
+     *
+     * <p>写在 doMenuMigrate 里不会生效：vehicle:menu:v1.0 已记录版本，applyOnce 会整体跳过 task。
+     * 同一个坑本轮又踩了一次（编号规则也是靠移出 applyOnce 才生效），所以凡是"既有数据的修正"
+     * 一律放每次启动，与 DataInitializer.fixAssetMenuGrouping 同一做法。
+     */
+    private void syncMenuSort() {
+        int vehicle = jdbcTemplate.update(
+                "UPDATE sys_menu SET sort_order = 5 WHERE menu_key = ? AND deleted = 0 AND sort_order <> 5", MENU_GROUP);
+        int basic = jdbcTemplate.update(
+                "UPDATE sys_menu SET sort_order = 6 WHERE menu_key = 'asset-basic' AND deleted = 0 AND sort_order <> 6");
+        if (vehicle > 0 || basic > 0) {
+            log.info("車輛管理與基礎數據菜單排序已互換: 車輛管理=5({} 行), 基礎數據=6({} 行)", vehicle, basic);
+        }
     }
 
     /** 把用车相关编号规则的归属菜单、拼接说明与前缀收敛到当前口径 */
@@ -311,6 +367,66 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
         log.info("用車管理菜單已就緒（1 分组 + {} 子菜单，system_code={}）", MENUS.length, systemCode);
     }
 
+    /* ==================== 3. 车辆参数库 ==================== */
+
+    private void doMasterMigrate() {
+        int executed = executeScript(MASTER_SCRIPT);
+        log.info("车辆参数库建表脚本已执行: {} 条语句（{}）", executed, MASTER_SCRIPT);
+
+        Long parentId = queryMenuId(MASTER_MENU_PARENT);
+        if (parentId == null) {
+            throw new IllegalStateException(MASTER_MENU_PARENT + " 菜单不存在，車輛參數庫无处挂载");
+        }
+        String systemCode = firstOrNull(jdbcTemplate.queryForList(
+                "SELECT system_code FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1", String.class,
+                MASTER_MENU_PARENT));
+        if (systemCode == null) {
+            throw new IllegalStateException(MASTER_MENU_PARENT + " 未归属任何门户系统，车辆参数库会成为孤儿菜单");
+        }
+        // 子菜单排在基础数据现有 5 项之后
+        // 菜单键与名称必须写字面量：scripts/check-menu-consistency.mjs 的正则只识别
+        // ensureMenu(变量, "key", "名称", "/path", "Component", "Icon", ...) 这种形式，
+        // 传常量会让新菜单逸出门禁（看似绿了，其实四项登记一项都没被校验）
+        ensureMenu(parentId, "vehicle-master-data", "車輛參數庫", "/vehicle-master-data",
+                "VehicleMasterData", "ClusterOutlined", 6, ACTIONS_MASTER, "Vehicle Master Data", systemCode);
+        grantMaster();
+    }
+
+    private void grantMaster() {
+        Long adminRoleId = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE code = 'admin' LIMIT 1", Long.class)
+                .stream().findFirst().orElse(null);
+        if (adminRoleId != null) {
+            upsertGrant(adminRoleId, MENU_MASTER, ACTIONS_MASTER);
+        }
+    }
+
+    /**
+     * 后置校验：三表 + 三个软删感知唯一键 + 菜单父级与门户归属。
+     *
+     * <p>父级和 system_code 必须显式校验：挂错分组或归属为空时，菜单会静默地从门户
+     * 导航里消失，比报错更难查。
+     */
+    private void verifyMaster() {
+        for (String table : new String[]{"biz_vehicle_brand", "biz_vehicle_series", "biz_vehicle_model"}) {
+            if (!tableExists(table)) {
+                throw new IllegalStateException(table + " 表未就绪，车辆参数库不可用");
+            }
+        }
+        Long parentId = queryMenuId(MASTER_MENU_PARENT);
+        Long menuId = queryMenuId(MENU_MASTER);
+        if (menuId == null) {
+            throw new IllegalStateException("車輛參數庫菜單未就緒");
+        }
+        if (parentId == null || !parentId.equals(parentOf(MENU_MASTER))) {
+            throw new IllegalStateException("車輛參數庫菜單未挂在 " + MASTER_MENU_PARENT + " 下");
+        }
+        if (!"eam".equals(systemCodeOf(MENU_MASTER))) {
+            throw new IllegalStateException("車輛參數庫菜單 system_code 非 eam，门户剪枝会丢掉它");
+        }
+        log.info("車輛參數庫已就緒（3 表 + 1 菜单，挂在 {} 下）", MASTER_MENU_PARENT);
+    }
+
     /**
      * 建菜单（已存在则校正父级/类型/门户域/排序/图标），返回 menu id。
      *
@@ -435,6 +551,13 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
             }
         }
         return executed;
+    }
+
+    private boolean tableExists(String table) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", Integer.class, table);
+        return n != null && n > 0;
     }
 
     /** 列是否存在（MySQL 8 无 ADD COLUMN IF NOT EXISTS，先查后加是唯一安全的写法） */

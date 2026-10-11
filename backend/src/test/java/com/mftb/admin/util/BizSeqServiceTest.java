@@ -60,6 +60,28 @@ class BizSeqServiceTest {
         assertNull(BizSeqService.algoRuleKey(0));
     }
 
+    /**
+     * 廣告訂單編號規則映射：必须覆盖各 AdSales*ServiceImpl 下单实际使用的规则 key，
+     * 否则存量旧 GD 订单号在 seq:init-v20 回填时会被判为「无对应规则」而留下错号。
+     */
+    @Test
+    void adOrderRuleKey_coversAllOrderSaleModules() {
+        assertEquals(BizSeqService.RULE_AD_ORDER_STAR, BizSeqService.adOrderRuleKey(1));
+        assertEquals(BizSeqService.RULE_AD_ORDER_NEW_STORE, BizSeqService.adOrderRuleKey(2));
+        assertEquals(BizSeqService.RULE_AD_ORDER_REVIVE, BizSeqService.adOrderRuleKey(3));
+        assertEquals(BizSeqService.RULE_AD_ORDER_POPULAR, BizSeqService.adOrderRuleKey(5));
+        assertEquals(BizSeqService.RULE_AD_ORDER_SIGNBOARD, BizSeqService.adOrderRuleKey(13));
+        assertEquals(BizSeqService.RULE_AD_ORDER_TRAFFIC, BizSeqService.adOrderRuleKey(15));
+    }
+
+    @Test
+    void adOrderRuleKey_nullAndUnknown() {
+        assertNull(BizSeqService.adOrderRuleKey(null));
+        // 自然流量等无「下单」入口的算法类型不应有订单编号规则
+        assertNull(BizSeqService.adOrderRuleKey(7));
+        assertNull(BizSeqService.adOrderRuleKey(99));
+    }
+
     @Test
     void giftRuleKey_knownTypes() {
         assertEquals("gift_new_store", BizSeqService.giftRuleKey("new_store"));

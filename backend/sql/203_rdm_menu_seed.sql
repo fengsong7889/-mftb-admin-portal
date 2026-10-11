@@ -1,11 +1,11 @@
--- 203: 產研協同系統（RDM）菜单与系统清单种子
+-- 203: 產研交付系統（RDM）菜单与系统清单种子
 --      一次性参考文档；实际执行与幂等由 RdmMenuInitializer 负责（版本键 rdm:menu-seed:v1.0）。
 --      归属系统：sys_system.code = 'rdm'（SystemCode.RDM），门户排序 75，介于物資管理(70) 与 OA(80) 之间。
 --      仅允许 INSERT / ON DUPLICATE KEY UPDATE，无任何破坏性语句。
 
 -- 1) 系统清单（门户卡片与系统准入真值）
 INSERT INTO sys_system (code, name, name_en, description, icon, sort_order, status, deleted)
-VALUES ('rdm', '產研協同系統', 'R&D Collaboration',
+VALUES ('rdm', '產研交付系統', 'R&D Delivery',
         '需求提交、审批、分配、研发交付、验收上线与产出看板', 'ProjectOutlined', 75, 1, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), name_en = VALUES(name_en),
                         description = VALUES(description), icon = VALUES(icon), sort_order = VALUES(sort_order);

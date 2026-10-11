@@ -376,10 +376,15 @@ public class VehicleUseServiceImpl implements VehicleUseService {
         if (!Boolean.TRUE.equals(dto.getKeyReceived())) {
             blockers.add("鑰匙未領取不可出車");
         }
-        // 与车辆详情返回的 suggestStartOdometer 同一个查询：两处不同源时页面提示一个值、后端拒绝另一个值
+        // 起始里程基线 = max(档案当前里程, 最近已确认结束里程)，与车辆详情 suggestStartOdometer 同口径。
+        // 只比 lastConfirmed 会漏掉「档案里程已推进但该车尚无已确认行程」的情况，导致起始里程可倒退登记。
         BigDecimal lastConfirmed = tripMapper.latestConfirmedEnd(vehicle.getId());
-        if (lastConfirmed != null && dto.getStartOdometer().compareTo(lastConfirmed) < 0) {
-            blockers.add("起始里程低於上次已確認值 " + lastConfirmed + " km");
+        BigDecimal odometerFloor = vehicle.getCurrentOdometer();
+        if (lastConfirmed != null && (odometerFloor == null || lastConfirmed.compareTo(odometerFloor) > 0)) {
+            odometerFloor = lastConfirmed;
+        }
+        if (odometerFloor != null && dto.getStartOdometer().compareTo(odometerFloor) < 0) {
+            blockers.add("起始里程低於車輛當前里程基線 " + odometerFloor + " km，不可倒退");
         }
         if (!blockers.isEmpty()) {
             throw new BusinessException(String.join("；", blockers));
@@ -1173,6 +1178,28 @@ public class VehicleUseServiceImpl implements VehicleUseService {
         }
         if (query.getDepartmentId() != null) {
             wrapper.eq(VehicleUse::getDepartmentId, query.getDepartmentId());
+        }
+        if (StringUtils.hasText(query.getUseNo())) {
+            wrapper.like(VehicleUse::getUseNo, query.getUseNo().trim());
+        }
+        if (StringUtils.hasText(query.getDriverName())) {
+            wrapper.like(VehicleUse::getDriverName, query.getDriverName().trim());
+        }
+        if (StringUtils.hasText(query.getRequesterName())) {
+            wrapper.like(VehicleUse::getApplicantName, query.getRequesterName().trim());
+        }
+        // 計劃時段取「區間相交」：planned_end >= from 且 planned_start <= to，
+        // 跨月單不會因為起點落在區間外而漏命中
+        if (query.getFromDate() != null) {
+            wrapper.ge(VehicleUse::getPlannedEnd, query.getFromDate());
+        }
+        if (query.getToDate() != null) {
+            wrapper.le(VehicleUse::getPlannedStart, query.getToDate());
+        }
+        // 行程狀態在子表：用 exists 下推，避免把行程表整张拉进内存再筛
+        if (StringUtils.hasText(query.getTripStatus())) {
+            wrapper.exists("SELECT 1 FROM biz_vehicle_trip t WHERE t.use_id = biz_vehicle_use.id "
+                    + "AND t.deleted = 0 AND t.status = {0}", query.getTripStatus());
         }
     }
 

@@ -171,7 +171,7 @@ export interface VehicleFile {
   /** 法人主体（复用购买公司字典维度，非汽车制造商品牌） */
   ownerCompanyId: number
   ownerCompanyName: string
-  /** 公司品牌：1=闪蜂 2=mFood（独立维度） */
+  /** 所属品牌：1=闪蜂 2=mFood（独立维度） */
   companyBrand: number
   /** 管理部门 */
   manageDeptId: number
@@ -200,6 +200,17 @@ export interface VehicleFile {
   remark?: string
   updatedBy: string
   updatedAt: string
+  /** 车辆参数库三级关联与展示快照（品牌/车系/年款均可空，历史车只有文本） */
+  brandId?: number
+  brandName?: string
+  seriesId?: number
+  seriesName?: string
+  modelId?: number
+  modelName?: string
+  bodyType?: string
+  bodyTypeLabel?: string
+  energyType?: string
+  energyTypeLabel?: string
   /** 后端乐观锁版本：编辑时回传为 expectVersion，避免覆盖他人改动 */
   version?: number
   /** 出车建议起始里程（后端按 max(档案, 最近已确认行程) 算，与出车校验同口径） */
@@ -359,6 +370,12 @@ export interface VehicleFileFormValues {
   vin?: string
   allowedDeptIds?: number[]
   remark?: string
+  /** 车辆参数库三级：选车系即自动带出车身形式与能源类型，仍可手工覆盖 */
+  brandId?: number
+  seriesId?: number
+  modelId?: number
+  bodyType?: string
+  energyType?: string
 }
 
 export interface VehicleUseApplyFormValues {

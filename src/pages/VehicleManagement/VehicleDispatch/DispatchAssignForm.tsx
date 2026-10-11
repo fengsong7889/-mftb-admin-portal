@@ -74,6 +74,8 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
 
   const vehicle = vehicles.find(v => v.id === vehicleId)
   const driver = driverOptions.find(d => d.value === driverEmpId)
+  // 展示与校验都对齐车辆登记地区那条资格：多地区驾驶人只显示最新相关的一条
+  const driverQual = driver?.qualifications.find(q => q.region === vehicle?.registerRegion) ?? driver?.qualification
   const changedVehicle = order.assign.finalVehicleId != null && order.assign.finalVehicleId !== vehicleId
   const busy = saving || submitting
 
@@ -90,14 +92,14 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
       }
     }
     if (!driver) list.push('未選擇實際駕駛人')
-    else driverQualified(driver.qualification).forEach(b => list.push(b.message))
+    else driverQualified(driver.qualifications, undefined, vehicle?.registerRegion).forEach(b => list.push(b.message))
 
     // 排除自己：改派/重派时本单已在候选里，否则永远报冲突
     findScheduleConflicts(candidates.filter(c => c.id !== order.id), {
       vehicleId, driverEmpId, start: order.apply.plannedStart, end: order.apply.plannedEnd,
       excludeUseId: order.id,
     }).forEach(c => list.push(
-      `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 占用`,
+      `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 佔用`,
     ))
     return list
   }, [order, vehicleId, driverEmpId, vehicle, driver, candidates])
@@ -139,8 +141,8 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
           <div className="confirm-info-row"><span>用車人：</span><b>{order.apply.actualUserName} · {order.apply.departmentName}</b></div>
           <div className="confirm-info-row"><span>最終車輛：</span><b>{vehicle?.plateNo ?? '—'}</b></div>
           <div className="confirm-info-row"><span>實際駕駛人：</span><b>{driver?.qualification.empName ?? '—'}</b></div>
-          <div className="confirm-info-row"><span>占用時段：</span><b>{formatWindow(order.apply.plannedStart, order.apply.plannedEnd)}</b></div>
-          {changedVehicle && <div className="confirm-info-row"><span>注意：</span><b>改派會釋放原車占用並占用新車時段</b></div>}
+          <div className="confirm-info-row"><span>佔用時段：</span><b>{formatWindow(order.apply.plannedStart, order.apply.plannedEnd)}</b></div>
+          {changedVehicle && <div className="confirm-info-row"><span>注意：</span><b>改派會釋放原車佔用並佔用新車時段</b></div>}
           <div className="confirm-info-row"><span>操作人：</span><b>{operator}</b></div>
         </div>
       ),
@@ -206,7 +208,7 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
               }))}
             />
             <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
-              只列出用車部門在顯式授權範圍內的車輛；運行狀態異常的車輛保留可見並標明原因，便於查明而不是静默隐藏。
+              只列出用車部門在顯式授權範圍內的車輛；運行狀態異常的車輛保留可見並標明原因，便於查明而不是靜默隱藏。
             </div>
           </div>
           {vehicle && (
@@ -234,15 +236,15 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
               options={driverOptions.map(d => ({ value: d.value, label: d.label }))}
             />
             <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
-              駕駛人與申請人、用車人分别记录；自驾场景默认本人，公司司机场景必须显式指派。
+              駕駛人與申請人、用車人分別記錄；自駕場景默認本人，公司司機場景必須顯式指派。
             </div>
           </div>
           {driver && (
             <Descriptions column={1} size="small" style={{ gridColumn: 'span 2' }}>
               <Descriptions.Item label="駕照適用地區 / 準駕範圍">
-                {driver.qualification.region} / {driver.qualification.licenseClass}
+                {driverQual?.region ?? '—'} / {driverQual?.licenseClass ?? '—'}
               </Descriptions.Item>
-              <Descriptions.Item label="有效期至">{driver.qualification.validUntil}</Descriptions.Item>
+              <Descriptions.Item label="有效期至">{driverQual?.validUntil ?? '—'}</Descriptions.Item>
             </Descriptions>
           )}
         </div>
@@ -262,7 +264,7 @@ export default function DispatchAssignForm({ order, vehicles, saving, onSubmit, 
           <Space size={4}>
             <Tag color="success">車輛可用</Tag>
             <Tag color="success">駕駛資格有效</Tag>
-            <Tag color="success">時段無占用衝突</Tag>
+            <Tag color="success">時段無佔用衝突</Tag>
             <Tag color="success">部門授權範圍內</Tag>
           </Space>
         ) : (

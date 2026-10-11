@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useMemo } from 'react'
 import { Button, Form, Input, InputNumber, Select, Spin, message, Space, Switch, TreeSelect } from 'antd'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemDetail, createConsumableItem, updateConsumableItem,
@@ -223,7 +224,7 @@ export default function ItemForm({ id, readOnly, onBack }: Props) {
             </Form.Item>
           </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
-            <Input.TextArea placeholder="選填" maxLength={300} showCount rows={3} />
+            <RemarkTextArea />
           </Form.Item>
         </div>
       </Form>

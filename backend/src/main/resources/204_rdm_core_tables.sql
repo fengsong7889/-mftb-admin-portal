@@ -1,4 +1,4 @@
--- 204: 產研協同（RDM）需求全生命周期 M1 核心表
+-- 204: 產研交付（RDM）需求全生命周期 M1 核心表
 --      一次性参考文档；实际执行与幂等由 RdmSchemaMigrationInitializer 负责。
 --      版本键: rdm:schema:v1.0（建表 + 状态机/流转/SLA 种子 + 编号规则 + 准入流程定义）
 --      方言：MySQL 8.x，全部 CREATE TABLE IF NOT EXISTS / INSERT IGNORE，可重复执行。
@@ -283,8 +283,8 @@ CREATE TABLE IF NOT EXISTS rdm_notify_log (
 
 -- ── 13. 编号规则 ──
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) VALUES
-  ('rdm_requirement','需求編號','產研協同','XQ','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
-  ('rdm_acceptance','需求驗收單號','產研協同','XQYS','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');
+  ('rdm_requirement','需求編號','產研交付','XQ','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
+  ('rdm_acceptance','需求驗收單號','產研交付','XQYS','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');
 
 -- ── 14. 准入审批流程定义（复用 OA 引擎：节点/审批人由「審批流程配置」维护） ──
 INSERT IGNORE INTO biz_oa_process (process_code, process_name, category, icon, description, workflow_type, sort_order, status)

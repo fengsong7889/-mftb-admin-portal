@@ -6,8 +6,8 @@
 #
 # 用法：
 #   bash restart-service.sh              # 自动检测变更类型，选择最优重启方式
-#   bash restart-service.sh --fast       # 仅跑已有 JAR，不编译（最快，~15s）
-#   bash restart-service.sh --rebuild    # 重新编译 + 跑 JAR（代码变更后，~45s）
+#   bash restart-service.sh --fast       # 仅跑已有 JAR，不编译（跳过编译阶段）
+#   bash restart-service.sh --rebuild    # 重新编译 + 跑 JAR（代码变更后）
 #   bash restart-service.sh --full       # 等同于 run-local.sh（mvn spring-boot:run）
 #   bash restart-service.sh --stop       # 仅停止后端服务
 #   bash restart-service.sh --status     # 查看后端运行状态
@@ -17,6 +17,14 @@
 #   pom.xml / 依赖 / 配置文件变更                     → --rebuild（必须重新编译）
 #   未变更 / 仅重启调试运行中服务                      → --fast
 #   首次启动 / target/ 不存在                          → 自动 --rebuild
+#
+# 就绪等待（冷启动不要误判为失败）：
+#   阶段1 轮询 /api/health/live  → Tomcat 已起来
+#   阶段2 轮询 /api/health/ready → 迁移与结构契约校验通过（DatabaseReadinessState）
+#   实测冷启动到 ready=200 约 140s（应用启动 66s + 各初始化器串行跑到契约校验），
+#   故窗口上限设为 240s；ready 在初始化期间返回 503 属中间态，不是失败。
+#   禁止改用根路径 / 或登录前接口作就绪判据：/ 需鉴权恒 401，
+#   而 /api/auth/captcha 只要 Tomcat 起来就 200，无法证明数据库已就绪。
 #
 # 详细说明：backend/SERVICE-RESTART-GUIDE.md
 # ─────────────────────────────────────────────────────────────────────────────
@@ -164,13 +172,21 @@ show_status() {
     port_pid=$(lsof -nP -iTCP:8080 -sTCP:LISTEN -t 2>/dev/null | tr '\n' ' ' | xargs 2>/dev/null || true)
     if [ -n "$port_pid" ]; then
         echo -e "${GREEN}✅ 后端服务运行中 (PID: $port_pid, 端口: 8080)${NC}"
-        local http_code
-        http_code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ 2>/dev/null || true)
-        http_code="${http_code:-000}"
-        if [ "$http_code" != "000" ]; then
-            echo -e "${GREEN}   HTTP 状态: $http_code${NC}"
+        # 用专用探针表征状态：根路径 / 需鉴权会返回 401，容易被误读成服务异常
+        local live_code ready_code
+        live_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:8080/api/health/live 2>/dev/null || true)
+        live_code="${live_code:-000}"
+        ready_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:8080/api/health/ready 2>/dev/null || true)
+        ready_code="${ready_code:-000}"
+        if [ "$live_code" = "000" ]; then
+            echo -e "${YELLOW}   进程在但 HTTP 未响应（可能正在启动中）${NC}"
         else
-            echo -e "${YELLOW}   HTTP 未响应（可能正在启动中）${NC}"
+            echo -e "${GREEN}   live=${live_code}${NC}"
+            if [ "$ready_code" = "200" ]; then
+                echo -e "${GREEN}   ready=${ready_code} (迁移与结构契约校验已就绪)${NC}"
+            else
+                echo -e "${YELLOW}   ready=${ready_code} (迁移/结构契约校验尚未通过，可稍后重探)${NC}"
+            fi
         fi
     else
         echo -e "${RED}❌ 后端服务未运行${NC}"
@@ -263,8 +279,10 @@ start_jar() {
     echo "$pid" > "$PID_FILE"
 
     # 等待启动确认
+    # 窗口需覆盖「应用启动 + 全部初始化器跑到结构契约校验通过」的总时长：
+    # 实测冷启动约 140s，120s 会在契约校验完成前就到期并误报「迁移未就绪」
     echo -e "${CYAN}⏳ 等待服务启动...${NC}"
-    local max_wait=120
+    local max_wait=240
     local waited=0
     local live_ok=false
 
@@ -392,7 +410,9 @@ case "${1:-}" in
         show_status
         ;;
     --help|-h)
-        sed -n '2,25p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'
+        # 自动输出文件头注释块（跳过 shebang，遇到首个非注释行即停止），
+        # 不再用硬编码行号范围，避免新增说明被截断
+        awk 'NR==1 {next} /^#/ {print; next} {exit}' "$0" | sed 's/^# \{0,1\}//'
         ;;
     "")
         setup_env

@@ -20,7 +20,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 產研協同（RDM）产出积分接口（M4）。
+ * 產研交付（RDM）产出积分接口（M4）。
  *
  * <p>权限口径：积分会被引用进绩效，属于强敏感数据，因此**不给"泛看板权"就能看**：
  * <ul>

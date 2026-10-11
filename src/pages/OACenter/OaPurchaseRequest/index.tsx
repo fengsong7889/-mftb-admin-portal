@@ -12,6 +12,7 @@ import {
   Table, Tag, Modal, Upload, TreeSelect,
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import {
   ArrowLeftOutlined, SendOutlined, SaveOutlined, PlusOutlined, ShoppingCartOutlined,
   FileTextOutlined, UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
@@ -380,7 +381,7 @@ function ItemEditModal({ open, editing, categories, brands, models, onOk, onCanc
           </Col>
         </Row>
         <Form.Item label="備註" name="remark">
-          <Input placeholder="備註（可選）" allowClear />
+          <RemarkTextArea />
         </Form.Item>
       </Form>
     </Modal>

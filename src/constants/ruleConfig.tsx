@@ -366,6 +366,7 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'ad_order_revive', label: '盤活復蘇訂單', type: 'table', value: 'DDPH', defaultValue: 'DDPH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDPH202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
       { key: 'ad_order_traffic', label: '投流廣告訂單', type: 'table', value: 'DDLL', defaultValue: 'DDLL', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDLL202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
       { key: 'ad_order_popular', label: '人氣商家訂單', type: 'table', value: 'DDRQ', defaultValue: 'DDRQ', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDRQ202608120001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
+      { key: 'ad_order_signboard', label: '金字招牌訂單', type: 'table', value: 'DDZP', defaultValue: 'DDZP', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'DDZP202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '廣告銷售' },
       { key: 'config_pricing_star', label: '無敵星星定價', type: 'table', value: 'DJWD', defaultValue: 'DJWD', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'DJWD20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '銷售定價' },
       { key: 'config_pricing_hot', label: '人氣商家定價', type: 'table', value: 'DJRQ', defaultValue: 'DJRQ', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'DJRQ20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '銷售定價' },
       { key: 'config_pricing_revive', label: '盤活復蘇定價', type: 'table', value: 'DJPH', defaultValue: 'DJPH', dateFormat: 'YYYYMMDD', min: 3, max: 3, unit: 'DJPH20260812000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '銷售定價' },
@@ -375,6 +376,8 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'gift_new_store', label: '新店廣告贈送ID', type: 'table', value: 'XDZS', defaultValue: 'XDZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'XDZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '推廣贈送' },
       { key: 'gift_popular', label: '人氣商家贈送ID', type: 'table', value: 'RQZS', defaultValue: 'RQZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'RQZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '推廣贈送' },
       { key: 'gift_revive', label: '盤活復蘇贈送ID', type: 'table', value: 'PHZS', defaultValue: 'PHZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PHZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '推廣贈送' },
+      { key: 'gift_signboard', label: '金字招牌贈送ID', type: 'table', value: 'JZZS', defaultValue: 'JZZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'JZZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '推廣贈送' },
+      { key: 'gift_traffic', label: '投流廣告贈送ID', type: 'table', value: 'TLZS', defaultValue: 'TLZS', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'TLZS202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '推廣贈送' },
       /* ── 批次查詢 ── */
       { key: 'batch_recharge', label: '充值批次', type: 'table', value: 'CZPC', defaultValue: 'CZPC', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'CZPC202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '批次查詢' },
       { key: 'batch_transfer', label: '轉賬批次', type: 'table', value: 'ZZPC', defaultValue: 'ZZPC', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'ZZPC202608120000', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '批次查詢' },

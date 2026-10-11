@@ -16,7 +16,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import { createDraft, fetchMyDrivingTasks, fetchMyUses, fetchUseDetail, newRequestKey, toIso } from '../../../api/vehicle'
 import { toOrder, toOrders } from '../vehicleAdapter'
 import type { VehicleUseApplyFormValues, VehicleUseOrder } from '../vehicleTypes'
-import MyUseList from './MyUseList'
+import MyUseList, { type MyUseFilters } from './MyUseList'
 import VehicleUseApplyForm from './VehicleUseApplyForm'
 import VehicleUseDetail from '../VehicleUseDetail'
 
@@ -39,10 +39,19 @@ export default function MyVehicleUse() {
 
   const [applied, setApplied] = useState<VehicleUseOrder[]>([])
   const [driving, setDriving] = useState<VehicleUseOrder[]>([])
+  /** 两个 Tab 在当前筛选条件下的服务端计数（Tab 标签用；绝不用本页条数顶替） */
+  const [appliedTotal, setAppliedTotal] = useState(0)
+  const [drivingTotal, setDrivingTotal] = useState(0)
   const [current, setCurrent] = useState<VehicleUseOrder>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [reload, setReload] = useState(0)
+
+  /* 列表查询状态全部交给服务端：Tab=视角、查询条件=filters、分页=page/size */
+  const [tab, setTab] = useState('applied')
+  const [filters, setFilters] = useState<MyUseFilters>({})
+  const [page, setPage] = useState(1)
+  const [size, setSize] = useState(10)
 
   const back = useCallback(() => navigate('/my-vehicle-use'), [navigate])
   const refresh = useCallback(() => setReload(n => n + 1), [])
@@ -52,20 +61,24 @@ export default function MyVehicleUse() {
     let alive = true
     setLoading(true)
     setError(undefined)
-    // 两个视角各一次请求：接口本身就只返回与本人相关的数据，不在前端做归属过滤
+    // 两个视角各一次请求：接口本身就只返回与本人相关的数据，不在前端做归属过滤；
+    // 筛选条件与分页一起下推服务端，避免「搜索只命中拉到的前 100 条」
+    const query = { ...filters, page, size }
     void Promise.all([
-      fetchMyUses({ page: 1, size: 100 }),
-      fetchMyDrivingTasks({ page: 1, size: 100 }),
+      fetchMyUses(query),
+      fetchMyDrivingTasks(query),
     ])
       .then(([a, d]) => {
         if (!alive) return
         setApplied(toOrders(a.records ?? []))
+        setAppliedTotal(a.total ?? 0)
         setDriving(toOrders(d.records ?? []))
+        setDrivingTotal(d.total ?? 0)
       })
       .catch(e => { if (alive) setError(e instanceof Error ? e.message : '加載失敗') })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [view, reload])
+  }, [view, reload, filters, page, size])
 
   useEffect(() => {
     if (view !== 'detail' || recordId == null) return
@@ -114,11 +127,22 @@ export default function MyVehicleUse() {
     <>
       {view === 'list' && (
         <MyUseList
+          tab={tab}
+          onTabChange={next => { setTab(next); setPage(1) }}
           applied={applied}
           driving={driving}
+          appliedTotal={appliedTotal}
+          drivingTotal={drivingTotal}
           loading={loading}
           error={error}
           onRetry={refresh}
+          onFiltersChange={next => { setFilters(next); setPage(1) }}
+          page={page}
+          size={size}
+          onPageChange={(nextPage, nextSize) => {
+            setPage(nextSize === size ? nextPage : 1)
+            setSize(nextSize)
+          }}
         />
       )}
 

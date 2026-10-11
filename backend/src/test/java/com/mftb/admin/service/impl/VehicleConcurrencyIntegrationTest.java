@@ -1,9 +1,12 @@
 package com.mftb.admin.service.impl;
 
 import com.mftb.admin.constant.VehicleConstants;
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.VehicleDto;
 import com.mftb.admin.dto.VehicleUseDto;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.VehicleService;
 import com.mftb.admin.service.VehicleUseService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +64,8 @@ class VehicleConcurrencyIntegrationTest {
 
     @Autowired
     private VehicleUseService vehicleUseService;
+    @Autowired
+    private VehicleService vehicleService;
     @Autowired
     private com.mftb.admin.mapper.VehicleTripMapper tripMapper;
     @Autowired
@@ -302,6 +307,86 @@ class VehicleConcurrencyIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(new java.math.BigDecimal(stats.get("totalMileage").toString()))
                 .as("累计里程只累已确认行程（1350-1000=350），实际=" + stats.get("totalMileage"))
                 .isEqualByComparingTo("350");
+    }
+
+    /* ==================== 6. 列表真实映射：toVO + 授权批量装载 ==================== */
+
+    @Test
+    @DisplayName("车辆分页走真实 toVO：授权部门必须随列表返回（防『能写不能读』与前端 TypeError 回归）")
+    void pageMapsFixtureVehicleWithGrants() {
+        VehicleDto.Query q = new VehicleDto.Query();
+        q.setKeyword(plateMarker);
+        q.setPage(1);
+        q.setSize(10);
+        PageResult<VehicleDto.VO> res = vehicleService.page(q);
+        assertEquals(1L, res.getTotal(), "夹具车辆必须能被关键词命中");
+        VehicleDto.VO vo = res.getRecords().get(0);
+        assertEquals(plateMarker, vo.getPlateNo());
+        assertNotNull(vo.getAllowedDepts(), "列表缺 allowedDepts 会让前端 (v.managers ?? []) 同类防护失效");
+        assertEquals(1, vo.getAllowedDepts().size());
+    }
+
+    /* ==================== 7. 列表搜索条件：服务端筛选接线 ==================== */
+
+    /**
+     * 办理页/我的用车页的搜索条件（单号/用车人/驾驶人/计划时段/行程状态）此前
+     * Query 里有字段但没接线，前端只能「拉全量再本地 filter」。接线后在真实库钉住：
+     * 每个条件既要能命中也要能排除；计划时段取区间相交（跨期单不得漏命中）；
+     * 行程状态走 exists 下推——SQL 列名/类型若与行程表不符，这一步会直接报错。
+     */
+    @Test
+    @DisplayName("列表搜索条件服务端接线：单号/用车人/驾驶人/计划时段相交/行程状态均能命中与排除")
+    void pageFiltersNarrowResultsServerSide() {
+        LocalDateTime start = LocalDateTime.now().plusDays(8).withHour(9).withMinute(0).withNano(0);
+        long useId = vehicleUseService.directRegister(directDto(start, start.plusHours(2), "vk-filter-" + start));
+        // 直接登记只推进到待出車、不建行程；行程状态筛选必须有行程事实，故补一次出車
+        depart(useId, start, "1000");
+        String useNo = jdbc.queryForObject(
+                "SELECT use_no FROM biz_vehicle_use WHERE id = ?", String.class, useId);
+        String adminName = sysUserMapper.selectById(operatorId).getName();
+
+        VehicleUseDto.Query byNo = baseQuery();
+        byNo.setUseNo(useNo.substring(useNo.length() - 6));
+        assertEquals(1L, vehicleUseService.page(byNo).getTotal(), "用车单号模糊必须命中夹具单");
+
+        VehicleUseDto.Query byPeople = baseQuery();
+        byPeople.setRequesterName(adminName.substring(0, 1));
+        byPeople.setDriverName(adminName.substring(0, 1));
+        assertEquals(1L, vehicleUseService.page(byPeople).getTotal(), "用车人/实际驾驶人模糊必须命中");
+
+        VehicleUseDto.Query missPeople = baseQuery();
+        missPeople.setDriverName("無此駕駛人ZZZ");
+        assertEquals(0L, vehicleUseService.page(missPeople).getTotal(), "不存在的驾驶人必须排除全部");
+
+        // 区间相交：查询区间只罩住单据前半段（start-1h ~ start+1h），仍必须命中
+        VehicleUseDto.Query overlap = baseQuery();
+        overlap.setFromDate(start.minusHours(1));
+        overlap.setToDate(start.plusHours(1));
+        assertEquals(1L, vehicleUseService.page(overlap).getTotal(), "计划时段取区间相交，部分重叠必须命中");
+
+        VehicleUseDto.Query before = baseQuery();
+        before.setFromDate(start.minusDays(2));
+        before.setToDate(start.minusHours(1));
+        assertEquals(0L, vehicleUseService.page(before).getTotal(), "区间完全在单据之前不得命中");
+
+        VehicleUseDto.Query trip = baseQuery();
+        trip.setTripStatus(VehicleConstants.TRIP_DEPARTED);
+        assertEquals(1L, vehicleUseService.page(trip).getTotal(), "直接登记后行程状态=departed，exists 下推必须命中");
+
+        VehicleUseDto.Query tripMiss = baseQuery();
+        tripMiss.setTripStatus(VehicleConstants.TRIP_DISPUTED);
+        assertEquals(0L, vehicleUseService.page(tripMiss).getTotal(), "行程状态不符必须排除");
+    }
+
+    /** 锁定夹具车辆 + 办理视角，避免开发库其它数据干扰断言 */
+    private VehicleUseDto.Query baseQuery() {
+        asUser();
+        VehicleUseDto.Query q = new VehicleUseDto.Query();
+        q.setScope("dispatch");
+        q.setPlateNo(plateMarker);
+        q.setPage(1);
+        q.setSize(10);
+        return q;
     }
 
     private void depart(long useId, LocalDateTime at, String odometer) {

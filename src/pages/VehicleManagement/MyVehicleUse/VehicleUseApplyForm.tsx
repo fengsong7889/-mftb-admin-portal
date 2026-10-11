@@ -144,7 +144,7 @@ export default function VehicleUseApplyForm({ onSubmit, onBack }: Props) {
     }
     return {
       ok: true as const, leader,
-      text: `本單將提交給「${leader}」審批。審批通過後由車管安排車輛與駕駛人，安排完成才開始計入資源占用。`,
+      text: `本單將提交給「${leader}」審批。審批通過後由車管安排車輛與駕駛人，安排完成才開始計入資源佔用。`,
     }
   }, [dept.departments, personaDeptId, selfName, user])
 
@@ -329,7 +329,7 @@ export default function VehicleUseApplyForm({ onSubmit, onBack }: Props) {
             <div>
               <Alert
                 type="warning" showIcon
-                message={`所選時段已有 ${conflicts.length} 項占用，仍可提交申請，但車管安排時會改派或要求調整時段`}
+                message={`所選時段已有 ${conflicts.length} 項佔用，仍可提交申請，但車管安排時會改派或要求調整時段`}
                 description={(
                   <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 12 }}>
                     {conflicts.map((c, i) => (
@@ -337,7 +337,7 @@ export default function VehicleUseApplyForm({ onSubmit, onBack }: Props) {
                         <Tag color={c.resource === 'vehicle' ? 'blue' : 'purple'}>
                           {c.resource === 'vehicle' ? '車輛' : '駕駛人'}
                         </Tag>
-                        {c.target} · {c.conflictWindow} · 占用單號 {c.conflictUseNo}
+                        {c.target} · {c.conflictWindow} · 佔用單號 {c.conflictUseNo}
                       </li>
                     ))}
                   </ul>

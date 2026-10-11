@@ -26,6 +26,7 @@ import { useDriverOptions, useVehicleDeptTree, type DeptTreeNode } from '../vehi
 import {
   VehicleFormPageHeader, VehicleSection,
 } from '../VehicleModuleLayout'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 
 interface FormState {
   vehicleId?: number
@@ -144,8 +145,11 @@ export default function BackfillForm({ defaultVehicleId, onBack }: Props) {
     let values: FormState
     try {
       values = await form.validateFields()
-    } catch {
-      return // 字段下方已有红字，不双弹
+    } catch (err) {
+      // 字段下方已有红字，不双弹；手动校验流程补滚动定位到首个错误字段（§F.4）
+      const firstField = (err as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0]?.name
+      if (firstField) form.scrollToField(firstField, { behavior: 'smooth', block: 'center' })
+      return
     }
     if (blockers.length) {
       message.warning('存在阻斷項，無法提交補錄')
@@ -217,7 +221,7 @@ export default function BackfillForm({ defaultVehicleId, onBack }: Props) {
             <Form.Item
               label="實際駕駛人" name="driverId"
               rules={[{ required: true, message: '請選擇駕駛人' }]}
-              extra="按穩定員工 ID 關聯，姓名只作展示"
+              extra="姓名只作展示"
             >
               <Select
                 showSearch optionFilterProp="label" placeholder="請選擇駕駛人"
@@ -254,7 +258,7 @@ export default function BackfillForm({ defaultVehicleId, onBack }: Props) {
             <Form.Item
               label="結束里程（km）" name="endOdometer"
               rules={[{ required: true, message: '請填寫結束里程' }]}
-              extra="行駛里程由後端計算，不由本頁填寫"
+              extra="里程由後端計算"
             >
               <InputNumber min={0} style={{ width: '100%' }} placeholder="實際歸還時表顯讀數" />
             </Form.Item>
@@ -270,7 +274,7 @@ export default function BackfillForm({ defaultVehicleId, onBack }: Props) {
             label="為什麼要事後補錄（必填，寫入操作記錄）"
             rules={[{ required: true, message: '請填寫補錄原因' }]}
           >
-            <Input.TextArea rows={3} maxLength={200} showCount placeholder="如：當晚行程結束後未及時登記，次日由車管據實補錄" />
+            <RemarkTextArea placeholder="如：當晚行程結束後未及時登記，次日由車管據實補錄" />
           </Form.Item>
           {vehicle && (
             <div style={{ fontSize: 12, color: '#8C8C8C' }}>

@@ -2373,7 +2373,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("asset-location",     new String[]{"倉庫管理",         "asset-basic",        "3"});
         menus.put("param-library",      new String[]{"產品參數庫",       "asset-basic",        "4"});
         menus.put("asset-tag",          new String[]{"資產標籤",         "asset-basic",        "5"});
-        // ── 協同辦公系統（原 oa-center 壳已退役）──
+        // ── 流程審批系統（原 oa-center 壳已退役）──
         menus.put("process-center",     new String[]{"流程中心",         null,         "1"});
         menus.put("oa-requests",        new String[]{"流程事項",         null,         "2"});
         menus.put("workflow-config",     new String[]{"流程配置",         null,         "3"});

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 產研協同（RDM）需求看板接口。
+ * 產研交付（RDM）需求看板接口。
  * <p>只读统计，入口菜单为看板分组下的四个二级菜单；需求相关角色均可查看，
  * 因为「我的需求进展」与「部门/个人产出」在同一个页面承载。
  */

@@ -10,8 +10,8 @@ import ru from './locales/ru.json'
 /** 語言持久化 key（localStorage） */
 export const LANGUAGE_STORAGE_KEY = 'app_language'
 
-/** 支持的语言（zh-TW/en 有靜態 JSON 兜底，ja/ko/ru 由數據庫語言包動態注入） */
-export const SUPPORTED_LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru'] as const
+/** 支持的语言（zh-TW/en 有靜態 JSON 兆底，ja/ko/ru/zh-CN 由數據庫語言包動態注入） */
+export const SUPPORTED_LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru', 'zh-CN'] as const
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
 /** 國家 → 默認語言 映射：中國/港澳台默認中文，其餘默認英文 */

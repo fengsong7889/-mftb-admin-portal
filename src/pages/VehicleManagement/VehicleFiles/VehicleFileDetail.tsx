@@ -92,7 +92,10 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                 <VehicleSection icon={<CarOutlined />} title="車輛檔案">
                   <Descriptions column={4} size="middle">
                     <Descriptions.Item label="車牌號碼">{record.plateNo}</Descriptions.Item>
-                    <Descriptions.Item label="登記地區">{record.registerRegion}</Descriptions.Item>
+                    <Descriptions.Item label="車輛品牌">{record.brandName ?? '未選擇'}</Descriptions.Item>
+          <Descriptions.Item label="車系">{record.seriesName ?? '未選擇'}</Descriptions.Item>
+          <Descriptions.Item label="年款車型">{record.modelName ?? '未選擇'}</Descriptions.Item>
+          <Descriptions.Item label="登記地區">{record.registerRegion}</Descriptions.Item>
                     <Descriptions.Item label="車型">{record.vehicleType}</Descriptions.Item>
                     <Descriptions.Item label="VIN / 底盤號">{record.vin ?? '—'}</Descriptions.Item>
                     <Descriptions.Item label="核定載客（含駕駛人）">{record.seatCount} 人</Descriptions.Item>
@@ -114,7 +117,7 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                   </div>
                 </VehicleSection>
 
-                <VehicleSection icon={<CheckCircleOutlined />} tone="config" title="占用與預約">
+                <VehicleSection icon={<CheckCircleOutlined />} tone="config" title="佔用與預約">
                   {occupied.length === 0 ? (
                     <span style={{ fontSize: 13, color: '#8C8C8C' }}>暫無在途或待派單據</span>
                   ) : (
@@ -126,7 +129,7 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                       columns={[
                         { title: '用車單號', dataIndex: 'useNo', width: 160 },
                         {
-                          title: '占用時段', width: 250,
+                          title: '佔用時段', width: 250,
                           render: (_: unknown, o) => formatWindow(
                             o.trip?.depart.departAt ?? o.apply.plannedStart,
                             o.trip?.tripReturn.returnAt ?? o.apply.plannedEnd,
@@ -164,7 +167,7 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                 <VehicleSection icon={<TeamOutlined />} title="歸屬與可用範圍">
                   <Descriptions column={2} size="middle">
                     <Descriptions.Item label="所屬法人">{record.ownerCompanyName}</Descriptions.Item>
-                    <Descriptions.Item label="公司品牌"><BrandTag value={record.companyBrand} /></Descriptions.Item>
+                    <Descriptions.Item label="所属品牌"><BrandTag value={record.companyBrand} /></Descriptions.Item>
                     <Descriptions.Item label="管理部門">{record.manageDeptName}</Descriptions.Item>
                     <Descriptions.Item label="可使用部門">
                       {record.allowedDepts.length
@@ -199,7 +202,7 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                   />
                   <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
                     管理範圍按「車輛 × 管理人員」關聯判定，不沿用商家集團數據權限；
-                    直接登記、補錄、更正、導出分别独立授权。
+                    直接登記、補錄、更正、導出分別獨立授權。
                   </div>
                 </VehicleSection>
               </>
@@ -243,7 +246,7 @@ export default function VehicleFileDetail({ record, onBack, onEdit }: Props) {
                 />
                 <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
                   待核驗、已失效、已過有效期的駕駛人不可安排新出車；
-                  下拉框中直接置灰並顯示原因，不做静默隱藏。
+                  下拉框中直接置灰並顯示原因，不做靜默隱藏。
                 </div>
               </VehicleSection>
             ),

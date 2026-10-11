@@ -10,6 +10,7 @@
  */
 import { useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Select, message } from 'antd'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import { FileProtectOutlined, SaveOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
@@ -138,7 +139,7 @@ export default function QualificationForm({ vehicleId, saving, onSubmit, onBack 
               <Input placeholder="承辦核驗的人員" maxLength={40} />
             </Form.Item>
             <Form.Item label="備註" name="remark" style={{ gridColumn: 'span 3' }}>
-              <Input placeholder="選填" maxLength={200} />
+              <RemarkTextArea />
             </Form.Item>
           </div>
           <div style={{ fontSize: 12, color: '#8C8C8C' }}>

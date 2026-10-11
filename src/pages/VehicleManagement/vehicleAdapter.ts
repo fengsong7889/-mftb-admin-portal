@@ -180,6 +180,16 @@ export function toVehicleFile(vo: VehicleVO): VehicleFile {
     manageDeptId: vo.manageDeptId,
     manageDeptName: vo.manageDeptName,
     eamAssetNo: optStr(vo.eamAssetNo),
+    brandId: vo.brandId ?? undefined,
+    brandName: optStr(vo.brandName),
+    seriesId: vo.seriesId ?? undefined,
+    seriesName: optStr(vo.seriesName),
+    modelId: vo.modelId ?? undefined,
+    modelName: optStr(vo.modelName),
+    bodyType: optStr(vo.bodyType),
+    bodyTypeLabel: optStr(vo.bodyTypeLabel),
+    energyType: optStr(vo.energyType),
+    energyTypeLabel: optStr(vo.energyTypeLabel),
     suggestStartOdometer: vo.suggestStartOdometer ?? undefined,
     remark: optStr(vo.remark),
     allowedDepts: (vo.allowedDepts ?? []).map(d => ({ deptId: d.deptId, deptName: d.deptName })),
@@ -291,6 +301,7 @@ export function toVehicleSavePayload(
     currentOdometer?: number; status: string; allowDirectRegister: boolean; insuranceValidUntil?: string
     inspectionValidUntil?: string; ownerCompanyId?: number; companyBrand?: number; manageDeptId?: number
     allowedDeptIds?: number[]; eamAssetNo?: string; remark?: string
+    brandId?: number; seriesId?: number; modelId?: number; bodyType?: string; energyType?: string
   },
   editing?: VehicleFile,
 ): VehicleSave {
@@ -311,6 +322,11 @@ export function toVehicleSavePayload(
     manageDeptId: values.manageDeptId ?? 0,
     allowedDeptIds: values.allowedDeptIds,
     eamAssetNo: values.eamAssetNo,
+    brandId: values.brandId,
+    seriesId: values.seriesId,
+    modelId: values.modelId,
+    bodyType: values.bodyType,
+    energyType: values.energyType,
     remark: values.remark,
     // 管理人员不在本表单维护，编辑时必须把原值带回，否则后端按"整组覆盖"会清空授权
     managers: editing?.managers.map(m => ({

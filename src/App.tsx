@@ -256,6 +256,7 @@ const VehicleFiles = lazy(() => import('./pages/VehicleManagement/VehicleFiles')
 const MyVehicleUse = lazy(() => import('./pages/VehicleManagement/MyVehicleUse'))
 const VehicleDispatch = lazy(() => import('./pages/VehicleManagement/VehicleDispatch'))
 const VehicleLedger = lazy(() => import('./pages/VehicleManagement/VehicleLedger'))
+const VehicleMasterData = lazy(() => import('./pages/VehicleManagement/VehicleMasterData'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
 const AssetTagView = lazy(() => import('./pages/AssetTagView'))
 // 資產領用簽署頁（釘釘工作通知直達，令牌免登，不含後台佈局）
@@ -265,7 +266,7 @@ const WorkflowConfig = lazy(() => import('./pages/WorkflowConfig'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowConfig/WorkflowEditor'))
 const WorkflowDetail = lazy(() => import('./pages/WorkflowConfig/WorkflowDetail'))
 
-// 產研協同（RDM）：需求全生命周期管理
+// 產研交付（RDM）：需求全生命周期管理
 const RdmWorkbench = lazy(() => import('./pages/Rdm/Workbench'))
 const RdmRequirementSubmit = lazy(() => import('./pages/Rdm/RequirementSubmit'))
 const RdmRequirementList = lazy(() => import('./pages/Rdm/RequirementList'))
@@ -570,7 +571,7 @@ function AuthenticatedLayout() {
               <Route path="/oa-requests" element={<OaRequests />} />
               <Route path="/process-center" element={<ProcessCenter />} />
               <Route path="/oa-purchase-request" element={<OaPurchaseRequest />} />
-              {/* 產研協同（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
+              {/* 產研交付（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
               <Route path="/rdm-workbench" element={<RdmWorkbench />} />
               <Route path="/rdm-submit" element={<RdmRequirementSubmit />} />
               <Route path="/rdm-requirement" element={<RdmRequirementList />} />
@@ -697,6 +698,9 @@ function AuthenticatedLayout() {
               <Route path="/vehicle-ledger" element={<VehicleLedger />} />
               <Route path="/vehicle-ledger/detail" element={<VehicleLedger />} />
               <Route path="/vehicle-ledger/correct" element={<VehicleLedger />} />
+              <Route path="/vehicle-master-data" element={<VehicleMasterData />} />
+              <Route path="/vehicle-master-data/add" element={<VehicleMasterData />} />
+              <Route path="/vehicle-master-data/edit" element={<VehicleMasterData />} />
               <Route path="/vehicle-ledger/backfill" element={<VehicleLedger />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />

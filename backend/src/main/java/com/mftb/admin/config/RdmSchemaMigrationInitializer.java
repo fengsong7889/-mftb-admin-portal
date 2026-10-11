@@ -14,7 +14,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * RDM（產研協同）M1 结构迁移：建 12 张 {@code rdm_} 表 + 状态机/流转/SLA 种子 + 编号规则 + 准入流程定义。
+ * RDM（產研交付）M1 结构迁移：建 12 张 {@code rdm_} 表 + 状态机/流转/SLA 种子 + 编号规则 + 准入流程定义。
  * <p>
  * DDL 只在 classpath 脚本 {@code 204_rdm_core_tables.sql} 存一份（{@code backend/sql/} 下同名文件为参考副本），
  * 避免 Java 与 SQL 双份漂移。脚本全部 CREATE TABLE IF NOT EXISTS / INSERT IGNORE，天然幂等。
@@ -333,7 +333,7 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         // 编号规则种子：缺行时 create 放行单会报「編號生成規則未配置」，整条上线闸门不可用
         int inserted = jdbcTemplate.update(
                 "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
-                        + "VALUES ('rdm_release', '發布放行單號', '產研協同', 'FZ', 'YYYYMMDD', 4, 1, 1, '{prefix} + YYYYMMDD + {n}位自增序號')");
+                        + "VALUES ('rdm_release', '發布放行單號', '產研交付', 'FZ', 'YYYYMMDD', 4, 1, 1, '{prefix} + YYYYMMDD + {n}位自增序號')");
         log.info("放行單編號規則種子已写入: 新增 {} 行", inserted);
     }
 

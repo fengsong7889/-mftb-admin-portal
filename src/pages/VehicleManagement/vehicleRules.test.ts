@@ -10,7 +10,7 @@ import {
   buildCorrectionDiff, canCancel, canTransition, countsInLedger, computeDurationHours,
   deptAllowed, driverQualified, evaluateBackfill, evaluateDepart, findScheduleConflicts,
   hasTimeOverlap, isOverdue, passengerWithinSeatLimit, plannedRangeValid, summarizeLedger,
-  vehicleDispatchable, checkMileage, buildVisibleNodes,
+  vehicleDispatchable, checkMileage, buildVisibleNodes, normalizePlate, validatePlate,
 } from './vehicleRules'
 import {
   APPROVAL_OUTCOME, DRIVING_MODE, QUALIFICATION_RESULT, TRIP_STATUS, USE_SOURCE, USE_STATUS,
@@ -170,6 +170,27 @@ describe('driverQualified', () => {
   it('有效期已过按失效处理', () => {
     expect(driverQualified(qual({ validUntil: '2026-01-01' }), '2026-10-08'))
       .toContainEqual(expect.objectContaining({ code: 'QUAL_VALID_UNTIL_EXPIRED' }))
+  })
+
+  it('资格地区与车辆登记地区不匹配时阻断（跨地区驾照不默认互认）', () => {
+    expect(driverQualified(qual({ region: '澳門' }), '2026-10-08', '中國內地'))
+      .toContainEqual(expect.objectContaining({ code: 'QUAL_REGION_MISMATCH' }))
+  })
+
+  it('多地区资格按车辆登记地区选对应那条判定', () => {
+    const quals = [
+      qual({ region: '澳門', result: QUALIFICATION_RESULT.EXPIRED }),
+      qual({ region: '中國內地', result: QUALIFICATION_RESULT.VERIFIED, validUntil: '2030-01-01' }),
+    ]
+    // 内地登记车：用内地那条（有效）→ 合格
+    expect(driverQualified(quals, '2026-10-08', '中國內地')).toEqual([])
+    // 澳門登记车：用澳門那条（已失效）→ 阻断
+    expect(driverQualified(quals, '2026-10-08', '澳門'))
+      .toContainEqual(expect.objectContaining({ code: 'QUAL_EXPIRED' }))
+  })
+
+  it('未指定登记地区时不做地区过滤（向后兼容单资格调用）', () => {
+    expect(driverQualified(qual({ region: '澳門' }), '2026-10-08')).toEqual([])
   })
 })
 
@@ -440,5 +461,50 @@ describe('buildVisibleNodes', () => {
     expect(nodes.at(-1)!.state).toBe('current')
     // 未来节点（确认归档）不得出现
     expect(nodes.filter(n => n.state === 'pending')).toHaveLength(0)
+  })
+})
+
+/* ==================== 10. 车牌格式（港澳与内地并存一列） ==================== */
+
+describe('normalizePlate / validatePlate', () => {
+  it('归一化吃掉空格与分隔点并转大写，避免同一车牌落成两条唯一键', () => {
+    expect(normalizePlate('粤b 12345')).toBe('粤B12345')
+    expect(normalizePlate('mt-88-01')).toBe('MT-88-01')
+  })
+
+  it('内地燃油牌 7 位通过；位数不符按能源类型给具体提示，结构不符给格式提示', () => {
+    // 省 + 字母 + 5 位 = 7 位，燃油牌正解
+    expect(validatePlate('粤B12345', 'petrol')).toEqual([])
+    // 尾部 6 位（共 8 位）却是燃油车：位数提示，告诉用户该换成 7 位普通号牌
+    expect(validatePlate('粤B123456', 'petrol')[0].code).toBe('PLATE_FUEL_LEN')
+    // 尾部只有 4 位，连"像不像内地牌"都不满足：给格式提示而不是位数提示
+    expect(validatePlate('粤B1234', 'petrol')[0].code).toBe('PLATE_MAINLAND')
+  })
+
+  it('繁体字形「粵」按内地牌处理，不会被误判成港澳牌', () => {
+    expect(normalizePlate('粵B12345')).toBe('粤B12345')
+    // 粵 + 1 位字母 + 5 位 = 合法内地牌结构；位数够但能源不匹配时走位数分支
+    expect(validatePlate('粵B123456', 'petrol')[0].code).toBe('PLATE_FUEL_LEN')
+  })
+
+  it('新能源牌必须 8 位，且提示说明是插混/纯电', () => {
+    expect(validatePlate('粤BD12345', 'ev')).toEqual([])
+    expect(validatePlate('粤B12345', 'phev')[0].code).toBe('PLATE_NEW_ENERGY_LEN')
+  })
+
+  it('能源类型未知时不按位数误杀（历史数据没填能源类型也要能改其他字段）', () => {
+    expect(validatePlate('粤B12345', null)).toEqual([])
+    expect(validatePlate('粤BD12345', undefined)).toEqual([])
+  })
+
+  it('港澳牌接受字母数字与连字符组合，纯字母没有数字则拒绝', () => {
+    expect(validatePlate('MT-88-01', null)).toEqual([])
+    expect(validatePlate('MX-12-34', null)).toEqual([])
+    expect(validatePlate('AAAAAA', null)[0].code).toBe('PLATE_HK_MO')
+  })
+
+  it('空车牌给出必填提示而不是格式错误', () => {
+    expect(validatePlate('', null)[0].code).toBe('PLATE_EMPTY')
+    expect(validatePlate(undefined, 'ev')[0].code).toBe('PLATE_EMPTY')
   })
 })

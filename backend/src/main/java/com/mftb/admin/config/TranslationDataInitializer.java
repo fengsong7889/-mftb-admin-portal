@@ -38,6 +38,7 @@ public class TranslationDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        log.info("多语言翻译模块初始化开始");
         try {
             // 基础建表与默认语言种子: 一次性, 版本化后重启跳过 (启动提速)
             versionTracker.applyOnce("translation:base-v1", () -> {
@@ -62,6 +63,16 @@ public class TranslationDataInitializer implements CommandLineRunner {
                 }, "i18n-auto-translate");
                 thread.setDaemon(true);
                 thread.start();
+            }
+            // zh-CN 回填: 将已有 zh-TW 翻译通过 ICU4J 繁→简转换填充缺失的 zh-CN（一次性，版本化保护）
+            boolean applied = versionTracker.applyOnce("translation:zh-cn-backfill-v1", () -> {
+                int filled = translationService.backfillZhCn();
+                if (filled > 0) {
+                    log.info("多语言模块: zh-CN 简体中文回填完成，共填充 {} 条翻译", filled);
+                }
+            });
+            if (!applied) {
+                log.info("多语言模块: zh-CN 回填已在先前启动中完成，跳过");
             }
         } catch (Exception e) {
             log.error("多语言翻译模块初始化失败: {}", e.getMessage(), e);

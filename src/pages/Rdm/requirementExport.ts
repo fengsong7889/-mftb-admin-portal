@@ -43,7 +43,7 @@ function stayDays(stayHours?: number | null): number | '' {
  */
 export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabel: string): Promise<void> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = '產研協同'
+  wb.creator = '產研交付'
   const ws = wb.addWorksheet('需求台賬')
 
   ws.columns = [

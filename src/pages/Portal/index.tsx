@@ -24,6 +24,7 @@ import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
 import { getPortalSystemKey, getSystemDisplayName } from '../../constants/portalSystems'
 import { useAuth } from '../../contexts/AuthContext'
+import { chineseNameToPinyinEnglish } from '../Home/homeUtils'
 import AnimatedNumber from '../../components/AnimatedNumber'
 import SystemArtwork, { type PortalArtworkStyle } from './SystemArtwork'
 import './index.css'
@@ -69,11 +70,11 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '資產、耗材、採購、庫存、盤點', icon: 'InboxOutlined',
   },
   {
-    code: 'rdm', name: '產研協同系統', nameEn: 'R&D Collaboration',
+    code: 'rdm', name: '產研交付系統', nameEn: 'R&D Delivery',
     description: '需求提交、審批、分配、研發交付、驗收上線與產出看板', icon: 'ProjectOutlined',
   },
   {
-    code: 'oa', name: '協同辦公系統', nameEn: 'Office Collaboration',
+    code: 'oa', name: '流程審批系統', nameEn: 'Workflow Approval',
     description: '流程中心、流程事項、審批配置、員工自助', icon: 'SolutionOutlined',
   },
   {
@@ -120,7 +121,7 @@ const PORTAL_DOMAINS: readonly PortalDomain[] = [
     codes: ['finance', 'eam'],
   },
   {
-    key: 'org', nameKey: 'portal.domain.org', nameFallback: '組織與協同辦公',
+    key: 'org', nameKey: 'portal.domain.org', nameFallback: '組織與流程審批',
     descKey: 'portal.domain.orgDesc', descFallback: '人事組織、流程審批與產研交付',
     icon: <TeamOutlined />, tone: '#1890FF', toneBg: '#E6F7FF',
     codes: ['hr', 'oa', 'rdm'],
@@ -162,7 +163,7 @@ function greetingOf(hour: number): { key: string; fallback: string } {
 /** 视图模型：artworkName 固定为接口返回的原始名称，保证插画场景不随界面语言漂移。 */
 type ViewSystem = PortalSystem & { artworkName: string }
 
-/** 插画构图候选：目前產研協同与广告推荐各自提供两套，进门户时逐档轮换，不给员工做选择。 */
+/** 插画构图候选：目前產研交付与广告推荐各自提供两套，进门户时逐档轮换，不给员工做选择。 */
 const ARTWORK_STYLES: readonly PortalArtworkStyle[] = ['primary', 'alternate']
 /** 只记录上次实际展示的档位；与业务导航状态（current_system_code 等）分开，不互相覆盖。 */
 const ARTWORK_STYLE_KEY = 'portal_artwork_style'
@@ -228,6 +229,7 @@ export default function Portal() {
   const navigate = useNavigate()
   const { setCurrentSystemCode } = useCurrentSystem()
   const { user } = useAuth()
+  const isNonZh = !i18n.language?.startsWith('zh')
 
   const [systems, setSystems] = useState<PortalSystem[]>([])
   const [loading, setLoading] = useState(true)
@@ -473,7 +475,7 @@ export default function Portal() {
               <span className="portal-hero-hello">
                 {t('portal.greetingLine', '{{greeting}}，{{name}}{{empId}}', {
                   greeting: t(`portal.greeting.${greeting.key}`, greeting.fallback),
-                  name: user?.name || t('portal.heroUserFallback', '同事'),
+                  name: isNonZh ? chineseNameToPinyinEnglish(user?.name || '') : (user?.name || t('portal.heroUserFallback', '同事')),
                   empId: user?.empId ? t('portal.greetingEmpIdSuffix', '（{{empId}}）', { empId: user.empId }) : '',
                 })}
               </span>

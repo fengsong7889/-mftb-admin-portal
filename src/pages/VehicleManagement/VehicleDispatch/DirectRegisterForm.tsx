@@ -10,7 +10,7 @@
  * 不伪造为「审批通过」。OA 故障时不得自动切换到本路径。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Select, Tag, message, TreeSelect} from 'antd'
+import { Alert, Button, DatePicker, Descriptions, Form, Input, InputNumber, Select, Tag, message, TreeSelect } from 'antd'
 import { CarOutlined, SafetyCertificateOutlined, SendOutlined, TeamOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -25,6 +25,7 @@ import {
 } from '../vehicleRules'
 import { useDriverOptions, useVehicleDeptTree, type DeptTreeNode } from '../vehicleOptions'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import { fetchUses, toIso } from '../../../api/vehicle'
 import { toOrders } from '../vehicleAdapter'
 
@@ -134,7 +135,7 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
     }
     const driver = driverOptions.find(d => d.value === watchedDriverId)
     if (!driver) list.push('未選擇實際駕駛人')
-    else driverQualified(driver.qualification).forEach(b => list.push(b.message))
+    else driverQualified(driver.qualifications, undefined, selectedVehicle?.registerRegion).forEach(b => list.push(b.message))
 
     if (rangeValid) {
       findScheduleConflicts(conflictCandidates, {
@@ -142,7 +143,7 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
         driverEmpId: watchedDriverId,
         start: watchedRange[0], end: watchedRange[1],
       }).forEach(c => list.push(
-        `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 占用`,
+        `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 佔用`,
       ))
     } else {
       list.push('請填寫完整且合法的用車時段')
@@ -180,27 +181,13 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
     let values: FormState
     try {
       values = await form.validateFields()
-    } catch {
-      return // antd 已在字段下方提示
-    }
-    if (blockers.length) {
-      Modal.confirm({
-        title: '存在阻斷項，仍要提交？',
-        className: 'custom-confirm-modal',
-        icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-        okText: '仍然提交', cancelText: '返回修改',
-        content: (
-          <div className="confirm-info-card">
-            {blockers.map(b => (
-              <div className="confirm-info-row" key={b}><span>阻斷：</span><b style={{ color: '#FF4D4F' }}>{b}</b></div>
-            ))}
-            <div className="confirm-info-row"><span>說明：</span><b>最終是否放行由後端判定，此處僅提示。</b></div>
-          </div>
-        ),
-        onOk: () => runSubmit(values),
-      })
+    } catch (err) {
+      // antd 已在字段下方标红；手动校验流程补滚动定位到首个错误字段（§F.4）
+      const firstField = (err as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0]?.name
+      if (firstField) form.scrollToField(firstField, { behavior: 'smooth', block: 'center' })
       return
     }
+    // 提交按钮在 blockers.length > 0 时已 disabled，走到这里必然无阻断，直接提交
     await runSubmit(values)
   }
 
@@ -217,7 +204,7 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
       <VehicleFormPageHeader
         title="授權直接登記"
         onBack={onBack}
-        meta="用于明確授權的臨時安排、固定配車或緊急任務，不是繞過審批的通用入口"
+        meta="用於明確授權的臨時安排、固定配車或緊急任務，不是繞過審批的通用入口"
       />
 
       {!canDirectRegister && (
@@ -232,6 +219,7 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>選擇車輛</div>
           <Select
+            showSearch optionFilterProp="label"
             style={{ width: '100%' }} placeholder={manageableDirectVehicles.length ? '請選擇車輛' : '無可登記車輛：需車管開啟直接登記且你在管理範圍內'}
             value={watchedVehicleId}
             onChange={v => {
@@ -244,7 +232,13 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
             }}
             options={manageableDirectVehicles.map(v => ({
               value: v.id,
-              label: `${v.plateNo} · ${v.vehicleType} · ${VEHICLE_STATUS_LABEL[v.status]} · ${v.allowedDepts.map(d => d.deptName).join('/')}`,
+              label: [
+                v.plateNo,
+                [v.brandName, v.seriesName].filter(Boolean).join(' '),
+                v.vehicleType,
+                VEHICLE_STATUS_LABEL[v.status],
+                v.allowedDepts.map(d => d.deptName).join('/'),
+              ].filter(Boolean).join(' · '),
             }))}
           />
         </div>
@@ -316,16 +310,16 @@ export default function DirectRegisterForm({ vehicles, saving, error, onSubmit, 
             <Form.Item
               label="起始里程（km）" name="startOdometer"
               rules={[{ required: true, message: '請填寫起始里程' }]}
-              extra="默認帶出上次確認值，有差異需在歸還時說明"
+              extra="默認帶出上次確認值"
             >
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item
               label="直接登記原因" name="directRegisterReason"
               rules={[{ required: true, message: '請填寫直接登記原因' }, { min: 6, message: '原因不少於 6 個字' }]}
-              style={{ gridColumn: 'span 3' }}
+              style={{ gridColumn: '1 / -1' }}
             >
-              <Input.TextArea rows={2} maxLength={200} placeholder="如：客戶臨時改約，用車人無法操作系統，經電話確認授權" />
+              <RemarkTextArea placeholder="如：客戶臨時改約，用車人無法操作系統，經電話確認授權" />
             </Form.Item>
           </div>
         </VehicleSection>

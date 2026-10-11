@@ -54,11 +54,27 @@ export function writeCurrentSystemCode(code: string | null): void {
   }))
 }
 
-/** 从菜单树自顶向下建立 path → systemCode 映射；仅使用带 path 的叶子节点 */
-export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, string> {
-  const map: Record<string, string> = {}
-  if (!tree) return map
+/**
+ * 訂單列表 / 訂單詳情是「廣告銷售(ads)」與「店鋪隨心推(seller)」共用的路由：
+ * 同一 pathname 的歸屬取決於進入時攜帶的 from 參數，只按 pathname 反查會把
+ * 廣告銷售進入的訂單頁誤判成 seller 系統（側欄高亮早已有同一判定，此處共用）。
+ */
+const SHARED_ORDER_ROUTE_PATHS = ['/promotion-order-manage', '/order-detail']
+const AD_SALES_MENU_KEY = 'ad-sales'
+const SELLER_ORDER_MENU_KEY = 'promotion-sales-config'
+
+/** 解析共用訂單路由的歸屬菜單 key；非共用路由返回 null，交由調用方按 path 反查 */
+export function resolveOrderRouteMenuKey(pathname: string, search = ''): string | null {
+  if (!SHARED_ORDER_ROUTE_PATHS.includes(pathname)) return null
+  return new URLSearchParams(search).get('from') === AD_SALES_MENU_KEY
+    ? AD_SALES_MENU_KEY
+    : SELLER_ORDER_MENU_KEY
+}
+
+/** 从菜单树自顶向下建立 menuKey / path → systemCode 双映射；path 仅取带 path 的节点 */
+function buildSystemIndex(tree: MenuVO[]) {
   const systemByKey: Record<string, string> = {}
+  const map: Record<string, string> = {}
   const walk = (nodes: MenuVO[], inherited: string | null): void => {
     for (const node of nodes) {
       if (node.status !== 1) continue
@@ -78,22 +94,35 @@ export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, stri
   for (const [path, menuKey] of Object.entries(ROUTE_MENU_KEY_MAP)) {
     if (systemByKey[menuKey]) map[path] ??= systemByKey[menuKey]
   }
-  return map
+  return { systemByKey, pathToSystem: map }
 }
 
-/** 依据 pathname 反查系统 code；未匹配返回 null。 */
+/** 从菜单树自顶向下建立 path → systemCode 映射；仅使用带 path 的叶子节点 */
+export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, string> {
+  if (!tree) return {}
+  return buildSystemIndex(tree).pathToSystem
+}
+
+/**
+ * 依据 pathname(+query) 反查系统 code；未匹配返回 null。
+ * search 仅用于共用訂單路由的來源歸屬：from=ad-sales 歸廣告系統，否則歸店鋪經營系統；
+ * 歸屬菜單不在服务端菜单树时（菜单缺失/停用）退回按 path 反查的既有行为。
+ */
 export function resolveSystemFromPathname(
   pathname: string,
   tree: MenuVO[] | null,
+  search = '',
 ): string | null {
   if (!tree) return null
-  const map = buildPathToSystemMap(tree)
+  const { systemByKey, pathToSystem } = buildSystemIndex(tree)
+  const ownerKey = resolveOrderRouteMenuKey(pathname, search)
+  if (ownerKey && systemByKey[ownerKey]) return systemByKey[ownerKey]
   // 精确匹配优先
-  if (map[pathname]) return map[pathname]
+  if (pathToSystem[pathname]) return pathToSystem[pathname]
   // 动态段（如 /workflow-config/123）取最长前缀匹配
   const clean = pathname.replace(/\/+$/, '')
   let best: { path: string; sys: string } | null = null
-  for (const [path, sys] of Object.entries(map)) {
+  for (const [path, sys] of Object.entries(pathToSystem)) {
     if (!path || path === '/') continue
     if (clean === path || clean.startsWith(path + '/')) {
       if (!best || path.length > best.path.length) {

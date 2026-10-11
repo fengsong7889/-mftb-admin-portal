@@ -147,10 +147,10 @@ CREATE TABLE IF NOT EXISTS rdm_change_request (
 
 -- ── 6. 编号规则 ──
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) VALUES
-  ('rdm_prd','PRD 編號','產研協同','PRD','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
-  ('rdm_review','需求評審編號','產研協同','RV','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
-  ('rdm_work_task','研發任務編號','產研協同','RT','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
-  ('rdm_change','需求變更編號','產研協同','XC','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');
+  ('rdm_prd','PRD 編號','產研交付','PRD','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
+  ('rdm_review','需求評審編號','產研交付','RV','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
+  ('rdm_work_task','研發任務編號','產研交付','RT','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號'),
+  ('rdm_change','需求變更編號','產研交付','XC','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');
 
 -- ── 7. 需求变更审批流程（复用 OA 引擎；节点与审批人由「審批流程配置」维护） ──
 INSERT IGNORE INTO biz_oa_process (process_code, process_name, category, icon, description, workflow_type, sort_order, status)

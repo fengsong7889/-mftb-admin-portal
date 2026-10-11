@@ -447,6 +447,40 @@ describe('广告系统与店鋪經營系統切换隔离', () => {
   })
 })
 
+describe('廣告銷售查看訂單不切換系統', () => {
+  /** 訂單列表/詳情是兩套系統共用的路由，歸屬由 from 參數決定 */
+  const tree: MenuVO[] = [
+    { id: 1, parentId: null, menuKey: 'merchant_promotion', name: '商家推廣工具', type: 1, status: 1, sort: 1, systemCode: 'ads', children: [
+      { id: 2, parentId: 1, menuKey: 'ad-sales', name: '廣告銷售', type: 2, status: 1, sort: 1 },
+    ] },
+    { id: 3, parentId: null, menuKey: 'promotion-sales-config', name: '店鋪隨心推', type: 2, status: 1, sort: 2, systemCode: 'seller' },
+  ]
+
+  beforeEach(() => {
+    setMenuState(tree, 'online')
+    vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [
+      { code: 'ads', name: '廣告推薦系統', icon: 'AimOutlined' },
+      { code: 'seller', name: '店鋪經營系統', icon: 'ShoppingOutlined' },
+    ], superAdmin: false })
+  })
+
+  it('带 from=ad-sales 进入订单列表时保留广告推荐系统并高亮廣告銷售', async () => {
+    writeCurrentSystemCode('ads')
+    const { container } = renderSidebar('/promotion-order-manage?type=%E7%84%A1%E6%83%B9%E6%98%9F%E6%98%9F&from=ad-sales')
+    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('廣告推薦系統'))
+    expect(readCurrentSystemCode()).toBe('ads')
+    expect(await screen.findByRole('menuitem', { name: /廣告銷售/ })).toHaveClass('ant-menu-item-selected')
+  })
+
+  it('不带 from 时仍归属店鋪經營系統，共用路由的反查口径与高亮一致', async () => {
+    writeCurrentSystemCode('ads')
+    const { container } = renderSidebar('/promotion-order-manage?type=%E7%84%A1%E6%83%B9%E6%98%9F%E6%98%9F')
+    await waitFor(() => expect(container.querySelector('.sidebar-logo')).toHaveTextContent('店鋪經營系統'))
+    expect(readCurrentSystemCode()).toBe('seller')
+    expect(await screen.findByRole('menuitem', { name: /店鋪隨心推/ })).toHaveClass('ant-menu-item-selected')
+  })
+})
+
 describe('Sidebar 菜单真值来源', () => {
   it.each(consumableMenus)('$menuKey：导航、后端连接、权限与图标登记完整', (menu) => {
     expect(keyToPath[menu.menuKey]).toBe(menu.path)

@@ -848,6 +848,12 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'create', label: '發起申請' },
   ],
+  // 车辆参数库：三级主数据维护；删除归到 edit（后端没有独立的 delete 动作名）
+  'vehicle-master-data': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增主數據' },
+    { key: 'edit', label: '編輯/停用/刪除' },
+  ],
   // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
   'asset-claim': [
     { key: 'view', label: '查看' },
@@ -978,7 +984,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
-  // ── 產研協同（RDM）需求全生命周期 ──
+  // ── 產研交付（RDM）需求全生命周期 ──
   'rdm-center': [
     { key: 'view', label: '查看' },
   ],
@@ -1472,7 +1478,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // OA中心
   'oa-requests',
   'workflow-config',
-  // 產研協同（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
+  // 產研交付（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
   'rdm-workbench',
   'rdm-requirement',
   'rdm-pool-group',
@@ -1523,6 +1529,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'vehicle-dispatch',
   'vehicle-ledger',
   'my-vehicle-use',
+  'vehicle-master-data',
   // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
   'asset-claim',
   'asset-borrow',
@@ -1715,7 +1722,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // OA中心
   '/oa-requests': 'oa-requests',
   '/workflow-config': 'workflow-config',
-  // 產研協同（RDM）—— 子页（详情/验收入口/提交表单）归入其主菜单。
+  // 產研交付（RDM）—— 子页（详情/验收入口/提交表单）归入其主菜单。
   // 提交需求/產品需求處理/交付中需求退役后，这些路由必须改挂存活菜单：
   // 它们原本的授权已随菜单清除，仍映射到退役 key 会让前端守卫把所有人都拦在门外。
   '/rdm-workbench': 'rdm-workbench',
@@ -1799,6 +1806,9 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/vehicle-ledger': 'vehicle-ledger',
   '/vehicle-ledger/detail': 'vehicle-ledger',
   '/vehicle-ledger/correct': 'vehicle-ledger',
+  '/vehicle-master-data': 'vehicle-master-data',
+  '/vehicle-master-data/add': 'vehicle-master-data',
+  '/vehicle-master-data/edit': 'vehicle-master-data',
   '/vehicle-ledger/backfill': 'vehicle-ledger',
   '/my-vehicle-use': 'my-vehicle-use',
   '/my-vehicle-use/apply': 'my-vehicle-use',

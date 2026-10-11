@@ -24,8 +24,8 @@
 | `ai` | 人工智能系統 | Artificial Intelligence | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
 | `hr` | 人力資源系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
 | `eam` | 物資管理系統 | Asset Management | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
-| `rdm` | 產研協同系統 | R&D Collaboration | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
-| `oa` | 協同辦公系統 | Office Collaboration | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
+| `rdm` | 產研交付系統 | R&D Delivery | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
+| `oa` | 流程審批系統 | Workflow Approval | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
 | `iam` | 權限管理系統 | Access Control | `SafetyCertificateOutlined` | 90 | 角色、功能授权、数据授权、菜单配置、账号安全 |
 | `platform` | 平台支撐系統 | Platform Support | `SettingOutlined` | 100 | 通知渠道、规则中心、版本管理 |
 | `i18n` | 翻譯管理系統 | Translation Management | `GlobalOutlined` | 110 | 翻译工作台、语言管理、导入导出、机翻引擎、翻译统计 |

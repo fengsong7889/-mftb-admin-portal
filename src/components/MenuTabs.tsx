@@ -235,7 +235,7 @@ const SUB_PAGE_NAME: Record<string, string> = {
   '/order-detail': '訂單詳情',
   '/promotion-order-manage': '訂單管理',
   /*
-   * 產研協同（RDM）的详情/独立表单页：这些路由本就没有菜单记录，
+   * 產研交付（RDM）的详情/独立表单页：这些路由本就没有菜单记录，
    * 不兜底就会退成 slug（深度测试实测到页签显示「rdm submit」）。
    * <p>只列详情页与独立表单页：门禁（check:menu）限制本表条目数且禁止“菜单名副本”，
    * 所以退役菜单（rdm-query / rdm-product / rdm-delivery-req）的名字不往这里塞——

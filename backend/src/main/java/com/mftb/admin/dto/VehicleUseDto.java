@@ -43,8 +43,12 @@ public final class VehicleUseDto {
         private Long vehicleId;
         private String plateNo;
         private String driverName;
+        /** 用車單號：模糊匹配。独立于 keyword，避免「单号精确收窄」被车牌/事由的 OR 稀释 */
+        private String useNo;
+        /** 用車人（申请人）姓名：模糊匹配 */
+        private String requesterName;
         private Long departmentId;
-        /** 按实际出车日期归属期间（跨日不拆分） */
+        /** 計劃時段篩選：與用車單的計劃區間取交集（跨月單不會因「起點不在區間」而漏命中） */
         private LocalDateTime fromDate;
         private LocalDateTime toDate;
         /** 办理页分组：to_assign / to_depart / in_use / to_confirm / backfill / all */

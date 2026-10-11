@@ -2,7 +2,7 @@ import { act, render, renderHook, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MenuVO } from '../api/menu'
 import request from '../api/request'
-import { CURRENT_SYSTEM_STORAGE_KEY, useCurrentSystem, writeCurrentSystemCode, resolveSystemFromPathname } from './useCurrentSystem'
+import { CURRENT_SYSTEM_STORAGE_KEY, useCurrentSystem, writeCurrentSystemCode, resolveSystemFromPathname, resolveOrderRouteMenuKey } from './useCurrentSystem'
 import { invalidateSystemNavigation, pickFirstEntryPath, useSystemNavigation } from './useSystemNavigation'
 import { resolveMenuPath } from '../constants/menuDataSource'
 
@@ -85,6 +85,39 @@ function deferred<T>() {
   const promise = new Promise<T>(done => { resolve = done })
   return { promise, resolve }
 }
+
+/** 廣告銷售(ads) 與店鋪隨心推(seller) 共用訂單路由的菜单树形态 */
+const orderSharingTree: MenuVO[] = [
+  { id: 5, parentId: null, menuKey: 'merchant_promotion', name: '商家推廣工具', type: 1, sort: 1, status: 1, systemCode: 'ads', children: [
+    { id: 6, parentId: 5, menuKey: 'ad-sales', name: '廣告銷售', type: 2, sort: 1, status: 1 },
+  ] },
+  { id: 7, parentId: null, menuKey: 'promotion-sales-config', name: '店鋪隨心推', type: 2, sort: 2, status: 1, systemCode: 'seller' },
+]
+
+describe('共用訂單路由的系統歸屬', () => {
+  const cases: [string, string][] = [
+    ['?type=無敵星星&from=ad-sales', 'ads'],
+    ['?type=無敵星星', 'seller'],
+    ['', 'seller'],
+  ]
+  it.each(cases)('訂單列表 %s 反查為 %s 系統', (search, expected) => {
+    expect(resolveSystemFromPathname('/promotion-order-manage', orderSharingTree, search)).toBe(expected)
+  })
+
+  it('訂單詳情同按 from 判定，非共用路由不受 query 影響', () => {
+    expect(resolveSystemFromPathname('/order-detail', orderSharingTree, '?from=ad-sales')).toBe('ads')
+    expect(resolveSystemFromPathname('/ad-sales', orderSharingTree, '?from=x')).toBe('ads')
+    expect(resolveOrderRouteMenuKey('/ad-sales', '?from=ad-sales')).toBeNull()
+  })
+
+  it('廣告銷售停用時退回共用路由的既有歸屬，不猜系统', () => {
+    const degraded: MenuVO[] = [
+      { ...orderSharingTree[0], children: [{ ...orderSharingTree[0].children![0], status: 0 }] },
+      orderSharingTree[1],
+    ]
+    expect(resolveSystemFromPathname('/promotion-order-manage', degraded, '?from=ad-sales')).toBe('seller')
+  })
+})
 
 describe('系统导航异步隔离', () => {
   it('快速切换不会显示或被迟到的上一系统响应覆盖', async () => {

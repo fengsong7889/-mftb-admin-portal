@@ -212,7 +212,7 @@ export default function Login() {
         localStorage.setItem(FAIL_COUNT_KEY, String(next))
         message.error(result.message || t('login.failed'))
         if (next >= FAIL_THRESHOLD) {
-          message.warning('為保護賬號安全，下次登錄需先完成滑塊安全驗證')
+          message.warning(t('login.captchaRequiredHint'))
         }
       }
     }, 600)

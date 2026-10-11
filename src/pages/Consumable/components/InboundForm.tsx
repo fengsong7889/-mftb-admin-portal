@@ -5,7 +5,8 @@
  * 用于手工入库 / 期初建账 / 预警补货；提交前 custom-confirm-modal 二次确认
  */
 import { useState, useEffect } from 'react'
-import { Button, Form, Input, InputNumber, Select, Modal, message, Space, Spin } from 'antd'
+import { Button, Form, InputNumber, Select, Modal, message, Space, Spin } from 'antd'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemOptions, inboundConsumable, type ConsumableItem,
@@ -145,7 +146,7 @@ export default function InboundForm({ onBack, presetItemId }: Props) {
             </Form.Item>
           </div>
           <Form.Item label="備註" name="remark" style={{ marginBottom: 0 }}>
-            <Input.TextArea placeholder="選填，如採購單號/來源說明" maxLength={200} showCount rows={2} />
+            <RemarkTextArea placeholder="選填，如採購單號/來源說明" />
           </Form.Item>
         </div>
       </Form>

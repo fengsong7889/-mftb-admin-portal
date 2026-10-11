@@ -47,6 +47,17 @@ CREATE TABLE IF NOT EXISTS biz_vehicle (
     owner_company_id      BIGINT       NULL COMMENT '所属法人主体（sys_purchase_company.id），与公司品牌是两个独立维度',
     owner_company_name    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '所属法人名称快照：不因字典改名而改写历史',
     company_brand         TINYINT      NOT NULL DEFAULT 1 COMMENT '公司品牌：1=闪蜂 2=mFood',
+    -- 车辆参数库三级关联（均可空：历史车允许只有文本快照，不逼着回填才能保存）
+    brand_id              BIGINT       NULL COMMENT '车辆品牌 ID（biz_vehicle_brand.id）',
+    series_id             BIGINT       NULL COMMENT '车系 ID（biz_vehicle_series.id）',
+    model_id              BIGINT       NULL COMMENT '年款车型 ID（biz_vehicle_model.id）',
+    body_type             VARCHAR(20)  NULL COMMENT '車身形式：sedan/suv/mpv/van/bus/pickup/coupe',
+    energy_type           VARCHAR(20)  NULL COMMENT '能源類型：petrol/diesel/hybrid/phev/ev，决定车牌位数',
+    -- 名称快照：与 manage_dept_name 同一做法。参数库日后改名或被停用，历史车仍显示当时的叫法；
+    -- 也避免列表页为了显示三个名字去逐行查参数库（N+1）
+    brand_name            VARCHAR(60)  NULL COMMENT '品牌名称快照',
+    series_name           VARCHAR(80)  NULL COMMENT '车系名称快照',
+    model_name            VARCHAR(120) NULL COMMENT '年款车型名称快照（含年款）',
     manage_dept_id        BIGINT       NOT NULL COMMENT '管理部门（sys_department.id）',
     manage_dept_name      VARCHAR(128) NOT NULL DEFAULT '' COMMENT '管理部门名称快照',
     eam_asset_id          BIGINT       NULL COMMENT '关联 EAM 资产 ID（可空；关联后资产编号/购置信息以 EAM 为准）',

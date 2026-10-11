@@ -83,7 +83,7 @@ export interface EmployeeOption {
  * 法人主体（购买公司字典）候选。
  *
  * <p>走已有只读接口 GET /api/purchase-companies（登录即可，无需额外菜单权限）。
- * <p>法人主体与「公司品牌」是两个独立维度，车辆档案必须分开保存，不能共用一个 brand 字段。
+ * <p>法人主体与「所属品牌」是两个独立维度，车辆档案必须分开保存，不能共用一个 brand 字段。
  * <p>静默请求 + 失败置空：不给演示回退项，否则用户会选中一个不存在的法人并提交。
  */
 export interface PurchaseCompanyOption { value: number; label: string }
@@ -168,11 +168,27 @@ export function useDriverOptions() {
 
   useEffect(() => { void load() }, [load])
 
-  const options = useMemo(() => quals.map(q => ({
-    value: q.userId,
-    label: `${q.empName}（${q.empNo}） · ${q.region} · ${q.licenseClass} · ${QUALIFICATION_LABEL[QUALIFICATION_RESULT.VERIFIED]}`,
-    qualification: q,
-  })), [quals])
+  // 同一员工可能有多地区资格：按 userId 去重成一个候选人，暴露 qualifications 供地区匹配，
+  // 否则下拉会出现同 value 的重复项（F8），且资格预检拿不到目标地区那条（F2）
+  const options = useMemo<DriverOption[]>(() => {
+    const byUser = new Map<number, QualificationVO[]>()
+    for (const q of quals) {
+      const list = byUser.get(q.userId)
+      if (list) list.push(q)
+      else byUser.set(q.userId, [q])
+    }
+    return Array.from(byUser.entries()).map(([userId, list]) => {
+      const first = list[0]
+      const regions = Array.from(new Set(list.map(q => q.region))).join('、')
+      const licenseClasses = Array.from(new Set(list.map(q => q.licenseClass))).join('、')
+      return {
+        value: userId,
+        label: `${first.empName}（${first.empNo}） · ${regions} · ${licenseClasses} · ${QUALIFICATION_LABEL[QUALIFICATION_RESULT.VERIFIED]}`,
+        qualification: first,
+        qualifications: list,
+      }
+    })
+  }, [quals])
 
   return { options, quals, loading, failed, refetch: load }
 }
@@ -181,5 +197,8 @@ export function useDriverOptions() {
 export type DriverOption = {
   value: number
   label: string
+  /** 首条资格：向后兼容只读单条的展示位 */
   qualification: QualificationVO
+  /** 该候选人全部地区资格：资格预检按车辆 registerRegion 从中选取 */
+  qualifications: QualificationVO[]
 }

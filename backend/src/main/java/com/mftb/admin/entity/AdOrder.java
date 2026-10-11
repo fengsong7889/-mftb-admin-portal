@@ -20,7 +20,7 @@ public class AdOrder {
     @TableId
     private Long id;
 
-    /** 订单编号: 算法前缀 + 年月日 + 4位自增（如 WD202608120000） */
+    /** 订单编号: 按编号生成规则 ad_order_* 生成（如 DDWD202608120000） */
     private String orderNo;
 
     /** 算法类型快照 */

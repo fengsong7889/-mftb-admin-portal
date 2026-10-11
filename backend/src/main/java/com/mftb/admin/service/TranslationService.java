@@ -71,4 +71,12 @@ public interface TranslationService {
      * @return 翻译结果，失败返回 null
      */
     String translateText(String text, String targetLang);
+
+    /**
+     * 回填所有缺失的 zh-CN 翻译：从 zh-TW 源文本通过 ICU4J 繁→简转换生成。
+     * 由初始化器在启动时调用，幂等（只填充空缺）。
+     *
+     * @return 本次回填的记录数
+     */
+    int backfillZhCn();
 }

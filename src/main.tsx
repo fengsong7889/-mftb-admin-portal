@@ -3,9 +3,15 @@ import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'
 import zhTW from 'antd/locale/zh_TW'
 import enUS from 'antd/locale/en_US'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-tw'
 import App from './App'
 import i18n from './i18n'
 import './styles/global.css'
+
+// antd DatePicker 的星期表头取自 dayjs locale，未设置时会显示英文（Sun/Mon…）；
+// 默认语言为繁中，这里同步把 dayjs locale 设为 zh-tw，语言切换时再跟随调整
+dayjs.locale('zh-tw')
 
 const themeConfig = {
   token: {
@@ -47,7 +53,9 @@ function AppProviders() {
 
   useEffect(() => {
     const syncLocale = () => {
-      setLocale(i18n.language?.startsWith('en') ? enUS : zhTW)
+      const isEn = !!i18n.language?.startsWith('en')
+      setLocale(isEn ? enUS : zhTW)
+      dayjs.locale(isEn ? 'en' : 'zh-tw')
     }
     syncLocale()
     i18n.on('languageChanged', syncLocale)

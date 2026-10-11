@@ -41,4 +41,4 @@ CREATE TABLE IF NOT EXISTS rdm_release (
 -- 放行单编号规则：缺这条种子时 bizSeqService.next("rdm_release") 会直接报
 -- 「編號生成規則未配置或已停用」，整个放行链路 100% 不可用（深度测试实测踩过）。
 INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) VALUES
-  ('rdm_release','發布放行單號','產研協同','FZ','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');
+  ('rdm_release','發布放行單號','產研交付','FZ','YYYYMMDD',4,1,1,'{prefix} + YYYYMMDD + {n}位自增序號');

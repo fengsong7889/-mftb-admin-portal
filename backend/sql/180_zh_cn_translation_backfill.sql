@@ -1,0 +1,11 @@
+-- 180: zh-CN 简体中文翻译回填
+-- 说明: 将所有已有 zh-TW 翻译通过 ICU4J 繁→简转换自动填充缺失的 zh-CN 翻译
+-- 实际执行由 Java 迁移代码 TranslationDataInitializer.backfillZhCn() 负责（ICU4J 无法用纯 SQL 表达）
+-- 本 SQL 仅为参考文档，展示回填逻辑的语义：
+--
+-- 回填条件: deleted=0 AND translations_json 不含 "zh-CN" key AND 含有 zh-TW 值
+-- 回填方式: ICU4J Transliterator.getInstance("Traditional-Simplified").transliterate(zhTW_text)
+-- 回填结果: 写入 translations_json 的 "zh-CN" 字段，updated_by 设为 "backfill-zh-CN"
+--
+-- 注意: MySQL CONVERT(... USING gb2312) 只能做编码转换，不能做繁→简字形转换。
+-- 真正的繁→简转换需要 ICU4J 的 Transliterator，因此本迁移由 Java 代码执行。

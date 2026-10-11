@@ -174,7 +174,7 @@
       "growthDesc": "廣告投放、門店經營與搜索轉化",
       "biz": "經營與資產支撐",
       "bizDesc": "資金賬戶、財務對賬與物資資產管理",
-      "org": "組織與協同辦公",
+      "org": "組織與流程審批",
       "orgDesc": "人事組織、流程審批與產研交付",
       "govern": "智能與平台治理",
       "governDesc": "AI 能力、權限授權與平台配置",
@@ -284,11 +284,11 @@
         "description": "資產、耗材、採購與庫存的全生命週期管理"
       },
       "rdm": {
-        "name": "產研協同系統",
+        "name": "產研交付系統",
         "description": "需求提交、審批、分配、研發交付、驗收上線與產出看板"
       },
       "oa": {
-        "name": "協同辦公系統",
+        "name": "流程審批系統",
         "description": "流程申請、事項審批與員工自助，高效協作"
       },
       "iam": {
@@ -2584,7 +2584,13 @@
     "bizTag": "【商圈】",
     "basicInfo": "基本信息",
     "copy": "複製",
-    "pleaseSelect": "請選擇"
+    "pleaseSelect": "請選擇",
+    "serverError": "服務器異常，請稍後重試",
+    "requestFailed": "請求失敗",
+    "networkError": "網絡異常",
+    "noPermission": "您沒有權限執行此操作，請聯繫管理員授權",
+    "apiNotFound": "接口或資源不存在（404）：{{path}}，請檢查請求地址、資源是否存在及後端版本是否已更新",
+    "sessionExpired": "登錄校驗已過期，請重新登錄"
   },
   "country": {
     "china": "中国",
@@ -3655,7 +3661,8 @@
     "accountDisabledTitle": "账号已被停用",
     "accountDisabledDesc": "您的账号已被管理员停用，如需恢复请联系管理员。",
     "accountDisabledOk": "我知道了",
-    "backendUnavailable": "無法連接後端服務，部分菜單與數據不可用，請檢查服務或重新登入"
+    "backendUnavailable": "無法連接後端服務，部分菜單與數據不可用，請檢查服務或重新登入",
+    "captchaRequiredHint": "為保護賬號安全，連續登錄失敗後下次登錄需先完成滑塊安全驗證"
   },
   "sidebar": {
     "offlineMenuTip": "後端服務不可用：僅顯示離線菜單，恢復後以伺服器為準",
@@ -9517,5 +9524,19 @@
     "revisedNo": "未修訂",
     "appealSubmit": "提交申訴",
     "actionReassign": "評估人改派"
+  },
+  "auth": {
+    "kickedTitle": "帳號已在其他設備登錄",
+    "kickedDesc": "您的帳號已在另一台設備上登錄，當前設備已被強制下線。",
+    "kickedIp": "登錄 IP：",
+    "kickedLocation": "登錄地點：",
+    "kickedAdvice": "如非本人操作，請及時修改密碼",
+    "forceOfflineTitle": "帳號已被強制下線",
+    "forceOfflineDesc": "您的帳號已被以下操作人強制下線，如有疑問請聯繫操作人：",
+    "operator": "操作人：",
+    "empNo": "工號：",
+    "disabledTitle": "帳號已被停用",
+    "disabledDesc": "您的帳號已被管理員停用，如需恢復請聯繫管理員。",
+    "iKnow": "我知道了"
   }
 }

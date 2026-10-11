@@ -1,6 +1,9 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { message } from 'antd'
+// 说明：本文件的用户提示故意保持繁中字面量而不接 i18n —— request.ts 被全站 import，
+// 一旦静态引入 src/i18n，`i18n.use(initReactI18next)` 会在任何 mock react-i18next 的
+// 测试里于模块加载期抛错（表现为整个测试文件 0 用例直接红）。要接 i18n 需改成惰性取值。
 
 /** 后端统一响应结构 */
 export interface ApiResult<T = unknown> {
@@ -122,7 +125,7 @@ request.interceptors.response.use(
       } else {
         handleUnauthorized()
       }
-      return Promise.reject(new Error(res.message || '登录校验已过期，请重新登录'))
+      return Promise.reject(new Error(res.message || '登錄校驗已過期，請重新登錄'))
     }
     // 空闲超时: 后端检测到用户长时间无操作，强制登出并提示
     if (res.code === SESSION_IDLE_TIMEOUT_CODE) {
@@ -139,15 +142,15 @@ request.interceptors.response.use(
         }))
         return Promise.reject(new Error(res.message || '需先修改密碼'))
       }
-      if (!silent) message.error(res.message || '您没有权限执行此操作，请联系管理员授权')
+      if (!silent) message.error(res.message || '您沒有權限執行此操作，請聯繫管理員授權')
       return Promise.reject(new Error(res.message || '无权限'))
     }
     // 其它业务错误: 弹出提示（除非调用方声明静默）
     if (!silent) {
-      message.error(res.message || '请求失败')
+      message.error(res.message || '請求失敗')
     }
     // 携带业务码抛出，便于调用方按 code 做精细化处理（如登录滑块验证 1005）
-    const bizError = new Error(res.message || '请求失败') as Error & { code?: number }
+    const bizError = new Error(res.message || '請求失敗') as Error & { code?: number }
     bizError.code = res.code
     return Promise.reject(bizError)
   },
@@ -161,7 +164,7 @@ request.interceptors.response.use(
     } else if (status === FORBIDDEN_CODE) {
       // HTTP 403: 优先展示后端返回的提示信息（Spring Security 拦截时可能无 body）
       const backendMsg = error?.response?.data?.message
-      if (!silent) message.error(backendMsg || '您没有权限执行此操作，请联系管理员授权')
+      if (!silent) message.error(backendMsg || '您沒有權限執行此操作，請聯繫管理員授權')
     } else if (status === NOT_FOUND_CODE) {
       // HTTP 404 也可能是业务资源不存在；只展示路径，避免暴露查询参数。
       const url = typeof error?.config?.url === 'string' ? error.config.url : ''
@@ -170,11 +173,11 @@ request.interceptors.response.use(
         ? url
         : `${baseURL.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`
       const path = fullUrl.split(/[?#]/)[0]
-      if (!silent) message.error(`接口或资源不存在（404）：${path}，请检查请求地址、资源是否存在及后端版本是否已更新`)
+      if (!silent) message.error(`接口或資源不存在（404）：${path}，請檢查請求地址、資源是否存在及後端版本是否已更新`)
     } else if (status >= 500) {
-      if (!silent) message.error('服务器异常, 请稍后重试')
+      if (!silent) message.error('服務器異常，請稍後重試')
     } else {
-      if (!silent) message.error(error?.message || '网络异常')
+      if (!silent) message.error(error?.message || '網絡異常')
     }
     return Promise.reject(error)
   },
@@ -191,7 +194,7 @@ function handleUnauthorized(customMessage?: string) {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem('is_authenticated')
   localStorage.removeItem('user_info')
-  message.error(customMessage || '登录校验已过期，请重新登录')
+  message.error(customMessage || '登錄校驗已過期，請重新登錄')
   // 通知 AuthContext 清除 React 状态（isAuthenticated），路由守卫自动跳回登录页
   window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
   // 兜底: HashRouter 场景下直接跳转登录页

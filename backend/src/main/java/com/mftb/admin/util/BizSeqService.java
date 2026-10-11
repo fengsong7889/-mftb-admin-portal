@@ -287,6 +287,30 @@ public class BizSeqService {
     }
 
     /**
+     * 按算法类型取廣告訂單編號規則 key（前端 AlgorithmType 枚举值 = biz_ad_order.algo_type 快照）。
+     * <p>
+     * 类型集合必须覆盖各销售服务下单时实际使用的 RULE_AD_ORDER_* 常量，否则存量订单号
+     * 回填（BizSeqRuleInitializer seq:init-v20）会漏类型、留下旧前缀的号。
+     *
+     * @param algoType 算法类型快照
+     * @return 规则 key，无对应订单规则时返回 null
+     */
+    public static String adOrderRuleKey(Integer algoType) {
+        if (algoType == null) {
+            return null;
+        }
+        return switch (algoType) {
+            case 1 -> RULE_AD_ORDER_STAR;
+            case 2 -> RULE_AD_ORDER_NEW_STORE;
+            case 3 -> RULE_AD_ORDER_REVIVE;
+            case 5 -> RULE_AD_ORDER_POPULAR;
+            case 13 -> RULE_AD_ORDER_SIGNBOARD;
+            case 15 -> RULE_AD_ORDER_TRAFFIC;
+            default -> null;
+        };
+    }
+
+    /**
      * 按广告类型取赠送ID规则 key。
      * <p>
      * 这里的类型集合必须等于「新增赠送」界面可选的广告类型集合（前端 shared.tsx

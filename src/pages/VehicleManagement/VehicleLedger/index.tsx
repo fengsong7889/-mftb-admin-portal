@@ -24,7 +24,6 @@ import {
 } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import AnimatedNumber from '../../../components/AnimatedNumber'
 import BrandTag from '../../../components/BrandTag'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -39,7 +38,7 @@ import {
   USE_SOURCE_LABEL, USE_STATUS_COLOR, USE_STATUS_LABEL,
 } from '../vehicleMeta'
 import { TRIP_STATUS, type TripStatus, type VehicleFile, type VehicleTrip, type VehicleUseOrder } from '../vehicleTypes'
-import { VehicleFlagTags } from '../VehicleModuleLayout'
+import { VehicleFlagTags, VehicleStatCard } from '../VehicleModuleLayout'
 import { useVehicleDeptTree } from '../vehicleOptions'
 
 interface Filters {
@@ -254,7 +253,7 @@ function LedgerTable() {
       render: (_: unknown, o: VehicleUseOrder) => (o.trip as VehicleTrip).plateNo,
     },
     {
-      key: 'brand', title: '公司品牌', width: 100,
+      key: 'brand', title: '所属品牌', width: 100,
       render: (_: unknown, o: VehicleUseOrder) => {
         const v = vehicles.find(x => x.id === o.trip?.vehicleId)
         return v ? <BrandTag value={v.companyBrand} /> : '—'
@@ -334,7 +333,7 @@ function LedgerTable() {
   const columnMeta = useMemo(() => [
     { key: 'useNo', title: '用車單號' }, { key: 'source', title: '來源' },
     { key: 'approval', title: '審批結論' }, { key: 'plate', title: '車牌（發生時）' },
-    { key: 'brand', title: '公司品牌' }, { key: 'driver', title: '實際駕駛人' },
+    { key: 'brand', title: '所属品牌' }, { key: 'driver', title: '實際駕駛人' },
     { key: 'user', title: '用車人 / 部門' }, { key: 'purpose', title: '事由' },
     { key: 'depart', title: '實際出車' }, { key: 'ret', title: '實際歸還' },
     { key: 'mileage', title: '行駛里程' }, { key: 'hours', title: '用車時長' },
@@ -360,11 +359,12 @@ function LedgerTable() {
       </div>
 
       {/* 统计卡（按 UI 规范置于搜索区之后，与搜索条件影响的数据保持一致） */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
-        <LedgerStatCard icon={<FileDoneOutlined />} color="#1890FF" bg="#E6F7FF" value={stats.tripCount} label="有效行車次數（已確認）" />
-        <LedgerStatCard icon={<CarOutlined />} color="#E8720C" bg="#FFF7E6" value={stats.vehicleCount} label="涉及車輛數" />
-        <LedgerStatCard icon={<DashboardOutlined />} color="#52C41A" bg="#F6FFED" value={stats.totalMileage} label="累計行駛里程（km）" />
-        <LedgerStatCard icon={<WarningOutlined />} color="#722ED1" bg="#F9F0FF" value={stats.pendingCount} label="補錄／爭議待核對" />
+      {/* key 绑定筛选条件：条件一变就重放计数动画，否则数字换了但看起来没动 */}
+      <div key={JSON.stringify(filters)} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}>
+        <VehicleStatCard icon={<FileDoneOutlined />} color="#1890FF" bg="#E6F7FF" value={stats.tripCount} label="有效行車次數（已確認）" />
+        <VehicleStatCard icon={<CarOutlined />} color="#E8720C" bg="#FFF7E6" value={stats.vehicleCount} label="涉及車輛數" />
+        <VehicleStatCard icon={<DashboardOutlined />} color="#52C41A" bg="#F6FFED" value={stats.totalMileage} label="累計行駛里程（km）" />
+        <VehicleStatCard icon={<WarningOutlined />} color="#722ED1" bg="#F9F0FF" value={stats.pendingCount} label="補錄／爭議待核對" />
       </div>
 
       {stats.overdueCount > 0 && (
@@ -377,9 +377,14 @@ function LedgerTable() {
 
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} disabled={!canExport || !total} onClick={() => void handleExport()}>
-            {t('common.export')}
-          </Button>
+          {/* 禁用态按钮不触发鼠标事件，用 span 包裹让 Tooltip 仍能说明禁用原因（无权限 / 结果为空） */}
+          <Tooltip title={!canExport ? '無導出權限' : !total ? '當前篩選結果為空，無可導出數據' : ''}>
+            <span style={{ display: 'inline-block' }}>
+              <Button className="btn-export" icon={<ExportOutlined />} disabled={!canExport || !total} onClick={() => void handleExport()}>
+                {t('common.export')}
+              </Button>
+            </span>
+          </Tooltip>
           {pendingRows.length > 0 && (
             <span style={{ fontSize: 12, color: '#FA8C16', marginLeft: 12 }}>
               本頁含 {pendingRows.length} 條補錄／爭議記錄，未計入上方「有效行車次數」
@@ -520,25 +525,4 @@ function flagText(code: string): string {
   return map[code] ?? code
 }
 
-/** 统计卡：数值口径全部来自后端 ledgerStats，前端不再自行汇总当页数据 */
-function LedgerStatCard(props: {
-  icon: React.ReactNode
-  color: string
-  bg: string
-  value: number
-  label: string
-}) {
-  return (
-    <div className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 8, display: 'flex', alignItems: 'center',
-        justifyContent: 'center', background: props.bg, color: props.color, fontSize: 18,
-      }}>{props.icon}</div>
-      <div>
-        <div style={{ fontSize: 20, fontWeight: 600 }}><AnimatedNumber value={props.value} /></div>
-        <div style={{ fontSize: 12, color: '#8C8C8C' }}>{props.label}</div>
-      </div>
-    </div>
-  )
-}
 

@@ -17,7 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 產研協同（RDM）附件上传接口。
+ * 產研交付（RDM）附件上传接口。
  * <p>沿用 EAM 验收入库照片的口径：服务端不落盘，返回 Base64 Data URL 由业务表存 MEDIUMTEXT 列
  * （见 205 迁移），避免为原型阶段引入对象存储与静态资源目录配置。
  * <p>安全：大小 5MB 上限 + 图片走 magic bytes 校验 + 非图片按扩展名白名单，

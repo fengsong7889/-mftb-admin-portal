@@ -405,6 +405,19 @@ const handleToggle = async (id, enabled) => { await toggleApi(id, enabled) }
 - **禁止**在 vertical 布局下给 Form.Item 用 `labelCol={{ flex: 'XXXpx' }}`（会撑出大片空白）
 - 行内短配置项（参数类）：标签固定 `minWidth: 96, textAlign: 'right', flexShrink: 0`，字号 `13px / #595959`
 
+### C.4.1 備註輸入框統一標準 ⚠️ 強制標準
+
+- 全系統備註一律使用 `src/components/RemarkTextArea`（`Input.TextArea` + `rows={3}` + `maxLength={200}` + `showCount` + `resize: none`）。
+- 備註必須**獨占一整行**（grid 容器內 `gridColumn: '1 / -1'`），禁止與其它字段並排：並排時列寬變窄，3 行裝不下 200 字。
+- 尺寸依據：備註實際多為 1~3 句（60~120 字），上限 200 字；整行約 85 字/行，`rows={3}` 可顯示約 255 字 ≥ 上限，用戶無需拖拽高度即可看全內容。
+- 禁止自行寫 `rows={1|2|4|8}` 或單行 `Input` 充當備註；歷史散落的 rows 取值（1~8）均視為不合规。
+
+### C.4.2 字段下方提示（extra）約束 ⚠️ 強制標準
+
+- `extra` 只保留**必要**提醒（位數校驗、級聯前置條件、業務硬約束），其餘一律刪除；placeholder 已能表達的不得再寫 extra。
+- 提示必須**簡短單行**（原則 ≤ 12 字），禁止出現換行/折行；動態校驗反饋（如車牌位數不符）除外。
+- 提示文案必須繁中，禁止簡體字混入。
+
 ### C.5 底部操作按钮
 
 ```tsx

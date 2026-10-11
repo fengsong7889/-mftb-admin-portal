@@ -77,6 +77,30 @@ public class Vehicle {
     /** 公司品牌：1=闪蜂 2=mFood */
     private Integer companyBrand;
 
+    /** 车辆品牌 ID（biz_vehicle_brand.id），可空：历史车允许只有文本快照 */
+    private Long brandId;
+
+    /** 车系 ID（biz_vehicle_series.id） */
+    private Long seriesId;
+
+    /** 年款车型 ID（biz_vehicle_model.id） */
+    private Long modelId;
+
+    /** 车身形式代码，由车系带出；决定展示与统计口径 */
+    private String bodyType;
+
+    /** 能源类型代码：决定内地车牌位数（新能源 8 位 / 燃油 7 位） */
+    private String energyType;
+
+    /** 品牌名称快照（参数库改名或停用后，历史车仍显示当时叫法） */
+    private String brandName;
+
+    /** 车系名称快照 */
+    private String seriesName;
+
+    /** 年款车型名称快照，含年款 */
+    private String modelName;
+
     /** 管理部门 */
     private Long manageDeptId;
 

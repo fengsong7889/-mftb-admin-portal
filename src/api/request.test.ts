@@ -126,9 +126,9 @@ describe('API request 模块', () => {
       await expect(request.get('/mcp/tools', { baseURL: '/api/' })).rejects.toBeInstanceOf(AxiosError)
       const tip = String(vi.mocked(message.error).mock.calls[0]?.[0])
       expect(message.error).toHaveBeenCalledTimes(1)
-      expect(tip).toContain('接口或资源不存在（404）')
+      expect(tip).toContain('接口或資源不存在（404）')
       expect(tip).toContain('/api/mcp/tools')
-      expect(tip).toContain('后端版本是否已更新')
+      expect(tip).toContain('後端版本是否已更新')
       expect(tip).not.toContain('Request failed with status code')
     })
 
@@ -155,7 +155,7 @@ describe('API request 模块', () => {
     it('5xx 仍提示服务器异常', async () => {
       stubHttpStatus(503, { code: 503 })
       await expect(request.get('/mcp/tools')).rejects.toBeTruthy()
-      expect(message.error).toHaveBeenCalledWith('服务器异常, 请稍后重试')
+      expect(message.error).toHaveBeenCalledWith('服務器異常，請稍後重試')
     })
   })
 })

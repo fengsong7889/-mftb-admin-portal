@@ -207,8 +207,16 @@ export const MENU_NAME_EN: Record<string, string> = {
  * - 最終回退中文（數據庫菜單名）
  */
 export function translateMenuName(menuKey: string, zhName: string, dbNameEn?: string | null): string {
-  // 中文模式直接返回
-  if (i18n.language?.startsWith('zh')) return zhName
+  // 繁中模式直接返回
+  if (i18n.language === 'zh-TW') return zhName
+
+  // 简中模式：优先取 bundle 中的简体翻译，回退繁中菜单名
+  if (i18n.language === 'zh-CN') {
+    const bundleKey = `menu.${menuKey}`
+    const bundleVal = i18n.t(bundleKey)
+    if (bundleVal && bundleVal !== bundleKey) return bundleVal
+    return zhName
+  }
 
   // 1. 后端 name_en 为真值源（菜单配置页改名后实时生效）
   if (dbNameEn && dbNameEn.trim()) {

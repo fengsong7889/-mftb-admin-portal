@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS biz_vehicle (
     owner_company_id      BIGINT       NULL COMMENT '所属法人主体（sys_purchase_company.id），与公司品牌是两个独立维度',
     owner_company_name    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '所属法人名称快照：不因字典改名而改写历史',
     company_brand         TINYINT      NOT NULL DEFAULT 1 COMMENT '公司品牌：1=闪蜂 2=mFood',
+    -- 车辆参数库三级关联（均可空：历史车允许只有文本快照，不逼着回填才能保存）
+    brand_id              BIGINT       NULL COMMENT '车辆品牌 ID（biz_vehicle_brand.id）',
+    series_id             BIGINT       NULL COMMENT '车系 ID（biz_vehicle_series.id）',
+    model_id              BIGINT       NULL COMMENT '年款车型 ID（biz_vehicle_model.id）',
+    body_type             VARCHAR(20)  NULL COMMENT '車身形式：sedan/suv/mpv/van/bus/pickup/coupe',
+    energy_type           VARCHAR(20)  NULL COMMENT '能源類型：petrol/diesel/hybrid/phev/ev，决定车牌位数',
     manage_dept_id        BIGINT       NOT NULL COMMENT '管理部门（sys_department.id）',
     manage_dept_name      VARCHAR(128) NOT NULL DEFAULT '' COMMENT '管理部门名称快照',
     eam_asset_id          BIGINT       NULL COMMENT '关联 EAM 资产 ID（可空；关联后资产编号/购置信息以 EAM 为准）',
@@ -333,9 +339,22 @@ CREATE TABLE IF NOT EXISTS biz_vehicle_use_event (
 
 -- -----------------------------------------------------------------------------
 -- 8. 业务编号规则（接入 BizSeqService，不按记录数生成）
+--
+-- 用车单**不分路径**，三种来源统一 YC 前缀：共用一条规则才能共用一个计数器。
+-- 若保留三条规则但都写 YC，审批单与直接登记单会在同一天各自从 0001 开起，
+-- 直接撞 uk_vehicle_use_no。路径信息不丢：已落在 biz_vehicle_use.source 与列表「來源」列。
+--
+-- biz_menu / remark 必须填：「規則中心 → 編號生成規則」按 biz_menu 归类展示，
+-- remark 写的是拼接公式；两者为空时该规则在规则菜单里认不出来、也查不到依据。
 -- -----------------------------------------------------------------------------
-INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, prefix, date_format, seq_length, seq_start, status)
-VALUES ('vehicle', '车辆编号', 'VH', '', 6, 1, 1),
-       ('vehicle_use', '用车单号', 'YC', 'YYYYMMDD', 4, 1, 1),
-       ('vehicle_use_direct', '直接登记用车单号', 'ZC', 'YYYYMMDD', 4, 1, 1),
-       ('vehicle_use_backfill', '补录用车单号', 'BL', 'YYYYMMDD', 4, 1, 1);
+INSERT IGNORE INTO sys_biz_seq_rule
+    (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark)
+VALUES ('vehicle', '車輛編號', '物資管理-車輛管理', 'VH', '', 6, 1, 1,
+        '{prefix} + {n}位固定序號（無日期維度，全局自增）'),
+       ('vehicle_use', '用車單號', '物資管理-車輛管理', 'YC', 'YYYYMMDD', 4, 1, 1,
+        '{prefix} + YYYYMMDD + {n}位自增序號；審批用車/直接登記/事後補錄共用同一序列'),
+       -- 历史遗留规则：已合并进 vehicle_use，置 status=0 保留可追溯，不物理删除
+       ('vehicle_use_direct', '直接登記用車單號（已废弃）', '物資管理-車輛管理', 'ZC', 'YYYYMMDD', 4, 1, 0,
+        '已废弃：直接登记改用 vehicle_use（YC），避免多序列同前缀撞单号'),
+       ('vehicle_use_backfill', '補錄用車單號（已废弃）', '物資管理-車輛管理', 'BL', 'YYYYMMDD', 4, 1, 0,
+        '已废弃：补录改用 vehicle_use（YC），路径区分由 source 列与「來源」列承担');

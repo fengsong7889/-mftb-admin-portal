@@ -208,7 +208,7 @@ export const keyToPath: Record<string, string> = {
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
   'consumable-alert':     '/consumable-alert',
-  // 產研協同（RDM）—— M0 原型菜单（前端补挂，M1 由 sys_menu 种子接管后保留同一 key/path）
+  // 產研交付（RDM）—— M0 原型菜单（前端补挂，M1 由 sys_menu 种子接管后保留同一 key/path）
   'rdm-workbench':        '/rdm-workbench',
   'rdm-requirement':      '/rdm-requirement',
   'rdm-intake':           '/rdm-intake',
@@ -249,6 +249,7 @@ export const keyToPath: Record<string, string> = {
   'my-vehicle-use':       '/my-vehicle-use',
   'vehicle-dispatch':     '/vehicle-dispatch',
   'vehicle-ledger':       '/vehicle-ledger',
+  'vehicle-master-data':  '/vehicle-master-data',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -396,7 +397,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'asset-handover', 'asset-repair', 'asset-loss', 'asset-compensation', 'asset-scrap',
   'asset-flow', 'asset-inventory',
   // 用車管理（B1 已接真实 /api/vehicle/*，不再是前端原型，必须登记为已接入后端）
-  'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use',
+  'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use', 'vehicle-master-data',
   // EAM 採購
   'purchase-order', 'purchase-request',
   // 耗材管理

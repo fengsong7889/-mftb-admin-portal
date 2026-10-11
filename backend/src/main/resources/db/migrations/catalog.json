@@ -158,6 +158,30 @@
       "comment": "贈送ID口徑收口：登記 5 條贈送ID編號規則（新店 XDZS/人氣 RQZS/盤活 PHZS/金字招牌 JZZS/投流廣告 TLZS）到「推廣贈送」菜單，使「新增贈送」可選廣告類型與後端 BizSeqService.giftRuleKey、各銷售模組 GIFT_AD_TYPE 完全對齊（此前金字招牌/投流廣告無規則，贈送能力斷鏈）；同時把 biz_gift_record 存量不符合現行格式的 gift_id 按創建日期重新取號，同步 biz_gift_consume 快照，並清理舊生成器殘留的 GZ 孤兒計數行。附后置校驗，失敗不記版本、下次啟動重試。參考 SQL: sql/226_gift_ad_type_seq_rules.sql"
     },
     {
+      "versionKey": "seq:init-v20",
+      "module": "seq",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "dependencies": [
+        "seq:init-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "廣告訂單編號口径收口：登記 6 條廣告訂單編號規則到「廣告銷售」菜單（無敵星星 DDWD/新店 DDXD/盤活 DDPH/投流 DDLL/人氣 DDRQ/金字招牌 DDZP，此前金字招牌訂單無規則，下單必報「編號生成規則未配置」）；規則化改造前的存量訂單號仍是舊生成器硬編碼的 GD 前綴（歷史腳本 sql/34_migrate_history_codes.sql 從未執行，且它也不同步明細表快照），本遷移按創建日期重新取號，同步 biz_ad_order_item_* 與 biz_gift_consume 的訂單號快照，先對齊 sys_biz_seq 計數防撞 order_no 唯一鍵，再清理 GD 孤兒計數行。附后置校驗，失敗不記版本、下次啟動重試。參考 SQL: sql/227_ad_order_no_seq_rule_align.sql"
+    },
+    {
+      "versionKey": "seq:init-v21",
+      "module": "seq",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "dependencies": [
+        "seq:init-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "產研協同系統更名產研交付系統（與協同辦公系統→流程審批系統同步，消除雙「協同」命名混淆）：sys_system 展示名由 SystemPortalSchemaInitializer.seedSystems 每次啟動幂等刷新，本遷移負責存量 sys_biz_seq_rule.biz_menu 归属文案「產研協同」→「產研交付」的幂等归一（REPLACE 無残留時更新 0 行）。"
+    },
+    {
       "versionKey": "eam:schema-v1",
       "module": "eam",
       "phase": "MODULE_STRUCTURE",
@@ -1164,6 +1188,25 @@
       "comment": "DDL 只在 classpath 资源 220_vehicle_core_tables.sql 存一份，backend/sql/ 下为参考副本。后置校验钉住三件事：表存在、关键唯一键就位（软删感知生成列唯一键 + 幂等键 + 活动行程占用唯一键）、编号规则就绪——缺任一都会在并发或重跑时长出重复事实，或在建单时报「編號生成規則未配置」。跨模块引用（sys_user/sys_department/biz_eam_asset）只建索引不建 FK：这三张表有历史软删与脏数据，加 FK 会让启动失败；新表之间用 FK 硬约束。"
     },
     {
+      "versionKey": "vehicle:master:v1.0",
+      "module": "vehicle",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "vehicleSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "vehicle:schema:v1.0",
+        "vehicle:menu:v1.0"
+      ],
+      "scriptFiles": [
+        "221_vehicle_master_data.sql"
+      ],
+      "intent": "车辆参数库三级主数据（品牌→车系→年款车型）+ 车辆档案接入列 + 「基礎數據」下的車輛參數庫菜单",
+      "author": "Qoder",
+      "ticket": "vehicle-mgmt-b1",
+      "comment": "三级层级对齐懂车帝/汽车之家的 品牌→车系→年款配置，只保留影响用车决策与费用的参数（车身形式/能源类型/座位数/排量/变速箱/建议价），不做配置表级细粒度参数——主数据由人维护就会腐烂。车身形式与能源类型动车牌位数（燃油7位/新能源8位），故落在车系级并允许年款覆盖座位数。三表用软删感知生成列唯一键；车辆档案的 brand/series/model 三列可空且不建 FK，因历史车早于参数库录入，强外键会让启动失败。车辆参数库三表由 verifyMaster 校验，不能写进 TABLES：verifySchema 在 221 建表之前执行，写了会让全新库启动即失败。"
+    },
+    {
       "versionKey": "vehicle:menu:v1.0",
       "module": "vehicle",
       "phase": "MENU_SEED",
@@ -1177,7 +1220,7 @@
       "intent": "物資管理下新增二級分組「車輛管理」+ 4 个业务菜单，system_code 显式写 eam，并补 admin 角色授权",
       "author": "Qoder",
       "ticket": "vehicle-mgmt-b1",
-      "comment": "分组取 sort_order=6（末位）：DataInitializer.fixAssetMenuGrouping 每次启动硬设 耗材(2)/资产运营(3)/采购(4)/基础数据(5)，占 3~5 会在下次启动被顶掉。system_code 必须显式写入——SystemPortalSchemaInitializer.propagateSystemToDescendants 在 @Order(15) 只跑一次，早于本初始化器 @Order(32) 插入菜单，留 NULL 会让门户导航剪枝与系统准入落到未定义行为。后置校验除存在性外还钉住父级与 system_code，父级错挂会让菜单静默出现在别的系统树里。"
+      "comment": "分组 sort_order 现为 5：基础数据让到末位 6，二者由 fixAssetMenuGrouping 与本初始化器同步维护（任一处改了另一处没改，下次启动就会被顶回去）。system_code 必须显式写入——SystemPortalSchemaInitializer.propagateSystemToDescendants 在 @Order(15) 只跑一次，早于本初始化器 @Order(29) 插入菜单，留 NULL 会让门户导航剪枝与系统准入落到未定义行为。后置校验除存在性外还钉住父级与 system_code，父级错挂会让菜单静默出现在别的系统树里。"
     }
   ]
 }

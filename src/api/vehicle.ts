@@ -38,6 +38,19 @@ export interface VehicleVO {
   manageDeptName: string
   eamAssetId?: number | null
   eamAssetNo?: string | null
+  /** 车辆参数库三级关联（名称为发生时的快照，参数库改名不影响历史展示） */
+  brandId?: number | null
+  brandName?: string | null
+  seriesId?: number | null
+  seriesName?: string | null
+  modelId?: number | null
+  modelName?: string | null
+  /** 车身形式代码与后端给出的展示名 */
+  bodyType?: string | null
+  bodyTypeLabel?: string | null
+  /** 能源类型：决定内地车牌位数（新能源 8 位 / 燃油 7 位） */
+  energyType?: string | null
+  energyTypeLabel?: string | null
   remark?: string | null
   allowedDepts?: DeptGrant[]
   managers?: ManagerGrant[]
@@ -207,6 +220,10 @@ export interface UseQuery {
   vehicleId?: number
   plateNo?: string
   driverName?: string
+  /** 用車單號模糊匹配；独立于 keyword */
+  useNo?: string
+  /** 用車人（申请人）姓名模糊匹配 */
+  requesterName?: string
   departmentId?: number
   /** ISO 字符串，见文件头约定 */
   fromDate?: string
@@ -234,6 +251,12 @@ export interface VehicleSave {
   eamAssetNo?: string | null
   remark?: string | null
   allowedDeptIds?: number[]
+  /** 参数库三级关联与车身/能源（选车系即自动带出，可再覆盖） */
+  brandId?: number
+  seriesId?: number
+  modelId?: number
+  bodyType?: string
+  energyType?: string
   managers?: ManagerGrant[]
   requestKey?: string
   expectVersion?: number

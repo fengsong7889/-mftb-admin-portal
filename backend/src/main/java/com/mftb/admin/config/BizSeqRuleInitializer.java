@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -133,6 +134,47 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 旧赠送ID生成器的前缀（已无对应规则，其序号计数属孤儿行，需清理） */
     private static final String LEGACY_GIFT_SEQ_PREFIX = "GZ";
 
+    /**
+     * 增量版本: 廣告訂單編號口径收口 (seq:init-v20)。
+     * <p>
+     * 编号规则化改造前，所有广告订单共用硬编码的 GD 前缀下单；规则化后下单已改走
+     * ad_order_* 规则（DDXD/DDWD/...），但存量库里的旧 GD 号从未被改写（历史改写脚本
+     * sql/34_migrate_history_codes.sql 未在任何环境执行过，且它也不同步明细表快照），
+     * 导致「订单列表」里新店广告等订单仍显示 GD 前缀，与「編號生成規則」记录对不上。
+     */
+    private static final String V_INIT_AD_ORDER_CODES = "seq:init-v20";
+
+    /** 廣告銷售訂單规则的「所属菜单」文案，必须与前端 ruleConfig.tsx 的 menu 完全一致 */
+    private static final String AD_ORDER_BIZ_MENU = "廣告銷售";
+
+    /** 广告订单编号 6 条规则：rule_key / rule_name / prefix（序号统一 4 位、日期 YYYYMMDD、从 0000 起） */
+    private static final String[][] AD_ORDER_RULES = {
+            {BizSeqService.RULE_AD_ORDER_STAR, "無敵星星訂單", "DDWD"},
+            {BizSeqService.RULE_AD_ORDER_NEW_STORE, "新店廣告訂單", "DDXD"},
+            {BizSeqService.RULE_AD_ORDER_REVIVE, "盤活復蘇訂單", "DDPH"},
+            {BizSeqService.RULE_AD_ORDER_TRAFFIC, "投流廣告訂單", "DDLL"},
+            {BizSeqService.RULE_AD_ORDER_POPULAR, "人氣商家訂單", "DDRQ"},
+            {BizSeqService.RULE_AD_ORDER_SIGNBOARD, "金字招牌訂單", "DDZP"},
+    };
+
+    /** 现行广告订单号格式：DD + 两位业务码 + YYYYMMDD + 4 位序号 */
+    private static final String AD_ORDER_NO_PATTERN = "^DD[A-Z]{2}[0-9]{12}$";
+
+    /** 可回填订单号的算法类型快照，必须与 BizSeqService.adOrderRuleKey 的映射集合一致 */
+    private static final String AD_ORDER_ALGO_TYPES = "1, 2, 3, 5, 13, 15";
+
+    /** 旧广告订单生成器的统一前缀（规则化改造前所有类型都用 GD，已无对应规则，其计数属孤儿行） */
+    private static final String LEGACY_AD_ORDER_SEQ_PREFIX = "GD";
+
+    /** 增量版本: 產研協同系統更名產研交付系統，存量编号规则 biz_menu 归属文案同步归一 */
+    private static final String V_INIT_RDM_MENU_LABEL_RENAME = "seq:init-v21";
+
+    /** 订单号快照表：各广告明细表按 order_id 同步快照 */
+    private static final String[] AD_ORDER_ITEM_TABLES = {
+            "biz_ad_order_item_star", "biz_ad_order_item_new_store", "biz_ad_order_item_revive",
+            "biz_ad_order_item_traffic", "biz_ad_order_item_hot", "biz_ad_order_item_signboard",
+    };
+
     @Override
     public void run(String... args) {
         // 一次性初始化按版本执行, 重启时已执行的直接跳过 (启动提速)
@@ -196,6 +238,9 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 this::migrateTrafficAlgoPrefixAndPricingMenu, this::verifyTrafficAlgoPrefixAndPricingMenu);
         versionTracker.applyOnce(V_INIT_GIFT_AD_TYPE_RULES,
                 this::seedGiftRulesAndNormalizeGiftIds, this::verifyGiftRulesAndGiftIds);
+        versionTracker.applyOnce(V_INIT_AD_ORDER_CODES,
+                this::migrateAdOrderCodes, this::verifyAdOrderCodes);
+        versionTracker.applyOnce(V_INIT_RDM_MENU_LABEL_RENAME, this::renameRdmRuleBizMenu);
     }
 
     /**
@@ -219,6 +264,20 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                         + "WHERE biz_menu LIKE '物資管理-賠付管理%'");
         log.info("编号规则归属菜单文案统一: 前缀 {} 条 / 裸前缀 {} 条 / 採購執行 {} 条 / 損壞賠付 {} 条",
                 withSuffix, bare, renamed, compensation);
+        bizSeqService.refreshRules();
+    }
+
+    /**
+     * 存量修正：產研協同系統更名產研交付系統后，编号规则的「所属菜单」文案同步归一。
+     * <p>
+     * 独立版本键：v16 的 EAM 文案统一已在存量库应用过，挂在它里面永远不会再执行。
+     * REPLACE 幂等：无「產研協同」残留时更新 0 行，重跑无副作用。
+     */
+    private void renameRdmRuleBizMenu() {
+        int renamed = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET biz_menu = REPLACE(biz_menu, '產研協同', '產研交付') "
+                        + "WHERE biz_menu LIKE '%產研協同%'");
+        log.info("编号规则归属菜单文案统一: 產研協同 → 產研交付 {} 条", renamed);
         bizSeqService.refreshRules();
     }
 
@@ -271,6 +330,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 {"ad_order_revive", "盤活復蘇訂單", "廣告銷售", "DDPH", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_traffic", "流量廣告訂單", "廣告銷售", "DDLL", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_popular", "人氣商家訂單", "廣告銷售", "DDRQ", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"ad_order_signboard", "金字招牌訂單", "廣告銷售", "DDZP", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_pricing_star", "無敵星星定價", PRICING_BIZ_MENU, "DJWD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_pricing_hot", "人氣商家定價", PRICING_BIZ_MENU, "DJRQ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_pricing_revive", "盤活復蘇定價", PRICING_BIZ_MENU, "DJPH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
@@ -867,7 +927,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         // 新增规则必须先失效规则缓存，否则 BizSeqService.next() 会认为规则未配置
         bizSeqService.refreshRules();
         int renamed = normalizeLegacyGiftIds();
-        int orphanSeqRows = dropOrphanGiftSeqCounter();
+        int orphanSeqRows = dropOrphanSeqCounter(LEGACY_GIFT_SEQ_PREFIX);
         log.info("贈送ID口徑收口: 規則 {} 條 / 存量贈送ID回填 {} 筆 / 孤兒計數清理 {} 行",
                 GIFT_RULES.length, renamed, orphanSeqRows);
     }
@@ -905,17 +965,177 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         return renamed;
     }
 
-    /** 清理旧赠送ID生成器遗留的序号计数行（仅当已无任何规则使用该前缀，避免误删在用计数） */
-    private int dropOrphanGiftSeqCounter() {
+    /**
+     * 清理旧生成器遗留的序号计数行（仅当已无任何规则使用该前缀，避免误删在用计数）。
+     *
+     * @param legacyPrefix 已废弃的旧前缀
+     * @return 删除行数
+     */
+    private int dropOrphanSeqCounter(String legacyPrefix) {
         if (!tableExists("sys_biz_seq")) {
             return 0;
         }
         Integer inUse = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ?", Integer.class, LEGACY_GIFT_SEQ_PREFIX);
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ?", Integer.class, legacyPrefix);
         if (inUse != null && inUse > 0) {
             return 0;
         }
-        return jdbcTemplate.update("DELETE FROM sys_biz_seq WHERE prefix = ?", LEGACY_GIFT_SEQ_PREFIX);
+        return jdbcTemplate.update("DELETE FROM sys_biz_seq WHERE prefix = ?", legacyPrefix);
+    }
+
+    /**
+     * 廣告訂單編號口径收口 (seq:init-v20)。
+     * <p>
+     * 前缀是编号的业务语义（新店訂單 → DDXD，旧 GD 是「廣告」拼音首字母、所有类型共用），
+     * 因此除了把 6 条訂單規則 upsert 到「廣告銷售」菜单，还必须：
+     * 1) 先把 sys_biz_seq 计数对齐到存量最大号，否则重新取号会撞 order_no 唯一键；
+     * 2) 按创建日期给存量旧号重新取号，并同步各明细表与赠送流水的订单号快照；
+     * 3) 清理旧生成器遗留的 GD 孤兒計數行。
+     * 全部语句幂等，重复执行无副作用。
+     */
+    private void migrateAdOrderCodes() {
+        // 前缀唯一键（uk_seq_rule_prefix）冲突时 upsert 会误改到占用该前缀的其它规则，必须先挡住：
+        // 本方法在 CommandLineRunner 内执行，抛异常会导致容器反复重启，故跳过并 loudly 记录交人工处理。
+        int rules = 0;
+        for (String[] r : AD_ORDER_RULES) {
+            Integer occupied = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE prefix = ? AND rule_key <> ?",
+                    Integer.class, r[2], r[0]);
+            if (occupied != null && occupied > 0) {
+                log.error("編號規則前綴 {} 已被其它規則佔用, 跳過 {} 規則登記(需人工處理)", r[2], r[0]);
+                continue;
+            }
+            rules += upsertRule(r[0], r[1], AD_ORDER_BIZ_MENU, r[2],
+                    "YYYYMMDD", 4, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+        }
+        // 新增规则必须先失效规则缓存，否则 BizSeqService.next() 会认为规则未配置
+        bizSeqService.refreshRules();
+        int commentFixed = syncAdOrderNoColumnComment();
+        int aligned = alignAdOrderSeqCounters();
+        int renamed = normalizeLegacyAdOrderNos();
+        int orphanSeqRows = dropOrphanSeqCounter(LEGACY_AD_ORDER_SEQ_PREFIX);
+        log.info("廣告訂單編號收口: 規則 {} 條 / 列註釋同步 {} 條 / 序號計數對齊 {} 行 / 存量訂單號回填 {} 筆 / 孤兒計數清理 {} 行",
+                rules, commentFixed, aligned, renamed, orphanSeqRows);
+    }
+
+    /**
+     * 修正 order_no 列注释：建表脚本的注释还写着旧生成器的「GD + 年月日 + 4位自增」，
+     * 与「編號生成規則」记录（DDXD 等）不一致，是排查编号问题时的误导来源。
+     * 注释变更在 MySQL 8 是元数据级操作，不重建表。
+     */
+    private int syncAdOrderNoColumnComment() {
+        if (!tableExists("biz_ad_order")) {
+            return 0;
+        }
+        // DDL 语句的 update 计数恒为 0，不能直接当作同步条数返回
+        jdbcTemplate.update("ALTER TABLE biz_ad_order MODIFY COLUMN order_no VARCHAR(64) NOT NULL "
+                + "COMMENT '订单编号: 按编号生成规则 ad_order_* 生成（DDxx + 年月日 + 4位自增序号，如 DDXD202608120000）'");
+        return 1;
+    }
+
+    /**
+     * 用存量已合规的订单号回填 sys_biz_seq 计数（seq_start=0 口径下 current_value = 最大序号 + 1）。
+     * 重新取号前必须先对齐，否则新号会与库里已存在的同号订单撞 biz_ad_order.order_no 唯一键。
+     */
+    private int alignAdOrderSeqCounters() {
+        if (!tableExists("biz_ad_order") || !tableExists("sys_biz_seq")) {
+            return 0;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT LEFT(order_no, 4) AS prefix, MID(order_no, 5, 8) AS date_key, "
+                        + "MAX(CAST(RIGHT(order_no, 4) AS UNSIGNED)) + 1 AS next_value FROM biz_ad_order "
+                        + "WHERE order_no REGEXP '" + AD_ORDER_NO_PATTERN + "' "
+                        + "GROUP BY LEFT(order_no, 4), MID(order_no, 5, 8)");
+        int aligned = 0;
+        for (Map<String, Object> row : rows) {
+            Object nextValue = row.get("next_value");
+            if (nextValue == null) {
+                continue;
+            }
+            aligned += jdbcTemplate.update(
+                    "INSERT INTO sys_biz_seq (prefix, date_key, current_value) VALUES (?, ?, ?) "
+                            + "ON DUPLICATE KEY UPDATE current_value = GREATEST(current_value, ?)",
+                    (String) row.get("prefix"), (String) row.get("date_key"), nextValue, nextValue);
+        }
+        return aligned;
+    }
+
+    /**
+     * 存量广告订单号按现行规则重新取号（日期段取创建日期，同日按 id 升序连续编号），
+     * 并同步各明细表与赠送流水的订单号快照。算法类型无对应规则时跳过并告警（不猜前缀，避免造出错号）。
+     */
+    private int normalizeLegacyAdOrderNos() {
+        if (!tableExists("biz_ad_order")) {
+            return 0;
+        }
+        List<String> itemTables = listExistingTables(AD_ORDER_ITEM_TABLES);
+        boolean hasGiftConsume = tableExists("biz_gift_consume");
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, order_no, algo_type, created_at FROM biz_ad_order "
+                        + "WHERE order_no IS NULL OR order_no NOT REGEXP '" + AD_ORDER_NO_PATTERN + "' "
+                        + "ORDER BY created_at, id");
+        int renamed = 0;
+        for (Map<String, Object> row : rows) {
+            Long id = ((Number) row.get("id")).longValue();
+            String oldNo = (String) row.get("order_no");
+            Integer algoType = row.get("algo_type") == null ? null : ((Number) row.get("algo_type")).intValue();
+            String ruleKey = BizSeqService.adOrderRuleKey(algoType);
+            if (ruleKey == null) {
+                log.warn("廣告訂單號回填跳過: 訂單 {} 的算法類型 {} 無對應編號規則（order_no={}），請人工核對",
+                        id, algoType, oldNo);
+                continue;
+            }
+            String newNo = bizSeqService.next(ruleKey, toLocalDate(row.get("created_at")));
+            jdbcTemplate.update("UPDATE biz_ad_order SET order_no = ? WHERE id = ?", newNo, id);
+            // 明细快照按外键同步（订单号本身可能已被人工改过，按旧值匹配会漏行）
+            for (String table : itemTables) {
+                jdbcTemplate.update("UPDATE " + table + " SET order_no = ? WHERE order_id = ?", newNo, id);
+            }
+            // 赠送流水只存订单号快照、无外键，只能按旧号同步
+            if (hasGiftConsume && oldNo != null) {
+                jdbcTemplate.update("UPDATE biz_gift_consume SET order_no = ? WHERE order_no = ?", newNo, oldNo);
+            }
+            renamed++;
+            log.info("廣告訂單號回填: {} → {}（訂單 {}，算法類型 {}）", oldNo, newNo, id, algoType);
+        }
+        return renamed;
+    }
+
+    /**
+     * 迁移后置校验：6 条廣告訂單規則已登记归位，且可映射算法类型的存量订单号都符合现行格式。
+     * 校验失败不记版本、下次启动重试。
+     */
+    private void verifyAdOrderCodes() {
+        Integer ruleOk = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key IN ('ad_order_star','ad_order_new_store',"
+                        + " 'ad_order_revive','ad_order_traffic','ad_order_popular','ad_order_signboard') "
+                        + "AND biz_menu = ? AND status = 1",
+                Integer.class, AD_ORDER_BIZ_MENU);
+        if (ruleOk == null || ruleOk != AD_ORDER_RULES.length) {
+            throw new IllegalStateException("廣告訂單編號規則未全部登記到「" + AD_ORDER_BIZ_MENU + "」菜單: 實際 "
+                    + ruleOk + " 條");
+        }
+        if (!tableExists("biz_ad_order")) {
+            return;
+        }
+        Integer legacy = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_ad_order WHERE algo_type IN (" + AD_ORDER_ALGO_TYPES + ") "
+                        + "AND (order_no IS NULL OR order_no NOT REGEXP '" + AD_ORDER_NO_PATTERN + "')",
+                Integer.class);
+        if (legacy != null && legacy > 0) {
+            throw new IllegalStateException("仍有 " + legacy + " 筆存量廣告訂單號不符合現行格式，未回填完成");
+        }
+    }
+
+    /** 过滤出实际存在的表（存量库可能尚未建某类广告明细表，缺失时跳过其快照同步） */
+    private List<String> listExistingTables(String[] candidates) {
+        List<String> existing = new ArrayList<>(candidates.length);
+        for (String table : candidates) {
+            if (tableExists(table)) {
+                existing.add(table);
+            }
+        }
+        return existing;
     }
 
     /**

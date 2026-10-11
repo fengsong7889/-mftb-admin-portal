@@ -9,6 +9,7 @@ import { useMenu } from '../contexts/MenuContext'
 import {
   useCurrentSystem,
   resolveSystemFromPathname,
+  resolveOrderRouteMenuKey,
   isBusinessSystemCode,
 } from '../hooks/useCurrentSystem'
 import { useSystemNavigation } from '../hooks/useSystemNavigation'
@@ -35,6 +36,7 @@ import {
   CarryOutOutlined,
   CompassOutlined,
   LoginOutlined,
+  ClusterOutlined,
   CheckCircleOutlined,
   DatabaseOutlined,
   ScissorOutlined,
@@ -97,7 +99,7 @@ import {
   UserAddOutlined, // 资产领用/归还
   UserDeleteOutlined, // 離職管理
   PartitionOutlined, // 入轉調離分组
-  ClusterOutlined, // 部門架構
+// 部門架構
   HourglassOutlined, // 假期額度
   UserSwitchOutlined, // 員工自助（一级域）
   FieldTimeOutlined, // 我的假期
@@ -582,11 +584,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'vehicle-dispatch': <CarryOutOutlined />,
   'vehicle-ledger':   <CompassOutlined />,
   'my-vehicle-use':   <LoginOutlined />,
+  'vehicle-master-data': <ClusterOutlined />,
   'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,
   'purchase-request': <ShoppingCartOutlined />,
-  // 產研協同（RDM）—— 需求全生命周期（已拍平为一级菜单）
+  // 產研交付（RDM）—— 需求全生命周期（已拍平为一级菜单）
   // 提交需求/產品需求處理/交付中需求三个菜单已收敛退役，兜底图标随之移除（需求清单复用 FileTextOutlined）
   'rdm-workbench':    <DashboardOutlined />,
   'rdm-requirement':  <FileTextOutlined />,
@@ -713,21 +716,30 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const systemIcon = renderMenuIcon(currentSystem?.icon)
     ?? renderMenuIcon(systemKey ? PORTAL_SYSTEM_ICONS[systemKey] : 'AppstoreOutlined')
 
+  // 浏览器标签页标题与侧栏品牌名保持同一真值：index.html 的静态标题在切换系统后不会更新，
+  // 会出现“侧栏显示 MFTB<当前系统>、标签页仍是旧标题”的不一致
+  useEffect(() => {
+    document.title = brandTitle
+  }, [brandTitle])
+
   /** 自动同步 currentSystemCode：
    *  - 菜单树就绪后，若当前 pathname 属于某业务系统→写入；
    *  - 当前处于门户/工作台等无系统上下文页面→保持旧值，不主动清空，避免刷新时 Sidebar 无菜单可展；
    *  - 只在路径真正变化时反查：切换系统的写入与路由跳转不是同一帧提交时，
-   *    旧路径会把刚选中的系统反向覆盖（如从商家报表切广告系统后被写回商家工作台）。 */
+   *    旧路径会把刚选中的系统反向覆盖（如从商家报表切广告系统后被写回商家工作台）；
+   *  - 去重键含 query：訂單列表/詳情是廣告銷售與店鋪隨心推共用路由，
+   *    同路徑只變 from 參數時也要重新判定歸屬系統。 */
   const lastSystemSyncPathRef = useRef<string | null>(null)
   useEffect(() => {
     if (!menuTree) return
-    if (lastSystemSyncPathRef.current === location.pathname) return
-    lastSystemSyncPathRef.current = location.pathname
-    const sys = resolveSystemFromPathname(location.pathname, menuTree)
+    const locationKey = `${location.pathname}${location.search}`
+    if (lastSystemSyncPathRef.current === locationKey) return
+    lastSystemSyncPathRef.current = locationKey
+    const sys = resolveSystemFromPathname(location.pathname, menuTree, location.search)
     if (isBusinessSystemCode(sys) && sys !== currentSystemCode) {
       setCurrentSystemCode(sys)
     }
-  }, [menuTree, location.pathname, currentSystemCode, setCurrentSystemCode])
+  }, [menuTree, location.pathname, location.search, currentSystemCode, setCurrentSystemCode])
 
   /** 按当前登录人权限过滤后的可见菜单：
    *  1) currentSystemCode 已锁 + 服务端导航非空 → 直接用服务端剪枝树（已仅包含当前用户可访问菜单），
@@ -756,6 +768,10 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     return withSystemHome(filterMenusByPermission(items, hasMenuPermission))
   }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
+  /** 訂單列表 / 訂單詳情按來源歸屬菜單（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）；
+   *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。 */
+  const orderRouteMenuKey = resolveOrderRouteMenuKey(location.pathname, location.search)
+
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
     // 充值頁面：高亮「賬戶餘額」
@@ -763,10 +779,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     // 審批流程編輯頁：高亮「審批流程」
     : location.pathname.startsWith('/workflow-config/') ? 'workflow-config'
     : location.pathname.startsWith('/version-history-detail') ? 'version-history'
-    // 訂單列表 / 訂單詳情：按來源高亮（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）
-    : (location.pathname === '/promotion-order-manage' || location.pathname === '/order-detail')
-      ? (new URLSearchParams(location.search).get('from') === 'ad-sales' ? 'ad-sales' : 'promotion-sales-config')
-    : (pathToKey[location.pathname] || 'home')
+    : (orderRouteMenuKey || pathToKey[location.pathname] || 'home')
 
   /** 路由變化時自動展開對應的父級菜單（刷新/直接跳轉均生效） */
   useEffect(() => {

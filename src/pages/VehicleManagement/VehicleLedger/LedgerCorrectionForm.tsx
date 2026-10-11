@@ -6,7 +6,7 @@
  * 与原记录冲突则进入争议核对，不覆盖旧单。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, DatePicker, Descriptions, Form, Input, InputNumber, Modal, Result, Select, Spin, message } from 'antd'
+import { Alert, Button, DatePicker, Descriptions, Form, InputNumber, Modal, Result, Select, Spin, message } from 'antd'
 import { EditOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -16,6 +16,7 @@ import { correctTrip, fetchUseDetail, newRequestKey, toIso } from '../../../api/
 import { toOrder } from '../vehicleAdapter'
 import { useDriverOptions } from '../vehicleOptions'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 
 interface CorrectState {
   driverEmpId?: number
@@ -146,7 +147,14 @@ export default function LedgerCorrectionForm({ id, onBack }: Props) {
 
   const handleSubmit = async () => {
     let values: CorrectState
-    try { values = await form.validateFields() } catch { return }
+    try {
+      values = await form.validateFields()
+    } catch (err) {
+      // 手动 validateFields 不会触发 <Form scrollToFirstError>，这里定位到首个错误字段（§F.4）
+      const firstField = (err as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0]?.name
+      if (firstField) form.scrollToField(firstField, { behavior: 'smooth', block: 'center' })
+      return
+    }
     if (!values.reason?.trim()) { message.warning('必須填寫更正理由'); return }
 
     Modal.confirm({
@@ -165,7 +173,7 @@ export default function LedgerCorrectionForm({ id, onBack }: Props) {
             </div>
           ))}
           {revalidation.length > 0 && (
-            <div className="confirm-info-row"><span>重校验：</span><b style={{ color: '#FF4D4F' }}>{revalidation.join('；')}</b></div>
+            <div className="confirm-info-row"><span>重校驗：</span><b style={{ color: '#FF4D4F' }}>{revalidation.join('；')}</b></div>
           )}
         </div>
       ),
@@ -247,20 +255,20 @@ export default function LedgerCorrectionForm({ id, onBack }: Props) {
             <Form.Item
               label="更正理由" name="reason"
               rules={[{ required: true, message: '請填寫更正理由' }, { min: 6, message: '理由不少於 6 個字' }]}
-              style={{ gridColumn: 'span 3' }}
+              style={{ gridColumn: '1 / -1' }}
             >
-              <Input.TextArea rows={2} maxLength={200} placeholder="如：臨時換班未事前登記，經車管確認後更正駕駛人" />
+              <RemarkTextArea placeholder="如：臨時換班未事前登記，經車管確認後更正駕駛人" />
             </Form.Item>
           </div>
 
           {revalidation.length > 0 && (
             <Alert
-              type="error" showIcon message="更正後存在冲突或校验问题"
+              type="error" showIcon message="更正後存在衝突或校驗問題"
               description={(
                 <>
                   <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 12 }}>{revalidation.map((m, i) => <li key={i}>{m}</li>)}</ul>
                   <div style={{ marginTop: 8, fontSize: 12 }}>
-                    与既有记录冲突时本单会进入争议核对，不覆盖旧记录，也不能直接确认为正常。
+                    與既有記錄衝突時本單會進入爭議核對，不覆蓋舊記錄，也不能直接確認為正常。
                   </div>
                 </>
               )}

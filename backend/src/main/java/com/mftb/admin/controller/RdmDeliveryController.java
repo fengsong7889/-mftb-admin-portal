@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 產研協同（RDM）交付过程接口：PRD、评审、任务与工时、迭代、需求变更。
+ * 產研交付（RDM）交付过程接口：PRD、评审、任务与工时、迭代、需求变更。
  * <p>权限归属：产品侧动作挂「產品需求處理」，研发/设计/测试侧动作挂「研發交付」，
  * 两边互为 anyOf，避免"看得到需求却报不了进度"的授权缝隙。
  */

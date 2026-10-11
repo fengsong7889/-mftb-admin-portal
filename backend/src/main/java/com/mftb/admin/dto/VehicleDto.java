@@ -36,6 +36,18 @@ public final class VehicleDto {
         private Long ownerCompanyId;
         /** 公司品牌：1=闪蜂 2=mFood */
         private Integer companyBrand;
+        private Long brandId;
+        private String brandName;
+        private Long seriesId;
+        private String seriesName;
+        private Long modelId;
+        /** 年款全称（年款 + 车型），来自快照列 */
+        private String modelName;
+        /** 车身形式代码与展示名（展示名由后端给，避免前端两份映射漂移） */
+        private String bodyType;
+        private String bodyTypeLabel;
+        private String energyType;
+        private String energyTypeLabel;
         /** 只看某部门可用（数据范围过滤，不是前端可选的"排序"） */
         private Long usableByDeptId;
     }
@@ -63,6 +75,20 @@ public final class VehicleDto {
         private Long ownerCompanyId;
         private String ownerCompanyName;
         private Integer companyBrand;
+        /** 三级参数库关联：均可空，选到车系即可自动带出车身形式与能源类型 */
+        private Long brandId;
+        private Long seriesId;
+        private Long modelId;
+        private String bodyType;
+        private String energyType;
+        /** 参数库名称快照（biz_vehicle 冗余列）：列表直接展示，避免逐行回查三张参数表 */
+        private String brandName;
+        private String seriesName;
+        /** 年款全称（年款 + 车型名称） */
+        private String modelName;
+        /** 车身形式 / 能源类型的展示名：由后端给，避免前后端两份映射漂移 */
+        private String bodyTypeLabel;
+        private String energyTypeLabel;
         private Long manageDeptId;
         private String manageDeptName;
         private Long eamAssetId;
@@ -101,6 +127,13 @@ public final class VehicleDto {
         private LocalDate inspectionValidUntil;
         private Long ownerCompanyId;
         private Integer companyBrand;
+        /** 三级参数库关联：均可空；服务端校验子级必须属于声明的父级 */
+        private Long brandId;
+        private Long seriesId;
+        private Long modelId;
+        /** 车身形式 / 能源类型：留空时服务端从所选车系带出 */
+        private String bodyType;
+        private String energyType;
         private Long manageDeptId;
         private String eamAssetNo;
         private String remark;

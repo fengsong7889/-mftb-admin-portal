@@ -8,6 +8,7 @@
  * 时间口径：一期业务显示按 UTC+8，这里统一接收 'YYYY-MM-DD HH:mm:ss' 或 dayjs 对象。
  */
 import dayjs, { type Dayjs } from 'dayjs'
+import { NEW_ENERGY_TYPES, PROVINCE_ABBREVIATIONS } from './vehicleMeta'
 import {
   APPROVAL_OUTCOME, DRIVING_MODE, QUALIFICATION_RESULT, TRIP_FLAG, TRIP_STATUS, USE_SOURCE, USE_STATUS,
   VEHICLE_STATUS,
@@ -185,29 +186,54 @@ export interface QualificationLike {
   empName: string
   result: string
   validUntil: string
+  /** 资格适用的登记地区：跨地区驾照不默认互认，需与车辆 registerRegion 比对 */
+  region: string
 }
 
-/** 驾驶资格能否用于驾驶该车（阶段 B1 需要车辆登记准驾要求，一期先校验有效期与核验状态） */
-export function driverQualified(qual: QualificationLike | undefined, at: TimeInput = dayjs()): Blocker[] {
-  const blockers: Blocker[] = []
-  if (!qual) {
-    blockers.push({ code: 'QUAL_MISSING', message: '該駕駛人無駕駛資格核驗記錄，不可安排出車' })
-    return blockers
-  }
+/** 单条资格的核验状态与有效期判定（不含地区维度） */
+function qualificationStatusBlockers(qual: QualificationLike, now: Dayjs | null): Blocker[] {
   if (qual.result === QUALIFICATION_RESULT.EXPIRED) {
-    blockers.push({ code: 'QUAL_EXPIRED', message: `${qual.empName} 的駕駛資格已失效` })
-    return blockers
+    return [{ code: 'QUAL_EXPIRED', message: `${qual.empName} 的駕駛資格已失效` }]
   }
   if (qual.result === QUALIFICATION_RESULT.PENDING) {
-    blockers.push({ code: 'QUAL_PENDING', message: `${qual.empName} 的駕駛資格尚未核驗，不可安排出車` })
-    return blockers
+    return [{ code: 'QUAL_PENDING', message: `${qual.empName} 的駕駛資格尚未核驗，不可安排出車` }]
   }
   const until = toDay(qual.validUntil)
-  const now = toDay(at)
   if (until && now && until.isBefore(now, 'day')) {
-    blockers.push({ code: 'QUAL_VALID_UNTIL_EXPIRED', message: `${qual.empName} 的駕駛資格已過有效期（${qual.validUntil}）` })
+    return [{ code: 'QUAL_VALID_UNTIL_EXPIRED', message: `${qual.empName} 的駕駛資格已過有效期（${qual.validUntil}）` }]
   }
-  return blockers
+  return []
+}
+
+/**
+ * 驾驶资格能否用于驾驶该车。
+ *
+ * <p>同一驾驶人可能持有多地区资格（下拉按 userId 去重后一个候选人对应多条），传入 registerRegion 时
+ * 只用该地区的资格判定：跨地区驾照不默认互认，地区不匹配即阻断（后端 guard 同口径重验，前端只做 UX）。
+ * <p>qual 兼容单条与数组：单条为向后兼容旧调用与单测，数组为去重后的多地区资格。
+ */
+export function driverQualified(
+  qual: QualificationLike | QualificationLike[] | undefined,
+  at: TimeInput = dayjs(),
+  registerRegion?: string,
+): Blocker[] {
+  const quals = Array.isArray(qual) ? qual : (qual ? [qual] : [])
+  if (quals.length === 0) {
+    return [{ code: 'QUAL_MISSING', message: '該駕駛人無駕駛資格核驗記錄，不可安排出車' }]
+  }
+  const now = toDay(at)
+  const scoped = registerRegion ? quals.filter(q => q.region === registerRegion) : quals
+  if (scoped.length === 0) {
+    return [{
+      code: 'QUAL_REGION_MISMATCH',
+      message: `該駕駛人無「${registerRegion}」地區的有效駕駛資格核驗記錄，不可安排出車`,
+    }]
+  }
+  // 同一地区理论上唯一；防御多条时只要有一条通过即视为合格
+  for (const q of scoped) {
+    if (qualificationStatusBlockers(q, now).length === 0) return []
+  }
+  return qualificationStatusBlockers(scoped[0], now)
 }
 
 /** 部门是否在车辆可使用范围内：一期按显式授权判定，不隐式继承子部门 */
@@ -335,7 +361,7 @@ export function evaluateDepart(
   } else {
     blockers.push(...vehicleDispatchable(vehicle, at))
   }
-  blockers.push(...driverQualified(qual, at))
+  blockers.push(...driverQualified(qual, at, vehicle?.registerRegion))
 
   const departTime = toDay(order.apply.plannedStart) ?? toDay(at)
   const clash = findScheduleConflicts(allOrders, {
@@ -348,7 +374,7 @@ export function evaluateDepart(
   for (const c of clash) {
     blockers.push({
       code: 'CONFLICT',
-      message: `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 占用`,
+      message: `${c.resource === 'vehicle' ? '車輛' : '駕駛人'} ${c.target} 在 ${c.conflictWindow} 已被 ${c.conflictUseNo} 佔用`,
     })
   }
   return blockers
@@ -493,7 +519,7 @@ export function buildVisibleNodes(order: VehicleUseOrder): VisibleNode[] {
   if (order.approval === APPROVAL_OUTCOME.NOT_SUBMITTED) {
     nodes.push({
       label: '主管審批', actor: '未提交', state: 'pending',
-      note: '草稿尚未提交審批，审批与资源占用均未开始',
+      note: '草稿尚未提交審批，審批與資源佔用均未開始',
     })
     return nodes
   }
@@ -503,7 +529,7 @@ export function buildVisibleNodes(order: VehicleUseOrder): VisibleNode[] {
   if (!order.assign.finalVehicleId) {
     nodes.push({
       label: '車輛安排', actor: '待車管安排', state: 'current',
-      note: '審批通過不等於已預約，安排成功才占用車輛時段',
+      note: '審批通過不等於已預約，安排成功才佔用車輛時段',
     })
     return nodes
   }
@@ -544,4 +570,62 @@ export function formatWindow(start: TimeInput, end: TimeInput): string {
 /** 自驾场景下驾驶人即申请人，安排表单需要据此决定是否选司机 */
 export function resolveDriverId(drivingMode: string, applicantEmpId: number, selectedDriverId?: number): number | undefined {
   return drivingMode === DRIVING_MODE.SELF ? applicantEmpId : selectedDriverId
+}
+
+/* ==================== 9. 车牌格式（前端只做 UX 校验，后端必须重验） ==================== */
+
+/**
+ * 归一化：去空白与分隔点、转大写，并统一省份简称字形。
+ *
+ * 两层原因：
+ * 1. 「粤B 12345」与「粤B12345」必须落到同一个唯一键，否则同一副牌能登记两次；
+ * 2. 平台界面是繁体，用户很自然输入「粵B12345」（U+7CB5），而车牌实际字形是
+ *    「粤」（U+7CA4）。不做字形归一，繁体输入会被当成港澳牌走另一套校验。
+ */
+const PLATE_GLYPH_ALIAS: Record<string, string> = { 粵: '粤' }
+
+export function normalizePlate(plateNo?: string | null): string {
+  const bare = (plateNo ?? '').replace(/[\s·]/g, '').toUpperCase()
+  return Array.from(bare).map(ch => PLATE_GLYPH_ALIAS[ch] ?? ch).join('')
+}
+
+/** 内地牌首字符是省份简称 */
+export function isMainlandPlate(plateNo?: string | null): boolean {
+  const p = normalizePlate(plateNo)
+  return p.length > 0 && PROVINCE_ABBREVIATIONS.includes(p[0])
+}
+
+/**
+ * 车牌校验：返回 null 表示通过。
+ *
+ * 刻意不校验「发证机关字母是否与省份匹配」这类细分规则（如粵Z 港澳入境专用号段）：
+ * 规则不确定时写死成硬校验，结果是合法车牌存不进去，比少校验一项更糟。
+ */
+export function validatePlate(plateNo?: string | null, energyType?: string | null): Blocker[] {
+  const plate = normalizePlate(plateNo)
+  if (!plate) return [{ code: 'PLATE_EMPTY', message: '請填寫車牌號碼' }]
+  if (isMainlandPlate(plate)) {
+    // 尾部 5~6 位都放行到这里：位数差异由下面的能源类型分支给出具体提示，
+    // 否则「粤B1234」只会得到笼统的格式错误，用户不知道该补几位
+    if (!new RegExp('^[' + PROVINCE_ABBREVIATIONS + '][A-Z][A-Z0-9]{5,6}$').test(plate)) {
+      return [{ code: 'PLATE_MAINLAND', message: '內地車牌格式應為「省份簡稱 + 1位字母 + 5位字母數字」，如 粵B12345' }]
+    }
+    if (energyType) {
+      const needNew = NEW_ENERGY_TYPES.includes(energyType)
+      const expected = needNew ? 8 : 7
+      if (plate.length !== expected) {
+        return [{
+          code: needNew ? 'PLATE_NEW_ENERGY_LEN' : 'PLATE_FUEL_LEN',
+          message: needNew
+            ? '新能源（插電混合/純電）須為 8 位新能源專用號牌，如 粵BD12345'
+            : '燃油/油電混合車輛須為 7 位普通號牌，如 粵B12345',
+        }]
+      }
+    }
+    return []
+  }
+  if (!/^[A-Z0-9][A-Z0-9-]{2,9}$/.test(plate) || !/[0-9]/.test(plate)) {
+    return [{ code: 'PLATE_HK_MO', message: '港澳車牌格式不正確（應為字母與數字組合，4~10 位），如 MX-12-34' }]
+  }
+  return []
 }

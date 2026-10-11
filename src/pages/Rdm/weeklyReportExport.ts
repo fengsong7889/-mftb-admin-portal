@@ -35,7 +35,7 @@ function appendTable(ws: ExcelJS.Worksheet, title: string, headers: string[], da
  */
 export async function exportWeeklyReport(report: RdmWeeklyReport): Promise<void> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = '產研協同(RDM)'
+  wb.creator = '產研交付(RDM)'
   wb.created = new Date()
 
   const overview = wb.addWorksheet('週報摘要')

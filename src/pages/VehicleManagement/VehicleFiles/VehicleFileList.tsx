@@ -141,9 +141,13 @@ export default function VehicleFileList({
       { title: '車輛編號', dataIndex: 'vehicleCode' },
       { title: '車牌', dataIndex: 'plateNo' },
       { title: '登記地區', dataIndex: 'registerRegion' },
-      { title: '車型', dataIndex: 'vehicleType' },
+      { title: '品牌', dataIndex: 'brandName' },
+      { title: '車系', dataIndex: 'seriesName' },
+      { title: '年款車型', dataIndex: 'modelName' },
+      { title: '車身類型', dataIndex: 'bodyTypeLabel' },
+      { title: '能源類型', dataIndex: 'energyTypeLabel' },
       { title: '所屬法人', dataIndex: 'ownerCompanyName' },
-      { title: '公司品牌', dataIndex: 'companyBrand', render: (v: number) => v === 2 ? 'mFood' : '閃蜂' },
+      { title: '所属品牌', dataIndex: 'companyBrand', render: (v: number) => v === 2 ? 'mFood' : '閃蜂' },
       { title: '管理部門', dataIndex: 'manageDeptName' },
       { title: '核定載客', dataIndex: 'seatCount' },
       { title: '當前里程', dataIndex: 'currentOdometer' },
@@ -173,9 +177,27 @@ export default function VehicleFileList({
         <>{v.plateNo}<div style={{ fontSize: 12, color: '#8C8C8C' }}>{v.registerRegion}</div></>
       ),
     },
-    { key: 'vehicleType', title: '車型', dataIndex: 'vehicleType', width: 100 },
+    {
+      key: 'brand', title: '品牌 / 車系', width: 170,
+      render: (_: unknown, v: VehicleFile) => (
+        // 参数库是后加的，历史车只有文本快照时退回显示 vehicleType，不留空白
+        <>{v.brandName ?? '—'}
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+            {v.seriesName ?? v.vehicleType ?? '—'}{v.modelName ? ` · ${v.modelName}` : ''}
+          </div>
+        </>
+      ),
+    },
+    {
+      key: 'bodyType', title: '車身 / 能源', width: 140,
+      render: (_: unknown, v: VehicleFile) => (
+        <>{v.bodyTypeLabel ?? v.vehicleType ?? '—'}
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{v.energyTypeLabel ?? '未錄入'}</div>
+        </>
+      ),
+    },
     { key: 'ownerCompanyName', title: '所屬法人', dataIndex: 'ownerCompanyName', width: 170, ellipsis: true },
-    { key: 'companyBrand', title: '公司品牌', dataIndex: 'companyBrand', width: 100, render: (v: number) => <BrandTag value={v} /> },
+    { key: 'companyBrand', title: '所属品牌', dataIndex: 'companyBrand', width: 100, render: (v: number) => <BrandTag value={v} /> },
     { key: 'manageDeptName', title: '管理部門', dataIndex: 'manageDeptName', width: 130 },
     { key: 'seatCount', title: '核定載客', dataIndex: 'seatCount', width: 90, align: 'center' as const, render: (v: number) => `${v} 人` },
     {
@@ -227,9 +249,10 @@ export default function VehicleFileList({
   const columnMeta = useMemo(() => [
     { key: 'vehicleCode', title: '車輛編號' },
     { key: 'plate', title: '車牌 / 登記地區' },
-    { key: 'vehicleType', title: '車型' },
+    { key: 'brand', title: '品牌 / 車系' },
+    { key: 'bodyType', title: '車身 / 能源' },
     { key: 'ownerCompanyName', title: '所屬法人' },
-    { key: 'companyBrand', title: '公司品牌' },
+    { key: 'companyBrand', title: '所属品牌' },
     { key: 'manageDeptName', title: '管理部門' },
     { key: 'seatCount', title: '核定載客' },
     { key: 'currentOdometer', title: '當前里程' },

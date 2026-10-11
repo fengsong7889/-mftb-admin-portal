@@ -8,6 +8,7 @@
  */
 import type { ReactNode } from 'react'
 import { Button, Tag } from 'antd'
+import AnimatedNumber from '../../components/AnimatedNumber'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { TRIP_FLAG_COLOR, TRIP_FLAG_LABEL } from './vehicleMeta'
 import type { TripFlag } from './vehicleTypes'
@@ -127,6 +128,49 @@ export function VehicleFieldRow({ label, children }: { label: string; children: 
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 14, color: '#262626' }}>{children}</div>
+    </div>
+  )
+}
+
+/**
+ * 数据指标统计卡（规范 §B.7 强制标准）。
+ *
+ * 抽成一份共享实现的原因：办理页与台账页原本各写一张卡，台账那张用了旧式
+ * `.stat-card` + 40×40 图标块（静态、无计数动画、无 hover），两处已经漂移。
+ * 标准要点：三段居中（图标 20px → 数值 22px/700 → 标签 12px #8C8C8C）、圆角 12、
+ * padding 16、淡色底 + `${色值}22` 描边、hover 上浮 4px + `0 8px 24px` 阴影、
+ * 数值必须走 AnimatedNumber 计数动画。
+ */
+export function VehicleStatCard({ icon, color, bg, value, label, decimals = 0 }: {
+  icon: ReactNode
+  color: string
+  bg: string
+  value: number
+  label: string
+  /** 里程/时长这类带小数的口径用 2 位小数，整数场景保持 0 */
+  decimals?: number
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 12, padding: 16, background: bg, border: `1px solid ${color}22`,
+        textAlign: 'center', position: 'relative', overflow: 'hidden', cursor: 'default',
+        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-4px)'
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+    >
+      <div style={{ fontSize: 20, color }}>{icon}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color, margin: '6px 0 2px' }}>
+        <AnimatedNumber value={value} decimals={decimals} />
+      </div>
+      <div style={{ fontSize: 12, color: '#8C8C8C' }}>{label}</div>
     </div>
   )
 }

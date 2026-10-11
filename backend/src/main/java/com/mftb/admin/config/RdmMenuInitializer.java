@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 產研協同系統（RDM）菜单与系统准入初始化。
+ * 產研交付系統（RDM）菜单与系统准入初始化。
  * <p>
  * 按需求生命周期维护一级菜单（system_code=rdm）与一个配置分组，并把 admin 角色授权、
  * {@code sys_system} 准入一并补齐：
@@ -251,7 +251,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研協同(RDM) 菜单已就绪（一级菜单 + 需求總看板/效能與產出/研發交付/需求配置四个分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研交付(RDM) 菜单已就绪（一级菜单 + 需求總看板/效能與產出/研發交付/需求配置四个分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
     }
 
     /**

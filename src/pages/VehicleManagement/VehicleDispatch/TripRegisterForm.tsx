@@ -36,6 +36,7 @@ import { useDriverOptions } from '../vehicleOptions'
 import { fetchVehicleDetail, toIso } from '../../../api/vehicle'
 import { toVehicleFile } from '../vehicleAdapter'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
+import RemarkTextArea from '../../../components/RemarkTextArea'
 
 export type TripRegisterMode = 'depart' | 'return' | 'confirm'
 
@@ -102,12 +103,22 @@ export default function TripRegisterForm({
   const watchedReturnAt = Form.useWatch('returnAt', form)
   const watchedEnd = Form.useWatch('endOdometer', form)
   const watchedCondition = Form.useWatch('condition', form)
+  const watchedStart = Form.useWatch('startOdometer', form)
 
   const trip = order?.trip
 
   /** 出车起始里程默认带出上次确认值 */
   // 建议起始里程取后端算好的口径：档案值可能低于最近已确认行程，用它当默认值会让用户照填后被拒
   const suggestedStart = vehicle?.suggestStartOdometer ?? vehicle?.currentOdometer
+
+  // F3: initialValues 只在挂载时求值一次，而车辆详情是异步返回的，
+  // 首帧 suggestedStart 还是 undefined → 出车起始里程默认空白；用 useEffect 在字段为空时回填
+  useEffect(() => {
+    if (mode !== 'depart' || suggestedStart == null) return
+    if (form.getFieldValue('startOdometer') == null) {
+      form.setFieldValue('startOdometer', suggestedStart)
+    }
+  }, [mode, suggestedStart, form])
 
   const mileage = useMemo(
     () => (mode === 'return' && trip
@@ -121,14 +132,19 @@ export default function TripRegisterForm({
     const list: string[] = []
     if (vehicle) vehicleDispatchable(vehicle).forEach(b => list.push(b.message))
     else list.push('未找到安排的最終車輛')
-    driverQualified(driverOptions.find(d => d.value === order.assign.driverEmpId)?.qualification)
+    const matchedDriver = driverOptions.find(d => d.value === order.assign.driverEmpId)
+    driverQualified(matchedDriver?.qualifications, undefined, vehicle?.registerRegion)
       .forEach(b => list.push(b.message))
+    // 起始里程不可低于车辆当前基线（与后端 depart 同口径 max(档案里程, 最近确认)），否则台账会出现倒退
+    if (vehicle && watchedStart != null && suggestedStart != null && watchedStart < suggestedStart) {
+      list.push(`起始里程低於車輛當前里程基線 ${suggestedStart.toLocaleString()} km，不可倒退`)
+    }
     // 已过期但未出车的预约不能直接补点出车，需重新办理
     if (isOverdue(order.apply.plannedStart, new Date())) {
       list.push('該預約已超過批准開始時間，不可直接補點出車，請撤銷後重新申請')
     }
     return list
-  }, [mode, order, vehicle, driverOptions])
+  }, [mode, order, vehicle, driverOptions, watchedStart, suggestedStart])
 
   const confirmBlockers = useMemo(() => {
     if (mode !== 'confirm' || !trip) return [] as string[]
@@ -204,7 +220,14 @@ export default function TripRegisterForm({
     }
 
     let values: TripFormState
-    try { values = await form.validateFields() } catch { return }
+    try {
+      values = await form.validateFields()
+    } catch (err) {
+      // 手动 validateFields 不会触发 <Form scrollToFirstError>，这里定位到首个错误字段（§F.4）
+      const firstField = (err as { errorFields?: { name: (string | number)[] }[] }).errorFields?.[0]?.name
+      if (firstField) form.scrollToField(firstField, { behavior: 'smooth', block: 'center' })
+      return
+    }
 
     if (mode === 'depart') {
       if (departBlockers.length) { message.warning('存在阻斷項，無法出車'); return }
@@ -219,7 +242,7 @@ export default function TripRegisterForm({
             <div className="confirm-info-row"><span>實際出車：</span><b>{values.departAt?.format('YYYY-MM-DD HH:mm')}</b></div>
             <div className="confirm-info-row"><span>起始里程：</span><b>{values.startOdometer} km</b></div>
             <div className="confirm-info-row"><span>鑰匙 / 車況：</span><b>{values.keyReceived ? '已領取' : '未領取'} / {values.conditionOk ? '已確認' : '有異常'}</b></div>
-            <div className="confirm-info-row"><span>生效：</span><b>出車後車輛與駕駛人進入實際占用</b></div>
+            <div className="confirm-info-row"><span>生效：</span><b>出車後車輛與駕駛人進入實際佔用</b></div>
           </div>
         ),
         onOk: () => withBusy(() => runDepart(values), '出車已登記'),
@@ -280,7 +303,10 @@ export default function TripRegisterForm({
 
   const disabledSave = mode === 'depart'
     ? departBlockers.length > 0
-    : mode === 'confirm' ? confirmBlockers.length > 0 : false
+    : mode === 'confirm'
+      ? confirmBlockers.length > 0
+      // 归还态：结束里程为空或倒退时 checkMileage 会给出 blocker，此时禁用保存，避免提交非法/0 公里里程
+      : (mileage?.blockers.length ?? 0) > 0
 
   return (
     <div className="content-area">
@@ -325,7 +351,7 @@ export default function TripRegisterForm({
               <Form.Item
                 label="起始里程（km）" name="startOdometer"
                 rules={[{ required: true, message: '請填寫起始里程' }]}
-                extra={`默認帶出上次確認值 ${suggestedStart?.toLocaleString() ?? '—'} km；低於該值需說明差異`}
+                extra={`默認帶出上次確認值 ${suggestedStart?.toLocaleString() ?? '—'} km`}
               >
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
@@ -362,7 +388,7 @@ export default function TripRegisterForm({
               <Form.Item
                 label="結束里程（km）" name="endOdometer"
                 rules={[{ required: true, message: '請填寫結束里程' }]}
-                extra={`起始 ${trip.depart.startOdometer ?? '—'} km；行駛里程由後端計算，前端只做 UX 校驗`}
+                extra={`起始 ${trip.depart.startOdometer ?? '—'} km；里程由後端計算`}
               >
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
@@ -372,8 +398,12 @@ export default function TripRegisterForm({
               <Form.Item label="歸還車況" name="condition" rules={[{ required: true, message: '請選擇車況' }]}>
                 <Select options={CONDITION_OPTIONS} />
               </Form.Item>
+              <Form.Item label="鑰匙交還" name="keyReturned" valuePropName="checked" style={{ gridColumn: 'span 2' }}>
+                <Checkbox>已交還鑰匙（未交還時車輛不可派出，但不阻斷本單據實登記）</Checkbox>
+              </Form.Item>
+              {/* 异常说明属备注类自由文本：独占整行并统一用 RemarkTextArea（§C.4.1），不得用单行 Input 充当备注 */}
               <Form.Item
-                label="異常說明" name="exceptionNote"
+                label="異常說明" name="exceptionNote" style={{ gridColumn: '1 / -1' }}
                 rules={[{
                   validator: () => (watchedCondition === 'abnormal'
                     ? (form.getFieldValue('exceptionNote')
@@ -382,10 +412,7 @@ export default function TripRegisterForm({
                     : Promise.resolve()),
                 }]}
               >
-                <Input placeholder="如：右前胎壓偏低" maxLength={200} />
-              </Form.Item>
-              <Form.Item label="鑰匙交還" name="keyReturned" valuePropName="checked">
-                <Checkbox>已交還鑰匙（未交還時車輛不可派出，但不阻斷本單據實登記）</Checkbox>
+                <RemarkTextArea placeholder="如：右前胎壓偏低" />
               </Form.Item>
             </div>
 

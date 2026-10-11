@@ -240,7 +240,7 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'ExpandAltOutlined': ExpandAltOutlined,
   'ShrinkOutlined': ShrinkOutlined,
   'BranchesOutlined': BranchesOutlined,
-  // 產研協同：系统入口图标与「研發交付」分组图标按名称渲染，未登记会退回默认兜底图标
+  // 產研交付：系统入口图标与「研發交付」分组图标按名称渲染，未登记会退回默认兜底图标
   'NodeIndexOutlined': NodeIndexOutlined,
   'ProjectOutlined': ProjectOutlined,
   // 智能中心 (AI) 菜单图标

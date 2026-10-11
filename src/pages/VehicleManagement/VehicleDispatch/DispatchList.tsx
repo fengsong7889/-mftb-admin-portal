@@ -11,14 +11,14 @@
  *    车管看到 8 条而实际 30 条时就会漏办——待办统计最不能错的就是这个数。
  */
 import { useMemo, useState } from 'react'
-import { Badge, Button, Empty, message, Select, Space, Table, Tabs, Tag } from 'antd'
-import { CarOutlined, ReloadOutlined, ExportOutlined, FieldTimeOutlined, InboxOutlined, WarningOutlined } from '@ant-design/icons'
+import { Badge, Button, DatePicker, Empty, Form, Input, message, Select, Space, Table, Tabs, Tag } from 'antd'
+import type { Dayjs } from 'dayjs'
+import { CarOutlined, ExportOutlined, FieldTimeOutlined, InboxOutlined, ReloadOutlined, SearchOutlined, WarningOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import AnimatedNumber from '../../../components/AnimatedNumber'
 import { exportToCSV } from '../../../utils/exportCSV'
-import { fetchUses, type TodoStats, type UseQuery } from '../../../api/vehicle'
+import { fetchUses, toIso, type TodoStats, type UseQuery } from '../../../api/vehicle'
 import { toOrders } from '../vehicleAdapter'
 import {
   APPROVAL_COLOR, APPROVAL_LABEL, TRIP_STATUS_COLOR, TRIP_STATUS_LABEL,
@@ -26,6 +26,7 @@ import {
 } from '../vehicleMeta'
 import { TRIP_STATUS, USE_STATUS, type VehicleUseOrder } from '../vehicleTypes'
 import { formatWindow } from '../vehicleRules'
+import { VehicleStatCard } from '../VehicleModuleLayout'
 
 interface Props {
   /** 当前页数据：服务端已按 group + 筛选条件过滤并分页 */
@@ -40,8 +41,9 @@ interface Props {
   /** 当前 Tab（即服务端 group） */
   tab: string
   onTabChange: (tab: string) => void
-  plateFilter?: string
-  onPlateChange: (plateNo?: string) => void
+  onFiltersChange: (filters: DispatchFilters) => void
+  /** 查询条件：与 Tab 分组、统计卡、导出共用同一份，避免"看到的数"和"导出的数"不一致 */
+  filters: DispatchFilters
   page: number
   size: number
   onPageChange: (page: number, size: number) => void
@@ -52,6 +54,27 @@ interface Props {
   onRefresh: () => void
 }
 
+/** 查询条件（界面态；空值统一用 undefined，避免把空串当筛选条件传给后端） */
+export interface DispatchFilters {
+  useNo?: string
+  status?: string
+  plateNo?: string
+  driverName?: string
+  requesterName?: string
+  fromDate?: string
+  toDate?: string
+}
+
+/** 搜索表单态：计划时段在表单里是 Dayjs 区间，提交时才转成 ISO 字符串 */
+interface DispatchFormValues {
+  useNo?: string
+  status?: string
+  plateNo?: string
+  driverName?: string
+  requesterName?: string
+  plannedRange?: [Dayjs, Dayjs] | null
+}
+
 /** 办理分组：一个 Tab 就是一组可执行动作的集合，key 必须与服务端 group 取值一致 */
 interface DispatchGroup {
   key: string
@@ -59,33 +82,6 @@ interface DispatchGroup {
 }
 
 /** 待办统计卡（§B.7 三段式：图标 → 数值 → 标签） */
-function TodoStatCard({ icon, color, bg, value, label }: {
-  icon: React.ReactNode; color: string; bg: string; value: number; label: string
-}) {
-  return (
-    <div
-      style={{
-        borderRadius: 12, padding: 16, background: bg, border: `1px solid ${color}22`,
-        textAlign: 'center', position: 'relative', overflow: 'hidden', cursor: 'default',
-        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-4px)'
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = 'none'
-      }}
-    >
-      <div style={{ fontSize: 20, color }}>{icon}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color, margin: '6px 0 2px' }}>
-        <AnimatedNumber value={value} />
-      </div>
-      <div style={{ fontSize: 12, color: '#8C8C8C' }}>{label}</div>
-    </div>
-  )
-}
 
 /** 分组 key 与服务端 VehicleConstants.GROUP_* 一一对应 */
 const GROUP_TO_CONFIRM = 'to_confirm'
@@ -94,12 +90,35 @@ const GROUP_ALL = 'all'
 
 export default function DispatchList({
   rows, total, stats, loading, canManage, canDirectRegister,
-  tab, onTabChange, plateFilter, onPlateChange, page, size, onPageChange,
+  tab, onTabChange, filters, onFiltersChange, page, size, onPageChange,
   plateOptions, exportQuery, onRefresh,
 }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [exporting, setExporting] = useState(false)
+  const [form] = Form.useForm<DispatchFormValues>()
+  
+  /**
+   * 提交查询：先 trim 再判空。
+   *
+   * 空串不能当筛选条件发给后端（会被当成“关键字为空”以外的第三种情况，
+   * 各接口对空串的处理不一致），统一归一成 undefined。
+   * 计划时段取整天边界：从当天 00:00:00 到当天 23:59:59，避免漏掉当天晚间的单。
+   */
+  const submitFilters = () => {
+    const v = form.getFieldsValue()
+    onFiltersChange({
+      useNo: v.useNo?.trim() || undefined,
+      status: v.status || undefined,
+      plateNo: v.plateNo || undefined,
+      driverName: v.driverName?.trim() || undefined,
+      requesterName: v.requesterName?.trim() || undefined,
+      fromDate: toIso(v.plannedRange?.[0]?.startOf('day')),
+      toDate: toIso(v.plannedRange?.[1]?.endOf('day')),
+    })
+  }
+
+  const resetFilters = () => { form.resetFields(); onFiltersChange({}) }
 
   const tabGroups: DispatchGroup[] = [
     { key: USE_STATUS.TO_ASSIGN, label: '待安排' },
@@ -239,37 +258,62 @@ export default function DispatchList({
     <div className="content-area">
 
       <div className="search-section">
-        <Tabs
-          activeKey={tab}
-          onChange={onTabChange}
-          style={{ gridColumn: 'span 3' }}
-          items={tabGroups.map(g => ({
-            key: g.key,
-            label: (
-              <Badge
-                count={badgeCount(g.key)}
-                size="small"
-                offset={[10, -6]}
-              >
-                <span style={{ paddingRight: 6 }}>{g.label}</span>
-              </Badge>
-            ),
-          }))}
-        />
-        <Select
-          allowClear placeholder="全部車輛" value={plateFilter}
-          onChange={onPlateChange}
-          options={plateOptions.map(p => ({ value: p, label: p }))}
-        />
+        <Form form={form} layout="inline" onFinish={submitFilters}>
+          <Form.Item label="用車單號" name="useNo">
+            <Input placeholder="單號模糊匹配" allowClear style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="單據狀態" name="status">
+            <Select
+              allowClear placeholder={t('common.all')} style={{ width: '100%' }}
+              options={Object.entries(USE_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+            />
+          </Form.Item>
+          <Form.Item label="車輛" name="plateNo">
+            <Select
+              allowClear showSearch optionFilterProp="label" placeholder={t('common.all')}
+              options={plateOptions.map(p => ({ value: p, label: p }))} style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label="實際駕駛人" name="driverName">
+            <Input placeholder="姓名模糊匹配" allowClear style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="用車人" name="requesterName">
+            <Input placeholder="申請人姓名" allowClear style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item label="計劃時段" name="plannedRange">
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={resetFilters}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
       </div>
+
+      {/* Tab 是"办理分组"的切换器，不是查询条件，因此不放搜索区（规范 §E.1 搜索区只放查询字段） */}
+      <Tabs
+        activeKey={tab}
+        onChange={onTabChange}
+        style={{ marginBottom: 16 }}
+        items={tabGroups.map(g => ({
+          key: g.key,
+          label: (
+            <Badge count={badgeCount(g.key)} size="small" offset={[10, -6]}>
+              <span style={{ paddingRight: 6 }}>{g.label}</span>
+            </Badge>
+          ),
+        }))}
+      />
 
       {/* 待办统计（按 UI 规范置于搜索区之后，与列表同条件；口径不是独立指标体系） */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 16 }}
-        key={`${plateFilter ?? 'all'}-${stats?.toAssign ?? 0}-${stats?.inUse ?? 0}`}>
-        <TodoStatCard icon={<InboxOutlined />} color="#1890FF" bg="#E6F7FF" value={stats?.toAssign ?? 0} label="待安排車輛" />
-        <TodoStatCard icon={<CarOutlined />} color="#E8720C" bg="#FFF7E6" value={stats?.inUse ?? 0} label="使用中行程" />
-        <TodoStatCard icon={<FieldTimeOutlined />} color="#722ED1" bg="#F9F0FF" value={stats?.toConfirm ?? 0} label="待歸還確認" />
-        <TodoStatCard icon={<WarningOutlined />} color="#FF4D4F" bg="#FFF1F0" value={stats?.overdue ?? 0} label="超時未歸還" />
+        key={`${JSON.stringify(filters)}-${stats?.toAssign ?? 0}-${stats?.inUse ?? 0}-${stats?.toConfirm ?? 0}-${stats?.overdue ?? 0}`}>
+        <VehicleStatCard icon={<InboxOutlined />} color="#1890FF" bg="#E6F7FF" value={stats?.toAssign ?? 0} label="待安排車輛" />
+        <VehicleStatCard icon={<CarOutlined />} color="#E8720C" bg="#FFF7E6" value={stats?.inUse ?? 0} label="使用中行程" />
+        <VehicleStatCard icon={<FieldTimeOutlined />} color="#722ED1" bg="#F9F0FF" value={stats?.toConfirm ?? 0} label="待歸還確認" />
+        <VehicleStatCard icon={<WarningOutlined />} color="#FF4D4F" bg="#FFF1F0" value={stats?.overdue ?? 0} label="超時未歸還" />
       </div>
 
       <div className="action-section">

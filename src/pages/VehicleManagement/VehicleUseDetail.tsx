@@ -212,9 +212,9 @@ export default function VehicleUseDetail({ order, vehicle, onBack, primaryAction
       </VehicleSection>
 
       {showAudit && (
-        <VehicleSection icon={<CarOutlined />} tone="special" title="資源占用提示">
+        <VehicleSection icon={<CarOutlined />} tone="special" title="資源佔用提示">
           <div style={{ fontSize: 12, color: '#595959', lineHeight: 1.8 }}>
-            本單在「待出車 / 使用中 / 待歸還確認」期間占用車輛 {assign.finalPlateNo ?? '—'} 與駕駛人
+            本單在「待出車 / 使用中 / 待歸還確認」期間佔用車輛 {assign.finalPlateNo ?? '—'} 與駕駛人
             {' '}{assign.driverName ?? '—'}。前車晚歸時後車預約會標記受影響並由車管改派，
             不會倒改真實還車時間消除衝突。
           </div>
