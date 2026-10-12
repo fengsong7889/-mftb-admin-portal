@@ -63,6 +63,14 @@ const CARD_STYLE: React.CSSProperties = {
   padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
 }
 
+/**
+ * antd Select 的 onChange 第二参会原样回传选中项对象（含自定义字段）。
+ * 用于从选项快照取回记录本体，避免只靠「当前列表数组 + id 反查」。
+ */
+function optionRecord<T>(option: unknown): T | undefined {
+  return (option as { data?: T } | undefined)?.data
+}
+
 export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee, initialAsset, assets, employees, departments = EMPTY_DEPARTMENTS, operatorName, operatorEmpNo, canProxy = false, loading = false, error, onAssetQuery, onEmployeeQuery, onSubmit }: Props) {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
@@ -211,9 +219,12 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                     filterOption={false}
                     disabled={!onAssetQuery || submitting}
                     onSearch={(keyword) => setAssetQuery({ ...assetQuery, keyword: keyword.trim() || undefined, page: 1 })}
-                    onChange={(id: number) => setSelected(assetOptions.find((item) => item.id === id))}
+                    // 优先取选项快照携带的记录本体，再回退到当前数组反查：
+                    // 反查依赖上方将已选记录 unshift 回 assetOptions 的隐式副作用，
+                    // 列表被搜索结果替换时容易退化为静默清空选中项。
+                    onChange={(id: number, option) => setSelected(optionRecord<ClaimAssetOption>(option) ?? assetOptions.find((item) => item.id === id))}
                     options={assetOptions.map((a) => ({
-                      label: `${a.assetNo} / ${a.assetName}`, value: a.id,
+                      label: `${a.assetNo} / ${a.assetName}`, value: a.id, data: a,
                     }))}
                   />
                 </Form.Item>
@@ -270,8 +281,8 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                 <Form.Item label={t('asset.colClaimant')} name="employeeId" rules={[{ required: true, message: t('asset.claimantRequired') }]}>
                   <Select showSearch filterOption={false} placeholder="搜索姓名 / 工号" disabled={!onEmployeeQuery || submitting}
                     onSearch={(keyword) => setEmployeeQuery({ ...employeeQuery, keyword: keyword.trim() || undefined, page: 1 })}
-                    onChange={(id: number) => setEmployee(employeeOptions.find((item) => item.employeeId === id))}
-                    options={employeeOptions.map((item) => ({ value: item.employeeId, label: `${item.empName}（${item.empNo}）` }))} />
+                    onChange={(id: number, option) => setEmployee(optionRecord<ClaimEmployee>(option) ?? employeeOptions.find((item) => item.employeeId === id))}
+                    options={employeeOptions.map((item) => ({ value: item.employeeId, label: `${item.empName}（${item.empNo}）`, data: item }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={8}>

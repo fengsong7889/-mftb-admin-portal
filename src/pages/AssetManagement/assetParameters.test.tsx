@@ -88,4 +88,29 @@ describe('资产参数页面链路', () => {
       expect(screen.getByText('历史实物参数')).toBeInTheDocument()
     })
   })
+
+  it('资产列表被后续搜索替换后，已选资产信息与参数不丢失', async () => {
+    window.location.hash = '#/asset-claim/add'
+    // 首次列表返回 TEST-001；后续搜索返回不含它的另一条记录，用来构造「选中后集合被替换」
+    vi.mocked(fetchAssetList)
+      .mockResolvedValueOnce({ records: [asset], total: 1 })
+      .mockResolvedValue({ records: [{ ...asset, id: 99, assetNo: 'OTHER-99', assetName: '另一台设备' }], total: 1 })
+    const { container } = page(<AssetClaim />, '/asset-claim/add')
+    await waitFor(() => expect(fetchAssetList).toHaveBeenCalled())
+    fireEvent.mouseDown(container.querySelector('.ant-select-selector')!)
+    await waitFor(() => {
+      const content = Array.from(document.querySelectorAll('.ant-select-item-option-content'))
+        .find((node) => node.textContent?.includes('TEST-001 / 测试实物'))
+      const option = content?.closest('.ant-select-item-option')
+      expect(option).toBeTruthy()
+      fireEvent.click(option!)
+      expect(screen.getByText('历史实物参数')).toBeInTheDocument()
+    })
+
+    // 选中后再触发一次关键字搜索：新集合里没有 TEST-001，但已选资产、参数与选中项文本必须仍在
+    fireEvent.change(container.querySelector('.ant-select-selection-search-input')!, { target: { value: 'OTHER' } })
+    await waitFor(() => expect(fetchAssetList).toHaveBeenCalledWith(expect.objectContaining({ keyword: 'OTHER' })))
+    expect(screen.getByText('历史实物参数')).toBeInTheDocument()
+    expect(container.querySelector('.ant-select-selection-item')).toHaveTextContent('TEST-001 / 测试实物')
+  })
 })
