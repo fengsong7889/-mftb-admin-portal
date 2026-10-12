@@ -27,4 +27,15 @@ public interface DingTalkAppService {
      */
     java.util.concurrent.CompletableFuture<Boolean> sendWorkNotification(String scenario, long appId,
             java.util.List<String> userIds, String title, String content);
+
+    /**
+     * 用指定应用的凭证调用钉钉服务端 API（企业内部应用 topapi）。
+     * <p>access_token 由实现内部获取与缓存，**不向调用方返回**，避免凭据在业务层与日志里扩散。
+     * <p>apiPath 必须是白名单形态（{@code topapi/} 开头的相对路径），不接受外部拼接完整 URL，
+     * 否则这个口子会变成 SSRF。
+     *
+     * @return 钉钉原始响应（已确认 errcode=0）
+     * @throws com.mftb.admin.common.BusinessException 凭据不可用、网络失败或 errcode 非 0；消息不回显 token 与原始 URL
+     */
+    java.util.Map<String, Object> callApi(long appId, String apiPath, java.util.Map<String, Object> body);
 }

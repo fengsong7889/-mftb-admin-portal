@@ -854,6 +854,64 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '新增主數據' },
     { key: 'edit', label: '編輯/停用/刪除' },
   ],
+  // ── 考勤假勤系统（动作集必须与 sys_menu.actions 逐字对齐：少登记一个动作，
+  //  授权中心就勾不到该能力；多登记一个动作，就会授出接口并不存在的权限）──
+  'attendance-workbench': [
+    { key: 'view', label: '查看' },
+  ],
+  'attendance-group': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增考勤組' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-shift': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增班次' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-holiday': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增節假日' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入年度日曆' },
+  ],
+  'attendance-schedule': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '排班/儲存' },
+    { key: 'import', label: '導入排班' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-punch': [
+    { key: 'view', label: '查看' },
+    { key: 'import', label: '導入打卡' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-exception': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '指派處理方式/確認異常' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-daily': [
+    { key: 'view', label: '查看' },
+    // 重算會改日報、生成異常並回寫打卡判定，屬寫操作；動作集必須與後端
+    // sys_menu.actions（attendance:menu:v1.1 補齊）逐字對齊，少登記就勾不到該能力
+    { key: 'edit', label: '重算區間日報' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-monthly': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '凍結/同步薪酬' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-setting': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '修改口徑參數' },
+  ],
   // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
   'asset-claim': [
     { key: 'view', label: '查看' },
@@ -1530,6 +1588,17 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'vehicle-ledger',
   'my-vehicle-use',
   'vehicle-master-data',
+  // 考勤假勤系统（后端 AttendanceMenuInitializer 已按菜单鉴权，前端同步纳入受控）
+  'attendance-workbench',
+  'attendance-group',
+  'attendance-shift',
+  'attendance-holiday',
+  'attendance-schedule',
+  'attendance-punch',
+  'attendance-exception',
+  'attendance-daily',
+  'attendance-monthly',
+  'attendance-setting',
   // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
   'asset-claim',
   'asset-borrow',
@@ -1813,6 +1882,24 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/my-vehicle-use': 'my-vehicle-use',
   '/my-vehicle-use/apply': 'my-vehicle-use',
   '/my-vehicle-use/detail': 'my-vehicle-use',
+  // 考勤假勤系统（列表页 + 子页同属一个菜单授权）
+  '/attendance-workbench': 'attendance-workbench',
+  '/attendance-group': 'attendance-group',
+  '/attendance-group-form': 'attendance-group',
+  '/attendance-group-detail': 'attendance-group',
+  '/attendance-shift': 'attendance-shift',
+  '/attendance-shift-form': 'attendance-shift',
+  '/attendance-shift-detail': 'attendance-shift',
+  '/attendance-holiday': 'attendance-holiday',
+  '/attendance-holiday-form': 'attendance-holiday',
+  '/attendance-holiday-detail': 'attendance-holiday',
+  '/attendance-schedule': 'attendance-schedule',
+  '/attendance-punch': 'attendance-punch',
+  '/attendance-exception': 'attendance-exception',
+  '/attendance-exception-handle': 'attendance-exception',
+  '/attendance-daily': 'attendance-daily',
+  '/attendance-monthly': 'attendance-monthly',
+  '/attendance-setting': 'attendance-setting',
   // 領用管理（子路由歸屬 asset-claim 菜單）
   '/asset-claim': 'asset-claim',
   '/asset-claim/add': 'asset-claim',

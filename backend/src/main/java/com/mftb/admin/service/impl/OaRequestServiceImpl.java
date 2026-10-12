@@ -87,6 +87,12 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final HrLifecycleCallbackService hrLifecycleCallbackService;
     /** HR 请假单据审批回调（独立服务，避免与 HrLeaveService 形成构造器循环依赖）。 */
     private final HrLeaveCallbackService hrLeaveCallbackService;
+
+    /**
+     * 考勤域回调：请假通过后抵扣缺勤异常并重算日报。
+     * <p>必须排在 {@code hrLeaveCallbackService} 之后执行——先有 approved 假单，重算才看得到它。
+     */
+    private final com.mftb.admin.service.AttendanceCallbackService attendanceCallbackService;
     /** 證明開具审批回调（员工自助） */
     private final HrCertificateCallbackService hrCertificateCallbackService;
     /** 績效考核整批确认回调 */
@@ -766,6 +772,13 @@ public class OaRequestServiceImpl implements OaRequestService {
                     hrLeaveCallbackService.onFlowApproved(flowNo);
                 } catch (Exception e) {
                     log.error("HR請假審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+                }
+
+                // 考勤异常抵扣：必须在请假回调之后（假单已置 approved），失败不回滚审批
+                try {
+                    attendanceCallbackService.onLeaveApproved(flowNo);
+                } catch (Exception e) {
+                    log.error("考勤異常請假抵扣回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
                 }
             }
 

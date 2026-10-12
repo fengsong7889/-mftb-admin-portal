@@ -445,6 +445,8 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                         "統一管理智能模型、使用配額與安全審計", "RobotOutlined", 50},
                 {SystemCode.HR.code(), "人力資源系統", "Human Resources",
                         "連接員工、組織與職位，掌握人事動態", "TeamOutlined", 60},
+                {SystemCode.ATTENDANCE.code(), "考勤假勤系統", "Workforce & Attendance",
+                        "打卡排班、請假額度與考勤匯總，為薪酬核算提供取數", "ClockCircleOutlined", 65},
                 {SystemCode.EAM.code(), "物資管理系統", "Asset Management",
                         "資產、耗材、採購與庫存的全生命週期管理", "InboxOutlined", 70},
                 {SystemCode.RDM.code(), "產研交付系統", "R&D Delivery",

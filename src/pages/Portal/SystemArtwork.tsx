@@ -857,6 +857,232 @@ function AdsModelScene() {
   )
 }
 
+/**
+ * 逐字揭示的标题文案：裁切框用 steps() 一档一档往右走，字是一个一个蹦出来的，
+ * 而不是平滑擦除；调用方拿同一个节拍安排“蹦完才出现”的完成标记。
+ * 裁切标识用 useId，同一页面渲染多张卡片时不会互相引用。
+ */
+function TypedArtworkLabel({ label, x, y, width }: { label: string; x: number; y: number; width: number }) {
+  const id = useId()
+  return <>
+    <defs><clipPath id={`${id}-reveal`}><rect className="portal-art-motion portal-attendance-type" x={x - width / 2} y={y - 14} width={width} height="22" /></clipPath></defs>
+    <g clipPath={`url(#${id}-reveal)`}><ArtworkText label={label} x={x} y={y} width={width} /></g>
+  </>
+}
+
+/**
+ * 考勤假勤场景一（今日出勤动线）：四拍可读叙事，而不是“一个时钟 + 一个表格”。
+ * 悬停后的完整时序（一个 7.2 秒周期）：
+ * ① 打卡机扫描 + 指纹确认，分针开始转
+ * ② 标题逐字蹦完 → 绿勾才出现
+ * ③ 连线从日历底部绕到右侧图表底部，逐段画出
+ * ④ 线到位后柱状图才上升；随后线回退消失、柱子回落，进入下一轮
+ * 静态层自身必须构图完整（[data-motion=idle] 会 animation:none），动画层只在悬停时逐拍点亮。
+ */
+function AttendancePunchScene() {
+  return (
+    <>
+      {/* 地面线与顶部状态胶囊 */}
+      <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
+      <rect x="84" y="6" width="152" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <g className="portal-art-motion portal-attendance-check">
+        <circle cx="98" cy="18" r="8" fill="#52C41A" />
+        <path d="m94.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
+      </g>
+      <TypedArtworkLabel label="attendancePunched" x={168} y={22} width={124} />
+
+      {/* ① 打卡机：屏幕扫描 + 指纹波 */}
+      <rect x="26" y="62" width="44" height="66" rx="7" fill="currentColor" opacity="0.12" />
+      <rect x="26" y="62" width="44" height="66" rx="7" fill="#fff" stroke="currentColor" strokeOpacity="0.4" />
+      <rect x="33" y="70" width="30" height="20" rx="3" fill="currentColor" opacity="0.1" />
+      <path className="portal-art-motion portal-attendance-scan" d="M35 80h26" stroke="#E8720C" strokeWidth="2" />
+      <g stroke="currentColor" fill="none" strokeWidth="1.6" strokeOpacity="0.7">
+        <path className="portal-art-motion portal-attendance-ripple" d="M40 112q8-6 16 0" />
+        <path d="M43 117q5-4 10 0" />
+      </g>
+      <circle cx="48" cy="121" r="2.5" fill="#E8720C" />
+
+      {/* 时钟盘与指针（分针逐拍转动）；圆心右移到 96，避开打卡机右边缘 */}
+      <circle cx="96" cy="50" r="21" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+      {Array.from({ length: 12 }, (_, i) => {
+        const angle = (i * 30 * Math.PI) / 180
+        return (
+          <line
+            key={i}
+            x1={96 + Math.sin(angle) * (i % 3 === 0 ? 15 : 17)}
+            y1={50 - Math.cos(angle) * (i % 3 === 0 ? 15 : 17)}
+            x2={96 + Math.sin(angle) * 19}
+            y2={50 - Math.cos(angle) * 19}
+            stroke="currentColor"
+            strokeOpacity={i % 3 === 0 ? 0.8 : 0.3}
+            strokeWidth={i % 3 === 0 ? 2 : 1}
+          />
+        )
+      })}
+      <path className="portal-art-motion portal-attendance-hand" d="M96 50V34" stroke="#E8720C" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M96 50h10" stroke="currentColor" strokeOpacity="0.6" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="96" cy="50" r="2.5" fill="currentColor" />
+
+      {/* 员工踏步走向闸机 */}
+      <g className="portal-art-motion portal-attendance-step"><Person x={52} y={142} scale={0.46} /></g>
+      <path d="M74 146h30" stroke="#E8720C" strokeOpacity="0.5" strokeWidth="2" strokeDasharray="4 4" />
+
+      {/* ② 周排班日历：七列两行，今日格打勾 + 迟到格警示 */}
+      <rect x="118" y="56" width="104" height="76" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="118" y="56" width="104" height="14" rx="7" fill="currentColor" opacity="0.14" />
+      {Array.from({ length: 7 }, (_, col) => (
+        <rect key={col} x={124 + col * 14} y={60} width="8" height="5" rx="2.5" fill="currentColor" opacity="0.4" />
+      ))}
+      {Array.from({ length: 14 }, (_, index) => {
+        const col = index % 7
+        const row = Math.floor(index / 7)
+        const today = row === 0 && col === 2
+        const late = row === 1 && col === 4
+        return (
+          <rect
+            key={index}
+            className={today ? 'portal-art-motion portal-attendance-today' : undefined}
+            x={124 + col * 14}
+            y={78 + row * 22}
+            width="11"
+            height="11"
+            rx="2.5"
+            fill={today ? '#FFF7F0' : 'currentColor'}
+            fillOpacity={today ? 1 : 0.22}
+            stroke={today || late ? '#E8720C' : 'none'}
+            strokeWidth="1.6"
+          />
+        )
+      })}
+      {/* 今日格列2（x 152~163, y 78~89）落勾；迟到三角必须落在被橙色描边的 row1/col4 格上 */}
+      <path className="portal-art-motion portal-art-draw" pathLength="1" d="m154 82 3 3 6-6" fill="none" stroke="#E8720C" strokeWidth="2" />
+      <g className="portal-art-motion portal-art-signal">
+        <path d="M185.5 103.5l4.5 7h-9Z" fill="#E8720C" />
+        <path d="M185.5 106v2.5" stroke="#fff" strokeWidth="1.2" />
+      </g>
+
+      {/* ③ 工时报表：柱子必须等连线到位才上升，线回退后跟着回落 */}
+      <rect x="232" y="62" width="64" height="82" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <path d="M240 72h40" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+      {[26, 40, 32, 52].map((height, index) => (
+        <rect
+          key={index}
+          className="portal-art-motion portal-attendance-bars"
+          style={{ animationDelay: `${index * 0.18}s` }}
+          x={241 + index * 14}
+          y={132 - height}
+          width="9"
+          height={height}
+          rx="2.5"
+          fill={index === 3 ? '#E8720C' : 'currentColor'}
+          fillOpacity={index === 3 ? 0.9 : 0.35}
+        />
+      ))}
+      <path d="M238 134h52" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+
+      {/* 动线：打卡 → 排班（静态虚线），排班 → 工时（按节拍从日历底部绕到图表底部再回退） */}
+      <path d="M72 100q22 4 44 -18" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+      <path className="portal-art-motion portal-attendance-connection" pathLength="1" d="M200 132v12h48v-10" fill="none" stroke="#E8720C" strokeWidth="2" strokeLinejoin="round" />
+    </>
+  )
+}
+
+/**
+ * 考勤假勤场景二（请假与额度）：把“假”画成一条完整的业务链路。
+ * 悬停后的时序：① 假单核准盖章 → ② 标题逐字蹦完
+ * → ③ 日历上那日被徽章“拍”下来标记为休假（落下弹一下再轻摆）
+ * → ④ 额度环逐段绘制：紫=剩余、橙=已用，环上标记点绕行，沙漏漏沙，图例依次浮现。
+ */
+function AttendanceLeaveScene() {
+  return (
+    <>
+      <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
+      <rect x="80" y="6" width="160" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <TypedArtworkLabel label="leaveApproved" x={160} y={22} width={132} />
+
+      {/* ① 假单 + 审批人 + 核准章 */}
+      <Sheet x={24} y={60} width={72} height={80} />
+      <path d="M36 88h48m-48 12h38m-38 12h44" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" />
+      <path d="M60 132h22l-6 8h-16Z" fill="#E8720C" opacity="0.55" />
+      <g className="portal-art-motion portal-attendance-step"><Person x={100} y={56} scale={0.36} /></g>
+      {/* 核准章不能写 opacity="0"：静止态（[data-motion=idle]）会 animation:none，
+          静态层必须自己把“已核准”说完整，出现/落下动作只由 keyframes 在悬停时叠加。 */}
+      <g className="portal-art-motion portal-attendance-stamp">
+        <circle cx="82" cy="122" r="12" fill="#fff" stroke="#52C41A" strokeWidth="2" />
+        <path d="m77 122 3.6 3.8 7-8" fill="none" stroke="#52C41A" strokeWidth="2.2" />
+      </g>
+
+      {/* ② 月历：被圈出的休假日 + 遮阳伞与太阳 */}
+      <rect x="116" y="52" width="112" height="92" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="116" y="52" width="112" height="15" rx="7" fill="currentColor" opacity="0.14" />
+      <path d="M130 50v8m32-8v8m32-8v8m32-8v8" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
+      {Array.from({ length: 21 }, (_, index) => {
+        const col = index % 7
+        const row = Math.floor(index / 7)
+        const offDay = row === 1 && col === 3
+        const restDay = col === 6 || col === 0
+        return (
+          <rect
+            key={index}
+            x={124 + col * 15}
+            y={74 + row * 22}
+            width="11"
+            height="11"
+            rx="2.5"
+            fill="currentColor"
+            fillOpacity={offDay ? 0 : restDay ? 0.12 : 0.26}
+            stroke={offDay ? '#E8720C' : 'none'}
+            strokeWidth="1.8"
+          />
+        )
+      })}
+      {/* 休假标记：徽章从上方拍下来把当日“标记一下”，落定后伞面轻摆；
+          11×11 的格子里装不下完整的伞，所以做成压在当日格上的小徽章，太阳放到日历右上角空位 */}
+      <g className="portal-art-motion portal-attendance-mark">
+        <circle cx="174.5" cy="101.5" r="8.5" fill="#FFF7F0" stroke="#E8720C" strokeWidth="1.8" />
+        <g className="portal-art-motion portal-attendance-umbrella">
+          <path d="M169.5 101a5.5 5.5 0 0 1 11 0Z" fill="#E8720C" />
+          <path d="M175 101v5" stroke="#E8720C" strokeWidth="1.4" />
+        </g>
+      </g>
+      <circle className="portal-art-motion portal-art-signal" cx="232" cy="46" r="6.5" fill="#FAAD14" />
+
+      {/* ③ 额度环：底环呼吸→紫弧（剩余）绘制→橙弧（已用）扣减→标记点绕行→沙漏漏沙→图例浮现 */}
+      <circle className="portal-art-motion portal-attendance-track" cx="268" cy="84" r="23" fill="none" stroke="currentColor" strokeOpacity="0.18" strokeWidth="7" />
+      <path
+        className="portal-art-motion portal-attendance-ring"
+        pathLength="1"
+        d="M268 61a23 23 0 0 1 19 35"
+        fill="none"
+        stroke="#722ED1"
+        strokeWidth="7"
+        strokeLinecap="round"
+      />
+      <path
+        className="portal-art-motion portal-attendance-used"
+        pathLength="1"
+        d="M249 95a23 23 0 0 0 19 12"
+        fill="none"
+        stroke="#E8720C"
+        strokeWidth="7"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      <circle className="portal-art-motion portal-attendance-orbit" cx="268" cy="61" r="3.2" fill="#722ED1" />
+      <g className="portal-art-motion portal-attendance-hourglass">
+        <path d="M262 76h12l-6 9 6 9h-12l6-9Z" fill="#fff" stroke="currentColor" strokeWidth="1.8" />
+        <path className="portal-art-motion portal-attendance-sand" d="M268 94l4 6h-8Z" fill="#E8720C" />
+      </g>
+      <path className="portal-art-motion portal-attendance-legend" d="M248 122h40" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+      <path className="portal-art-motion portal-attendance-legend" style={{ animationDelay: '0.4s' }} d="M248 130h26" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+
+      {/* 动线：假单 → 日历 → 额度 */}
+      <path d="M98 100h14" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+      <path className="portal-art-motion portal-attendance-connection" pathLength="1" d="M230 96q8 0 14 -4" fill="none" stroke="#E8720C" strokeWidth="2" />
+    </>
+  )
+}
+
 const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   finance: (
     <>
@@ -1094,6 +1320,11 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
     </>
   ),
   translation: null,
+  /*
+   * 考勤假勤：两套构图——「今日出勤动线」与「请假与额度」，进门户时逐档轮换。
+   * 共用同一个 data-scene 场景色，不新增系统卡片也不会多出一个色。
+   */
+  attendance: <AttendancePunchScene />,
   generic: (
     <>
       <path d="M95 65h130v67H95Z" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
@@ -1114,6 +1345,8 @@ export type PortalArtworkStyle = 'primary' | 'alternate'
 const variantScenes: Partial<Record<PortalSystemKey | 'generic', (style: PortalArtworkStyle) => ReactNode>> = {
   rdm: style => (style === 'alternate' ? <RdmGanttScene /> : <RdmPipelineScene />),
   ads: style => (style === 'alternate' ? <AdsModelScene /> : <AdsTrafficScene />),
+  // 考勤与假期是同一系统的两个日常场景，分两套构图轮换，避免“只看得到打卡”
+  attendance: style => (style === 'alternate' ? <AttendanceLeaveScene /> : <AttendancePunchScene />),
 }
 
 export default function SystemArtwork({ code, name = '', active = false, style = 'primary' }: {

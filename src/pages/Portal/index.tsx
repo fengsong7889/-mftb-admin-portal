@@ -66,6 +66,10 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '員工、組織、職位、員工動態', icon: 'TeamOutlined',
   },
   {
+    code: 'attendance', name: '考勤假勤系統', nameEn: 'Workforce & Attendance',
+    description: '打卡、排班、節假日、請假額度與考勤匯總', icon: 'ClockCircleOutlined',
+  },
+  {
     code: 'eam', name: '物資管理系統', nameEn: 'EAM',
     description: '資產、耗材、採購、庫存、盤點', icon: 'InboxOutlined',
   },
@@ -124,7 +128,7 @@ const PORTAL_DOMAINS: readonly PortalDomain[] = [
     key: 'org', nameKey: 'portal.domain.org', nameFallback: '組織與流程審批',
     descKey: 'portal.domain.orgDesc', descFallback: '人事組織、流程審批與產研交付',
     icon: <TeamOutlined />, tone: '#1890FF', toneBg: '#E6F7FF',
-    codes: ['hr', 'oa', 'rdm'],
+    codes: ['hr', 'attendance', 'oa', 'rdm'],
   },
   {
     key: 'govern', nameKey: 'portal.domain.govern', nameFallback: '智能與平台治理',

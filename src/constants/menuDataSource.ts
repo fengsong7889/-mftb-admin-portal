@@ -250,6 +250,17 @@ export const keyToPath: Record<string, string> = {
   'vehicle-dispatch':     '/vehicle-dispatch',
   'vehicle-ledger':       '/vehicle-ledger',
   'vehicle-master-data':  '/vehicle-master-data',
+  // 考勤假勤系统（attendance）—— 独立入口，菜单真值由 AttendanceMenuInitializer 写入 sys_menu。
+  'attendance-workbench':  '/attendance-workbench',
+  'attendance-group':      '/attendance-group',
+  'attendance-shift':      '/attendance-shift',
+  'attendance-holiday':    '/attendance-holiday',
+  'attendance-schedule':   '/attendance-schedule',
+  'attendance-punch':      '/attendance-punch',
+  'attendance-exception':  '/attendance-exception',
+  'attendance-daily':      '/attendance-daily',
+  'attendance-monthly':    '/attendance-monthly',
+  'attendance-setting':    '/attendance-setting',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -324,6 +335,15 @@ pathToKey['/vehicle-ledger/detail'] = 'vehicle-ledger'
 pathToKey['/vehicle-ledger/correct'] = 'vehicle-ledger'
 pathToKey['/vehicle-ledger/backfill'] = 'vehicle-ledger'
 
+// 考勤假勤子页（新增/编辑/详情/处理）均为对应菜单的子页面，非独立菜单，复用同一菜单授权
+pathToKey['/attendance-group-form'] = 'attendance-group'
+pathToKey['/attendance-group-detail'] = 'attendance-group'
+pathToKey['/attendance-shift-form'] = 'attendance-shift'
+pathToKey['/attendance-shift-detail'] = 'attendance-shift'
+pathToKey['/attendance-holiday-form'] = 'attendance-holiday'
+pathToKey['/attendance-holiday-detail'] = 'attendance-holiday'
+pathToKey['/attendance-exception-handle'] = 'attendance-exception'
+
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
  *
@@ -396,8 +416,15 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'asset-claim', 'asset-borrow', 'asset-return', 'asset-transfer-list',
   'asset-handover', 'asset-repair', 'asset-loss', 'asset-compensation', 'asset-scrap',
   'asset-flow', 'asset-inventory',
-  // 用車管理（B1 已接真实 /api/vehicle/*，不再是前端原型，必须登记为已接入后端）
+  // 用車管理（B1 已接真实 /api/vehicle/*，不再是前端原型，必须登记为已接入后端 ）
   'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use', 'vehicle-master-data',
+  // 考勤假勤系统：菜单来自后端 sys_menu（阶段二 2A 已落种子），因此十个菜单全部必须登记：
+  // 未登记会被 check-menu-consistency 判为「离线路由无法阻断」。
+  // 2C 已完成：十个菜单及其子页（表单/详情/处理页）全部走真实 /api/attendance/*，
+  // 模块内 mockData.ts 已删除，后端离线时页面如实报错而不是展示假数据。
+  'attendance-workbench', 'attendance-group', 'attendance-shift', 'attendance-holiday',
+  'attendance-schedule', 'attendance-punch', 'attendance-exception', 'attendance-daily',
+  'attendance-monthly', 'attendance-setting',
   // EAM 採購
   'purchase-order', 'purchase-request',
   // 耗材管理

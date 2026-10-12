@@ -7,7 +7,7 @@
 
 ---
 
-## 1. 系统清单（13 个业务系统 + 1 个公共入口）
+## 1. 系统清单（14 个业务系统 + 1 个公共入口）
 
 > **命名规范（2026-10 统一）**：中文显示名一律「4字域名 + 系統」= 6 字，全部以「系統」结尾。
 > 不再混用「中心 / 工作台 / 配置」——那类后缀属菜单级语义，会把独立系统降级成菜单。
@@ -23,6 +23,7 @@
 | `finance` | 財務結算系統 | Finance & Settlement | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
 | `ai` | 人工智能系統 | Artificial Intelligence | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
 | `hr` | 人力資源系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
+| `attendance` | 考勤假勤系統 | Workforce & Attendance | `ClockCircleOutlined` | 65 | 打卡/排班/班次/節假日/異常/請假額度/日報月報（v228 从 hr 拆出独立入口） |
 | `eam` | 物資管理系統 | Asset Management | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
 | `rdm` | 產研交付系統 | R&D Delivery | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
 | `oa` | 流程審批系統 | Workflow Approval | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
@@ -78,6 +79,18 @@
 | ~~`permission`~~ | 權限管理 | `iam` | **v45 已物理删除** — v45 已退役；授權中心/角色管理/數據授權 提升为顶级 |
 | ~~`system-config`~~ | 系統配置 | `platform` | **v45 已物理删除** — v45 已退役；規則總覽/規則中心/版本管理/通知渠道配置 提升为顶级。`menu-config`（菜單配置）归 `iam` 治理面，不随 platform |
 | `i18n-center` | 多語言管理 | `platform` |  |
+| `attendance-workbench` | 假勤工作台 | `attendance` | 顶级菜单，sort 26；待办只跳转流程事项，不承载审批动作 |
+| `attendance-group` | 考勤組與規則 | `attendance` | 顶级菜单，sort 27；考勤结论的最小计算单位 |
+| `attendance-shift` | 班次管理 | `attendance` | 顶级菜单，sort 28 |
+| `attendance-holiday` | 節假日日曆 | `attendance` | 顶级菜单，sort 29 |
+| `attendance-schedule` | 排班管理 | `attendance` | 顶级菜单，sort 30 |
+| `attendance-punch` | 打卡記錄 | `attendance` | 顶级菜单，sort 31；只读账本 |
+| `attendance-exception` | 異常處理 | `attendance` | 顶级菜单，sort 32；子页 `/attendance-exception-handle` 归同一菜单 |
+| `hr-leave` | 請假管理 | `attendance` | **v228 从 `hr-profile` 迁入并提升为顶级**，sort 33；key/path/actions 未变，存量授权随行 |
+| `hr-leave-quota` | 假期額度 | `attendance` | **v228 从 `hr-profile` 迁入并提升为顶级**，sort 34；同上 |
+| `attendance-daily` | 考勤日報 | `attendance` | 顶级菜单，sort 35；**v1.1 補齊 `edit` 動作**（重算區間日報屬寫操作，缺 edit 則該能力對普通角色永遠授不出去） |
+| `attendance-monthly` | 月度考勤匯總 | `attendance` | 顶级菜单，sort 36；冻结后为薪酬核算取数来源 |
+| `attendance-setting` | 假勤設置 | `attendance` | 顶级菜单，sort 37；只含考勤口径参数，**不含审批流程配置**（归 `oa` 的流程配置） |
 
 ## 3. 叶子菜单归属规则
 
@@ -91,6 +104,7 @@
 | `purchase-request`（採購申請） | 曾挂 `oa-center` / 已迁移 | `oa` | 属于 OA 流程 |
 | `approval-center`（審批中心） | `finance > approval` | `finance` | 保留在 finance，本轮不迁移至 `oa`；未来若要合并两套审批引擎再讨论 |
 | `login-log`（員工動態） | `hr` | `hr` | 展示层保留；账号安全类操作（强制下线、密码重置）本轮仍由 HR 页面调用，Round 2 迁移到 `iam` |
+| `hr-leave`（請假管理）、`hr-leave-quota`（假期額度） | 原挂 `hr-profile` | `attendance` | **v228 迁入考勤假勤系统**。迁移动作是把两条叶子提升为 `attendance` 顶级菜单（`parent_id = NULL`），而不是在 `hr-profile` 树内改子叶子归属——§3 的不变量是「一棵树同属一个系统」，留父级改子级正是违规形态。`ess-leave`（我的假期）属员工自助视图，仍留在 `hr` 的 `ess-center` 树下。 |
 | `menu-config`（菜單配置） | `system-config` | `iam` | 系统配置类操作从 platform 迁至 iam；本清单里作为例外覆盖上表 |
 
 > **例外说明**：`menu-config` 与 `role-management`、`function-permission`、`data-permission` 一样，属于「权限中心治理面」，即使物理上在 `system-config` 树下，也归 `iam`。这保证「谁能修改菜单/权限」由 `iam` 一处授权。

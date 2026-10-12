@@ -93,7 +93,7 @@ beforeEach(async () => {
 })
 
 describe('门户场景卡片与授权边界', () => {
-  it('上图下文、无英文副标题，全部十三种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
+  it('上图下文、无英文副标题，全部十四种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
     const { container } = mount()
     const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     expect(card.querySelector('.portal-card-cover > svg[data-scene="finance"]')).toBeInTheDocument()
@@ -106,7 +106,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(card.querySelector('.portal-card-body .anticon')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(12)
+    expect(cards).toHaveLength(13)
     cards.forEach(button => {
       expect(button).toBeEnabled()
       expect(button).toHaveClass('is-locked')
@@ -119,7 +119,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
     const scenes = Array.from(container.querySelectorAll('[data-scene]'), image => image.getAttribute('data-scene'))
-    expect(new Set(scenes).size).toBe(13)
+    expect(new Set(scenes).size).toBe(14)
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
@@ -143,7 +143,7 @@ describe('门户场景卡片与授权边界', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
     expect(document.querySelector('[data-testid="system-route"]')).toBeNull()
-    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(12)
+    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(13)
     expect(localStorage.getItem('current_system_code')).toBeNull()
     expect(loadSystemNavigation).not.toHaveBeenCalled()
   })
@@ -163,7 +163,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.noSystem)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(13)
+    expect(cards).toHaveLength(14)
     cards.forEach(button => expect(button).toHaveClass('is-locked'))
   })
 
@@ -458,7 +458,7 @@ describe('场景区分与低干扰动效', () => {
     const tones = new Map<string, string>()
     for (const [, scene, color] of css.matchAll(/\.portal-card-artwork\[data-scene='(\w+)'\]\s*\{\s*color:\s*(#[\dA-Fa-f]{6})/g)) tones.set(scene, color)
     expect([...tones.keys()].sort()).toEqual([
-      'ads', 'ai', 'eam', 'finance', 'hr', 'iam', 'merchant', 'merchantWorkbench', 'oa', 'platform', 'rdm', 'search', 'translation',
+      'ads', 'ai', 'attendance', 'eam', 'finance', 'hr', 'iam', 'merchant', 'merchantWorkbench', 'oa', 'platform', 'rdm', 'search', 'translation',
     ].sort())
     expect(new Set(tones.values()).size).toBe(tones.size)
     // 营销与商家增长组内四张卡并排展示，色相必须彼此互斥
@@ -501,7 +501,14 @@ describe('场景区分与低干扰动效', () => {
     await i18n.changeLanguage(lang)
     const copy = resources[lang].portal.artwork
     expect(Object.keys(copy).sort()).toEqual(Object.keys(en.portal.artwork).sort())
-    const { container } = render(<>{['search', 'iam', 'eam', 'hr', 'oa', 'translation', 'ads', 'merchant', 'seller', 'platform', 'rdm'].map(code => <SystemArtwork key={code} code={code} />)}</>)
+    // 考勤假勤两套构图各承载一条状态文案，必须两套都渲染才能覆盖 portal.artwork 全键
+    const frames: Array<[string, 'primary' | 'alternate']> = [
+      ['search', 'primary'], ['iam', 'primary'], ['eam', 'primary'], ['hr', 'primary'], ['oa', 'primary'],
+      ['translation', 'primary'], ['ads', 'primary'], ['merchant', 'primary'], ['seller', 'primary'],
+      ['platform', 'primary'], ['rdm', 'primary'],
+      ['attendance', 'primary'], ['attendance', 'alternate'],
+    ]
+    const { container } = render(<>{frames.map(([code, style]) => <SystemArtwork key={`${code}-${style}`} code={code} style={style} />)}</>)
     for (const text of Object.values(copy)) expect(container).toHaveTextContent(text)
   })
 
@@ -519,6 +526,38 @@ describe('场景区分与低干扰动效', () => {
     // 驳回（红）与挂起（琥珀）两条支路静态可见，不占用主线节拍
     expect(image.querySelector('path[stroke="#FF4D4F"]')).toBeInTheDocument()
     expect(image.querySelector('circle[stroke="#FA8C16"]')).toBeInTheDocument()
+  })
+
+  it('考勤假勤两套构图分别讲今日出勤与请假额度，静态层自身完整可读', () => {
+    const punch = render(<SystemArtwork code="attendance" name="考勤假勤系統" />)
+    const image = punch.container.querySelector('svg[data-scene="attendance"]')!
+    // 场景一：打卡机指纹 + 分针 + 周排班日历 + 逐字揭示标题 + 等连线到位才上升的工时柱
+    expect(image.querySelector('.portal-attendance-ripple')).toHaveClass('portal-art-motion')
+    expect(image.querySelector('.portal-attendance-hand')).toBeInTheDocument()
+    expect(image.querySelectorAll('.portal-attendance-today')).toHaveLength(1)
+    expect(image.querySelectorAll('.portal-attendance-bars')).toHaveLength(4)
+    expect(image.querySelector('.portal-attendance-type')).toBeInTheDocument()
+    expect(image.querySelector('.portal-attendance-connection')).toBeInTheDocument()
+    expect(image).toHaveTextContent(zh.portal.artwork.attendancePunched)
+
+    const leave = render(<SystemArtwork code="attendance" name="考勤假勤系統" style="alternate" />)
+    const alt = leave.container.querySelector('svg[data-scene="attendance"]')!
+    // 场景二：假单 + 核准章 + 被徽章拍下的休假日 + 紫/橙两段额度环与绕行标记点
+    expect(alt.querySelector('.portal-attendance-stamp')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-mark')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-umbrella')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-hourglass')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-ring')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-used')).toBeInTheDocument()
+    expect(alt.querySelector('.portal-attendance-orbit')).toBeInTheDocument()
+    expect(alt.querySelector('circle[stroke="#52C41A"]')).toBeInTheDocument()
+    expect(alt.querySelector('path[stroke="#722ED1"]')).toBeInTheDocument()
+    expect(alt).not.toHaveTextContent(zh.portal.artwork.attendancePunched)
+    expect(alt).toHaveTextContent(zh.portal.artwork.leaveApproved)
+    // 两套构图必须真的画得不一样，否则轮换只是重复展示同一张图
+    expect(alt.innerHTML).not.toBe(image.innerHTML)
+    punch.unmount()
+    leave.unmount()
   })
 
   it.each([

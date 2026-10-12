@@ -134,6 +134,17 @@ import {
   FundOutlined, // 消耗统计
   AlertOutlined, // 库存预警
   TranslationOutlined, // 多语言管理
+  // 考勤假勤系统（菜单图标必须与后端 sys_menu.icon 一致，缺一处侧边栏就没图标）
+  ClockCircleOutlined, // 假勤工作台
+  GroupOutlined, // 考勤組與規則
+  RetweetOutlined, // 班次管理
+  SnippetsOutlined, // 節假日日曆
+  BorderOutlined, // 排班管理
+  ScanOutlined, // 打卡記錄
+  ExclamationCircleOutlined, // 異常處理
+  AreaChartOutlined, // 考勤日報
+  PayCircleOutlined, // 月度考勤匯總
+  FunctionOutlined, // 假勤設置
 } from '@ant-design/icons'
 
 const { Sider } = Layout
@@ -585,6 +596,17 @@ const keyToIcon: Record<string, ReactNode> = {
   'vehicle-ledger':   <CompassOutlined />,
   'my-vehicle-use':   <LoginOutlined />,
   'vehicle-master-data': <ClusterOutlined />,
+  // 考勤假勤系统（独立入口，菜单归属 sys_menu.system_code=attendance）
+  'attendance-workbench':  <ClockCircleOutlined />,
+  'attendance-group':      <GroupOutlined />,
+  'attendance-shift':      <RetweetOutlined />,
+  'attendance-holiday':    <SnippetsOutlined />,
+  'attendance-schedule':   <BorderOutlined />,
+  'attendance-punch':      <ScanOutlined />,
+  'attendance-exception':  <ExclamationCircleOutlined />,
+  'attendance-daily':      <AreaChartOutlined />,
+  'attendance-monthly':    <PayCircleOutlined />,
+  'attendance-setting':    <FunctionOutlined />,
   'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,

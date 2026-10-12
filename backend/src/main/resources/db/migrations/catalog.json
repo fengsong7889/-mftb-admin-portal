@@ -1221,6 +1221,70 @@
       "author": "Qoder",
       "ticket": "vehicle-mgmt-b1",
       "comment": "分组 sort_order 现为 5：基础数据让到末位 6，二者由 fixAssetMenuGrouping 与本初始化器同步维护（任一处改了另一处没改，下次启动就会被顶回去）。system_code 必须显式写入——SystemPortalSchemaInitializer.propagateSystemToDescendants 在 @Order(15) 只跑一次，早于本初始化器 @Order(29) 插入菜单，留 NULL 会让门户导航剪枝与系统准入落到未定义行为。后置校验除存在性外还钉住父级与 system_code，父级错挂会让菜单静默出现在别的系统树里。"
+    },
+    {
+      "versionKey": "attendance:schema:v1.0",
+      "module": "attendance",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "attendanceSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "scriptFiles": [
+        "229_attendance_core_tables.sql"
+      ],
+      "intent": "考勤假勤系统数据底座：9 张 att_* 表（主数据 4 + 事实 2 + 结论 3）+ 2 条编号规则",
+      "author": "Qoder",
+      "ticket": "attendance-b1",
+      "comment": "DDL 只在 classpath 资源 229_attendance_core_tables.sql 存一份，backend/sql/ 下为参考副本。所有事实表与结论表都用 STORED 生成列把 deleted 折进唯一键：打卡幂等键（人+时刻+来源）、排班一人一天一条、异常同人同日同类型一条、日报一天一组一条、月报一人一月一条——这五个键就是「同步重跑/重复导入/重算 UPSERT 不会长出重复事实」的全部依据，缺任一都会让薪酬按重复汇总取数。跨模块只引用 sys_user/sys_department 不建 FK（历史软删数据会让启动失败），新表之间用 FK 硬约束。work_date 写入时按班次跨天规则定死，不让查询用 punch_at 的日期推算，否则跨夜班永远算错一天。请假表 hr_leave_* 不搬：已跑通 OA 审批回调，搬表牵动流程锁点与历史单据而收益只有名字好看，考勤侧单向读取其结论。后置校验钉三件事：表存在 + 十个关键唯一键就位 + 实体依赖列存在，把「实体与表结构漂移」从运行期故障前动为启动失败。编号规则的展示元数据写在 applyOnce 外的 syncSeqRules：版本已记录的库不重跑 task，只靠脚本里的 INSERT IGNORE 会让旧行永远停在空描述状态（用车域踩过同一个坑）。"
+    },
+    {
+      "versionKey": "attendance:schema:v1.1",
+      "module": "attendance",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "attendanceSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "attendance:schema:v1.0"
+      ],
+      "intent": "att_exception 增加 handle_remark 列，把处理说明与判定明细 detail 分列",
+      "author": "Qoder",
+      "ticket": "attendance-b2",
+      "comment": "异常处理需要落库「为何确认不抵扣 / 为何补卡」，但 detail 是判定引擎写入的量化描述且只有 VARCHAR(200) NOT NULL：把人工备注追加进去一是与重算互相覆盖（引擎每次重算都重写 detail），二是长备注会撑爆列宽直接报数据过长（MySQL 严格模式下是 500 而不是警告），三是混在一列后说不清哪一段是算出来的、哪一段是人写的。因此独立成列。存量库走本迁移的 ALTER ADD COLUMN（列已存在则跳过），新建库由 229 脚本一次建出，两条路径的最终结构由 REQUIRED_COLUMNS 与脚本结构锁用例共同钉住。服务层对备注长度做上限校验并直接拒绝超长提交，不做静默截断——截断会让审计凭据缺尾，而缺尾的说明比没有说明更难发现。"
+    },
+    {
+      "versionKey": "attendance:menu:v1.0",
+      "module": "attendance",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "attendanceMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
+      "intent": "考勤假勤系统独立入口：10 个顶级菜单（system_code=attendance）+ 請假管理/假期額度从 hr-profile 迁入 + admin 授权与角色/部门系统准入反推",
+      "author": "Qoder",
+      "ticket": "attendance-b1",
+      "comment": "对齐北森「假勤」/飞书「假勤」/Workday Time Tracking 的产品边界：考勤与请假同属一个计算口径，拆在两个系统会导致异常抵扣跨系统对齐。迁入的两条请假菜单只改 parent_id/system_code/sort_order，不动 menu_key/path/actions——菜单行 id 不变则 sys_role_menu/sys_department_menu 授权天然随行，改 key 等于让存量授权集体失效。system_code 必须显式写入：SystemPortalSchemaInitializer.propagateSystemToDescendants 只在门户底座迁移那一次运行，晚于本初始化器插入的菜单留 NULL 会让门户导航剪枝与系统准入落到未定义行为。排序与改名都带「当前值仍等于旧默认值」条件，管理员在「菜单配置」自定义过的一律不动；grantAdmin 的 UPDATE 只补空动作集，不扩写已有授权。后置校验钉三件事：菜单存在且启用且真挂在顶级、两条请假菜单确实完成迁入（父级为空且归属已改写）、admin 授权条数达标——缺任一不记版本，下次启动重试。"
+    },
+    {
+      "versionKey": "attendance:menu:v1.1",
+      "module": "attendance",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "attendanceMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "attendance:menu:v1.0"
+      ],
+      "intent": "給考勤日報菜單補齊 edit 動作（重算區間日報屬寫操作），並同步給 admin 角色",
+      "author": "Qoder",
+      "ticket": "attendance-b2",
+      "comment": "v1.0 把日報當成純只讀菜單只給了 view/export，但 2B-2b 接上的「重算區間日報」會改日報、生成異常並回寫打卡判定，屬寫操作。sys_menu.actions 是授權中心能勾出什麼動作的唯一依據，缺 edit 就等於該能力永遠授不出去（超管走代碼直通看不出來，普通角色上線當天才暴露 403）。不能只改 v1.0 聲明：ensureMenu 對已存在菜單只對齊結構不覆蓋 actions，已落庫環境拿不到新動作集，因此單獨一個版本鍵做一次性糾正。只動日報這一個菜單，不批量對齊全部考勤菜單：批量覆蓋會把管理員在授權中心主動收窄過的動作集擴回去，那屬於靜默擴權。admin 顯式擴權一次（內置運維角色必須能重算），其他角色授權行完全不動。後置校驗釘 sys_menu.actions 已等於聲明真值，未對齊則不記版本、下次啟動重試。"
     }
   ]
 }

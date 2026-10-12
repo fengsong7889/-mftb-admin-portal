@@ -21,6 +21,12 @@ public enum SystemCode {
     FINANCE("finance"),
     AI("ai"),
     HR("hr"),
+    /**
+     * 考勤假勤系統：打卡/排班/班次/節假日/異常/請假額度/日報月報。
+     * <p>從人力資源系統拆出獨立入口，對齊北森「假勤」/飛書「假勤」/Workday Time Tracking 的產品邊界；
+     * 月度匯總凍結後是薪酬核算系統的唯一取數來源。
+     */
+    ATTENDANCE("attendance"),
     EAM("eam"),
     /** 產研交付系統（RDM）：需求從提交、審批、分配、受理、研發、驗收到上線的全生命周期管理 */
     RDM("rdm"),

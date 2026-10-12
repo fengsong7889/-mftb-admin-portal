@@ -283,6 +283,111 @@ body {
   0%, 66%, 98%, 100% { opacity: 0; }
   72%, 94% { opacity: 1; }
 }
+/* 考勤假勤（场景一）：打卡机扫描→指纹确认→分针走过→今日格落勾→工时累积。 */
+@keyframes portalAttendanceScan {
+  0%, 3%, 100% { opacity: 0; transform: translateY(-6px); }
+  7%, 17% { opacity: 1; }
+  8% { transform: translateY(-6px); }
+  16% { transform: translateY(6px); }
+  21% { opacity: 0; transform: translateY(6px); }
+}
+@keyframes portalAttendanceRipple {
+  0%, 12%, 100% { opacity: 0.2; transform: scale(0.86); }
+  20%, 30% { opacity: 1; transform: scale(1.14); }
+  38% { opacity: 0.2; transform: scale(0.86); }
+}
+/* 分针转一圈对应“从报到时刻走到整点”，必须线性，否则呼吸曲线会让指针往返抽动。 */
+@keyframes portalAttendanceHand {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes portalAttendanceStep {
+  0%, 100% { transform: translateY(0); }
+  20% { transform: translateY(-2px); }
+  40% { transform: translateY(0); }
+  60% { transform: translateY(-2px); }
+  80% { transform: translateY(0); }
+}
+/*
+ * 考勤假勤共用的 7.2 秒节拍（两套构图同一时序骨架）：
+ * 6%→34% 标题逐字蹦完 → 34%→40% 完成标记才出现 → 28%→50% 连线走到图表
+ * → 52%→70% 柱状上升 → 78%→96% 连线回退、柱子回落，下一轮开始。
+ */
+@keyframes portalAttendanceType {
+  0%, 6% { transform: scaleX(0); }
+  34%, 92% { transform: scaleX(1); }
+  98%, 100% { transform: scaleX(0); }
+}
+@keyframes portalAttendanceBadge {
+  0%, 34%, 100% { opacity: 0; transform: scale(0.6); }
+  42%, 92% { opacity: 1; transform: scale(1); }
+}
+@keyframes portalAttendanceToday {
+  0%, 26%, 100% { stroke-opacity: 0.25; }
+  36%, 92% { stroke-opacity: 1; }
+}
+/* 连线先画后擦：dashoffset 0→1 是往回擦，视觉上就是“线回退消失”。 */
+@keyframes portalAttendanceConnection {
+  0%, 28%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  32% { stroke-dashoffset: 1; opacity: 1; }
+  50%, 76% { stroke-dashoffset: 0; opacity: 1; }
+  86%, 96% { stroke-dashoffset: 1; opacity: 1; }
+}
+@keyframes portalAttendanceBars {
+  0%, 52%, 100% { transform: scaleY(0); }
+  70%, 84% { transform: scaleY(1); }
+  94% { transform: scaleY(0); }
+}
+/* 考勤假勤（场景二）：假单核准盖章→休假标记→额度环逐段绘制→沙漏漏沙→图例浮现。 */
+@keyframes portalAttendanceStamp {
+  0%, 12%, 100% { opacity: 0; transform: scale(1.7); }
+  20% { opacity: 1; transform: scale(0.88); }
+  26%, 94% { opacity: 1; transform: scale(1); }
+}
+/* 休假徽章“拍”在当日格上：从上方落下、弹一下再定住，让“被标记”这个动作可感知。 */
+@keyframes portalAttendanceMark {
+  0%, 30%, 100% { opacity: 0; transform: translateY(-10px) scale(1.5); }
+  38% { opacity: 1; transform: translateY(0) scale(0.85); }
+  44%, 94% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes portalAttendanceUmbrella {
+  0%, 44%, 100% { transform: rotate(0deg); }
+  56% { transform: rotate(-7deg); }
+  70% { transform: rotate(6deg); }
+  84% { transform: rotate(0deg); }
+}
+@keyframes portalAttendanceTrack {
+  0%, 40%, 100% { transform: scale(1); }
+  52% { transform: scale(1.05); }
+  66% { transform: scale(1); }
+  80% { transform: scale(1.04); }
+}
+@keyframes portalAttendanceRing {
+  0%, 44%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  48% { stroke-dashoffset: 1; opacity: 1; }
+  64%, 94% { stroke-dashoffset: 0; opacity: 1; }
+}
+@keyframes portalAttendanceUsed {
+  0%, 64%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  68% { stroke-dashoffset: 1; opacity: 0.9; }
+  80%, 94% { stroke-dashoffset: 0; opacity: 0.9; }
+}
+@keyframes portalAttendanceOrbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes portalAttendanceHourglass {
+  0%, 72%, 100% { opacity: 0.35; }
+  80%, 94% { opacity: 1; }
+}
+@keyframes portalAttendanceSand {
+  0%, 76%, 100% { opacity: 0; transform: translateY(-5px); }
+  84%, 92% { opacity: 1; transform: translateY(2px); }
+}
+@keyframes portalAttendanceLegend {
+  0%, 84%, 100% { opacity: 0.25; }
+  90%, 96% { opacity: 1; }
+}
 /* 物资卡片：先登记与关联设备，再发放一本耗材；结余仅在领用完成后扣减。 */
 @keyframes portalEamTag {
   0%, 3%, 100% { opacity: 0; transform: translateY(-6px); }

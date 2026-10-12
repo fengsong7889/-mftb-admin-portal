@@ -152,6 +152,17 @@ public class BizSeqService {
      */
     public static final String RULE_VEHICLE_USE = "vehicle_use";
 
+    /* ==================== 考勤假勤系统 ==================== */
+
+    /**
+     * 考勤组编号：AG + YYYYMM + 4 位。
+     * <p>取 YYYYMM 而不是 YYYYMMDD：考勤组是长期主数据，按天出号会在一个月内
+     * 散成几十个无意义序列，规则菜单里也看不出规律。
+     */
+    public static final String RULE_ATTENDANCE_GROUP = "attendance_group";
+    /** 月度考勤汇总批次号：AT + YYYYMM + 4 位，冻结时生成，薪酬侧按此对账 */
+    public static final String RULE_ATTENDANCE_MONTHLY_BATCH = "attendance_monthly_batch";
+
     /**
      * 公司品牌 ID → 资产编号编码（静态兜底，优先使用 SysCompanyBrandService.getCodeById）
      * 已迁移至 sys_company_brand 表动态查询，此方法仅作 fallback。

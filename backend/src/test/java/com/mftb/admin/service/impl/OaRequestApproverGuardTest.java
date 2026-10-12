@@ -53,6 +53,7 @@ class OaRequestApproverGuardTest {
                 mock(EamPurchaseService.class), mock(EamPurchaseRequestMapper.class), mock(DingTalkService.class),
                 mock(DataScopeService.class), mock(AiGrantOnApprovalService.class),
                 mock(HrLifecycleCallbackService.class), mock(HrLeaveCallbackService.class),
+                mock(com.mftb.admin.service.AttendanceCallbackService.class),
                 mock(HrCertificateCallbackService.class), mock(HrPerfCallbackService.class),
                 mock(com.mftb.admin.service.RdmIntakeCallbackService.class),
                 mock(com.mftb.admin.service.RdmChangeCallbackService.class));

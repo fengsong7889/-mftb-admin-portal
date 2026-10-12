@@ -5,6 +5,7 @@
 **当前模块更接近“员工账号管理 + 部分人事档案”，尚不是成熟的 Core HR。优先级应是数据可信、权限边界和人事事件闭环，而非单纯增加页面。**
 
 - 用户已确认：面向中国境内，范围为组织、员工档案、雇佣任职、入转调离、合同、权限与审计；招聘、考勤、完整薪酬核算仅考虑接口边界。
+- **边界已变更（2026-10）**：考勤不再只是“接口边界”，已按用户决策拆为**独立的第 14 个门户系统「考勤假勤系統」**（`system_code = attendance`），并把原本挂在集团人事下的「請假管理 / 假期額度」两条菜单迁入。原因与代码地图见第十节。本节的其余结论仍针对集团人事本身。
 - 流程入口统一原则：所有申请流程统一从现有 OA「流程中心」发起，在「流程事项」查看、审核和跟踪；各业务模块不独立新增流程菜单、申请列表或审批列表。本次按此原则接入 HR 流程，不额外扩大为全仓现有流程改造。
 - 不新增「员工服务/OA」分组，也不新增集团人事下的「人事事务」流程菜单；员工和经理自助是权限与场景能力，不等于新建一套流程入口。
 - 本方案来自当前工作区的静态代码核验与公开资料调研；未读取生产员工明细、未执行生产接口写入、未进行浏览器保存回归，因此“有真实接口”不等于“生产数据已核实准确”。
@@ -32,7 +33,7 @@
 | 账号管理 | 登录账号、冻结/解冻、重置密码、钉钉用户 ID | 已接真实接口；密码显示的圆点仅为安全占位，不是真实密码，也不应返回真实密码 |
 | 授权展示 | 角色标签、部门授权标签 | 基于角色 ID、部门权限数据生成；详情使用“角色#ID”式标签属于展示不足，不是虚构角色 |
 
-依据：[员工 API](file:///Users/yangjingjing/Desktop/SARY/src/api/employee.ts)、[员工服务](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/service/impl/EmployeeServiceImpl.java#L347-L408)、[费用服务](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/service/impl/EmployeeSalaryServiceImpl.java)。
+依据：[员工 API](file:///Users/yangjingjing/Desktop/SRAS/src/api/employee.ts)、[员工服务](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/service/impl/EmployeeServiceImpl.java#L347-L408)、[费用服务](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/service/impl/EmployeeSalaryServiceImpl.java)。
 
 ### 2.2 必须整改的非真实闭环
 
@@ -47,11 +48,11 @@
 | 错误派生，非 Mock | 工龄、当前任职、详情在职状态 | 工龄按最小序号挑记录；当前任职按序号大小挑选；而后端序号是“同一天内递增”，不能跨日期比较 | 改由后端统一按生效日和雇佣期间计算；区分司龄、本次任职时长、认可工龄 |
 
 关键证据：
-- [基础信息前端读写](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L477-L543)、[后端保存遗漏](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/service/impl/EmployeeServiceImpl.java#L382-L408)。
-- [职务提交函数](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L698-L752)、[后端职务 DTO](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/dto/PositionRecordRequest.java#L13-L40)。
-- [合同和奖惩占位处理](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L1208-L1263)。
-- [本地更新时间覆盖](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/index.tsx#L277-L327)。
-- [历史入职补录](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/config/DataInitializer.java#L1180-L1234)。
+- [基础信息前端读写](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L477-L543)、[后端保存遗漏](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/service/impl/EmployeeServiceImpl.java#L382-L408)。
+- [职务提交函数](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L698-L752)、[后端职务 DTO](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/dto/PositionRecordRequest.java#L13-L40)。
+- [合同和奖惩占位处理](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L1208-L1263)。
+- [本地更新时间覆盖](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/index.tsx#L277-L327)。
+- [历史入职补录](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/config/DataInitializer.java#L1180-L1234)。
 
 ### 2.3 静态字典不等于 Mock，但应集中治理
 
@@ -61,7 +62,7 @@
 - 稳定法定枚举可以保留代码常量；公司、工作地点、职务体系等可变主数据必须由后台维护，并使用稳定 ID/code。
 - `src/api/mock/hr-mock.ts` 确实存在员工种子和 localStorage CRUD，但**当前员工 API 没有调用它，也未接入请求失败自动降级**。其在 `merchantMock.ts` 中仍有源码引用，不能因为文件存在就把当前员工列表判定为 Mock，也不应未核验引用便全仓删除。
 
-依据：[静态选项](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L128-L217)、[国家城市映射](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/types.ts#L896-L939)、[真实请求层](file:///Users/yangjingjing/Desktop/SARY/src/api/request.ts)。
+依据：[静态选项](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L128-L217)、[国家城市映射](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/types.ts#L896-L939)、[真实请求层](file:///Users/yangjingjing/Desktop/SRAS/src/api/request.ts)。
 
 ## 三、整体设计是否合理
 
@@ -93,9 +94,9 @@
 | P1 | 页面权限和交互不一致 | 列表“详情”依赖 edit 权限；详情各 Tab 操作未按权限隐藏；大量编辑 Modal 与项目独立页面规范不符 | view/edit 模式分开，独立编辑/业务单页面；普通查看者不出现不可执行按钮 |
 | P2 | “员工动态”命名误导 | 实际主要是登录、退出、在线时长和强制下线，不是人事异动记录 | 更名“账号登录日志”，归入账号安全；人事事件时间轴独立展示 |
 
-补充证据：[列表筛选与导出](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/index.tsx#L302-L388)、[详情大分页查找](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L449-L475)、[分页上限](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/dto/PageResult.java#L13-L31)、[日期与序号口径](file:///Users/yangjingjing/Desktop/SARY/src/pages/Permission/Employee/EmployeeDetail.tsx#L637-L669)、[同日序号实现](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/service/impl/PositionRecordServiceImpl.java#L117-L125)、[员工权限边界](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/controller/EmployeeController.java)。
+补充证据：[列表筛选与导出](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/index.tsx#L302-L388)、[详情大分页查找](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L449-L475)、[分页上限](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/dto/PageResult.java#L13-L31)、[日期与序号口径](file:///Users/yangjingjing/Desktop/SRAS/src/pages/Permission/Employee/EmployeeDetail.tsx#L637-L669)、[同日序号实现](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/service/impl/PositionRecordServiceImpl.java#L117-L125)、[员工权限边界](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/controller/EmployeeController.java)。
 
-已有数据范围服务主要处理商家集团编码，不等于 HR 的法人/部门/汇报线人员范围，不能直接视为 HR 隔离已完成。[现有数据范围定义](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/service/DataScopeService.java)。
+已有数据范围服务主要处理商家集团编码，不等于 HR 的法人/部门/汇报线人员范围，不能直接视为 HR 隔离已完成。[现有数据范围定义](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/service/DataScopeService.java)。
 
 ## 四、市面成熟 Core HR 的做法及本项目取舍
 
@@ -239,9 +240,11 @@ OA 中心（复用现有菜单）
 已有而不应重复建设的能力：
 - OA 已有流程中心、流程事项，以及流程实例、审批节点、通过/驳回、撤销、草稿提交等 API；本次只扩展 HR 类型、统一详情中的业务表单、业务校验与批准后的生效执行，不新建 HR 流程列表或审核入口。
 - EAM 已有资产交接 API 和页面；缺的是离职业务单关联、待交接任务与状态汇总，不是“没有资产交接”。
-- 流程中心的请假、加班当前为禁用占位，且不属于本次 Core HR 必建范围。
+- 流程中心的请假早已不是禁用占位：`oa_leave`（請假申請）已注册并跑通端到端审批回调（`HrLeaveCallbackService` 累加额度，`AttendanceCallbackService` 抵扣考勤异常并重算日报），其菜单也已迁入考勤假勤系统。
+- 补卡与加班**至今没有流程编码**（`biz_oa_process` 里没有 `oa_reissue` / `oa_overtime`），不是“禁用占位”而是“尚未建设”。考勤侧的 `AttendanceExceptionService.markHandledByFlow` 已就绪但**没有调用方**，属第十节列出的剩余待办。
+- 已注册并通过回调接入 OA 的人事类流程：入职、转正、调动、离职、合同续签、证明开具、绩效考核确认、绩效申诉。核验方式是 SQL 种子与服务层回调类存在，**未做浏览器端保存回归**。
 
-依据：[OA 请求 API](file:///Users/yangjingjing/Desktop/SARY/src/api/oaRequest.ts)、[资产交接 API](file:///Users/yangjingjing/Desktop/SARY/backend/src/main/java/com/mftb/admin/controller/EamHandoverController.java)、[流程中心 HR 占位](file:///Users/yangjingjing/Desktop/SARY/src/pages/OACenter/ProcessCenter/index.tsx#L139-L162)。
+依据：[OA 请求 API](file:///Users/yangjingjing/Desktop/SRAS/src/api/oaRequest.ts)、[资产交接 API](file:///Users/yangjingjing/Desktop/SRAS/backend/src/main/java/com/mftb/admin/controller/EamHandoverController.java)、[流程中心 HR 占位](file:///Users/yangjingjing/Desktop/SRAS/src/pages/OACenter/ProcessCenter/index.tsx#L139-L162)。
 
 ## 七、技术落地规则
 
@@ -311,7 +314,7 @@ OA 中心（复用现有菜单）
 
 交付花名册中的本人/团队授权视图、人事报表、岗位编制、扩展履历/资质/奖惩；资料变更与证明申请扩展为流程中心类型，员工/经理仍在流程事项查看或审核，不新增员工服务流程菜单。电子签只定义供应商适配与验证要求，首期可使用受控的签署文件登记，不假定上传文件即等于可靠电子签。
 
-招聘、考勤排班、绩效、培训、完整工资核算不纳入本期菜单扩建。
+招聘、完整工资核算、培训不纳入本期菜单扩建。考勤排班已作为**独立门户系统**交付（不在集团人事菜单内，见第十节）；绩效已有真实表与流程（`201_hr_performance`、`202_hr_perf_report`、考核/确认/申诉三类流程），不属于“未纳入”之列。
 
 ### 必测场景
 
@@ -339,4 +342,99 @@ OA 中心（复用现有菜单）
 - 合同模板、试用与留存规则、电子签采购需求及个人信息处理合法性基础。
 - 生产部署版本、数据库结构与本工作区是否一致；对历史任职与账号快照冲突先出差异报告，再按授权修复。
 
-**推荐立项顺序：先完成 P0，再以“入转调离 + 合同 + 人员权限”作为 P1 的验收闭环；不要先扩建完整薪酬、考勤、招聘。**
+**推荐立项顺序：先完成 P0，再以“入转调离 + 合同 + 人员权限”作为 P1 的验收闭环；不要先扩建完整薪酬、招聘。**
+
+实际执行已经偏离这条建议一次，并且结果是对的：**考勤假勤被提前到薪酬之前做**，因为它是薪酬核算的必需上游（出勤天数、加班工时、请假额度）——先做薪酬会在考勤上线后重算所有历史月份口径。剩余顺序建议不变：P0 数据可信 → 薪酬核算（消费考勤月报冻结批次）→ 招聘。
+
+## 十、考勤假勤系统：交付现状与接续开发指南
+
+本节面向继续开发考勤/薪酬/招聘的人。前三阶段（2A/2B/2C）已完成并接真实数据，`src/pages/Attendance/mockData.ts` 已删除。
+
+### 10.1 为什么是独立系统而不是人事下的菜单
+
+调研结论是三家成熟产品都把假勤做成与 Core HR 平级的独立应用/模块：北森 iTalentX 的假勤与人事分开订阅；飞书「假勤」是独立应用（打卡/排班/加班/假期/补卡，并区分租户/应用/考勤三种管理员角色）；Workday 的 Time Tracking 独立于 Core HCM。
+
+两个具体设计决定由这个边界推导出来：
+
+1. **请假整体迁入考勤系统**，而不是留在集团人事。考勤与请假属同一个计算口径：异常抵扣要读假单结论，拆在两个系统就变成跨系统对齐。
+2. **不能依赖部门树推导考勤地**。本仓不存在 `sys_user_store` 人员-门店绑定表（全库 grep 无命中，只有 `biz_store_bd`），所以多门店场景下“某人当天算哪个考勤地”必须由考勤系统自己的「考勤组 + 成员范围」承担。
+
+### 10.2 交付范围
+
+| 阶段 | 内容 | 关键产物 |
+|---|---|---|
+| 2A 入口与权限 | 第 14 个门户系统、10 个顶级菜单、请假两条菜单跨系统迁入、角色/部门准入反推 | `SystemCode.ATTENDANCE`、`AttendanceMenuInitializer`、`attendance:menu:v1.0/v1.1` |
+| 2B 数据与服务 | 9 张 `att_*` 表、9 个 Controller / 11 个 Service（主数据三套 + 排班 + 打卡 + 同步 + 异常 + 汇总 + 工作台 + 设置 + 审批回调）、判定引擎、请假审批回调 | `229_attendance_core_tables.sql`、`attendance:schema:v1.0/v1.1` |
+| 2C 前端与 i18n | 14 个页面全部接真实 API、五语言文案、删除 mock | `src/api/attendance.ts`、`src/pages/Attendance/`、`attendance.*` 414 键 |
+
+该系统在门户中的排序为 65，介于人力資源系統（60）与物資管理系統（70）之间。
+
+### 10.3 代码地图
+
+**后端**（`com.mftb.admin`）
+- 常量：`constant/AttendanceConstants`（菜单 key + 动作集 + 口径参数 key 的唯一真值源）
+- 迁移：`config/AttendanceMenuInitializer`、`config/AttendanceSchemaMigrationInitializer`、`config/AttendancePunchSyncJob`
+- 9 个 `controller/Attendance*Controller`，路径前缀：`/api/attendance/{groups,shifts,holidays,schedules,punches,exceptions,summaries,workbench,settings}`
+- 服务：`service/Attendance*Service` + `service/impl/Attendance*ServiceImpl`；判定引擎在 `AttendanceSummaryServiceImpl`
+- 实体：`entity/Att*`；视图：`dto/Attendance*VO`
+- 参考 SQL：`backend/sql/228_attendance_system.sql`（菜单）、`backend/sql/229_attendance_core_tables.sql`（建表，与 classpath 真值逐字一致，有用例钉）
+
+**前端**
+- `src/api/attendance.ts`：枚举常量 + 全部类型 + 请求函数；**故意不做 mock 降级**
+- `src/pages/Attendance/`：14 个页面 + `meta.ts`（枚举→i18n key/Tag 颜色）、`settingMeta.ts`、`deptTree.ts`、`useAttendanceOptions.ts`、`punchImport.ts`（Excel 解析）
+- 门户登记：`constants/portalSystems.ts`、`pages/Portal/SystemArtwork.tsx`、`components/Sidebar.tsx`、`components/MenuIcon.tsx`、`pages/Permission/types.ts`（菜单动作表）、`constants/menuDataSource.ts`
+
+### 10.4 改代码前必须知道的九条口径
+
+1. **判定引擎只允许存在一处**。`AttendanceSummaryServiceImpl` 内部的人日结论 `PersonalDay` 同时喂日报（日×组）与月报（月×人）。两边各写一套算法必然出现“日报对、月报错”，而月报是薪酬取数来源，错一天就是错发工资。
+2. **打卡流水是只读账本**。没有任何修改/删除端点；修正只能走异常处理（补录或关联假单）后重算。来源码区分钉钉同步/手工导入/人工补录，补录可事后辨别。
+3. **`work_date` 写入时定死**，由班次跨天规则决定，不允许查询时用 `punch_at` 的日期推算——否则跨天夜班永远算错一天。
+4. **月度状态机严格单向**：`draft → frozen → synced`。只有 draft 可冻结、只有 frozen 可同步；冻结后禁止回溯修改，重算整体跳过已冻结月份并回报 `skippedFrozen`（界面必须把这个数字显示出来）。
+5. **异常只有「待處理」可被推进**，重算不会把已处理行退回待处理。请假抵扣只适用于缺卡/旷工，**不能抵扣迟到/早退**（否则薪酬的迟到扣减会凭空消失）。
+6. **成员带生效区间**（`att_group_member.valid_from/valid_to`）。用今天的归属重算历史月份是考勤最常见的错账。
+7. **排班全局一人一天一条**，`shiftId=null` 的显式排休与“没有记录”是两件事：后者会产生「未排班」异常，前者不会。
+8. **判定回写是双向的**：补卡后当天不再迟到时，上一轮写的「遲到」必须复位为正常，否则打卡页与日报永远对不上；外勤与无效卡是人工认定的业务事实，自动判定不得覆盖。
+9. **时间字段形态**：实体的 `LocalDateTime` 序列化为**毫秒时间戳**，所以面向人的接口一律走 VO 字符串（`yyyy-MM-dd HH:mm:ss`）；`AttShift` 是全仓唯一直接暴露 `LocalTime` 的实体，形态由 `AttendanceJsonContractTest` 钉住（VO 收敛为 `HH:mm`）。
+
+### 10.5 权限与门禁（已经踩过一次，别再踩）
+
+- `sys_menu.actions` 是授权中心能勾出哪些动作的**唯一依据**。给已上线菜单新增写接口时若没登记该动作，后果是普通角色永久 403，而**超管走代码直通看不出问题**。菜单初始化器的 `ensureMenu` 对已存在菜单**不覆盖 actions**，所以不能只改声明，必须新开一个 versionKey 做一次性纠正（参考 `attendance:menu:v1.1` 给日报补 `edit`）。
+- `AttendanceControllerMappingTest` 已经反射断言：每个 handler 带 `@RequirePermission`、菜单属于考勤域、**且 action 已在 `sys_menu.actions` 登记**（动作集直接读 `AttendanceMenuInitializer.MENUS` 真值，不再重复维护一份）。前端 `pages/Permission/types.ts` 的动作表必须与后端逐字对齐。
+- **401 不能证明路由存在**：JWT 过滤器在 Spring MVC 之前统一返回 401，不存在的路径看起来一样。验证映射用 MockMvc（同测试类）。
+- 纯 Mockito 单测里 `LambdaQueryWrapper.select(Entity::getX)` 会**立即**解析列名（`.eq()` 是延迟解析），没有 mapper 扫描时须先 `TableInfoHelper.initTableInfo` 预热 lambda 缓存，否则报 "can not find lambda cache"。
+
+### 10.6 剩余待办（接续从这里开始）
+
+| 优先级 | 待办 | 说明 |
+|---|---|---|
+| **P0 安全** | **考勤查询未做数据范围收敛** | **11 个 `Attendance*ServiceImpl` 全部未引用** `DataScopeService`/`scopedUserId()`（已逐个 grep 核实，命中数 0），只要持有 `attendance-punch:view` 就能看全公司打卡与异常；而 `HrLeaveServiceImpl` 是有范围收敛的。上线前必须按角色（本人/团队/全员）强制收敛，不能只靠隐藏菜单 |
+| **P0** | 补卡/加班接入流程中心 | `biz_oa_process` 里没有 `oa_reissue`/`oa_overtime`；`AttendanceExceptionService.markHandledByFlow` 已就绪但没有调用方。需先新增 OA 流程编码与单据类型（属 OA 域迁移，不是考勤侧能单独完成的） |
+| P1 | 薪酬侧消费月报冻结批次 | 月报已按工作日/休息日/法定节假日三类加班分列并输出 `batch_no`，但没任何下游读取；异常表保留 `late_minutes` 供扣减口径 |
+| P1 | 日报/月报无自动重算调度 | 目前只有手动重算；`AttendancePunchSyncJob` 只同步打卡不算结论。长假（>31 天）的请假抵扣也只记异常不回算，依赖夜间任务 |
+| P2 | 钉钉侧只做了拉取 | 补卡/请假审批结果回写钉钉未做 |
+| P2 | 留存年限只是口径说明 | 假勤设置里的「3 年」不对应任何归档任务；本系统不提供删除入口 |
+| P2 | 未验证项 | 生产库迁移未执行过；未做浏览器端保存回归；工作台「今日无钉钉同步」预警在全员休假日会误报 |
+
+### 10.7 数据模型
+
+9 张表分三层：主数据（`att_shift`/`att_holiday`/`att_group`/`att_group_member`）、事实（`att_punch_log`/`att_exception`）、结论（`att_day_summary`/`att_monthly_summary`）。
+
+所有事实表与结论表都用 STORED 生成列把 `deleted` 折进唯一键（`attendance:schema:v1.0` 的校验钉住了十个关键唯一键）：打卡幂等键（人+时刻+来源）、排班一人一天一条、异常同人同日同类型一条、日报一天一组一条、月报一人一月一条——这五个键就是“同步重跑/重复导入/重算 UPSERT 不会长出重复事实”的全部依据，缺任一都会让薪酬按重复汇总取数。跨模块只引用 `sys_user`/`sys_department` 不建 FK（历史软删数据会让启动失败）。
+
+请假表 `hr_leave_*` **不搬**：已跑通 OA 审批回调，搬表牵动流程锁点与历史单据，收益只有“名字好看”；考勤侧单向读取其结论。
+
+### 10.8 验证命令
+
+```bash
+# 后端（必须带 clean：增量编译会复用 IDE 写坏的 class，出现假绿）
+cd backend && mvn -o clean test -Dtest='Attendance*Test' -DfailIfNoTests=false
+
+# 前端门禁
+npm run typecheck && npm run test:run
+npm run check:menu && npm run check:stat-order && npm run secret-scan
+
+# 重启（改过 Java 源码必须 --rebuild；不确定时不带参数脚本会自行判定）
+cd backend && bash restart-service.sh --rebuild
+```
+
+重启后不能只看脚本打印的“启动成功”：要核对脚本给出的 PID 与 `lsof -nP -iTCP:8080 -sTCP:LISTEN` 的实际进程一致，否则探针响应可能来自旧进程。

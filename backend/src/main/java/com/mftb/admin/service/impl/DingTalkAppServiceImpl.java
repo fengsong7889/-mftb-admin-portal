@@ -89,6 +89,45 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
     /* ==================== 内部方法 ==================== */
 
     /**
+     * 通用钉钉 topapi 调用。
+     * <p>三条安全约束：
+     * ① token 只在方法内拼接，调用方拿不到凭据；
+     * ② apiPath 走形态白名单，不接受完整 URL，避免把这里变成 SSRF 入口；
+     * ③ 失败消息不回显 token/原始 URL/上游原文（RestClient 异常消息里会带完整 URL）。
+     */
+    @Override
+    public Map<String, Object> callApi(long appId, String apiPath, Map<String, Object> body) {
+        if (apiPath == null || !apiPath.matches("^topapi/[A-Za-z0-9_./-]+$")) {
+            throw new BusinessException(400, "釘釘接口路径不合法");
+        }
+        Credentials app = appService.credentials(appId, false);
+        appService.requireComplete(app);
+        String token = getAccessToken(app);
+        if (token == null) {
+            throw new BusinessException(400, "釘釘憑證不可用，請到通知配置中重新校驗該應用連接");
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = restTemplate.postForObject(
+                    "https://oapi.dingtalk.com/" + apiPath + "?access_token=" + token,
+                    body == null ? Map.of() : body, Map.class);
+            if (response == null) {
+                throw new BusinessException(400, "釘釘返回空響應，請稍後重試");
+            }
+            if (!(response.get("errcode") instanceof Number code) || code.longValue() != 0) {
+                // 只记接口名与错误码：errmsg 可能含员工姓名等个人信息，不入日志
+                log.warn("钉钉接口调用失败: api={}, errcode={}", apiPath, response.get("errcode"));
+                throw new BusinessException(400, "釘釘接口返回異常（錯誤碼 " + response.get("errcode")
+                        + "），請確認應用已開通考勤權限且出口 IP 在白名單內");
+            }
+            return response;
+        } catch (RestClientException e) {
+            log.warn("钉钉接口连接异常 {}: {}", apiPath, e.getClass().getSimpleName());
+            throw new BusinessException(400, "無法連接釘釘服務，請檢查網絡後重試");
+        }
+    }
+
+    /**
      * 获取 access_token（带内存缓存，过期前 5 分钟自动刷新）
      */
     private synchronized String getAccessToken(Credentials app) {

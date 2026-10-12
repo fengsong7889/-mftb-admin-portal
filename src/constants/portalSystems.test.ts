@@ -19,6 +19,7 @@ const AUTHORITATIVE_NAMES: Record<string, string> = {
   finance: '財務結算系統',
   ai: '人工智能系統',
   hr: '人力資源系統',
+  attendance: '考勤假勤系統',
   eam: '物資管理系統',
   rdm: '產研交付系統',
   oa: '流程審批系統',
@@ -34,7 +35,7 @@ beforeAll(async () => {
 })
 
 describe('系统名称全局统一（以企业门户为准）', () => {
-  it('繁中下 13 个业务系统全部返回门户真值名称，不受 sys_system.name 旧写法影响', () => {
+  it('繁中下全部业务系统全部返回门户真值名称，不受 sys_system.name 旧写法影响', () => {
     for (const [code, expected] of Object.entries(AUTHORITATIVE_NAMES)) {
       // 故意传入数据库里的旧名称，验证语言包优先于 sys_system.name
       expect(getSystemDisplayName(i18n.getFixedT('zh-TW'), { code, name: `${code} 旧名` })).toBe(expected)

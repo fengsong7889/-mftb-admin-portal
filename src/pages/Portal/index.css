@@ -554,6 +554,10 @@
   color: #1890FF; /* 用户蓝：对齐侧边栏 */
 }
 
+.portal-card-artwork[data-scene='attendance'] {
+  color: #13A8A8; /* 青（ant cyan-7）：考勤假勤与 HR 蓝、同组 OA 琥珀色相互斥，比商户青绿更暗一档 */
+}
+
 .portal-card-artwork[data-scene='oa'] {
   color: #FA8C16; /* 琥珀：流程发起与审批 */
 }
@@ -630,6 +634,7 @@
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 .portal-card-artwork[data-scene='hr'] .portal-art-motion { animation-duration: 8s; }
+.portal-card-artwork[data-scene='attendance'] .portal-art-motion { animation-duration: 7.2s; }
 .portal-card-artwork[data-scene='oa'] .portal-art-motion { animation-duration: 9s; }
 .portal-card-artwork[data-scene='ai'] .portal-art-motion { animation-duration: 6.4s; }
 .portal-card-artwork[data-scene='ads'] .portal-art-motion,
@@ -683,6 +688,51 @@
 .portal-card-artwork .portal-hr-assigned { animation-name: portalHrAssigned; }
 .portal-card-artwork .portal-hr-matching { animation-name: portalHrMatching; }
 .portal-card-artwork .portal-hr-assigned { color: #52C41A; }
+
+/*
+ * 考勤假勤两套构图共用一个 7.2 秒节拍：
+ * 打卡机/指纹/分针先动（0~30%）→ 今日格与状态徐章（25~40%）→ 工时柱与动线（45~95%）。
+ * 旋转与位移类元素必须显式给 transform-origin（SVG 默认以 view-box 为基准），
+ * 不写就会绕自身左上角转，指针与印章会飘到卡片外。
+ */
+.portal-card-artwork .portal-attendance-scan { animation-name: portalAttendanceScan; }
+.portal-card-artwork .portal-attendance-ripple { transform-origin: 48px 110px; animation-name: portalAttendanceRipple; }
+.portal-card-artwork .portal-attendance-hand {
+  transform-origin: 96px 50px;
+  animation-name: portalAttendanceHand;
+  animation-timing-function: linear;
+}
+.portal-card-artwork .portal-attendance-step { animation-name: portalAttendanceStep; }
+/* 逐字揭示：裁切框从左往右按 14 档跳，视觉上就是一个字一个字蹦；
+   不写 transform-box: fill-box 的话，SVG 默认以 view-box 为基准，缩放会整张卡片跑偏。 */
+.portal-card-artwork .portal-attendance-type {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation-name: portalAttendanceType;
+  animation-timing-function: steps(14, end);
+}
+.portal-card-artwork .portal-attendance-check { transform-origin: 98px 18px; animation-name: portalAttendanceBadge; }
+.portal-card-artwork .portal-attendance-today { animation-name: portalAttendanceToday; }
+.portal-card-artwork .portal-attendance-connection { stroke-dasharray: 1; animation-name: portalAttendanceConnection; }
+.portal-card-artwork .portal-attendance-bars {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation-name: portalAttendanceBars;
+}
+.portal-card-artwork .portal-attendance-stamp { transform-origin: 82px 122px; animation-name: portalAttendanceStamp; }
+.portal-card-artwork .portal-attendance-mark { transform-origin: 174.5px 101.5px; animation-name: portalAttendanceMark; }
+.portal-card-artwork .portal-attendance-umbrella { transform-origin: 175px 101px; animation-name: portalAttendanceUmbrella; }
+.portal-card-artwork .portal-attendance-track { transform-origin: 268px 84px; animation-name: portalAttendanceTrack; }
+.portal-card-artwork .portal-attendance-ring { stroke-dasharray: 1; animation-name: portalAttendanceRing; }
+.portal-card-artwork .portal-attendance-used { stroke-dasharray: 1; animation-name: portalAttendanceUsed; }
+.portal-card-artwork .portal-attendance-orbit {
+  transform-origin: 268px 84px;
+  animation-name: portalAttendanceOrbit;
+  animation-timing-function: linear;
+}
+.portal-card-artwork .portal-attendance-hourglass { animation-name: portalAttendanceHourglass; }
+.portal-card-artwork .portal-attendance-sand { animation-name: portalAttendanceSand; }
+.portal-card-artwork .portal-attendance-legend { animation-name: portalAttendanceLegend; }
 
 /* 登记设备 → 关联领用人 → 发放耗材并扣减结余，所有动作共享十秒时序。 */
 .portal-card-artwork .portal-eam-asset-tag { animation-name: portalEamTag; }

@@ -100,6 +100,21 @@ const EssMyRequests = lazy(() => import('./pages/Ess/MyRequests'))
 const EssMyProfile = lazy(() => import('./pages/Ess/MyProfile'))
 const LeaveQuotaForm = lazy(() => import('./pages/Permission/HrLeave/LeaveQuotaForm'))
 const ContractLedger = lazy(() => import('./pages/Permission/ContractLedger'))
+// 考勤假勤系统（独立门户入口，阶段一：前端界面 + 模块内 mock）
+const AttendanceWorkbench = lazy(() => import('./pages/Attendance/Workbench'))
+const AttendanceGroupList = lazy(() => import('./pages/Attendance/GroupList'))
+const AttendanceGroupForm = lazy(() => import('./pages/Attendance/GroupForm'))
+const AttendanceSchedule = lazy(() => import('./pages/Attendance/Schedule'))
+const AttendancePunchList = lazy(() => import('./pages/Attendance/PunchList'))
+const AttendanceExceptionList = lazy(() => import('./pages/Attendance/ExceptionList'))
+const AttendanceExceptionHandle = lazy(() => import('./pages/Attendance/ExceptionHandle'))
+const AttendanceShiftList = lazy(() => import('./pages/Attendance/ShiftList'))
+const AttendanceShiftForm = lazy(() => import('./pages/Attendance/ShiftForm'))
+const AttendanceHolidayList = lazy(() => import('./pages/Attendance/HolidayList'))
+const AttendanceHolidayForm = lazy(() => import('./pages/Attendance/HolidayForm'))
+const AttendanceDailyReport = lazy(() => import('./pages/Attendance/DailyReport'))
+const AttendanceMonthlyReport = lazy(() => import('./pages/Attendance/MonthlyReport'))
+const AttendanceSetting = lazy(() => import('./pages/Attendance/Setting'))
 const LoginLog = lazy(() => import('./pages/LoginLog'))
 const RoleManagement = lazy(() => import('./pages/Permission/RoleManagement'))
 const AuthorizationCenter = lazy(() => import('./pages/Permission/AuthorizationCenter'))
@@ -454,6 +469,25 @@ function AuthenticatedLayout() {
               <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
               <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />
               <Route path="/contract-ledger" element={<ContractLedger />} />
+              {/* 考勤假勤系统：考勤组/排班/打卡/异常，第二阶段会补 sys_menu 种子使其进入侧边栏 */}
+              <Route path="/attendance-workbench" element={<AttendanceWorkbench />} />
+              <Route path="/attendance-group" element={<AttendanceGroupList />} />
+              <Route path="/attendance-group-form" element={<AttendanceGroupForm />} />
+              <Route path="/attendance-group-detail" element={<AttendanceGroupForm />} />
+              <Route path="/attendance-schedule" element={<AttendanceSchedule />} />
+              <Route path="/attendance-punch" element={<AttendancePunchList />} />
+              <Route path="/attendance-exception" element={<AttendanceExceptionList />} />
+              <Route path="/attendance-exception-handle" element={<AttendanceExceptionHandle />} />
+              {/* 假勤基础数据与报表：班次/节假日各自具详情与表单页，日报与月报为只读计算结果 */}
+              <Route path="/attendance-shift" element={<AttendanceShiftList />} />
+              <Route path="/attendance-shift-form" element={<AttendanceShiftForm />} />
+              <Route path="/attendance-shift-detail" element={<AttendanceShiftForm />} />
+              <Route path="/attendance-holiday" element={<AttendanceHolidayList />} />
+              <Route path="/attendance-holiday-form" element={<AttendanceHolidayForm />} />
+              <Route path="/attendance-holiday-detail" element={<AttendanceHolidayForm />} />
+              <Route path="/attendance-daily" element={<AttendanceDailyReport />} />
+              <Route path="/attendance-monthly" element={<AttendanceMonthlyReport />} />
+              <Route path="/attendance-setting" element={<AttendanceSetting />} />
               <Route path="/login-log" element={<LoginLog />} />
               <Route path="/role-management" element={<RoleManagement />} />
               {/* 授權中心：合并旧「功能授權」/「系統授權」，旧路径重定向兼容存量入口 */}
