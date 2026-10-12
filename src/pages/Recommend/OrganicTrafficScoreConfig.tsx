@@ -3,10 +3,13 @@ import DOMPurify from 'dompurify'
 import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip, Segmented } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import ScoreRow from './AlgorithmForm/ScoreRow'
 import CouponIntensityPanel from './CouponIntensityConfig'
-import { ServiceStatus } from './constants'
+import CouponScorePanel from './CouponScorePanel'
+import CommercialSchemeCompare from './CommercialSchemeCompare'
+import { ServiceStatus, AppType } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
 import {
@@ -21,6 +24,8 @@ import {
   type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem, type MultiplierTier, type RegionSupportConfig, type RegionOverheatConfig, type RegionKey,
   REGION_KEYS, REGION_LABELS, REGION_COLORS,
   isCouponIntensityRule, createDefaultCouponIntensityConfig, validateCouponIntensityConfig,
+  isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG,
+  type CouponScoreConfig,
   type CouponIntensityConfig,
 } from './organicTrafficConfig'
 import {
@@ -100,6 +105,8 @@ const PLT_03_PREREQ_OPTIONS = [
 interface Props {
   /** 詳情模式：只讀，隱藏所有編輯入口 */
   readOnly?: boolean
+  /** 所屬品牌：用於過濾品牌專屬計分項（如 MFOOD 無閃蜂官方神券） */
+  brand?: AppType
 }
 
 /**
@@ -235,7 +242,6 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
   COM_05: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   COM_06: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   COM_07: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
-  COM_09: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   COM_10: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_02: { color: 'purple', label: '四檔狀態計分' },
@@ -276,8 +282,11 @@ const REGION_SEGMENT_OPTIONS = REGION_KEYS.map(k => ({
  * 自然流量算法參數配置：3 個維度的商家評分規則。
  * 自然流量不售賣坑位，商家靠綜合得分高低較量排名。
  */
-export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
+export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: Props) {
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  // 計分口徑評審臨時開關：URL 帶 schemeDemo=1 預設展開，也可用商業維度工具條的「口徑對照 Demo」按鈕切換；評審定稿後連同組件一併刪除
+  const [showSchemeDemo, setShowSchemeDemo] = useState(searchParams.get('schemeDemo') === '1')
   const [rules, setRules] = useState<OrganicScoreRule[]>(DEFAULT_ORGANIC_SCORE_RULES)
   const [loading, setLoading] = useState(true)
 
@@ -287,7 +296,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     try {
       const config = await fetchOrganicScoreConfig()
       if (config.rules.length > 0) {
-        const loaded = config.rules.map(voToRule).filter(r => r.id !== 'COM_08' && r.id !== 'COM_11' && r.id !== 'PLT_02B' && r.id !== 'PLT_02C' && r.id !== 'PLT_02D' && r.id !== 'PLT_02E')
+        const loaded = config.rules.map(voToRule).filter(r => !RETIRED_ORGANIC_RULE_IDS.includes(r.id) && r.id !== 'COM_08' && r.id !== 'COM_11' && r.id !== 'PLT_02B' && r.id !== 'PLT_02C' && r.id !== 'PLT_02D' && r.id !== 'PLT_02E')
         // 前端保底：確保 PLT_03/PLT_04 名稱與維度正確（SQLPub 複制延遲時生效）
         loaded.forEach(r => {
           if (r.id === 'PLT_03') {
@@ -379,6 +388,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
           if (r.id === 'COM_02' && !r.prerequisites) {
             r.prerequisites = '報名減免運費'
           }
+          // 計分項更名：後端舊名稱帶「-按金額」後綴，前端保底統一為新名稱
+          if (r.id === 'COM_06') r.name = '會員紅包'
+          if (r.id === 'COM_07') r.name = '閃蜂官方神券'
           if (r.id === 'PLT_03') {
             r.name = '商家扶持'
             // 升級舊格式為區域配置
@@ -504,6 +516,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   /** 內聯編輯臨時表單值 */
   const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
   const [couponDrafts, setCouponDrafts] = useState<Record<string, CouponIntensityConfig>>({})
+  /** 方案 v1 試點（進店領券）頁面草稿 */
+  const [schemeDrafts, setSchemeDrafts] = useState<Record<string, CouponScoreConfig>>({})
   /** PLT_03 屏蔽商家輸入框臨時值 */
   const [blockedMerchantInput, setBlockedMerchantInput] = useState('')
   /** PLT_03 區域切換狀態 */
@@ -883,9 +897,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
     }
   }
 
-  /** 按維度取規則 */
+  /** 按維度取規則（已下架與當前品牌不適用的計分項不展示） */
   const getRules = (dimension: ScoreDimension) =>
-    rules.filter(r => r.dimension === dimension)
+    rules.filter(r => r.dimension === dimension && isOrganicRuleVisible(r.id, brand))
 
   /** 按維度取規則並疊加關鍵字 / 狀態篩選 */
   const getFilteredRules = (dimension: ScoreDimension) => {
@@ -944,8 +958,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
   const selectedTemplate = addTemplateId ? DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === addTemplateId) : undefined
   /** 模板是否已被添加到列表 */
   const isTemplateDuplicate = addTemplateId ? rules.some(r => r.id === addTemplateId) : false
-  /** 當前維度可用的模板選項 */
-  const availableTemplates = DEFAULT_ORGANIC_SCORE_RULES.filter(r => r.dimension === modalDimension)
+  /** 當前維度可用的模板選項（與列表同源的品牌/下架過濾） */
+  const availableTemplates = DEFAULT_ORGANIC_SCORE_RULES.filter(r => r.dimension === modalDimension && isOrganicRuleVisible(r.id, brand))
 
 
   /** 保存評分項（新增或編輯） */
@@ -1182,7 +1196,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
               {t('organicTrafficScore.addConfig')}
             </Button>
           )}
+          {/* 臨時評審入口：只掛在商業維度，定稿後與 CommercialSchemeCompare 一起刪除 */}
+          {dimension === ScoreDimension.COMMERCIAL && (
+            <Button
+              size="small"
+              disabled={false}
+              style={readOnly ? { marginLeft: 'auto' } : undefined}
+              onClick={() => setShowSchemeDemo(prev => !prev)}
+            >
+              {showSchemeDemo ? '收起口徑對照' : '口徑對照 Demo'}
+            </Button>
+          )}
         </div>
+
+        {dimension === ScoreDimension.COMMERCIAL && showSchemeDemo && <CommercialSchemeCompare />}
 
         {/* 可展開規則列表（參考規則配置菜單風格） */}
         <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
@@ -1255,6 +1282,21 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                   const isEditingInline = !!inlineEditing[rule.id]
                   const form = inlineForm[rule.id] || rule
                   const tone = dimension === ScoreDimension.COMMERCIAL ? 'strategy' : dimension === ScoreDimension.PLATFORM ? 'advanced' : 'info'
+                  // 方案 v1 試點：進店領券改用「報名分＋門檻分＋力度分」新面板，其餘四項保持舊面板待方案確認
+                  if (rule.id === 'COM_03') {
+                    const draft = schemeDrafts[rule.id]
+                    return (
+                      <div className="algorithm-form__rule-body">
+                        <CouponScorePanel
+                          ruleName={rule.name.replace('-按金額', '')}
+                          config={draft ?? DEFAULT_COUPON_SCORE_CONFIG}
+                          hasDraft={!!draft}
+                          readOnly={readOnly}
+                          onSave={next => setSchemeDrafts(prev => ({ ...prev, [rule.id]: next }))}
+                        />
+                      </div>
+                    )
+                  }
                   if (isCouponIntensityRule(rule.id)) {
                     const saved = couponDrafts[rule.id] ?? rule.couponIntensityConfig ?? COUPON_PREVIEW_TEMPLATE
                     return (
@@ -1289,7 +1331,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             if (tagEntry) {
                               // COM_03~COM_10/STB_01/STB_04/PLT_02A/STB_ACT 根據 mode 動態切換標籤
                               const isDynamic = rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                                && ['COM_03','COM_04','COM_05','COM_06','COM_07','COM_09','COM_10','STB_01','STB_04','PLT_02A','STB_ACT'].includes(rule.id)
+                                && ['COM_03','COM_04','COM_05','COM_06','COM_07','COM_10','STB_01','STB_04','PLT_02A','STB_ACT'].includes(rule.id)
                               return <Tag color={tagEntry.color} style={{ fontSize: 11, margin: 0 }}>{isDynamic ? '動態加分' : tagEntry.label}</Tag>
                             }
                             return (
@@ -1694,7 +1736,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                       <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div className="organic-score-config-grid">
-                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_09' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
+                          {(rule.id !== 'COM_01' && rule.id !== 'COM_02' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -2439,7 +2481,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                               <Select value={form.mode} style={{ width: '100%' }}
                                 options={rule.id === 'STB_01' || rule.id === 'STB_04' || rule.id === 'COM_02' ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
-                                ] : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') ? [
+                                ] : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
                                   { label: '動態加分', value: ScoreMode.AMOUNT_MULTIPLIER },
                                 ] : MODE_OPTIONS}
@@ -2448,9 +2490,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                             <div>
                               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
                                 <span style={{ fontSize: 12, color: '#595959' }}>
-                                  {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? '倍率' : '分值'}
+                                  {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? '倍率' : '分值'}
                                 </span>
-                                {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && (
+                                {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') && (
                                   <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                                     {form.mode === ScoreMode.AMOUNT_MULTIPLIER
                                       ? rule.id === 'COM_01' ? '（立減金額 × 倍率 = 得分）' : rule.id === 'COM_03' ? '（領券金額 × 倍率 = 得分）' : rule.id === 'COM_04' ? '（新客立減金額 × 倍率 = 得分）' : rule.id === 'COM_05' ? '（贈券金額 × 倍率 = 得分）' : rule.id === 'COM_06' ? '（紅包金額 × 倍率 = 得分）' : rule.id === 'COM_07' ? '（神券金額 × 倍率 = 得分）' : '（廣告金額 × 倍率 = 得分）'
@@ -2458,7 +2500,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false }: Props) {
                                   </span>
                                 )}
                               </div>
-                              <InputNumber value={form.score} min={(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_09' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? 0.1 : -100} max={100} style={{ width: '100%' }}
+                              <InputNumber value={form.score} min={(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? 0.1 : -100} max={100} style={{ width: '100%' }}
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                             </div>
                           </div>

@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import MerchantStatusFields, { ConsistencyCheckField } from './AlgorithmForm/MerchantStatusFields'
-import { AlgorithmType, APP_OPTIONS } from './constants'
+import { AlgorithmType, AppType, APP_OPTIONS } from './constants'
 import dayjs from 'dayjs'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '../../api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
@@ -77,6 +77,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
   const isEditMode = !!algorithmIdParam && !isDetailMode // 有 id 参数且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听曝光策略选择
+  const selectedBrand = Form.useWatch('brand', form) as AppType | undefined // 监听所属品牌（部分计分项品牌专属）
   const isTrafficAlgorithm = selectedAlgorithmType === AlgorithmType.TRAFFIC_AD
 
   // 商家维度配置（按商家维度曝光策略）
@@ -813,7 +814,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
         <TrafficAlgorithmConfig form={form} readOnly={isDetailMode} errors={trafficForm.errors} />
       ) : selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? (
         /* 自然流量：4 個維度的商家評分規則配置 */
-        <OrganicTrafficScoreConfig readOnly={isDetailMode} />
+        <OrganicTrafficScoreConfig readOnly={isDetailMode} brand={selectedBrand} />
       ) : (selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR || selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD || selectedAlgorithmType === AlgorithmType.NEW_STORE_AD || selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT || selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA || selectedAlgorithmType === AlgorithmType.BRAND_MERCHANT || selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE || selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD) ? (
         <div className="algorithm-form__parameters">
 

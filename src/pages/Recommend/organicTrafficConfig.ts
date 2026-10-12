@@ -1,4 +1,4 @@
-import { ServiceStatus } from './constants'
+import { AppType, ServiceStatus } from './constants'
 
 /**
  * 自然流量算法評分配置
@@ -61,7 +61,7 @@ export const SCORE_DIMENSION_LABEL: Record<ScoreDimension, string> = {
 }
 
 export const SCORE_DIMENSION_DESC: Record<ScoreDimension, string> = {
-  [ScoreDimension.COMMERCIAL]: '商家商業化投入貢獻：購買金字招牌、點金廣告等付費推廣及平台活動參與情況',
+  [ScoreDimension.COMMERCIAL]: '商家商業化投入貢獻：購買金字招牌等付費推廣及平台活動參與情況',
   [ScoreDimension.STORE]: '店鋪自身質量：基礎信息完善度 + 店鋪運營表現（評分、出餐、好差評等）',
   [ScoreDimension.PLATFORM]: '平台調控因子：距離衰減、運力天氣、流量均衡與風控降權',
 }
@@ -341,6 +341,205 @@ export type CouponIntensityRuleId = typeof COUPON_INTENSITY_RULE_IDS[number]
 export const isCouponIntensityRule = (id?: string): boolean =>
   !!id && (COUPON_INTENSITY_RULE_IDS as readonly string[]).includes(id)
 
+/** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理） */
+export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09']
+
+/** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無閃蜂官方神券） */
+export const BRAND_HIDDEN_ORGANIC_RULE_IDS: Partial<Record<AppType, string[]>> = {
+  [AppType.MFOOD]: ['COM_07'],
+}
+
+/** 計分項當前是否可見：已下架編碼一律隱藏，品牌專屬編碼按所屬品牌過濾（未選品牌時按可見處理） */
+export function isOrganicRuleVisible(ruleId: string, brand?: AppType): boolean {
+  if (RETIRED_ORGANIC_RULE_IDS.includes(ruleId)) return false
+  if (brand == null) return true
+  return !(BRAND_HIDDEN_ORGANIC_RULE_IDS[brand] ?? []).includes(ruleId)
+}
+
+/** 券類計分 v1：門檻倍率檔（門檻 ÷ 門店客單價 ≤ upper 倍 → score，末檔 upper 為 Infinity 作兜底） */
+export interface ThresholdBand {
+  /** 門檻倍率上界（含） */
+  upper: number
+  /** 該檔分值 */
+  score: number
+}
+
+/** 券類計分 v1：優惠力度檔（券面 ÷ 門店客單價 ≥ lower% → score，按下界由高到低首個命中） */
+export interface DiscountBand {
+  /** 優惠力度下界（含），單位 % */
+  lower: number
+  /** 該檔分值 */
+  score: number
+}
+
+/**
+ * 券類計分 v1 配置：得分 = 報名分 + 門檻分 + 力度分（三條獨立加分線查表後相加，無乘法/無降檔）。
+ * 與舊 COUPON_INTENSITY（比例檔 × 門檻係數）互斥，目前僅進店領券試點。
+ */
+export interface CouponScoreConfig {
+  enrollmentEnabled: boolean
+  enrollmentScore: number
+  /** 門檻計分模組開關：停用時該模組不計分 */
+  thresholdEnabled: boolean
+  thresholdBands: ThresholdBand[]
+  /** 力度計分模組開關：停用時該模組不計分 */
+  discountEnabled: boolean
+  discountBands: DiscountBand[]
+  /** 力度分閘門：門檻 ≤ 該倍數 × 客單價時視為「夠得著」，力度分全額發放 */
+  gateMultiplier: number
+  /** 力度分閘門豁免：券面 ≥ 該比例 × 門檻（%）時視為「省得夠狠」，力度分全額發放 */
+  gateDiscountRate: number
+  /** 硬護欄倍數：門檻超過該倍數視為空轉券，門檻分與力度分均不發 */
+  guardMultiplier: number
+  /** 護欄觸發時是否仍發報名分（默認否，避免挂廢券白拿報名分） */
+  enrollWhenGuarded: boolean
+}
+
+/**
+ * 方案 v1 默認檔位：量級對齊現行（滿分 90 < 維度封頂 100）。
+ * 門檻檔按「門檻 ÷ 門店客單價」單調遞減：門檻低於客單價越多（越好用）分越高，
+ * 高於客單價逐檔遞減，超過護欄倍數直接 0 分。
+ */
+export const DEFAULT_COUPON_SCORE_CONFIG: CouponScoreConfig = {
+  enrollmentEnabled: true,
+  enrollmentScore: 10,
+  thresholdEnabled: true,
+  thresholdBands: [
+    { upper: 0.3, score: 20 },
+    { upper: 0.5, score: 16 },
+    { upper: 0.8, score: 12 },
+    { upper: 1, score: 8 },
+    { upper: 1.5, score: 4 },
+    { upper: 3, score: 2 },
+    { upper: Infinity, score: 0 },
+  ],
+  discountEnabled: true,
+  discountBands: [
+    { lower: 50, score: 60 },
+    { lower: 30, score: 45 },
+    { lower: 20, score: 30 },
+    { lower: 10, score: 18 },
+    { lower: 5, score: 8 },
+    { lower: 0, score: 0 },
+  ],
+  gateMultiplier: 1.5,
+  gateDiscountRate: 50,
+  guardMultiplier: 2,
+  enrollWhenGuarded: false,
+}
+
+/** 门槛档的整句条件文案（避开“上界/下界”术语，首档含无门槛，末档为超过） */
+export function thresholdBandLabel(bands: ThresholdBand[], index: number): string {
+  const band = bands[index]
+  if (band.upper === Infinity) return `使用門檻超過 ${bands[index - 1]?.upper ?? 0} 倍門店客單價`
+  if (index === 0) return `無門檻 ～ ≤ ${band.upper} 倍門店客單價`
+  return `使用門檻 > ${bands[index - 1].upper} 倍且 ≤ ${band.upper} 倍門店客單價`
+}
+
+/** 力度档的整句条件文案（首档不设上限，末档为未达最低门槛） */
+export function discountBandLabel(bands: DiscountBand[], index: number): string {
+  const band = bands[index]
+  if (index === 0) return `券面金額 ≥ ${band.lower}% 門店客單價`
+  const upper = bands[index - 1].lower
+  return band.lower === 0
+    ? `券面金額 < ${upper}% 門店客單價`
+    : `券面金額 ≥ ${band.lower}% 且 < ${upper}% 門店客單價`
+}
+
+/** 方案 v1 計算結果 */
+export interface CouponScoreResult {
+  /** 基準不可信（B≤0）時不計門檻分與力度分 */
+  canCompute: boolean
+  reason?: string
+  /** 門檻倍率（T/B），保留兩位 */
+  thresholdRatio: number
+  thresholdBand?: ThresholdBand
+  thresholdScore: number
+  /** 優惠力度（D/B，%），保留兩位 */
+  discountRate: number
+  discountBand?: DiscountBand
+  discountScore: number
+  /** 硬護欄是否觸發 */
+  guarded: boolean
+  /** 力度分閘門通過方式：①門檻可達 / ②折扣率達標 / 未通過 */
+  gateBy: 'threshold' | 'discount' | null
+  gatePassed: boolean
+  enrollmentScore: number
+  total: number
+}
+
+/**
+ * 方案 v1 算分：三個獨立查表相加 + 力度分閘門。
+ * 用金額交叉比較代替除法判檔，避免 0.1/0.3 這類浮點誤差造成錯檔。
+ * 閘門存在的理由：加法結構只能表達「或」，而業務要求「低門檻且高面額」才給力度分，
+ * 否則高門檻空轉券（券沒人用）能拿走近乎滿分，形成刷分通道。
+ */
+export function computeCouponScore(cfg: CouponScoreConfig, benchmark: number, threshold: number, coupon: number): CouponScoreResult {
+  const b = benchmark || 0
+  const t = threshold || 0
+  const d = coupon || 0
+  const enrollment = cfg.enrollmentEnabled ? cfg.enrollmentScore : 0
+  if (b <= 0) {
+    return {
+      canCompute: false, reason: '缺少可信門店客單價，不計門檻分與力度分',
+      thresholdRatio: 0, thresholdScore: 0, discountRate: 0, discountScore: 0,
+      guarded: false, gateBy: null, gatePassed: false, enrollmentScore: enrollment, total: enrollment,
+    }
+  }
+  const thresholdRatio = Math.round((t / b + Number.EPSILON) * 100) / 100
+  const guarded = t > cfg.guardMultiplier * b
+  const thresholdBand = guarded ? undefined : cfg.thresholdBands.find(band => band.upper === Infinity || t <= band.upper * b)
+  // 閘門：①門檻夠得著 或 ②券面省得夠狠（券面 ≥ 閘門比例 × 門檻；無門檻券直接過 ①）
+  const gateBy: 'threshold' | 'discount' | null = guarded
+    ? null
+    : (t <= cfg.gateMultiplier * b ? 'threshold' : (t > 0 && d * 100 >= cfg.gateDiscountRate * t ? 'discount' : null))
+  const gatePassed = gateBy !== null
+  const discountBand = guarded ? undefined : cfg.discountBands.find(band => d * 100 >= band.lower * b)
+  // 命中檔位仍然回傳（供界面灰显與對照），但停用模組或閘門未通過時分值不計入總分
+  const thresholdScore = guarded || !cfg.thresholdEnabled ? 0 : thresholdBand?.score ?? 0
+  const discountScore = guarded || !gatePassed || !cfg.discountEnabled ? 0 : discountBand?.score ?? 0
+  return {
+    canCompute: true,
+    thresholdRatio, thresholdBand, thresholdScore,
+    discountRate: Math.round((d / b * 100 + Number.EPSILON) * 100) / 100, discountBand, discountScore,
+    guarded, gateBy, gatePassed,
+    enrollmentScore: guarded && !cfg.enrollWhenGuarded ? 0 : enrollment,
+    total: (guarded && !cfg.enrollWhenGuarded ? 0 : enrollment) + thresholdScore + discountScore,
+  }
+}
+
+/** 方案 v1 草稿校驗：返回錯誤文案，null 表示通過 */
+export function validateCouponScoreConfig(cfg: CouponScoreConfig): string | null {
+  if (!Number.isInteger(cfg.enrollmentScore) || cfg.enrollmentScore < 0 || cfg.enrollmentScore > 100) return '報名分必須是 0～100 的整數'
+  if (cfg.gateMultiplier < 1 || cfg.gateMultiplier > 20) return '閘門倍數必須在 1～20 之間'
+  if (cfg.gateMultiplier > cfg.guardMultiplier) return '閘門倍數不得大於硬護欄倍數，否則閘門永遠失效'
+  if (cfg.gateDiscountRate < 0 || cfg.gateDiscountRate > 100) return '閘門折扣率必須在 0～100% 之間'
+  if (cfg.guardMultiplier < 1 || cfg.guardMultiplier > 20) return '硬護欄倍數必須在 1～20 之間'
+  const tb = cfg.thresholdBands
+  if (!tb.length || tb[tb.length - 1].upper !== Infinity) return '門檻檔位須保留「不限」兜底檔'
+  for (let i = 0; i < tb.length; i++) {
+    if (tb[i].score < 0 || tb[i].score > 1000) return `門檻第 ${i + 1} 檔分值必須在 0～1000 之間`
+    // 兜底檔的 Infinity 不参与递增比较，否则默认配置永远过不了校验
+    if (i > 0 && i < tb.length - 1 && tb[i].upper <= tb[i - 1].upper) return '門檻倍率上界必須嚴格遞增，不得重疊或留空檔'
+  }
+  const db = cfg.discountBands
+  if (db.length < 2 || db[0].lower <= 0 || db[db.length - 1].lower !== 0) return '力度檔位須以「≥ 某%」開頭並以「< 0%」兜底'
+  for (let i = 0; i < db.length; i++) {
+    if (db[i].score < 0 || db[i].score > 1000) return `力度第 ${i + 1} 檔分值必須在 0～1000 之間`
+    if (i > 0 && db[i].lower >= db[i - 1].lower) return '力度比例下界必須嚴格遞減，不得重複'
+  }
+  return null
+}
+
+/** 單調性軟提示：業務可以故意反常，只提醒不攔截保存 */
+export function couponScoreMonotonicHint(cfg: CouponScoreConfig): string | null {
+  const tBad = cfg.thresholdBands.some((band, i) => i > 0 && band.upper !== Infinity && cfg.thresholdBands[i - 1].upper !== Infinity && band.score > cfg.thresholdBands[i - 1].score)
+  if (tBad) return '提醒：門檻倍率越高檔位分值反而更高，與「門檻越低越可達」的直覺相反'
+  const dBad = cfg.discountBands.some((band, i) => i > 0 && band.score > cfg.discountBands[i - 1].score)
+  if (dBad) return '提醒：優惠力度越高檔位分值反而更低，與「讓利越大越值得推」的直覺相反'
+  return null
+}
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -433,7 +632,6 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '商家設置收藏送券：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包', description: '商家設置會員紅包：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券', description: '商家設置閃蜂官方神券：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_09', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 80, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====

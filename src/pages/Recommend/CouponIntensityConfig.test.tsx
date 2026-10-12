@@ -3,6 +3,7 @@ import { ConfigProvider, Form, message } from 'antd'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
+import { AppType } from './constants'
 import { createDefaultCouponIntensityConfig, validateCouponIntensityConfig, DEFAULT_ORGANIC_SCORE_RULES, ScoreDimension } from './organicTrafficConfig'
 import ScoreRow from './AlgorithmForm/ScoreRow'
 
@@ -27,11 +28,11 @@ function LocationIndicator() {
   return <output aria-label="当前位置">{location.pathname + location.search}</output>
 }
 
-async function mount(readOnly = false) {
+async function mount(readOnly = false, brand?: AppType) {
   await act(async () => {
     render(<ConfigProvider theme={{ token: { motion: false } }}>
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={['/promotion-algorithm-add?type=7&id=123']}>
-        <Form disabled={readOnly}><OrganicTrafficScoreConfig readOnly={readOnly} /></Form>
+        <Form disabled={readOnly}><OrganicTrafficScoreConfig readOnly={readOnly} brand={brand} /></Form>
         <LocationIndicator />
       </MemoryRouter>
     </ConfigProvider>)
@@ -39,7 +40,8 @@ async function mount(readOnly = false) {
 }
 
 // 分组定位后验证结构、值和交互，按钮查询跳过 jsdom 昂贵的 CSS 可见性遍历。
-function openRule(id = 'COM_03', name = '進店領券') {
+// COM_03 已改用方案 v1 面板（见 CouponScorePanel.test.tsx），本文件继续覆盖旧面板，故默认取 COM_05。
+function openRule(id = 'COM_05', name = '收藏送券') {
   fireEvent.click(screen.getByText(id))
   return within(screen.getByLabelText(`${name}優惠配置`))
 }
@@ -58,8 +60,8 @@ beforeEach(() => {
 
 describe('优惠配置原位编辑', () => {
   it('旧后端模式仍可展示新原型，编辑保存不跳路由、不写后端，折叠不丢草稿', async () => {
-    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 3, ruleCode: 'COM_03', dimension: 1,
-      name: '進店領券', description: '原有规则', mode: 4, score: 9, status: 1, builtin: 1 }] })
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 5, ruleCode: 'COM_05', dimension: 1,
+      name: '收藏送券', description: '原有规则', mode: 4, score: 9, status: 1, builtin: 1 }] })
     await mount()
     let panel = openRule()
     expect(panel.queryByRole('spinbutton')).not.toBeInTheDocument()
@@ -71,7 +73,7 @@ describe('优惠配置原位编辑', () => {
     expect(panel.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
     expect(panel.queryByRole('spinbutton')).not.toBeInTheDocument()
     expect(message.info).toHaveBeenCalledWith(expect.stringContaining('當前頁面草稿'))
-    fireEvent.click(screen.getByText('COM_03'))
+    fireEvent.click(screen.getByText('COM_05'))
     panel = openRule()
     expect(panel.getByRole('switch', { name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
     expect(screen.getByLabelText('当前位置')).toHaveTextContent('/promotion-algorithm-add?type=7&id=123')
@@ -211,8 +213,40 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
 
   it('其他计分项配置同样以模块卡片呈现', async () => {
     await mount()
-    fireEvent.click(screen.getByText('COM_09'))
+    fireEvent.click(screen.getByText('COM_10'))
     expect(screen.getByText('計分明細')).toBeInTheDocument()
+  })
+
+  it('点金广告计分项已下架，后端残留数据也不再展示', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 9, ruleCode: 'COM_09', dimension: 1,
+      name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: 1, score: 80, status: 1, builtin: 1 }] })
+    await mount()
+    expect(screen.queryByText('COM_09')).not.toBeInTheDocument()
+    expect(screen.queryByText('購買廣告-點金廣告')).not.toBeInTheDocument()
+  })
+})
+
+describe('计分项名称与品牌可见性', () => {
+  it('后端旧名称带「-按金額」后缀，界面统一展示新名称', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 6, ruleCode: 'COM_06', dimension: 1, name: '會員紅包-按金額', description: '舊名称', mode: 4, score: 2, status: 1, builtin: 1 },
+      { id: 7, ruleCode: 'COM_07', dimension: 1, name: '閃蜂官方神券-按金額', description: '舊名称', mode: 4, score: 2, status: 1, builtin: 1 },
+    ] })
+    await mount(false, AppType.SHANFENG)
+    expect(screen.getByText('會員紅包')).toBeInTheDocument()
+    expect(screen.getByText('閃蜂官方神券')).toBeInTheDocument()
+    expect(screen.queryByText(/按金額/)).not.toBeInTheDocument()
+  })
+
+  it('所屬品牌為 MFOOD 時不展示閃蜂官方神券，同維度其他計分项仍在', async () => {
+    await mount(false, AppType.MFOOD)
+    expect(screen.queryByText('COM_07')).not.toBeInTheDocument()
+    expect(screen.getByText('COM_06')).toBeInTheDocument()
+  })
+
+  it('所屬品牌為閃蜂時仍展示閃蜂官方神券', async () => {
+    await mount(false, AppType.SHANFENG)
+    expect(screen.getByText('COM_07')).toBeInTheDocument()
   })
 })
 
@@ -228,7 +262,7 @@ describe('自然流量计分展示一致性', () => {
     for (const rule of rules) {
       fireEvent.click(screen.getByText(rule.id))
       const body = screen.getByText(rule.id).parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
-      expect(body).toBeTruthy()
+      expect(body, rule.id).toBeTruthy()
       if (rule.id === 'STB_ACT') {
         expect(body).toHaveTextContent('尚未配置')
       } else {

@@ -34,7 +34,8 @@ interface PreviewResult {
 }
 
 /** 依据配置与试算输入计算单项得分（口径见方案：X=max(B,T)，D=min(券面,X)，R=D/X，M=T/B） */
-function computePreview(cfg: CouponIntensityConfig, B: number, T: number, amount: number): PreviewResult {
+/** 导出的原因：口径评审 Demo 必须复用同一套计算，避免对照结果与面板试算漂移。 */
+export function computePreview(cfg: CouponIntensityConfig, B: number, T: number, amount: number): PreviewResult {
   const threshold = T || 0
   const coupon = amount || 0
   if (!B || B <= 0) {
@@ -89,7 +90,7 @@ interface Props {
   onSave: (config: CouponIntensityConfig) => void
 }
 
-const PREVIEW_CASES = [
+export const PREVIEW_CASES = [
   { name: '早餐店滿 10 減 3', B: 10, T: 10, amount: 3 },
   { name: '早餐店無門檻減 3', B: 10, T: 0, amount: 3 },
   { name: '正常餐廳滿 100 減 60', B: 100, T: 100, amount: 60 },
