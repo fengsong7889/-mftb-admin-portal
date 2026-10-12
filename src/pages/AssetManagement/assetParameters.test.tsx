@@ -76,7 +76,16 @@ describe('资产参数页面链路', () => {
     const { container } = page(<AssetClaim />, '/asset-claim/add')
     await waitFor(() => expect(fetchAssetList).toHaveBeenCalled())
     fireEvent.mouseDown(container.querySelector('.ant-select-selector')!)
-    fireEvent.click(await screen.findByText('TEST-001 / 测试实物'))
-    expect(await screen.findByText('历史实物参数')).toBeInTheDocument()
+    // rc-virtual-list 会在列表数据落地时重建选项节点：若 click 打在已被替换的脱离文档的旧节点上，
+    // onChange 根本不会触发，选不中资产→参数区永远不渲染（本用例在连续运行下 50% 偶发红的根因）。
+    // 因此在 waitFor 内重试「定位选项根节点 + 点击」，断言目标与原用例一致（params 来自列表 API），不放宽。
+    await waitFor(() => {
+      const content = Array.from(document.querySelectorAll('.ant-select-item-option-content'))
+        .find((node) => node.textContent?.includes('TEST-001 / 测试实物'))
+      const option = content?.closest('.ant-select-item-option')
+      expect(option).toBeTruthy()
+      fireEvent.click(option!)
+      expect(screen.getByText('历史实物参数')).toBeInTheDocument()
+    })
   })
 })
