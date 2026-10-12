@@ -139,6 +139,7 @@ src/
 | `frontend-coding-standards.md` | 编写前端代码 | 架构设计、TypeScript 规范、命名风格、组件库版本 |
 | `backend-sql-migration.md` | 编写后端 SQL 或迁移代码 | MySQL 方言约束、迁移文件管理、Java 迁移代码规范、就绪门禁 |
 | `frontend-ui-design-spec.md` | 涉及前端界面开发 | 设计令牌、交互样式、新增/编辑/详情/列表界面规范、**列表页统计卡片位置（§E.8）**、反馈提醒、i18n、注释、菜单图标、样式架构、UI 检查清单、禁止清单 |
+| `form-page-style.md` | 新增/编辑/详情类表单页面 | 页面头部（橙色渐变动画条 + 返回按钮）、白色 div 模块卡片（禁用 antd Card 彩色标题头）、图标色块配色约定、表单布局（vertical Form、行内配置项标签右对齐）、底部 `.form-footer` 操作按钮 |
 | `security-architecture-quality.md` | 前后端开发 | 安全元规则、总原则、开发工作流、前后端规范、数据库设计、API 契约、测试门禁、完成定义、禁止清单、检查清单 |
 | `business-data-dictionary.md` | 涉及业务枚举值 | 系统级枚举常量（品牌、业务类型、状态等） |
 | `efficient-dev-mode.md` | 涉及界面调整 | 高效开发模式（两阶段交付：先 UI 后 i18n/后端/数据库） |
