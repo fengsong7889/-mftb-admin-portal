@@ -44,7 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality-gate
     steps:
+      # 取足够历史：构建期要把最近提交写进 version.json 供「版本更新弹窗」展示更新内容
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
       - uses: actions/setup-node@v4
         with:
           node-version: 20

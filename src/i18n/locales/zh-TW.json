@@ -2826,6 +2826,9 @@
     "current": "當前版本",
     "latest": "最新版本",
     "snooze": "稍後再說",
+    "changesTitle": "本次更新內容",
+    "changesCount": "共 {{total}} 項",
+    "changesShown": " · 僅顯示最近 {{shown}} 項",
     "refreshHint": "刷新後仍會回到當前頁面，未保存的表單內容可能丟失。"
   },
   "guard": {

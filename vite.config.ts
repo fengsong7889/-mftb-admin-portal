@@ -481,6 +481,31 @@ function llmProxyPlugin(envDir: string): Plugin {
 /** 構建時間戳：versionFilePlugin 生成檔案時與 define 共用同一值，確保前端對比一致 */
 const BUILD_TIME = new Date().toISOString()
 
+/** 随版本下发的提交日志条数：再多会淹没更新弹窗里的说明文字 */
+const CHANGELOG_LIMIT = 10
+
+/**
+ * 读取最近提交日志（短哈希 + 标题），供版本更新弹窗展示「本次更新内容」。
+ * 非 git 环境或 CI 浅克隆只拿到部分历史时返回可用部分，不得阻断构建。
+ */
+function readRecentCommits(limit = CHANGELOG_LIMIT): Array<{ hash: string; subject: string }> {
+  try {
+    // %x1f 由 git 侧展开成分隔符，避免提交标题里出现竖线等字符时解析错位
+    const output = execSync(`git log -n ${limit} --pretty=format:%h%x1f%s`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString()
+    return output
+      .split('\n')
+      .map((line) => {
+        const [hash = '', ...rest] = line.split('\u001f')
+        return { hash: hash.trim(), subject: rest.join('\u001f').trim() }
+      })
+      .filter((item) => Boolean(item.hash && item.subject))
+  } catch {
+    return []
+  }
+}
+
 /**
  * 版本檢測插件：
  * 1. 生成 public/version.json — 前端定期拉取與內嵌時間戳對比
@@ -499,7 +524,7 @@ function versionFilePlugin(): Plugin {
       fs.mkdirSync(publicDir, { recursive: true })
       fs.writeFileSync(
         path.resolve(publicDir, 'version.json'),
-        JSON.stringify({ buildTime: BUILD_TIME, commitHash }, null, 2),
+        JSON.stringify({ buildTime: BUILD_TIME, commitHash, changes: readRecentCommits() }, null, 2),
       )
 
       // src/build-meta.ts：供前端直接 import

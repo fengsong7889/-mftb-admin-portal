@@ -2945,6 +2945,9 @@
     "current": "Current version",
     "latest": "Latest version",
     "snooze": "Later",
+    "changesTitle": "What's new",
+    "changesCount": "{{total}} items",
+    "changesShown": " · showing latest {{shown}}",
     "refreshHint": "Refreshing returns you to this page; unsaved form input may be lost."
   },
   "guard": {

@@ -1,10 +1,34 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { BUILD_TIME, COMMIT_HASH } from '../build-meta'
 
+/** 单条提交记录：短哈希 + 标题，用于在更新弹窗里展示「本次更新内容」 */
+export interface CommitChange {
+  hash: string
+  subject: string
+}
+
 /** 版本标识：commit 短哈希 + 构建时间，用于在更新提示里做具体对照 */
 export interface VersionInfo {
   hash: string
   buildTime: string
+  /** 该版本携带的最近提交清单；旧版 version.json 无此字段时为空数组 */
+  changes: CommitChange[]
+}
+
+/**
+ * version.json 是公开静态产物，内容按不可信处理：逐条校验字段形状，脏数据直接丢弃。
+ */
+function parseChanges(raw: unknown): CommitChange[] {
+  if (!Array.isArray(raw)) return []
+  const changes: CommitChange[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue
+    const { hash, subject } = item as { hash?: unknown; subject?: unknown }
+    if (typeof hash !== 'string' || typeof subject !== 'string') continue
+    if (!hash.trim() || !subject.trim()) continue
+    changes.push({ hash: hash.trim(), subject: subject.trim() })
+  }
+  return changes.slice(0, 20)
 }
 
 /** 版本检测返回结果 */
@@ -34,7 +58,7 @@ export default function useVersionCheck(): VersionCheckResult {
   const timerRef = useRef<ReturnType<typeof setInterval>>()
 
   const currentBuildTime = BUILD_TIME
-  const current = useMemo(() => ({ hash: COMMIT_HASH, buildTime: BUILD_TIME }), [])
+  const current = useMemo<VersionInfo>(() => ({ hash: COMMIT_HASH, buildTime: BUILD_TIME, changes: [] }), [])
 
   const check = useCallback(async () => {
     if (!currentBuildTime) return
@@ -46,7 +70,7 @@ export default function useVersionCheck(): VersionCheckResult {
       if (!res.ok) return
       const data = await res.json()
       if (data.buildTime && data.buildTime !== currentBuildTime) {
-        setLatest({ hash: data.commitHash ?? '—', buildTime: String(data.buildTime) })
+        setLatest({ hash: data.commitHash ?? '—', buildTime: String(data.buildTime), changes: parseChanges(data.changes) })
         setUpdateAvailable(true)
         // 检测到新版本后停止轮询，避免重复提示
         if (timerRef.current) clearInterval(timerRef.current)

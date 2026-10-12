@@ -4,21 +4,21 @@
    动效复用 global.css 已注册的 keyframes：nodeBreath（图标呼吸）、
    progressShimmer（头部扫光）、statusPulse（胶囊脉冲光环）、pageFadeIn（入场）。 */
 
-/* 通知容器由 antd 生成，这里抹掉它自己的内边距与阴影，视觉全部交给卡片本体 */
-.version-update-notice .ant-notification-notice-content {
+/* 弹窗容器由 antd 生成，这里抹掉它自己的内边距，视觉全部交给卡片本体 */
+.version-update-modal .ant-modal-content {
   padding: 0;
-  background: transparent;
-  box-shadow: none;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.version-update-modal .ant-modal-body {
+  padding: 0;
 }
 
 .version-update-card {
-  width: 380px;
-  max-width: calc(100vw - 32px);
+  width: 100%;
   overflow: hidden;
   background: #fff;
-  border: 1px solid #FFE7D1;
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(232, 114, 12, 0.24);
   animation: pageFadeIn 0.35s ease-out;
 }
 
@@ -29,7 +29,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 16px 20px;
   overflow: hidden;
   background: linear-gradient(120deg, #E8720C 0%, #F59432 58%, #FFB347 100%);
   color: #fff;
@@ -91,64 +91,124 @@
   animation: progressShimmer 2.4s linear infinite;
 }
 
-/* ---------- 正文：版本对照 + 说明 + 操作 ---------- */
+/* ---------- 正文：更新内容为主角，版本对照只作一行元信息 ---------- */
 
 .version-update-body {
-  padding: 14px 16px 16px;
+  padding: 16px 20px 18px;
 }
 
-.version-update-versions {
+/* 版本对照行：弱化为浅灰窄条，不与更新内容抢视觉焦点 */
+.version-update-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
-}
-
-.version-update-version {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
   background: #FAFAFA;
   border: 1px solid #f0f0f0;
-}
-
-.version-update-version.is-latest {
-  background: #FFF7F0;
-  border-color: #FFE7D1;
-}
-
-.version-update-version-label {
-  display: block;
   font-size: 11px;
   color: #8C8C8C;
 }
 
-.version-update-version code {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.5;
-  color: #262626;
+.version-update-meta-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
 }
 
-.version-update-version.is-latest code {
+.version-update-meta-arrow {
+  flex-shrink: 0;
+  color: #D9D9D9;
+  font-size: 10px;
+}
+
+.version-update-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8C8C8C;
+}
+
+.version-update-meta code.is-latest {
   color: #E8720C;
 }
 
-.version-update-version-time {
-  display: block;
+.version-update-meta-time {
+  margin-left: auto;
   font-size: 11px;
   color: #8C8C8C;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
 }
 
-.version-update-arrow {
-  flex-shrink: 0;
-  color: #E8720C;
+/* 本次更新内容：暖橙面板承载，条目可滚动，避免弹窗被长列表顶高 */
+.version-update-changes {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #FFF7F0;
+  border: 1px solid #FFE7D1;
+}
+
+.version-update-changes-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.version-update-changes-title .anticon {
+  color: #E8720C;
+}
+
+.version-update-changes-title em {
+  margin-left: auto;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  color: #8C8C8C;
+}
+
+.version-update-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 148px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.version-update-change-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #595959;
+}
+
+.version-update-change-list code {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #FFE7D1;
+  color: #E8720C;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.version-update-change-list li > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .version-update-desc {
