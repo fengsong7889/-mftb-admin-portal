@@ -22,6 +22,10 @@ src/build-meta.ts
 Thumbs.db
 
 # Environment
+# `.env` 只应承载本地默认值：真实凭据一律放 `.env.local`（已被忽略）。
+# 根 `.env` 此前被 git 跟踪，属于埋雷：一旦有人往里写真实值就会被提交，故取消跟踪并忽略。
+# 说明：`.env.example` 是入库模板；`.env.production` 仅含公开后端地址，继续入库。
+.env
 .env.local
 .env.*.local
 
