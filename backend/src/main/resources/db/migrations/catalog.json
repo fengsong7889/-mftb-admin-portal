@@ -1287,6 +1287,23 @@
       "comment": "v1.0 把日報當成純只讀菜單只給了 view/export，但 2B-2b 接上的「重算區間日報」會改日報、生成異常並回寫打卡判定，屬寫操作。sys_menu.actions 是授權中心能勾出什麼動作的唯一依據，缺 edit 就等於該能力永遠授不出去（超管走代碼直通看不出來，普通角色上線當天才暴露 403）。不能只改 v1.0 聲明：ensureMenu 對已存在菜單只對齊結構不覆蓋 actions，已落庫環境拿不到新動作集，因此單獨一個版本鍵做一次性糾正。只動日報這一個菜單，不批量對齊全部考勤菜單：批量覆蓋會把管理員在授權中心主動收窄過的動作集擴回去，那屬於靜默擴權。admin 顯式擴權一次（內置運維角色必須能重算），其他角色授權行完全不動。後置校驗釘 sys_menu.actions 已等於聲明真值，未對齊則不記版本、下次啟動重試。"
     },
     {
+      "versionKey": "notify:schema:v1.0",
+      "module": "notify",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "notificationSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "scriptFiles": [
+        "165_notification_apps_and_scenarios.sql"
+      ],
+      "intent": "把 165 通知底座（sys_notification_app + sys_notification_scenario）纳入迁移框架：每个环境启动都收敛，不再依赖手工跑脚本",
+      "author": "Qoder",
+      "comment": "事故背景（2026-10-14 生產發布失敗）：165 腳本長期只是 backend/sql 下的手工參考副本——無版本鍵、無 Java 執行器、無結構契約，開發庫被人手工跑過而生產 RDS 從未建過這兩張表。230 會議建表腳本第 7 段向 sys_notification_scenario 登記 3 條會議場景時抛 Table doesn't exist，applyOnce 按設計向上抛出 → @Order(28) 的會議 Runner 失敗 → Spring 上下文啟動失敗 → Pod 崩潰循環、K8s 摘掉 Service endpoint、入口網關 503。修復取「納入遷移框架」而不是「把 230 的插入改成容錯跳過」：跳過只是把缺表從啟動期推遲到用戶打開通知配置時才 500，而且會議通知場景永遠登記不上。執行器 @Order(14) 必須晚於 DataInitializer(5)（腳本讀寫 sys_config 的 notification_apps_migrated 守衛鍵）並早於任何引用場景表的業務域，該順序不變量由 NotificationSchemaOrderingTest 釘住。腳本本身冪等（CREATE TABLE IF NOT EXISTS + WHERE NOT EXISTS + ON DUPLICATE KEY），被本次事故部分套用過的環境可安全重跑。另登記 ContractRegistry 結構契約作第二道閘。教訓：凡新增 backend/sql 腳本必須同批登記版本鍵，只放 sql 目錄等於沒有遷移。"
+    },
+    {
       "versionKey": "meeting:schema:v1.0",
       "module": "meeting",
       "phase": "MODULE_STRUCTURE",
@@ -1294,7 +1311,8 @@
       "executor": "meetingSchemaMigrationInitializer",
       "status": "ACTIVE",
       "dependencies": [
-        "core:schema-v10"
+        "core:schema-v10",
+        "notify:schema:v1.0"
       ],
       "scriptFiles": [
         "230_meeting_core_tables.sql"

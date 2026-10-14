@@ -35,7 +35,80 @@ public class ContractRegistry {
         combined.add(hrLifecycleRequestContract());
         // 自然流量評分規則：生產缺 multiplier_tiers/threshold_score/region_configs 導致規則列表查詢 500
         combined.add(organicScoreRuleContract());
+        // 通知底座兩表：165 腳本長期未接入遷移框架，生產缺表直接把會議域啟動打成崩潰循環
+        combined.addAll(notificationContracts());
         return combined;
+    }
+
+    /**
+     * 通知底座兩表契約（DDL 與 165 腳本逐字一致）：sys_notification_app / sys_notification_scenario。
+     * <p>
+     * 事故背景（2026-10-14 生產發布失敗）：{@code backend/sql/165_notification_apps_and_scenarios.sql}
+     * 只是手工參考腳本，開發庫跑過、生產 RDS 從未建過。{@code 230_meeting_core_tables.sql} 第 7 段
+     * 向 {@code sys_notification_scenario} 登記會議通知場景時抛「Table doesn't exist」，
+     * applyOnce 向上抛出使 Spring 上下文啟動失敗，Pod 崩潰循環導致入口網關 503。
+     * <p>
+     * 建表已由 {@code NotificationSchemaMigrationInitializer}（{@code notify:schema:v1.0}，@Order 14）
+     * 在業務域之前執行；本契約是第二道閘：任何環境被人為刪表或列漂移時，啟動自愈並在校驗不過時
+     * 把實例置為 not-ready，而不是等到用戶點開「通知配置」才 500。
+     * <p>
+     * 場景表的外鍵指向應用表，故必須先登記 app 再登記 scenario（校驗器按列表順序自癒）。
+     */
+    public static List<ContractSpec> notificationContracts() {
+        return List.of(
+                new ContractSpec("sys-notification-app", "sys_notification_app",
+                        "CREATE TABLE IF NOT EXISTS sys_notification_app ("
+                                + "id BIGINT PRIMARY KEY AUTO_INCREMENT, "
+                                + "name VARCHAR(100) NOT NULL COMMENT '应用名称', "
+                                + "platform VARCHAR(20) NOT NULL DEFAULT 'dingtalk', "
+                                + "app_key VARCHAR(100) NOT NULL, "
+                                + "app_secret VARCHAR(256) NOT NULL DEFAULT '', "
+                                + "agent_id VARCHAR(32) NOT NULL DEFAULT '', "
+                                + "base_url VARCHAR(500) NOT NULL DEFAULT '', "
+                                + "enabled TINYINT NOT NULL DEFAULT 1, "
+                                + "remark VARCHAR(500) NOT NULL DEFAULT '', "
+                                + "legacy_key VARCHAR(50) DEFAULT NULL COMMENT '旧配置迁移标记', "
+                                + "updated_by VARCHAR(100) NOT NULL DEFAULT '', "
+                                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                                + "UNIQUE KEY uk_notification_app_key (app_key), "
+                                + "UNIQUE KEY uk_notification_app_legacy (legacy_key)"
+                                + ") COMMENT='企业内部应用（凭据每应用保存一次）'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("name",
+                                        "ADD COLUMN name VARCHAR(100) NOT NULL DEFAULT '' COMMENT '应用名称'"),
+                                new ContractSpec.ColumnSpec("platform",
+                                        "ADD COLUMN platform VARCHAR(20) NOT NULL DEFAULT 'dingtalk'"),
+                                new ContractSpec.ColumnSpec("app_key",
+                                        "ADD COLUMN app_key VARCHAR(100) NOT NULL DEFAULT ''"),
+                                new ContractSpec.ColumnSpec("app_secret",
+                                        "ADD COLUMN app_secret VARCHAR(256) NOT NULL DEFAULT ''"),
+                                new ContractSpec.ColumnSpec("agent_id",
+                                        "ADD COLUMN agent_id VARCHAR(32) NOT NULL DEFAULT ''"),
+                                new ContractSpec.ColumnSpec("base_url",
+                                        "ADD COLUMN base_url VARCHAR(500) NOT NULL DEFAULT ''"),
+                                new ContractSpec.ColumnSpec("enabled",
+                                        "ADD COLUMN enabled TINYINT NOT NULL DEFAULT 1"),
+                                new ContractSpec.ColumnSpec("legacy_key",
+                                        "ADD COLUMN legacy_key VARCHAR(50) DEFAULT NULL COMMENT '旧配置迁移标记'"))),
+                new ContractSpec("sys-notification-scenario", "sys_notification_scenario",
+                        "CREATE TABLE IF NOT EXISTS sys_notification_scenario ("
+                                + "scenario_key VARCHAR(64) PRIMARY KEY, "
+                                + "app_id BIGINT DEFAULT NULL, "
+                                + "enabled TINYINT NOT NULL DEFAULT 0, "
+                                + "updated_by VARCHAR(100) NOT NULL DEFAULT '', "
+                                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                                + "CONSTRAINT fk_notification_scenario_app FOREIGN KEY (app_id) REFERENCES sys_notification_app(id)"
+                                + ") COMMENT='业务通知场景路由，场景定义与接收人规则由业务代码声明'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("app_id",
+                                        "ADD COLUMN app_id BIGINT DEFAULT NULL"),
+                                new ContractSpec.ColumnSpec("enabled",
+                                        "ADD COLUMN enabled TINYINT NOT NULL DEFAULT 0"),
+                                new ContractSpec.ColumnSpec("updated_by",
+                                        "ADD COLUMN updated_by VARCHAR(100) NOT NULL DEFAULT ''"),
+                                new ContractSpec.ColumnSpec("updated_at",
+                                        "ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))));
     }
 
     /**
