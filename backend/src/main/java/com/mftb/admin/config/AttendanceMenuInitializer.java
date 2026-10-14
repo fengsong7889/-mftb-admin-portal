@@ -57,9 +57,17 @@ public class AttendanceMenuInitializer implements CommandLineRunner {
      */
     static final String VERSION_KEY_DAILY_ACTIONS = "attendance:menu:v1.1";
 
+    /**
+     * v2.0：把平铺的 12 个叶子菜单收入 4 个分组（type=1），假勤工作台与假勤設置保持独立顶级。
+     * <p>分组结构：考勤管理(4) / 基础设置(2) / 请假管理(2) / 报表统计(2)。
+     * 排序遵循管理动线：工作台 → 日常操作 → 基础数据 → 请假 → 报表 → 设置。
+     */
+    static final String VERSION_KEY_V2 = "attendance:menu:v2.0";
+
     private static final String SYSTEM_CODE = SystemCode.ATTENDANCE.code();
     private static final String ADMIN_ROLE_CODE = "admin";
     private static final int MENU_TYPE_LEAF = 2;
+    private static final int MENU_TYPE_GROUP = 1;
 
     /**
      * 菜单声明：{menuKey, 中文名, 英文名, path, component, icon, sort, actions}。
@@ -106,6 +114,7 @@ public class AttendanceMenuInitializer implements CommandLineRunner {
             migrate();
         }
         versionTracker.applyOnce(VERSION_KEY_DAILY_ACTIONS, this::alignDailyActions, this::verifyDailyActions);
+        versionTracker.applyOnce(VERSION_KEY_V2, this::groupMenus, this::verifyV2);
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -310,6 +319,147 @@ public class AttendanceMenuInitializer implements CommandLineRunner {
             }
         }
         throw new IllegalStateException("MENUS 声明缺少考勤日報: " + AttendanceConstants.MENU_DAILY);
+    }
+
+    /* ==================== v2.0：菜单分组 ==================== */
+
+    /**
+     * 把平铺的考勤叶子菜单收入 4 个分组（type=1），假勤工作台与假勤設置保持独立顶级。
+     * <p>分组创建后不可逆（type=1 不会降回 type=2），但叶子归属可以后续调整。
+     * 一次性迁移 applyOnce 记版本后不再重跑，后续归属调整由
+     * {@code DataInitializer.reconcileMenuMasterData} 的 ensureMenuParent 每次启动自愈。
+     */
+    private void groupMenus() {
+        // 1) 创建 4 个分组菜单（type=1, 无 path/component/actions）
+        ensureGroup(AttendanceConstants.GROUP_OPS, "考勤管理", "Attendance Ops",
+                "ScheduleOutlined", 27);
+        ensureGroup(AttendanceConstants.GROUP_BASIC, "基礎設置", "Basic Setup",
+                "ControlOutlined", 28);
+        ensureGroup(AttendanceConstants.GROUP_LEAVE, "請假管理", "Leave Management",
+                "BarChartOutlined", 29);
+        ensureGroup(AttendanceConstants.GROUP_REPORT, "報表統計", "Reports",
+                "PieChartOutlined", 30);
+
+        // 2) 把叶子菜单挂到对应分组下（WHERE 带「当前仍是顶级」条件，不顶自定义调整）
+        //    考勤管理：规则 → 排班 → 打卡 → 异常（日常操作动线）
+        moveUnderGroup(AttendanceConstants.MENU_GROUP, AttendanceConstants.GROUP_OPS, 1);
+        moveUnderGroup(AttendanceConstants.MENU_SCHEDULE, AttendanceConstants.GROUP_OPS, 2);
+        moveUnderGroup(AttendanceConstants.MENU_PUNCH, AttendanceConstants.GROUP_OPS, 3);
+        moveUnderGroup(AttendanceConstants.MENU_EXCEPTION, AttendanceConstants.GROUP_OPS, 4);
+        //    基础设置：班次 → 节假日（低频配置）
+        moveUnderGroup(AttendanceConstants.MENU_SHIFT, AttendanceConstants.GROUP_BASIC, 1);
+        moveUnderGroup(AttendanceConstants.MENU_HOLIDAY, AttendanceConstants.GROUP_BASIC, 2);
+        //    请假管理：请假单 → 额度（从顶级迁入分组）
+        moveUnderGroup(AttendanceConstants.MENU_LEAVE, AttendanceConstants.GROUP_LEAVE, 1);
+        moveUnderGroup(AttendanceConstants.MENU_LEAVE_QUOTA, AttendanceConstants.GROUP_LEAVE, 2);
+        //    报表统计：日报 → 月报
+        moveUnderGroup(AttendanceConstants.MENU_DAILY, AttendanceConstants.GROUP_REPORT, 1);
+        moveUnderGroup(AttendanceConstants.MENU_MONTHLY, AttendanceConstants.GROUP_REPORT, 2);
+
+        // 3) 重写顶级排序：工作台(26) → 4个分组(27-30) → 设置(31)
+        updateTopSort(AttendanceConstants.MENU_WORKBENCH, 26);
+        updateTopSort(AttendanceConstants.GROUP_OPS, 27);
+        updateTopSort(AttendanceConstants.GROUP_BASIC, 28);
+        updateTopSort(AttendanceConstants.GROUP_LEAVE, 29);
+        updateTopSort(AttendanceConstants.GROUP_REPORT, 30);
+        updateTopSort(AttendanceConstants.MENU_SETTING, 31);
+
+        permissionService.evictAll();
+        log.info("考勤假勤菜單已分組: 4 个分组 + 10 个叶子归组, 工作台与設置保持独立顶级");
+    }
+
+    /** 新增或对齐分组菜单（type=1，无 path/component/actions） */
+    private void ensureGroup(String menuKey, String name, String nameEn, String icon, int sortOrder) {
+        Long id = queryMenuId(menuKey);
+        if (id == null) {
+            jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", menuKey);
+            jdbcTemplate.update(
+                    "INSERT INTO sys_menu (parent_id, menu_key, name, name_en, type, icon, "
+                            + "sort_order, actions, status, system_code, updated_by, deleted) "
+                            + "VALUES (NULL, ?, ?, ?, ?, ?, ?, '', 1, ?, 'system', 0)",
+                    menuKey, name, nameEn, MENU_TYPE_GROUP, icon, sortOrder, SYSTEM_CODE);
+            log.info("已創建考勤分組: {} ({})", name, menuKey);
+        } else {
+            // 已存在则对齐 type=1 与 icon，不覆盖名称（留给菜单配置自定义）
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET type = ?, icon = ?, system_code = ?, parent_id = NULL, "
+                            + "status = 1, deleted = 0, updated_by = 'system' WHERE id = ?",
+                    MENU_TYPE_GROUP, icon, SYSTEM_CODE, id);
+            jdbcTemplate.update("UPDATE sys_menu SET name_en = ? WHERE id = ? AND (name_en IS NULL OR name_en = '')",
+                    nameEn, id);
+        }
+    }
+
+    /** 把叶子菜单挂到分组下（仅当当前仍是顶级时移动，不顶自定义调整） */
+    private void moveUnderGroup(String menuKey, String groupKey, int sortInGroup) {
+        Long groupId = queryMenuId(groupKey);
+        if (groupId == null) {
+            throw new IllegalStateException("分组菜单不存在: " + groupKey);
+        }
+        int moved = jdbcTemplate.update(
+                "UPDATE sys_menu SET parent_id = ?, sort_order = ?, updated_by = 'system' "
+                        + "WHERE menu_key = ? AND deleted = 0 AND parent_id IS NULL",
+                groupId, sortInGroup, menuKey);
+        if (moved > 0) {
+            log.info("菜單 {} 已挂入分組 {} (sort={})", menuKey, groupKey, sortInGroup);
+        }
+    }
+
+    /** 重写顶级菜单排序（仅当当前仍是旧默认值时修正，不顶自定义） */
+    private void updateTopSort(String menuKey, int newSort) {
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
+                        + "WHERE menu_key = ? AND deleted = 0 AND parent_id IS NULL",
+                newSort, menuKey);
+    }
+
+    /**
+     * v2.0 后置校验：分组存在且为顶级目录，叶子菜单挂在正确分组下。
+     * <p>工作台与設置仍为顶级，不在分组下。
+     */
+    private void verifyV2() {
+        // 4 个分组必须存在且为顶级 type=1
+        for (String gk : new String[]{AttendanceConstants.GROUP_OPS, AttendanceConstants.GROUP_BASIC,
+                AttendanceConstants.GROUP_LEAVE, AttendanceConstants.GROUP_REPORT}) {
+            Integer cnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND status = 1 "
+                            + "AND system_code = ? AND parent_id IS NULL AND type = ?",
+                    Integer.class, gk, SYSTEM_CODE, MENU_TYPE_GROUP);
+            if (cnt == null || cnt == 0) {
+                throw new IllegalStateException("考勤分組未就绪: " + gk);
+            }
+        }
+        // 叶子菜单必须在正确分组下
+        String[][] expected = {
+                {AttendanceConstants.MENU_GROUP, AttendanceConstants.GROUP_OPS},
+                {AttendanceConstants.MENU_SCHEDULE, AttendanceConstants.GROUP_OPS},
+                {AttendanceConstants.MENU_PUNCH, AttendanceConstants.GROUP_OPS},
+                {AttendanceConstants.MENU_EXCEPTION, AttendanceConstants.GROUP_OPS},
+                {AttendanceConstants.MENU_SHIFT, AttendanceConstants.GROUP_BASIC},
+                {AttendanceConstants.MENU_HOLIDAY, AttendanceConstants.GROUP_BASIC},
+                {AttendanceConstants.MENU_LEAVE, AttendanceConstants.GROUP_LEAVE},
+                {AttendanceConstants.MENU_LEAVE_QUOTA, AttendanceConstants.GROUP_LEAVE},
+                {AttendanceConstants.MENU_DAILY, AttendanceConstants.GROUP_REPORT},
+                {AttendanceConstants.MENU_MONTHLY, AttendanceConstants.GROUP_REPORT},
+        };
+        for (String[] pair : expected) {
+            Integer wrong = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 "
+                            + "AND parent_id != (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1) x)",
+                    Integer.class, pair[0], pair[1]);
+            if (wrong != null && wrong > 0) {
+                throw new IllegalStateException("菜单 " + pair[0] + " 未挂入分组 " + pair[1]);
+            }
+        }
+        // 工作台与設置仍为顶级
+        for (String topKey : new String[]{AttendanceConstants.MENU_WORKBENCH, AttendanceConstants.MENU_SETTING}) {
+            Integer cnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND parent_id IS NULL",
+                    Integer.class, topKey);
+            if (cnt == null || cnt == 0) {
+                throw new IllegalStateException("菜单 " + topKey + " 应为独立顶级");
+            }
+        }
     }
 
     /* ==================== 后置校验 ==================== */

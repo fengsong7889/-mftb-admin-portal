@@ -3,12 +3,10 @@ import DOMPurify from 'dompurify'
 import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip, Segmented } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import ScoreRow from './AlgorithmForm/ScoreRow'
-import CouponIntensityPanel from './CouponIntensityConfig'
 import CouponScorePanel from './CouponScorePanel'
-import CommercialSchemeCompare from './CommercialSchemeCompare'
+import SignboardScorePanel from './SignboardScorePanel'
 import { ServiceStatus, AppType } from './constants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
@@ -23,23 +21,19 @@ import {
   TIER_DIRECTION_LABEL,
   type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem, type MultiplierTier, type RegionSupportConfig, type RegionOverheatConfig, type RegionKey,
   REGION_KEYS, REGION_LABELS, REGION_COLORS,
-  isCouponIntensityRule, createDefaultCouponIntensityConfig, validateCouponIntensityConfig,
-  isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG,
-  type CouponScoreConfig,
-  type CouponIntensityConfig,
+  isCouponScoreRule,
+  isSignboardScoreRule, DEFAULT_SIGNBOARD_SCORE_CONFIG,
+  isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
+  type CouponScoreConfig, type SignboardScoreConfig,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
   createOrganicRule, updateOrganicRule, toggleOrganicRuleStatus,
   deleteOrganicRule,
-  type OrganicRuleVO,
+  type OrganicRuleVO, type OrganicRulePayload,
 } from '@/api/organicScore'
 import { fetchStores } from '@/api/store'
 import { fetchAdAlgorithms, fetchAdAlgorithmByCode, type AdAlgorithm } from '@/api/adPromotion'
-
-
-// 原型模板独立于后端规则；编辑和保存仅操作当前页面草稿。
-const COUPON_PREVIEW_TEMPLATE = createDefaultCouponIntensityConfig()
 
 /** 維度順序（界面展示順序） */
 const DIMENSION_ORDER: ScoreDimension[] = [
@@ -284,9 +278,6 @@ const REGION_SEGMENT_OPTIONS = REGION_KEYS.map(k => ({
  */
 export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: Props) {
   const { t } = useTranslation()
-  const [searchParams] = useSearchParams()
-  // 計分口徑評審臨時開關：URL 帶 schemeDemo=1 預設展開，也可用商業維度工具條的「口徑對照 Demo」按鈕切換；評審定稿後連同組件一併刪除
-  const [showSchemeDemo, setShowSchemeDemo] = useState(searchParams.get('schemeDemo') === '1')
   const [rules, setRules] = useState<OrganicScoreRule[]>(DEFAULT_ORGANIC_SCORE_RULES)
   const [loading, setLoading] = useState(true)
 
@@ -369,20 +360,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           if (r.id === 'COM_01') {
             r.name = '滿額立減'
             r.dimension = ScoreDimension.COMMERCIAL
-            // 升級舊模式為倍數梯度計分
-            if (r.mode !== ScoreMode.TIERED_MULTIPLIER) {
-              r.mode = ScoreMode.TIERED_MULTIPLIER
-              r.score = 0
-            }
-            if (!r.multiplierTiers?.length) {
-              r.multiplierTiers = [
-                { multiplier: 1, score: 30 },
-                { multiplier: 2, score: 20 },
-                { multiplier: 3, score: 10 },
-              ]
-            }
-            // 舊數據無門檻≤客單價加分配置時補預設值
-            if (r.thresholdScore == null) r.thresholdScore = 10
+            // 滿額立減已改用券類計分 v1 面板：舊倍率梯度列（multiplierTiers / thresholdScore）僅保留讀取，
+            // 不再補默認值、不再覆寫計分模式，第二階段隨遷移改為 v1 檔位列
           }
           // 減免運費本質為「報名即給分」，後端缺 prerequisites 時補默認，使報名計分開關正確顯示為開啟
           if (r.id === 'COM_02' && !r.prerequisites) {
@@ -391,6 +370,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           // 計分項更名：後端舊名稱帶「-按金額」後綴，前端保底統一為新名稱
           if (r.id === 'COM_06') r.name = '會員紅包'
           if (r.id === 'COM_07') r.name = '閃蜂官方神券'
+          // 計分項更名：後端舊名稱「購買廣告-金字招牌」統一為「金字招牌(廣告)」
+          if (r.id === 'COM_10') r.name = '金字招牌(廣告)'
           if (r.id === 'PLT_03') {
             r.name = '商家扶持'
             // 升級舊格式為區域配置
@@ -515,9 +496,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   const [inlineEditing, setInlineEditing] = useState<Record<string, boolean>>({})
   /** 內聯編輯臨時表單值 */
   const [inlineForm, setInlineForm] = useState<Record<string, Partial<OrganicScoreRule>>>({})
-  const [couponDrafts, setCouponDrafts] = useState<Record<string, CouponIntensityConfig>>({})
-  /** 方案 v1 試點（進店領券）頁面草稿 */
+  /** 券類計分 v1（COM_03~COM_07）頁面草稿，按計分項獨立存放 */
   const [schemeDrafts, setSchemeDrafts] = useState<Record<string, CouponScoreConfig>>({})
+  /** 金字招牌標籤計分（COM_10）頁面草稿 */
+  const [signboardDrafts, setSignboardDrafts] = useState<Record<string, SignboardScoreConfig>>({})
   /** PLT_03 屏蔽商家輸入框臨時值 */
   const [blockedMerchantInput, setBlockedMerchantInput] = useState('')
   /** PLT_03 區域切換狀態 */
@@ -628,12 +610,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   /** 進入內聯編輯模式 */
   const handleInlineEdit = (rule: OrganicScoreRule) => {
     setInlineEditing(prev => ({ ...prev, [rule.id]: true }))
-    setInlineForm(prev => ({ ...prev, [rule.id]: {
-      ...rule,
-      ...(isCouponIntensityRule(rule.id) ? {
-        couponIntensityConfig: couponDrafts[rule.id] ?? rule.couponIntensityConfig ?? createDefaultCouponIntensityConfig(),
-      } : {}),
-    } }))
+    setInlineForm(prev => ({ ...prev, [rule.id]: { ...rule } }))
     // 自動展開詳情區
     if (!expandedRules[rule.id]) {
       setExpandedRules(prev => ({ ...prev, [rule.id]: true }))
@@ -644,16 +621,42 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     setInlineEditing(prev => { const n = { ...prev }; delete n[ruleId]; return n })
     setInlineForm(prev => { const n = { ...prev }; delete n[ruleId]; return n })
   }
-  /** 原型草稿不提交到旧规则接口，避免误报生产配置生效。 */
-  const handleSaveCouponDraft = (ruleId: string, config: CouponIntensityConfig) => {
-    if (readOnly) return
-    const error = validateCouponIntensityConfig(config)
-    if (error) { message.warning(error); return }
-    setCouponDrafts(prev => ({ ...prev, [ruleId]: config }))
-    handleInlineCancel(ruleId)
-    message.info('已保存當前頁面草稿；刷新或離開頁面後不保留，未影響真實排名')
-  }
-
+  /**
+   * 前端規則對象 → 後端全量更新請求。
+   * 後端 updateRule 是整行覆蓋（缺字段會被置空），因此任何「只改一個字段」的保存都必須先經此處補齊其餘字段。
+   */
+  const buildRulePayload = (values: Partial<OrganicScoreRule>): OrganicRulePayload => ({
+    dimension: values.dimension!,
+    name: values.name!,
+    description: values.description!,
+    mode: values.mode!,
+    score: values.score,
+    prerequisites: values.prerequisites,
+    statDays: values.statDays,
+    rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
+    tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
+    conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
+    multiplierTiers: values.multiplierTiers ? JSON.stringify(values.multiplierTiers) : undefined,
+    thresholdScore: (values as any).thresholdScore,
+    calcCycle: values.calcCycle,
+    calcIntervalHours: values.calcIntervalHours,
+    statDaysTotal: values.statDaysTotal,
+    statDaysRecent: values.statDaysRecent,
+    peakTimeRanges: values.peakTimeRanges ? JSON.stringify(values.peakTimeRanges) : undefined,
+    deductionPerOrder: (values as any).deductionPerOrder,
+    decayCoefficient: (values as any).decayCoefficient,
+    timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
+    blockedMerchants: (values as any).blockedMerchants ? JSON.stringify((values as any).blockedMerchants) : undefined,
+    regionConfigs: (values as any).regionConfigs ? JSON.stringify((values as any).regionConfigs) : undefined,
+    activityItems: (values as any).activityItems?.length
+      ? JSON.stringify(((values as any).activityItems as ActivityScoreItem[]).map(it => ({
+          activityId: it.activityId.trim(),
+          activityName: algoOptions.find(a => a.algoCode === it.activityId.trim())?.algoName ?? it.activityName,
+          score: it.score,
+        })))
+      : undefined,
+    status: values.status!,
+  })
   /** 保存內聯編輯 */
   const handleInlineSave = async (ruleId: string) => {
     const values = inlineForm[ruleId]
@@ -762,61 +765,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         }
       }
     }
-    // COM_01 滿額立減校驗：門檻≤客單價加分與倍數梯度配置不允許空值
-    if (ruleId === 'COM_01') {
-      const ts = (values as any).thresholdScore
-      if (ts === undefined || ts === null || ts < 0) {
-        message.warning('請輸入門檻≤客單價對應的固定加分')
-        return
-      }
-      const mt: MultiplierTier[] = (values as any).multiplierTiers || []
-      if (mt.length === 0) {
-        message.warning('請至少配置一個倍數梯度檔位')
-        return
-      }
-      for (let i = 0; i < mt.length; i++) {
-        if (!mt[i].multiplier || mt[i].multiplier <= 0) {
-          message.warning(`第 ${i + 1} 個梯度請輸入倍數閾值`)
-          return
-        }
-        if (mt[i].score === undefined || mt[i].score === null || mt[i].score < 0) {
-          message.warning(`第 ${i + 1} 個梯度請輸入加分分值`)
-          return
-        }
-      }
-    }
-    const payload = {
-      dimension: values.dimension!,
-      name: values.name!,
-      description: values.description!,
-      mode: values.mode!,
-      score: values.score,
-      prerequisites: values.prerequisites,
-      statDays: values.statDays,
-      rangeScores: values.rangeScores ? JSON.stringify(values.rangeScores) : undefined,
-      tiers: values.tiers ? JSON.stringify(values.tiers) : undefined,
-      conditionItems: values.conditionItems ? JSON.stringify(values.conditionItems) : undefined,
-      multiplierTiers: values.multiplierTiers ? JSON.stringify(values.multiplierTiers) : undefined,
-      thresholdScore: (values as any).thresholdScore,
-      calcCycle: values.calcCycle,
-      calcIntervalHours: values.calcIntervalHours,
-      statDaysTotal: values.statDaysTotal,
-      statDaysRecent: values.statDaysRecent,
-      peakTimeRanges: values.peakTimeRanges ? JSON.stringify(values.peakTimeRanges) : undefined,
-      deductionPerOrder: (values as any).deductionPerOrder,
-      decayCoefficient: (values as any).decayCoefficient,
-      timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
-      blockedMerchants: (values as any).blockedMerchants ? JSON.stringify((values as any).blockedMerchants) : undefined,
-      regionConfigs: (values as any).regionConfigs ? JSON.stringify((values as any).regionConfigs) : undefined,
-      activityItems: (values as any).activityItems?.length
-        ? JSON.stringify(((values as any).activityItems as ActivityScoreItem[]).map(it => ({
-            activityId: it.activityId.trim(),
-            activityName: algoOptions.find(a => a.algoCode === it.activityId.trim())?.algoName ?? it.activityName,
-            score: it.score,
-          })))
-        : undefined,
-      status: values.status!,
-    }
+    // COM_01 已改用券類計分 v1 面板（檔位由面板自管頁面草稿），不再走內聯編輯的舊倍率梯度校驗
+    const payload = buildRulePayload(values)
     try {
       const vo = await updateOrganicRule(ruleId as unknown as number, payload)
       // 保留前端編輯過的前提條件（API 可能未返回該字段）
@@ -851,6 +801,44 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
     }
     handleInlineCancel(ruleId)
+  }
+
+  /**
+   * 面板共用的保存收尾：評分說明是規則已有字段，内容有變動才寫庫；
+   * 後端 updateRule 是整行覆蓋，因此必須經 buildRulePayload 補齊全部字段。
+   */
+  const savePanelDescription = async (rule: OrganicScoreRule, description: string, draftLabel: string) => {
+    if (description === rule.description) {
+      message.info('已保存當前頁面草稿；刷新或離開頁面後不保留，未寫入後端。')
+      return
+    }
+    try {
+      const vo = await updateOrganicRule(rule.id as unknown as number, buildRulePayload({ ...rule, description }))
+      // 後端 Jackson non_null 可能省略空字段，因此僅採用 VO 實際返回的更新人與更新時間
+      setRules(prev => prev.map(r => (r.id === rule.id ? {
+        ...r,
+        description,
+        updatedBy: vo?.updatedBy ?? r.updatedBy,
+        updatedAt: vo?.updateTime ?? r.updatedAt,
+      } : r)))
+      message.success(`評分說明已保存；${draftLabel}僅為當前頁面草稿`)
+    } catch {
+      message.warning('評分說明保存失敗，請重試')
+    }
+  }
+
+  /** 券類計分 v1 面板保存：檔位配置只進頁面草稿，評分說明寫庫 */
+  const handleSaveCouponPanel = async (rule: OrganicScoreRule, next: CouponScoreConfig, description: string) => {
+    if (readOnly) return
+    setSchemeDrafts(prev => ({ ...prev, [rule.id]: next }))
+    await savePanelDescription(rule, description, '檔位配置')
+  }
+
+  /** 金字招牌面板保存：標籤分值只進頁面草稿（後端尚無對應列），評分說明寫庫 */
+  const handleSaveSignboardPanel = async (rule: OrganicScoreRule, next: SignboardScoreConfig, description: string) => {
+    if (readOnly) return
+    setSignboardDrafts(prev => ({ ...prev, [rule.id]: next }))
+    await savePanelDescription(rule, description, '標籤分值')
   }
 
   // 排名規則說明彈窗
@@ -1196,20 +1184,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               {t('organicTrafficScore.addConfig')}
             </Button>
           )}
-          {/* 臨時評審入口：只掛在商業維度，定稿後與 CommercialSchemeCompare 一起刪除 */}
-          {dimension === ScoreDimension.COMMERCIAL && (
-            <Button
-              size="small"
-              disabled={false}
-              style={readOnly ? { marginLeft: 'auto' } : undefined}
-              onClick={() => setShowSchemeDemo(prev => !prev)}
-            >
-              {showSchemeDemo ? '收起口徑對照' : '口徑對照 Demo'}
-            </Button>
-          )}
         </div>
-
-        {dimension === ScoreDimension.COMMERCIAL && showSchemeDemo && <CommercialSchemeCompare />}
 
         {/* 可展開規則列表（參考規則配置菜單風格） */}
         <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
@@ -1282,8 +1257,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                   const isEditingInline = !!inlineEditing[rule.id]
                   const form = inlineForm[rule.id] || rule
                   const tone = dimension === ScoreDimension.COMMERCIAL ? 'strategy' : dimension === ScoreDimension.PLATFORM ? 'advanced' : 'info'
-                  // 方案 v1 試點：進店領券改用「報名分＋門檻分＋力度分」新面板，其餘四項保持舊面板待方案確認
-                  if (rule.id === 'COM_03') {
+                  // 券類計分 v1：五個券類活動共用「報名分＋門檻分＋力度分」面板，各自一份獨立草稿
+                  if (isCouponScoreRule(rule.id)) {
                     const draft = schemeDrafts[rule.id]
                     return (
                       <div className="algorithm-form__rule-body">
@@ -1291,29 +1266,30 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           ruleName={rule.name.replace('-按金額', '')}
                           config={draft ?? DEFAULT_COUPON_SCORE_CONFIG}
                           hasDraft={!!draft}
+                          description={rule.description}
+                          amountLabel={rule.id === 'COM_01' ? '立減金額' : '券面金額'}
+                          updatedBy={rule.updatedBy}
+                          updatedAt={rule.updatedAt}
                           readOnly={readOnly}
-                          onSave={next => setSchemeDrafts(prev => ({ ...prev, [rule.id]: next }))}
+                          onSave={(next, desc) => { void handleSaveCouponPanel(rule, next, desc) }}
                         />
                       </div>
                     )
                   }
-                  if (isCouponIntensityRule(rule.id)) {
-                    const saved = couponDrafts[rule.id] ?? rule.couponIntensityConfig ?? COUPON_PREVIEW_TEMPLATE
+                  // 金字招牌（COM_10）：按商家已購買且在投放期內的標籤逐個累加計分
+                  if (isSignboardScoreRule(rule.id)) {
+                    const draft = signboardDrafts[rule.id]
                     return (
                       <div className="algorithm-form__rule-body">
-                        <CouponIntensityPanel
-                          ruleName={rule.name.replace('-按金額', '')}
-                          config={isEditingInline ? form.couponIntensityConfig ?? saved : saved}
-                          editing={isEditingInline}
+                        <SignboardScorePanel
+                          ruleName={rule.name}
+                          config={draft ?? DEFAULT_SIGNBOARD_SCORE_CONFIG}
+                          hasDraft={!!draft}
+                          description={rule.description}
+                          updatedBy={rule.updatedBy}
+                          updatedAt={rule.updatedAt}
                           readOnly={readOnly}
-                          hasDraft={!!couponDrafts[rule.id]}
-                          onEdit={() => handleInlineEdit(rule)}
-                          onCancel={() => handleInlineCancel(rule.id)}
-                          onChange={config => {
-                            if (readOnly) return
-                            setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], couponIntensityConfig: config } }))
-                          }}
-                          onSave={config => handleSaveCouponDraft(rule.id, config)}
+                          onSave={(next, desc) => { void handleSaveSignboardPanel(rule, next, desc) }}
                         />
                       </div>
                     )
@@ -1342,23 +1318,22 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           })()}
 
 
-                          {/* 最後更新信息（只讀模式） */}
-                          {(rule.updatedBy || rule.updatedAt) && (
-                            <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 'auto', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                              {rule.updatedBy && <>修改人：<span style={{ color: '#595959' }}>{rule.updatedBy}</span></>}
-                              {rule.updatedBy && rule.updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
-                              {rule.updatedAt && <span>{rule.updatedAt}</span>}
-                            </span>
-                          )}
-
-                          {!readOnly && (
-                            <div className="organic-score-toolbar__actions" style={{ flexShrink: 0 }}>
+                          {/* 最後更新信息 + 編輯按鈕：統一靠右成組（兩個 margin-left:auto 會把說明擠到中間） */}
+                          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                            {(rule.updatedBy || rule.updatedAt) && (
+                              <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
+                                {rule.updatedBy && <>修改人：<span style={{ color: '#595959' }}>{rule.updatedBy}</span></>}
+                                {rule.updatedBy && rule.updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
+                                {rule.updatedAt && <span>{rule.updatedAt}</span>}
+                              </span>
+                            )}
+                            {!readOnly && (
                               <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
                                 style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
                                 編輯
                               </Button>
-                            </div>
-                          )}
+                            )}
+                          </span>
                         </>
                       )}
                     </div>
@@ -1429,13 +1404,21 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                           <div className="organic-score-panel">
                             <div className="organic-score-list">
-                              {[
-                                { key: 'operating', label: '營業額中狀態', desc: '正常營業中' },
-                                { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業' },
-                                { key: 'overload', label: '爆單了，暫停接單一會', desc: '訂單量超過承載能力' },
-                                { key: 'closed', label: '休息打烊', desc: '當日不再營業' },
-                              ].map((item, idx) => {
+                              {BUSINESS_STATE_ITEMS.map((item, idx) => {
                                 const condItem = items[idx] || { condition: 'bonus', score: 0 }
+                                // 系统过滤档不参与计分，因此不展示分值，避免被误读成“打烊只扣 N 分”
+                                if (isFilteredBusinessState(item, condItem)) return (
+                                  <div key={item.key} className="organic-score-row">
+                                    <div className="organic-score-row__condition">
+                                      <div className="organic-score-row__label">{item.label}</div>
+                                    </div>
+                                    <span className="organic-score-value organic-score-value--disabled">
+                                      <span className="organic-score-value__badge">瀑布流</span>
+                                      <span className="organic-score-value__number">直接過濾</span>
+                                    </span>
+                                    <div className="organic-score-row__hint">{item.desc}，系統直接過濾不加載到瀑布流，也不參與排名計分</div>
+                                  </div>
+                                )
                                 const isBonus = condItem.condition !== 'deduction'
                                 return <ScoreRow key={item.key} label={item.label} hint={item.desc}
                                   score={condItem.score} kind={isBonus ? 'bonus' : 'deduction'} />
@@ -1708,26 +1691,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           </div>
                         )}
-                        {/* COM_01 滿額立減計分展示：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
-                        {rule.id === 'COM_01' && rule.multiplierTiers && rule.multiplierTiers.length > 0 && (
-                          <div className="organic-score-panel">
-                            {/* ① 基礎條件加分：門檻 ≤ 客單價 → 直接給分 */}
-                            <div style={{ marginBottom: 12 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>基礎條件加分</div>
-                              <ScoreRow label="滿額立減門檻 ≤ 客單價" score={rule.thresholdScore ?? 10} />
-                            </div>
-                            {/* ② 倍數梯度加分：門檻 < 客單價 × 倍數 → 按檔加分 */}
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>倍數梯度加分（以門店客單價為基準）</div>
-                              <div className="organic-score-list">
-                                {[...rule.multiplierTiers].sort((a, b) => a.multiplier - b.multiplier).map((tier, idx) => (
-                                  <ScoreRow key={idx} index={idx} score={tier.score}
-                                    label={<>滿額立減門檻 {'<'} 客單價 × <b>{tier.multiplier}</b>{tier.multiplier === 1 ? '（即低於客單價）' : '倍'}</>} />
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
                         {/* 備註（描述）放最下面 */}
                         <div className="organic-score-note">{rule.description}</div>
                       </AlgorithmSection>
@@ -1938,112 +1901,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             )
                           })()}
 
-                          {/* COM_01 滿額立減計分配置：① 門檻≤客單價直接給分 ② 倍數梯度計分 */}
-                          {rule.id === 'COM_01' && (
-                            <div className="organic-score-panel">
-                              {/* ① 基礎條件加分 */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#52C41A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>①</span>
-                                </div>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>基礎條件加分</span>
-                                <span style={{ fontSize: 11, color: '#8C8C8C' }}>門檻≤客單價直接給分</span>
-                              </div>
-                              <div className="organic-score-edit-tier" style={{ marginBottom: 16 }}>
-                                <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>滿額立減門檻 ≤ 客單價</span>
-                                <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
-                                <InputNumber
-                                  value={(form as any).thresholdScore ?? undefined}
-                                  min={0}
-                                  max={200}
-                                  style={{ width: 110 }}
-                                  addonAfter="分"
-                                  placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], thresholdScore: val ?? 0 } }) as any)}
-                                />
-                              </div>
-                              {/* ② 倍數梯度計分 */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#E8720C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <span style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>②</span>
-                                </div>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>倍數梯度配置</span>
-                                <span style={{ fontSize: 11, color: '#8C8C8C' }}>以門店客單價為基準，滿額立減門檻越低得分越高</span>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {((form as any).multiplierTiers || []).map((tier: MultiplierTier, idx: number) => (
-                                  <div key={idx} className="organic-score-edit-tier">
-                                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
-                                    <InputNumber
-                                      value={tier.multiplier || undefined}
-                                      min={0.1}
-                                      step={0.5}
-                                      style={{ width: 100 }}
-                                      placeholder="倍數"
-                                      addonAfter="倍"
-                                      onChange={val => {
-                                        const newTiers = [...(form as any).multiplierTiers]
-                                        newTiers[idx] = { ...newTiers[idx], multiplier: val ?? 1 }
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
-                                      }}
-                                    />
-                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
-                                    <InputNumber
-                                      value={tier.score ?? undefined}
-                                      min={0}
-                                      max={200}
-                                      style={{ width: 110 }}
-                                      addonAfter="分"
-                                      placeholder="輸入分數"
-                                      onChange={val => {
-                                        const newTiers = [...(form as any).multiplierTiers]
-                                        newTiers[idx] = { ...newTiers[idx], score: val ?? 0 }
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
-                                      }}
-                                    />
-                                    <Button
-                                      type="text"
-                                      danger
-                                      size="small"
-                                      icon={<DeleteOutlined />}
-                                      onClick={() => {
-                                        const newTiers = ((form as any).multiplierTiers || []).filter((_: MultiplierTier, i: number) => i !== idx)
-                                        setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
-                                      }}
-                                      style={{ padding: '0 4px', marginLeft: 'auto' }}
-                                    />
-                                  </div>
-                                ))}
-                                <Button
-                                  type="dashed"
-                                  icon={<PlusOutlined />}
-                                  onClick={() => {
-                                    const currentTiers = (form as any).multiplierTiers || []
-                                    const newTiers = [...currentTiers, { multiplier: undefined, score: undefined }]
-                                    setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], multiplierTiers: newTiers } }) as any)
-                                  }}
-                                  style={{ width: '100%' }}
-                                >
-                                  新增梯度
-                                </Button>
-                              </div>
-                            </div>
-                          )}
 
                         </div>
                         {/* STB_02 營業狀態專屬配置 */}
                         {rule.id === 'STB_02' && (
                           <div className="organic-score-panel">
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              {[
-                                { key: 'operating', label: '營業額中狀態', desc: '正常營業中' },
-                                { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業' },
-                                { key: 'overload', label: '爆單了，暫停接單一會', desc: '訂單量超過承載能力' },
-                                { key: 'closed', label: '休息打烊', desc: '當日不再營業' },
-                              ].map((item, idx) => {
+                              {BUSINESS_STATE_ITEMS.map((item, idx) => {
                                 const items = (form as any).conditionItems || []
                                 const currentItem = items[idx] || { condition: '', score: 0 }
+                                // 系统过滤档不计数，因此不给加/减分配置入口，避免配出“打烊只扣 N 分”的矛盾口径
+                                if (isFilteredBusinessState(item, currentItem)) return (
+                                  <div key={item.key} className="organic-score-edit-tier">
+                                    <div>
+                                      <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>{item.label}</div>
+                                      <div style={{ fontSize: 11, color: '#8C8C8C' }}>{item.desc}</div>
+                                    </div>
+                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#8C8C8C' }}>由系統直接過濾，不加載到瀑布流，無需配置分值</span>
+                                  </div>
+                                )
                                 return (
                                   <div key={item.key} className="organic-score-edit-tier">
                                     <div>
@@ -2507,7 +2383,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         )}
                         <div>
                           <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>評分說明</div>
-                          <Input.TextArea size="small" value={form.description} rows={2} maxLength={120} showCount
+                          <Input.TextArea value={form.description} rows={2} maxLength={120} showCount
                             onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
                         </div>
                         {/* 最後一排：狀態 + 取消/保存 */}

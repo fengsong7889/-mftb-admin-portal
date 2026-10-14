@@ -240,7 +240,7 @@ export const keyToPath: Record<string, string> = {
   'rdm-config-routing':   '/rdm-config-routing',
   'rdm-config-sla':       '/rdm-config-sla',
   'rdm-config-score':     '/rdm-score-rule',
-  // 用車管理（階段 B1）—— 歸屬物資管理系統（EAM）的顶级分组「車輛管理」。
+  // 用車管理（階段 B1）—— 歸屬物資管理系統（EAM）的顶级分组「用車管理」。
   // 職責邊界：車輛檔案/辦理/台賬/維護等業務菜單全部在 EAM；OA 側只保留流程定義
   // （biz_oa_process: vehicle_use）、審批待辦與流程中心一張跳轉入口卡，不承載任何
   // 用車業務頁面——與 consumable-claim（業務頁在 EAM，流程中心只放 route）同法。
@@ -261,6 +261,19 @@ export const keyToPath: Record<string, string> = {
   'attendance-daily':      '/attendance-daily',
   'attendance-monthly':    '/attendance-monthly',
   'attendance-setting':    '/attendance-setting',
+  // 文檔中心：菜單真值由 DocSchemaMigrationInitializer 寫入 sys_menu
+  'doc-library': '/doc-center',
+  'doc-space': '/doc-space',
+  'doc-stats': '/doc-stats',
+  'doc-learning': '/doc-learning',
+  // 会议管理系统（meeting）—— 独立入口，菜单真值由 MeetingSchemaMigrationInitializer 写入 sys_menu。
+  // 只登记 M1 已交付的 4 个；看板与预约规则分属 M3/M2，菜单跟随页面一起登记，
+  // 提前登记会让菜单指向一个不存在的路由（点击后白屏）。
+  'meeting-my':            '/meeting-my',
+  'meeting-booking':       '/meeting-booking',
+  'meeting-room':          '/meeting-room',
+  'meeting-record':        '/meeting-record',
+  'meeting-config':        '/meeting-config',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -343,6 +356,23 @@ pathToKey['/attendance-shift-detail'] = 'attendance-shift'
 pathToKey['/attendance-holiday-form'] = 'attendance-holiday'
 pathToKey['/attendance-holiday-detail'] = 'attendance-holiday'
 pathToKey['/attendance-exception-handle'] = 'attendance-exception'
+// 会议详情不是菜单项（从钉钉卡片/日程单元格跳进来），但路由必须归到「我的會議」的菜单权限下，
+// 否则守卫拿不到菜单 key，要么人人可进要么永久 403
+pathToKey['/meeting-detail'] = 'meeting-my'
+// 会议室新增/编辑、预约新增都是独立页（非菜单项）：归到各自的父菜单，守卫与页签高亮才有锚点
+pathToKey['/meeting-room-form'] = 'meeting-room'
+pathToKey['/meeting-booking-form'] = 'meeting-booking'
+pathToKey['/meeting-blacklist-form'] = 'meeting-config'
+// 签到二维码指向的独立免登页：不套后台布局，注册进 pathToKey 只为了菜单高亮不报错
+pathToKey['/meeting-checkin'] = 'meeting-my'
+// 文檔中心子頁（詳情/登記/編輯歸文檔庫，空間表單歸空間管理）：守衛與頁簽高亮才有錨點
+pathToKey['/doc-center/detail'] = 'doc-library'
+pathToKey['/doc-center/register'] = 'doc-library'
+pathToKey['/doc-center/edit'] = 'doc-library'
+pathToKey['/doc-space/form'] = 'doc-space'
+// 學習路徑子頁（詳情/策展表單）：守衛與頁簽高亮錨點
+pathToKey['/doc-learning/detail'] = 'doc-learning'
+pathToKey['/doc-learning/form'] = 'doc-learning'
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合
@@ -425,6 +455,10 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'attendance-workbench', 'attendance-group', 'attendance-shift', 'attendance-holiday',
   'attendance-schedule', 'attendance-punch', 'attendance-exception', 'attendance-daily',
   'attendance-monthly', 'attendance-setting',
+  // 会议管理：四个菜单及其详情页全部走真实 /api/meeting/*，无前端 mock 回退
+  'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config',
+  // 文檔中心：四個菜單及子頁全部走真實 /api/doc/*，無前端 mock 回退
+  'doc-library', 'doc-space', 'doc-stats', 'doc-learning',
   // EAM 採購
   'purchase-order', 'purchase-request',
   // 耗材管理

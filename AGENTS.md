@@ -190,6 +190,7 @@ AI 禁止：
 - 日志打印敏感信息。
 - 错误返回堆栈、SQL、内部路径。
 - **列表页把统计卡片放在搜索区上方**（见下方「列表页统计卡片位置」）。
+- **用 `Tooltip` 承载多句/长文本的字段或规则说明**（白底无层次、移开即消失，阅读体验差）；此类说明必须改用 `HelpPopover`（见下方「问号/提示说明规范」）。
 
 ---
 
@@ -219,6 +220,48 @@ AI 禁止：
 5. 参考实现：`src/pages/Consumable/Report/index.tsx`（消耗统计）。
 
 自检：`npm run check:stat-order` 扫描列表页，统计卡片渲染在搜索区之前则报告并阻断。
+
+---
+
+## 问号/提示说明规范（前端 UI 强制规范）
+
+> 背景：历史上大量「字段释义 / 算法口径 / 规则说明」直接用 antd `Tooltip` 承载多句长文本，
+> 呈现为白底无层次的一大段字，且鼠标一移开就消失、无法停留滚动，阅读体验很差
+> （典型如进店领券「力度计分档位」问号）。已统一改为结构化弹出说明。
+
+**凡是「问号 / 信息图标」承载的解释性说明，一律使用共享组件 `HelpPopover`（`src/components/HelpPopover.tsx`），禁止再手写 `<Tooltip><QuestionCircleOutlined/></Tooltip>` 塞长文本。**
+
+`HelpPopover` 统一为「点击图标 → 结构化 Popover」：有标题、有语义分区、可停留滚动。三种用法：
+
+```tsx
+import HelpPopover from '@/components/HelpPopover'   // 或相对路径
+
+// 1) 简单释义：给一个标题 + 一段文字（\n 可分行）
+<HelpPopover title="API 兼容" ariaLabel="API兼容说明"
+  content={'决定调用协议：openai / anthropic / gemini。\n管理后台据此转发到对应 SDK。'} />
+
+// 2) 结构化说明：content 传 HelpSection[]，按 tone 渲染带色分区卡（neutral/info/warn/danger/success）
+<HelpPopover title="力度口径说明" ariaLabel="力度口徑說明" placement="bottomRight" width={400}
+  content={[
+    { tone: 'warn', body: '計價基數 = max(B, T)。' },
+    { tone: 'info', label: '門檻 ≤ 客單價', body: '力度 = D ÷ B' },
+    { tone: 'danger', label: '只用 D ÷ B', body: '空轉券會拿滿力度分' },
+  ]} />
+
+// 3) 自定义触发节点（如把一个 Tag 变成说明入口）：传 children
+<HelpPopover title="策略匹配順序說明" ariaLabel="匹配顺序说明" content="…">
+  <Tag>匹配順序…</Tag>
+</HelpPopover>
+```
+
+**强制约束：**
+1. 说明文字**超过一句**或含「定义 + 原因/后果」结构的，必须用 `HelpPopover`，禁止 `Tooltip`。
+2. 分区 `tone` 只能取 `neutral/info/warn/danger/success`，其底色/描边/强调色已在组件内映射到 §A.1 设计令牌，禁止在调用处再写新色值。
+3. `ariaLabel` 必填（供读屏与测试定位）；文案遵循繁中规范。
+4. **保留 `Tooltip` 的正当场景**：表格单元格截断悬浮、按钮的单一动作提示（affordance hint）等短提示仍可用 `Tooltip`；本规范只约束「解释性长文本」。
+5. 参考实现：`src/pages/Recommend/CouponScorePanel.tsx`（力度口径，结构化分区）、`src/pages/AiModelList/AiModelEdit.tsx`（字段释义，标题+正文）。
+
+自检：`python3 scripts/scan-help-tooltips.py src` 扫描「长说明型 `Tooltip`」候选，命中数应持续下降；新增解释性问号必须走 `HelpPopover`。
 
 ---
 

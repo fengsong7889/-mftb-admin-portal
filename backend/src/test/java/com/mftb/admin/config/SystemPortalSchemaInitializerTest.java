@@ -352,6 +352,8 @@ class SystemPortalSchemaInitializerTest {
                 Map.entry("eam", "物資管理系統"),
                 Map.entry("rdm", "產研交付系統"),
                 Map.entry("oa", "流程審批系統"),
+                Map.entry("meeting", "會議管理系統"),
+                Map.entry("doc", "文檔中心系統"),
                 Map.entry("iam", "權限管理系統"),
                 Map.entry("platform", "平台支撐系統"),
                 Map.entry("i18n", "翻譯管理系統"));

@@ -1285,6 +1285,292 @@
       "author": "Qoder",
       "ticket": "attendance-b2",
       "comment": "v1.0 把日報當成純只讀菜單只給了 view/export，但 2B-2b 接上的「重算區間日報」會改日報、生成異常並回寫打卡判定，屬寫操作。sys_menu.actions 是授權中心能勾出什麼動作的唯一依據，缺 edit 就等於該能力永遠授不出去（超管走代碼直通看不出來，普通角色上線當天才暴露 403）。不能只改 v1.0 聲明：ensureMenu 對已存在菜單只對齊結構不覆蓋 actions，已落庫環境拿不到新動作集，因此單獨一個版本鍵做一次性糾正。只動日報這一個菜單，不批量對齊全部考勤菜單：批量覆蓋會把管理員在授權中心主動收窄過的動作集擴回去，那屬於靜默擴權。admin 顯式擴權一次（內置運維角色必須能重算），其他角色授權行完全不動。後置校驗釘 sys_menu.actions 已等於聲明真值，未對齊則不記版本、下次啟動重試。"
+    },
+    {
+      "versionKey": "meeting:schema:v1.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "scriptFiles": [
+        "230_meeting_core_tables.sql"
+      ],
+      "intent": "会议管理 B1 底座：5 张 biz_meeting* 表（会议室档案/预约单/参会人/审计事件/通知投递留痕）+ 会议单号规则 + 全局预约规则 + 3 条通知场景 + 示例会议室",
+      "author": "Qoder",
+      "ticket": "meeting-b1",
+      "comment": "DDL 只在 classpath 资源 230_meeting_core_tables.sql 存一份，backend/sql/ 下为参考副本（结构锁用例断言逐字一致）。后置校验钉三件事：表存在、关键唯一键就位、实体依赖列存在。三个唯一键是并发正确性的全部依据：uk_meeting_booking_slot（软删感知生成列，只把 deleted=0 且 status IN ('booked','checked_in') 的行折进键，取消/释放后同窗口可被重订）挡「完全相同窗口」的并发插入，区间重叠仍由服务层「SELECT ... FOR UPDATE 锁房间行 + 锁内当前读」判定；uk_meeting_booking_request(organizer_id, request_key) 挡重复点击长出两场会；uk_meeting_notify_dedup(booking_id, event_code, receiver_user_id) 挡提醒 Job 每轮给全员重发。缺任一键的方向性后果分别是「同一间房同一时段被订两次」「重放点击多出会议」「参会人被重复轰炸」，因此不允许只验表存在。房间/参会人/事件/通知四张新表之间用 FK 硬约束；跨模块引用（sys_user/sys_department）只建索引不建 FK——历史软删与脏数据会让启动失败。参会人表的外键不能写 ON DELETE CASCADE：开发库 MySQL 8.4 实测「外键列被 STORED 生成列引用」与 CASCADE 互斥，同时出现直接报 1215 Cannot add foreign key constraint 并让建表失败；本域只做逻辑删除，保留默认 NO ACTION 反而更安全（结构锁用例 attendeeForeignKeyMustNotCascade 已钉住这条）。示例会议室用 WHERE NOT EXISTS (SELECT 1 FROM biz_meeting_room) 守卫，仅在表完全为空时写入 4 间，已有真实档案的环境绝不注入假数据。sys_config 的 12 个 meeting_* 键用 INSERT IGNORE：管理员在规则配置页调过的提前期/时长上限不能被发版重跑打回出厂值。"
+    },
+    {
+      "versionKey": "meeting:menu:v1.0",
+      "module": "meeting",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0",
+        "meeting:schema:v1.0"
+      ],
+      "intent": "新建独立一级系统 meeting：顶级分组「會議管理」+ 4 个 M1 菜单（我的會議/會議室預約/會議室檔案/預約記錄）+ admin 授权 + 按菜单授权反推角色/部门系统准入",
+      "author": "Qoder",
+      "ticket": "meeting-b1",
+      "comment": "会议独立成系统而不并入 OA：会议室是资源占用型对象（房间×时间窗×并发抢位），OA 是流程审批型对象（节点×会签×超时），两者的状态机、数据范围与统计口径没有一处分母相同，塞进 oa-center 会让「先到先得免审批」与「必须审批」两套语义在同一张菜单树上互相解释不通。system_code 必须显式写入：SystemPortalSchemaInitializer.propagateSystemToDescendants 只在门户底座迁移那一次运行，晚于本初始化器（@Order 28）插入的菜单留 NULL 会让门户导航剪枝与系统准入落到未定义行为——菜单静默消失比报错更难查。顶级分组 sort 取「当前顶级最大 sort + 10」且只在首次插入时定价，不写死数字也不在重放时覆盖，避免与后续新增系统互相顶位、并尊重管理员在菜单配置里的自定义顺序。四个叶子菜单以字面量逐条调用 ensureMenu（不放进数组循环）：scripts/check-menu-consistency.mjs 的正则只识别 ensureMenu(变量, \"key\", \"名称\", \"/path\", \"Component\", \"Icon\", ...) 字面量形态，写成循环会让这批菜单落在主种子门禁盲区。图标 PlaySquareOutlined 之外全部取自 sys_menu 未占用集合（会议图标全局唯一是硬规则）。grantAdmin 两步写（INSERT IGNORE + 只补空动作集的 UPDATE），不扩写管理员主动收窄过的授权。后置校验钉三件事：分组为顶级且 type=1、四个叶子父级与 system_code 正确、admin 授权条数达标。"
+    },
+    {
+      "versionKey": "meeting:seed:v1.0",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:schema:v1.0",
+        "meeting:menu:v1.0"
+      ],
+      "intent": "全局预约规则（12 个 meeting_* 键）、会议单号规则 meeting_booking、3 条钉钉通知场景登记，并刷新编号规则缓存",
+      "author": "Qoder",
+      "ticket": "meeting-b1",
+      "comment": "单独成键而不是并进 schema：这三类数据缺任一项，功能在表已就绪的环境上依然是不可用状态（建单报「編號生成規則未配置」、房间规则无处回落、邀约无处路由），独立版本键允许失败后只重试这一步而不动结构。sys_config 只补不存在的键、sys_notification_scenario 的 enabled 只在首次插入为 0 之后一律不动——否则每次发版都会把管理员调好的提前期打回出厂值、把他开启的通知场景关回去。syncSeqRule/syncNotificationScenarios/refreshRules 同时写在 applyOnce 之外每次启动重放：版本已记录的库不重跑 task，只靠脚本里的 INSERT IGNORE 会让旧行永远停在描述为空的状态（用车域踩过同一个坑）。"
+    },
+    {
+      "versionKey": "meeting:schema:v1.1",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:schema:v1.0"
+      ],
+      "scriptFiles": [
+        "231_meeting_series_blacklist.sql"
+      ],
+      "intent": "会议管理 M2 底座：biz_meeting_series（周期会议主表）+ biz_meeting_blacklist（预约黑名单）+ 预约单 cancel_scope 补列 + 参会人投递态索引 + 系列编号规则",
+      "author": "Qoder",
+      "ticket": "meeting-b2",
+      "comment": "周期会议采用「创建时一次性物化实例」而不是读时虚拟展开：单次签到、单次取消、单次改期都需要一份可独立修改的事实，虚拟展开要么做不到、要么最终长成第二张实例表。两张新表都用软删感知生成列唯一键：系列编号可重建、同一组织者同一幂等键只生效一次、同一用户同时只有一条生效限制记录。cancel_scope 用 applyOnce 之外的 repairSchema 先查后加——CREATE TABLE IF NOT EXISTS 对已存在的表整体失效，只写进 231 脚本的话跑过 v1.1 的环境永远拿不到后加的列。黑名单的「已到期」是日期派生态而非落库状态：不写库就不用每天全表 UPDATE 翻状态，也不会因为 Job 漏跑一轮而让人被永久误锁。系列表的 occurrence_limit 由 CHECK 钉在 1~100，服务层再加 SERIES_MAX_SPAN_DAYS 兜底，防止一次「每天直到 2100 年」的输入把预约表埋掉。"
+    },
+    {
+      "versionKey": "meeting:menu:v1.1",
+      "module": "meeting",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:schema:v1.1",
+        "meeting:menu:v1.0"
+      ],
+      "intent": "給「會議管理」分组补上「預約規則」菜单（规则 Tab + 黑名单 Tab），actions 为 view,edit",
+      "author": "Qoder",
+      "ticket": "meeting-b2",
+      "comment": "必须单独一个版本键：ensureMenu 对已存在菜单只对齐 parent/path/icon/system_code 等结构，不覆盖 actions，且已记录 meeting:menu:v1.0 的库整体跳过 task——把新菜单写进 v1.0 声明里，真实环境不会出现该项（用车域补列与考勤日报动作集两次踩过同一机制）。写动作统一用 edit：菜单种子里没有 create/delete 动作，@RequirePermission 标一个种子里不存在的动作等于让接口对所有人永久 403。规则与黑名单的「能不能改」由服务层 requireRecordManager 锚在 meeting-record:edit 上判定，菜单动作只管能不能进页面——全站规则影响所有人，能进 meeting-config 不等于有这份权力。后置校验钉两件事：菜单已挂在会议分组下且归属正确、actions 与声明真值逐字一致。"
+    },
+    {
+      "versionKey": "meeting:menu:v1.2",
+      "module": "meeting",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:menu:v1.1"
+      ],
+      "scriptFiles": [],
+      "intent": "会议管理一级菜单重构：單一「會議管理」拆成「會議中心」（我的會議、會議室預約）与「會議治理」（會議室檔案、預約記錄、預約規則），使用侧与行政治理侧分列两个一级菜单",
+      "author": "Qoder",
+      "ticket": "meeting-b3",
+      "comment": "五个叶子挂在一个一级菜单下时，普通员工每次展开都要跳过会议室档案/预约记录/预约规则三条行政入口，行政也要在五条里翻治理项；拆成两个一级菜单后各自不超过三条，且侧边栏排序按日常动线（先看自己的会→再去订；资源→记录→规则）。实现上复用 meeting-management 这一行只改显示名，不新建分组再删旧的：分组已被角色授权，换 menu_key 等于换 menu_id，所有已授权角色都得重新授权。新增分组图标 MonitorOutlined 已现场核对 sys_menu 现有菜单无重复（图标重复会让侧边栏两个一级菜单长得一样，等于没拆）。挂载与排序都用带条件的 UPDATE（parent_id 或 sort_order 确有变化才写），重启重放不产生无谓更新，也不会把管理员在菜单配置里调过的顶级排序打回去——只有首次插入时按「會議中心 sort + 1」定价，让两个一级菜单在侧边栏相邻。新分组同样带 system_code=meeting，因此末尾重放 deriveSystemAccess，保证非 admin 角色被授权后系统准入跟得上。后置校验钉三件事：分组已更名、五个叶子分别挂在正确的父级下、admin 已拿到新分组授权；v1.0/v1.1 的 verify 里「五个叶子都挂在會議管理下」的断言由本版本取代，那两个 verify 只在各自版本键首次落地时运行。"
+    },
+    {
+      "versionKey": "meeting:seed:v1.1",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:seed:v1.0"
+      ],
+      "scriptFiles": [],
+      "intent": "修正 230 脚本示例会议室位置描述的简体字（走廊尽头 → 走廊盡頭），界面与钉钉通知全站繁中一致",
+      "author": "Qoder",
+      "ticket": "meeting-b3",
+      "comment": "只改 SQL 文件修不上已有环境：建表脚本与种子 INSERT 都只在首次落地时执行，跑过 meeting:seed:v1.0 的库不会重读脚本，所以文案修正必须单独登记版本键做一次性 UPDATE。UPDATE 与校验都以旧值本身作条件，管理员在界面上改过位置描述的房间不会被覆盖，也不会把繁中写法再改回去。校验查「旧值残留行数必须为 0」而不是查新值存在：残留说明 UPDATE 没打中（列名或排序规则变了），必须让启动暴露它。"
+    },
+    {
+      "versionKey": "organic:com10-rename-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "232_organic_com10_rename.sql"
+      ],
+      "intent": "自然流量商業維度計分項 COM_10 內置名稱收敛為「金字招牌(廣告)」",
+      "author": "Qoder",
+      "comment": "前端已用保底覆蓋統一展示新名稱，但庫裡仍是 23_organic_score.sql 種子的舊內置名「購買廣告-金字招牌」，看庫/對賬與界面口徑不一致；歷史種子腳本不得修改（跑過 organic:seed-23-v1 的環境也不會重讀），故單獨登記版本鍵做一次性 UPDATE 收斂。UPDATE 與校驗都以舊值本身作條件：管理員在界面上自定義過名稱的行不會被覆蓋，新名稱也不會被改回去。校驗查「舊值殘留行數必須為 0」而不是查新值存在：殘留說明 UPDATE 未打中（編碼或列名變了），必須讓啟動暴露它。參考 SQL: sql/232_organic_com10_rename.sql"
+    },
+    {
+      "versionKey": "organic:retire-rules-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "234_organic_retire_rules.sql"
+      ],
+      "intent": "自然流量下架計分項 COM_09（點金廣告）與 STB_04（店鋪標籤-金牌）收斂為邏輯刪除",
+      "author": "Qoder",
+      "comment": "兩項要下架：前端已從 DEFAULT_ORGANIC_SCORE_RULES 移除並加入 RETIRED_ORGANIC_RULE_IDS，加載時過濾所以界面不再展示，但 23_organic_score.sql 種子寫入的內置行仍在庫裡，看庫/對賬口徑與界面不一致；歷史種子腳本不得修改，故單獨登記版本鍵做一次性收斂。用邏輯刪除（deleted=1）而不是 DELETE：biz_organic_score_rule 是 MyBatis-Plus @TableLogic 表，應用自身刪除也是置 deleted=1，保持一致語義、保留歷史且把 deleted 改回 0 即可回滾。校驗查「未刪除的殘留行數必須為 0」而不是查已刪除行存在：殘留說明 UPDATE 未打中，必須讓啟動暴露它。參考 SQL: sql/234_organic_retire_rules.sql"
+    },
+    {
+      "versionKey": "organic:stb02-filtered-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "235_organic_stb02_filtered.sql"
+      ],
+      "intent": "STB_02 營業狀態第 4 檔（休息打烊）由「重降權扣分」升級為「系統直接過濾、不加載到瀑布流」的數據標記",
+      "author": "Qoder",
+      "comment": "業務口徑已改為打烊不計分而是被召回側過濾，但該語義此前只存在於前端常量 BUSINESS_STATE_ITEMS 的第 4 檔 filtered，靠索引位置約定，看 condition_items 完全無法得知這一檔不計分，未來計分/召回側極易照舊扣分。遷移把 condition_items[3].condition 寫成 'filtered' 並將 score 歸 0，評分說明以舊文案片段作條件同步（管理員自定義過的不覆蓋）。用 Java 解析 JSON 後回寫而不是 MySQL JSON_SET，是為了能在 H2 單測裡驗證冪等與校驗；生產等價 SQL 見 sql/235_organic_stb02_filtered.sql。注意：本遷移只完成「數據側口徑」，商家營業狀態的寫入方（商家端上報接口）與召回側按 filtered 過濾都在本倉庫之外，尚未落地。"
+    },
+    {
+      "versionKey": "doc:schema:v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "233_doc_center_tables.sql"
+      ],
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
+      "intent": "文檔中心建表：doc_space / doc_node / doc_view_log 三張索引與留痕表（正文單一事實源在騰訊文檔側）",
+      "author": "Qoder",
+      "comment": "233 腳本只在 classpath 存一份，backend/sql 下為參考副本；applyOnce 帶後置校驗（表存在+實體依賴列就緒），失敗不記版本下次啟動重試；三表另在 ContractRegistry 登記契約每次啟動自愈。"
+    },
+    {
+      "versionKey": "doc:seed:v1.0",
+      "module": "doc",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "doc:schema:v1.0"
+      ],
+      "intent": "文檔中心默認知識空間種子：需求文檔/人事/行政/公司制度/培訓中心 5 個空間",
+      "author": "Qoder",
+      "comment": "只在 doc_space 空表時種入：管理員刪過空間的庫不復種，避免啟動重放復活被刪數據。後置校驗釘空間數不少於 5。"
+    },
+    {
+      "versionKey": "doc:menu:v1.0",
+      "module": "doc",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0",
+        "doc:schema:v1.0"
+      ],
+      "intent": "新建獨立一級系統 doc：頂級分組「文檔中心」+ 文檔庫/空間管理兩葉 + admin 授權 + 系統准入反推",
+      "author": "Qoder",
+      "comment": "system_code 顯式寫 doc（propagateSystemToDescendants 只在門戶底座遷移跑一次，晚插入的菜單留 NULL 會丟樹）。權限粒度為菜單級統一（產品決策）：view 查閱全空間、edit 登記/維護；寫動作統一用 edit，不種 create/delete。兩葉以字面量調用 ensureMenu 對齊 check-menu-consistency.mjs 掃描形態。【v1.1 取代說明】任務體已同步改為扁平形態（兩葉直接頂級、不建分組）供全新庫使用；已跑過本鍵的存量庫由 doc:menu:v1.1 一次性拍平並解除歷史分組 doc-center-management。"
+    },
+    {
+      "versionKey": "doc:menu:v1.1",
+      "module": "doc",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "doc:menu:v1.0"
+      ],
+      "intent": "文檔中心菜單拍平：文檔庫/空間管理兩葉升為 doc 系統頂級菜單，解除歷史分組 doc-center-management 及其 admin 授權",
+      "author": "Qoder",
+      "comment": "用戶反饋：系統視圖已按 system_code 剪枝，一級分組沒有運行時職責只多一次展開（對齊 rdm 拍平先例）。必須單獨版本鍵：v1.0 已落庫的開發庫不重跑 task，只改 v1.0 聲明真實環境永遠不出現拍平。全部條件化寫入（parent_id 確有變化才寫；分組存在才刪行+清授權），重放自癒無害。後置校驗釘三件事：兩葉為頂級且歸屬正確、歷史分組已解除、admin 授權條數達標。"
+    },
+    {
+      "versionKey": "doc:menu:v1.2",
+      "module": "doc",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "doc:menu:v1.1"
+      ],
+      "intent": "文檔中心新增唯讀頂級菜單「閱讀統計」（doc-stats → /doc-stats，BarChartOutlined）+ admin view 授權",
+      "author": "Qoder",
+      "comment": "P2 閱讀統計看板入口。必須單獨版本鍵：v1.0/v1.1 已落庫環境不重跑 task，只改舊聲明真實環境永遠看不到新菜單（與 v1.1 同坑）。v1.0 任務體同步加該 ensureMenu 供全新庫；actions 只給 view（頁面純唯讀，不種 edit）；後置校驗 verifyMenus 已擴到三葉+授權 >=3。"
+    },
+    {
+      "versionKey": "doc:learning:v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "234_doc_learning_path.sql"
+      ],
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0",
+        "doc:schema:v1.0"
+      ],
+      "intent": "文檔中心學習路徑（新人入職包/培訓清單）建表：doc_learning_path + doc_learning_path_item",
+      "author": "Qoder",
+      "comment": "「已讀」不另建進度表：由 doc_view_log 按「本人 × 文檔」推導，避免雙寫漂移且口徑與閱讀統計看板一致。234 腳本只在 classpath 存一份（backend/sql 為參考副本）；學習表列校驗放在本任務自己的 verifyLearningSchema（不能並入 v1.0 的 REQUIRED_COLUMNS——那會在全新庫上先於 234 腳本執行而誤報缺列卡死）。兩表同步登記 ContractRegistry 啟動自愈契約。"
+    },
+    {
+      "versionKey": "doc:menu:v1.3",
+      "module": "doc",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "doc:learning:v1.0",
+        "doc:menu:v1.2"
+      ],
+      "intent": "文檔中心新增頂級菜單「學習路徑」（doc-learning → /doc-learning，FlagOutlined）+ admin view/edit 授權",
+      "author": "Qoder",
+      "comment": "P2 新人入職包入口。必須單獨版本鍵：舊版本已落庫環境不重跑 task（與 v1.1/v1.2 同坑）。v1.0 任務體同步加該 ensureMenu 供全新庫；actions 含 edit（路徑策展是寫操作，管理側需要）；verifyMenus 已擴到四葉+授權 >=4。"
+    },
+    {
+      "versionKey": "core:portal-favorites-v1",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "236_portal_favorites.sql"
+      ],
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "intent": "sys_user 補列 portal_favorites：企業門戶「我的常用」按帳號持久化，換設備/清瀏覽器緩存不再丟失",
+      "author": "Qoder",
+      "comment": "必須獨立版本鍵：core:schema-v10 已落庫的環境不會重跑 migrateSchema()。調用點放在 dataInitializer.run 內緊跟 163 釘釘補列之後、任何 sys_user 查詢之前——SysUser 實體已帶該欄位，MyBatis-Plus 生成的顯式欄位清單會 SELECT 它，缺欄會讓全部用戶查詢報錯。不登記 ContractRegistry：純 UI 偏好欄、非事故相關寫入路徑，缺欄由 applyOnce 後置校驗不記版本 + 下次啟動重試 + readiness 卡流量兜住。與 quick_favorites 刻意分欄：兩者都是整份覆蓋寫入（PUT 傳全量數組），共用一列會互相抹掉對方的數據。"
     }
   ]
 }

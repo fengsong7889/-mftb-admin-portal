@@ -1,0 +1,527 @@
+/**
+ * 会议详情（非菜单子页：/meeting-detail?id=）
+ *
+ * 归属：钉钉邀约卡片的「查看會議詳情」跳转、日程单元格与三个列表页的"詳情"按钮，
+ * 菜单权限挂在 meeting-my 下（见 Permission/types.ts 的 ROUTE_MENU_KEY_MAP）。
+ *
+ * 越权处理：服务端把"不是你相关的会"与"不存在的会"统一按无权限/查不到返回，
+ * 页面只如实转述接口结论，不区分两者——能区分就等于在探测单号是否存在。
+ *
+ * 四个模块固定顺序：基本信息 → 参会人与响应 → 邀约投递状态 → 会议轨迹。
+ * 「N 人未綁定釘釘」的提示必须出现在基本信息附近：组织者最关心的是"人到底知不知道"。
+ *
+ * 界面口径：
+ *   1. 头部统一用 DetailPageHeader（§D.1），业务动作放它的 extra 槽，不自己手写返回按钮；
+ *   2. 底部按 §D.4 收尾于「最后更新人 + 最后更新时间」；会议轨迹是业务内容（这场会经历了什么、
+ *      谁在什么时候因为什么原因取消/释放），不是审计日志表格，所以保留为独立模块；
+ *   3. 释放与取消都必填原因并二次确认（§B.3）：这两个动作都会把窗口立刻让给别人，不可逆。
+ */
+import { useCallback, useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tag, Timeline, message } from 'antd'
+import type { TableColumnsType } from 'antd'
+import {
+  BellOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, TeamOutlined,
+} from '@ant-design/icons'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import DetailPageHeader from '../../../components/DetailPageHeader'
+import {
+  cancelMeeting,
+  checkinMeeting,
+  fetchMeetingDetail,
+  fetchMeetingEvents,
+  finishMeeting,
+  issueCheckinToken,
+  releaseMeeting,
+  respondMeeting,
+  type MeetingEventVO,
+  type MeetingNotifyVO,
+  type MeetingAttendeeVO,
+  type MeetingVO,
+} from '../../../api/meeting'
+import {
+  ATTENDEE_TYPE_LABELS,
+  BIZ_TYPE_LABELS,
+  RESPONSE_META,
+  NOTIFY_STATUS_META,
+  eventLabel,
+  notifyEventLabel,
+  phaseMeta,
+} from '../meetingMeta'
+
+/** 详情卡片（§D.3）：白底、8px 圆角、不加 border，阴影统一 0.06 */
+const cardStyle: CSSProperties = {
+  borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+}
+
+function CardTitle({ icon, bg, color, title, note }: {
+  icon: React.ReactNode; bg: string; color: string; title: string; note?: React.ReactNode
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 6, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontSize: 14, color }}>{icon}</span>
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+      {note && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{note}</span>}
+    </div>
+  )
+}
+
+export default function MeetingDetail() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const idParam = searchParams.get('id')
+  const bookingId = idParam && /^[1-9]\d*$/.test(idParam) ? Number(idParam) : undefined
+
+  const [record, setRecord] = useState<MeetingVO>()
+  const [events, setEvents] = useState<MeetingEventVO[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>()
+  const [qr, setQr] = useState<{ url: string; expireAt: string }>()
+
+  const load = useCallback(async () => {
+    if (!bookingId) {
+      setError('缺少會議編號，請從列表或邀約卡片進入')
+      return
+    }
+    setLoading(true)
+    setError(undefined)
+    try {
+      const [detail, trail] = await Promise.all([fetchMeetingDetail(bookingId), fetchMeetingEvents(bookingId)])
+      setRecord(detail)
+      setEvents(trail ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '會議詳情加載失敗')
+      setRecord(undefined)
+    } finally {
+      setLoading(false)
+    }
+  }, [bookingId])
+
+  useEffect(() => { void load() }, [load])
+
+  const respond = async (accept: boolean) => {
+    if (!record) return
+    try {
+      await respondMeeting(record.id, { accept })
+      message.success(accept ? '已接受邀約' : '已婉拒邀約')
+      void load()
+    } catch (e) {
+      // request.ts 已统一弹出错误，这里只留日志，避免双弹
+      console.warn('響應邀約失敗', e instanceof Error ? e.message : e)
+    }
+  }
+
+  /** 签到 / 提前结束：状态推进后必须重取详情，按钮可用性完全由服务端结论决定 */
+  const run = async (fn: (id: number) => Promise<unknown>, okText: string) => {
+    if (!record) return
+    try {
+      await fn(record.id)
+      message.success(okText)
+      void load()
+    } catch (e) {
+      console.warn('會議操作失敗', e instanceof Error ? e.message : e)
+    }
+  }
+
+  /** 提前结束会把剩余窗口立刻还给他人，不可逆：必须二次确认（§B.3） */
+  const handleFinish = () => {
+    if (!record) return
+    Modal.confirm({
+      title: '確認提前結束這場會議？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認結束',
+      cancelText: '返回',
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>時間：</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>影響：</span><b>結束後剩餘窗口立刻可被他人預訂，不可恢復</b></div>
+        </div>
+      ),
+      onOk: () => run(finishMeeting, '會議已結束'),
+    })
+  }
+
+  /** 释放：计入爽约统计，必填原因（写入审计并通知组织者） */
+  const handleRelease = () => {
+    if (!record) return
+    let reason = ''
+    Modal.confirm({
+      title: '確認釋放這間會議室？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認釋放',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>單號：</span><b>{record.bookingNo}</b></div>
+          <div className="confirm-info-row"><span>時間：</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>影響：</span><b>記入爽約統計並通知組織者，窗口立刻可被他人預訂</b></div>
+          <div className="confirm-info-row"><span>與取消的區別：</span><b>釋放針對已開始卻無人到場，取消針對尚未開始</b></div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>釋放原因（必填）</div>
+            <Input.TextArea
+              rows={3}
+              maxLength={200}
+              showCount
+              style={{ resize: 'none' }}
+              placeholder="例：開始 20 分鐘無人到場，現場已確認"
+              onChange={(e) => { reason = e.target.value }}
+            />
+          </div>
+        </div>
+      ),
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.warning('請填寫釋放原因')
+          // 抛出以阻止弹窗关闭：释放会计入爽约，不留原因等于无法事后解释
+          throw new Error('reason required')
+        }
+        await releaseMeeting(record.id, { reason: reason.trim(), version: record.version })
+        message.success('會議室已釋放')
+        void load()
+      },
+    })
+  }
+
+  /** 取消：窗口立即归还，必填原因（写入审计并附在通知里） */
+  const handleCancel = () => {
+    if (!record) return
+    let reason = ''
+    Modal.confirm({
+      title: '確認取消這場會議？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認取消',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>單號：</span><b>{record.bookingNo}</b></div>
+          <div className="confirm-info-row"><span>時間：</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>影響：</span><b>房間窗口立即歸還，參會人會收到取消通知</b></div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>取消原因（必填）</div>
+            <Input.TextArea
+              rows={3}
+              maxLength={200}
+              showCount
+              style={{ resize: 'none' }}
+              placeholder="例：議程取消／改期另約"
+              onChange={(e) => { reason = e.target.value }}
+            />
+          </div>
+        </div>
+      ),
+      onOk: async () => {
+        if (!reason.trim()) {
+          message.warning('請填寫取消原因')
+          throw new Error('reason required')
+        }
+        await cancelMeeting(record.id, { reason: reason.trim(), version: record.version })
+        message.success('會議已取消，房間窗口已歸還')
+        void load()
+      },
+    })
+  }
+
+  /**
+   * 签到二维码：令牌由后端按需签发，不落 URL、不进列表接口。
+   *
+   * <p>页面自己拼绝对地址（用 window.location.origin）：后端只有在通知场景绑定了企业应用
+   * 且配了站点地址时才拿得到 base url，开发/生产域名不同，写死后二维码就扫不通了。
+   */
+  const showQr = async () => {
+    if (!record) return
+    try {
+      const issued = await issueCheckinToken(record.id)
+      const base = issued.url ?? `${window.location.origin}${window.location.pathname}#/meeting-checkin?token=${issued.token}`
+      setQr({ url: base, expireAt: issued.expireAt })
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '生成簽到碼失敗')
+    }
+  }
+
+  const attendeeColumns: TableColumnsType<MeetingAttendeeVO> = [
+    { title: '姓名', dataIndex: 'name', key: 'name', width: 120 },
+    { title: '工號', dataIndex: 'empNo', key: 'empNo', width: 110, render: (v?: string | null) => v || '-' },
+    { title: '部門', dataIndex: 'departmentName', key: 'departmentName', width: 160, render: (v?: string | null) => v || '-' },
+    {
+      title: '身份', dataIndex: 'attendeeType', key: 'attendeeType', width: 90,
+      render: (v: string) => <Tag>{ATTENDEE_TYPE_LABELS[v] ?? v}</Tag>,
+    },
+    {
+      title: '響應', dataIndex: 'response', key: 'response', width: 100,
+      render: (v: string) => {
+        const meta = RESPONSE_META[v] ?? { label: v, color: 'default' as const }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    { title: '響應時間', dataIndex: 'respondAt', key: 'respondAt', width: 160, render: (v?: string | null) => v || '-' },
+    {
+      title: '簽到', key: 'checkinAt', width: 160,
+      render: (_, row) => (row.checkinAt
+        ? <span style={{ color: '#52C41A' }}>{row.checkinAt}</span>
+        : <span style={{ color: '#BFBFBF' }}>未簽到</span>),
+    },
+    {
+      title: '邀約投遞', key: 'notifyStatus', width: 170,
+      render: (_, row) => {
+        const meta = NOTIFY_STATUS_META[row.notifyStatus ?? ''] ?? { label: row.notifyStatus || '-', color: 'default' as const }
+        return (
+          <Space direction="vertical" size={2}>
+            <Tag color={meta.color}>{meta.label}</Tag>
+            {row.notifyNote && <span style={{ fontSize: 12, color: '#8C8C8C' }}>{row.notifyNote}</span>}
+          </Space>
+        )
+      },
+    },
+  ]
+
+  const notifyColumns: TableColumnsType<MeetingNotifyVO> = [
+    { title: '事件', dataIndex: 'eventCode', key: 'eventCode', width: 150, render: (v: string) => notifyEventLabel(v) },
+    { title: '場景', dataIndex: 'scenario', key: 'scenario', width: 130 },
+    {
+      title: '接收人', key: 'receiver', width: 150,
+      render: (_, row) => `${row.receiverName}${row.receiverEmpNo ? `（${row.receiverEmpNo}）` : ''}`,
+    },
+    {
+      title: '釘釘', dataIndex: 'dingtalkBound', key: 'dingtalkBound', width: 90,
+      render: (v: boolean) => (v ? <Tag color="green">已綁定</Tag> : <Tag color="orange">未綁定</Tag>),
+    },
+    {
+      title: '狀態', dataIndex: 'sendStatus', key: 'sendStatus', width: 110,
+      render: (v: string) => {
+        const meta = NOTIFY_STATUS_META[v] ?? { label: v, color: 'default' as const }
+        return <Tag color={meta.color}>{meta.label}</Tag>
+      },
+    },
+    { title: '重試', dataIndex: 'retryCount', key: 'retryCount', width: 70, render: (v?: number | null) => v ?? 0 },
+    { title: '說明', dataIndex: 'errorMsg', key: 'errorMsg', render: (v?: string | null) => v || '-' },
+    { title: '更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 160, render: (v?: string | null) => v || '-' },
+  ]
+
+  const phase = phaseMeta(record?.phase)
+  /** 最后更新取轨迹里最近一条：MeetingVO 不带 updatedAt，而"谁在什么时候动了这场会"就是最后更新 */
+  const lastEvent = events.length > 0 ? events[events.length - 1] : undefined
+
+  if (loading && !record) {
+    return (
+      <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" tip="載入會議詳情..." />
+      </div>
+    )
+  }
+
+  return (
+    <div className="content-area">
+      <DetailPageHeader
+        title="會議詳情"
+        tags={record ? <Tag color={phase.color}>{phase.label}</Tag> : undefined}
+        meta={record
+          ? <>{record.bookingNo} · {record.roomName} · {record.timeText}</>
+          : undefined}
+        onBack={() => (window.history.length > 1 ? navigate(-1) : navigate('/meeting-my'))}
+        extra={record && (
+          <Space size={8} wrap>
+            <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button>
+            {record.myRole && record.myRole !== 'none' && record.status !== 'finished'
+              && record.status !== 'cancelled' && (
+              <Button size="small" icon={<QrcodeOutlined />} onClick={() => void showQr()}>我的簽到碼</Button>
+            )}
+            {record.myRole !== 'organizer' && record.status === 'booked' && record.myResponse === 'pending' && (
+              <>
+                <Button size="small" type="primary" onClick={() => void respond(true)}>接受邀約</Button>
+                <Button size="small" onClick={() => void respond(false)}>婉拒</Button>
+              </>
+            )}
+            {record.canCheckin && (
+              <Button size="small" type="primary" onClick={() => void run(checkinMeeting, '已簽到')}>簽到</Button>
+            )}
+            {record.canFinish && <Button size="small" onClick={handleFinish}>提前結束</Button>}
+            {record.canRelease && <Button size="small" danger onClick={handleRelease}>釋放會議室</Button>}
+            {record.canCancel && <Button size="small" danger onClick={handleCancel}>取消會議</Button>}
+          </Space>
+        )}
+      />
+
+      {!bookingId && <Alert type="warning" showIcon message="位址列不合法" description={error} />}
+      {bookingId && error && !record && (
+        <Alert type="error" showIcon message="無法載入會議詳情" description={error}
+          action={<Button size="small" onClick={() => void load()}>重試</Button>} />
+      )}
+
+      {record && (
+        <>
+          {/* 一、基本信息 */}
+          <div style={cardStyle}>
+            <CardTitle icon={<ProfileOutlined />} bg="#e6f7ff" color="#1890ff" title="基本信息"
+              note={`${record.attendeeCount} 人 · ${BIZ_TYPE_LABELS[record.bizType] ?? record.bizType}`} />
+            {typeof record.notifySkippedCount === 'number' && record.notifySkippedCount > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`${record.notifySkippedCount} 人未收到釘釘邀約`}
+                description="下方「參會人」列表的投遞列標明了每個人未送達的原因；站內日程仍然可見，不受影響。"
+              />
+            )}
+            <Descriptions column={4} size="middle" items={[
+              { key: 'time', label: '會議時間', span: 2, children: `${record.startTime} ~ ${record.endTime}（${record.durationMinutes} 分鐘）` },
+              {
+                key: 'room', label: '會議室', span: 2,
+                children: (
+                  <Space size={4} wrap>
+                    <span>{record.roomName}</span>
+                    <span style={{ color: '#8C8C8C', fontSize: 12 }}>{record.roomNo}</span>
+                    {record.roomBookable === false && <Tag color="orange">房間當前不可約</Tag>}
+                  </Space>
+                ),
+              },
+              { key: 'location', label: '位置', span: 2, children: record.roomLocation || '-' },
+              {
+                key: 'organizer', label: '組織者', span: 2,
+                children: `${record.organizerName}${record.organizerEmpNo ? `（${record.organizerEmpNo}）` : ''}${record.departmentName ? ` · ${record.departmentName}` : ''}`,
+              },
+              // 代订单把"实际使用人"单独摆出来：只看到组织者是行政时，
+              // 参会人会以为这场会由行政召集，散会后也不知道该找谁
+              ...(record.delegateForId ? [{
+                key: 'delegate', label: '實際使用人', span: 2,
+                children: (
+                  <Space size={6}>
+                    <span>{record.delegateForName || '已指定人員'}</span>
+                    <Tag color="blue">行政代訂 · 由 {record.organizerName} 預訂</Tag>
+                  </Space>
+                ),
+              }] : []),
+              { key: 'count', label: '參會人數', children: `${record.attendeeCount} 人` },
+              { key: 'biz', label: '會議類型', children: BIZ_TYPE_LABELS[record.bizType] ?? record.bizType },
+              {
+                key: 'online', label: '線上鏈接', span: 2,
+                children: record.onlineMeetingUrl
+                  ? <a href={record.onlineMeetingUrl} target="_blank" rel="noreferrer">進入線上會議</a>
+                  : '-',
+              },
+              {
+                key: 'link', label: '關聯業務', span: 2,
+                children: record.bizNo
+                  ? (record.bizUrl
+                    ? <a href={record.bizUrl} target="_blank" rel="noreferrer">{record.bizNo}</a>
+                    : record.bizNo)
+                  : '無',
+              },
+              { key: 'desc', label: '會議議程', span: 4, children: record.description || '-' },
+              { key: 'external', label: '外部參會人', span: 4, children: record.externalAttendees || '-' },
+              ...(record.cancelReason ? [{ key: 'cancel', label: '取消原因', span: 4, children: record.cancelReason }] : []),
+              ...(record.releaseReason
+                ? [{ key: 'release', label: '釋放原因', span: 4, children: `${record.releaseReason}（${record.releaseAt ?? '-'}）` }]
+                : []),
+            ]} />
+          </div>
+
+          {/* 二、参会人与响应 */}
+          <div style={cardStyle}>
+            <CardTitle icon={<TeamOutlined />} bg="#f6ffed" color="#52c41a" title="參會人"
+              note={`共 ${record.attendees?.length ?? 0} 人（含組織者與外部人員）`} />
+            <Table<MeetingAttendeeVO>
+              rowKey="id"
+              size="small"
+              columns={attendeeColumns}
+              dataSource={record.attendees ?? []}
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+            />
+          </div>
+
+          {/* 三、邀约投递状态 */}
+          <div style={cardStyle}>
+            <CardTitle icon={<BellOutlined />} bg="#fff7e6" color="#fa8c16" title="邀約投遞狀態"
+              note="每條邀約只發一次，重試次數與失敗原因都在這裡" />
+            <Table<MeetingNotifyVO>
+              rowKey="id"
+              size="small"
+              columns={notifyColumns}
+              dataSource={record.notifies ?? []}
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+              locale={{ emptyText: '尚無投遞記錄（通知場景可能未啟用，或該會議未產生邀約事件）' }}
+            />
+          </div>
+
+          {/* 四、会议轨迹（业务事件，不是审计日志表格） */}
+          <div style={cardStyle}>
+            <CardTitle icon={<HistoryOutlined />} bg="#f9f0ff" color="#722ed1" title="會議軌跡"
+              note={`${events.length} 條`} />
+            {events.length === 0 ? (
+              <span style={{ color: '#8C8C8C', fontSize: 12 }}>無軌跡</span>
+            ) : (
+              <Timeline
+                items={events.map(item => ({
+                  color: item.eventCode === 'cancel' ? 'red' : item.eventCode === 'create' ? 'green' : 'blue',
+                  children: (
+                    <Space direction="vertical" size={2}>
+                      <Space size={6} wrap>
+                        <strong>{eventLabel(item.eventCode)}</strong>
+                        <span style={{ color: '#8C8C8C', fontSize: 12 }}>
+                          {item.operatorName}{item.operatorEmpNo ? `（${item.operatorEmpNo}）` : ''} · {item.occurredAt}
+                        </span>
+                      </Space>
+                      {item.reason && <span style={{ fontSize: 12 }}>說明：{item.reason}</span>}
+                    </Space>
+                  ),
+                }))}
+              />
+            )}
+          </div>
+
+          {/* 操作记录（§D.4）：详情页以「最后更新人 + 最后更新时间」收尾 */}
+          <div style={{
+            background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+            border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24,
+          }}>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+              最後更新人：<span style={{ color: '#595959' }}>
+                {lastEvent ? `${lastEvent.operatorName}${lastEvent.operatorEmpNo ? `（${lastEvent.operatorEmpNo}）` : ''}` : record.organizerName}
+              </span>
+            </span>
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+              最後更新時間：<span style={{ color: '#595959' }}>{lastEvent?.occurredAt ?? record.startTime}</span>
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* 我的签到码：纯展示型弹窗（§9.1 允许），令牌由后端按需签发 */}
+      <Modal
+        title="我的簽到碼"
+        open={Boolean(qr)}
+        onCancel={() => setQr(undefined)}
+        footer={<Button onClick={() => setQr(undefined)}>關閉</Button>}
+      >
+        {qr && (
+          <div style={{ textAlign: 'center' }}>
+            <QRCode value={qr.url} size={220} />
+            <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
+              有效期內可在會議室門口掃碼簽到，至 {qr.expireAt}（會議結束後 2 小時失效）
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: '#8C8C8C', wordBreak: 'break-all' }}>{qr.url}</div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  )
+}

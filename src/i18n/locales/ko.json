@@ -44,7 +44,7 @@
       "매몰비용을 내려야 성장할 공간이 생깁니다",
       "오늘을 최선으로 만들면 내일은 저절로 열립니다"
     ],
-    "heroEyebrow": "Maifeng Tech · 통합 워크스페이스",
+    "heroEyebrow": "Maifeng Group · 통합 워크스페이스",
     "heroUserFallback": "동료",
     "greetingLine": "{{greeting}}, {{name}}{{empId}}",
     "greetingEmpIdSuffix": " ({{empId}})",
@@ -64,6 +64,14 @@
     "filterLabel": "업무 영역",
     "filterAll": "전체",
     "resultCount": "총 {{count}}개 시스템",
+    "quickFavorite": "내 자주 사용",
+    "quickRecent": "최근 사용",
+    "favoritesTip": "카드 오른쪽 위 ☆ 를 누르면 여기에 추가됩니다",
+    "cardFavorite": "자주 사용에 추가",
+    "cardUnfavorite": "자주 사용에서 해제",
+    "favAdded": "자주 사용에 추가했습니다 · {{name}}",
+    "favRemoved": "자주 사용에서 해제했습니다 · {{name}}",
+    "favNotSaved": "브라우저 저장소를 사용할 수 없어 이 변경은 현재 페이지만 적용됩니다",
     "noDomainSystem": "이 업무 영역에 사용 가능한 시스템이 없습니다",
     "viewAllSystems": "모든 시스템 보기",
     "domain": {
@@ -71,8 +79,10 @@
       "growthDesc": "광고 집행, 매장 운영 및 검색 전환",
       "biz": "경영 및 자산 지원",
       "bizDesc": "자금 계정, 재무 대사 및 물자 자산 관리",
-      "org": "조직 및 결재",
+      "org": "인사·조직",
       "orgDesc": "인사 조직, 결재 프로세스 및 개발 납품",
+      "collab": "협업 및 전달",
+      "collabDesc": "결재 프로세스, 개발 전달, 회의 및 지식 협업",
       "govern": "AI 및 플랫폼 관리",
       "governDesc": "AI 기능, 권한 부여 및 플랫폼 설정",
       "other": "기타 시스템",
@@ -100,6 +110,9 @@
       "hrAssigned": "부서 배정 완료",
       "attendancePunched": "출퇴근 등록 · 09:00",
       "leaveApproved": "휴가 승인 · 오늘 휴무",
+      "meetingBooked": "회의실 예약됨 · 10:00–11:00",
+      "meetingCheckedIn": "출석 등록 · 회의 중",
+      "meetingInviteSent": "초대 발송 완료 · 3명",
       "workflowArchived": "승인 · 보관 완료",
       "accessDenied": "인증 실패, 접근 거부",
       "accessGranted": "인증 성공, 접근 허용",
@@ -119,7 +132,12 @@
       "assetCustodian": "사용자",
       "start": "신청",
       "review": "심사",
-      "approved": "승인"
+      "approved": "승인",
+      "docKnowledgeBase": "지식 축적",
+      "docIndex": "통합 인덱스",
+      "docCloudDocs": "클라우드 문서",
+      "docKnowledgeVault": "기업 지식 저장소",
+      "docArchiveFiles": "아카이브 자료"
     },
     "businessSystems": "업무 시스템",
     "backToPortal": "기업 포털로 돌아가기",
@@ -146,6 +164,10 @@
     "backToWorkbench": "작업 공간으로 돌아가기",
     "logout": "로그아웃",
     "systems": {
+      "meeting": {
+        "name": "회의·회의실 시스템",
+        "description": "회의실 대장, 실시간 예약 현황과 초대 이력을 한곳에서 관리합니다."
+      },
       "merchantWorkbench": {
         "name": "매장 경영 시스템",
         "description": "매장 운영, 주문 처리, 영업 데이터를 한곳에서 관리합니다."
@@ -201,6 +223,10 @@
       "platform": {
         "name": "플랫폼 지원 시스템",
         "description": "알림 채널, 업무 규칙, 버전 설정을 통합 관리합니다."
+      },
+      "doc": {
+        "name": "문서 센터 시스템",
+        "description": "요구사항 문서, 인사·행정 제도, 교육 자료의 통합 인덱스 및 열람 게이트웨이."
       }
     }
   },

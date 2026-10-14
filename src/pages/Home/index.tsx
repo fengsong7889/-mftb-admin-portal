@@ -17,6 +17,7 @@ import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
+import TodayMeetingCard from './TodayMeetingCard'
 import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, formatAiText, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import type { AiBlockReason } from './homeUtils'
 import {
@@ -1181,6 +1182,9 @@ export default function Home() {
           <div className="home-greeting-date">{dateStr}</div>
         </div>
       </div>
+
+      {/* 今日會議概览：无 meeting-my 菜单或后端不可用时整卡不渲染 */}
+      <TodayMeetingCard />
 
       {/* 主区域：左 AI 助手 + 右快捷入口 */}
       <div className="home-main-grid">

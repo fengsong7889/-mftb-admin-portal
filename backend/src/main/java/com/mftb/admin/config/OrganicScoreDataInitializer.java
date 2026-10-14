@@ -1,5 +1,8 @@
 package com.mftb.admin.config;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -11,7 +14,9 @@ import org.springframework.util.StreamUtils;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 自然流量评分配置初始化器: 启动时幂等创建评分维度/规则表并写入种子数据
@@ -39,6 +44,27 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     private static final String RENAME_SCRIPT = "53_rename_sto_to_stb_plt.sql";
     private static final String CLEANUP_SCRIPT = "52_cleanup_tmp_organic_rules.sql";
     private static final String COM02_PREREQ_SCRIPT = "187_com02_prerequisites.sql";
+
+    /** COM_10 內置計分項舊名稱：僅仍為該值的行才更名，管理員自定義過的名稱不動 */
+    static final String COM10_LEGACY_NAME = "購買廣告-金字招牌";
+    /** COM_10 計分項新名稱：與前端 organicTrafficConfig 展示口徑一致 */
+    static final String COM10_NEW_NAME = "金字招牌(廣告)";
+
+    /** 已下架的內置計分項：前端已用 RETIRED_ORGANIC_RULE_IDS 過濾展示，此處收斂庫內殘留行，讓看庫/對賬與界面口徑一致 */
+    static final List<String> RETIRED_RULE_CODES = List.of("COM_09", "STB_04");
+
+    /** STB_02 conditionItems 中「休息打烊」槽位索引（與前端 BUSINESS_STATE_ITEMS 順序對齊） */
+    static final int STB02_CLOSED_INDEX = 3;
+    /** 系統過濾檔標記：該檔不計分而是不參與召回，避免消費方誤讀為「打烊扣 N 分」 */
+    static final String FILTERED_CONDITION = "filtered";
+    /** STB_02 舊內置評分說明的特徵片段：僅仍含該片段才同步新文案，管理員自定義過的不覆蓋 */
+    static final String STB02_LEGACY_DESC_MARKER = "四檔狀態分別配置得分";
+    /** STB_02 新評分說明：與前端展示口徑一致 */
+    static final String STB02_NEW_DESCRIPTION =
+            "營業中滿分；休息一會與爆單暫停（2小時自動恢復）按檔降權；休息打烊由系統直接過濾，不加載到瀑布流也不計分";
+
+    /** condition_items JSON 读写用；不注入容器 bean，避免迁移依赖全局 Jackson 配置 */
+    private static final ObjectMapper CONDITION_JSON = new ObjectMapper();
 
     /** 需要幂等添加的列：列名 → DDL 定义 */
     private static final Map<String, String> NEW_COLUMNS = new LinkedHashMap<>();
@@ -109,6 +135,149 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
             });
         } catch (Exception e) {
             log.error("COM_02 减免运费前置条件迁移失败：{}", e.getMessage(), e);
+        }
+
+        // Step 7: COM_10 計分項更名為「金字招牌(廣告)」 (一次性, 版本化, 帶後置校驗)
+        // 前端一直用保底覆蓋展示新名稱, 但庫裡仍是 23 種子腳本的舊內置名, 看庫/對賬口徑不一致;
+        // 歷史種子腳本不得修改, 故單獨登記版本鍵做一次性收斂。參考 SQL: sql/232_organic_com10_rename.sql
+        try {
+            versionTracker.applyOnce("organic:com10-rename-v1", this::renameCom10Rule, this::verifyCom10Renamed);
+        } catch (Exception e) {
+            log.error("COM_10 計分項更名失敗：{}", e.getMessage(), e);
+        }
+
+        // Step 8: 收斂已下架的內置計分項 (一次性, 版本化, 帶後置校驗)
+        // 前端不再展示 COM_09/STB_04，但 23 種子仍會寫入這兩行；用邏輯刪除對齊應用自身 deleteRule 的
+        // @TableLogic 語義，保留歷史且可回滾。參考 SQL: sql/234_organic_retire_rules.sql
+        try {
+            versionTracker.applyOnce("organic:retire-rules-v1", this::retireOrganicRules, this::verifyRetiredRulesGone);
+        } catch (Exception e) {
+            log.error("自然流量下架計分項收斂失敗：{}", e.getMessage(), e);
+        }
+
+        // Step 9: STB_02「休息打烊」升級為系統過濾檔 (一次性, 版本化, 帶後置校驗)
+        // 打烊不是扣分而是不加載到瀑布流，把語義寫進 condition_items，消費方不再靠索引位置猜。
+        // 參考 SQL: sql/235_organic_stb02_filtered.sql
+        try {
+            versionTracker.applyOnce("organic:stb02-filtered-v1", this::markStb02ClosedAsFiltered, this::verifyStb02Filtered);
+        } catch (Exception e) {
+            log.error("STB_02 休息打烊過濾檔標記失敗：{}", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 將仍為舊內置名稱的 COM_10 行更名為新名稱。
+     * 以舊值本身作條件：命中 0 行說明已收斂或名稱已被管理員自定義, 兩者均屬正常, 不得無條件覆蓋。
+     */
+    private void renameCom10Rule() {
+        int changed = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET name = ?, updated_by = 'system' "
+                        + "WHERE rule_code = 'COM_10' AND name = ?",
+                COM10_NEW_NAME, COM10_LEGACY_NAME);
+        log.info("已更新 COM_10 計分項名稱「{}」→「{}」: {} 行", COM10_LEGACY_NAME, COM10_NEW_NAME, changed);
+    }
+
+    /** 後置校驗：查舊名稱殘留行數必須為 0（而非查新名稱存在），殘留說明 UPDATE 未打中，不記版本、下次啟動重試。 */
+    private void verifyCom10Renamed() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = 'COM_10' AND name = ?",
+                Integer.class, COM10_LEGACY_NAME);
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("COM_10 計分項仍為舊名稱「" + COM10_LEGACY_NAME + "」，更名未生效");
+        }
+    }
+
+    /** 逻辑删除已下架的内置计分项（保留历史、可回滚，与应用 deleteRule 的 @TableLogic 语义一致）。 */
+    private void retireOrganicRules() {
+        int changed = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET deleted = 1, updated_by = 'system' WHERE deleted = 0 AND rule_code IN ("
+                        + retiredPlaceholders() + ")",
+                RETIRED_RULE_CODES.toArray());
+        log.info("已逻辑删除下架計分項 {}: {} 行", RETIRED_RULE_CODES, changed);
+    }
+
+    /** 后置校验：下架编码不得再有未删除的残留行，残留说明 UPDATE 未打中，不记版本、下次启动重试。 */
+    private void verifyRetiredRulesGone() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE deleted = 0 AND rule_code IN ("
+                        + retiredPlaceholders() + ")",
+                Integer.class, RETIRED_RULE_CODES.toArray());
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("下架計分項仍有 " + remains + " 行未收斂：" + RETIRED_RULE_CODES);
+        }
+    }
+
+    private static String retiredPlaceholders() {
+        return RETIRED_RULE_CODES.stream().map(code -> "?").collect(Collectors.joining(", "));
+    }
+
+    /**
+     * 把 STB_02 第 4 槽（休息打烊）标记为系统过滤档：condition 改為 filtered、分值归 0；
+     * 评分说明仅在仍为旧内置文案时同步，管理员自定义过的不覆盖。
+     */
+    private void markStb02ClosedAsFiltered() {
+        for (Map<String, Object> row : jdbcTemplate.queryForList(
+                "SELECT id, condition_items FROM biz_organic_score_rule WHERE rule_code = 'STB_02' AND deleted = 0")) {
+            List<Map<String, Object>> items = parseConditionItems(row.get("condition_items"));
+            if (items == null || items.size() <= STB02_CLOSED_INDEX) {
+                continue;
+            }
+            Map<String, Object> closed = items.get(STB02_CLOSED_INDEX);
+            if (FILTERED_CONDITION.equals(closed.get("condition"))) {
+                continue;
+            }
+            closed.put("condition", FILTERED_CONDITION);
+            closed.put("score", 0);
+            writeConditionItems(row.get("id"), items);
+            log.info("已將 STB_02 第 {} 檔（休息打烊）標記為系統過濾檔", STB02_CLOSED_INDEX + 1);
+        }
+        int descChanged = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET description = ?, updated_by = 'system' "
+                        + "WHERE rule_code = 'STB_02' AND deleted = 0 AND description LIKE ?",
+                STB02_NEW_DESCRIPTION, "%" + STB02_LEGACY_DESC_MARKER + "%");
+        if (descChanged > 0) {
+            log.info("已同步 STB_02 評分說明：{} 行", descChanged);
+        }
+    }
+
+    /** 后置校验：第 4 槽必须是 filtered（槽位不足或为空的行无标记可加，不视为失败）。 */
+    private void verifyStb02Filtered() {
+        for (Map<String, Object> row : jdbcTemplate.queryForList(
+                "SELECT condition_items FROM biz_organic_score_rule WHERE rule_code = 'STB_02' AND deleted = 0")) {
+            List<Map<String, Object>> items = parseConditionItems(row.get("condition_items"));
+            if (items == null || items.size() <= STB02_CLOSED_INDEX) {
+                continue;
+            }
+            if (!FILTERED_CONDITION.equals(items.get(STB02_CLOSED_INDEX).get("condition"))) {
+                throw new IllegalStateException("STB_02 休息打烊檔仍未標記為系統過濾檔，遷移未生效");
+            }
+        }
+    }
+
+    /** 解析 condition_items；内容非法时抛出，避免把坏数据当成就绪 */
+    private List<Map<String, Object>> parseConditionItems(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String json = String.valueOf(raw);
+        // MySQL JSON 列可能存字符串 "null"，不能当成有效数组
+        if (json.isBlank() || "null".equals(json)) {
+            return null;
+        }
+        try {
+            return CONDITION_JSON.readValue(json, new TypeReference<List<Map<String, Object>>>() { });
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("condition_items 不是合法 JSON 數組: " + json, e);
+        }
+    }
+
+    private void writeConditionItems(Object id, List<Map<String, Object>> items) {
+        try {
+            jdbcTemplate.update(
+                    "UPDATE biz_organic_score_rule SET condition_items = ?, updated_by = 'system' WHERE id = ?",
+                    CONDITION_JSON.writeValueAsString(items), id);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("condition_items 序列化失敗", e);
         }
     }
 

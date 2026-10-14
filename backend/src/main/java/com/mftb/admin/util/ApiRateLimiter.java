@@ -61,6 +61,23 @@ public class ApiRateLimiter {
     }
 
     /**
+     * 按显式 key 限流，不查登录态。
+     *
+     * <p>为什么需要单独一个方法：{@link #tryAcquire(String, int, long)} 在未认证时直接返回 true
+     * （注释写明"未认证场景由 Security 层拦截"）。免登页正是未认证场景，用它等于完全不限流，
+     * 而把"已限流"写进设计里却不生效，比不限流更危险。免登端点按「客户端 IP + 令牌指纹」限流。
+     *
+     * @param key 限流维度（调用方负责确保其中不含明文令牌等敏感值）
+     */
+    public boolean tryAcquireByKey(String key, int maxPerWindow, long windowMs) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        Bucket bucket = buckets.computeIfAbsent(key, k -> buildBucket(maxPerWindow, windowMs));
+        return bucket.tryConsumeAndReturnRemaining(1).isConsumed();
+    }
+
+    /**
      * 构建 Bucket4j 令牌桶。
      * 使用 greedy refill 策略：令牌尽可能快地补充到上限。
      */

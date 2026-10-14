@@ -812,3 +812,87 @@ body {
   min-width: 0 !important;
   padding: 0 !important;
 }
+
+/*
+ * 会议管理两套构图共用一个 7.6 秒节拍：
+ * 6%→34% 标题逐字蹦完 → 34%→42% 顶部绿勾才出现 → 10%→60% 忙闲游标从左扫到右
+ * → 46%→86% 空闲段被选中亮起 → 20%→50% 邀约卡飞线逐段画出、落点绿勾错峰弹出
+ * → 56%→80% 二维码扫描线走一遍、已签到绿章落下 → 88%→100% 全部回退。
+ * 静态层自身构图完整（[data-motion=idle] 会 animation:none），动画只在悬停时逐拍点亮。
+ */
+@keyframes portalMeetingType {
+  0%, 6% { transform: scaleX(0); }
+  34%, 92% { transform: scaleX(1); }
+  98%, 100% { transform: scaleX(0); }
+}
+@keyframes portalMeetingBadge {
+  0%, 34%, 100% { opacity: 0; transform: scale(0.6); }
+  42%, 92% { opacity: 1; transform: scale(1); }
+}
+/* 游标横扫时间轴：位移用 px（SVG 内坐标），透明度先淡入再淡出，避免两端"硬切" */
+@keyframes portalMeetingCursor {
+  0%, 8% { opacity: 0; transform: translateX(0); }
+  14% { opacity: 1; transform: translateX(0); }
+  62%, 84% { opacity: 1; transform: translateX(130px); }
+  92%, 100% { opacity: 0; transform: translateX(130px); }
+}
+/* 空闲段被选中：描边淡入 + 轻微放大，读作"这段可以订" */
+@keyframes portalMeetingPick {
+  0%, 44%, 100% { stroke-opacity: 0; transform: scale(0.94); }
+  54%, 86% { stroke-opacity: 1; transform: scale(1); }
+  94% { stroke-opacity: 0; transform: scale(0.94); }
+}
+/* 分针必须线性：呼吸曲线会让指针来回抽动，读不出"时间在走" */
+@keyframes portalMeetingHand {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes portalMeetingStep {
+  0%, 10% { transform: translate(18px, 0); }
+  26% { transform: translate(12px, -2px); }
+  42%, 100% { transform: translate(0, 0); }
+  58% { transform: translate(0, -2px); }
+  74% { transform: translate(0, 0); }
+}
+@keyframes portalMeetingPlate {
+  0%, 12%, 100% { opacity: 0.35; }
+  26%, 90% { opacity: 1; }
+}
+@keyframes portalMeetingDoor {
+  0%, 14%, 100% { opacity: 0; }
+  24%, 44% { opacity: 1; }
+  56% { opacity: 0; }
+}
+/* 动线先画后擦：dashoffset 1→0 是画出，0→1 是往回擦 */
+@keyframes portalMeetingLink {
+  0%, 18%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  24% { stroke-dashoffset: 1; opacity: 1; }
+  44%, 80% { stroke-dashoffset: 0; opacity: 1; }
+  92% { stroke-dashoffset: 1; opacity: 1; }
+}
+@keyframes portalMeetingCard {
+  0%, 4%, 100% { opacity: 0.55; transform: translateY(6px); }
+  16%, 90% { opacity: 1; transform: translateY(0); }
+}
+@keyframes portalMeetingInvite {
+  0%, 10%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  16% { stroke-dashoffset: 1; opacity: 1; }
+  36%, 84% { stroke-dashoffset: 0; opacity: 1; }
+  94% { stroke-dashoffset: 1; opacity: 0.6; }
+}
+@keyframes portalMeetingTick {
+  0%, 30%, 100% { opacity: 0; transform: scale(0.5); }
+  38% { opacity: 1; transform: scale(1.18); }
+  46%, 88% { opacity: 1; transform: scale(1); }
+}
+@keyframes portalMeetingQr {
+  0%, 52%, 100% { opacity: 0; transform: translateY(0); }
+  58% { opacity: 1; transform: translateY(0); }
+  76% { opacity: 1; transform: translateY(38px); }
+  84% { opacity: 0; transform: translateY(38px); }
+}
+@keyframes portalMeetingSigned {
+  0%, 76%, 100% { opacity: 0; transform: translateY(-10px) scale(1.12); }
+  84% { opacity: 1; transform: translateY(0) scale(0.96); }
+  90%, 96% { opacity: 1; transform: translateY(0) scale(1); }
+}

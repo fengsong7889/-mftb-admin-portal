@@ -222,6 +222,25 @@ export interface ScoreConditionItem {
   score: number
 }
 
+/**
+ * 营业状态四档（索引与 STB_02 的 conditionItems 一一对应）。
+ * filtered 档由系统直接过滤、不加载到瀑布流，因此不参与计分也不提供分值配置入口；
+ * 库里对应槽位的 condition 固定为 'filtered'（见迁移 organic:stb02-filtered-v1），两边语义一致。
+ */
+export const BUSINESS_STATE_ITEMS: Array<{ key: string; label: string; desc: string; filtered?: boolean }> = [
+  { key: 'operating', label: '營業中狀態', desc: '正常營業中' },
+  { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業' },
+  { key: 'overload', label: '爆單了，暫停接單一會', desc: '訂單量超過承載能力' },
+  { key: 'closed', label: '休息打烊', desc: '當日不再營業', filtered: true },
+]
+
+/** 系統過濾檔在 conditionItems 裡的 condition 標記（與後端 FILTERED_CONDITION 一致） */
+export const FILTERED_STATE_CONDITION = 'filtered'
+
+/** 該檔是否為系統過濾檔：以數據標記為準，前端常量作為種子/舊數據未收斂時的兜底 */
+export const isFilteredBusinessState = (item: { filtered?: boolean }, condItem?: { condition?: string }): boolean =>
+  condItem?.condition === FILTERED_STATE_CONDITION || !!item.filtered
+
 /** 活動加分子項（一個對象 → 固定加分，僅 STB_ACT 規則使用；暫以算法庫算法ID對接驗證，後續切換為系統活動） */
 export interface ActivityScoreItem {
   /** 對象ID（暫存算法庫算法ID，如 SFWD20260812000；後續切換為活動ID） */
@@ -232,117 +251,16 @@ export interface ActivityScoreItem {
   score: number
 }
 
-/** 優惠比例力度檔位（R = 有效抵扣額 / 參考消費額，單檔命中不累加） */
-export interface IntensityTier {
-  /** 優惠比例下界（含），單位 % */
-  minRate: number
-  /** 優惠比例上界（不含），單位 %；最後一档為 100（含） */
-  maxRate: number
-  /** 該檔力度基礎分（正=加分） */
-  score: number
-}
+/** 使用券類計分 v1 面板的規則編碼集合（COM_01 滿額立減 + COM_03~COM_07 五個券類活動） */
+export const COUPON_SCORE_RULE_IDS = ['COM_01', 'COM_03', 'COM_04', 'COM_05', 'COM_06', 'COM_07'] as const
+export type CouponScoreRuleId = typeof COUPON_SCORE_RULE_IDS[number]
 
-/** 門檻可達係數檔（M = 門檻 / 基準客單價，單檔命中不累加） */
-export interface ThresholdCoefficientTier {
-  /** 門檻倍數上界（含） */
-  maxMultiplier: number
-  /** 該檔對應力度折減係數（0~1，隨門檻提高單調不增） */
-  coefficient: number
-}
-
-/** 優惠券力度計分配置（COM_03~COM_07 新方案：報名分 + 力度分 × 門檻係數） */
-export interface CouponIntensityConfig {
-  /** 報名計分開關 */
-  enrollmentEnabled: boolean
-  /** 有效報名固定分值 */
-  enrollmentScore: number
-  /** 力度計分開關 */
-  intensityEnabled: boolean
-  /** 優惠比例力度檔位表 */
-  intensityTiers: IntensityTier[]
-  /** 力度分上限 */
-  intensityCap: number
-  /** 門檻可達係數檔位表 */
-  thresholdTiers: ThresholdCoefficientTier[]
-  /** 基準口徑說明（只讀展示，後端下發） */
-  benchmarkDescription?: string
-}
-
-/** 默認優惠比例力度檔位（方案試算模板，非行業標準） */
-export const DEFAULT_INTENSITY_TIERS: IntensityTier[] = [
-  { minRate: 0, maxRate: 5, score: 0 },
-  { minRate: 5, maxRate: 10, score: 10 },
-  { minRate: 10, maxRate: 20, score: 30 },
-  { minRate: 20, maxRate: 30, score: 50 },
-  { minRate: 30, maxRate: 50, score: 70 },
-  { minRate: 50, maxRate: 100, score: 100 },
-]
-
-/** 默認門檻可達係數檔位（方案試算模板，非行業標準） */
-export const DEFAULT_THRESHOLD_TIERS: ThresholdCoefficientTier[] = [
-  { maxMultiplier: 1, coefficient: 1.0 },
-  { maxMultiplier: 1.5, coefficient: 0.8 },
-  { maxMultiplier: 2, coefficient: 0.5 },
-  { maxMultiplier: 3, coefficient: 0.2 },
-  { maxMultiplier: Infinity, coefficient: 0 },
-]
-
-/** 生成一份默認優惠券力度配置（各活動獨立保存，避免隱含聯動） */
-export function createDefaultCouponIntensityConfig(): CouponIntensityConfig {
-  return {
-    enrollmentEnabled: true,
-    enrollmentScore: 10,
-    intensityEnabled: true,
-    intensityTiers: DEFAULT_INTENSITY_TIERS.map(t => ({ ...t })),
-    intensityCap: 100,
-    thresholdTiers: DEFAULT_THRESHOLD_TIERS.map(t => ({ ...t })),
-    benchmarkDescription: '同門店、同業務場景、同幣種，近 30 天有效訂單商品金額中位數 P50（至少 50 單）；不足時擴展至 90 天，再回退至平台維護的同區域、同品類、同價格帶基準。',
-  }
-}
-
-/** 前端草稿与试算共用校验；正式接入时后端必须重验。 */
-export function validateCouponIntensityConfig(config: CouponIntensityConfig): string | null {
-  const inRange = (value: number, max: number) => Number.isFinite(value) && value >= 0 && value <= max
-  if (!inRange(config.enrollmentScore, 100)) return '報名分必須在 0～100 之間'
-  if (!inRange(config.intensityCap, 1000)) return '力度分上限必須在 0～1000 之間'
-  const tiers = config.intensityTiers
-  if (!tiers.length || tiers[0].minRate !== 0 || tiers[tiers.length - 1].maxRate !== 100) {
-    return '優惠比例檔位必須完整覆蓋 0%～100%'
-  }
-  for (let i = 0; i < tiers.length; i++) {
-    const tier = tiers[i]
-    if (!inRange(tier.minRate, 100) || !inRange(tier.maxRate, 100) || tier.maxRate <= tier.minRate) {
-      return `優惠比例第 ${i + 1} 檔須滿足 0 ≤ 下界 < 上界 ≤ 100`
-    }
-    if (!inRange(tier.score, 1000)) return `優惠比例第 ${i + 1} 檔分值必須在 0～1000 之間`
-    if (i > 0 && tier.minRate !== tiers[i - 1].maxRate) return '優惠比例檔位必須按順序排列，不得重疊或留空檔'
-  }
-  const thresholds = config.thresholdTiers
-  if (!thresholds.length || thresholds[thresholds.length - 1].maxMultiplier !== Infinity) {
-    return '門檻係數須保留不限兜底檔'
-  }
-  for (let i = 0; i < thresholds.length; i++) {
-    const tier = thresholds[i]
-    if (i < thresholds.length - 1 && (!Number.isFinite(tier.maxMultiplier) || tier.maxMultiplier <= 0)) {
-      return `門檻第 ${i + 1} 檔上界必須是有限正數`
-    }
-    if (!inRange(tier.coefficient, 1)) return '門檻係數必須在 0～1 之間'
-    if (i > 0 && tier.maxMultiplier <= thresholds[i - 1].maxMultiplier) return '門檻倍數上界必須嚴格遞增，不得重複'
-    if (i > 0 && tier.coefficient > thresholds[i - 1].coefficient) return '門檻係數須隨門檻提高而不增加'
-  }
-  return null
-}
-
-/** 使用優惠券力度計分的規則編碼集合（COM_03~COM_07） */
-export const COUPON_INTENSITY_RULE_IDS = ['COM_03', 'COM_04', 'COM_05', 'COM_06', 'COM_07'] as const
-export type CouponIntensityRuleId = typeof COUPON_INTENSITY_RULE_IDS[number]
-
-/** 判断是否展示优惠力度原位配置；不改变后端已保存的计分模式。 */
-export const isCouponIntensityRule = (id?: string): boolean =>
-  !!id && (COUPON_INTENSITY_RULE_IDS as readonly string[]).includes(id)
+/** 判斷該計分項是否走券類計分 v1 面板；不改變後端已保存的計分模式。 */
+export const isCouponScoreRule = (id?: string): boolean =>
+  !!id && (COUPON_SCORE_RULE_IDS as readonly string[]).includes(id)
 
 /** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理） */
-export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09']
+export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'STB_04']
 
 /** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無閃蜂官方神券） */
 export const BRAND_HIDDEN_ORGANIC_RULE_IDS: Partial<Record<AppType, string[]>> = {
@@ -356,7 +274,7 @@ export function isOrganicRuleVisible(ruleId: string, brand?: AppType): boolean {
   return !(BRAND_HIDDEN_ORGANIC_RULE_IDS[brand] ?? []).includes(ruleId)
 }
 
-/** 券類計分 v1：門檻倍率檔（門檻 ÷ 門店客單價 ≤ upper 倍 → score，末檔 upper 為 Infinity 作兜底） */
+/** 券類計分 v1：門檻倍率檔（門檻 ÷ 門店客單價 ≤ upper 倍 → score，匹配不到即 0 分，不設兜底行） */
 export interface ThresholdBand {
   /** 門檻倍率上界（含） */
   upper: number
@@ -364,7 +282,7 @@ export interface ThresholdBand {
   score: number
 }
 
-/** 券類計分 v1：優惠力度檔（券面 ÷ 門店客單價 ≥ lower% → score，按下界由高到低首個命中） */
+/** 券類計分 v1：優惠力度檔（券面 ÷ 計價基數 ≥ lower% → score，按下界由高到低首個命中，匹配不到即 0 分） */
 export interface DiscountBand {
   /** 優惠力度下界（含），單位 % */
   lower: number
@@ -374,7 +292,7 @@ export interface DiscountBand {
 
 /**
  * 券類計分 v1 配置：得分 = 報名分 + 門檻分 + 力度分（三條獨立加分線查表後相加，無乘法/無降檔）。
- * 與舊 COUPON_INTENSITY（比例檔 × 門檻係數）互斥，目前僅進店領券試點。
+ * COM_03~COM_07 五個券類活動各自獨立一份配置，互不影響。
  */
 export interface CouponScoreConfig {
   enrollmentEnabled: boolean
@@ -382,13 +300,9 @@ export interface CouponScoreConfig {
   /** 門檻計分模組開關：停用時該模組不計分 */
   thresholdEnabled: boolean
   thresholdBands: ThresholdBand[]
-  /** 力度計分模組開關：停用時該模組不計分 */
+  /** 力度計分模組開關：停用時該模組不計分，也不參與校驗 */
   discountEnabled: boolean
   discountBands: DiscountBand[]
-  /** 力度分閘門：門檻 ≤ 該倍數 × 客單價時視為「夠得著」，力度分全額發放 */
-  gateMultiplier: number
-  /** 力度分閘門豁免：券面 ≥ 該比例 × 門檻（%）時視為「省得夠狠」，力度分全額發放 */
-  gateDiscountRate: number
   /** 硬護欄倍數：門檻超過該倍數視為空轉券，門檻分與力度分均不發 */
   guardMultiplier: number
   /** 護欄觸發時是否仍發報名分（默認否，避免挂廢券白拿報名分） */
@@ -397,8 +311,8 @@ export interface CouponScoreConfig {
 
 /**
  * 方案 v1 默認檔位：量級對齊現行（滿分 90 < 維度封頂 100）。
- * 門檻檔按「門檻 ÷ 門店客單價」單調遞減：門檻低於客單價越多（越好用）分越高，
- * 高於客單價逐檔遞減，超過護欄倍數直接 0 分。
+ * 門檻檔按「門檻 ÷ 門店客單價」單調遞減，末檔對齊硬護欄倍數，不設兜底行（匹配不到即 0 分）；
+ * 力度檔按「券面 ÷ 計價基數（客單價與門檻取大）」取下界，不設兜底行。
  */
 export const DEFAULT_COUPON_SCORE_CONFIG: CouponScoreConfig = {
   enrollmentEnabled: true,
@@ -410,8 +324,7 @@ export const DEFAULT_COUPON_SCORE_CONFIG: CouponScoreConfig = {
     { upper: 0.8, score: 12 },
     { upper: 1, score: 8 },
     { upper: 1.5, score: 4 },
-    { upper: 3, score: 2 },
-    { upper: Infinity, score: 0 },
+    { upper: 2, score: 2 },
   ],
   discountEnabled: true,
   discountBands: [
@@ -420,15 +333,12 @@ export const DEFAULT_COUPON_SCORE_CONFIG: CouponScoreConfig = {
     { lower: 20, score: 30 },
     { lower: 10, score: 18 },
     { lower: 5, score: 8 },
-    { lower: 0, score: 0 },
   ],
-  gateMultiplier: 1.5,
-  gateDiscountRate: 50,
   guardMultiplier: 2,
   enrollWhenGuarded: false,
 }
 
-/** 门槛档的整句条件文案（避开“上界/下界”术语，首档含无门槛，末档为超过） */
+/** 门槛档的整句条件文案（避开「上界/下界」术语；首档含无门槛，匹配不到即 0 分） */
 export function thresholdBandLabel(bands: ThresholdBand[], index: number): string {
   const band = bands[index]
   if (band.upper === Infinity) return `使用門檻超過 ${bands[index - 1]?.upper ?? 0} 倍門店客單價`
@@ -436,14 +346,11 @@ export function thresholdBandLabel(bands: ThresholdBand[], index: number): strin
   return `使用門檻 > ${bands[index - 1].upper} 倍且 ≤ ${band.upper} 倍門店客單價`
 }
 
-/** 力度档的整句条件文案（首档不设上限，末档为未达最低门槛） */
-export function discountBandLabel(bands: DiscountBand[], index: number): string {
+/** 力度档的整句条件文案（分母為計價基數 = 客單價與門檻取大；匹配不到即 0 分） */
+export function discountBandLabel(bands: DiscountBand[], index: number, amountLabel = '券面金額'): string {
   const band = bands[index]
-  if (index === 0) return `券面金額 ≥ ${band.lower}% 門店客單價`
-  const upper = bands[index - 1].lower
-  return band.lower === 0
-    ? `券面金額 < ${upper}% 門店客單價`
-    : `券面金額 ≥ ${band.lower}% 且 < ${upper}% 門店客單價`
+  if (index === 0) return `${amountLabel} ≥ ${band.lower}% 計價基數`
+  return `${amountLabel} ≥ ${band.lower}% 且 < ${bands[index - 1].lower}% 計價基數`
 }
 
 /** 方案 v1 計算結果 */
@@ -455,24 +362,26 @@ export interface CouponScoreResult {
   thresholdRatio: number
   thresholdBand?: ThresholdBand
   thresholdScore: number
-  /** 優惠力度（D/B，%），保留兩位 */
+  /** 力度計價基數 = max(客單價, 門檻)：門檻高於客單價時分母被抬高，空轉券力度分自動壓低 */
+  intensityBase: number
+  /** 基數是否由門檻抬高（供界面標註） */
+  intensityBaseFromThreshold: boolean
+  /** 優惠力度（券面/計價基數，%），保留兩位 */
   discountRate: number
   discountBand?: DiscountBand
   discountScore: number
   /** 硬護欄是否觸發 */
   guarded: boolean
-  /** 力度分閘門通過方式：①門檻可達 / ②折扣率達標 / 未通過 */
-  gateBy: 'threshold' | 'discount' | null
-  gatePassed: boolean
   enrollmentScore: number
   total: number
 }
 
 /**
- * 方案 v1 算分：三個獨立查表相加 + 力度分閘門。
+ * 方案 v1 算分：三個獨立查表相加，加上硬護欄。
+ * 力度分母取「計價基數 = max(客單價, 門檻)」，把「用戶能否用上」隱式編進分母：
+ * 門檻超過客單價時分母變大，同樣面額的力度分自動變低，因此不需要額外的閘門規則。
+ * 匹配不到任何檔位即 0 分（檔位表不再設兜底行）。
  * 用金額交叉比較代替除法判檔，避免 0.1/0.3 這類浮點誤差造成錯檔。
- * 閘門存在的理由：加法結構只能表達「或」，而業務要求「低門檻且高面額」才給力度分，
- * 否則高門檻空轉券（券沒人用）能拿走近乎滿分，形成刷分通道。
  */
 export function computeCouponScore(cfg: CouponScoreConfig, benchmark: number, threshold: number, coupon: number): CouponScoreResult {
   const b = benchmark || 0
@@ -482,61 +391,133 @@ export function computeCouponScore(cfg: CouponScoreConfig, benchmark: number, th
   if (b <= 0) {
     return {
       canCompute: false, reason: '缺少可信門店客單價，不計門檻分與力度分',
-      thresholdRatio: 0, thresholdScore: 0, discountRate: 0, discountScore: 0,
-      guarded: false, gateBy: null, gatePassed: false, enrollmentScore: enrollment, total: enrollment,
+      thresholdRatio: 0, thresholdScore: 0, intensityBase: 0, intensityBaseFromThreshold: false,
+      discountRate: 0, discountScore: 0, guarded: false, enrollmentScore: enrollment, total: enrollment,
     }
   }
   const thresholdRatio = Math.round((t / b + Number.EPSILON) * 100) / 100
   const guarded = t > cfg.guardMultiplier * b
+  const intensityBase = Math.max(b, t)
   const thresholdBand = guarded ? undefined : cfg.thresholdBands.find(band => band.upper === Infinity || t <= band.upper * b)
-  // 閘門：①門檻夠得著 或 ②券面省得夠狠（券面 ≥ 閘門比例 × 門檻；無門檻券直接過 ①）
-  const gateBy: 'threshold' | 'discount' | null = guarded
-    ? null
-    : (t <= cfg.gateMultiplier * b ? 'threshold' : (t > 0 && d * 100 >= cfg.gateDiscountRate * t ? 'discount' : null))
-  const gatePassed = gateBy !== null
-  const discountBand = guarded ? undefined : cfg.discountBands.find(band => d * 100 >= band.lower * b)
-  // 命中檔位仍然回傳（供界面灰显與對照），但停用模組或閘門未通過時分值不計入總分
+  const discountBand = guarded ? undefined : cfg.discountBands.find(band => d * 100 >= band.lower * intensityBase)
+  // 命中檔位仍然回傳（供界面灰显與對照），但停用模組或匹配不到時不計入總分
   const thresholdScore = guarded || !cfg.thresholdEnabled ? 0 : thresholdBand?.score ?? 0
-  const discountScore = guarded || !gatePassed || !cfg.discountEnabled ? 0 : discountBand?.score ?? 0
+  const discountScore = guarded || !cfg.discountEnabled ? 0 : discountBand?.score ?? 0
   return {
     canCompute: true,
     thresholdRatio, thresholdBand, thresholdScore,
-    discountRate: Math.round((d / b * 100 + Number.EPSILON) * 100) / 100, discountBand, discountScore,
-    guarded, gateBy, gatePassed,
+    intensityBase, intensityBaseFromThreshold: t > b,
+    discountRate: Math.round((d / intensityBase * 100 + Number.EPSILON) * 100) / 100, discountBand, discountScore,
+    guarded,
     enrollmentScore: guarded && !cfg.enrollWhenGuarded ? 0 : enrollment,
     total: (guarded && !cfg.enrollWhenGuarded ? 0 : enrollment) + thresholdScore + discountScore,
   }
 }
 
-/** 方案 v1 草稿校驗：返回錯誤文案，null 表示通過 */
+/**
+ * 方案 v1 草稿校驗：返回錯誤文案，null 表示通過。
+ * 停用的模組跳過全部校驗（其檔位不參與計算，也不應阻擋保存）；啟用時才校驗。
+ */
 export function validateCouponScoreConfig(cfg: CouponScoreConfig): string | null {
   if (!Number.isInteger(cfg.enrollmentScore) || cfg.enrollmentScore < 0 || cfg.enrollmentScore > 100) return '報名分必須是 0～100 的整數'
-  if (cfg.gateMultiplier < 1 || cfg.gateMultiplier > 20) return '閘門倍數必須在 1～20 之間'
-  if (cfg.gateMultiplier > cfg.guardMultiplier) return '閘門倍數不得大於硬護欄倍數，否則閘門永遠失效'
-  if (cfg.gateDiscountRate < 0 || cfg.gateDiscountRate > 100) return '閘門折扣率必須在 0～100% 之間'
   if (cfg.guardMultiplier < 1 || cfg.guardMultiplier > 20) return '硬護欄倍數必須在 1～20 之間'
-  const tb = cfg.thresholdBands
-  if (!tb.length || tb[tb.length - 1].upper !== Infinity) return '門檻檔位須保留「不限」兜底檔'
-  for (let i = 0; i < tb.length; i++) {
-    if (tb[i].score < 0 || tb[i].score > 1000) return `門檻第 ${i + 1} 檔分值必須在 0～1000 之間`
-    // 兜底檔的 Infinity 不参与递增比较，否则默认配置永远过不了校验
-    if (i > 0 && i < tb.length - 1 && tb[i].upper <= tb[i - 1].upper) return '門檻倍率上界必須嚴格遞增，不得重疊或留空檔'
+  if (cfg.thresholdEnabled) {
+    const tb = cfg.thresholdBands
+    if (!tb.length) return '門檻計分已啟用，至少需要一個門檻檔位'
+    for (let i = 0; i < tb.length; i++) {
+      if (i > 0 && (tb[i].upper === Infinity || tb[i - 1].upper === Infinity || tb[i].upper <= tb[i - 1].upper)) return '門檻倍率上界必須嚴格遞增，不得重疊或留空檔'
+      if (tb[i].upper === Infinity) return '門檻檔位不再使用「不限」兜底行，匹配不到即 0 分'
+      if (tb[i].score < 0 || tb[i].score > 1000) return `門檻第 ${i + 1} 檔分值必須在 0～1000 之間`
+      // 硬校驗：門檻越高分值不能越高，防止把高分誤填到高門檻檔（如 2 倍拿最高分）
+      if (i > 0 && tb[i].score > tb[i - 1].score) return `門檻越高，分值必須不高於上一檔（第 ${i + 1} 檔 ${tb[i].score} 分 > 第 ${i} 檔 ${tb[i - 1].score} 分）`
+    }
   }
-  const db = cfg.discountBands
-  if (db.length < 2 || db[0].lower <= 0 || db[db.length - 1].lower !== 0) return '力度檔位須以「≥ 某%」開頭並以「< 0%」兜底'
-  for (let i = 0; i < db.length; i++) {
-    if (db[i].score < 0 || db[i].score > 1000) return `力度第 ${i + 1} 檔分值必須在 0～1000 之間`
-    if (i > 0 && db[i].lower >= db[i - 1].lower) return '力度比例下界必須嚴格遞減，不得重複'
+  if (cfg.discountEnabled) {
+    const db = cfg.discountBands
+    if (!db.length) return '力度計分已啟用，至少需要一個力度檔位'
+    for (let i = 0; i < db.length; i++) {
+      if (db[i].lower <= 0) return '力度比例下界必須大於 0%（低於最低檔即 0 分，不需兜底行）'
+      if (db[i].score < 0 || db[i].score > 1000) return `力度第 ${i + 1} 檔分值必須在 0～1000 之間`
+      if (i > 0 && db[i].lower >= db[i - 1].lower) return '力度比例下界必須嚴格遞減，不得重複'
+      // 硬校驗：力度越低分值不能越高，防止把高分誤填到低力度檔
+      if (i > 0 && db[i].score > db[i - 1].score) return `力度越低，分值必須不高於上一檔（第 ${i + 1} 檔 ${db[i].score} 分 > 第 ${i} 檔 ${db[i - 1].score} 分）`
+    }
   }
   return null
 }
 
-/** 單調性軟提示：業務可以故意反常，只提醒不攔截保存 */
+/** 配置軟提示：只保留「不攔截」的建議，分值方向已改為硬校驗 */
 export function couponScoreMonotonicHint(cfg: CouponScoreConfig): string | null {
-  const tBad = cfg.thresholdBands.some((band, i) => i > 0 && band.upper !== Infinity && cfg.thresholdBands[i - 1].upper !== Infinity && band.score > cfg.thresholdBands[i - 1].score)
-  if (tBad) return '提醒：門檻倍率越高檔位分值反而更高，與「門檻越低越可達」的直覺相反'
-  const dBad = cfg.discountBands.some((band, i) => i > 0 && band.score > cfg.discountBands[i - 1].score)
-  if (dBad) return '提醒：優惠力度越高檔位分值反而更低，與「讓利越大越值得推」的直覺相反'
+  const lastThreshold = cfg.thresholdBands[cfg.thresholdBands.length - 1]
+  if (lastThreshold && lastThreshold.upper !== Infinity && lastThreshold.upper > cfg.guardMultiplier) {
+    return `提醒：門檻末檔 ${lastThreshold.upper} 倍已超過硬護欄 ${cfg.guardMultiplier} 倍，該檔永遠不會命中`
+  }
+  if (cfg.thresholdEnabled && lastThreshold && lastThreshold.upper !== Infinity && lastThreshold.upper < cfg.guardMultiplier) {
+    return `提醒：門檻末檔 ${lastThreshold.upper} 倍低於硬護欄 ${cfg.guardMultiplier} 倍，${lastThreshold.upper}～${cfg.guardMultiplier} 倍之間的券門檻分為 0，建議補一檔小分作為邊界容錯`
+  }
+  return null
+}
+
+/* ============================ 金字招牌標籤計分（COM_10） ============================ */
+
+/** 使用金字招牌標籤計分面板的規則編碼 */
+export const SIGNBOARD_SCORE_RULE_IDS = ['COM_10'] as const
+export type SignboardScoreRuleId = typeof SIGNBOARD_SCORE_RULE_IDS[number]
+
+/** 判斷該計分項是否走金字招牌標籤計分面板 */
+export const isSignboardScoreRule = (id?: string): boolean =>
+  !!id && (SIGNBOARD_SCORE_RULE_IDS as readonly string[]).includes(id)
+
+/** 單個招牌標籤的計分配置 */
+export interface SignboardLabelScore {
+  /** 標籤存儲值（枚舉見 signboardLabels.ts，與訂單表 label_type 一致） */
+  labelType: string
+  /** 標籤名稱快照：保存時從枚舉帶出，枚舉調整後歷史數據仍可讀 */
+  labelName: string
+  /** 該標籤分值：商家購買且在投放期內即得分，多標籤逐個累加 */
+  score: number
+}
+
+/** 金字招牌標籤計分配置（與券類 v1 面板互斥，不共用結構） */
+export interface SignboardScoreConfig {
+  items: SignboardLabelScore[]
+}
+
+/** 默認配置：空清單，標籤與分值全部由運營自行增刪 */
+export const DEFAULT_SIGNBOARD_SCORE_CONFIG: SignboardScoreConfig = { items: [] }
+
+/** 金字招牌計分結果 */
+export interface SignboardScoreResult {
+  /** 命中的標籤（保持配置順序） */
+  matched: SignboardLabelScore[]
+  /** 商家持有但未配置分值的標籤（不計分，供界面提示補配） */
+  unconfigured: string[]
+  total: number
+}
+
+/**
+ * 算分：以商家「已購買且在投放期內」的標籤為準，逐個累加已配置的分值。
+ * 不區分場景（全澳對比與商圈對比同標籤同分）；未配置分值的標籤不計分。
+ */
+export function computeSignboardScore(cfg: SignboardScoreConfig, ownedLabels: string[]): SignboardScoreResult {
+  const owned = Array.from(new Set(ownedLabels.filter(Boolean)))
+  const matched = cfg.items.filter(item => owned.includes(item.labelType))
+  const matchedTypes = matched.map(item => item.labelType)
+  const unconfigured = owned.filter(type => !matchedTypes.includes(type))
+  return { matched, unconfigured, total: matched.reduce((sum, item) => sum + item.score, 0) }
+}
+
+/** 配置校驗：返回錯誤文案，null 表示通過（同一標籤不得重複，分值必須是 0～1000 整數） */
+export function validateSignboardScoreConfig(cfg: SignboardScoreConfig): string | null {
+  const seen = new Set<string>()
+  for (let i = 0; i < cfg.items.length; i++) {
+    const item = cfg.items[i]
+    const name = item.labelName || item.labelType || `第 ${i + 1} 行`
+    if (!item.labelType) return `${name}請選擇招牌標籤`
+    if (seen.has(item.labelType)) return `標籤「${name}」重複配置，同一標籤只能有一檔分值`
+    seen.add(item.labelType)
+    if (!Number.isInteger(item.score) || item.score < 0 || item.score > 1000) return `標籤「${name}」的分值必須是 0～1000 的整數`
+  }
   return null
 }
 
@@ -595,8 +576,6 @@ export interface OrganicScoreRule {
   regionConfigs?: Record<string, RegionSupportConfig | RegionOverheatConfig>
   /** 活動加分配置（僅 STB_ACT 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
   activityItems?: ActivityScoreItem[]
-  /** 優惠券力度計分配置（僅 COM_03~COM_07 新方案使用；mode=COUPON_INTENSITY 時生效） */
-  couponIntensityConfig?: CouponIntensityConfig
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -621,27 +600,27 @@ const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 /** 默認評分規則（可在界面上新增/停用/調整分值） */
 export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   // ===== 商業維度（商家營銷投入與付費推廣） =====
-  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減活動加分：門檻≤客單價直接給分，再以門店客單價為基準按倍數梯度計分（門檻越低得分越高）', mode: ScoreMode.TIERED_MULTIPLIER, score: 0, status: ENABLED, builtin: true, thresholdScore: 10, multiplierTiers: [
+  { id: 'COM_01', dimension: ScoreDimension.COMMERCIAL, name: '滿額立減', description: '商家參與滿額立減：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（立減金額 ÷ 計價基數）', mode: ScoreMode.TIERED_MULTIPLIER, score: 0, status: ENABLED, builtin: true, thresholdScore: 10, multiplierTiers: [
     { multiplier: 1, score: 30 },
     { multiplier: 2, score: 20 },
     { multiplier: 3, score: 10 },
   ] },
   { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費加分', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true, prerequisites: '報名減免運費' },
-  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '商家設置進店領券：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
-  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '商家設置收藏送券：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包', description: '商家設置會員紅包：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券', description: '商家設置閃蜂官方神券：報名分 + 優惠力度分（優惠比例檔位 × 門檻可達係數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '購買廣告-金字招牌', description: '購買金字招牌廣告投放期內加分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
+  { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '商家設置進店領券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '商家設置收藏送券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包', description: '商家設置會員紅包：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券', description: '商家設置閃蜂官方神券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '金字招牌(廣告)', description: '商家購買金字招牌標籤後，按已購買且在投放期內的標籤逐個累加計分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
   { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
-  { id: 'STB_04', dimension: ScoreDimension.STORE, name: '店鋪標籤-金牌', description: '金牌店鋪身份標籤加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
-  { id: 'STB_02', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊重降權，四檔狀態分別配置得分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
+  { id: 'STB_02', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊由系統直接過濾，不加載到瀑布流也不計分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
       { condition: 'bonus', score: 100 },
       { condition: 'deduction', score: 20 },
       { condition: 'deduction', score: 50 },
-      { condition: 'deduction', score: 80 },
+      // 休息打烊为系统过滤档：condition 固定 filtered、分值 0，与后端迁移写回的口径一致
+      { condition: 'filtered', score: 0 },
     ] },
   { id: 'STB_03', dimension: ScoreDimension.STORE, name: '評價得分', description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: [
     { condition: 'fixed_bonus', score: 50 },

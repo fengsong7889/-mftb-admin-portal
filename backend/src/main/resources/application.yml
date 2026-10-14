@@ -110,6 +110,19 @@ schema:
 app:
   build-tag: ${APP_BUILD_TAG:unknown}
 
+# 騰訊文檔開放平台集成（個人開發者）：憑據經 backend/.env.local 注入，嚴禁寫死進受版本控制文件
+tencent:
+  docs:
+    base-url: ${TENCENT_DOCS_BASE_URL:https://docs.qq.com}
+    client-id: ${TENCENT_DOCS_CLIENT_ID:}
+    access-token: ${TENCENT_DOCS_ACCESS_TOKEN:}
+    open-id: ${TENCENT_DOCS_OPEN_ID:}
+    root-folder-id: ${TENCENT_DOCS_ROOT_FOLDER_ID:}
+    sync-space-id: ${TENCENT_DOCS_SYNC_SPACE_ID:1}
+    # 定時同步開關與頻率：憑據配好後顯式開啟；默認每天 03:30/15:30 兩輪（錯開考勤同步）
+    sync-enabled: ${TENCENT_DOCS_SYNC_ENABLED:false}
+    sync-cron: ${TENCENT_DOCS_SYNC_CRON:0 30 3,15 * * ?}
+
 
 logging:
   level:

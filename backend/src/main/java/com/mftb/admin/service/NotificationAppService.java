@@ -24,6 +24,12 @@ import java.util.*;
 @RequiredArgsConstructor
 public class NotificationAppService {
     public static final String CLAIM_SIGN = "asset_claim_sign";
+    /** 会议邀约：创建/变更/取消/参会人增减 */
+    public static final String MEETING_INVITE = "meeting_invite";
+    /** 会议开始前提醒 */
+    public static final String MEETING_REMIND = "meeting_remind";
+    /** 释放/爽约/管理员操作告知组织者 */
+    public static final String MEETING_OPS = "meeting_ops";
     private static final String SIGN_SECRET = DingTalkAppService.SIGN_SECRET;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final JdbcTemplate jdbc;
@@ -31,8 +37,15 @@ public class NotificationAppService {
     private final Validator validator;
 
     /** 只登记已有触发点的场景；新增业务必须同时接入通知调用，不能由前端任意创建。 */
-    private static final Map<String, List<String>> SCENARIOS = Map.of(CLAIM_SIGN,
-            List.of("資產領用待簽署", "領用登記或重新發送簽署通知時", "領用人（已綁定釘釘用戶 ID）"));
+    private static final Map<String, List<String>> SCENARIOS = Map.of(
+            CLAIM_SIGN,
+            List.of("資產領用待簽署", "領用登記或重新發送簽署通知時", "領用人（已綁定釘釘用戶 ID）"),
+            MEETING_INVITE,
+            List.of("會議邀約", "會議創建/改期/取消/参会人變更時", "必参与选参参会人（已綁定釘釘用戶 ID）"),
+            MEETING_REMIND,
+            List.of("會議開始前提醒", "會議開始前 N 分鐘由定时作业触发（同一场会只发一次）", "必参与选参参会人与组织者"),
+            MEETING_OPS,
+            List.of("會議室釋放告知", "超时未签到自动释放或行政手动释放时", "會議组织者"));
 
     public List<View> list(String name, Boolean enabled) {
         List<ScenarioView> scenarios = scenarios();

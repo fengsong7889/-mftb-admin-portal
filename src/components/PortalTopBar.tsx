@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import BrandLogo from './BrandLogo'
 import UserMenu from './UserMenu'
 import { changeAppLanguage, ensureLanguageBundle } from '../i18n'
+import { getBrandTitle } from '../constants/portalSystems'
 import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '../api/translation'
 import { COUNTRY_INFO, countrySysName, getCountryOfLanguage, LANG_INFO } from '../utils/translationConfig'
 import './PortalTopBar.css'
@@ -126,7 +127,14 @@ export function PortalLocaleControls() {
 }
 
 export default function PortalTopBar() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const brandTitle = getBrandTitle(t, i18n.language)
+
+  // 门户页不渲染 Sidebar，浏览器标签页标题必须在此回落到「MFTB企業門戶」，
+  // 否则从业务系统返回门户后，标签页仍显示上一个系统的名称
+  useEffect(() => {
+    document.title = brandTitle
+  }, [brandTitle])
 
   return (
     <Header className="portal-top-bar">

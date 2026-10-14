@@ -458,7 +458,7 @@ function RdmGanttScene() {
  * 压缩只用 lengthAdjust="spacing"（调字距），禁止 spacingAndGlyphs——
  * 后者会横向缩放字形，导致中文等宽字形被纵向压扁。
  */
-function ArtworkText({ label, x, y, width = 120 }: { label: string; x: number; y: number; width?: number }) {
+function ArtworkText({ label, x, y, width = 120, fontSize = 12 }: { label: string; x: number; y: number; width?: number; fontSize?: number }) {
   const { t } = useTranslation()
   const text = t(`portal.artwork.${label}`)
   const textRef = useRef<SVGTextElement>(null)
@@ -466,10 +466,19 @@ function ArtworkText({ label, x, y, width = 120 }: { label: string; x: number; y
   useEffect(() => {
     const node = textRef.current
     if (!node) return
-    try { setNaturalWidth(node.getBBox().width) } catch { /* jsdom 等环境不支持 getBBox 时保持自然渲染 */ }
+    try {
+      setNaturalWidth(node.getBBox().width)
+    } catch {
+      // getBBox 不可用时（jsdom 等），按字符数估算：中文/全角约 13px，ASCII 约 7px
+      let estimated = 0
+      for (const ch of text) {
+        estimated += ch.codePointAt(0)! > 0x7f ? 13 : 7
+      }
+      setNaturalWidth(estimated)
+    }
   }, [text])
   const compressed = naturalWidth > width
-  return <text ref={textRef} x={x} y={y} textAnchor="middle" fontSize="12" fontWeight="600" fill="currentColor" textLength={compressed ? width : undefined} lengthAdjust={compressed ? 'spacing' : undefined}>{text}</text>
+  return <text ref={textRef} x={x} y={y} textAnchor="middle" fontSize={fontSize} fontWeight="600" fill="currentColor" textLength={compressed ? width : undefined} lengthAdjust={compressed ? 'spacing' : undefined}>{text}</text>
 }
 
 /** 用裁切逐字揭示，避免定时器触发整张卡片重渲染；每个实例使用独立 SVG 标识。 */
@@ -1325,6 +1334,13 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
    * 共用同一个 data-scene 场景色，不新增系统卡片也不会多出一个色。
    */
   attendance: <AttendancePunchScene />,
+  /*
+   * 会议管理：两套构图分别是「选房与忙闲」和「邀约与签到」——
+   * 前者讲资源与时间，后者讲人与送达，合起来才是这套系统真正在做的事。
+   * 只给一个时钟或一张日历会被读成考勤系统，所以俯视会议桌必须常驻。
+   */
+  meeting: <MeetingRoomScene />,
+  doc: <DocKnowledgeScene />,
   generic: (
     <>
       <path d="M95 65h130v67H95Z" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
@@ -1333,6 +1349,281 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <path d="m144 95 12 12 21-24" className="portal-art-motion portal-art-draw" pathLength="1" fill="none" stroke="#fff" strokeWidth="4" />
     </>
   ),
+}
+
+/** 会议插画共用的逐字揭示（与考勤同款裁切动画，单独命名以免"会议场景依赖考勤类名"这种隐性耦合） */
+function MeetingLabel({ label, x, y, width }: { label: string; x: number; y: number; width: number }) {
+  const id = useId()
+  return <>
+    <defs><clipPath id={`${id}-reveal`}><rect className="portal-art-motion portal-meeting-type" x={x - width / 2} y={y - 14} width={width} height="22" /></clipPath></defs>
+    <g clipPath={`url(#${id}-reveal)`}><ArtworkText label={label} x={x} y={y} width={width} /></g>
+  </>
+}
+
+/** 俯视会议桌 + 环绕座椅：会议插画最不会认错的一组符号（对标 shutterstock/flaticon 的 room booking 图形语言） */
+function MeetingTable({ x, y }: { x: number; y: number }) {
+  return (
+    <g>
+      <rect x={x} y={y} width="56" height="34" rx="17" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
+      {/* 六把椅子：桌子四角 + 上下各一，俯视视角下椅子比人更容易读成"座位数=容量" */}
+      {[[x - 7, y + 8], [x - 7, y + 26], [x + 63, y + 8], [x + 63, y + 26], [x + 21, y - 8], [x + 35, y + 42]].map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="5" fill="#fff" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.8" />
+      ))}
+      {/* 桌面中线：读作"桌子"而不是"胶囊按钮"的关键一笔 */}
+      <path d={`M${x + 12} ${y + 17}h32`} stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
+    </g>
+  )
+}
+
+/**
+ * 会议管理场景一（選房與忙閒）：房间 + 时间轴 + 时钟，三件东西一起才读得出"预约会议室"。
+ *
+ * 悬停后的时序（一个 7.6 秒周期）：
+ * ① 大屏时间轴游标从左扫到右，扫过空闲段时该段亮起绿框（"这段能订"）
+ * ② 顶部标题逐字蹦完 → 绿勾出现
+ * ③ 门口的人沿虚线走向会议桌（步进动画），房间门牌亮起
+ * ④ 时钟分针持续转动，暗示"窗口是按时间占用的"
+ * 静态层自身构图完整：只画一个日历或一个时钟都会读成考勤系统，
+ * 所以俯视会议桌与忙闲时间轴必须同时在场。
+ */
+function MeetingRoomScene() {
+  return (
+    <>
+      <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
+      {/* 顶部状态胶囊：预订成功 */}
+      <rect x="84" y="6" width="152" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <g className="portal-art-motion portal-meeting-badge">
+        <circle cx="98" cy="18" r="8" fill="#52C41A" />
+        <path d="m94.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
+      </g>
+      <MeetingLabel label="meetingBooked" x={170} y={22} width={126} />
+
+      {/* ① 房间：门牌 + 墙体（右下留门洞）+ 俯视会议桌 */}
+      <rect x="22" y="46" width="100" height="96" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+      <path d="M122 118v24" stroke="#fff" strokeWidth="5" />
+      <path className="portal-art-motion portal-meeting-door" d="M118 118h8v24h-8" fill="none" stroke="#E8720C" strokeWidth="2" />
+      <g className="portal-art-motion portal-meeting-plate">
+        <rect x="34" y="54" width="42" height="14" rx="4" fill="currentColor" fillOpacity="0.14" />
+        <path d="M40 61h30" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
+      </g>
+      <MeetingTable x={44} y={80} />
+      {/* 走向会议桌的人：从门口步进到桌边 */}
+      <g className="portal-art-motion portal-meeting-step"><Person x={104} y={146} scale={0.42} /></g>
+      <path d="M112 150q-14 2-26-8" fill="none" stroke="#E8720C" strokeOpacity="0.45" strokeWidth="2" strokeDasharray="4 4" />
+
+      {/* ② 忙闲大屏：时间轴 + 占用块 + 游标 + 选中空闲段 */}
+      <rect x="136" y="42" width="160" height="82" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+      <rect x="136" y="42" width="160" height="14" rx="7" fill="currentColor" fillOpacity="0.12" />
+      {[143, 149, 155].map(cx => <circle key={cx} cx={cx} cy="49" r="2" fill="currentColor" fillOpacity="0.4" />)}
+      <path d="M146 106h140" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+      {Array.from({ length: 8 }, (_, i) => (
+        <path key={i} d={`M${146 + i * 20} 106v4`} stroke="currentColor" strokeOpacity="0.3" strokeWidth="1.6" />
+      ))}
+      {/* 占用段（橙）与空闲段（浅）：左闭右开，相邻不重叠——与后端预约口径一致 */}
+      <rect x="150" y="90" width="36" height="16" rx="3" fill="#E8720C" fillOpacity="0.85" />
+      <rect x="190" y="90" width="28" height="16" rx="3" fill="currentColor" fillOpacity="0.14" />
+      <rect x="222" y="90" width="44" height="16" rx="3" fill="#E8720C" fillOpacity="0.85" />
+      <rect className="portal-art-motion portal-meeting-pick" x="188" y="88" width="32" height="20" rx="4"
+        fill="none" stroke="#52C41A" strokeWidth="2.4" />
+      {/* 游标：从左扫到右，代表"正在看这一天的忙闲" */}
+      <g className="portal-art-motion portal-meeting-cursor">
+        <path d="M150 66v44" stroke="#0958D9" strokeWidth="2" />
+        <path d="m146 64 4-5 4 5Z" fill="#0958D9" />
+      </g>
+      {/* 屏幕右上角：容量与设备提示点 */}
+      <path d="M256 66h30m-30 8h20" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+
+      {/* ③ 时钟：分针线性转动（会议是按时间占用的资源） */}
+      <circle cx="272" cy="140" r="17" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+      {Array.from({ length: 12 }, (_, i) => {
+        const angle = (i * 30 * Math.PI) / 180
+        return (
+          <line key={i}
+            x1={272 + Math.sin(angle) * (i % 3 === 0 ? 12 : 14)} y1={140 - Math.cos(angle) * (i % 3 === 0 ? 12 : 14)}
+            x2={272 + Math.sin(angle) * 15.5} y2={140 - Math.cos(angle) * 15.5}
+            stroke="currentColor" strokeOpacity={i % 3 === 0 ? 0.75 : 0.28} strokeWidth={i % 3 === 0 ? 1.8 : 1} />
+        )
+      })}
+      <path className="portal-art-motion portal-meeting-hand" d="M272 140v-12" stroke="#E8720C" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M272 140h8" stroke="currentColor" strokeOpacity="0.55" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="272" cy="140" r="2.2" fill="currentColor" />
+
+      {/* 动线：房间 → 大屏（先画后擦，与考勤场景同一套视觉语言） */}
+      <path className="portal-art-motion portal-meeting-link" pathLength="1" d="M124 74h10v-8" fill="none" stroke="#0958D9" strokeWidth="2" strokeLinejoin="round" />
+    </>
+  )
+}
+
+/**
+ * 会议管理场景二（邀約與簽到）：一张邀约卡发给三个人 + 扫码签到。
+ *
+ * 悬停时序：① 卡片沿三条虚线飞向三个人，落点依次弹出绿勾（错峰 0.18s）
+ * ② 顶部标题逐字蹦完 ③ 二维码扫描线上下走一遍 → 右下角"已簽到"绿章落下
+ * ④ 全部回退，进入下一轮。
+ * 与场景一共用 data-scene，卡片色调不新增。
+ */
+function MeetingInviteScene() {
+  const receivers = [[168, 62], [168, 104], [214, 83]] as const
+  return (
+    <>
+      <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
+      <rect x="80" y="6" width="160" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <g className="portal-art-motion portal-meeting-badge">
+        <circle cx="94" cy="18" r="8" fill="#52C41A" />
+        <path d="m90.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
+      </g>
+      <MeetingLabel label="meetingInviteSent" x={168} y={22} width={130} />
+
+      {/* ① 邀约卡片：主题条 + 时间片 + 房间/组织者三行，一眼是"一张会议邀约"而不是普通文档 */}
+      <g className="portal-art-motion portal-meeting-card">
+        <rect x="24" y="52" width="92" height="86" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+        <rect x="24" y="52" width="92" height="16" rx="8" fill="currentColor" fillOpacity="0.14" />
+        <circle cx="36" cy="60" r="4" fill="#E8720C" />
+        <path d="M46 60h58" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2.4" />
+        {/* 时间片：左时刻右时长，读作"10:00–11:00 · 60 分钟" */}
+        <rect x="34" y="76" width="42" height="16" rx="4" fill="#E8720C" fillOpacity="0.16" />
+        <path d="M40 84h30" stroke="#E8720C" strokeOpacity="0.8" strokeWidth="2.4" />
+        <rect x="82" y="76" width="24" height="16" rx="4" fill="currentColor" fillOpacity="0.12" />
+        <path d="M87 84h14" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
+        <path d="M34 102h64m-64 10h48m-48 10h56" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.6" />
+        {/* 卡片右下角的小会议桌：把"这张卡是关于会议的"再钉一次 */}
+        <rect x="86" y="112" width="20" height="12" rx="6" fill="currentColor" fillOpacity="0.2" />
+      </g>
+
+      {/* ② 三位接收人：虚线飞行 + 落点绿勾（错峰） */}
+      {receivers.map(([px, py], i) => (
+        <g key={i}>
+          <path className="portal-art-motion portal-meeting-invite" pathLength="1"
+            style={{ animationDelay: `${i * 0.18}s` }}
+            d={`M118 ${70 + i * 16}q${(px - 118) / 2} ${py - 96} ${px - 130} ${py - 84}`}
+            fill="none" stroke="#0958D9" strokeOpacity="0.55" strokeWidth="2" strokeDasharray="4 4" />
+          <Person x={px} y={py + 16} scale={0.4} />
+          <g className="portal-art-motion portal-meeting-tick" style={{ animationDelay: `${0.3 + i * 0.18}s` }}>
+            <circle cx={px + 12} cy={py - 2} r="7" fill="#52C41A" />
+            <path d={`m${px + 9} ${py - 2} 2.2 2.4 4.2-4.8`} fill="none" stroke="#fff" strokeWidth="1.8" />
+          </g>
+        </g>
+      ))}
+
+      {/* ③ 签到二维码 + 扫描线 + 已签到绿章 */}
+      <g>
+        <rect x="248" y="52" width="50" height="50" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+        {/* 三个定位角 + 数据点：这是二维码能被认出来的最小要素 */}
+        {[[254, 58], [280, 58], [254, 84]].map(([qx, qy]) => (
+          <g key={`${qx}-${qy}`}>
+            <rect x={qx} y={qy} width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+            <rect x={qx + 3.5} y={qy + 3.5} width="5" height="5" fill="currentColor" />
+          </g>
+        ))}
+        {[[272, 74], [280, 82], [288, 74], [272, 90], [288, 90]].map(([dx, dy]) => (
+          <rect key={`${dx}-${dy}`} x={dx} y={dy} width="4" height="4" fill="currentColor" fillOpacity="0.75" />
+        ))}
+        <path className="portal-art-motion portal-meeting-qr" d="M252 60h42" stroke="#E8720C" strokeWidth="2.4" />
+      </g>
+      <g className="portal-art-motion portal-meeting-signed">
+        <rect x="210" y="112" width="105" height="26" rx="13" fill="#52C41A" />
+        <ArtworkText label="meetingCheckedIn" x={262} y={129} width={95} fontSize={10} />
+      </g>
+      <g className="portal-art-motion portal-meeting-step"><Person x={232} y={150} scale={0.4} /></g>
+    </>
+  )
+}
+
+/**
+ * 文檔中心主構成：「知識沉澱 → 統一索引 → 雲側閱讀」。
+ * 左側四張小卡代表需求/人事/行政/制度四個知識域，依次浮入疊成一摞；
+ * 中間索引卡的放大鏡與命中行講「搜得到、看得見口徑」；
+ * 右側雲 + 文檔窗口講「正文沉澱在騰訊文檔側」——只畫文件會讀成本地網盤，
+ * 只畫雲會讀成備份，兩者必須同時在場。
+ */
+function DocKnowledgeScene() {
+  return <g className="portal-doc-scene">
+    <rect x="64" y="9" width="192" height="26" rx="8" fill="#fff" />
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="docKnowledgeBase" x={160} y={27} width={176} /></g>
+
+    {/* 左側：知識域文檔疊放（由后至前依次浮入，色條區分四個知識域） */}
+    {[[38, 100, '#1890FF'], [46, 90, '#52C41A'], [54, 80, '#E8720C'], [62, 70, '#722ED1']].map(([x, y, tone], i) => (
+      <g key={i} className="portal-art-motion portal-doc-stack" style={{ animationDelay: `${i * 0.5}s` }}>
+        <rect x={x as number} y={y as number} width="62" height="44" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+        <rect x={(x as number) + 8} y={(y as number) + 8} width="18" height="4" rx="2" fill={tone as string} />
+        <path d={`M${(x as number) + 8} ${(y as number) + 21}h46M${(x as number) + 8} ${(y as number) + 29}h30`} stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
+      </g>
+    ))}
+
+    {/* 动线：文档堆 → 索引卡 */}
+    <path d="M124 104h16" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+    <path className="portal-art-motion portal-art-draw" pathLength="1" d="M124 104h16" fill="none" stroke="#E8720C" strokeWidth="2" />
+
+    {/* 中间：统一索引卡 */}
+    <rect x="142" y="56" width="78" height="94" rx="9" fill="currentColor" opacity="0.08" transform="translate(4 4)" />
+    <rect x="142" y="56" width="78" height="94" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+    <circle cx="160" cy="76" r="7" fill="none" stroke="#1890FF" strokeWidth="2.5" />
+    <path d="m165 81 5 5" stroke="#1890FF" strokeWidth="2.5" strokeLinecap="round" />
+    <ArtworkText label="docIndex" x={198} y={80} width={50} />
+    {[100, 116, 132].map((y, i) => (
+      <g key={y} className="portal-art-motion portal-doc-hit" style={{ animationDelay: `${0.8 + i * 0.6}s` }} opacity="0">
+        <rect x="152" y={y - 7} width="6" height="6" rx="1.5" fill="#52C41A" />
+        <path d={`M164 ${y - 4}h46M164 ${y + 2}h28`} stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+      </g>
+    ))}
+
+    {/* 动线：索引卡 → 云端 */}
+    <path d="M224 100h16" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+    <path className="portal-art-motion portal-art-draw" pathLength="1" d="M224 100h16" fill="none" stroke="#E8720C" strokeWidth="2" />
+
+    {/* 右侧：腾讯文档云 + 文档窗口 */}
+    <g className="portal-art-motion portal-doc-cloud">
+      <path d="M252 46a16 16 0 0 1 31 6 11 11 0 0 1 3 22h-38a10 10 0 0 1 4-28Z" fill="currentColor" opacity="0.8" />
+    </g>
+    <g className="portal-art-motion portal-doc-window">
+      <rect x="242" y="88" width="58" height="46" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <path d="M242 98h58" stroke="#E8720C" strokeOpacity="0.85" strokeWidth="6" strokeLinecap="round" />
+      <path d="M250 112h42M250 122h26" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
+    </g>
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="docCloudDocs" x={271} y={150} width={62} /></g>
+  </g>;
+}
+
+/**
+ * 文檔中心副構成：「企業知識庫」。
+ * 主體是三層檔案櫃：需求/制度/培訓/合同等分類資料夾依次入櫃，色標籤區分知識域；
+ * 一頁資料夾被抽出櫃體並標注「檔案資料」——講的是「公司文檔、檔案、內部資料有共同金庫」，
+ * 培訓只是使用場景之一，不畫成主角，避免被讀成培訓系統。
+ */
+function DocKnowledgeVaultScene() {
+  return <g className="portal-doc-alt-scene">
+    <rect x="64" y="9" width="192" height="26" rx="8" fill="#fff" />
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="docKnowledgeVault" x={160} y={27} width={176} /></g>
+
+    {/* 左側：新資料入庫 */}
+    <g className="portal-art-motion portal-doc-window">
+      <rect x="26" y="86" width="40" height="34" rx="5" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <path d="M33 96h26M33 104h16" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+    </g>
+    <path d="M70 103h18" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+    <path className="portal-art-motion portal-art-draw" pathLength="1" d="M70 103h18" fill="none" stroke="#E8720C" strokeWidth="2" />
+
+    {/* 主體：三層檔案櫃，分類資料夾依次入櫃（色標籤區分知識域） */}
+    <rect x="92" y="44" width="150" height="112" rx="10" fill="currentColor" opacity="0.07" transform="translate(4 4)" />
+    <rect x="92" y="44" width="150" height="112" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
+    <path d="M92 82h150M92 118h150" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
+    {[[102, 56], [132, 56], [162, 56], [192, 56], [222, 56],
+      [102, 92], [132, 92], [162, 92], [192, 92], [222, 92],
+      [102, 128], [132, 128], [222, 128]].map(([x, y], i) => (
+      <g key={i} className="portal-art-motion portal-doc-stack" style={{ animationDelay: `${(i % 5) * 0.4}s` }}>
+        <rect x={x as number} y={y as number} width="22" height="22" rx="3" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+        <rect x={(x as number) + 4} y={y as number} width="10" height="4" rx="2" fill={(['#1890FF', '#52C41A', '#E8720C', '#722ED1', '#13C2C2'] as const)[i % 5]} />
+      </g>
+    ))}
+
+    {/* 被抽出的檔案資料夾：企業知識的可視化錨點 */}
+    <g className="portal-art-motion portal-doc-window" style={{ animationDelay: '2.2s' }}>
+      <rect x="150" y="124" width="66" height="32" rx="5" fill="#FFF7E6" stroke="#E8720C" strokeOpacity="0.6" />
+      <rect x="158" y="124" width="20" height="5" rx="2.5" fill="#E8720C" opacity="0.8" />
+      <path d="M158 138h50M158 146h30" stroke="#E8720C" strokeOpacity="0.45" strokeWidth="2" />
+    </g>
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="docArchiveFiles" x={183} y={172} width={64} /></g>
+  </g>;
 }
 
 /** 门户插画构图风格：同一系统可提供两套构图，进门户时随机抽一套；用不区分主次的语义名，方便更多系统接入。 */
@@ -1347,6 +1638,9 @@ const variantScenes: Partial<Record<PortalSystemKey | 'generic', (style: PortalA
   ads: style => (style === 'alternate' ? <AdsModelScene /> : <AdsTrafficScene />),
   // 考勤与假期是同一系统的两个日常场景，分两套构图轮换，避免“只看得到打卡”
   attendance: style => (style === 'alternate' ? <AttendanceLeaveScene /> : <AttendancePunchScene />),
+  meeting: style => (style === 'alternate' ? <MeetingInviteScene /> : <MeetingRoomScene />),
+  // 文檔中心：主構成講「沉澱與檢索」，副構成講「企業知識庫與檔案資料」，兩面合起來才是這個系統的全部承諾
+  doc: style => (style === 'alternate' ? <DocKnowledgeVaultScene /> : <DocKnowledgeScene />),
 }
 
 export default function SystemArtwork({ code, name = '', active = false, style = 'primary' }: {

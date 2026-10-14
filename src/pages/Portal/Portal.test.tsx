@@ -10,6 +10,7 @@ import SystemArtwork from './SystemArtwork'
 import PortalTopBar from '../../components/PortalTopBar'
 import HeaderBar from '../../components/HeaderBar'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { fetchPortalFavorites, savePortalFavorites } from '../../api/auth'
 import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '../../api/translation'
 import { loadSystemNavigation } from '../../hooks/useSystemNavigation'
 import i18n, { ensureLanguageBundle, getSavedLanguage, injectTranslationBundle, SUPPORTED_LANGUAGES } from '../../i18n'
@@ -19,13 +20,20 @@ import ja from '../../i18n/locales/ja.json'
 import ko from '../../i18n/locales/ko.json'
 import ru from '../../i18n/locales/ru.json'
 
+/** 门户收藏按 username 隔离，默认不提供 username 以保持其余用例不受影响。 */
+const authState = vi.hoisted(() => ({ username: undefined as string | undefined }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
-  user: { name: '测试员工', empId: 'TEST', role: 'user' },
+  user: { name: '测试员工', empId: 'TEST', role: 'user', username: authState.username },
   hasMenuPermission: () => true,
   logout: vi.fn(),
 }) }))
 vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null }) }))
 vi.mock('../../api/portal', () => ({ fetchPortalContext: vi.fn() }))
+// 默认 null = 「该账号从未同步过」，门户保留 localStorage 缓存，不干扰既有用例
+vi.mock('../../api/auth', () => ({
+  fetchPortalFavorites: vi.fn().mockResolvedValue(null),
+  savePortalFavorites: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('../../api/translation', async importOriginal => ({
   ...await importOriginal<typeof import('../../api/translation')>(),
   fetchLanguages: vi.fn(),
@@ -82,18 +90,78 @@ async function selectLanguage(label: string) {
 
 beforeEach(async () => {
   localStorage.clear()
+  authState.username = undefined
   vi.clearAllMocks()
   vi.mocked(ensureLanguageBundle).mockResolvedValue(undefined)
   vi.mocked(fetchLanguages).mockResolvedValue(configuredLanguages)
   await i18n.changeLanguage('zh-TW')
   vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [finance], superAdmin: false })
+  // clearAllMocks 只清调用记录不清实现，逐用例改过的云端返回值必须在这里复位
+  vi.mocked(fetchPortalFavorites).mockResolvedValue(null)
   vi.mocked(loadSystemNavigation).mockResolvedValue([
     { id: 1, parentId: null, menuKey: 'account-balance', name: '賬戶餘額', path: '/account-balance', type: 2, sort: 1, status: 1 },
   ])
 })
 
+describe('门户常用入口带（收藏与最近使用）', () => {
+  beforeEach(() => { authState.username = 'TEST01' })
+
+  it('收藏的系统提到第一屏，权限已撤销的收藏编码不残留', async () => {
+    localStorage.setItem('portal_favorites:TEST01', JSON.stringify(['finance', 'revoked-system']))
+    const { container } = mount()
+    // 常用带出现即代表加载完成；'revoked-system' 不在接口返回的系统里，必须被过滤掉
+    await screen.findByText('我的常用')
+    const chips = container.querySelectorAll('.portal-quick-item')
+    expect(chips).toHaveLength(1)
+    expect(chips[0]).toHaveTextContent('財務結算系統')
+    // 已收藏的卡片星标常亮，未授权系统不给收藏入口
+    expect(container.querySelector('.portal-card-fav.is-on')).toBeInTheDocument()
+  })
+
+  it('点击卡片星标写入个人收藏，收藏项不会成为进入未授权系统的通道', async () => {
+    const { container } = mount()
+    const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    const shell = card.closest('.portal-card-shell')!
+    fireEvent.click(shell.querySelector('.portal-card-fav')!)
+    expect(JSON.parse(localStorage.getItem('portal_favorites:TEST01')!)).toEqual(['finance'])
+    // 本地写成功的同时整份覆盖到云端账号，换设备/清缓存才不会丢
+    expect(savePortalFavorites).toHaveBeenCalledWith(['finance'])
+    expect(container.querySelector('.portal-quick-item')).toHaveTextContent('財務結算系統')
+    // 星标点击不得冒泡触发整卡进入，仍停留在门户路由
+    expect(screen.getByTestId('portal-route')).toHaveTextContent('/portal')
+  })
+
+  it('云端同步过且已清空时覆盖本地缓存，换设备的清空动作能同步过来', async () => {
+    localStorage.setItem('portal_favorites:TEST01', JSON.stringify(['finance']))
+    vi.mocked(fetchPortalFavorites).mockResolvedValue([])
+    const { container } = mount()
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    expect(container.querySelector('.portal-favorites')).toBeNull()
+    expect(container.querySelector('.portal-card-fav.is-on')).toBeNull()
+  })
+
+  it('云端从未同步（null）时保留本地缓存，不被误判成「用户清空了」', async () => {
+    localStorage.setItem('portal_favorites:TEST01', JSON.stringify(['finance']))
+    vi.mocked(fetchPortalFavorites).mockResolvedValue(null)
+    const { container } = mount()
+    await screen.findByText('我的常用')
+    expect(container.querySelectorAll('.portal-quick-item')).toHaveLength(1)
+  })
+
+  it('收藏不设数量上限，已有 12 项时仍能继续加入', async () => {
+    const seeded = Array.from({ length: 12 }, (_, index) => `sys-${index}`)
+    localStorage.setItem('portal_favorites:TEST01', JSON.stringify(seeded))
+    const { container } = mount()
+    const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    fireEvent.click(card.closest('.portal-card-shell')!.querySelector('.portal-card-fav')!)
+    expect(JSON.parse(localStorage.getItem('portal_favorites:TEST01')!)).toEqual([...seeded, 'finance'])
+    // 12 个种子编码都不在接口返回的系统里，因此带内只会出现新收藏的这一张
+    expect(container.querySelectorAll('.portal-quick-item')).toHaveLength(1)
+  })
+})
+
 describe('门户场景卡片与授权边界', () => {
-  it('上图下文、无英文副标题，全部十四种系统有不同场景；未授权卡片点击弹出申请引导', async () => {
+  it('上图下文、无英文副标题，全部十六张卡片各有不同场景；未授权卡片点击弹出申请引导', async () => {
     const { container } = mount()
     const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     expect(card.querySelector('.portal-card-cover > svg[data-scene="finance"]')).toBeInTheDocument()
@@ -106,7 +174,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(card.querySelector('.portal-card-body .anticon')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(13)
+    // 目录卡片数 = sys_system 业务系统数（新增 doc 文档中心系统后为 15）
+    expect(cards).toHaveLength(15)
     cards.forEach(button => {
       expect(button).toBeEnabled()
       expect(button).toHaveClass('is-locked')
@@ -119,7 +188,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
     const scenes = Array.from(container.querySelectorAll('[data-scene]'), image => image.getAttribute('data-scene'))
-    expect(new Set(scenes).size).toBe(14)
+    // 15 个目录系统 + 接口返回的 finance = 16 张卡片，每张都有专属场景插画
+    expect(new Set(scenes).size).toBe(16)
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
@@ -143,7 +213,7 @@ describe('门户场景卡片与授权边界', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
     expect(document.querySelector('[data-testid="system-route"]')).toBeNull()
-    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(13)
+    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(15)
     expect(localStorage.getItem('current_system_code')).toBeNull()
     expect(loadSystemNavigation).not.toHaveBeenCalled()
   })
@@ -163,7 +233,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.noSystem)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    expect(cards).toHaveLength(14)
+    // 15 个业务系统 + 测试内注入的 future 系统 = 16 张未授权卡片
+    expect(cards).toHaveLength(16)
     cards.forEach(button => expect(button).toHaveClass('is-locked'))
   })
 
@@ -458,11 +529,13 @@ describe('场景区分与低干扰动效', () => {
     const tones = new Map<string, string>()
     for (const [, scene, color] of css.matchAll(/\.portal-card-artwork\[data-scene='(\w+)'\]\s*\{\s*color:\s*(#[\dA-Fa-f]{6})/g)) tones.set(scene, color)
     expect([...tones.keys()].sort()).toEqual([
-      'ads', 'ai', 'attendance', 'eam', 'finance', 'hr', 'iam', 'merchant', 'merchantWorkbench', 'oa', 'platform', 'rdm', 'search', 'translation',
+      'ads', 'ai', 'attendance', 'doc', 'eam', 'finance', 'hr', 'iam', 'meeting', 'merchant', 'merchantWorkbench', 'oa', 'platform', 'rdm', 'search', 'translation',
     ].sort())
     expect(new Set(tones.values()).size).toBe(tones.size)
     // 营销与商家增长组内四张卡并排展示，色相必须彼此互斥
     expect(new Set(['ads', 'search', 'merchant', 'merchantWorkbench'].map(scene => tones.get(scene)))).toHaveLength(4)
+    // 协作与交付组（oa/rdm/meeting）同样并排，会议的深蓝必须与流程琥珀、产研洋红拉开
+    expect(new Set(['oa', 'rdm', 'meeting'].map(scene => tones.get(scene)))).toHaveLength(3)
   })
 
   it('每次进入门户轮换一档插画构图，连续两次不会看到同一风格', async () => {
@@ -507,6 +580,10 @@ describe('场景区分与低干扰动效', () => {
       ['translation', 'primary'], ['ads', 'primary'], ['merchant', 'primary'], ['seller', 'primary'],
       ['platform', 'primary'], ['rdm', 'primary'],
       ['attendance', 'primary'], ['attendance', 'alternate'],
+      // 会议两套构图各承载状态文案：场景一讲"已预订"，场景二讲"邀约送达 + 已签到"
+      ['meeting', 'primary'], ['meeting', 'alternate'],
+      // 文檔中心两套构图各承载状态文案：主構成讲"沉淀与检索"，副構成讲"企业知识库与档案资料"
+      ['doc', 'primary'], ['doc', 'alternate'],
     ]
     const { container } = render(<>{frames.map(([code, style]) => <SystemArtwork key={`${code}-${style}`} code={code} style={style} />)}</>)
     for (const text of Object.values(copy)) expect(container).toHaveTextContent(text)
@@ -760,5 +837,16 @@ describe('门户多语言与系统继承', () => {
     await i18n.changeLanguage('ja')
     expect(i18n.t('portal.systems.finance.name')).toBe('財務決済システム')
     expect(i18n.t('portal:systems.finance.name')).toBe('財務決済システム')
+  })
+
+  it('门户页把浏览器标签页标题回落为门户名称，切换语言后同步', async () => {
+    // 模拟从业务系统返回门户：Sidebar 卸载后残留的标题必须被门户顶栏覆盖
+    document.title = 'MFTB財務結算系統'
+    mount()
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    expect(document.title).toBe(`MFTB${zh.portal.title}`)
+    await selectLanguage('English')
+    await screen.findByRole('button', { name: 'Finance & Settlement · Enter system' })
+    expect(document.title).toBe('MFTB Enterprise Portal')
   })
 })

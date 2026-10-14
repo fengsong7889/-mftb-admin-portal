@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Empty, Modal, Select, Space, Spin, Switch, Tag, Tooltip, Tree, message } from 'antd'
 import type { DataNode } from 'antd/es/tree'
 import { CopyOutlined, InfoCircleOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons'
+import HelpPopover from '../../../components/HelpPopover'
 import { useTranslation } from 'react-i18next'
 import type { MenuPermission } from '../types'
 import { getMenuActions } from '../types'
@@ -849,10 +850,15 @@ export default function PermissionWorkbench() {
                       <span className="authz-batch-grant">
                         <span className="authz-batch-grant-label">
                           {t('authorizationCenter.batchGrantLabel', '批量授權')}
-                          <Tooltip title={t('authorizationCenter.batchGrantTip',
-                            '「僅查看」只開放頁面進入；「全部權限」會一併授予新增/編輯/刪除/導入/導出，請按需選擇。')}>
+                          <HelpPopover
+                            title="批量授權說明"
+                            content={t('authorizationCenter.batchGrantTip',
+                              '「僅查看」只開放頁面進入；\n「全部權限」會一併授予新增/編輯/刪除/導入/導出，請按需選擇。')}
+                            ariaLabel="批量授權說明"
+                            placement="bottomLeft"
+                          >
                             <InfoCircleOutlined className="authz-batch-grant-info" />
-                          </Tooltip>
+                          </HelpPopover>
                         </span>
                         <Tooltip title={t('authorizationCenter.selectAllMenusHint',
                           '勾選本系統全部菜單，僅授予「查看」權限；已授權的菜單保留其原有動作。')}>

@@ -912,6 +912,31 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '修改口徑參數' },
   ],
+  // ── 会议管理系统（动作集必须与 MeetingSchemaMigrationInitializer 写入的 sys_menu.actions 逐字对齐：
+  //  少登记一个动作，授权中心就勾不到该能力；多登记一个动作，就会授出接口并不存在的权限）──
+  'meeting-my': [
+    { key: 'view', label: '查看' },
+    // 响应邀约与取消自己发起的会议都是写操作，与后端 @RequirePermission(action=edit) 对齐
+    { key: 'edit', label: '響應/取消會議' },
+  ],
+  'meeting-booking': [
+    { key: 'view', label: '查看忙閒' },
+    { key: 'edit', label: '預約/改期/取消' },
+  ],
+  'meeting-room': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增會議室' },
+    { key: 'edit', label: '編輯/啟停/刪除' },
+  ],
+  'meeting-record': [
+    { key: 'view', label: '查看全部記錄' },
+    { key: 'edit', label: '代訂/手動釋放/取消' },
+  ],
+  // 預約規則：改全局規則與手動拉黑/撤銷都是寫操作，動作集與 sys_menu.actions 逐字對齊
+  'meeting-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '修改規則/黑名單' },
+  ],
   // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
   'asset-claim': [
     { key: 'view', label: '查看' },
@@ -1599,6 +1624,17 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'attendance-daily',
   'attendance-monthly',
   'attendance-setting',
+  // 会议管理（后端 MeetingSchemaMigrationInitializer 已按菜单鉴权，前端同步纳入受控）
+  'meeting-my',
+  'meeting-booking',
+  'meeting-room',
+  'meeting-record',
+  'meeting-config',
+  // 文檔中心（後端 DocSchemaMigrationInitializer 已種菜單，前端同步納入受控）
+  'doc-library',
+  'doc-space',
+  'doc-stats',
+  'doc-learning',
   // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
   'asset-claim',
   'asset-borrow',
@@ -1900,6 +1936,30 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/attendance-daily': 'attendance-daily',
   '/attendance-monthly': 'attendance-monthly',
   '/attendance-setting': 'attendance-setting',
+  // 会议管理（/meeting-detail 不是菜单项，但从钉钉卡片与日程单元格跳进来，
+  // 必须归到 meeting-my 的菜单权限下，否则路由守卫拿不到菜单 key）
+  '/meeting-my': 'meeting-my',
+  '/meeting-detail': 'meeting-my',
+  '/meeting-booking': 'meeting-booking',
+  '/meeting-booking-form': 'meeting-booking',
+  '/meeting-room': 'meeting-room',
+  '/meeting-room-form': 'meeting-room',
+  '/meeting-record': 'meeting-record',
+  '/meeting-config': 'meeting-config',
+  '/meeting-blacklist-form': 'meeting-config',
+  // 文檔中心（詳情/登記/編輯為文檔庫非菜單子頁，空間表單為空間管理子頁）
+  '/doc-center': 'doc-library',
+  '/doc-center/detail': 'doc-library',
+  '/doc-center/register': 'doc-library',
+  '/doc-center/edit': 'doc-library',
+  '/doc-space': 'doc-space',
+  '/doc-space/form': 'doc-space',
+  '/doc-stats': 'doc-stats',
+  '/doc-learning': 'doc-learning',
+  '/doc-learning/detail': 'doc-learning',
+  '/doc-learning/form': 'doc-learning',
+  // 免登签到页（扫码直达）：不是菜单项，归到「我的會議」，没有登录态时由路由本身放行
+  '/meeting-checkin': 'meeting-my',
   // 領用管理（子路由歸屬 asset-claim 菜單）
   '/asset-claim': 'asset-claim',
   '/asset-claim/add': 'asset-claim',

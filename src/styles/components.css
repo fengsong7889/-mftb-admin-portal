@@ -1651,6 +1651,20 @@
   border: 1px solid rgba(255, 255, 255, 0.3); /* 玻璃边框 */
 }
 
+/* ⚠️ 例外登记（对 .qoder/rules/frontend-ui-design-spec.md §K.2「无 @media 响应式断点」）：
+ *   原因：卡片固定 430px 在 390pt 宽的手机上会横向溢出，而移动 APP 原型（/app-preview）
+ *         必须先在真机走通登录链路，登录页被撑破则整条验证路径不通。
+ *   风险：仅 ≤480px 视口生效，桌面端登录页与后台业务页布局完全不变。
+ *   补偿：范围限定 .login-card-v2 单类，宽度与留白按 §D.7 登录页规范取值，不新增色值/圆角令牌。
+ *   负责人：产品/前端（移动 APP 原型发起人）。到期：随 APP 正式立项、移动端登录独立设计即移除。 */
+@media (max-width: 480px) {
+  .login-card-v2 {
+    width: auto;
+    margin: 0 14px;
+    padding: 60px 20px 28px; /* 顶部仍避开右上角国家/语言选择器，左右收窄防止溢出 */
+  }
+}
+
 /* 登录页右上角国家 & 语言选择器 */
 .login-locale-corner {
   position: absolute;

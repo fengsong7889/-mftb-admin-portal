@@ -7,7 +7,7 @@
 
 ---
 
-## 1. 系统清单（14 个业务系统 + 1 个公共入口）
+## 1. 系统清单（16 个业务系统 + 1 个公共入口）
 
 > **命名规范（2026-10 统一）**：中文显示名一律「4字域名 + 系統」= 6 字，全部以「系統」结尾。
 > 不再混用「中心 / 工作台 / 配置」——那类后缀属菜单级语义，会把独立系统降级成菜单。
@@ -27,6 +27,8 @@
 | `eam` | 物資管理系統 | Asset Management | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
 | `rdm` | 產研交付系統 | R&D Delivery | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
 | `oa` | 流程審批系統 | Workflow Approval | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
+| `meeting` | 會議管理系統 | Meeting Management | `VideoCameraOutlined` | 85 | 会议室档案、全员预约、参会人日程、钉钉邀约（v230 新增独立一级系统） |
+| `doc` | 文檔中心系統 | Document Center | `CloudOutlined` | 87 | 騰訊文檔為內容中台：需求/人事/行政/制度/培訓文檔的統一索引、菜單門禁與查閱審計（doc:menu:v1.0 新增獨立一級系統） |
 | `iam` | 權限管理系統 | Access Control | `SafetyCertificateOutlined` | 90 | 角色、功能授权、数据授权、菜单配置、账号安全 |
 | `platform` | 平台支撐系統 | Platform Support | `SettingOutlined` | 100 | 通知渠道、规则中心、版本管理 |
 | `i18n` | 翻譯管理系統 | Translation Management | `GlobalOutlined` | 110 | 翻译工作台、语言管理、导入导出、机翻引擎、翻译统计 |
@@ -91,6 +93,45 @@
 | `attendance-daily` | 考勤日報 | `attendance` | 顶级菜单，sort 35；**v1.1 補齊 `edit` 動作**（重算區間日報屬寫操作，缺 edit 則該能力對普通角色永遠授不出去） |
 | `attendance-monthly` | 月度考勤匯總 | `attendance` | 顶级菜单，sort 36；冻结后为薪酬核算取数来源 |
 | `attendance-setting` | 假勤設置 | `attendance` | 顶级菜单，sort 37；只含考勤口径参数，**不含审批流程配置**（归 `oa` 的流程配置） |
+| `meeting-management` | 會議中心 | `meeting` | 顶级分组（type=1）；**meeting:menu:v1.2 由「會議管理」更名**（复用同一行只改显示名，menu_id 不变，存量授权随行）；sort 取「当前顶级最大值 + 10」而非写死，避免与后续新增系统互顶 |
+| `meeting-admin` | 會議治理 | `meeting` | **meeting:menu:v1.2 新增**的第二个顶级分组（type=1），icon `MonitorOutlined`（已核对 sys_menu 无重复）；sort 取「會議中心 + 1」使两个一级菜单在侧边栏相邻；使用侧与行政治理侧分列，避免普通员工每次展开都要跳过三条治理入口 |
+| `meeting-my` | 我的會議 | `meeting` | 挂在 `meeting-management`（會議中心）下，组内 sort 1；actions `view,edit`；非菜单子页 `/meeting-detail` 也归本菜单（钉钉邀约卡片直达） |
+| `meeting-booking` | 會議室預約 | `meeting` | 挂在 `meeting-management`（會議中心）下，组内 sort 2；actions `view,edit`；写动作统一用 `edit`（菜单种子里没有 `create`，标注不存在的动作等于接口永久 403） |
+| `meeting-room` | 會議室檔案 | `meeting` | **v1.2 从 `meeting-management` 迁到 `meeting-admin`**，组内 sort 1；actions `view,create,edit`；档案全员可读、仅行政可写，M1 不开放导出（无导出接口就不登记 export） |
+| `meeting-record` | 預約記錄 | `meeting` | **v1.2 迁到 `meeting-admin`**，组内 sort 2；actions `view,edit`；`view` 决定能否看全量（行政视野），`edit` 决定能否代操作 |
+| `meeting-config` | 預約規則 | `meeting` | **M2（v231 + meeting:menu:v1.1）新增**，**v1.2 迁到 `meeting-admin`**，组内 sort 3；actions `view,edit`。改全局規則與手動拉黑/撤銷都是寫操作；「能不能改」由服務層 `requireRecordManager` 錨在 `meeting-record:edit` 判定，菜單動作只決定能不能進頁面 |
+| `doc-library` | 文檔庫 | `doc` | 頂級菜單（type=2，**doc:menu:v1.1 拍平**，對齊 rdm「菜單拍平為一級」形態，無分組殼）；actions `view,edit`；**權限粒度為菜單級統一（產品決策）**：持有 view 即全空間可見，edit 承載登記/編輯/刪除；非菜單子頁 `/doc-center/detail`、`/doc-center/register`、`/doc-center/edit` 均歸本菜單 |
+| `doc-space` | 空間管理 | `doc` | 頂級菜單（**doc:menu:v1.1 拍平**）；actions `view,edit`；空間維護與騰訊文檔目錄同步/OpenAPI 用量查看入口；子頁 `/doc-space/form` 歸本菜單 |
+| `doc-stats` | 閱讀統計 | `doc` | 頂級菜單（**P2 新增，doc:menu:v1.2**），icon `BarChartOutlined`；actions `view`（頁面純唯讀，不種 edit）；期間窗口（7/30/90 天）內按文檔聚合的閱讀口徑看板 |
+| `doc-learning` | 學習路徑 | `doc` | 頂級菜單（**P2 新增，doc:menu:v1.3**），icon `FlagOutlined`；actions `view,edit`；新人入職包/培訓清單（有序文檔集合 + 本人完成度，已讀由留痕推導）；子頁 `/doc-learning/detail`、`/doc-learning/form` 歸本菜單 |
+
+> 歷史分組 `doc-center-management` 已由 doc:menu:v1.1 解除（邏輯刪除+清授權）：系統視圖按 system_code 剪枝，一級分組沒有運行時職責只多一次展開。門戶業務域歸類：doc 屬「協作與交付」（collab），使用視角為全員查閱知識，空間治理入口留在系統內。
+
+> **免登签到页 `/meeting-checkin?token=`（M2）不是菜单项**：它对应后端安全白名单里的 `/api/meeting/checkin-page/**`，
+> 身份由 HMAC 令牌（绑人 + 绑会议 + 会议结束后 2 小时失效）校验；前端把它登记进 `pathToKey` / `ROUTE_MENU_KEY_MAP`
+> 并归到 `meeting-my`，只是为了让页签与菜单高亮拿得到锚点，不代表该页需要登录态。
+
+> **会议域三个新增/编辑独立页（非菜单项，UI 规范 §9.1 禁止用弹窗承载表单）**：
+> `/meeting-room-form`（會議室檔案 新增/编辑，归 `meeting-room`）、
+> `/meeting-booking-form`（新建预约，归 `meeting-booking`）、
+> `/meeting-blacklist-form`（手動加入黑名單，归 `meeting-config`）。
+> 三个页面都需在 `App.tsx` 注册路由 + `menuDataSource.pathToKey` + `Permission/types.ROUTE_MENU_KEY_MAP` 三处对齐，
+> 否则路由守卫拿不到菜单 key（要么人人可进，要么永久 403）；带 `?id=` 时按 id 回查接口，刷新与粘贴 URL 都不丢上下文。
+
+> **行政代订（`delegate_for_id`）不是新菜单，也不新增动作**：入参只有一个 `delegateForId`（sys_user.id），
+> 权限锚沿用 `meeting-record:edit`（与手动释放、代取消同源，由服务层 `MeetingAccessGuard.resolveDelegateFor` 判定，
+> 控制器注解只管菜单入口）。语义：**组织者仍是登录的行政**（保留改期/取消权），
+> 实际使用人落 `delegate_for_id/delegate_for_name` 快照并**自动并入必参名单**，
+> 因此他的日程、响应、签到全都天然挂载；时段冲突按**使用人**而不是行政判定（行政不出席这场会）；
+> 黑名单**两人都查**（否则被限制的人只要找人代订就能继续占用窗口）；改期**不迁移**使用人，要换人只能取消重订。
+> 代订人参与幂等哈希，同一 `requestKey` 换挂名对象会被判为不同请求而拒绝。
+
+> **门户业务域归属（Portal `PORTAL_DOMAINS`）**：`meeting` 归 **協作與交付（collab）**，与 `oa`（流程审批）、`rdm`（产研交付）同域；
+> 同期把 `org` 收窄为 **組織與人事**（只剩 `hr`、`attendance`）。
+> 会议同时带行政与协作两种属性——会议室档案/预约规则/黑名单由行政维护（治理面），但使用者是全员排期开会（协作面）；
+> 门户分类按使用者视角划分，所以归协作域，行政治理入口留在系统内部的「會議治理」一级菜单。
+> 插画为专属两套构图（`data-scene='meeting'`，色调 `#0958D9`）：场景一「选房与忙闲」= 俯视会议桌 + 忙闲时间轴 + 时钟，
+> 场景二「邀约与签到」= 邀约卡飞向三人 + 二维码扫码签到；只画时钟或日历会被读成考勤系统，所以会议桌必须常驻。
 
 ## 3. 叶子菜单归属规则
 

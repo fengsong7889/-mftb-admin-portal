@@ -44,7 +44,7 @@
       "サンクコストを手放して、成長の余地を広げる",
       "今日を最善にすれば、明日は自然と開ける"
     ],
-    "heroEyebrow": "麦峰テクノロジー · 統合ワークスペース",
+    "heroEyebrow": "麦峰グループ · 統合ワークスペース",
     "heroUserFallback": "皆様",
     "greetingLine": "{{greeting}}、{{name}}{{empId}}",
     "greetingEmpIdSuffix": "（{{empId}}）",
@@ -64,6 +64,14 @@
     "filterLabel": "業務領域",
     "filterAll": "すべて",
     "resultCount": "合計 {{count}} 件のシステム",
+    "quickFavorite": "マイ常用",
+    "quickRecent": "最近使用",
+    "favoritesTip": "カード右上の ☆ をクリックするとここに追加されます",
+    "cardFavorite": "常用に追加",
+    "cardUnfavorite": "常用から解除",
+    "favAdded": "常用に追加しました · {{name}}",
+    "favRemoved": "常用から解除しました · {{name}}",
+    "favNotSaved": "ブラウザのストレージが利用できないため、この変更は現在のページのみに有効です",
     "noDomainSystem": "この業務領域に利用可能なシステムはありません",
     "viewAllSystems": "すべてのシステムを見る",
     "domain": {
@@ -71,8 +79,10 @@
       "growthDesc": "広告出稿、店舗運営、検索コンバージョン",
       "biz": "経営・資産サポート",
       "bizDesc": "資金口座、財務照合、物資資産管理",
-      "org": "組織と承認",
+      "org": "人事・組織",
       "orgDesc": "人事組織、承認フロー、開発納品",
+      "collab": "協働とデリバリー",
+      "collabDesc": "承認フロー、開発デリバリー、会議と知識共有",
       "govern": "AIとプラットフォーム管理",
       "governDesc": "AI機能、権限付与、プラットフォーム設定",
       "other": "その他のシステム",
@@ -100,6 +110,9 @@
       "hrAssigned": "部署への配属が完了",
       "attendancePunched": "打刻完了 · 09:00",
       "leaveApproved": "休暇承認済み · 本日は休業",
+      "meetingBooked": "会議室予約済み · 10:00–11:00",
+      "meetingCheckedIn": "出席登録済み · 会議中",
+      "meetingInviteSent": "招待送付済み · 3名",
       "workflowArchived": "承認済み・保管完了",
       "accessDenied": "認証失敗、アクセス拒否",
       "accessGranted": "認証成功、アクセス許可",
@@ -119,7 +132,12 @@
       "assetCustodian": "使用者",
       "start": "申請",
       "review": "審査",
-      "approved": "承認済み"
+      "approved": "承認済み",
+      "docKnowledgeBase": "ナレッジ蓄積",
+      "docIndex": "統一インデックス",
+      "docCloudDocs": "クラウド文書",
+      "docKnowledgeVault": "企業ナレッジベース",
+      "docArchiveFiles": "アーカイブ資料"
     },
     "businessSystems": "業務システム",
     "backToPortal": "企業ポータルに戻る",
@@ -146,6 +164,10 @@
     "backToWorkbench": "ワークスペースに戻る",
     "logout": "ログアウト",
     "systems": {
+      "meeting": {
+        "name": "会議・会議室システム",
+        "description": "会議室台帳、空き状況からの予約と招待の追跡まで一括管理。"
+      },
       "merchantWorkbench": {
         "name": "店舗経営システム",
         "description": "店舗運営、注文処理、営業データを一か所で管理。"
@@ -201,6 +223,10 @@
       "platform": {
         "name": "プラットフォーム支援システム",
         "description": "通知チャネル、業務ルール、バージョンをまとめて設定。"
+      },
+      "doc": {
+        "name": "文書センターシステム",
+        "description": "要件文書・人事総務制度・研修資料の統一インデックスと閲覧ゲートウェイ。"
       }
     }
   },

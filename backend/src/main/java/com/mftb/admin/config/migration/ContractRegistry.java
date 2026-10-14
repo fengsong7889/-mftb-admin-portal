@@ -27,6 +27,10 @@ public class ContractRegistry {
         combined.add(deliveryLogContract());
         // 权限中心重构：授权审计是关键写入路径，登记契约保证启动自愈
         combined.add(permAuditLogContract());
+        // 文檔中心：索引與留痕三表為 doc 域關鍵寫入路徑，啟動自愈防遷移漏執行
+        combined.addAll(docCenterContracts());
+        // 文檔中心：學習路徑兩表（新人入職包/培訓清單）同為關鍵寫入路徑
+        combined.addAll(docLearningContracts());
         // HR 入转调离：审批回调办理链路的关键写入表，启动自愈保证不因迁移漏执行而缺表
         combined.add(hrLifecycleRequestContract());
         // 自然流量評分規則：生產缺 multiplier_tiers/threshold_score/region_configs 導致規則列表查詢 500
@@ -219,6 +223,124 @@ public class ContractRegistry {
     /** 预留：当前本契约直接包含在 allContracts 中，本方法存在只为向后兼容旧initializer 写法。 */
     public static void registerDeliveryLog() {
         // no-op：契约已在 allContracts 里，无需可变的注册列表。
+    }
+
+    /**
+     * 文檔中心三表契約（DDL 與 233 腳本逐字一致）：doc_space / doc_node / doc_view_log。
+     * <p>登記理由：文檔庫列表/詳情/留痕全部按實體字段拼 SELECT，任何環境缺表缺列
+     * 都會把整個模塊打成 500；applyOnce 漏跑時由本契約每次啟動自愈。
+     */
+    public static List<ContractSpec> docCenterContracts() {
+        return List.of(
+                new ContractSpec("doc-space", "doc_space",
+                        "CREATE TABLE IF NOT EXISTS doc_space ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主鍵ID', "
+                                + "name VARCHAR(64) NOT NULL COMMENT '空間名稱', "
+                                + "icon VARCHAR(16) DEFAULT NULL COMMENT '空間圖標（emoji）', "
+                                + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序（小在前）', "
+                                + "description VARCHAR(255) DEFAULT NULL COMMENT '空間說明', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '創建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最後更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '邏輯刪除', "
+                                + "KEY idx_doc_space_sort (sort_order)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DOC-文檔空間'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("name", "ADD COLUMN name VARCHAR(64) NOT NULL COMMENT '空間名稱'"),
+                                new ContractSpec.ColumnSpec("icon", "ADD COLUMN icon VARCHAR(16) DEFAULT NULL COMMENT '空間圖標（emoji）'"),
+                                new ContractSpec.ColumnSpec("sort_order", "ADD COLUMN sort_order INT NOT NULL DEFAULT 0 COMMENT '排序（小在前）'"))),
+                new ContractSpec("doc-node", "doc_node",
+                        "CREATE TABLE IF NOT EXISTS doc_node ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主鍵ID', "
+                                + "space_id BIGINT NOT NULL COMMENT '所屬空間ID', "
+                                + "category VARCHAR(64) NOT NULL DEFAULT '未分類' COMMENT '文檔分類', "
+                                + "title VARCHAR(200) NOT NULL COMMENT '文檔標題', "
+                                + "doc_type TINYINT NOT NULL DEFAULT 1 COMMENT '類型: 1=在線文檔 2=表格 3=幻燈片 4=PDF 5=外部鏈接', "
+                                + "status TINYINT NOT NULL DEFAULT 1 COMMENT '狀態: 1=草稿 2=評審中 3=已發布 4=已歸檔', "
+                                + "tags VARCHAR(255) DEFAULT NULL COMMENT '標籤（逗號分隔）', "
+                                + "owner_user_id BIGINT DEFAULT NULL COMMENT '負責人用戶ID', "
+                                + "owner_name VARCHAR(64) DEFAULT NULL COMMENT '負責人姓名', "
+                                + "tencent_file_id VARCHAR(64) DEFAULT NULL COMMENT '騰訊文檔fileID', "
+                                + "tencent_url VARCHAR(500) NOT NULL COMMENT '騰訊文檔鏈接', "
+                                + "biz_type VARCHAR(16) DEFAULT NULL COMMENT '業務掛接類型: REQ', "
+                                + "biz_id BIGINT DEFAULT NULL COMMENT '業務掛接ID', "
+                                + "summary VARCHAR(1000) DEFAULT NULL COMMENT '文檔摘要', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '創建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最後更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '邏輯刪除', "
+                                + "KEY idx_doc_node_space (space_id, deleted), "
+                                + "KEY idx_doc_node_biz (biz_type, biz_id), "
+                                + "KEY idx_doc_node_file (tencent_file_id)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DOC-文檔元數據索引'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("tencent_file_id", "ADD COLUMN tencent_file_id VARCHAR(64) DEFAULT NULL COMMENT '騰訊文檔fileID'"),
+                                new ContractSpec.ColumnSpec("tencent_url", "ADD COLUMN tencent_url VARCHAR(500) NOT NULL COMMENT '騰訊文檔鏈接'"),
+                                new ContractSpec.ColumnSpec("biz_type", "ADD COLUMN biz_type VARCHAR(16) DEFAULT NULL COMMENT '業務掛接類型: REQ'"),
+                                new ContractSpec.ColumnSpec("biz_id", "ADD COLUMN biz_id BIGINT DEFAULT NULL COMMENT '業務掛接ID'"),
+                                new ContractSpec.ColumnSpec("summary", "ADD COLUMN summary VARCHAR(1000) DEFAULT NULL COMMENT '文檔摘要'"))),
+                new ContractSpec("doc-view-log", "doc_view_log",
+                        "CREATE TABLE IF NOT EXISTS doc_view_log ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主鍵ID', "
+                                + "node_id BIGINT NOT NULL COMMENT '文檔ID', "
+                                + "user_id BIGINT DEFAULT NULL COMMENT '查閱人用戶ID', "
+                                + "user_name VARCHAR(64) DEFAULT NULL COMMENT '查閱人姓名', "
+                                + "department VARCHAR(128) DEFAULT NULL COMMENT '部門（快照）', "
+                                + "viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '查閱時間', "
+                                + "duration_sec INT DEFAULT NULL COMMENT '停留時長秒', "
+                                + "KEY idx_doc_view_log_node (node_id, viewed_at), "
+                                + "KEY idx_doc_view_log_user (user_id)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DOC-查閱審計留痕'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("node_id", "ADD COLUMN node_id BIGINT NOT NULL COMMENT '文檔ID'"),
+                                new ContractSpec.ColumnSpec("duration_sec", "ADD COLUMN duration_sec INT DEFAULT NULL COMMENT '停留時長秒'"))));
+    }
+
+    /**
+     * 文檔中心學習路徑兩表契約（DDL 與 234 腳本逐字一致）：doc_learning_path / doc_learning_path_item。
+     * <p>登記理由：路徑列表/詳情按實體字段拼 SELECT，缺表缺列會把新人入職包入口打成 500；
+     * applyOnce 漏跑時由本契約每次啟動自愈。
+     */
+    public static List<ContractSpec> docLearningContracts() {
+        return List.of(
+                new ContractSpec("doc-learning-path", "doc_learning_path",
+                        "CREATE TABLE IF NOT EXISTS doc_learning_path ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主鍵ID', "
+                                + "name VARCHAR(64) NOT NULL COMMENT '路徑名稱', "
+                                + "description VARCHAR(255) DEFAULT NULL COMMENT '路徑說明', "
+                                + "status TINYINT NOT NULL DEFAULT 1 COMMENT '1=啟用 0=停用', "
+                                + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序（小在前）', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '創建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最後更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '邏輯刪除', "
+                                + "KEY idx_doc_learning_path_sort (sort_order)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DOC-學習路徑'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("name", "ADD COLUMN name VARCHAR(64) NOT NULL COMMENT '路徑名稱'"),
+                                new ContractSpec.ColumnSpec("status", "ADD COLUMN status TINYINT NOT NULL DEFAULT 1 COMMENT '1=啟用 0=停用'"),
+                                new ContractSpec.ColumnSpec("sort_order", "ADD COLUMN sort_order INT NOT NULL DEFAULT 0 COMMENT '排序（小在前）'"))),
+                new ContractSpec("doc-learning-item", "doc_learning_path_item",
+                        "CREATE TABLE IF NOT EXISTS doc_learning_path_item ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主鍵ID', "
+                                + "path_id BIGINT NOT NULL COMMENT '所屬路徑ID', "
+                                + "node_id BIGINT NOT NULL COMMENT '文檔ID', "
+                                + "sort_order INT NOT NULL DEFAULT 0 COMMENT '路徑內順序', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '創建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最後更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '創建時間', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '邏輯刪除', "
+                                + "KEY idx_doc_learning_item_path (path_id, sort_order), "
+                                + "KEY idx_doc_learning_item_node (node_id)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DOC-學習路徑條目'",
+                        List.of(
+                                new ContractSpec.ColumnSpec("path_id", "ADD COLUMN path_id BIGINT NOT NULL COMMENT '所屬路徑ID'"),
+                                new ContractSpec.ColumnSpec("node_id", "ADD COLUMN node_id BIGINT NOT NULL COMMENT '文檔ID'"),
+                                new ContractSpec.ColumnSpec("sort_order", "ADD COLUMN sort_order INT NOT NULL DEFAULT 0 COMMENT '路徑內順序'"))));
     }
 
     /** V0 AI 治理底座契约（与 {@code AiGovernanceSchemaInitializer} 同构，确保启动自愈）。 */

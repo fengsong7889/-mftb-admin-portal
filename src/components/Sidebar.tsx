@@ -15,7 +15,7 @@ import {
 import { useSystemNavigation } from '../hooks/useSystemNavigation'
 import type { MenuVO } from '../api/menu'
 import { fetchPortalContext, type PortalSystem } from '../api/portal'
-import { getPortalSystemKey, getSystemDisplayName, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
+import { getBrandTitle, getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
 import { keyToPath, pathToKey } from '../constants/menuDataSource'
 import type { OfflineMenuNode } from '../constants/offlineMenus'
@@ -24,6 +24,14 @@ import { renderMenuIcon } from './MenuIcon'
 import type { ReactNode } from 'react'
 import {
   AccountBookOutlined,
+  // 会议管理（meeting）菜单兜底图标：后端菜单树未返回 icon 时仍能渲染，
+  // check-menu-consistency 会逐字比对这里与 sys_menu.icon
+  VideoCameraOutlined,
+  UsergroupAddOutlined,
+  PlusSquareOutlined,
+  LayoutOutlined,
+  BookOutlined,
+  PropertySafetyOutlined,
   WalletOutlined,
   SearchOutlined,
   FileSearchOutlined,
@@ -75,6 +83,7 @@ import {
   SolutionOutlined,
   ScheduleOutlined,
   MenuOutlined,
+  MonitorOutlined,
   HistoryOutlined,
   ExperimentOutlined,
   NodeIndexOutlined,
@@ -589,7 +598,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'asset-loss':       <SearchOutlined />,
   'asset-inventory':  <AuditOutlined />,
   'param-library':    <DatabaseOutlined />,
-  // 用車管理（物資管理下的「車輛管理」分组）
+  // 用車管理（物資管理下的「用車管理」分组）
   'vehicle-management': <CarOutlined />,
   'vehicle-files':    <TruckOutlined />,
   'vehicle-dispatch': <CarryOutOutlined />,
@@ -597,6 +606,10 @@ const keyToIcon: Record<string, ReactNode> = {
   'my-vehicle-use':   <LoginOutlined />,
   'vehicle-master-data': <ClusterOutlined />,
   // 考勤假勤系统（独立入口，菜单归属 sys_menu.system_code=attendance）
+  'attendance-ops-group':     <ScheduleOutlined />,     // 考勤管理分组
+  'attendance-basic-group':   <ControlOutlined />,      // 基礎設置分组
+  'attendance-leave-group':   <BarChartOutlined />,     // 請假管理分组
+  'attendance-report-group':  <PieChartOutlined />,     // 報表統計分组
   'attendance-workbench':  <ClockCircleOutlined />,
   'attendance-group':      <GroupOutlined />,
   'attendance-shift':      <RetweetOutlined />,
@@ -607,6 +620,15 @@ const keyToIcon: Record<string, ReactNode> = {
   'attendance-daily':      <AreaChartOutlined />,
   'attendance-monthly':    <PayCircleOutlined />,
   'attendance-setting':    <FunctionOutlined />,
+  // 会议管理系统（独立入口，菜单归属 sys_menu.system_code=meeting）
+  // 两个一级菜单：會議中心（使用侧）与會議治理（行政侧），图标必须与后端 v1.2 迁移写入的一致
+  'meeting-management':  <VideoCameraOutlined />,
+  'meeting-admin':       <MonitorOutlined />,
+  'meeting-my':          <UsergroupAddOutlined />,
+  'meeting-booking':     <PlusSquareOutlined />,
+  'meeting-room':        <LayoutOutlined />,
+  'meeting-record':      <BookOutlined />,
+  'meeting-config':      <PropertySafetyOutlined />,
   'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,
@@ -731,10 +753,10 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const currentSystem = systems.find(system => system.code === currentSystemCode)
   const systemKey = getPortalSystemKey(currentSystemCode ?? '', currentSystem?.name ?? '')
   /** 系统名称统一走全局取名入口，保证与门户/切换器/首页同一真值 */
-  const systemName = currentSystemCode
-    ? getSystemDisplayName(t, { code: currentSystemCode, name: currentSystem?.name ?? currentSystemCode, nameEn: currentSystem?.nameEn }, i18nInstance.language)
-    : t('portal.title')
-  const brandTitle = `MFTB${i18nInstance.language.startsWith('zh') ? '' : ' '}${systemName.replace(/^MFTB\s*/i, '')}`
+  const currentSystemSource = currentSystemCode
+    ? { code: currentSystemCode, name: currentSystem?.name ?? currentSystemCode, nameEn: currentSystem?.nameEn }
+    : null
+  const brandTitle = getBrandTitle(t, i18nInstance.language, currentSystemSource)
   const systemIcon = renderMenuIcon(currentSystem?.icon)
     ?? renderMenuIcon(systemKey ? PORTAL_SYSTEM_ICONS[systemKey] : 'AppstoreOutlined')
 

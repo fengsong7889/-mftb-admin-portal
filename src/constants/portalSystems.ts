@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next'
 /** 门户展示映射只选择文案与插画，不参与系统准入或导航判断。 */
 const PORTAL_SYSTEM_KEYS = [
   'ads', 'merchant', 'search', 'finance', 'ai', 'hr', 'attendance', 'eam', 'rdm', 'oa', 'iam', 'platform',
-  'merchantWorkbench', 'translation',
+  'merchantWorkbench', 'translation', 'meeting', 'doc',
 ] as const
 
 export type PortalSystemKey = (typeof PORTAL_SYSTEM_KEYS)[number]
@@ -24,6 +24,8 @@ export const PORTAL_SYSTEM_ICONS: Record<PortalSystemKey, string> = {
   platform: 'SettingOutlined',
   merchantWorkbench: 'ShopOutlined',
   translation: 'GlobalOutlined',
+  meeting: 'VideoCameraOutlined',
+  doc: 'CloudOutlined',
 }
 
 /** 优先业务编码；自定义目录保留原始名称匹配，切换语言不会改变场景。 */
@@ -60,4 +62,21 @@ export function getSystemDisplayName(
   const key = getPortalSystemKey(system.code, system.name) ?? system.code
   const fallback = (language && !language.startsWith('zh') && system.nameEn) || system.name
   return t(`portal.systems.${key}.name`, { defaultValue: fallback })
+}
+
+/**
+ * 全局唯一的品牌标题入口（侧栏 logo 文案 + 浏览器标签页标题）。
+ * <p>为什么必须统一：标签页标题历史上只在 Sidebar 内计算，
+ * 门户页（/portal）不渲染 Sidebar，从业务系统返回门户后标题仍停留在上一个系统名。
+ * @param system 当前业务系统；为空表示处于企业门户，回落到 `portal.title`
+ */
+export function getBrandTitle(
+  t: TFunction,
+  language: string,
+  system?: SystemNameSource | null,
+): string {
+  const systemName = system?.code
+    ? getSystemDisplayName(t, system, language)
+    : t('portal.title', { defaultValue: '企業門戶' })
+  return `MFTB${language.startsWith('zh') ? '' : ' '}${systemName.replace(/^MFTB\s*/i, '')}`
 }

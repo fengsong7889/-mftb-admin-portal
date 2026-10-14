@@ -33,7 +33,7 @@ import java.nio.charset.StandardCharsets;
  * 取 29；菜单排序不受影响，因为 {@code fixAssetMenuGrouping} 只硬设 2~5，
  * 本分组故意落在末位 6。
  *
- * <p><b>菜单归属</b>：车辆业务菜单 = 顶级分组「車輛管理」（{@code parent_id = NULL}，与现在的
+ * <p><b>菜单归属</b>：车辆业务菜单 = 顶级分组「用車管理」（{@code parent_id = NULL}，与现在的
  * 耗材管理/資產運營/採購與供應/基礎數據 同层）+ 4 个子菜单，
  * {@code system_code} 显式写 {@code eam}。
  *
@@ -61,7 +61,7 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     private static final String MASTER_MENU_PARENT = "asset-basic";
     private static final String ACTIONS_MASTER = "[\"view\",\"create\",\"edit\"]";
 
-    /** v1.1：車輛管理分组 + 4 个业务菜单 + admin 授权 */
+    /** v1.1：用車管理分组 + 4 个业务菜单 + admin 授权 */
     private static final String VERSION_MENU = "vehicle:menu:v1.0";
 
     private static final String MENU_GROUP = "vehicle-management";
@@ -188,7 +188,7 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     };
 
     /** 规则归属的业务菜单名（与既有规则同一命名风格：系统-模块） */
-    private static final String SEQ_RULE_BIZ_MENU = "物資管理-車輛管理";
+    private static final String SEQ_RULE_BIZ_MENU = "物資管理-用車管理";
 
     /** 各菜单的授权动作（与前端 PERMISSION_ACTIONS 的取值集合一致） */
     private static final String ACTIONS_FILES = "[\"view\",\"create\",\"edit\",\"export\"]";
@@ -225,7 +225,7 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     }
 
     /**
-     * 每次启动同步「車輛管理」与「基礎數據」的排序（互换位置）。
+     * 每次启动同步「用車管理」与「基礎數據」的排序（互换位置）。
      *
      * <p>写在 doMenuMigrate 里不会生效：vehicle:menu:v1.0 已记录版本，applyOnce 会整体跳过 task。
      * 同一个坑本轮又踩了一次（编号规则也是靠移出 applyOnce 才生效），所以凡是"既有数据的修正"
@@ -237,7 +237,7 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
         int basic = jdbcTemplate.update(
                 "UPDATE sys_menu SET sort_order = 6 WHERE menu_key = 'asset-basic' AND deleted = 0 AND sort_order <> 6");
         if (vehicle > 0 || basic > 0) {
-            log.info("車輛管理與基礎數據菜單排序已互換: 車輛管理=5({} 行), 基礎數據=6({} 行)", vehicle, basic);
+            log.info("用車管理與基礎數據菜單排序已互換: 用車管理=5({} 行), 基礎數據=6({} 行)", vehicle, basic);
         }
     }
 
@@ -343,10 +343,10 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
         // sort=5：与「基礎數據」互换位置（基础数据让到末位 6）。DataInitializer
         // .fixAssetMenuGrouping 每次启动硬设 耗材2/资产运营3/采购4/基础数据6，
         // 这里必须与它一致，否则两边互相顶来顶去
-        Long groupId = ensureMenu(null, MENU_GROUP, "車輛管理",
-                "", "", "CarOutlined", 5, GROUP_ACTIONS, "Vehicle Management", systemCode);
+        Long groupId = ensureMenu(null, MENU_GROUP, "用車管理",
+                "", "", "CarOutlined", 5, GROUP_ACTIONS, "Vehicle Operations", systemCode);
         if (groupId == null) {
-            throw new IllegalStateException("車輛管理分组创建失败");
+            throw new IllegalStateException("用車管理分组创建失败");
         }
         // 四个子菜单必须逐条以字面量参数调用：check-menu-consistency.mjs 的正则只识别
         // ensureMenu(变量, "key", "名称", "/path", "Component", "Icon", ...) 这种字面量形式，
@@ -505,14 +505,14 @@ public class VehicleSchemaMigrationInitializer implements CommandLineRunner {
     private void verifyMenus() {
         Long groupId = queryMenuId(MENU_GROUP);
         if (groupId == null) {
-            throw new IllegalStateException("車輛管理分组未就緒");
+            throw new IllegalStateException("用車管理分组未就緒");
         }
         // 顶级分组：parent 必须为 NULL（挂错层会让菜单出现在另一棵树上，静默且难查）
         if (parentOf(MENU_GROUP) != null) {
-            throw new IllegalStateException("車輛管理分组应为顶级菜单，实际 parent_id=" + parentOf(MENU_GROUP));
+            throw new IllegalStateException("用車管理分组应为顶级菜单，实际 parent_id=" + parentOf(MENU_GROUP));
         }
         if (!"eam".equals(systemCodeOf(MENU_GROUP))) {
-            throw new IllegalStateException("車輛管理分组 system_code 非 eam，门户导航剪枝会丢掉整棵车辆子树");
+            throw new IllegalStateException("用車管理分组 system_code 非 eam，门户导航剪枝会丢掉整棵车辆子树");
         }
         for (String[] m : MENUS) {
             Long id = queryMenuId(m[0]);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Button, Form, Input, InputNumber, Select, Switch, Tooltip, message, Spin, Tag } from 'antd'
+import { Button, Form, Input, InputNumber, Select, Switch, message, Spin, Tag } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, QuestionCircleOutlined, AppstoreOutlined, SettingOutlined, EyeOutlined, CodeOutlined, DollarOutlined, PoweroffOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, SettingOutlined, EyeOutlined, CodeOutlined, DollarOutlined, PoweroffOutlined } from '@ant-design/icons'
+import HelpPopover from '../../components/HelpPopover'
 import {
   getModelById,
   updateModel,
@@ -260,9 +261,12 @@ export default function AiModelEdit() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型能力</span>
             <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>只读</Tag>
-            <Tooltip title="由模型供应商决定，本处不开放调整。「支持」=该模型具备此能力，「不支持」=该模型本身不具备此能力。">
-              <QuestionCircleOutlined style={{ fontSize: 12, color: '#8C8C8C' }} />
-            </Tooltip>
+            <HelpPopover
+              title="模型能力"
+              content={'由模型供应商决定，本处不开放调整。\n「支持」=该模型具备此能力，「不支持」=该模型本身不具备此能力。'}
+              ariaLabel="模型能力说明"
+              placement="bottom"
+            />
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
@@ -306,9 +310,12 @@ export default function AiModelEdit() {
             <div>
               <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
                 API 兼容
-                <Tooltip title="决定调用协议：openai / anthropic / gemini。管理后台根据该字段将请求转发到对应 SDK 或协议适配器，实现多供应商统一接入。">
-                  <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 12 }} />
-                </Tooltip>
+                <HelpPopover
+                  title="API 兼容"
+                  content={'决定调用协议：openai / anthropic / gemini。\n管理后台根据该字段将请求转发到对应 SDK 或协议适配器，实现多供应商统一接入。'}
+                  ariaLabel="API兼容说明"
+                  placement="bottom"
+                />
               </div>
               <Tag color={API_COMPAT_LABEL[model.apiCompat || 'openai']?.color} style={{ fontSize: 13, padding: '2px 10px', lineHeight: '24px' }}>
                 {API_COMPAT_LABEL[model.apiCompat || 'openai']?.label || model.apiCompat || '-'}
@@ -317,9 +324,12 @@ export default function AiModelEdit() {
             <div>
               <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
                 类型
-                <Tooltip title="决定模型用途：chat=对话、completion=文本补全、embedding=向量嵌入、token_count=Token 计数。由供应商发布时确定，不可调整。">
-                  <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 12 }} />
-                </Tooltip>
+                <HelpPopover
+                  title="类型"
+                  content={'决定模型用途：chat=对话、completion=文本补全、embedding=向量嵌入、token_count=Token 计数。\n由供应商发布时确定，不可调整。'}
+                  ariaLabel="类型说明"
+                  placement="bottom"
+                />
               </div>
               <Tag color={MODEL_TYPE_TAG[model.type as ModelType]} style={{ fontSize: 13, padding: '2px 10px', lineHeight: '24px' }}>
                 {MODEL_TYPE_LABEL[model.type as ModelType] || model.type || '-'}
@@ -328,9 +338,12 @@ export default function AiModelEdit() {
             <div>
               <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
                 模态
-                <Tooltip title="支持处理的数据类型：text=文本、image=图像、audio=音频、video=视频。例：vision-exp 类模型通常支持 text+image。">
-                  <QuestionCircleOutlined style={{ marginLeft: 4, fontSize: 12 }} />
-                </Tooltip>
+                <HelpPopover
+                  title="模态"
+                  content={'支持处理的数据类型：text=文本、image=图像、audio=音频、video=视频。\n例：vision-exp 类模型通常支持 text+image。'}
+                  ariaLabel="模态说明"
+                  placement="bottom"
+                />
               </div>
               <ModalityChips modalities={model.modalities} />
             </div>
@@ -345,9 +358,12 @@ export default function AiModelEdit() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>官方价格</span>
             <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>只读</Tag>
-            <Tooltip title="官方定价不可调整；仅本地化部署的模型可在创建供应商时设置自定义费率。">
-              <QuestionCircleOutlined style={{ fontSize: 12, color: '#8C8C8C' }} />
-            </Tooltip>
+            <HelpPopover
+              title="官方价格"
+              content="官方定价不可调整；仅本地化部署的模型可在创建供应商时设置自定义费率。"
+              ariaLabel="官方价格说明"
+              placement="bottom"
+            />
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>

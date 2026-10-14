@@ -61,6 +61,17 @@ public interface AuthService {
     /** 保存用户快捷入口 */
     void saveQuickFavorites(String username, String json);
 
+    /**
+     * 获取用户企业门户「我的常用」系统编码列表。
+     *
+     * @return 从未同步过时返回 {@code null}（区别于「同步过且清空了」的空列表），
+     *         前端据此决定是回退本地缓存还是照云端覆盖
+     */
+    List<String> getPortalFavorites(String username);
+
+    /** 保存用户企业门户「我的常用」系统编码列表 */
+    void savePortalFavorites(String username, String json);
+
     /** 保存用户在线头像 URL（含 fallback） */
     void saveAvatarUrl(String username, String avatarUrl);
 

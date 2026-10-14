@@ -93,3 +93,52 @@ WHERE menu_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'atten
 -- DELETE FROM sys_department_system WHERE system_code = 'attendance';
 -- DELETE FROM sys_system WHERE code = 'attendance';
 -- DELETE FROM sys_schema_version WHERE version_key IN ('attendance:menu:v1.0', 'attendance:menu:v1.1');
+
+-- ============================================================
+-- 7) v2.0 菜单分组（attendance:menu:v2.0）
+--    把平铺的 12 个叶子菜单收入 4 个分组（type=1），
+--    假勤工作台与假勤設置保持独立顶级。
+--    排序遵循管理动线：工作台 → 日常操作 → 基础数据 → 请假 → 报表 → 设置。
+--    实际执行与幂等由 AttendanceMenuInitializer.groupMenus() 负责。
+-- ============================================================
+
+-- 4 个分组菜单（type=1，无 path/component/actions）
+INSERT INTO sys_menu (parent_id, menu_key, name, name_en, type, icon, sort_order, actions, status, system_code, updated_by, deleted)
+SELECT NULL, t.menu_key, t.name, t.name_en, 1, t.icon, t.sort_order, '', 1, 'attendance', 'system', 0
+FROM (
+    SELECT 'attendance-ops-group'    AS menu_key, '考勤管理'   AS name, 'Attendance Ops'     AS name_en, 'ScheduleOutlined' AS icon, 27 AS sort_order
+    UNION ALL SELECT 'attendance-basic-group',  '基礎設置',     'Basic Setup',       'ControlOutlined',  28
+    UNION ALL SELECT 'attendance-leave-group',  '請假管理',     'Leave Management',  'BarChartOutlined', 29
+    UNION ALL SELECT 'attendance-report-group', '報表統計',     'Reports',           'PieChartOutlined', 30
+) t
+ON DUPLICATE KEY UPDATE type = 1, icon = VALUES(icon), system_code = 'attendance',
+                        status = 1, deleted = 0;
+
+-- 叶子菜单挂入分组（仅当当前仍是顶级时移动）
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-ops-group' AND deleted = 0 LIMIT 1) g), sort_order = 1 WHERE menu_key = 'attendance-group'    AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-ops-group' AND deleted = 0 LIMIT 1) g), sort_order = 2 WHERE menu_key = 'attendance-schedule'  AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-ops-group' AND deleted = 0 LIMIT 1) g), sort_order = 3 WHERE menu_key = 'attendance-punch'     AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-ops-group' AND deleted = 0 LIMIT 1) g), sort_order = 4 WHERE menu_key = 'attendance-exception'  AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-basic-group' AND deleted = 0 LIMIT 1) g), sort_order = 1 WHERE menu_key = 'attendance-shift'     AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-basic-group' AND deleted = 0 LIMIT 1) g), sort_order = 2 WHERE menu_key = 'attendance-holiday'   AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-leave-group' AND deleted = 0 LIMIT 1) g), sort_order = 1 WHERE menu_key = 'hr-leave'            AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-leave-group' AND deleted = 0 LIMIT 1) g), sort_order = 2 WHERE menu_key = 'hr-leave-quota'      AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-report-group' AND deleted = 0 LIMIT 1) g), sort_order = 1 WHERE menu_key = 'attendance-daily'     AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET parent_id = (SELECT id FROM (SELECT id FROM sys_menu WHERE menu_key = 'attendance-report-group' AND deleted = 0 LIMIT 1) g), sort_order = 2 WHERE menu_key = 'attendance-monthly'   AND deleted = 0 AND parent_id IS NULL;
+
+-- 顶级排序重写
+UPDATE sys_menu SET sort_order = 26 WHERE menu_key = 'attendance-workbench' AND deleted = 0 AND parent_id IS NULL;
+UPDATE sys_menu SET sort_order = 31 WHERE menu_key = 'attendance-setting'   AND deleted = 0 AND parent_id IS NULL;
+
+-- 回滚分组（按需手工执行）
+-- UPDATE sys_menu SET parent_id = NULL, sort_order = CASE menu_key
+--     WHEN 'attendance-group' THEN 27 WHEN 'attendance-shift' THEN 28 WHEN 'attendance-holiday' THEN 29
+--     WHEN 'attendance-schedule' THEN 30 WHEN 'attendance-punch' THEN 31 WHEN 'attendance-exception' THEN 32
+--     WHEN 'hr-leave' THEN 33 WHEN 'hr-leave-quota' THEN 34
+--     WHEN 'attendance-daily' THEN 35 WHEN 'attendance-monthly' THEN 36 WHEN 'attendance-setting' THEN 37 END,
+--     updated_by = 'system'
+-- WHERE menu_key IN ('attendance-group','attendance-shift','attendance-holiday','attendance-schedule',
+--     'attendance-punch','attendance-exception','hr-leave','hr-leave-quota','attendance-daily','attendance-monthly','attendance-setting')
+-- AND deleted = 0;
+-- DELETE FROM sys_menu WHERE menu_key IN ('attendance-ops-group','attendance-basic-group','attendance-leave-group','attendance-report-group');
+-- DELETE FROM sys_schema_version WHERE version_key = 'attendance:menu:v2.0';

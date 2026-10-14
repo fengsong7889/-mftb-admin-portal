@@ -131,6 +131,12 @@ public class DataInitializer implements CommandLineRunner {
         //      (163 脚本等效, 每次启动幂等检查, 不受 V_SCHEMA 版本门控;
         //       必须位于任何 sys_user 查询之前, 否则启动期 Runner 查询报 Unknown column 导致启动失败重启循环)
         migrateDingTalkAppSignature();
+        // 236: 企业门户「我的常用」持久化列 sys_user.portal_favorites。
+        //      紧随钉钉补列之后、任何 sys_user 查询之前：SysUser 实体已带该字段，
+        //      MyBatis-Plus 生成的显式列清单会 SELECT 它，缺列会让全部用户查询报错。
+        //      必须用独立版本键：core:schema-v10 已落库的环境不会重跑 migrateSchema()。
+        versionTracker.applyOnce("core:portal-favorites-v1",
+                this::migratePortalFavoritesColumn, this::verifyPortalFavoritesColumn);
         // 机翻引擎配置表 + 种子数据（每次启动幂等检查, 不受 V_SCHEMA 版本门控）
         migrateMtEngineTable();
         // 迁移旧表数据到统一 OA 表
@@ -1693,6 +1699,32 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         }
     }
 
+    /** 列是否已存在（供迁移后置校验使用，不吞异常：查不到就让本次迁移记为失败并重试） */
+    private boolean columnExists(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+        return count != null && count > 0;
+    }
+
+    /**
+     * 236: 企业门户「我的常用」持久化列。用 TEXT 而非 VARCHAR，
+     * 收藏不设数量上限，系统总量只会越来越多，避免定长列静默截断出半个 JSON。
+     */
+    private void migratePortalFavoritesColumn() {
+        addColumnIfAbsent("sys_user", "portal_favorites",
+                "ALTER TABLE sys_user ADD COLUMN portal_favorites TEXT NULL "
+                        + "COMMENT '企业门户常用系统编码列表，JSON 数组格式' AFTER quick_favorites");
+    }
+
+    /** 后置校验：列没真的建出来就不记成功版本，下次启动重试（防止误记导致生产缺列） */
+    private void verifyPortalFavoritesColumn() {
+        if (!columnExists("sys_user", "portal_favorites")) {
+            throw new IllegalStateException("sys_user.portal_favorites 列未就绪");
+        }
+    }
+
     /**
      * 158: 交接单增加「接收人类型」字段（employee=员工 / department=部门）, 幂等
      */
@@ -2865,6 +2897,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         renameMenuIfLegacy("consumable-item", "耗材檔案", "耗材档案");
         renameMenuIfLegacy("consumable-stock", "耗材庫存", "耗材库存");
         renameMenuIfLegacy("consumable-claim", "耗材領用", "耗材领用");
+        // v2.0: 車輛管理 → 用車管理（分组不只是管车，更核心的是用车全流程：档案/办理/台账/自助）
+        renameMenuIfLegacy("vehicle-management", "用車管理", "車輛管理");
         renameMenuIfLegacy("consumable-alert", "庫存預警", "库存预警");
         renameMenuIfLegacy("ai-auth-manage", "模型授權管理", "模型授权管理");
         renameMenuIfLegacy("ai-conversation-audit", "對話審計", "对话审计");
@@ -2928,6 +2962,18 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 "hr-certificate");
         applyMenuSort("hr-lifecycle", "hr-onboarding", "hr-regularization", "hr-transfer", "hr-dimission");
         applyMenuSort("hr-config", "position-management", "hr-dict", "contract-ledger");
+        // v2.0: 考勤假勤分组归属自愈——一次性迁移 applyOnce 已记版本不再重跑，
+        //       分组归属与排序必须在此兜住（与 HR 分组同法）
+        ensureMenuParent("attendance-ops-group", "attendance-group", "attendance-schedule",
+                "attendance-punch", "attendance-exception");
+        ensureMenuParent("attendance-basic-group", "attendance-shift", "attendance-holiday");
+        ensureMenuParent("attendance-leave-group", "hr-leave", "hr-leave-quota");
+        ensureMenuParent("attendance-report-group", "attendance-daily", "attendance-monthly");
+        applyMenuSort("attendance-ops-group", "attendance-group", "attendance-schedule",
+                "attendance-punch", "attendance-exception");
+        applyMenuSort("attendance-basic-group", "attendance-shift", "attendance-holiday");
+        applyMenuSort("attendance-leave-group", "hr-leave", "hr-leave-quota");
+        applyMenuSort("attendance-report-group", "attendance-daily", "attendance-monthly");
         // v44: 组织域一级菜单排序（顶级 + 域内）与存量 key/名称/路由自愈
         applyMenuSort("org-center", "org-structure");
         // v45: 員工自助域内排序（ESS 菜单由 hrEssSchemaInitializer 一次性建，此处兜归属顺序）

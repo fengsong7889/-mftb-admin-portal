@@ -32,6 +32,7 @@ import DeliveryPanel from './components/DeliveryPanel'
 import ReleasePanel from './components/ReleasePanel'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import { fetchVersionHistory } from '../../api/versionHistory'
+import { fetchDocNodes, DOC_STATUS_COLOR, type DocNode } from '../../api/docCenter'
 import {
   addComment,
   fetchIterations,
@@ -110,6 +111,13 @@ export default function RequirementDetail() {
   const [versionOptions, setVersionOptions] = useState<{ value: string; label: string }[]>([])
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
+  /** 文檔中心掛接了本需求的關聯文檔；無 doc-library 權限(403)或無文檔時靜默隱藏卡片 */
+  const [reqDocs, setReqDocs] = useState<DocNode[]>([])
+
+  useEffect(() => {
+    if (!id) { setReqDocs([]); return }
+    fetchDocNodes({ bizType: 'REQ', bizId: id }).then(setReqDocs).catch(() => setReqDocs([]))
+  }, [id])
 
   const load = useCallback(async () => {
     if (!id) return
@@ -505,6 +513,28 @@ export default function RequirementDetail() {
               </>
             )}
           </div>
+
+          {/* 關聯文檔（文檔中心 bizType=REQ 掛接）：需求正文沉澱在騰訊文檔，這裡是反向入口 */}
+          {reqDocs.length > 0 && (
+            <div className="rdm-card">
+              <div className="rdm-card-title">
+                <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><FileProtectOutlined /></span>
+                關聯文檔
+                <span className="rdm-card-title-split" />
+                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>正文存於文檔中心，點擊標題在系統內查閱</span>
+              </div>
+              <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                {reqDocs.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <a onClick={() => navigate(`/doc-center/detail?id=${d.id}`)} style={{ fontWeight: 600 }}>{d.title}</a>
+                    <Tag>{d.docTypeLabel ?? d.docType}</Tag>
+                    <Tag color={DOC_STATUS_COLOR[d.status]}>{d.statusLabel ?? d.status}</Tag>
+                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>{d.ownerName} · {d.updatedAt}</span>
+                  </div>
+                ))}
+              </Space>
+            </div>
+          )}
 
           {/* 交付过程（PRD / 任务 / 评审 / 变更）：状态变化时重取，保证任务联动后的进度一致 */}
           <DeliveryPanel

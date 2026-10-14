@@ -96,6 +96,12 @@ public class SysUser {
     /** 快捷入口菜单 key 列表，JSON 数组格式如 ["account-balance","batch-query"] */
     private String quickFavorites;
 
+    /**
+     * 企业门户「我的常用」系统编码列表，JSON 数组格式如 ["finance","doc"]。
+     * 与 quickFavorites 分列：后者是业务系统内部的菜单 key，两者都是整份覆盖写入，共用会互相抹掉。
+     */
+    private String portalFavorites;
+
     /** 用户选中的在线头像 URL（IconFont/DiceBear 等外部 URL） */
     private String avatarUrl;
 

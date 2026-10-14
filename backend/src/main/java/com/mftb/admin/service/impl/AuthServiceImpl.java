@@ -428,6 +428,35 @@ public class AuthServiceImpl implements AuthService {
                         .set(SysUser::getQuickFavorites, json));
     }
 
+    /**
+     * 企业门户「我的常用」：列为空表示该账号从未同步过，返回 null（而非空列表），
+     * 前端据此保留本地缓存；「同步过且被清空」存的是 "[]"，会正常解析成空列表覆盖本地。
+     * 解析失败同样返回 null 走本地兜底——坏掉的云端数据不该抹掉员工已有的收藏。
+     */
+    @Override
+    public List<String> getPortalFavorites(String username) {
+        SysUser user = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .select(SysUser::getPortalFavorites));
+        String json = user != null ? user.getPortalFavorites() : null;
+        if (json == null || json.isBlank()) return null;
+        try {
+            return com.mftb.admin.util.JsonUtils.parseStringList(json);
+        } catch (Exception e) {
+            log.warn("解析 portal_favorites 失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @Override
+    public void savePortalFavorites(String username, String json) {
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .set(SysUser::getPortalFavorites, json));
+    }
+
     @Override
     public void saveAvatarUrl(String username, String avatarUrl) {
         try {

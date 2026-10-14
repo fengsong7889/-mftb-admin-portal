@@ -22,6 +22,7 @@ import './App.css'
 /* 懶加载所有页面组件，避免启动时一次性加载所有模块 */
 const Home = lazy(() => import('./pages/Home'))
 const Portal = lazy(() => import('./pages/Portal'))
+const AppPreview = lazy(() => import('./pages/AppPreview'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
 const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
 const TransferAdd = lazy(() => import('./pages/AccountBalance/TransferAdd'))
@@ -272,6 +273,19 @@ const MyVehicleUse = lazy(() => import('./pages/VehicleManagement/MyVehicleUse')
 const VehicleDispatch = lazy(() => import('./pages/VehicleManagement/VehicleDispatch'))
 const VehicleLedger = lazy(() => import('./pages/VehicleManagement/VehicleLedger'))
 const VehicleMasterData = lazy(() => import('./pages/VehicleManagement/VehicleMasterData'))
+// 会议管理系统（meeting）：会议室档案 / 忙闲预约 / 我的会议 / 预约记录 / 会议详情
+const MyMeeting = lazy(() => import('./pages/MeetingManagement/MyMeeting'))
+const RoomBooking = lazy(() => import('./pages/MeetingManagement/RoomBooking'))
+const RoomFiles = lazy(() => import('./pages/MeetingManagement/RoomFiles'))
+const BookingRecords = lazy(() => import('./pages/MeetingManagement/BookingRecords'))
+const MeetingDetail = lazy(() => import('./pages/MeetingManagement/MeetingDetail'))
+const MeetingConfig = lazy(() => import('./pages/MeetingManagement/MeetingConfig'))
+// 会议新增/编辑独立页（§9.1 禁止用弹窗承载表单）：不是菜单项，但必须显式注册，路由守卫按精确路径校验
+const MeetingRoomForm = lazy(() => import('./pages/MeetingManagement/RoomFiles/MeetingRoomForm'))
+const MeetingBookingForm = lazy(() => import('./pages/MeetingManagement/RoomBooking/MeetingBookingForm'))
+const MeetingBlacklistForm = lazy(() => import('./pages/MeetingManagement/MeetingConfig/MeetingBlacklistForm'))
+// 免登签到页（扫码直达，公开路由，不套后台布局）
+const MeetingCheckin = lazy(() => import('./pages/MeetingCheckin'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
 const AssetTagView = lazy(() => import('./pages/AssetTagView'))
 // 資產領用簽署頁（釘釘工作通知直達，令牌免登，不含後台佈局）
@@ -313,6 +327,15 @@ const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
 
+// 文檔中心（階段二：真實 /api/doc/**；菜單種子已由 DocSchemaMigrationInitializer 落庫）
+const DocCenter = lazy(() => import('./pages/DocCenter'))
+const DocSpaceManage = lazy(() => import('./pages/DocCenter/DocSpaceManage'))
+const DocSpaceForm = lazy(() => import('./pages/DocCenter/DocSpaceForm'))
+const DocStats = lazy(() => import('./pages/DocCenter/DocStats'))
+const DocLearning = lazy(() => import('./pages/DocCenter/DocLearning'))
+const DocLearningDetail = lazy(() => import('./pages/DocCenter/DocLearningDetail'))
+const DocLearningForm = lazy(() => import('./pages/DocCenter/DocLearningForm'))
+
 const { Content } = Layout
 
 /** 页面加载中指示器 */
@@ -336,6 +359,18 @@ function AuthenticatedLayout() {
   useEffect(() => {
     void ensureLanguageBundle(getSavedLanguage())
   }, [])
+
+  // 移动 APP 原型预览：/app-preview 全屏设备外壳，不注入 Sidebar / MenuTabs / PortalTopBar，
+  // 与 /portal 同级；入口来自企业门户「移動 APP 體驗」。
+  if (location.pathname === '/app-preview') {
+    return (
+      <RouteErrorBoundary key={location.pathname}>
+        <Suspense fallback={<PageLoading />}>
+          <AppPreview />
+        </Suspense>
+      </RouteErrorBoundary>
+    )
+  }
 
   // 统一门户 Round 2：/portal 作为应用入口，不注入 Sidebar / MenuTabs，
   // 避免默认业务菜单遮挡卡片；登录后默认落地。
@@ -719,6 +754,18 @@ function AuthenticatedLayout() {
               <Route path="/vehicle-files/edit" element={<VehicleFiles />} />
               <Route path="/vehicle-files/detail" element={<VehicleFiles />} />
               <Route path="/vehicle-files/qualification" element={<VehicleFiles />} />
+              {/* 会议管理：菜单真值由 MeetingSchemaMigrationInitializer 写入 sys_menu。
+                  /meeting-detail 不是菜单项（从钉钉邀约卡片与日程单元格跳进来），
+                  但仍需显式注册：路由守卫按精确路径校验 */}
+              <Route path="/meeting-my" element={<MyMeeting />} />
+              <Route path="/meeting-detail" element={<MeetingDetail />} />
+              <Route path="/meeting-booking" element={<RoomBooking />} />
+              <Route path="/meeting-booking-form" element={<MeetingBookingForm />} />
+              <Route path="/meeting-room" element={<RoomFiles />} />
+              <Route path="/meeting-room-form" element={<MeetingRoomForm />} />
+              <Route path="/meeting-record" element={<BookingRecords />} />
+              <Route path="/meeting-config" element={<MeetingConfig />} />
+              <Route path="/meeting-blacklist-form" element={<MeetingBlacklistForm />} />
               <Route path="/my-vehicle-use" element={<MyVehicleUse />} />
               <Route path="/my-vehicle-use/apply" element={<MyVehicleUse />} />
               <Route path="/my-vehicle-use/detail" element={<MyVehicleUse />} />
@@ -744,6 +791,18 @@ function AuthenticatedLayout() {
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* PRD需求查看 */}
               <Route path="/page-prd-view" element={<PagePRDView />} />
+              {/* 文檔中心：騰訊文檔為內容中台，本系統為索引與查閱入口；子視圖按 pathname 切換，
+                  守衛按精確路徑校驗，三條路徑逐條顯式註冊 */}
+              <Route path="/doc-center" element={<DocCenter />} />
+              <Route path="/doc-center/detail" element={<DocCenter />} />
+              <Route path="/doc-center/register" element={<DocCenter />} />
+              <Route path="/doc-center/edit" element={<DocCenter />} />
+              <Route path="/doc-space" element={<DocSpaceManage />} />
+              <Route path="/doc-space/form" element={<DocSpaceForm />} />
+              <Route path="/doc-stats" element={<DocStats />} />
+              <Route path="/doc-learning" element={<DocLearning />} />
+              <Route path="/doc-learning/detail" element={<DocLearningDetail />} />
+              <Route path="/doc-learning/form" element={<DocLearningForm />} />
               {/* 默认回首页 */}
               <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
@@ -777,16 +836,21 @@ function AppRoutes() {
   // - /asset-claim-sign 釘釘通知直達的領用簽署頁（憑 HMAC 令牌校驗身份）
   const isPublicMobilePath = location.pathname.startsWith('/m/')
   const isPublicSignPath = location.pathname.startsWith('/asset-claim-sign')
+  // 会议签到页与签署页同构：凭 HMAC 令牌鉴权，页面本身不能要求后台登录态
+  const isPublicMeetingCheckin = location.pathname.startsWith('/meeting-checkin')
 
   return (
     <Routes>
-      {isPublicMobilePath || isPublicSignPath ? (
+      {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin ? (
         <>
           <Route path="/m/asset-tag-view" element={
             <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
           } />
           <Route path="/asset-claim-sign" element={
             <Suspense fallback={<PageLoading />}><AssetClaimSign /></Suspense>
+          } />
+          <Route path="/meeting-checkin" element={
+            <Suspense fallback={<PageLoading />}><MeetingCheckin /></Suspense>
           } />
         </>
       ) : isAuthenticated ? (

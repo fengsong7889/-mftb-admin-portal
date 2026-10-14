@@ -11,7 +11,7 @@
  * 本面板只负责配置与「命中链路」展示，前端不参与「要不要审批」的判断。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Checkbox, DatePicker, Input, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Checkbox, DatePicker, Input, Select, Space, Spin, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   DeleteOutlined,
@@ -21,6 +21,7 @@ import {
   SafetyCertificateOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
+import HelpPopover from '../../../components/HelpPopover'
 import dayjs from 'dayjs'
 import StatusSwitch from '../components/StatusSwitch'
 import {
@@ -379,11 +380,16 @@ export default function AdmitPolicyPanel() {
 
       <div className="action-section">
         <div className="action-section-left">
-          <Tooltip title="强制审批约束优先于免审；同优先级且条件重叠的策略服务端拒绝保存；未命中任何策略时默认需审批">
-            <Tag color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', borderRadius: 6 }}>
+          <HelpPopover
+            title="策略匹配順序說明"
+            content={'强制审批约束优先于免审；\n同优先级且条件重叠的策略服务端拒绝保存；\n未命中任何策略时默认需审批。'}
+            ariaLabel="匹配顺序说明"
+            placement="bottomLeft"
+          >
+            <Tag color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', borderRadius: 6, cursor: 'pointer' }}>
               匹配順序：強制審批 &gt; 優先級小者 &gt; 默認需審批
             </Tag>
-          </Tooltip>
+          </HelpPopover>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增策略</Button>

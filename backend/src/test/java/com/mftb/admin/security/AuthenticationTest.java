@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +44,19 @@ class AuthenticationTest extends SecurityTestBase {
         @DisplayName("无 Token 访问 /api/auth/quick-favorites → HTTP 401 未认证")
         void favoritesWithoutToken() throws Exception {
             mockMvc.perform(get("/api/auth/quick-favorites"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value(401));
+        }
+
+        @Test
+        @DisplayName("无 Token 读写 /api/auth/portal-favorites → HTTP 401 未认证")
+        void portalFavoritesWithoutToken() throws Exception {
+            mockMvc.perform(get("/api/auth/portal-favorites"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value(401));
+            mockMvc.perform(put("/api/auth/portal-favorites")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("[\"finance\"]"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value(401));
         }

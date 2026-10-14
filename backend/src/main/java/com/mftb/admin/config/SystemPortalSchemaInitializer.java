@@ -419,7 +419,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     }
 
     /**
-     * 种子 13 个业务系统；portal 是哨兵值不落库。每次启动幂等刷新展示元数据。
+     * 种子 16 个业务系统；portal 是哨兵值不落库。每次启动幂等刷新展示元数据。
      * <p><b>名称真值规则</b>：{@code name} / {@code name_en} / {@code description} 必须逐字等于
      * 前端语言包 {@code portal.systems.<key>}（zh-TW 与 en），因为企业门户是系统名称的对外口径，
      * 而授权中心 / 侧边栏 / 系统切换器 / 首页都经 {@code getSystemDisplayName} 取同一套文案。
@@ -453,12 +453,16 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                         "需求提交、審批、分配、研發交付、驗收上線與產出看板", "ProjectOutlined", 75},
                 {SystemCode.OA.code(), "流程審批系統", "Workflow Approval",
                         "流程申請、事項審批與員工自助，高效協作", "SolutionOutlined", 80},
+                {SystemCode.MEETING.code(), "會議管理系統", "Meeting Management",
+                        "會議室檔案、忙閒選房與預約邀約，掌握每一間房的實際使用", "VideoCameraOutlined", 85},
                 {SystemCode.IAM.code(), "權限管理系統", "Access Control",
                         "統一配置角色、功能與數據權限，守護訪問安全", "SafetyCertificateOutlined", 90},
                 {SystemCode.PLATFORM.code(), "平台支撐系統", "Platform Support",
                         "集中管理通知渠道、業務規則與版本配置", "SettingOutlined", 100},
                 {SystemCode.TRANSLATION.code(), "翻譯管理系統", "Translation Management",
                         "多語言翻譯、語料維護與品質校驗，連接全球業務", "GlobalOutlined", 110},
+                {SystemCode.DOC.code(), "文檔中心系統", "Document Center",
+                        "需求文檔、人事行政制度與培訓課程的統一索引與查閱入口", "CloudOutlined", 87},
         };
         for (Object[] r : rows) {
             jdbcTemplate.update(

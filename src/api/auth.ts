@@ -96,6 +96,22 @@ export function saveQuickFavorites(keys: string[]) {
   return request.put<unknown, void>('/auth/quick-favorites', keys)
 }
 
+/**
+ * 获取当前用户企业门户「我的常用」系统编码。
+ * null 表示该账号从未同步过（后端列为空，Jackson non_null 会省略 data），
+ * 与「同步过且已清空」返回的空数组语义不同，调用方必须区分处理。
+ */
+export function fetchPortalFavorites() {
+  return request.get<unknown, string[] | null>('/auth/portal-favorites', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+/** 保存当前用户企业门户「我的常用」系统编码（整份覆盖） */
+export function savePortalFavorites(codes: string[]) {
+  return request.put<unknown, void>('/auth/portal-favorites', codes)
+}
+
 /** 更新当前用户头像（持久化到后端） */
 export function updateAvatarApi(avatar: string) {
   return request.put<unknown, void>('/auth/avatar', { avatar })

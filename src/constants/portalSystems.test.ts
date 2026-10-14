@@ -26,6 +26,7 @@ const AUTHORITATIVE_NAMES: Record<string, string> = {
   iam: '權限管理系統',
   platform: '平台支撐系統',
   i18n: '翻譯管理系統',
+  doc: '文檔中心系統',
 }
 
 const LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru'] as const

@@ -1,0 +1,648 @@
+/**
+ * 新建会议预约（独立页面，路由 /meeting-booking-form?roomId=&date=&start=）。
+ *
+ * <p>为什么是独立页面而不是弹窗（§9.1）：预约要同时决定"哪间房、哪段时间、谁参加、是否周期"，
+ * 周期设置还会展开出 4~5 个字段与场次预览；弹窗里这些内容只能滚动查看，
+ * 用户看不到自己刚选的房间与时间就已经在填参会人了。独立页面把这些拆成三张卡片，
+ * 并且 URL 可分享（把"订这间房这个点"的链接发给同事，他打开就是同一张表单）。
+ *
+ * <p>时间选择只给"日期 + 开始时刻 + 时长"三项，不让用户手输结束时间：
+ * 结束时间由时长算出，才能保证与后端 15 分钟粒度、单场时长上下限一致，
+ * 也避免出现"结束早于开始"这类要来回纠正的输入。
+ *
+ * <p>参会人数含组织者本人与外部人员，与后端容量校验同一口径 ——
+ * 前端少算一个人，就会出现"页面说能坐 8 人、提交被拒"的不一致。
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CSSProperties } from 'react'
+import {
+  Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, message,
+} from 'antd'
+import {
+  ArrowLeftOutlined, ClockCircleOutlined, ProfileOutlined, SendOutlined, TeamOutlined,
+} from '@ant-design/icons'
+import dayjs, { type Dayjs } from 'dayjs'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../../contexts/AuthContext'
+import RemarkTextArea from '../../../components/RemarkTextArea'
+import {
+  createMeeting,
+  createSeries,
+  fetchMeetingRoomDetail,
+  newMeetingRequestKey,
+  previewSeries,
+  toMeetingIso,
+  type MeetingCreateForm,
+  type MeetingRoomVO,
+  type SeriesPreview,
+} from '../../../api/meeting'
+import { BIZ_TYPE_LABELS } from '../meetingMeta'
+import { durationOptions, ruleForRoom, validateBookingWindow } from '../meetingRules'
+import EmployeeSelect from '../EmployeeSelect'
+
+/** 周期会议的跳过清单：只给一句 toast 等于让用户自己去数哪几天没订上 */
+interface SkippedItem { seq: number; startTime: string; endTime: string; reason: string }
+
+/**
+ * 时间选择器的分钟档位：antd DatePicker 的 minuteStep 只接受 1~59，
+ * 规则粒度 60 分钟（按小时对齐）在这里必须降级成 30 档——小时位仍由用户单选，
+ * 不会出现"选不到整点"的问题，也不会把非法值塞进组件类型。
+ */
+function pickerMinuteStep(granularity?: number): 5 | 10 | 15 | 20 | 30 {
+  const value = granularity ?? 15
+  if (value >= 30) return 30
+  if (value >= 20) return 20
+  if (value >= 15) return 15
+  if (value >= 10) return 10
+  return 5
+}
+
+type FormShape = Omit<MeetingCreateForm,
+  'startTime' | 'endTime' | 'attendeeUserIds' | 'optionalUserIds' | 'externalAttendees' | 'delegateForId'> & {
+  start?: Dayjs
+  duration?: number
+  attendeeUserIds?: number[]
+  optionalUserIds?: number[]
+  externalAttendees?: string[]
+  /** 代订开关：只是 UI 状态，提交时决定是否带 delegateForId（关掉即回到自订） */
+  delegateEnabled?: boolean
+  /** EmployeeSelect 统一以数组承载值，单选模式也回数组 */
+  delegateForId?: number[]
+  /** 周期设置：none=单场；daily/weekly 走 /meeting/series */
+  repeat?: 'none' | 'daily' | 'weekly'
+  intervalN?: number
+  byWeekday?: number[]
+  repeatEndDate?: Dayjs
+  occurrenceLimit?: number
+}
+
+const WEEKDAY_OPTIONS = [
+  { value: 1, label: '一' }, { value: 2, label: '二' }, { value: 3, label: '三' },
+  { value: 4, label: '四' }, { value: 5, label: '五' }, { value: 6, label: '六' },
+  { value: 7, label: '日' },
+]
+
+const cardStyle: CSSProperties = {
+  border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+  padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+}
+
+const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }
+
+function CardTitle({ icon, bg, color, title, note }: {
+  icon: React.ReactNode; bg: string; color: string; title: string; note?: React.ReactNode
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 6, background: bg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontSize: 14, color }}>{icon}</span>
+      </div>
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+      {note && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{note}</span>}
+    </div>
+  )
+}
+
+export default function MeetingBookingForm() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const [form] = Form.useForm<FormShape>()
+
+  const roomId = Number(searchParams.get('roomId'))
+  const dateParam = searchParams.get('date')
+  const startParam = searchParams.get('start')
+  const day = dateParam && dayjs(dateParam).isValid() ? dayjs(dateParam) : dayjs()
+  const initialStart = startParam && dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`).isValid()
+    ? dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`)
+    : undefined
+
+  const [room, setRoom] = useState<MeetingRoomVO>()
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string>()
+  const [submitting, setSubmitting] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [issues, setIssues] = useState<string[]>([])
+  const [preview, setPreview] = useState<SeriesPreview[]>([])
+  const [skipped, setSkipped] = useState<SkippedItem[]>([])
+  const [skippedOpen, setSkippedOpen] = useState(false)
+  /** 代订人的姓名快照只用于二次确认展示；落库与判定一律按 id 由服务端回查 */
+  const [delegateName, setDelegateName] = useState('')
+  const { hasPermission } = useAuth()
+  // 与手动释放、代取消同一个权限锚：能代操作他人预约的人才有权替他人占用会议室
+  const canDelegate = hasPermission('meeting-record:edit')
+
+  // Form.useWatch 的数组参数是「嵌套路径」而不是「多个字段名」：
+  // 传 ['start','duration',...] 会被当成 start.duration 这种嵌套取值，结果永远是 undefined，
+  // 于是周期字段整块不展开、结束时间恒为「待选择」、人数恒为 1 而容量超额告警永不触发。
+  // 多字段必须逐个 useWatch。
+  const start = Form.useWatch('start', form) as Dayjs | undefined
+  const duration = Form.useWatch('duration', form) as number | undefined
+  const required = (Form.useWatch('attendeeUserIds', form) as number[] | undefined) ?? []
+  const optional = (Form.useWatch('optionalUserIds', form) as number[] | undefined) ?? []
+  const externals = (Form.useWatch('externalAttendees', form) as string[] | undefined) ?? []
+  const watchedRepeat = (Form.useWatch('repeat', form) as 'none' | 'daily' | 'weekly' | undefined) ?? 'none'
+  const watchedDelegateEnabled = Form.useWatch('delegateEnabled', form) ?? false
+  const watchedDelegateIds = (Form.useWatch('delegateForId', form) as number[] | undefined) ?? []
+  const delegateUserId = watchedDelegateEnabled ? watchedDelegateIds[0] : undefined
+
+  const rule = useMemo(() => (room ? ruleForRoom(room) : undefined), [room])
+  // 后端会把实际使用人并入必参名单，前端必须同口径：少算一个就会出现
+  // 「页面说 6 人刚好、提交被容量拒」，且超额告警也不会亮
+  const delegateExtra = delegateUserId != null
+    && !required.includes(delegateUserId) && !optional.includes(delegateUserId) ? 1 : 0
+  const attendeeCount = 1 + required.length + optional.length + externals.filter(Boolean).length + delegateExtra
+
+  // 关掉代订时清掉挂名人：不能在 Switch 上写 onChange，那会覆盖 Form.Item 注入的 onChange，
+  // 导致开关自己的值都写不进表单
+  useEffect(() => {
+    if (!watchedDelegateEnabled) {
+      form.setFieldValue('delegateForId', [])
+      setDelegateName('')
+    }
+  }, [watchedDelegateEnabled, form])
+  const end = start && duration ? start.add(duration, 'minute') : undefined
+
+  const goBack = useCallback(() => {
+    navigate('/meeting-booking', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
+  }, [navigate, location.pathname, location.search])
+
+  /** 按 roomId 回查房间档案：忙闲页只带展示字段，容量与生效规则必须从档案接口取 */
+  useEffect(() => {
+    if (!roomId || Number.isNaN(roomId)) {
+      setLoading(false)
+      setLoadError('缺少會議室參數，請從「會議室預約」頁重新進入')
+      return
+    }
+    let alive = true
+    setLoading(true)
+    setLoadError(undefined)
+    fetchMeetingRoomDetail(roomId)
+      .then((data) => {
+        if (!alive) return
+        setRoom(data)
+        if (!data.bookable || data.status !== 'active') {
+          setLoadError('該會議室目前不接受預約（維護中或已停用），請改選其他會議室')
+        }
+      })
+      .catch((e: unknown) => {
+        if (alive) setLoadError(e instanceof Error ? e.message : '會議室檔案加載失敗')
+      })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [roomId])
+
+  /** 房间规则到手后才能算默认时长，因此初始化放在 room 之后（否则默认值会先按无规则算一次） */
+  useEffect(() => {
+    if (!room) return
+    const roomRule = ruleForRoom(room)
+    form.setFieldsValue({
+      start: initialStart ?? day.hour(10).minute(0).second(0),
+      duration: roomRule.minDuration && roomRule.minDuration >= 30 ? roomRule.minDuration : 60,
+      attendeeUserIds: [],
+      optionalUserIds: [],
+      externalAttendees: [],
+      bizType: 'general',
+      delegateEnabled: false,
+      delegateForId: [],
+      repeat: 'none',
+      intervalN: 1,
+      byWeekday: [],
+      occurrenceLimit: 12,
+    })
+    setPreview([])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room, form])
+
+  /** 预览周期场次：与后端 occurrences 同一算法，只算不写库 */
+  const doPreview = async () => {
+    if (!room) return
+    const values = form.getFieldsValue() as FormShape
+    if (!values.start || !values.duration) {
+      setIssues(['請先選擇開始時間與時長'])
+      return
+    }
+    if (values.repeat === 'weekly' && !(values.byWeekday ?? []).length) {
+      setIssues(['每週重複請至少選擇一個星期'])
+      return
+    }
+    setIssues([])
+    setPreviewing(true)
+    try {
+      const list = await previewSeries({
+        title: (values.title ?? '').trim(),
+        roomId: room.id,
+        startDate: values.start.format('YYYY-MM-DD'),
+        timeStart: values.start.format('HH:mm'),
+        timeEnd: values.start.add(values.duration, 'minute').format('HH:mm'),
+        freq: values.repeat === 'weekly' ? 'weekly' : 'daily',
+        intervalN: values.intervalN ?? 1,
+        byWeekday: values.byWeekday ?? [],
+        endDate: values.repeatEndDate ? values.repeatEndDate.format('YYYY-MM-DD') : undefined,
+        occurrenceLimit: values.occurrenceLimit ?? 12,
+      })
+      setPreview(list)
+    } catch (e) {
+      setIssues([e instanceof Error ? e.message : '預覽失敗'])
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  /** 真正的提交：单次与周期共用，失败留在本页（冲突原因已由 request.ts 弹出） */
+  const doSubmit = async (payload: MeetingCreateForm, raw: FormShape, startValue: Dayjs, endValue: Dayjs) => {
+    setSubmitting(true)
+    try {
+      if (raw.repeat && raw.repeat !== 'none') {
+        const series = await createSeries({
+          title: payload.title,
+          roomId: payload.roomId,
+          startDate: startValue.format('YYYY-MM-DD'),
+          timeStart: startValue.format('HH:mm'),
+          timeEnd: endValue.format('HH:mm'),
+          freq: raw.repeat,
+          intervalN: raw.intervalN ?? 1,
+          byWeekday: raw.repeat === 'weekly' ? raw.byWeekday : undefined,
+          endDate: raw.repeatEndDate ? raw.repeatEndDate.format('YYYY-MM-DD') : undefined,
+          occurrenceLimit: raw.occurrenceLimit ?? 12,
+          attendeeUserIds: payload.attendeeUserIds,
+          optionalUserIds: payload.optionalUserIds,
+          externalAttendees: payload.externalAttendees,
+          description: payload.description,
+          onlineMeetingUrl: payload.onlineMeetingUrl,
+          bizType: payload.bizType,
+          delegateForId: payload.delegateForId,
+          bizId: payload.bizId,
+          bizNo: payload.bizNo,
+          bizUrl: payload.bizUrl,
+          requestKey: payload.requestKey,
+        })
+        if (series.skippedCount && series.skippedCount > 0) {
+          message.warning(`已生成 ${series.generatedCount} 場，${series.skippedCount} 場因時段衝突被跳過`)
+          setSkipped(series.skipped ?? [])
+          setSkippedOpen(true)
+        } else if (!series.inviteQueued) {
+          message.success(`已生成 ${series.generatedCount} 場週期會議，但通知場景未啟用，邀約未發送`)
+          goBack()
+        } else {
+          message.success(`已生成 ${series.generatedCount} 場週期會議：${series.seriesNo}`)
+          goBack()
+        }
+        return
+      }
+      const result = await createMeeting(payload)
+      if (!result.inviteQueued) {
+        message.warning(`會議已預約（${result.bookingNo}），但通知場景未啟用，邀約未發送`)
+      } else if (result.notifySkippedCount > 0) {
+        message.warning(`會議已預約（${result.bookingNo}），${result.notifySkippedCount} 人未綁定釘釘，邀約未送達`)
+      } else {
+        message.success(`會議已預約：${result.bookingNo}`)
+      }
+      goBack()
+    } catch (e) {
+      const text = e instanceof Error ? e.message : '預約失敗'
+      setIssues([text])
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** 校验 → 二次确认 → 调接口（§B.3 顺序不可颠倒） */
+  const handleSubmit = async () => {
+    if (!room || submitting) return
+    let raw: FormShape
+    try {
+      raw = await form.validateFields()
+    } catch {
+      return // antd 已在字段下方标出原因
+    }
+    const startValue = raw.start as Dayjs
+    const durationValue = raw.duration as number
+    const endValue = startValue.add(durationValue, 'minute')
+    const payload: MeetingCreateForm = {
+      title: (raw.title ?? '').trim(),
+      roomId: room.id,
+      startTime: toMeetingIso(startValue) ?? '',
+      endTime: toMeetingIso(endValue) ?? '',
+      attendeeUserIds: raw.attendeeUserIds ?? [],
+      optionalUserIds: raw.optionalUserIds ?? [],
+      externalAttendees: (raw.externalAttendees ?? []).filter(Boolean),
+      description: raw.description?.trim() || undefined,
+      onlineMeetingUrl: raw.onlineMeetingUrl?.trim() || undefined,
+      bizType: raw.bizType || undefined,
+      // 关掉代订时明确传 undefined：留旧值会让"改回自订"仍挂着上一次的被代订人
+      delegateForId: raw.delegateEnabled ? raw.delegateForId?.[0] : undefined,
+      // 幂等键：一次进入页面生成一次，重复点击提交不会长出第二场会
+      requestKey: raw.requestKey ?? newMeetingRequestKey('book'),
+    }
+
+    // 周期场景只对"第一场"做前端校验：后续场次都落在同一星期几与同一时段，
+    // 每日窗/时长/粒度/容量的结论与之完全相同，逐场重复校验只会给出同一个答案
+    const errors = validateBookingWindow({ room, start: startValue.toDate(), end: endValue.toDate(), attendeeCount })
+    if (errors.length > 0) {
+      setIssues(errors)
+      return
+    }
+    if (raw.repeat === 'weekly' && !(raw.byWeekday ?? []).length) {
+      setIssues(['每週重複請至少選擇一個星期'])
+      return
+    }
+    setIssues([])
+
+    const repeatText = raw.repeat === 'none'
+      ? '不重複（單場）'
+      : `${raw.repeat === 'weekly' ? `每 ${raw.intervalN ?? 1} 週` : `每 ${raw.intervalN ?? 1} 天`}，最多 ${raw.occurrenceLimit ?? 12} 場`
+    Modal.confirm({
+      title: '確認提交預約？',
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: '確認預約',
+      cancelText: '取消',
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>會議主題：</span><b>{payload.title}</b></div>
+          <div className="confirm-info-row"><span>會議室：</span><b>{room.roomNo} · {room.roomName}</b></div>
+          <div className="confirm-info-row">
+            <span>時間：</span>
+            <b>{startValue.format('YYYY-MM-DD HH:mm')} ~ {endValue.format('HH:mm')}（{durationValue} 分鐘）</b>
+          </div>
+          <div className="confirm-info-row"><span>參會人數：</span><b>{attendeeCount} 人（含組織者）／容納 {room.capacity} 人</b></div>
+          {payload.delegateForId != null && (
+            <div className="confirm-info-row">
+              <span>實際使用人：</span>
+              <b>{delegateName || `id ${payload.delegateForId}`}（由你代訂，名額與衝突按此人判定）</b>
+            </div>
+          )}
+          <div className="confirm-info-row"><span>重複：</span><b>{repeatText}</b></div>
+        </div>
+      ),
+      onOk: () => doSubmit(payload, raw, startValue, endValue),
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" tip="載入會議室..." />
+      </div>
+    )
+  }
+
+  return (
+    <div className="content-area">
+      {/* 页面头部：橙色渐变顶条 + 返回 + 标题（§C.2，头部不放提交按钮） */}
+      <div style={{
+        position: 'relative', background: '#fff', marginBottom: 16,
+        borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
+      }}>
+        <div style={{
+          height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
+          backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
+        }} />
+        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Button type="primary" icon={<ArrowLeftOutlined />} onClick={goBack}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36,
+                padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
+              }}>返回</Button>
+            <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>預約會議室</h2>
+          </div>
+          {room && (
+            <Space size={6} wrap>
+              <Tag color="blue">{room.roomNo}</Tag>
+              <Tag>{room.roomName}</Tag>
+              <Tag color={attendeeCount > room.capacity ? 'red' : 'green'}>
+                當前 {attendeeCount} 人／容納 {room.capacity} 人
+              </Tag>
+            </Space>
+          )}
+        </div>
+      </div>
+
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="無法預約"
+          description={loadError}
+          style={{ marginBottom: 16 }}
+          action={<Button size="small" onClick={goBack}>返回預約頁</Button>}
+        />
+      )}
+
+      {issues.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          message="無法提交"
+          description={<ul style={{ margin: 0, paddingLeft: 18 }}>{issues.map(item => <li key={item}>{item}</li>)}</ul>}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      <Form form={form} layout="vertical" requiredMark="optional" disabled={!room || submitting}>
+        {/* 一、会议室与时间 */}
+        <div style={cardStyle}>
+          <CardTitle
+            icon={<ClockCircleOutlined />} bg="#e6f7ff" color="#1890ff" title="會議室與時間"
+            note={room ? `${room.locationText ?? ''} · 可預約 ${room.bookableStartTime ?? '08:00'}–${room.bookableEndTime ?? '22:00'} · 單場 ${room.minDuration ?? rule?.minDuration ?? 15}~${room.maxDuration ?? rule?.maxDuration ?? 240} 分鐘` : undefined}
+          />
+          <div style={gridStyle}>
+            <Form.Item label="開始時間" name="start" rules={[{ required: true, message: '請選擇開始時間' }]}>
+              <DatePicker
+                showTime={{ format: 'HH:mm', minuteStep: pickerMinuteStep(rule?.granularity) }}
+                format="YYYY-MM-DD HH:mm"
+                style={{ width: '100%' }}
+                disabledDate={current => !!current && current < dayjs().startOf('day')}
+              />
+            </Form.Item>
+            <Form.Item label="時長" name="duration" rules={[{ required: true, message: '請選擇時長' }]}
+              extra="結束時間由時長算出，保證符合粒度與上下限">
+              <Select
+                placeholder="選擇"
+                options={(rule ? durationOptions(rule.granularity, rule.maxDuration) : []).map(m => ({
+                  value: m,
+                  label: m >= 60 ? `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ''}` : `${m} 分鐘`,
+                }))}
+              />
+            </Form.Item>
+            <Form.Item label="結束時間" extra="左閉右開：與下一場背靠背不衝突">
+              <div style={{
+                height: 32, lineHeight: '32px', padding: '0 11px', borderRadius: 6,
+                border: '1px solid #d9d9d9', background: '#fafafa', color: '#262626', fontSize: 14,
+              }}>
+                {end ? end.format('YYYY-MM-DD HH:mm') : '待選擇'}
+              </div>
+            </Form.Item>
+          </div>
+
+          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <Form.Item label="重複頻率" name="repeat"
+              extra="週期會議提交時一次性生成全部場次，衝突場次跳過並列明原因">
+              <Select options={[
+                { value: 'none', label: '不重複（單場）' },
+                { value: 'daily', label: '每天重複' },
+                { value: 'weekly', label: '每週重複' },
+              ]} />
+            </Form.Item>
+            {watchedRepeat !== 'none' && (
+              <Form.Item label="重複截止日期" name="repeatEndDate" extra="留空表示只按場次上限結束">
+                <DatePicker style={{ width: '100%' }}
+                  disabledDate={current => !!current && current < dayjs().startOf('day')} />
+              </Form.Item>
+            )}
+          </div>
+
+          {watchedRepeat !== 'none' && (
+            <>
+              <div style={gridStyle}>
+                <Form.Item label="重複間隔" name="intervalN" rules={[{ required: true, message: '請填寫間隔' }]}
+                  extra={watchedRepeat === 'weekly' ? '每 N 週重複一次' : '每 N 天重複一次'}>
+                  <InputNumber min={1} max={30} style={{ width: '100%' }}
+                    addonAfter={watchedRepeat === 'weekly' ? '週' : '天'} />
+                </Form.Item>
+                <Form.Item label="場次上限" name="occurrenceLimit" rules={[{ required: true, message: '請填寫場次上限' }]}
+                  extra="與截止日期取先到者，單次最多 100 場">
+                  <InputNumber min={1} max={100} style={{ width: '100%' }} addonAfter="場" />
+                </Form.Item>
+                {watchedRepeat === 'weekly' && (
+                  <Form.Item label="重複星期" name="byWeekday" rules={[{ required: true, message: '請選擇星期' }]}
+                    extra="從起始日所在周開始，該周已過的星期不補生成">
+                    <Select mode="multiple" options={WEEKDAY_OPTIONS} placeholder="選擇重複的星期" maxTagCount={7} />
+                  </Form.Item>
+                )}
+              </div>
+              <Space style={{ marginBottom: 4 }} wrap>
+                <Button size="small" loading={previewing} onClick={() => void doPreview()}>預覽場次</Button>
+                {preview.length > 0 && (
+                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                    共 {preview.length} 場：{preview.slice(0, 3).map(d => `${d.date}(${d.weekdayText})`).join('、')}
+                    {preview.length > 3 ? ` … 最後 ${preview[preview.length - 1].date}` : ''}
+                  </span>
+                )}
+              </Space>
+            </>
+          )}
+        </div>
+
+        {/* 二、参会人员 */}
+        <div style={cardStyle}>
+          <CardTitle
+            icon={<TeamOutlined />} bg="#f6ffed" color="#52c41a" title="參會人員"
+            note={`含組織者共 ${attendeeCount} 人／容納 ${room?.capacity ?? '-'} 人`}
+          />
+          {/* 行政代订：房间记在"实际使用人"名下，组织者仍是登录的行政（保留操作权）。
+              只对 meeting-record:edit 开放——普通员工能替别人订会，等于能给别人强塞日程、
+              也能替被黑名单的人绕开限制。 */}
+          {canDelegate && (
+            <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              <Form.Item label="替他人預訂" name="delegateEnabled" valuePropName="checked"
+                extra="開啟後這場會記在使用人名下">
+                <Switch checkedChildren="代訂" unCheckedChildren="自訂" />
+              </Form.Item>
+              {watchedDelegateEnabled && (
+                <Form.Item label="實際使用人" name="delegateForId"
+                  rules={[{ required: true, message: '請選擇實際使用人' }]}
+                  extra="自動計入必參；衝突與名額按此人判定">
+                  <EmployeeSelect single placeholder="搜尋姓名或工號"
+                    onPick={items => setDelegateName(items[0]?.name ?? '')} />
+                </Form.Item>
+              )}
+            </div>
+          )}
+          <div style={gridStyle}>
+            <Form.Item label="必參人員" name="attendeeUserIds" extra="組織者由登入態確定，不需也不能選自己">
+              <EmployeeSelect placeholder="搜尋姓名或工號（可多選）" />
+            </Form.Item>
+            <Form.Item label="選參人員" name="optionalUserIds" extra="只提醒不強制出席，同樣計入容量">
+              <EmployeeSelect placeholder="搜尋姓名或工號（可多選）" />
+            </Form.Item>
+            <Form.Item label="外部參會人" name="externalAttendees" extra="訪客／面試者，只留姓名快照，收不到釘釘邀約">
+              <Select mode="tags" allowClear open={false} placeholder="輸入姓名後回車" tokenSeparators={[',', '、']} />
+            </Form.Item>
+          </div>
+          {attendeeCount > (room?.capacity ?? 0) && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`參會人數 ${attendeeCount} 人已超過該會議室容納 ${room?.capacity} 人`}
+              description="請減少參會人，或返回預約頁改選容納更多的會議室。"
+            />
+          )}
+        </div>
+
+        {/* 三、会议信息 */}
+        <div style={cardStyle}>
+          <CardTitle icon={<ProfileOutlined />} bg="#fff7e6" color="#fa8c16" title="會議信息" />
+          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <Form.Item label="會議主題" name="title" rules={[
+              { required: true, message: '請填寫會議主題' },
+              { max: 200, message: '最長 200 字' },
+            ]}>
+              <Input placeholder="如 Q4 需求評審" maxLength={200} allowClear />
+            </Form.Item>
+            <Form.Item label="會議類型" name="bizType">
+              <Select options={Object.entries(BIZ_TYPE_LABELS).map(([value, label]) => ({ value, label }))} />
+            </Form.Item>
+          </div>
+          <Form.Item label="線上會議鏈接" name="onlineMeetingUrl" rules={[{ max: 500, message: '最長 500 字' }]}>
+            <Input placeholder="https://..." allowClear maxLength={500} />
+          </Form.Item>
+          {/* 议程独占一整行（§C.4.1 备注类长文本同款处理） */}
+          <Form.Item label="會議議程" name="description" rules={[{ max: 1000, message: '最長 1000 字' }]}>
+            <RemarkTextArea rows={4} maxLength={1000} placeholder="選填：議題、需要提前準備的材料" />
+          </Form.Item>
+        </div>
+      </Form>
+
+      {/* 规则说明：把"免审批先到先得"这类容易被追问的口径写在页面上，而不是等用户踩到再解释 */}
+      <div style={{ ...cardStyle, background: '#FAFAFA', border: '1px solid #f0f0f0', boxShadow: 'none' }}>
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#8C8C8C', lineHeight: 1.9 }}>
+          <li>免審批先到先得：提交即佔用時段，行政不再二次審核。</li>
+          <li>邀約經釘釘工作通知發給必參與選參；未綁定釘釘的人會在會議詳情頁列明。</li>
+          <li>會議開始後不可改期，需取消後重新預約；開啟簽到保留的房間，超時未簽到將被自動釋放。</li>
+        </ul>
+      </div>
+
+      {/* 底部操作栏（§C.5） */}
+      <div className="form-footer">
+        <Button onClick={goBack}>取消</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!room}
+          onClick={() => void handleSubmit()}>提交預約</Button>
+      </div>
+
+      {/* 周期会议被跳过的场次：纯展示型提示（§9.1 允许 Modal），逐条列明原因而不是只给一句 toast */}
+      <Modal
+        title="部分場次因時段衝突被跳過"
+        open={skippedOpen}
+        onCancel={() => { setSkippedOpen(false); goBack() }}
+        onOk={() => { setSkippedOpen(false); goBack() }}
+        okText="知道了"
+        cancelButtonProps={{ style: { display: 'none' } }}
+      >
+        <Table<SkippedItem>
+          size="small"
+          rowKey="seq"
+          dataSource={skipped}
+          pagination={false}
+          scroll={{ y: 240 }}
+          columns={[
+            { title: '場次', dataIndex: 'seq', key: 'seq', width: 60 },
+            { title: '時間', key: 'time', render: (_, row) => `${row.startTime.slice(5, 16)} ~ ${row.endTime.slice(11, 16)}` },
+            { title: '原因', dataIndex: 'reason', key: 'reason' },
+          ]}
+        />
+        <p style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
+          跳過的場次不會佔用房間：如需那幾天的時段，請改選其他時間或與其他組織者協調。
+        </p>
+      </Modal>
+    </div>
+  )
+}

@@ -10,16 +10,17 @@
  * 分组与筛选只做视觉归类，授权判定仍以门户接口返回为唯一依据。
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Button, Empty, Input, Modal, Spin, Tabs } from 'antd'
+import { Button, Empty, Input, Modal, Spin, Tabs, message } from 'antd'
 import {
-  AccountBookOutlined, AppstoreOutlined, ControlOutlined, DeploymentUnitOutlined,
-  FileProtectOutlined, GlobalOutlined, LockOutlined, PartitionOutlined,
-  QuestionCircleOutlined, RiseOutlined, SafetyCertificateOutlined, SearchOutlined,
-  TeamOutlined, ThunderboltOutlined,
+  AccountBookOutlined, AppstoreOutlined, ClockCircleOutlined, CloseOutlined, ControlOutlined,
+  DeploymentUnitOutlined, FileProtectOutlined, GlobalOutlined, LockOutlined, PartitionOutlined,
+  QuestionCircleOutlined, RiseOutlined, SafetyCertificateOutlined, ScheduleOutlined, SearchOutlined,
+  MobileOutlined, StarFilled, StarOutlined, TeamOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { fetchPortalFavorites, savePortalFavorites } from '../../api/auth'
 import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
 import { getPortalSystemKey, getSystemDisplayName } from '../../constants/portalSystems'
@@ -27,6 +28,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { chineseNameToPinyinEnglish } from '../Home/homeUtils'
 import AnimatedNumber from '../../components/AnimatedNumber'
 import SystemArtwork, { type PortalArtworkStyle } from './SystemArtwork'
+import appMerchantPromo from '../../assets/app-merchant-promo.jpg'
+import appConsumerPromo from '../../assets/app-consumer-promo.jpg'
 import './index.css'
 
 /**
@@ -82,6 +85,14 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '流程中心、流程事項、審批配置、員工自助', icon: 'SolutionOutlined',
   },
   {
+    code: 'meeting', name: '會議管理系統', nameEn: 'Meeting Management',
+    description: '會議室檔案、忙閒選房、預約邀約與參會日程', icon: 'VideoCameraOutlined',
+  },
+  {
+    code: 'doc', name: '文檔中心系統', nameEn: 'Document Center',
+    description: '需求文檔、人事行政制度與培訓課程的統一索引與查閱入口', icon: 'CloudOutlined',
+  },
+  {
     code: 'iam', name: '權限管理系統', nameEn: 'IAM',
     description: '角色、功能授權、數據授權、菜單配置', icon: 'SafetyCertificateOutlined',
   },
@@ -125,10 +136,26 @@ const PORTAL_DOMAINS: readonly PortalDomain[] = [
     codes: ['finance', 'eam'],
   },
   {
-    key: 'org', nameKey: 'portal.domain.org', nameFallback: '組織與流程審批',
-    descKey: 'portal.domain.orgDesc', descFallback: '人事組織、流程審批與產研交付',
+    key: 'org', nameKey: 'portal.domain.org', nameFallback: '組織與人事',
+    descKey: 'portal.domain.orgDesc', descFallback: '人事組織、職位異動與考勤假勤',
     icon: <TeamOutlined />, tone: '#1890FF', toneBg: '#E6F7FF',
-    codes: ['hr', 'attendance', 'oa', 'rdm'],
+    codes: ['hr', 'attendance'],
+  },
+  {
+    /*
+     * 協作與交付：把"人怎么把事协同做完"的四个系统放在一起——
+     * 流程审批（oa）是协同的审批面、产研交付（rdm）是协同的交付面、会议（meeting）是协同的时间面、
+     * 文檔中心（doc）是协同的知识面（需求文檔沉澱交付的來龍去脈，制度/培訓支撐全員落地）。
+     * 会议原先落到「其他應用」不是因为它没有业务属性，而是因为它同时带行政与协作两种属性：
+     * 会议室档案/预约规则/黑名单由行政维护（治理面），但真正的使用者是全员排期开会（协作面）。
+     * 门户分类按使用者视角划分，所以归协作；行政治理入口留在系统内部的「預約規則」菜单。
+     * 文檔中心同理：內容橫跨人事/行政/產品，但使用視角是全員在系統內查閱知識，
+     * 空間治理入口留在系統內的「空間管理」菜单。
+     */
+    key: 'collab', nameKey: 'portal.domain.collab', nameFallback: '協作與交付',
+    descKey: 'portal.domain.collabDesc', descFallback: '流程審批、產研交付、會議與知識協作',
+    icon: <ScheduleOutlined />, tone: '#0958D9', toneBg: '#E6F0FF',
+    codes: ['oa', 'rdm', 'meeting', 'doc'],
   },
   {
     key: 'govern', nameKey: 'portal.domain.govern', nameFallback: '智能與平台治理',
@@ -184,6 +211,37 @@ function nextArtworkStyle(): PortalArtworkStyle {
 }
 
 /**
+ * 常用（员工手动收藏）与最近使用（进入系统时自动记录）按用户名隔离持久化。
+ * key 与首页快捷入口的 `home_favorites:*` 分开：两者语义不同（菜单 key vs 系统编码），
+ * 且都是「整份覆盖写入」，共用一份会互相抹掉对方的数据。
+ */
+const FAVORITES_KEY = (username: string) => `portal_favorites:${username}`
+const RECENT_KEY = (username: string) => `portal_recent:${username}`
+/** 收藏不设上限：常用与否由员工自己判断，系统总量只会越来越多。最近使用是滚动窗口，保留最后访问的若干个。 */
+const MAX_RECENT = 8
+
+/** 读取编码列表：脏数据一律按空处理，不能让一次坏写入把整个门户打不开。 */
+function readCodeList(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** 写入列表：隐私模式或配额满时返回 false，由调用方提示降级为「仅本次会话有效」，不打断进入系统。 */
+function writeCodeList(key: string, list: string[]): boolean {
+  try {
+    localStorage.setItem(key, JSON.stringify(list))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * 横幅日期时间行：24 小时制时钟 + 今天日期胶囊。
  * 独立组件并自持定时器，避免每秒重渲染整个门户而打断卡片插画的悬停播放。
  */
@@ -228,6 +286,9 @@ function PortalMotivationQuote() {
   )
 }
 
+/** 门户 Tab 白名单：仅这些页签可作为 ?tab= 深链还原目标 */
+const PORTAL_TAB_KEYS = ['authorized', 'unauthorized', 'app'] as const
+
 export default function Portal() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
@@ -243,7 +304,12 @@ export default function Portal() {
   /** 未授权系统点击后弹出的申请确认框，记录当前待申请的系统。 */
   const [requestSystem, setRequestSystem] = useState<PortalSystem | null>(null)
   /** Tab 与业务域筛选只决定展示范围，不改变任何系统的准入结果。 */
-  const [activeTab, setActiveTab] = useState('authorized')
+  // 支持从 APP 返回时按 ?tab= 还原进入来源页签；无参数或非法值仍默认「已獲得權限」
+  const [searchParams] = useSearchParams()
+  const paramTab = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(
+    paramTab && (PORTAL_TAB_KEYS as readonly string[]).includes(paramTab) ? paramTab : 'authorized',
+  )
   const [domain, setDomain] = useState('all')
   /**
    * 插画构图逐档轮换：Portal 是路由级组件，登录进入、从系统内返回门户与刷新页面都会重新挂载，
@@ -252,6 +318,31 @@ export default function Portal() {
   const [artworkStyle] = useState<PortalArtworkStyle>(nextArtworkStyle)
   /** 落盘放到挂载后，保证持久化的值就是本次真正看到的构图；重复写入同一个值，对 StrictMode 重挂载也幂等。 */
   useEffect(() => { localStorage.setItem(ARTWORK_STYLE_KEY, artworkStyle) }, [artworkStyle])
+  /** 常用与最近使用只决定「谁排在第一屏」，不决定谁能进系统，准入判定始终只看后端返回。 */
+  const [favorites, setFavorites] = useState<string[]>([])
+  const [recent, setRecent] = useState<string[]>([])
+
+  /**
+   * 按当前登录用户加载个人常用/最近使用；无 username（含测试桩）时保持为空，避免串号。
+   * 收藏先渲染本地缓存再等云端：门户是登录后的第一屏，不该为一次偏好请求空着。
+   * 云端返回数组（含空数组）以云端为准；返回 null/undefined 表示该账号从未同步过，保留本地，
+   * 这样「在另一台设备上清空收藏」也能正确同步，而不会被本地残留反向覆盖回云端。
+   */
+  useEffect(() => {
+    const username = user?.username
+    if (!username) {
+      setFavorites([])
+      setRecent([])
+      return
+    }
+    setFavorites(readCodeList(localStorage.getItem(FAVORITES_KEY(username))))
+    setRecent(readCodeList(localStorage.getItem(RECENT_KEY(username))))
+    let cancelled = false
+    fetchPortalFavorites()
+      .then((codes) => { if (!cancelled && Array.isArray(codes)) setFavorites(codes) })
+      .catch(() => { /* 后端不可用时保留本地缓存，下次改动再尝试同步 */ })
+    return () => { cancelled = true }
+  }, [user?.username])
 
   /** 授权结果完全使用后端响应；区分请求失败和成功返回空列表。 */
   const load = useCallback(async () => {
@@ -300,6 +391,38 @@ export default function Portal() {
     return counts
   }, [activeList])
 
+  /**
+   * 收藏切换：只维护本地展示顺序，不写任何准入标记。
+   * 权限被后端撤销后，常用带会因下面的 `favoriteSystems` 过滤而自动消失，收藏本身不构成放行依据。
+   * 不设数量上限，但每次切换都给轻提示：星标只有 28px、藏在卡片右上角，
+   * 员工点完很难确认是否生效，之前「点了没反应」的困惑就来自这里。
+   */
+  const toggleFavorite = useCallback((code: string, name: string) => {
+    const username = user?.username
+    if (!username) return
+    const adding = !favorites.includes(code)
+    const next = adding ? [...favorites, code] : favorites.filter((item) => item !== code)
+    setFavorites(next)
+    if (!writeCodeList(FAVORITES_KEY(username), next)) {
+      message.warning(t('portal.favNotSaved', '瀏覽器存儲不可用，本次收藏僅在当前頁面有效'))
+      return
+    }
+    // 云端整份覆盖。失败不打断操作：本地已经生效，下次改动会再试，刷新时回退本地缓存。
+    savePortalFavorites(next).catch(() => { /* 后端不可用时降级为仅本地持久化 */ })
+    message.success(adding
+      ? t('portal.favAdded', '已加入常用 · {{name}}', { name })
+      : t('portal.favRemoved', '已移出常用 · {{name}}', { name }))
+  }, [favorites, t, user?.username])
+
+  /** 记录最近使用：真正跳转成功前才写，弹窗引导申请的未授权系统不会被记进来。 */
+  const rememberRecent = useCallback((code: string) => {
+    const username = user?.username
+    if (!username) return
+    const next = [code, ...recent.filter((item) => item !== code)].slice(0, MAX_RECENT)
+    setRecent(next)
+    writeCodeList(RECENT_KEY(username), next)
+  }, [recent, user?.username])
+
   const handleEnter = (sys: PortalSystem) => {
     if (loading || loadError) return
     if (!systems.some((system) => system.code === sys.code)) {
@@ -307,6 +430,7 @@ export default function Portal() {
       setRequestSystem(sys)
       return
     }
+    rememberRecent(sys.code)
     // 系统首页不依赖首个菜单；菜单权限仍由首页和侧边栏读取服务端导航。
     setCurrentSystemCode(sys.code)
     navigate('/')
@@ -329,8 +453,23 @@ export default function Portal() {
     }
   }
 
-  /** 单卡结构保持原样（整卡即按钮、无独立操作按钮与图标），只调整外层分组容器。 */
-  const renderCard = (sys: ViewSystem, hasAccess: boolean) => (
+  /** 常用带只渲染仍然有权进入的系统：收藏里残留的编码（权限已撤销/系统已下线）自动被过滤掉。 */
+  const favoriteSystems = useMemo(() => favorites
+    .map((code) => systems.find((system) => system.code === code))
+    .filter((system): system is PortalSystem => !!system),
+  [favorites, systems])
+
+  /** 最近使用与常用去重，同一系统不在第一屏出现两次。 */
+  const recentSystems = useMemo(() => recent
+    .filter((code) => !favorites.includes(code))
+    .map((code) => systems.find((system) => system.code === code))
+    .filter((system): system is PortalSystem => !!system),
+  [recent, favorites, systems])
+
+  /** 单卡结构保持原样（整卡即按钮、卡内无独立操作按钮与图标）；收藏按钮挂在卡片外壳上，与卡按钮同级。 */
+  const renderCard = (sys: ViewSystem, hasAccess: boolean) => {
+    const favorited = favorites.includes(sys.code)
+    return (
     <div
       key={sys.code}
       className="portal-card-shell"
@@ -361,8 +500,54 @@ export default function Portal() {
           )}
         </span>
       </button>
+      {/* 未授权系统没有进入资格，也就不给收藏入口：既符合语义，也避免门户出现进不去的常用项 */}
+      {hasAccess && (
+        <button
+          type="button"
+          className={`portal-card-fav${favorited ? ' is-on' : ''}`}
+          aria-label={`${favorited ? t('portal.cardUnfavorite', '取消常用') : t('portal.cardFavorite', '設為常用')} · ${sys.name}`}
+          aria-pressed={favorited}
+          onClick={() => toggleFavorite(sys.code, sys.name)}
+        >
+          {favorited ? <StarFilled aria-hidden="true" /> : <StarOutlined aria-hidden="true" />}
+        </button>
+      )}
     </div>
-  )
+    )
+  }
+
+  /** 常用带的小胶囊：色点取业务域语义色，不引入新色值；名称走与卡片同一套 i18n 解析。 */
+  const renderQuickChip = (sys: PortalSystem, removable: boolean) => {
+    const view = toView(sys)
+    const domain = resolveDomain(view.code, view.artworkName)
+    return (
+      <span
+        key={sys.code}
+        className="portal-quick-item"
+        style={{ background: domain.toneBg, borderColor: `${domain.tone}22` }}
+      >
+        <button
+          type="button"
+          className="portal-quick-open"
+          onClick={() => handleEnter(sys)}
+          aria-label={`${view.name} · ${t('portal.enter')}`}
+        >
+          <span className="portal-quick-dot" style={{ background: domain.tone }} aria-hidden="true" />
+          <span className="portal-quick-name">{view.name}</span>
+        </button>
+        {removable && (
+          <button
+            type="button"
+            className="portal-quick-remove"
+            onClick={() => toggleFavorite(sys.code, view.name)}
+            aria-label={`${t('portal.cardUnfavorite', '取消常用')} · ${view.name}`}
+          >
+            <CloseOutlined aria-hidden="true" />
+          </button>
+        )}
+      </span>
+    )
+  }
 
   const renderSystemPanel = (group: readonly PortalSystem[], hasAccess: boolean) => {
     if (loading) {
@@ -444,6 +629,47 @@ export default function Portal() {
     )
   }
 
+  /** APP 面板：两张与系统卡同样式的入口卡（商家端 / 用户端），点击进入对应 APP 原型。 */
+  const renderAppPanel = () => {
+    const apps = [
+      { key: 'merchant', name: t('portal.appMerchant', '商家端'), desc: t('portal.appMerchantDesc', '選購廣告、真實下單，訂單同步後台可查'), img: appMerchantPromo, status: t('portal.appMerchantStatus', '真實下單'), statusBg: '#52C41A', statusFg: '#fff' },
+      { key: 'consumer', name: t('portal.appConsumer', '用戶端'), desc: t('portal.appConsumerDesc', '瀏覽正在推廣的商家與黃金時段'), img: appConsumerPromo, status: t('portal.appConsumerStatus', '數據待接入'), statusBg: '#FAAD14', statusFg: '#262626' },
+    ]
+    return (
+      <div className="portal-groups">
+        <section className="portal-group">
+          <header className="portal-group-head">
+            <span className="portal-group-icon" style={{ background: '#FFF7E6', color: '#E8720C' }}><MobileOutlined /></span>
+            <h2 className="portal-group-title">{t('portal.appGroup', '移動應用')}</h2>
+            <span className="portal-group-count" style={{ color: '#E8720C', background: '#FFF7E6' }}>2</span>
+            <span className="portal-group-line" aria-hidden="true" />
+            <span className="portal-group-desc">{t('portal.appGroupDesc', '原型預覽 · 數據取自真實後端')}</span>
+          </header>
+          <div className="portal-grid">
+            {apps.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                className="portal-card"
+                onClick={() => navigate(`/app-preview?app=${a.key}&from=app`)}
+                aria-label={a.name}
+              >
+                <span className="portal-card-cover">
+                  <img className="portal-card-cover-img" src={a.img} alt={a.name} />
+                  <span className="portal-card-status" style={{ background: a.statusBg, color: a.statusFg }}>{a.status}</span>
+                </span>
+                <span className="portal-card-body">
+                  <span className="portal-card-title">{a.name}</span>
+                  <span className="portal-card-desc">{a.desc}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+    )
+  }
+
   /** 概览指标卡配色沿用设计令牌 A.1 与 B.7 统计卡色板，数值统一走计数动画。 */
   const stats = [
     { key: 'authorized', icon: <AppstoreOutlined />, tone: '#1890FF', bg: '#E6F7FF', value: systems.length, suffix: '', label: t('portal.statAuthorized', '已授權系統') },
@@ -471,7 +697,7 @@ export default function Portal() {
               <h1 className="portal-title">{t('portal.appCenter')}</h1>
               <span className="portal-hero-eyebrow">
                 <ThunderboltOutlined aria-hidden="true" />
-                {t('portal.heroEyebrow', '麥峰科技 · 統一工作入口')}
+                {t('portal.heroEyebrow', '麥峰集團 · 統一工作入口')}
               </span>
             </div>
             {/* 职位/部门已在右上角展示，横幅只保留工号与一句问候 */}
@@ -516,35 +742,75 @@ export default function Portal() {
         ))}
       </div>
 
-      {/* 业务板块筛选：放在 Tabs 外部，不改变卡片自身的可访问性结构 */}
-      <div className="portal-filter">
-        <span className="portal-filter-label">{t('portal.filterLabel', '業務板塊')}</span>
-        <div className="portal-filter-chips">
-          <Button
-            type={domain === 'all' ? 'primary' : 'default'}
-            className="portal-chip"
-            onClick={() => { setDomain('all'); setHoveredSystem(null) }}
-          >
-            {t('portal.filterAll', '全部')}<em>{activeList.length}</em>
-          </Button>
-          {PORTAL_DOMAINS.map((item) => {
-            const count = domainCounts.get(item.key) ?? 0
-            if (!count) return null
-            return (
-              <Button
-                key={item.key}
-                type={domain === item.key ? 'primary' : 'default'}
-                className="portal-chip"
-                icon={item.icon}
-                onClick={() => { setDomain(item.key); setHoveredSystem(null) }}
-              >
-                {t(item.nameKey, item.nameFallback)}<em>{count}</em>
-              </Button>
-            )
-          })}
+      {/*
+        我的常用：内容模块，独立白卡。它是「入口清单」，点击是导航，
+        所以给块面、给标题，与下方卡片墙同属内容层；
+        搜索中（结果已收敛，再排一次会互相打架）、加载中与移动 APP 页签都不展示。
+      */}
+      {activeTab !== 'app' && !keyword.trim() && !loading && !loadError
+        && (favoriteSystems.length > 0 || recentSystems.length > 0) && (
+        <section className="portal-favorites" aria-label={t('portal.quickFavorite', '我的常用')}>
+          <header className="portal-favorites-head">
+            <span className="portal-favorites-icon" aria-hidden="true"><StarFilled /></span>
+            {/* 一张卡里可能只有最近使用（还没收藏过），标题跟着实际内容走，不挂空名 */}
+            <h2 className="portal-favorites-title">
+              {favoriteSystems.length > 0 ? t('portal.quickFavorite', '我的常用') : t('portal.quickRecent', '最近使用')}
+            </h2>
+            <span className="portal-favorites-count">{(favoriteSystems.length || recentSystems.length)}</span>
+            <span className="portal-favorites-line" aria-hidden="true" />
+            <span className="portal-favorites-tip">{t('portal.favoritesTip', '在卡片右上角點 ☆ 即可加入常用')}</span>
+          </header>
+          {favoriteSystems.length > 0 && (
+            <div className="portal-favorites-chips">{favoriteSystems.map((sys) => renderQuickChip(sys, true))}</div>
+          )}
+          {recentSystems.length > 0 && (
+            <div className={`portal-favorites-chips${favoriteSystems.length > 0 ? ' portal-favorites-recent' : ''}`}>
+              {favoriteSystems.length > 0 && (
+                <span className="portal-favorites-recent-label">
+                  <ClockCircleOutlined aria-hidden="true" />{t('portal.quickRecent', '最近使用')}
+                </span>
+              )}
+              {recentSystems.map((sys) => renderQuickChip(sys, false))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/*
+        业务板块：筛选工具条，故意不给卡片底 —— 它是控件不是内容，
+        裸行紧贴下方面板，读起来就是「这排胶囊在筛下面这些卡片」。
+        放在 Tabs 外部，不改变卡片自身的可访问性结构。
+      */}
+      {activeTab !== 'app' && (
+        <div className="portal-filter">
+          <span className="portal-filter-label">{t('portal.filterLabel', '業務板塊')}</span>
+          <div className="portal-filter-chips">
+            <Button
+              type={domain === 'all' ? 'primary' : 'default'}
+              className="portal-chip"
+              onClick={() => { setDomain('all'); setHoveredSystem(null) }}
+            >
+              {t('portal.filterAll', '全部')}<em>{activeList.length}</em>
+            </Button>
+            {PORTAL_DOMAINS.map((item) => {
+              const count = domainCounts.get(item.key) ?? 0
+              if (!count) return null
+              return (
+                <Button
+                  key={item.key}
+                  type={domain === item.key ? 'primary' : 'default'}
+                  className="portal-chip"
+                  icon={item.icon}
+                  onClick={() => { setDomain(item.key); setHoveredSystem(null) }}
+                >
+                  {t(item.nameKey, item.nameFallback)}<em>{count}</em>
+                </Button>
+              )
+            })}
+          </div>
+          <span className="portal-filter-result">{t('portal.resultCount', '當前共 {{count}} 個系統', { count: activeList.length })}</span>
         </div>
-        <span className="portal-filter-result">{t('portal.resultCount', '當前共 {{count}} 個系統', { count: activeList.length })}</span>
-      </div>
+      )}
 
       <div className="portal-panel">
         <Tabs
@@ -573,6 +839,17 @@ export default function Portal() {
                 </span>
               ),
               children: renderSystemPanel(unauthorizedSystems, false),
+            },
+            {
+              key: 'app',
+              label: (
+                <span className="portal-tab-label">
+                  <MobileOutlined aria-hidden="true" />
+                  <span>{t('portal.appTab', '移動 APP')}</span>
+                  <span className="portal-tab-count">2</span>
+                </span>
+              ),
+              children: renderAppPanel(),
             },
           ]}
         />

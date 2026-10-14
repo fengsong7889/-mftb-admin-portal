@@ -225,6 +225,57 @@ public class AuthController {
         return Result.success();
     }
 
+    /* ────────────── 企业门户「我的常用」收藏 ────────────── */
+
+    /**
+     * 门户常用系统编码：系统编码是有限集合，100 条远大于当前接入量，
+     * 只为挡住恶意超大请求体，不构成用户可感知的功能上限。
+     */
+    private static final int PORTAL_FAVORITES_MAX = 100;
+
+    /** 系统编码白名单形状（sys_system.code 的取值形态），不信任前端传来的任意字符串 */
+    private static final java.util.regex.Pattern PORTAL_CODE_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
+
+    /**
+     * 获取当前用户企业门户常用系统。
+     * 从未同步过时 data 为 null（Jackson non_null 会省略该字段），前端据此回退本地缓存；
+     * 同步过且已清空则返回空数组，覆盖本地缓存。
+     */
+    @GetMapping("/portal-favorites")
+    public Result<List<String>> getPortalFavorites() {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        return Result.success(authService.getPortalFavorites(username));
+    }
+
+    /** 保存当前用户企业门户常用系统：整份覆盖，只允许改自己的列表（username 取自 JWT，不接受前端传入） */
+    @PutMapping("/portal-favorites")
+    public Result<Void> savePortalFavorites(@RequestBody List<String> codes) {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        List<String> cleaned = normalizePortalFavorites(codes);
+        if (cleaned == null) return Result.error("收藏列表格式不正確");
+        authService.savePortalFavorites(username, cleaned.isEmpty() ? "[]" : toJson(cleaned));
+        return Result.success();
+    }
+
+    /**
+     * 清洗收藏列表：条数上限、编码形状白名单、去重保序。
+     *
+     * @return 合法结果；入参非法时返回 {@code null} 交由调用方直接拒绝
+     */
+    private List<String> normalizePortalFavorites(List<String> codes) {
+        if (codes == null || codes.isEmpty()) return List.of();
+        if (codes.size() > PORTAL_FAVORITES_MAX) return null;
+        List<String> result = new java.util.ArrayList<>(codes.size());
+        for (String code : codes) {
+            if (code == null || !PORTAL_CODE_PATTERN.matcher(code).matches()) return null;
+            if (!result.contains(code)) result.add(code);
+        }
+        return result;
+    }
+
     /**
      * 保存用户选中的在线头像 URL（IconFont 等外部 URL）
      * @param request

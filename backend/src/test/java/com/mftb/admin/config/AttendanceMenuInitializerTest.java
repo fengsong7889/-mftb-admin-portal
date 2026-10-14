@@ -62,6 +62,14 @@ class AttendanceMenuInitializerTest {
         ReflectionTestUtils.invokeMethod(initializer, "migrate");
     }
 
+    private void groupMenus() {
+        ReflectionTestUtils.invokeMethod(initializer, "groupMenus");
+    }
+
+    private void verifyV2() {
+        ReflectionTestUtils.invokeMethod(initializer, "verifyV2");
+    }
+
     private Integer countTopAttendanceMenus() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE system_code = 'attendance' "
                 + "AND deleted = 0 AND status = 1 AND parent_id IS NULL", Integer.class);
@@ -195,5 +203,64 @@ class AttendanceMenuInitializerTest {
 
     private void assertDoesNotThrowVerify() {
         ReflectionTestUtils.invokeMethod(initializer, "verify");
+    }
+
+    /**
+     * v2.0：平铺的 12 个叶子菜单收入 4 个分组，工作台与設置保持独立顶级。
+     * <p>本用例钉三件事：
+     * ① 4 个分组必须为 type=1 顶级目录；
+     * ② 10 个叶子必须挂入对应分组，顶级只剩 6 条（工作台 + 4 分组 + 設置）；
+     * ③ verifyV2 对分组缺失真的失败。
+     */
+    @Test
+    void groupsFlatMenusIntoFourCategoriesAndKeepsWorkbenchStandalone() {
+        migrate();
+        groupMenus();
+
+        // 顶级只剩 6 条：工作台 + 4 分组 + 設置
+        assertEquals(6, countTopAttendanceMenus());
+
+        // 4 个分组必须为 type=1 顶级目录
+        for (String gk : new String[]{
+                AttendanceConstants.GROUP_OPS, AttendanceConstants.GROUP_BASIC,
+                AttendanceConstants.GROUP_LEAVE, AttendanceConstants.GROUP_REPORT}) {
+            assertEquals(1, jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 "
+                            + "AND parent_id IS NULL AND type = 1 AND system_code = 'attendance'",
+                    Integer.class, gk), gk + " 必须是 type=1 顶级分组");
+        }
+
+        // 考勤管理分组下挂 4 个叶子
+        assertEquals(4, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE parent_id = "
+                        + "(SELECT id FROM sys_menu WHERE menu_key = 'attendance-ops-group' AND deleted = 0 LIMIT 1) "
+                        + "AND deleted = 0", Integer.class));
+
+        // 请假管理分组下挂 2 个叶子（从 hr-profile 迁入的）
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE parent_id = "
+                        + "(SELECT id FROM sys_menu WHERE menu_key = 'attendance-leave-group' AND deleted = 0 LIMIT 1) "
+                        + "AND deleted = 0", Integer.class));
+
+        // 工作台仍为独立顶级
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'attendance-workbench' "
+                        + "AND deleted = 0 AND parent_id IS NULL", Integer.class));
+
+        // verifyV2 不抛异常
+        verifyV2();
+    }
+
+    @Test
+    void verifyV2FailsWhenAGroupIsMissing() {
+        migrate();
+        groupMenus();
+        // 停用考勤管理分组
+        jdbc.update("UPDATE sys_menu SET status = 0 WHERE menu_key = 'attendance-ops-group'");
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> ReflectionTestUtils.invokeMethod(initializer, "verifyV2"));
+        assertTrue(error.getMessage().contains("attendance-ops-group"),
+                "校验信息必须点出缺失的分组 key");
     }
 }

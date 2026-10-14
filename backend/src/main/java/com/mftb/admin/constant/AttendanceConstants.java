@@ -15,9 +15,23 @@ public final class AttendanceConstants {
     private AttendanceConstants() {
     }
 
-    // ==================== 菜单 key（全部为顶级菜单，system_code=attendance） ====================
+    // ==================== 分组菜单 key（type=1，无 path/component） ====================
 
-    /** 假勤工作台：指标与预警，待办只跳转流程事项，不承载审批动作 */
+    /** 考勤管理分组：日常操作（考勤组/排班/打卡/异常） */
+    public static final String GROUP_OPS = "attendance-ops-group";
+
+    /** 基础设置分组：低频配置（班次/节假日） */
+    public static final String GROUP_BASIC = "attendance-basic-group";
+
+    /** 请假管理分组：独立业务域（请假单/额度） */
+    public static final String GROUP_LEAVE = "attendance-leave-group";
+
+    /** 报表统计分组：汇总输出（日报/月报） */
+    public static final String GROUP_REPORT = "attendance-report-group";
+
+    // ==================== 菜单 key（system_code=attendance） ====================
+
+    /** 假勤工作台：指标与预警，待办只跳转流程事项，不承载审批动作（独立顶级，不挂分组） */
     public static final String MENU_WORKBENCH = "attendance-workbench";
 
     /** 考勤组与规则：考勤结论的最小计算单位（成员范围 + 考勤地 + 班次 + 宽限 + 来源） */

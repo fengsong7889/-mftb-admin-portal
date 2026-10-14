@@ -33,6 +33,13 @@ import {
   SafetyCertificateOutlined,
   MoneyCollectOutlined,
   AccountBookOutlined,
+  // 会议管理（meeting）：会议室档案/预约/我的会议/预约记录
+  VideoCameraOutlined,
+  UsergroupAddOutlined,
+  PlusSquareOutlined,
+  LayoutOutlined,
+  BookOutlined,
+  PropertySafetyOutlined,
   FileSearchOutlined,
   AuditOutlined,
   // 用車管理菜单图标（後端 sys_menu.icon 同名的注册，缺一处菜单就不渲染）
@@ -179,6 +186,13 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'SafetyCertificateOutlined': SafetyCertificateOutlined,
   'MoneyCollectOutlined': MoneyCollectOutlined,
   'AccountBookOutlined': AccountBookOutlined,
+  // 会议管理菜单图标（与 MeetingSchemaMigrationInitializer 写入的 sys_menu.icon 逐字对齐）
+  'VideoCameraOutlined': VideoCameraOutlined,
+  'UsergroupAddOutlined': UsergroupAddOutlined,
+  'PlusSquareOutlined': PlusSquareOutlined,
+  'LayoutOutlined': LayoutOutlined,
+  'BookOutlined': BookOutlined,
+  'PropertySafetyOutlined': PropertySafetyOutlined,
   'FileSearchOutlined': FileSearchOutlined,
   'AuditOutlined': AuditOutlined,
   'CheckCircleOutlined': CheckCircleOutlined,
@@ -272,7 +286,7 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'ControlOutlined': ControlOutlined,
   // 物资管理菜单图标
   'InboxOutlined': InboxOutlined,
-  // 用車管理（物資管理下的「車輛管理」分组）
+  // 用車管理（物資管理下的「用車管理」分组）
   'CarOutlined': CarOutlined,
   'TruckOutlined': TruckOutlined,
   'CarryOutOutlined': CarryOutOutlined,
