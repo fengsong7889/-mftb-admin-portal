@@ -268,7 +268,13 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
                         + "，並發下會長出重複預約/重複軌跡/重複推送");
             }
         }
-        verifyColumns();
+        // 此处绝不可调 verifyColumns()：REQUIRED_COLUMNS 覆盖 38 列，其中 cancel_scope 要等 231
+        // 补列、biz_meeting_series / biz_meeting_blacklist 的 6 列要等 231 建表，v1.0 任务刚跑完时
+        // 它们必然还不存在。开发库因 v1.0 早已记版本、applyOnce 直接 return，这个顺序错误从未暴露；
+        // 生产全新库上它会让 v1.0 永远记不上版本 → 每次启动重跑重败 → Pod 崩溃循环（2026-10-14 实际踩过）。
+        // 全量列校验统一由 run() 末尾的 verifyColumns() 承担：那时 repairSchema() 已补完列，
+        // 且它每次启动都跑、不受 applyOnce 门控，覆盖面比塞进 v1.0 后置校验更严格。
+        // 该不变量由 MeetingSchemaVerifyOrderingTest 钉住。
     }
 
     /** 实体列必验：每次启动都跑（新加字段在任何已跑过 v1.0 的环境上都要立刻暴露缺列） */
