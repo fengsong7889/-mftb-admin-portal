@@ -188,6 +188,7 @@ export function usePurchaseOrderForm(
 
   const handleRemoveGroup = (groupId: string) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
       title: t('asset.deleteConfirmTitle'),
       content: t('asset.warnDeleteGroup'),
       okText: t('common.confirm'),

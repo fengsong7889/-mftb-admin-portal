@@ -25,7 +25,8 @@ import {
   type RdmProductOption,
   type RdmRequirementDetail,
 } from '../../api/rdm'
-import { RDM_PRIORITY_LABEL, RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, type RdmPriority, type RdmStatus } from '../../constants/rdm'
+import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, type RdmStatus } from '../../constants/rdm'
+import { PriorityTag } from './components/Tags'
 import './index.css'
 
 /** 选中的产品经理（确认框与提交都要用名字，避免提交后再去反查） */
@@ -126,7 +127,7 @@ export default function AssignPm() {
     { title: '標題', dataIndex: 'title', key: 'title', ellipsis: true },
     {
       title: '優先級', dataIndex: 'priority', key: 'priority', width: 110,
-      render: (v: string) => RDM_PRIORITY_LABEL[v as RdmPriority] ?? v,
+      render: (v: string) => <PriorityTag priority={v} />,
     },
     {
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
@@ -136,7 +137,8 @@ export default function AssignPm() {
         </Tag>
       ),
     },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 110 },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 110, ellipsis: true },
+    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
       title: '現負責產品', dataIndex: 'pmName', key: 'pmName', width: 120,
       render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>未分配</span>,

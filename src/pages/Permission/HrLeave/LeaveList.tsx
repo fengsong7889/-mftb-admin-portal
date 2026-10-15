@@ -61,6 +61,8 @@ export default function LeaveList({ scope = HR_LEAVE_SCOPE }: { scope?: LeaveSco
 
   const handleDelete = (record: LeaveRequestItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hrLeave.confirmDeleteTitle'),
       content: (
         <div className="confirm-info-card">

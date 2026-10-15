@@ -65,54 +65,57 @@ export default function RequirementStageBar({ status, overdue, compact, hint }: 
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: 0,
-      padding: '16px 8px 8px',
-      flexWrap: 'wrap',
-    }}>
-      {RDM_STAGE_ORDER.map((st, idx) => {
-        const done = idx < currentIdx
-        const active = idx === currentIdx
-        const color = done || active ? '#E8720C' : '#D9D9D9'
-        return (
-          <div key={st} style={{ flex: 1, display: 'flex', alignItems: 'flex-start', minWidth: 0 }}>
-            {/* 节点 */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
-              <div style={{
-                width: 22, height: 22, borderRadius: '50%',
-                background: done ? '#E8720C' : active ? '#FFF7F0' : '#fff',
-                border: `2px solid ${color}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? '#E8720C' : '#BFBFBF',
-                boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
-                animation: active ? 'statusPulse 2s ease-in-out infinite' : undefined,
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}>
-                {done ? '✓' : idx + 1}
+    <div style={{ padding: '16px 8px 8px' }}>
+      {/*
+        步骤行与「当前状态」文本必须分成两个块级行。
+        原先两者是同一个 flex-row 的兄弟，状态文本 width:100% 的 flex-basis 会吃满整行，
+        6 个 flex:1 步骤被压成 0 宽并叠在同一坐标 —— 弹窗里看起来「进度条是空的」。
+      */}
+      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+        {RDM_STAGE_ORDER.map((st, idx) => {
+          const done = idx < currentIdx
+          const active = idx === currentIdx
+          const color = done || active ? '#E8720C' : '#D9D9D9'
+          return (
+            <div key={st} style={{ flex: 1, display: 'flex', alignItems: 'flex-start', minWidth: 0 }}>
+              {/* 节点 */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: done ? '#E8720C' : active ? '#FFF7F0' : '#fff',
+                  border: `2px solid ${color}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? '#E8720C' : '#BFBFBF',
+                  boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
+                  animation: active ? 'statusPulse 2s ease-in-out infinite' : undefined,
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}>
+                  {done ? '✓' : idx + 1}
+                </div>
+                <div style={{
+                  marginTop: 6, fontSize: 12, whiteSpace: 'nowrap',
+                  color: active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
+                  fontWeight: active ? 600 : 400,
+                }}>
+                  {RDM_STAGE_LABEL[st]}
+                </div>
               </div>
-              <div style={{
-                marginTop: 6, fontSize: 12, whiteSpace: 'nowrap',
-                color: active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
-                fontWeight: active ? 600 : 400,
-              }}>
-                {RDM_STAGE_LABEL[st]}
-              </div>
+              {/* 连接线 */}
+              {idx < RDM_STAGE_ORDER.length - 1 && (
+                <div style={{
+                  flex: 1, height: 2, marginTop: 11,
+                  background: idx < currentIdx ? 'linear-gradient(90deg,#E8720C,#F59432)' : '#F0F0F0',
+                  borderRadius: 2,
+                }} />
+              )}
             </div>
-            {/* 连接线 */}
-            {idx < RDM_STAGE_ORDER.length - 1 && (
-              <div style={{
-                flex: 1, height: 2, marginTop: 11,
-                background: idx < currentIdx ? 'linear-gradient(90deg,#E8720C,#F59432)' : '#F0F0F0',
-                borderRadius: 2,
-              }} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       {/* 当前状态明细（Popover 展示阶段说明 + 状态码） */}
       {currentIdx >= 0 && (
-        <div style={{ textAlign: 'center', marginTop: 4, width: '100%' }}>
+        <div style={{ textAlign: 'center', marginTop: 8 }}>
           <Popover
             trigger="hover"
             content={

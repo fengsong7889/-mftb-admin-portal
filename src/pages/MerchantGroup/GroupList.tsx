@@ -117,6 +117,8 @@ export default function GroupList() {
       return
     }
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common:confirmDelete'),
       content: t('confirmDeleteGroup', { name: record.groupName }),
       okText: t('common:confirm'),

@@ -3,12 +3,14 @@ package com.mftb.admin.service.impl;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmDeliveryDTO;
+import com.mftb.admin.dto.RdmDeliveryVO;
 import com.mftb.admin.entity.RdmMilestone;
 import com.mftb.admin.entity.RdmPrd;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmWorkLog;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.mapper.RdmChangeRequestMapper;
+import com.mftb.admin.mapper.RdmDeliveryItemMapper;
 import com.mftb.admin.mapper.RdmIterationMapper;
 import com.mftb.admin.mapper.RdmMilestoneMapper;
 import com.mftb.admin.mapper.RdmPrdMapper;
@@ -24,6 +26,7 @@ import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmDeliveryService;
+import com.mftb.admin.service.RdmFlowVersionGuard;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.util.BizSeqService;
@@ -38,7 +41,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,7 +59,7 @@ import static org.mockito.Mockito.when;
  * <p>锁死的是「计划与交付事实不能被糊过去」这几条：
  * <ol>
  *   <li>已定稿的 PRD 不可原地修改，只能开新版本并写原因；</li>
- *   <li>任务估时/日期必须自洽，负责人必须有交付权限；</li>
+ *   <li>任务估时/日期必须自洽，负责人必须在职启用（无研发交付权限只提醒不阻断）；</li>
  *   <li>完成任务必须留交付说明，不再自动补 1 工日；</li>
  *   <li>基线冻结后初步计划不可回改，不适用节点必须写原因。</li>
  * </ol>
@@ -67,6 +73,8 @@ class RdmDeliveryGuardTest {
     private RdmWorkLogMapper workLogMapper;
     private RdmRequirementMapper requirementMapper;
     private OperatorResolver operatorResolver;
+    private SysUserMapper userMapper;
+    private PermissionService permissionService;
     private RdmDeliveryService service;
 
     @BeforeEach
@@ -78,18 +86,20 @@ class RdmDeliveryGuardTest {
         requirementMapper = mock(RdmRequirementMapper.class);
         accessGuard = mock(RdmAccessGuard.class);
         operatorResolver = mock(OperatorResolver.class);
+        userMapper = mock(SysUserMapper.class);
+        permissionService = mock(PermissionService.class);
         when(operatorResolver.operatorSignature(any())).thenReturn("MF00041|李四");
         // 当前登录人固定为任务负责人：工时明细只允许本人填报，多个用例要走到真实分支
         when(operatorResolver.currentUser()).thenReturn(owner41());
         service = new RdmDeliveryServiceImpl(
                 prdMapper, mock(RdmReviewMapper.class), taskMapper,
                 mock(RdmIterationMapper.class), mock(RdmChangeRequestMapper.class),
-                requirementMapper, mock(RdmRequirementRoleMapper.class), mock(SysUserMapper.class),
+                requirementMapper, mock(RdmRequirementRoleMapper.class), userMapper,
                 mock(BizSeqService.class), operatorResolver, mock(RdmConfigService.class),
                 mock(RdmNotifyService.class), mock(RdmRequirementService.class),
                 mock(OaRequestService.class), mock(JdbcTemplate.class), accessGuard,
                 milestoneMapper, workLogMapper, mock(RdmPrdSnapshotMapper.class),
-                mock(PermissionService.class));
+                permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class));
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
@@ -195,6 +205,48 @@ class RdmDeliveryGuardTest {
                 () -> service.saveTask(taskDto("backend", BigDecimal.TEN, "2026-10-20", "2026-10-10")));
         assertThrows(BusinessException.class,
                 () -> service.saveTask(taskDto("firmware", BigDecimal.TEN, null, null)));
+    }
+
+    @Test
+    @DisplayName("负责人无研发交付权限：只提醒不阻断，任务仍可保存")
+    void ownerWithoutDeliveryPermissionStillSaves() {
+        RdmDeliveryDTO.Task dto = taskDto("backend", BigDecimal.TEN, null, null);
+        dto.setOwnerUserId(41L);
+        when(userMapper.selectById(41L)).thenReturn(owner41());
+        // PermissionService 默认返回 false = 该员工无交付权限
+        assertDoesNotThrow(() -> service.saveTask(dto));
+
+        RdmDeliveryVO.OwnerCheck check = service.checkTaskOwner(41L);
+        assertFalse(check.getAble());
+        assertFalse(check.getHardBlocked(), "无权限属于可先派活、后补权限，不得硬拦");
+        assertTrue(check.getWarning().contains("無研發交付權限"), check.getWarning());
+    }
+
+    @Test
+    @DisplayName("负责人已离职：预检标红且保存仍被拦下")
+    void inactiveOwnerIsRejected() {
+        com.mftb.admin.entity.SysUser gone = owner41();
+        gone.setStatus(0);
+        when(userMapper.selectById(41L)).thenReturn(gone);
+
+        RdmDeliveryDTO.Task dto = taskDto("backend", BigDecimal.TEN, null, null);
+        dto.setOwnerUserId(41L);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.saveTask(dto));
+        assertTrue(ex.getMessage().contains("離職或停用"), ex.getMessage());
+
+        RdmDeliveryVO.OwnerCheck check = service.checkTaskOwner(41L);
+        assertTrue(check.getHardBlocked(), "离职负责人保存时会被拦，预检必须先报错而不是给个黄色提醒");
+    }
+
+    @Test
+    @DisplayName("负责人有交付权限：预检不弹提醒")
+    void eligibleOwnerGetsNoWarning() {
+        when(userMapper.selectById(41L)).thenReturn(owner41());
+        when(permissionService.hasPermission(any(), any(), any())).thenReturn(true);
+
+        RdmDeliveryVO.OwnerCheck check = service.checkTaskOwner(41L);
+        assertTrue(check.getAble());
+        assertNull(check.getWarning());
     }
 
     @Test

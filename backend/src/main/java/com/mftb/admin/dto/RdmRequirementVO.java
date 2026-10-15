@@ -7,6 +7,8 @@ import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmRequirementTarget;
 import com.mftb.admin.entity.RdmStatusLog;
+import com.mftb.admin.service.RdmAllowedActionsService;
+import com.mftb.admin.service.RdmRequirementStructureService;
 import com.mftb.admin.util.DateTimeUtils;
 import lombok.Data;
 
@@ -86,16 +88,42 @@ public class RdmRequirementVO {
     private Long stayHours;
 
     /* ── 验收 ── */
+    private Long acceptorUserId;
     private String acceptorName;
     private String acceptanceResult;
     private Integer acceptanceScore;
     private String acceptanceTime;
 
     /**
+     * 提交时指定的意向产品经理 ID。
+     * <p>必须随详情下发：草稿续编要把「指定产品经理」回填到表单，
+     * 只回姓名不回 id 的话，用户保存草稿时会被 update 逻辑当成「改回统一分配」而清掉意向人。
+     */
+    private Long intentPmUserId;
+
+    /**
      * 流程版本（阶段 4）：1=历史记录（无五节点/定稿快照/工时明细），2=新链路。
      * <p>界面靠它区分“真的没做”与“那个年代还没这个要求”，避免把存量需求误判为不合格。
      */
     private Integer flowVersion;
+
+    /* ── V3 分层链路（Batch 2 / Phase 2） ── */
+    /** 所属项目ID */
+    private Long projectId;
+    /** 需求种类：aggregate（聚合）/ execution（执行） */
+    private String requirementKind;
+    /** 结构父需求ID（主子关系） */
+    private Long structureParentReqId;
+    /** 结构子需求（仅聚合需求详情填充；执行需求为空列表） */
+    private List<RdmRequirementStructureService.RequirementTreeNode> structureChildren = new ArrayList<>();
+    /** 结构父需求信息（有结构父时填充，供详情页展示祖先） */
+    private RdmRequirementStructureService.RequirementTreeNode structureParent;
+    /**
+     * 需求管理类可执行动作（来自 {@link RdmAllowedActionsService#computeRequirementActions}）。
+     * <p>与 {@link #allowedActions}（基于流转规则表的流转动作）互补：前者是「按角色可发起的管理操作」，
+     * 后者是「当前状态配置允许的流转」。命名区分避免与既有流转动作字段冲突。
+     */
+    private List<RdmAllowedActionsService.AllowedAction> requirementActions = new ArrayList<>();
 
     private String updatedAt;
 
@@ -362,9 +390,14 @@ public class RdmRequirementVO {
         vo.setReworkCount(r.getReworkCount());
         vo.setParentReqNo(r.getParentReqNo());
         vo.setChangeCount(r.getChangeCount());
+        vo.setAcceptorUserId(r.getAcceptorUserId());
         vo.setAcceptorName(r.getAcceptorName());
+        vo.setIntentPmUserId(r.getIntentPmUserId());
         vo.setAcceptanceResult(r.getAcceptanceResult());
         vo.setFlowVersion(r.getFlowVersion() == null ? 1 : r.getFlowVersion());
+        vo.setProjectId(r.getProjectId());
+        vo.setRequirementKind(r.getRequirementKind());
+        vo.setStructureParentReqId(r.getStructureParentReqId());
         vo.setAcceptanceScore(r.getAcceptanceScore());
         vo.setAcceptanceTime(DateTimeUtils.format(r.getAcceptanceTime()));
         vo.setUpdatedAt(DateTimeUtils.format(r.getUpdatedAt()));

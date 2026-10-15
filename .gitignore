@@ -57,6 +57,9 @@ Thumbs.db
 docs/test_*.png
 docs/verify_*.png
 
+# 独立验证临时产物（javac 输出/日志/类文件），仅供本地验证，禁止入库
+.*-verify/
+
 # Dev-only login bypass scripts (security risk if deployed)
 quick-login-hack.js
 

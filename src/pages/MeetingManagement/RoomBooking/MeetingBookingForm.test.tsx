@@ -12,6 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingBookingForm from './MeetingBookingForm'
+import i18n from '../../../i18n'
 
 const hasPermission = vi.fn(() => false)
 
@@ -68,7 +69,9 @@ function mount() {
 }
 
 describe('會議預約表单联动', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // 组件文案已 i18n 化：测试必须钉住语言，否则 jsdom 无 localStorage 时走 fallbackLng=en
+    await i18n.changeLanguage('zh-TW')
     vi.clearAllMocks()
     hasPermission.mockReturnValue(false)
     vi.mocked(fetchMeetingRoomDetail).mockResolvedValue(ROOM as never)

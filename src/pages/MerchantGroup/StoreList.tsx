@@ -153,6 +153,8 @@ export default function StoreList() {
 
   const handleDelete = (record: StoreItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common:confirmDelete'),
       content: t('confirmDeleteStore', { name: record.storeName }),
       okText: t('common:confirm'),

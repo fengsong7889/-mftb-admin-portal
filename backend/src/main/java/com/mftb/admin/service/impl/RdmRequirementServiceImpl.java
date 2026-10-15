@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
@@ -40,13 +41,17 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RdmAccessGuard;
+import com.mftb.admin.service.RdmAllowedActionsService;
 import com.mftb.admin.service.RdmConfigService;
+import com.mftb.admin.service.RdmDeliveryItemService;
+import com.mftb.admin.service.RdmFlowVersionGuard;
 import com.mftb.admin.service.RdmIntakeCallbackService;
 import com.mftb.admin.service.RdmIntakePolicyService;
 import com.mftb.admin.service.RdmIntakeRoundService;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmReleaseService;
 import com.mftb.admin.service.RdmRequirementService;
+import com.mftb.admin.service.RdmRequirementStructureService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
@@ -90,6 +95,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     /** 需求池责任人（技术负责人）菜单，用于判定谁能分发 */
     private static final String MENU_DISPATCHER = RdmConstants.MENU_INTAKE;
 
+    /**
+     * 未认证时的数据范围哨兵 id（任务19 / 缺口5）。
+     * <p>拿不到登录人身份又非管理视角时，用它替代 {@code null} 传入查询条件：
+     * 自增主键从 1 起，-1 不可能命中任何人员字段，从而把「我的」fail-closed 收敛为空集，
+     * 而不是像 {@code null} 那样被 {@code toWrapper} 当成「不受限 = 全量」。
+     */
+    private static final Long UNAUTHENTICATED_SCOPE_ID = -1L;
+
     private final RdmRequirementMapper requirementMapper;
     private final RdmRequirementTargetMapper targetMapper;
     private final RdmRequirementRoleMapper roleMapper;
@@ -116,6 +129,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     private final RdmIntakeRoundService intakeRoundService;
     /** 阶段 4：上线前的发布放行闸门（只在 release/uat_fail/reopen 三个动作上介入） */
     private final RdmReleaseService releaseService;
+    /** 流程版本守卫：V3 分批交付需求不走旧整需求状态机推进 */
+    private final RdmFlowVersionGuard flowVersionGuard;
+    /** V3 分层：结构主子关系维护（聚合需求下挂执行需求） */
+    private final RdmRequirementStructureService structureService;
+    /** V3 分层：需求创建后自动生成默认交付项 */
+    private final RdmDeliveryItemService deliveryItemService;
+    /** V3 分层：需求管理类可执行动作计算（与流转动作互补） */
+    private final RdmAllowedActionsService allowedActionsService;
 
     /* ==================== 查询 ==================== */
 
@@ -130,7 +151,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         // 这一视角不按 relatedOnly 收敛，改由下面的审批待办 id 集合决定范围，
         // 否则审批人只会看到自己提的单，出现「待办计数 3 条、点进去空列表」。
         boolean relatedOnly = !RdmConstants.SCOPE_APPROVING.equals(query.getScope());
-        var wrapper = query.toWrapper(unrestricted ? null : (current == null ? null : current.getId()), relatedOnly);
+        var wrapper = query.toWrapper(scopeUserId(current, unrestricted), relatedOnly);
         // 待我審批需要 join OA 审批任务表才能定出审批人，LambdaQueryWrapper 表达不了：先取 id 再收敛
         if (RdmConstants.SCOPE_APPROVING.equals(query.getScope())) {
             List<Long> approvingIds = approvingRequirementIds(current);
@@ -150,7 +171,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     @Override
     public Map<String, Long> scopeCounts() {
         SysUser current = operatorResolver.currentUser();
-        Long userId = canSeeAll(current) ? null : (current == null ? null : current.getId());
+        Long userId = scopeUserId(current, canSeeAll(current));
         Map<String, Long> counts = new LinkedHashMap<>();
         counts.put(RdmConstants.SCOPE_MINE, countByScope(RdmConstants.SCOPE_MINE, userId));
         counts.put(RdmConstants.SCOPE_TODO, countByScope(RdmConstants.SCOPE_TODO, userId));
@@ -160,6 +181,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         counts.put(RdmConstants.SCOPE_PRODUCT, countByScope(RdmConstants.SCOPE_PRODUCT, userId));
         counts.put(RdmConstants.SCOPE_DELIVERY, countByScope(RdmConstants.SCOPE_DELIVERY, userId));
         counts.put(RdmConstants.SCOPE_ACCEPTANCE, countByScope(RdmConstants.SCOPE_ACCEPTANCE, userId));
+        // 上线后待評分与我的验收记录：与列表同一口径（同一 applyScope 分支），避免计数与点进去不一致
+        counts.put(RdmConstants.SCOPE_ACCEPTANCE_POST, countByScope(RdmConstants.SCOPE_ACCEPTANCE_POST, userId));
+        counts.put(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, countByScope(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, userId));
         counts.put(RdmConstants.SCOPE_ALL, countByScope(RdmConstants.SCOPE_ALL, userId));
         return counts;
     }
@@ -168,6 +192,24 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         RdmRequirementQuery q = new RdmRequirementQuery();
         q.setScope(scope);
         return requirementMapper.selectCount(q.toWrapper(userId));
+    }
+
+    /**
+     * 解析数据范围收敛用的 userId（任务19 / 缺口5：身份 vs 可见范围分离）。
+     * <p>{@link RdmRequirementQuery#toWrapper} 把 {@code null} 当作「管理视角 = 不受限 = 全量」，
+     * 因此绝不能把「未认证 / 拿不到登录人」也传成 {@code null} —— 那会让「我的」退化成「全部」，
+     * 任何绕过登录态的调用都能读到全公司需求。
+     * <p>口径：管理视角（canSeeAll）才返回 {@code null} 放开全量；否则必须取认证主体的
+     * {@code SysUser.id}，拿不到身份时 fail-closed，返回一个不可能命中的哨兵 id 把结果收敛为空集。
+     */
+    private Long scopeUserId(SysUser current, boolean unrestricted) {
+        if (unrestricted) {
+            return null;
+        }
+        if (current == null || current.getId() == null) {
+            return UNAUTHENTICATED_SCOPE_ID;
+        }
+        return current.getId();
     }
 
     /**
@@ -180,7 +222,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     public Map<String, Long> stats(RdmRequirementQuery query) {
         SysUser current = operatorResolver.currentUser();
         boolean unrestricted = canSeeAll(current);
-        Long userId = unrestricted ? null : (current == null ? null : current.getId());
+        Long userId = scopeUserId(current, unrestricted);
         boolean approvingScope = RdmConstants.SCOPE_APPROVING.equals(query.getScope());
         // 待我審批的 id 集合只算一次、四个指标共用：每算一个指标重查一轮 OA 太浪费
         List<Long> approvingIds = approvingScope ? approvingRequirementIds(current) : null;
@@ -284,6 +326,29 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
         vo.setSla(buildSla(req));
         vo.setAllowedActions(allowedActions(req, current));
+
+        // 需求管理类可执行动作（与流转动作 allowedActions 互补）：粗粒度按钮口径，按角色/生命周期下发
+        Long currentUserId = current == null ? null : current.getId();
+        vo.setRequirementActions(allowedActionsService.computeRequirementActions(req.getId(), currentUserId));
+
+        // V3 分层：填充结构子需求（聚合需求）与结构父信息（有结构父时）。
+        // 仅 V3 需求触发，V1/V2 不做额外查询、行为保持不变（也避免测试中 mock 服务返回 null 造成 NPE）。
+        boolean flowV3 = req.getFlowVersion() != null && req.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
+        if (flowV3) {
+            if (RdmConstants.KIND_AGGREGATE.equals(req.getRequirementKind())) {
+                List<RdmRequirementStructureService.RequirementTreeNode> children =
+                        structureService.getRequirementTree(req.getId());
+                vo.setStructureChildren(children == null ? new ArrayList<>() : children);
+            }
+            if (req.getStructureParentReqId() != null) {
+                // 祖先链为 根→…→父→当前，直接父节点即倒数第二位
+                List<RdmRequirementStructureService.RequirementTreeNode> chain =
+                        structureService.getAncestorChain(req.getId());
+                if (chain != null && chain.size() >= 2) {
+                    vo.setStructureParent(chain.get(chain.size() - 2));
+                }
+            }
+        }
         return vo;
     }
 
@@ -319,8 +384,17 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         req.setBlockedFlag(0);
         req.setOverdueFlag(0);
         // 新建需求走新链路（五节点/定稿快照/工时明细）；存量记录保持 flow_version=1，
-        // 否则发布闸门会把历史记录一律算成「未做验收准备」
-        req.setFlowVersion(2);
+        // 否则发布闸门会把历史记录一律算成「未做验收准备」。
+        // V3（第二批分层并行链路）：仅当客户端显式传 flowVersion=3 才走 V3，否则一律回落 V2；
+        // 服务端只认 3 与非 3，不接受任意版本号，避免伪造版本绕过闸门口径。V1/V2 行为保持不变。
+        boolean flowV3 = dto.getFlowVersion() != null && dto.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
+        req.setFlowVersion(flowV3 ? RdmConstants.FLOW_VERSION_3 : 2);
+        if (flowV3) {
+            // V3：项目可后关联（准入阶段再挂，允许为空）；需求种类缺省 execution，聚合需求须显式声明 aggregate
+            req.setProjectId(dto.getProjectId());
+            req.setRequirementKind(StringUtils.hasText(dto.getRequirementKind())
+                    ? dto.getRequirementKind().trim() : RdmConstants.KIND_EXECUTION);
+        }
         req.setRejectCount(0);
         req.setReopenCount(0);
         req.setReworkCount(0);
@@ -340,9 +414,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             req.setIntentPmUserId(pm.getId());
             req.setIntentPmName(pm.getName());
         }
-        SysUser acceptor = dto.getAcceptorUserId() == null ? current : userMapper.selectById(dto.getAcceptorUserId());
-        req.setAcceptorUserId(acceptor == null ? current.getId() : acceptor.getId());
-        req.setAcceptorName(acceptor == null ? current.getName() : acceptor.getName());
+        SysUser acceptor = resolveAcceptor(dto.getAcceptorUserId(), current);
+        req.setAcceptorUserId(acceptor.getId());
+        req.setAcceptorName(acceptor.getName());
 
         if (draft) {
             req.setStatus(RdmConstants.STATUS_DRAFT);
@@ -370,9 +444,56 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (!draft) {
             openIntakeRound(req, decision, current);
         }
+
+        // V3 分层链路（任务19 / 缺口1）：
+        // ① 默认交付项只对「执行类(execution) 且 已准入」的 V3 需求生成 —— 聚合需求(aggregate)只是看板归并口径，
+        //    其交付由下挂的执行子需求承担，绝不在此直接建执行交付项；草稿/待准入阶段同样不建，
+        //    待准入(INTAKE_PENDING)的 V3 执行需求由准入完成点（actIntakeApproval / OA 回调）再补建。
+        // ② 结构父挂载与准入无关（表达聚合归属），但必须走 do* 内部方法，避免把 structureService 的
+        //    executeOnce 幂等入口嵌进 create 的活动事务（决策2）。父需为 aggregate、单父、无环、两端鉴权、
+        //    同项目、均 V3 等校验一律在 doAddChildRequirement 内强制，此处不放宽。
+        if (flowV3 && !draft) {
+            maybeCreateV3DefaultItem(req, current.getId());
+            if (dto.getStructureParentReqId() != null) {
+                structureService.doAddChildRequirement(dto.getStructureParentReqId(), req.getId(), current.getId());
+            }
+        }
+
         notifyOnCreate(req, pm);
         log.info("需求已創建: reqNo={}, status={}, submitter={}", req.getReqNo(), req.getStatus(), req.getSubmitterName());
         return RdmRequirementVO.from(req, configService.stageMap());
+    }
+
+    /**
+     * V3 执行类需求「已准入」后生成默认交付项（任务19 / 缺口1：正确时机 + 聚合不建 + 幂等）。
+     * <p>准入 = 已通过准入审批或无需审批直接进池/受理。以下情形一律不建：
+     * <ul>
+     *   <li>非 V3 流程（V1/V2 整需求链路不以交付项为单位，语义完全不变）；</li>
+     *   <li>聚合需求(aggregate)——它只是看板归并口径，交付由下挂的执行子需求承担；</li>
+     *   <li>草稿 / 待准入(INTAKE_PENDING) / 准入驳回(INTAKE_REJECTED)——尚未准入，过早建会污染范围口径。</li>
+     * </ul>
+     * <p>{@code getOrCreateDefaultItem} 本身是 get-or-create 语义，重复触发天然幂等，
+     * 因此可在 create / selfSubmit / 准入回调等多个「准入完成点」安全调用。
+     */
+    private void maybeCreateV3DefaultItem(RdmRequirement req, Long operatorId) {
+        if (req == null || !isFlowV3(req.getFlowVersion())) {
+            return;
+        }
+        if (!RdmConstants.KIND_EXECUTION.equals(req.getRequirementKind())) {
+            return;
+        }
+        String status = req.getStatus();
+        if (RdmConstants.STATUS_DRAFT.equals(status)
+                || RdmConstants.STATUS_INTAKE_PENDING.equals(status)
+                || RdmConstants.STATUS_INTAKE_REJECTED.equals(status)) {
+            return;
+        }
+        deliveryItemService.getOrCreateDefaultItem(req.getId(), operatorId);
+    }
+
+    /** 是否 V3 分批交付流程版本（仅认 3，与 RdmFlowVersionGuard 同口径） */
+    private boolean isFlowV3(Integer flowVersion) {
+        return flowVersion != null && flowVersion == RdmConstants.FLOW_VERSION_3;
     }
 
     @Override
@@ -385,6 +506,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
         requireOwner(req, current, "修改");
         validateCreate(dto);
+        Long previousAcceptorUserId = req.getAcceptorUserId();
+        Long previousPmUserId = req.getIntentPmUserId();
+        Long previousStructureParentReqId = req.getStructureParentReqId();
         req.setTitle(dto.getTitle().trim());
         req.setReqType(dto.getReqType());
         if (StringUtils.hasText(dto.getPriority())) {
@@ -395,12 +519,83 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         req.setExpectResult(dto.getExpectResult());
         req.setBusinessValue(dto.getBusinessValue());
         req.setExpectDate(parseDate(dto.getExpectDate()));
+
+        /*
+         * 草稿续编必须把「意向产品经理 / 业务验收人 / 附件」一起落库。
+         * 原先 update 只改标量字段，用户在草稿里选的验收人和指定的 PM 会被静默丢弃，
+         * 提交后单据回到「提交人自己验收」——这是能被界面确认、却对不上库的假成功。
+         */
+        SysUser pm = null;
+        if (dto.getPmUserId() != null) {
+            pm = userMapper.selectById(dto.getPmUserId());
+            if (pm == null) {
+                throw new BusinessException("指定的產品經理不存在，請重新選擇");
+            }
+            requirePmEligible(pm);
+            req.setIntentPmUserId(pm.getId());
+            req.setIntentPmName(pm.getName());
+        } else {
+            // 明确清空：草稿里选了「提交技術部統一分配」就要真的不再带意向人
+            req.setIntentPmUserId(null);
+            req.setIntentPmName(null);
+        }
+        SysUser acceptor = resolveAcceptor(dto.getAcceptorUserId(), current);
+        req.setAcceptorUserId(acceptor.getId());
+        req.setAcceptorName(acceptor.getName());
+        // 任务19 / 缺口1：草稿续编时补齐 V3 字段，避免 projectId/requirementKind 被静默丢弃
+        //（与旧版静默丢弃意向 PM/验收人同类问题）。仅草稿可改，此处直接落标量字段；
+        // 结构父变更走 structureService 完整校验，不在这里直写 structureParentReqId 绕过校验。
+        boolean flowV3 = req.getFlowVersion() != null && req.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
+        if (flowV3) {
+            req.setProjectId(dto.getProjectId());
+            if (StringUtils.hasText(dto.getRequirementKind())) {
+                req.setRequirementKind(dto.getRequirementKind().trim());
+            }
+        }
         req.setUpdatedBy(operatorResolver.operatorSignature(current));
         requirementMapper.updateById(req);
 
+        /*
+         * MyBatis-Plus 的 updateById 默认 NOT_NULL 策略，null 字段根本不会进 SET 子句，
+         * 所以「清掉意向 PM」必须走显式 UpdateWrapper，否则改回「统一分配」的草稿
+         * 下次审批通过时仍会把旧意向人派成受理人（界面看起来已经清空了，库里还留着）。
+         */
+        if (pm == null && previousPmUserId != null) {
+            requirementMapper.update(null, new LambdaUpdateWrapper<RdmRequirement>()
+                    .eq(RdmRequirement::getId, id)
+                    .set(RdmRequirement::getIntentPmUserId, null)
+                    .set(RdmRequirement::getIntentPmName, null));
+        }
+
+        // 任务19 / 缺口1：结构父变更走 structureService 完整校验（父需 aggregate、两端鉴权、同项目、均 V3、无环），
+        // 而不是直写 structureParentReqId 绕过校验。仅当显式传入且与现值不同时处理；换父时先解绑再绑。
+        // 走 do* 内部方法：update 已处于活动事务，不能把 executeOnce 幂等入口嵌进来（决策2）。
+        if (flowV3 && dto.getStructureParentReqId() != null
+                && !dto.getStructureParentReqId().equals(previousStructureParentReqId)) {
+            if (previousStructureParentReqId != null) {
+                structureService.removeChildRequirement(previousStructureParentReqId, id, current.getId());
+            }
+            structureService.doAddChildRequirement(dto.getStructureParentReqId(), id, current.getId());
+        }
+
         targetMapper.delete(new LambdaQueryWrapper<RdmRequirementTarget>().eq(RdmRequirementTarget::getReqId, id));
         saveTargets(id, dto.getTargets());
-        return RdmRequirementVO.from(req, configService.stageMap());
+        // 附件与定位对象同一口径：整份替换。fileUrl 就是 storagePath 原值，data URL 可原样回传
+        attachmentMapper.delete(new LambdaQueryWrapper<RdmAttachment>().eq(RdmAttachment::getReqId, id));
+        saveAttachments(id, dto.getAttachments(), current);
+
+        /*
+         * 换人要收旧角色的权：草稿阶段虽然还没开始流转，但参与角色行一旦留下，
+         * 旧验收人就会在「参与角色」里挂名，后续按角色判定的地方也会误认他还在场。
+         */
+        if (previousAcceptorUserId != null && !previousAcceptorUserId.equals(acceptor.getId())) {
+            deactivateRole(id, previousAcceptorUserId, RdmConstants.ROLE_ACCEPTOR);
+        }
+        if (previousPmUserId != null && !previousPmUserId.equals(pm == null ? null : pm.getId())) {
+            deactivateRole(id, previousPmUserId, RdmConstants.ROLE_PM);
+        }
+        saveInitialRoles(req, current, pm, acceptor, dto.getCcUserIds());
+        return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
     }
 
     @Override
@@ -453,6 +648,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         req.setCurrentHandlerName(computeHandler(req, null));
         requirementMapper.updateById(req);
         openIntakeRound(req, decision, current);
+        // 任务19 / 缺口1：草稿提交后，若这条 V3 执行需求已准入（无需审批直接进池/受理）则补建默认交付项；
+        // 仍处草稿/待准入或为聚合需求时不建（helper 内部按 kind + status 判定）。
+        maybeCreateV3DefaultItem(req, current.getId());
         return RdmRequirementVO.from(req, configService.stageMap());
     }
 
@@ -533,6 +731,28 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
     }
 
+    /**
+     * 解析并校验业务验收人：不传即提交人本人。
+     * <p>以前是「查不到人就静默回落到提交人」——用户明明指派了别人，单据上却变成自己签字，
+     * 属于把前端传的 userId 当可信数据。现在查不到/已停用一律直接拒绝，
+     * 让提出人在提交时就改选人，而不是等到验收当天才发现签错人。
+     * <p>验收人不要求任何菜单权限：它是业务角色（提出人的同事），
+     * 授权中心不会给普通业务同事发 rdm-acceptance 权限。
+     */
+    private SysUser resolveAcceptor(Long acceptorUserId, SysUser current) {
+        if (acceptorUserId == null || acceptorUserId.equals(current == null ? null : current.getId())) {
+            return current;
+        }
+        SysUser acceptor = userMapper.selectById(acceptorUserId);
+        if (acceptor == null) {
+            throw new BusinessException("指定的業務驗收人不存在，請重新選擇");
+        }
+        if (acceptor.getStatus() != null && acceptor.getStatus() == 0) {
+            throw new BusinessException("指定的業務驗收人已離職或停用，請改選其他人");
+        }
+        return acceptor;
+    }
+
     /* ==================== 流转 ==================== */
 
     @Override
@@ -552,6 +772,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             return actIntakeApproval(req, dto,
                     RdmConstants.ACTION_APPROVE_INTAKE.equals(dto.getActionCode()));
         }
+        // V3 分批交付需求（任务19 / 缺口1）：放行准入/分配/受理等前段动作，但交付/测试/验收/发布类动作
+        // 必须走交付项接口，不得经此绕过发布批次门禁（准入审批已在此之前分流）。V1/V2 语义完全不变。
+        flowVersionGuard.requireV3TransitionAllowed(id, dto.getActionCode());
         transitionInternal(req, dto.getActionCode(), dto, current, accessGuard.activeRoles(id, current));
         return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
     }
@@ -574,6 +797,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                     current == null ? null : current.getUsername());
             transitionInternal(req, dto.getActionCode(), dto, current,
                     accessGuard.activeRoles(req.getId(), current));
+            // 任务19 / 缺口1：无准入单时退回状态机直改，若因此让 V3 执行需求进入已准入状态，补建默认交付项。
+            maybeCreateV3DefaultItem(requirementMapper.selectById(req.getId()), current == null ? null : current.getId());
             return latestVO(req.getId());
         }
 
@@ -1389,18 +1614,39 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return new ArrayList<>(systems.values());
     }
 
+    /**
+     * 菜单下的功能点候选。
+     * <p>真值源是 sys_menu.actions（该菜单声明的功能操作：查看/新增/編輯/刪除/導入/導出…），
+     * 选完系统菜单即可直接选对应功能；再并入历史需求提过的定位对象名称（去重），
+     * 让常用锚点沉淀为候选。action key 原样返回，展示标签由前端 ACTION_LABEL_MAP 映射。
+     */
     @Override
     public List<RdmOptionVO.FunctionPoint> functionPoints(String menuKey) {
         if (!StringUtils.hasText(menuKey)) {
             return List.of();
         }
-        // 功能点来自历史需求：同一菜单被提过的定位对象即候选，避免维护一份静态清单
+        List<RdmOptionVO.FunctionPoint> points = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        String menuActionsJson = jdbcTemplate.queryForList(
+                        "SELECT actions FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
+                        String.class, menuKey).stream().findFirst().orElse(null);
+        for (String action : JsonUtils.parseStringList(menuActionsJson)) {
+            if (StringUtils.hasText(action) && seen.add(action)) {
+                points.add(new RdmOptionVO.FunctionPoint(action, action));
+            }
+        }
+        // 历史需求：同一菜单被提过的定位对象即候选，避免维护一份静态清单
         List<String> names = jdbcTemplate.queryForList(
                 "SELECT DISTINCT anchor_name FROM rdm_requirement_target "
                         + "WHERE deleted = 0 AND menu_key = ? AND anchor_name IS NOT NULL AND anchor_name <> '' "
                         + "ORDER BY anchor_name LIMIT 50",
                 String.class, menuKey);
-        return names.stream().map(n -> new RdmOptionVO.FunctionPoint(n, n)).toList();
+        for (String name : names) {
+            if (seen.add(name)) {
+                points.add(new RdmOptionVO.FunctionPoint(name, name));
+            }
+        }
+        return points;
     }
 
     /* ==================== 内部辅助 ==================== */

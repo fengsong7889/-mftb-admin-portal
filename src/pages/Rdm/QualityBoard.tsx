@@ -54,15 +54,11 @@ export default function QualityBoard() {
 
   const reworkColumns: TableColumnsType<RdmQualityData['reworkRank'][number]> = useMemo(() => [
     {
-      title: '需求', dataIndex: 'title', key: 'title',
-      render: (v: string, r) => (
-        <div style={{ lineHeight: 1.4 }}>
-          <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.reqNo}</div>
-        </div>
-      ),
+      title: '需求標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
+      render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
-    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 130, render: (v?: string | null) => v ?? '-' },
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
+    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
     { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 110, render: (v?: string | null) => v ?? '-' },
     {
       title: '返工次數', dataIndex: 'reworkCount', key: 'reworkCount', width: 110,
@@ -214,6 +210,7 @@ export default function QualityBoard() {
           rowKey="reqId"
           size="small"
           columns={reworkColumns}
+          scroll={{ x: 1160 }}
           dataSource={data.reworkRank}
           pagination={false}
           locale={{ emptyText: '本期沒有驗收退回，全部一次通過' }}

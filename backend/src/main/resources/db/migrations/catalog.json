@@ -1173,6 +1173,58 @@
       "comment": "生产核查（scripts/prod-menu-precheck.sql）发现的同类缺陷：RDM 绩效建议推送把 rdm_hr_suggestion.total_score DECIMAL(12,2) 原值写入 hr_perf_score_item.suggested_score，而该列实查为 DECIMAL(6,2)（上限 9999.99），个人周期贡献分一旦超过就抛 Data truncation: Out of range —— 与 v2.3 的 budget_used_ratio 完全同源：列宽按分数不会大的直觉设定，且只在有真实数据时才暴露。开发库与生产库实查均为 decimal(6,2)，趁生产 score_records=0（代价为零）先扩列。后置校验不写死等于 decimal(12,2)，而是断言写入列与来源列 COLUMN_TYPE 相同：扩到同精度后溢出在结构上不可能发生，因此不再加永远不会命中的截断兜底（那会把两列再次漂移的真实风险藏起来），改窄任一侧时启动即大声失败。DDL 只在 classpath 脚本 218_rdm_suggested_score_widen.sql 存一份，backend/sql 下为参考副本（MODIFY COLUMN 可重复执行）。"
     },
     {
+      "versionKey": "rdm:schema:v3.0",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": ["rdm:schema:v2.5"],
+      "status": "ACTIVE",
+      "resource": "219_rdm_batch1_project_delivery.sql",
+      "scriptFiles": ["219_rdm_batch1_project_delivery.sql"],
+      "intent": "补登记既有分层交付基础结构，不重放已应用版本",
+      "comment": "实际执行与契约仅使用classpath根目录安全版，sql目录历史参考副本不可执行。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.1",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": ["rdm:schema:v3.0"],
+      "status": "ACTIVE",
+      "resource": "220_rdm_batch2_foundation.sql",
+      "scriptFiles": ["220_rdm_batch2_foundation.sql"],
+      "intent": "补登记范围失效和原幂等日志基础",
+      "comment": "保留既有执行器与版本，不修改已应用脚本。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.2",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": ["rdm:schema:v3.1"],
+      "status": "ACTIVE",
+      "resource": "237_rdm_batch3_test_release.sql",
+      "scriptFiles": ["237_rdm_batch3_test_release.sql"],
+      "intent": "冻结轮次、发布申请裁决和追加尝试、豁免补验、延期闭环、原子请求占位",
+      "comment": "classpath根资源由现有pom资源规则打包。命名锁内逐列逐索引逐约束条件DDL，后置检查类型/非空/默认/唯一索引列序/外键和CHECK。旧记录不回填，新发布仍禁用。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.3",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": ["rdm:schema:v3.2"],
+      "status": "ACTIVE",
+      "resource": "238_rdm_batch4_migration.sql",
+      "scriptFiles": ["238_rdm_batch4_migration.sql"],
+      "intent": "默认关闭的GLOBAL/项目灰度、小批迁移预览确认审计和既有通知出站去重",
+      "comment": "只播种GLOBAL一条且不覆盖已有人为配置，不自动迁移任何需求。非空scope_key唯一，活动迁移按生成列唯一。缺表列与关键约束漂移均阻止初始化完成。"
+    },
+    {
       "versionKey": "vehicle:schema:v1.0",
       "module": "vehicle",
       "phase": "MODULE_STRUCTURE",

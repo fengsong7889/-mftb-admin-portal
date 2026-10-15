@@ -107,6 +107,8 @@ export default function EmpQuotaList() {
   /* ── 刪除 ── */
   const handlePosDelete = (row: PosQuotaVO) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteQuota'),
       content: t('aiQuotaAuth.deleteQuotaContent', { name: row.name, count: row.totalEmployeeCount }),
       okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
@@ -123,6 +125,8 @@ export default function EmpQuotaList() {
   const handlePosToggle = (row: PosQuotaVO) => {
     const toDisable = row.status === 1
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: toDisable ? t('aiQuotaAuth.confirmDisableQuota') : t('aiQuotaAuth.confirmEnableQuota'),
       content: toDisable
         ? t('aiQuotaAuth.disableQuotaContent', { name: row.name, count: row.totalEmployeeCount })
@@ -288,6 +292,8 @@ export default function EmpQuotaList() {
   /* ── 刪除 ── */
   const handleRoleDelete = (row: RoleQuotaVO) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteQuota'),
       content: t('aiQuotaAuth.deleteQuotaContent', { name: row.roleName, count: row.totalEmployeeCount }),
       okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
@@ -304,6 +310,8 @@ export default function EmpQuotaList() {
   const handleRoleToggle = (row: RoleQuotaVO) => {
     const toDisable = row.status === 1
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: toDisable ? t('aiQuotaAuth.confirmDisableQuota') : t('aiQuotaAuth.confirmEnableQuota'),
       content: toDisable
         ? t('aiQuotaAuth.disableQuotaContent', { name: row.roleName, count: row.totalEmployeeCount })

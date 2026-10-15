@@ -45,7 +45,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>为什么递增而不是改 v3.8/v3.9：本轮退役了一个已入库的菜单并改变了 canSeeAll 的口径，
      * 复用旧 key 会让已记账环境留着 rdm-query 菜单、而代码已不再认它的全量权。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.11";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.12";
     private static final String ADMIN_ROLE_CODE = "admin";
     /** 被取消的旧一级目录（软删，保留回滚能力） */
     private static final String LEGACY_ROOT_KEY = "rdm-center";
@@ -85,6 +85,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-dashboard-quality", "質量口徑", "Quality Metrics", "/rdm-quality", "QualityBoard", "SafetyCertificateOutlined", "2", "3", "rdm-dashboard", VIEW_EXPORT},
             {"rdm-dashboard-version", "版本追溯", "Version Trace", "/rdm-version-trace", "VersionTrace", "BranchesOutlined", "2", "4", "rdm-dashboard", VIEW_ONLY},
             {"rdm-dashboard-report", "交付週報", "Weekly Report", "/rdm-weekly-report", "WeeklyReport", "CalendarOutlined", "2", "5", "rdm-dashboard", VIEW_EXPORT},
+            {"rdm-dashboard-project", "項目總覽", "Project Overview", "/rdm-project", "ProjectOverview", "ProjectOutlined", "2", "15", "rdm-dashboard", VIEW_EXPORT},
             /*
              * 效能與產出：「看人和效率」的三个视图归同一分组。
              * <p>原本它们与「看结果」的看板混在一个分组里达 8 个子项；而「部門與人員產出」
@@ -114,6 +115,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-delivery", "研發交付", "R&D Delivery", null, null, "NodeIndexOutlined", "1", "23", null, VIEW_ONLY},
             {"rdm-delivery-board", "交付工作台", "Delivery Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
             {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-delivery", ITERATION_ACTIONS},
+            {"rdm-delivery-test", "測試工作台", "Test Workbench", "/rdm-test", "TestWorkbench", "ExperimentOutlined", "2", "24", "rdm-delivery", DELIVERY_ACTIONS},
+            {"rdm-delivery-release", "發布中心", "Release Center", "/rdm-release", "ReleaseCenter", "RocketOutlined", "2", "25", "rdm-delivery", DELIVERY_ACTIONS},
             {"rdm-acceptance", "需求驗收", "Requirement Acceptance", "/rdm-acceptance", "AcceptanceList", "CheckSquareOutlined", "2", "24", null, VIEW_CREATE},
             {"rdm-config-group", "需求配置", "Requirement Settings", null, null, "SettingOutlined", "1", "25", null, VIEW_ONLY},
             {"rdm-config-status", "狀態與流轉", "Status & Transition", "/rdm-config-status", "StatusConfig", "PartitionOutlined", "2", "1", "rdm-config-group", VIEW_EDIT},
@@ -164,8 +167,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 否则每次启动都会把“仅有目录权”的角色多补一份子页权限（权限只减不增是红线）。
      */
     private static final String[][] GROUP_GRANT_INHERIT = {
-            {"rdm-delivery", "rdm-delivery-board", "rdm-delivery-iteration"},
-            {"rdm-dashboard", "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-version", "rdm-dashboard-report"},
+            {"rdm-delivery", "rdm-delivery-board", "rdm-delivery-iteration", "rdm-delivery-test", "rdm-delivery-release"},
+            {"rdm-dashboard", "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-version", "rdm-dashboard-report", "rdm-dashboard-project"},
             {"rdm-config-group", "rdm-config-score"},
             // v3.5 新增叶子：風險中心沿用看板存量授权；部門與人員產出沿用新分组授权
             {"rdm-dashboard", "rdm-dashboard-risk"},

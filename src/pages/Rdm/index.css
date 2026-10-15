@@ -110,6 +110,31 @@
   min-width: 0;
 }
 
+/* 表格内长标题必须可收缩，旁侧状态标签保持完整，避免覆盖相邻列。 */
+.rdm-table-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.rdm-table-title__link {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #E8720C;
+}
+
+.rdm-table-title > .ant-tag {
+  flex-shrink: 0;
+}
+
 .rdm-todo-item-title {
   font-size: 13px;
   color: #262626;
@@ -351,6 +376,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .rdm-board-card-meta {
@@ -905,10 +931,59 @@
   border-color: #FFE7D1;
 }
 
+/* 需求对象字段区：全局表单规范 §C.4 —— 每行 3 个字段，控件撑满列宽 */
 .rdm-target-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 16px;
+}
+
+.rdm-target-fields .ant-input,
+.rdm-target-fields .ant-select,
+.rdm-target-fields .ant-cascader {
+  width: 100%;
+}
+
+/* 受理路径与时间：產品經理 / 期望完成時間 / 業務驗收人 并排（同为每行 3 字段） */
+.rdm-intake-fields,
+.rdm-more-settings-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 16px;
+}
+
+.rdm-intake-fields .ant-input,
+.rdm-intake-fields .ant-select,
+.rdm-intake-fields .ant-picker,
+.rdm-more-settings-fields .ant-input,
+.rdm-more-settings-fields .ant-select {
+  width: 100%;
+}
+
+/* 任务表单字段区：全局表单规范 §C.4 —— 每行 3 个字段，控件撑满列宽 */
+.rdm-task-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  column-gap: 16px;
+}
+
+.rdm-task-fields .ant-input,
+.rdm-task-fields .ant-input-affix-wrapper,
+.rdm-task-fields .ant-input-textarea,
+.rdm-task-fields .ant-select,
+.rdm-task-fields .ant-picker,
+.rdm-task-fields .ant-input-number {
+  width: 100%;
+}
+
+/* 长文本与回显字段独占整行（负责人这类需要看清全名的字段也走整行） */
+.rdm-task-fields > .rdm-field-full {
+  grid-column: 1 / -1;
+}
+
+/* 任务标题要容得下「需求名（端）」+ 120 字计数，给两列宽 */
+.rdm-task-fields > .rdm-field-span2 {
+  grid-column: span 2;
 }
 
 /* 审批要求：暖橙面板只做告知，不提供可操作控件（避免把准入决定交给提交人） */
@@ -1125,4 +1200,825 @@
   border-radius: 3px;
   border: 1px solid transparent;
   cursor: default;
+}
+
+/* ========== 需求详情：处理条 / 属性栏 / 分区页签（体验简化第一阶段） ========== */
+
+/*
+ * 处理条：把「当前阶段 + 下一步 + 谁在处理 + 唯一主动作」收在一块。
+ * 原来这三件事分散在阶段条卡片、next-bar 卡片和右侧「流转处理」卡片，
+ * 用户要扫三处才知道自己该点什么。
+ */
+.rdm-action-bar {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid #e8eaed;
+  border-left: 3px solid #E8720C;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 14px 20px;
+  margin-bottom: 16px;
+}
+
+.rdm-action-bar-left {
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/*
+ * 阶段条直铺在处理条顶部：占满整行才有足够横向空间摆 6 个节点；
+ * 负 margin 抵掉组件自带的上下留白，避免处理条被顶得太高。
+ */
+.rdm-action-bar-stages {
+  flex: 0 0 100%;
+  min-width: 0;
+  margin: -10px 0 -6px;
+}
+
+.rdm-action-bar-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rdm-action-bar-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #fff;
+  background: #E8720C;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.rdm-action-bar-hint {
+  font-size: 13px;
+  font-weight: 500;
+  color: #262626;
+}
+
+.rdm-action-bar-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+.rdm-action-bar-meta b {
+  color: #595959;
+  font-weight: 500;
+}
+
+/* 风险摘要可能是一整句阻塞原因，限宽省略，避免把处理条右侧按钮挤出容器 */
+.rdm-action-bar-meta .ant-tag {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 处理条右侧不再放按钮（已全部收进页面底部 .form-footer）；本类是无动作时的占位提示 */
+.rdm-action-bar-locked {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+/*
+ * 动作执行弹窗的字段区：二次确认与必填字段在同一处完成，
+ * 每行 2 个字段（弹窗宽 600px，3 列会把日期控件压出滚动条）。
+ */
+.rdm-action-modal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.rdm-action-modal-fields .ant-select,
+.rdm-action-modal-fields .ant-picker,
+.rdm-action-modal-fields .ant-input-number,
+.rdm-action-modal-fields .ant-auto-complete {
+  width: 100%;
+}
+
+/* 弹窗内字段标签：与表单标签同一口径（12px 次色） */
+.rdm-action-modal-label {
+  font-size: 12px;
+  color: #595959;
+  margin-bottom: 4px;
+}
+
+/* 审批判断口径入口（长说明必须走 HelpPopover，不用 Tooltip 塞多句文本） */
+.rdm-action-bar-judge {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px dashed #f0f0f0;
+  padding-top: 8px;
+}
+
+.rdm-judge-trigger {
+  font-size: 12px;
+  color: #E8720C;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rdm-judge-note {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+/* 风险提示：处理条只显示最需要行动的一条，其余点开看 */
+.rdm-risk-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 420px;
+}
+
+.rdm-risk-popover-item {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.rdm-risk-popover-item.danger {
+  background: #FFF2F0;
+  border: 1px solid #FFCCC7;
+  color: #CF1322;
+}
+
+.rdm-risk-popover-item.warn {
+  background: #FFF7E6;
+  border: 1px solid #FFE7D1;
+  color: #D46B08;
+}
+
+/* 页签内的小节标题：比 rdm-card-title 轻一档，避免页签里再出现一层大标题 */
+.rdm-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 10px;
+}
+
+.rdm-section-title:first-child {
+  margin-top: 0;
+}
+
+/* 属性栏：一行一字段，标签左、值右，替代原来的 4 列大网格 */
+.rdm-prop-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rdm-prop-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.rdm-prop-row:last-child {
+  border-bottom: none;
+}
+
+.rdm-prop-label {
+  font-size: 12px;
+  color: #8C8C8C;
+  flex-shrink: 0;
+}
+
+.rdm-prop-value {
+  font-size: 13px;
+  color: #262626;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-all;
+}
+
+/* 参与人：一人一行、多角色并排，取代原来一角色一行的六行清单 */
+.rdm-participant-block {
+  border-top: 1px solid #f0f0f0;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.rdm-participant-title {
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-bottom: 6px;
+}
+
+.rdm-participant-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #f5f5f5;
+}
+
+.rdm-participant-row:last-child {
+  border-bottom: none;
+}
+
+/*
+ * 分区页签内的卡片扁平化：ReleasePanel / AcceptanceTraceCard 自带 .rdm-card，
+ * 放进页签后不该再有边框和阴影，否则出现「卡片套卡片」的三层观感。
+ */
+.rdm-detail-tabs {
+  padding: 4px 20px 16px;
+}
+
+.rdm-detail-tabs .rdm-card {
+  border: none;
+  box-shadow: none;
+  padding: 12px 0;
+  margin-bottom: 0;
+}
+
+/*
+ * 页签内容链必须允许被压缩，否则定宽列的表格会把整页顶出横向滚动条
+ * （复验实测：992px 下子任务表 813px 宽，页面级 scrollWidth 855 > 容器 686）。
+ * antd 的 content-holder 只有 flex:1 1 auto，不带 min-width:0，
+ * 补上后表格才会用自己的 overflow 滚动，而不是撑宽父级。
+ */
+.rdm-detail-tabs .ant-tabs-content-holder,
+.rdm-detail-tabs .ant-tabs-content,
+.rdm-detail-tabs .ant-tabs-tabpane,
+.rdm-detail-tabs .ant-tabs-tabpane > * {
+  min-width: 0;
+}
+
+.rdm-activity-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+/* 活动流：评论与流转记录合并展示，但数据源与审计留痕不变 */
+.rdm-activity-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.rdm-activity-item:last-child {
+  border-bottom: none;
+}
+
+.rdm-activity-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.rdm-activity-text {
+  font-size: 13px;
+  color: #262626;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.rdm-activity-meta {
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-top: 4px;
+}
+
+/* 评论输入框：独占一整行（与全局备注标准一致），高度固定不允许拖拽 */
+.rdm-comment-box {
+  margin-top: 16px;
+}
+
+.rdm-comment-box .ant-input {
+  resize: none;
+}
+
+/* antd 的字数统计绝对定位在输入框外侧下方（约 22px），按钮行必须让出这段高度，
+   否则右对齐的「發布」会与计数文字重叠 */
+.rdm-comment-box-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 26px;
+}
+
+/* 业务价值：一行的辅助信息，不再占一个分块标题 */
+.rdm-value-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #595959;
+  line-height: 1.6;
+}
+
+.rdm-value-line-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+/* 长正文默认收 6 行，由显式的「展開全文」按钮放开（不用 hover，避免鼠标扫过就跳版） */
+.rdm-clamped {
+  max-height: 168px;
+  overflow: hidden;
+  -webkit-line-clamp: 6;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+}
+
+/* 详情页统一收尾：最后更新时间 + 最近操作人，不再单开「操作记录」卡片 */
+.rdm-detail-footer {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+.rdm-detail-footer b {
+  color: #595959;
+  font-weight: 500;
+}
+
+/* ========== 需求工作区：视图栏 + 主内容（体验简化第一阶段） ========== */
+
+/*
+ * 外壳：左侧具名视图 + 右侧工作区主体。
+ * 原来「我的提交 / 待我审批 / 待分配 / 全部需求」这些同一张列表的数据切片
+ * 同时以顶部 Tab 和多个菜单名存在，用户要先判断哪个菜单才是自己要看的页。
+ */
+.rdm-workspace-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.rdm-workspace-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rdm-workspace-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.rdm-workspace-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.rdm-view-rail {
+  width: 184px;
+  flex-shrink: 0;
+  align-self: stretch;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rdm-view-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.rdm-view-rail-group-title {
+  font-size: 12px;
+  color: #8C8C8C;
+  padding: 6px 6px 2px;
+}
+
+.rdm-view-rail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-view-rail-item:hover {
+  background: #F5F5F5;
+  color: #E8720C;
+}
+
+/* 选中态沿用侧边栏菜单的「左侧 3px 主色指示条」语言，保持全站一致 */
+.rdm-view-rail-item.active {
+  background: #FFF7F0;
+  color: #E8720C;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #E8720C;
+}
+
+.rdm-view-rail-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rdm-view-rail-item-count {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+.rdm-view-rail-item.active .rdm-view-rail-item-count {
+  color: #E8720C;
+}
+
+.rdm-view-rail-foot {
+  margin-top: auto;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8C8C8C;
+  padding: 8px 6px 0;
+  border-top: 1px dashed #f0f0f0;
+}
+
+/*
+ * 搜索区按钮溢出修复（复验实测：折叠态下「更多篩選」右边缘被推到视口外，
+ * 只能靠内容区横向滚动才点得到）。
+ * 全局 .search-section 的 4 列 grid 用的是 repeat(4, 1fr)，1fr 的最小轨道宽度是
+ * auto，会被三个并排按钮的固有宽度撑破整行；这里把轨道锁成 minmax(0,1fr)、
+ * 让按钮组可换行，容器就不会再被内容顶宽。只作用于 RDM 工作区，不动全局样式。
+ */
+.rdm-workspace .search-section .ant-form-inline {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rdm-workspace .search-section .ant-form-item {
+  min-width: 0;
+}
+
+.rdm-workspace .search-section .search-actions {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+/* ========== 提測工作台統計卡片 ========== */
+.rdm-test-stats {
+  margin-bottom: 16px;
+  animation: headerFadeSlideIn 0.4s ease;
+}
+
+.rdm-stat-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  border: 1px solid #e8eaed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.rdm-stat-card--warning {
+  border-left: 3px solid #FA8C16;
+}
+
+.rdm-stat-card--processing {
+  border-left: 3px solid #1890FF;
+}
+
+.rdm-stat-card--error {
+  border-left: 3px solid #FF4D4F;
+}
+
+.rdm-stat-card--success {
+  border-left: 3px solid #52C41A;
+}
+
+/* ========== 問題詳情：延期記錄卡片 ========== */
+.rdm-defer-detail-card {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #FAFBFC;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+
+/* ========== 發布中心 ========== */
+.rdm-release-stats {
+  margin-bottom: 16px;
+}
+
+.rdm-release-stat-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  border: 1px solid #F0F0F0;
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.rdm-release-stat-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.rdm-release-stat-card--processing {
+  border-color: #91D5FF;
+  background: linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 100%);
+}
+
+.rdm-release-stat-card--warning {
+  border-color: #FFE7D1;
+  background: linear-gradient(135deg, #FFF9F0 0%, #FFFFFF 100%);
+}
+
+.rdm-release-stat-card--success {
+  border-color: #B7EB8F;
+  background: linear-gradient(135deg, #F6FFED 0%, #FFFFFF 100%);
+}
+
+.rdm-release-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-release-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0 0 16px;
+  display: flex;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #F0F0F0;
+}
+
+.rdm-release-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rdm-release-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #F0F0F0;
+  transition: background 0.2s;
+}
+
+.rdm-release-check-item.passed {
+  background: #F6FFED;
+  border-color: #B7EB8F;
+}
+
+.rdm-release-check-item.failed {
+  background: #FFF2F0;
+  border-color: #FFCCC7;
+}
+
+.rdm-release-check-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.rdm-release-check-type {
+  font-weight: 600;
+  font-size: 13px;
+  color: #262626;
+  min-width: 120px;
+}
+
+.rdm-release-check-msg {
+  font-size: 13px;
+  color: #595959;
+  flex: 1;
+}
+
+/* ==================== V3 分批交付增强（仅在 flowVersion=3 / 有新数据时生效） ==================== */
+
+/* 工作台「我的項目」横向卡片 */
+.rdm-v3-projects {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.rdm-v3-project-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.rdm-v3-project-card {
+  flex: 0 0 260px;
+  min-width: 260px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+  background: #fafcff;
+}
+
+.rdm-v3-project-card:hover {
+  border-color: #adc6ff;
+  box-shadow: 0 2px 12px rgba(47, 84, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+.rdm-v3-project-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rdm-v3-project-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rdm-v3-project-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.rdm-v3-project-card-meta b {
+  color: #2f54eb;
+  font-weight: 600;
+}
+
+.rdm-v3-project-card-warn {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 需求详情「交付項清單」 */
+.rdm-v3-delivery-items {
+  margin-bottom: 16px;
+}
+
+.rdm-v3-delivery-single {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fafcff;
+}
+
+.rdm-v3-delivery-single-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.rdm-v3-delivery-single-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+  color: #595959;
+}
+
+/* 研发交付「按交付項」分组视图 */
+.rdm-v3-group-toggle {
+  flex-shrink: 0;
+}
+
+.rdm-v3-di-tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+}
+
+.rdm-v3-di-tag a {
+  color: inherit;
+}
+
+.rdm-v3-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rdm-v3-group {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rdm-v3-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+.rdm-v3-group-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.rdm-v3-group-coord {
+  font-size: 12px;
+  color: #595959;
+}
+
+.rdm-v3-group-count {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-left: auto;
+}
+
+/* 需求验收：视角切换与交付项级标识 */
+.rdm-v3-acceptance-mode {
+  margin-bottom: 12px;
+}
+
+.rdm-v3-req-title-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.rdm-v3-di-badge {
+  margin: 0;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  flex-shrink: 0;
 }

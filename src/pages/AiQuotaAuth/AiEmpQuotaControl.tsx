@@ -181,6 +181,8 @@ export default function AiEmpQuotaControl() {
 
   const handleStrategyDelete = (row: PositionQuotaStrategy) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteStrategy'),
       content: t('aiQuotaAuth.deleteStrategyContent', { name: row.ruleName }),
       okText: t('common.delete'),
@@ -197,6 +199,8 @@ export default function AiEmpQuotaControl() {
     const toDisable = row.status === 1
     const actionText = toDisable ? t('aiQuotaAuth.disableText') : t('aiQuotaAuth.enableText')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: toDisable ? t('aiQuotaAuth.confirmDisable') : t('aiQuotaAuth.confirmEnable'),
       content: toDisable ? t('aiQuotaAuth.disableContent', { name: row.ruleName }) : t('aiQuotaAuth.enableContent', { name: row.ruleName }),
       okText: t('common.confirm'),

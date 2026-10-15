@@ -102,6 +102,8 @@ export default function LifecycleList({ type }: Props) {
 
   const handleDelete = (record: HrLifecycleItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hrLifecycle.confirmDeleteTitle'),
       content: (
         <div className="confirm-info-card">

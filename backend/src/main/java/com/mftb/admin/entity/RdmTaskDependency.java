@@ -21,6 +21,13 @@ public class RdmTaskDependency {
     /** 依赖类型：完成-开始 */
     public static final String TYPE_FS = "FS";
 
+    /** 阻断点：开工阻断（Batch 2） */
+    public static final String BLOCK_START = "start";
+    /** 阻断点：提测阻断（Batch 2） */
+    public static final String BLOCK_TEST = "test";
+    /** 阻断点：上线阻断（Batch 2） */
+    public static final String BLOCK_RELEASE = "release";
+
     @TableId
     private Long id;
 
@@ -38,6 +45,18 @@ public class RdmTaskDependency {
 
     /** 延迟工作日数（可为负，表示允许提前重叠） */
     private Integer lagDays;
+
+    /** 阻断点:start/test/release（Batch 2，跨交付项依赖在哪个节点阻断后续） */
+    private String blockPoint = BLOCK_START;
+
+    /** 是否跨交付项（Batch 2）：1=跨交付项依赖，0=同需求内任务依赖 */
+    private Integer crossDeliveryFlag = 0;
+
+    /** 前置交付项ID（Batch 2，跨交付项依赖时非空） */
+    private Long predDeliveryItemId;
+
+    /** 后续交付项ID（Batch 2，跨交付项依赖时非空） */
+    private Long succDeliveryItemId;
 
     private String createdBy;
 

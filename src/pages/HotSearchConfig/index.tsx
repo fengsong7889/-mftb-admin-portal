@@ -316,6 +316,8 @@ export default function HotSearchConfig() {
 
   const handleDelete = (record: HotSearchRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hotSearchConfig.deleteTitle'),
       content: t('hotSearchConfig.deleteContent', { word: record.word }),
       okText: t('common.confirm'), cancelText: t('common.cancel'),

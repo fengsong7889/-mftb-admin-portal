@@ -128,6 +128,8 @@ export default function AiEmpPermissionDetail() {
   const handleSave = useCallback(() => {
     if (!emp) return
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認保存',
       content: '確定要保存所有修改嗎？保存後將返回列錶。',
       okText: '確認保存',

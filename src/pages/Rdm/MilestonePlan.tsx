@@ -225,7 +225,7 @@ export default function MilestonePlan() {
       <RdmFormHeader
         title="節點計劃"
         backText="返回需求"
-        onBack={() => navigate(`/rdm-detail?id=${reqId}`)}
+        onBack={() => navigate(`/rdm-detail?id=${reqId}&tab=plan`)}
         meta={detail ? `${detail.reqNo} · ${detail.title} · 當前處理人 ${detail.currentHandler ?? '-'}` : '載入中…'}
       />
 

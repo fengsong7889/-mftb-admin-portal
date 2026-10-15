@@ -76,7 +76,11 @@ class RdmClaimReassignTest {
         operatorResolver = mock(OperatorResolver.class);
         notifyService = mock(RdmNotifyService.class);
         RdmConfigService configService = mock(RdmConfigService.class);
-        RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper);
+        RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
+                mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
+                mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
+                mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));
 
         service = new RdmRequirementServiceImpl(
                 requirementMapper, mock(RdmRequirementTargetMapper.class),
@@ -89,7 +93,11 @@ class RdmClaimReassignTest {
                 mock(OaRequestService.class), mock(RdmIntakeCallbackService.class),
                 permissionService, jdbcTemplate, accessGuard,
                 mock(RdmIntakePolicyService.class), mock(RdmIntakeRoundService.class),
-                mock(com.mftb.admin.service.RdmReleaseService.class));
+                mock(com.mftb.admin.service.RdmReleaseService.class),
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
+                mock(com.mftb.admin.service.RdmRequirementStructureService.class),
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class),
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
 
         when(operatorResolver.isAdmin(any())).thenReturn(false);
         when(operatorResolver.currentUser()).thenReturn(user(31L, "陳雅婷"));

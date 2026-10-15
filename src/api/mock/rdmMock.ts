@@ -464,8 +464,7 @@ const FUNCTION_POINTS: Record<string, { key: string; title: string }[]> = {
     { key: 'date-range', title: '時間區間篩選' },
     { key: 'export', title: '報表導出' },
     { key: 'brand-tab', title: '品牌切換頁簽' },
-  ],
-  'store-list': [
+  ],  'store-list': [
     { key: 'column-config', title: '列配置' },
     { key: 'risk-tag', title: '風險標籤列' },
     { key: 'batch-import', title: '批量導入' },
@@ -764,9 +763,17 @@ export function mockMenuTree(): RdmMenuTreeNode[] {
   return MENU_TREE
 }
 
+/** 与真实接口口径一致：菜单声明的功能操作（action key）始终作为候选，展示标签由前端映射 */
+const MOCK_MENU_ACTIONS = ['view', 'create', 'edit', 'delete', 'export']
+
 export function mockFunctionPoints(menuKey?: string): { key: string; title: string }[] {
   if (!menuKey) return []
-  return FUNCTION_POINTS[menuKey] ?? []
+  const history = FUNCTION_POINTS[menuKey] ?? []
+  const keys = new Set(history.map(fp => fp.key))
+  return [
+    ...MOCK_MENU_ACTIONS.filter(k => !keys.has(k)).map(k => ({ key: k, title: k })),
+    ...history,
+  ]
 }
 
 export function mockProductOptions(): RdmProductOption[] {

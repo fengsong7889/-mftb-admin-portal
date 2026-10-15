@@ -247,6 +247,38 @@ export const RDM_COMPLEXITY_LABEL: Record<RdmComplexity, string> = {
   [RDM_COMPLEXITY.HUGE]: '超大',
 }
 
+/**
+ * 历史编码只翻译显示文案，不加入可选字典，也不推断 P 等级、SLA 或积分权重。
+ * 大小写与首尾空白仅在展示时兼容，原始字段和提交值保持不变。
+ */
+const PRIORITY_DISPLAY_LABEL: Record<string, string> = {
+  ...RDM_PRIORITY_LABEL,
+  MEDIUM: '中等',
+  NORMAL: '常規',
+  LOW: '低',
+  HIGH: '高',
+  URGENT: '緊急',
+  CRITICAL: '嚴重',
+}
+const COMPLEXITY_DISPLAY_LABEL: Record<string, string> = {
+  ...RDM_COMPLEXITY_LABEL,
+  NORMAL: '一般',
+}
+
+function rdmDisplayLabel(labels: Record<string, string>, value?: string | null): string {
+  const key = value?.trim().toUpperCase()
+  if (!key) return '-'
+  return Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : '未識別'
+}
+
+export function getRdmPriorityLabel(value?: string | null): string {
+  return rdmDisplayLabel(PRIORITY_DISPLAY_LABEL, value)
+}
+
+export function getRdmComplexityLabel(value?: string | null): string {
+  return rdmDisplayLabel(COMPLEXITY_DISPLAY_LABEL, value)
+}
+
 export const RDM_COMPLEXITY_WEIGHT: Record<RdmComplexity, number> = {
   [RDM_COMPLEXITY.SIMPLE]: 1,
   [RDM_COMPLEXITY.MEDIUM]: 2,
@@ -484,7 +516,12 @@ export const RDM_SCOPE = {
   POOL: 'pool',
   PRODUCT: 'product',
   DELIVERY: 'delivery',
+  /** 上线前预验收：服务端只捞 uat_pending，逐项判定用例后才能发起发布放行 */
   ACCEPTANCE: 'acceptance',
+  /** 上线后待评分：已 released，等业务验收人打 1-5 分（与预验收是两件事实） */
+  ACCEPTANCE_POST: 'acceptance_post',
+  /** 我的验收记录：我作为验收人签过的单子 */
+  ACCEPTANCE_HISTORY: 'acceptance_history',
   ALL: 'all',
 } as const
 export type RdmScope = (typeof RDM_SCOPE)[keyof typeof RDM_SCOPE]
@@ -496,7 +533,9 @@ export const RDM_SCOPE_LABEL: Record<RdmScope, string> = {
   [RDM_SCOPE.POOL]: '需求池·待分配',
   [RDM_SCOPE.PRODUCT]: '我負責的產品需求',
   [RDM_SCOPE.DELIVERY]: '研發交付中',
-  [RDM_SCOPE.ACCEPTANCE]: '待我驗收',
+  [RDM_SCOPE.ACCEPTANCE]: '上線前預驗收',
+  [RDM_SCOPE.ACCEPTANCE_POST]: '上線後待評分',
+  [RDM_SCOPE.ACCEPTANCE_HISTORY]: '我的驗收記錄',
   [RDM_SCOPE.ALL]: '全部需求',
 }
 
@@ -518,6 +557,14 @@ export const RDM_SOURCE_CHANNEL = {
 } as const
 export type RdmSourceChannel = (typeof RDM_SOURCE_CHANNEL)[keyof typeof RDM_SOURCE_CHANNEL]
 
+/** 来源渠道展示文案（详情页「更多属性」用，避免直接暴露枚举码） */
+export const RDM_SOURCE_CHANNEL_LABEL: Record<RdmSourceChannel, string> = {
+  [RDM_SOURCE_CHANNEL.WEB]: '網頁端',
+  [RDM_SOURCE_CHANNEL.MOBILE]: '移動端',
+  [RDM_SOURCE_CHANNEL.DINGTALK]: '釘釘',
+  [RDM_SOURCE_CHANNEL.AI]: 'AI 助手',
+}
+
 /**
  * 角色 → 该角色当前可执行的动作（M0 前端演示用口径；
  * M1 后由后端 GET /rdm/requirement/{id}/actions 返回权威结果）
@@ -530,6 +577,10 @@ export const RDM_SCOPE_DEFAULT_STATUS: Record<RdmScope, RdmStatus | undefined> =
   [RDM_SCOPE.PRODUCT]: undefined,
   [RDM_SCOPE.DELIVERY]: undefined,
   [RDM_SCOPE.ACCEPTANCE]: RDM_STATUS.UAT_PENDING,
+  // 这两个视角的状态收敛在服务端 applyScope 里做（含多状态 in），
+  // 前端不再叠 status 筛选条件，否则两处口径会互相覆盖
+  [RDM_SCOPE.ACCEPTANCE_POST]: undefined,
+  [RDM_SCOPE.ACCEPTANCE_HISTORY]: undefined,
   [RDM_SCOPE.ALL]: undefined,
 }
 
@@ -935,6 +986,7 @@ export const RDM_MENU_KEYS = [
   'rdm-delivery', 'rdm-delivery-board', 'rdm-delivery-iteration',
   'rdm-acceptance', 'rdm-config-group',
   'rdm-config-status', 'rdm-config-routing', 'rdm-config-sla', 'rdm-config-score',
+  'rdm-dashboard-project', 'rdm-delivery-test', 'rdm-delivery-release',
 ] as const
 
 /** 通知事件码（与后端 RDM_EVENT 对齐，M1 接入） */
@@ -1190,4 +1242,296 @@ export const RDM_BASELINE_FREEZE_STATUS: string[] = [
 /** 基线冻结入口是否可用（列表页/详情页/节点计划页共用同一判断） */
 export function canFreezeBaseline(status?: string | null): boolean {
   return !!status && RDM_BASELINE_FREEZE_STATUS.includes(status)
+}
+
+/* ==================== V3 分批交付：项目 / 交付项 / 提测 / 问题 / 发布 / 验收 ==================== */
+
+// ===== 项目状态 =====
+export const RDM_PROJECT_STATUS = {
+  PREPARING: 'preparing',
+  IN_PROGRESS: 'in_progress',
+  PARTIAL_DELIVERED: 'partial_delivered',
+  ALL_DELIVERED: 'all_delivered',
+  CLOSED: 'closed',
+} as const
+
+export const RDM_PROJECT_STATUS_LABEL: Record<string, string> = {
+  preparing: '籌備中',
+  in_progress: '進行中',
+  partial_delivered: '部分交付',
+  all_delivered: '全部交付',
+  closed: '已關閉',
+}
+
+export const RDM_PROJECT_STATUS_COLOR: Record<string, string> = {
+  preparing: 'default',
+  in_progress: 'processing',
+  partial_delivered: 'warning',
+  all_delivered: 'success',
+  closed: 'default',
+}
+
+// ===== 交付项状态 =====
+export const RDM_DELIVERY_ITEM_STATUS = {
+  PREPARING: 'preparing',
+  DEVELOPING: 'developing',
+  TESTING: 'testing',
+  PENDING_ACCEPTANCE: 'pending_acceptance',
+  PENDING_RELEASE: 'pending_release',
+  RELEASED_PENDING: 'released_pending',
+  DONE: 'done',
+} as const
+
+export const RDM_DELIVERY_ITEM_STATUS_LABEL: Record<string, string> = {
+  preparing: '待準備',
+  developing: '開發中',
+  testing: '測試中',
+  pending_acceptance: '待驗收',
+  pending_release: '待發布',
+  released_pending: '已上線待完成',
+  done: '已完成',
+}
+
+export const RDM_DELIVERY_ITEM_STATUS_COLOR: Record<string, string> = {
+  preparing: 'default',
+  developing: 'processing',
+  testing: 'cyan',
+  pending_acceptance: 'warning',
+  pending_release: 'purple',
+  released_pending: 'gold',
+  done: 'success',
+}
+
+// ===== 测试批次状态 =====
+export const RDM_TEST_BATCH_STATUS = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  RETURNED: 'returned',
+  EXECUTING: 'executing',
+  PASSED: 'passed',
+  FAILED: 'failed',
+} as const
+
+export const RDM_TEST_BATCH_STATUS_LABEL: Record<string, string> = {
+  pending: '待接收',
+  accepted: '已接收',
+  returned: '已退回',
+  executing: '執行中',
+  passed: '已通過',
+  failed: '未通過',
+}
+
+export const RDM_TEST_BATCH_STATUS_COLOR: Record<string, string> = {
+  pending: 'warning',
+  accepted: 'processing',
+  returned: 'error',
+  executing: 'cyan',
+  passed: 'success',
+  failed: 'error',
+}
+
+// ===== 问题状态 =====
+export const RDM_ISSUE_STATUS = {
+  OPEN: 'open',
+  PROCESSING: 'processing',
+  PENDING_VERIFY: 'pending_verify',
+  RESOLVED: 'resolved',
+  DEFERRED: 'deferred',
+} as const
+
+export const RDM_ISSUE_STATUS_LABEL: Record<string, string> = {
+  open: '未解決',
+  processing: '處理中',
+  pending_verify: '待驗證',
+  resolved: '已解決',
+  deferred: '已延期',
+}
+
+export const RDM_ISSUE_STATUS_COLOR: Record<string, string> = {
+  open: 'error',
+  processing: 'processing',
+  pending_verify: 'warning',
+  resolved: 'success',
+  deferred: 'purple',
+}
+
+// ===== 问题严重程度 =====
+export const RDM_ISSUE_SEVERITY = {
+  CRITICAL: 'critical',
+  MAJOR: 'major',
+  MINOR: 'minor',
+  TRIVIAL: 'trivial',
+} as const
+
+export const RDM_ISSUE_SEVERITY_LABEL: Record<string, string> = {
+  critical: '致命',
+  major: '嚴重',
+  minor: '一般',
+  trivial: '輕微',
+}
+
+export const RDM_ISSUE_SEVERITY_COLOR: Record<string, string> = {
+  critical: '#f5222d',
+  major: '#fa541c',
+  minor: '#faad14',
+  trivial: '#8c8c8c',
+}
+
+// ===== 延期决定状态 =====
+export const RDM_DEFER_STATUS = {
+  PENDING_PRODUCT: 'pending_product',
+  PENDING_BIZ: 'pending_biz',
+  PENDING_BIND: 'pending_bind',
+  EFFECTIVE: 'effective',
+  REJECTED: 'rejected',
+} as const
+
+export const RDM_DEFER_STATUS_LABEL: Record<string, string> = {
+  pending_product: '待產品確認',
+  pending_biz: '待業務確認',
+  pending_bind: '待承接',
+  effective: '已生效',
+  rejected: '已拒絕',
+}
+
+export const RDM_DEFER_STATUS_COLOR: Record<string, string> = {
+  pending_product: 'warning',
+  pending_biz: 'warning',
+  pending_bind: 'processing',
+  effective: 'success',
+  rejected: 'error',
+}
+
+// ===== 发布批次状态 =====
+export const RDM_RELEASE_BATCH_STATUS = {
+  PLANNING: 'planning',
+  CHECKING: 'checking',
+  APPROVED: 'approved',
+  DEPLOYING: 'deploying',
+  VERIFYING: 'verifying',
+  RELEASED: 'released',
+  ROLLED_BACK: 'rolled_back',
+  CANCELLED: 'cancelled',
+} as const
+
+export const RDM_RELEASE_BATCH_STATUS_LABEL: Record<string, string> = {
+  planning: '計劃中',
+  checking: '檢查中',
+  approved: '已批准',
+  deploying: '部署中',
+  verifying: '驗證中',
+  released: '已發布',
+  rolled_back: '已回滾',
+  cancelled: '已取消',
+}
+
+export const RDM_RELEASE_BATCH_STATUS_COLOR: Record<string, string> = {
+  planning: 'default',
+  checking: 'processing',
+  approved: 'cyan',
+  deploying: 'warning',
+  verifying: 'purple',
+  released: 'success',
+  rolled_back: 'error',
+  cancelled: 'default',
+}
+
+// ===== 部署状态 =====
+export const RDM_DEPLOY_STATUS = {
+  PENDING: 'pending',
+  DEPLOYING: 'deploying',
+  SUCCESS: 'success',
+  FAILED: 'failed',
+  ROLLED_BACK: 'rolled_back',
+} as const
+
+export const RDM_DEPLOY_STATUS_LABEL: Record<string, string> = {
+  pending: '待部署',
+  deploying: '部署中',
+  success: '成功',
+  failed: '失敗',
+  rolled_back: '已回滾',
+}
+
+export const RDM_DEPLOY_STATUS_COLOR: Record<string, string> = {
+  pending: 'default',
+  deploying: 'processing',
+  success: 'success',
+  failed: 'error',
+  rolled_back: 'warning',
+}
+
+// ===== 验收类型（交付项级） =====
+export const RDM_ACCEPTANCE_TYPE = {
+  PRODUCT: 'product',
+  BUSINESS: 'business',
+} as const
+
+export const RDM_ACCEPTANCE_TYPE_LABEL: Record<string, string> = {
+  product: '產品驗收',
+  business: '業務驗收',
+}
+
+// ===== 验收路径 =====
+export const RDM_ACCEPTANCE_PATH = {
+  A: 'A',
+  B: 'B',
+} as const
+
+export const RDM_ACCEPTANCE_PATH_LABEL: Record<string, string> = {
+  A: '路徑A（先驗收後上線）',
+  B: '路徑B（先上線後驗收）',
+}
+
+// ===== 需求种类 =====
+export const RDM_REQUIREMENT_KIND = {
+  AGGREGATE: 'aggregate',
+  EXECUTION: 'execution',
+} as const
+
+export const RDM_REQUIREMENT_KIND_LABEL: Record<string, string> = {
+  aggregate: '聚合需求',
+  execution: '執行需求',
+}
+
+// ===== 流程版本 =====
+export const RDM_FLOW_VERSION = {
+  V1: 1,
+  V2: 2,
+  V3: 3,
+} as const
+
+export const RDM_FLOW_VERSION_LABEL: Record<number, string> = {
+  1: '流程V1',
+  2: '流程V2',
+  3: '分批交付V3',
+}
+
+// ===== Batch2: 阻斷點 =====
+export const RDM_BLOCK_POINT = { START: 'start', TEST: 'test', RELEASE: 'release' } as const
+export const RDM_BLOCK_POINT_LABEL: Record<string, string> = {
+  start: '開工阻斷', test: '提測阻斷', release: '上線阻斷',
+}
+export const RDM_BLOCK_POINT_COLOR: Record<string, string> = {
+  start: 'orange', test: 'gold', release: 'volcano',
+}
+
+// ===== Batch2: 範圍操作 =====
+export const RDM_SCOPE_ACTION = { FREEZE: 'freeze', NEW_VERSION: 'new_version' } as const
+export const RDM_SCOPE_ACTION_LABEL: Record<string, string> = {
+  freeze: '凍結範圍', new_version: '發起範圍變更',
+}
+
+// ===== Batch2: 跨交付項依賴類型（PDM 標準） =====
+export const RDM_DEP_TYPE = {
+  FS: 'finish_to_start',
+  SS: 'start_to_start',
+  FF: 'finish_to_finish',
+  SF: 'start_to_finish',
+} as const
+export const RDM_DEP_TYPE_LABEL: Record<string, string> = {
+  finish_to_start: '完成→開始（FS）',
+  start_to_start: '開始→開始（SS）',
+  finish_to_finish: '完成→完成（FF）',
+  start_to_finish: '開始→完成（SF）',
 }

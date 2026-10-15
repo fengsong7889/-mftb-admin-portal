@@ -101,6 +101,8 @@ export default function AiModelProvider() {
 
   const handleProviderDelete = async (row: AiProvider) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除該供應商？',
       content: `刪除後「${row.name}」的所有模型將不可用，是否繼續？`,
       okText: '刪除',
@@ -126,6 +128,8 @@ export default function AiModelProvider() {
     const actionText = toDisable ? '停用' : '啟用'
     
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: `確認${actionText}該供應商？`,
       content: `${actionText}後「${row.name}」${toDisable ? '及其下所有模型將立即不可調用' : '將恢復可用，用戶端可正常調用'}`,
       okText: '確認',

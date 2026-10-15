@@ -15,7 +15,6 @@ import { Button, Input, message, Modal, Radio, Row, Col, Select, Tag, Tooltip, U
 import {
   ArrowLeftOutlined, SendOutlined, SaveOutlined, CheckCircleOutlined,
   LockOutlined, WalletOutlined, QuestionCircleOutlined,
-  ExclamationCircleOutlined,
   UploadOutlined, FileImageOutlined, FilePdfOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
@@ -284,8 +283,9 @@ export default function AiAccessApply() {
       return
     }
     Modal.confirm({
+      className: 'custom-confirm-modal',
       title: '確認保存',
-      icon: <ExclamationCircleOutlined />,
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: '確認保存當前 AI 申請為草稿？保存後可在「我的申請」中查看。',
       okText: '確認保存',
       cancelText: '取消',

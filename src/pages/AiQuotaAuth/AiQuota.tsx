@@ -99,6 +99,8 @@ export default function AiQuota({ fixedSection }: { fixedSection?: 'quota' | 'ro
 
   const handlePolicyDelete = (row: QuotaPolicy) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteQuotaPolicy'),
       content: t('aiQuotaAuth.deleteQuotaPolicyContent', { name: row.name }),
       okText: t('common.delete'),
@@ -115,6 +117,8 @@ export default function AiQuota({ fixedSection }: { fixedSection?: 'quota' | 'ro
     const toDisable = row.status === 1
     const action = toDisable ? t('aiQuotaAuth.disableText') : t('aiQuotaAuth.enableText')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDisableQuotaPolicy', { action }),
       content: t('aiQuotaAuth.disableQuotaPolicyContent', {
         action,

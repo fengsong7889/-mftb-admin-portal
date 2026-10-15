@@ -34,6 +34,10 @@ jobs:
         run: npm run check:menu
       - name: Stat Card Order
         run: npm run check:stat-order
+      - name: Confirm Modal Style
+        run: npm run check:confirm-modal
+      - name: i18n Coverage
+        run: npm run check:i18n
       - name: Secret Scan
         run: npm run secret-scan
       - name: Test

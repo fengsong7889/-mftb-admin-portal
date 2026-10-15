@@ -20,13 +20,15 @@
  * 也能看到分配按钮，点了才被后端拒）。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tabs, Tag, message } from 'antd'
+import { Alert, Button, Checkbox, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
   CheckCircleOutlined,
   ExportOutlined,
   FileAddOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   ReloadOutlined,
   SearchOutlined,
   UserAddOutlined,
@@ -42,19 +44,23 @@ import {
   fetchScopeCounts,
   fetchRequirementStats,
   fetchProductOptions,
+  fetchProjectPage,
   claimRequirement,
   submitRequirement,
   urgeRequirement,
   withdrawRequirement,
+  type RdmProjectListItem,
   type RdmRequirementRow,
 } from '../../api/rdm'
 import { fetchDepartments } from '../../api/department'
 import { exportRequirementRows } from './requirementExport'
 import RequirementKanban from './components/RequirementKanban'
 import {
+  RDM_FLOW_VERSION_LABEL,
   RDM_KANBAN_SIZE,
   RDM_PRIORITY_LABEL,
   RDM_REQ_TYPE_LABEL,
+  RDM_REQUIREMENT_KIND_LABEL,
   RDM_SCOPE,
   RDM_SCOPE_LABEL,
   RDM_STATUS,
@@ -122,12 +128,33 @@ interface RequirementFilters {
   deptId?: number
   pmUserId?: number
   overdueOnly?: boolean
+  /** V3：所属项目 */
+  projectId?: number
+  /** V3：需求种类 */
+  requirementKind?: string
+  /** V3：流程版本 */
+  flowVersion?: number
 }
 
 /** 视图形态偏好存储键（PM 习惯看板、业务/技术习惯表格，不应每次回来重选） */
 const VIEW_STORAGE_KEY = 'rdm-requirement:view'
 
+/** 视图栏收起偏好存储键（同一组件服务三个职责页，偏好共用一份） */
+const RAIL_STORAGE_KEY = 'rdm-requirement:rail'
+
 type ViewMode = 'table' | 'kanban'
+
+/**
+ * 视图分组：把切片按「我自己的事」和「治理别人的事」分开。
+ * <p>审批人/提出人与分配人不是同一批角色，混在一排 Tab 里时高层会误入分配区、
+ * PM 会看到与自己无关的审批列（这也是菜单拆分的同一动因）。
+ */
+const PERSONAL_SCOPES: RdmScope[] = [
+  RDM_SCOPE.MINE,
+  RDM_SCOPE.TODO,
+  RDM_SCOPE.APPROVING,
+  RDM_SCOPE.ACCEPTANCE,
+]
 
 interface RequirementListProps {
   /**
@@ -158,6 +185,17 @@ function readStoredView(): ViewMode {
   }
 }
 
+/** 视图栏默认收起状态：未存过偏好时按视口宽度决定（窄屏先把宽度留给表格） */
+function readStoredRail(): boolean {
+  try {
+    const saved = localStorage.getItem(RAIL_STORAGE_KEY)
+    if (saved != null) return saved === '1'
+  } catch {
+    // 读不到偏好就走默认值，不影响页面可用
+  }
+  return typeof window !== 'undefined' && window.innerWidth < 1440
+}
+
 export default function RequirementList({
   defaultScope,
   scopeTabs = EXECUTION_SCOPES,
@@ -178,6 +216,8 @@ export default function RequirementList({
   const isPoolView = activeScope === RDM_SCOPE.POOL
 
   const [view, setView] = useState<ViewMode>(readStoredView)
+  /** 视图栏收起偏好：宽屏看列表时想多留宽度给表格，窄屏默认收起 */
+  const [railCollapsed, setRailCollapsed] = useState<boolean>(readStoredRail)
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -186,6 +226,8 @@ export default function RequirementList({
   const [counts, setCounts] = useState<Record<string, number>>({})
   /** 看板信号卡（服务端统计结果） */
   const [stats, setStats] = useState<Record<string, number>>({})
+  /** 统计卡是否已取到数：未取到时显示占位符，不能把「还在加载/取数失败」渲染成 0 */
+  const [statsReady, setStatsReady] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<number[]>([])
   const [filters, setFilters] = useState<RequirementFilters>({})
 
@@ -270,9 +312,10 @@ export default function RequirementList({
   useEffect(() => {
     if (view !== 'kanban') return
     let alive = true
+    setStatsReady(false)
     fetchRequirementStats({ scope: activeScope, ...filters })
-      .then(s => { if (alive) setStats(s) })
-      .catch(() => { if (alive) setStats({}) })
+      .then(s => { if (alive) { setStats(s); setStatsReady(true) } })
+      .catch(() => { if (alive) { setStats({}); setStatsReady(false) } })
     return () => { alive = false }
   }, [view, activeScope, filters])
 
@@ -304,6 +347,28 @@ export default function RequirementList({
     } catch {
       // 存不上只是下次不记住偏好，不该影响本次切换
     }
+  }
+
+  /** 视图栏分组：只渲染调用方授权展示的切片，可见范围仍由服务端按 scope 收敛 */
+  const railGroups = useMemo(() => {
+    const personal = scopeTabs.filter(key => PERSONAL_SCOPES.includes(key))
+    const governance = scopeTabs.filter(key => !PERSONAL_SCOPES.includes(key))
+    return [
+      { key: 'personal', label: '我的需求', items: personal },
+      { key: 'governance', label: '治理視圖', items: governance },
+    ]
+  }, [scopeTabs])
+
+  const toggleRail = () => {
+    setRailCollapsed(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(RAIL_STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        // 存不上只是下次不记住偏好，不该影响本次展开/收起
+      }
+      return next
+    })
   }
 
   /**
@@ -416,23 +481,46 @@ export default function RequirementList({
   }
 
   const columnMeta = useMemo(() => ([
-    { key: 'reqNo', title: '需求編號' },
     { key: 'title', title: '需求標題' },
-    { key: 'reqType', title: '需求類型' },
-    { key: 'priority', title: '優先級' },
-    { key: 'complexity', title: '規模' },
     { key: 'status', title: '當前狀態' },
-    { key: 'submitter', title: '提出人/部門' },
-    { key: 'pmName', title: '產品經理' },
+    { key: 'priority', title: '優先級' },
     { key: 'currentHandler', title: '當前處理人' },
+    { key: 'submitter', title: '提出人' },
+    { key: 'submitDeptName', title: '提出部門' },
+    { key: 'planReleaseDate', title: '計劃上線' },
+    { key: 'reqNo', title: '需求編號' },
+    { key: 'reqType', title: '需求類型' },
+    { key: 'complexity', title: '規模' },
+    { key: 'pmName', title: '產品經理' },
     { key: 'submitTime', title: '提交時間' },
     { key: 'expectDate', title: '期望完成' },
-    { key: 'planReleaseDate', title: '計劃上線' },
     { key: 'stay', title: '當前停留' },
+    { key: 'projectName', title: '所屬項目' },
+    { key: 'deliveryProgress', title: '交付進度' },
     { key: 'action', title: '操作' },
   ]), [])
 
-  const { configComponent, applyConfig } = useColumnConfig('rdm-requirement', columnMeta, [
+  /**
+   * 标题、编号、提出人和部门独立显示；其余辅助列仍可按需开启。
+   * 列配置升到 v3，避免旧偏好隐藏唯一的编号字段，或继续保留合并列布局。
+   */
+  const { configComponent, applyConfig } = useColumnConfig('rdm-requirement-v3', columnMeta, [
+    { key: 'title', visible: true, locked: 'head' as const },
+    { key: 'status', visible: true },
+    { key: 'priority', visible: true },
+    { key: 'currentHandler', visible: true },
+    { key: 'submitter', visible: true },
+    { key: 'submitDeptName', visible: true },
+    { key: 'planReleaseDate', visible: true },
+    { key: 'reqNo', visible: true },
+    { key: 'reqType', visible: false },
+    { key: 'complexity', visible: false },
+    { key: 'pmName', visible: false },
+    { key: 'submitTime', visible: false },
+    { key: 'expectDate', visible: false },
+    { key: 'stay', visible: false },
+    { key: 'projectName', visible: false },
+    { key: 'deliveryProgress', visible: false },
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
@@ -443,12 +531,12 @@ export default function RequirementList({
     },
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 148 },
     {
-      title: '需求標題', dataIndex: 'title', key: 'title', width: 260, fixed: 'left',
+      title: '需求標題', dataIndex: 'title', key: 'title', width: 300, fixed: 'left', ellipsis: true,
       render: (v: string, r) => (
-        <Space size={4}>
-          <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.id}`)}>{v}</a>
+        <div className="rdm-table-title">
+          <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.id}&tab=activity`}>{v}</a>
           {r.blockedFlag && <Tag color="purple" style={{ margin: 0 }}>阻塞</Tag>}
-        </Space>
+        </div>
       ),
     },
     {
@@ -467,15 +555,8 @@ export default function RequirementList({
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v: string, r) => <StatusTag status={v} overdue={r.overdueFlag ?? false} />,
     },
-    {
-      title: '提出人/部門', key: 'submitter', width: 140,
-      render: (_, r) => (
-        <div style={{ lineHeight: 1.4 }}>
-          <div>{r.submitterName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.submitDeptName ?? '-'}</div>
-        </div>
-      ),
-    },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 110, ellipsis: true, render: (v?: string | null) => v || '-' },
+    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
       title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100,
       render: (v?: string | null) => v ?? <span style={{ color: '#FF4D4F' }}>未分配</span>,
@@ -495,6 +576,26 @@ export default function RequirementList({
         return (
           <span style={{ color: r.overdueFlag ? '#CF1322' : days > 3 ? '#D46B08' : '#595959' }}>
             {days} 天
+          </span>
+        )
+      },
+    },
+    {
+      title: '所屬項目', dataIndex: 'projectName', key: 'projectName', width: 150, ellipsis: true,
+      render: (v?: string | null, r?: RdmRequirementRow) => {
+        if (!v) return '-'
+        return r?.projectId
+          ? <a className="rdm-table-title__link" href={`#/rdm-project-detail?id=${r.projectId}`}>{v}</a>
+          : <span>{v}</span>
+      },
+    },
+    {
+      title: '交付進度', key: 'deliveryProgress', width: 100,
+      render: (_, r) => {
+        if (r.flowVersion !== 3 || !r.deliveryItemCount) return '-'
+        return (
+          <span style={{ color: '#2F54EB', fontWeight: 500 }}>
+            {r.deliveryDoneCount ?? 0}/{r.deliveryItemCount}
           </span>
         )
       },
@@ -536,6 +637,12 @@ export default function RequirementList({
         }
         // 自助提交只对提出人本人开（服务端同样会拒），否则列表上会出现点了必报错的按钮
         if (SELF_SUBMITTABLE.includes(r.status) && !!user?.empId && r.submitterEmpNo === user.empId) {
+          // 草稿先给「編輯」：没有它，存了草稿的人只能整张表单重填，保存草稿等于丢弃
+          if (r.status === RDM_STATUS.DRAFT) {
+            actions.push(
+              <Button key="edit" type="link" size="small" onClick={() => navigate(`/rdm-submit?id=${r.id}`)}>編輯</Button>,
+            )
+          }
           actions.push(
             <Button key="submit" type="link" size="small" onClick={() => handleSelfSubmit(r)}>
               {r.status === RDM_STATUS.INTAKE_REJECTED ? '重提' : '提交'}
@@ -544,7 +651,7 @@ export default function RequirementList({
         }
         if (RDM_ACCEPTANCE_OPEN_STATUS.includes(status)) {
           actions.push(
-            <Button key="accept" type="link" size="small" style={{ color: '#52C41A' }}
+            <Button key="accept" type="link" size="small"
               onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}`)}
             >
               {/* 与详情页同一文案：已上线后的验收是正式业务验收，不是上线前预验 */}
@@ -562,6 +669,9 @@ export default function RequirementList({
     },
   ]
 
+  const visibleColumns = applyConfig(columns) as TableColumnsType<RdmRequirementRow>
+  const tableWidth = visibleColumns.reduce((sum, col) => sum + Number(col.width ?? 120), 0)
+
   /** 批量勾选只对“有分配权 + 停在需求池视角 + 表格视图”有意义：看板卡片无法勾选，
    *  列设置在看板下也没有列可设 —— 两者在不满足时直接隐藏，而不是留一个永远点不动的按钮 */
   const canBatchAssign = canDispatch && isPoolView && view === 'table'
@@ -577,128 +687,162 @@ export default function RequirementList({
     pool: stats.pool ?? 0,
   }
 
+  /**
+   * 统计卡取值：未取到数时给占位符而不是 0。
+   * <p>「逾期 0 / 待驗收 0」在取数中或取数失败时是假事实，会让人以为没有风险要处理。
+   */
+  const statValue = (v: number) => (statsReady ? v : '—')
+
   return (
-    <div className="content-area">
-      {/* ── 视图形态切换：表格精查 ⇄ 看板扫视 ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 12, flexWrap: 'wrap', marginBottom: 12,
-      }}>
-        <Segmented
-          value={view}
-          onChange={v => switchView(v as ViewMode)}
-          options={[
-            { label: '表格視圖', value: 'table' },
-            { label: '看板視圖', value: 'kanban' },
-          ]}
-        />
-        <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
-      </div>
+    <div className="content-area rdm-workspace">
+      <div className="rdm-workspace-body">
+        {/* ── 视图栏：把「同一张列表的不同切片」收在左侧具名视图里 ──
+            原来这些切片同时以顶部 Tab 和多个菜单入口存在，用户要先弄清
+            「需求清單 / 提交需求 / 需求管理」哪个才是自己要的那一页。 */}
+        {scopeTabs.length > 0 && !railCollapsed && (
+          <aside className="rdm-view-rail">
+            <div className="rdm-view-rail-head">
+              視圖
+              <Tooltip title="收起視圖欄">
+                <Button type="text" size="small" icon={<MenuFoldOutlined />} onClick={toggleRail} />
+              </Tooltip>
+            </div>
+            {railGroups.map(group => group.items.length > 0 && (
+              <div key={group.key} className="rdm-view-rail-group">
+                <div className="rdm-view-rail-group-title">{group.label}</div>
+                {group.items.map(key => (
+                  <div
+                    key={key}
+                    className={`rdm-view-rail-item ${activeScope === key ? 'active' : ''}`}
+                    onClick={() => switchScope(key)}
+                  >
+                    <span className="rdm-view-rail-item-label">{RDM_SCOPE_LABEL[key]}</span>
+                    {counts[key] != null && <span className="rdm-view-rail-item-count">{counts[key]}</span>}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="rdm-view-rail-foot">
+              視圖只切換資料切片，不改變你的可見範圍與可執行動作
+            </div>
+          </aside>
+        )}
 
-      {/* ── 视角入口：由调用方（哪个职责页）决定展示哪几个视角；
-          不展示 Tab 时必须用视角名作标题，否则页面就是一张不知所以的表 ── */}
-      {scopeTabs.length > 0 ? (
-        <Tabs
-          activeKey={activeScope}
-          onChange={switchScope}
-          items={scopeTabs.map(key => ({
-            key,
-            label: `${RDM_SCOPE_LABEL[key]}${counts[key] != null ? ` (${counts[key]})` : ''}`,
-          }))}
-        />
-      ) : (
-        <div style={{ marginBottom: 12, fontSize: 15, fontWeight: 600, color: '#262626' }}>
-          {RDM_SCOPE_LABEL[activeScope]}
-        </div>
-      )}
+        <div className="rdm-workspace-main">
+          {/* ── 工具条：形态切换 + 刷新（收起状态下在这里重新展开视图栏） ── */}
+          <div className="rdm-workspace-toolbar">
+            {scopeTabs.length > 0 && railCollapsed && (
+              <Tooltip title="展開視圖欄">
+                <Button icon={<MenuUnfoldOutlined />} onClick={toggleRail}>視圖</Button>
+              </Tooltip>
+            )}
+            <Segmented
+              value={view}
+              onChange={v => switchView(v as ViewMode)}
+              options={[
+                { label: '表格視圖', value: 'table' },
+                { label: '看板視圖', value: 'kanban' },
+              ]}
+            />
+            {scopeTabs.length === 0 && (
+              <span className="rdm-workspace-title">{RDM_SCOPE_LABEL[activeScope]}</span>
+            )}
+            <div style={{ flex: 1 }} />
+            <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          </div>
 
-      {/* 看板是扫视场景，需要信号卡给出分母与堵点；表格视角靠 Tab 计数 + 筛选，不再多占一行 */}
-      {view === 'kanban' && (
-        <div style={{ marginBottom: 16 }}>
-          <StatCards
-            items={[
-              { key: 'total', icon: <FileAddOutlined />, value: kanbanStats.total, label: '範圍內需求', color: 'info' },
-              { key: 'pool', icon: <UserAddOutlined />, value: kanbanStats.pool, label: '待分配', color: 'brand' },
-              { key: 'overdue', icon: <AlertOutlined />, value: kanbanStats.overdue, label: '逾期需求', color: 'system' },
-              { key: 'accept', icon: <CheckCircleOutlined />, value: kanbanStats.toAccept, label: '待驗收', color: 'success' },
-            ]}
+          {/* ── 搜索区 ── */}
+          <SearchBar
+            advanced={advancedFilters}
+            onSearch={v => { setFilters(v); setPage(1) }}
+            onReset={() => { setFilters({}); setPage(1) }}
           />
-        </div>
-      )}
 
-      {/* ── 搜索区 ── */}
-      <SearchBar
-        advanced={advancedFilters}
-        onSearch={v => { setFilters(v); setPage(1) }}
-        onReset={() => { setFilters({}); setPage(1) }}
-      />
-
-      {/* ── 操作区：新增类主操作在右（components.css 规定 right 只放「新增」与「列配置」），
-          批量分配/导出等数据操作在左 ── */}
-      <div className="action-section">
-        <div className="action-section-left">
-          {canBatchAssign && (
-            <Button
-              icon={<UserSwitchOutlined />}
-              disabled={selectedKeys.length === 0}
-              onClick={() => navigate(`/rdm-assign?ids=${selectedKeys.join(',')}&back=${assignBack}`)}
-            >
-              批量分配{selectedKeys.length ? `（${selectedKeys.length}）` : ''}
-            </Button>
+          {/* 看板是扫视场景，需要信号卡给出分母与堵点；表格视角靠视图栏计数 + 筛选，不再多占一行。
+              统计卡必须在搜索区下方（§E.8），口径跟随当前筛选条件。 */}
+          {view === 'kanban' && (
+            <div style={{ marginBottom: 16 }}>
+              <StatCards
+                animationKey={`${activeScope}-${JSON.stringify(filters)}`}
+                items={[
+                  { key: 'total', icon: <FileAddOutlined />, value: statValue(kanbanStats.total), label: '範圍內需求', color: 'info' },
+                  { key: 'pool', icon: <UserAddOutlined />, value: statValue(kanbanStats.pool), label: '待分配', color: 'brand' },
+                  { key: 'overdue', icon: <AlertOutlined />, value: statValue(kanbanStats.overdue), label: '逾期需求', color: 'system' },
+                  { key: 'accept', icon: <CheckCircleOutlined />, value: statValue(kanbanStats.toAccept), label: '待驗收', color: 'success' },
+                ]}
+              />
+            </div>
           )}
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
-        </div>
-        <div className="action-section-right">
-          <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-submit')}>
-            我要提需求
-          </Button>
-          {/* 列配置只作用于表格；看板视图下没有可配置的列 */}
-          {view === 'table' ? configComponent : null}
+
+          {/* ── 操作区：新增类主操作在右（components.css 规定 right 只放「新增」与「列配置」），
+              批量分配/导出等数据操作在左 ── */}
+          <div className="action-section">
+            <div className="action-section-left">
+              {canBatchAssign && (
+                <Button
+                  icon={<UserSwitchOutlined />}
+                  disabled={selectedKeys.length === 0}
+                  onClick={() => navigate(`/rdm-assign?ids=${selectedKeys.join(',')}&back=${assignBack}`)}
+                >
+                  批量分配{selectedKeys.length ? `（${selectedKeys.length}）` : ''}
+                </Button>
+              )}
+              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+            </div>
+            <div className="action-section-right">
+              <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-submit')}>
+                提需求
+              </Button>
+              {/* 列配置只作用于表格；看板视图下没有可配置的列 */}
+              {view === 'table' ? configComponent : null}
+            </div>
+          </div>
+
+          {canBatchAssign && rows.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="需求池視角：勾選後可批量分配產品經理；分配即通知對方，超 24 小時未受理將自動升級提醒技術負責人。"
+            />
+          )}
+
+          {/* 分配产品经理统一走独立页 /rdm-assign（§9.1 禁弹窗承载表单） */}
+          {view === 'table' ? (
+            <Table<RdmRequirementRow>
+              className="nowrap-table"
+              rowKey="id"
+              columns={visibleColumns}
+              tableLayout="fixed"
+              dataSource={rows}
+              loading={loading}
+              rowSelection={rowSelection}
+              scroll={{ x: tableWidth + (canBatchAssign ? 32 : 0) }}
+              pagination={{
+                current: page,
+                pageSize: size,
+                total,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showTotal: t => `共 ${t} 條`,
+                // 改每页条数必须回第 1 页，否则会停在越界页码上显示空列表
+                onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s) },
+              }}
+            />
+          ) : loading ? (
+            <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
+          ) : (
+            <RequirementKanban
+              rows={rows}
+              onOpen={id => navigate(`/rdm-detail?id=${id}&tab=activity`)}
+              limitHint={kanbanTruncated
+                ? `已顯示前 ${RDM_KANBAN_SIZE} 條（共 ${total} 條），請縮小篩選範圍或切回表格視圖翻頁。`
+                : undefined}
+            />
+          )}
         </div>
       </div>
-
-      {canBatchAssign && rows.length > 0 && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 12 }}
-          message="需求池視角：勾選後可批量分配產品經理；分配即通知對方，超 24 小時未受理將自動升級提醒技術負責人。"
-        />
-      )}
-
-      {/* 分配产品经理统一走独立页 /rdm-assign（§9.1 禁弹窗承载表单） */}
-      {view === 'table' ? (
-        <Table<RdmRequirementRow>
-          className="nowrap-table"
-          rowKey="id"
-          columns={applyConfig(columns) as TableColumnsType<RdmRequirementRow>}
-          dataSource={rows}
-          loading={loading}
-          rowSelection={rowSelection}
-          scroll={{ x: 1700 }}
-          pagination={{
-            current: page,
-            pageSize: size,
-            total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: t => `共 ${t} 條`,
-            // 改每页条数必须回第 1 页，否则会停在越界页码上显示空列表
-            onChange: (p, s) => { setPage(s !== size ? 1 : p); setSize(s) },
-          }}
-        />
-      ) : loading ? (
-        <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
-      ) : (
-        <RequirementKanban
-          rows={rows}
-          onOpen={id => navigate(`/rdm-detail?id=${id}`)}
-          limitHint={kanbanTruncated
-            ? `已顯示前 ${RDM_KANBAN_SIZE} 條（共 ${total} 條），請縮小篩選範圍或切回表格視圖翻頁。`
-            : undefined}
-        />
-      )}
     </div>
   )
 }
@@ -712,8 +856,9 @@ export default function RequirementList({
  * “回到 initialValues”，绑上去会让【重置】变成“恢复到上次查询条件”，
  * 搜索框里的关键字清不掉、但表格已变成未过滤的 4 条（界面与数据不一致）。
  * 表单值只在查询时单向同步给父组件，切视角不重建本组件所以条件自然保留。
- * <p>advanced=true 多给三个跨部门检索条件（提出部门/产品经理/仅看逾期），
- * 下拉数据只在需要时才拉，避免清单页与需求池白白多两个请求。
+ * <p>advanced=true 多给三个跨部门检索条件（提出部门/产品经理/仅看逾期）。
+ * 低频条件收进「更多篩選」：收起时一并清掉这些字段，避免留下看不见的过滤条件
+ * 让人以为列表坏了。
  */
 function SearchBar({ onSearch, onReset, advanced = false }: {
   onSearch: (v: RequirementFilters) => void
@@ -723,15 +868,22 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
   const [form] = Form.useForm<RequirementFilters>()
   const [deptOptions, setDeptOptions] = useState<{ value: number; label: string }[]>([])
   const [pmOptions, setPmOptions] = useState<{ value: number; label: string }[]>([])
+  const [projectOptions, setProjectOptions] = useState<{ value: number; label: string }[]>([])
+  const [more, setMore] = useState(false)
 
   useEffect(() => {
-    if (!advanced) return
-    fetchDepartments()
-      .then(list => setDeptOptions(list.map(d => ({ value: d.id, label: d.name }))))
-      .catch(() => setDeptOptions([]))
-    fetchProductOptions()
-      .then(list => setPmOptions(list.map(p => ({ value: p.userId, label: p.name }))))
-      .catch(() => setPmOptions([]))
+    if (advanced) {
+      fetchDepartments()
+        .then(list => setDeptOptions(list.map(d => ({ value: d.id, label: d.name }))))
+        .catch(() => setDeptOptions([]))
+      fetchProductOptions()
+        .then(list => setPmOptions(list.map(p => ({ value: p.userId, label: p.name }))))
+        .catch(() => setPmOptions([]))
+    }
+    // V3 筛选（所属项目）在所有路由可用，不依赖 advanced
+    fetchProjectPage({ pageNo: 1, pageSize: 200 })
+      .then(res => setProjectOptions((res.records ?? []).map((p: RdmProjectListItem) => ({ value: p.id, label: p.name }))))
+      .catch(() => setProjectOptions([]))
   }, [advanced])
 
   const statusOptions = (Object.keys(RDM_STATUS_LABEL) as RdmStatus[]).map(k => ({
@@ -741,18 +893,31 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
 
   const submit = () => onSearch(form.getFieldsValue())
 
+  /** 低频字段：收起时清空并立即重查，保证「看不见的条件」不存在 */
+  const MORE_FIELDS: (keyof RequirementFilters)[] = advanced
+    ? ['reqType', 'deptId', 'pmUserId', 'overdueOnly', 'projectId', 'requirementKind', 'flowVersion']
+    : ['reqType', 'projectId', 'requirementKind', 'flowVersion']
+
+  const toggleMore = () => {
+    if (more) {
+      form.setFieldsValue(
+        MORE_FIELDS.reduce<Partial<RequirementFilters>>((acc, key) => ({ ...acc, [key]: undefined }), {}),
+      )
+      // 同步清掉复选框的受控值（valuePropName=checked 时 undefined 不等于未勾选）
+      form.setFieldValue('overdueOnly', false)
+      onSearch(form.getFieldsValue())
+    }
+    setMore(v => !v)
+  }
+
   return (
     <div className="search-section">
       <Form form={form} layout="inline" onFinish={submit}>
         <Form.Item label="需求關鍵字" name="keyword">
           <Input allowClear placeholder="標題 / 編號 / 提出人" onPressEnter={submit} />
         </Form.Item>
-        <Form.Item label="需求類型" name="reqType">
-          <Select
-            allowClear
-            placeholder="全部"
-            options={Object.entries(RDM_REQ_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
-          />
+        <Form.Item label="需求狀態" name="status">
+          <Select allowClear showSearch placeholder="全部" options={statusOptions} />
         </Form.Item>
         <Form.Item label="優先級" name="priority">
           <Select
@@ -761,22 +926,51 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
             options={Object.entries(RDM_PRIORITY_LABEL).map(([value, label]) => ({ value, label }))}
           />
         </Form.Item>
-        <Form.Item label="需求狀態" name="status">
-          <Select allowClear showSearch placeholder="全部" options={statusOptions} />
-        </Form.Item>
-        {advanced && (
+        {more && (
+          <Form.Item label="需求類型" name="reqType">
+            <Select
+              allowClear
+              placeholder="全部"
+              options={Object.entries(RDM_REQ_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+            />
+          </Form.Item>
+        )}
+        {advanced && more && (
           <Form.Item label="提出部門" name="deptId">
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={deptOptions} />
           </Form.Item>
         )}
-        {advanced && (
+        {advanced && more && (
           <Form.Item label="產品經理" name="pmUserId">
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={pmOptions} />
           </Form.Item>
         )}
-        {advanced && (
+        {advanced && more && (
           <Form.Item name="overdueOnly" valuePropName="checked">
             <Checkbox>僅看逾期</Checkbox>
+          </Form.Item>
+        )}
+        {more && projectOptions.length > 0 && (
+          <Form.Item label="所屬項目" name="projectId">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={projectOptions} />
+          </Form.Item>
+        )}
+        {more && (
+          <Form.Item label="需求種類" name="requirementKind">
+            <Select
+              allowClear
+              placeholder="全部"
+              options={Object.entries(RDM_REQUIREMENT_KIND_LABEL).map(([value, label]) => ({ value, label }))}
+            />
+          </Form.Item>
+        )}
+        {more && (
+          <Form.Item label="流程版本" name="flowVersion">
+            <Select
+              allowClear
+              placeholder="全部"
+              options={Object.entries(RDM_FLOW_VERSION_LABEL).map(([value, label]) => ({ value: Number(value), label }))}
+            />
           </Form.Item>
         )}
         <Form.Item>
@@ -786,11 +980,13 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
               icon={<ReloadOutlined />}
               onClick={() => {
                 form.resetFields()
+                setMore(false)
                 onReset()
               }}
             >
               重置
             </Button>
+            <Button type="link" onClick={toggleMore}>{more ? '收起篩選' : '更多篩選'}</Button>
           </div>
         </Form.Item>
       </Form>

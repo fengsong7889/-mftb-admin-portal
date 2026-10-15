@@ -122,6 +122,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   const handleGroupDelete = (row: DeptAuthGroupItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteDeptStrategy'),
       content: t('aiQuotaAuth.deleteDeptStrategyContent', { name: row.name, count: row.deptIds.length }),
       okText: t('common.delete'),
@@ -143,6 +145,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
   const handleGroupToggle = (row: DeptAuthGroupItem) => {
     const toDisable = row.status === 1
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: toDisable ? t('aiQuotaAuth.confirmDisableDept') : t('aiQuotaAuth.confirmEnableDept'),
       content: toDisable
         ? t('aiQuotaAuth.disableDeptContent', { name: row.name, count: row.deptIds.length })
@@ -372,6 +376,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   const handleOverrideDelete = (row: EmployeeModelOverride) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmRemoveOverride'),
       content: t('aiQuotaAuth.removeOverrideContent', { name: row.empName }),
       okText: t('aiQuotaAuth.removeBtnOverride'),

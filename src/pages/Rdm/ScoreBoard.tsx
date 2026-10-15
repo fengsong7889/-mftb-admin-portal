@@ -35,8 +35,6 @@ import {
   type RdmScoreRecord,
 } from '../../api/rdm'
 import {
-  RDM_COMPLEXITY_LABEL,
-  RDM_PRIORITY_LABEL,
   RDM_REQ_TYPE_LABEL,
   RDM_ROLE_LABEL,
   RDM_SCORE_ALLOC_MODE,
@@ -44,12 +42,11 @@ import {
   RDM_SCORE_PUSH_STATUS,
   RDM_SCORE_PUSH_STATUS_COLOR,
   RDM_SCORE_PUSH_STATUS_LABEL,
-  type RdmComplexity,
-  type RdmPriority,
   type RdmReqType,
   type RdmRoleCode,
   type RdmScorePushStatus,
 } from '../../constants/rdm'
+import { ComplexityTag, PriorityTag } from './components/Tags'
 import './index.css'
 
 /** 排名表展开行：把该人在本周期内的每条得分与成因列出来 */
@@ -66,8 +63,8 @@ function ScoreTracePanel({ records }: { records: RdmScoreRecord[] }) {
             <span style={{ color: '#595959' }}>{r.reqNo}</span>
             <span style={{ color: '#8C8C8C', fontSize: 12 }}>{r.reqTitle}</span>
             <Tag color="geekblue" style={{ margin: 0 }}>{RDM_ROLE_LABEL[r.roleCode as RdmRoleCode] ?? r.roleCode}</Tag>
-            <Tag style={{ margin: 0 }}>{RDM_COMPLEXITY_LABEL[r.complexity as RdmComplexity] ?? r.complexity ?? '-'}</Tag>
-            <Tag color="orange" style={{ margin: 0 }}>{RDM_PRIORITY_LABEL[r.priority as RdmPriority] ?? r.priority ?? '-'}</Tag>
+            <ComplexityTag complexity={r.complexity} />
+            <PriorityTag priority={r.priority} />
             {r.onTime === false && <Tag color="error" style={{ margin: 0 }}>逾期</Tag>}
             {(r.reworkCount ?? 0) > 0 && <Tag color="warning" style={{ margin: 0 }}>返工 {r.reworkCount} 次</Tag>}
           </div>
@@ -237,8 +234,8 @@ export default function ScoreBoard() {
   const recordColumns: TableColumnsType<RdmScoreRecord> = useMemo(() => [
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
-      title: '需求標題', dataIndex: 'reqTitle', key: 'reqTitle',
-      render: (v: string, r) => <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>,
+      title: '需求標題', dataIndex: 'reqTitle', key: 'reqTitle', width: 280, ellipsis: true,
+      render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
     { title: '人員', dataIndex: 'userName', key: 'userName', width: 100 },
     {
@@ -297,7 +294,6 @@ export default function ScoreBoard() {
             icon={<SendOutlined />}
             loading={busy === 'push'}
             onClick={handlePush}
-            style={{ backgroundColor: '#722ED1', borderColor: '#722ED1' }}
           >
             推送建議值
           </Button>

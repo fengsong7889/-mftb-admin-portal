@@ -124,6 +124,8 @@ export default function PromotionSlotConfig() {
     const newStatus = r.status === 1 ? 2 : 1
     const actionText = newStatus === 1 ? t('common.enable') : t('common.disable')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('promotionSlotConfig.confirmToggleTitle', { action: actionText }),
       content: t('promotionSlotConfig.confirmToggleContent', { action: actionText, name: r.strategyName }),
       okText: t('common.confirm'), cancelText: t('common.cancel'),
@@ -142,6 +144,8 @@ export default function PromotionSlotConfig() {
 
   const handleDelete = (r: WaterfallListView) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('promotionSlotConfig.confirmDeleteContent', { name: r.strategyName }),
       okText: t('common.confirm'), cancelText: t('common.cancel'), okButtonProps: { danger: true },

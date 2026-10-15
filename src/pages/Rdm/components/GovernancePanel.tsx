@@ -133,6 +133,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
 
   const handleDeleteBudget = (row: RdmScoreBudgetItem) => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除該筆預算？',
       className: 'custom-confirm-modal',
       content: (
@@ -155,6 +156,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
 
   const handleGenerate = () => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '重新聚合績效建議？',
       className: 'custom-confirm-modal',
       content: (
@@ -206,6 +208,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
   const handlePush = () => {
     const confirmed = suggestions.filter(s => s.status === RDM_SUGGESTION_STATUS.CONFIRMED)
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '推送已確認的建議值？',
       className: 'custom-confirm-modal',
       content: (
@@ -611,7 +614,8 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 placeholder={['起始日', '結束日']}
               />
               <Button type="primary" loading={busy === 'recompute'} onClick={() => Modal.confirm({
-                title: '確認重算歷史快照？',
+                icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+                                                                                     title: '確認重算歷史快照？',
                 className: 'custom-confirm-modal',
                 content: (
                   <div className="confirm-info-card">

@@ -37,6 +37,7 @@ public class ContractRegistry {
         combined.add(organicScoreRuleContract());
         // 通知底座兩表：165 腳本長期未接入遷移框架，生產缺表直接把會議域啟動打成崩潰循環
         combined.addAll(notificationContracts());
+        combined.addAll(RdmBatch34Schema.contracts());
         return combined;
     }
 

@@ -15,6 +15,7 @@ import com.mftb.admin.mapper.RdmWorkCalendarMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RdmAccessGuard;
+import com.mftb.admin.service.RdmIdempotentService;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +56,7 @@ class RdmScheduleGuardTest {
     private RdmAccessGuard accessGuard;
     private OperatorResolver operatorResolver;
     private JdbcTemplate jdbcTemplate;
+    private RdmIdempotentService idempotentService;
     private RdmScheduleServiceImpl service;
 
     private static final long OWNER = 41L;
@@ -69,6 +71,12 @@ class RdmScheduleGuardTest {
         accessGuard = mock(RdmAccessGuard.class);
         operatorResolver = mock(OperatorResolver.class);
         jdbcTemplate = mock(JdbcTemplate.class);
+        idempotentService = mock(RdmIdempotentService.class);
+        // 任务19 / 缺口3：依赖写操作已接入 executeOnce。离线单测不验证幂等底层，
+        // 只让 executeOnce 直接执行 supplier（否则业务逻辑不会被触发），并保证派生键非空。
+        when(idempotentService.stableRequestHash(any())).thenReturn("stable-hash");
+        when(idempotentService.executeOnce(any(), any(), any()))
+                .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
         RdmRequirementMapper requirementMapper = mock(RdmRequirementMapper.class);
         // 日历保存会先确认人存在（排程输入不能指向一个不存在的人）
         SysUser owner = new SysUser();
@@ -79,7 +87,11 @@ class RdmScheduleGuardTest {
         when(userMapper.selectById(any())).thenReturn(owner);
         service = new RdmScheduleServiceImpl(dependencyMapper, calendarMapper, taskMapper,
                 requirementMapper, milestoneMapper, userMapper,
-                accessGuard, operatorResolver, jdbcTemplate);
+                accessGuard, operatorResolver, jdbcTemplate,
+                mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class), idempotentService,
+                // 任务21：工作日计算已抽取为公共组件。测试注入真实实例包裹同一 mocked calendarMapper，
+                // 保证请假/周末支援等真实工作日数学与原私有实现逐字等价。
+                new com.mftb.admin.service.RdmWorkingDayCalculator(calendarMapper));
 
         SysUser current = new SysUser();
         current.setId(OWNER);

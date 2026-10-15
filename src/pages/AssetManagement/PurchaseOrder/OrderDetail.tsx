@@ -161,6 +161,8 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     }
 
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirm'),
       content: t('asset.confirmCompletePurchase'),
       okText: t('common.confirm'),

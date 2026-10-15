@@ -29,6 +29,9 @@ public class RdmWorkTask {
     /** 业务需求ID */
     private Long reqId;
 
+    /** 关联交付项ID */
+    private Long deliveryItemId;
+
     /** 所属 PRD */
     private Long prdId;
 

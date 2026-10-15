@@ -8,11 +8,10 @@
 import ExcelJS from 'exceljs'
 import type { RdmRequirementRow } from '../../api/rdm'
 import {
-  RDM_PRIORITY_LABEL,
+  getRdmPriorityLabel,
   RDM_REQ_TYPE_LABEL,
   RDM_STAGE_LABEL,
   RDM_STATUS_LABEL,
-  type RdmPriority,
   type RdmReqType,
   type RdmStage,
   type RdmStatus,
@@ -54,7 +53,7 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
     { header: '狀態', key: 'status', width: 14 },
     { header: '所屬階段', key: 'stage', width: 12 },
     { header: '提出人', key: 'submitterName', width: 12 },
-    { header: '提出人部門', key: 'submitDeptName', width: 16 },
+    { header: '提出部門', key: 'submitDeptName', width: 16 },
     { header: '產品經理', key: 'pmName', width: 12 },
     { header: '研發負責人', key: 'devOwnerName', width: 12 },
     { header: '當前處理人', key: 'currentHandler', width: 12 },
@@ -80,7 +79,7 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
       reqNo: r.reqNo,
       title: r.title,
       reqType: label(RDM_REQ_TYPE_LABEL, r.reqType as RdmReqType),
-      priority: label(RDM_PRIORITY_LABEL, r.priority as RdmPriority),
+      priority: getRdmPriorityLabel(r.priority),
       status: label(RDM_STATUS_LABEL, r.status as RdmStatus),
       stage: label(RDM_STAGE_LABEL, r.stage as RdmStage),
       submitterName: r.submitterName ?? '',

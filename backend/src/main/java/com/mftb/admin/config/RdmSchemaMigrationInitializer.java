@@ -1,5 +1,7 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.config.migration.MigrationLock;
+import com.mftb.admin.config.migration.RdmBatch34Schema;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -135,6 +137,24 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final String VERSION_SUGGESTED_FIX = "rdm:schema:v2.5";
     private static final String SUGGESTED_FIX_SCRIPT = "218_rdm_suggested_score_widen.sql";
+
+    /**
+     * 阶段 7（Batch 1）结构：项目交付与质量管理 — 10 张新表 + 需求/任务表扩展列。
+     * <p>为什么要 project_id 和 delivery_item_id：需求原来只到「一条需求=一次交付」，
+     * 但真实场景一个需求拆多个交付项、多个需求归一个项目，缺了这两列就无法按项目聚合看板、
+     * 也无法把测试批次精确对应到交付项粒度。
+     */
+    private static final String VERSION_BATCH1 = "rdm:schema:v3.0";
+    private static final String BATCH1_SCRIPT = "219_rdm_batch1_project_delivery.sql";
+
+    /**
+     * 阶段 8（Batch 2 / Phase 1A）结构：分层并行底座 — 证据失效表 + 幂等日志表
+     * + 交付项范围版本列 + 任务依赖跨交付项列。
+     * <p>为什么要范围版本与证据失效：交付项一旦开工就可能改范围，若不记版本，
+     * 旧范围下做的测试/验收会被当成新范围的质量凭证，并行交付时无法区分“真通过”与“过期通过”。
+     */
+    private static final String VERSION_BATCH2 = "rdm:schema:v3.1";
+    private static final String BATCH2_SCRIPT = "220_rdm_batch2_foundation.sql";
     private static final String[][] RELEASE_FIX_COLUMNS = {
             {"rdm_release", "applicant_emp_no",
                     "ALTER TABLE rdm_release ADD COLUMN applicant_emp_no VARCHAR(32) DEFAULT NULL "
@@ -223,6 +243,52 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
             "rdm_prd", "rdm_review", "rdm_iteration", "rdm_work_task", "rdm_change_request",
     };
 
+    /** 阶段 7（Batch 1）新增表 */
+    private static final String[] BATCH1_TABLES = {
+            "rdm_project", "rdm_project_member", "rdm_delivery_item",
+            "rdm_test_batch", "rdm_test_execution", "rdm_issue", "rdm_issue_defer",
+            "rdm_release_batch", "rdm_release_deployment", "rdm_acceptance_record",
+    };
+
+    /** 阶段 7（Batch 1）需求/任务表新增列 {表, 列, DDL} */
+    private static final String[][] BATCH1_COLUMNS = {
+            {"rdm_requirement", "project_id",
+                    "ALTER TABLE rdm_requirement ADD COLUMN project_id BIGINT NULL COMMENT '所属项目ID' AFTER parent_req_no"},
+            {"rdm_requirement", "structure_parent_req_id",
+                    "ALTER TABLE rdm_requirement ADD COLUMN structure_parent_req_id BIGINT NULL COMMENT '结构父需求ID(主子关系)' AFTER project_id"},
+            {"rdm_requirement", "requirement_kind",
+                    "ALTER TABLE rdm_requirement ADD COLUMN requirement_kind VARCHAR(16) NOT NULL DEFAULT 'execution' COMMENT '需求种类:aggregate/execution' AFTER structure_parent_req_id"},
+            {"rdm_work_task", "delivery_item_id",
+                    "ALTER TABLE rdm_work_task ADD COLUMN delivery_item_id BIGINT NULL COMMENT '关联交付项ID' AFTER req_id"},
+    };
+
+    /** 阶段 8（Batch 2）新增表 */
+    private static final String[] BATCH2_TABLES = {
+            "rdm_evidence_invalidation", "rdm_idempotent_log",
+    };
+
+    /**
+     * 阶段 8（Batch 2）交付项/任务依赖表新增列 {表, 列, DDL}。
+     * <p>MySQL 8 无 ADD COLUMN IF NOT EXISTS，这些列不能放进脚本（脚本中途失败时
+     * 前面的 CREATE TABLE 已自提交，重跑会撞 duplicate column），必须逐列先查再加。
+     */
+    private static final String[][] BATCH2_COLUMNS = {
+            {"rdm_delivery_item", "scope_frozen_at",
+                    "ALTER TABLE rdm_delivery_item ADD COLUMN scope_frozen_at DATETIME NULL COMMENT '范围冻结时间' AFTER scope_version"},
+            {"rdm_delivery_item", "scope_frozen_by",
+                    "ALTER TABLE rdm_delivery_item ADD COLUMN scope_frozen_by BIGINT NULL COMMENT '范围冻结人' AFTER scope_frozen_at"},
+            {"rdm_delivery_item", "scope_change_log",
+                    "ALTER TABLE rdm_delivery_item ADD COLUMN scope_change_log JSON NULL COMMENT '范围变更日志' AFTER scope_frozen_by"},
+            {"rdm_task_dependency", "block_point",
+                    "ALTER TABLE rdm_task_dependency ADD COLUMN block_point VARCHAR(16) NOT NULL DEFAULT 'start' COMMENT '阻断点:start/test/release' AFTER lag_days"},
+            {"rdm_task_dependency", "cross_delivery_flag",
+                    "ALTER TABLE rdm_task_dependency ADD COLUMN cross_delivery_flag TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否跨交付项' AFTER block_point"},
+            {"rdm_task_dependency", "pred_delivery_item_id",
+                    "ALTER TABLE rdm_task_dependency ADD COLUMN pred_delivery_item_id BIGINT NULL COMMENT '前置交付项ID' AFTER cross_delivery_flag"},
+            {"rdm_task_dependency", "succ_delivery_item_id",
+                    "ALTER TABLE rdm_task_dependency ADD COLUMN succ_delivery_item_id BIGINT NULL COMMENT '后续交付项ID' AFTER pred_delivery_item_id"},
+    };
+
     /** M3 新增列（验收一次通过率与返工链路的存证入口，缺列则质量口径只能靠倒推） */
     private static final String[][] ACCEPTANCE_COLUMNS = {
             {"rdm_acceptance", "attempt"},
@@ -239,9 +305,17 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final MigrationLock migrationLock;
+    private final RdmBatch34Schema batch34Schema;
 
     @Override
     public void run(String... args) {
+        String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        if (schema == null || schema.isBlank()) throw new IllegalStateException("RDM迁移无法确定数据库命名锁范围");
+        migrationLock.runExclusive("mftb:schema:" + schema, 120, this::runMigrations);
+    }
+
+    private void runMigrations() {
         versionTracker.applyOnce(VERSION_SCHEMA, this::doMigrate, this::verify);
         versionTracker.applyOnce(VERSION_ATTACHMENT, this::doAttachmentMigrate, this::verifyAttachment);
         versionTracker.applyOnce(VERSION_DELIVERY, this::doDeliveryMigrate, this::verifyDelivery);
@@ -258,6 +332,83 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_RATIO_FIX, this::doRatioFixMigrate, this::verifyRatioFix);
         versionTracker.applyOnce(VERSION_INDICATOR_TYPE, this::doIndicatorTypeMigrate, this::verifyIndicatorType);
         versionTracker.applyOnce(VERSION_SUGGESTED_FIX, this::doSuggestedFixMigrate, this::verifySuggestedFix);
+        versionTracker.applyOnce(VERSION_BATCH1, this::doBatch1Migrate, this::verifyBatch1);
+        versionTracker.applyOnce(VERSION_BATCH2, this::doBatch2Migrate, this::verifyBatch2);
+        versionTracker.applyOnce(RdmBatch34Schema.VERSION_3,
+                () -> batch34Schema.migrate(RdmBatch34Schema.SCRIPT_3),
+                () -> batch34Schema.verify(RdmBatch34Schema.SCRIPT_3));
+        versionTracker.applyOnce(RdmBatch34Schema.VERSION_4,
+                () -> batch34Schema.migrate(RdmBatch34Schema.SCRIPT_4),
+                () -> batch34Schema.verify(RdmBatch34Schema.SCRIPT_4));
+        // 已记版本仍检查列、唯一键及约束，不能靠applyOnce跳过验证掩盖漂移。
+        batch34Schema.verify(RdmBatch34Schema.SCRIPT_3);
+        batch34Schema.verify(RdmBatch34Schema.SCRIPT_4);
+    }
+
+    private void doBatch1Migrate() {
+        int executed = executeScript(BATCH1_SCRIPT);
+        log.info("RDM v3.0 Batch1 建表脚本已执行: {} 条语句（{}）", executed, BATCH1_SCRIPT);
+        for (String[] col : BATCH1_COLUMNS) {
+            if (columnExists(col[0], col[1])) {
+                continue;
+            }
+            jdbcTemplate.execute(col[2]);
+            log.info("已添加 Batch1 扩展列: {}.{}", col[0], col[1]);
+        }
+        // 索引：MySQL 8 无 CREATE INDEX IF NOT EXISTS，先查再建
+        if (indexCount("rdm_requirement", "idx_project") == 0) {
+            jdbcTemplate.execute("CREATE INDEX idx_project ON rdm_requirement (project_id)");
+        }
+        if (indexCount("rdm_requirement", "idx_structure_parent") == 0) {
+            jdbcTemplate.execute("CREATE INDEX idx_structure_parent ON rdm_requirement (structure_parent_req_id)");
+        }
+        if (indexCount("rdm_work_task", "idx_delivery_item") == 0) {
+            jdbcTemplate.execute("CREATE INDEX idx_delivery_item ON rdm_work_task (delivery_item_id)");
+        }
+    }
+
+    /** v3.0 后置校验：10 张新表存在 + 需求表 project_id 列就绪 + 任务表 delivery_item_id 列就绪 */
+    private void verifyBatch1() {
+        requireTables(BATCH1_TABLES);
+        for (String[] col : BATCH1_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("v3.0 Batch1 结构未就绪：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
+        requireAtLeast("Batch1 编号规则", 6,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key IN "
+                        + "('rdm_project','rdm_delivery_item','rdm_test_batch','rdm_issue','rdm_release_batch','rdm_acceptance_record')");
+    }
+
+    private void doBatch2Migrate() {
+        int executed = executeScript(BATCH2_SCRIPT);
+        log.info("RDM v3.1 Batch2 建表脚本已执行: {} 条语句（{}）", executed, BATCH2_SCRIPT);
+        for (String[] col : BATCH2_COLUMNS) {
+            if (columnExists(col[0], col[1])) {
+                continue;
+            }
+            // 不吞异常：缺列会让范围冻结/跨交付项依赖写入报“未知列”，失败必须抛出并不记版本
+            jdbcTemplate.execute(col[2]);
+            log.info("已添加 Batch2 扩展列: {}.{}", col[0], col[1]);
+        }
+        // 结构父索引：v3.0 已建，这里只做幂等兜底（MySQL 8 无 CREATE INDEX IF NOT EXISTS，先查再建）
+        if (indexCount("rdm_requirement", "idx_structure_parent") == 0) {
+            jdbcTemplate.execute("CREATE INDEX idx_structure_parent ON rdm_requirement (structure_parent_req_id)");
+        }
+        // 跨交付项依赖按后续交付项反查阻塞关系，补索引避免全表扫
+        if (indexCount("rdm_task_dependency", "idx_succ_delivery_item") == 0) {
+            jdbcTemplate.execute("CREATE INDEX idx_succ_delivery_item ON rdm_task_dependency (succ_delivery_item_id)");
+        }
+    }
+
+    /** v3.1 后置校验：2 张新表存在 + 交付项 scope_frozen_at 列就绪 + 任务依赖 block_point 列就绪 */
+    private void verifyBatch2() {
+        requireTables(BATCH2_TABLES);
+        for (String[] col : BATCH2_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("v3.1 Batch2 结构未就绪：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
     }
 
     private void doSuggestedFixMigrate() {

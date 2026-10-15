@@ -52,7 +52,11 @@ class RdmAccessGuardTest {
         // 按 id 反查必须能拿到需求本体：否则「需求不存在」会伪装成「无权限」，测试就测不到真实分支
         when(requirementMapper.selectById(100L)).thenReturn(requirement100());
         when(operatorResolver.isAdmin(any())).thenReturn(false);
-        guard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper);
+        guard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
+                mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
+                mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
+                mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));
     }
 
     private static SysUser user(long id) {

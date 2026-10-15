@@ -95,6 +95,8 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
       btns.push(
         <Button key="cancel" danger icon={<StopOutlined />} onClick={() => {
           Modal.confirm({
+            className: 'custom-confirm-modal',
+            icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
             title: '確認取消領用？',
             content: '取消後領用記錄將標記為已取消，代辦生效的資產將釋放為閒置。',
             okText: '確認取消',

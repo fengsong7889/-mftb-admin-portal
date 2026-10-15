@@ -174,6 +174,8 @@ export default function AiPositionAuth() {
 
   const handleMappingDelete = (row: PositionModelMapping) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeletePosPerm'),
       content: t('aiQuotaAuth.deletePosPermContent', { pos: row.positionName, model: row.modelName }),
       okText: t('common.delete'),
@@ -192,6 +194,8 @@ export default function AiPositionAuth() {
     const action = toDisable ? t('aiQuotaAuth.disableText') : t('aiQuotaAuth.enableText')
     const effect = toDisable ? t('aiQuotaAuth.cannotCallModel') : t('aiQuotaAuth.canCallModel')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmTogglePosPerm', { action }),
       content: t('aiQuotaAuth.togglePosPermContent', { action, pos: row.positionName, effect, model: row.modelName }),
       okText: t('aiQuotaAuth.confirmOk'),

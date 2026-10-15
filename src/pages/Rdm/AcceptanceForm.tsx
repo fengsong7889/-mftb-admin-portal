@@ -88,6 +88,12 @@ export default function AcceptanceForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)
+  /**
+   * 回详情页时落回用户离开时的那个页签。
+   * <p>验收入口有两处（处理条的「業務驗收」按钮、「驗收與發布」页签内），
+   * 写死 tab 会让从处理条进来的人被丢到验收页签，找不到刚才看的进度条。
+   */
+  const backTab = searchParams.get('tab') ?? 'gate'
 
   const [detail, setDetail] = useState<RdmRequirementDetail | null>(null)
   const [history, setHistory] = useState<RdmAcceptanceRecord[]>([])
@@ -257,7 +263,7 @@ export default function AcceptanceForm() {
               && followUpTitle.trim() ? followUpTitle.trim() : undefined,
           })
           message.success('驗收結論已提交')
-          navigate(`/rdm-detail?id=${id}`)
+          navigate(`/rdm-detail?id=${id}&tab=${backTab}`)
         } catch {
           message.error('提交失敗，請重試')
           throw new Error('acceptance submit failed')
@@ -352,7 +358,7 @@ export default function AcceptanceForm() {
       <RdmFormHeader
         title="業務驗收"
         backText="返回詳情"
-        onBack={() => navigate(`/rdm-detail?id=${detail.id}`)}
+        onBack={() => navigate(`/rdm-detail?id=${detail.id}&tab=${backTab}`)}
         badge={(
           <>
             <Tag color={attempt > 1 ? 'error' : 'green'} style={{ margin: 0 }}>第 {attempt} 次驗收{attempt > 1 ? ' · 返工復驗' : ''}</Tag>
@@ -583,7 +589,7 @@ export default function AcceptanceForm() {
 
       {/* ── 底部操作栏 ── */}
       <div className="form-footer">
-        <Button onClick={() => navigate(`/rdm-detail?id=${detail.id}`)}>取消</Button>
+        <Button onClick={() => navigate(`/rdm-detail?id=${detail.id}&tab=${backTab}`)}>取消</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!canAccept} onClick={handleSubmit}>
           提交驗收結論
         </Button>

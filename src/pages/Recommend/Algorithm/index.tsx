@@ -197,6 +197,8 @@ export default function Algorithm() {
       const groupedList = Object.values(groupedRefs)
 
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('algorithm.confirmToggleTitle', { action: actionText }),
         content: (
           <div>
@@ -261,6 +263,8 @@ export default function Algorithm() {
     const hasRefs = references.length > 0
 
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: (
         <div>

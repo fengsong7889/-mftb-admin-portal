@@ -9,6 +9,7 @@
  * 幂等由后端保证：唯一键 (user_id, punch_at, source)，重复导入不会长出重复打卡。
  */
 import ExcelJS from 'exceljs'
+import i18n from '../../i18n'
 import type { PunchImportRow } from '../../api/attendance'
 
 export interface ParsedPunchExcel {
@@ -77,7 +78,7 @@ export async function parsePunchExcel(file: File): Promise<ParsedPunchExcel> {
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer)
   const ws = wb.worksheets[0]
-  if (!ws) return { rows: [], errors: ['文件無有效工作表'] }
+  if (!ws) return { rows: [], errors: [i18n.t('attendance.noValidWorksheet', { defaultValue: '文件無有效工作表' })] }
 
   const matrix: unknown[][] = []
   ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
@@ -87,7 +88,7 @@ export async function parsePunchExcel(file: File): Promise<ParsedPunchExcel> {
     })
     matrix[rowNumber - 1] = cells
   })
-  if (matrix.length < 2) return { rows: [], errors: ['文件無有效數據行'] }
+  if (matrix.length < 2) return { rows: [], errors: [i18n.t('attendance.noValidDataRows', { defaultValue: '文件無有效數據行' })] }
 
   const header = (matrix[0] ?? []).map(h => String(h ?? '').trim())
   const col = {

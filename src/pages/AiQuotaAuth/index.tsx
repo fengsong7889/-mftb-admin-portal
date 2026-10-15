@@ -213,6 +213,8 @@ export default function AiQuotaAuth() {
 
   const handlePolicyDelete = (row: QuotaPolicy) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeletePolicy'),
       content: t('aiQuotaAuth.deletePolicyContent', { name: row.name }),
       okText: t('common.delete'),

@@ -64,6 +64,7 @@ export default function RuleGroupPage({ menuKey }: Props) {
 
   const handleReset = useCallback(() => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認重置',
       className: 'custom-confirm-modal',
       content: `「${group?.title ?? ''}」的所有規則將恢復為默認值並保存，此操作不可撤銷。`,

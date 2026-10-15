@@ -237,6 +237,8 @@ export default function LoginLog() {
   /** 強制下線 */
   const handleForceLogout = (record: LoginLogRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('loginLog.confirmLogout'),
       content: t('loginLog.confirmLogoutContent', { name: record.employeeName }),
       okText: t('common.confirm'),
@@ -256,6 +258,8 @@ export default function LoginLog() {
   /** 刪除日志 */
   const handleDelete = (record: LoginLogRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('loginLog.confirmDeleteContent', { name: record.employeeName }),
       okText: t('common.confirm'),

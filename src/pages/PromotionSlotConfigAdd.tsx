@@ -257,6 +257,7 @@ function PromotionSlotConfigForm() {
     const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0
     if (!hasConfig) { setContentType(next); setHasUnsavedChanges(true); return }
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('promotionSlotConfig:switchContentTypeTitle'),
       className: 'custom-confirm-modal',
       content: t('promotionSlotConfig:switchContentTypeContent'),
@@ -293,7 +294,8 @@ function PromotionSlotConfigForm() {
       setHasUnsavedChanges(true)
     }
     if (fixedSlots.length || algoSlots.length || fallbackCategoryIds.length || naturalAlgoId) {
-      Modal.confirm({ title: t('promotionSlotConfig:switchChannelTitle'), content: t('promotionSlotConfig:switchChannelHint'), className: 'custom-confirm-modal', okText: t('common:confirm'), cancelText: t('common:cancel'), onOk: apply })
+      Modal.confirm({ icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        title: t('promotionSlotConfig:switchChannelTitle'), content: t('promotionSlotConfig:switchChannelHint'), className: 'custom-confirm-modal', okText: t('common:confirm'), cancelText: t('common:cancel'), onOk: apply })
     } else apply()
   }
 
@@ -305,6 +307,7 @@ function PromotionSlotConfigForm() {
 
   const deleteSlot = (position: number) => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common:confirmDelete'),
       className: 'custom-confirm-modal',
       content: t(useAlgorithmSlots ? 'promotionSlotConfig:deleteSlotConfirm' : 'promotionSlotConfig:deleteFixedSlotConfirm', { pos: position }),
@@ -326,6 +329,7 @@ function PromotionSlotConfigForm() {
     if (importBusyRef.current) return
     if (hasUnsavedChanges && !isDetailMode) {
       Modal.confirm({
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('promotionSlotConfig:discardConfirmTitle'),
         content: t('promotionSlotConfig:discardConfirmContent'),
         okText: t('promotionSlotConfig:discardConfirmOk'), cancelText: t('promotionSlotConfig:discardConfirmCancel'),

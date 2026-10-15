@@ -117,8 +117,8 @@ public class Vehicle {
 
     /**
      * 乐观锁版本。
-     * <p>本引擎没装 OptimisticLockerInnerInterceptor（见 MyBatisPlusConfig），所以 @Version 在此
-     * 会静默失效——看起来有锁其实没锁。并发改档案一律走 Mapper 里显式的
+     * <p>引擎已在 MyBatisPlusConfig 注册 OptimisticLockerInnerInterceptor，但本字段刻意未加
+     * {@code @Version} 注解，以免与已有的显式并发控制冲突。并发改档案一律走 Mapper 里显式的
      * {@code UPDATE ... SET version = version + 1 ... WHERE id = ? AND version = ?} 并校对受影响行数。
      */
     private Long version;

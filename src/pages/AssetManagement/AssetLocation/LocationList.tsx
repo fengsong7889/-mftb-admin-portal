@@ -140,6 +140,8 @@ export default function LocationList({ onAdd, onEdit, onView }: Props) {
 
   const handleDelete = (record: LocationRow) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: `${record.name}（${record.code}）`,
       okText: t('common.confirm'),

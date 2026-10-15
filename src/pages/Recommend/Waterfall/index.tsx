@@ -370,6 +370,8 @@ export default function Waterfall() {
   // 删除
   const handleDelete = (record: WaterfallSlotConfig) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('waterfall.confirmDeleteContent', { name: record.promotionName || `${t('waterfall.slotPositionPrefix')}${record.slotPosition}` }),
       okText: t('common.confirm'),
@@ -407,6 +409,8 @@ export default function Waterfall() {
     const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
 
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('waterfall.confirmToggleTitle', { action: actionText }),
       content: t('waterfall.confirmToggleContent', { action: actionText, name: record.promotionName || `${t('waterfall.slotPositionPrefix')}${record.slotPosition}` }),
       okText: t('common.confirm'),

@@ -122,6 +122,8 @@ export default function PerfCycleList() {
   const handleChangeStatus = (row: PerfCycle, next: string) => {
     const label = CYCLE_STATUS_LABEL_KEY[next] ? t(CYCLE_STATUS_LABEL_KEY[next]) : next
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hrPerf.changeCycleStatusConfirm', { name: row.name, status: label }),
       content: next === CYCLE_STATUS.CLOSED ? t('hrPerf.closeCycleTip') : undefined,
       onOk: async () => {

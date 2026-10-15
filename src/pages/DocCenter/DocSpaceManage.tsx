@@ -43,6 +43,8 @@ export default function DocSpaceManage() {
 
   const handleDelete = (r: DocSpace) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('doc.deleteSpaceTitle', { name: r.name }),
       content: t('doc.deleteSpaceContent'),
       okText: t('doc.del'),

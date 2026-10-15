@@ -267,6 +267,8 @@ export default function AssetList() {
   }
   const handleDelete = (record: AssetItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteTitle'),
       content: `${record.assetName}（${record.assetNo}）`,
       okText: t('common.confirm'),

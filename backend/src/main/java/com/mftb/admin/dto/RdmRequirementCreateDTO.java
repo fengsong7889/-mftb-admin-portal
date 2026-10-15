@@ -58,6 +58,24 @@ public class RdmRequirementCreateDTO {
     /** 提交模式: draft=存草稿，其它值按正式提交处理 */
     private String mode;
 
+    /* ==================== V3 分层链路（Batch 2 / Phase 2） ==================== */
+
+    /**
+     * 流程版本：缺省按 V2 新链路；显式传 3 走 V3 分层并行链路。
+     * <p>V3 下创建成功后自动生成默认交付项，并支持挂结构父需求。不接受客户端任意值，
+     * 服务端只认 {@code 3} 与非 3（回落 V2），避免伪造版本号绕过闸门口径。
+     */
+    private Integer flowVersion;
+
+    /** 所属项目ID（V3 可在准入阶段后再关联，允许为空） */
+    private Long projectId;
+
+    /** 需求种类：aggregate（聚合）/ execution（执行）；V3 缺省 execution */
+    private String requirementKind;
+
+    /** 结构父需求ID（主子关系）；传入则创建后挂到该聚合需求下，服务层校验父需为 aggregate、无环、单父 */
+    private Long structureParentReqId;
+
     /** 需求关联对象 */
     @Data
     public static class Target {

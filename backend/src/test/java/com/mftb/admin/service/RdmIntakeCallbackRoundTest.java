@@ -55,7 +55,8 @@ class RdmIntakeCallbackRoundTest {
         roundService = mock(RdmIntakeRoundService.class);
         userMapper = mock(SysUserMapper.class);
         callback = new RdmIntakeCallbackService(requirementMapper, roleMapper, statusLogMapper,
-                mock(RdmConfigService.class), notifyService, roundService, userMapper);
+                mock(RdmConfigService.class), notifyService, roundService, userMapper,
+                mock(RdmDeliveryItemService.class));
         when(statusLogMapper.selectList(any())).thenReturn(List.of());
         when(roleMapper.selectCount(any())).thenReturn(0L);
     }

@@ -58,6 +58,7 @@ export default function LeaveQuotaList() {
   const handleBatchInit = () => {
     initForm.validateFields().then(values => {
       Modal.confirm({
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('hrLeave.batchInitTitle'),
         className: 'custom-confirm-modal',
         content: (
@@ -80,6 +81,8 @@ export default function LeaveQuotaList() {
 
   const handleDelete = (record: LeaveBalance) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hrLeave.confirmDeleteQuotaTitle'),
       content: (
         <div className="confirm-info-card">
@@ -182,6 +185,7 @@ export default function LeaveQuotaList() {
               <Button icon={<ThunderboltOutlined />} onClick={() => {
                 initForm.setFieldsValue({ year, leaveType: 'ANNUAL' })
                 Modal.confirm({
+                  className: 'custom-confirm-modal',
                   title: t('hrLeave.batchInitTitle'),
                   icon: null,
                   width: 460,

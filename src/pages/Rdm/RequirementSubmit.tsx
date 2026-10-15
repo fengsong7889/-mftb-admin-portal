@@ -9,7 +9,7 @@
  *    提交后服务端会再算一次并以结果为准，前端传什么都不影响结论。
  * 5. 执行顺序：表单校验 → 二次确认弹窗 → 提交（禁止先弹框后校验）。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Button,
   Cascader,
@@ -18,6 +18,7 @@ import {
   Form,
   Input,
   Modal,
+  Radio,
   Segmented,
   Select,
   Space,
@@ -47,31 +48,46 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
+import { useAuth } from '../../contexts/AuthContext'
+import { fetchEmployees, type EmployeeItem } from '../../api/employee'
 import {
   RDM_INTAKE_MODE_LABEL,
   createRequirement,
   fetchFunctionPoints,
   fetchMenuTree,
   fetchProductOptions,
+  fetchProjectPage,
+  fetchRequirementDetail,
+  fetchRequirementPage,
   simulateIntake,
+  submitRequirement,
+  updateRequirement,
   uploadAttachment,
   type RdmIntakeDecision,
   type RdmMenuTreeNode,
   type RdmProductOption,
+  type RdmProjectListItem,
   type RdmRequirementForm,
   type RdmTargetRef,
 } from '../../api/rdm'
 import SimilarNotice from './components/SimilarNotice'
+import { ACTION_LABEL_MAP } from '../Permission/types'
 import {
-  RDM_ANCHOR_LABEL,
   RDM_ANCHOR_TYPE,
   RDM_COMPLEXITY_LABEL,
+  getRdmComplexityLabel,
+  getRdmPriorityLabel,
+  RDM_FLOW_VERSION,
+  RDM_FLOW_VERSION_LABEL,
   RDM_PRIORITY,
   RDM_PRIORITY_LABEL,
   RDM_PRIORITY_SLA_DAYS,
   RDM_REQ_TYPE,
   RDM_REQ_TYPE_LABEL,
-  type RdmAnchorType,
+  RDM_REQUIREMENT_KIND,
+  RDM_REQUIREMENT_KIND_LABEL,
+  RDM_PROJECT_STATUS,
+  RDM_STATUS,
   type RdmComplexity,
   type RdmPriority,
   type RdmReqType,
@@ -89,21 +105,42 @@ const ANCHOR_KIND_LABEL: Record<AnchorKind, string> = {
   UNKNOWN: '暫不確定位置',
 }
 
-/** 「已有功能」可选的定位粒度（不含 NONE：NONE 走「新增/暂不确定」两条） */
-const GRANULARITY_OPTIONS = (Object.keys(RDM_ANCHOR_LABEL) as RdmAnchorType[])
-  .filter(key => key !== RDM_ANCHOR_TYPE.NONE)
-
 /** 「新增」时建议同步的需求类型，只提示不改用户已选的值 */
 const NEW_HINT_TEXT = '全新入口會连带權限、菜單位置與數據口徑，產品受理時會補齊方案；此處只需你說清想要什麼。'
 
 interface TargetValues {
   kind: AnchorKind
   menuPath?: (string | number)[]
-  granularity?: RdmAnchorType
   functionPoint?: string
   anchorName?: string
   anchorDesc?: string
   newSystemCode?: string
+}
+
+/**
+ * 接口对象 → 界面对象（草稿续编回填，toTargetRef 的逆映射）。
+ * <p>三条路径靠「有没有菜单 / 有没有定位对象名」反推，与提交时的落库口径一一对应。
+ * <p>功能点无法还原：提交时 anchorName 缺失才会用功能点顶替 anchorName 落库，
+ * 两者在库里已合并成一个值，回填到「具體位置」即可，不猜它原来属于哪一个。
+ */
+function fromTargetRef(t: RdmTargetRef): TargetValues {
+  if (t.menuKey && t.systemCode) {
+    return {
+      kind: 'EXISTING',
+      menuPath: [t.systemCode, t.menuKey],
+      anchorName: t.anchorName ?? undefined,
+      anchorDesc: t.anchorDesc ?? undefined,
+    }
+  }
+  if (t.anchorName) {
+    return {
+      kind: 'NEW',
+      anchorName: t.anchorName,
+      newSystemCode: t.systemCode ?? undefined,
+      anchorDesc: t.anchorDesc ?? undefined,
+    }
+  }
+  return { kind: 'UNKNOWN', anchorDesc: t.anchorDesc ?? undefined }
 }
 
 interface FormValues {
@@ -114,10 +151,20 @@ interface FormValues {
   expectDate?: dayjs.Dayjs
   assignMode: 'PM' | 'POOL'
   pmUserId?: number
+  /** 業務驗收人（sys_user.id），默认提交人本人，可改选其他同事 */
+  acceptorUserId?: number
   reqType: RdmReqType
   priority: RdmPriority
   complexity?: RdmComplexity
   businessValue?: string
+  /** V3：流程版本（2=傳統整需求交付 / 3=分批並行交付） */
+  flowVersion?: number
+  /** V3：所属项目 */
+  projectId?: number
+  /** V3：需求种类 aggregate/execution */
+  requirementKind?: string
+  /** V3：结构化父需求（执行需求挂到聚合需求下） */
+  structureParentReqId?: number
 }
 
 interface TargetRowProps {
@@ -175,25 +222,21 @@ function TargetRow({ field, form, menuOptions, systemOptions, canRemove, onRemov
             name={[name, 'menuPath']}
             rules={[{ required: true, message: '請選擇所屬系統與菜單' }]}
           >
-            <Cascader style={{ width: 300 }} options={menuOptions} placeholder="例：廣告推薦系統 / 報表分析" showSearch />
+            <Cascader options={menuOptions} placeholder="例：廣告推薦系統 / 報表分析" showSearch />
           </Form.Item>
-          <Form.Item label="定位粒度" name={[name, 'granularity']} initialValue={RDM_ANCHOR_TYPE.MENU}>
+          <Form.Item label="功能點（該菜單已有的功能）" name={[name, 'functionPoint']}>
             <Select
-              style={{ width: 150 }}
-              options={GRANULARITY_OPTIONS.map(key => ({ value: key, label: RDM_ANCHOR_LABEL[key] }))}
-            />
-          </Form.Item>
-          <Form.Item label="功能點（歷史提過的位置）" name={[name, 'functionPoint']}>
-            <Select
-              style={{ width: 220 }}
               allowClear
-              disabled={functionPoints.length === 0}
-              placeholder={functionPoints.length ? '選擇已有功能點' : '該菜單暫無功能點清單'}
-              options={functionPoints.map(fp => ({ value: fp.title, label: fp.title }))}
+              disabled={!menuPath?.[1]}
+              placeholder={menuPath?.[1] ? (functionPoints.length ? '選擇功能點' : '該菜單暫無可選功能') : '先選系統 / 菜單'}
+              options={functionPoints.map(fp => {
+                const label = ACTION_LABEL_MAP[fp.key] ?? fp.title
+                return { value: label, label }
+              })}
             />
           </Form.Item>
           <Form.Item label="具體位置 / 按鈕名稱" name={[name, 'anchorName']}>
-            <Input style={{ width: 220 }} placeholder="例：報表右上角導出按鈕" />
+            <Input placeholder="例：報表右上角導出按鈕" />
           </Form.Item>
         </div>
       )}
@@ -205,12 +248,12 @@ function TargetRow({ field, form, menuOptions, systemOptions, canRemove, onRemov
             name={[name, 'anchorName']}
             rules={[{ required: true, message: '請寫出想要新增的入口名稱' }]}
           >
-            <Input style={{ width: 280 }} placeholder="例：門店自營活動報名後台" />
+            <Input placeholder="例：門店自營活動報名後台" />
           </Form.Item>
           <Form.Item label="期望歸屬系統（選填）" name={[name, 'newSystemCode']}>
-            <Select style={{ width: 220 }} allowClear placeholder="不清楚可留空" options={systemOptions} />
+            <Select allowClear placeholder="不清楚可留空" options={systemOptions} />
           </Form.Item>
-          <div style={{ width: '100%' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               {NEW_HINT_TEXT}
             </Typography.Text>
@@ -220,7 +263,7 @@ function TargetRow({ field, form, menuOptions, systemOptions, canRemove, onRemov
 
       {kind === 'UNKNOWN' && (
         <div className="rdm-target-fields">
-          <div style={{ width: '100%' }}>
+          <div style={{ gridColumn: '1 / -1' }}>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               可以先不填位置，產品經理受理時會與你確認；著急上線的話，把路徑寫在「現狀與痛點」里更快。
             </Typography.Text>
@@ -238,11 +281,15 @@ function TargetRow({ field, form, menuOptions, systemOptions, canRemove, onRemov
 export default function RequirementSubmit() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
   const [menuTree, setMenuTree] = useState<RdmMenuTreeNode[]>([])
   const [pmOptions, setPmOptions] = useState<RdmProductOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
+  /** 業務驗收人候选（远程搜索，保留已选项 label 避免退化成 id） */
+  const [acceptorOptions, setAcceptorOptions] = useState<{ value: number; label: string }[]>([])
+  const acceptorSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   /** 已上传附件（含 Base64 dataUrl；首张图作为现状主图） */
   const [attachments, setAttachments] = useState<{
     name: string; fileType: string; fileSize: number; dataUrl: string
@@ -251,12 +298,83 @@ export default function RequirementSubmit() {
   /** 服务端准入裁决（只读展示）：提交时服务端会重算一次 */
   const [decision, setDecision] = useState<RdmIntakeDecision | null>(null)
   const [decisionFailed, setDecisionFailed] = useState(false)
+  /** V3：进行中的项目候选（流程版本=V3 时选所属项目） */
+  const [projectOptions, setProjectOptions] = useState<RdmProjectListItem[]>([])
+  /** V3：所选项目下的聚合需求候选（执行需求挂结构父需求） */
+  const [aggregateOptions, setAggregateOptions] = useState<{ value: number; label: string }[]>([])
+
+  /*
+   * 草稿续编：带 ?id= 进来就是编辑自己那条草稿（服务端也只允许改草稿态）。
+   * 之前「保存草稿」是个单向门——存完回不来，用户只能整张表单重填，
+   * 于是草稿实际上等于丢弃。
+   */
+  const draftId = Number(searchParams.get('id') ?? 0)
+  const isDraftEdit = Number.isInteger(draftId) && draftId > 0
+  const [draftNo, setDraftNo] = useState<string>()
+  const [draftLoaded, setDraftLoaded] = useState(!isDraftEdit)
+
+  useEffect(() => {
+    if (!isDraftEdit) return
+    fetchRequirementDetail(draftId)
+      .then(d => {
+        if (!d) return
+        if (d.status !== RDM_STATUS.DRAFT) {
+          message.warning('僅草稿狀態可修改，已轉入需求詳情')
+          navigate(`/rdm-detail?id=${draftId}`, { replace: true })
+          return
+        }
+        setDraftNo(d.reqNo)
+        form.setFieldsValue({
+          title: d.title,
+          description: d.description ?? '',
+          expectResult: d.expectResult ?? undefined,
+          businessValue: d.businessValue ?? undefined,
+          reqType: d.reqType as RdmReqType,
+          priority: d.priority as RdmPriority,
+          complexity: (d.complexity ?? undefined) as RdmComplexity | undefined,
+          expectDate: d.expectDate ? dayjs(d.expectDate) : undefined,
+          // 草稿阶段落库的是「意向 PM」，受理人要等审批通过才生效，回填必须读同一个字段
+          pmUserId: d.intentPmUserId ?? undefined,
+          assignMode: d.intentPmUserId ? 'PM' : 'POOL',
+          acceptorUserId: d.acceptorUserId ?? undefined,
+          targets: (d.targets ?? []).length > 0 ? d.targets.map(fromTargetRef) : [{ kind: 'EXISTING' } as TargetValues],
+          // V3 分批交付字段回填（旧草稿无这些字段时保持 V2 默认）
+          flowVersion: d.flowVersion ?? RDM_FLOW_VERSION.V2,
+          projectId: d.projectId ?? undefined,
+          requirementKind: (d.requirementKind ?? RDM_REQUIREMENT_KIND.EXECUTION) as string,
+          structureParentReqId: d.structureParentReqId ?? undefined,
+        })
+        // 附件回显：fileUrl 存的就是原始 data URL，可原样再传回去
+        setAttachments((d.attachments ?? []).map(a => ({
+          name: a.fileName,
+          fileType: a.fileType ?? '',
+          fileSize: a.fileSize ?? 0,
+          dataUrl: a.fileUrl ?? '',
+        })))
+        if (d.acceptorName) {
+          setAcceptorOptions(prev => (prev.some(o => o.value === d.acceptorUserId)
+            ? prev
+            : [{ value: d.acceptorUserId as number, label: d.acceptorName as string }, ...prev]))
+        }
+        setDraftLoaded(true)
+      })
+      .catch(() => {
+        // 取不到草稿不能装作空白新建：那样用户点保存会新建出第二条需求，原草稿还在
+        message.error('草稿載入失敗，請從「我提的需求」重進')
+        setDraftLoaded(true)
+      })
+  }, [isDraftEdit, draftId, form, navigate])
 
   const assignMode = Form.useWatch('assignMode', form)
   // 查重联动：标题与期望结果变化时提示相似需求（仅提示，不拦提交）
   const titleValue = Form.useWatch('title', form)
   const expectValue = Form.useWatch('expectResult', form)
   const pmUserId = Form.useWatch('pmUserId', form)
+  /** V3 联动：流程版本 / 所属项目 / 需求种类 */
+  const flowVersion = Form.useWatch('flowVersion', form)
+  const projectIdValue = Form.useWatch('projectId', form)
+  const requirementKindValue = Form.useWatch('requirementKind', form)
+  const isV3 = flowVersion === RDM_FLOW_VERSION.V3
 
   /** 从其它页面带上下文进来时预填第一条对象（例：报表页右上角「提需求」） */
   const prefilledMenuPath = useMemo(() => {
@@ -273,11 +391,79 @@ export default function RequirementSubmit() {
     fetchProductOptions().then(setPmOptions).catch(() => setPmOptions([]))
   }, [])
 
+  /** V3：切到分批交付时拉可用项目供选所属项目（后端不可用时降级为空）。
+   *  后端无 'active' 状态，故不传 status，改为客户端过滤出仍在进行中的项目
+   *  （筹备中 / 进行中 / 部分交付），排除全部交付与已关闭的项目。 */
+  useEffect(() => {
+    if (!isV3) return
+    let cancelled = false
+    const USABLE_PROJECT_STATUS: string[] = [
+      RDM_PROJECT_STATUS.PREPARING,
+      RDM_PROJECT_STATUS.IN_PROGRESS,
+      RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
+    ]
+    fetchProjectPage({ pageNo: 1, pageSize: 200 })
+      .then(res => {
+        if (cancelled) return
+        const usable = (res.records ?? []).filter(p => USABLE_PROJECT_STATUS.includes(p.status))
+        setProjectOptions(usable)
+      })
+      .catch(() => { if (!cancelled) setProjectOptions([]) })
+    return () => { cancelled = true }
+  }, [isV3])
+
+  /** V3：选定项目后拉该项目下的聚合需求，供执行需求挂结构父需求 */
+  useEffect(() => {
+    if (!isV3 || !projectIdValue) { setAggregateOptions([]); return }
+    let cancelled = false
+    fetchRequirementPage({ page: 1, size: 200, projectId: projectIdValue, requirementKind: RDM_REQUIREMENT_KIND.AGGREGATE })
+      .then(res => {
+        if (cancelled) return
+        // 后端若未支持种类过滤，前端再按 requirementKind + projectId 兜底过滤一次
+        const rows = (res.records ?? []).filter(r =>
+          (!r.requirementKind || r.requirementKind === RDM_REQUIREMENT_KIND.AGGREGATE) &&
+          (r.projectId == null || r.projectId === projectIdValue))
+        setAggregateOptions(rows.map(r => ({ value: r.id, label: `${r.reqNo} · ${r.title}` })))
+      })
+      .catch(() => { if (!cancelled) setAggregateOptions([]) })
+    return () => { cancelled = true }
+  }, [isV3, projectIdValue])
+
+  /** 業務驗收人默认选中提交人本人（按工号匹配到 sys_user.id），可改选他人 */
+  useEffect(() => {
+    if (!user?.empId || !draftLoaded) return
+    // 草稿回填已带验收人时不再覆盖：否则「默认本人」会把用户上次指派的人冲掉
+    if (form.getFieldValue('acceptorUserId')) return
+    fetchEmployees({ page: 1, size: 20, keyword: user.empId, employmentStatus: 'active' })
+      .then(res => {
+        const me = (res.records ?? []).find(e => e.empId === user.empId) ?? res.records?.[0]
+        if (!me) return
+        form.setFieldValue('acceptorUserId', me.id)
+        setAcceptorOptions(prev => (
+          prev.some(o => o.value === me.id) ? prev : [{ value: me.id, label: `${me.name}（${me.empId}）` }, ...prev]
+        ))
+      })
+      .catch(() => { /* 取不到本人就留空，验收人可手输姓名搜索补选 */ })
+  }, [user?.empId, draftLoaded, form])
+
+  /** 验收人远程搜索：按工号/姓名模糊查在职员工 */
+  const handleAcceptorSearch = (keyword: string) => {
+    if (acceptorSearchTimer.current) clearTimeout(acceptorSearchTimer.current)
+    acceptorSearchTimer.current = setTimeout(() => {
+      fetchEmployees({ page: 1, size: 30, keyword: keyword.trim() || undefined, employmentStatus: 'active' })
+        .then(res => setAcceptorOptions(prev => {
+          const map = new Map(prev.map(o => [o.value, o.label]))
+          ;(res.records ?? []).forEach((e: EmployeeItem) => map.set(e.id, `${e.name}（${e.empId}${e.department ? ` · ${e.department}` : ''}）`))
+          return [...map.entries()].map(([value, label]) => ({ value, label }))
+        }))
+        .catch(() => { /* 搜索失败保留已有候选 */ })
+    }, 300)
+  }
+
   useEffect(() => {
     if (!prefilledMenuPath) return
     form.setFieldValue('targets', [{
       kind: 'EXISTING',
-      granularity: RDM_ANCHOR_TYPE.MENU,
       menuPath: prefilledMenuPath,
       anchorName: prefillAnchorName,
     }])
@@ -331,7 +517,8 @@ export default function RequirementSubmit() {
       }
     }
     return {
-      anchorType: t?.granularity ?? RDM_ANCHOR_TYPE.MENU,
+      // 定位粒度字段已删除：选了功能点即 FUNCTION，否则按菜单级 MENU 落库
+      anchorType: t?.functionPoint ? RDM_ANCHOR_TYPE.FUNCTION : RDM_ANCHOR_TYPE.MENU,
       systemCode: t?.menuPath?.[0] ? String(t.menuPath[0]) : undefined,
       systemName,
       menuKey: t?.menuPath?.[1] ? String(t.menuPath[1]) : undefined,
@@ -360,12 +547,23 @@ export default function RequirementSubmit() {
       assignMode: values.assignMode,
       pmUserId: values.assignMode === 'PM' ? pm?.userId : undefined,
       pmName: values.assignMode === 'PM' ? pm?.name : undefined,
+      // 业务验收人必须随请求送出：不传的话服务端一律回落成提交人本人，界面上选的人等于白选
+      acceptorUserId: values.acceptorUserId,
       attachments: attachments.map(a => ({
         fileName: a.name,
         storagePath: a.dataUrl,
         fileType: a.fileType,
         fileSize: a.fileSize,
       })),
+      // V3 分批交付字段：仅在选了 V3 时携带，V2 保持原有行为不变
+      ...(values.flowVersion === RDM_FLOW_VERSION.V3 ? {
+        flowVersion: RDM_FLOW_VERSION.V3,
+        projectId: values.projectId,
+        requirementKind: values.requirementKind ?? RDM_REQUIREMENT_KIND.EXECUTION,
+        structureParentReqId: values.requirementKind === RDM_REQUIREMENT_KIND.EXECUTION
+          ? values.structureParentReqId
+          : undefined,
+      } : {}),
     }
   }
 
@@ -375,7 +573,7 @@ export default function RequirementSubmit() {
     if (kind === 'NEW') return `新增：${t.anchorName || '未命名入口'}`
     if (kind === 'UNKNOWN') return '位置待定'
     const { menuName } = resolveMenuLabels(t.menuPath)
-    return `${menuName ?? '未選菜單'} · ${t.anchorName || t.functionPoint || RDM_ANCHOR_LABEL[t.granularity ?? RDM_ANCHOR_TYPE.MENU]}`
+    return `${menuName ?? '未選菜單'} · ${t.anchorName || t.functionPoint || '菜單整體'}`
   })
 
   const reqTypeValue = Form.useWatch('reqType', form)
@@ -430,7 +628,7 @@ export default function RequirementSubmit() {
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>需求標題：</span><b>{values.title}</b></div>
           <div className="confirm-info-row"><span>需求類型：</span><b>{RDM_REQ_TYPE_LABEL[values.reqType]}</b></div>
-          <div className="confirm-info-row"><span>優先級：</span><b>{RDM_PRIORITY_LABEL[values.priority]}</b></div>
+          <div className="confirm-info-row"><span>優先級：</span><b>{getRdmPriorityLabel(values.priority)}</b></div>
           <div className="confirm-info-row">
             <span>需求對象：</span>
             <b>{targetSummary.length > 0 ? targetSummary.join('；') : '暫未指定（產品受理時補齊）'}</b>
@@ -446,7 +644,8 @@ export default function RequirementSubmit() {
               : '由系統按部門與角色判定，提交後以服務端結果為準'}</b>
           </div>
           <div className="confirm-info-row">
-            <span>業務驗收人：</span><b>本人（提交人）</b>
+            <span>業務驗收人：</span>
+            <b>{acceptorOptions.find(o => o.value === values.acceptorUserId)?.label ?? '本人（提交人）'}</b>
           </div>
           {values.expectDate && (
             <div className="confirm-info-row"><span>期望完成：</span><b>{values.expectDate.format('YYYY-MM-DD')}</b></div>
@@ -461,9 +660,18 @@ export default function RequirementSubmit() {
       onOk: async () => {
         setSubmitting(true)
         try {
-          const created = await createRequirement(buildPayload(values), 'submit')
-          message.success(`需求已提交，編號 ${created.reqNo}`)
-          navigate(`/rdm-detail?id=${created.id}`)
+          const payload = buildPayload(values)
+          let saved
+          if (isDraftEdit) {
+            // 草稿提交走「先存改动、再自助提交」：提交接口要按最新内容重新裁决准入，
+            // 只调提交会把用户在编辑页改的内容丢掉
+            await updateRequirement(draftId, payload)
+            saved = await submitRequirement(draftId)
+          } else {
+            saved = await createRequirement(payload, 'submit')
+          }
+          message.success(`需求已提交，編號 ${saved.reqNo}`)
+          navigate(`/rdm-detail?id=${saved.id}&tab=activity`)
         } catch {
           // 失败提示由请求层统一弹出，这里保留用户已填内容不丢（不清空表单、不假装成功）
         } finally {
@@ -482,8 +690,14 @@ export default function RequirementSubmit() {
     const values = await form.validateFields(['title', 'description', 'reqType', 'priority'])
     setDraftSaving(true)
     try {
-      await createRequirement(buildPayload({ ...(form.getFieldsValue(true) as FormValues), ...values }), 'draft')
-      message.success('草稿已保存，可在「我提的需求」裡點「提交」送出（草稿回填編輯尚未提供，修改內容請重新填寫）')
+      const payload = buildPayload({ ...(form.getFieldsValue(true) as FormValues), ...values })
+      if (isDraftEdit) {
+        await updateRequirement(draftId, payload)
+        message.success('草稿已更新，可繼續編輯或點「提交需求」送出')
+      } else {
+        await createRequirement(payload, 'draft')
+        message.success('草稿已保存，可在「我提的需求」裡點「編輯」繼續填、「提交」送出')
+      }
       navigate('/rdm-requirement?scope=mine')
     } catch {
       // 同上：请求层已统一提示，保留表单内容让用户能重试
@@ -496,10 +710,12 @@ export default function RequirementSubmit() {
     <div className="content-area">
       {/* ── 页面头部（统一组件）── */}
       <RdmFormHeader
-        title="提交需求"
-        backText="返回工作台"
-        onBack={() => navigate('/rdm-workbench')}
-        meta="說清「現在怎麼做、哪兒不方便、想要什麼樣」即可提交；技術方案、排期與工時由產研在受理後補充"
+        title={isDraftEdit ? '編輯需求草稿' : '提交需求'}
+        backText={isDraftEdit ? '返回我的需求' : '返回工作台'}
+        onBack={() => navigate(isDraftEdit ? '/rdm-requirement?scope=mine' : '/rdm-workbench')}
+        meta={isDraftEdit && draftNo
+          ? `草稿 ${draftNo} · 修改後可繼續保存，或提交進入準入審批（提交時會按最新內容重新裁決）`
+          : '說清「現在怎麼做、哪兒不方便、想要什麼樣」即可提交；技術方案、排期與工時由產研在受理後補充'}
       />
 
       <Form
@@ -509,9 +725,65 @@ export default function RequirementSubmit() {
           reqType: RDM_REQ_TYPE.OPTIMIZE,
           priority: RDM_PRIORITY.P2,
           assignMode: 'POOL',
-          targets: [{ kind: 'EXISTING', granularity: RDM_ANCHOR_TYPE.MENU }],
+          targets: [{ kind: 'EXISTING' }],
+          flowVersion: RDM_FLOW_VERSION.V2,
+          requirementKind: RDM_REQUIREMENT_KIND.EXECUTION,
         }}
       >
+        {/* ── ① 流程版本（V3 分批並行交付入口）── */}
+        <div className="rdm-form-section">
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#E6FFFB', color: '#13C2C2' }}><NodeIndexOutlined /></span>
+            流程版本
+            <Tooltip title="V2 為傳統整需求交付；V3 支持把大需求拆成聚合需求 + 執行需求，掛到項目下分批並行交付">
+              <InfoCircleOutlined style={{ color: '#8C8C8C', fontSize: 12 }} />
+            </Tooltip>
+          </div>
+          <div className="rdm-more-settings-fields">
+            <Form.Item label="交付流程" name="flowVersion" extra={isV3 ? '分批並行交付：可掛項目、區分聚合 / 執行需求' : '傳統整需求交付'}>
+              <Select
+                options={[
+                  { value: RDM_FLOW_VERSION.V2, label: `${RDM_FLOW_VERSION_LABEL[RDM_FLOW_VERSION.V2]}（傳統整需求交付）` },
+                  { value: RDM_FLOW_VERSION.V3, label: `${RDM_FLOW_VERSION_LABEL[RDM_FLOW_VERSION.V3]}（分批並行交付）` },
+                ]}
+              />
+            </Form.Item>
+            {isV3 && (
+              <Form.Item label="所屬項目" name="projectId" rules={[{ required: true, message: '請選擇所屬項目' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="選擇進行中的項目"
+                  notFoundContent="暫無可用項目"
+                  options={projectOptions.map(p => ({ value: p.id, label: `${p.projectNo} · ${p.name}` }))}
+                />
+              </Form.Item>
+            )}
+          </div>
+          {isV3 && (
+            <>
+              <Form.Item label="需求種類" name="requirementKind" rules={[{ required: true, message: '請選擇需求種類' }]}>
+                <Radio.Group>
+                  <Radio value={RDM_REQUIREMENT_KIND.AGGREGATE}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.AGGREGATE]}</Radio>
+                  <Radio value={RDM_REQUIREMENT_KIND.EXECUTION}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.EXECUTION]}</Radio>
+                </Radio.Group>
+              </Form.Item>
+              {requirementKindValue === RDM_REQUIREMENT_KIND.EXECUTION && (
+                <Form.Item label="結構父需求" name="structureParentReqId" extra="執行需求掛到所選項目下的某個聚合需求，形成主子結構">
+                  <Select
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder={projectIdValue ? '選擇聚合父需求（可留空）' : '請先選擇所屬項目'}
+                    disabled={!projectIdValue}
+                    notFoundContent="該項目下暫無聚合需求"
+                    options={aggregateOptions}
+                  />
+                </Form.Item>
+              )}
+            </>
+          )}
+        </div>
         {/* ── ① 需求内容（业务方唯一必须回答的部分）── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
@@ -567,7 +839,7 @@ export default function RequirementSubmit() {
                   type="link"
                   icon={<PlusOutlined />}
                   style={{ padding: 0, marginBottom: 12 }}
-                  onClick={() => add({ kind: 'EXISTING', granularity: RDM_ANCHOR_TYPE.MENU })}
+                  onClick={() => add({ kind: 'EXISTING' })}
                 >
                   再加一個需求對象
                 </Button>
@@ -607,24 +879,43 @@ export default function RequirementSubmit() {
             </div>
           </div>
           <Form.Item name="assignMode" hidden><Input /></Form.Item>
-          {assignMode === 'PM' && (
-            <Form.Item
-              label="產品經理"
-              name="pmUserId"
-              rules={[{ required: true, message: '請選擇產品經理' }]}
-              style={{ marginTop: 12 }}
-              extra={selectedPm ? `當前在途需求 ${selectedPm.activeCount} 個 / 容量 ${selectedPm.capacity} 個，負責域：${selectedPm.domains.join('、')}` : undefined}
-            >
+          {/* 产品/时间/验收人三字段并排（全局表单规范：每行 3 个字段） */}
+          <div className="rdm-intake-fields">
+            {assignMode === 'PM' && (
+              <Form.Item
+                label="產品經理"
+                name="pmUserId"
+                rules={[{ required: true, message: '請選擇產品經理' }]}
+                extra={selectedPm ? `在途 ${selectedPm.activeCount} 個 / 容量 ${selectedPm.capacity} 個，負責域：${selectedPm.domains.join('、')}` : undefined}
+              >
+                <Select
+                  placeholder="選擇產品經理"
+                  showSearch
+                  optionFilterProp="label"
+                  options={pmOptions.map(pm => ({
+                    value: pm.userId,
+                    label: `${pm.name}（在途 ${pm.activeCount}/${pm.capacity} · ${pm.domains.join('/')}）`,
+                  }))}
+                />
+              </Form.Item>
+            )}
+            <Form.Item label="期望完成時間" name="expectDate"
+              extra="填業務硬期限即可；產研承諾時間以受理後的排期為準">
+              <DatePicker style={{ width: '100%' }} placeholder="選填" minDate={dayjs()} />
+            </Form.Item>
+            <Form.Item label="業務驗收人" name="acceptorUserId"
+              extra="默認為提交人本人，可改選他人；需求上線後由該同事在「需求驗收」逐條確認並打 1-5 分">
               <Select
-                style={{ width: 360 }}
-                placeholder="選擇產品經理"
-                options={pmOptions.map(pm => ({
-                  value: pm.userId,
-                  label: `${pm.name}（在途 ${pm.activeCount}/${pm.capacity} · ${pm.domains.join('/')}）`,
-                }))}
+                showSearch
+                filterOption={false}
+                onSearch={handleAcceptorSearch}
+                onFocus={() => handleAcceptorSearch('')}
+                options={acceptorOptions}
+                placeholder="搜索姓名 / 工号選擇"
+                notFoundContent={null}
               />
             </Form.Item>
-          )}
+          </div>
           {assignMode === 'PM' && selectedPm && (
             <div style={{ maxWidth: 360, marginBottom: 12 }}>
               <div className="rdm-load-bar">
@@ -632,16 +923,6 @@ export default function RequirementSubmit() {
               </div>
             </div>
           )}
-          <Space size={24} style={{ marginTop: 4 }} align="start">
-            <Form.Item label="期望完成時間" name="expectDate" style={{ marginBottom: 12 }}
-              extra="填業務硬期限即可；產研承諾時間以受理後的排期為準">
-              <DatePicker style={{ width: 180 }} placeholder="選填" minDate={dayjs()} />
-            </Form.Item>
-            <Form.Item label="業務驗收人" style={{ marginBottom: 12 }}
-              extra="默認為提交人本人；需求上線後由該同事在「需求驗收」逐條確認並打 1-5 分">
-              <Input style={{ width: 200 }} value="本人（提交人）" disabled />
-            </Form.Item>
-          </Space>
 
           {/*
             审批要求：只读展示服务端准入裁决（命中策略 + 版本 + 审批链），提交人不能选。
@@ -696,16 +977,16 @@ export default function RequirementSubmit() {
             label: <span style={{ fontSize: 13, fontWeight: 500, color: '#595959' }}>更多設置（需求類型、優先級、業務價值、附件）</span>,
             children: (
               <>
-                <Space size={12} style={{ flexWrap: 'wrap' }}>
+                {/* 三字段并排（全局表单规范：每行 3 个字段），固定宽度会把优先级长文案截断 */}
+                <div className="rdm-more-settings-fields">
                   <Form.Item label="需求類型" name="reqType" rules={[{ required: true, message: '請選擇需求類型' }]}>
                     <Select
-                      style={{ width: 180 }}
                       options={Object.entries(RDM_REQ_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
                     />
                   </Form.Item>
                   <Form.Item label="優先級" name="priority" rules={[{ required: true, message: '請選擇優先級' }]}>
                     <Select
-                      style={{ width: 240 }}
+                      labelRender={({ label, value }) => label ?? getRdmPriorityLabel(String(value ?? ''))}
                       options={Object.entries(RDM_PRIORITY_LABEL).map(([value, label]) => ({
                         value,
                         label: `${label}（產研承諾 ${RDM_PRIORITY_SLA_DAYS[value as RdmPriority]} 天內響應）`,
@@ -714,13 +995,13 @@ export default function RequirementSubmit() {
                   </Form.Item>
                   <Form.Item label="預期規模" name="complexity" extra="不確定可留空，由產品經理評估">
                     <Select
-                      style={{ width: 160 }}
                       allowClear
                       placeholder="由產品評估"
+                      labelRender={({ label, value }) => label ?? getRdmComplexityLabel(String(value ?? ''))}
                       options={Object.entries(RDM_COMPLEXITY_LABEL).map(([value, label]) => ({ value, label }))}
                     />
                   </Form.Item>
-                </Space>
+                </div>
                 <Form.Item label="業務價值（可量化最佳，用於產研排優先）" name="businessValue">
                   <TextArea rows={2} placeholder="例：每月節省財務與運營 6 人時；避免手工合併導致的口徑錯誤。" />
                 </Form.Item>

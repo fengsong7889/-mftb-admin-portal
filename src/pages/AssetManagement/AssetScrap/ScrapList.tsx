@@ -208,6 +208,8 @@ export default function ScrapList({ onCreate, onViewDetail }: Props) {
 
   const handleDelete = (record: ScrapRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除此報廢記錄？',
       content: (
         <div style={{ background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginTop: 12 }}>

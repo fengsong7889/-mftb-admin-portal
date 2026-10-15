@@ -15,7 +15,7 @@ import type { TableColumnsType, UploadFile } from 'antd'
 import RemarkTextArea from '../../../components/RemarkTextArea'
 import {
   ArrowLeftOutlined, SendOutlined, SaveOutlined, PlusOutlined, ShoppingCartOutlined,
-  FileTextOutlined, UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
+  FileTextOutlined, UploadOutlined, CheckCircleOutlined,
   FileImageOutlined, FilePdfOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -552,8 +552,9 @@ export default function OaPurchaseRequest() {
         return
       }
       Modal.confirm({
+        className: 'custom-confirm-modal',
         title: '確認保存',
-        icon: <ExclamationCircleOutlined />,
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         content: '確認保存當前採購申請為草稿？保存後可在「我的申請」中查看。',
         okText: '確認保存',
         cancelText: '取消',

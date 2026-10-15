@@ -117,6 +117,17 @@ public final class RdmConstants {
     public static final String SCOPE_PRODUCT = "product";
     public static final String SCOPE_DELIVERY = "delivery";
     public static final String SCOPE_ACCEPTANCE = "acceptance";
+    /**
+     * 上线后待評分：需求已 released，等业务验收人打 1-5 分。
+     * <p>必须与 {@code SCOPE_ACCEPTANCE} 分开：那个只捞 uat_pending，是**上线前预验收**；
+     * 两者在业务上是两件事实（质量预验 vs 上线后是否真解决问题），混在一个队列里
+     * 会让「待验收」计数把两种动作算成一件事。
+     * <p>按验收人字段收敛（非管理视角），不是"与我相关"：提单人不是验收人时，
+     * 这条队列对他没有意义，摆出来只会让他以为该自己操作。
+     */
+    public static final String SCOPE_ACCEPTANCE_POST = "acceptance_post";
+    /** 我的验收记录：我作为验收人签过的单子（含已上线待评分、已确认交付、预验收退回） */
+    public static final String SCOPE_ACCEPTANCE_HISTORY = "acceptance_history";
     public static final String SCOPE_ALL = "all";
 
     /* ==================== 验收结论 ==================== */
@@ -320,4 +331,299 @@ public final class RdmConstants {
     public static final int DEFAULT_SLA_HOURS = 72;
     /** 需求标题最大长度 */
     public static final int TITLE_MAX_LENGTH = 200;
+
+    /* ==================== 项目状态（Batch 1） ==================== */
+
+    public static final String PROJECT_PREPARING = "preparing";
+    public static final String PROJECT_IN_PROGRESS = "in_progress";
+    public static final String PROJECT_PARTIAL_DELIVERED = "partial_delivered";
+    public static final String PROJECT_ALL_DELIVERED = "all_delivered";
+    public static final String PROJECT_CLOSED = "closed";
+
+    /** 项目活跃状态（未关闭） */
+    public static final Set<String> PROJECT_ACTIVE_STATUSES = Set.of(
+            PROJECT_PREPARING, PROJECT_IN_PROGRESS, PROJECT_PARTIAL_DELIVERED, PROJECT_ALL_DELIVERED);
+
+    /* ==================== 交付项状态（Batch 1） ==================== */
+
+    public static final String DI_PREPARING = "preparing";
+    public static final String DI_DEVELOPING = "developing";
+    public static final String DI_TESTING = "testing";
+    public static final String DI_PENDING_ACCEPTANCE = "pending_acceptance";
+    public static final String DI_PENDING_RELEASE = "pending_release";
+    public static final String DI_RELEASED_PENDING = "released_pending";
+    public static final String DI_DONE = "done";
+
+    /** 交付项活跃状态（未完成） */
+    public static final Set<String> DI_ACTIVE_STATUSES = Set.of(
+            DI_PREPARING, DI_DEVELOPING, DI_TESTING, DI_PENDING_ACCEPTANCE,
+            DI_PENDING_RELEASE, DI_RELEASED_PENDING);
+
+    /* ==================== 测试批次状态（Batch 1） ==================== */
+
+    public static final String TB_PENDING = "pending";
+    public static final String TB_ACCEPTED = "accepted";
+    public static final String TB_RETURNED = "returned";
+    public static final String TB_EXECUTING = "executing";
+    public static final String TB_PASSED = "passed";
+    public static final String TB_FAILED = "failed";
+
+    /** 测试批次未结束状态 */
+    public static final Set<String> TB_OPEN_STATUSES = Set.of(
+            TB_PENDING, TB_ACCEPTED, TB_EXECUTING);
+
+    /* ==================== 问题状态（Batch 1） ==================== */
+
+    public static final String ISSUE_OPEN = "open";
+    public static final String ISSUE_PROCESSING = "processing";
+    public static final String ISSUE_PENDING_VERIFY = "pending_verify";
+    public static final String ISSUE_RESOLVED = "resolved";
+    public static final String ISSUE_DEFERRED = "deferred";
+
+    /** 问题未关闭状态 */
+    public static final Set<String> ISSUE_OPEN_STATUSES = Set.of(
+            ISSUE_OPEN, ISSUE_PROCESSING, ISSUE_PENDING_VERIFY);
+
+    /* ==================== 问题严重程度（Batch 1） ==================== */
+
+    public static final String SEV_CRITICAL = "critical";
+    public static final String SEV_MAJOR = "major";
+    public static final String SEV_MINOR = "minor";
+    public static final String SEV_TRIVIAL = "trivial";
+
+    /* ==================== 延期决定状态（Batch 1） ==================== */
+
+    public static final String DEFER_PENDING_PRODUCT = "pending_product";
+    public static final String DEFER_PENDING_BIZ = "pending_biz";
+    public static final String DEFER_PENDING_BIND = "pending_bind";
+    public static final String DEFER_EFFECTIVE = "effective";
+    public static final String DEFER_REJECTED = "rejected";
+
+    /** 延期决定未结束状态 */
+    public static final Set<String> DEFER_OPEN_STATUSES = Set.of(
+            DEFER_PENDING_PRODUCT, DEFER_PENDING_BIZ, DEFER_PENDING_BIND);
+
+    /* ==================== 问题闭环（任务21：取消/合并/阻断口径） ==================== */
+
+    /** 问题已取消（重复/无效/不予处理），非阻断终态 */
+    public static final String ISSUE_CANCELLED = "cancelled";
+    /** 问题已合并到另一问题（承接目标记于该问题），非阻断终态 */
+    public static final String ISSUE_MERGED = "merged";
+
+    /**
+     * 问题终态（不再阻断门禁）：已解决 / 已取消 / 已合并。
+     * <p>注意：<b>deferred 不在其中</b>——延期是否解除阻断取决于延期是否「已获批准」，
+     * 由 {@link #DEFER_APPROVED_STATUSES} 判定，不能仅凭问题状态 deferred 就放行。
+     */
+    public static final Set<String> ISSUE_CLOSED_STATUSES = Set.of(
+            ISSUE_RESOLVED, ISSUE_CANCELLED, ISSUE_MERGED);
+
+    /**
+     * 延期「已获批准」的状态：待建立承接 / 已生效。
+     * <p>只有走到这两个状态，才代表产品（及必要时的业务）已批准延期，此时严重问题的阻断才被解除；
+     * pending_product/pending_biz（待决）与 rejected（被拒）期间问题持续阻断。
+     */
+    public static final Set<String> DEFER_APPROVED_STATUSES = Set.of(
+            DEFER_PENDING_BIND, DEFER_EFFECTIVE);
+
+    /** 需求「尚未准入」的状态：草稿 / 待准入 / 准入被拒（承接需求必须已准入，不在此列） */
+    public static final Set<String> REQ_NOT_ADMITTED_STATUSES = Set.of(
+            STATUS_DRAFT, STATUS_INTAKE_PENDING, STATUS_INTAKE_REJECTED);
+
+    /* ==================== 延期逾期升级（任务21，按真实工作日判定） ==================== */
+
+    /** 逾期升级级别 1 阈值：超过修复期限 ≥1 个工作日 */
+    public static final int ESCALATION_L1_OVERDUE_DAYS = 1;
+    /** 逾期升级级别 2 阈值：超过修复期限 ≥3 个工作日 */
+    public static final int ESCALATION_L2_OVERDUE_DAYS = 3;
+    /** 逾期升级级别 3 阈值：超过修复期限 ≥5 个工作日 */
+    public static final int ESCALATION_L3_OVERDUE_DAYS = 5;
+    /** 最高升级级别 */
+    public static final int ESCALATION_LEVEL_MAX = 3;
+
+    /* ==================== 承接与修复闭环证据（任务21） ==================== */
+
+    /** 承接生效标记 */
+    public static final int FOLLOWUP_ACTIVE = 1;
+    /** 承接失效标记 */
+    public static final int FOLLOWUP_INACTIVE = 0;
+    /** 修复闭环结论：通过 */
+    public static final String RESOLUTION_PASS = "pass";
+    /** 修复闭环结论：不通过 */
+    public static final String RESOLUTION_FAIL = "fail";
+
+    /* ==================== 发布批次状态（Batch 1） ==================== */
+
+    public static final String RB_PLANNING = "planning";
+    public static final String RB_CHECKING = "checking";
+    public static final String RB_APPROVED = "approved";
+    public static final String RB_DEPLOYING = "deploying";
+    public static final String RB_VERIFYING = "verifying";
+    public static final String RB_RELEASED = "released";
+    public static final String RB_ROLLED_BACK = "rolled_back";
+    public static final String RB_CANCELLED = "cancelled";
+
+    /** 发布批次活跃状态（未结束） */
+    public static final Set<String> RB_ACTIVE_STATUSES = Set.of(
+            RB_PLANNING, RB_CHECKING, RB_APPROVED, RB_DEPLOYING, RB_VERIFYING);
+
+    /* ==================== 部署状态（Batch 1） ==================== */
+
+    public static final String DEPLOY_PENDING = "pending";
+    public static final String DEPLOY_DEPLOYING = "deploying";
+    public static final String DEPLOY_SUCCESS = "success";
+    public static final String DEPLOY_FAILED = "failed";
+    public static final String DEPLOY_ROLLED_BACK = "rolled_back";
+
+    /* ==================== 验收类型（Batch 1） ==================== */
+
+    public static final String ACCEPTANCE_TYPE_PRODUCT = "product";
+    public static final String ACCEPTANCE_TYPE_BUSINESS = "business";
+
+    /* ==================== 验收路径（Batch 1） ==================== */
+
+    /** 路径 A：先验收后上线 */
+    public static final String PATH_A = "A";
+    /** 路径 B：先上线后验收 */
+    public static final String PATH_B = "B";
+
+    /* ==================== 需求种类（Batch 1） ==================== */
+
+    /** 聚合需求（项目级） */
+    public static final String KIND_AGGREGATE = "aggregate";
+    /** 执行需求（默认） */
+    public static final String KIND_EXECUTION = "execution";
+
+    /* ==================== 流程版本（Batch 1） ==================== */
+
+    /** 流程版本 3：项目交付与质量管理链路 */
+    public static final int FLOW_VERSION_3 = 3;
+
+    /* ==================== 菜单 Key（Batch 1） ==================== */
+
+    /** 菜单：项目总览 */
+    public static final String MENU_DASHBOARD_PROJECT = "rdm-dashboard-project";
+    /** 菜单：测试工作台 */
+    public static final String MENU_DELIVERY_TEST = "rdm-delivery-test";
+    /** 菜单：发布中心 */
+    public static final String MENU_DELIVERY_RELEASE = "rdm-delivery-release";
+
+    /* ==================== 原子幂等（Batch 3 / rdm:schema:v3.2） ==================== */
+
+    /**
+     * rdm_idempotent_log.status 取值。
+     * <p>{@code legacy}=旧 V1/V2 路径（只认 request_id，不含绑定列）；
+     * {@code processing}=executeOnce 业务执行前的原子占位；{@code completed}=业务与结果已同事务写入、可回放。
+     * <p>受 CHECK 约束 {@code ck_rdm_idempotent_binding} 保护：processing/completed 时绑定列必须全部非空。
+     */
+    public static final String IDEMPOTENT_STATUS_LEGACY = "legacy";
+    public static final String IDEMPOTENT_STATUS_PROCESSING = "processing";
+    public static final String IDEMPOTENT_STATUS_COMPLETED = "completed";
+
+    /* ==================== 发布申请/裁决/部署事实（Batch 3） ==================== */
+
+    /** rdm_release_approval.action：申请放行 / 裁决放行 */
+    public static final String APPROVAL_ACTION_APPLY = "apply";
+    public static final String APPROVAL_ACTION_DECIDE = "decide";
+
+    /** rdm_release_attempt.action：部署 / 验证 / 开放放量 / 回滚 */
+    public static final String ATTEMPT_ACTION_DEPLOY = "deploy";
+    public static final String ATTEMPT_ACTION_VERIFY = "verify";
+    public static final String ATTEMPT_ACTION_OPEN = "open";
+    public static final String ATTEMPT_ACTION_ROLLBACK = "rollback";
+
+    /** 通用裁决结论（发布审批 / 豁免签署共用）：批准 / 驳回 */
+    public static final String DECISION_APPROVED = "approved";
+    public static final String DECISION_REJECTED = "rejected";
+
+    /**
+     * rdm_release_exemption_decision.decision_type：两类**独立**签署。
+     * <p>产品风险确认 与 独立发布审批必须由不同签署人分别签，且都不得是豁免申请人本人
+     * （管理员不得代签/自批），由服务层校验，常量层只定义取值。
+     */
+    public static final String EXEMPTION_DECISION_PRODUCT_RISK = "product_risk";
+    public static final String EXEMPTION_DECISION_RELEASE = "release";
+
+    /* ==================== 补验任务（Batch 3） ==================== */
+
+    /** rdm_supplementary_verification.verification_type：产品补验 / 业务补验 */
+    public static final String SUPPLEMENTARY_TYPE_PRODUCT = "product";
+    public static final String SUPPLEMENTARY_TYPE_BUSINESS = "business";
+
+    /** rdm_supplementary_verification.status */
+    public static final String SUPPLEMENTARY_STATUS_PENDING = "pending";
+    public static final String SUPPLEMENTARY_STATUS_COMPLETED = "completed";
+    public static final String SUPPLEMENTARY_STATUS_OVERDUE = "overdue";
+    public static final String SUPPLEMENTARY_STATUS_FAILED = "failed";
+
+    /** rdm_supplementary_verification.result / rdm_issue_resolution.conclusion：通过 / 不通过 */
+    public static final String SUPPLEMENTARY_RESULT_PASS = "pass";
+    public static final String SUPPLEMENTARY_RESULT_FAIL = "fail";
+
+    /* ==================== 灰度配置（Batch 4 / rdm:schema:v3.3） ==================== */
+
+    /**
+     * rdm_flow_config.scope_key 约定：全局行为字面量 {@code GLOBAL}（project_id 为 NULL）；
+     * 项目行为 {@code PROJECT:<数字ID>}（project_id 与后缀一致），由 {@code ck_rdm_flow_scope} 强约束。
+     */
+    public static final String FLOW_SCOPE_GLOBAL = "GLOBAL";
+    public static final String FLOW_SCOPE_PROJECT_PREFIX = "PROJECT:";
+
+    /** 灰度开关取值：关闭 / 开启。V3 写入与发布是两个独立开关，且**默认关闭**（种子两开关均为 0）。 */
+    public static final int FLOW_FLAG_OFF = 0;
+    public static final int FLOW_FLAG_ON = 1;
+
+    /** 构造项目级 scope_key：{@code PROJECT:<projectId>}。写入端与读取端必须共用，不得各自拼接。 */
+    public static String projectScopeKey(long projectId) {
+        return FLOW_SCOPE_PROJECT_PREFIX + projectId;
+    }
+
+    /* ==================== 数据迁移（Batch 4） ==================== */
+
+    /** rdm_migration_batch.status：预览 → 确认 → 执行 → 暂停/完成/失败/回退 */
+    public static final String MIGRATION_BATCH_PREVIEWED = "previewed";
+    public static final String MIGRATION_BATCH_CONFIRMED = "confirmed";
+    public static final String MIGRATION_BATCH_RUNNING = "running";
+    public static final String MIGRATION_BATCH_PAUSED = "paused";
+    public static final String MIGRATION_BATCH_COMPLETED = "completed";
+    public static final String MIGRATION_BATCH_FAILED = "failed";
+    public static final String MIGRATION_BATCH_ROLLED_BACK = "rolled_back";
+
+    /** rdm_migration_item.status：逐项预览 → 确认 → 执行 → 完成/失败/阻塞/回退 */
+    public static final String MIGRATION_ITEM_PREVIEWED = "previewed";
+    public static final String MIGRATION_ITEM_CONFIRMED = "confirmed";
+    public static final String MIGRATION_ITEM_RUNNING = "running";
+    public static final String MIGRATION_ITEM_COMPLETED = "completed";
+    public static final String MIGRATION_ITEM_FAILED = "failed";
+    public static final String MIGRATION_ITEM_BLOCKED = "blocked";
+    public static final String MIGRATION_ITEM_ROLLED_BACK = "rolled_back";
+
+    /** rdm_migration_audit.action：不可覆盖审计的动作类型 */
+    public static final String MIGRATION_ACTION_PREVIEW = "preview";
+    public static final String MIGRATION_ACTION_CONFIRM = "confirm";
+    public static final String MIGRATION_ACTION_EXECUTE = "execute";
+    public static final String MIGRATION_ACTION_PAUSE = "pause";
+    public static final String MIGRATION_ACTION_RESUME = "resume";
+    public static final String MIGRATION_ACTION_ROLLBACK = "rollback";
+    public static final String MIGRATION_ACTION_RECONCILE = "reconcile";
+
+    /** rdm_migration_audit.result */
+    public static final String MIGRATION_RESULT_SUCCESS = "success";
+    public static final String MIGRATION_RESULT_FAILED = "failed";
+    public static final String MIGRATION_RESULT_BLOCKED = "blocked";
+
+    /** 迁移分块大小边界（rdm_migration_batch.chunk_size BETWEEN 1 AND 100） */
+    public static final int MIGRATION_CHUNK_MIN = 1;
+    public static final int MIGRATION_CHUNK_MAX = 100;
+    public static final int MIGRATION_CHUNK_DEFAULT = 20;
+
+    /* ==================== 通知事件级去重（Batch 4） ==================== */
+
+    /**
+     * rdm_notify_log.event_version 前缀约定：
+     * {@code VERSION:<并发版本>}（版本驱动事件）或 {@code DATE:<yyyy-MM-dd>}（日期驱动事件，如到期提醒）。
+     * 与 object_type/object_id/receiver_user_id 一起规范化摘要为 dedupe_key，保证同事件同版本同接收人只出站一次。
+     */
+    public static final String NOTIFY_EVENT_VERSION_PREFIX = "VERSION:";
+    public static final String NOTIFY_EVENT_DATE_PREFIX = "DATE:";
 }

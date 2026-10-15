@@ -366,6 +366,8 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
       const scDef = sc ? SCENARIO_DEFS.find(d => d.apiValue === sc) : null
       const displayName = scDef ? `${scDef.icon} ${scDef.label}` : cfg?.label ?? lt
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: '取消標籤確認',
         content: (
           <div style={{ padding: '8px 0' }}>
@@ -1122,6 +1124,8 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
               extra={Object.values(labelDates).some(d => d.length > 0) && (
                 <Button type="link" size="small" danger onClick={() => {
                   Modal.confirm({
+                    className: 'custom-confirm-modal',
+                    icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
                     title: '清空所有日期確認',
                     content: '確定清空所有標籤的已選日期？清空後需重新選擇。',
                     okText: '確認清空',

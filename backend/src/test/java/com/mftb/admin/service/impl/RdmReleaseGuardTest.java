@@ -70,7 +70,8 @@ class RdmReleaseGuardTest {
         BizSeqService bizSeqService = mock(BizSeqService.class);
         when(bizSeqService.next(anyString())).thenReturn("FZ202610060001");
         service = new RdmReleaseServiceImpl(releaseMapper, accessGuard, operatorResolver,
-                bizSeqService, mock(RdmNotifyService.class), jdbcTemplate, new ObjectMapper(), configService);
+                bizSeqService, mock(RdmNotifyService.class), jdbcTemplate, new ObjectMapper(), configService,
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class));
 
         SysUser current = new SysUser();
         current.setId(APPLICANT_ID);

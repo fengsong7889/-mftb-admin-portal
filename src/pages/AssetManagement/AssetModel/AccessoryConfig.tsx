@@ -94,6 +94,8 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
   /** 刪除（二次確認） */
   const handleDelete = (record: CategoryAccessory) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteAcc'),
       content: t('asset.deleteAccContent', { name: record.name }),
       okText: t('common.confirmDelete'),

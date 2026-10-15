@@ -50,6 +50,14 @@ public class RdmRequirementQuery {
             RdmConstants.STATUS_INTEGRATION, RdmConstants.STATUS_TESTING, RdmConstants.STATUS_TEST_PASSED);
 
     /**
+     * 验收记录状态集合：验收人已经或正在出结论的环节。
+     * <p>含 released 是因为「上线后正式验收」通过时不改状态（只写结论与分数），
+     * 要等「確認交付」才推到 verified；漏掉它会让刚签完单的人在自己的记录页里找不到那条。
+     */
+    private static final List<String> ACCEPTANCE_HISTORY_STATUS = List.of(
+            RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_VERIFIED, RdmConstants.STATUS_UAT_REJECTED);
+
+    /**
      * 构造查询条件（默认按相关人收敛）。
      *
      * @param currentUserId 当前登录人ID（null 表示不受限：超管 / PMO / 技术负责人）
@@ -118,6 +126,25 @@ public class RdmRequirementQuery {
         switch (scopeCode) {
             case RdmConstants.SCOPE_POOL -> wrapper.eq(RdmRequirement::getStatus, RdmConstants.STATUS_POOL);
             case RdmConstants.SCOPE_ACCEPTANCE -> wrapper.eq(RdmRequirement::getStatus, RdmConstants.STATUS_UAT_PENDING);
+            /*
+             * 上线后待評分 / 我的验收记录：都按「验收人字段」收敛，不靠 relatedOnly。
+             * <p>relatedOnly 命中提出人/PM/研发负责人/验收人四个字段，用它当唯一防线的话，
+             * 提单人会在「待我验收」里看到一堆自己签不了的单，反而以为流程坏了。
+             * <p>currentUserId 为 null 表示管理视角（超管/PMO/技术负责人），此时不加人员条件，
+             * 与 SCOPE_PRODUCT 同一口径。
+             */
+            case RdmConstants.SCOPE_ACCEPTANCE_POST -> {
+                if (currentUserId != null) {
+                    wrapper.eq(RdmRequirement::getAcceptorUserId, currentUserId);
+                }
+                wrapper.eq(RdmRequirement::getStatus, RdmConstants.STATUS_RELEASED);
+            }
+            case RdmConstants.SCOPE_ACCEPTANCE_HISTORY -> {
+                if (currentUserId != null) {
+                    wrapper.eq(RdmRequirement::getAcceptorUserId, currentUserId);
+                }
+                wrapper.in(RdmRequirement::getStatus, ACCEPTANCE_HISTORY_STATUS);
+            }
             case RdmConstants.SCOPE_DELIVERY -> wrapper.in(RdmRequirement::getStatus, DELIVERY_STATUS);
             case RdmConstants.SCOPE_PRODUCT -> {
                 if (currentUserId != null) {

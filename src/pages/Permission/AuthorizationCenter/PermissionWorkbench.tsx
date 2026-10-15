@@ -263,6 +263,8 @@ export default function PermissionWorkbench() {
     }
     if (dirtyCount > 0) {
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('authorizationCenter.discardTitle', '放棄未保存的修改？'),
         content: t('authorizationCenter.discardContent', '當前有 {{count}} 個系統的授權修改尚未保存，切換目標後將丟棄。', { count: dirtyCount }),
         okText: t('authorizationCenter.discardOk', '放棄並切換'),

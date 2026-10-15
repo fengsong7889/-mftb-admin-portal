@@ -98,6 +98,8 @@ export default function AiDeptQuotaList() {
   /* ── 刪除（二次確認） ── */
   const handleDelete = (row: DeptQuotaVO) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('aiQuotaAuth.confirmDeleteQuotaPolicy'),
       content: t('aiQuotaAuth.deleteQuotaPolicyContent', { name: row.name, deptCount: row.deptNames.length || row.deptIds.length }),
       okText: t('common.delete'),
@@ -117,6 +119,8 @@ export default function AiDeptQuotaList() {
     const toDisable = row.status === 1
     const action = toDisable ? t('aiQuotaAuth.disableText') : t('aiQuotaAuth.enableText')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: toDisable ? t('aiQuotaAuth.confirmDisableQuotaPolicy') : t('aiQuotaAuth.confirmEnableQuotaPolicy'),
       content: toDisable
         ? t('aiQuotaAuth.disableQuotaPolicyContent', { name: row.name })

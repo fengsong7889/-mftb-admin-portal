@@ -40,22 +40,25 @@ import {
 } from '../../../api/meeting'
 import { phaseMeta, statusMeta } from '../meetingMeta'
 import MeetingStatCards from '../MeetingStatCards'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const EMPTY_STATS: MeetingStats = { total: 0, pending: 0, ongoing: 0, finished: 0, cancelled: 0, released: 0 }
 
 /** 列配置元数据（§E.3）：时间锁头、操作锁尾 */
-const COLUMN_META = [
-  { key: 'timeText', title: '時間' },
-  { key: 'title', title: '主題' },
-  { key: 'roomName', title: '會議室' },
-  { key: 'organizerName', title: '組織者' },
-  { key: 'attendeeCount', title: '參會' },
-  { key: 'myRole', title: '我的身份' },
-  { key: 'phase', title: '狀態' },
-  { key: 'action', title: '操作' },
+const COLUMN_META = (t: TFunction) => [
+  { key: 'timeText', title: t('meeting.time', { defaultValue: '時間' }) },
+  { key: 'title', title: t('meeting.topic', { defaultValue: '主題' }) },
+  { key: 'roomName', title: t('meeting.meetingRoom', { defaultValue: '會議室' }) },
+  { key: 'organizerName', title: t('meeting.organizer', { defaultValue: '組織者' }) },
+  { key: 'attendeeCount', title: t('meeting.attendees3', { defaultValue: '參會' }) },
+  { key: 'myRole', title: t('meeting.myRole', { defaultValue: '我的身份' }) },
+  { key: 'phase', title: t('meeting.status', { defaultValue: '狀態' }) },
+  { key: 'action', title: t('meeting.actions', { defaultValue: '操作' }) },
 ]
 
 export default function MyMeeting() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [day, setDay] = useState<Dayjs>(dayjs())
   const [agenda, setAgenda] = useState<MeetingScheduleVO[]>([])
@@ -69,7 +72,7 @@ export default function MyMeeting() {
   const [error, setError] = useState<string>()
   const [form] = Form.useForm()
 
-  const { configComponent, applyConfig } = useColumnConfig('meeting-my', COLUMN_META, [
+  const { configComponent, applyConfig } = useColumnConfig('meeting-my', COLUMN_META(t), [
     { key: 'timeText', visible: true, locked: 'head' },
     { key: 'action', visible: true, locked: 'tail' },
   ])
@@ -84,7 +87,7 @@ export default function MyMeeting() {
         pendingResponseCount: sum.pendingResponseCount ?? 0,
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : '日程加載失敗')
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe3', { defaultValue: '日程加載失敗' }))
     }
   }, [day])
 
@@ -98,7 +101,7 @@ export default function MyMeeting() {
       setTotal(res.page?.total ?? 0)
       setStats(res.stats ?? EMPTY_STATS)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '會議列表加載失敗')
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe4', { defaultValue: '會議列表加載失敗' }))
     } finally {
       setLoading(false)
     }
@@ -129,11 +132,11 @@ export default function MyMeeting() {
   const handleRespond = async (record: MeetingVO, accept: boolean) => {
     try {
       await respondMeeting(record.id, { accept })
-      message.success(accept ? '已接受邀約' : '已婉拒邀約')
+      message.success(accept ? t('meeting.invitationAccepted', { defaultValue: '已接受邀約' }) : t('meeting.invitationDeclined', { defaultValue: '已婉拒邀約' }))
       refresh()
     } catch (e) {
       // request.ts 已统一弹出错误，这里只留日志，避免双弹
-      console.warn('響應邀約失敗', e instanceof Error ? e.message : e)
+      console.warn(t('meeting.failedToRespond', { defaultValue: '響應邀約失敗' }), e instanceof Error ? e.message : e)
     }
   }
 
@@ -147,27 +150,27 @@ export default function MyMeeting() {
       message.success(okText)
       refresh()
     } catch (e) {
-      console.warn('會議操作失敗', e instanceof Error ? e.message : e)
+      console.warn(t('meeting.meetingOperationFailed', { defaultValue: '會議操作失敗' }), e instanceof Error ? e.message : e)
     }
   }
 
   /** 提前结束会把房间立刻还给他人，属于不可逆操作：必须二次确认（§B.3） */
   const handleFinish = (record: MeetingVO) => {
     Modal.confirm({
-      title: '確認提前結束這場會議？',
+      title: t('meeting.finishThisMeetingEarly', { defaultValue: '確認提前結束這場會議？' }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認結束',
-      cancelText: '返回',
+      okText: t('meeting.confirmFinish', { defaultValue: '確認結束' }),
+      cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
-          <div className="confirm-info-row"><span>時間：</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
           <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
-          <div className="confirm-info-row"><span>影響：</span><b>結束後剩餘窗口立刻可被他人預訂，不可恢復</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theRemainingSlotBecomes', { defaultValue: '結束後剩餘窗口立刻可被他人預訂，不可恢復' })}</b></div>
         </div>
       ),
-      onOk: () => act(record.id, finishMeeting, '會議已結束'),
+      onOk: () => act(record.id, finishMeeting, t('meeting.meetingFinished', { defaultValue: '會議已結束' })),
     })
   }
 
@@ -175,28 +178,28 @@ export default function MyMeeting() {
   const handleCancel = (record: MeetingVO) => {
     let reason = ''
     Modal.confirm({
-      title: '確認取消這場會議？',
+      title: t('meeting.cancelThisMeeting', { defaultValue: '確認取消這場會議？' }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認取消',
+      okText: t('meeting.confirmCancel', { defaultValue: '確認取消' }),
       okButtonProps: { danger: true },
-      cancelText: '返回',
+      cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
-          <div className="confirm-info-row"><span>單號：</span><b>{record.bookingNo}</b></div>
-          <div className="confirm-info-row"><span>時間：</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
           <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
-          <div className="confirm-info-row"><span>狀態：</span><b>{statusMeta(record.status).label}</b></div>
-          <div className="confirm-info-row"><span>影響：</span><b>房間窗口立即歸還，參會人會收到取消通知</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.status2', { defaultValue: '狀態：' })}</span><b>{statusMeta(record.status).label}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還，參會人會收到取消通知' })}</b></div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>取消原因（必填）</div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
             <Input.TextArea
               rows={3}
               maxLength={200}
               showCount
               style={{ resize: 'none' }}
-              placeholder="如 議程取消／改期另約"
+              placeholder={t('meeting.eGAgendaDropped2', { defaultValue: '如 議程取消／改期另約' })}
               onChange={(e) => { reason = e.target.value }}
             />
           </div>
@@ -204,12 +207,12 @@ export default function MyMeeting() {
       ),
       onOk: async () => {
         if (!reason.trim()) {
-          message.warning('請填寫取消原因')
+          message.warning(t('meeting.pleaseEnterTheCancellation', { defaultValue: '請填寫取消原因' }))
           // 抛出以阻止弹窗关闭：原因没填就放行，等于允许无凭据取消会议
           throw new Error('reason required')
         }
         await cancelMeeting(record.id, { reason: reason.trim(), version: record.version })
-        message.success('會議已取消，房間窗口已歸還')
+        message.success(t('meeting.meetingCancelledTheRoom', { defaultValue: '會議已取消，房間窗口已歸還' }))
         refresh()
       },
     })
@@ -217,7 +220,7 @@ export default function MyMeeting() {
 
   const columns: TableColumnsType<MeetingVO> = [
     {
-      title: '時間', key: 'timeText', width: 200, fixed: 'left',
+      title: t('meeting.time', { defaultValue: '時間' }), key: 'timeText', width: 200, fixed: 'left',
       render: (_, record) => (
         <div>
           <div style={{ fontWeight: 500 }}>{record.timeText}</div>
@@ -226,7 +229,7 @@ export default function MyMeeting() {
       ),
     },
     {
-      title: '主題', dataIndex: 'title', key: 'title', width: 240, ellipsis: true,
+      title: t('meeting.topic', { defaultValue: '主題' }), dataIndex: 'title', key: 'title', width: 240, ellipsis: true,
       render: (value: string, record) => (
         <Space direction="vertical" size={2}>
           <a onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{value}</a>
@@ -235,7 +238,7 @@ export default function MyMeeting() {
       ),
     },
     {
-      title: '會議室', key: 'roomName', width: 200,
+      title: t('meeting.meetingRoom', { defaultValue: '會議室' }), key: 'roomName', width: 200,
       render: (_, record) => (
         <div>
           <div>{record.roomName}</div>
@@ -243,46 +246,46 @@ export default function MyMeeting() {
         </div>
       ),
     },
-    { title: '組織者', dataIndex: 'organizerName', key: 'organizerName', width: 110 },
+    { title: t('meeting.organizer', { defaultValue: '組織者' }), dataIndex: 'organizerName', key: 'organizerName', width: 110 },
     {
-      title: '參會', key: 'attendeeCount', width: 90,
+      title: t('meeting.attendees3', { defaultValue: '參會' }), key: 'attendeeCount', width: 90,
       render: (_, record) => `${record.attendeeCount ?? 0} 人`,
     },
     {
-      title: '我的身份', key: 'myRole', width: 110,
+      title: t('meeting.myRole', { defaultValue: '我的身份' }), key: 'myRole', width: 110,
       render: (_, record) => (
         <Tag color={record.myRole === 'organizer' ? 'blue' : record.myRole === 'none' ? 'default' : 'green'}>
-          {roleLabel(record.myRole)}
+          {roleLabel(t, record.myRole)}
         </Tag>
       ),
     },
     {
-      title: '狀態', key: 'phase', width: 110,
+      title: t('meeting.status', { defaultValue: '狀態' }), key: 'phase', width: 110,
       render: (_, record) => {
         const meta = phaseMeta(record.phase)
         return <Tag color={meta.color}>{meta.label}</Tag>
       },
     },
     {
-      title: '操作', key: 'action', width: 300, fixed: 'right',
+      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 300, fixed: 'right',
       // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作（取消）在最后
       render: (_, record) => (
         <Space size={0} wrap split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>詳情</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
           {record.myRole !== 'organizer' && record.status === 'booked' && record.myResponse === 'pending' && (
             <>
-              <Button type="link" size="small" onClick={() => void handleRespond(record, true)}>接受</Button>
-              <Button type="link" size="small" onClick={() => void handleRespond(record, false)}>婉拒</Button>
+              <Button type="link" size="small" onClick={() => void handleRespond(record, true)}>{t('meeting.accept', { defaultValue: '接受' })}</Button>
+              <Button type="link" size="small" onClick={() => void handleRespond(record, false)}>{t('meeting.decline', { defaultValue: '婉拒' })}</Button>
             </>
           )}
           {record.canCheckin && (
-            <Button type="link" size="small" onClick={() => void act(record.id, checkinMeeting, '已簽到')}>簽到</Button>
+            <Button type="link" size="small" onClick={() => void act(record.id, checkinMeeting, t('meeting.checkedIn', { defaultValue: '已簽到' }))}>{t('meeting.checkIn', { defaultValue: '簽到' })}</Button>
           )}
           {record.canFinish && (
-            <Button type="link" size="small" onClick={() => handleFinish(record)}>提前結束</Button>
+            <Button type="link" size="small" onClick={() => handleFinish(record)}>{t('meeting.finishEarly', { defaultValue: '提前結束' })}</Button>
           )}
           {record.canCancel && (
-            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>取消</Button>
+            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
           )}
         </Space>
       ),
@@ -296,32 +299,32 @@ export default function MyMeeting() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="這裡只顯示與你相關的會議：你發起的、你被邀請的"
-        description="組織者可改期與取消，參會人僅能響應邀約、簽到與查看。開啟簽到保留的會議，開始後超過保留分鐘未簽到將被行政或系統釋放。"
+        message={t('meeting.onlyMeetingsRelatedTo', { defaultValue: '這裡只顯示與你相關的會議：你發起的、你被邀請的' })}
+        description={t('meeting.theOrganizerCanReschedule', { defaultValue: '組織者可改期與取消，參會人僅能響應邀約、簽到與查看。開啟簽到保留的會議，開始後超過保留分鐘未簽到將被行政或系統釋放。' })}
       />
 
       {error && (
         <Alert
           type="error"
           showIcon
-          message="數據加載失敗"
+          message={t('meeting.failedToLoadData', { defaultValue: '數據加載失敗' })}
           description={error}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" icon={<ReloadOutlined />} onClick={refresh}>重試</Button>}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={refresh}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
         />
       )}
 
       {/* 今日日程：日期选择器放在面板内，因为它只影响这块，不影响下方列表 */}
       <div style={{ marginBottom: 16, padding: '12px 16px', background: '#FAFAFA', border: '1px solid #F0F0F0', borderRadius: 8 }}>
         <Space style={{ marginBottom: 8 }} wrap>
-          <strong style={{ fontSize: 13, color: '#262626' }}>我的日程</strong>
+          <strong style={{ fontSize: 13, color: '#262626' }}>{t('meeting.mySchedule', { defaultValue: '我的日程' })}</strong>
           <DatePicker value={day} allowClear={false} size="small"
             disabledDate={current => !!current && current < dayjs().startOf('day')}
             onChange={value => value && setDay(value)} />
           <span style={{ fontSize: 12, color: '#8C8C8C' }}>{agenda.length} 場</span>
         </Space>
         {agenda.length === 0 ? (
-          <div style={{ color: '#8C8C8C', fontSize: 12 }}>這一天沒有與你相關的會議</div>
+          <div style={{ color: '#8C8C8C', fontSize: 12 }}>{t('meeting.noMeetingRelatedTo', { defaultValue: '這一天沒有與你相關的會議' })}</div>
         ) : (
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             {agenda.map(item => (
@@ -332,7 +335,7 @@ export default function MyMeeting() {
                 <a onClick={() => navigate(`/meeting-detail?id=${item.bookingId}`)}>{item.title}</a>
                 <span style={{ fontSize: 12, color: '#8C8C8C' }}>{item.roomName}</span>
                 <Tag color={phaseMeta(item.phase).color}>{phaseMeta(item.phase).label}</Tag>
-                {item.myResponse === 'pending' && <Tag color="orange">待響應</Tag>}
+                {item.myResponse === 'pending' && <Tag color="orange">{t('meeting.pendingResponse', { defaultValue: '待響應' })}</Tag>}
               </Space>
             ))}
           </Space>
@@ -341,24 +344,24 @@ export default function MyMeeting() {
 
       <div className="search-section">
         <Form form={form} layout="inline" initialValues={{ group: query.group ?? 'all' }}>
-          <Form.Item label="關鍵字" name="keyword">
-            <Input placeholder="單號／主題" allowClear style={{ width: '100%' }} onPressEnter={search} />
+          <Form.Item label={t('meeting.keyword', { defaultValue: '關鍵字' })} name="keyword">
+            <Input placeholder={t('meeting.bookingNoTopic', { defaultValue: '單號／主題' })} allowClear style={{ width: '100%' }} onPressEnter={search} />
           </Form.Item>
-          <Form.Item label="分組" name="group">
+          <Form.Item label={t('meeting.group', { defaultValue: '分組' })} name="group">
             <Select
               style={{ width: '100%' }}
               options={[
-                { value: 'all', label: '全部狀態' },
-                { value: 'pending', label: '待開會' },
-                { value: 'ongoing', label: '進行中' },
-                { value: 'done', label: '已結束' },
+                { value: 'all', label: t('meeting.allStatuses', { defaultValue: '全部狀態' }) },
+                { value: 'pending', label: t('meeting.upcoming', { defaultValue: '待開會' }) },
+                { value: 'ongoing', label: t('meeting.ongoing', { defaultValue: '進行中' }) },
+                { value: 'done', label: t('meeting.finished2', { defaultValue: '已結束' }) },
               ]}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={search}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={reset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={search}>{t('meeting.search', { defaultValue: '查詢' })}</Button>
+              <Button icon={<ReloadOutlined />} onClick={reset}>{t('meeting.reset', { defaultValue: '重置' })}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -370,24 +373,24 @@ export default function MyMeeting() {
         onChange={key => { setTab(key as typeof tab); setQuery(q => ({ ...q, page: 1 })) }}
         items={[
           { key: 'todo', label: `待我響應${summary.pendingResponseCount ? `（${summary.pendingResponseCount}）` : ''}` },
-          { key: 'mine', label: '我發起的' },
-          { key: 'attended', label: '我參與的' },
-          { key: 'done', label: '已結束' },
+          { key: 'mine', label: t('meeting.organizedByMe', { defaultValue: '我發起的' }) },
+          { key: 'attended', label: t('meeting.iAttend', { defaultValue: '我參與的' }) },
+          { key: 'done', label: t('meeting.finished2', { defaultValue: '已結束' }) },
         ]}
       />
 
       <MeetingStatCards key={statsKey} loading={loading} items={[
-        { icon: <CalendarOutlined />, color: '#1890FF', bg: '#E6F7FF', value: summary.todayCount, label: '今日會議', hint: '我發起 + 我參與，按開始日期統計' },
-        { icon: <HourglassOutlined />, color: '#E8720C', bg: '#FFF7E6', value: summary.upcomingCount, label: '未來 7 天會議' },
-        { icon: <NotificationOutlined />, color: '#722ED1', bg: '#F9F0FF', value: summary.pendingResponseCount, label: '待我響應' },
-        { icon: <FolderOpenOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.total, label: '當前條件會議數' },
+        { icon: <CalendarOutlined />, color: '#1890FF', bg: '#E6F7FF', value: summary.todayCount, label: t('meeting.today', { defaultValue: '今日會議' }), hint: t('meeting.organizedByMePlus', { defaultValue: '我發起 + 我參與，按開始日期統計' }) },
+        { icon: <HourglassOutlined />, color: '#E8720C', bg: '#FFF7E6', value: summary.upcomingCount, label: t('meeting.meetingsInTheNext', { defaultValue: '未來 7 天會議' }) },
+        { icon: <NotificationOutlined />, color: '#722ED1', bg: '#F9F0FF', value: summary.pendingResponseCount, label: t('meeting.waitingForMe', { defaultValue: '待我響應' }) },
+        { icon: <FolderOpenOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.total, label: t('meeting.meetingsUnderCurrentFilters', { defaultValue: '當前條件會議數' }) },
       ]} />
 
       {/* 操作区（§E.2）：右侧只放「新增」与列配置 */}
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/meeting-booking')}>預約新會議</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/meeting-booking')}>{t('meeting.bookAMeeting', { defaultValue: '預約新會議' })}</Button>
           {configComponent}
         </div>
       </div>
@@ -434,12 +437,12 @@ function buildQuery(tab: string, base: MeetingQuery): MeetingQuery {
   }
 }
 
-function roleLabel(role?: string | null): string {
+function roleLabel(t: TFunction, role?: string | null): string {
   switch (role) {
-    case 'organizer': return '組織者'
-    case 'required': return '必參'
-    case 'optional': return '選參'
-    case 'external': return '外部'
-    default: return '無關'
+    case 'organizer': return t('meeting.organizer', { defaultValue: '組織者' })
+    case 'required': return t('meeting.required', { defaultValue: '必參' })
+    case 'optional': return t('meeting.optional', { defaultValue: '選參' })
+    case 'external': return t('meeting.external', { defaultValue: '外部' })
+    default: return t('meeting.unrelated', { defaultValue: '無關' })
   }
 }

@@ -64,6 +64,8 @@ public class RdmDeliveryVO {
         private String reqNo;
         private String reqTitle;
         private String reqStatus;
+        /** 任务归属的交付项ID（任务19 / 缺口2）：回显给前端，V3 下任务挂在具体交付项上 */
+        private Long deliveryItemId;
         private Long prdId;
         private String taskType;
         private String title;
@@ -90,6 +92,25 @@ public class RdmDeliveryVO {
         /** 是否已逾期（计划完成日已过且未完成） */
         private Boolean overdue;
         private String createdAt;
+    }
+
+    /**
+     * 任务负责人资格预检结果。
+     * <p>只用于界面提醒：无研发交付权限不阻断保存（先排期、后补权限），
+     * 离职/停用才会在保存时被真正拦下。
+     */
+    @Data
+    public static class OwnerCheck {
+        /** 负责人是否可正常干活（在职启用且具备研发交付权限） */
+        private Boolean able = true;
+        /** 是否会被保存硬拦下（离职/停用/查无此人）；false 表示只提醒不阻断 */
+        private Boolean hardBlocked = false;
+        /** 负责人姓名（回显确认派给了谁） */
+        private String ownerName;
+        /** 负责人所在部门（表单「所屬部門」自动带出用，编辑态也能回填） */
+        private String department;
+        /** 提醒文案（null 表示无需提醒） */
+        private String warning;
     }
 
     /** 需求下的交付概览（PRD + 任务汇总） */

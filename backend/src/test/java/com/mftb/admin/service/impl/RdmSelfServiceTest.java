@@ -78,7 +78,11 @@ class RdmSelfServiceTest {
         configService = mock(RdmConfigService.class);
         operatorResolver = mock(OperatorResolver.class);
         PermissionService permissionService = mock(PermissionService.class);
-        RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper);
+        RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
+                mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
+                mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
+                mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));
         policyService = mock(RdmIntakePolicyService.class);
         roundService = mock(RdmIntakeRoundService.class);
         bizSeqService = mock(BizSeqService.class);
@@ -93,7 +97,11 @@ class RdmSelfServiceTest {
                 configService, mock(RdmNotifyService.class),
                 oaRequestService, mock(RdmIntakeCallbackService.class),
                 permissionService, mock(JdbcTemplate.class), accessGuard, policyService, roundService,
-                mock(com.mftb.admin.service.RdmReleaseService.class));
+                mock(com.mftb.admin.service.RdmReleaseService.class),
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
+                mock(com.mftb.admin.service.RdmRequirementStructureService.class),
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class),
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
 
         // 默认裁决：需审批、走上级主管；不预置时 service 会拿到 null 裁决并NPE，测试要的是真实分支
         when(policyService.decide(any(), any(), any())).thenReturn(approveDecision());

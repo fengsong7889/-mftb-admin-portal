@@ -166,6 +166,8 @@ export default function MenuConfig() {
     if (code === activeSystem) return
     if (editingId != null) {
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('menuConfig.discardTitle'),
         content: t('menuConfig.discardContent'),
         okText: t('common.confirm'),

@@ -89,6 +89,8 @@ export default function SupplierForm({ id, onBack }: Props) {
       return
     }
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteContact'),
       content: `${c.contactName || t('asset.contactNameEmpty')}`,
       okText: t('common.confirm'),

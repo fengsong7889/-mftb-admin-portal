@@ -97,6 +97,8 @@ export default function AccountBalance() {
   /** 凍結賬戶 */
   const handleFreeze = (record: AccountRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('accountBalance.freezeTitle'),
       content: t('accountBalance.freezeContent', { name: record.groupName }),
       okText: t('accountBalance.freezeOk'),
@@ -113,6 +115,8 @@ export default function AccountBalance() {
   /** 解凍賬戶 */
   const handleUnfreeze = (record: AccountRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('accountBalance.unfreezeTitle'),
       content: t('accountBalance.unfreezeContent', { name: record.groupName }),
       okText: t('accountBalance.unfreezeOk'),

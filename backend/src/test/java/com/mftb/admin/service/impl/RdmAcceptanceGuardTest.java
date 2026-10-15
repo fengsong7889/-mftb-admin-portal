@@ -78,10 +78,18 @@ class RdmAcceptanceGuardTest {
                 mock(OaRequestService.class), mock(RdmIntakeCallbackService.class),
                 mock(PermissionService.class),
                 mock(JdbcTemplate.class),
-                new RdmAccessGuard(operatorResolver, mock(PermissionService.class), requirementMapper, roleMapper),
+                new RdmAccessGuard(operatorResolver, mock(PermissionService.class), requirementMapper, roleMapper,
+                        mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                        mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
+                        mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
+                        mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class)),
                 mock(com.mftb.admin.service.RdmIntakePolicyService.class),
                 mock(com.mftb.admin.service.RdmIntakeRoundService.class),
-                mock(com.mftb.admin.service.RdmReleaseService.class));
+                mock(com.mftb.admin.service.RdmReleaseService.class),
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
+                mock(com.mftb.admin.service.RdmRequirementStructureService.class),
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class),
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
         // 待业务验收状态才可提交验收；不预置产品经理，避免触发钉钉通知路径
         RdmRequirement req = new RdmRequirement();
         req.setId(1L);

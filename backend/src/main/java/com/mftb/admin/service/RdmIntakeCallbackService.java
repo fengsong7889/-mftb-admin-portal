@@ -47,6 +47,8 @@ public class RdmIntakeCallbackService {
     private final RdmNotifyService notifyService;
     private final RdmIntakeRoundService roundService;
     private final SysUserMapper userMapper;
+    /** 任务19 / 缺口1：准入通过后为执行类 V3 需求补建默认交付项（OA 回调不走 transition 状态机） */
+    private final RdmDeliveryItemService deliveryItemService;
 
     /** 是否需求准入流程 */
     public boolean isIntakeProcess(String processCode) {
@@ -85,6 +87,9 @@ public class RdmIntakeCallbackService {
         } else {
             moveToPool(req, RdmConstants.ACTION_APPROVE_INTAKE, "審批通過，進入需求池");
         }
+        // 任务19 / 缺口1：准入通过是执行类 V3 需求生成默认交付项的正确时机。
+        // 重新拉取需求以取到 moveTo* 落库后的最新状态与受理人；建项失败不回滚已通过的准入流转。
+        maybeCreateV3DefaultItemAfterIntake(requirementMapper.selectById(req.getId()));
         notifyService.notifyUserIds(RdmConstants.EVENT_INTAKE_PASS, req, List.of(req.getSubmitterUserId()),
                 "需求已通過准入", "### ✅ 需求准入通過\n\n- **編號**: " + req.getReqNo() + "\n- **標題**: "
                         + req.getTitle() + "\n\n" + (dispatched
@@ -97,6 +102,35 @@ public class RdmIntakeCallbackService {
                             + "\n- **標題**: " + req.getTitle() + "\n- **提出人**: " + req.getSubmitterName()
                             + "\n- **優先級**: " + req.getPriority() + "\n\n請盡快分配產品經理（超時將升級提醒）。"
             );
+        }
+    }
+
+    /**
+     * 准入通过后为「执行类 V3 需求」补建默认交付项（任务19 / 缺口1）。
+     * <p>OA 回调不走 {@code transition} 状态机，故在此显式补建；与需求 create/selfSubmit 的口径一致：
+     * 仅 V3 + execution 且非草稿/待准入/驳回时建项，聚合需求不建。
+     * <p>建项失败只记日志、不回滚已通过的准入流转（与本回调“办理失败不回滚审批”同口径）。
+     */
+    private void maybeCreateV3DefaultItemAfterIntake(RdmRequirement req) {
+        if (req == null) {
+            return;
+        }
+        Integer flowVersion = req.getFlowVersion();
+        if (flowVersion == null || flowVersion != RdmConstants.FLOW_VERSION_3) {
+            return;
+        }
+        if (!RdmConstants.KIND_EXECUTION.equals(req.getRequirementKind())) {
+            return;
+        }
+        String status = req.getStatus();
+        if (RdmConstants.STATUS_DRAFT.equals(status) || RdmConstants.STATUS_INTAKE_PENDING.equals(status)
+                || RdmConstants.STATUS_INTAKE_REJECTED.equals(status)) {
+            return;
+        }
+        try {
+            deliveryItemService.getOrCreateDefaultItem(req.getId(), req.getSubmitterUserId());
+        } catch (Exception e) {
+            log.error("准入通過後補建默認交付項失敗（不回滾准入）: reqId={}, reqNo={}", req.getId(), req.getReqNo(), e);
         }
     }
 

@@ -1052,6 +1052,17 @@
   border-color: #F59432;
   box-shadow: 0 4px 12px rgba(232, 114, 12, 0.4);
 }
+/* 弹窗危险确认（okButtonProps.danger / okType='danger'）保持红色，不能被主色规则盖掉 */
+.ant-modal-footer .ant-btn-primary.ant-btn-dangerous {
+  background: #FF4D4F;
+  border-color: #FF4D4F;
+  box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
+}
+.ant-modal-footer .ant-btn-primary.ant-btn-dangerous:hover {
+  background: #FF7875;
+  border-color: #FF7875;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.35);
+}
 /* 弹窗取消按钮 - 描边柔和 */
 .ant-modal-footer .ant-btn-default {
   border-color: #D9D9D9;
@@ -2696,28 +2707,51 @@
   margin-top: 28px;
   padding: 0;
 }
-/* 确认按钮：全局蓝色（antd 主色） */
+/*
+ * 确认按钮：品牌主色实心（AGENTS §B.1「弹窗底部-确认 = 主色实心」）。
+ * Modal.confirm 走静态 API、不在 React 树内，不继承 ConfigProvider 的 colorPrimary，
+ * 会退回 antd 默认蓝 #1677FF —— 必须显式覆盖。选择器故意不带 custom-confirm-modal，
+ * 让漏加类名的确认弹窗也不会漏色（历史上这里写过蓝色，与规范冲突）。
+ */
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary {
+  background: #E8720C;
+  border-color: #E8720C;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
+}
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary:hover {
+  background: #F59432;
+  border-color: #F59432;
+  box-shadow: 0 4px 12px rgba(232, 114, 12, 0.4);
+}
+/* 危险确认（okType: 'danger'）保持红色，不能被上面的主色规则盖掉 */
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous {
+  background: #FF4D4F;
+  border-color: #FF4D4F;
+  box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
+}
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous:hover {
+  background: #FF7875;
+  border-color: #FF7875;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.35);
+}
+/* 确认按钮尺寸（只对统一样式的确认弹窗生效，颜色由上面的全局规则兜底） */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-primary {
   height: 38px;
   padding: 0 24px;
   min-width: 96px;
   border-radius: 8px;
-  background: #1677FF;
   border: none;
   font-weight: 500;
   font-size: 14px;
-  color: #fff;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.25);
 }
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-primary:hover {
-  background: #4096FF;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.35);
 }
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-primary:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(22, 119, 255, 0.25);
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
 }
 /* 取消按钮：白色描边 */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-default {
@@ -2732,9 +2766,10 @@
   background: #fff;
   color: #595959;
 }
+/* 取消按钮 hover 跟随品牌橙（与 .ant-modal-footer 同一口径） */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-default:hover {
-  border-color: #1677FF;
-  color: #1677FF;
+  border-color: #E8720C;
+  color: #E8720C;
 }
 
 /* ── 表單標籤幫助提示（label + ? 圖標 + Tooltip） ── */

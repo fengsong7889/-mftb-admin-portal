@@ -4,8 +4,8 @@
  * 研发负责人/产品经理把一条需求拆成 UI设计/前端/后端/测试/数据 任务，
  * 指派到人并登记计划工时与起止日期；已受理的需求拆任务后自动进入「開發中」。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -13,12 +13,14 @@ import dayjs from 'dayjs'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { fetchEmployees } from '../../api/employee'
 import {
+  checkTaskOwner,
   fetchIterations,
   fetchReqTasks,
   fetchRequirementDetail,
   saveTask,
   type RdmIterationItem,
   type RdmTaskForm as RdmTaskFormValues,
+  type RdmTaskOwnerCheck,
 } from '../../api/rdm'
 import { RDM_ITERATION_STATUS, RDM_TASK_TYPE_LABEL, type RdmTaskType } from '../../constants/rdm'
 import './index.css'
@@ -47,7 +49,38 @@ export default function TaskForm() {
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
   /** 负责人显示名：表单值只有 userId，确认框光靠 id 没法核对派给了谁 */
   const [ownerLabel, setOwnerLabel] = useState<string>()
+  /** 负责人资格预检：无研发交付权限只提醒、不阻断保存 */
+  const [ownerCheck, setOwnerCheck] = useState<RdmTaskOwnerCheck | null>(null)
+  /** 所属部门：负责人派生字段，不入库（任务上已存工号，部门随时可反查） */
+  const [ownerDept, setOwnerDept] = useState<string>()
+  /** 员工 id → 部门：下拉数据带回来的，选完立刻回填，不等预检接口 */
+  const deptByIdRef = useRef<Record<string, string>>({})
+  /** 预检请求序号：快速换人时丢弃过期响应，避免提醒对不上当前负责人 */
+  const ownerCheckSeq = useRef(0)
   const [saving, setSaving] = useState(false)
+
+  /**
+   * 选完人即预检负责人资格。
+   * <p>预检失败不得阻断派活：拿不到结果就当无提醒，真正的硬约束（离职/停用）
+   * 仍由保存接口兜底拦截。
+   */
+  const checkOwner = useCallback(async (userId?: string) => {
+    const seq = ++ownerCheckSeq.current
+    if (!userId) {
+      setOwnerCheck(null)
+      setOwnerDept(undefined)
+      return
+    }
+    try {
+      const res = await checkTaskOwner(Number(userId))
+      if (seq !== ownerCheckSeq.current) return
+      setOwnerCheck(res)
+      // 接口没回部门时保留下拉带回来的值，不把已显示的部门清空
+      if (res.department) setOwnerDept(res.department)
+    } catch {
+      if (seq === ownerCheckSeq.current) setOwnerCheck(null)
+    }
+  }, [])
 
   useEffect(() => {
     fetchIterations().then(setIterations).catch(() => setIterations([]))
@@ -76,12 +109,17 @@ export default function TaskForm() {
       if (task.ownerName) {
         setOwnerLabel(task.ownerEmpNo ? `${task.ownerName}（${task.ownerEmpNo}）` : task.ownerName)
       }
+      // 编辑态也预检：历史任务可能派给了当时有权限、后来被收权的人
+      void checkOwner(task.ownerUserId ? String(task.ownerUserId) : undefined)
     }).catch(() => message.error('任務資訊載入失敗'))
-  }, [reqId, taskId, form])
+  }, [reqId, taskId, form, checkOwner])
 
   const fetchOwnerOptions = useCallback(async (keyword: string) => {
     const res = await fetchEmployees({ page: 1, size: 20, keyword: keyword || undefined, employmentStatus: 'active' })
-    return (res.records ?? []).map(e => ({ value: String(e.id), label: `${e.name}（${e.empId}${e.department ? ` · ${e.department}` : ''}）` }))
+    const records = res.records ?? []
+    // 部门不再挤进下拉标签（一个字段只装一个语义），单独缓存供选完即时带出
+    records.forEach(e => { if (e.department) deptByIdRef.current[String(e.id)] = e.department })
+    return records.map(e => ({ value: String(e.id), label: `${e.name}（${e.empId}）` }))
   }, [])
 
   const ownerOptions = useMemo(() => {
@@ -106,6 +144,10 @@ export default function TaskForm() {
           <div className="confirm-info-row"><span>任務標題：</span><b>{values.title.trim()}</b></div>
           <div className="confirm-info-row"><span>任務類型：</span><b>{RDM_TASK_TYPE_LABEL[values.taskType as RdmTaskType] ?? values.taskType}</b></div>
           <div className="confirm-info-row"><span>負責人：</span><b>{ownerText}</b></div>
+          {/* 无交付权限不阻断保存，但必须在确认框里再提醒一次，否则 PM 会以为对方能直接上报进度 */}
+          {ownerCheck?.warning && (
+            <div className="confirm-info-row"><span>權限提醒：</span><b style={{ color: '#D46B08' }}>{ownerCheck.warning}</b></div>
+          )}
           <div className="confirm-info-row"><span>計劃工時：</span><b>{values.planHours ?? '-'} h</b></div>
           {!taskId && <div className="confirm-info-row"><span>說明：</span><b>創建後負責人會收到待辦提醒</b></div>}
         </div>
@@ -137,7 +179,7 @@ export default function TaskForm() {
       message.success(taskId ? '任務已更新' : '任務已創建並指派')
       navigate(reqId ? `/rdm-detail?id=${reqId}` : '/rdm-delivery')
     } catch {
-      message.error('保存失敗，請重試')
+      // request.ts 已统一弹后端返回的失败原因（如「已離職或停用，請改派他人」），此处不再重复弹
     } finally {
       setSaving(false)
     }
@@ -152,39 +194,57 @@ export default function TaskForm() {
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '將需求拆成可執行任務並指派到人，工時用於產出量化'}
       />
 
-      <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
+      {/* 表单不再锁 720px：独立页必须撑满内容区，字段按全局规范每行 3 列铺开 */}
+      <Form form={form} layout="vertical">
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">任務信息</div>
-          <Form.Item label="所屬需求">
-            <Input value={requirement ? `${requirement.reqNo} ${requirement.title}` : '-'} disabled />
-          </Form.Item>
-          <Form.Item label="任務類型" name="taskType" rules={[{ required: true, message: '請選擇任務類型' }]}>
-            <Select
-              style={{ width: 220 }}
-              placeholder="選擇任務類型"
-              options={Object.entries(RDM_TASK_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
-            />
-          </Form.Item>
-          <Form.Item label="任務標題" name="title" rules={[{ required: true, message: '請填寫任務標題' }, { max: 120, message: '不超過 120 字' }]}>
-            <Input placeholder="例：報表導出支持自定義時間區間（前端）" maxLength={120} showCount />
-          </Form.Item>
-          <Form.Item label="任務說明 / 技術方案" name="content">
-            <TextArea rows={4} placeholder="寫清改動點、接口/組件、依賴與驗收要點，減少來回問" />
-          </Form.Item>
+          <div className="rdm-task-fields">
+            <Form.Item label="所屬需求" className="rdm-field-full">
+              <Input value={requirement ? `${requirement.reqNo} ${requirement.title}` : '-'} disabled />
+            </Form.Item>
+            <Form.Item label="任務類型" name="taskType" rules={[{ required: true, message: '請選擇任務類型' }]}>
+              <Select
+                placeholder="選擇任務類型"
+                options={Object.entries(RDM_TASK_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+              />
+            </Form.Item>
+            <Form.Item
+              label="任務標題"
+              name="title"
+              className="rdm-field-span2"
+              rules={[{ required: true, message: '請填寫任務標題' }, { max: 120, message: '不超過 120 字' }]}
+            >
+              <Input placeholder="例：報表導出支持自定義時間區間（前端）" maxLength={120} showCount />
+            </Form.Item>
+            <Form.Item label="任務說明 / 技術方案" name="content" className="rdm-field-full">
+              <TextArea rows={4} placeholder="寫清改動點、接口/組件、依賴與驗收要點，減少來回問" />
+            </Form.Item>
+          </div>
         </div>
 
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">指派與排期</div>
-          <Form.Item label="負責人" name="owner" rules={[{ required: true, message: '請選擇負責人' }]}>
-            <RemoteSearchSelect
-              placeholder="輸入姓名/工號搜索在職員工"
-              fetchOptions={fetchOwnerOptions}
-              initialOptions={ownerOptions}
-              onChange={(_, label) => setOwnerLabel(label)}
-              style={{ width: 320 }}
-            />
-          </Form.Item>
-          <Space size={16} wrap>
+          <div className="rdm-task-fields">
+            <Form.Item label="負責人" name="owner" rules={[{ required: true, message: '請選擇負責人' }]}>
+              <RemoteSearchSelect
+                placeholder="輸入姓名/工號搜索在職員工"
+                fetchOptions={fetchOwnerOptions}
+                initialOptions={ownerOptions}
+                onChange={(value, label) => {
+                  setOwnerLabel(label)
+                  setOwnerDept(value ? deptByIdRef.current[value] : undefined)
+                  void checkOwner(value)
+                }}
+              />
+            </Form.Item>
+            {/* 部门是负责人的派生信息，只读回显：手填会和工号反查结果不一致 */}
+            <Form.Item label="所屬部門">
+              <Input
+                disabled
+                value={ownerDept ?? ''}
+                placeholder={form.getFieldValue('owner') ? '該員工未配置部門' : '選擇負責人後自動帶出'}
+              />
+            </Form.Item>
             <Form.Item
               label="計劃工時（小時）"
               name="planHours"
@@ -193,14 +253,13 @@ export default function TaskForm() {
                 message: '計劃工時必須在 0-999 人時之間',
               }]}
             >
-              <InputNumber min={0} step={1} style={{ width: 150 }} placeholder="例：16" />
+              <InputNumber min={0} step={1} placeholder="例：16" />
             </Form.Item>
             <Form.Item label="計劃起止" name="planRange">
-              <DatePicker.RangePicker style={{ width: 260 }} />
+              <DatePicker.RangePicker />
             </Form.Item>
             <Form.Item label="所屬迭代" name="iterationCode">
               <Select
-                style={{ width: 220 }}
                 allowClear
                 placeholder="選擇迭代（可選）"
                 options={iterations.filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED).map(i => ({
@@ -209,7 +268,15 @@ export default function TaskForm() {
                 }))}
               />
             </Form.Item>
-          </Space>
+            {ownerCheck?.warning && (
+              <Alert
+                type={ownerCheck.hardBlocked ? 'error' : 'warning'}
+                showIcon
+                style={{ gridColumn: '1 / -1' }}
+                message={ownerCheck.warning}
+              />
+            )}
+          </div>
         </div>
       </Form>
 

@@ -16,6 +16,7 @@ import {
   ExclamationCircleOutlined,
   FileAddOutlined,
   InboxOutlined,
+  ProjectOutlined,
   RightOutlined,
   RocketOutlined,
   SolutionOutlined,
@@ -25,8 +26,10 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchRequirementPage, fetchWorkbench, type RdmRequirementRow, type RdmWorkbenchData } from '../../api/rdm'
+import { fetchProjectPage, fetchRequirementPage, fetchWorkbench, fetchWorkbenchSummary, type RdmProjectListItem, type RdmRequirementRow, type RdmWorkbenchData, type RdmWorkbenchSummary } from '../../api/rdm'
 import {
+  RDM_PROJECT_STATUS_COLOR,
+  RDM_PROJECT_STATUS_LABEL,
   RDM_SCOPE,
   RDM_STAGE_LABEL,
   RDM_STAGE_ORDER,
@@ -122,17 +125,25 @@ export default function RdmWorkbench() {
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
   /** 我提的需求（含草稿与被驳回的），走列表接口 scope=mine，与待办分区不同口径 */
   const [mineRows, setMineRows] = useState<RdmRequirementRow[]>([])
+  /** V3：我參與的項目（PM 或成員） */
+  const [myProjects, setMyProjects] = useState<RdmProjectListItem[]>([])
+  /** Batch2：个人工作台聚合摘要（后端不可用时为 null，相关区块自动隐藏） */
+  const [wbSummary, setWbSummary] = useState<RdmWorkbenchSummary | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // 两个只读接口任一失败都不应把整页打成空白，所以提交列表单独兜底
-      const [wb, mine] = await Promise.all([
+      // 三个只读接口任一失败都不应把整页打成空白，所以各自单独兜底
+      const [wb, mine, projects, summ] = await Promise.all([
         fetchWorkbench(),
         fetchRequirementPage({ page: 1, size: 6, scope: RDM_SCOPE.MINE }).catch(() => null),
+        fetchProjectPage({ pageNo: 1, pageSize: 8 }).catch(() => null),
+        fetchWorkbenchSummary().catch(() => null),
       ])
       setData(wb)
       setMineRows(mine?.records ?? [])
+      setMyProjects(projects?.records ?? [])
+      setWbSummary(summ)
     } catch {
       message.error('工作台數據載入失敗')
     } finally {
@@ -214,6 +225,61 @@ export default function RdmWorkbench() {
         />
       </div>
 
+      {/* ── Batch2：个人交付聚合摘要（后端摘要可用时才展示）── */}
+      {wbSummary && (
+        <div style={{ marginBottom: 16 }}>
+          <StatCards
+            items={[
+              { key: 'myProjects', icon: <ProjectOutlined />, value: wbSummary.myProjectCount, label: '我的項目數', color: 'info' },
+              { key: 'myPending', icon: <ClockCircleOutlined />, value: wbSummary.myPendingTaskCount, label: '待辦任務數', color: 'system' },
+              { key: 'myDelivery', icon: <RocketOutlined />, value: wbSummary.myDeliveryItemCount, label: '我的交付項數', color: 'brand' },
+              { key: 'upcoming', icon: <AlertOutlined />, value: wbSummary.upcomingDeadlineCount, label: '近期到期數', color: 'success' },
+            ]}
+          />
+        </div>
+      )}
+
+      {/* ── V3 我的項目（只在有項目數據時展示）── */}
+      {myProjects.length > 0 && (
+        <div className="rdm-v3-projects">
+          <div className="rdm-card-title">
+            <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><ProjectOutlined /></span>
+            我的項目
+            <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
+            <span className="rdm-todo-hint">分批交付項目進度一覽</span>
+          </div>
+          <div className="rdm-v3-project-scroll">
+            {myProjects.slice(0, 4).map(proj => (
+              <div
+                key={proj.id}
+                className="rdm-v3-project-card"
+                onClick={() => navigate(`/rdm-project-detail?id=${proj.id}`)}
+              >
+                <div className="rdm-v3-project-card-head">
+                  <span className="rdm-v3-project-card-name" title={proj.name}>{proj.name}</span>
+                  <Tag color={RDM_PROJECT_STATUS_COLOR[proj.status] ?? 'default'} style={{ margin: 0 }}>
+                    {RDM_PROJECT_STATUS_LABEL[proj.status] ?? proj.status}
+                  </Tag>
+                </div>
+                <div className="rdm-v3-project-card-meta">
+                  {(() => {
+                    const sp = wbSummary?.projects.find(p => p.projectId === proj.id)
+                    return <span>交付項 <b>{sp ? `${sp.deliveryItemCompleted}/${sp.deliveryItemTotal}` : `${proj.deliveredCount}/${proj.totalDeliveryCount}`}</b></span>
+                  })()}
+                  {proj.nextDeliveryDate && <span>下次交付：{proj.nextDeliveryDate}</span>}
+                </div>
+                {(proj.blockedCount > 0 || proj.pendingDecisionCount > 0) && (
+                  <div className="rdm-v3-project-card-warn">
+                    {proj.blockedCount > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>阻塞 {proj.blockedCount}</Tag>}
+                    {proj.pendingDecisionCount > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>待決策 {proj.pendingDecisionCount}</Tag>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── 需要我补充（提出人阻塞项，排在待办分区之前：球在我手上就先看到）── */}
       {needAction.length > 0 && (
         <div className="rdm-card" style={{ marginBottom: 16 }}>
@@ -289,6 +355,12 @@ export default function RdmWorkbench() {
                       <span>提出人：{item.submitterName}</span>
                       {item.submitDeptName && <span>{item.submitDeptName}</span>}
                       {item.expectDate && <span>期望：{item.expectDate}</span>}
+                      {/* V3：显示交付项进度 */}
+                      {item.flowVersion === 3 && item.deliveryItemCount != null && item.deliveryItemCount > 0 && (
+                        <span style={{ color: '#2F54EB', fontWeight: 500 }}>
+                          交付項 {item.deliveryDoneCount ?? 0}/{item.deliveryItemCount}
+                        </span>
+                      )}
                       {item.stayHours != null && item.stayHours > 24 && (
                         <span style={{ color: '#D46B08' }}>
                           已停留 {Math.round(item.stayHours / 24)} 天

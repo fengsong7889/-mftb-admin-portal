@@ -5,16 +5,19 @@
  * 因此默认筛选「未完成」，逾期与阻塞置顶；上报走行内展开面板（不弹窗，避免打断录入）。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Input, InputNumber, Progress, Segmented, Space, Table, Tag, message } from 'antd'
+import { Alert, Badge, Button, Empty, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Spin, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileAddOutlined,
+  LinkOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
+  PlusOutlined,
   ReloadOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -23,11 +26,24 @@ import GanttChart from './components/GanttChart'
 import WorkloadPanel from './components/WorkloadPanel'
 import { useAuth } from '../../contexts/AuthContext'
 import {
+  addCrossDeliveryDependency,
+  fetchBlockedTasks,
+  fetchDeliveryItems,
   fetchMyTasks,
+  fetchReqTasks,
   reportTask,
+  type RdmBlockedTaskInfo,
+  type RdmDeliveryItemListItem,
   type RdmTaskItem,
 } from '../../api/rdm'
 import {
+  RDM_BLOCK_POINT,
+  RDM_BLOCK_POINT_COLOR,
+  RDM_BLOCK_POINT_LABEL,
+  RDM_DELIVERY_ITEM_STATUS_COLOR,
+  RDM_DELIVERY_ITEM_STATUS_LABEL,
+  RDM_DEP_TYPE,
+  RDM_DEP_TYPE_LABEL,
   RDM_TASK_ACTION,
   RDM_TASK_ACTION_LABEL,
   RDM_TASK_STATUS,
@@ -58,6 +74,12 @@ const MODE_OPTIONS = [
   { label: '資源負載', value: 'load' },
 ]
 
+/** V3：任务分组视角（按任务 / 按交付项） */
+const GROUP_MODE_OPTIONS = [
+  { label: '按任務', value: 'task' },
+  { label: '按交付項', value: 'deliveryItem' },
+]
+
 export default function DeliveryBoard() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
@@ -71,6 +93,28 @@ export default function DeliveryBoard() {
   const [actualHours, setActualHours] = useState<number | null>(null)
   const [remark, setRemark] = useState('')
   const [saving, setSaving] = useState(false)
+  /** V3：任务分组视角 */
+  const [groupMode, setGroupMode] = useState<'task' | 'deliveryItem'>('task')
+  /** V3：交付项列表（按交付项分组时用） */
+  const [deliveryItems, setDeliveryItems] = useState<RdmDeliveryItemListItem[]>([])
+  const [deliveryItemsLoading, setDeliveryItemsLoading] = useState(false)
+
+  /** Batch2：跨交付项依赖弹窗 */
+  const [depModalOpen, setDepModalOpen] = useState(false)
+  const [depSuccTask, setDepSuccTask] = useState<RdmTaskItem | null>(null)
+  const [depItems, setDepItems] = useState<RdmDeliveryItemListItem[]>([])
+  const [depItemsLoading, setDepItemsLoading] = useState(false)
+  const [depPredItemId, setDepPredItemId] = useState<number | undefined>()
+  const [depPredTasks, setDepPredTasks] = useState<RdmTaskItem[]>([])
+  const [depPredTasksLoading, setDepPredTasksLoading] = useState(false)
+  const [depPredTaskId, setDepPredTaskId] = useState<number | undefined>()
+  const [depBlockPoint, setDepBlockPoint] = useState<string>(RDM_BLOCK_POINT.START)
+  const [depType, setDepType] = useState<string>(RDM_DEP_TYPE.FS)
+  const [depSubmitting, setDepSubmitting] = useState(false)
+
+  /** Batch2：交付项阻塞任务映射（按交付项分组视图用） */
+  const [blockedMap, setBlockedMap] = useState<Record<number, RdmBlockedTaskInfo[]>>({})
+  const [expandedBlockedId, setExpandedBlockedId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -92,6 +136,101 @@ export default function DeliveryBoard() {
 
   useEffect(() => { void load() }, [load])
 
+  /** V3：按交付项分组时拉取交付项列表 */
+  useEffect(() => {
+    if (groupMode !== 'deliveryItem') { setDeliveryItems([]); return }
+    setDeliveryItemsLoading(true)
+    fetchDeliveryItems({ pageNo: 1, pageSize: 200 })
+      .then(res => setDeliveryItems(res.records ?? []))
+      .catch(() => setDeliveryItems([]))
+      .finally(() => setDeliveryItemsLoading(false))
+  }, [groupMode])
+
+  /** V3：按交付项分组的任务 */
+  const groupedByDeliveryItem = useMemo(() => {
+    if (groupMode !== 'deliveryItem' || deliveryItems.length === 0) return null
+    const map = new Map<number | 'none', { item?: RdmDeliveryItemListItem; tasks: RdmTaskItem[] }>()
+    // 初始化每个交付项的分组
+    deliveryItems.forEach(di => map.set(di.id, { item: di, tasks: [] }))
+    map.set('none', { tasks: [] })
+    // 分配任务到对应分组
+    rows.forEach(task => {
+      const key = task.deliveryItemId ?? 'none'
+      const group = map.get(key)
+      if (group) group.tasks.push(task)
+      else map.get('none')!.tasks.push(task)
+    })
+    return [...map.entries()].filter(([, g]) => g.tasks.length > 0 || g.item)
+  }, [groupMode, deliveryItems, rows])
+
+  /** Batch2：按交付项分组时，拉每个交付项的阻塞任务（后端不可用时降级为空） */
+  useEffect(() => {
+    if (groupMode !== 'deliveryItem' || deliveryItems.length === 0) { setBlockedMap({}); return }
+    let cancelled = false
+    Promise.all(deliveryItems.map(di =>
+      fetchBlockedTasks(di.id).catch(() => [] as RdmBlockedTaskInfo[]).then(list => [di.id, list] as const)
+    )).then(entries => {
+      if (cancelled) return
+      const map: Record<number, RdmBlockedTaskInfo[]> = {}
+      entries.forEach(([id, list]) => { if (list.length > 0) map[id] = list })
+      setBlockedMap(map)
+    }).catch(() => { if (!cancelled) setBlockedMap({}) })
+    return () => { cancelled = true }
+  }, [groupMode, deliveryItems])
+
+  /** Batch2：打开「添加跨交付项依赖」弹窗 */
+  const openDepModal = (task: RdmTaskItem) => {
+    setDepSuccTask(task)
+    setDepPredItemId(undefined)
+    setDepPredTaskId(undefined)
+    setDepPredTasks([])
+    setDepBlockPoint(RDM_BLOCK_POINT.START)
+    setDepType(RDM_DEP_TYPE.FS)
+    setDepModalOpen(true)
+    setDepItemsLoading(true)
+    fetchDeliveryItems({ pageNo: 1, pageSize: 200 })
+      .then(res => setDepItems((res.records ?? []).filter(di => di.id !== task.deliveryItemId)))
+      .catch(() => setDepItems([]))
+      .finally(() => setDepItemsLoading(false))
+  }
+
+  /** Batch2：选定前置交付项后拉其任务 */
+  const handlePredItemChange = (itemId: number) => {
+    setDepPredItemId(itemId)
+    setDepPredTaskId(undefined)
+    const item = depItems.find(di => di.id === itemId)
+    if (!item) { setDepPredTasks([]); return }
+    setDepPredTasksLoading(true)
+    fetchReqTasks(item.reqId)
+      .then(tasks => setDepPredTasks((tasks ?? []).filter(t => t.deliveryItemId === itemId)))
+      .catch(() => setDepPredTasks([]))
+      .finally(() => setDepPredTasksLoading(false))
+  }
+
+  /** Batch2：提交跨交付项依赖 */
+  const submitDep = async () => {
+    if (!depSuccTask || !depPredTaskId) {
+      message.warning('請選擇前置交付項與前置任務')
+      return
+    }
+    setDepSubmitting(true)
+    try {
+      await addCrossDeliveryDependency({
+        predTaskId: depPredTaskId,
+        succTaskId: depSuccTask.id,
+        depType,
+        blockPoint: depBlockPoint,
+      })
+      message.success('跨交付項依賴已添加')
+      setDepModalOpen(false)
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error && err.message ? err.message : '添加依賴失敗，請重試')
+    } finally {
+      setDepSubmitting(false)
+    }
+  }
+
   const stats = useMemo(() => ({
     total: rows.length,
     doing: rows.filter(r => r.status === RDM_TASK_STATUS.DOING).length,
@@ -103,8 +242,17 @@ export default function DeliveryBoard() {
 
   /** 上报任务动作（开始/完成/阻塞/解除），完成后自动收起面板 */
   const handleReport = async (task: RdmTaskItem, action: RdmTaskAction) => {
-    if (action === RDM_TASK_ACTION.BLOCK && !remark.trim()) {
-      message.warning('標記阻塞必須填寫阻塞原因')
+    /*
+     * 完成与阻塞都必须先有说明：服务端本来就要求「完成必須填寫交付說明或交付物連結」，
+     * 之前界面让「完成」按钮直发请求，用户点了只收到一句报错，
+     * 不知道要在哪里补、甚至以为上报坏了。现在就地展开面板并说清缺什么。
+     */
+    if ((action === RDM_TASK_ACTION.BLOCK || action === RDM_TASK_ACTION.DONE) && !remark.trim()) {
+      setExpandedId(task.id)
+      setProgress(task.progress ?? 0)
+      message.warning(action === RDM_TASK_ACTION.DONE
+        ? '完成任務必須填寫交付說明或交付物連結（作為驗收與績效依據）'
+        : '標記阻塞必須填寫阻塞原因')
       return
     }
     setSaving(true)
@@ -130,12 +278,19 @@ export default function DeliveryBoard() {
   const columns: TableColumnsType<RdmTaskItem> = [
     { title: '任務編號', dataIndex: 'taskNo', key: 'taskNo', width: 150 },
     {
-      title: '任務標題', dataIndex: 'title', key: 'title', width: 240,
+      title: '任務標題', dataIndex: 'title', key: 'title', width: 240, ellipsis: true,
       render: (v: string, r) => (
-        <Space size={4}>
-          <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>
+        <div className="rdm-table-title">
+          <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>
           {r.overdue && <Tag color="error" style={{ margin: 0 }}>逾期</Tag>}
-        </Space>
+          {r.deliveryItemId != null && (
+            <Tag className="rdm-v3-di-tag" color="geekblue" style={{ margin: 0 }} title={r.deliveryItemTitle ?? undefined}>
+              <a onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${r.deliveryItemId}`)}>
+                {r.deliveryItemTitle ?? `交付項 #${r.deliveryItemId}`}
+              </a>
+            </Tag>
+          )}
+        </div>
       ),
     },
     {
@@ -146,10 +301,10 @@ export default function DeliveryBoard() {
       },
     },
     {
-      title: '所屬需求', key: 'req', width: 220,
+      title: '所屬需求', key: 'req', width: 220, ellipsis: true,
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div>{r.reqTitle ?? '-'}</div>
+          <div className="rdm-table-title__link" title={r.reqTitle ?? undefined} style={{ color: '#262626' }}>{r.reqTitle ?? '-'}</div>
           <div style={{ fontSize: 12, color: '#8C8C8C' }}>
             {r.reqNo}
             {r.reqStatus ? ` · ${RDM_STATUS_LABEL[r.reqStatus as RdmStatus] ?? r.reqStatus}` : ''}
@@ -202,7 +357,7 @@ export default function DeliveryBoard() {
           )}
           {r.status === RDM_TASK_STATUS.DOING && (
             <>
-              <Button type="link" size="small" style={{ color: '#52C41A' }} icon={<CheckCircleOutlined />} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
+              <Button type="link" size="small" icon={<CheckCircleOutlined />} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
               <span className="action-split">|</span>
             </>
           )}
@@ -216,6 +371,60 @@ export default function DeliveryBoard() {
     },
   ]
 
+  /** 任务上报的行内展开面板：分组视图与平铺视图共用同一份配置，避免两处逻辑漂移 */
+  const expandableConfig = {
+    expandedRowKeys: expandedId ? [expandedId] : [],
+    showExpandColumn: false,
+    expandedRowRender: (r: RdmTaskItem) => (
+      <div className="rdm-action-panel" style={{ margin: '4px 0 8px' }}>
+        <div className="rdm-action-panel-title">上報進度：{r.taskNo}</div>
+        <Space size={12} wrap align="end">
+          <span>
+            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>進度 %</span>
+            <InputNumber min={0} max={100} value={progress} onChange={v => setProgress(v ?? 0)} style={{ width: 80 }} />
+          </span>
+          <span>
+            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>實際工時</span>
+            <InputNumber min={0} step={0.5} value={actualHours} onChange={setActualHours} placeholder="選填" style={{ width: 90 }} />
+          </span>
+          <span style={{ minWidth: 260 }}>
+            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>說明 / 阻塞原因</span>
+            <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="完成/阻塞必填：交付說明或阻塞原因" style={{ width: 260 }} />
+          </span>
+          {/* 计划起止时间属于排期修正，走任务编辑页；此处只报进度与工时 */}
+          <Space>
+            <Button type="primary" size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始 / 上報進度</Button>
+            <Button size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
+            <Button size="small" danger loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.BLOCK)}>標記阻塞</Button>
+            <Button size="small" onClick={() => setExpandedId(null)}>取消</Button>
+          </Space>
+        </Space>
+        {/* Batch2：前置依賴（跨交付項） */}
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E8EAED' }}>
+          <Space size={8} wrap>
+            <LinkOutlined style={{ color: '#2F54EB' }} />
+            <span style={{ fontSize: 12, color: '#595959' }}>前置依賴</span>
+            <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openDepModal(r)}>添加跨交付項依賴</Button>
+          </Space>
+        </div>
+      </div>
+    ),
+  }
+
+  /** 渲染任务表：paged=true 为平铺视图（分页），false 为分组内嵌视图（不分页） */
+  const renderTaskTable = (data: RdmTaskItem[], paged: boolean, extraLoading = false) => (
+    <Table<RdmTaskItem>
+      className="nowrap-table"
+      rowKey="id"
+      loading={loading || extraLoading}
+      columns={columns}
+      dataSource={data}
+      scroll={{ x: 1500 }}
+      expandable={expandableConfig}
+      pagination={paged ? { pageSize: 10, showTotal: t => `共 ${t} 條` } : false}
+    />
+  )
+
   return (
     <div className="content-area">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -223,6 +432,14 @@ export default function DeliveryBoard() {
           <Segmented value={mode} onChange={v => setMode(v as string)} options={MODE_OPTIONS} />
           {mode === 'task' && (
             <Segmented value={view} onChange={v => setView(v as string)} options={VIEW_OPTIONS} />
+          )}
+          {mode === 'task' && (
+            <Segmented
+              className="rdm-v3-group-toggle"
+              value={groupMode}
+              onChange={v => setGroupMode(v as 'task' | 'deliveryItem')}
+              options={GROUP_MODE_OPTIONS}
+            />
           )}
         </Space>
         <Space size={8} wrap>
@@ -260,47 +477,136 @@ export default function DeliveryBoard() {
         message="任務全部完成後，需求才會沿當前狀態可走的路徑聯動（需求尚在排期/設計階段時不會直接跳到驗收，必須先在需求詳情逐段流轉）；實際工時用於產出量化與績效對接，請如實填報。"
       />
 
-      <Table<RdmTaskItem>
-        className="nowrap-table"
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={rows}
-        scroll={{ x: 1500 }}
-        expandable={{
-          expandedRowKeys: expandedId ? [expandedId] : [],
-          showExpandColumn: false,
-          expandedRowRender: (r) => (
-            <div className="rdm-action-panel" style={{ margin: '4px 0 8px' }}>
-              <div className="rdm-action-panel-title">上報進度：{r.taskNo}</div>
-              <Space size={12} wrap align="end">
-                <span>
-                  <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>進度 %</span>
-                  <InputNumber min={0} max={100} value={progress} onChange={v => setProgress(v ?? 0)} style={{ width: 80 }} />
-                </span>
-                <span>
-                  <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>實際工時</span>
-                  <InputNumber min={0} step={0.5} value={actualHours} onChange={setActualHours} placeholder="選填" style={{ width: 90 }} />
-                </span>
-                <span style={{ minWidth: 260 }}>
-                  <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>說明 / 阻塞原因</span>
-                  <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="阻塞時必填；可寫依賴方或風險" style={{ width: 260 }} />
-                </span>
-                {/* 计划起止时间属于排期修正，走任务编辑页；此处只报进度与工时 */}
-                <Space>
-                  <Button type="primary" size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始 / 上報進度</Button>
-                  <Button size="small" style={{ color: '#52C41A', borderColor: '#52C41A' }} loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
-                  <Button size="small" danger loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.BLOCK)}>標記阻塞</Button>
-                  <Button size="small" onClick={() => setExpandedId(null)}>取消</Button>
-                </Space>
-              </Space>
+      {groupMode === 'deliveryItem' && groupedByDeliveryItem ? (
+        <div className="rdm-v3-groups">
+          {groupedByDeliveryItem.map(([key, g]) => (
+            <div className="rdm-v3-group" key={String(key)}>
+              <div className="rdm-v3-group-head">
+                <span className="rdm-v3-group-title">{g.item ? g.item.title : '未關聯交付項'}</span>
+                {g.item && (
+                  <Tag color={RDM_DELIVERY_ITEM_STATUS_COLOR[g.item.status] ?? 'default'} style={{ margin: 0 }}>
+                    {RDM_DELIVERY_ITEM_STATUS_LABEL[g.item.status] ?? g.item.status}
+                  </Tag>
+                )}
+                {g.item?.coordinatorUserName && (
+                  <span className="rdm-v3-group-coord">協調人：{g.item.coordinatorUserName}</span>
+                )}
+                <span className="rdm-v3-group-count">{g.tasks.length} 個任務</span>
+                {g.item && (blockedMap[g.item.id]?.length ?? 0) > 0 && (
+                  <Badge count={blockedMap[g.item.id].length} size="small">
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      icon={<WarningOutlined />}
+                      onClick={() => setExpandedBlockedId(expandedBlockedId === g.item!.id ? null : g.item!.id)}
+                    >
+                      阻塞項
+                    </Button>
+                  </Badge>
+                )}
+                {g.item && (
+                  <Button type="link" size="small" onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${g.item!.id}`)}>交付項詳情</Button>
+                )}
+              </div>
+              {g.item && expandedBlockedId === g.item.id && (blockedMap[g.item.id]?.length ?? 0) > 0 && (
+                <div style={{ margin: '0 0 8px', padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFE7BA', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#D46B08', marginBottom: 6 }}>
+                    <WarningOutlined /> 被前置依賴阻塞的任務（{blockedMap[g.item.id].length}）
+                  </div>
+                  {blockedMap[g.item.id].map(bt => (
+                    <div key={bt.taskId} style={{ fontSize: 12, color: '#595959', lineHeight: 1.9 }}>
+                      · {bt.taskTitle}
+                      <Tag color={RDM_BLOCK_POINT_COLOR[bt.blockPoint] ?? 'orange'} style={{ margin: '0 6px' }}>
+                        {RDM_BLOCK_POINT_LABEL[bt.blockPoint] ?? bt.blockPoint}
+                      </Tag>
+                      待 <a onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${bt.predDeliveryItemId}`)}>{bt.predDeliveryItemTitle}</a>
+                      {bt.reason && <span style={{ color: '#8C8C8C' }}>（{bt.reason}）</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {renderTaskTable(g.tasks, false, deliveryItemsLoading)}
             </div>
-          ),
-        }}
-        pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }}
-      />
+          ))}
+        </div>
+      ) : (
+        renderTaskTable(rows, true)
+      )}
       </>
       )}
+
+      {/* Batch2：添加跨交付項依賴 */}
+      <Modal
+        title="添加跨交付項依賴"
+        open={depModalOpen}
+        onCancel={() => setDepModalOpen(false)}
+        onOk={submitDep}
+        okText="添加"
+        cancelText="取消"
+        confirmLoading={depSubmitting}
+        okButtonProps={{ disabled: !depPredTaskId }}
+      >
+        {depSuccTask && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={<span>後置任務：<b>{depSuccTask.taskNo}</b> {depSuccTask.title}</span>}
+          />
+        )}
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div>
+            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前置交付項</div>
+            <Select
+              style={{ width: '100%' }}
+              showSearch
+              optionFilterProp="label"
+              loading={depItemsLoading}
+              placeholder="選擇前置交付項"
+              value={depPredItemId}
+              onChange={handlePredItemChange}
+              notFoundContent={depItemsLoading ? <Spin size="small" /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="無其他交付項" />}
+              options={depItems.map(di => ({ value: di.id, label: `${di.itemNo} · ${di.title}` }))}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前置任務</div>
+            <Select
+              style={{ width: '100%' }}
+              showSearch
+              optionFilterProp="label"
+              disabled={!depPredItemId}
+              loading={depPredTasksLoading}
+              placeholder={depPredItemId ? '選擇前置任務' : '請先選擇前置交付項'}
+              value={depPredTaskId}
+              onChange={setDepPredTaskId}
+              notFoundContent={depPredTasksLoading ? <Spin size="small" /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="該交付項下暫無任務" />}
+              options={depPredTasks.map(t => ({ value: t.id, label: `${t.taskNo} · ${t.title}` }))}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>阻斷點</div>
+              <Select
+                style={{ width: '100%' }}
+                value={depBlockPoint}
+                onChange={setDepBlockPoint}
+                options={Object.values(RDM_BLOCK_POINT).map(bp => ({ value: bp, label: RDM_BLOCK_POINT_LABEL[bp] ?? bp }))}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>依賴類型</div>
+              <Select
+                style={{ width: '100%' }}
+                value={depType}
+                onChange={setDepType}
+                options={Object.values(RDM_DEP_TYPE).map(dt => ({ value: dt, label: RDM_DEP_TYPE_LABEL[dt] ?? dt }))}
+              />
+            </div>
+          </div>
+        </Space>
+      </Modal>
     </div>
   )
 }

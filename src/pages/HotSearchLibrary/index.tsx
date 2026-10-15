@@ -197,6 +197,8 @@ export default function HotSearchLibrary() {
 
   const handleDelete = (record: HotSearchWord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('hotSearchLibrary.deleteTitle'),
       content: t('hotSearchLibrary.deleteContent', { word: record.word }),
       okText: t('common.confirm'), okType: 'danger', cancelText: t('common.cancel'),
@@ -207,6 +209,8 @@ export default function HotSearchLibrary() {
   const handleToggleStatus = (record: HotSearchWord) => {
     const action = record.status === 'active' ? t('common.disable') : t('common.enable')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmOperation'),
       content: t('hotSearchLibrary.toggleContent', { word: record.word, action }),
       okText: t('common.confirm'), cancelText: t('common.cancel'),

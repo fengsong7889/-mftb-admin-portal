@@ -1108,6 +1108,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     const newStatus = record.status === ServiceStatus.ENABLED ? ServiceStatus.DISABLED : ServiceStatus.ENABLED
     const actionText = newStatus === ServiceStatus.ENABLED ? t('common.enable') : t('common.disable')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('organicTrafficScore.confirmToggle', { action: actionText }),
       content: t('organicTrafficScore.confirmToggleContent', { action: actionText, name: record.name }),
       okText: t('common.confirm'),
@@ -1125,6 +1127,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   /** 刪除自定義評分項 */
   const handleDelete = (record: OrganicScoreRule) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('organicTrafficScore.confirmDeleteContent', { name: record.name }),
       okText: t('common.confirm'),

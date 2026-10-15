@@ -561,6 +561,8 @@ function WaterfallAddGeneral() {
   const handleRemoveRegionConfig = (region: Region) => {
     if (regionPricingConfigs.length === 1) {
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('recommend.confirmDeleteTitle'),
         content: t('recommend.confirmDeleteLastDistrict'),
         okText: t('recommend.confirmDeleteBtn'),

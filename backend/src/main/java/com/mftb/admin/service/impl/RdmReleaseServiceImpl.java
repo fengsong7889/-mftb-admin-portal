@@ -12,6 +12,7 @@ import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmReleaseMapper;
 import com.mftb.admin.service.RdmAccessGuard;
+import com.mftb.admin.service.RdmFlowVersionGuard;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmReleaseService;
 import com.mftb.admin.util.BizSeqService;
@@ -83,6 +84,8 @@ public class RdmReleaseServiceImpl implements RdmReleaseService {
     private final ObjectMapper objectMapper;
     /** 状态中文名：检查项 reason 不能把 uat_pending 这种枚举直给用户 */
     private final com.mftb.admin.service.RdmConfigService configService;
+    /** 流程版本守卫：V3 分批交付需求不得走旧的整需求发布放行 */
+    private final RdmFlowVersionGuard flowVersionGuard;
 
     @Override
     public RdmReleaseVO.Gate preview(Long reqId) {
@@ -99,6 +102,8 @@ public class RdmReleaseServiceImpl implements RdmReleaseService {
     @Transactional(rollbackFor = Exception.class)
     public RdmReleaseVO.Gate apply(Long reqId, RdmReleaseDTO.Apply dto) {
         RdmRequirement req = accessGuard.requireDeliveryWriter(reqId, "發起發布放行");
+        // V3 分批交付需求的发布以「发布批次」为单位，不得走此旧整需求放行路径
+        flowVersionGuard.rejectFlowV3(reqId);
         if (!AFTER_TEST_STATUS.contains(req.getStatus())) {
             throw new BusinessException("僅「測試開始」之後的階段可發起放行 ，當前狀態：" + statusName(req.getStatus()));
         }

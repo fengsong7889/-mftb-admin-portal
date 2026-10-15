@@ -245,6 +245,8 @@ export default function RepairDetail({ assetId, onBack }: Props) {
 
   const handleFinishRepair = (record: AssetRepairRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmFinishRepair'),
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
@@ -301,6 +303,8 @@ export default function RepairDetail({ assetId, onBack }: Props) {
 
   const handleDeleteRecord = (record: AssetRepairRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteRepair', '確認刪除此維修記錄？'),
       content: `${record.repairDate} - ${record.faultDesc}`,
       okText: t('common.confirm'),

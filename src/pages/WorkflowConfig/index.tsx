@@ -64,6 +64,8 @@ export default function WorkflowConfig() {
   /* 刪除流程 */
   const handleDelete = (record: WorkflowDefinition) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除',
       content: `確定刪除「${record.name}」流程？此操作不可撤銷。`,
       okText: '確認刪除',
@@ -82,6 +84,8 @@ export default function WorkflowConfig() {
     if (!wf) return
     const action = wf.enabled ? '停用' : '啟用'
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: `確認${action}`,
       content: wf.enabled
         ? `確定${action}「${wf.name}」流程？${action}後對應操作將直接執行，無需審批。`

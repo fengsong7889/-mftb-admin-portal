@@ -63,6 +63,8 @@ public class RdmDeliveryDTO {
     public static class Task {
         private Long id;
         private Long reqId;
+        /** 任务归属的交付项ID（任务19 / 缺口2）：仅 V3 分批交付需求下有效，服务端校验属于该 reqId 且需求为 V3 */
+        private Long deliveryItemId;
         private Long prdId;
         /** design/frontend/app/backend/qa/data */
         private String taskType;

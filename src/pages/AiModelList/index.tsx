@@ -177,6 +177,8 @@ export default function AiModelList() {
     const actionText = toDisable ? '停用' : '啟用'
 
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: `確認${actionText}該模型？`,
       content: `${actionText}後「${row.name}」${toDisable ? '將立即不可調用，所有用戶端同步失效' : '將恢復可用，用戶端可正常調用'}`,
       okText: '確認',
@@ -221,6 +223,8 @@ export default function AiModelList() {
   /* ── 刪除模型 ── */
   const handleDeleteModel = (row: AiModel) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除該模型？',
       content: `刪除後「${row.name}」將從模型庫中移除，後續不可恢復。`,
       okText: '刪除',

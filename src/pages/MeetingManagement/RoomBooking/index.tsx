@@ -21,14 +21,16 @@ import {
   toMeetingIso,
   type RoomAvailability,
 } from '../../../api/meeting'
-import { FACILITY_LABELS, FACILITY_OPTIONS } from '../meetingMeta'
+import { facilityLabels, facilityOptions } from '../meetingMeta'
 import { minuteOfDateTimeText, toMinutesOfDay } from '../meetingRules'
 import MeetingStatCards from '../MeetingStatCards'
+import { useTranslation } from 'react-i18next'
 
 const WINDOW_FALLBACK_START = 480   // 08:00
 const WINDOW_FALLBACK_END = 1320    // 22:00
 
 export default function RoomBooking() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const [day, setDay] = useState<Dayjs>(dayjs())
@@ -53,7 +55,7 @@ export default function RoomBooking() {
       })
       setRooms(Array.isArray(list) ? list : [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : '忙閒數據加載失敗')
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadBusy', { defaultValue: '忙閒數據加載失敗' }))
       setRooms([])
     } finally {
       setLoading(false)
@@ -95,24 +97,24 @@ export default function RoomBooking() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="先看誰佔用了哪一段，再決定訂哪間；點擊空白時段即可帶出開始時間"
-        description="相鄰時段不衝突（10:00–11:00 與 11:00–12:00 可背靠背）。部分會議室已開啟主題脫敏，忙閒條只顯示「已佔用」，不顯示主題與組織者。"
+        message={t('meeting.seeWhoOccupiesWhich', { defaultValue: '先看誰佔用了哪一段，再決定訂哪間；點擊空白時段即可帶出開始時間' })}
+        description={t('meeting.adjacentSlotsDoNot', { defaultValue: '相鄰時段不衝突（10:00–11:00 與 11:00–12:00 可背靠背）。部分會議室已開啟主題脫敏，忙閒條只顯示「已佔用」，不顯示主題與組織者。' })}
       />
 
       {error && (
         <Alert
           type="error"
           showIcon
-          message="忙閒數據加載失敗"
+          message={t('meeting.failedToLoadBusy', { defaultValue: '忙閒數據加載失敗' })}
           description={error}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>重試</Button>}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
         />
       )}
 
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="查詢日期">
+          <Form.Item label={t('meeting.date', { defaultValue: '查詢日期' })}>
             <DatePicker
               value={day}
               allowClear={false}
@@ -120,25 +122,25 @@ export default function RoomBooking() {
               onChange={value => value && setDay(value)}
             />
           </Form.Item>
-          <Form.Item label="最少人數" name="minCapacity">
-            <InputNumber min={1} placeholder="不限" style={{ width: 100 }} addonAfter="人" />
+          <Form.Item label={t('meeting.minimumCapacity', { defaultValue: '最少人數' })} name="minCapacity">
+            <InputNumber min={1} placeholder={t('meeting.any', { defaultValue: '不限' })} style={{ width: 100 }} addonAfter={t('meeting.people', { defaultValue: '人' })} />
           </Form.Item>
-          <Form.Item label="設備" name="facilities">
-            <Select mode="multiple" allowClear placeholder="全部" style={{ minWidth: 220 }} options={FACILITY_OPTIONS} />
+          <Form.Item label={t('meeting.facilities', { defaultValue: '設備' })} name="facilities">
+            <Select mode="multiple" allowClear placeholder={t('meeting.all', { defaultValue: '全部' })} style={{ minWidth: 220 }} options={facilityOptions()} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); setCriteria({}) }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('meeting.search', { defaultValue: '查詢' })}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); setCriteria({}) }}>{t('meeting.reset', { defaultValue: '重置' })}</Button>
             </div>
           </Form.Item>
         </Form>
       </div>
 
       <MeetingStatCards key={statsKey} loading={loading} items={[
-        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: rooms.length, label: '符合條件的會議室', hint: '隨日期與篩選條件變化' },
-        { icon: <PushpinOutlined />, color: '#E8720C', bg: '#FFF7E6', value: occupiedCount, label: '當日已佔用時段' },
-        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: freeCount, label: '當日完全空閒' },
+        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: rooms.length, label: t('meeting.matchingMeetingRooms', { defaultValue: '符合條件的會議室' }), hint: '隨日期與篩選條件變化' },
+        { icon: <PushpinOutlined />, color: '#E8720C', bg: '#FFF7E6', value: occupiedCount, label: t('meeting.occupiedSlotsThatDay', { defaultValue: '當日已佔用時段' }) },
+        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: freeCount, label: t('meeting.freeAllDay', { defaultValue: '當日完全空閒' }) },
       ]} />
 
       <div className="action-section">
@@ -152,7 +154,7 @@ export default function RoomBooking() {
 
       <Spin spinning={loading}>
         {rooms.length === 0 && !loading ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="沒有符合條件的會議室" style={{ padding: '48px 0' }} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('meeting.noRoomMatchesThe', { defaultValue: '沒有符合條件的會議室' })} style={{ padding: '48px 0' }} />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {rooms.map(room => (
@@ -168,6 +170,7 @@ export default function RoomBooking() {
 
 /** 单间房的忙闲行：可预约窗内的占用段按比例画在时间轴上，点击空白段直接带出开始时间 */
 function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Dayjs) => void }) {
+  const { t } = useTranslation()
   const windowStart = toMinutesOfDay(room.bookableStartTime) || WINDOW_FALLBACK_START
   const windowEnd = toMinutesOfDay(room.bookableEndTime) || WINDOW_FALLBACK_END
   const span = Math.max(1, windowEnd - windowStart)
@@ -189,8 +192,8 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
         <span style={{ fontWeight: 600 }}>{room.roomName}</span>
         <span style={{ color: '#8C8C8C', fontSize: 12 }}>{room.roomNo} · {room.locationText}</span>
         <Tag>{room.capacity} 人</Tag>
-        {room.facilities.map(code => <Tag key={code} color="blue">{FACILITY_LABELS[code] ?? code}</Tag>)}
-        {!room.bookable && <Tag color="orange">暫不可約</Tag>}
+        {room.facilities.map(code => <Tag key={code} color="blue">{facilityLabels()[code] ?? code}</Tag>)}
+        {!room.bookable && <Tag color="orange">{t('meeting.notBookable', { defaultValue: '暫不可約' })}</Tag>}
         <span style={{ color: '#8C8C8C', fontSize: 12 }}>
           可預約 {room.bookableStartTime}–{room.bookableEndTime}
         </span>
@@ -250,7 +253,7 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>
         <span>{room.bookableStartTime}</span>
-        <span>{room.slots.length === 0 ? '全天空閒' : `已佔 ${room.slots.length} 段`}</span>
+        <span>{room.slots.length === 0 ? t('meeting.freeAllDay2', { defaultValue: '全天空閒' }) : `已佔 ${room.slots.length} 段`}</span>
         <span>{room.bookableEndTime}</span>
       </div>
     </div>

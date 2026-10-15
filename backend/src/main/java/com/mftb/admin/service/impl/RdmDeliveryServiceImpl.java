@@ -118,6 +118,10 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final com.mftb.admin.mapper.RdmPrdSnapshotMapper prdSnapshotMapper;
     /** 任务负责人资格校验用：派给无交付权限的人，他会收到待办却上报不了进度 */
     private final com.mftb.admin.service.PermissionService permissionService;
+    /** 任务19 / 缺口2：任务归属交付项校验（deliveryItemId 必须属于该需求且需求为 V3） */
+    private final com.mftb.admin.mapper.RdmDeliveryItemMapper deliveryItemMapper;
+    /** 任务19 / 缺口2：交付项归属的 V3 流程版本校验 */
+    private final com.mftb.admin.service.RdmFlowVersionGuard flowVersionGuard;
 
     /* ==================== PRD ==================== */
 
@@ -349,7 +353,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             throw new BusinessException("任務負責人不存在或已停用");
         }
         if (owner != null) {
-            requireTaskOwnerEligible(owner);
+            requireTaskOwnerActive(owner);
         }
 
         RdmWorkTask task = dto.getId() == null ? new RdmWorkTask() : requireTask(dto.getId());
@@ -364,6 +368,9 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             task.setProgress(0);
             task.setCreatedBy(operatorResolver.operatorSignature(current));
         }
+        // 任务19 / 缺口2：任务可归属到具体交付项（V3 分批交付）。deliveryItemId 必须真实存在、
+        // 属于该任务所在需求、且需求为 V3；否则会把任务挂到别人的交付项或非分批交付需求上，破坏交付项进度推导。
+        task.setDeliveryItemId(resolveTaskDeliveryItemId(dto.getDeliveryItemId(), task));
         task.setPrdId(dto.getPrdId());
         task.setTaskType(dto.getTaskType());
         task.setTitle(dto.getTitle().trim());
@@ -392,6 +399,58 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                             + (task.getPlanFinishDate() == null ? "" : "\n- **計劃完成**: " + task.getPlanFinishDate()));
         }
         return toTaskVO(taskMapper.selectById(task.getId()), req);
+    }
+
+    /**
+     * 校验并解析任务的交付项归属（任务19 / 缺口2）。
+     * <p>requestedId 为空时：编辑保留任务原有归属，新建则为空（V1/V2 或尚未拆交付项）。
+     * 非空时：交付项必须存在、属于该任务所在需求、且需求为 V3。
+     */
+    private Long resolveTaskDeliveryItemId(Long requestedId, RdmWorkTask task) {
+        if (requestedId == null) {
+            return task.getDeliveryItemId();
+        }
+        com.mftb.admin.entity.RdmDeliveryItem item = deliveryItemMapper.selectById(requestedId);
+        if (item == null) {
+            throw new BusinessException("交付項不存在");
+        }
+        if (task.getReqId() == null || !task.getReqId().equals(item.getReqId())) {
+            throw new BusinessException("交付項不屬於該需求，不能把任務掛到其他需求的交付項下");
+        }
+        if (!flowVersionGuard.isDeliveryItemFlowV3(requestedId)) {
+            throw new BusinessException("僅分批交付流程（V3）的需求可把任務歸屬到交付項");
+        }
+        return requestedId;
+    }
+
+    @Override
+    public RdmDeliveryVO.OwnerCheck checkTaskOwner(Long userId) {
+        RdmDeliveryVO.OwnerCheck check = new RdmDeliveryVO.OwnerCheck();
+        check.setAble(true);
+        if (userId == null) {
+            return check;
+        }
+        SysUser owner = userMapper.selectById(userId);
+        if (owner == null) {
+            check.setAble(false);
+            check.setHardBlocked(true);
+            check.setWarning("該員工不存在或已刪除，請重新選擇負責人");
+            return check;
+        }
+        check.setOwnerName(owner.getName());
+        // 部门快照一并回传：表单的「所屬部門」是派生字段，编辑态也得能带出来
+        check.setDepartment(owner.getDepartment());
+        if (isInactive(owner)) {
+            check.setAble(false);
+            check.setHardBlocked(true);
+            check.setWarning(ownerInactiveWarning(owner));
+            return check;
+        }
+        if (!canOwnerReportProgress(owner)) {
+            check.setAble(false);
+            check.setWarning(ownerNoPermissionWarning(owner));
+        }
+        return check;
     }
 
     @Override
@@ -903,6 +962,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         vo.setId(task.getId());
         vo.setTaskNo(task.getTaskNo());
         vo.setReqId(task.getReqId());
+        vo.setDeliveryItemId(task.getDeliveryItemId());
         vo.setPrdId(task.getPrdId());
         vo.setTaskType(task.getTaskType());
         vo.setTitle(task.getTitle());
@@ -1340,7 +1400,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         if (owner == null) {
             throw new BusinessException("節點負責人不存在或已停用");
         }
-        requireTaskOwnerEligible(owner);
+        requireTaskOwnerActive(owner);
         row.setOwnerUserId(owner.getId());
         row.setOwnerName(owner.getName());
         // 节点负责人同时成为需求参与人，否则他在详情页看不到自己的节点
@@ -1491,18 +1551,43 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     }
 
     /**
-     * 任务负责人资格：在职启用且能进交付工作台（或持有需求处理权）。
-     * <p>不校这一条时，任务可以派给一个打开页面只会看到“无权”的人，待办照发但没人能干活。
+     * 任务负责人硬性资格：必须在职启用。
+     * <p>派给离职/停用的人，任务永远做不完且没人能更正，这条继续阻断。
+     * 「无研发交付权限」不再阻断，见 {@link #canOwnerReportProgress}。
      */
-    private void requireTaskOwnerEligible(SysUser owner) {
-        if (owner.getStatus() != null && owner.getStatus() == 0) {
-            throw new BusinessException("任務負責人「" + owner.getName() + "」已離職或停用，請改派他人");
+    private void requireTaskOwnerActive(SysUser owner) {
+        if (isInactive(owner)) {
+            throw new BusinessException(ownerInactiveWarning(owner));
         }
-        boolean able = permissionService.hasPermission(owner, RdmConstants.MENU_DELIVERY_BOARD, "edit")
+        if (!canOwnerReportProgress(owner)) {
+            /*
+             * 派活与授权是两条线：PM 常需要先占位排期，再让项目负责人去授权中心补权限，
+             * 原先在这里硬拦会把「先排期」这个正常动作也挡掉。放行但留日志，
+             * 便于事后回答「这条任务为什么派给了一个进不了交付工作台的人」。
+             */
+            log.warn("任務負責人無研發交付權限，已放行保存但無法上報進度，請補授權: empId={}, name={}",
+                    owner.getEmpId(), owner.getName());
+        }
+    }
+
+    /** 负责人是否已离职或停用 */
+    private static boolean isInactive(SysUser owner) {
+        return owner.getStatus() != null && owner.getStatus() == 0;
+    }
+
+    /** 负责人能否进交付工作台上报进度（或持有需求处理权） */
+    private boolean canOwnerReportProgress(SysUser owner) {
+        return permissionService.hasPermission(owner, RdmConstants.MENU_DELIVERY_BOARD, "edit")
                 || permissionService.hasPermission(owner, RdmConstants.MENU_REQUIREMENT, "edit");
-        if (!able) {
-            throw new BusinessException("「" + owner.getName() + "」當前無研發交付權限，無法上報進度，請先在授權中心配置");
-        }
+    }
+
+    private static String ownerInactiveWarning(SysUser owner) {
+        return "任務負責人「" + owner.getName() + "」已離職或停用，請改派他人";
+    }
+
+    private static String ownerNoPermissionWarning(SysUser owner) {
+        return "「" + owner.getName() + "」當前無研發交付權限：任務可正常保存，但他在交付工作台看不到上報入口，"
+                + "請隨後到「授權中心」為其補權";
     }
 
     /** 参与人ID串 → 姓名串（快照展示用，不泄露多余字段） */

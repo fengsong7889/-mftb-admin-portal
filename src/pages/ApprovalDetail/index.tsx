@@ -638,6 +638,8 @@ export default function ApprovalDetail() {
     }
     Modal.confirm({
       title: t('approvalDetail.approveConfirm'),
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: type === 'ai_access'
         ? t('approvalDetail.aiApproveContent')
         : t('approvalDetail.approveContent'),

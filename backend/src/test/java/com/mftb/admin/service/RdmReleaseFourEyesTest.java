@@ -58,7 +58,8 @@ class RdmReleaseFourEyesTest {
         jdbcTemplate = mock(JdbcTemplate.class);
         service = new RdmReleaseServiceImpl(releaseMapper, accessGuard, operatorResolver,
                 mock(BizSeqService.class), mock(RdmNotifyService.class),
-                jdbcTemplate, new ObjectMapper(), mock(RdmConfigService.class));
+                jdbcTemplate, new ObjectMapper(), mock(RdmConfigService.class),
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class));
 
         release = new RdmRelease();
         release.setId(RELEASE_ID);

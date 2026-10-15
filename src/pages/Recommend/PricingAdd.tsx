@@ -225,6 +225,8 @@ export default function PricingAdd() {
   const handleRemoveDistrict = (region: Region) => {
     if (districtPricings.length === 1) {
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('common:confirmDelete'),
         content: t('recommend.confirmDeleteLastDistrict'),
         onOk: () => setDistrictPricings([]),

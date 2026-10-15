@@ -84,7 +84,8 @@ export default function RiskCenter() {
 
   const columnMeta = useMemo(() => ([
     { key: 'riskType', title: '風險類型' },
-    { key: 'title', title: '需求' },
+    { key: 'title', title: '需求標題' },
+    { key: 'reqNo', title: '需求編號' },
     { key: 'status', title: '當前狀態' },
     { key: 'handler', title: '當前處理人' },
     { key: 'submitterName', title: '提出人' },
@@ -115,14 +116,9 @@ export default function RiskCenter() {
       },
     },
     {
-      title: '需求', key: 'title', width: 320,
-      render: (_, r) => (
-        <div style={{ lineHeight: 1.5 }}>
-          <span style={{ color: '#262626' }}>{r.title}</span>
-          <span style={{ display: 'block', fontSize: 12, color: '#8C8C8C' }}>{r.reqNo}</span>
-        </div>
-      ),
+      title: '需求標題', dataIndex: 'title', key: 'title', width: 320, ellipsis: true,
     },
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v?: string | null) => (v ? (RDM_STATUS_LABEL[v as RdmStatus] ?? v) : '-'),

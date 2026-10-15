@@ -104,6 +104,8 @@ export default function AiOperationAuth() {
     const toDisable = row.status === 1
     const actionText = toDisable ? '停用' : '啟用'
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: `確認${actionText}該工具？`,
       content: `${actionText}後「${row.name}」將${toDisable ? '不再' : '恢復'}在 AI 對話中提供該能力`,
       okText: '確認',

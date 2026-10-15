@@ -213,6 +213,15 @@ public class RdmRequirement {
     /** 衍生来源需求编号快照 */
     private String parentReqNo;
 
+    /** 所属项目ID */
+    private Long projectId;
+
+    /** 结构父需求ID(主子关系) */
+    private Long structureParentReqId;
+
+    /** 需求种类:aggregate/execution */
+    private String requirementKind;
+
     private String createdBy;
 
     private String updatedBy;

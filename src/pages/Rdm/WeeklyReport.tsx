@@ -111,8 +111,8 @@ export default function WeeklyReport() {
   const releasedColumns: TableColumnsType<RdmWeeklyReport['released'][number]> = useMemo(() => [
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
-      title: '標題', dataIndex: 'title', key: 'title',
-      render: (v: string, r) => <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>,
+      title: '標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
+      render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
     { title: '關聯版本', dataIndex: 'versionNo', key: 'versionNo', width: 110, render: (v?: string | null) => v ?? '-' },
     { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 110, render: (v?: string | null) => v ?? '-' },
@@ -126,8 +126,8 @@ export default function WeeklyReport() {
   const riskColumns: TableColumnsType<RdmWeeklyReport['risks'][number]> = useMemo(() => [
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
-      title: '標題', dataIndex: 'title', key: 'title',
-      render: (v: string, r) => <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>,
+      title: '標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
+      render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 130,
@@ -164,8 +164,8 @@ export default function WeeklyReport() {
   const nextColumns: TableColumnsType<RdmWeeklyReport['nextWeek'][number]> = useMemo(() => [
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
-      title: '標題', dataIndex: 'title', key: 'title',
-      render: (v: string, r) => <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>,
+      title: '標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
+      render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
     { title: '計劃上線', dataIndex: 'planReleaseDate', key: 'planReleaseDate', width: 120, render: (v?: string | null) => v ?? '-' },
     {

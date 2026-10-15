@@ -181,6 +181,8 @@ export default function AssetClaimSign() {
       return
     }
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認提交簽名？',
       content: `提交後領用單 ${claim?.claimNo || ''} 即完成簽署確認，不可重籤。`,
       okText: '確認簽署',

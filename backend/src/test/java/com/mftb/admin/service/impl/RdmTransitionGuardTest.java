@@ -66,7 +66,11 @@ class RdmTransitionGuardTest {
         when(roleMapper.selectCount(any())).thenReturn(0L);
         // 数据范围与角色口径已收到 RdmAccessGuard，它必须与需求服务用同一套 mock，
         // 否则测试里“可见/无权”的结论与真实调用链不是一个口径
-        accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper);
+        accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
+                mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
+                mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
+                mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));
         service = new RdmRequirementServiceImpl(
                 requirementMapper, mock(RdmRequirementTargetMapper.class),
                 roleMapper, mock(RdmStatusLogMapper.class),
@@ -80,7 +84,11 @@ class RdmTransitionGuardTest {
                 permissionService, mock(JdbcTemplate.class), accessGuard,
                 mock(com.mftb.admin.service.RdmIntakePolicyService.class),
                 mock(com.mftb.admin.service.RdmIntakeRoundService.class),
-                mock(com.mftb.admin.service.RdmReleaseService.class));
+                mock(com.mftb.admin.service.RdmReleaseService.class),
+                mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
+                mock(com.mftb.admin.service.RdmRequirementStructureService.class),
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class),
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
     }
 
     private static SysUser user(long id, String empId, String name) {

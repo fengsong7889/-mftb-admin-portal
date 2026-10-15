@@ -315,6 +315,8 @@ export default function ModelList({
 
   const handleDeleteBrand = (record: AssetBrand) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteBrand'),
       content: `${record.brandZh}（${record.brandEn}）`,
       okText: t('common.confirm'),
@@ -335,6 +337,8 @@ export default function ModelList({
 
   const handleDeleteProduct = (record: AssetModel) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteTitle'),
       content: `${record.brandZh} ${record.name}`,
       okText: t('common.confirm'),

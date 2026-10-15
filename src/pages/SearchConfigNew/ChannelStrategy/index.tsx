@@ -317,7 +317,9 @@ export default function DimensionStrategy() {
     setTimeout(() => actForm.setFieldsValue({ ...r, appChannel: r.appChannel || 'all' }), 0)
   }
   const handleActDelete = (r: ActivityRecord) => {
-    Modal.confirm({ title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.activityName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
+    Modal.confirm({ className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.activityName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
       onOk: () => { updateBiz(p => ({ ...p, activities: p.activities.filter(a => a.key !== r.key) })); message.success(t('common.deleteSuccess')) } })
   }
   const handleActSave = () => {
@@ -375,7 +377,9 @@ export default function DimensionStrategy() {
       message.warning(t('channelStrategy.notDeletable'))
       return
     }
-    Modal.confirm({ title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.adName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
+    Modal.confirm({ className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('common.confirmDelete'), content: t('channelStrategy.deleteContent', { name: r.adName }), okText: t('common.confirm'), cancelText: t('common.cancel'),
       onOk: () => { updateBiz(p => ({ ...p, ads: p.ads.filter(a => a.key !== r.key) })); message.success(t('common.deleteSuccess')) } })
   }
   const handleAdSave = () => {

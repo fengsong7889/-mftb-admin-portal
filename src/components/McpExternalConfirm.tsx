@@ -8,6 +8,8 @@ import { t } from 'i18next'
 export function confirmExternalCall(name: string, argsJson: string): Promise<boolean> {
   return new Promise((resolve) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('mcpExternal.confirmTitle'),
       content: (
         <div>

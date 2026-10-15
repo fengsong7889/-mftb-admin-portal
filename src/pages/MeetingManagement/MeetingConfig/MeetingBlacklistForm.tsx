@@ -17,6 +17,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import RemarkTextArea from '../../../components/RemarkTextArea'
 import { addBlacklist } from '../../../api/meeting'
 import EmployeeSelect from '../EmployeeSelect'
+import { useTranslation } from 'react-i18next'
 
 const MENU = 'meeting-config'
 
@@ -34,6 +35,7 @@ interface FormValues {
 }
 
 export default function MeetingBlacklistForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const { hasPermission } = useAuth()
@@ -76,7 +78,7 @@ export default function MeetingBlacklistForm() {
     } else if (ok.length > 0) {
       message.warning(`已新增 ${ok.length} 條，${failed.length} 條未成功（原因見下方清單）`)
     } else {
-      message.error('未新增任何限制記錄，請檢查下方原因')
+      message.error(t('meeting.nothingWasAddedSee', { defaultValue: '未新增任何限制記錄，請檢查下方原因' }))
     }
   }
 
@@ -98,9 +100,9 @@ export default function MeetingBlacklistForm() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36,
                 padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>返回</Button>
+              }}>{t('meeting.back', { defaultValue: '返回' })}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>手動加入黑名單</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('meeting.addToBlacklist', { defaultValue: '手動加入黑名單' })}</h2>
           </div>
         </div>
       </div>
@@ -109,8 +111,8 @@ export default function MeetingBlacklistForm() {
         type="warning"
         showIcon
         style={{ marginBottom: 16 }}
-        message="被限制期間該員工無法新建或改期預約"
-        description="只影響新建與改期；已有會議與其簽到不受影響，需要一併處理請到「預約記錄」代取消。到期後由日期自動失效，不需人工解除。"
+        message={t('meeting.whileRestrictedThisEmployee', { defaultValue: '被限制期間該員工無法新建或改期預約' })}
+        description={t('meeting.onlyBookingAndRescheduling', { defaultValue: '只影響新建與改期；已有會議與其簽到不受影響，需要一併處理請到「預約記錄」代取消。到期後由日期自動失效，不需人工解除。' })}
       />
 
       <Form form={form} layout="vertical" disabled={!canEdit || submitting} initialValues={{ days: 7 }}>
@@ -122,26 +124,26 @@ export default function MeetingBlacklistForm() {
             }}>
               <StopOutlined style={{ fontSize: 14, color: '#FF4D4F' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>限制對象與期限</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('meeting.restrictionTargetPeriod', { defaultValue: '限制對象與期限' })}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>可多選，逐人寫入並分別給出結論</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('meeting.multiplePeopleEachIs', { defaultValue: '可多選，逐人寫入並分別給出結論' })}</span>
           </div>
-          <Form.Item label="被限制人員" name="userIds" rules={[{ required: true, message: '請選擇人員' }]}
-            extra="搜尋姓名或工號，可多選">
-            <EmployeeSelect placeholder="搜尋姓名或工號（可多選）" />
+          <Form.Item label={t('meeting.restrictedPerson', { defaultValue: '被限制人員' })} name="userIds" rules={[{ required: true, message: t('meeting.pleaseSelectPeople', { defaultValue: '請選擇人員' }) }]}
+            extra={t('meeting.searchByNameOr2', { defaultValue: '搜尋姓名或工號，可多選' })}>
+            <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
           </Form.Item>
           <div style={gridStyle}>
-            <Form.Item label="限制天數" name="days" rules={[{ required: true, message: '請填寫天數' }]}
-              extra="自今日起算，到期自動失效">
-              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter="天" />
+            <Form.Item label={t('meeting.restrictionDays', { defaultValue: '限制天數' })} name="days" rules={[{ required: true, message: t('meeting.pleaseEnterTheNumber', { defaultValue: '請填寫天數' }) }]}
+              extra={t('meeting.countedFromTodayExpires', { defaultValue: '自今日起算，到期自動失效' })}>
+              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter={t('meeting.days', { defaultValue: '天' })} />
             </Form.Item>
           </div>
           {/* 原因独占一整行（§C.4.1）：这是处置凭据，写不下就等于没写 */}
-          <Form.Item label="原因" name="reason" rules={[
-            { required: true, message: '請填寫原因' },
-            { max: 200, message: '原因不得超過 200 字' },
+          <Form.Item label={t('meeting.reason', { defaultValue: '原因' })} name="reason" rules={[
+            { required: true, message: t('meeting.pleaseEnterTheReason', { defaultValue: '請填寫原因' }) },
+            { max: 200, message: t('meeting.reasonCannotExceed200', { defaultValue: '原因不得超過 200 字' }) },
           ]}>
-            <RemarkTextArea placeholder="例：連續三次預約後未到場且未取消" maxLength={200} />
+            <RemarkTextArea placeholder={t('meeting.eGThreeBookings', { defaultValue: '例：連續三次預約後未到場且未取消' })} maxLength={200} />
           </Form.Item>
         </div>
       </Form>
@@ -149,7 +151,7 @@ export default function MeetingBlacklistForm() {
       {/* 逐人写入结果：成功与失败分开列，避免"提交了一次却不知道谁没生效" */}
       {(results.ok.length > 0 || results.failed.length > 0) && (
         <div style={{ ...cardStyle, background: '#FAFAFA', border: '1px solid #f0f0f0', boxShadow: 'none' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>本次寫入結果</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('meeting.writeResult', { defaultValue: '本次寫入結果' })}</div>
           <div style={{ fontSize: 12, color: '#52C41A', marginBottom: 4 }}>
             成功 {results.ok.length} 條
           </div>
@@ -163,7 +165,7 @@ export default function MeetingBlacklistForm() {
 
       {/* 底部操作栏（§C.5） */}
       <div className="form-footer">
-        <Button onClick={goBack}>返回</Button>
+        <Button onClick={goBack}>{t('meeting.back', { defaultValue: '返回' })}</Button>
         {canEdit && (
           <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={() => void handleSubmit()}>
             確認新增

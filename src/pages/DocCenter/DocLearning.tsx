@@ -50,6 +50,8 @@ export default function DocLearning() {
 
   const handleDelete = (r: DocLearningPathRow) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('doc.deletePathTitle', { name: r.name }),
       content: t('doc.deletePathContent'),
       okText: t('doc.del'),

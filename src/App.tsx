@@ -326,6 +326,15 @@ const RdmTeamOutput = lazy(() => import('./pages/Rdm/TeamOutput'))
 const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
+// V3 分批交付：项目总览 / 提测工作台 / 发布中心
+const RdmProjectOverview = lazy(() => import('./pages/Rdm/ProjectOverview'))
+const RdmProjectDetail = lazy(() => import('./pages/Rdm/ProjectDetail'))
+const RdmTestWorkbench = lazy(() => import('./pages/Rdm/TestWorkbench'))
+const RdmTestBatchDetail = lazy(() => import('./pages/Rdm/TestBatchDetail'))
+const RdmReleaseCenter = lazy(() => import('./pages/Rdm/ReleaseCenter'))
+const RdmReleaseBatchDetail = lazy(() => import('./pages/Rdm/ReleaseBatchDetail'))
+const RdmDeliveryItemForm = lazy(() => import('./pages/Rdm/DeliveryItemForm'))
+const RdmIssueDetail = lazy(() => import('./pages/Rdm/IssueDetail'))
 
 // 文檔中心（階段二：真實 /api/doc/**；菜單種子已由 DocSchemaMigrationInitializer 落庫）
 const DocCenter = lazy(() => import('./pages/DocCenter'))
@@ -681,6 +690,15 @@ function AuthenticatedLayout() {
               <Route path="/rdm-config-status" element={<RdmConfigStatus />} />
               <Route path="/rdm-config-routing" element={<RdmConfigRouting />} />
               <Route path="/rdm-config-sla" element={<RdmConfigSla />} />
+              {/* V3 分批交付：项目 / 提测 / 发布 / 交付项 / 问题 */}
+              <Route path="/rdm-project" element={<RdmProjectOverview />} />
+              <Route path="/rdm-project-detail" element={<RdmProjectDetail />} />
+              <Route path="/rdm-test" element={<RdmTestWorkbench />} />
+              <Route path="/rdm-test-detail" element={<RdmTestBatchDetail />} />
+              <Route path="/rdm-release" element={<RdmReleaseCenter />} />
+              <Route path="/rdm-release-detail" element={<RdmReleaseBatchDetail />} />
+              <Route path="/rdm-delivery-item" element={<RdmDeliveryItemForm />} />
+              <Route path="/rdm-issue" element={<RdmIssueDetail />} />
               {/* 物資管理（EAM 完整路由）*/}
               <Route path="/asset-list"       element={<AssetList />} />
               <Route path="/asset-add"        element={<AssetAdd />} />

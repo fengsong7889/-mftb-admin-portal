@@ -103,6 +103,22 @@ export interface RdmRequirementRow {
   planReleaseDate?: string | null
   actualReleaseDate?: string | null
   versionNo?: string | null
+  /** 所属迭代编码（详情属性区用于判断「是否已进迭代产能对账」） */
+  iterationCode?: string | null
+  /** 业务验收人姓名（不传即提出人本人，界面据此显示实际签字人） */
+  acceptorName?: string | null
+  /** 业务验收人 sys_user.id（草稿续编要回填，否则保存会把指派的验收人重置成提交人） */
+  acceptorUserId?: number | null
+  /** 提交时指定的意向产品经理 id（需审批时先存意向，审批通过后才生效为受理人） */
+  intentPmUserId?: number | null
+  /** 分配时间（技术负责人派单动作的时间戳） */
+  distributeTime?: string | null
+  /** 产品受理时间 */
+  acceptTime?: string | null
+  /** 计划开发完成日期 */
+  planDevDate?: string | null
+  /** 挂起复审日期（暂缓到期后要有人确认是否继续） */
+  onHoldUntil?: string | null
   progress?: number | null
   blockedFlag?: boolean | null
   blockedReason?: string | null
@@ -114,10 +130,24 @@ export interface RdmRequirementRow {
   /** 当前状态停留小时数（逾期/风险判定依据） */
   stayHours?: number | null
   /**
-   * 流程版本：1=历史记录（无五节点计划/PRD 定稿快照/工时明细），2=新链路。
+   * 流程版本：1=历史记录（无五节点计划/PRD 定稿快照/工时明细），2=新链路，3=分批交付。
    * <p>发布闸门的检查项会据此跳过不适用的新口径，界面需要跟同一口径显示。
    */
   flowVersion?: number | null
+  /** V3：所属项目 ID */
+  projectId?: number | null
+  /** V3：所属项目名称（列表行冗余，减少前端二次查询） */
+  projectName?: string | null
+  /** V3：需求种类 aggregate/execution */
+  requirementKind?: string | null
+  /** V3：结构化主需求 ID（执行需求指向其聚合父需求） */
+  structureParentReqId?: number | null
+  /** V3：结构化主需求编号 */
+  structureParentReqNo?: string | null
+  /** V3：交付项总数（后端冗余计数） */
+  deliveryItemCount?: number | null
+  /** V3：已完成交付项数 */
+  deliveryDoneCount?: number | null
   /** 当前准入轮次（服务端裁决快照，与 rdm_intake_round 对齐） */
   intakeRoundNo?: number | null
   /** 本轮是否需审批（服务端裁决；1=需要 0=已命中免审策略） */
@@ -287,6 +317,14 @@ export interface RdmRequirementForm {
   acceptorUserId?: number
   /** 附件（舆後端 RdmRequirementCreateDTO.attachments 对齐，storagePath 存 Base64 Data URL） */
   attachments?: { fileName: string; storagePath: string; fileType?: string; fileSize?: number }[]
+  /** V3：流程版本（不传默认 V2） */
+  flowVersion?: number
+  /** V3：所属项目 ID */
+  projectId?: number
+  /** V3：需求种类 aggregate/execution */
+  requirementKind?: string
+  /** V3：结构化父需求 ID（执行需求指向聚合父需求） */
+  structureParentReqId?: number
 }
 
 /** 状态流转请求 */
@@ -594,6 +632,10 @@ export interface RdmRequirementQuery {
   /** 产品经理用户 ID */
   pmUserId?: number
   overdueOnly?: boolean
+  /** V3：按所属项目过滤 */
+  projectId?: number
+  /** V3：按需求种类过滤 aggregate/execution */
+  requirementKind?: string
 }
 
 /* ==================== 查询 ==================== */
@@ -1019,6 +1061,10 @@ export interface RdmTaskItem {
   reqTitle?: string | null
   reqStatus?: string | null
   prdId?: number | null
+  /** V3：关联的交付项 ID */
+  deliveryItemId?: number | null
+  /** V3：关联的交付项标题（冗余，列表展示用） */
+  deliveryItemTitle?: string | null
   taskType: string
   title: string
   content?: string | null
@@ -1258,6 +1304,33 @@ export async function fetchIterations(): Promise<RdmIterationItem[]> {
 /** 保存任务 */
 export function saveTask(form: RdmTaskForm) {
   return request.post<unknown, RdmTaskItem>('/rdm/delivery/task', form)
+}
+
+/** 任务负责人资格预检结果 */
+export interface RdmTaskOwnerCheck {
+  /** 负责人能否正常干活（在职启用且有研发交付权限） */
+  able: boolean
+  /** 是否会被保存硬拦下（离职/停用）；false = 只提醒不阻断 */
+  hardBlocked?: boolean
+  ownerName?: string | null
+  /** 负责人所在部门（表单「所屬部門」自动带出用） */
+  department?: string | null
+  /** 提醒文案（null/undefined = 无需提醒） */
+  warning?: string | null
+}
+
+/**
+ * 预检任务负责人：选完人立刻告诉他「这人没交付权限」，
+ * 但不再因此拦住保存（先排期、后补权限）。
+ */
+export async function checkTaskOwner(userId: number): Promise<RdmTaskOwnerCheck> {
+  try {
+    return await request.get<unknown, RdmTaskOwnerCheck>('/rdm/delivery/task/owner-check', { params: { userId }, ...SILENT })
+  } catch (err) {
+    // 后端不可用时降级为「不提醒」，不能因为预检失败就派不了活
+    if (isBackendUnavailable(err)) return { able: true }
+    throw err
+  }
 }
 
 /** 上报任务进度与工时 */
@@ -2176,6 +2249,672 @@ export async function fetchRiskSummary(minStayDays = 0): Promise<RdmRiskSummary 
     return await request.post<unknown, RdmRiskSummary>('/rdm/assistant/risk-summary', null, { params: { minStayDays } })
   } catch (err) {
     if (isBackendUnavailable(err)) return mockRiskSummary(minStayDays)
+    throw err
+  }
+}
+
+/* ==================== V3 分批交付：项目 / 交付项 / 提测 / 问题 / 发布 / 验收 ==================== */
+
+// ===== Project 项目 =====
+export interface RdmProjectListItem {
+  id: number; projectNo: string; name: string; objective: string;
+  pmUserName: string; productOwnerUserName: string;
+  planStartDate: string; planEndDate: string;
+  status: string; pausedFlag: boolean; riskFlag: boolean; overdueFlag: boolean;
+  deliveredCount: number; totalDeliveryCount: number;
+  nextDeliveryDate: string | null; blockedCount: number; pendingDecisionCount: number;
+  updatedAt: string;
+}
+
+export interface RdmProjectDetail extends RdmProjectListItem {
+  pmUserId: number; productOwnerUserId: number;
+  defaultAcceptancePath: string; scopeSummaryJson: string | null;
+  version: number; createdAt: string;
+  members: RdmProjectMemberItem[];
+}
+
+export interface RdmProjectMemberItem {
+  id: number; userId: number; empNo: string; userName: string; roleCode: string; joinTime: string;
+}
+
+export interface RdmProjectSummary {
+  projectId: number; projectName: string; status: string;
+  totalItems: number; deliveredItems: number; testingItems: number;
+  blockedItems: number; pendingItems: number; overdueItems: number;
+  nextMilestone: string | null; lastUpdated: string;
+}
+
+export interface RdmProjectStatsCard {
+  inProgressCount: number; attentionCount: number; pendingDecisionCount: number;
+}
+
+export interface RdmProjectPendingItem {
+  type: string; refId: number; refNo: string; title: string;
+  responsibleName: string; dueDate: string | null; actionUrl: string;
+}
+
+export interface RdmProjectDeliveryChecklist {
+  reqId: number; reqTitle: string; reqNo: string;
+  items: RdmChecklistItem[];
+}
+
+export interface RdmChecklistItem {
+  itemId: number; itemNo: string; title: string; coordinatorName: string;
+  status: string; planEndDate: string; testStatus: string;
+  acceptanceStatus: string; blockedReason: string | null;
+}
+
+export interface RdmProjectQuery {
+  keyword?: string; pmUserId?: number; status?: string;
+  pageNo?: number; pageSize?: number;
+}
+
+export interface RdmProjectCreateForm {
+  name: string; objective?: string; pmUserId?: number; pmUserName?: string;
+  productOwnerUserId?: number; productOwnerUserName?: string;
+  planStartDate?: string; planEndDate?: string; defaultAcceptancePath?: string;
+}
+
+export interface RdmProjectUpdateForm extends Partial<RdmProjectCreateForm> {
+  status?: string; pausedFlag?: boolean; riskFlag?: boolean; expectedVersion: number;
+}
+
+// ===== Delivery Item 交付项 =====
+export interface RdmDeliveryItemListItem {
+  id: number; itemNo: string; reqId: number; reqTitle: string; reqNo: string;
+  projectId: number | null; projectName: string | null; title: string;
+  status: string; coordinatorUserName: string; acceptancePath: string;
+  planStartDate: string; planEndDate: string; scopeVersion: number;
+  blockedFlag: boolean; taskProgress: string; testStatus: string;
+  acceptanceStatus: string; updatedAt: string;
+}
+
+export interface RdmDeliveryItemDetail extends RdmDeliveryItemListItem {
+  scopeDesc: string; acceptanceCriteria: string; prdSnapshotId: number | null;
+  productAcceptorUserName: string; bizAcceptorUserName: string;
+  version: number; createdAt: string;
+  /** Batch2：範圍凍結時間（非空即已凍結，修改需走變更流程） */
+  scopeFrozenAt?: string | null;
+}
+
+export interface RdmDeliveryItemQuery {
+  reqId?: number; projectId?: number; status?: string; keyword?: string;
+  coordinatorUserId?: number; pageNo?: number; pageSize?: number;
+}
+
+export interface RdmDeliveryItemCreateForm {
+  reqId: number; projectId?: number; title: string; scopeDesc?: string;
+  acceptanceCriteria?: string; coordinatorUserId?: number; coordinatorUserName?: string;
+  productAcceptorUserId?: number; productAcceptorUserName?: string;
+  bizAcceptorUserId?: number; bizAcceptorUserName?: string;
+  acceptancePath?: string; planStartDate?: string; planEndDate?: string;
+}
+
+export interface RdmDeliveryItemUpdateForm extends Partial<RdmDeliveryItemCreateForm> {
+  status?: string; expectedVersion: number;
+}
+
+// ===== Test Batch 提测批次 =====
+export interface RdmTestBatchListItem {
+  id: number; batchNo: string; reqId: number; reqTitle: string; reqNo: string;
+  deliveryItemTitles: string[]; testEnv: string; testLeadUserName: string;
+  status: string; roundNo: number; planEndTime: string;
+  passCount: number; failCount: number; totalCount: number; createdAt: string;
+}
+
+export interface RdmTestBatchDetail extends RdmTestBatchListItem {
+  scopeSnapshotJson: string; buildIdsJson: string; executorUserIds: number[];
+  executions: RdmTestExecutionRecord[]; applicantUserName: string;
+  returnedReason: string | null; updatedAt: string;
+}
+
+export interface RdmTestExecutionRecord {
+  id: number; deliveryItemId: number; deliveryItemTitle: string;
+  caseTitle: string; executorUserName: string; buildId: string;
+  testEnv: string; result: string; executedAt: string; remark: string; roundNo: number;
+}
+
+export interface RdmTestBatchSummary {
+  totalCases: number; executedCases: number; passedCases: number;
+  failedCases: number; blockedCases: number; skippedCases: number;
+  notExecutedCases: number; passRate: number;
+}
+
+export interface RdmTestBatchQuery {
+  reqId?: number; status?: string; testLeadUserId?: number;
+  keyword?: string; pageNo?: number; pageSize?: number;
+}
+
+export interface RdmTestBatchSubmitForm {
+  reqId: number; deliveryItemIds: number[]; buildIds?: string[];
+  testEnv: string; testLeadUserId: number; testLeadUserName: string;
+  executorUserIds?: number[]; planEndTime?: string;
+}
+
+export interface RdmTestExecutionForm {
+  deliveryItemId?: number; caseTitle: string; result: string;
+  buildId?: string; testEnv?: string; remark?: string;
+}
+
+// ===== Issue 问题 =====
+export interface RdmIssueListItem {
+  id: number; issueNo: string; title: string; sourceType: string;
+  reqId: number; reqTitle: string; reqNo: string;
+  deliveryItemId: number | null; deliveryItemTitle: string | null;
+  severity: string; ownerUserName: string; status: string; createdAt: string;
+}
+
+export interface RdmIssueDetail extends RdmIssueListItem {
+  description: string; impact: string; scopeVersion: number;
+  buildId: string; reporterUserName: string; updatedAt: string;
+  deferRecords: RdmIssueDeferRecord[];
+}
+
+export interface RdmIssueDeferRecord {
+  id: number; reason: string; impactDesc: string; mitigation: string;
+  targetVersion: string; ownerUserName: string; dueAt: string;
+  productDecision: string; productDecideUserName: string;
+  productDecideTime: string; productDecideReason: string;
+  bizDecision: string; bizDecideUserName: string;
+  bizDecideTime: string; bizDecideReason: string;
+  followUpReqId: number | null; followUpReqNo: string | null;
+  status: string; applicantUserName: string; createdAt: string;
+}
+
+export interface RdmIssueQuery {
+  reqId?: number; deliveryItemId?: number; status?: string;
+  severity?: string; ownerUserId?: number; sourceType?: string;
+  keyword?: string; pageNo?: number; pageSize?: number;
+}
+
+export interface RdmIssueCreateForm {
+  sourceType: string; sourceId?: number; reqId?: number;
+  deliveryItemId?: number; scopeVersion?: number; buildId?: string;
+  title: string; description?: string; impact?: string;
+  severity: string; ownerUserId?: number; ownerUserName?: string;
+}
+
+export interface RdmIssueDeferApplyForm {
+  reason: string; impactDesc?: string; mitigation?: string;
+  targetVersion: string; ownerUserId?: number; ownerUserName?: string; dueAt: string;
+}
+
+export interface RdmIssueDeferDecisionForm {
+  decision: string; reason: string; followUpReqId?: number;
+}
+
+// ===== Release Batch 发布批次 =====
+export interface RdmReleaseBatchListItem {
+  id: number; batchNo: string; versionTag: string; projectName: string;
+  releaseOwnerUserName: string; planTime: string; status: string;
+  systemCount: number; deployedCount: number; createdAt: string;
+}
+
+export interface RdmReleaseBatchDetail extends RdmReleaseBatchListItem {
+  scopeSnapshotJson: string; approvalUserName: string; approvalTime: string;
+  applicantUserName: string; rollbackReason: string | null;
+  deployments: RdmReleaseDeploymentRecord[];
+  checkResults: RdmReleaseCheckResult[];
+  updatedAt: string;
+}
+
+export interface RdmReleaseDeploymentRecord {
+  id: number; systemCode: string; systemName: string; buildId: string;
+  deployOrder: number; deployStatus: string; deployTime: string;
+  verifyStatus: string; verifyTime: string; openStatus: string;
+  openTime: string; rollbackReason: string | null; attemptNo: number;
+  operatorUserName: string;
+}
+
+export interface RdmReleaseCheckResult {
+  checkType: string; passed: boolean; message: string;
+  refId: number | null; refNo: string | null;
+}
+
+export interface RdmReleaseBatchQuery {
+  projectId?: number; status?: string; releaseOwnerUserId?: number;
+  keyword?: string; pageNo?: number; pageSize?: number;
+}
+
+export interface RdmReleaseBatchCreateForm {
+  versionTag: string; projectId?: number; reqId?: number;
+  releaseOwnerUserId: number; releaseOwnerUserName: string;
+  planTime?: string; deliveryItemIds?: number[];
+  deployments: { systemCode: string; systemName?: string; buildId?: string; deployOrder?: number }[];
+}
+
+export interface RdmReleaseDecideForm { decision: string; reason?: string }
+export interface RdmReleaseDeployForm { systemCode: string; deployStatus: string; buildId?: string }
+export interface RdmReleaseVerifyForm { systemCode: string; verifyStatus: string; remark?: string }
+export interface RdmReleaseRollbackForm { reason: string; systemCodes?: string[] }
+
+// ===== Acceptance Record 验收记录（交付项级） =====
+export interface RdmAcceptanceRecordListItem {
+  id: number; recordNo: string; deliveryItemId: number; deliveryItemTitle: string;
+  reqId: number; reqTitle: string; acceptanceType: string; stage: string;
+  conclusion: string; score: number | null; signerUserName: string;
+  roundNo: number; createdAt: string;
+}
+
+export interface RdmAcceptanceRecordDetail extends RdmAcceptanceRecordListItem {
+  scopeVersion: number; buildId: string; testEnv: string;
+  opinion: string; conditionsJson: string | null; evidenceJson: string | null;
+}
+
+export interface RdmAcceptanceRecordSubmitForm {
+  acceptanceType: string; stage: string; scopeVersion?: number;
+  buildId?: string; testEnv?: string; conclusion: string;
+  score?: number; opinion?: string; conditionsJson?: string; evidenceJson?: string;
+}
+
+/* ==================== V3 API 函数 ==================== */
+
+// ===== 项目 Project =====
+
+export async function fetchProjectPage(params: RdmProjectQuery): Promise<{ records: RdmProjectListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmProjectListItem[]; total: number }>('/rdm/project', { params, ...SILENT })
+}
+
+export async function createProject(data: RdmProjectCreateForm): Promise<RdmProjectDetail> {
+  return request.post<unknown, RdmProjectDetail>('/rdm/project', data)
+}
+
+export async function fetchProjectDetail(id: number): Promise<RdmProjectDetail> {
+  return request.get<unknown, RdmProjectDetail>(`/rdm/project/${id}`, SILENT)
+}
+
+export async function updateProject(id: number, data: RdmProjectUpdateForm): Promise<void> {
+  return request.patch<unknown, void>(`/rdm/project/${id}`, data)
+}
+
+export async function fetchProjectSummary(id: number): Promise<RdmProjectSummary> {
+  return request.get<unknown, RdmProjectSummary>(`/rdm/project/${id}/summary`, SILENT)
+}
+
+export async function fetchProjectStats(params: RdmProjectQuery): Promise<RdmProjectStatsCard> {
+  return request.get<unknown, RdmProjectStatsCard>('/rdm/project/stats', { params, ...SILENT })
+}
+
+export async function fetchProjectPending(id: number): Promise<RdmProjectPendingItem[]> {
+  return request.get<unknown, RdmProjectPendingItem[]>(`/rdm/project/${id}/pending`, SILENT)
+}
+
+export async function fetchProjectChecklist(id: number): Promise<RdmProjectDeliveryChecklist[]> {
+  return request.get<unknown, RdmProjectDeliveryChecklist[]>(`/rdm/project/${id}/checklist`, SILENT)
+}
+
+export async function addProjectMember(id: number, data: { userId: number; empNo?: string; userName?: string; roleCode: string }): Promise<void> {
+  return request.post<unknown, void>(`/rdm/project/${id}/members`, data)
+}
+
+export async function removeProjectMember(id: number, userId: number): Promise<void> {
+  return request.delete<unknown, void>(`/rdm/project/${id}/members/${userId}`)
+}
+
+// ===== 交付项 Delivery Item =====
+
+export async function fetchDeliveryItems(params: RdmDeliveryItemQuery): Promise<{ records: RdmDeliveryItemListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmDeliveryItemListItem[]; total: number }>('/rdm/delivery-item', { params, ...SILENT })
+}
+
+export async function createDeliveryItem(data: RdmDeliveryItemCreateForm): Promise<RdmDeliveryItemDetail> {
+  return request.post<unknown, RdmDeliveryItemDetail>('/rdm/delivery-item', data)
+}
+
+export async function fetchDeliveryItemDetail(id: number): Promise<RdmDeliveryItemDetail> {
+  return request.get<unknown, RdmDeliveryItemDetail>(`/rdm/delivery-item/${id}`, SILENT)
+}
+
+export async function updateDeliveryItem(id: number, data: RdmDeliveryItemUpdateForm): Promise<void> {
+  return request.patch<unknown, void>(`/rdm/delivery-item/${id}`, data)
+}
+
+// ===== 提测 Test Batch =====
+
+export async function fetchTestBatches(params: RdmTestBatchQuery): Promise<{ records: RdmTestBatchListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmTestBatchListItem[]; total: number }>('/rdm/test-batch', { params, ...SILENT })
+}
+
+export async function submitTestBatch(data: RdmTestBatchSubmitForm): Promise<RdmTestBatchDetail> {
+  return request.post<unknown, RdmTestBatchDetail>('/rdm/test-batch', data)
+}
+
+export async function fetchTestBatchDetail(id: number): Promise<RdmTestBatchDetail> {
+  return request.get<unknown, RdmTestBatchDetail>(`/rdm/test-batch/${id}`, SILENT)
+}
+
+export async function fetchTestBatchSummary(id: number): Promise<RdmTestBatchSummary> {
+  return request.get<unknown, RdmTestBatchSummary>(`/rdm/test-batch/${id}/summary`, SILENT)
+}
+
+export async function acceptTestBatch(id: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/test-batch/${id}/accept`, {})
+}
+
+export async function returnTestBatch(id: number, data: { reason: string }): Promise<void> {
+  return request.post<unknown, void>(`/rdm/test-batch/${id}/return`, data)
+}
+
+export async function submitTestExecution(id: number, data: RdmTestExecutionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/test-batch/${id}/executions`, data)
+}
+
+export async function retestBatch(id: number, data: { buildIds?: string[]; reason: string }): Promise<void> {
+  return request.post<unknown, void>(`/rdm/test-batch/${id}/retest`, data)
+}
+
+// ===== 问题 Issue =====
+
+export async function fetchIssues(params: RdmIssueQuery): Promise<{ records: RdmIssueListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmIssueListItem[]; total: number }>('/rdm/issue', { params, ...SILENT })
+}
+
+export async function createIssue(data: RdmIssueCreateForm): Promise<RdmIssueDetail> {
+  return request.post<unknown, RdmIssueDetail>('/rdm/issue', data)
+}
+
+export async function fetchIssueDetail(id: number): Promise<RdmIssueDetail> {
+  return request.get<unknown, RdmIssueDetail>(`/rdm/issue/${id}`, SILENT)
+}
+
+export async function applyIssueDefer(id: number, data: RdmIssueDeferApplyForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/defer`, data)
+}
+
+export async function decideIssueDefer(deferId: number, decisionType: 'product' | 'business', data: RdmIssueDeferDecisionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/defer/${deferId}/decide`, data, { params: { decisionType } })
+}
+
+export async function resolveIssue(id: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/resolve`, {})
+}
+
+// ===== 发布批次 Release Batch =====
+
+export async function fetchReleaseBatches(params: RdmReleaseBatchQuery): Promise<{ records: RdmReleaseBatchListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmReleaseBatchListItem[]; total: number }>('/rdm/release-batch', { params, ...SILENT })
+}
+
+export async function createReleaseBatch(data: RdmReleaseBatchCreateForm): Promise<RdmReleaseBatchDetail> {
+  return request.post<unknown, RdmReleaseBatchDetail>('/rdm/release-batch', data)
+}
+
+export async function fetchReleaseBatchDetail(id: number): Promise<RdmReleaseBatchDetail> {
+  return request.get<unknown, RdmReleaseBatchDetail>(`/rdm/release-batch/${id}`, SILENT)
+}
+
+export async function checkReleaseBatch(id: number): Promise<RdmReleaseCheckResult[]> {
+  return request.post<unknown, RdmReleaseCheckResult[]>(`/rdm/release-batch/${id}/check`, {})
+}
+
+export async function applyReleaseBatch(id: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/apply`, {})
+}
+
+export async function decideReleaseBatch(id: number, data: RdmReleaseDecideForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/decide`, data)
+}
+
+export async function submitReleaseDeployment(id: number, data: RdmReleaseDeployForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/deployments`, data)
+}
+
+export async function submitReleaseVerification(id: number, data: RdmReleaseVerifyForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/verification`, data)
+}
+
+export async function rollbackReleaseBatch(id: number, data: RdmReleaseRollbackForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/rollback`, data)
+}
+
+// ===== 验收记录（交付项级） =====
+
+export async function fetchAcceptanceRecords(deliveryItemId: number, params?: { acceptanceType?: string; stage?: string; pageNo?: number; pageSize?: number }): Promise<{ records: RdmAcceptanceRecordListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmAcceptanceRecordListItem[]; total: number }>(`/rdm/delivery-item/${deliveryItemId}/acceptance`, { params, ...SILENT })
+}
+
+export async function submitAcceptanceRecord(deliveryItemId: number, data: RdmAcceptanceRecordSubmitForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/delivery-item/${deliveryItemId}/acceptance`, data)
+}
+
+export async function fetchAcceptanceRecordDetail(deliveryItemId: number, recordId: number): Promise<RdmAcceptanceRecordDetail> {
+  return request.get<unknown, RdmAcceptanceRecordDetail>(`/rdm/delivery-item/${deliveryItemId}/acceptance/detail/${recordId}`, SILENT)
+}
+
+/* ==================== Batch2 API 函数 ==================== */
+
+// ===== Batch2: 結構主子需求 =====
+
+/** 需求結構樹節點 */
+export interface RdmStructureTreeNode {
+  reqId: number
+  reqNo: string
+  title: string
+  requirementKind: string
+  status: string
+  deliveryItemCount: number
+  deliveryDoneCount: number
+  children?: RdmStructureTreeNode[]
+}
+
+/** 為聚合需求掛一個執行子需求 */
+export async function addStructureChild(data: { parentReqId: number; childReqId: number }): Promise<void> {
+  return request.post<unknown, void>('/rdm/requirement-structure/add-child', data)
+}
+
+/** 移除聚合需求下的一個子需求 */
+export async function removeStructureChild(data: { parentReqId: number; childReqId: number }): Promise<void> {
+  return request.post<unknown, void>('/rdm/requirement-structure/remove-child', data)
+}
+
+/** 以某需求為根展開的結構子樹 */
+export async function fetchRequirementTree(reqId: number): Promise<RdmStructureTreeNode[]> {
+  try {
+    return await request.get<unknown, RdmStructureTreeNode[]>(`/rdm/requirement-structure/tree/${reqId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 某需求的結構祖先鏈（用於麵包屑） */
+export async function fetchRequirementAncestors(reqId: number): Promise<RdmStructureTreeNode[]> {
+  try {
+    return await request.get<unknown, RdmStructureTreeNode[]>(`/rdm/requirement-structure/ancestors/${reqId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+// ===== Batch2: 範圍版本 =====
+
+/** 交付項範圍版本歷史條目 */
+export interface RdmScopeVersionEntry {
+  version: number
+  reason: string
+  userId: number
+  userName?: string
+  time: string
+}
+
+/** 凍結交付項當前範圍 */
+export async function freezeDeliveryItemScope(id: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/delivery-item/${id}/freeze-scope`, {})
+}
+
+/** 發起範圍變更，生成新版本 */
+export async function createNewScopeVersion(id: number, data: { changeReason: string; newScopeDesc?: string; newAcceptanceCriteria?: string }): Promise<void> {
+  return request.post<unknown, void>(`/rdm/delivery-item/${id}/new-scope-version`, data)
+}
+
+/** 交付項範圍版本歷史 */
+export async function fetchScopeHistory(id: number): Promise<RdmScopeVersionEntry[]> {
+  try {
+    return await request.get<unknown, RdmScopeVersionEntry[]>(`/rdm/delivery-item/${id}/scope-history`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+// ===== Batch2: 統一摘要 =====
+
+/** 項目聚合摘要（跨交付項/任務/缺陷/測試/驗收統計） */
+export interface RdmProjectAggregateSummary {
+  projectId: number
+  deliveryItemTotal: number
+  deliveryItemCompleted: number
+  deliveryItemInProgress: number
+  requirementTotal: number
+  taskTotal: number
+  taskCompleted: number
+  taskInProgress: number
+  issueOpen: number
+  issueCritical: number
+  testBatchTotal: number
+  acceptancePending: number
+  blockedTaskCount: number
+  computedAt: string
+}
+
+/** 交付項聚合摘要 */
+export interface RdmDeliveryItemSummary {
+  deliveryItemId: number
+  taskTotal: number
+  taskCompleted: number
+  taskInProgress: number
+  latestTestBatchStatus?: string
+  acceptanceTotal: number
+  acceptancePassed: number
+  issueOpenCount: number
+  dependencyBlockCount: number
+  scopeVersion: number
+  scopeFrozen: boolean
+  computedAt: string
+}
+
+/** 工作台個人摘要 */
+export interface RdmWorkbenchSummary {
+  myProjectCount: number
+  myPendingTaskCount: number
+  myDeliveryItemCount: number
+  upcomingDeadlineCount: number
+  projects: Array<{ projectId: number; projectName: string; status: string; deliveryItemTotal: number; deliveryItemCompleted: number }>
+  computedAt: string
+}
+
+/** 項目聚合摘要 */
+export async function fetchProjectAggregateSummary(id: number): Promise<RdmProjectAggregateSummary | null> {
+  try {
+    return await request.get<unknown, RdmProjectAggregateSummary>(`/rdm/summary/project/${id}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 需求聚合摘要 */
+export async function fetchRequirementSummary(reqId: number): Promise<unknown> {
+  try {
+    return await request.get<unknown, unknown>(`/rdm/summary/requirement/${reqId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 交付項聚合摘要 */
+export async function fetchDeliveryItemSummary(id: number): Promise<RdmDeliveryItemSummary | null> {
+  try {
+    return await request.get<unknown, RdmDeliveryItemSummary>(`/rdm/summary/delivery-item/${id}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 工作台個人摘要 */
+export async function fetchWorkbenchSummary(): Promise<RdmWorkbenchSummary | null> {
+  try {
+    return await request.get<unknown, RdmWorkbenchSummary>('/rdm/summary/workbench', SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 項目總覽列表統計卡（跟隨搜索條件） */
+export async function fetchProjectListStats(params?: { status?: string; keyword?: string }): Promise<unknown> {
+  try {
+    return await request.get<unknown, unknown>('/rdm/summary/project-stats', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+// ===== Batch2: AllowedActions（實體級可執行動作） =====
+
+/** 實體級可執行動作（項目/交付項/測試批次/問題/發布批次） */
+export interface RdmEntityAction {
+  code: string
+  label: string
+  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger'
+}
+
+async function fetchEntityActions(path: string): Promise<RdmEntityAction[]> {
+  try {
+    return await request.get<unknown, RdmEntityAction[]>(path, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+export async function fetchProjectActions(id: number): Promise<RdmEntityAction[]> {
+  return fetchEntityActions(`/rdm/project/${id}/actions`)
+}
+
+export async function fetchDeliveryItemActions(id: number): Promise<RdmEntityAction[]> {
+  return fetchEntityActions(`/rdm/delivery-item/${id}/actions`)
+}
+
+export async function fetchTestBatchActions(id: number): Promise<RdmEntityAction[]> {
+  return fetchEntityActions(`/rdm/test-batch/${id}/actions`)
+}
+
+export async function fetchIssueActions(id: number): Promise<RdmEntityAction[]> {
+  return fetchEntityActions(`/rdm/issue/${id}/actions`)
+}
+
+export async function fetchReleaseBatchActions(id: number): Promise<RdmEntityAction[]> {
+  return fetchEntityActions(`/rdm/release-batch/${id}/actions`)
+}
+
+// ===== Batch2: 跨交付項依賴 =====
+
+/** 被阻塞任務信息 */
+export interface RdmBlockedTaskInfo {
+  taskId: number
+  taskTitle: string
+  predDeliveryItemId: number
+  predDeliveryItemTitle: string
+  blockPoint: string
+  reason: string
+}
+
+/** 添加跨交付項依賴 */
+export async function addCrossDeliveryDependency(data: { predTaskId: number; succTaskId: number; depType: string; blockPoint: string }): Promise<void> {
+  return request.post<unknown, void>('/rdm/schedule/cross-delivery-dependency', data)
+}
+
+/** 某交付項下被前置依賴阻塞的任務 */
+export async function fetchBlockedTasks(deliveryItemId: number): Promise<RdmBlockedTaskInfo[]> {
+  try {
+    return await request.get<unknown, RdmBlockedTaskInfo[]>(`/rdm/schedule/blocked-tasks/${deliveryItemId}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
     throw err
   }
 }

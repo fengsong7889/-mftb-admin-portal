@@ -37,23 +37,25 @@ import {
   type MeetingRuleForm,
 } from '../../../api/meeting'
 import MeetingStatCards from '../MeetingStatCards'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 const MENU = 'meeting-config'
 
 const EMPTY_STATS: BlacklistStats = { total: 0, effective: 0, expired: 0, revoked: 0 }
 
-const DISPLAY_STATE: Record<string, { label: string; color: string }> = {
-  effective: { label: '生效中', color: 'red' },
-  expired: { label: '已到期', color: 'default' },
-  revoked: { label: '已撤銷', color: 'green' },
-}
+const DISPLAY_STATE = (t: TFunction): Record<string, { label: string; color: string }> => ({
+  effective: { label: t('meeting.effective', { defaultValue: '生效中' }), color: 'red' },
+  expired: { label: t('meeting.expired', { defaultValue: '已到期' }), color: 'default' },
+  revoked: { label: t('meeting.revoked', { defaultValue: '已撤銷' }), color: 'green' },
+})
 
-const SOURCE_LABEL: Record<string, string> = { auto: '系統自動', admin: '行政手動' }
+const SOURCE_LABEL = (t: TFunction): Record<string, string> => ({ auto: t('meeting.automatic', { defaultValue: '系統自動' }), admin: t('meeting.manualByAdmin', { defaultValue: '行政手動' }) })
 
-const STATUS_OPTIONS = [
-  { value: 'active', label: '生效中' },
-  { value: 'expired', label: '已到期' },
-  { value: 'revoked', label: '已撤銷' },
+const STATUS_OPTIONS = (t: TFunction) => [
+  { value: 'active', label: t('meeting.effective', { defaultValue: '生效中' }) },
+  { value: 'expired', label: t('meeting.expired', { defaultValue: '已到期' }) },
+  { value: 'revoked', label: t('meeting.revoked', { defaultValue: '已撤銷' }) },
 ]
 
 /** 模块卡片（§C.3）：白底 + 8px 圆角 + 图标色块标题行，不用 antd Card 的彩色标题头 */
@@ -83,34 +85,35 @@ function CardTitle({ icon, bg, color, title, note }: {
 }
 
 /** 黑名单列配置元数据（§E.3）：人员锁头、操作锁尾 */
-const COLUMN_META = [
-  { key: 'name', title: '人員' },
-  { key: 'departmentName', title: '部門' },
-  { key: 'source', title: '來源' },
-  { key: 'noShowCount', title: '爽約次數' },
-  { key: 'reason', title: '原因' },
-  { key: 'period', title: '限制期' },
-  { key: 'displayState', title: '狀態' },
-  { key: 'revoke', title: '撤銷' },
-  { key: 'createdBy', title: '登記人' },
-  { key: 'action', title: '操作' },
+const COLUMN_META = (t: TFunction) => [
+  { key: 'name', title: t('meeting.person', { defaultValue: '人員' }) },
+  { key: 'departmentName', title: t('meeting.department', { defaultValue: '部門' }) },
+  { key: 'source', title: t('meeting.source', { defaultValue: '來源' }) },
+  { key: 'noShowCount', title: t('meeting.noShowCount', { defaultValue: '爽約次數' }) },
+  { key: 'reason', title: t('meeting.reason', { defaultValue: '原因' }) },
+  { key: 'period', title: t('meeting.restrictedPeriod', { defaultValue: '限制期' }) },
+  { key: 'displayState', title: t('meeting.status', { defaultValue: '狀態' }) },
+  { key: 'revoke', title: t('meeting.revoke', { defaultValue: '撤銷' }) },
+  { key: 'createdBy', title: t('meeting.recordedBy', { defaultValue: '登記人' }) },
+  { key: 'action', title: t('meeting.actions', { defaultValue: '操作' }) },
 ]
 
 export default function MeetingConfig() {
+  const { t } = useTranslation()
   return (
     <div className="content-area">
       <Alert
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="這裡的規則是全域默認值：房間檔案留空時回落到這裡，房間自身配置過的欄位以房間為準"
-        description="修改規則會影響所有人的預約結果（含已有會議的改期判定），因此必須填寫變更原因並二次確認；變更會寫入審計。"
+        message={t('meeting.theseAreGlobalDefaults', { defaultValue: '這裡的規則是全域默認值：房間檔案留空時回落到這裡，房間自身配置過的欄位以房間為準' })}
+        description={t('meeting.rulesAffectEveryoneS', { defaultValue: '修改規則會影響所有人的預約結果（含已有會議的改期判定），因此必須填寫變更原因並二次確認；變更會寫入審計。' })}
       />
       <Tabs
         defaultActiveKey="rules"
         items={[
-          { key: 'rules', label: '預約規則', children: <RulePanel /> },
-          { key: 'blacklist', label: '黑名單', children: <BlacklistPanel /> },
+          { key: 'rules', label: t('meeting.bookingRules', { defaultValue: '預約規則' }), children: <RulePanel /> },
+          { key: 'blacklist', label: t('meeting.blacklist', { defaultValue: '黑名單' }), children: <BlacklistPanel /> },
         ]}
       />
     </div>
@@ -127,6 +130,7 @@ export default function MeetingConfig() {
 const reasonRef: { value: string } = { value: '' }
 
 function RulePanel() {
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission(`${MENU}:edit`)
   const [form] = Form.useForm<MeetingRuleForm>()
@@ -147,7 +151,7 @@ function RulePanel() {
       setMissing(view.missingKeys ?? [])
       setUpdated({ by: view.updatedBy, at: view.updatedAt })
     } catch (e) {
-      setError(e instanceof Error ? e.message : '規則加載失敗')
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadRules', { defaultValue: '規則加載失敗' }))
     } finally {
       setLoading(false)
     }
@@ -169,47 +173,47 @@ function RulePanel() {
       bookableEnd: fmtTime(values.bookableEnd as unknown as Dayjs),
     }
     if (payload.maxDuration < payload.minLeadMinutes) {
-      message.warning('單場最長時長不應小於最少提前分鐘數')
+      message.warning(t('meeting.maximumDurationShouldNot', { defaultValue: '單場最長時長不應小於最少提前分鐘數' }))
       return
     }
     reasonRef.value = ''
     Modal.confirm({
-      title: '確認修改全局預約規則？',
+      title: t('meeting.changeTheGlobalBooking', { defaultValue: '確認修改全局預約規則？' }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認保存',
-      cancelText: '返回',
+      okText: t('meeting.confirmSave', { defaultValue: '確認保存' }),
+      cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row">
-            <span>可預約窗：</span>
+            <span>{t('meeting.bookableWindow', { defaultValue: '可預約窗：' })}</span>
             <b>{payload.bookableStart}–{payload.bookableEnd}</b>
           </div>
           <div className="confirm-info-row">
-            <span>提前量：</span>
+            <span>{t('meeting.leadTime', { defaultValue: '提前量：' })}</span>
             <b>最遠 {payload.advanceDays} 天／最少提前 {payload.minLeadMinutes} 分鐘</b>
           </div>
           <div className="confirm-info-row">
-            <span>單場時長：</span>
+            <span>{t('meeting.duration', { defaultValue: '單場時長：' })}</span>
             <b>默認 {payload.defaultDuration} 分鐘，最長 {payload.maxDuration} 分鐘，粒度 {payload.granularityMinutes} 分鐘</b>
           </div>
           <div className="confirm-info-row">
-            <span>簽到與釋放：</span>
+            <span>{t('meeting.checkInRelease', { defaultValue: '簽到與釋放：' })}</span>
             <b>可提前 {payload.checkinOpenMinutes} 分鐘簽到，未簽到 {payload.releaseAfterMinutes} 分鐘後釋放</b>
           </div>
           <div className="confirm-info-row">
-            <span>爽約治理：</span>
+            <span>{t('meeting.noShowControl', { defaultValue: '爽約治理：' })}</span>
             <b>近 30 天爽約 {payload.noShowThreshold} 次自動限制 {payload.blacklistDays} 天</b>
           </div>
-          <div className="confirm-info-row"><span>影響範圍：</span><b>全站所有人（含已有會議的改期判定）</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.blastRadius', { defaultValue: '影響範圍：' })}</span><b>{t('meeting.everyoneIncludingRescheduleChecks', { defaultValue: '全站所有人（含已有會議的改期判定）' })}</b></div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>變更原因（必填）</div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.changeReasonRequired', { defaultValue: '變更原因（必填）' })}</div>
             <Input.TextArea
               rows={3}
               maxLength={200}
               showCount
               style={{ resize: 'none' }}
-              placeholder="例：行政統一將可預約窗延後至 23:00，配合夜班例會"
+              placeholder={t('meeting.eGAdminMoved', { defaultValue: '例：行政統一將可預約窗延後至 23:00，配合夜班例會' })}
               onChange={e => { reasonRef.value = e.target.value }}
             />
           </div>
@@ -217,14 +221,14 @@ function RulePanel() {
       ),
       onOk: async () => {
         if (!reasonRef.value.trim()) {
-          message.warning('請填寫變更原因')
+          message.warning(t('meeting.pleaseEnterTheChange', { defaultValue: '請填寫變更原因' }))
           // 抛出以阻止弹窗关闭：全局规则不留原因就等于事后无法解释
           throw new Error('reason required')
         }
         setSaving(true)
         try {
           await saveMeetingRules({ ...payload, changeReason: reasonRef.value.trim() })
-          message.success('預約規則已保存')
+          message.success(t('meeting.bookingRulesSaved', { defaultValue: '預約規則已保存' }))
           reasonRef.value = ''
           await load()
         } finally {
@@ -237,7 +241,7 @@ function RulePanel() {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="載入預約規則..." />
+        <Spin size="large" tip={t('meeting.loadingBookingRules', { defaultValue: '載入預約規則...' })} />
       </div>
     )
   }
@@ -248,10 +252,10 @@ function RulePanel() {
         <Alert
           type="error"
           showIcon
-          message="規則加載失敗"
+          message={t('meeting.failedToLoadRules', { defaultValue: '規則加載失敗' })}
           description={error}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>重試</Button>}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
         />
       )}
       {missing.length > 0 && (
@@ -260,65 +264,65 @@ function RulePanel() {
           showIcon
           style={{ marginBottom: 16 }}
           message={`${missing.length} 個規則尚未落庫，當前顯示的是代碼兜底值`}
-          description="保存一次即全部寫入 sys_config；之後再改只會更新已存在的值，啟動不會把管理員的調整打回默認值。"
+          description={t('meeting.savingOnceWritesAll', { defaultValue: '保存一次即全部寫入 sys_config；之後再改只會更新已存在的值，啟動不會把管理員的調整打回默認值。' })}
         />
       )}
 
       <Form form={form} layout="vertical" disabled={!canEdit}>
         {/* 一、可预约窗口与时长 */}
         <div style={cardStyle}>
-          <CardTitle icon={<ClockCircleOutlined />} bg="#e6f7ff" color="#1890ff" title="可預約窗與時長"
-            note="房間檔案留空時回落到這裡" />
+          <CardTitle icon={<ClockCircleOutlined />} bg="#e6f7ff" color="#1890ff" title={t('meeting.bookableWindowDuration', { defaultValue: '可預約窗與時長' })}
+            note={t('meeting.roomsFallBackHere', { defaultValue: '房間檔案留空時回落到這裡' })} />
           <div style={gridStyle}>
-            <Form.Item label="最遠可預約天數" name="advanceDays" rules={[{ required: true, message: '請填寫天數' }]}
-              extra="週期會議的後續場次不受此限制">
-              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter="天" />
+            <Form.Item label={t('meeting.maximumAdvanceDays', { defaultValue: '最遠可預約天數' })} name="advanceDays" rules={[{ required: true, message: t('meeting.pleaseEnterTheNumber', { defaultValue: '請填寫天數' }) }]}
+              extra={t('meeting.laterOccurrencesOfA', { defaultValue: '週期會議的後續場次不受此限制' })}>
+              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter={t('meeting.days', { defaultValue: '天' })} />
             </Form.Item>
-            <Form.Item label="最少提前分鐘數" name="minLeadMinutes" rules={[{ required: true, message: '請填寫分鐘數' }]}
-              extra="0 表示允許即時預約">
-              <InputNumber min={0} max={1440} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.minimumLeadTime', { defaultValue: '最少提前分鐘數' })} name="minLeadMinutes" rules={[{ required: true, message: t('meeting.pleaseEnterTheMinutes', { defaultValue: '請填寫分鐘數' }) }]}
+              extra={t('meeting.0AllowsBookingRight', { defaultValue: '0 表示允許即時預約' })}>
+              <InputNumber min={0} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label="時間粒度" name="granularityMinutes" rules={[{ required: true, message: '請選擇粒度' }]}
-              extra="開始時間與時長都要對齊該刻度">
+            <Form.Item label={t('meeting.timeGranularity', { defaultValue: '時間粒度' })} name="granularityMinutes" rules={[{ required: true, message: t('meeting.pleaseChooseTheGranularity', { defaultValue: '請選擇粒度' }) }]}
+              extra={t('meeting.startTimeAndDuration', { defaultValue: '開始時間與時長都要對齊該刻度' })}>
               <Select options={[5, 10, 15, 20, 30, 60].map(v => ({ value: v, label: `${v} 分鐘` }))} />
             </Form.Item>
-            <Form.Item label="每日可預約開始" name="bookableStart" rules={[{ required: true, message: '請選擇開始時間' }]}>
+            <Form.Item label={t('meeting.dailyBookableStart', { defaultValue: '每日可預約開始' })} name="bookableStart" rules={[{ required: true, message: t('meeting.pleaseChooseTheStart', { defaultValue: '請選擇開始時間' }) }]}>
               <TimePicker format="HH:mm" minuteStep={5 as const} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label="每日可預約結束" name="bookableEnd" rules={[{ required: true, message: '請選擇結束時間' }]}>
+            <Form.Item label={t('meeting.bookableUntil', { defaultValue: '每日可預約結束' })} name="bookableEnd" rules={[{ required: true, message: t('meeting.pleaseChooseTheEnd', { defaultValue: '請選擇結束時間' }) }]}>
               <TimePicker format="HH:mm" minuteStep={5 as const} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label="默認時長" name="defaultDuration" rules={[{ required: true, message: '請填寫默認時長' }]}>
-              <InputNumber min={5} max={720} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.defaultDuration', { defaultValue: '默認時長' })} name="defaultDuration" rules={[{ required: true, message: t('meeting.pleaseEnterTheDefault', { defaultValue: '請填寫默認時長' }) }]}>
+              <InputNumber min={5} max={720} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label="單場最長時長" name="maxDuration" rules={[{ required: true, message: '請填寫最長時長' }]}>
-              <InputNumber min={15} max={720} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.maximumDuration', { defaultValue: '單場最長時長' })} name="maxDuration" rules={[{ required: true, message: t('meeting.pleaseEnterTheMaximum', { defaultValue: '請填寫最長時長' }) }]}>
+              <InputNumber min={15} max={720} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
           </div>
         </div>
 
         {/* 二、提醒、签到与爽约治理 */}
         <div style={cardStyle}>
-          <CardTitle icon={<BellOutlined />} bg="#fff7e6" color="#fa8c16" title="提醒、簽到與爽約治理"
-            note="同一場會只提醒一次" />
+          <CardTitle icon={<BellOutlined />} bg="#fff7e6" color="#fa8c16" title={t('meeting.reminderCheckInAnd', { defaultValue: '提醒、簽到與爽約治理' })}
+            note={t('meeting.eachMeetingIsReminded', { defaultValue: '同一場會只提醒一次' })} />
           <div style={gridStyle}>
-            <Form.Item label="開始前提醒" name="remindMinutes" rules={[{ required: true, message: '請填寫提醒分鐘數' }]}
-              extra="0 表示不發提醒">
-              <InputNumber min={0} max={1440} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.reminderBeforeStart', { defaultValue: '開始前提醒' })} name="remindMinutes" rules={[{ required: true, message: t('meeting.pleaseEnterTheReminder', { defaultValue: '請填寫提醒分鐘數' }) }]}
+              extra={t('meeting.0DisablesTheReminder', { defaultValue: '0 表示不發提醒' })}>
+              <InputNumber min={0} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label="可提前簽到" name="checkinOpenMinutes" rules={[{ required: true, message: '請填寫分鐘數' }]}>
-              <InputNumber min={0} max={120} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.checkInOpensEarly', { defaultValue: '可提前簽到' })} name="checkinOpenMinutes" rules={[{ required: true, message: t('meeting.pleaseEnterTheMinutes', { defaultValue: '請填寫分鐘數' }) }]}>
+              <InputNumber min={0} max={120} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label="未簽到自動釋放" name="releaseAfterMinutes" rules={[{ required: true, message: '請填寫分鐘數' }]}
-              extra="僅對開了「需簽到保留」的房間生效">
-              <InputNumber min={1} max={240} style={{ width: '100%' }} addonAfter="分鐘" />
+            <Form.Item label={t('meeting.autoReleaseOnNo', { defaultValue: '未簽到自動釋放' })} name="releaseAfterMinutes" rules={[{ required: true, message: t('meeting.pleaseEnterTheMinutes', { defaultValue: '請填寫分鐘數' }) }]}
+              extra={t('meeting.appliesOnlyToRooms', { defaultValue: '僅對開了「需簽到保留」的房間生效' })}>
+              <InputNumber min={1} max={240} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label="爽約自動拉黑閾值" name="noShowThreshold" rules={[{ required: true, message: '請填寫次數' }]}
-              extra="近 30 天爽約達該次數即暫停預約；0 表示只做人工黑名單">
-              <InputNumber min={0} max={30} style={{ width: '100%' }} addonAfter="次" />
+            <Form.Item label={t('meeting.noShowThresholdFor', { defaultValue: '爽約自動拉黑閾值' })} name="noShowThreshold" rules={[{ required: true, message: t('meeting.pleaseEnterTheCount', { defaultValue: '請填寫次數' }) }]}
+              extra={t('meeting.noShowsIn30', { defaultValue: '近 30 天爽約達該次數即暫停預約；0 表示只做人工黑名單' })}>
+              <InputNumber min={0} max={30} style={{ width: '100%' }} addonAfter={t('meeting.times', { defaultValue: '次' })} />
             </Form.Item>
-            <Form.Item label="自動限制天數" name="blacklistDays" rules={[{ required: true, message: '請填寫天數' }]}>
-              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter="天" />
+            <Form.Item label={t('meeting.autoRestrictionDays', { defaultValue: '自動限制天數' })} name="blacklistDays" rules={[{ required: true, message: t('meeting.pleaseEnterTheNumber', { defaultValue: '請填寫天數' }) }]}>
+              <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter={t('meeting.days', { defaultValue: '天' })} />
             </Form.Item>
           </div>
         </div>
@@ -358,6 +362,7 @@ function fmtTime(value: Dayjs | string | undefined | null): string {
 /* ==================== 黑名单 Tab ==================== */
 
 function BlacklistPanel() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission(`${MENU}:edit`)
@@ -369,7 +374,7 @@ function BlacklistPanel() {
   const [error, setError] = useState<string>()
   const [form] = Form.useForm()
 
-  const { configComponent, applyConfig } = useColumnConfig('meeting-blacklist', COLUMN_META, [
+  const { configComponent, applyConfig } = useColumnConfig('meeting-blacklist', COLUMN_META(t), [
     { key: 'name', visible: true, locked: 'head' },
     { key: 'action', visible: true, locked: 'tail' },
   ])
@@ -383,7 +388,7 @@ function BlacklistPanel() {
       setTotal(res.page?.total ?? 0)
       setStats(res.stats ?? EMPTY_STATS)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '黑名單加載失敗')
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe', { defaultValue: '黑名單加載失敗' }))
     } finally {
       setLoading(false)
     }
@@ -415,23 +420,23 @@ function BlacklistPanel() {
       title: `確認撤銷「${row.name}」的預約限制？`,
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認撤銷',
-      cancelText: '返回',
+      okText: t('meeting.confirmRevoke', { defaultValue: '確認撤銷' }),
+      cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>人員：</span><b>{row.name}{row.empNo ? `（${row.empNo}）` : ''}</b></div>
-          <div className="confirm-info-row"><span>部門：</span><b>{row.departmentName || '-'}</b></div>
-          <div className="confirm-info-row"><span>限制期：</span><b>{row.startDate} ~ {row.endDate}</b></div>
-          <div className="confirm-info-row"><span>登記來源：</span><b>{SOURCE_LABEL[row.source] ?? row.source}</b></div>
-          <div className="confirm-info-row"><span>影響：</span><b>撤銷後該員工立即可預約，記錄行保留不刪除</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.person2', { defaultValue: '人員：' })}</span><b>{row.name}{row.empNo ? `（${row.empNo}）` : ''}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.department2', { defaultValue: '部門：' })}</span><b>{row.departmentName || '-'}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.restrictedPeriod2', { defaultValue: '限制期：' })}</span><b>{row.startDate} ~ {row.endDate}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.source2', { defaultValue: '登記來源：' })}</span><b>{SOURCE_LABEL(t)[row.source] ?? row.source}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theEmployeeCanBook', { defaultValue: '撤銷後該員工立即可預約，記錄行保留不刪除' })}</b></div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>撤銷原因（必填）</div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.revokeReasonRequired', { defaultValue: '撤銷原因（必填）' })}</div>
             <Input.TextArea
               rows={3}
               maxLength={200}
               showCount
               style={{ resize: 'none' }}
-              placeholder="例：本人已說明當時在客戶現場，行政複核後解除"
+              placeholder={t('meeting.eGExplainedHe', { defaultValue: '例：本人已說明當時在客戶現場，行政複核後解除' })}
               onChange={(e) => { reason = e.target.value }}
             />
           </div>
@@ -439,12 +444,12 @@ function BlacklistPanel() {
       ),
       onOk: async () => {
         if (!reason.trim()) {
-          message.warning('請填寫撤銷原因')
+          message.warning(t('meeting.pleaseEnterTheRevoke', { defaultValue: '請填寫撤銷原因' }))
           // 抛出以阻止弹窗关闭：撤销不留原因，事后无法解释"为什么放人"
           throw new Error('reason required')
         }
         await revokeBlacklist(row.id, { reason: reason.trim(), version: row.version })
-        message.success('限制已撤銷')
+        message.success(t('meeting.restrictionRevoked', { defaultValue: '限制已撤銷' }))
         void load()
       },
     })
@@ -452,24 +457,24 @@ function BlacklistPanel() {
 
   const columns: TableColumnsType<BlacklistItem> = [
     {
-      title: '人員', key: 'name', width: 150, fixed: 'left', ellipsis: true,
+      title: t('meeting.person', { defaultValue: '人員' }), key: 'name', width: 150, fixed: 'left', ellipsis: true,
       render: (_, row) => `${row.name}${row.empNo ? `（${row.empNo}）` : ''}`,
     },
-    { title: '部門', dataIndex: 'departmentName', key: 'departmentName', width: 140, render: v => v || '-' },
+    { title: t('meeting.department', { defaultValue: '部門' }), dataIndex: 'departmentName', key: 'departmentName', width: 140, render: v => v || '-' },
     {
-      title: '來源', dataIndex: 'source', key: 'source', width: 110,
-      render: (v: string) => <Tag color={v === 'auto' ? 'orange' : 'blue'}>{SOURCE_LABEL[v] ?? v}</Tag>,
+      title: t('meeting.source', { defaultValue: '來源' }), dataIndex: 'source', key: 'source', width: 110,
+      render: (v: string) => <Tag color={v === 'auto' ? 'orange' : 'blue'}>{SOURCE_LABEL(t)[v] ?? v}</Tag>,
     },
     {
-      title: '爽約次數', dataIndex: 'noShowCount', key: 'noShowCount', width: 100,
+      title: t('meeting.noShowCount', { defaultValue: '爽約次數' }), dataIndex: 'noShowCount', key: 'noShowCount', width: 100,
       render: (v: number, row) => (row.source === 'auto' ? `${v} 次` : '—'),
     },
-    { title: '原因', dataIndex: 'reason', key: 'reason', width: 260, ellipsis: true },
-    { title: '限制期', key: 'period', width: 200, render: (_, row) => `${row.startDate} ~ ${row.endDate}` },
+    { title: t('meeting.reason', { defaultValue: '原因' }), dataIndex: 'reason', key: 'reason', width: 260, ellipsis: true },
+    { title: t('meeting.restrictedPeriod', { defaultValue: '限制期' }), key: 'period', width: 200, render: (_, row) => `${row.startDate} ~ ${row.endDate}` },
     {
-      title: '狀態', key: 'displayState', width: 130,
+      title: t('meeting.status', { defaultValue: '狀態' }), key: 'displayState', width: 130,
       render: (_, row) => {
-        const meta = DISPLAY_STATE[row.displayState] ?? { label: row.displayState, color: 'default' }
+        const meta = DISPLAY_STATE(t)[row.displayState] ?? { label: row.displayState, color: 'default' }
         return (
           <Space direction="vertical" size={2}>
             <Tag color={meta.color}>{meta.label}</Tag>
@@ -481,19 +486,19 @@ function BlacklistPanel() {
       },
     },
     {
-      title: '撤銷', key: 'revoke', width: 200, ellipsis: true,
+      title: t('meeting.revoke', { defaultValue: '撤銷' }), key: 'revoke', width: 200, ellipsis: true,
       render: (_, row) => (row.displayState === 'revoked'
         ? <span style={{ fontSize: 12, color: '#8C8C8C' }} title={`${row.revokedByName ?? ''} ${row.revokeReason ?? ''}`}>
           {row.revokedByName ?? ''} {row.revokeReason ?? ''}
         </span>
         : '—'),
     },
-    { title: '登記人', key: 'createdBy', width: 120, render: (_, row) => row.createdBy || '-' },
+    { title: t('meeting.recordedBy', { defaultValue: '登記人' }), key: 'createdBy', width: 120, render: (_, row) => row.createdBy || '-' },
     {
-      title: '操作', key: 'action', width: 90, fixed: 'right',
+      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 90, fixed: 'right',
       // 操作列（§B.9）：纯文本 link + 危险色，撤销是唯一动作，不需要分隔符
       render: (_, row) => (canEdit && row.displayState === 'effective'
-        ? <Button type="link" size="small" danger onClick={() => handleRevoke(row)}>撤銷</Button>
+        ? <Button type="link" size="small" danger onClick={() => handleRevoke(row)}>{t('meeting.revoke', { defaultValue: '撤銷' })}</Button>
         : <span style={{ color: '#BFBFBF' }}>—</span>),
     },
   ]
@@ -504,29 +509,29 @@ function BlacklistPanel() {
         <Alert
           type="error"
           showIcon
-          message="黑名單加載失敗"
+          message={t('meeting.failedToLoadThe', { defaultValue: '黑名單加載失敗' })}
           description={error}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>重試</Button>}
+          action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void load()}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
         />
       )}
 
       <div className="search-section">
         <Form form={form} layout="inline">
-          <Form.Item label="關鍵字" name="keyword">
-            <Input placeholder="姓名／工號" allowClear style={{ width: '100%' }} onPressEnter={search} />
+          <Form.Item label={t('meeting.keyword', { defaultValue: '關鍵字' })} name="keyword">
+            <Input placeholder={t('meeting.nameEmployeeNo', { defaultValue: '姓名／工號' })} allowClear style={{ width: '100%' }} onPressEnter={search} />
           </Form.Item>
-          <Form.Item label="來源" name="source">
-            <Select placeholder="全部來源" allowClear style={{ width: '100%' }}
-              options={Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label }))} />
+          <Form.Item label={t('meeting.source', { defaultValue: '來源' })} name="source">
+            <Select placeholder={t('meeting.allSources', { defaultValue: '全部來源' })} allowClear style={{ width: '100%' }}
+              options={Object.entries(SOURCE_LABEL(t)).map(([value, label]) => ({ value, label }))} />
           </Form.Item>
-          <Form.Item label="狀態" name="status">
-            <Select placeholder="全部狀態" allowClear style={{ width: '100%' }} options={STATUS_OPTIONS} />
+          <Form.Item label={t('meeting.status', { defaultValue: '狀態' })} name="status">
+            <Select placeholder={t('meeting.allStatuses', { defaultValue: '全部狀態' })} allowClear style={{ width: '100%' }} options={STATUS_OPTIONS(t)} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={search}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={reset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={search}>{t('meeting.search', { defaultValue: '查詢' })}</Button>
+              <Button icon={<ReloadOutlined />} onClick={reset}>{t('meeting.reset', { defaultValue: '重置' })}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -534,10 +539,10 @@ function BlacklistPanel() {
 
       {/* 统计卡片：搜索区之后、操作区之前（§E.8），口径随筛选条件变化 */}
       <MeetingStatCards key={statsKey} loading={loading} items={[
-        { icon: <FolderOpenOutlined />, color: '#1890FF', bg: '#E6F7FF', value: stats.total, label: '限制記錄總數', hint: '隨篩選條件變化' },
-        { icon: <StopOutlined />, color: '#FF4D4F', bg: '#FFF1F0', value: stats.effective, label: '生效中' },
-        { icon: <ClockCircleOutlined />, color: '#8C8C8C', bg: '#FAFAFA', value: stats.expired, label: '已到期（自動解除）' },
-        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.revoked, label: '行政已撤銷' },
+        { icon: <FolderOpenOutlined />, color: '#1890FF', bg: '#E6F7FF', value: stats.total, label: t('meeting.restrictionRecords', { defaultValue: '限制記錄總數' }), hint: t('meeting.followsCurrentFilters', { defaultValue: '隨篩選條件變化' }) },
+        { icon: <StopOutlined />, color: '#FF4D4F', bg: '#FFF1F0', value: stats.effective, label: t('meeting.effective', { defaultValue: '生效中' }) },
+        { icon: <ClockCircleOutlined />, color: '#8C8C8C', bg: '#FAFAFA', value: stats.expired, label: t('meeting.expiredLiftedAutomatically', { defaultValue: '已到期（自動解除）' }) },
+        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.revoked, label: t('meeting.revokedByAdmin', { defaultValue: '行政已撤銷' }) },
       ]} />
 
       {/* 操作区（§E.2）：右侧只放「新增」与列配置 */}

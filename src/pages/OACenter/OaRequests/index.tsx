@@ -600,6 +600,8 @@ export default function OaRequests() {
   }
   const handleCancel = (record: FlowRow) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('approvalCenter.cancelTitle'),
       content: t('approvalCenter.cancelContent', { flowNo: record.flowNo }),
       okText: t('approvalCenter.cancelOk'),

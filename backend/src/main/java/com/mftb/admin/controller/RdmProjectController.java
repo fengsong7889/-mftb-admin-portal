@@ -1,0 +1,151 @@
+package com.mftb.admin.controller;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.annotation.RequirePermission;
+import com.mftb.admin.common.Result;
+import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.RdmProjectDTO;
+import com.mftb.admin.dto.RdmProjectVO;
+import com.mftb.admin.entity.RdmProject;
+import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.service.RdmAllowedActionsService;
+import com.mftb.admin.service.RdmProjectService;
+import com.mftb.admin.util.OperatorResolver;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/**
+ * 產研交付（RDM）项目总览接口（Batch 1）。
+ * <p>菜单归属：{@code rdm-dashboard-project}。数据范围由服务层按登录人收敛
+ * （非全量授权者只看「我参与的项目」），控制器只负责鉴权注解、取当前操作人与结果封装。
+ */
+@Slf4j
+@RestController
+@RequestMapping("/api/rdm/project")
+@RequiredArgsConstructor
+public class RdmProjectController {
+
+    private final RdmProjectService projectService;
+    private final RdmAllowedActionsService allowedActionsService;
+    private final OperatorResolver operatorResolver;
+
+    /* ==================== 查询 ==================== */
+
+    /** 项目分页列表（含交付汇总） */
+    @GetMapping
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<PageResult<RdmProjectVO.ListItem>> listProjects(RdmProjectDTO.Query query) {
+        Page<RdmProjectVO.ListItem> page = projectService.listProjects(query, currentUserId());
+        return Result.success(new PageResult<>(page.getRecords(), page.getTotal()));
+    }
+
+    /**
+     * 项目总览统计卡片。
+     * <p>口径跟随列表查询条件（与 {@link #listProjects} 同一组 filters），
+     * 而非绑定单个项目 id —— 统计卡必须反映当前筛选结果（见前端 UI 规范 §E.8），
+     * 故按 {@code RdmProjectDTO.Query} 取数，服务层同样按登录人收敛数据范围。
+     */
+    @GetMapping("/stats")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<RdmProjectVO.StatsCard> getStatsCards(RdmProjectDTO.Query query) {
+        return Result.success(projectService.getStatsCards(query, currentUserId()));
+    }
+
+    /** 项目详情（含在途成员与交付汇总） */
+    @GetMapping("/{id}")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<RdmProjectVO.Detail> getProjectDetail(@PathVariable Long id) {
+        return Result.success(projectService.getProjectDetail(id, currentUserId()));
+    }
+
+    /**
+     * 项目可执行动作（按钮口径的单一真相源）。
+     * <p>前端详情页/列表行按此列表渲染按钮，避免各自拼 {@code if status==... && role==...}
+     * 导致「按钮能点但接口 403」的错位；真实强校验仍由写接口的 access guard 兜底。
+     */
+    @GetMapping("/{id}/actions")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<List<RdmAllowedActionsService.AllowedAction>> getProjectActions(@PathVariable Long id) {
+        return Result.success(allowedActionsService.computeProjectActions(id, currentUserId()));
+    }
+
+    /** 项目交付概览（看板卡片） */
+    @GetMapping("/{id}/summary")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<RdmProjectVO.Summary> getProjectSummary(@PathVariable Long id) {
+        return Result.success(projectService.getProjectSummary(id));
+    }
+
+    /** 项目待办事项（未分配/阻塞/待决策/逾期） */
+    @GetMapping("/{id}/pending")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<List<RdmProjectVO.PendingItem>> getPendingItems(@PathVariable Long id) {
+        return Result.success(projectService.getPendingItems(id));
+    }
+
+    /** 交付清单（按需求分组的交付项） */
+    @GetMapping("/{id}/checklist")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<List<RdmProjectVO.DeliveryChecklist>> getDeliveryChecklist(@PathVariable Long id) {
+        return Result.success(projectService.getDeliveryChecklist(id));
+    }
+
+    /* ==================== 写入 ==================== */
+
+    /** 创建项目（自动把项目经理加入成员） */
+    @PostMapping
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "create")
+    public Result<RdmProject> createProject(@RequestBody RdmProjectDTO.Create dto) {
+        RdmProject project = projectService.createProject(dto, currentUserId());
+        log.info("RDM 项目已创建: id={}, name={}, operator={}",
+                project.getId(), project.getName(), operatorResolver.currentOperatorName());
+        return Result.success("項目已創建", project);
+    }
+
+    /** 编辑项目（乐观锁，expectedVersion 不匹配即拒绝） */
+    @PatchMapping("/{id}")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "edit")
+    public Result<Void> updateProject(@PathVariable Long id, @RequestBody RdmProjectDTO.Update dto) {
+        projectService.updateProject(id, dto, currentUserId());
+        log.info("RDM 项目已更新: id={}, operator={}", id, operatorResolver.currentOperatorName());
+        return Result.success("項目已更新", null);
+    }
+
+    /** 添加项目成员 */
+    @PostMapping("/{id}/members")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "edit")
+    public Result<Void> addMember(@PathVariable Long id, @RequestBody RdmProjectDTO.MemberAdd dto) {
+        projectService.addMember(id, dto, currentUserId());
+        log.info("RDM 项目成员已添加: projectId={}, userId={}, role={}, operator={}",
+                id, dto == null ? null : dto.getUserId(), dto == null ? null : dto.getRoleCode(),
+                operatorResolver.currentOperatorName());
+        return Result.success("成員已添加", null);
+    }
+
+    /** 移除项目成员 */
+    @DeleteMapping("/{id}/members/{userId}")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "edit")
+    public Result<Void> removeMember(@PathVariable Long id, @PathVariable Long userId) {
+        projectService.removeMember(id, userId, currentUserId());
+        log.info("RDM 项目成员已移除: projectId={}, userId={}, operator={}",
+                id, userId, operatorResolver.currentOperatorName());
+        return Result.success("成員已移除", null);
+    }
+
+    /** 当前登录人 ID（未登录返回 null，由服务层与 @RequirePermission 双重兜底） */
+    private Long currentUserId() {
+        SysUser user = operatorResolver.currentUser();
+        return user == null ? null : user.getId();
+    }
+}

@@ -112,6 +112,8 @@ export default function PerfPlanForm() {
     form.validateFields().then(values => {
       const unassigned = preview?.unassigned ?? 0
       Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('hrPerf.launchConfirmTitle'),
         content: unassigned
           ? t('hrPerf.launchConfirmUnassigned', { total: preview?.total ?? 0, count: unassigned })

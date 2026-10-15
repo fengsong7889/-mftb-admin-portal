@@ -26,14 +26,13 @@ import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_RESULT_COLOR,
   RDM_ACCEPT_RESULT_LABEL,
-  RDM_PRIORITY_LABEL,
   RDM_REQ_TYPE_LABEL,
   RDM_STATUS_LABEL,
   type RdmAcceptResult,
-  type RdmPriority,
   type RdmReqType,
   type RdmStatus,
 } from '../../constants/rdm'
+import { PriorityTag } from './components/Tags'
 import './index.css'
 
 /** 版本列表兜底（后端版本历史不可用时仍可演示追溯） */
@@ -88,24 +87,22 @@ export default function VersionTrace() {
 
   const columns: TableColumnsType<RdmVersionTrace['requirements'][number]> = useMemo(() => [
     {
-      title: '需求', dataIndex: 'title', key: 'title', width: 280,
+      title: '需求標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
       render: (v: string, r) => (
-        <div style={{ lineHeight: 1.4 }}>
-          <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.reqNo}</div>
-        </div>
+        <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>
       ),
     },
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     {
       title: '類型 / 優先級', key: 'type', width: 150,
       render: (_, r) => (
         <Space size={4} wrap>
           <Tag style={{ margin: 0 }}>{RDM_REQ_TYPE_LABEL[r.reqType as RdmReqType] ?? r.reqType ?? '-'}</Tag>
-          <Tag color="orange" style={{ margin: 0 }}>{RDM_PRIORITY_LABEL[r.priority as RdmPriority] ?? r.priority ?? '-'}</Tag>
+          <PriorityTag priority={r.priority} />
         </Space>
       ),
     },
-    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 120, render: (v?: string | null) => v ?? '-' },
+    { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
     { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100, render: (v?: string | null) => v ?? '-' },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 110,
@@ -145,7 +142,8 @@ export default function VersionTrace() {
    * 否则渲染次数不一致会报 out-of-order hooks。
    */
   const { configComponent, applyConfig } = useColumnConfig('rdm-version-trace', [
-    { key: 'title', title: '需求' },
+    { key: 'title', title: '需求標題' },
+    { key: 'reqNo', title: '需求編號' },
     { key: 'type', title: '類型 / 優先級' },
     { key: 'submitDeptName', title: '提出部門' },
     { key: 'pmName', title: '產品經理' },

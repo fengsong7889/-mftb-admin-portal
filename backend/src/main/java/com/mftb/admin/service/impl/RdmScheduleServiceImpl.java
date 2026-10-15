@@ -2,14 +2,17 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmScheduleDTO;
 import com.mftb.admin.dto.RdmScheduleVO;
+import com.mftb.admin.entity.RdmDeliveryItem;
 import com.mftb.admin.entity.RdmMilestone;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmTaskDependency;
 import com.mftb.admin.entity.RdmWorkCalendar;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.RdmDeliveryItemMapper;
 import com.mftb.admin.mapper.RdmMilestoneMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmTaskDependencyMapper;
@@ -17,7 +20,11 @@ import com.mftb.admin.mapper.RdmWorkCalendarMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RdmAccessGuard;
+import com.mftb.admin.service.RdmIdempotentService;
+import com.mftb.admin.service.IdempotentKey;
 import com.mftb.admin.service.RdmScheduleService;
+import com.mftb.admin.service.RdmWorkingDayCalculator;
+import com.mftb.admin.service.RdmWorkingDayCalculator.DayCalendar;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +36,6 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -41,6 +47,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
+
+import static com.mftb.admin.service.RdmWorkingDayCalculator.countWorking;
+import static com.mftb.admin.service.RdmWorkingDayCalculator.nextWorking;
+import static com.mftb.admin.service.RdmWorkingDayCalculator.nthWorking;
+import static com.mftb.admin.service.RdmWorkingDayCalculator.nthWorkingBack;
+import static com.mftb.admin.service.RdmWorkingDayCalculator.prevWorking;
+import static com.mftb.admin.service.RdmWorkingDayCalculator.shift;
 
 /**
  * 排程实现（阶段 5）。
@@ -76,6 +90,21 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
     private final RdmAccessGuard accessGuard;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
+    /** Batch 2：跨交付项依赖需按交付项状态判定阻断 */
+    private final RdmDeliveryItemMapper deliveryItemMapper;
+    /** 任务19 / 缺口3：依赖写操作接入原子幂等 executeOnce，防重试/并发双副作用 */
+    private final RdmIdempotentService idempotentService;
+    /**
+     * 任务21：工作日计算抽取为公共能力（原为本类私有实现）。
+     * <p>调度侧仅由「本地私有方法」改为「委托本组件」，算法逐字保持既有行为；
+     * 同一能力另供问题延期期限、逾期升级与任务27 紧急补验复用。
+     */
+    private final RdmWorkingDayCalculator workingDayCalculator;
+
+    /** executeOnce 业务类型：需求内任务依赖（任务19 / 缺口3） */
+    private static final String BIZ_TASK_DEPENDENCY = "rdm_task_dependency";
+    /** executeOnce 业务类型：跨交付项任务依赖（任务19 / 缺口3） */
+    private static final String BIZ_CROSS_DELIVERY_DEPENDENCY = "rdm_cross_delivery_dependency";
 
     /* ==================== 依赖 ==================== */
 
@@ -88,8 +117,34 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public RdmScheduleVO.Dependency addDependency(RdmScheduleDTO.Dependency dto) {
+        if (dto == null || dto.getReqId() == null || dto.getPredTaskId() == null || dto.getSuccTaskId() == null) {
+            throw new BusinessException("請選擇前置任務與後續任務");
+        }
+        // 幂等边界在本方法（决策2）：executeOnce 自身即事务边界，实际逻辑落在 doAddDependency。
+        // 服务端派生天然幂等键（决策1，不改 DTO/Controller 契约）：resourceKey=task_dep:<reqId>，
+        // clientRequestId=dep:<pred>-><succ>（边标识作判别子），requestHash=依赖参数的稳定内容哈希。
+        // 语义：同一边重试→回放；不同边→各自执行；同边不同 lag→CONFLICT。
+        Long currentUserId = currentUserIdOrThrow();
+        IdempotentKey key = IdempotentKey.builder()
+                .userId(currentUserId)
+                .bizType(BIZ_TASK_DEPENDENCY)
+                .resourceKey("task_dep:" + dto.getReqId())
+                .clientRequestId("dep:" + dto.getPredTaskId() + "->" + dto.getSuccTaskId())
+                .requestHash(idempotentService.stableRequestHash(List.of(
+                        String.valueOf(dto.getReqId()), String.valueOf(dto.getPredTaskId()),
+                        String.valueOf(dto.getSuccTaskId()), String.valueOf(dto.getLagDays()))))
+                .build();
+        return idempotentService.executeOnce(key, () -> doAddDependency(dto), RdmScheduleVO.Dependency.class);
+    }
+
+    /**
+     * 需求内任务依赖的实际逻辑（事务内纯逻辑，不含 executeOnce）。
+     * <p>供两类调用方复用：①{@link #addDependency} 的幂等 supplier；②跨交付项依赖回落到同需求时
+     * 直接调本方法（避免把 executeOnce 嵌进已活动的幂等事务）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public RdmScheduleVO.Dependency doAddDependency(RdmScheduleDTO.Dependency dto) {
         if (dto == null || dto.getReqId() == null || dto.getPredTaskId() == null || dto.getSuccTaskId() == null) {
             throw new BusinessException("請選擇前置任務與後續任務");
         }
@@ -762,6 +817,18 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
         return task;
     }
 
+    /**
+     * 从认证主体解析当前登录人 ID（任务19 / 缺口3）。
+     * <p>幂等键的 userId 必须来自服务端认证主体而非入参，且必须 &gt;0；未登录直接 fail-closed。
+     */
+    private Long currentUserIdOrThrow() {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null || current.getId() == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        return current.getId();
+    }
+
     /** lag 范围收敛：±60 工作日之外已经不是排程延迟，是填错了 */
     private static Integer clampLag(Integer lag) {
         if (lag == null) {
@@ -773,129 +840,15 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
         return lag;
     }
 
-    /* ==================== 工作日计算 ==================== */
+    /* ==================== 工作日计算（任务21 抽取为 RdmWorkingDayCalculator，本类委托） ==================== */
 
     /**
-     * 某个人的工作日历：默认周一至周五 8 小时，表里存在的日子按登记值覆盖。
-     * <p>leave 使当天完全不可用；overtime/custom 只要 availableHours &gt; 0 就算可用。
+     * 批量加载按人例外日历。任务21 起委托 {@link RdmWorkingDayCalculator}，
+     * 算法与原私有实现逐字一致（{@code nextWorking/prevWorking/nthWorking/nthWorkingBack/shift/countWorking}
+     * 与 {@code DayCalendar} 已迁至该组件，本类通过静态导入继续使用同名调用，行为不变）。
      */
-    private static final class DayCalendar {
-        private final Map<LocalDate, RdmWorkCalendar> overrides;
-
-        private DayCalendar(Map<LocalDate, RdmWorkCalendar> overrides) {
-            this.overrides = overrides;
-        }
-
-        private boolean isWeekend(LocalDate day) {
-            DayOfWeek dow = day.getDayOfWeek();
-            return dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
-        }
-
-        private boolean isLeave(LocalDate day) {
-            RdmWorkCalendar row = overrides.get(day);
-            return row != null && RdmWorkCalendar.TYPE_LEAVE.equals(row.getDayType());
-        }
-
-        private boolean isWorking(LocalDate day) {
-            return capacity(day).signum() > 0;
-        }
-
-        private BigDecimal capacity(LocalDate day) {
-            RdmWorkCalendar row = overrides.get(day);
-            if (row != null) {
-                return row.getAvailableHours() == null
-                        ? (RdmWorkCalendar.TYPE_LEAVE.equals(row.getDayType()) ? BigDecimal.ZERO : HOURS_PER_DAY)
-                        : row.getAvailableHours();
-            }
-            return isWeekend(day) ? BigDecimal.ZERO : HOURS_PER_DAY;
-        }
-    }
-
     private Map<Long, DayCalendar> loadCalendars(Set<Long> userIds, LocalDate from, LocalDate to) {
-        Map<Long, DayCalendar> map = new LinkedHashMap<>();
-        if (userIds.isEmpty()) {
-            return map;
-        }
-        Map<Long, Map<LocalDate, RdmWorkCalendar>> buckets = new LinkedHashMap<>();
-        userIds.forEach(id -> buckets.put(id, new LinkedHashMap<>()));
-        calendarMapper.selectList(new LambdaQueryWrapper<RdmWorkCalendar>()
-                        .in(RdmWorkCalendar::getUserId, userIds)
-                        .between(RdmWorkCalendar::getDay, from, to))
-                .forEach(row -> {
-                    Map<LocalDate, RdmWorkCalendar> bucket = buckets.get(row.getUserId());
-                    if (bucket != null && row.getDay() != null) {
-                        bucket.put(row.getDay(), row);
-                    }
-                });
-        buckets.forEach((id, days) -> map.put(id, new DayCalendar(days)));
-        return map;
-    }
-
-    private static LocalDate nextWorking(LocalDate day, DayCalendar calendar) {
-        LocalDate cursor = day;
-        for (int guard = 0; guard < 400 && !calendar.isWorking(cursor); guard++) {
-            cursor = cursor.plusDays(1);
-        }
-        return cursor;
-    }
-
-    private static LocalDate prevWorking(LocalDate day, DayCalendar calendar) {
-        LocalDate cursor = day;
-        for (int guard = 0; guard < 400 && !calendar.isWorking(cursor); guard++) {
-            cursor = cursor.minusDays(1);
-        }
-        return cursor;
-    }
-
-    /** 从 start（含）数第 n 个工作日 */
-    private static LocalDate nthWorking(LocalDate start, int n, DayCalendar calendar) {
-        LocalDate cursor = nextWorking(start, calendar);
-        int counted = 1;
-        while (counted < Math.max(1, n)) {
-            cursor = nextWorking(cursor.plusDays(1), calendar);
-            counted++;
-        }
-        return cursor;
-    }
-
-    /** 从 end（含）往前数第 n 个工作日 */
-    private static LocalDate nthWorkingBack(LocalDate end, int n, DayCalendar calendar) {
-        LocalDate cursor = prevWorking(end, calendar);
-        int counted = 1;
-        while (counted < Math.max(1, n)) {
-            cursor = prevWorking(cursor.minusDays(1), calendar);
-            counted++;
-        }
-        return cursor;
-    }
-
-    /** 按工作日移动（n 可为负），结果归到工作日 */
-    private static LocalDate shift(LocalDate day, int n, DayCalendar calendar) {
-        LocalDate cursor = day;
-        if (n > 0) {
-            for (int i = 0; i < n; i++) {
-                cursor = nextWorking(cursor.plusDays(1), calendar);
-            }
-        } else if (n < 0) {
-            for (int i = 0; i < -n; i++) {
-                cursor = prevWorking(cursor.minusDays(1), calendar);
-            }
-        }
-        return nextWorking(cursor, calendar);
-    }
-
-    /** 含首尾的工作日数 */
-    private static int countWorking(LocalDate from, LocalDate to, DayCalendar calendar) {
-        if (from == null || to == null || from.isAfter(to)) {
-            return 0;
-        }
-        int count = 0;
-        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
-            if (calendar.isWorking(cursor)) {
-                count++;
-            }
-        }
-        return count;
+        return workingDayCalculator.loadCalendars(userIds, from, to);
     }
 
     private static LocalDate parseOrNull(String value) {
@@ -942,5 +895,269 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
             ids.add(e.getSuccTaskId());
         });
         return ids;
+    }
+
+    /* ==================== 跨交付项依赖（Batch 2 / Phase 1A） ==================== */
+
+    /**
+     * 添加跨交付项任务依赖。
+     * <p>blockPoint 表达「后续交付项在哪个节点被前置阻断」：start（开工）/test（提测）/release（上线）。
+     * <p>同一交付项内的两个任务不是跨交付项依赖：若两端同属一个交付项且同属一条需求，
+     * 直接回落到需求内依赖 {@link #addDependency}；否则拒绝（跨需求的关系应由需求结构显式表达）。
+     */
+    public RdmScheduleVO.Dependency addCrossDeliveryDependency(Long predTaskId, Long succTaskId, String depType,
+                                                               String blockPoint, Long currentUserId) {
+        if (predTaskId == null || succTaskId == null) {
+            throw new BusinessException("請選擇前置任務與後續任務");
+        }
+        // 幂等边界在本方法（决策2）+ 服务端派生天然幂等键（决策1）：resourceKey=cross_dep:<succTaskId>，
+        // clientRequestId=xdep:<predTask>-><succTask>（边标识作判别子），requestHash=依赖参数稳定内容哈希。
+        Long operatorId = currentUserId != null && currentUserId > 0 ? currentUserId : currentUserIdOrThrow();
+        IdempotentKey key = IdempotentKey.builder()
+                .userId(operatorId)
+                .bizType(BIZ_CROSS_DELIVERY_DEPENDENCY)
+                .resourceKey("cross_dep:" + succTaskId)
+                .clientRequestId("xdep:" + predTaskId + "->" + succTaskId)
+                .requestHash(idempotentService.stableRequestHash(List.of(
+                        String.valueOf(predTaskId), String.valueOf(succTaskId),
+                        String.valueOf(depType), String.valueOf(blockPoint))))
+                .build();
+        return idempotentService.executeOnce(key,
+                () -> doAddCrossDeliveryDependency(predTaskId, succTaskId, depType, blockPoint, operatorId),
+                RdmScheduleVO.Dependency.class);
+    }
+
+    /**
+     * 跨交付项依赖的实际逻辑（事务内纯逻辑，不含 executeOnce）。
+     * <p>两端鉴权（任务19 / 缺口3）：跨交付项依赖同时牽动前置与后续两条需求/交付项的排程，
+     * 只校后续侧会让「能改后续需求的人」把别人需求里的任务拖进依赖，故前置侧也必须校。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public RdmScheduleVO.Dependency doAddCrossDeliveryDependency(Long predTaskId, Long succTaskId, String depType,
+                                                                 String blockPoint, Long currentUserId) {
+        if (predTaskId == null || succTaskId == null) {
+            throw new BusinessException("請選擇前置任務與後續任務");
+        }
+        if (predTaskId.equals(succTaskId)) {
+            throw new BusinessException("任務不能依賴自己");
+        }
+        RdmWorkTask pred = taskMapper.selectById(predTaskId);
+        RdmWorkTask succ = taskMapper.selectById(succTaskId);
+        if (pred == null || succ == null) {
+            throw new BusinessException("任務不存在");
+        }
+        Long predItemId = pred.getDeliveryItemId();
+        Long succItemId = succ.getDeliveryItemId();
+        if (predItemId == null || succItemId == null) {
+            throw new BusinessException("任務未關聯交付項，無法建立跨交付項依賴");
+        }
+        // 同一交付项：回落到需求内依赖（不是跨交付项）
+        if (predItemId.equals(succItemId)) {
+            if (!java.util.Objects.equals(pred.getReqId(), succ.getReqId())) {
+                throw new BusinessException("同一交付項下的兩個任務必須同屬一條需求");
+            }
+            RdmScheduleDTO.Dependency dto = new RdmScheduleDTO.Dependency();
+            dto.setReqId(succ.getReqId());
+            dto.setPredTaskId(predTaskId);
+            dto.setSuccTaskId(succTaskId);
+            dto.setLagDays(0);
+            // 回落到需求内依赖时走 do*（已处于 executeOnce 事务内，不得再嵌一层幂等入口）。
+            return doAddDependency(dto);
+        }
+
+        // 两端鉴权（任务19 / 缺口3）：前置与后续可能分属不同需求，两侧都要有交付写权限。
+        accessGuard.requireDeliveryWriter(pred.getReqId(), "維護跨交付項依賴");
+        accessGuard.requireDeliveryWriter(succ.getReqId(), "維護跨交付項依賴");
+        Long exists = dependencyMapper.selectCount(new LambdaQueryWrapper<RdmTaskDependency>()
+                .eq(RdmTaskDependency::getPredTaskId, predTaskId)
+                .eq(RdmTaskDependency::getSuccTaskId, succTaskId));
+        if (exists != null && exists > 0) {
+            throw new BusinessException("該依賴已存在");
+        }
+        if (wouldCreateCrossDeliveryCycle(predItemId, succItemId)) {
+            throw new BusinessException("新增後交付項之間會形成循環依賴，已拒絕");
+        }
+
+        RdmTaskDependency edge = new RdmTaskDependency();
+        edge.setReqId(succ.getReqId());
+        edge.setPredTaskId(predTaskId);
+        edge.setSuccTaskId(succTaskId);
+        edge.setDepType(StringUtils.hasText(depType) ? depType : RdmTaskDependency.TYPE_FS);
+        edge.setLagDays(0);
+        edge.setBlockPoint(normalizeBlockPoint(blockPoint));
+        edge.setCrossDeliveryFlag(1);
+        edge.setPredDeliveryItemId(predItemId);
+        edge.setSuccDeliveryItemId(succItemId);
+        String signature = operatorResolver.operatorSignature(operatorResolver.currentUser());
+        edge.setCreatedBy(signature);
+        edge.setUpdatedBy(signature);
+        dependencyMapper.insert(edge);
+        log.info("新增跨交付項依賴: predTask={} (item {}), succTask={} (item {}), blockPoint={}, operator={}",
+                predTaskId, predItemId, succTaskId, succItemId, edge.getBlockPoint(), currentUserId);
+        return toDependencyVO(edge);
+    }
+
+    /**
+     * 跨交付项环检测（以交付项为节点的 DAG）。
+     * <p>沿已有跨交付项依赖从 succDeliveryItemId 向下游走，若能到达 predDeliveryItemId，
+     * 说明再加一条 pred→succ 就会闭环。
+     */
+    public boolean wouldCreateCrossDeliveryCycle(Long predDeliveryItemId, Long succDeliveryItemId) {
+        if (predDeliveryItemId == null || succDeliveryItemId == null) {
+            return false;
+        }
+        if (predDeliveryItemId.equals(succDeliveryItemId)) {
+            return true;
+        }
+        Map<Long, List<Long>> adjacency = crossDeliveryAdjacency();
+        Set<Long> visited = new HashSet<>();
+        Deque<Long> stack = new ArrayDeque<>();
+        stack.push(succDeliveryItemId);
+        while (!stack.isEmpty()) {
+            Long node = stack.pop();
+            if (node.equals(predDeliveryItemId)) {
+                return true;
+            }
+            if (!visited.add(node)) {
+                continue;
+            }
+            for (Long next : adjacency.getOrDefault(node, List.of())) {
+                stack.push(next);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 获取因跨交付项依赖而被阻塞的任务（针对某个后续交付项）。
+     * <p>对每条 succDeliveryItemId=deliveryItemId 的跨交付项依赖，若前置交付项未达到阻断点要求的里程碑，
+     * 则后续任务被视为阻塞。
+     */
+    public List<BlockedTaskInfo> getBlockedTasks(Long deliveryItemId) {
+        if (deliveryItemId == null) {
+            return List.of();
+        }
+        List<RdmTaskDependency> deps = dependencyMapper.selectList(new LambdaQueryWrapper<RdmTaskDependency>()
+                .eq(RdmTaskDependency::getSuccDeliveryItemId, deliveryItemId)
+                .eq(RdmTaskDependency::getCrossDeliveryFlag, 1));
+        List<BlockedTaskInfo> blocked = new ArrayList<>();
+        for (RdmTaskDependency dep : deps) {
+            RdmDeliveryItem predItem = dep.getPredDeliveryItemId() == null
+                    ? null : deliveryItemMapper.selectById(dep.getPredDeliveryItemId());
+            if (isPredSatisfied(predItem, dep.getBlockPoint())) {
+                continue;
+            }
+            BlockedTaskInfo info = new BlockedTaskInfo();
+            info.setTaskId(dep.getSuccTaskId());
+            info.setTaskTitle(taskTitle(dep.getSuccTaskId()));
+            info.setPredDeliveryItemId(dep.getPredDeliveryItemId());
+            info.setPredDeliveryItemTitle(predItem == null ? null : predItem.getTitle());
+            info.setBlockPoint(dep.getBlockPoint());
+            info.setReason("前置交付項「" + (predItem == null ? "?" : predItem.getTitle())
+                    + "」尚未達到" + blockPointLabel(dep.getBlockPoint()) + "要求，後續任務被阻斷");
+            blocked.add(info);
+        }
+        return blocked;
+    }
+
+    /**
+     * 检查交付项在某个节点（start/test/release）的前置跨交付项依赖是否全部满足。
+     * <p>只看阻断点与 checkType 匹配的依赖；全部前置达标才返回 true。
+     */
+    public boolean checkDeliveryItemDependenciesMet(Long deliveryItemId, String checkType) {
+        if (deliveryItemId == null) {
+            return true;
+        }
+        String type = normalizeBlockPoint(checkType);
+        List<RdmTaskDependency> deps = dependencyMapper.selectList(new LambdaQueryWrapper<RdmTaskDependency>()
+                .eq(RdmTaskDependency::getSuccDeliveryItemId, deliveryItemId)
+                .eq(RdmTaskDependency::getCrossDeliveryFlag, 1)
+                .eq(RdmTaskDependency::getBlockPoint, type));
+        for (RdmTaskDependency dep : deps) {
+            RdmDeliveryItem predItem = dep.getPredDeliveryItemId() == null
+                    ? null : deliveryItemMapper.selectById(dep.getPredDeliveryItemId());
+            if (!isPredSatisfied(predItem, dep.getBlockPoint())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 跨交付项依赖的交付项级邻接表：pred_item → [succ_item...] */
+    private Map<Long, List<Long>> crossDeliveryAdjacency() {
+        List<RdmTaskDependency> edges = dependencyMapper.selectList(new LambdaQueryWrapper<RdmTaskDependency>()
+                .eq(RdmTaskDependency::getCrossDeliveryFlag, 1));
+        Map<Long, List<Long>> adjacency = new HashMap<>();
+        for (RdmTaskDependency e : edges) {
+            if (e.getPredDeliveryItemId() == null || e.getSuccDeliveryItemId() == null) {
+                continue;
+            }
+            adjacency.computeIfAbsent(e.getPredDeliveryItemId(), k -> new ArrayList<>()).add(e.getSuccDeliveryItemId());
+        }
+        return adjacency;
+    }
+
+    /** 前置交付项是否已达标（按阻断点要求不同里程碑） */
+    private boolean isPredSatisfied(RdmDeliveryItem predItem, String blockPoint) {
+        if (predItem == null) {
+            return false;
+        }
+        int order = deliveryStatusOrder(predItem.getStatus());
+        return switch (normalizeBlockPoint(blockPoint)) {
+            // 开工阻断：前置至少已开工（进入 developing 及以后）
+            case RdmTaskDependency.BLOCK_START -> order >= deliveryStatusOrder(RdmConstants.DI_DEVELOPING);
+            // 提测阻断：前置测试已通过（pending_acceptance 及以后）
+            case RdmTaskDependency.BLOCK_TEST -> order >= deliveryStatusOrder(RdmConstants.DI_PENDING_ACCEPTANCE);
+            // 上线阻断：前置已上线/完成（released_pending 及以后）
+            case RdmTaskDependency.BLOCK_RELEASE -> order >= deliveryStatusOrder(RdmConstants.DI_RELEASED_PENDING);
+            default -> false;
+        };
+    }
+
+    /** 交付项状态序号（只前进不回退的偏序） */
+    private static int deliveryStatusOrder(String status) {
+        if (status == null) {
+            return 0;
+        }
+        return switch (status) {
+            case RdmConstants.DI_PREPARING -> 1;
+            case RdmConstants.DI_DEVELOPING -> 2;
+            case RdmConstants.DI_TESTING -> 3;
+            case RdmConstants.DI_PENDING_ACCEPTANCE -> 4;
+            case RdmConstants.DI_PENDING_RELEASE -> 5;
+            case RdmConstants.DI_RELEASED_PENDING -> 6;
+            case RdmConstants.DI_DONE -> 7;
+            default -> 0;
+        };
+    }
+
+    private static String normalizeBlockPoint(String blockPoint) {
+        if (!StringUtils.hasText(blockPoint)) {
+            return RdmTaskDependency.BLOCK_START;
+        }
+        String v = blockPoint.trim().toLowerCase();
+        return switch (v) {
+            case RdmTaskDependency.BLOCK_TEST, RdmTaskDependency.BLOCK_RELEASE -> v;
+            default -> RdmTaskDependency.BLOCK_START;
+        };
+    }
+
+    private static String blockPointLabel(String blockPoint) {
+        return switch (normalizeBlockPoint(blockPoint)) {
+            case RdmTaskDependency.BLOCK_TEST -> "提測";
+            case RdmTaskDependency.BLOCK_RELEASE -> "上線";
+            default -> "開工";
+        };
+    }
+
+    /** 被阻塞任务信息 */
+    @lombok.Data
+    public static class BlockedTaskInfo {
+        private Long taskId;
+        private String taskTitle;
+        private Long predDeliveryItemId;
+        private String predDeliveryItemTitle;
+        private String blockPoint;
+        private String reason;
     }
 }

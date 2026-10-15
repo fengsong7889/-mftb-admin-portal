@@ -148,6 +148,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
   /** 删除依赖会重算关键路径，属于危险动作：必须二次确认并说明后果 */
   const handleRemove = (dep: RdmScheduleDependency) => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除這條依賴？',
       className: 'custom-confirm-modal',
       content: (

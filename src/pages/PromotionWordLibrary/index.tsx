@@ -154,6 +154,8 @@ export default function PromotionWordLibrary() {
 
   const handleDelete = (record: WordLibraryItem) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('promotionWordLibrary.deleteWordContent', { word: record.word }),
       okText: t('common.confirm'),
@@ -173,6 +175,8 @@ export default function PromotionWordLibrary() {
       ? t('promotionWordLibrary.disableWordContent', { word: record.word })
       : t('promotionWordLibrary.enableWordContent', { word: record.word })
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: confirmTitle,
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),

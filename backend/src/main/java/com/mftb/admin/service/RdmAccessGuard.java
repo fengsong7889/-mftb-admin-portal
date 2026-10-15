@@ -3,12 +3,20 @@ package com.mftb.admin.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.entity.RdmDeliveryItem;
+import com.mftb.admin.entity.RdmProjectMember;
+import com.mftb.admin.entity.RdmReleaseBatch;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmReview;
+import com.mftb.admin.entity.RdmTestBatch;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.RdmDeliveryItemMapper;
+import com.mftb.admin.mapper.RdmProjectMemberMapper;
+import com.mftb.admin.mapper.RdmReleaseBatchMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmRequirementRoleMapper;
+import com.mftb.admin.mapper.RdmTestBatchMapper;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +59,14 @@ public class RdmAccessGuard {
     private final PermissionService permissionService;
     private final RdmRequirementMapper requirementMapper;
     private final RdmRequirementRoleMapper roleMapper;
+    /** Batch 1：项目成员资格判定 */
+    private final RdmProjectMemberMapper projectMemberMapper;
+    /** Batch 1：交付项协调人/验收人资格判定 */
+    private final RdmDeliveryItemMapper deliveryItemMapper;
+    /** Batch 1：提测批次测试负责人资格判定 */
+    private final RdmTestBatchMapper testBatchMapper;
+    /** Batch 1：发布批次发布负责人资格判定 */
+    private final RdmReleaseBatchMapper releaseBatchMapper;
 
     /**
      * 是否可看全量需求（不被「与自己相关」收敛）。
@@ -265,6 +281,137 @@ public class RdmAccessGuard {
             return;
         }
         throw new BusinessException("僅任務負責人或產品/研發負責人可" + action);
+    }
+
+    /* ==================== Batch 1：项目/交付项/测试/发布角色守卫 ==================== */
+
+    /**
+     * 项目成员守卫：只有项目成员（在途）或管理员可操作。
+     * <p>项目级动作（编辑、成员管理、交付清单）的前置校验；
+     * 前端隐藏按钮不作为安全边界。
+     */
+    public void requireProjectMember(Long projectId, Long userId) {
+        if (isAdmin(userId)) {
+            return;
+        }
+        if (!isProjectMember(projectId, userId)) {
+            throw new BusinessException("您不是該項目成員，無法執行此操作");
+        }
+    }
+
+    /** 是否为项目成员（在途，leave_time IS NULL） */
+    public boolean isProjectMember(Long projectId, Long userId) {
+        if (projectId == null || userId == null) {
+            return false;
+        }
+        return projectMemberMapper.selectCount(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, projectId)
+                .eq(RdmProjectMember::getUserId, userId)
+                .isNull(RdmProjectMember::getLeaveTime)) > 0;
+    }
+
+    /**
+     * 交付项协调人守卫：只有协调人或管理员可操作。
+     * <p>协调人是「对这个交付项的研发进度负责」的人，换人须走项目编辑流程。
+     */
+    public void requireDeliveryCoordinator(Long deliveryItemId, Long userId) {
+        if (isAdmin(userId)) {
+            return;
+        }
+        RdmDeliveryItem item = deliveryItemId == null ? null : deliveryItemMapper.selectById(deliveryItemId);
+        if (item == null) {
+            throw new BusinessException("交付項不存在");
+        }
+        if (!userId.equals(item.getCoordinatorUserId())) {
+            throw new BusinessException("僅交付項協調人可以執行此操作");
+        }
+    }
+
+    /**
+     * 提测批次测试负责人守卫：只有测试负责人或管理员可操作。
+     * <p>受理/退回/录入结果均由测试负责人把关，研发不能代测试签字。
+     */
+    public void requireTestLead(Long batchId, Long userId) {
+        if (isAdmin(userId)) {
+            return;
+        }
+        RdmTestBatch batch = batchId == null ? null : testBatchMapper.selectById(batchId);
+        if (batch == null) {
+            throw new BusinessException("提測批次不存在");
+        }
+        if (!userId.equals(batch.getTestLeadUserId())) {
+            throw new BusinessException("僅提測批次的測試負責人可以執行此操作");
+        }
+    }
+
+    /**
+     * 发布批次发布负责人守卫：只有发布负责人或管理员可操作。
+     * <p>部署、验证、回滚等高风险动作由发布负责人一人把关。
+     */
+    public void requireReleaseOwner(Long batchId, Long userId) {
+        if (isAdmin(userId)) {
+            return;
+        }
+        RdmReleaseBatch batch = batchId == null ? null : releaseBatchMapper.selectById(batchId);
+        if (batch == null) {
+            throw new BusinessException("發布批次不存在");
+        }
+        if (!userId.equals(batch.getReleaseOwnerUserId())) {
+            throw new BusinessException("僅發布批次的發布負責人可以執行此操作");
+        }
+    }
+
+    /**
+     * 产品验收人守卫：只有交付项指定的产品验收人可以出产品验收结论。
+     * <p>产品验收验的是「交付物与 PRD 一致」，只有产品验收人能签字。
+     * <p><b>任务19 / 决策3：签署类守卫不设 admin 直通。</b>管理员「全量可见 / 可协调分配」
+     * 不等于「可代签验收」—— 可见范围（canSeeAll）与签署资格是两个正交口径，绝不能拿前者放行后者。
+     * 因此这里移除了原有的 {@code isAdmin} 豁免，闭合「超管替产品验收人签字 / 自批」的后门；
+     * 管理岗守卫（{@link #requireDeliveryCoordinator}、{@link #requireTestLead}、
+     * {@link #requireReleaseOwner}、{@link #requireProjectMember}）仍保留 admin 直通，
+     * 因为查看 / 分配 / 协调 ≠ 签署权。
+     * <p>身份必须来自认证主体（{@code SysUser.id}）：userId 为空即视为登录态失效，fail-closed，
+     * 绝不可把 null 当成「全量 / 任意人」放行。
+     */
+    public void requireProductAcceptor(Long deliveryItemId, Long userId) {
+        if (userId == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        RdmDeliveryItem item = deliveryItemId == null ? null : deliveryItemMapper.selectById(deliveryItemId);
+        if (item == null) {
+            throw new BusinessException("交付項不存在");
+        }
+        if (!userId.equals(item.getProductAcceptorUserId())) {
+            throw new BusinessException("僅交付項的產品驗收人可以執行此操作");
+        }
+    }
+
+    /**
+     * 业务验收人守卫：只有交付项指定的业务验收人可以出业务验收结论。
+     * <p>业务验收验的是「上线后是否真的解决了业务问题」，只有业务验收人能签字。
+     * <p><b>任务19 / 决策3：同 {@link #requireProductAcceptor}，签署类守卫不设 admin 直通。</b>
+     * 管理员无代签 / 自批豁免；userId 为空 fail-closed。
+     */
+    public void requireBizAcceptor(Long deliveryItemId, Long userId) {
+        if (userId == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        RdmDeliveryItem item = deliveryItemId == null ? null : deliveryItemMapper.selectById(deliveryItemId);
+        if (item == null) {
+            throw new BusinessException("交付項不存在");
+        }
+        if (!userId.equals(item.getBizAcceptorUserId())) {
+            throw new BusinessException("僅交付項的業務驗收人可以執行此操作");
+        }
+    }
+
+    /** 按 userId 判断是否管理员（通过 OperatorResolver） */
+    private boolean isAdmin(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        SysUser current = operatorResolver.currentUser();
+        return current != null && current.getId().equals(userId) && operatorResolver.isAdmin(current);
     }
 
     private Long toLong(String value) {

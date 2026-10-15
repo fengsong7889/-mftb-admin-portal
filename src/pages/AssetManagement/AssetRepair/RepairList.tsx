@@ -162,6 +162,8 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
 
   const handleDelete = (record: AssetRepairRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteRepair', '確認刪除此維修記錄？'),
       content: `${record.assetNo} - ${record.faultDesc}`,
       okText: t('common.confirm'),

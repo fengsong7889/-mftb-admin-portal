@@ -59,6 +59,9 @@ npm run secret-scan
 
 # UI 规范门禁（列表页统计卡片必须在搜索区下方，见 §E.8）
 npm run check:stat-order
+
+# 确认弹窗门禁（所有 Modal.confirm 必须带 custom-confirm-modal + 规范图标，见 §B.1/§B.3）
+npm run check:confirm-modal
 ```
 
 ## 关键约束
@@ -95,7 +98,7 @@ src/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + stat-card-order + test + secret-scan（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + stat-card-order + confirm-modal + i18n + secret-scan + test（任一失败中止部署）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试

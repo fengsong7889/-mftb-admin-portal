@@ -59,6 +59,8 @@ export default function WordSegmentation() {
 
   const handleDelete = (record: WordRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
       content: t('wordSegmentation.deleteContent', { word: record.word }),
       okText: t('common.confirm'),
@@ -69,6 +71,8 @@ export default function WordSegmentation() {
 
   const handleBatchDelete = () => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('common.batchDelete'),
       content: t('wordSegmentation.batchDeleteContent'),
       okText: t('common.confirm'),

@@ -46,6 +46,13 @@ public interface RdmDeliveryService {
     /** 新增/编辑任务 */
     RdmDeliveryVO.Task saveTask(RdmDeliveryDTO.Task dto);
 
+    /**
+     * 任务负责人资格预检（选人时即时提醒用）。
+     * <p>不抛异常、只回结果：无研发交付权限属于「可以派活、随后补权限」，
+     * 保存时也只记日志不阻断。
+     */
+    RdmDeliveryVO.OwnerCheck checkTaskOwner(Long userId);
+
     /** 上报任务进度/工时（start/done/block/unblock），并联动需求状态 */
     RdmDeliveryVO.Task updateTaskProgress(Long id, RdmDeliveryDTO.TaskProgress dto);
 

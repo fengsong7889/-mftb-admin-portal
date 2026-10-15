@@ -506,6 +506,8 @@ export default function SearchWeightConfig() {
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
     const statusText = newStatus === 'active' ? t('searchWeight.statusActive') : t('searchWeight.statusInactive')
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('searchWeight.toggleTitle'),
       content: t('searchWeight.toggleContent', { name: record.groupName, status: statusText }),
       okText: t('common.confirm'),

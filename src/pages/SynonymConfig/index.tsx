@@ -204,6 +204,8 @@ export default function SynonymConfig() {
 
   const handleDelete = (record: SynonymRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('synonymConfig.deleteTitle'),
       content: t('synonymConfig.deleteContent', { word: record.mainWord }),
       okText: t('common.confirm'),
@@ -219,6 +221,8 @@ export default function SynonymConfig() {
       return
     }
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('synonymConfig.batchDeleteTitle'),
       content: t('synonymConfig.batchDeleteContent', { count: selectedRowKeys.length }),
       okText: t('common.confirm'),

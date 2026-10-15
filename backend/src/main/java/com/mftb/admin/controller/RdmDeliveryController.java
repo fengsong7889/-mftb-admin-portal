@@ -148,6 +148,16 @@ public class RdmDeliveryController {
         return Result.success("任務已保存", deliveryService.saveTask(dto));
     }
 
+    /**
+     * 任务负责人资格预检（选人时即时提醒）。
+     * <p>只回姓名与「能否上报进度」，不返回权限明细；门控与写任务同一组权限。
+     */
+    @GetMapping("/task/owner-check")
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    public Result<RdmDeliveryVO.OwnerCheck> checkTaskOwner(@RequestParam Long userId) {
+        return Result.success(deliveryService.checkTaskOwner(userId));
+    }
+
     /** 上报任务进度与工时 */
     @PostMapping("/task/{id}/progress")
     @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})

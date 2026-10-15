@@ -96,6 +96,8 @@ export default function DocLibrary() {
   /** 刪除的是系統內索引；正文在騰訊文檔側不受影響，文案必須講清楚避免誤會丢文件 */
   const handleDelete = (r: DocNode) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('doc.deleteTitle'),
       content: t('doc.deleteContent', { title: r.title }),
       okText: t('doc.del'),

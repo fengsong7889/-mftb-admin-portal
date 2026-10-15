@@ -281,6 +281,7 @@ export default function Home() {
       return
     }
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('home.convDeleteConfirm'),
       centered: true,
       className: 'custom-confirm-modal',
@@ -349,6 +350,7 @@ export default function Home() {
   /** 永久删除会话 */
   const handlePermanentDelete = (convId: number) => {
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('home.convPermanentDeleteConfirm'),
       centered: true,
       className: 'custom-confirm-modal',

@@ -100,7 +100,13 @@ export default function McpService() {
             load()
           },
         }
-    Modal.confirm({ ...confirm, okText: t('mcpService.confirm'), cancelText: t('mcpService.cancel') })
+    Modal.confirm({
+      ...confirm,
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      okText: t('mcpService.confirm'),
+      cancelText: t('mcpService.cancel'),
+    })
   }
 
   /* ── 工具卡片（內部/外部共用；外部附加接入方式標籤） ── */

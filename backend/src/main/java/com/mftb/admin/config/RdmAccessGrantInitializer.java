@@ -36,7 +36,14 @@ import java.util.Set;
  * 与 {@code RdmMenuInitializer} 从提交需求平移过来的动作一致。
  * 不递增版本而只改常量的话，已记账 v1.0 的环境里基线仍会把权限授到一个不存在的菜单并启动失败。
  * <p>
- * 版本键 {@code rdm:access-grant:v1.1}；每次启动重放自愈（幂等 ON DUPLICATE KEY UPDATE）。
+ * v1.2：Batch 1 新增三张菜单（项目总览 / 测试工作台 / 发布中心）纳入基线，但<b>只铺 view</b>。
+ * 三张菜单的列表都按登录人收敛数据范围（非全量授权者只看「与我相关」的项目/批次），
+ * 因此全员授 view 不会泄露他部门数据；create/edit 刻意不自动授——测试提测、发布建批次的写入口
+ * <b>没有资源级「谁能发起」守卫</b>，全员授 edit 等于任何人都能提测/建发布批次。
+ * 且 QA/DEV_LEAD/PM/PMO 是<b>需求级 role_code</b>（{@code rdm_requirement_role}），并非 {@code sys_role.code}，
+ * 无法在本初始化器里按角色名匹配授权；职能岗的写权限必须由管理员在「授權中心 · 功能授權」按角色勾选。
+ * <p>
+ * 版本键 {@code rdm:access-grant:v1.2}；每次启动重放自愈（幂等 ON DUPLICATE KEY UPDATE）。
  */
 @Slf4j
 @Component
@@ -44,7 +51,7 @@ import java.util.Set;
 @Order(25)
 public class RdmAccessGrantInitializer implements CommandLineRunner {
 
-    private static final String VERSION_KEY = "rdm:access-grant:v1.1";
+    private static final String VERSION_KEY = "rdm:access-grant:v1.2";
     /**
      * 全员基线菜单：key → 动作。
      * <p>rdm-requirement 带 create 是让全员能提需求（原「提交需求」菜单的 create 已平移到需求清单），
@@ -53,7 +60,15 @@ public class RdmAccessGrantInitializer implements CommandLineRunner {
     private static final Map<String, String> BASELINE_MENUS = Map.of(
             "rdm-workbench", "[\"view\"]",
             "rdm-requirement", "[\"view\",\"create\"]",
-            "rdm-acceptance", "[\"view\",\"create\"]");
+            // rdm-acceptance 的 create 可全员铺：提交验收结论有服务端签字人校验（按交付项验收人字段），
+            // 冒签会被服务层拦下，故 create 属于「有资源级守卫」的安全基线。
+            "rdm-acceptance", "[\"view\",\"create\"]",
+            // Batch 1：项目总览/测试工作台/发布中心只铺 view（全员可打开、列表按登录人收敛数据范围）。
+            // create/edit 不自动授——提测/建发布批次没有资源级「谁能发起」守卫，全员授 edit 会造成越权；
+            // 职能岗（QA/DEV_LEAD/PM/PMO）的写权限由管理员在授權中心按角色勾选。
+            "rdm-dashboard-project", "[\"view\"]",
+            "rdm-delivery-test", "[\"view\"]",
+            "rdm-delivery-release", "[\"view\"]");
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;

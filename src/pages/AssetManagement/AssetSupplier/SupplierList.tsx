@@ -94,6 +94,8 @@ export default function SupplierList({ onAdd, onEdit, onView }: Props) {
 
   const handleDelete = (record: SupplierRow) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('asset.confirmDeleteSupplier'),
       content: `${record.name}（${record.code}）`,
       okText: t('common.confirm'),
@@ -115,6 +117,8 @@ export default function SupplierList({ onAdd, onEdit, onView }: Props) {
   const handleToggle = (record: SupplierRow) => {
     const enabling = record.status !== 'enabled'
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: enabling ? t('asset.confirmEnableSupplier') : t('asset.confirmDisableSupplier'),
       content: `${record.name}（${record.code}）`,
       okText: t('common.confirm'),

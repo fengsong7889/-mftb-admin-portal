@@ -240,6 +240,7 @@ export default function PromotionSlotConfigSlots() {
     if (existing) {
       if (currentResource && currentResource.id !== existing.itemId) {
         Modal.confirm({
+          icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
           title: t('promotionSlotConfig:replaceSlotTitle'),
           className: 'custom-confirm-modal',
           content: t('promotionSlotConfig:replaceSlotContent', { pos, name: currentResource.name }),
@@ -281,6 +282,7 @@ export default function PromotionSlotConfigSlots() {
   const clearAllPositions = () => {
     if (readOnly) return
     Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('promotionSlotConfig:clearSlotsConfirm'), className: 'custom-confirm-modal',
       okText: t('common:confirm'), cancelText: t('common:cancel'), okButtonProps: { danger: true },
       onOk: () => setDraft(prev => prev ? (isContentMode ? { ...prev, fixedSlots: [] } : { ...prev, algoSlots: [] }) : prev),
@@ -290,6 +292,7 @@ export default function PromotionSlotConfigSlots() {
   const handleBack = () => {
     if (!readOnly && JSON.stringify(draft) !== initialDraftRef.current) {
       Modal.confirm({
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         title: t('promotionSlotConfig:discardConfirmTitle'), className: 'custom-confirm-modal',
         content: t('promotionSlotConfig:discardConfirmContent'),
         okText: t('promotionSlotConfig:discardConfirmOk'), cancelText: t('common:cancel'),

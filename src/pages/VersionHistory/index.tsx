@@ -67,6 +67,8 @@ export default function VersionHistory() {
 
   const handleDelete = (record: VersionHistoryRecord) => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('versionHistory.deleteConfirmTitle'),
       content: t('versionHistory.deleteConfirmContent', { version: record.versionNo }),
       okText: t('common.confirm'),
@@ -82,6 +84,8 @@ export default function VersionHistory() {
 
   const handleSyncFromGit = () => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('versionHistory.syncConfirmTitle'),
       content: t('versionHistory.syncConfirmContent'),
       okText: t('common.confirm'),
@@ -100,6 +104,8 @@ export default function VersionHistory() {
 
   const handleRenumberAll = () => {
     Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認重新編號',
       content: '將按創建時間倒序重新編排所有版本編號（起始 1.0.0），確定要繼續嗎？',
       okText: t('common.confirm'),

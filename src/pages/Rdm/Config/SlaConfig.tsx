@@ -12,7 +12,7 @@ import StatusSwitch from '../components/StatusSwitch'
 import { fetchSlaConfigs, saveSlaConfig, type RdmSlaRow } from '../../../api/rdm'
 import {
   RDM_PRIORITY_LABEL,
-  type RdmPriority,
+  getRdmPriorityLabel,
   RDM_ROLE_LABEL,
   RDM_STATUS_LABEL,
   type RdmRoleCode,
@@ -64,6 +64,7 @@ export default function SlaConfig() {
           allowClear
           placeholder="全部優先級"
           value={r.priority || undefined}
+          labelRender={({ label, value }) => label ?? getRdmPriorityLabel(String(value ?? ''))}
           onChange={v => update(r.statusCode, { priority: v ?? '' })}
           options={Object.entries(RDM_PRIORITY_LABEL).map(([value, label]) => ({ value, label }))}
         />
@@ -98,7 +99,7 @@ export default function SlaConfig() {
       render: (_, r) => (
         <StatusSwitch
           checked={r.enabled}
-          target={`${r.statusLabel}${r.priority ? ` · ${RDM_PRIORITY_LABEL[r.priority as RdmPriority] ?? r.priority}` : ''}`}
+          target={`${r.statusLabel}${r.priority ? ` · ${getRdmPriorityLabel(r.priority)}` : ''}`}
           onConfirm={(next: boolean) => update(r.statusCode, { enabled: next })}
         />
       ),

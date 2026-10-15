@@ -36,9 +36,10 @@ import {
   type MeetingRoomVO,
   type SeriesPreview,
 } from '../../../api/meeting'
-import { BIZ_TYPE_LABELS } from '../meetingMeta'
+import { bizTypeLabels } from '../meetingMeta'
 import { durationOptions, ruleForRoom, validateBookingWindow } from '../meetingRules'
 import EmployeeSelect from '../EmployeeSelect'
+import { useTranslation } from 'react-i18next'
 
 /** 周期会议的跳过清单：只给一句 toast 等于让用户自己去数哪几天没订上 */
 interface SkippedItem { seq: number; startTime: string; endTime: string; reason: string }
@@ -108,6 +109,7 @@ function CardTitle({ icon, bg, color, title, note }: {
 }
 
 export default function MeetingBookingForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -175,7 +177,7 @@ export default function MeetingBookingForm() {
   useEffect(() => {
     if (!roomId || Number.isNaN(roomId)) {
       setLoading(false)
-      setLoadError('缺少會議室參數，請從「會議室預約」頁重新進入')
+      setLoadError(t('meeting.missingRoomParameterPlease', { defaultValue: '缺少會議室參數，請從「會議室預約」頁重新進入' }))
       return
     }
     let alive = true
@@ -186,11 +188,11 @@ export default function MeetingBookingForm() {
         if (!alive) return
         setRoom(data)
         if (!data.bookable || data.status !== 'active') {
-          setLoadError('該會議室目前不接受預約（維護中或已停用），請改選其他會議室')
+          setLoadError(t('meeting.thisRoomIsNot', { defaultValue: '該會議室目前不接受預約（維護中或已停用），請改選其他會議室' }))
         }
       })
       .catch((e: unknown) => {
-        if (alive) setLoadError(e instanceof Error ? e.message : '會議室檔案加載失敗')
+        if (alive) setLoadError(e instanceof Error ? e.message : t('meeting.failedToLoadThe5', { defaultValue: '會議室檔案加載失敗' }))
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
@@ -223,11 +225,11 @@ export default function MeetingBookingForm() {
     if (!room) return
     const values = form.getFieldsValue() as FormShape
     if (!values.start || !values.duration) {
-      setIssues(['請先選擇開始時間與時長'])
+      setIssues([t('meeting.chooseTheStartTime', { defaultValue: '請先選擇開始時間與時長' })])
       return
     }
     if (values.repeat === 'weekly' && !(values.byWeekday ?? []).length) {
-      setIssues(['每週重複請至少選擇一個星期'])
+      setIssues([t('meeting.weeklyRecurrenceNeedsAt', { defaultValue: '每週重複請至少選擇一個星期' })])
       return
     }
     setIssues([])
@@ -247,7 +249,7 @@ export default function MeetingBookingForm() {
       })
       setPreview(list)
     } catch (e) {
-      setIssues([e instanceof Error ? e.message : '預覽失敗'])
+      setIssues([e instanceof Error ? e.message : t('meeting.previewFailed', { defaultValue: '預覽失敗' })])
     } finally {
       setPreviewing(false)
     }
@@ -304,7 +306,7 @@ export default function MeetingBookingForm() {
       }
       goBack()
     } catch (e) {
-      const text = e instanceof Error ? e.message : '預約失敗'
+      const text = e instanceof Error ? e.message : t('meeting.bookingFailed', { defaultValue: '預約失敗' })
       setIssues([text])
     } finally {
       setSubmitting(false)
@@ -348,32 +350,32 @@ export default function MeetingBookingForm() {
       return
     }
     if (raw.repeat === 'weekly' && !(raw.byWeekday ?? []).length) {
-      setIssues(['每週重複請至少選擇一個星期'])
+      setIssues([t('meeting.weeklyRecurrenceNeedsAt', { defaultValue: '每週重複請至少選擇一個星期' })])
       return
     }
     setIssues([])
 
     const repeatText = raw.repeat === 'none'
-      ? '不重複（單場）'
+      ? t('meeting.noRepeatSingle', { defaultValue: '不重複（單場）' })
       : `${raw.repeat === 'weekly' ? `每 ${raw.intervalN ?? 1} 週` : `每 ${raw.intervalN ?? 1} 天`}，最多 ${raw.occurrenceLimit ?? 12} 場`
     Modal.confirm({
-      title: '確認提交預約？',
+      title: t('meeting.confirmThisBooking', { defaultValue: '確認提交預約？' }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認預約',
-      cancelText: '取消',
+      okText: t('meeting.confirmBooking', { defaultValue: '確認預約' }),
+      cancelText: t('meeting.cancel', { defaultValue: '取消' }),
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>會議主題：</span><b>{payload.title}</b></div>
           <div className="confirm-info-row"><span>會議室：</span><b>{room.roomNo} · {room.roomName}</b></div>
           <div className="confirm-info-row">
-            <span>時間：</span>
+            <span>{t('meeting.time2', { defaultValue: '時間：' })}</span>
             <b>{startValue.format('YYYY-MM-DD HH:mm')} ~ {endValue.format('HH:mm')}（{durationValue} 分鐘）</b>
           </div>
-          <div className="confirm-info-row"><span>參會人數：</span><b>{attendeeCount} 人（含組織者）／容納 {room.capacity} 人</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.attendees4', { defaultValue: '參會人數：' })}</span><b>{attendeeCount} 人（含組織者）／容納 {room.capacity} 人</b></div>
           {payload.delegateForId != null && (
             <div className="confirm-info-row">
-              <span>實際使用人：</span>
+              <span>{t('meeting.actualUser2', { defaultValue: '實際使用人：' })}</span>
               <b>{delegateName || `id ${payload.delegateForId}`}（由你代訂，名額與衝突按此人判定）</b>
             </div>
           )}
@@ -387,7 +389,7 @@ export default function MeetingBookingForm() {
   if (loading) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="載入會議室..." />
+        <Spin size="large" tip={t('meeting.loadingRoom', { defaultValue: '載入會議室...' })} />
       </div>
     )
   }
@@ -410,9 +412,9 @@ export default function MeetingBookingForm() {
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36,
                 padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
-              }}>返回</Button>
+              }}>{t('meeting.back', { defaultValue: '返回' })}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>預約會議室</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('meeting.bookAMeetingRoom', { defaultValue: '預約會議室' })}</h2>
           </div>
           {room && (
             <Space size={6} wrap>
@@ -430,10 +432,10 @@ export default function MeetingBookingForm() {
         <Alert
           type="error"
           showIcon
-          message="無法預約"
+          message={t('meeting.cannotBook', { defaultValue: '無法預約' })}
           description={loadError}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" onClick={goBack}>返回預約頁</Button>}
+          action={<Button size="small" onClick={goBack}>{t('meeting.backToBooking', { defaultValue: '返回預約頁' })}</Button>}
         />
       )}
 
@@ -441,7 +443,7 @@ export default function MeetingBookingForm() {
         <Alert
           type="error"
           showIcon
-          message="無法提交"
+          message={t('meeting.cannotSubmit', { defaultValue: '無法提交' })}
           description={<ul style={{ margin: 0, paddingLeft: 18 }}>{issues.map(item => <li key={item}>{item}</li>)}</ul>}
           style={{ marginBottom: 16 }}
         />
@@ -451,11 +453,11 @@ export default function MeetingBookingForm() {
         {/* 一、会议室与时间 */}
         <div style={cardStyle}>
           <CardTitle
-            icon={<ClockCircleOutlined />} bg="#e6f7ff" color="#1890ff" title="會議室與時間"
+            icon={<ClockCircleOutlined />} bg="#e6f7ff" color="#1890ff" title={t('meeting.roomTime', { defaultValue: '會議室與時間' })}
             note={room ? `${room.locationText ?? ''} · 可預約 ${room.bookableStartTime ?? '08:00'}–${room.bookableEndTime ?? '22:00'} · 單場 ${room.minDuration ?? rule?.minDuration ?? 15}~${room.maxDuration ?? rule?.maxDuration ?? 240} 分鐘` : undefined}
           />
           <div style={gridStyle}>
-            <Form.Item label="開始時間" name="start" rules={[{ required: true, message: '請選擇開始時間' }]}>
+            <Form.Item label={t('meeting.startTime', { defaultValue: '開始時間' })} name="start" rules={[{ required: true, message: t('meeting.pleaseChooseTheStart', { defaultValue: '請選擇開始時間' }) }]}>
               <DatePicker
                 showTime={{ format: 'HH:mm', minuteStep: pickerMinuteStep(rule?.granularity) }}
                 format="YYYY-MM-DD HH:mm"
@@ -463,17 +465,17 @@ export default function MeetingBookingForm() {
                 disabledDate={current => !!current && current < dayjs().startOf('day')}
               />
             </Form.Item>
-            <Form.Item label="時長" name="duration" rules={[{ required: true, message: '請選擇時長' }]}
-              extra="結束時間由時長算出，保證符合粒度與上下限">
+            <Form.Item label={t('meeting.duration2', { defaultValue: '時長' })} name="duration" rules={[{ required: true, message: t('meeting.pleaseChooseTheDuration', { defaultValue: '請選擇時長' }) }]}
+              extra={t('meeting.endTimeIsDerived', { defaultValue: '結束時間由時長算出，保證符合粒度與上下限' })}>
               <Select
-                placeholder="選擇"
+                placeholder={t('meeting.select', { defaultValue: '選擇' })}
                 options={(rule ? durationOptions(rule.granularity, rule.maxDuration) : []).map(m => ({
                   value: m,
                   label: m >= 60 ? `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ''}` : `${m} 分鐘`,
                 }))}
               />
             </Form.Item>
-            <Form.Item label="結束時間" extra="左閉右開：與下一場背靠背不衝突">
+            <Form.Item label={t('meeting.endTime', { defaultValue: '結束時間' })} extra={t('meeting.halfOpenIntervalBack', { defaultValue: '左閉右開：與下一場背靠背不衝突' })}>
               <div style={{
                 height: 32, lineHeight: '32px', padding: '0 11px', borderRadius: 6,
                 border: '1px solid #d9d9d9', background: '#fafafa', color: '#262626', fontSize: 14,
@@ -484,16 +486,16 @@ export default function MeetingBookingForm() {
           </div>
 
           <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-            <Form.Item label="重複頻率" name="repeat"
+            <Form.Item label={t('meeting.recurrence', { defaultValue: '重複頻率' })} name="repeat"
               extra="週期會議提交時一次性生成全部場次，衝突場次跳過並列明原因">
               <Select options={[
-                { value: 'none', label: '不重複（單場）' },
-                { value: 'daily', label: '每天重複' },
-                { value: 'weekly', label: '每週重複' },
+                { value: 'none', label: t('meeting.noRepeatSingle', { defaultValue: '不重複（單場）' }) },
+                { value: 'daily', label: t('meeting.daily', { defaultValue: '每天重複' }) },
+                { value: 'weekly', label: t('meeting.weekly', { defaultValue: '每週重複' }) },
               ]} />
             </Form.Item>
             {watchedRepeat !== 'none' && (
-              <Form.Item label="重複截止日期" name="repeatEndDate" extra="留空表示只按場次上限結束">
+              <Form.Item label={t('meeting.repeatUntil', { defaultValue: '重複截止日期' })} name="repeatEndDate" extra={t('meeting.leaveEmptyToEnd', { defaultValue: '留空表示只按場次上限結束' })}>
                 <DatePicker style={{ width: '100%' }}
                   disabledDate={current => !!current && current < dayjs().startOf('day')} />
               </Form.Item>
@@ -503,24 +505,24 @@ export default function MeetingBookingForm() {
           {watchedRepeat !== 'none' && (
             <>
               <div style={gridStyle}>
-                <Form.Item label="重複間隔" name="intervalN" rules={[{ required: true, message: '請填寫間隔' }]}
-                  extra={watchedRepeat === 'weekly' ? '每 N 週重複一次' : '每 N 天重複一次'}>
+                <Form.Item label={t('meeting.repeatEvery', { defaultValue: '重複間隔' })} name="intervalN" rules={[{ required: true, message: t('meeting.pleaseEnterTheInterval', { defaultValue: '請填寫間隔' }) }]}
+                  extra={watchedRepeat === 'weekly' ? t('meeting.everyNWeeks', { defaultValue: '每 N 週重複一次' }) : t('meeting.everyNDays', { defaultValue: '每 N 天重複一次' })}>
                   <InputNumber min={1} max={30} style={{ width: '100%' }}
-                    addonAfter={watchedRepeat === 'weekly' ? '週' : '天'} />
+                    addonAfter={watchedRepeat === 'weekly' ? '週' : t('meeting.days', { defaultValue: '天' })} />
                 </Form.Item>
-                <Form.Item label="場次上限" name="occurrenceLimit" rules={[{ required: true, message: '請填寫場次上限' }]}
-                  extra="與截止日期取先到者，單次最多 100 場">
-                  <InputNumber min={1} max={100} style={{ width: '100%' }} addonAfter="場" />
+                <Form.Item label={t('meeting.occurrenceLimit', { defaultValue: '場次上限' })} name="occurrenceLimit" rules={[{ required: true, message: t('meeting.pleaseEnterTheOccurrence', { defaultValue: '請填寫場次上限' }) }]}
+                  extra={t('meeting.whicheverComesFirstUp', { defaultValue: '與截止日期取先到者，單次最多 100 場' })}>
+                  <InputNumber min={1} max={100} style={{ width: '100%' }} addonAfter={t('meeting.occurrences', { defaultValue: '場' })} />
                 </Form.Item>
                 {watchedRepeat === 'weekly' && (
-                  <Form.Item label="重複星期" name="byWeekday" rules={[{ required: true, message: '請選擇星期' }]}
-                    extra="從起始日所在周開始，該周已過的星期不補生成">
-                    <Select mode="multiple" options={WEEKDAY_OPTIONS} placeholder="選擇重複的星期" maxTagCount={7} />
+                  <Form.Item label={t('meeting.daysOfWeek', { defaultValue: '重複星期' })} name="byWeekday" rules={[{ required: true, message: t('meeting.pleaseChooseWeekdays', { defaultValue: '請選擇星期' }) }]}
+                    extra={t('meeting.countingStartsFromThe', { defaultValue: '從起始日所在周開始，該周已過的星期不補生成' })}>
+                    <Select mode="multiple" options={WEEKDAY_OPTIONS} placeholder={t('meeting.chooseWeekdays', { defaultValue: '選擇重複的星期' })} maxTagCount={7} />
                   </Form.Item>
                 )}
               </div>
               <Space style={{ marginBottom: 4 }} wrap>
-                <Button size="small" loading={previewing} onClick={() => void doPreview()}>預覽場次</Button>
+                <Button size="small" loading={previewing} onClick={() => void doPreview()}>{t('meeting.previewOccurrences', { defaultValue: '預覽場次' })}</Button>
                 {preview.length > 0 && (
                   <span style={{ fontSize: 12, color: '#8C8C8C' }}>
                     共 {preview.length} 場：{preview.slice(0, 3).map(d => `${d.date}(${d.weekdayText})`).join('、')}
@@ -535,7 +537,7 @@ export default function MeetingBookingForm() {
         {/* 二、参会人员 */}
         <div style={cardStyle}>
           <CardTitle
-            icon={<TeamOutlined />} bg="#f6ffed" color="#52c41a" title="參會人員"
+            icon={<TeamOutlined />} bg="#f6ffed" color="#52c41a" title={t('meeting.attendees5', { defaultValue: '參會人員' })}
             note={`含組織者共 ${attendeeCount} 人／容納 ${room?.capacity ?? '-'} 人`}
           />
           {/* 行政代订：房间记在"实际使用人"名下，组织者仍是登录的行政（保留操作权）。
@@ -543,29 +545,29 @@ export default function MeetingBookingForm() {
               也能替被黑名单的人绕开限制。 */}
           {canDelegate && (
             <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              <Form.Item label="替他人預訂" name="delegateEnabled" valuePropName="checked"
-                extra="開啟後這場會記在使用人名下">
-                <Switch checkedChildren="代訂" unCheckedChildren="自訂" />
+              <Form.Item label={t('meeting.bookForSomeoneElse', { defaultValue: '替他人預訂' })} name="delegateEnabled" valuePropName="checked"
+                extra={t('meeting.whenOnTheMeeting', { defaultValue: '開啟後這場會記在使用人名下' })}>
+                <Switch checkedChildren={t('meeting.onBehalf', { defaultValue: '代訂' })} unCheckedChildren={t('meeting.self', { defaultValue: '自訂' })} />
               </Form.Item>
               {watchedDelegateEnabled && (
-                <Form.Item label="實際使用人" name="delegateForId"
-                  rules={[{ required: true, message: '請選擇實際使用人' }]}
-                  extra="自動計入必參；衝突與名額按此人判定">
-                  <EmployeeSelect single placeholder="搜尋姓名或工號"
+                <Form.Item label={t('meeting.actualUser', { defaultValue: '實際使用人' })} name="delegateForId"
+                  rules={[{ required: true, message: t('meeting.pleaseChooseTheActual', { defaultValue: '請選擇實際使用人' }) }]}
+                  extra={t('meeting.countedAsRequiredAttendee', { defaultValue: '自動計入必參；衝突與名額按此人判定' })}>
+                  <EmployeeSelect single placeholder={t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
                     onPick={items => setDelegateName(items[0]?.name ?? '')} />
                 </Form.Item>
               )}
             </div>
           )}
           <div style={gridStyle}>
-            <Form.Item label="必參人員" name="attendeeUserIds" extra="組織者由登入態確定，不需也不能選自己">
-              <EmployeeSelect placeholder="搜尋姓名或工號（可多選）" />
+            <Form.Item label={t('meeting.requiredAttendees', { defaultValue: '必參人員' })} name="attendeeUserIds" extra={t('meeting.theOrganizerComesFrom', { defaultValue: '組織者由登入態確定，不需也不能選自己' })}>
+              <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
-            <Form.Item label="選參人員" name="optionalUserIds" extra="只提醒不強制出席，同樣計入容量">
-              <EmployeeSelect placeholder="搜尋姓名或工號（可多選）" />
+            <Form.Item label={t('meeting.optionalAttendees', { defaultValue: '選參人員' })} name="optionalUserIds" extra={t('meeting.reminderOnlyStillCounted', { defaultValue: '只提醒不強制出席，同樣計入容量' })}>
+              <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
-            <Form.Item label="外部參會人" name="externalAttendees" extra="訪客／面試者，只留姓名快照，收不到釘釘邀約">
-              <Select mode="tags" allowClear open={false} placeholder="輸入姓名後回車" tokenSeparators={[',', '、']} />
+            <Form.Item label={t('meeting.externalAttendees', { defaultValue: '外部參會人' })} name="externalAttendees" extra={t('meeting.guestsOrCandidatesName', { defaultValue: '訪客／面試者，只留姓名快照，收不到釘釘邀約' })}>
+              <Select mode="tags" allowClear open={false} placeholder={t('meeting.typeANameAnd', { defaultValue: '輸入姓名後回車' })} tokenSeparators={[',', '、']} />
             </Form.Item>
           </div>
           {attendeeCount > (room?.capacity ?? 0) && (
@@ -573,31 +575,31 @@ export default function MeetingBookingForm() {
               type="warning"
               showIcon
               message={`參會人數 ${attendeeCount} 人已超過該會議室容納 ${room?.capacity} 人`}
-              description="請減少參會人，或返回預約頁改選容納更多的會議室。"
+              description={t('meeting.reduceTheAttendeesOr', { defaultValue: '請減少參會人，或返回預約頁改選容納更多的會議室。' })}
             />
           )}
         </div>
 
         {/* 三、会议信息 */}
         <div style={cardStyle}>
-          <CardTitle icon={<ProfileOutlined />} bg="#fff7e6" color="#fa8c16" title="會議信息" />
+          <CardTitle icon={<ProfileOutlined />} bg="#fff7e6" color="#fa8c16" title={t('meeting.meetingInfo', { defaultValue: '會議信息' })} />
           <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-            <Form.Item label="會議主題" name="title" rules={[
-              { required: true, message: '請填寫會議主題' },
-              { max: 200, message: '最長 200 字' },
+            <Form.Item label={t('meeting.meetingTopic', { defaultValue: '會議主題' })} name="title" rules={[
+              { required: true, message: t('meeting.pleaseEnterTheMeeting', { defaultValue: '請填寫會議主題' }) },
+              { max: 200, message: t('meeting.max200Characters', { defaultValue: '最長 200 字' }) },
             ]}>
-              <Input placeholder="如 Q4 需求評審" maxLength={200} allowClear />
+              <Input placeholder={t('meeting.eGQ4Requirement', { defaultValue: '如 Q4 需求評審' })} maxLength={200} allowClear />
             </Form.Item>
-            <Form.Item label="會議類型" name="bizType">
-              <Select options={Object.entries(BIZ_TYPE_LABELS).map(([value, label]) => ({ value, label }))} />
+            <Form.Item label={t('meeting.meetingType', { defaultValue: '會議類型' })} name="bizType">
+              <Select options={Object.entries(bizTypeLabels()).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
           </div>
-          <Form.Item label="線上會議鏈接" name="onlineMeetingUrl" rules={[{ max: 500, message: '最長 500 字' }]}>
+          <Form.Item label={t('meeting.onlineMeetingLink', { defaultValue: '線上會議鏈接' })} name="onlineMeetingUrl" rules={[{ max: 500, message: t('meeting.max500Characters', { defaultValue: '最長 500 字' }) }]}>
             <Input placeholder="https://..." allowClear maxLength={500} />
           </Form.Item>
           {/* 议程独占一整行（§C.4.1 备注类长文本同款处理） */}
-          <Form.Item label="會議議程" name="description" rules={[{ max: 1000, message: '最長 1000 字' }]}>
-            <RemarkTextArea rows={4} maxLength={1000} placeholder="選填：議題、需要提前準備的材料" />
+          <Form.Item label={t('meeting.agenda', { defaultValue: '會議議程' })} name="description" rules={[{ max: 1000, message: t('meeting.max1000Characters', { defaultValue: '最長 1000 字' }) }]}>
+            <RemarkTextArea rows={4} maxLength={1000} placeholder={t('meeting.optionalTopicsAndMaterials', { defaultValue: '選填：議題、需要提前準備的材料' })} />
           </Form.Item>
         </div>
       </Form>
@@ -605,26 +607,26 @@ export default function MeetingBookingForm() {
       {/* 规则说明：把"免审批先到先得"这类容易被追问的口径写在页面上，而不是等用户踩到再解释 */}
       <div style={{ ...cardStyle, background: '#FAFAFA', border: '1px solid #f0f0f0', boxShadow: 'none' }}>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#8C8C8C', lineHeight: 1.9 }}>
-          <li>免審批先到先得：提交即佔用時段，行政不再二次審核。</li>
-          <li>邀約經釘釘工作通知發給必參與選參；未綁定釘釘的人會在會議詳情頁列明。</li>
-          <li>會議開始後不可改期，需取消後重新預約；開啟簽到保留的房間，超時未簽到將被自動釋放。</li>
+          <li>{t('meeting.noApprovalNeededSubmitting', { defaultValue: '免審批先到先得：提交即佔用時段，行政不再二次審核。' })}</li>
+          <li>{t('meeting.invitationsAreSentVia', { defaultValue: '邀約經釘釘工作通知發給必參與選參；未綁定釘釘的人會在會議詳情頁列明。' })}</li>
+          <li>{t('meeting.reschedulingIsNotAllowed', { defaultValue: '會議開始後不可改期，需取消後重新預約；開啟簽到保留的房間，超時未簽到將被自動釋放。' })}</li>
         </ul>
       </div>
 
       {/* 底部操作栏（§C.5） */}
       <div className="form-footer">
-        <Button onClick={goBack}>取消</Button>
+        <Button onClick={goBack}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!room}
-          onClick={() => void handleSubmit()}>提交預約</Button>
+          onClick={() => void handleSubmit()}>{t('meeting.submitBooking', { defaultValue: '提交預約' })}</Button>
       </div>
 
       {/* 周期会议被跳过的场次：纯展示型提示（§9.1 允许 Modal），逐条列明原因而不是只给一句 toast */}
       <Modal
-        title="部分場次因時段衝突被跳過"
+        title={t('meeting.someOccurrencesWereSkipped', { defaultValue: '部分場次因時段衝突被跳過' })}
         open={skippedOpen}
         onCancel={() => { setSkippedOpen(false); goBack() }}
         onOk={() => { setSkippedOpen(false); goBack() }}
-        okText="知道了"
+        okText={t('meeting.gotIt', { defaultValue: '知道了' })}
         cancelButtonProps={{ style: { display: 'none' } }}
       >
         <Table<SkippedItem>
@@ -634,9 +636,9 @@ export default function MeetingBookingForm() {
           pagination={false}
           scroll={{ y: 240 }}
           columns={[
-            { title: '場次', dataIndex: 'seq', key: 'seq', width: 60 },
-            { title: '時間', key: 'time', render: (_, row) => `${row.startTime.slice(5, 16)} ~ ${row.endTime.slice(11, 16)}` },
-            { title: '原因', dataIndex: 'reason', key: 'reason' },
+            { title: t('meeting.occurrence', { defaultValue: '場次' }), dataIndex: 'seq', key: 'seq', width: 60 },
+            { title: t('meeting.time', { defaultValue: '時間' }), key: 'time', render: (_, row) => `${row.startTime.slice(5, 16)} ~ ${row.endTime.slice(11, 16)}` },
+            { title: t('meeting.reason', { defaultValue: '原因' }), dataIndex: 'reason', key: 'reason' },
           ]}
         />
         <p style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
