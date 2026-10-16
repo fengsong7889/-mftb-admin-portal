@@ -10721,5 +10721,13 @@
         "opsReleased": "會議室釋放"
       }
     }
+  },
+  "rdm": {
+    "rdm": {
+      "reqNoPending": "尚未生成",
+      "mgmtPreAdmissionFiltered": "需求管理的准入口径已由服务端生效；本页仍保留一层前端兜底过滤，避免旧实例未升级时把未准入需求透到治理侧。",
+      "submitApprovalPendingNoNumber": "需求已提交並進入準入審批，正式需求編號將於審批通過後自動產生",
+      "draftNoNumberYet": "草稿尚未生成正式需求編號（准入通過後自動分配）· 修改後可繼續保存，或提交進入準入審批"
+    }
   }
 }

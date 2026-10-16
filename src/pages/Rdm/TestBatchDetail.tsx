@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Col, Descriptions, Form, Input, Modal, Progress,
-  Radio, Row, Select, Space, Spin, Statistic, Table, Tag, message,
+  Radio, Row, Select, Space, Spin, Table, Tag, message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -21,11 +21,14 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
+import StatCards from '../../components/StatCards'
+import HelpPopover from '../../components/HelpPopover'
 import {
   fetchTestBatchDetail, fetchTestBatchSummary, acceptTestBatch, returnTestBatch,
   submitTestExecution, retestBatch,
   type RdmTestBatchDetail as RdmTestBatchDetailType,
   type RdmTestBatchSummary, type RdmTestExecutionRecord, type RdmTestExecutionForm,
+  type RdmTestBatchScopeItem,
 } from '../../api/rdm'
 import {
   RDM_TEST_BATCH_STATUS, RDM_TEST_BATCH_STATUS_LABEL, RDM_TEST_BATCH_STATUS_COLOR,
@@ -132,13 +135,19 @@ export default function TestBatchDetail() {
     try {
       const values = await execForm.validateFields()
       setExecLoading(true)
+      const diId = values.deliveryItemId ? Number(values.deliveryItemId) : undefined
       const payload: RdmTestExecutionForm = {
         caseTitle: values.caseTitle,
-        deliveryItemId: values.deliveryItemId ? Number(values.deliveryItemId) : undefined,
+        deliveryItemId: diId,
         result: values.result,
         buildId: values.buildId || undefined,
         testEnv: values.testEnv || undefined,
         remark: values.remark || undefined,
+        // Batch3：V3 测试流字段——稳定 caseId + 证据 + 冻结范围版本（按选中交付项自动带出）
+        caseId: values.caseId || undefined,
+        evidenceJson: values.evidenceJson || undefined,
+        scopeVersion: diId != null ? scopeVersionByItem.get(diId) : undefined,
+        expectedVersion: detail?.version,
       }
       await submitTestExecution(id, payload)
       message.success('執行結果已錄入')
@@ -179,13 +188,40 @@ export default function TestBatchDetail() {
     return names.map(n => ({ value: n, label: n }))
   }, [detail?.executions])
 
-  const deliveryItemOptions = useMemo(() => {
-    const titles = detail?.deliveryItemTitles ?? []
-    return titles.map((t, i) => ({ value: String(i + 1), label: t }))
-  }, [detail?.deliveryItemTitles])
+  /**
+   * 解析范围快照，取<b>真实 deliveryItemId</b>（后端 buildScopeSnapshot 逐交付项写入）。
+   * <p>绝不用数组下标 +1 伪造 ID：伪 ID 提交后后端无法定位交付项，等于把执行结果记到错误对象上。
+   */
+  const scopeItems = useMemo<RdmTestBatchScopeItem[]>(() => {
+    if (!detail?.scopeSnapshotJson) return []
+    try {
+      const parsed = JSON.parse(detail.scopeSnapshotJson)
+      return Array.isArray(parsed) ? (parsed as RdmTestBatchScopeItem[]) : []
+    } catch { return [] }
+  }, [detail?.scopeSnapshotJson])
+
+  const deliveryItemOptions = useMemo(
+    () => scopeItems
+      .filter(it => it.deliveryItemId != null)
+      .map(it => ({
+        value: String(it.deliveryItemId),
+        label: it.itemNo ? `${it.itemNo} ${it.title ?? ''}`.trim() : (it.title || `交付項 #${it.deliveryItemId}`),
+      })),
+    [scopeItems],
+  )
+
+  /** 选中交付项时带出其冻结范围版本（scopeVersion 以冻结轮次为权威，不一致即拒） */
+  const scopeVersionByItem = useMemo(() => {
+    const m = new Map<number, number>()
+    scopeItems.forEach(it => {
+      if (it.deliveryItemId != null && it.scopeVersion != null) m.set(it.deliveryItemId, it.scopeVersion)
+    })
+    return m
+  }, [scopeItems])
 
   const execColumns: TableColumnsType<RdmTestExecutionRecord> = [
     { title: '交付項', dataIndex: 'deliveryItemTitle', key: 'deliveryItemTitle', width: 160, ellipsis: true },
+    { title: '用例ID', dataIndex: 'caseId', key: 'caseId', width: 130, ellipsis: true, render: (v: string | null) => v || '-' },
     { title: '用例標題', dataIndex: 'caseTitle', key: 'caseTitle', width: 220, ellipsis: true },
     { title: '執行人', dataIndex: 'executorUserName', key: 'executorUserName', width: 100 },
     { title: '構建', dataIndex: 'buildId', key: 'buildId', width: 120, ellipsis: true, render: (v: string) => v || '-' },
@@ -254,7 +290,18 @@ export default function TestBatchDetail() {
         <Descriptions column={4} size="small" bordered={false}>
           <Descriptions.Item label="批次號">{detail.batchNo}</Descriptions.Item>
           <Descriptions.Item label="狀態"><Tag color={statusColor}>{statusLabel}</Tag></Descriptions.Item>
-          <Descriptions.Item label="輪次">第 {detail.roundNo} 輪</Descriptions.Item>
+          <Descriptions.Item label={(
+            <span>輪次
+              <HelpPopover
+                title="凍結輪次與稳定用例ID"
+                ariaLabel="凍結輪次說明"
+                content={[
+                  { label: '輪次不可變', body: '接收後本輪範圍與用例集即凍結（roundNo 固定），修改範圍必須走變更流程、開新一輪。', tone: 'info' },
+                  { label: '穩定 caseId', body: '通過門禁按本輪凍結的唯一 caseId 逐用例判定，絕不按「QA 任務完成度」推導通過。', tone: 'warn' },
+                ]}
+              />
+            </span>
+          )}>第 {detail.roundNo} 輪</Descriptions.Item>
           <Descriptions.Item label="測試環境"><Tag>{detail.testEnv?.toUpperCase()}</Tag></Descriptions.Item>
           <Descriptions.Item label="測試負責人">{detail.testLeadUserName}</Descriptions.Item>
           <Descriptions.Item label="申請人">{detail.applicantUserName || '-'}</Descriptions.Item>
@@ -264,9 +311,20 @@ export default function TestBatchDetail() {
             <a onClick={() => navigate(`/rdm-detail?id=${detail.reqId}`)}>{detail.reqNo} {detail.reqTitle}</a>
           </Descriptions.Item>
           <Descriptions.Item label="交付項" span={2}>
-            <Space size={4} wrap>
-              {detail.deliveryItemTitles?.map((t, i) => <Tag key={i}>{t}</Tag>)}
-            </Space>
+            {scopeItems.length > 0 ? (
+              <Space size={4} wrap>
+                {scopeItems.map(it => (
+                  <Tag key={it.deliveryItemId}>
+                    {it.itemNo ? `${it.itemNo} ` : ''}{it.title || `#${it.deliveryItemId}`}
+                    {it.scopeVersion != null ? ` · 範圍v${it.scopeVersion}` : ''}
+                  </Tag>
+                ))}
+              </Space>
+            ) : (
+              <Space size={4} wrap>
+                {detail.deliveryItemTitles?.map((t, i) => <Tag key={i}>{t}</Tag>)}
+              </Space>
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="構建標識" span={2}>
             {parsedBuildIds.length > 0
@@ -292,26 +350,38 @@ export default function TestBatchDetail() {
             執行摘要
             <span className="rdm-card-title-split" />
           </div>
-          <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col span={3}><Statistic title="總用例數" value={summary.totalCases} /></Col>
-            <Col span={3}><Statistic title="已執行" value={summary.executedCases} valueStyle={{ color: '#1890FF' }} /></Col>
-            <Col span={3}><Statistic title="通過" value={summary.passedCases} valueStyle={{ color: '#52C41A' }} /></Col>
-            <Col span={3}><Statistic title="失敗" value={summary.failedCases} valueStyle={{ color: '#FF4D4F' }} /></Col>
-            <Col span={3}><Statistic title="阻塞" value={summary.blockedCases} valueStyle={{ color: '#FA8C16' }} /></Col>
-            <Col span={3}><Statistic title="跳過" value={summary.skippedCases} valueStyle={{ color: '#8C8C8C' }} /></Col>
-            <Col span={3}><Statistic title="未執行" value={summary.notExecutedCases} valueStyle={{ color: '#8C8C8C' }} /></Col>
-            <Col span={3}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>通過率</div>
-                <Progress
-                  type="circle"
-                  size={56}
-                  percent={Math.round(summary.passRate * 100)}
-                  strokeColor={summary.passRate >= 0.8 ? '#52C41A' : summary.passRate >= 0.5 ? '#FA8C16' : '#FF4D4F'}
-                />
-              </div>
-            </Col>
-          </Row>
+          {/* §B.7：数据指标卡统一走 StatCards（4 格 grid + 计数动画 + 统一 hover），
+              不再用 antd Row/Col + Statistic 旧式静态卡；通過率圆盘作为附属读数并列展示 */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <StatCards
+                animationKey={`${detail?.id}-${summary.totalCases}`}
+                columns={4}
+                items={[
+                  { key: 'total', icon: <ExperimentOutlined />, color: 'info', value: summary.totalCases, label: '總用例數' },
+                  { key: 'executed', icon: <SyncOutlined />, color: 'brand', value: summary.executedCases, label: '已執行' },
+                  { key: 'passed', icon: <CheckCircleOutlined />, color: 'success', value: summary.passedCases, label: '通過' },
+                  { key: 'failed', icon: <CloseCircleOutlined />, color: 'danger', value: summary.failedCases, label: '失敗' },
+                  { key: 'blocked', icon: <MinusCircleOutlined />, color: 'system', value: summary.blockedCases, label: '阻塞' },
+                  { key: 'skipped', icon: <MinusCircleOutlined />, color: 'system', value: summary.skippedCases, label: '跳過' },
+                  { key: 'notExecuted', icon: <MinusCircleOutlined />, color: 'info', value: summary.notExecutedCases, label: '未執行' },
+                ]}
+              />
+            </div>
+            <div style={{
+              width: 132, flexShrink: 0, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              border: '1px solid #f0f0f0', borderRadius: 12,
+            }}>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>通過率</div>
+              <Progress
+                type="circle"
+                size={72}
+                percent={Math.max(0, Math.min(100, Math.round(summary.passRate)))}
+                strokeColor={summary.passRate >= 80 ? '#52C41A' : summary.passRate >= 50 ? '#FA8C16' : '#FF4D4F'}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -346,7 +416,13 @@ export default function TestBatchDetail() {
           columns={execColumns}
           dataSource={filteredExecutions}
           scroll={{ x: 1100 }}
-          pagination={{ pageSize: 20, showTotal: t => `共 ${t} 條` }}
+          pagination={{
+            pageSize: 20,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+          }}
           locale={{ emptyText: '尚無執行記錄' }}
         />
       </div>
@@ -408,7 +484,12 @@ export default function TestBatchDetail() {
             <Input placeholder="例：用戶登入後跳轉首頁" maxLength={200} />
           </Form.Item>
           <Form.Item name="deliveryItemId" label="交付項">
-            <Select placeholder="選擇交付項（可選）" allowClear options={deliveryItemOptions} />
+            <Select placeholder="選擇交付項（可選）" allowClear options={deliveryItemOptions}
+              notFoundContent="無可用交付項（缺範圍快照）" />
+          </Form.Item>
+          <Form.Item name="caseId" label="用例ID"
+            tooltip="V3 凍結輪次的稳定用例ID；門禁按此ID逐用例判定通過，建議填寫">
+            <Input placeholder="例：CASE-LOGIN-001（選填）" maxLength={64} />
           </Form.Item>
           <Form.Item name="result" label="執行結果" rules={[{ required: true, message: '請選擇結果' }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
@@ -431,6 +512,10 @@ export default function TestBatchDetail() {
           </Row>
           <Form.Item name="remark" label="備註">
             <TextArea rows={3} placeholder="補充說明（選填）" maxLength={500} />
+          </Form.Item>
+          <Form.Item name="evidenceJson" label="執行證據"
+            tooltip="截圖/日誌連結等證據（JSON 字串，服務端原樣留存）">
+            <TextArea rows={3} placeholder='例：{"screenshots":["..."],"logs":["..."]}（選填）' />
           </Form.Item>
         </Form>
       </Modal>

@@ -10721,5 +10721,13 @@
         "opsReleased": "Room released"
       }
     }
+  },
+  "rdm": {
+    "rdm": {
+      "reqNoPending": "Not yet generated",
+      "mgmtPreAdmissionFiltered": "The admission rule is already enforced by the backend for requirement management; this page keeps one layer of client-side filtering so a not-yet-upgraded instance cannot leak pre-admission rows into the management view.",
+      "submitApprovalPendingNoNumber": "Requirement submitted and entered admission approval; the official requirement number will be generated once it is approved",
+      "draftNoNumberYet": "This draft has no official requirement number yet (it is assigned automatically after admission) · you can keep saving edits, or submit to start admission approval"
+    }
   }
 }

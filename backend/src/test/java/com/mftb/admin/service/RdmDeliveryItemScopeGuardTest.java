@@ -73,9 +73,11 @@ class RdmDeliveryItemScopeGuardTest {
         evidenceInvalidationMapper = mock(RdmEvidenceInvalidationMapper.class);
         flowVersionGuard = mock(RdmFlowVersionGuard.class);
         RdmIdempotentService idempotentService = mock(RdmIdempotentService.class);
+        // 任务33：失效过滤改由共享解析器承担，解析器包同一个 mock Mapper，桩数据口径不变
         service = new RdmDeliveryItemService(deliveryItemMapper, requirementMapper, taskMapper, testBatchMapper,
                 testExecutionMapper, acceptanceRecordMapper, issueMapper, projectMapper, userMapper,
-                bizSeqService, accessGuard, evidenceInvalidationMapper, flowVersionGuard, idempotentService);
+                bizSeqService, accessGuard, evidenceInvalidationMapper,
+                new EvidenceValidityResolver(evidenceInvalidationMapper), flowVersionGuard, idempotentService);
         when(taskMapper.selectCount(any())).thenReturn(0L);
         when(testBatchMapper.selectList(any())).thenReturn(List.of());
     }

@@ -7,7 +7,6 @@ import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmTestBatchDTO;
 import com.mftb.admin.dto.RdmTestBatchVO;
 import com.mftb.admin.entity.RdmDeliveryItem;
-import com.mftb.admin.entity.RdmEvidenceInvalidation;
 import com.mftb.admin.entity.RdmIssue;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmTestBatch;
@@ -15,7 +14,6 @@ import com.mftb.admin.entity.RdmTestExecution;
 import com.mftb.admin.entity.RdmTestRound;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmDeliveryItemMapper;
-import com.mftb.admin.mapper.RdmEvidenceInvalidationMapper;
 import com.mftb.admin.mapper.RdmIssueMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmTestBatchMapper;
@@ -86,12 +84,11 @@ public class RdmTestBatchService {
     /** Batch 3：不可变测试轮次事实（受理即冻结用例集/范围/构建） */
     private final RdmTestRoundMapper testRoundMapper;
     /**
-     * Batch 2/任务19：范围变更证据失效登记。
-     * <p>任务19 的 loadValidXxx / loadInvalidatedEvidenceIds 在 {@link RdmDeliveryItemService} 为 private，
-     * 此处注入同一 Mapper <b>复刻同一失效过滤语义</b>（不改动任务19 服务可见性、不制造循环依赖）。
-     * <b>重复逻辑提醒</b>：建议任务24/收尾阶段抽取共享 {@code EvidenceValidityResolver} 以防两处漂移。
+     * 任务33：范围变更「证据失效过滤」统一委派共享解析器。
+     * <p>历史上此处注入 {@code RdmEvidenceInvalidationMapper} 复刻了 {@link RdmDeliveryItemService} 的失效过滤语义（三处重复、有漂移风险），
+     * 现统一抽取为 {@link EvidenceValidityResolver}；该解析器只依赖 Mapper，不反向依赖本服务，无循环依赖。
      */
-    private final RdmEvidenceInvalidationMapper evidenceInvalidationMapper;
+    private final EvidenceValidityResolver evidenceValidityResolver;
     /** Batch 3：受理/执行/复测接入原子幂等 executeOnce */
     private final RdmIdempotentService idempotentService;
 
@@ -534,11 +531,11 @@ public class RdmTestBatchService {
      * <ul>
      *   <li>A.5 分母是冻结的唯一 caseId（mandatory 必测全 pass），<b>不是执行记录条数</b>；</li>
      *   <li>A.7 <b>绝不从 QA 任务 100% 推导测试通过</b>：无有效批次或无冻结轮次 → 恒 false；</li>
-     *   <li>A.8 消费证据失效：复刻任务19 {@code loadValidTestBatches}/{@code loadInvalidatedEvidenceIds} 同一失效过滤语义，
+     *   <li>A.8 消费证据失效：委派共享 {@link EvidenceValidityResolver} 过滤已因范围变更失效的提测批次，
      *       范围变更后旧提测批次登记失效即不再作为门禁凭证。</li>
      * </ul>
-     * <p><b>重复逻辑提醒</b>：本过滤语义与 {@link RdmDeliveryItemService} 的 private loadValid* 重复，
-     * 建议任务24/收尾阶段抽取共享 {@code EvidenceValidityResolver} 以防两处漂移。
+     * <p><b>任务33</b>：失效过滤语义已统一抽取到 {@link EvidenceValidityResolver}，与 {@link RdmDeliveryItemService}、
+     * {@link RdmAcceptanceRecordService} 三处共用同一实现，杜绝漂移。
      */
     public boolean isTestPassed(Long deliveryItemId) {
         if (deliveryItemId == null) {
@@ -874,16 +871,11 @@ public class RdmTestBatchService {
     }
 
     /**
-     * A.8 复刻任务19 {@code loadValidTestBatches} 失效过滤语义：范围变更后登记失效的提测批次不再有效。
-     * <p><b>重复逻辑</b>：与 {@link RdmDeliveryItemService} 的 private loadValid* 同源，建议任务24 抽取共享解析器。
+     * A.8 失效过滤：范围变更后登记失效的提测批次不再有效。
+     * <p>任务33：全量批次仍按本服务口径加载（delivery_item_ids_json 关联过滤），失效过滤委派共享 {@link EvidenceValidityResolver}。
      */
     private List<RdmTestBatch> loadValidTestBatchesForItem(Long itemId) {
-        List<RdmTestBatch> all = loadTestBatchesForItem(itemId);
-        Set<Long> invalidated = loadInvalidatedBatchIds(itemId);
-        if (invalidated.isEmpty()) {
-            return all;
-        }
-        return all.stream().filter(b -> !invalidated.contains(b.getId())).toList();
+        return evidenceValidityResolver.validTestBatches(itemId, loadTestBatchesForItem(itemId));
     }
 
     /** 复刻任务19 {@code loadTestBatchesForItem}：test_batch 通过 delivery_item_ids_json 关联，全查后按数组包含过滤。 */
@@ -896,20 +888,6 @@ public class RdmTestBatchService {
                 .stream()
                 .filter(b -> itemIdsOf(b).contains(itemId))
                 .toList();
-    }
-
-    /** 复刻任务19 {@code loadInvalidatedEvidenceIds(itemId, TYPE_TEST_BATCH)}。 */
-    private Set<Long> loadInvalidatedBatchIds(Long itemId) {
-        if (itemId == null) {
-            return Set.of();
-        }
-        return evidenceInvalidationMapper.selectList(new LambdaQueryWrapper<RdmEvidenceInvalidation>()
-                        .eq(RdmEvidenceInvalidation::getDeliveryItemId, itemId)
-                        .eq(RdmEvidenceInvalidation::getEvidenceType, RdmEvidenceInvalidation.TYPE_TEST_BATCH))
-                .stream()
-                .map(RdmEvidenceInvalidation::getEvidenceId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
     }
 
     private static Long toLong(String value) {

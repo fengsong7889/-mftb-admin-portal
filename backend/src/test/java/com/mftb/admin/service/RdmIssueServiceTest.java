@@ -37,6 +37,7 @@ import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -721,5 +723,108 @@ class RdmIssueServiceTest {
         assertEquals(cached, result);
         verify(deferMapper, never()).insert(any(RdmIssueDefer.class));
         verify(issueMapper, never()).selectById(any());
+    }
+
+    /* ==================== 任务28：派生 clientRequestId 必适配 VARCHAR(64) ascii ==================== */
+
+    /**
+     * 用真实 64 位 hex 作为服务端判别子（而非 setUp 里的短桩值 "stable-hash"），
+     * 复现生产超宽场景：{@code op + ":" + 64hex} 均 >64 字符。
+     */
+    private void stubRealHexDiscriminator() {
+        when(idempotentService.stableRequestHash(any())).thenReturn(RdmIdempotentService.sha256Hex("real-payload"));
+    }
+
+    /** 断言落库到 client_request_id 列的值安全：长度 ≤64、全为可打印 ASCII(0x20..0x7E)、且已是归一化不动点。 */
+    private static void assertColumnSafe(IdempotentKey key, String op) {
+        String v = key.getClientRequestId();
+        assertNotNull(v, op + "：clientRequestId 不得为 null（CHECK ck_rdm_idempotent_binding 要求非空）");
+        assertTrue(v.length() <= 64, op + "：长度须 ≤64，实际 " + v.length() + " → " + v);
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            assertTrue(c >= 0x20 && c <= 0x7E,
+                    op + "：第 " + i + " 位 0x" + Integer.toHexString(c) + " 超出可打印 ASCII");
+        }
+        assertEquals(RdmIdempotentService.normalizeClientRequestId(v), v,
+                op + "：派生结果必须已经过中心归一化（不动点）");
+    }
+
+    private List<IdempotentKey> capturedKeys(int expectedCalls) {
+        ArgumentCaptor<IdempotentKey> kc = ArgumentCaptor.forClass(IdempotentKey.class);
+        verify(idempotentService, times(expectedCalls)).executeOnce(kc.capture(), any(), any());
+        return kc.getAllValues();
+    }
+
+    @Test
+    @DisplayName("延期闭环（applyDefer/productDecide/bizDecide）派生的 clientRequestId 均 ≤64 纯 ASCII")
+    void deferLifecycleClientRequestIdFitsColumn() {
+        stubRealHexDiscriminator();
+        RdmIssue issue = issue(RdmConstants.SEV_MAJOR, RdmConstants.ISSUE_OPEN, "test");
+        when(issueMapper.selectById(ISSUE_ID)).thenReturn(issue);
+        when(requirementMapper.selectById(REQ_ID)).thenReturn(req(REQ_ID, 3, "developing", PROJECT_ID, PM));
+
+        // 1) 申请延期（判别子 = 64 hex → 逻辑值 "applyDefer:<64hex>" = 75 字符超宽）
+        loginAs(OWNER);
+        when(deferMapper.selectOne(any())).thenReturn(null);
+        service.applyDefer(ISSUE_ID, deferApplyDto(), OWNER, "owner");
+
+        // 2) 产品裁决
+        loginAs(PM);
+        when(deferMapper.selectById(DEFER_ID)).thenReturn(defer(RdmConstants.DEFER_PENDING_PRODUCT));
+        service.productDecide(DEFER_ID, decision("approved"), PM, "pm");
+
+        // 3) 业务确认
+        loginAs(BIZ);
+        when(deferMapper.selectById(DEFER_ID)).thenReturn(defer(RdmConstants.DEFER_PENDING_BIZ));
+        service.bizDecide(DEFER_ID, decision("approved"), BIZ, "biz");
+
+        List<IdempotentKey> keys = capturedKeys(3);
+        assertColumnSafe(keys.get(0), "applyDefer");
+        assertColumnSafe(keys.get(1), "productDecide");
+        assertColumnSafe(keys.get(2), "bizDecide");
+        // 不同操作的派生值必须互不相同（op 前缀仍参与身份区分，归一化未令其撞键）
+        assertNotEquals(keys.get(0).getClientRequestId(), keys.get(1).getClientRequestId());
+        assertNotEquals(keys.get(1).getClientRequestId(), keys.get(2).getClientRequestId());
+        assertEquals("rdm_issue_defer", keys.get(0).getBizType());
+    }
+
+    @Test
+    @DisplayName("承接/关闭/取消派生的 clientRequestId 均 ≤64 纯 ASCII（含客户端传入超长/非 ASCII requestId）")
+    void bindResolveActionClientRequestIdFitsColumn() {
+        stubRealHexDiscriminator();
+        loginAs(OWNER);
+        RdmIssue deferred = issue(RdmConstants.SEV_MAJOR, RdmConstants.ISSUE_DEFERRED, "test");
+        when(issueMapper.selectById(ISSUE_ID)).thenReturn(deferred);
+        when(requirementMapper.selectById(REQ_ID)).thenReturn(req(REQ_ID, 3, "developing", PROJECT_ID, PM));
+        when(requirementMapper.selectById(FOLLOWUP_REQ_ID)).thenReturn(req(FOLLOWUP_REQ_ID, 3, "developing", PROJECT_ID, PM));
+
+        // 1) 绑定承接：客户端传入「非 ASCII + 超长」 requestId（双重不适配）
+        when(deferMapper.selectOne(any())).thenReturn(defer(RdmConstants.DEFER_PENDING_BIND));
+        when(followupMapper.selectCount(any())).thenReturn(0L);
+        RdmIssueDTO.Bind bind = bindDto();
+        bind.setRequestId("延期承接-" + "x".repeat(80));
+        assertTrue(bind.getRequestId().length() > 64);
+        service.bindFollowUp(bind);
+
+        // 2) 关闭问题：requestId 为空 → 用服务端 64 hex 判别子（"resolve:<64hex>" = 70 字符）
+        when(issueMapper.selectById(ISSUE_ID)).thenReturn(issue(RdmConstants.SEV_MINOR, RdmConstants.ISSUE_OPEN, "test"));
+        when(testRoundMapper.selectById(ROUND_ID)).thenReturn(round(ROUND_ID, true));
+        when(acceptanceRecordMapper.selectById(PROD_ACC))
+                .thenReturn(acceptance(PROD_ACC, RdmConstants.ACCEPTANCE_TYPE_PRODUCT, RdmConstants.ACCEPT_PASS));
+        when(followupMapper.selectById(FOLLOWUP_ID)).thenReturn(activeFollowup());
+        service.resolveIssue(ISSUE_ID, resolveDto());
+
+        // 3) 取消（issueAction）：客户端传入纯 ASCII 但超长 requestId
+        when(issueMapper.selectById(ISSUE_ID)).thenReturn(issue(RdmConstants.SEV_MINOR, RdmConstants.ISSUE_OPEN, "test"));
+        RdmIssueDTO.IssueAction action = actionDto("无效问题");
+        action.setRequestId("y".repeat(100));
+        service.cancelIssue(ISSUE_ID, action);
+
+        List<IdempotentKey> keys = capturedKeys(3);
+        assertColumnSafe(keys.get(0), "bindFollowUp");
+        assertColumnSafe(keys.get(1), "resolveIssue");
+        assertColumnSafe(keys.get(2), "cancelIssue(issueAction)");
+        assertNotEquals(keys.get(0).getClientRequestId(), keys.get(1).getClientRequestId());
+        assertNotEquals(keys.get(1).getClientRequestId(), keys.get(2).getClientRequestId());
     }
 }

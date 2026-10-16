@@ -139,7 +139,6 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
           <div style={{ fontSize: 12, color: '#8C8C8C' }}>
             {r.taskNo}
             {r.iterationCode ? ` · ${r.iterationCode}` : ''}
-            {r.planFinishDate ? ` · 計劃 ${r.planFinishDate}` : ''}
           </div>
         </div>
       ),
@@ -149,6 +148,21 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
       render: (v: string) => <SoftTag color={RDM_TASK_TYPE_COLOR[v as RdmTaskType]} text={RDM_TASK_TYPE_LABEL[v as RdmTaskType] ?? v} />,
     },
     { title: '負責人', dataIndex: 'ownerName', key: 'ownerName', width: 100, render: (v?: string | null) => v ?? '-' },
+    /*
+      起止日期拆成两列：计划完成日原先只藏在任务标题的「計劃 xxx」小字里，
+      既看不出工期跨度，也没法与开始日期对齐比较，排期讨论时要逐个点开详情。
+    */
+    {
+      title: '開始日期', dataIndex: 'planStartDate', key: 'planStartDate', width: 110,
+      render: (v?: string | null) => <span style={{ whiteSpace: 'nowrap', color: v ? '#595959' : '#BFBFBF' }}>{v ?? '-'}</span>,
+    },
+    {
+      title: '結束日期', dataIndex: 'planFinishDate', key: 'planFinishDate', width: 110,
+      render: (v: string | null | undefined, r: RdmTaskItem) => (
+        /* 逾期由服务端判定（未完成且计划完成日已过），这里只做红色提示，不另算一套口径 */
+        <span style={{ whiteSpace: 'nowrap', color: v && r.overdue ? '#CF1322' : v ? '#595959' : '#BFBFBF' }}>{v ?? '-'}</span>
+      ),
+    },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 96,
       render: (v: string, r) => (
@@ -212,7 +226,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
             实测在窄视口下撑破 .rdm-detail-grid 与 main，横向滚动条落到页面上而不是表格里。
             给固定值后表格容器保持父级宽度、由自身 overflow 滚动。
           */
-          <Table<RdmTaskItem> rowKey="id" size="small" columns={columns} dataSource={tasks} pagination={false} scroll={{ x: 780 }} />
+          <Table<RdmTaskItem> rowKey="id" size="small" columns={columns} dataSource={tasks} pagination={false} scroll={{ x: 1000 }} />
         )}
     </>
   )

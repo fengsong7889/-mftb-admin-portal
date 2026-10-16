@@ -29,6 +29,7 @@ import {
   RDM_RISK_COLOR,
   RDM_RISK_LABEL,
   RDM_STATUS_LABEL,
+  formatRdmReqNo,
   type RdmRiskType,
   type RdmStatus,
 } from '../../constants/rdm'
@@ -118,7 +119,11 @@ export default function RiskCenter() {
     {
       title: '需求標題', dataIndex: 'title', key: 'title', width: 320, ellipsis: true,
     },
-    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
+    /*
+     * 審批卡殼（INTAKE_STUCK）行属准入前需求，还没有正式编号；
+     * 直接空着会被读成「数据丢了」，必须给「尚未生成」。
+     */
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150, render: (v?: string | null) => formatRdmReqNo(v) },
     {
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v?: string | null) => (v ? (RDM_STATUS_LABEL[v as RdmStatus] ?? v) : '-'),

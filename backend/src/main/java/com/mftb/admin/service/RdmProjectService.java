@@ -4,17 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.dto.RdmFactVO;
 import com.mftb.admin.dto.RdmProjectDTO;
 import com.mftb.admin.dto.RdmProjectVO;
-import com.mftb.admin.entity.RdmDeliveryItem;
-import com.mftb.admin.entity.RdmIssue;
 import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.RdmDeliveryItemMapper;
-import com.mftb.admin.mapper.RdmIssueMapper;
 import com.mftb.admin.mapper.RdmProjectMapper;
 import com.mftb.admin.mapper.RdmProjectMemberMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
@@ -32,11 +29,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * RDM 项目管理服务（Batch 1）。
@@ -46,6 +42,12 @@ import java.util.stream.Collectors;
  * 三处不互写对方的状态，避免同一事实出现两个真相源。
  * <p>数据范围：非全量授权者只能看到自己参与（成员）的项目，读口径与写口径统一走
  * {@link RdmAccessGuard}。
+ *
+ * <p><b>任务22 的定位变化</b>：本类过去自带一套统计口径（{@code applyDeliveryStats} /
+ * {@code deriveTestStatus} / {@code deriveAcceptanceStatus} / {@code getPendingItems}），
+ * 与 {@link RdmSummaryService} 的那一套并存，同一事实能算出两个数字。现在项目维度的
+ * <b>全部统计与待办</b>一律委派 {@link RdmProjectFactService}（唯一权威事实源），
+ * 本类只负责项目主档写入、成员管理与把事实投影成页面 VO。
  */
 @Slf4j
 @Service
@@ -60,60 +62,44 @@ public class RdmProjectService {
 
     private final RdmProjectMapper projectMapper;
     private final RdmProjectMemberMapper memberMapper;
-    private final RdmDeliveryItemMapper deliveryItemMapper;
     private final RdmRequirementMapper requirementMapper;
     private final RdmWorkTaskMapper taskMapper;
-    private final RdmIssueMapper issueMapper;
     private final SysUserMapper userMapper;
     private final BizSeqService bizSeqService;
     private final RdmAccessGuard accessGuard;
+    /** 任务22 统一权威事实源：统计卡片 / 列表行 / 下钻 / 待办 / 导出 / 对账共用同一批事实 */
+    private final RdmProjectFactService factService;
+    /** 任务21 真实工作日历（含请假/周末支援）：交付清单的逾期工作日数与催办口径必须同源 */
+    private final RdmWorkingDayCalculator workingDayCalculator;
 
     /* ==================== 查询 ==================== */
 
-    /** 项目分页列表（含交付汇总）；非全量授权者收敛为「我参与的项目」 */
+    /**
+     * 项目分页列表（含交付汇总）；非全量授权者收敛为「我参与的项目」。
+     *
+     * <p><b>任务22：行与卡同一批事实</b>。列表行改为从 {@link RdmProjectFactService#projectFactPage}
+     * 取数（内存切片，{@code total} = 范围内全部事实行数），与统计卡用的是<b>同一个快照</b>，
+     * 因此卡片数字恒等于各行相加；旧实现列表走 {@code selectPage}、卡片走另一套 {@code selectList}，
+     * 两边条件一旦漂移就出现两个数字。
+     *
+     * <p><b>行级待裁决不再硬编码 0</b>（旧 {@code applyDeliveryStats} 写死
+     * {@code setPendingDecisionCount(0)}，卡片却是真实查询，永远对不上）。
+     */
     public Page<RdmProjectVO.ListItem> listProjects(RdmProjectDTO.Query query, Long currentUserId) {
         RdmProjectDTO.Query q = query == null ? new RdmProjectDTO.Query() : query;
-        LambdaQueryWrapper<RdmProject> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(q.getKeyword())) {
-            String kw = q.getKeyword().trim();
-            wrapper.and(w -> w.like(RdmProject::getName, kw).or().like(RdmProject::getProjectNo, kw));
-        }
-        if (q.getPmUserId() != null) {
-            wrapper.eq(RdmProject::getPmUserId, q.getPmUserId());
-        }
-        if (StringUtils.hasText(q.getStatus())) {
-            wrapper.eq(RdmProject::getStatus, q.getStatus());
-        }
-        // 数据范围收敛：只能看自己参与的项目（全量授权者不受限）
-        if (!canSeeAll(currentUserId)) {
-            List<Long> joinedIds = joinedProjectIds(currentUserId);
-            if (joinedIds.isEmpty()) {
-                return emptyPage(q.getPageNo(), q.getPageSize());
-            }
-            wrapper.in(RdmProject::getId, joinedIds);
-        }
-        wrapper.orderByDesc(RdmProject::getUpdatedAt);
-
-        Page<RdmProject> page = new Page<>(normalizePage(q.getPageNo()), normalizeSize(q.getPageSize()));
-        Page<RdmProject> result = projectMapper.selectPage(page, wrapper);
-
+        Page<RdmFactVO.ProjectFact> factPage =
+                factService.projectFactPage(toFactQuery(q), currentUserId, q.getPageNo(), q.getPageSize());
         Page<RdmProjectVO.ListItem> voPage =
-                new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
-        List<RdmProject> records = result.getRecords();
-        Map<Long, List<RdmDeliveryItem>> itemsByProject = loadDeliveryItems(
-                records.stream().map(RdmProject::getId).filter(Objects::nonNull).toList());
-        voPage.setRecords(records.stream().map(p -> toListItem(p, itemsByProject.get(p.getId()))).toList());
+                new Page<>(factPage.getCurrent(), factPage.getSize(), factPage.getTotal());
+        voPage.setRecords(factPage.getRecords().stream().map(this::toListItem).toList());
         return voPage;
     }
 
     /** 项目详情（含在途成员与交付汇总） */
     public RdmProjectVO.Detail getProjectDetail(Long id, Long currentUserId) {
         RdmProject project = requireProject(id);
-        if (!canSeeAll(currentUserId) && !accessGuard.isProjectMember(id, currentUserId)) {
-            throw new BusinessException("您不是該項目成員，無法查看項目詳情");
-        }
-        List<RdmDeliveryItem> items = deliveryItemMapper.selectList(
-                new LambdaQueryWrapper<RdmDeliveryItem>().eq(RdmDeliveryItem::getProjectId, id));
+        // A.6 资源守卫：事实源内部 fail-closed 校验（未登录 / 越权他项目一律拒绝）
+        RdmFactVO.ProjectFact fact = factService.projectFact(id, currentUserId);
         RdmProjectVO.Detail vo = new RdmProjectVO.Detail();
         vo.setId(project.getId());
         vo.setProjectNo(project.getProjectNo());
@@ -131,143 +117,117 @@ public class RdmProjectService {
         vo.setVersion(project.getVersion());
         vo.setCreatedAt(DateTimeUtils.format(project.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(project.getUpdatedAt()));
-        applyDeliveryStats(vo, items);
+        applyFactStats(vo, fact);
         vo.setMembers(loadMembers(id));
         return vo;
     }
 
-    /** 项目交付概览（看板卡片） */
-    public RdmProjectVO.Summary getProjectSummary(Long id) {
-        RdmProject project = requireProject(id);
-        List<RdmDeliveryItem> items = deliveryItemMapper.selectList(
-                new LambdaQueryWrapper<RdmDeliveryItem>().eq(RdmDeliveryItem::getProjectId, id));
+    /**
+     * 项目交付概览（看板卡片）。
+     *
+     * <p><b>任务22</b>：新增 {@code currentUserId} 并补资源守卫（A.6）—— 旧签名只校验项目存在，
+     * 任何登录用户凭 id 就能读到别人项目的交付概览。全部计数改为消费事实源，与统计卡/列表行同源。
+     */
+    public RdmProjectVO.Summary getProjectSummary(Long id, Long currentUserId) {
+        RdmFactVO.ProjectFact fact = factService.projectFact(id, currentUserId);
         RdmProjectVO.Summary vo = new RdmProjectVO.Summary();
-        vo.setProjectId(project.getId());
-        vo.setProjectName(project.getName());
-        vo.setStatus(project.getStatus());
-        vo.setTotalItems(items.size());
-        LocalDate today = LocalDate.now();
-        int delivered = 0, testing = 0, blocked = 0, pending = 0, overdue = 0;
-        LocalDate nextMilestone = null;
-        for (RdmDeliveryItem item : items) {
-            String st = item.getStatus();
-            if (RdmConstants.DI_DONE.equals(st)) {
-                delivered++;
-            } else {
-                if (RdmConstants.DI_TESTING.equals(st)) {
-                    testing++;
-                }
-                if (Integer.valueOf(1).equals(item.getBlockedFlag())) {
-                    blocked++;
-                }
-                if (RdmConstants.DI_PENDING_ACCEPTANCE.equals(st) || RdmConstants.DI_PENDING_RELEASE.equals(st)
-                        || RdmConstants.DI_RELEASED_PENDING.equals(st)) {
-                    pending++;
-                }
-                LocalDate end = item.getPlanEndDate();
-                if (end != null && end.isBefore(today)) {
-                    overdue++;
-                }
-                if (end != null && (nextMilestone == null || end.isBefore(nextMilestone))) {
-                    nextMilestone = end;
-                }
-            }
+        if (fact == null) {
+            return vo;
         }
-        vo.setDeliveredItems(delivered);
-        vo.setTestingItems(testing);
-        vo.setBlockedItems(blocked);
-        vo.setPendingItems(pending);
-        vo.setOverdueItems(overdue);
-        vo.setNextMilestone(DateTimeUtils.format(nextMilestone));
-        vo.setLastUpdated(DateTimeUtils.format(project.getUpdatedAt()));
+        vo.setProjectId(fact.getProjectId());
+        vo.setProjectName(fact.getProjectName());
+        vo.setStatus(fact.getStatus());
+        vo.setTotalItems(fact.getDeliveryItemTotal());
+        vo.setDeliveredItems(fact.getDeliveryItemCompleted());
+        vo.setTestingItems(fact.getDeliveryItemTesting());
+        vo.setBlockedItems(fact.getDeliveryItemBlocked());
+        vo.setPendingItems(fact.getDeliveryItemPendingAcceptance());
+        vo.setOverdueItems(fact.getDeliveryItemOverdue());
+        vo.setNextMilestone(fact.getNextDeliveryDate());
+        vo.setLastUpdated(fact.getUpdatedAt());
         return vo;
     }
 
-    /** 项目总览统计卡片（口径跟随查询条件） */
+    /**
+     * 项目总览统计卡片（口径跟随查询条件）。
+     *
+     * <p><b>任务22</b>：委派 {@link RdmProjectFactService#cards}，与列表行/导出/对账共用同一个快照。
+     * 旧实现在这里另查一次未决问题，与 {@code applyDeliveryStats} 的行级值（硬编码 0）永远对不上。
+     */
     public RdmProjectVO.StatsCard getStatsCards(RdmProjectDTO.Query query, Long currentUserId) {
-        RdmProjectDTO.Query q = query == null ? new RdmProjectDTO.Query() : query;
-        List<RdmProject> scope = scopedProjects(q, currentUserId);
+        RdmFactVO.CardSummary cards = factService.cards(toFactQuery(query), currentUserId);
         RdmProjectVO.StatsCard card = new RdmProjectVO.StatsCard();
-        int inProgress = 0, attention = 0, pendingDecision = 0;
-        for (RdmProject p : scope) {
-            if (RdmConstants.PROJECT_PREPARING.equals(p.getStatus())
-                    || RdmConstants.PROJECT_IN_PROGRESS.equals(p.getStatus())) {
-                inProgress++;
-            }
-            if (Integer.valueOf(1).equals(p.getRiskFlag()) || Integer.valueOf(1).equals(p.getOverdueFlag())
-                    || Integer.valueOf(1).equals(p.getPausedFlag())) {
-                attention++;
-            }
-        }
-        // 待决策：项目下交付项关联的未决问题数（open/processing/pending_verify）
-        List<Long> projectIds = scope.stream().map(RdmProject::getId).filter(Objects::nonNull).toList();
-        if (!projectIds.isEmpty()) {
-            List<RdmDeliveryItem> items = deliveryItemMapper.selectList(
-                    new LambdaQueryWrapper<RdmDeliveryItem>().in(RdmDeliveryItem::getProjectId, projectIds));
-            List<Long> itemIds = items.stream().map(RdmDeliveryItem::getId).filter(Objects::nonNull).toList();
-            if (!itemIds.isEmpty()) {
-                pendingDecision = Math.toIntExact(issueMapper.selectCount(new LambdaQueryWrapper<RdmIssue>()
-                        .in(RdmIssue::getDeliveryItemId, itemIds)
-                        .in(RdmIssue::getStatus, RdmConstants.ISSUE_OPEN_STATUSES)));
-            }
-        }
-        card.setInProgressCount(inProgress);
-        card.setAttentionCount(attention);
-        card.setPendingDecisionCount(pendingDecision);
+        card.setInProgressCount(cards.getInProgressCount());
+        card.setAttentionCount(cards.getAttentionCount());
+        card.setPendingDecisionCount(cards.getPendingDecisionCount());
+        card.setTotalProjects(cards.getTotalProjects());
+        // 关闭项目 ≠ 交付完成：两者分列，绝不相加
+        card.setAllDeliveredProjects(cards.getAllDeliveredProjects());
+        card.setClosedProjects(cards.getClosedProjects());
+        card.setDeferResidualCount(cards.getDeferResidualCount());
+        card.setTodoTotal(cards.getTodoTotal());
+        card.setTodoMineCount(cards.getTodoMineCount());
+        card.setTodoWaitingOthersCount(cards.getTodoWaitingOthersCount());
+        card.setTodoUnassignedCount(cards.getTodoUnassignedCount());
         return card;
     }
 
-    /** 项目待办事项（未分配/阻塞/待决策/待确认/逾期） */
-    public List<RdmProjectVO.PendingItem> getPendingItems(Long projectId) {
-        requireProject(projectId);
-        List<RdmDeliveryItem> items = deliveryItemMapper.selectList(
-                new LambdaQueryWrapper<RdmDeliveryItem>().eq(RdmDeliveryItem::getProjectId, projectId));
+    /**
+     * 项目待办事项（已去重 + 分三桶）。
+     *
+     * <p><b>任务22 A.3</b>：待办由 {@link RdmTodoBoardService} 统一计算，按
+     * {@code (objectType, refId, responsibleUserId)} 去重，同一对象命中多个成因只算一条；
+     * 旧实现对同一交付项分别按「未指派 / 阻塞 / 逾期」各产一条，待办总数虚高。
+     *
+     * <p><b>任务22 A.4</b>：{@code actionUrl} 一律为前端已注册路由且按对象类型分流，
+     * 问题绝不套用交付项地址。
+     *
+     * <p><b>任务22 A.6</b>：新增 {@code currentUserId} 并补资源守卫 —— 旧签名只校验项目存在，
+     * 任何登录用户凭 id 就能读到别人项目的待办。
+     */
+    public List<RdmProjectVO.PendingItem> getPendingItems(Long projectId, Long currentUserId) {
+        RdmFactVO.TodoBoard board = factService.todoBoard(projectId, currentUserId);
         List<RdmProjectVO.PendingItem> result = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-        for (RdmDeliveryItem item : items) {
-            if (RdmConstants.DI_DONE.equals(item.getStatus())) {
-                continue;
-            }
-            if (item.getCoordinatorUserId() == null) {
-                result.add(pendingItem("unassigned", item.getId(), item.getItemNo(), item.getTitle(),
-                        null, DateTimeUtils.format(item.getPlanEndDate())));
-            }
-            if (Integer.valueOf(1).equals(item.getBlockedFlag())) {
-                result.add(pendingItem("blocked", item.getId(), item.getItemNo(), item.getTitle(),
-                        item.getCoordinatorUserName(), DateTimeUtils.format(item.getPlanEndDate())));
-            }
-            if (item.getPlanEndDate() != null && item.getPlanEndDate().isBefore(today)) {
-                result.add(pendingItem("overdue", item.getId(), item.getItemNo(), item.getTitle(),
-                        item.getCoordinatorUserName(), DateTimeUtils.format(item.getPlanEndDate())));
-            }
-        }
-        // 待决策：项目交付项上的未决问题
-        List<Long> itemIds = items.stream().map(RdmDeliveryItem::getId).filter(Objects::nonNull).toList();
-        if (!itemIds.isEmpty()) {
-            List<RdmIssue> issues = issueMapper.selectList(new LambdaQueryWrapper<RdmIssue>()
-                    .in(RdmIssue::getDeliveryItemId, itemIds)
-                    .in(RdmIssue::getStatus, RdmConstants.ISSUE_OPEN_STATUSES));
-            for (RdmIssue issue : issues) {
-                result.add(pendingItem("decision", issue.getId(), issue.getIssueNo(), issue.getTitle(),
-                        issue.getOwnerUserName(), null));
-            }
+        for (RdmFactVO.Todo todo : board.getTodos()) {
+            result.add(toPendingItem(todo));
         }
         return result;
     }
 
-    /** 交付清单（按需求分组的交付项） */
-    public List<RdmProjectVO.DeliveryChecklist> getDeliveryChecklist(Long projectId) {
-        requireProject(projectId);
-        List<RdmDeliveryItem> items = deliveryItemMapper.selectList(
-                new LambdaQueryWrapper<RdmDeliveryItem>()
-                        .eq(RdmDeliveryItem::getProjectId, projectId)
-                        .orderByAsc(RdmDeliveryItem::getReqId));
-        Map<Long, List<RdmDeliveryItem>> byReq = items.stream()
-                .filter(i -> i.getReqId() != null)
-                .collect(Collectors.groupingBy(RdmDeliveryItem::getReqId, LinkedHashMap::new, Collectors.toList()));
+    /**
+     * 交付清单（按需求分组的交付项）。
+     *
+     * <p><b>任务22 A.5</b>：{@code testStatus} / {@code acceptanceStatus} 改为消费事实源承载的
+     * 任务20 权威结论，<b>不由任务状态推导测试通过、不由交付状态推导验收</b>；
+     * 旧 {@code deriveTestStatus} 看「有没有 doing 任务」、{@code deriveAcceptanceStatus} 看
+     * 「交付项是不是 done」，两者都是让被门禁的对象自己给自己发通行证。
+     *
+     * <p><b>任务22 A.6</b>：新增 {@code currentUserId} 并补资源守卫。
+     */
+    public List<RdmProjectVO.DeliveryChecklist> getDeliveryChecklist(Long projectId, Long currentUserId) {
+        List<RdmFactVO.ItemFact> facts = factService.itemFacts(projectId, currentUserId);
+        // 按需求分组（保持 reqId 升序，与旧行为一致）；同时取需求标题/编号
+        Map<Long, List<RdmFactVO.ItemFact>> byReq = new LinkedHashMap<>();
+        for (RdmFactVO.ItemFact fact : facts) {
+            if (fact.getReqId() == null) {
+                continue;
+            }
+            byReq.computeIfAbsent(fact.getReqId(), k -> new ArrayList<>()).add(fact);
+        }
+        List<Long> reqIds = new ArrayList<>(byReq.keySet());
+        Map<Long, RdmRequirement> reqById = new HashMap<>();
+        if (!reqIds.isEmpty()) {
+            // 集合条件 + 空集合守卫：空集合直接不发 SQL
+            for (RdmRequirement req : requirementMapper.selectList(
+                    new LambdaQueryWrapper<RdmRequirement>().in(RdmRequirement::getId, reqIds))) {
+                if (req != null && req.getId() != null) {
+                    reqById.put(req.getId(), req);
+                }
+            }
+        }
         List<RdmProjectVO.DeliveryChecklist> result = new ArrayList<>();
-        for (Map.Entry<Long, List<RdmDeliveryItem>> e : byReq.entrySet()) {
-            RdmRequirement req = requirementMapper.selectById(e.getKey());
+        for (Map.Entry<Long, List<RdmFactVO.ItemFact>> e : byReq.entrySet()) {
+            RdmRequirement req = reqById.get(e.getKey());
             RdmProjectVO.DeliveryChecklist group = new RdmProjectVO.DeliveryChecklist();
             group.setReqId(e.getKey());
             if (req != null) {
@@ -278,6 +238,59 @@ public class RdmProjectService {
             result.add(group);
         }
         return result;
+    }
+
+    /**
+     * 待办看板（含三桶计数与不变量校验）。
+     *
+     * <p><b>任务22 A.3</b>：与 {@link #getPendingItems} 同一批事实，额外暴露
+     * {@code mineCount / waitingOthersCount / unassignedCount / rawReasonHits}，
+     * 使「待我处理」「等待他人」「待分派」三桶与总数满足
+     * {@code mine + waitingOthers + unassigned == total}，而 {@code rawReasonHits}
+     * 保留去重前的成因命中次数（它 ≥ total 才证明去重真的生效）。
+     *
+     * <p><b>任务22 A.6</b>：{@code projectId == null} 表示跨项目工作台视角，此时数据范围
+     * 仍由事实源 fail-closed 收敛；传入具体 id 时内部做资源守卫，越权他项目一律拒绝。
+     */
+    public RdmFactVO.TodoBoard getTodoBoard(Long projectId, Long currentUserId) {
+        return factService.todoBoard(projectId, currentUserId);
+    }
+
+    /**
+     * 逐交付项下钻事实（项目 → 交付项明细）。
+     *
+     * <p><b>任务22 A.1/A.7</b>：下钻行与统计卡出自同一个事实源，因此「卡片合计 = 下钻行相加」
+     * 是结构性质而非约定；每行自带任务20 权威结论（{@code testPassed} / {@code productAccepted} /
+     * {@code bizAccepted}）、未决问题数、原范围延期残余数与已注册前端路由 {@code actionUrl}。
+     */
+    public List<RdmFactVO.ItemFact> getItemFacts(Long projectId, Long currentUserId) {
+        return factService.itemFacts(projectId, currentUserId);
+    }
+
+    /**
+     * 全量导出数据包（供任务23 前端 ExcelJS 多 Sheet 导出消费）。
+     *
+     * <p><b>任务22 A.7</b>：返回的是<b>全量</b>事实（范围内全部项目行 + 全部交付项行 +
+     * 全部待办行 + 统计卡 + 对账结论），<b>不是</b>当前页/已加载行 —— 前端只需一次请求即可
+     * 生成与页面完全一致的报表，避免「导出只导出了已滚动加载的前 N 行」。
+     *
+     * <p>数据范围与 {@link #listProjects} 完全一致（同一个 {@code toFactQuery} + 同一个登录人），
+     * 因此导出内容不会比页面多出一行越权数据。
+     */
+    public RdmFactVO.ExportBundle getExportBundle(RdmProjectDTO.Query query, Long currentUserId) {
+        return factService.exportBundle(toFactQuery(query), currentUserId);
+    }
+
+    /**
+     * 对账口径校验（计数一致性自证）。
+     *
+     * <p><b>任务22 A.1/A.7</b>：两条独立路径互验 —— 路径A 从项目事实行逐项相加，路径B 绕开聚合
+     * 直接向库发 {@code selectCount}；两者不等即写入 {@code mismatches} 并置
+     * {@code consistent=false}。导出前调用本接口即可证明报表数字可核对，
+     * 也用于回归中锁死「卡片=行级=下钻=导出=对账」。
+     */
+    public RdmFactVO.Reconciliation getReconciliation(RdmProjectDTO.Query query, Long currentUserId) {
+        return factService.reconcile(toFactQuery(query), currentUserId);
     }
 
     /* ==================== 写入 ==================== */
@@ -434,54 +447,20 @@ public class RdmProjectService {
         return project;
     }
 
-    private boolean canSeeAll(Long currentUserId) {
-        SysUser current = currentUserId == null ? null : userMapper.selectById(currentUserId);
-        return accessGuard.canSeeAll(current);
-    }
-
-    /** 我参与（在途）的项目ID集合 */
-    private List<Long> joinedProjectIds(Long currentUserId) {
-        if (currentUserId == null) {
-            return List.of();
-        }
-        return memberMapper.selectList(new LambdaQueryWrapper<RdmProjectMember>()
-                        .eq(RdmProjectMember::getUserId, currentUserId)
-                        .isNull(RdmProjectMember::getLeaveTime))
-                .stream().map(RdmProjectMember::getProjectId).filter(Objects::nonNull).distinct().toList();
-    }
-
-    /** 统计卡片口径的项目集合（跟随查询条件与数据范围） */
-    private List<RdmProject> scopedProjects(RdmProjectDTO.Query q, Long currentUserId) {
-        LambdaQueryWrapper<RdmProject> wrapper = new LambdaQueryWrapper<>();
-        if (StringUtils.hasText(q.getKeyword())) {
-            String kw = q.getKeyword().trim();
-            wrapper.and(w -> w.like(RdmProject::getName, kw).or().like(RdmProject::getProjectNo, kw));
-        }
-        if (q.getPmUserId() != null) {
-            wrapper.eq(RdmProject::getPmUserId, q.getPmUserId());
-        }
-        if (StringUtils.hasText(q.getStatus())) {
-            wrapper.eq(RdmProject::getStatus, q.getStatus());
-        }
-        if (!canSeeAll(currentUserId)) {
-            List<Long> joinedIds = joinedProjectIds(currentUserId);
-            if (joinedIds.isEmpty()) {
-                return List.of();
-            }
-            wrapper.in(RdmProject::getId, joinedIds);
-        }
-        return projectMapper.selectList(wrapper);
-    }
-
-    private Map<Long, List<RdmDeliveryItem>> loadDeliveryItems(List<Long> projectIds) {
-        if (projectIds == null || projectIds.isEmpty()) {
-            return Map.of();
-        }
-        return deliveryItemMapper.selectList(new LambdaQueryWrapper<RdmDeliveryItem>()
-                        .in(RdmDeliveryItem::getProjectId, projectIds))
-                .stream()
-                .filter(i -> i.getProjectId() != null)
-                .collect(Collectors.groupingBy(RdmDeliveryItem::getProjectId));
+    /**
+     * 把页面查询条件投影为事实源查询条件。
+     * <p>列表与统计卡<b>必须走同一组 filters</b>（前端 UI 规范 §E.8），因此两边都由本方法转换，
+     * 绝不允许各自拼条件 —— 那正是「卡片显示全量、列表已筛选」口径错位的成因。
+     */
+    private RdmFactVO.FactQuery toFactQuery(RdmProjectDTO.Query query) {
+        RdmProjectDTO.Query q = query == null ? new RdmProjectDTO.Query() : query;
+        RdmFactVO.FactQuery fact = new RdmFactVO.FactQuery();
+        fact.setKeyword(q.getKeyword());
+        fact.setStatus(q.getStatus());
+        fact.setPmUserId(q.getPmUserId());
+        fact.setIncludeTodos(true);
+        fact.setIncludeItems(true);
+        return fact;
     }
 
     private List<RdmProjectVO.MemberItem> loadMembers(Long projectId) {
@@ -501,107 +480,158 @@ public class RdmProjectService {
                 }).toList();
     }
 
-    private RdmProjectVO.ListItem toListItem(RdmProject p, List<RdmDeliveryItem> items) {
+    /** 项目事实 → 列表行（全部计数直接搬事实，不再另算一套） */
+    private RdmProjectVO.ListItem toListItem(RdmFactVO.ProjectFact fact) {
         RdmProjectVO.ListItem vo = new RdmProjectVO.ListItem();
-        vo.setId(p.getId());
-        vo.setProjectNo(p.getProjectNo());
-        vo.setName(p.getName());
-        vo.setObjective(p.getObjective());
-        vo.setPmUserName(p.getPmUserName());
-        vo.setProductOwnerUserName(p.getProductOwnerUserName());
-        vo.setPlanStartDate(DateTimeUtils.format(p.getPlanStartDate()));
-        vo.setPlanEndDate(DateTimeUtils.format(p.getPlanEndDate()));
-        vo.setStatus(p.getStatus());
-        vo.setPausedFlag(p.getPausedFlag());
-        vo.setRiskFlag(p.getRiskFlag());
-        vo.setOverdueFlag(p.getOverdueFlag());
-        vo.setUpdatedAt(DateTimeUtils.format(p.getUpdatedAt()));
-        applyDeliveryStats(vo, items);
-        return vo;
-    }
-
-    /** 交付汇总：已交付/总数/下一交付日/阻塞数（ListItem 与 Detail 共用） */
-    private void applyDeliveryStats(RdmProjectVO.ListItem vo, List<RdmDeliveryItem> items) {
-        List<RdmDeliveryItem> list = items == null ? List.of() : items;
-        LocalDate today = LocalDate.now();
-        int delivered = 0, blocked = 0;
-        LocalDate next = null;
-        for (RdmDeliveryItem item : list) {
-            if (RdmConstants.DI_DONE.equals(item.getStatus())) {
-                delivered++;
-            } else {
-                if (Integer.valueOf(1).equals(item.getBlockedFlag())) {
-                    blocked++;
-                }
-                LocalDate end = item.getPlanEndDate();
-                if (end != null && (next == null || end.isBefore(next))) {
-                    next = end;
-                }
-            }
-        }
-        vo.setDeliveredCount(delivered);
-        vo.setTotalDeliveryCount(list.size());
-        vo.setBlockedCount(blocked);
-        vo.setNextDeliveryDate(DateTimeUtils.format(next));
+        vo.setId(fact.getProjectId());
+        vo.setProjectNo(fact.getProjectNo());
+        vo.setName(fact.getProjectName());
+        vo.setObjective(fact.getObjective());
+        vo.setPmUserName(fact.getPmUserName());
+        vo.setProductOwnerUserName(fact.getProductOwnerUserName());
+        vo.setPlanStartDate(fact.getPlanStartDate());
+        vo.setPlanEndDate(fact.getPlanEndDate());
+        vo.setStatus(fact.getStatus());
+        vo.setPausedFlag(fact.getPausedFlag());
+        vo.setRiskFlag(fact.getRiskFlag());
+        vo.setOverdueFlag(fact.getOverdueFlag());
+        vo.setUpdatedAt(fact.getUpdatedAt());
+        vo.setDeliveredCount(fact.getDeliveryItemCompleted());
+        vo.setTotalDeliveryCount(fact.getDeliveryItemTotal());
+        vo.setBlockedCount(fact.getDeliveryItemBlocked());
+        vo.setNextDeliveryDate(fact.getNextDeliveryDate());
         // 逾期标记随汇总刷新（有未完成项已过计划结束日即视为逾期）
-        if (next != null && next.isBefore(today)) {
+        if (fact.getDeliveryItemOverdue() > 0) {
             vo.setOverdueFlag(1);
         }
-        vo.setPendingDecisionCount(0);
+        // 行级「待裁决」与卡片同口径：旧实现硬编码 0，卡片却是真实查询，两者永远对不上
+        vo.setPendingDecisionCount(fact.getPendingDecisionCount());
+        return vo;
     }
 
-    /** Detail 复用 ListItem 的汇总逻辑（Detail 不继承 ListItem，这里桥接一次） */
-    private void applyDeliveryStats(RdmProjectVO.Detail vo, List<RdmDeliveryItem> items) {
-        RdmProjectVO.ListItem tmp = new RdmProjectVO.ListItem();
-        applyDeliveryStats(tmp, items);
-        vo.setDeliveredCount(tmp.getDeliveredCount());
-        vo.setTotalDeliveryCount(tmp.getTotalDeliveryCount());
-        vo.setBlockedCount(tmp.getBlockedCount());
-        vo.setNextDeliveryDate(tmp.getNextDeliveryDate());
-        vo.setPendingDecisionCount(tmp.getPendingDecisionCount());
+    /** 项目事实 → 详情汇总（与列表行走同一段搬数逻辑，两者不可能不一致） */
+    private void applyFactStats(RdmProjectVO.Detail vo, RdmFactVO.ProjectFact fact) {
+        if (fact == null) {
+            vo.setDeliveredCount(0);
+            vo.setTotalDeliveryCount(0);
+            vo.setBlockedCount(0);
+            vo.setPendingDecisionCount(0);
+            return;
+        }
+        vo.setDeliveredCount(fact.getDeliveryItemCompleted());
+        vo.setTotalDeliveryCount(fact.getDeliveryItemTotal());
+        vo.setBlockedCount(fact.getDeliveryItemBlocked());
+        vo.setNextDeliveryDate(fact.getNextDeliveryDate());
+        vo.setPendingDecisionCount(fact.getPendingDecisionCount());
+        if (fact.getDeliveryItemOverdue() > 0) {
+            vo.setOverdueFlag(1);
+        }
     }
 
-    private RdmProjectVO.ChecklistItem toChecklistItem(RdmDeliveryItem item) {
+    /**
+     * 待办事实 → 页面待办行。
+     * <p>{@code type} 取<b>首要成因</b>（按固定优先级），全部成因放 {@code reasons}；
+     * 旧实现把一个交付项的三个成因拆成三行，待办总数因此虚高。
+     * <p>{@code actionUrl} 直接搬事实源的已注册路由，<b>不在这里重拼</b> ——
+     * 两处拼路由是历史上「问题套用交付项地址」的成因。
+     */
+    private RdmProjectVO.PendingItem toPendingItem(RdmFactVO.Todo todo) {
+        RdmProjectVO.PendingItem item = new RdmProjectVO.PendingItem();
+        item.setType(primaryReason(todo.getReasons()));
+        item.setRefId(todo.getRefId());
+        item.setRefNo(todo.getRefNo());
+        item.setTitle(todo.getTitle());
+        item.setResponsibleName(todo.getResponsibleName());
+        item.setResponsibleUserId(todo.getResponsibleUserId());
+        item.setDueDate(todo.getDueDate());
+        item.setObjectType(todo.getObjectType());
+        item.setBucket(todo.getBucket());
+        item.setReasons(todo.getReasons() == null ? new ArrayList<>() : new ArrayList<>(todo.getReasons()));
+        item.setOverdue(todo.isOverdue());
+        item.setOverdueWorkingDays(todo.getOverdueWorkingDays());
+        item.setActionUrl(todo.getActionUrl());
+        return item;
+    }
+
+    /** 首要成因优先级：需要人裁决的事优先于单纯逾期，逾期优先于未指派/阻塞等推进类成因。 */
+    private static String primaryReason(List<String> reasons) {
+        if (reasons == null || reasons.isEmpty()) {
+            return null;
+        }
+        for (String preferred : List.of(
+                RdmConstants.TODO_REASON_PENDING_DECISION,
+                RdmConstants.TODO_REASON_DEFER_RESIDUAL,
+                RdmConstants.TODO_REASON_PENDING_PRODUCT_ACCEPTANCE,
+                RdmConstants.TODO_REASON_PENDING_BIZ_ACCEPTANCE,
+                RdmConstants.TODO_REASON_TEST_NOT_PASSED,
+                RdmConstants.TODO_REASON_BLOCKED,
+                RdmConstants.TODO_REASON_OVERDUE,
+                RdmConstants.TODO_REASON_UNASSIGNED)) {
+            if (reasons.contains(preferred)) {
+                return preferred;
+            }
+        }
+        return reasons.get(0);
+    }
+
+    /**
+     * 交付项事实 → 交付清单行。
+     *
+     * <p><b>A.5：不由任务状态推导测试通过、不由交付状态推导验收</b>。
+     * {@code testStatus=passed} 当且仅当事实源承载的任务20 {@code isTestPassed} 为真；
+     * {@code acceptanceStatus=passed} 当且仅当产品<b>且</b>业务验收权威结论均为通过。
+     * 旧实现：{@code deriveTestStatus} 看「有没有 doing 任务」、{@code deriveAcceptanceStatus} 看
+     * 「交付项是不是 done」—— 后者尤其危险：交付项 done 只需发布完成，未经任何签署也会显示「已验收」。
+     */
+    private RdmProjectVO.ChecklistItem toChecklistItem(RdmFactVO.ItemFact fact) {
         RdmProjectVO.ChecklistItem vo = new RdmProjectVO.ChecklistItem();
-        vo.setItemId(item.getId());
-        vo.setItemNo(item.getItemNo());
-        vo.setTitle(item.getTitle());
-        vo.setCoordinatorName(item.getCoordinatorUserName());
-        vo.setStatus(item.getStatus());
-        vo.setPlanEndDate(DateTimeUtils.format(item.getPlanEndDate()));
-        vo.setTestStatus(deriveTestStatus(item.getId()));
-        vo.setAcceptanceStatus(deriveAcceptanceStatus(item.getId()));
-        if (Integer.valueOf(1).equals(item.getBlockedFlag())) {
-            vo.setBlockedReason(resolveBlockedReason(item.getId()));
+        vo.setItemId(fact.getItemId());
+        vo.setItemNo(fact.getItemNo());
+        vo.setTitle(fact.getTitle());
+        vo.setCoordinatorName(fact.getCoordinatorUserName());
+        vo.setStatus(fact.getStatus());
+        vo.setPlanEndDate(fact.getPlanEndDate());
+        vo.setScopeVersion(fact.getScopeVersion());
+        vo.setPendingDecisionCount(fact.getPendingDecisionCount());
+        vo.setDeferResidualCount(fact.getDeferResidualCount());
+        vo.setProductAcceptancePassed(fact.isProductAccepted());
+        vo.setBizAcceptancePassed(fact.isBizAccepted());
+        vo.setActionUrl(fact.getActionUrl());
+
+        if (fact.isTestPassed()) {
+            vo.setTestStatus("passed");
+        } else if (RdmConstants.DI_TESTING.equals(fact.getStatus())) {
+            // 仅表示「处于测试环节」，绝不表示已通过
+            vo.setTestStatus(RdmConstants.DI_TESTING);
+        }
+        if (fact.isProductAccepted() && fact.isBizAccepted()) {
+            vo.setAcceptanceStatus("passed");
+        } else if (RdmTodoBoardService.isReachedAcceptanceStage(fact)) {
+            vo.setAcceptanceStatus("pending");
+        }
+        if (fact.isBlocked()) {
+            vo.setBlockedReason(resolveBlockedReason(fact.getItemId()));
+        }
+        if (fact.isOverdue() && fact.getPlanEndDate() != null) {
+            LocalDate due = parseFactDate(fact.getPlanEndDate());
+            if (due != null) {
+                vo.setOverdueWorkingDays(
+                        workingDayCalculator.overdueWorkingDays(due, LocalDate.now(), fact.getCoordinatorUserId()));
+            }
         }
         return vo;
     }
 
-    /** 测试状态：由该交付项关联任务是否处于测试中推导（简化口径，事实以提测批次为准） */
-    private String deriveTestStatus(Long deliveryItemId) {
-        if (deliveryItemId == null) {
+    private static LocalDate parseFactDate(String value) {
+        if (!StringUtils.hasText(value)) {
             return null;
         }
-        long testing = taskMapper.selectCount(new LambdaQueryWrapper<RdmWorkTask>()
-                .eq(RdmWorkTask::getDeliveryItemId, deliveryItemId)
-                .eq(RdmWorkTask::getStatus, "doing"));
-        return testing > 0 ? RdmConstants.DI_TESTING : null;
-    }
-
-    /** 验收状态占位：验收事实由 {@link RdmAcceptanceRecordService} 汇总，这里只反映交付项状态 */
-    private String deriveAcceptanceStatus(Long deliveryItemId) {
-        if (deliveryItemId == null) {
+        try {
+            String trimmed = value.trim();
+            return LocalDate.parse(trimmed.substring(0, Math.min(10, trimmed.length())));
+        } catch (RuntimeException e) {
             return null;
         }
-        RdmDeliveryItem item = deliveryItemMapper.selectById(deliveryItemId);
-        if (item == null) {
-            return null;
-        }
-        return switch (item.getStatus()) {
-            case RdmConstants.DI_PENDING_ACCEPTANCE, RdmConstants.DI_RELEASED_PENDING -> "pending";
-            case RdmConstants.DI_DONE -> "passed";
-            default -> null;
-        };
     }
 
     /** 阻塞原因：取该交付项下最近一条 blocked 任务的说明 */
@@ -615,19 +645,6 @@ public class RdmProjectService {
                 .orderByDesc(RdmWorkTask::getUpdatedAt)
                 .last("LIMIT 1"));
         return blocked.isEmpty() ? null : blocked.get(0).getBlockedReason();
-    }
-
-    private RdmProjectVO.PendingItem pendingItem(String type, Long refId, String refNo, String title,
-                                                 String responsibleName, String dueDate) {
-        RdmProjectVO.PendingItem item = new RdmProjectVO.PendingItem();
-        item.setType(type);
-        item.setRefId(refId);
-        item.setRefNo(refNo);
-        item.setTitle(title);
-        item.setResponsibleName(responsibleName);
-        item.setDueDate(dueDate);
-        item.setActionUrl("/rdm/project/delivery/" + refId);
-        return item;
     }
 
     private String resolveUserName(Long userId, String fallback) {
@@ -654,20 +671,5 @@ public class RdmProjectService {
         } catch (DateTimeParseException e) {
             throw new BusinessException(fieldName + "格式不正確，應為 yyyy-MM-dd");
         }
-    }
-
-    private Page<RdmProjectVO.ListItem> emptyPage(Integer pageNo, Integer pageSize) {
-        return new Page<>(normalizePage(pageNo), normalizeSize(pageSize), 0);
-    }
-
-    private long normalizePage(Integer pageNo) {
-        return pageNo == null || pageNo < 1 ? 1 : pageNo;
-    }
-
-    private long normalizeSize(Integer pageSize) {
-        if (pageSize == null || pageSize < 1) {
-            return 20;
-        }
-        return Math.min(pageSize, 200);
     }
 }

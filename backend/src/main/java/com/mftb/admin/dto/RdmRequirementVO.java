@@ -24,6 +24,12 @@ import java.util.List;
 public class RdmRequirementVO {
 
     private Long id;
+    /**
+     * 需求编号，<b>允许为 null</b>（需求提交/需求管理拆分 · 批次1）。
+     * <p>只在首次准入成功（审批全部通过或服务端免审批命中）时生成；草稿/待审批/审批驳回
+     * 阶段的列表行与详情均为 null，前端必须渲染「尚未生成」而不是空字符串或 0。
+     * <p>治理侧（scope=all/todo 等已准入口径）的每一行都保证有号；提交侧不保证。
+     */
     private String reqNo;
     private String title;
     private String reqType;
@@ -337,6 +343,8 @@ public class RdmRequirementVO {
     /**
      * 由实体构造列表视图。
      * <p>子集合默认空列表，详情接口再单独填充。
+     * <p>{@code reqNo} 原样透传，允许为 null（准入前需求没有正式编号），
+     * 不得在这里填占位串或回落到内部 id / 准入单号——那会把「尚未生成」伪造成已有号。
      *
      * @param stageOf 状态→阶段映射（来自 rdm_status_def）
      */

@@ -2,6 +2,8 @@ package com.mftb.admin.config;
 
 import com.mftb.admin.config.migration.MigrationLock;
 import com.mftb.admin.config.migration.RdmBatch34Schema;
+import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.util.BizSeqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -155,6 +157,34 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final String VERSION_BATCH2 = "rdm:schema:v3.1";
     private static final String BATCH2_SCRIPT = "220_rdm_batch2_foundation.sql";
+
+    /**
+     * 需求提交/需求管理拆分 · 批次 1：正式需求编号延迟生成 + XQSP 审批流程编号规则。
+     * <p>为什么要改列而不是只在前端藏号：{@code create()} 过去在判断草稿/待审之前就把 req_no 拉走了，
+     * 于是「审批被驳回的需求也占了一个正式号」。延迟发号要求准入前的行允许 {@code req_no IS NULL}，
+     * 这与建表时的 {@code NOT NULL UNIQUE} 直接冲突，必须同批改结构 + 改代码 + 改发号映射
+     * （见 {@code OaRequestServiceImpl.submit()} 的 rdm_intake → rdm_intake_approval）。
+     * <p>编号唯一性仍由既有 {@code uk_rdm_req_no} 保证：MySQL 唯一索引允许多条 NULL，
+     * 所以「准入前无数条互不冲突 / 已生成号码全局唯一」一把键同时成立，不需要部分索引。
+     * <p>两条 CHECK 是兜底而不是业务规则：代码保证「落准入状态与发号在同一条更新里」，
+     * 数据库保证「就算有人绕过服务层写库，也不会留下已准入却无号的半成品，或用空串冒号码」。
+     * <p>参考文档：{@code backend/sql/240_rdm_delayed_req_no_and_xqsp_rule.sql}。下面这段 DDL 是
+     * 逐步带存在性判断的版本（不能整脚本重放：ADD CONSTRAINT 重跑必报错），两者口径必须一致。
+     */
+    private static final String VERSION_DELAYED_REQ_NO = "rdm:schema:v3.4";
+    /**
+     * 延迟发号 v2：需求编号生成时机从「审批通过」推迟到「产品经理认领」。
+     * <p>需要放宽 CHECK 约束：pool/assigned 状态也允许 req_no IS NULL（认领前暂无编号）。
+     */
+    private static final String VERSION_CLAIM_REQ_NO = "rdm:schema:v3.5";
+    /**
+     * 允许 req_no IS NULL 的状态集合的 SQL IN 列表（延迟发号 v2）。
+     * <p>使用 {@code RdmConstants.REQ_NO_NULLABLE_STATUSES} 而非 {@code REQ_NOT_ADMITTED_STATUSES}：
+     * 后者只含准入前三态，前者额外包含 pool/assigned（认领前允许暂无编号）。
+     */
+    private String reqNoNullableStatusList() {
+        return "('" + String.join("', '", RdmConstants.REQ_NO_NULLABLE_STATUSES.stream().sorted().toList()) + "')";
+    }
     private static final String[][] RELEASE_FIX_COLUMNS = {
             {"rdm_release", "applicant_emp_no",
                     "ALTER TABLE rdm_release ADD COLUMN applicant_emp_no VARCHAR(32) DEFAULT NULL "
@@ -303,6 +333,23 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     private static final int MIN_STATUS_DEFS = 23;
     private static final int MIN_TRANSITIONS = 30;
 
+    /**
+     * 免审批直送的【落点真值】补登：把池基落点从代码里收回 {@code rdm_transition}。
+     * <p>为什么要单独一个版本键：状态机真值定义就是 rdm_status_def + rdm_transition
+     * （见 204 脚本头注），而 {@code rdm:schema:v1.0} 在存量库不会重跑——只改脚本不会给
+     * 已有环境补上 {@code resubmit_pool}，免审批重提就会因查不到配置而直接报错。
+     * <p>口径：配置只给<b>基落点 pool</b>；「提交时已指定有效产品则直送 assigned」仍由代码
+     * 按意向细化（{@code RdmRequirementServiceImpl}），OA 终审回调的
+     * {@code approve_intake→pool + applyIntentPm→assigned} 是同一形状，不另造一套。
+     * <p>配置缺行/停用时 {@code findTransition} 返回 null → 服务层拒绝提交，
+     * <b>不得把缺配置当成「审批已完成」或「自动免审」</b>（方案 §四 明文要求）。
+     */
+    private static final String VERSION_EXEMPT_TRANSITION = "rdm:transition:v1.0";
+
+    /** 免审批直送的配置动作码（与 204 种子的 action_code 逐字一致） */
+    private static final String ACTION_SUBMIT_POOL = "submit_pool";
+    private static final String ACTION_RESUBMIT_POOL = "resubmit_pool";
+
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
     private final MigrationLock migrationLock;
@@ -343,6 +390,178 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         // 已记版本仍检查列、唯一键及约束，不能靠applyOnce跳过验证掩盖漂移。
         batch34Schema.verify(RdmBatch34Schema.SCRIPT_3);
         batch34Schema.verify(RdmBatch34Schema.SCRIPT_4);
+        versionTracker.applyOnce(VERSION_DELAYED_REQ_NO, this::doDelayedReqNoMigrate, this::verifyDelayedReqNo);
+        versionTracker.applyOnce(VERSION_CLAIM_REQ_NO, this::doClaimReqNoMigrate, this::verifyClaimReqNo);
+        versionTracker.applyOnce(VERSION_EXEMPT_TRANSITION, this::doExemptTransitionSeed, this::verifyExemptTransitionSeed);
+    }
+
+    /**
+     * v（rdm:transition:v1.0）：免审批直送的两个基落点动作种子。
+     * <p>{@code submit_pool} 早在 204 就有，这里仍走 INSERT IGNORE 做兵底：存量库被人
+     * 为删行/改名时，不补就会让免审批提交直接失败；已存在时则不覆盖管理员自定义。
+     */
+    private void doExemptTransitionSeed() {
+        // allowed_roles 只给 SUBMITTER：免审批直送是提出人自己的提交动作，不得给审批岗或多开权限面
+        int a = jdbcTemplate.update(
+                "INSERT IGNORE INTO rdm_transition (from_status, to_status, action_code, action_name, "
+                        + "allowed_roles, required_fields, sort_order, status) "
+                        + "VALUES ('draft', 'pool', ?, '免審批直送需求池', 'SUBMITTER', '', 2, 1)", ACTION_SUBMIT_POOL);
+        int b = jdbcTemplate.update(
+                "INSERT IGNORE INTO rdm_transition (from_status, to_status, action_code, action_name, "
+                        + "allowed_roles, required_fields, sort_order, status) "
+                        + "VALUES ('intake_rejected', 'pool', ?, '免審批重提直送需求池', 'SUBMITTER', '', 6, 1)",
+                ACTION_RESUBMIT_POOL);
+        log.info("RDM 免审批直送动作种子已写入: submit_pool 新增 {} 行、resubmit_pool 新增 {} 行", a, b);
+    }
+
+    /**
+     * 后置校验：两条动作必须存在且启用，且落点是 pool。
+     * <p>为什么把种子当硬条件：免审批分支现在以配置为落点真值，配置不在就是「无落点可用」；
+     * 不校验收等于把一个只在代码里存在的路径记成「迁移成功」，到生产上直接报错。
+     */
+    private void verifyExemptTransitionSeed() {
+        requireEnabledTransition(RdmConstants.STATUS_DRAFT, ACTION_SUBMIT_POOL);
+        requireEnabledTransition(RdmConstants.STATUS_INTAKE_REJECTED, ACTION_RESUBMIT_POOL);
+    }
+
+    /** 指定 (from_status, action_code) 必须存在、启用且落点为需求池 */
+    private void requireEnabledTransition(String fromStatus, String actionCode) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_transition WHERE deleted = 0 AND status = 1 "
+                        + "AND from_status = ? AND action_code = ? AND to_status = ?",
+                Integer.class, fromStatus, actionCode, RdmConstants.STATUS_POOL);
+        if (n == null || n == 0) {
+            throw new IllegalStateException("RDM 免审批直送配置未就绪：rdm_transition 缺启用行 "
+                    + fromStatus + " --" + actionCode + "--> pool（缺配置不得当免审放行，服务层会直接拒提交）");
+        }
+    }
+
+    /**
+     * v3.4：正式需求编号延迟生成。
+     * <p>每一步都先读 information_schema 再决定是否执行（MySQL 8 没有
+     * {@code ADD CONSTRAINT IF NOT EXISTS}），所以中途失败后下次启动可重入；
+     * 任何一步失败都直接向上抛，由 applyOnce 记失败并不记版本，绝不自吞异常假称已迁移。
+     */
+    private void doDelayedReqNoMigrate() {
+        // 1. 放开 NOT NULL：MODIFY 可重复执行，已为 NULL 时是无操作
+        jdbcTemplate.execute("ALTER TABLE rdm_requirement MODIFY COLUMN req_no VARCHAR(32) NULL DEFAULT NULL "
+                + "COMMENT '需求编号 XQ+YYYYMMDD+4位；仅首次准入成功（审批全通过或免审批）时生成，准入前为 NULL'");
+        // 2. 已准入必须有号（准入前三态 + pool/assigned 例外，延迟发号 v2）
+        if (!checkConstraintExists("ck_rdm_req_no_admitted")) {
+            jdbcTemplate.execute("ALTER TABLE rdm_requirement ADD CONSTRAINT ck_rdm_req_no_admitted "
+                    + "CHECK (status IN " + reqNoNullableStatusList() + " OR req_no IS NOT NULL)");
+        }
+        // 3. 有号就不能是空白：禁止空串/内部 ID/XQSP 号冒充正式需求号
+        if (!checkConstraintExists("ck_rdm_req_no_blank")) {
+            jdbcTemplate.execute("ALTER TABLE rdm_requirement ADD CONSTRAINT ck_rdm_req_no_blank "
+                    + "CHECK (req_no IS NULL OR CHAR_LENGTH(TRIM(req_no)) > 0)");
+        }
+        // 4. XQSP 审批流程编号规则种子：缺行时 rdm_intake 提交会直接报「編號生成規則未配置」，
+        //    代码侧把流程路由到新规则与本行种子必须同批落地，否则每次提交都失败。
+        //    rule_key 一律用 BizSeqService 常量拼接，不让种子与发号代码各写一份字面量飘移。
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, "
+                        + "seq_length, seq_start, status, remark) VALUES "
+                        + "('" + BizSeqService.RULE_RDM_INTAKE_APPROVAL + "', '需求審批流程編號', '流程審批系統－需求審批', 'XQSP', 'YYYYMMDD', 2, 1, 1, "
+                        + "'{prefix} + YYYYMMDD + 至少2位自增序號：每日從 01 起，超過 99 自然擴位為 100，不截斷、不循環複用。僅在需求正式提交且需要審批時為本輪生成；免審批需求不產生本編號。')");
+        // 5. 既有 rdm_requirement 规则只刷新说明，不改前缀/位数/流水起点（历史号码与计数器一律不动）
+        int refreshed = jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET rule_name = '需求編號', biz_menu = '流程審批系統－需求審批', "
+                        + "remark = '{prefix} + YYYYMMDD + {n}位自增序號。生成時機：首次准入成功（審批全部通過，或服務端免審批裁決命中）時生成一次，准入前的草稿/待審批/審批駁回不預佔、不消費流水；存量已生成號碼保持不變。' "
+                        + "WHERE rule_key = '" + BizSeqService.RULE_RDM_REQUIREMENT + "'");
+        log.info("RDM v3.4 延迟发号迁移完成：XQSP 规则新增 {} 行、需求编号规则说明刷新 {} 行", inserted, refreshed);
+    }
+
+    /**
+     * v3.4 后置校验：列必须真的可空、两条 CHECK 必须强制生效、XQSP 规则必须可用。
+     * <p>为什么不能只验「列存在」：本迁移改的是可空性，列存在但仍是 NOT NULL 时，
+     * {@code create()} 存草稿会直接 SQLException——只有实查 IS_NULLABLE 才能证明迁移真生效。
+     * <p>CHECK 必须是 ENFORCED='YES'：MySQL 5.7/8.0.16 之前会静默接受并忽略 CHECK，
+     * 登记成「已迁移」但兜底不存在，比没有更危险。
+     */
+    private void verifyDelayedReqNo() {
+        String nullable = jdbcTemplate.queryForObject(
+                "SELECT IS_NULLABLE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rdm_requirement' AND COLUMN_NAME = 'req_no'",
+                String.class);
+        if (!"YES".equalsIgnoreCase(nullable)) {
+            throw new IllegalStateException("RDM v3.4 核验失败：rdm_requirement.req_no 仍为 NOT NULL（实际 "
+                    + nullable + "），准入前需求无法落库");
+        }
+        if (!checkConstraintExists("ck_rdm_req_no_admitted")) {
+            throw new IllegalStateException("RDM v3.4 核验失败：CHECK ck_rdm_req_no_admitted 缺失或未强制");
+        }
+        if (!checkConstraintExists("ck_rdm_req_no_blank")) {
+            throw new IllegalStateException("RDM v3.4 核验失败：CHECK ck_rdm_req_no_blank 缺失或未强制");
+        }
+        // 唯一键必须还在：延迟发号只放开空值，已生成号码仍要全局唯一
+        Integer uk = indexCount("rdm_requirement", "uk_rdm_req_no");
+        if (uk == null || uk == 0) {
+            throw new IllegalStateException("RDM v3.4 核验失败：rdm_requirement 缺 uk_rdm_req_no，正式需求编号可能重号");
+        }
+        requireAtLeast("需求審批流程編號規則 rdm_intake_approval", 1,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = '" + BizSeqService.RULE_RDM_INTAKE_APPROVAL + "' "
+                        + "AND prefix = 'XQSP' AND status = 1");
+        requireAtLeast("需求編號規則 rdm_requirement", 1,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = '" + BizSeqService.RULE_RDM_REQUIREMENT + "' AND status = 1");
+    }
+
+    /**
+     * v3.5 迁移：放宽 CHECK 约束，允许 pool/assigned 状态也接受 req_no IS NULL。
+     * <p>延迟发号 v2：需求编号生成时机从「审批通过」推迟到「产品经理认领」，
+     * 因此 pool 和 assigned 状态在认领前允许暂无编号。
+     * <p>操作：DROP 旧约束 → 用扩展后的状态集重建。DROP IF EXISTS + ADD 可重复执行。
+     */
+    private void doClaimReqNoMigrate() {
+        // DROP 旧约束（如果存在）
+        if (checkConstraintExists("ck_rdm_req_no_admitted")) {
+            jdbcTemplate.execute("ALTER TABLE rdm_requirement DROP CHECK ck_rdm_req_no_admitted");
+        }
+        // 用扩展后的状态集重建
+        jdbcTemplate.execute("ALTER TABLE rdm_requirement ADD CONSTRAINT ck_rdm_req_no_admitted "
+                + "CHECK (status IN " + reqNoNullableStatusList() + " OR req_no IS NOT NULL)");
+        // 刷新需求编号规则说明
+        jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET remark = "
+                        + "'{prefix} + YYYYMMDD + {n}位自增序號。生成時機：產品經理認領（claim）時首次生成，"
+                        + "審批通過/免審提交不預佔、不消費流水；存量已生成號碼保持不變。' "
+                        + "WHERE rule_key = '" + BizSeqService.RULE_RDM_REQUIREMENT + "'");
+        log.info("RDM v3.5 延迟发号 v2 迁移完成：CHECK 约束已放宽（pool/assigned 允许 NULL）");
+    }
+
+    /**
+     * v3.5 后置校验：约束必须存在且已强制，状态集必须包含 pool/assigned。
+     */
+    private void verifyClaimReqNo() {
+        if (!checkConstraintExists("ck_rdm_req_no_admitted")) {
+            throw new IllegalStateException("RDM v3.5 核验失败：CHECK ck_rdm_req_no_admitted 缺失或未强制");
+        }
+        // 验证约束内容确实包含 pool 和 assigned
+        String checkClause = jdbcTemplate.queryForObject(
+                "SELECT CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'ck_rdm_req_no_admitted'",
+                String.class);
+        if (checkClause == null || (!checkClause.contains("pool") && !checkClause.contains("assigned"))) {
+            throw new IllegalStateException("RDM v3.5 核验失败：CHECK 约束未包含 pool/assigned 状态");
+        }
+    }
+
+    /**
+     * CHECK 约束是否已存在且处于强制状态。
+     * <p>读 {@code TABLE_CONSTRAINTS}而不是 {@code CHECK_CONSTRAINTS}：MySQL 8 的
+     * {@code CHECK_CONSTRAINTS} 只有 CHECK_CLAUSE，没有 ENFORCED 列（把它当筛选条件会直接
+     * BadSqlGrammarException，整个迁移因而不记版本）；ENFORCED 在 TABLE_CONSTRAINTS 上，
+     * 与 {@code RdmBatch34Schema.constraintExists} 保持同一查法。
+     * <p>必须要求 ENFORCED='YES'：不被强制的 CHECK（旧版本/被人为置 NO）兑底等于不存在，
+     * 记成「已迁移」比没记更危险。
+     */
+    private boolean checkConstraintExists(String constraintName) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'rdm_requirement' "
+                        + "AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'CHECK' AND ENFORCED = 'YES'",
+                Integer.class, constraintName);
+        return n != null && n > 0;
     }
 
     private void doBatch1Migrate() {

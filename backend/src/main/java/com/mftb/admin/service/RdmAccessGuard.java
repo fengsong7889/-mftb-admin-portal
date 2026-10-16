@@ -70,8 +70,11 @@ public class RdmAccessGuard {
 
     /**
      * 是否可看全量需求（不被「与自己相关」收敛）。
-     * <p>口径只认分配侧授权：需求池 view（含持有 edit 的人）。不把台账的 export/delete
-     * 当全量凭证 —— 台账是人人可看的宽权限，那样等于「能导 Excel 就能读全公司需求」。
+     * <p>口径只认分配侧授权：全量查看权（新 {@code rdm-requirement:view_all}，过渡期兼容旧
+     * {@code rdm-intake:view}）或分配权。不把台账的 view/export/delete 当全量凭证 ——
+     * 台账是人人可看的宽权限，那样等于「能导 Excel 就能读全公司需求」。
+     * <p>两个锚点并存是菜单退役（保留 rdm-requirement 锚点、软删 rdm-intake）的过渡态：
+     * 先让新动作可用再迁移存量授权，反过来会让非超管在迁移完成前直接丢权。
      */
     public boolean canSeeAll(SysUser current) {
         if (operatorResolver.isAdmin(current)) {
@@ -80,16 +83,24 @@ public class RdmAccessGuard {
         if (current == null) {
             return false;
         }
-        return permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "view")
+        return permissionService.hasPermission(current, RdmConstants.MENU_REQUIREMENT, RdmConstants.ACTION_VIEW_ALL)
+                || permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "view")
                 || canDispatch(current);
     }
-
-    /** 是否可分发需求（技术负责人） */
+    
+    /**
+     * 是否可分发需求（技术负责人）。
+     * <p>新锚点 {@code rdm-requirement:dispatch} 与旧 {@code rdm-intake:edit} 并行生效；
+     * 刻意不认 {@code rdm-requirement:edit}——那是产品受理权，合起来就会在菜单退役时把
+     * 分配权逆发给每一个产品经理（RdmAccessGuardTest 钉住了这条）。
+     */
     public boolean canDispatch(SysUser current) {
         if (operatorResolver.isAdmin(current)) {
             return true;
         }
-        return current != null && permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "edit");
+        return current != null
+                && (permissionService.hasPermission(current, RdmConstants.MENU_REQUIREMENT, RdmConstants.ACTION_DISPATCH)
+                || permissionService.hasPermission(current, RdmConstants.MENU_INTAKE, "edit"));
     }
 
     /**

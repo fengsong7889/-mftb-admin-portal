@@ -48,6 +48,43 @@ export interface RuleItem {
   dateFormat?: string
   /** 觸發菜單（用於 table 類型的編號規則，展示該業務在哪個菜單觸發） */
   menu?: string
+  /**
+   * 序号起始口径（用於編號生成規則）：1=首號即 0…01；0/undefined=表內從 1 計數但編号從 0000 起。
+   * <p>示例必须按它算：BizSeqService 对 seq_start=1 直接用表内值，不反映进来就会把
+   * 「每日從 01 起」的 XQSP 展成 00，让配置页与实际发号对不上。
+   */
+  seqStart?: number
+}
+
+/**
+ * 编号首号示例（由前缀 / 日期格式 / 序号位数 / 起始口径推导）。
+ *
+ * <p>为什么不是统一补零：{@code BizSeqService} 的口径是 seq_start=0 时表内从 1 计数但编号
+ * 从 0000 起；seq_start=1 时直接用表内值，首号就是 0…01。一律补零会把 XQSP 这种
+ * 「每日從 01 起」的规则展成 00，让「編號生成規則」页与实际发号两套口径。
+ *
+ * <p>位数是**最少**位数：超过 99/9999 时自然扩位，不截断也不循环复用，所这里用 padStart
+ * 而不是固定截位。
+ *
+ * @param prefix   编号前缀；'-' 表示人工编码等不适用场景，返回空串
+ * @param dateFormat YYYYMMDD / YYYYMM / YYMM / 空=无日期维度
+ * @param seqLength 序号最少位数
+ * @param seqStart  起始口径（1=首號 01；0/undefined=首號 00…0）
+ */
+export function formatSeqExample(
+  prefix: string,
+  dateFormat?: string,
+  seqLength?: number,
+  seqStart?: number,
+): string {
+  if (prefix === '-') return ''
+  const first = seqStart != null && seqStart >= 1 ? seqStart : 0
+  const seq = seqLength ? String(first).padStart(seqLength, '0') : '0000'
+  const datePart = dateFormat === 'YYYYMMDD' ? '20260812'
+    : dateFormat === 'YYYYMM' ? '202608'
+    : dateFormat === 'YYMM' ? '2608'
+    : ''
+  return `${prefix}${datePart}${seq}`
 }
 
 export interface RuleGroup {
@@ -433,6 +470,19 @@ export const DEFAULT_RULE_GROUPS: RuleGroup[] = [
       { key: 'eam_return', label: '歸還編號', type: 'table', value: 'GH', defaultValue: 'GH', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'GH202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-歸還資產' },
       { key: 'eam_borrow', label: '借用編號', type: 'table', value: 'JY', defaultValue: 'JY', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'JY202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-借用資產' },
       { key: 'eam_compensation', label: '賠付編號', type: 'table', value: 'PF', defaultValue: 'PF', dateFormat: 'YYYYMMDD', min: 4, max: 4, unit: 'PF202609170001', remark: '{prefix} + YYYYMMDD + {n}位自增序號', menu: '物資管理-損壞賠付' },
+      /* ── 產研交付（RDM）── 两条都是后端管真值，静态条目只供归类与「生成时机」说明，同 key 会被后端覆盖 */
+      {
+        key: 'rdm_intake_approval', label: '需求審批流程編號', type: 'table', value: 'XQSP', defaultValue: 'XQSP',
+        dateFormat: 'YYYYMMDD', min: 2, max: 2, seqStart: 1, unit: 'XQSP2026101601',
+        remark: '{prefix} + YYYYMMDD + 至少{n}位自增序號：每日從 01 起，超過 99 自然擴位為 100，不截斷、不循環複用。僅在需求正式提交且需要審批時為本輪生成；免審批需求不產生本編號。',
+        menu: '流程審批系統－需求審批',
+      },
+      {
+        key: 'rdm_requirement', label: '需求編號', type: 'table', value: 'XQ', defaultValue: 'XQ',
+        dateFormat: 'YYYYMMDD', min: 4, max: 4, seqStart: 1, unit: 'XQ202610160001',
+        remark: '{prefix} + YYYYMMDD + {n}位自增序號。生成時機：首次准入成功（審批全部通過，或服務端免審批裁決命中）時生成一次，准入前的草稿/待審批/審批駁回不預佔、不消費流水；存量已生成號碼保持不變。',
+        menu: '流程審批系統－需求審批',
+      },
     ],
   },
 ]

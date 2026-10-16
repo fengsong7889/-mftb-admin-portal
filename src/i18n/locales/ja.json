@@ -949,6 +949,8 @@
     "statScheduleStaff": "今週の対象人数",
     "statScheduleScheduled": "設定済セル数",
     "statScheduleRest": "休日セル数",
-    "statScheduleUnscheduled": "週間未設定の人数"
+    "statScheduleUnscheduled": "週間未設定の人数",
+    "noValidWorksheet": "ファイルに有効なワークシートがありません",
+    "noValidDataRows": "ファイルに有効なデータ行がありません"
   }
 }

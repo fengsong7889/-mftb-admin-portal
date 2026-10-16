@@ -88,8 +88,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class RdmRequirementServiceImpl implements RdmRequirementService {
 
-    /** 编号规则键（对应 sys_biz_seq_rule.rule_key） */
-    private static final String SEQ_REQUIREMENT = "rdm_requirement";
+    /** 验收单编号规则（对应 sys_biz_seq_rule.rule_key）。正式需求编号用 {@code BizSeqService.RULE_RDM_REQUIREMENT}，延迟到首次准入时发号 */
     private static final String SEQ_ACCEPTANCE = "rdm_acceptance";
 
     /** 需求池责任人（技术负责人）菜单，用于判定谁能分发 */
@@ -365,7 +364,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         boolean draft = RdmConstants.STATUS_DRAFT.equals(dto.getMode());
 
         RdmRequirement req = new RdmRequirement();
-        req.setReqNo(bizSeqService.next(SEQ_REQUIREMENT));
+        // 正式需求编号延迟生成：草稿 / 待审批 / 审批驳回阶段不预占号码、不消费流水。
+        // 拆分前这里无条件 next("rdm_requirement")，于是「审批被驳回的需求也占了一个正式号」；
+        // 发号只在准入完成点（本方法的免审直送分支 / OA 终审回调 / 无单回退状态机 / 验收遗留后续需求）发生。
         req.setTitle(dto.getTitle().trim());
         req.setReqType(dto.getReqType());
         req.setPriority(StringUtils.hasText(dto.getPriority()) ? dto.getPriority() : "P2");
@@ -423,13 +424,11 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         } else if (req.getNeedApproval() == 1) {
             req.setStatus(RdmConstants.STATUS_INTAKE_PENDING);
             req.setSubmitTime(LocalDateTime.now());
-        } else if (pm != null) {
-            req.setStatus(RdmConstants.STATUS_ASSIGNED);
-            req.setSubmitTime(LocalDateTime.now());
-            applyPm(req, pm, current);
         } else {
-            req.setStatus(RdmConstants.STATUS_POOL);
+            // 服务端确认免审批：提交成功即已准入，落点与首次发号在同一条 insert 里完成。
+            // 新建直接提交等价于「存草稿再提交」，所以跟 selfSubmit 读同一份配置落点，保证两条路径结果一字不差。
             req.setSubmitTime(LocalDateTime.now());
+            applyExemptLanding(req, current, pm, requireExemptPoolRule(RdmConstants.STATUS_DRAFT));
         }
         applyIntakeDecision(req, decision);
         req.setStatusEnterTime(LocalDateTime.now());
@@ -494,6 +493,98 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     /** 是否 V3 分批交付流程版本（仅认 3，与 RdmFlowVersionGuard 同口径） */
     private boolean isFlowV3(Integer flowVersion) {
         return flowVersion != null && flowVersion == RdmConstants.FLOW_VERSION_3;
+    }
+
+    /**
+     * 首次准入成功时生成正式需求编号：仅当 {@code req_no} 为空时取号，已有号原样返回。
+     * <p>幂等是硬要求：OA 终审回调可能重复投递（补偿推进、重试），直取号会每天白吹流水；
+     * 已准入的需求号一旦生成就永不变更、不重发。
+     * <p>调用方必须在取号后同一条 insert/update 里落库，不得先改状态后补号——
+     * {@code rdm_requirement} 的 CHECK 不允许「已准入却无号」的中间态存在。
+     * <p>本方法不抛异常也不判空字符串：取号失败直接向上抛使整个准入事务回滚，
+     * 不能留下「已放行但无编号」的半成品。
+     */
+    private void ensureRequirementNumber(RdmRequirement req) {
+        if (req == null || StringUtils.hasText(req.getReqNo())) {
+            return;
+        }
+        req.setReqNo(bizSeqService.next(BizSeqService.RULE_RDM_REQUIREMENT));
+    }
+
+    /**
+     * 免审批需求的执行起点：基落点从 {@code rdm_transition} 读（状态机真值），
+     * 再按「提交时已指定且仍有效的意向产品」细化为直送受理；两种落点都在同一次调用里首次发号。
+     * <p>为什么不再在代码里硬写 pool：仓库口径是「状态机真值：rdm_status_def + rdm_transition，
+     * 不在代码里硬编码流转」。硬写会让管理员在「狀態與流轉」里停用/改落点时，免审批路径仍照旧放行。
+     * <p>assigned 细化仍留在代码：它是「意向→正式受理人」的业务判定，不是状态机分支；
+     * OA 终审回调的 {@code approve_intake→pool + applyIntentPm→assigned} 是同一形状。
+     * <p>{@code create()} 的直接提交与 {@code selfSubmit()} 的草稿提交/驳回重提共用本方法，
+     * 否则会出现「新建时直送产品、存草稿后再提交却停在待审批」两套结果。
+     * <p>意向产品失效（离职/停用/已无受理权）时不报错而是回配置基落点：宁可让人重新分配，
+     * 也不能把需求交给一个点不动任何动作的人。{@code create()} 路径上 pm 已经过
+     * {@link #requirePmEligible} 硬校验，这里的软判定不会改变它的结果。
+     */
+    private void applyExemptLanding(RdmRequirement req, SysUser operator, SysUser intentPm,
+                                    RdmConfigVO.Transition poolRule) {
+        // 延迟发号 v2：免审批提交不再立即生成需求编号，编号推迟到产品经理认领（claim）时生成。
+        SysUser pm = isPmEligible(intentPm) ? intentPm : null;
+        if (pm != null) {
+            req.setStatus(RdmConstants.STATUS_ASSIGNED);
+            applyPm(req, pm, operator);
+        } else {
+            req.setStatus(poolRule.getToStatus());
+        }
+        req.setOverdueFlag(0);
+    }
+
+    /**
+     * 取免审批直送的配置流转规则（基落点真值）；缺行、停用或落点不是需求池一律拒提交。
+     * <p>fail-closed 是方案明文要求：「缺配置时明确报错，不以缺配置当审批完成或免审」。
+     * 静默回退到代码里的 pool 会把「配置被改坏」伪装成「正常免审放行」，难排查且绕过了管理。
+     */
+    private RdmConfigVO.Transition requireExemptPoolRule(String fromStatus) {
+        String actionCode = RdmConstants.STATUS_INTAKE_REJECTED.equals(fromStatus)
+                ? RdmConstants.ACTION_RESUBMIT_POOL : RdmConstants.ACTION_SUBMIT_POOL;
+        RdmConfigVO.Transition rule = configService.findTransition(fromStatus, actionCode);
+        if (rule == null || !RdmConstants.STATUS_POOL.equals(rule.getToStatus())) {
+            throw new BusinessException("免審批直送配置缺失或落點異常（" + fromStatus + " --" + actionCode
+                    + "--> pool），本次提交已拒絕；請在「需求配置 › 狀態與流轉」補好該流轉規則，或改回需審批策略");
+        }
+        return rule;
+    }
+
+    /**
+     * 草稿提交 / 驳回重提命中免审批时的准入落点（不走 intake_pending）。
+     * <p>为什么不能先走 {@code transitionInternal(submit)}：那条配置的落点是 intake_pending，
+     * 而免审批本轮不会发起 OA 准入单（{@code openIntakeRound} 只在需审时提交），
+     * 需求会永久停在「待审批」且无单可推。
+     * <p>基落点取配置的 {@code submit_pool / resubmit_pool}（缺配置则拒提交），再由
+     * {@link #applyExemptLanding} 按有效意向产品细化为直送受理；两者合起来就是回调的
+     * {@code approve_intake→pool + applyIntentPm→assigned} 同形状。
+     * <p>不走 {@code transitionInternal} 的原因：它只能给出配置的单一落点，无法表达
+     * 「提交时已指定有效产品→assigned」；且它会先拿 intake_pending 的规则做角色/必填校验。
+     * 本路径的提交人身份已由 {@code requireOwner}（本人）与 {@code requireVisible}（相关人）守住，
+     * 配置动作的 allowed_roles 本就是 SUBMITTER，不构成新的权限面。
+     */
+    private void landExemptSubmission(RdmRequirement req, SysUser current, String fromStatus) {
+        LocalDateTime now = LocalDateTime.now();
+        // 先取配置落点：缺规则时立刻拒绝，不能先改状态/先拿号再报错
+        RdmConfigVO.Transition poolRule = requireExemptPoolRule(fromStatus);
+        SysUser intentPm = req.getIntentPmUserId() == null ? null : userMapper.selectById(req.getIntentPmUserId());
+        req.setSubmitTime(now);
+        applyExemptLanding(req, current, intentPm, poolRule);
+        req.setStatusEnterTime(now);
+        req.setCurrentHandlerName(computeHandler(req, null));
+        req.setUpdatedBy(operatorResolver.operatorSignature(current));
+        requirementMapper.updateById(req);
+
+        closeOpenStatusLog(req.getId(), now, isOverdue(req));
+        // 留痕用配置动作码（submit_pool / resubmit_pool），时间轴与「需求配置」里的规则一字不差
+        appendStatusLog(req, fromStatus, current, poolRule.getActionCode(),
+                "服務端免審批直送：" + labelOf(req.getStatus()));
+        notifyOnCreate(req, isPmEligible(intentPm) ? intentPm : null);
+        log.info("免審批提交已直送落点: reqId={}, reqNo={}, {} -> {}, action={}",
+                req.getId(), req.getReqNo(), fromStatus, req.getStatus(), poolRule.getActionCode());
     }
 
     @Override
@@ -636,17 +727,24 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         requireOwner(req, current, "提交");
         requireVisible(req, current, "提交");
         String actionCode = resolveSelfSubmitAction(req.getStatus());
-        transitionInternal(req, actionCode, dto, current, accessGuard.activeRoles(id, current));
+        // 落状态前先把原状态记住：免审批分支要把「从哪一态直送」写进时间轴，不能被后续变更污染
+        String fromStatus = req.getStatus();
         /*
-         * 提交/重提都重新裁决一次：人员调岗、策略改版后不能沿用上一轮的结论；
-         * 同时开启新一轮并发起本轮准入单，否则会出现「界面待审批、OA 没有待办」。
+         * 提交/重提都先重新裁决再落状态：人员调岗、策略改版后不能沿用上一轮的结论。
+         * <p>需审批：走配置状态机进「待审批」，并发起本轮准入单（否则“界面待审批、OA 没有待办”）。
+         * <p>免审批：走与直接创建同一落点口径（{@link #landExemptSubmission}）并首次发号。
          */
         RdmIntakeVO.Decision decision = intakePolicyService.decide(current, req.getReqType(), reqSystemCode(req));
         req.setNeedApproval(decision.isNeedApproval() ? 1 : 0);
         applyIntakeDecision(req, decision);
-        req.setSubmitTime(LocalDateTime.now());
-        req.setCurrentHandlerName(computeHandler(req, null));
-        requirementMapper.updateById(req);
+        if (decision.isNeedApproval()) {
+            transitionInternal(req, actionCode, dto, current, accessGuard.activeRoles(id, current));
+            req.setSubmitTime(LocalDateTime.now());
+            req.setCurrentHandlerName(computeHandler(req, null));
+            requirementMapper.updateById(req);
+        } else {
+            landExemptSubmission(req, current, fromStatus);
+        }
         openIntakeRound(req, decision, current);
         // 任务19 / 缺口1：草稿提交后，若这条 V3 执行需求已准入（无需审批直接进池/受理）则补建默认交付项；
         // 仍处草稿/待准入或为聚合需求时不建（helper 内部按 kind + status 判定）。
@@ -718,17 +816,30 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 产品经理资格：在职启用 + 具备需求侧处理权（rdm-requirement:edit）。
+     * <p>免审批直送落点时只能做软判定（拿不到合格产品就回需求池），硬拒会误伤“提交时还能接、
+     * 存完草稿隔一周调岗后已不能接”的正常场景；资格检查本身仍是同一口径，避免两处飘移。
+     */
+    private boolean isPmEligible(SysUser pm) {
+        if (pm == null || (pm.getStatus() != null && pm.getStatus() == 0)) {
+            return false;
+        }
+        return permissionService.hasPermission(pm, RdmConstants.MENU_REQUIREMENT, "edit");
+    }
+
+    /**
      * 产品经理资格校验：在职启用 + 具备需求侧处理权（rdm-requirement:edit）。
      * <p>不能只校「用户存在」：把需求分给无受理权的人，他会收到待办却点不动任何动作。
      */
     private void requirePmEligible(SysUser pm) {
-        if (pm.getStatus() != null && pm.getStatus() == 0) {
+        if (isPmEligible(pm)) {
+            return;
+        }
+        if (pm != null && pm.getStatus() != null && pm.getStatus() == 0) {
             throw new BusinessException("指定的產品經理已離職或停用，請改選其他人或提交技術部分配");
         }
-        if (!permissionService.hasPermission(pm, RdmConstants.MENU_REQUIREMENT, "edit")) {
-            throw new BusinessException("指定的員工「" + pm.getName()
-                    + "」當前無產品經理受理權限，請先在授權中心配置或改提交技術部分配");
-        }
+        throw new BusinessException("指定的員工「" + (pm == null ? "" : pm.getName())
+                + "」當前無產品經理受理權限，請先在授權中心配置或改提交技術部分配");
     }
 
     /**
@@ -795,6 +906,10 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (!StringUtils.hasText(flowNo)) {
             log.warn("需求無准入單，審批动作退回状态机直改: reqNo={}, operator={}", req.getReqNo(),
                     current == null ? null : current.getUsername());
+            /*
+             * 延迟发号 v2：无单回退也不再立即生成需求编号，编号推迟到产品经理认领（claim）时生成。
+             * 需求直接进入需求池（pool）状态，req_no 保持 NULL。
+             */
             transitionInternal(req, dto.getActionCode(), dto, current,
                     accessGuard.activeRoles(req.getId(), current));
             // 任务19 / 缺口1：无准入单时退回状态机直改，若因此让 V3 执行需求进入已准入状态，补建默认交付项。
@@ -988,17 +1103,29 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         requirePmEligible(current);
         String signature = operatorResolver.operatorSignature(current);
         /*
+         * 延迟发号 v2：产品经理认领时首次生成正式需求编号。
+         * 幂等保证：ensureRequirementNumber 内部检查 reqNo 是否已有值，已有则跳过。
+         * 取号失败直接向上抛，整个认领事务回滚，不会留下「已认领但无编号」的半成品。
+         */
+        String newReqNo = null;
+        if (!StringUtils.hasText(req.getReqNo())) {
+            newReqNo = bizSeqService.next(BizSeqService.RULE_RDM_REQUIREMENT);
+        }
+        final String reqNoToSet = newReqNo;
+        /*
          * 原子抢单：条件里带 status=pool 与「尚无受理人」，两个 PM 同时点只有一个人拿到 1 行。
          * 分发人列不动：自认领没有技术负责人参与，写自己进去会误导责任归属。
+         * 同时写入首次生成的需求编号（若已有号则原值覆盖写入，幂等安全）。
          */
         int taken = jdbcTemplate.update(
                 "UPDATE rdm_requirement SET status = ?, assignee_pm_user_id = ?, assignee_pm_emp_no = ?, "
                         + "assignee_pm_name = ?, current_handler_name = ?, distribute_time = now(), "
-                        + "status_enter_time = now(), overdue_flag = 0, updated_by = ? "
+                        + "status_enter_time = now(), overdue_flag = 0, updated_by = ?, "
+                        + "req_no = COALESCE(req_no, ?) "
                         + "WHERE id = ? AND deleted = 0 AND status = ? "
                         + "AND (assignee_pm_user_id IS NULL OR assignee_pm_user_id = 0)",
                 RdmConstants.STATUS_ASSIGNED, current.getId(), current.getEmpId(), current.getName(),
-                current.getName(), signature, id, RdmConstants.STATUS_POOL);
+                current.getName(), signature, reqNoToSet, id, RdmConstants.STATUS_POOL);
         if (taken == 0) {
             throw new BusinessException("該需求已被他人認領或狀態已變更，請刷新後重試");
         }
@@ -1356,7 +1483,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 : "【驗收遺留】" + parent.getTitle();
 
         RdmRequirement followUp = new RdmRequirement();
-        followUp.setReqNo(bizSeqService.next(SEQ_REQUIREMENT));
+        // 延迟发号 v2：验收遗留后续需求不再立即生成编号，编号推迟到产品经理认领（claim）时生成。
         followUp.setTitle(title.length() > RdmConstants.TITLE_MAX_LENGTH ? title.substring(0, RdmConstants.TITLE_MAX_LENGTH) : title);
         followUp.setReqType(parent.getReqType());
         // 遗留事项默认 P2：不得因为“原需求很急”就把补丁排到原需求前面
@@ -2012,6 +2139,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         flow.setProcessCode(RdmConstants.INTAKE_PROCESS_CODE);
         flow.setTitle("需求准入：" + req.getTitle());
         Map<String, Object> form = new LinkedHashMap<>();
+        // 延迟发号：本轮发起准入单时还没有正式需求编号，快照里保持 null 而不伪造占位串；
+        // 编号生成后由关联需求（reqId）读取，不改写历史审批快照。
         form.put("reqNo", req.getReqNo());
         form.put("reqId", req.getId());
         form.put("reqType", req.getReqType());
@@ -2055,10 +2184,12 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
         if (RdmConstants.STATUS_INTAKE_PENDING.equals(req.getStatus())) {
             // 审批人由 OA 引擎通知，这里补一条需求侧留痕，避免两边口径不一致
+            // 延迟发号：待审批行本就没有正式编号，不能把 null 拼进通知，也不能拿 XQSP 单号充数
             notifyService.notifyUsers(RdmConstants.EVENT_INTAKE_TODO, req, List.of(),
-                    "需求待審批", "### 📝 需求待審批\n\n- **編號**: " + req.getReqNo() + "\n- **標題**: "
+                    "需求待審批", "### 📝 需求待審批\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo())
+                            + "\n- **標題**: "
                             + req.getTitle() + "\n- **提出人**: " + req.getSubmitterName()
-                            + "\n\n請在流程事項或審批中心處理。");
+                            + "\n\n准入通過後将自动生成正式需求编号。請在流程事項或審批中心處理。");
             return;
         }
         if (pm != null) {
@@ -2097,11 +2228,12 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             case RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_VERIFIED -> RdmConstants.EVENT_ACCEPT_DONE;
             default -> RdmConstants.EVENT_STATUS_CHANGED;
         };
-        String text = "### 🔁 需求狀態更新\n\n- **編號**: " + req.getReqNo() + "\n- **標題**: " + req.getTitle()
+        String text = "### 🔁 需求狀態更新\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo()) + "\n- **標題**: " + req.getTitle()
                 + "\n- **動作**: " + rule.getActionName() + "\n- **當前狀態**: " + labelOf(req.getStatus())
                 + "\n- **操作人**: " + (actor == null ? "system" : actor.getName())
                 + (req.getPlanReleaseDate() != null ? "\n- **計劃上線**: " + req.getPlanReleaseDate() : "");
-        notifyService.notifyUserIds(event, req, receivers, "需求狀態更新：" + req.getReqNo(), text);
+        notifyService.notifyUserIds(event, req, receivers,
+                "需求狀態更新：" + RdmConstants.displayReqNo(req.getReqNo()), text);
     }
 
     /* ── 查询辅助 ── */

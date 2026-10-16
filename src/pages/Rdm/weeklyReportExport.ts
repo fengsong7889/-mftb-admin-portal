@@ -6,6 +6,7 @@
  */
 import ExcelJS from 'exceljs'
 import type { RdmWeeklyReport } from '../../api/rdm'
+import { formatRdmReqNo } from '../../constants/rdm'
 
 /** 百分比文本 */
 const pct = (v: number) => `${Math.round(v * 100)}%`
@@ -95,7 +96,7 @@ export async function exportWeeklyReport(report: RdmWeeklyReport): Promise<void>
     wb.addWorksheet('風險清單'),
     '需關注的風險需求',
     ['需求編號', '標題', '狀態', '當前處理人', '停留天數', '風險類型'],
-    report.risks.map(r => [r.reqNo, r.title, r.status, r.handler ?? '-', r.days, r.riskType]),
+    report.risks.map(r => [formatRdmReqNo(r.reqNo), r.title, r.status, r.handler ?? '-', r.days, r.riskType]),
   )
 
   appendTable(

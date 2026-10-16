@@ -18,7 +18,7 @@ import {
   fetchRequirementDetail,
   type RdmPrdItem,
 } from '../../api/rdm'
-import { RDM_REVIEW_TYPE_LABEL, type RdmReviewType } from '../../constants/rdm'
+import { RDM_REVIEW_TYPE_LABEL, formatRdmReqNo, type RdmReviewType } from '../../constants/rdm'
 import './index.css'
 
 const { TextArea } = Input
@@ -50,7 +50,7 @@ export default function ReviewForm() {
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: d.reqNo, title: d.title }))
+      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title }))
       .catch(() => message.error('需求資訊載入失敗'))
     fetchDeliverySummary(reqId).then(s => setPrds(s?.prds ?? [])).catch(() => setPrds([]))
   }, [reqId])

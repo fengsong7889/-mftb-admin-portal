@@ -30,28 +30,32 @@ public class RdmReleaseController {
 
     /** 检查项实时预览（不落库，供发起前自查） */
     @GetMapping("/requirement/{reqId}/check")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmReleaseVO.Gate> check(@PathVariable Long reqId) {
         return Result.success(releaseService.preview(reqId));
     }
 
     /** 放行单历史 */
     @GetMapping("/requirement/{reqId}")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmReleaseVO.Gate>> list(@PathVariable Long reqId) {
         return Result.success(releaseService.list(reqId));
     }
 
     /** 发起放行单（冻结检查项快照，等待他人裁决） */
     @PostMapping("/requirement/{reqId}/apply")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmReleaseVO.Gate> apply(@PathVariable Long reqId, @RequestBody RdmReleaseDTO.Apply dto) {
         return Result.success("放行單已發起，等待他人裁決", releaseService.apply(reqId, dto));
     }
 
     /** 放行 / 驳回 */
     @PostMapping("/{id}/decide")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmReleaseVO.Gate> decide(@PathVariable Long id, @RequestBody RdmReleaseDTO.Decide dto) {
         RdmReleaseVO.Gate gate = releaseService.decide(id, dto);
         return Result.success("passed".equals(gate.getStatus()) ? "已准許上線" : "已駁回放行", gate);

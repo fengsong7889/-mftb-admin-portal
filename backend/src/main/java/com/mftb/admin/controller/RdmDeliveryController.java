@@ -34,7 +34,8 @@ public class RdmDeliveryController {
 
     /** 需求交付概览（PRD + 任务 + 评审 + 变更 + 工时汇总），详情页一次拉齐 */
     @GetMapping("/requirement/{reqId}/summary")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmDeliveryVO.DeliverySummary> summary(@PathVariable Long reqId) {
         return Result.success(deliveryService.summary(reqId));
     }
@@ -43,7 +44,8 @@ public class RdmDeliveryController {
 
     /** 需求下的 PRD 列表 */
     @GetMapping("/requirement/{reqId}/prds")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Prd>> prds(@PathVariable Long reqId) {
         return Result.success(deliveryService.listPrds(reqId));
     }
@@ -52,14 +54,16 @@ public class RdmDeliveryController {
 
     /** 五节点计划（初步/基线/预测/实际） */
     @GetMapping("/requirement/{reqId}/milestones")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Milestone>> milestones(@PathVariable Long reqId) {
         return Result.success(deliveryService.milestones(reqId));
     }
 
     /** 保存节点计划（已冻结基线后只能改预测） */
     @PutMapping("/requirement/{reqId}/milestones")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<List<RdmDeliveryVO.Milestone>> saveMilestones(@PathVariable Long reqId,
                                                                 @RequestBody List<RdmDeliveryDTO.Milestone> list) {
         return Result.success("節點計劃已保存", deliveryService.saveMilestones(reqId, list));
@@ -67,21 +71,24 @@ public class RdmDeliveryController {
 
     /** 冻结基线（评审通过、估时确认后执行一次） */
     @PostMapping("/requirement/{reqId}/milestones/freeze")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<List<RdmDeliveryVO.Milestone>> freezeMilestones(@PathVariable Long reqId) {
         return Result.success("基線已凍結", deliveryService.freezeMilestoneBaseline(reqId));
     }
 
     /** PRD 定稿快照（版本链） */
     @GetMapping("/prd/{id}/snapshots")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.PrdSnapshot>> prdSnapshots(@PathVariable Long id) {
         return Result.success(deliveryService.prdSnapshots(id));
     }
 
     /** 填报工时明细（仅任务负责人本人） */
     @PostMapping("/task/{id}/work-logs")
-    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<List<RdmDeliveryVO.WorkLog>> saveWorkLogs(@PathVariable Long id,
                                                             @RequestBody List<RdmDeliveryDTO.WorkLog> logs) {
         return Result.success("工時已登記", deliveryService.saveWorkLogs(id, logs));
@@ -89,14 +96,16 @@ public class RdmDeliveryController {
 
     /** 新增/编辑 PRD */
     @PostMapping("/prd")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Prd> savePrd(@RequestBody RdmDeliveryDTO.Prd dto) {
         return Result.success("PRD 已保存", deliveryService.savePrd(dto));
     }
 
     /** 删除 PRD（仅草稿） */
     @DeleteMapping("/prd/{id}")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<Void> deletePrd(@PathVariable Long id) {
         deliveryService.deletePrd(id);
         return Result.success();
@@ -106,21 +115,24 @@ public class RdmDeliveryController {
 
     /** 需求下的评审记录 */
     @GetMapping("/requirement/{reqId}/reviews")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Review>> reviews(@PathVariable Long reqId) {
         return Result.success(deliveryService.listReviews(reqId));
     }
 
     /** 发起评审 */
     @PostMapping("/review")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Review> createReview(@RequestBody RdmDeliveryDTO.Review dto) {
         return Result.success("評審已發起", deliveryService.createReview(dto));
     }
 
     /** 录入评审结论 */
     @PostMapping("/review/{id}/decision")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Review> decideReview(@PathVariable Long id, @RequestBody RdmDeliveryDTO.ReviewDecision dto) {
         return Result.success("評審結論已録入", deliveryService.decideReview(id, dto));
     }
@@ -129,21 +141,24 @@ public class RdmDeliveryController {
 
     /** 需求下的任务列表 */
     @GetMapping("/requirement/{reqId}/tasks")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Task>> tasks(@PathVariable Long reqId) {
         return Result.success(deliveryService.listTasks(reqId));
     }
 
     /** 我的任务（研发/设计/测试视角；不传 status 时返回未完成） */
     @GetMapping("/tasks/mine")
-    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Task>> myTasks(@RequestParam(required = false) String status) {
         return Result.success(deliveryService.myTasks(status));
     }
 
     /** 新增/编辑任务 */
     @PostMapping("/task")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Task> saveTask(@RequestBody RdmDeliveryDTO.Task dto) {
         return Result.success("任務已保存", deliveryService.saveTask(dto));
     }
@@ -153,19 +168,28 @@ public class RdmDeliveryController {
      * <p>只回姓名与「能否上报进度」，不返回权限明细；门控与写任务同一组权限。
      */
     @GetMapping("/task/owner-check")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.OwnerCheck> checkTaskOwner(@RequestParam Long userId) {
         return Result.success(deliveryService.checkTaskOwner(userId));
     }
 
     /** 上报任务进度与工时 */
     @PostMapping("/task/{id}/progress")
-    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Task> taskProgress(@PathVariable Long id, @RequestBody RdmDeliveryDTO.TaskProgress dto) {
         return Result.success("進度已上報", deliveryService.updateTaskProgress(id, dto));
     }
 
-    /** 删除任务 */
+    /**
+     * 删除任务。
+     * <p>锚点走 rdm-delivery-iteration:delete 而不是研发菜单：研发侧写操作集 DELIVERY_ACTIONS 里
+     * 本来就没有 delete，能删迭代的就能删任务。
+     * <p>这一处是 intake:delete 映射的唯一例外，故意不加 anyPermissions：它的归宿就
+     * 是本注解的主菜单+主动作，再列一遍只会让人以为还需要旧锚点；旧 intake:delete
+     * 持有者已由授权镜像拿到本动作。
+     */
     @DeleteMapping("/task/{id}")
     @RequirePermission(menu = "rdm-delivery-iteration", action = "delete", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
     public Result<Void> deleteTask(@PathVariable Long id) {
@@ -177,14 +201,16 @@ public class RdmDeliveryController {
 
     /** 迭代列表（含已排入需求数与工时，用于产能对比） */
     @GetMapping("/iterations")
-    @RequirePermission(menu = "rdm-delivery-iteration", anyOf = {"rdm-delivery-board", "rdm-requirement", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-iteration", anyOf = {"rdm-delivery-board", "rdm-requirement", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Iteration>> iterations() {
         return Result.success(deliveryService.listIterations());
     }
 
     /** 新增/编辑迭代 */
     @PostMapping("/iteration")
-    @RequirePermission(menu = "rdm-delivery-iteration", action = "edit", anyOf = {"rdm-intake", "rdm-delivery-board"})
+    @RequirePermission(menu = "rdm-delivery-iteration", action = "edit", anyOf = {"rdm-intake", "rdm-delivery-board"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Iteration> saveIteration(@RequestBody RdmDeliveryDTO.Iteration dto) {
         return Result.success("迭代已保存", deliveryService.saveIteration(dto));
     }
@@ -193,7 +219,8 @@ public class RdmDeliveryController {
 
     /** 需求下的变更记录 */
     @GetMapping("/requirement/{reqId}/changes")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Change>> changes(@PathVariable Long reqId) {
         return Result.success(deliveryService.listChanges(reqId));
     }

@@ -29,6 +29,7 @@ import {
 import dayjs from 'dayjs'
 import {
   AlertOutlined,
+  BellOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
@@ -53,6 +54,7 @@ import {
   fetchProjectPending,
   removeProjectMember,
   updateProject,
+  urgeProject,
   type RdmChecklistItem,
   type RdmProjectDeliveryChecklist,
   type RdmProjectDetail as ProjectDetailType,
@@ -77,6 +79,22 @@ const PENDING_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string
 
 /** 交付項狀態是否已完成 */
 const isItemDone = (status: string) => status === 'done'
+
+/**
+ * 催辦結果（頁面級擴展類型，additive）。
+ * <p>api/rdm.ts 的 RdmTodoNotifyResult 只聲明了 3 個核心字段；後端 TodoNotifyResult 實際下發
+ * 更完整的「為什麼沒發」可解釋字段。此處僅在頁面層做只讀擴展展示，不改動已驗證的 API 契約類型。
+ * <p>該端點已接 executeOnce：同日重複點擊會回放首次結果，故呈现為「結果回放」而非「又發一次」。
+ */
+interface UrgeNotifyResult {
+  scannedProjects?: number; scannedTodos?: number;
+  notified?: number; deduped?: number; unassigned?: number;
+  nonWorkingDay?: number; belowThreshold?: number; failed?: number;
+  remindDay?: string; notes?: string[];
+}
+
+/** 從詳情頁 URL 中提取總覽的篩選/分頁鍵（排除 mode/id），用於返回時還原條件 */
+const LIST_QUERY_KEYS = ['keyword', 'status', 'pmUserId', 'pmName', 'pageNo', 'pageSize', 'drill']
 
 const { TextArea } = Input
 
@@ -108,6 +126,48 @@ export default function ProjectDetail() {
   const [memberName, setMemberName] = useState('')
   const [memberRole, setMemberRole] = useState('DEV')
   const [memberSubmitting, setMemberSubmitting] = useState(false)
+
+  // ── 催辦（urge）結果 ──
+  const [urging, setUrging] = useState(false)
+  const [urgeResult, setUrgeResult] = useState<UrgeNotifyResult | null>(null)
+  const [urgeOpen, setUrgeOpen] = useState(false)
+
+  // ── 返回總覽時還原原查詢條件（keyword/status/pmUserId/pageNo/pageSize/drill）──
+  const backToList = useCallback(() => {
+    const q = new URLSearchParams()
+    for (const k of LIST_QUERY_KEYS) {
+      const v = searchParams.get(k)
+      if (v) q.set(k, v)
+    }
+    const qs = q.toString()
+    navigate(qs ? `/rdm-project?${qs}` : '/rdm-project')
+  }, [navigate, searchParams])
+
+  /** 帶當前總覽條件跳轉編輯（返回後仍可還原） */
+  const listSuffix = useMemo(() => {
+    const q = new URLSearchParams()
+    for (const k of LIST_QUERY_KEYS) {
+      const v = searchParams.get(k)
+      if (v) q.set(k, v)
+    }
+    const qs = q.toString()
+    return qs ? `&${qs}` : ''
+  }, [searchParams])
+
+  // ── 手動催辦：展示「為什麼沒發」的可解釋結果 ──
+  const handleUrge = async () => {
+    if (!projectId || isNaN(projectId)) return
+    setUrging(true)
+    try {
+      const res = await urgeProject(projectId) as unknown as UrgeNotifyResult
+      setUrgeResult(res)
+      setUrgeOpen(true)
+    } catch {
+      // request.ts 已统一弹后端失败原因
+    } finally {
+      setUrging(false)
+    }
+  }
 
   // ── 載入數據 ──
   const loadAll = useCallback(async () => {
@@ -246,7 +306,7 @@ export default function ProjectDetail() {
         await createProject(payload)
         message.success('項目創建成功')
       }
-      navigate('/rdm-project')
+      backToList()
     } catch (err) {
       if (err && typeof err === 'object' && 'errorFields' in err) return
       message.error(mode === 'edit' ? '更新失敗，請重試' : '創建失敗，請重試')
@@ -275,7 +335,7 @@ export default function ProjectDetail() {
           action={<Button size="small" onClick={loadAll}>重試</Button>}
           style={{ marginBottom: 16 }}
         />
-        <Button onClick={() => navigate('/rdm-project')}>返回項目總覽</Button>
+        <Button onClick={() => backToList()}>返回項目總覽</Button>
       </div>
     )
   }
@@ -284,7 +344,7 @@ export default function ProjectDetail() {
   if (error && isFormMode) {
     return (
       <div className="content-area">
-        <RdmFormHeader title={mode === 'edit' ? '編輯項目' : '新增項目'} onBack={() => navigate('/rdm-project')} backText="返回項目" />
+        <RdmFormHeader title={mode === 'edit' ? '編輯項目' : '新增項目'} onBack={() => backToList()} backText="返回項目" />
         <Alert
           type="error"
           showIcon
@@ -301,7 +361,7 @@ export default function ProjectDetail() {
       <div className="content-area">
         <RdmFormHeader
           title={mode === 'edit' ? '編輯項目' : '新增項目'}
-          onBack={() => navigate('/rdm-project')}
+          onBack={() => backToList()}
           backText="返回項目"
         />
         <div className="rdm-card">
@@ -343,7 +403,7 @@ export default function ProjectDetail() {
           </Form>
         </div>
         <div className="form-footer">
-          <Button onClick={() => navigate('/rdm-project')}>取消</Button>
+          <Button onClick={() => backToList()}>取消</Button>
           <Button type="primary" loading={submitting} onClick={handleFormSubmit}>
             {mode === 'edit' ? '保存修改' : '創建項目'}
           </Button>
@@ -357,7 +417,7 @@ export default function ProjectDetail() {
     return (
       <div className="content-area">
         <Alert type="error" showIcon message="無法載入項目" style={{ marginBottom: 16 }} />
-        <Button onClick={() => navigate('/rdm-project')}>返回項目總覽</Button>
+        <Button onClick={() => backToList()}>返回項目總覽</Button>
       </div>
     )
   }
@@ -370,7 +430,7 @@ export default function ProjectDetail() {
       {/* ── 頁頭 ── */}
       <RdmFormHeader
         title={detail.name}
-        onBack={() => navigate('/rdm-project')}
+        onBack={() => backToList()}
         backText="返回項目"
         badge={
           <Space size={4}>
@@ -390,7 +450,8 @@ export default function ProjectDetail() {
         right={
           <Space size={8}>
             <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
-            <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit`)}>編輯項目</Button>
+            <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-delivery-item?projectId=${detail.id}&mode=create`)}>新增交付項</Button>
           </Space>
         }
@@ -691,7 +752,7 @@ export default function ProjectDetail() {
               <Button
                 block
                 icon={<EditOutlined />}
-                onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit`)}
+                onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}
               >
                 編輯項目信息
               </Button>
@@ -749,6 +810,46 @@ export default function ProjectDetail() {
             </Space>
           </div>
         </div>
+      </Modal>
+
+      {/* ── 催辦結果 Modal（展示「為什麼沒發」；executeOnce 同日回放非重發） ── */}
+      <Modal
+        title={<Space><BellOutlined />催辦結果</Space>}
+        open={urgeOpen}
+        onCancel={() => setUrgeOpen(false)}
+        footer={<Button type="primary" onClick={() => setUrgeOpen(false)}>知道了</Button>}
+        width={520}
+      >
+        {urgeResult && (
+          <div>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="催辦已接 executeOnce：同一提醒日重複點擊會回放首次結果，並非重複發送。"
+            />
+            <Descriptions column={2} size="small" bordered
+              labelStyle={{ color: '#8C8C8C', fontSize: 12 }}
+              contentStyle={{ fontSize: 13 }}
+            >
+              <Descriptions.Item label="已通知">{urgeResult.notified ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="已去重(同提醒日)">{urgeResult.deduped ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="未指派(無責任人)">{urgeResult.unassigned ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="非工作日不發">{urgeResult.nonWorkingDay ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="未達逾期門檻">{urgeResult.belowThreshold ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="發送失敗">{urgeResult.failed ?? 0}</Descriptions.Item>
+              <Descriptions.Item label="提醒日" span={2}>{urgeResult.remindDay || '-'}</Descriptions.Item>
+            </Descriptions>
+            {urgeResult.notes && urgeResult.notes.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>說明（為什麼沒發）</div>
+                <ul style={{ margin: 0, paddingLeft: 18, color: '#595959', fontSize: 13 }}>
+                  {urgeResult.notes.map((n, i) => <li key={i}>{n}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   )

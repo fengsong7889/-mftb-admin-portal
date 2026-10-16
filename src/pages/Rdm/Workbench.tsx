@@ -1,18 +1,23 @@
 /**
- * 需求工作台 —— 全员进入 RDM 的第一屏
+ * 個人工作台 —— 全员进入產研交付的第一屏
  *
- * 设计口径：按「我是谁、我该处理什么」组织页面，四组待办分别对应
- * 审批人 / 技术负责人 / 产品经理 / 业务验收人 四个角色视角，
- * 非相关角色的待办组为空时自动隐藏，避免干扰。
+ * 设计口径（角色化改造后）：这一屏不是「把所有人都要处理的事平铺出来」，
+ * 而是按「我是谁、我今天该看什么」编排。研发先看任务、测试先看批次、项目经理先看项目、
+ * 业务方先看自己的提交。具体规则：
+ * 1. 身份由菜单权限 + 后端角色标签 + 实际待办推导（见 workbenchLayout.deriveRdmIdentities）；
+ * 2. 每个身份有一套推荐区块顺序，个人可显隐与排序（见 WorkbenchCustomize）；
+ * 3. 区块候选集只包含本人有菜单权限的页面，配置动作不会扩权；
+ * 4. 专业执行操作仍留在研发/测试/发布各自的工作台，本页只做概览与直达。
+ *
+ * i18n：本轮按高效开发模式只交界面，文案暂沿用繁中硬编码（待界面确认后的第二阶段统一抽键）。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Empty, Space, Spin, Tag, message } from 'antd'
 import {
   AlertOutlined,
   AuditOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  CodeOutlined,
   ExclamationCircleOutlined,
   FileAddOutlined,
   InboxOutlined,
@@ -26,7 +31,18 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchProjectPage, fetchRequirementPage, fetchWorkbench, fetchWorkbenchSummary, type RdmProjectListItem, type RdmRequirementRow, type RdmWorkbenchData, type RdmWorkbenchSummary } from '../../api/rdm'
+import {
+  fetchProjectPage,
+  fetchRequirementPage,
+  fetchTodoBoard,
+  fetchWorkbench,
+  fetchWorkbenchSummary,
+  type RdmProjectListItem,
+  type RdmRequirementRow,
+  type RdmTodoBoard,
+  type RdmWorkbenchData,
+  type RdmWorkbenchSummary,
+} from '../../api/rdm'
 import {
   RDM_PROJECT_STATUS_COLOR,
   RDM_PROJECT_STATUS_LABEL,
@@ -35,10 +51,20 @@ import {
   RDM_STAGE_ORDER,
   RDM_STATUS,
   RDM_STATUS_LABEL,
+  formatRdmReqNo,
   RDM_STATUS_STAGE,
   type RdmStatus,
 } from '../../constants/rdm'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
+import {
+  RDM_IDENTITY_LABEL,
+  deriveRdmIdentities,
+  useRdmWorkbenchLayout,
+  type RdmIdentity,
+  type RdmSectionKey,
+} from './workbenchLayout'
+import { MyDevTasksPanel, MyReleaseBatchesPanel, MyTestBatchesPanel, OpenIssuesPanel } from './WorkbenchPanels'
+import WorkbenchCustomize from './WorkbenchCustomize'
 import './index.css'
 
 /**
@@ -54,7 +80,7 @@ const TODO_ROUTE: Record<string, string> = {
 }
 
 /**
- * 审批待办的落点：有「提交需求」菜单授权的人落该页的「待我審批」视角；
+ * 审批待办的落点：有「提需求」菜单授权的人落该页的「待我審批」视角；
  * <p>准入审批人常常是申请人的上级主管，不是产品总监 —— 他们未必持有分配侧授权，
  * 把所有人都固定落需求池会让他们点「查看全部」直接进不来。这类人走 OA 中心的待我审批，
  * 那边本来就是审批的单一事实源（准入审批已接 OA 回调）。
@@ -71,6 +97,23 @@ const TODO_ICON: Record<string, { icon: React.ReactNode; color: string; bg: stri
   pool: { icon: <InboxOutlined />, color: '#FA8C16', bg: '#FFF7F0' },
   product: { icon: <SolutionOutlined />, color: '#722ED1', bg: '#F9F0FF' },
   acceptance: { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED' },
+}
+
+/**
+ * 主身份的直达入口（hero 右侧主按钮）。
+ * <p>每个身份只留一个「今天干活去哪儿」的按钮，其余靠区块里的「查看全部」跳转，
+ * 否则会退化成把整条菜单抄一遍。menuKey 再次校验，避免推荐与授权不一致时点出 403。
+ */
+const PRIMARY_ENTRY: Partial<Record<RdmIdentity, { label: string; path: string; menuKey: string }>> = {
+  developer: { label: '研發工作台', path: '/rdm-delivery', menuKey: 'rdm-delivery-board' },
+  tester: { label: '測試工作台', path: '/rdm-test', menuKey: 'rdm-delivery-test' },
+  releaser: { label: '發布中心', path: '/rdm-release', menuKey: 'rdm-delivery-release' },
+  acceptor: { label: '驗收中心', path: '/rdm-acceptance', menuKey: 'rdm-acceptance' },
+  product: { label: '需求跟進清單', path: '/rdm-requirement?scope=product', menuKey: 'rdm-requirement' },
+  dispatcher: { label: '認領/分配', path: '/rdm-intake?scope=pool', menuKey: 'rdm-intake' },
+  projectMgr: { label: '項目總覽', path: '/rdm-project', menuKey: 'rdm-dashboard-project' },
+  approver: { label: '待我審批', path: '/rdm-intake-approval?scope=approving', menuKey: 'rdm-intake-approval' },
+  submitter: { label: '我的提交', path: '/rdm-requirement?scope=mine', menuKey: 'rdm-requirement' },
 }
 
 /**
@@ -120,7 +163,7 @@ function StageTrack({ status }: { status: string }) {
 
 export default function RdmWorkbench() {
   const navigate = useNavigate()
-  const { hasMenuPermission } = useAuth()
+  const { user, hasMenuPermission, hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
   /** 我提的需求（含草稿与被驳回的），走列表接口 scope=mine，与待办分区不同口径 */
@@ -129,21 +172,31 @@ export default function RdmWorkbench() {
   const [myProjects, setMyProjects] = useState<RdmProjectListItem[]>([])
   /** Batch2：个人工作台聚合摘要（后端不可用时为 null，相关区块自动隐藏） */
   const [wbSummary, setWbSummary] = useState<RdmWorkbenchSummary | null>(null)
+  /** V3：跨项目待办看板（id=0 哨兵）—— mine/waitingOthers/unassigned 三桶，total 已去重 */
+  const [todoBoard, setTodoBoard] = useState<RdmTodoBoard | null>(null)
+
+  const access = useMemo(
+    () => ({ hasMenuPermission, hasPermission, isAdmin: user?.role === 'admin' }),
+    [hasMenuPermission, hasPermission, user?.role],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // 三个只读接口任一失败都不应把整页打成空白，所以各自单独兜底
-      const [wb, mine, projects, summ] = await Promise.all([
+      // 只读接口任一失败都不应把整页打成空白，所以各自单独兜底
+      const [wb, mine, projects, summ, board] = await Promise.all([
         fetchWorkbench(),
-        fetchRequirementPage({ page: 1, size: 6, scope: RDM_SCOPE.MINE }).catch(() => null),
+        // 「待补充」走完整查询（size 拉满），不再从最近 6 条里筛，避免漏项
+        fetchRequirementPage({ page: 1, size: 200, scope: RDM_SCOPE.MINE }).catch(() => null),
         fetchProjectPage({ pageNo: 1, pageSize: 8 }).catch(() => null),
         fetchWorkbenchSummary().catch(() => null),
+        fetchTodoBoard(0).catch(() => null),
       ])
       setData(wb)
       setMineRows(mine?.records ?? [])
       setMyProjects(projects?.records ?? [])
       setWbSummary(summ)
+      setTodoBoard(board)
     } catch {
       message.error('工作台數據載入失敗')
     } finally {
@@ -152,6 +205,18 @@ export default function RdmWorkbench() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  /**
+   * 身份与布局必须在 loading 分支 return 之前算完（Hook 不能条件调用）。
+   * <p>数据未回来时只按菜单权限推导，roleNames 相关身份稍后补齐；
+   * 这段计算是纯函数，多跑一次不影响请求次数。
+   */
+  const identities = deriveRdmIdentities({
+    roleNames: data?.identity.roleNames,
+    access,
+    hasApprovalTodo: (data?.todos ?? []).some(group => group.key === 'intake' && group.total > 0),
+  })
+  const layout = useRdmWorkbenchLayout({ empId: user?.empId, identities, access })
 
   if (loading) {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
@@ -165,53 +230,16 @@ export default function RdmWorkbench() {
   // 需要我补充：从我的提交里按提出人可动作的状态过滤，并把原因带上（无原因就不堵人）
   const needAction = mineRows.filter(r => SUBMITTER_ACTION_STATUS.includes(String(r.status)))
   const tracking = mineRows.filter(r => !SUBMITTER_ACTION_STATUS.includes(String(r.status)))
+  const primaryEntry = PRIMARY_ENTRY[identities[0] ?? 'submitter']
 
-  return (
-    <div className="content-area">
-      {/* ── 顶部欢迎区 ── */}
-      <div className="rdm-hero">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div>
-            <div className="rdm-hero-title">
-              <RocketOutlined style={{ color: '#E8720C' }} />
-              需求工作台
-              <Tag color="orange" style={{ margin: 0 }}>產研交付</Tag>
-            </div>
-            <div className="rdm-hero-sub">
-              {identity.name}
-              {identity.deptName ? ` · ${identity.deptName}` : ''}
-              {' · 我的角色：'}{identity.roleNames.join(' / ')}
-            </div>
-          </div>
-          <div className="rdm-hero-actions">
-            <Button
-              type="primary"
-              icon={<FileAddOutlined />}
-              onClick={() => navigate('/rdm-submit')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
-                height: 36, padding: '0 20px', boxShadow: '0 2px 6px rgba(232,114,12,0.3)',
-              }}
-            >
-              我要提需求
-            </Button>
-            <Button icon={<ThunderboltOutlined />} onClick={() => navigate('/rdm-requirement?scope=mine')}>
-              我的需求
-            </Button>
-            {/* 研发侧角色（UI/前端/后端/测试）才有交付工作台，业务方不展示避免误入 */}
-            {hasMenuPermission('rdm-delivery-board') && (
-              <Button icon={<CodeOutlined />} onClick={() => navigate('/rdm-delivery')}>
-                我的研發任務
-              </Button>
-            )}
-            <Button icon={<AlertOutlined />} onClick={() => navigate('/rdm-dashboard')}>
-              全局看板
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 指标统计卡 ── */}
+  /**
+   * 区块渲染表：key 与 workbenchLayout 的区块注册表一一对应。
+   * <p>这里只是「创建元素」，未上屏的区块不会被挂载，其内部 useEffect 也不发请求，
+   * 因此关掉某个角色面板就等于不打那次接口调用。
+   */
+  const sections: Record<RdmSectionKey, React.ReactNode> = {
+    // ── 指标区 ──
+    'metrics': (
       <div style={{ marginBottom: 16 }}>
         <StatCards
           items={[
@@ -224,167 +252,234 @@ export default function RdmWorkbench() {
           ]}
         />
       </div>
+    ),
+    'delivery-metrics': wbSummary ? (
+      <div style={{ marginBottom: 16 }}>
+        <StatCards
+          items={[
+            { key: 'myProjects', icon: <ProjectOutlined />, value: wbSummary.myProjectCount, label: '我的項目數', color: 'info' },
+            { key: 'myPending', icon: <ClockCircleOutlined />, value: wbSummary.myPendingTaskCount, label: '待辦任務數', color: 'system' },
+            { key: 'myDelivery', icon: <RocketOutlined />, value: wbSummary.myDeliveryItemCount, label: '我的交付項數', color: 'brand' },
+            { key: 'upcoming', icon: <AlertOutlined />, value: wbSummary.upcomingDeadlineCount, label: '近期到期數', color: 'success' },
+          ]}
+        />
+      </div>
+    ) : null,
 
-      {/* ── Batch2：个人交付聚合摘要（后端摘要可用时才展示）── */}
-      {wbSummary && (
-        <div style={{ marginBottom: 16 }}>
-          <StatCards
-            items={[
-              { key: 'myProjects', icon: <ProjectOutlined />, value: wbSummary.myProjectCount, label: '我的項目數', color: 'info' },
-              { key: 'myPending', icon: <ClockCircleOutlined />, value: wbSummary.myPendingTaskCount, label: '待辦任務數', color: 'system' },
-              { key: 'myDelivery', icon: <RocketOutlined />, value: wbSummary.myDeliveryItemCount, label: '我的交付項數', color: 'brand' },
-              { key: 'upcoming', icon: <AlertOutlined />, value: wbSummary.upcomingDeadlineCount, label: '近期到期數', color: 'success' },
-            ]}
-          />
+    // ── 执行区（角色专属，各自取数）──
+    'dev-tasks': <MyDevTasksPanel />,
+    'test-batches': <MyTestBatchesPanel />,
+    'issues': <OpenIssuesPanel />,
+    'release-batches': <MyReleaseBatchesPanel />,
+
+    // ── 待办区 ──
+    'todo-board': todoBoard ? (
+      <div className="rdm-card" style={{ marginBottom: 16 }}>
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AuditOutlined /></span>
+          我的待辦
+          {/* 去重計數：用 todo-board 的 total（已去重），不用分組直接相加 */}
+          <Tag color="blue" style={{ margin: 0 }}>{todoBoard.total}</Tag>
+          {todoBoard.rawReasonHits > todoBoard.total && (
+            <Tag color="default" style={{ margin: 0 }}>已去重 {todoBoard.rawReasonHits - todoBoard.total} 條</Tag>
+          )}
+          <span className="rdm-todo-hint">一條待辦可能命中多個原因，這裡按對象去重後計數</span>
         </div>
-      )}
-
-      {/* ── V3 我的項目（只在有項目數據時展示）── */}
-      {myProjects.length > 0 && (
-        <div className="rdm-v3-projects">
-          <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><ProjectOutlined /></span>
-            我的項目
-            <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
-            <span className="rdm-todo-hint">分批交付項目進度一覽</span>
-          </div>
-          <div className="rdm-v3-project-scroll">
-            {myProjects.slice(0, 4).map(proj => (
-              <div
-                key={proj.id}
-                className="rdm-v3-project-card"
-                onClick={() => navigate(`/rdm-project-detail?id=${proj.id}`)}
-              >
-                <div className="rdm-v3-project-card-head">
-                  <span className="rdm-v3-project-card-name" title={proj.name}>{proj.name}</span>
-                  <Tag color={RDM_PROJECT_STATUS_COLOR[proj.status] ?? 'default'} style={{ margin: 0 }}>
-                    {RDM_PROJECT_STATUS_LABEL[proj.status] ?? proj.status}
-                  </Tag>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {([
+            { key: 'mine', title: '我負責', count: todoBoard.mineCount, color: '#1890FF', bg: '#E6F7FF' },
+            { key: 'waiting_others', title: '等待他人', count: todoBoard.waitingOthersCount, color: '#722ED1', bg: '#F9F0FF' },
+            { key: 'unassigned', title: '未指派', count: todoBoard.unassignedCount, color: '#8C8C8C', bg: '#FAFAFA' },
+          ] as const).map(bucket => {
+            const items = todoBoard.todos.filter(t => t.bucket === bucket.key)
+            return (
+              <div key={bucket.key} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10, background: '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: bucket.color }} />
+                  <span style={{ fontWeight: 600, fontSize: 13, color: bucket.color }}>{bucket.title}</span>
+                  <Tag color={bucket.count > 0 ? 'orange' : 'default'} style={{ margin: 0 }}>{bucket.count}</Tag>
                 </div>
-                <div className="rdm-v3-project-card-meta">
-                  {(() => {
-                    const sp = wbSummary?.projects.find(p => p.projectId === proj.id)
-                    return <span>交付項 <b>{sp ? `${sp.deliveryItemCompleted}/${sp.deliveryItemTotal}` : `${proj.deliveredCount}/${proj.totalDeliveryCount}`}</b></span>
-                  })()}
-                  {proj.nextDeliveryDate && <span>下次交付：{proj.nextDeliveryDate}</span>}
-                </div>
-                {(proj.blockedCount > 0 || proj.pendingDecisionCount > 0) && (
-                  <div className="rdm-v3-project-card-warn">
-                    {proj.blockedCount > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>阻塞 {proj.blockedCount}</Tag>}
-                    {proj.pendingDecisionCount > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>待決策 {proj.pendingDecisionCount}</Tag>}
+                {items.length === 0 ? (
+                  <div style={{ fontSize: 12, color: '#BFBFBF', padding: '8px 0' }}>無</div>
+                ) : items.slice(0, 6).map(item => (
+                  <div
+                    key={item.key}
+                    onClick={() => { if (item.actionUrl) navigate(item.actionUrl) }}
+                    style={{ padding: '6px 0', borderBottom: '1px dashed #f0f0f0', cursor: item.actionUrl ? 'pointer' : 'default' }}
+                  >
+                    <div style={{ fontSize: 13, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                      <span>{item.refNo}</span>
+                      {item.responsibleName && <span> · {item.responsibleName}</span>}
+                      {item.overdue && <span style={{ color: '#FF4D4F' }}> · 逾期{item.overdueWorkingDays ? ` ${item.overdueWorkingDays} 工作日` : ''}</span>}
+                    </div>
+                    {item.reasons.length > 0 && (
+                      <div style={{ fontSize: 12, color: '#D46B08', marginTop: 2 }}>{item.reasons.join('；')}</div>
+                    )}
                   </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    ) : null,
+    'role-todos': (
+      <>
+        {todos.filter(group => group.total > 0).map(group => {
+          const meta = TODO_ICON[group.key] ?? { icon: <InboxOutlined />, color: '#8C8C8C', bg: '#F5F5F5' }
+          return (
+            <div key={group.key} className="rdm-todo-group">
+              <div className="rdm-todo-head">
+                <div className="rdm-todo-title">
+                  <span className="rdm-icon-block" style={{ background: meta.bg, color: meta.color }}>{meta.icon}</span>
+                  {group.title}
+                  <Tag color={group.total > 0 ? 'orange' : 'default'} style={{ margin: 0 }}>{group.total}</Tag>
+                  <span className="rdm-todo-hint">{group.hint}</span>
+                </div>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => navigate(TODO_ROUTE[group.key] ?? intakeTodoRoute(hasMenuPermission('rdm-intake-approval')))}
+                >
+                  查看全部 <RightOutlined style={{ fontSize: 11 }} />
+                </Button>
+              </div>
+              <div className="rdm-todo-body">
+                {group.items.slice(0, 4).map(item => (
+                  <div key={item.id} className="rdm-todo-item">
+                    <div className="rdm-todo-item-main">
+                      <div
+                        className="rdm-todo-item-title"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => navigate(`/rdm-detail?id=${item.id}`)}
+                      >
+                        {item.title}
+                      </div>
+                      <div className="rdm-todo-item-meta">
+                        <span>{formatRdmReqNo(item.reqNo)}</span>
+                        <span>提出人：{item.submitterName}</span>
+                        {item.submitDeptName && <span>{item.submitDeptName}</span>}
+                        {item.expectDate && <span>期望：{item.expectDate}</span>}
+                        {/* V3：显示交付项进度 */}
+                        {item.flowVersion === 3 && item.deliveryItemCount != null && item.deliveryItemCount > 0 && (
+                          <span style={{ color: '#2F54EB', fontWeight: 500 }}>
+                            交付項 {item.deliveryDoneCount ?? 0}/{item.deliveryItemCount}
+                          </span>
+                        )}
+                        {item.stayHours != null && item.stayHours > 24 && (
+                          <span style={{ color: '#D46B08' }}>
+                            已停留 {Math.round(item.stayHours / 24)} 天
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Space size={6}>
+                      <TypeTag reqType={item.reqType} />
+                      <PriorityTag priority={item.priority} />
+                      <StatusTag status={item.status} overdue={item.overdueFlag ?? false} />
+                    </Space>
+                    <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${item.id}`)}>
+                      處理
+                    </Button>
+                  </div>
+                ))}
+                {group.items.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="無待辦" />}
+              </div>
+            </div>
+          )
+        })}
+      </>
+    ),
+    'need-action': needAction.length > 0 ? (
+      <div className="rdm-card" style={{ marginBottom: 16 }}>
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><ExclamationCircleOutlined /></span>
+          需要我補充
+          <Tag color="red" style={{ margin: 0 }}>{needAction.length}</Tag>
+          <span className="rdm-todo-hint">這些需求在等提出人補内容或做決定，不處理會停在原地</span>
+          <span className="rdm-card-title-split" />
+          <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+            查看全部 <RightOutlined style={{ fontSize: 11 }} />
+          </Button>
+        </div>
+        {needAction.map(row => (
+          <div key={row.id} className="rdm-need-item">
+            <div className="rdm-todo-item-main">
+              <div
+                className="rdm-todo-item-title"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/rdm-detail?id=${row.id}`)}
+              >
+                {row.title}
+              </div>
+              <div className="rdm-need-reason">
+                {SUBMITTER_ACTION_HINT[String(row.status)] ?? '需求等待提出人處理'}
+                {row.rejectReason ? `｜理由：${row.rejectReason}` : ''}
+              </div>
+              <div className="rdm-todo-item-meta">
+                <span>{formatRdmReqNo(row.reqNo)}</span>
+                {row.stayHours != null && row.stayHours > 24 && (
+                  <span style={{ color: '#D46B08' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 需要我补充（提出人阻塞项，排在待办分区之前：球在我手上就先看到）── */}
-      {needAction.length > 0 && (
-        <div className="rdm-card" style={{ marginBottom: 16 }}>
-          <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><ExclamationCircleOutlined /></span>
-            需要我補充
-            <Tag color="red" style={{ margin: 0 }}>{needAction.length}</Tag>
-            <span className="rdm-todo-hint">這些需求在等提出人補内容或做決定，不處理會停在原地</span>
-            <span className="rdm-card-title-split" />
-            <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
-              查看全部 <RightOutlined style={{ fontSize: 11 }} />
+            </div>
+            <StatusTag status={row.status} overdue={row.overdueFlag ?? false} />
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${row.id}`)}>
+              去處理
             </Button>
           </div>
-          {needAction.map(row => (
-            <div key={row.id} className="rdm-need-item">
-              <div className="rdm-todo-item-main">
-                <div
-                  className="rdm-todo-item-title"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/rdm-detail?id=${row.id}`)}
-                >
-                  {row.title}
-                </div>
-                <div className="rdm-need-reason">
-                  {SUBMITTER_ACTION_HINT[String(row.status)] ?? '需求等待提出人處理'}
-                  {row.rejectReason ? `｜理由：${row.rejectReason}` : ''}
-                </div>
-                <div className="rdm-todo-item-meta">
-                  <span>{row.reqNo}</span>
-                  {row.stayHours != null && row.stayHours > 24 && (
-                    <span style={{ color: '#D46B08' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
-                  )}
-                </div>
+        ))}
+      </div>
+    ) : null,
+
+    // ── 项目与追踪区 ──
+    'my-projects': myProjects.length > 0 ? (
+      <div className="rdm-v3-projects">
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><ProjectOutlined /></span>
+          我的項目
+          <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
+          <span className="rdm-todo-hint">分批交付項目進度一覽</span>
+          <span className="rdm-card-title-split" />
+          <Button type="link" size="small" onClick={() => navigate('/rdm-project')}>
+            項目總覽 <RightOutlined style={{ fontSize: 11 }} />
+          </Button>
+        </div>
+        <div className="rdm-v3-project-scroll">
+          {myProjects.slice(0, 4).map(proj => (
+            <div
+              key={proj.id}
+              className="rdm-v3-project-card"
+              onClick={() => navigate(`/rdm-project-detail?id=${proj.id}`)}
+            >
+              <div className="rdm-v3-project-card-head">
+                <span className="rdm-v3-project-card-name" title={proj.name}>{proj.name}</span>
+                <Tag color={RDM_PROJECT_STATUS_COLOR[proj.status] ?? 'default'} style={{ margin: 0 }}>
+                  {RDM_PROJECT_STATUS_LABEL[proj.status] ?? proj.status}
+                </Tag>
               </div>
-              <StatusTag status={row.status} overdue={row.overdueFlag ?? false} />
-              <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${row.id}`)}>
-                去處理
-              </Button>
+              <div className="rdm-v3-project-card-meta">
+                {(() => {
+                  const brief = wbSummary?.projects.find(p => p.projectId === proj.id)
+                  return <span>交付項 <b>{brief ? `${brief.deliveryItemCompleted}/${brief.deliveryItemTotal}` : `${proj.deliveredCount}/${proj.totalDeliveryCount}`}</b></span>
+                })()}
+                {proj.nextDeliveryDate && <span>下次交付：{proj.nextDeliveryDate}</span>}
+              </div>
+              {(proj.blockedCount > 0 || proj.pendingDecisionCount > 0) && (
+                <div className="rdm-v3-project-card-warn">
+                  {proj.blockedCount > 0 && <Tag color="error" style={{ margin: 0, fontSize: 11 }}>阻塞 {proj.blockedCount}</Tag>}
+                  {proj.pendingDecisionCount > 0 && <Tag color="warning" style={{ margin: 0, fontSize: 11 }}>待決策 {proj.pendingDecisionCount}</Tag>}
+                </div>
+              )}
             </div>
           ))}
         </div>
-      )}
-
-      {/* ── 待办分区（按角色渲染，空组自动隐藏） ── */}
-      {todos.filter(g => g.total > 0).map(group => {
-        const meta = TODO_ICON[group.key] ?? { icon: <InboxOutlined />, color: '#8C8C8C', bg: '#F5F5F5' }
-        return (
-          <div key={group.key} className="rdm-todo-group">
-            <div className="rdm-todo-head">
-              <div className="rdm-todo-title">
-                <span className="rdm-icon-block" style={{ background: meta.bg, color: meta.color }}>{meta.icon}</span>
-                {group.title}
-                <Tag color={group.total > 0 ? 'orange' : 'default'} style={{ margin: 0 }}>{group.total}</Tag>
-                <span className="rdm-todo-hint">{group.hint}</span>
-              </div>
-              <Button type="link" size="small" onClick={() => navigate(TODO_ROUTE[group.key] ?? intakeTodoRoute(hasMenuPermission('rdm-intake-approval')))}>
-                查看全部 <RightOutlined style={{ fontSize: 11 }} />
-              </Button>
-            </div>
-            <div className="rdm-todo-body">
-              {group.items.slice(0, 4).map(item => (
-                <div key={item.id} className="rdm-todo-item">
-                  <div className="rdm-todo-item-main">
-                    <div
-                      className="rdm-todo-item-title"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/rdm-detail?id=${item.id}`)}
-                    >
-                      {item.title}
-                    </div>
-                    <div className="rdm-todo-item-meta">
-                      <span>{item.reqNo}</span>
-                      <span>提出人：{item.submitterName}</span>
-                      {item.submitDeptName && <span>{item.submitDeptName}</span>}
-                      {item.expectDate && <span>期望：{item.expectDate}</span>}
-                      {/* V3：显示交付项进度 */}
-                      {item.flowVersion === 3 && item.deliveryItemCount != null && item.deliveryItemCount > 0 && (
-                        <span style={{ color: '#2F54EB', fontWeight: 500 }}>
-                          交付項 {item.deliveryDoneCount ?? 0}/{item.deliveryItemCount}
-                        </span>
-                      )}
-                      {item.stayHours != null && item.stayHours > 24 && (
-                        <span style={{ color: '#D46B08' }}>
-                          已停留 {Math.round(item.stayHours / 24)} 天
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <Space size={6}>
-                    <TypeTag reqType={item.reqType} />
-                    <PriorityTag priority={item.priority} />
-                    <StatusTag status={item.status} overdue={item.overdueFlag ?? false} />
-                  </Space>
-                  <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${item.id}`)}>
-                    處理
-                  </Button>
-                </div>
-              ))}
-              {group.items.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="無待辦" />}
-            </div>
-          </div>
-        )
-      })}
-
-      {/* ── 我的提交追踪（业务方最关心：到哪一步、谁在跟、什么时候给）── */}
+      </div>
+    ) : null,
+    'my-tracking': (
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RocketOutlined /></span>
@@ -412,7 +507,7 @@ export default function RdmWorkbench() {
               </div>
               <StageTrack status={String(row.status)} />
               <div className="rdm-todo-item-meta">
-                <span>{row.reqNo}</span>
+                <span>{formatRdmReqNo(row.reqNo)}</span>
                 <span>當前處理人：{row.currentHandler || RDM_STATUS_LABEL[row.status as RdmStatus] || '-'}</span>
                 {row.promisedPrdDate && <span>承諾 PRD：{row.promisedPrdDate}</span>}
                 {row.planReleaseDate && <span>計劃上線：{row.planReleaseDate}</span>}
@@ -430,9 +525,8 @@ export default function RdmWorkbench() {
           </div>
         ))}
       </div>
-
-      {/* ── 最近动态（仅在有意义数据时展示） ── */}
-      {recentActivity.length > 0 && (
+    ),
+    'activity': recentActivity.length > 0 ? (
       <div className="rdm-card">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
@@ -456,7 +550,62 @@ export default function RdmWorkbench() {
           </div>
         ))}
       </div>
-      )}
+    ) : null,
+  }
+
+  return (
+    <div className="content-area">
+      {/* ── 顶部欢迎区：身份可见 + 主入口只有一个 ── */}
+      <div className="rdm-hero">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="rdm-hero-title">
+              <RocketOutlined style={{ color: '#E8720C' }} />
+              個人工作台
+              <Tag color="orange" style={{ margin: 0 }}>產研交付</Tag>
+            </div>
+            <div className="rdm-hero-sub">
+              {identity.name}
+              {identity.deptName ? ` · ${identity.deptName}` : ''}
+              {' · 我的角色：'}{identity.roleNames.join(' / ')}
+            </div>
+            {/* 工作台视图名：解释「为什么我看到的是这几块」，与配置面板口径一致 */}
+            <div style={{ marginTop: 6 }}>
+              <span style={{ fontSize: 12, color: '#8C8C8C', marginRight: 6 }}>工作台視圖</span>
+              {identities.map(id => (
+                <Tag key={id} style={{ margin: '0 4px 0 0' }}>{RDM_IDENTITY_LABEL[id]}</Tag>
+              ))}
+            </div>
+          </div>
+          <div className="rdm-hero-actions">
+            <Button
+              type="primary"
+              icon={<FileAddOutlined />}
+              onClick={() => navigate('/rdm-submit')}
+              style={{
+                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                height: 36, padding: '0 20px', boxShadow: '0 2px 6px rgba(232,114,12,0.3)',
+              }}
+            >
+              我要提需求
+            </Button>
+            {primaryEntry && hasMenuPermission(primaryEntry.menuKey) && (
+              <Button icon={<ThunderboltOutlined />} onClick={() => navigate(primaryEntry.path)}>
+                {primaryEntry.label}
+              </Button>
+            )}
+            <Button icon={<AlertOutlined />} onClick={() => navigate('/rdm-dashboard')}>
+              全局看板
+            </Button>
+            <WorkbenchCustomize layout={layout} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── 按个人布局渲染区块（未上屏的面板不取数）── */}
+      {layout.visibleKeys.map(key => (
+        <Fragment key={key}>{sections[key] ?? null}</Fragment>
+      ))}
     </div>
   )
 }

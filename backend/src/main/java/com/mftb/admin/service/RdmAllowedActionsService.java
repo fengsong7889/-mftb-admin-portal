@@ -7,7 +7,10 @@ import com.mftb.admin.entity.RdmIssue;
 import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.RdmReleaseBatch;
+import com.mftb.admin.entity.RdmReleaseExemption;
+import com.mftb.admin.entity.RdmReleaseExemptionDecision;
 import com.mftb.admin.entity.RdmRequirement;
+import com.mftb.admin.entity.RdmSupplementaryVerification;
 import com.mftb.admin.entity.RdmTestBatch;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmDeliveryItemMapper;
@@ -67,6 +70,10 @@ public class RdmAllowedActionsService {
     private final RdmIssueMapper issueMapper;
     private final RdmReleaseBatchMapper releaseBatchMapper;
     private final OperatorResolver operatorResolver;
+    /** V3 发布灰度（默认关闭，GLOBAL 熔断优先）：推进型发布动作仅在灰度开启时才下发。 */
+    private final RdmFlowVersionGuard flowVersionGuard;
+    /** 紧急豁免 / 补验只读投影：判定 exemption_decide / supplementary_complete 是否有待办。 */
+    private final RdmReleaseExemptionService exemptionService;
 
     /* ==================== 项目 ==================== */
 
@@ -218,9 +225,32 @@ public class RdmAllowedActionsService {
     /* ==================== 发布批次 ==================== */
 
     /**
-     * 计算发布批次可执行动作。
-     * <p>第二批阶段 V3 实际发布能力未开放：所有写动作（申请发布/部署/验证/开放）一律不下发，
-     * 仅保留查看与加入交付项等准备动作，避免前端渲染出点了必失败的按钮。
+     * 计算发布批次可执行动作（任务31 · 第三四批发布动作码）。
+     *
+     * <p>本方法<b>只描述「能不能显示按钮」</b>，供前端 {@code ReleaseBatchDetail} 用
+     * {@code allowedActions ∩ 权限} 驱动发布按钮；<b>不弱化</b>任何写接口的
+     * {@code @RequirePermission} 与服务层四眼/状态机/硬门禁（那些仍独立重鉴权）。
+     *
+     * <p>下发口径（对齐 {@link RdmReleaseBatchService} / {@link RdmReleaseGateService} 的真实状态机）：
+     * <ul>
+     *   <li><b>灰度门控</b>：推进型动作（{@code apply/decide/deploy/verify/open/exemption_apply/
+     *       exemption_decide/supplementary_complete}）仅当
+     *       {@link RdmFlowVersionGuard#isV3ReleaseEnabled}(projectId)=true（GLOBAL 未熔断且两级都开启）
+     *       时才可能下发；灰度未开启一律不下发这些推进码；</li>
+     *   <li><b>止损例外</b>：{@code rollback} 是止损动作，<b>即使灰度关闭/证据过期</b>，
+     *       只要状态机允许回滚（部署中/验证中/已发布）即下发（与任务27「止损不被门禁拒」一致）；</li>
+     *   <li><b>状态机</b>：各码仅在对应状态下发（apply/decide 在 checking，deploy 在 deploying，
+     *       verify/open 在 verifying，rollback 在 deploying/verifying/released，add_item 在 planning）；</li>
+     *   <li><b>角色资格</b>：{@code decide/exemption_decide} 仅对<b>合格裁决人</b>下发
+     *       （项目成员且<b>非申请人本人</b>——四眼；管理员无自批，{@code canSeeAll} 不充当资格）；
+     *       {@code apply/deploy/verify/open/rollback/exemption_apply} 按发布负责人资格；
+     *       {@code supplementary_complete} 仅对补验单指定补验人本人下发；</li>
+     *   <li>{@code view} 可见即下发；{@code add_item} 保持既有（仅 PLANNING、发布负责人，不受灰度门控）。</li>
+     * </ul>
+     *
+     * <p>契约动作码（前后端共用，逐字一致）：{@code view}、{@code add_item}、{@code apply}、
+     * {@code decide}、{@code deploy}、{@code verify}、{@code open}、{@code rollback}、
+     * {@code exemption_apply}、{@code exemption_decide}、{@code supplementary_complete}。
      */
     public List<AllowedAction> computeReleaseBatchActions(Long batchId, Long userId) {
         List<AllowedAction> actions = new ArrayList<>();
@@ -229,15 +259,60 @@ public class RdmAllowedActionsService {
             return actions;
         }
         actions.add(new AllowedAction("view", "查看詳情", TONE_DEFAULT));
-        boolean releaseOwner = isAdmin(userId) || eq(batch.getReleaseOwnerUserId(), userId);
-        if (!releaseOwner) {
-            return actions;
-        }
+
         String status = batch.getStatus();
-        if (RdmConstants.RB_PLANNING.equals(status)) {
+        boolean releaseOwner = isAdmin(userId) || eq(batch.getReleaseOwnerUserId(), userId);
+        boolean projectMember = isProjectMember(batch.getProjectId(), userId);
+        boolean applicant = eq(batch.getApplicantUserId(), userId);
+
+        // add_item：仅 PLANNING、发布负责人（准备动作，保留既有行为，不受灰度门控）
+        if (releaseOwner && RdmConstants.RB_PLANNING.equals(status)) {
             actions.add(new AllowedAction("add_item", "加入交付項", TONE_PRIMARY));
         }
-        // 发布/部署/验证/开放属于第三批能力，第二批不下发这些动作（详见 RdmFlowVersionGuard）
+
+        // rollback：止损动作，即使灰度关闭/证据过期，只要状态机允许回滚即下发
+        if (releaseOwner && isRollbackable(status)) {
+            actions.add(new AllowedAction("rollback", "回滾", TONE_DANGER));
+        }
+
+        // 灰度门控：V3 发布灰度未开启时，推进型动作一律不下发（rollback 已在上面按止损口径处理）
+        boolean v3Enabled = flowVersionGuard.isV3ReleaseEnabled(batch.getProjectId());
+        if (!v3Enabled) {
+            return actions;
+        }
+
+        // apply：仅「检查中（放行检查已通过）」、发布负责人
+        if (releaseOwner && RdmConstants.RB_CHECKING.equals(status)) {
+            actions.add(new AllowedAction("apply", "申請發布", TONE_PRIMARY));
+        }
+        // decide：仅「检查中（已申请发布）」、合格裁决人（项目成员 + 四眼：非申请人本人）
+        if (projectMember && !applicant && RdmConstants.RB_CHECKING.equals(status)) {
+            actions.add(new AllowedAction("decide", "放行裁決", TONE_SUCCESS));
+        }
+        // deploy：仅「部署中」、发布负责人
+        if (releaseOwner && RdmConstants.RB_DEPLOYING.equals(status)) {
+            actions.add(new AllowedAction("deploy", "上報部署", TONE_PRIMARY));
+        }
+        // verify：仅「验证中」、发布负责人
+        if (releaseOwner && RdmConstants.RB_VERIFYING.equals(status)) {
+            actions.add(new AllowedAction("verify", "上報驗證", TONE_PRIMARY));
+        }
+        // open：仅「验证中」（全部验证通过后方可登记开放，真实校验由服务端兜底）、发布负责人
+        if (releaseOwner && RdmConstants.RB_VERIFYING.equals(status)) {
+            actions.add(new AllowedAction("open", "登記開放", TONE_SUCCESS));
+        }
+        // exemption_apply：批次未结束（active）、发布负责人
+        if (releaseOwner && RdmConstants.RB_ACTIVE_STATUSES.contains(status)) {
+            actions.add(new AllowedAction("exemption_apply", "申請緊急豁免", TONE_WARNING));
+        }
+        // exemption_decide：存在待裁决的在途豁免、合格裁决人（项目成员 + 四眼：非豁免申请人）
+        if (hasDecidableExemption(batch, userId, projectMember)) {
+            actions.add(new AllowedAction("exemption_decide", "裁決緊急豁免", TONE_WARNING));
+        }
+        // supplementary_complete：存在本人待补验（pending/overdue）的补验单
+        if (hasCompletableSupplementary(batch.getId(), userId)) {
+            actions.add(new AllowedAction("supplementary_complete", "登記補驗完成", TONE_PRIMARY));
+        }
         return actions;
     }
 
@@ -364,6 +439,76 @@ public class RdmAllowedActionsService {
 
     private static boolean eq(Long a, Long b) {
         return a != null && a.equals(b);
+    }
+
+    /* ==================== 发布批次动作辅助（任务31） ==================== */
+
+    /**
+     * 是否为项目成员（在途，leave_time IS NULL）。
+     * <p><b>不含 admin/canSeeAll 直通</b>：审批资格取「真实项目成员」，可见范围 ≠ 签署权；
+     * 管理员若同时也是项目成员，则凭真实成员资格入选，而非凭 canSeeAll。
+     */
+    private boolean isProjectMember(Long projectId, Long userId) {
+        if (projectId == null || userId == null) {
+            return false;
+        }
+        return memberMapper.selectCount(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, projectId)
+                .eq(RdmProjectMember::getUserId, userId)
+                .isNull(RdmProjectMember::getLeaveTime)) > 0;
+    }
+
+    /** 状态机是否允许回滚（部署中/验证中/已发布），与 {@code RdmReleaseBatchService#doRollback} 口径一致。 */
+    private boolean isRollbackable(String status) {
+        return RdmConstants.RB_DEPLOYING.equals(status)
+                || RdmConstants.RB_VERIFYING.equals(status)
+                || RdmConstants.RB_RELEASED.equals(status);
+    }
+
+    /**
+     * 是否存在待裁决的在途紧急豁免（且当前人为合格裁决人）。
+     * <p>四眼：裁决人不得是豁免申请人本人；资格：项目成员。
+     * 两类裁决（product_risk / release）齐备即无可裁决项；已全部驳回的旧单亦不再可裁。
+     */
+    private boolean hasDecidableExemption(RdmReleaseBatch batch, Long userId, boolean projectMember) {
+        if (userId == null || !projectMember) {
+            return false;
+        }
+        RdmReleaseExemption latest = exemptionService.latestExemption(batch.getId());
+        if (latest == null) {
+            return false;
+        }
+        // 四眼：裁决人 ≠ 豁免申请人（管理员无自批豁免）
+        if (userId.equals(latest.getApplicantUserId())) {
+            return false;
+        }
+        List<RdmReleaseExemptionDecision> decisions = exemptionService.listDecisions(latest.getId());
+        boolean productRiskDone = decisions.stream()
+                .anyMatch(d -> d != null && RdmConstants.EXEMPTION_DECISION_PRODUCT_RISK.equals(d.getDecisionType()));
+        boolean releaseDone = decisions.stream()
+                .anyMatch(d -> d != null && RdmConstants.EXEMPTION_DECISION_RELEASE.equals(d.getDecisionType()));
+        return !(productRiskDone && releaseDone);
+    }
+
+    /**
+     * 是否存在本人待补验（pending/overdue）的补验单。
+     * <p>补验完成是签署类动作，<b>仅指定补验人本人</b>可登记（无 admin 直通）。
+     */
+    private boolean hasCompletableSupplementary(Long batchId, Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        for (RdmSupplementaryVerification sv : exemptionService.listSupplementaries(batchId)) {
+            if (sv == null) {
+                continue;
+            }
+            boolean open = RdmConstants.SUPPLEMENTARY_STATUS_PENDING.equals(sv.getStatus())
+                    || RdmConstants.SUPPLEMENTARY_STATUS_OVERDUE.equals(sv.getStatus());
+            if (open && userId.equals(sv.getVerifierUserId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /* ==================== DTO ==================== */

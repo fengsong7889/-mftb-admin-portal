@@ -97,18 +97,41 @@ public class RdmNotifyDispatcher {
 
     /**
      * 队列表不可用时的兜底：直接尝试一次发送。
-     * <p>没有任务行就没有重试，只能尽力一次；调用方已记 error 日志，不会静默丢通知。
+     *
+     * <p><b>任务22 B.3 修复：本方法现在也严守 dry-run</b>。旧实现只看正文是否为空，
+     * 完全绕过 {@code rdm.notify.dry-run} 开关：只要登记 INSERT 报错（例如旧库缺列），
+     * 联调环境的测试消息就会真的打到生产群，而 dry-run 正是为「不向真实外部收件人发送」而存在的。
+     * 开关一旦置真，<b>任何路径</b>都不得发送，兜底路径也不例外。
+     *
+     * <p><b>调用时机约束</b>：本方法没有任何持久化凭据（无任务行 → 无重试、无抢占、无审计），
+     * 因此只允许在<b>业务事务已提交之后</b>调用；在提交前调用会造成「事务回滚了、通知却已发出」的
+     * 不可撤回后果。{@link RdmNotifyService} 现已改为「提交后重试登记」，正常路径不再调用本方法，
+     * 保留它是为了人工补发等运维场景，且同样受 dry-run 约束。
+     *
+     * @return {@code true} = 已交给渠道尝试发送；{@code false} = 被 dry-run / 空正文拦下，未发送
      */
-    public void sendOnce(String eventCode, String scenario, String title, String text, List<String> atMobiles) {
+    public boolean sendOnce(String eventCode, String scenario, String title, String text, List<String> atMobiles) {
+        if (dryRun) {
+            // dry-run 下连兜底路径也不发：不留任务行不等于可以绕过开关
+            log.info("RDM 通知兜底發送被 dry-run 拦下（未實際發送）: event={}, title={}", eventCode, title);
+            return false;
+        }
         if (!StringUtils.hasText(text)) {
-            return;
+            return false;
         }
         try {
             dingTalkService.sendMarkdownSync(scenario, title, text,
                     atMobiles == null ? List.of() : atMobiles, false);
+            return true;
         } catch (RuntimeException e) {
             log.error("RDM 通知即時嘗試也失敗（無重試憑據，請人工跟進）: event={}, error={}", eventCode, e.getMessage());
+            return false;
         }
+    }
+
+    /** dry-run 开关是否开启（供上层在入队前就能判断「本轮不会真发」，不得用于弱化开关）。 */
+    public boolean isDryRun() {
+        return dryRun;
     }
 
     /** 抢占任务：只有一个执行者能把 pending/failed 改成 sending */

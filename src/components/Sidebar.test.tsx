@@ -481,6 +481,57 @@ describe('廣告銷售查看訂單不切換系統', () => {
   })
 })
 
+/**
+ * V3 分批交付三个菜单（后端种子见 RdmMenuInitializer）。
+ * <p>回归背景：页面与路由（/rdm-project、/rdm-test、/rdm-release）早已交付，但
+ * keyToPath / ROUTE_MENU_KEY_MAP / CONTROLLED_MENU_KEYS / MENU_ACTIONS_MAP 漏登记，
+ * 点击落到 Sidebar 的 keyToPath 兜底、误报「該功能模塊開發中」；而当时的菜单一致性
+ * 门禁只解析 ensureMenu 形式的域初始化器，数组式种子全在盲区（已在 check-menu-consistency 补齐）。
+ */
+const v3DeliveryMenus: MenuVO[] = [
+  { id: 51, parentId: 50, menuKey: 'rdm-dashboard-project', name: '項目總覽', path: '/rdm-project', icon: 'ProjectOutlined', type: 2, status: 1, sort: 15 },
+  { id: 52, parentId: 50, menuKey: 'rdm-delivery-test', name: '測試工作台', path: '/rdm-test', icon: 'ExperimentOutlined', type: 2, status: 1, sort: 24 },
+  { id: 53, parentId: 50, menuKey: 'rdm-delivery-release', name: '發布中心', path: '/rdm-release', icon: 'RocketOutlined', type: 2, status: 1, sort: 25 },
+]
+
+function setV3DeliveryMenus() {
+  setMenuState([{
+    id: 50, parentId: null, menuKey: 'rdm-delivery', name: '研發交付', type: 1, status: 1, sort: 23,
+    children: v3DeliveryMenus,
+  }], 'online')
+}
+
+describe('Sidebar V3 分批交付菜单（項目總覽/測試工作台/發布中心）', () => {
+  it.each(v3DeliveryMenus)('$menuKey：路由与权限真值表登记完整', (menu) => {
+    expect(keyToPath[menu.menuKey]).toBe(menu.path)
+    expect(pathToKey[menu.path!]).toBe(menu.menuKey)
+    expect(CONTROLLED_MENU_KEYS).toContain(menu.menuKey)
+    expect(ROUTE_MENU_KEY_MAP[menu.path!]).toBe(menu.menuKey)
+    expect(renderMenuIcon(menu.icon)).not.toBeNull()
+  })
+
+  it.each(v3DeliveryMenus)('$menuKey：点击后进入真实页面，不再误报「開發中」', async (menu) => {
+    setV3DeliveryMenus()
+    renderSidebar()
+    fireEvent.click(await screen.findByText('研發交付'))
+    const item = await screen.findByRole('menuitem', { name: new RegExp(menu.name) })
+    fireEvent.click(item)
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent(menu.path!))
+    expect(screen.queryByText(zh.sidebar.underDevelopment)).not.toBeInTheDocument()
+  })
+
+  it.each(v3DeliveryMenus)('$menuKey：登记后受路由守卫保护，未授权直接访问返回 403', async (menu) => {
+    mockDeniedMenuKeys.add(menu.menuKey)
+    render(
+      <MemoryRouter initialEntries={[menu.path!]}>
+        <MenuPermissionGuard><div>受保护的 V3 页面</div></MenuPermissionGuard>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('403')).toBeInTheDocument()
+    expect(screen.queryByText('受保护的 V3 页面')).not.toBeInTheDocument()
+  })
+})
+
 describe('Sidebar 菜单真值来源', () => {
   it.each(consumableMenus)('$menuKey：导航、后端连接、权限与图标登记完整', (menu) => {
     expect(keyToPath[menu.menuKey]).toBe(menu.path)
@@ -619,3 +670,4 @@ describe('Sidebar 菜单真值来源', () => {
     expect(container.querySelector('.sidebar-offline-tip')).toBeInTheDocument()
   })
 })
+

@@ -25,7 +25,7 @@ import {
   type RdmScheduleDependency,
   type RdmSchedulePlan,
 } from '../../../api/rdm'
-import { RDM_TASK_STATUS, RDM_TASK_TYPE_COLOR, type RdmTaskType } from '../../../constants/rdm'
+import { RDM_TASK_STATUS, RDM_TASK_TYPE_COLOR, formatRdmReqNo, type RdmTaskType } from '../../../constants/rdm'
 
 /** 一天的像素宽度：太窄看不清依赖线，太宽一屏放不下一个月 */
 const DAY_W = 26
@@ -63,7 +63,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
   const loadOptions = useCallback(async (keyword?: string) => {
     try {
       const page = await fetchRequirementPage({ page: 1, size: 50, keyword: keyword || undefined })
-      setOptions((page.records ?? []).map(r => ({ value: r.id, label: `${r.reqNo} ${r.title}` })))
+      setOptions((page.records ?? []).map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} ${r.title}` })))
       if (!reqId && page.records?.length) {
         setReqId(page.records[0].id)
       }

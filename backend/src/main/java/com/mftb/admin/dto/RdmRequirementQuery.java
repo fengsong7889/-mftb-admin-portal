@@ -44,6 +44,9 @@ public class RdmRequirementQuery {
     /** 仅看逾期 */
     private Boolean overdueOnly;
 
+    /** 提出人用户ID（精确匹配） */
+    private Long submitterUserId;
+
     /** 交付中状态集合（研发视角） */
     private static final List<String> DELIVERY_STATUS = List.of(
             RdmConstants.STATUS_SCHEDULED, RdmConstants.STATUS_DESIGNING, RdmConstants.STATUS_DEVELOPING,
@@ -95,14 +98,16 @@ public class RdmRequirementQuery {
         if (pmUserId != null) {
             wrapper.eq(RdmRequirement::getAssigneePmUserId, pmUserId);
         }
+        if (submitterUserId != null) {
+            wrapper.eq(RdmRequirement::getSubmitterUserId, submitterUserId);
+        }
         if (Boolean.TRUE.equals(overdueOnly)) {
             wrapper.eq(RdmRequirement::getOverdueFlag, 1);
         }
         if (StringUtils.hasText(keyword)) {
             String kw = keyword.trim();
             wrapper.and(w -> w.like(RdmRequirement::getTitle, kw)
-                    .or().like(RdmRequirement::getReqNo, kw)
-                    .or().like(RdmRequirement::getSubmitterName, kw));
+                    .or().like(RdmRequirement::getReqNo, kw));
         }
         applyScope(wrapper, currentUserId);
         if (currentUserId != null && relatedOnly) {
@@ -157,12 +162,36 @@ public class RdmRequirementQuery {
                             .or().eq(RdmRequirement::getAcceptorUserId, currentUserId)
                             .or().eq(RdmRequirement::getDevOwnerUserId, currentUserId));
                 }
+                /*
+                 * 「处理中」不含 intake_pending（需求提交/需求管理拆分 · 批次1）。
+                 * <p>待审批是提交侧的审批待办，处理人是审批人，不在 PM/验收人/研发负责人
+                 * 三个执行字段上；上面那组人员条件已经把它自然排除了，再列进状态集合只会
+                 * 让「处理中」计数与需求管理的准入口径对不上。
+                 */
                 wrapper.in(RdmRequirement::getStatus, List.of(
                         RdmConstants.STATUS_POOL, RdmConstants.STATUS_ASSIGNED,
-                        RdmConstants.STATUS_INTAKE_PENDING, RdmConstants.STATUS_UAT_PENDING));
+                        RdmConstants.STATUS_UAT_PENDING));
             }
             case RdmConstants.SCOPE_ALL -> {
-                // 全部需求：仅 PMO/超管可用，服务层已按菜单权限门控，此处不再收敛
+                /*
+                 * 治理侧「全部」只看已准入需求（需求提交/需求管理拆分 · 批次1）。
+                 * <p>这里不收口，审批中/被驳回/草稿就会以「全部」名义泄露到需求管理、看板、
+                 * 计数与导出；而前端隐藏不是安全边界（改 URL / 直接调 API 就能绕过）。
+                 * 准入前需求归「提交需求」侧的 mine/approving 查看，不复制记录、不删提交历史。
+                 * <p>延迟发号后未准入行没有正式需求编号，本口径同时保证治理侧每一行都有号。
+                 * <p>用逐个 {@code ne} 而不是 {@code notIn(column, Set)}：后者在本项目的
+                 * MyBatis-Plus 版本上会渲染成 {@code status NOT IN ()}（零个占位符），MySQL 直接
+                 * 语法报错 —— 那是治理侧列表/统计整体 500，不是少一个条件。
+                 * <p>状态用 {@code RdmConstants.STATUS_*} 直接写：它们是编译期字符串常量，javac 会
+                 * 内联成字面量，不产生运行时静态字段读取（实测经容器/热加载后读取
+                 * {@code REQ_NOT_ADMITTED_STATUSES} 这个 Set 会拿到 null，取决于类初始化时序）。
+                 * 三者与 
+                 * {@link RdmConstants#REQ_NOT_ADMITTED_STATUSES} 必须一致，由
+                 * {@code RdmRequirementQueryScopeTest} 的常量一致性断言钉住。
+                 */
+                wrapper.and(w -> w.ne(RdmRequirement::getStatus, RdmConstants.STATUS_DRAFT)
+                        .ne(RdmRequirement::getStatus, RdmConstants.STATUS_INTAKE_PENDING)
+                        .ne(RdmRequirement::getStatus, RdmConstants.STATUS_INTAKE_REJECTED));
             }
             case RdmConstants.SCOPE_APPROVING -> {
                 // 待我审批：范围由服务层拿 OA 待办 id 后以 in(...) 收敛，这里不加人员字段条件；

@@ -12,7 +12,7 @@ import { Space, Tag, Tooltip } from 'antd'
 import { AlertOutlined } from '@ant-design/icons'
 import RequirementStageBar from './RequirementStageBar'
 import { PriorityTag, StatusTag, TypeTag } from './Tags'
-import { RDM_BOARD_COLUMNS, type RdmStatus } from '../../../constants/rdm'
+import { RDM_BOARD_COLUMNS, formatRdmReqNo, type RdmStatus } from '../../../constants/rdm'
 import type { RdmRequirementRow } from '../../../api/rdm'
 // 样式由承载页（需求清单）引入 index.css，本组件不重复引，与其他 components/ 下的组件一致
 
@@ -64,7 +64,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
                     <StatusTag status={item.status} overdue={item.overdueFlag ?? false} />
                   </div>
                   <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
-                    <span>{item.reqNo}</span>
+                    <span>{formatRdmReqNo(item.reqNo)}</span>
                     <span>提出：{item.submitterName}</span>
                   </div>
                   <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>

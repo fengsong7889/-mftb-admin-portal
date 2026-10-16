@@ -208,7 +208,7 @@ export const keyToPath: Record<string, string> = {
   'consumable-stock':     '/consumable-stock',
   'consumable-stock-txn': '/consumable-stock-txn',
   'consumable-alert':     '/consumable-alert',
-  // 產研交付（RDM）—— M0 原型菜单（前端补挂，M1 由 sys_menu 种子接管后保留同一 key/path）
+  // 產研交付（RDM）—— v3.13 生命周期分组结构（DB 已是目标结构，不再需要阶段 A 展示层合成）
   'rdm-workbench':        '/rdm-workbench',
   'rdm-requirement':      '/rdm-requirement',
   'rdm-intake':           '/rdm-intake',
@@ -229,11 +229,20 @@ export const keyToPath: Record<string, string> = {
   'rdm-dashboard-report':   '/rdm-weekly-report',
   'rdm-dashboard-score':     '/rdm-score',
   'rdm-dashboard-trend':     '/rdm-metric-trend',
+  // V3 分批交付「項目總覽」（RdmMenuInitializer Batch 1 种子 rdm-dashboard-project）。
+  // 这三个 key 曾漏登记，导致侧边栏点击落到 keyToPath 兜底、误报「該功能模塊開發中」（页面与路由其实已存在）。
+  'rdm-dashboard-project':   '/rdm-project',
   // 需求配置为分组目录，折叠态跳转指向首个子页（与其他一级分组同法）
   // 研發交付已升为一级分组：分组折叠态跳转指向首个子页（与 rdm-config-group 同法）
   'rdm-delivery':            '/rdm-delivery',
   'rdm-delivery-board':      '/rdm-delivery',
   'rdm-delivery-iteration':  '/rdm-iteration',
+  // v3.13 新建分组（声明必须在叶子之前，否则 pathToKey 反向映射被分组覆盖，叶子高亮失效）
+  'rdm-test-quality-group':  '/rdm-test',
+  'rdm-release-accept-group': '/rdm-acceptance',
+  // V3 分批交付「測試工作台 / 發布中心」（种子 rdm-delivery-test / rdm-delivery-release）
+  'rdm-delivery-test':       '/rdm-test',
+  'rdm-delivery-release':    '/rdm-release',
   // 需求配置为分组目录，折叠态跳转指向首个子页（与其他一级分组同法）
   'rdm-config-group':     '/rdm-config-status',
   'rdm-config-status':    '/rdm-config-status',
@@ -300,6 +309,19 @@ pathToKey['/rdm-task'] = 'rdm-delivery-board'
 // 分配产品经理独立页：后端 batch-assign 校 rdm-intake 的 edit，此处归属保持一致
 pathToKey['/rdm-assign'] = 'rdm-intake'
 pathToKey['/rdm-iteration-form'] = 'rdm-delivery-iteration'
+// V3 分批交付子页（非独立菜单）：归属按后端 @RequirePermission 的菜单锚点，守卫与页签高亮才有锚点
+// RdmProjectController=rdm-dashboard-project，RdmTestBatch/RdmIssue=rdm-delivery-test，
+// RdmReleaseBatch/RdmFlowConfig=rdm-delivery-release，RdmDeliveryItem=rdm-delivery-board，RdmStockMigration=rdm-delivery
+pathToKey['/rdm-project-detail'] = 'rdm-dashboard-project'
+pathToKey['/rdm-test-detail'] = 'rdm-delivery-test'
+// 发起提测 / 创建发布批次：独立表单页（§9.1 不得用 Modal），归属各自菜单权限锚点
+pathToKey['/rdm-test-submit'] = 'rdm-delivery-test'
+pathToKey['/rdm-release-create'] = 'rdm-delivery-release'
+pathToKey['/rdm-issue'] = 'rdm-delivery-test'
+pathToKey['/rdm-release-detail'] = 'rdm-delivery-release'
+pathToKey['/rdm-grayscale'] = 'rdm-delivery-release'
+pathToKey['/rdm-delivery-item'] = 'rdm-delivery-board'
+pathToKey['/rdm-stock-migration'] = 'rdm-delivery'
 // 需求↔版本追溯、交付周报、產出積分、效能量趨勢均已升为看板子菜单（由 keyToPath 反向映射）；PRD/变更仍为子页
 // PRD/评审的受理与处理权已从退役的 rdm-product 平移到需求清单的 edit
 pathToKey['/rdm-prd'] = 'rdm-requirement'

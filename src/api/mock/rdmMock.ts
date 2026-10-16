@@ -23,6 +23,7 @@ import {
   RDM_TEST_ENV,
   RDM_SCORE_ALLOC_MODE,
   RDM_SCORE_PUSH_STATUS,
+  RDM_REQ_NO_PENDING_TEXT,
   type RdmAction,
   type RdmAcceptResult,
   type RdmAnchorType,
@@ -247,18 +248,30 @@ let requirements: RdmRequirementRow[] = [
     RDM_STATUS.REJECTED, '趙蕾', '商家運營部', 360, '林志豪', undefined, undefined, undefined, {
       rejectReason: '與現有費用明細口徑一致，屬業務理解偏差，已線下說明並提供查詢指引',
     }),
-  row(10, 'XQ202609170005', '新增商戶分層定價策略配置', RDM_REQ_TYPE.POLICY, RDM_PRIORITY.P2, RDM_COMPLEXITY.MEDIUM,
+  row(10, null, '新增商戶分層定價策略配置', RDM_REQ_TYPE.POLICY, RDM_PRIORITY.P2, RDM_COMPLEXITY.MEDIUM,
     RDM_STATUS.INTAKE_PENDING, '刘洋', '渠道拓展部', 400, undefined, undefined, undefined, undefined),
-  row(11, 'XQ202609160001', '績效考核結果支持員工自助查詢與申訴入口', RDM_REQ_TYPE.NEW_FEATURE, RDM_PRIORITY.P2, RDM_COMPLEXITY.MEDIUM,
+  row(11, null, '績效考核結果支持員工自助查詢與申訴入口', RDM_REQ_TYPE.NEW_FEATURE, RDM_PRIORITY.P2, RDM_COMPLEXITY.MEDIUM,
     RDM_STATUS.DRAFT, '張偉', '集团人事處', 500, undefined, undefined, undefined, undefined),
   row(12, 'XQ202609150004', '地圖規劃支持門店聚類熱力展示', RDM_REQ_TYPE.OPTIMIZE, RDM_PRIORITY.P3, RDM_COMPLEXITY.COMPLEX,
     RDM_STATUS.ON_HOLD, '王大衛', '市場營銷部', 600, '陳雅婷', undefined, 20, undefined),
 ]
 
-/** 构造行数据（保持 mock 字段一致性） */
+/**
+ * mock 侧取「已准入需求」的正式编号（需求提交/需求管理拆分 · 批次1：延迟发号）。
+ * <p>质量口径/版本追溯/交付周报的已上线与下周计划/产出积分这些取数都限定在准入之后的需求上，
+ * 编号必然已生成；本函数只做 TS 层的可空收窄，不把 null 当作字串拼进看板。
+ * 万一有人把取数口径改宽到准入前需求，这里会显式给「尚未生成」而不是静默空值。
+ */
+const admittedReqNo = (r: RdmRequirementRow): string => r.reqNo ?? RDM_REQ_NO_PENDING_TEXT
+
+/**
+ * 构造行数据（保持 mock 字段一致性）。
+ * @param reqNo 正式需求编号；准入前（草稿/待审批/审批驳回）必须传 null，
+ *              与后端延迟发号口径一致（需求提交/需求管理拆分 · 批次1）。
+ */
 function row(
   id: number,
-  reqNo: string,
+  reqNo: string | null,
   title: string,
   reqType: RdmReqType,
   priority: RdmPriority,
@@ -579,7 +592,10 @@ export function mockListRequirements(params: {
   }
   if (params.keyword) {
     const kw = params.keyword.toLowerCase()
-    list = list.filter(r => r.title.toLowerCase().includes(kw) || r.reqNo.toLowerCase().includes(kw) || r.submitterName.includes(params.keyword!))
+    // 准入前的行没有编号，不能用 reqNo 直接调字符串方法（延迟发号后 reqNo 可为 null）
+    list = list.filter(r => r.title.toLowerCase().includes(kw)
+      || (r.reqNo ?? '').toLowerCase().includes(kw)
+      || r.submitterName.includes(params.keyword!))
   }
   if (params.reqType) list = list.filter(r => r.reqType === params.reqType)
   if (params.priority) list = list.filter(r => r.priority === params.priority)
@@ -963,7 +979,7 @@ function buildScoreRecords(): RdmScoreRecord[] {
       rows.push({
         id: rows.length + 1,
         reqId: r.id,
-        reqNo: r.reqNo,
+        reqNo: admittedReqNo(r),
         reqTitle: r.title,
         userId: 9000 + rows.length,
         userName: p.name,
@@ -1253,7 +1269,7 @@ export function mockQualityData(): RdmQualityData {
       .slice(0, 6)
       .map(r => ({
         reqId: r.id,
-        reqNo: r.reqNo,
+        reqNo: admittedReqNo(r),
         title: r.title,
         reworkCount: 1 + (r.id % 2),
         pmName: r.pmName ?? '-',
@@ -1286,7 +1302,7 @@ export function mockVersionTrace(versionNo: string): RdmVersionTrace {
     commitHash: 'a1b2c3d',
     requirements: rows.map(r => ({
       reqId: r.id,
-      reqNo: r.reqNo,
+      reqNo: admittedReqNo(r),
       title: r.title,
       status: r.status,
       reqType: r.reqType,
@@ -1370,7 +1386,7 @@ export function mockWeeklyReport(params: { startDate?: string; endDate?: string;
     })),
     released: released.slice(0, 8).map(r => ({
       reqId: r.id,
-      reqNo: r.reqNo,
+      reqNo: admittedReqNo(r),
       title: r.title,
       versionNo: r.versionNo ?? '2.9.0',
       pmName: r.pmName,
@@ -1392,7 +1408,7 @@ export function mockWeeklyReport(params: { startDate?: string; endDate?: string;
     nextWeek: requirements
       .filter(r => r.planReleaseDate && dayjs(r.planReleaseDate).isAfter(end, 'day') && dayjs(r.planReleaseDate).isBefore(end.add(8, 'day'), 'day'))
       .slice(0, 6)
-      .map(r => ({ reqId: r.id, reqNo: r.reqNo, title: r.title, planReleaseDate: r.planReleaseDate, status: r.status })),
+      .map(r => ({ reqId: r.id, reqNo: admittedReqNo(r), title: r.title, planReleaseDate: r.planReleaseDate, status: r.status })),
   }
 }
 

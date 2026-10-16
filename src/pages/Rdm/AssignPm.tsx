@@ -25,7 +25,7 @@ import {
   type RdmProductOption,
   type RdmRequirementDetail,
 } from '../../api/rdm'
-import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, type RdmStatus } from '../../constants/rdm'
+import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '../../constants/rdm'
 import { PriorityTag } from './components/Tags'
 import './index.css'
 
@@ -123,7 +123,7 @@ export default function AssignPm() {
   const notInPool = mode === 'DISPATCH' ? rows.filter(r => r.status !== RDM_STATUS.POOL) : []
 
   const columns: TableColumnsType<RdmRequirementDetail> = [
-    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150, render: (v?: string | null) => formatRdmReqNo(v) },
     { title: '標題', dataIndex: 'title', key: 'title', ellipsis: true },
     {
       title: '優先級', dataIndex: 'priority', key: 'priority', width: 110,
@@ -174,7 +174,7 @@ export default function AssignPm() {
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>產品經理：</span><b>{target.name}</b></div>
           <div className="confirm-info-row"><span>當前負荷：</span><b>{target.loadText}</b></div>
-          <div className="confirm-info-row"><span>需求：</span><b>{rows.map(r => r.reqNo).join('、') || `${ids.length} 條`}</b></div>
+          <div className="confirm-info-row"><span>需求：</span><b>{rows.map(r => formatRdmReqNo(r.reqNo)).join('、') || `${ids.length} 條`}</b></div>
           <div className="confirm-info-row"><span>狀態影響：</span><b>{mode === 'REASSIGN'
             ? '受理人更改為指定產品經理；舊受理人失去本單操作資格但保留歷史貢獻，雙方與提出人都會收到通知'
             : '需求直接進入「已分配·待受理」，並向對方發送待辦提醒'}</b></div>
@@ -237,7 +237,7 @@ export default function AssignPm() {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`有 ${notInPool.length} 條需求已不在需求池（${notInPool.map(r => r.reqNo).join('、')}）`}
+          message={`有 ${notInPool.length} 條需求已不在需求池（${notInPool.map(r => formatRdmReqNo(r.reqNo)).join('、')}）`}
           description="這些單已被他人接走或推進過，在池內才能分配；請返回列表刷新後重新選定。"
         />
       )}

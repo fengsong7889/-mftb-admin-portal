@@ -114,6 +114,19 @@ const domainSeedMenus = readdirSync(join(ROOT, initializerDir))
 if (!domainSeedMenus.some((menu) => menu.file === 'ConsumableSchemaInitializer.java')) {
   fail('未能解析耗材初始化器的 ensureMenu 种子，不能跳过域菜单检查')
 }
+
+/**
+ * 数组式种子菜单（`private static final String[][] MENUS = { {"key", "名", "英文名", "/path", ...} }`）。
+ * <p>背景：RdmMenuInitializer 这类初始化器不走 ensureMenu，历史上落在本脚本盲区——
+ * 「項目總覽/測試工作台/發布中心」三个菜单上线时没同步 Sidebar.keyToPath，
+ * 点击直接报「該功能模塊開發中」而 CI 全绿。此处把它们纳入校验 5/6 的叶子菜单集合。
+ * <p>只补「路由映射 + 功能操作集」两项盲区；图标/离线阻断等更严的校验仍由校验 8 的 ensureMenu 路径负责。
+ */
+const arraySeedMenus = readdirSync(join(ROOT, initializerDir))
+  .filter((file) => file.endsWith('Initializer.java'))
+  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+    /^\s*\{"([^"]+)",\s*"([^"]+)",\s*(?:"[^"]*"|null),\s*"(\/[^"\s]*)"/gm,
+  )].map((m) => ({ key: m[1], name: m[2], path: m[3], file })))
 const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KEYS[^=]*= new Set\(\[([\s\S]*?)\]\)/)
 const backendKeys = new Set(backendKeysBlock
   ? [...backendKeysBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
@@ -235,11 +248,17 @@ for (const key of seedLeafKeys) {
     fail(`后端种子菜单 ${key}「${seedNames[key]}」缺少 Sidebar.keyToPath 映射, 点击菜单将提示"开发中"`)
   }
 }
+for (const { key, name, path, file } of arraySeedMenus) {
+  if (keyToPath[key] !== path) {
+    fail(`${file} 种子菜单 ${key}「${name}」缺少/不匹配 Sidebar.keyToPath 映射（应为 ${path}）, `
+      + '点击菜单将落到“該功能模塊開發中”兜底提示')
+  }
+}
 
 // ────────── 校验 6：叶子菜单必须登记功能操作集 ──────────
 // 后端 sys_menu.actions 大多未回填（主种子不写 actions），授权中心「功能操作」面板实际取
 // MENU_ACTIONS_MAP；缺失即回退成全部 8 个通用动作，会把導入/啟用 等无关动作授予出去。
-for (const key of [...seedLeafKeys, ...domainSeedMenus.map((m) => m.key)]) {
+for (const key of [...seedLeafKeys, ...domainSeedMenus.map((m) => m.key), ...arraySeedMenus.map((m) => m.key)]) {
   if (!menuActionKeys.has(key)) {
     fail(`菜单 ${key}「${seedNames[key] || ''}」未在 MENU_ACTIONS_MAP 登记功能操作集, `
       + '授权中心将回退展示全部通用动作（按后端 @RequirePermission 实际动作补齐）')
@@ -271,7 +290,8 @@ for (const { key, name, path, icon, file } of domainSeedMenus) {
 
 // ────────── 输出 ──────────
 console.log('菜单一致性检查')
-console.log(`  域初始化器菜单声明 ${domainSeedMenus.length} 条（含导航、权限、图标检查）`)
+console.log(`  域初始化器菜单声明 ${domainSeedMenus.length} 条（含导航、权限、图标检查）/ `
+  + `数组式种子菜单 ${arraySeedMenus.length} 条（导航 + 功能操作集检查）`)
 console.log(`  后端种子菜单 ${seedKeys.length} 条 / 前端路由映射 ${Object.keys(keyToPath).length} 条 / `
   + `离线菜单 ${offlineKeys.length} 条 / 受控菜单 ${controlledKeys.length} 条 / `
   + `功能操作登记 ${menuActionKeys.size} 条`)

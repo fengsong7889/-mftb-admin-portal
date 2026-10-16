@@ -53,7 +53,10 @@ public final class RdmConstants {
     /* ==================== 流转动作 ==================== */
 
     public static final String ACTION_SUBMIT = "submit";
+    /** 免审批直送需求池（草稿直接提交命中免审时的配置落点，取代代码里硬写 pool/assigned） */
     public static final String ACTION_SUBMIT_POOL = "submit_pool";
+    /** 免审批重提直送需求池（准入驳回后重提命中免审时的配置落点） */
+    public static final String ACTION_RESUBMIT_POOL = "resubmit_pool";
     public static final String ACTION_WITHDRAW = "withdraw";
     public static final String ACTION_RESUBMIT = "resubmit";
     public static final String ACTION_APPROVE_INTAKE = "approve_intake";
@@ -187,6 +190,31 @@ public final class RdmConstants {
      * 它不该摊到人人都有的台账菜单上，而应跟分配权一起锁在这个窄权限菜单里。
      */
     public static final String MENU_INTAKE = "rdm-intake";
+
+    /* ==================== 菜单动作（需求管理两个能力锚点） ==================== */
+
+    /**
+     * 分配/改派权（技术负责人）。今天这个能力挂在 {@code rdm-intake:edit} 上。
+     * <p>为什么不直接用 {@code rdm-requirement:edit}：那是产品**受理/处理**权，两者合并后
+     * 给产品同事开受理权会连带拿到全池分配权（方案 §五 明文禁止）。菜单退役那一批把
+     * 两个菜单合到 {@code rdm-requirement} 一个锚点上，靠的就是这两个动作语义不合并。
+     * <p>动作常量定义见上方 {@code ACTION_DISPATCH}（流转动作区）。
+     */
+    /**
+     * 全量查看权（不被「与自己相关」收敛）。今天挂在 {@code rdm-intake:view} 上。
+     * <p>不能拿 {@code rdm-requirement:view} 当全量凭证：需求清单是人人可看的宽权限菜单
+     * （全员基线授权），那样等于「能看自己的需求就能读全公司需求」。也不能认 export，
+     * 那会重踏 v3.10 拆「需求查询」时解绑的那条错口径。
+     */
+    public static final String ACTION_VIEW_ALL = "view_all";
+    /**
+     * 需求沟通与附件上传权。今天挂在 {@code rdm-intake:create} 上，菜单收敛后落到
+     * {@code rdm-requirement:contribute}。
+     * <p>为什么单独一个动作而不复用 {@code rdm-requirement:create}：后者是「提需求」，
+     * 把它当成沟通权平铺给每一个参与者等于人人能建需求（扩权）；反过来只给沟通权
+     * 也不能推导提交权。两者必须分得开，菜单合并才安全。
+     */
+    public static final String ACTION_CONTRIBUTE = "contribute";
     public static final String MENU_ACCEPTANCE = "rdm-acceptance";
     public static final String MENU_DASHBOARD = "rdm-dashboard";
     public static final String MENU_WORKBENCH = "rdm-workbench";
@@ -430,6 +458,33 @@ public final class RdmConstants {
     public static final Set<String> REQ_NOT_ADMITTED_STATUSES = Set.of(
             STATUS_DRAFT, STATUS_INTAKE_PENDING, STATUS_INTAKE_REJECTED);
 
+    /**
+     * 允许 {@code req_no IS NULL} 的状态集合（延迟发号 v2：认领后发号）。
+     * <p>准入前三态（草稿/待审批/驳回）自然没有编号；
+     * 需求池（pool）和已分配（assigned）在产品经理认领前也允许暂无编号，
+     * 认领时由 {@code claim()} 首次发号并写入。
+     * <p>用于数据库 CHECK 约束 {@code ck_rdm_req_no_admitted} 的白名单。
+     */
+    public static final Set<String> REQ_NO_NULLABLE_STATUSES = Set.of(
+            STATUS_DRAFT, STATUS_INTAKE_PENDING, STATUS_INTAKE_REJECTED,
+            STATUS_POOL, STATUS_ASSIGNED);
+
+    /**
+     * 准入前需求没有正式编号时的统一占位文案（延迟发号，需求提交/需求管理拆分 · 批次1）。
+     * <p>通知/卡片文案不能直接把编号拼进去：用户读到「編號: null」会当成系统坏了，
+     * 而用内部 id 或 XQSP 审批流程号充数则是伪造编号。
+     */
+    public static final String REQ_NO_PENDING_TEXT = "尚未生成";
+
+    /**
+     * 面向用户展示需求编号：空值一律给「尚未生成」，不把 null 泄进通知文本。
+     * <p>只用于展示；取号、查重、写入数据库仍必须用原始 {@code reqNo} 字段，
+     * 不得把占位文案当编号使用。
+     */
+    public static String displayReqNo(String reqNo) {
+        return reqNo == null || reqNo.isBlank() ? REQ_NO_PENDING_TEXT : reqNo;
+    }
+
     /* ==================== 延期逾期升级（任务21，按真实工作日判定） ==================== */
 
     /** 逾期升级级别 1 阈值：超过修复期限 ≥1 个工作日 */
@@ -617,6 +672,50 @@ public final class RdmConstants {
     public static final int MIGRATION_CHUNK_MAX = 100;
     public static final int MIGRATION_CHUNK_DEFAULT = 20;
 
+    /* ==================== 发布开放与追加式尝试事实（任务27） ==================== */
+
+    /** rdm_release_deployment.open_status：待开放 / 已开放 / 不开放。开放是独立事实，不由验证通过推导。 */
+    public static final String OPEN_STATUS_PENDING = "pending";
+    public static final String OPEN_STATUS_OPENED = "opened";
+    public static final String OPEN_STATUS_NOT_OPENED = "not_opened";
+
+    /**
+     * rdm_release_attempt.result：部署/验证/开放/回滚的结果取值。
+     * <p>尝试事实<b>只追加不覆盖</b>：同 deployment 同 action 的 attempt_no 递增，历史永久留痕。
+     */
+    public static final String ATTEMPT_RESULT_DEPLOYING = "deploying";
+    public static final String ATTEMPT_RESULT_SUCCESS = "success";
+    public static final String ATTEMPT_RESULT_FAILED = "failed";
+    public static final String ATTEMPT_RESULT_ROLLED_BACK = "rolled_back";
+    public static final String ATTEMPT_RESULT_PASSED = "passed";
+    public static final String ATTEMPT_RESULT_OPENED = "opened";
+    public static final String ATTEMPT_RESULT_NOT_OPENED = "not_opened";
+
+    /** 部署后验证状态（rdm_release_deployment.verify_status） */
+    public static final String VERIFY_PENDING = "pending";
+    public static final String VERIFY_PASSED = "passed";
+    public static final String VERIFY_FAILED = "failed";
+
+    /**
+     * rdm_release_attempt.test_env：发布批次的部署/验证/开放/回滚一律是生产环境事实。
+     * <p>该列 NOT NULL，禁止留空或用占位符掩盖，统一取本常量。
+     */
+    public static final String RELEASE_ENV_PRODUCTION = "prod";
+
+    /**
+     * 补验冻结期限的日历版本前缀：{@code workday:v1:<补验人ID>}。
+     * <p>标记该期限是按<b>补验人真实工作日历</b>（含请假/周末支援/按人例外）冻结的，
+     * 而不是简单的周一至周五；读取端据此复核口径来源。
+     */
+    public static final String CALENDAR_VERSION_WORKDAY_PREFIX = "workday:v1:";
+
+    /**
+     * 产品补验时限默认值（天）。
+     * <p>{@code rdm_flow_config.product_verification_days} 缺失或非法（&lt;=0）时的兜底，
+     * 与 238 冻结 DDL 的 {@code DEFAULT 1} 保持一致；不得在业务代码里另设更宽松的默认。
+     */
+    public static final int DEFAULT_PRODUCT_VERIFICATION_DAYS = 1;
+
     /* ==================== 通知事件级去重（Batch 4） ==================== */
 
     /**
@@ -626,4 +725,218 @@ public final class RdmConstants {
      */
     public static final String NOTIFY_EVENT_VERSION_PREFIX = "VERSION:";
     public static final String NOTIFY_EVENT_DATE_PREFIX = "DATE:";
+
+    /* ==================== 去重对象类型（任务22） ==================== */
+
+    /**
+     * {@code rdm_notify_log.object_type} 取值（VARCHAR(32)）。
+     * <p>事件级去重键由 {@code (object_type, object_id, event_version, receiver_user_id)} 四元组规范化摘要而成，
+     * 因此 {@code object_type} 必须取到「能区分事件语义」的粒度：同一个对象上的不同事件（如待办提醒 vs 催办）
+     * 必须用不同的 object_type，否则会被数据库唯一索引 {@code uk_rdm_notify_dedupe} 互相抑制。
+     */
+    public static final String NOTIFY_OBJECT_PROJECT = "project";
+    public static final String NOTIFY_OBJECT_DELIVERY_ITEM = "delivery_item";
+    public static final String NOTIFY_OBJECT_ISSUE = "issue";
+    public static final String NOTIFY_OBJECT_ISSUE_DEFER = "issue_defer";
+    public static final String NOTIFY_OBJECT_TEST_BATCH = "test_batch";
+    public static final String NOTIFY_OBJECT_RELEASE_BATCH = "release_batch";
+    public static final String NOTIFY_OBJECT_REQUIREMENT = "requirement";
+    /** PM 待办通知（待办产生/变更时按去重键通知对应接收人） */
+    public static final String NOTIFY_OBJECT_PROJECT_TODO = "project_todo";
+    /** 工作日催办（提醒日去重，同一对象同一接收人同一天只催一次） */
+    public static final String NOTIFY_OBJECT_PROJECT_URGE = "project_urge";
+
+    /* ==================== 待办分桶与成因（任务22） ==================== */
+
+    /**
+     * 待办分桶：以「当前登录人是否就是责任人」区分，<b>三桶互斥且穷尽</b>，
+     * 因此 {@code mine + waitingOthers + unassigned == total}，对账口径可核对。
+     * <ul>
+     *   <li>{@link #TODO_BUCKET_MINE} 待我处理：责任人就是登录人；</li>
+     *   <li>{@link #TODO_BUCKET_WAITING_OTHERS} 等待他人：责任人是别人（登录人只能等，不该被算成自己的待办）；</li>
+     *   <li>{@link #TODO_BUCKET_UNASSIGNED} 未指派：没有责任人，谁都不动就永远不会动。</li>
+     * </ul>
+     */
+    public static final String TODO_BUCKET_MINE = "mine";
+    public static final String TODO_BUCKET_WAITING_OTHERS = "waiting_others";
+    public static final String TODO_BUCKET_UNASSIGNED = "unassigned";
+
+    /**
+     * 待办成因（一条待办可同时命中多个成因，但<b>只算一条待办</b>）。
+     * <p>历史实现按成因分组各自产出一条待办再相加，导致同一个交付项因「未指派+阻塞+逾期」被计 3 次，
+     * 待办总数虚高。现在成因只作为 {@code reasons} 明细，去重键是 {@code (objectType, refId)}。
+     */
+    public static final String TODO_REASON_UNASSIGNED = "unassigned";
+    public static final String TODO_REASON_BLOCKED = "blocked";
+    public static final String TODO_REASON_OVERDUE = "overdue";
+    public static final String TODO_REASON_PENDING_DECISION = "pending_decision";
+    public static final String TODO_REASON_PENDING_PRODUCT_ACCEPTANCE = "pending_product_acceptance";
+    public static final String TODO_REASON_PENDING_BIZ_ACCEPTANCE = "pending_biz_acceptance";
+    public static final String TODO_REASON_TEST_NOT_PASSED = "test_not_passed";
+    /** 原范围延期残余：旧 scopeVersion 下被延期、承接尚未闭环的问题 */
+    public static final String TODO_REASON_DEFER_RESIDUAL = "defer_residual";
+    public static final String TODO_REASON_PENDING_RELEASE_DECISION = "pending_release_decision";
+
+    /* ==================== 幂等 bizType（任务22） ==================== */
+
+    /** 手动催办项目待办（{@code resourceKey = project:<id>}） */
+    public static final String BIZ_TYPE_PROJECT_URGE = "rdm_project_urge";
+    /** 待办变更批量通知（{@code resourceKey = project:<id>}） */
+    public static final String BIZ_TYPE_TODO_NOTIFY = "rdm_todo_notify";
+
+    /* ==================== 催办工作日门槛（任务22） ==================== */
+
+    /**
+     * 催办的最小逾期工作日数：达到 {@link #ESCALATION_L1_OVERDUE_DAYS} 才催。
+     * <p><b>按责任人真实工作日历</b>（含请假/周末支援，见 {@code RdmWorkingDayCalculator}）计算，
+     * 不是简单的周一至周五——否则请假期间也会被催，且周一会一次性催出三天份的噪音。
+     */
+    public static final int URGE_MIN_OVERDUE_WORKING_DAYS = ESCALATION_L1_OVERDUE_DAYS;
+
+    /* ==================== 前端已注册路由（任务22：actionUrl 单一真相源） ==================== */
+
+    /**
+     * 前端 {@code App.tsx} 已注册的 RDM 路由前缀。
+     * <p>待办/卡片/导出的 {@code actionUrl} 一律由本组常量拼装，<b>禁止</b>在业务代码里手写路径：
+     * 历史实现拼出了未注册的 {@code /rdm/project/delivery/{id}}（点开即 404），
+     * 并且把问题(Issue)也套用了交付项地址（跳到错误对象）。
+     */
+    public static final String ROUTE_PROJECT_OVERVIEW = "/rdm-project";
+    public static final String ROUTE_PROJECT_DETAIL = "/rdm-project-detail";
+    public static final String ROUTE_DELIVERY_ITEM = "/rdm-delivery-item";
+    public static final String ROUTE_ISSUE_DETAIL = "/rdm-issue";
+    public static final String ROUTE_TEST_BATCH_DETAIL = "/rdm-test-detail";
+    public static final String ROUTE_RELEASE_BATCH_DETAIL = "/rdm-release-detail";
+    public static final String ROUTE_REQUIREMENT_DETAIL = "/rdm-detail";
+    public static final String ROUTE_TASK_FORM = "/rdm-task";
+
+    /** 项目详情路由（前端按 {@code ?id=&mode=view} 解析）。 */
+    public static String projectDetailRoute(long projectId) {
+        return ROUTE_PROJECT_DETAIL + "?id=" + projectId + "&mode=view";
+    }
+
+    /** 交付项详情路由（前端按 {@code ?id=&mode=view} 解析）。 */
+    public static String deliveryItemRoute(long itemId) {
+        return ROUTE_DELIVERY_ITEM + "?id=" + itemId + "&mode=view";
+    }
+
+    /** 问题详情路由。<b>问题不得套用交付项地址</b>：两者是不同对象、不同页面。 */
+    public static String issueRoute(long issueId) {
+        return ROUTE_ISSUE_DETAIL + "?id=" + issueId;
+    }
+
+    /** 提测批次详情路由。 */
+    public static String testBatchRoute(long batchId) {
+        return ROUTE_TEST_BATCH_DETAIL + "?id=" + batchId;
+    }
+
+    /** 发布批次详情路由。 */
+    public static String releaseBatchRoute(long batchId) {
+        return ROUTE_RELEASE_BATCH_DETAIL + "?id=" + batchId;
+    }
+
+    /** 需求详情路由。 */
+    public static String requirementRoute(long reqId) {
+        return ROUTE_REQUIREMENT_DETAIL + "?id=" + reqId;
+    }
+
+    /** 任务表单路由（前端需要 reqId 才能加载上下文，缺失时退化为需求详情）。 */
+    public static String taskRoute(long taskId, Long reqId) {
+        return reqId == null
+                ? ROUTE_TASK_FORM + "?id=" + taskId
+                : ROUTE_TASK_FORM + "?id=" + taskId + "&reqId=" + reqId;
+    }
+
+    /* ==================== 通知事件编码与催办分级（任务22 B） ==================== */
+
+    /**
+     * PM 待办通知事件编码（{@code rdm_notify_log.event_code}，VARCHAR(32)）。
+     * <p>待办<b>产生或变更</b>时按去重键通知责任人，去重 {@code event_version}
+     * 取 {@code VERSION:<对象并发版本>}（{@link #NOTIFY_EVENT_VERSION_PREFIX}）。
+     * <p>不复用 {@link #EVENT_URGE}：催办是「同一件事每天可以再提醒一次」，
+     * 待办通知是「这件事变了才再说一次」，两者共用编码会互相抑制。
+     */
+    public static final String EVENT_PROJECT_TODO = "PROJECT_TODO";
+
+    /**
+     * 工作日催办事件编码。
+     * <p>去重 {@code event_version} 取 {@code DATE:<yyyy-MM-dd>}（提醒日，
+     * {@link #NOTIFY_EVENT_DATE_PREFIX}），因此<b>同一对象同一接收人同一提醒日只催一次</b>；
+     * 催办是否触发由责任人真实工作日历判定，不是简单的周一至周五 cron。
+     */
+    public static final String EVENT_PROJECT_URGE = "PROJECT_URGE";
+
+    /**
+     * 催办分级门槛（逾期工作日数，按责任人真实工作日历）。
+     * <p>达到 L1 才催，L2/L3 只影响文案紧迫度与是否抄送上级，
+     * <b>不</b>产生新的通知行（同一提醒日仍只有一条 {@link #EVENT_PROJECT_URGE}），避免一天三条催办刷屏。
+     */
+    public static final int URGE_L2_OVERDUE_WORKING_DAYS = ESCALATION_L2_OVERDUE_DAYS;
+    public static final int URGE_L3_OVERDUE_WORKING_DAYS = ESCALATION_L3_OVERDUE_DAYS;
+
+    /** 通知渠道：钉钉群机器人（{@code rdm_notify_log.channel}）。 */
+    public static final String NOTIFY_CHANNEL_DINGTALK = "DINGTALK";
+
+    /**
+     * 出站状态（{@code rdm_notify_log.send_status}）。
+     * <p>{@code pending} 已入队待投递；{@code sending} 已被某个执行者抢占（崩溃遗留由
+     * {@code RdmNotifyRetryJob} 回收）；{@code sent} 渠道已受理；{@code failed} 待退避重试；
+     * {@code abandoned} 重试耗尽需人工补发；{@code skipped} 按规则不发（空正文 / dry-run）。
+     */
+    public static final String NOTIFY_STATUS_PENDING = "pending";
+    public static final String NOTIFY_STATUS_SENDING = "sending";
+    public static final String NOTIFY_STATUS_SENT = "sent";
+    public static final String NOTIFY_STATUS_FAILED = "failed";
+    public static final String NOTIFY_STATUS_ABANDONED = "abandoned";
+    public static final String NOTIFY_STATUS_SKIPPED = "skipped";
+
+    /* ==================== 存量迁移执行与灰度管理写侧（任务29，尾部追加） ==================== */
+
+    /**
+     * 存量迁移写操作的幂等 bizType（{@code rdm_idempotent_log.biz_type}，任务28 归一化口径）。
+     * <p>resourceKey 约定：预览 {@code migration_batch:preview}；其余 {@code migration_batch:<id>}。
+     */
+    public static final String BIZ_MIGRATION_PREVIEW = "rdm_migration_preview";
+    public static final String BIZ_MIGRATION_CONFIRM = "rdm_migration_confirm";
+    public static final String BIZ_MIGRATION_EXECUTE = "rdm_migration_execute";
+    public static final String BIZ_MIGRATION_PAUSE = "rdm_migration_pause";
+    public static final String BIZ_MIGRATION_RESUME = "rdm_migration_resume";
+    public static final String BIZ_MIGRATION_ROLLBACK = "rdm_migration_rollback";
+    public static final String BIZ_MIGRATION_RECONCILE = "rdm_migration_reconcile";
+
+    /** V3 灰度管理写操作的幂等 bizType；resourceKey 约定 {@code flow_config:<scopeKey>}。 */
+    public static final String BIZ_FLOW_CONFIG_UPDATE = "rdm_flow_config_update";
+
+    /**
+     * 业务补验时限默认值（天）：与 238 冻结 DDL 的 {@code business_verification_days DEFAULT 5} 保持一致；
+     * 仅供灰度行创建时回填默认，不得在业务代码里另设更宽松/更严的默认。
+     */
+    public static final int DEFAULT_BUSINESS_VERIFICATION_DAYS = 5;
+
+    /**
+     * 灰度开关变更审计落点（leader 批准，任务29）：复用通用授权审计表 {@code sys_permission_audit_log}，
+     * 经 {@code PermissionAuditService.record} 写入；开启/关闭 V3 灰度本质是显式授权/治理变更。
+     * <p>冻结的 {@code rdm_migration_audit} 受 action CHECK 白名单 + batch_id NOT NULL 约束，
+     * 无法承载灰度审计；两类审计严格分离：迁移域动作仍全部写 rdm_migration_audit。
+     * <p>target_type 列宽 VARCHAR(20)："RDM_FLOW_CONFIG" 恰 15 字符，安全。
+     */
+    public static final String AUDIT_TARGET_FLOW_CONFIG = "RDM_FLOW_CONFIG";
+    public static final String AUDIT_SYSTEM_RDM = "rdm";
+    public static final String AUDIT_CHANGE_UPDATE = "UPDATE";
+
+    /**
+     * 存量迁移产出标记（「来源=迁移，审计可辨」）：写入迁移项 result_json 与产出交付项的
+     * 快照/审计 JSON 的 {@code source} 字段。<b>仅作溯源标记</b>，不改变任何门禁语义：
+     * 迁移产出的交付项一律 DI_PREPARING（范围未冻结、无验收结论），消费方仍走任务20/27 权威判定，
+     * 绝不被推导为已测试/已验收/已发布。
+     */
+    public static final String MIGRATION_SOURCE_STOCK = "stock_migration";
+
+    /**
+     * 需求种类字面量（{@code rdm_requirement.requirement_kind}，219 引入）：聚合 / 执行。
+     * <p>存量迁移仅在该列为空时补默认 {@code execution}，绝不改动既有值；
+     * 聚合需求（aggregate）带子需求的，迁移按整棵树单独规划，预览阶段直接判 blocked。
+     */
+    public static final String REQ_KIND_AGGREGATE = "aggregate";
+    public static final String REQ_KIND_EXECUTION = "execution";
 }

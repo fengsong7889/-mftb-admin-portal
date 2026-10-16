@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,14 +39,24 @@ import java.util.Set;
 public class RdmMenuInitializer implements CommandLineRunner {
 
     /**
-     * v3.10：取消 rdm-query（需求查询）独立菜单，把全量可见并回 rdm-intake。
-     * <p>上一轮 v3.8 拆出 rdm-query 是为了把「数据范围」从 rdm-requirement 的 export/delete
-     * 上解绑——这个价值保留（全量可见不再认导出权），但落点错了：分配权必然蕴含可见权，
-     * 两者拆成两个窄权限菜单只会让管理员要同步维护两份授权。
-     * <p>为什么递增而不是改 v3.8/v3.9：本轮退役了一个已入库的菜单并改变了 canSeeAll 的口径，
-     * 复用旧 key 会让已记账环境留着 rdm-query 菜单、而代码已不再认它的全量权。
+     * v3.15：把 rdm-requirement 的可授动作集对齐到种子（管理员已裁决）。
+     * <p>v3.14 只补了 view_all/dispatch/contribute；执行时发现本环境该行的实际可授集是
+     * [view, export]，create（提需求）与 edit（产品受理）早已被摘掉，授权中心勾不到两者，
+     * 退役 rdm-intake 后需求侧受理权就无处可授。管理员已明确选定：恢复 create/edit 为可授。
+     * <p>可授 ≠ 已授：本迁移只动 sys_menu.actions 这一列元数据，不往 sys_role_menu /
+     * sys_department_menu 写任何一行，因此本轮**没有任何人得到新能力**；
+     * 谁可以勾这两个动作仍由管理员在授权中心显式决定。
+     * <p>上一版 v3.13 已完成生命周期分组，本轮仍不改结构、不改路径。
+     * <p>本轮仍保持双锚点过渡：rdm-intake 的 view/edit 仍是全量可见与分配权的现行判定依据，
+     * RdmAccessGuard 同时认新锚点，迁移完成前不拆旧。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.12";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.15";
+    /**
+     * v3.16 授权镜像登记号：与菜单结构迁移分号登记，因为它**只能跑一次**。
+     * <p>不能放进每次启动重放的 migrate()：管理员事后在新锚点上撤销的授权，
+     * 会被重放的镜像从旧锚点又加回来（“撤权不复活”是方案 §五 的红线）。
+     */
+    private static final String MIRROR_VERSION_KEY = "rdm:anchor-grant-mirror:v1";
     private static final String ADMIN_ROLE_CODE = "admin";
     /** 被取消的旧一级目录（软删，保留回滚能力） */
     private static final String LEGACY_ROOT_KEY = "rdm-center";
@@ -57,11 +68,22 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 需求清单：查看+导出是宽权限，create（提需求）从「提交需求」平移过来，
      * edit 是需求侧处理（受理/PRD/评审/变更）从「產品需求處理」平移过来。
      * <p>这里故意不含分配权 —— 分配只认 rdm-intake:edit，两者分开才能避免误授。
+     * <p>v3.14 另走 {@code ACTION_SYNC} 只补登记新动作：常量对已存在的行无效（upsert 不动 actions）。
      */
-    private static final String LIST_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
+    private static final String LIST_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\",\"view_all\",\"dispatch\",\"contribute\"]";
     private static final String FULL_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
     /** 研发侧写操作集（任务/迭代上报不涉及删除） */
     private static final String DELIVERY_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
+    /**
+     * 可授动作集「以种子为准」的菜单白名单：{菜单 key}。
+     * <p>v3.15 列入 rdm-requirement：管理员已裁决恢复 create/edit 可授，叠加 v3.14 的三个新锚点，
+     * 该菜单的可授集应等于种子 {@code LIST_ACTIONS}。
+     * <p>语义仍是**只并集追加、绝不删减**：管理员额外自定义出来的动作会被保留。
+     * <p>只有显式授权的菜单才进这张表：默认不刷，否则会把别人特意摘掉的能力悄悄补回去，那是扩权。
+     */
+    private static final String[] ACTION_SYNC_FROM_SEED = {
+            RdmConstants.MENU_REQUIREMENT,
+    };
     /**
      * 迭代排期额外带 delete：菜单收敛后「删除迭代」接口的锚点从已退役的 rdm-product 移到这里。
      * <p>种子的 actions 是「该菜单可授哪些动作」，不列上 delete 则管理员在授权中心永远勾不到
@@ -71,54 +93,44 @@ public class RdmMenuInitializer implements CommandLineRunner {
 
     /**
      * 菜单种子：{menuKey, 中文名, 英文名, path, component, icon, type, sort, parentKey, actions}。
-     * <p>一级菜单接在既有顶级菜单（i18n-center=15）之后，占 16..24，
-     * 顶部一律是管理者打开先看的东西，后面严格按需求生命周期动线排列：
-     * 总看板 → 个人待办 → 提交 → 台账 → 分配 → 产品处理 → 研发交付 → 验收 → 配置。
-     * 「需求配置」与「研發交付」为分组（type=1，无 path），各自下挂二级叶子。
+     * <p>v3.13 生命周期分组：
+     * 個人工作台 → 項目與計劃 → 需求中心 → 研發執行 → 測試與質量 → 發布與驗收 → 效能復盤 → 交付配置。
+     * 先建项目再挂靠需求，项目入口排在需求中心之前。
      */
     private static final String[][] MENUS = {
-            // 看板区也是多视图（结果/质量/追溯/周报），升为一级分组，避免 PMO 只能在顶部按钮里找入口
-            {"rdm-dashboard", "需求總看板", "Requirement Overview", null, null, "RiseOutlined", "1", "16", null, VIEW_ONLY},
-            {"rdm-dashboard-board", "交付看板", "Delivery Overview", "/rdm-dashboard", "RdmDashboard", "BarChartOutlined", "2", "1", "rdm-dashboard", VIEW_EXPORT},
-            // 风险是「每天都要看并要行动」的视图（跟催/解塞/分发），与周度复盘的看板频次不同，因此单独成页
-            {"rdm-dashboard-risk", "風險中心", "Risk Center", "/rdm-risk", "RiskCenter", "AlertOutlined", "2", "2", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-dashboard-quality", "質量口徑", "Quality Metrics", "/rdm-quality", "QualityBoard", "SafetyCertificateOutlined", "2", "3", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-dashboard-version", "版本追溯", "Version Trace", "/rdm-version-trace", "VersionTrace", "BranchesOutlined", "2", "4", "rdm-dashboard", VIEW_ONLY},
-            {"rdm-dashboard-report", "交付週報", "Weekly Report", "/rdm-weekly-report", "WeeklyReport", "CalendarOutlined", "2", "5", "rdm-dashboard", VIEW_EXPORT},
-            {"rdm-dashboard-project", "項目總覽", "Project Overview", "/rdm-project", "ProjectOverview", "ProjectOutlined", "2", "15", "rdm-dashboard", VIEW_EXPORT},
-            /*
-             * 效能與產出：「看人和效率」的三个视图归同一分组。
-             * <p>原本它们与「看结果」的看板混在一个分组里达 8 个子项；而「部門與人員產出」
-             * 与「產出積分」不同：前者是在途负载/吞吐（找瓶颈），后者是绩效结果（可追溯的分）。
-             */
-            {"rdm-efficiency", "效能與產出", "Efficiency & Output", null, null, "DashboardOutlined", "1", "17", null, VIEW_ONLY},
-            {"rdm-dashboard-score", "產出積分", "Output Scores", "/rdm-score", "ScoreBoard", "TrophyOutlined", "2", "1", "rdm-efficiency", VIEW_EDIT},
-            {"rdm-dashboard-trend", "效能量趨勢", "Metric Trend", "/rdm-metric-trend", "MetricTrend", "LineChartOutlined", "2", "2", "rdm-efficiency", VIEW_EXPORT},
+            // 1) 個人工作台：跨阶段待办入口，顶级单叶
+            {"rdm-workbench", "個人工作台", "Personal Workbench", "/rdm-workbench", "RdmWorkbench", "HistoryOutlined", "2", "16", null, VIEW_ONLY},
+            // 2) 項目與計劃：先建项目再挂靠需求（复用 rdm-dashboard key）
+            {"rdm-dashboard", "項目與計劃", "Projects & Planning", null, null, "RiseOutlined", "1", "17", null, VIEW_ONLY},
+            {"rdm-dashboard-project", "項目總覽", "Project Overview", "/rdm-project", "ProjectOverview", "ProjectOutlined", "2", "1", "rdm-dashboard", VIEW_EXPORT},
+            {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-dashboard", ITERATION_ACTIONS},
+            {"rdm-dashboard-risk", "風險中心", "Risk Center", "/rdm-risk", "RiskCenter", "AlertOutlined", "2", "3", "rdm-dashboard", VIEW_EXPORT},
+            // 3) 需求中心：业务侧提出与审批 + 分配侧统筹（复用 rdm-pool-group key）
+            {"rdm-pool-group", "需求中心", "Requirement Center", null, null, "ContainerOutlined", "1", "18", null, VIEW_ONLY},
+            {"rdm-intake-approval", "提需求", "Submit Requirement", "/rdm-intake-approval", "RequirementIntake", "SendOutlined", "2", "1", "rdm-pool-group", VIEW_ONLY},
+            {"rdm-intake", "认领/分配", "Claim & Assign", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "2", "rdm-pool-group", FULL_ACTIONS},
+            {"rdm-requirement", "需求跟进清单", "Requirement Follow-up", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "3", "rdm-pool-group", LIST_ACTIONS},
+            // 4) 研發執行：研发同学日常任务与工时上报（复用 rdm-delivery key）
+            {"rdm-delivery", "研發執行", "Development", null, null, "NodeIndexOutlined", "1", "19", null, VIEW_ONLY},
+            {"rdm-delivery-board", "研發工作台", "Dev Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
+            // 5) 測試與質量：测试批次执行 + 质量结果分析（新建分组）
+            {"rdm-test-quality-group", "測試與質量", "Testing & Quality", null, null, "ExperimentOutlined", "1", "20", null, VIEW_ONLY},
+            {"rdm-delivery-test", "測試工作台", "Test Workbench", "/rdm-test", "TestWorkbench", "BugOutlined", "2", "1", "rdm-test-quality-group", DELIVERY_ACTIONS},
+            {"rdm-dashboard-quality", "質量分析", "Quality Analysis", "/rdm-quality", "QualityBoard", "SafetyCertificateOutlined", "2", "2", "rdm-test-quality-group", VIEW_EXPORT},
+            // 6) 發布與驗收：验收中心 + 发布批次 + 版本追溯（新建分组）
+            {"rdm-release-accept-group", "發布與驗收", "Release & Acceptance", null, null, "CloudUploadOutlined", "1", "21", null, VIEW_ONLY},
+            {"rdm-acceptance", "驗收中心", "Acceptance Center", "/rdm-acceptance", "AcceptanceList", "CheckSquareOutlined", "2", "1", "rdm-release-accept-group", VIEW_CREATE},
+            {"rdm-delivery-release", "發布中心", "Release Center", "/rdm-release", "ReleaseCenter", "CloudServerOutlined", "2", "2", "rdm-release-accept-group", DELIVERY_ACTIONS},
+            {"rdm-dashboard-version", "版本追溯", "Version Trace", "/rdm-version-trace", "VersionTrace", "BranchesOutlined", "2", "3", "rdm-release-accept-group", VIEW_ONLY},
+            // 7) 效能復盤：交付结果 + 周报 + 部门人员负载 + 趋势 + 产出积分（复用 rdm-efficiency key）
+            {"rdm-efficiency", "效能復盤", "Review & Metrics", null, null, "DashboardOutlined", "1", "22", null, VIEW_ONLY},
+            {"rdm-dashboard-board", "交付看板", "Delivery Overview", "/rdm-dashboard", "RdmDashboard", "BarChartOutlined", "2", "1", "rdm-efficiency", VIEW_EXPORT},
+            {"rdm-dashboard-report", "交付週報", "Weekly Report", "/rdm-weekly-report", "WeeklyReport", "CalendarOutlined", "2", "2", "rdm-efficiency", VIEW_EXPORT},
             {"rdm-efficiency-output", "部門與人員產出", "Dept & People Output", "/rdm-output", "TeamOutput", "TeamOutlined", "2", "3", "rdm-efficiency", VIEW_EXPORT},
-            {"rdm-workbench", "需求工作台", "Requirement Workbench", "/rdm-workbench", "RdmWorkbench", "HistoryOutlined", "2", "18", null, VIEW_ONLY},
-            {"rdm-requirement", "需求清單", "Requirement List", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "19", null, LIST_ACTIONS},
-            /*
-             * v3.11：拆「需求池·分配」为一级分组下的两个二级菜单，让提出/审批侧与分配侧各得其所。
-             * <p>原本一页里塞「待分配 / 待我審批 / 全部需求」三个视角，但审批人（提出人的主管或高层）
-             * 与分配人（技术负责人/PM）不是同一批角色：高层会误入分配区，PM 每天看到无关的审批列。
-             * <p>关键约束：rdm-intake 这个 menuKey 是 canSeeAll（view）与分配权（edit）的锚点，
-             * 被 12 处服务端引用与存量 sys_role_menu/sys_department_menu 授权记录绑定，
-             * 所以只改显示名与层级位置（upsert 会对齐 parent_id，alignSeedSorts 会对齐排序），
-             * key/path/actions 一律不动 —— 不这样就得做授权平移，既有降权也有扩权风险。
-             * 新菜单 rdm-intake-approval 只给 view：审批动作由服务端按「OA 当前审批人=我」收敛，
-             * 分配动作仍只认 rdm-intake:edit，本菜单不携分配权。
-             */
-            {"rdm-pool-group", "需求池", "Requirement Pool", null, null, "ContainerOutlined", "1", "20", null, VIEW_ONLY},
-            {"rdm-intake-approval", "提交需求", "Submit & Approval", "/rdm-intake-approval", "RequirementIntake", "SendOutlined", "2", "1", "rdm-pool-group", VIEW_ONLY},
-            {"rdm-intake", "需求管理", "Requirement Pool", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "2", "rdm-pool-group", FULL_ACTIONS},
-            // 研發交付是研发侧唯一有明确子环节的区域，升为一级分组（与「需求配置」同法）
-            {"rdm-delivery", "研發交付", "R&D Delivery", null, null, "NodeIndexOutlined", "1", "23", null, VIEW_ONLY},
-            {"rdm-delivery-board", "交付工作台", "Delivery Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
-            {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-delivery", ITERATION_ACTIONS},
-            {"rdm-delivery-test", "測試工作台", "Test Workbench", "/rdm-test", "TestWorkbench", "ExperimentOutlined", "2", "24", "rdm-delivery", DELIVERY_ACTIONS},
-            {"rdm-delivery-release", "發布中心", "Release Center", "/rdm-release", "ReleaseCenter", "RocketOutlined", "2", "25", "rdm-delivery", DELIVERY_ACTIONS},
-            {"rdm-acceptance", "需求驗收", "Requirement Acceptance", "/rdm-acceptance", "AcceptanceList", "CheckSquareOutlined", "2", "24", null, VIEW_CREATE},
-            {"rdm-config-group", "需求配置", "Requirement Settings", null, null, "SettingOutlined", "1", "25", null, VIEW_ONLY},
+            {"rdm-dashboard-trend", "效能量趨勢", "Metric Trend", "/rdm-metric-trend", "MetricTrend", "LineChartOutlined", "2", "4", "rdm-efficiency", VIEW_EXPORT},
+            {"rdm-dashboard-score", "產出積分", "Output Scores", "/rdm-score", "ScoreBoard", "TrophyOutlined", "2", "5", "rdm-efficiency", VIEW_EDIT},
+            // 8) 交付配置：规则改动影响所有人的分（复用 rdm-config-group key）
+            {"rdm-config-group", "交付配置", "Delivery Settings", null, null, "SettingOutlined", "1", "23", null, VIEW_ONLY},
             {"rdm-config-status", "狀態與流轉", "Status & Transition", "/rdm-config-status", "StatusConfig", "PartitionOutlined", "2", "1", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-routing", "分發矩陣", "Assignment Matrix", "/rdm-config-routing", "RoutingConfig", "SwapOutlined", "2", "2", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-sla", "SLA 與逾期", "SLA & Overdue", "/rdm-config-sla", "SlaConfig", "FieldTimeOutlined", "2", "3", "rdm-config-group", VIEW_EDIT},
@@ -127,13 +139,25 @@ public class RdmMenuInitializer implements CommandLineRunner {
 
     /** 改名意图：只当现名仍是旧默认名时才改，用户走「菜单配置」自定义的名字永远不被覆盖 */
     private static final String[][] RENAMES = {
-            {"rdm-dashboard", "需求總看板", "需求看板"},
-            // 台账→清单：两个历史默认名都要覆盖，否则自定义过名字的不动、没改过的也改不过来
+            // v3.13 生命周期分组改名
+            {"rdm-dashboard", "項目與計劃", "需求總看板"},
+            {"rdm-dashboard", "項目與計劃", "需求看板"},
+            {"rdm-pool-group", "需求中心", "需求池"},
+            {"rdm-delivery", "研發執行", "研發交付"},
+            {"rdm-efficiency", "效能復盤", "效能與產出"},
+            {"rdm-config-group", "交付配置", "需求配置"},
+            {"rdm-workbench", "個人工作台", "需求工作台"},
+            {"rdm-delivery-board", "研發工作台", "交付工作台"},
+            {"rdm-dashboard-quality", "質量分析", "質量口徑"},
+            {"rdm-acceptance", "驗收中心", "需求驗收"},
+            // 历史改名保留（确保未升级环境也能改过来）
             {"rdm-requirement", "需求清單", "需求台賬"},
             {"rdm-requirement", "需求清單", "我的需求"},
-            // v3.11 拆分：需求池不再兼任审批总台，改名「需求管理」并挂进「需求池」分组
+            {"rdm-requirement", "需求跟进清单", "需求清單"},
             {"rdm-intake", "需求管理", "需求池·分配"},
             {"rdm-intake", "需求管理", "需求池/分配"},
+            {"rdm-intake", "认领/分配", "需求管理"},
+            {"rdm-intake-approval", "提需求", "提交需求"},
     };
 
     /**
@@ -167,17 +191,9 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 否则每次启动都会把“仅有目录权”的角色多补一份子页权限（权限只减不增是红线）。
      */
     private static final String[][] GROUP_GRANT_INHERIT = {
-            {"rdm-delivery", "rdm-delivery-board", "rdm-delivery-iteration", "rdm-delivery-test", "rdm-delivery-release"},
-            {"rdm-dashboard", "rdm-dashboard-board", "rdm-dashboard-quality", "rdm-dashboard-version", "rdm-dashboard-report", "rdm-dashboard-project"},
-            {"rdm-config-group", "rdm-config-score"},
-            // v3.5 新增叶子：風險中心沿用看板存量授权；部門與人員產出沿用新分组授权
-            {"rdm-dashboard", "rdm-dashboard-risk"},
-            {"rdm-efficiency", "rdm-efficiency-output"},
-            /*
-             * 注：rdm-dashboard-score / rdm-dashboard-trend 已从本表移除。它们是 v3.4 已继承过的存量叶子，
-             * 本次只改挂到 rdm-efficiency（菜单行 id 不变，自身授权随行）；若继续列在这里，
-             * 管理员在授权中心主动撤销后会被每次启动重放静静补回，违反「权限只减不增」。
-             */
+            // v3.13 新建分组的叶子继承（只列新增叶子，存量叶子改挂父级不重复继承）
+            {"rdm-test-quality-group", "rdm-delivery-test", "rdm-dashboard-quality"},
+            {"rdm-release-accept-group", "rdm-acceptance", "rdm-delivery-release", "rdm-dashboard-version"},
     };
 
     /**
@@ -189,6 +205,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
      */
     private static final String[][] GROUP_GRANT_SEED = {
             {"rdm-dashboard", "rdm-efficiency"},
+            // v3.13 新建分组从研发交付分组继承授权（测试/发布叶子原来就在它下面）
+            {"rdm-delivery", "rdm-test-quality-group", "rdm-release-accept-group"},
     };
 
     /**
@@ -200,17 +218,59 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 每行按自己的 menu_key + 旧 sort 定位，彼此不受执行顺序影响。
      */
     private static final String[][] SORT_ALIGN = {
-            {"rdm-dashboard-quality", "2", "3"},
-            {"rdm-dashboard-version", "3", "4"},
-            {"rdm-dashboard-report", "4", "5"},
-            {"rdm-dashboard-score", "5", "1"},
-            {"rdm-dashboard-trend", "6", "2"},
-            /*
-             * v3.11：rdm-intake 从顶级（sort 20）改挂到 rdm-pool-group 下，成为分组内第二项。
-             * 它跟父分组同用了 20，虽不影响组内排序（1 在前、20 在后），但同一层里留个 20 会让后续
-             * 插入子项时没有空位，所以按旧默认值对齐为 2（管理员自定义过排序则不动）。
-             */
+            // v3.13 生命周期分组排序对齐
+            // 項目與計劃组内：project(15→1), risk(2→3), iteration 迁入后保持 2
+            {"rdm-dashboard-project", "15", "1"},
+            {"rdm-dashboard-risk", "2", "3"},
+            // 需求中心组内：requirement(19→3), intake 已在 2
+            {"rdm-requirement", "19", "3"},
             {"rdm-intake", "20", "2"},
+            // 測試與質量组内：test(24→1), quality(3→2)
+            {"rdm-delivery-test", "24", "1"},
+            {"rdm-dashboard-quality", "3", "2"},
+            // 發布與驗收组内：acceptance(24→1), release(25→2), version(4→3)
+            {"rdm-acceptance", "24", "1"},
+            {"rdm-delivery-release", "25", "2"},
+            {"rdm-dashboard-version", "4", "3"},
+            // 效能復盤组内：score(1→5), trend(2→4), report(5→2), board 迁入后保持 1
+            {"rdm-dashboard-score", "1", "5"},
+            {"rdm-dashboard-trend", "2", "4"},
+            {"rdm-dashboard-report", "5", "2"},
+            // 顶级排序：workbench(18→16)
+            {"rdm-workbench", "18", "16"},
+    };
+
+    /**
+     * 锚点收敛的动作归宿：{源菜单, 源动作, 目标菜单, 目标动作}。
+     * <p>与 {@code RETIRED_MENU_MERGE} 的区别：那张表只做「同动作平移」，本表能做「动作改写」。
+     * rdm-intake 退役时必须改写，因为全量可见与分配权在新锚点上叫 view_all/dispatch，
+     * 直接同名搬运会把 intake:view 扫到 requirement:view（人人可看的宽权限）上，那才是真扩权。
+     * <p>为什么现在就建表并每次启动校验，而不是等退役那批再做：现在没人持有新动作，
+     * 映射不产生任何权限变化；但如果映射漏项，今天发现只是一条日志，退役当天发现就是一起
+     * 静默降权事故。把覆盖率检查前置到退役之前的启动里，漂移就不可能留到退役那天。
+     * <p>本表目前只用于校验，真正的平移写入属于「平移 + 切注解 + 软删」原子批次（未完成）。
+     */
+    private static final String[][] ANCHOR_REMAP = {
+            {RdmConstants.MENU_INTAKE, "view", RdmConstants.MENU_REQUIREMENT, RdmConstants.ACTION_VIEW_ALL},
+            {RdmConstants.MENU_INTAKE, "edit", RdmConstants.MENU_REQUIREMENT, RdmConstants.ACTION_DISPATCH},
+            {RdmConstants.MENU_INTAKE, "create", RdmConstants.MENU_REQUIREMENT, RdmConstants.ACTION_CONTRIBUTE},
+            // 导出与菜单同语义，不改名；它不携带 view_all/dispatch，所以单独一行
+            {RdmConstants.MENU_INTAKE, "export", RdmConstants.MENU_REQUIREMENT, "export"},
+            // 旧 intake:delete 的实际用途是删除迭代，语义归宿在迭代菜单而不是需求清单
+            {RdmConstants.MENU_INTAKE, "delete", RdmConstants.MENU_DELIVERY_ITERATION, "delete"},
+    };
+
+    /** 本次需要预先校验覆盖率的存量锚点（退役后交给 {@code RETIRED_MENU_MERGE} 自己的断言） */
+    private static final String ANCHOR_PRECHECK_MENU = RdmConstants.MENU_INTAKE;
+
+    /**
+     * 需要镜像授权的授权表与归属列：成对字面量常量，绝不接受外部输入拼 SQL。
+     * <p>两张表的语义相同（“这个主体在这个菜单上可做哪些动作”），
+     * 锚点收敛必须同时处理，漏一张就会造成“角色能用、部门不能用”。
+     */
+    private static final String[][] GRANT_TABLES = {
+            {"sys_role_menu", "role_id"},
+            {"sys_department_menu", "dept_id"},
     };
 
     /**
@@ -220,7 +280,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>出现表外动作时直接抛出：宁可启动失败，也不能静默丢掉一个动作后把它当成“已迁移”。
      */
     private static final List<String> ACTION_ORDER = List.of(
-            "view", "create", "edit", "delete", "export", "import", "enable", "disable");
+            "view", "create", "edit", "delete", "export", "import", "enable", "disable",
+            "view_all", "dispatch", "contribute");
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -233,6 +294,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
         if (!versionTracker.applyOnce(VERSION_KEY, this::migrate, this::verify)) {
             migrate();
         }
+        // 授权镜像是一次性迁移：applyOnce 已应用时不重跑，也不会进结构自愈的重放链
+        versionTracker.applyOnce(MIRROR_VERSION_KEY, this::mirrorAnchorGrants, this::verifyAnchorMirror);
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -248,13 +311,207 @@ public class RdmMenuInitializer implements CommandLineRunner {
         demoteToGroup("rdm-delivery");
         demoteToGroup("rdm-dashboard");
         alignSeedSorts();
+        // 新动作先登记到菜单行，再谈授权平移与退役：勾不到的动作等于不存在的动作
+        syncSeedActions();
+        // 锚点映射必须在退役之前就是完整的：漏项现在只是一条报错，退役那天就是静默降权
+        assertAnchorRemapCoversLiveMenu(ANCHOR_PRECHECK_MENU);
         // 先搬完旧菜单授权再补新叶子继承：退役不能目标未就位就执行
         retireMenusMergingGrants();
         inheritGroupGrants();
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研交付(RDM) 菜单已就绪（一级菜单 + 需求總看板/效能與產出/研發交付/需求配置四个分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研交付(RDM) 菜单已就绪（v3.15 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS；结构仍为 v3.13 生命周期分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+    }
+
+    /**
+     * 把白名单菜单的可授动作集补齐到种子声明的水平（只并集追加，幂等）。见 {@code ACTION_SYNC_FROM_SEED}。
+     * <p>为什么要单独一步：upsert 分支故意不动 actions（尊重「菜单配置」自定义），
+     * 所以给已有菜单新增「可授动作」必须发这条定向 UPDATE；不刷则退役旧锚点时
+     * 需求侧受理权无处可授，属静默降权。
+     * <p>只补不删：结果永远是「现有动作 ∪ 种子动作」，管理员在该菜单上额外加的动作不会被抹掉。
+     * <p>动作集直接取自 {@code MENUS} 而不是另拄一份 JSON 字面量，避免种子与同步表两处漂移。
+     * <p>读-改-写之间不拼条件 SQL：本方法是启动期 CommandLineRunner 的唯一写入方，
+     * 没有并发修改者；已对齐时重放空转。
+     */
+    private void syncSeedActions() {
+        for (String menuKey : ACTION_SYNC_FROM_SEED) {
+            // 种子动作集是 JSON 数组，必须走 parseActions；actionScope 是给「view,edit」这种逗号声明用的，
+            // 两者弄混会把 ["view" 当成动作名而报「未登记的授权动作」（单测已钉住这一条）
+            Set<String> declared = parseActions(seedActionsOf(menuKey));
+            List<String> currentRaws = jdbcTemplate.queryForList(
+                    "SELECT actions FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, menuKey);
+            if (currentRaws.isEmpty()) {
+                throw new IllegalStateException(menuKey + " 菜单不存在，无法对齐可授动作集");
+            }
+            Set<String> current = parseActions(currentRaws.get(0));
+            if (current.containsAll(declared)) {
+                continue; // 已覆盖种子声明的动作，重放空转
+            }
+            Set<String> union = new LinkedHashSet<>(current);
+            union.addAll(declared);
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET actions = ?, updated_by = 'system' WHERE menu_key = ? AND deleted = 0",
+                    writeActions(union), menuKey);
+            log.info("菜单可授动作集对齐 {}: {} → {}（种子外另保留 {} 项，未被删减）",
+                    menuKey, current, declared, union.size() - declared.size());
+        }
+    }
+
+    /** 从种子表取该菜单声明的可授动作集；菜单不在种子里直接抛（白名单写错不能静默空转） */
+    private static String seedActionsOf(String menuKey) {
+        for (String[] m : MENUS) {
+            if (m[0].equals(menuKey)) {
+                return m[9];
+            }
+        }
+        throw new IllegalStateException("菜单 " + menuKey + " 不在种子里，无法按种子对齐动作集");
+    }
+
+    /**
+     * 按 {@code ANCHOR_REMAP} 把一个菜单上的动作集改写成「目标菜单 → 应写动作集」的分流结果。
+     * <p>纯函数、包内可见，给退役迁移与单测共用同一份归宿口径；没归宿的动作直接抛出：
+     * 宁可启动失败，也不能把「剩下的动作当成已迁移」。允许一个源动作映到多个目标（不 break）。
+     */
+    static Map<String, Set<String>> remapAnchorGrants(String fromMenuKey, Set<String> actions) {
+        Map<String, Set<String>> targets = new LinkedHashMap<>();
+        for (String action : actions) {
+            boolean matched = false;
+            for (String[] row : ANCHOR_REMAP) {
+                if (row[0].equals(fromMenuKey) && row[1].equals(action)) {
+                    targets.computeIfAbsent(row[2], key -> new LinkedHashSet<>()).add(row[3]);
+                    matched = true;
+                }
+            }
+            if (!matched) {
+                throw new IllegalStateException("锚点 " + fromMenuKey + " 的动作 " + action
+                        + " 在 ANCHOR_REMAP 里没有归宿，退役后这个能力会静默丢失");
+            }
+        }
+        return targets;
+    }
+
+    /**
+     * 把旧锚点上的能力按 {@code ANCHOR_REMAP} **镜像**到新锚点：不删源、不改菜单结构。
+     * <p>为什么必须在切注解之前落地：注解一旦不再认 rdm-intake，仍只持有旧锚点的主体会直接 403；
+     * 两者在同一次启动里先生效镜像、后生效新注解，才算“平移不降权”。
+     * <p>可见副作用（必须告知而不静默）：若某主体原本在目标菜单上一行授权都没有，
+     * 镜像会新建一行，而菜单可见性 = 持有该菜单任一动作 → 该主体侧栏会多出目标菜单入口。
+     * 注意是“侧栏”而不是“权限扩大”：拿到的仍是同一个能力，只是入口提前可见。
+     * <p>方法只在 applyOnce 里执行一次，因此内部可以放心做并集写入而不会撑大“撤权不复活”的风险。
+     */
+    void mirrorAnchorGrants() {
+        int changed = 0;
+        for (String[] table : GRANT_TABLES) {
+            for (String[] rule : ANCHOR_REMAP) {
+                changed += mirrorGrantRule(table[0], table[1], rule);
+            }
+        }
+        log.info("锚点授权镜像（rdm-intake → rdm-requirement/迭代排期）：新建或更新 {} 条授权行；"
+                + "源菜单与其授权保持不变，未软删任何菜单", changed);
+    }
+
+    /** 一条映射规则在一张授权表上的镜像；返回实际发生写入的行数 */
+    private int mirrorGrantRule(String table, String ownerColumn, String[] rule) {
+        Long fromId = queryMenuIdByKey(rule[0]);
+        Long toId = queryMenuIdByKey(rule[2]);
+        if (fromId == null || toId == null) {
+            // 源已退役或目标未就位：空转。宁可不写，也不能把授权扫到查不到的菜单上
+            return 0;
+        }
+        int changed = 0;
+        for (Map<String, Object> source : queryGrantees(table, ownerColumn, fromId)) {
+            if (!parseActions(source.get("actions")).contains(rule[1])) {
+                continue;
+            }
+            Long ownerId = ((Number) source.get("owner_id")).longValue();
+            changed += grantActionOn(table, ownerColumn, toId, ownerId, rule[3]);
+        }
+        return changed;
+    }
+
+    /**
+     * 在目标菜单上为单个主体并集写入一个动作：已有则只补少的，没有则新建一行。
+     * <p>只补不删：绝不抹掉目标菜单上管理员已经自定义过的其他动作。
+     */
+    private int grantActionOn(String table, String ownerColumn, Long menuId, Long ownerId, String action) {
+        List<String> current = jdbcTemplate.queryForList(
+                "SELECT actions FROM " + table + " WHERE menu_id = ? AND " + ownerColumn + " = ?",
+                String.class, menuId, ownerId);
+        if (current.isEmpty()) {
+            jdbcTemplate.update("INSERT INTO " + table + " (" + ownerColumn + ", menu_id, actions) VALUES (?, ?, ?)",
+                    ownerId, menuId, writeActions(Set.of(action)));
+            return 1;
+        }
+        Set<String> target = parseActions(current.get(0));
+        if (target.contains(action)) {
+            return 0;
+        }
+        Set<String> union = new LinkedHashSet<>(target);
+        union.add(action);
+        jdbcTemplate.update("UPDATE " + table + " SET actions = ? WHERE menu_id = ? AND " + ownerColumn + " = ?",
+                writeActions(union), menuId, ownerId);
+        return 1;
+    }
+
+    /**
+     * 后置校验：旧锚点上每个持有某动作的主体，新锚点上必须已拿到对应动作。
+     * <p>不校验的话镜像漏写没有任何现象，等到注解不再认旧锚点那天才炸成 403，
+     * 而且现场已经隔了一个版本，回溯成本极高。
+     */
+    void verifyAnchorMirror() {
+        for (String[] table : GRANT_TABLES) {
+            for (String[] rule : ANCHOR_REMAP) {
+                assertMirrorRuleApplied(table[0], table[1], rule);
+            }
+        }
+    }
+
+    private void assertMirrorRuleApplied(String table, String ownerColumn, String[] rule) {
+        Long fromId = queryMenuIdByKey(rule[0]);
+        Long toId = queryMenuIdByKey(rule[2]);
+        if (fromId == null || toId == null) {
+            return;
+        }
+        for (Map<String, Object> source : queryGrantees(table, ownerColumn, fromId)) {
+            if (!parseActions(source.get("actions")).contains(rule[1])) {
+                continue;
+            }
+            Long ownerId = ((Number) source.get("owner_id")).longValue();
+            List<String> targetRaws = jdbcTemplate.queryForList(
+                    "SELECT actions FROM " + table + " WHERE menu_id = ? AND " + ownerColumn + " = ?",
+                    String.class, toId, ownerId);
+            if (targetRaws.isEmpty() || !parseActions(targetRaws.get(0)).contains(rule[3])) {
+                throw new IllegalStateException("锚点镜像未生效: " + table + " owner=" + ownerId
+                        + " 持有 " + rule[0] + ":" + rule[1] + "，但目标 " + rule[2] + ":" + rule[3] + " 未落地");
+            }
+        }
+    }
+
+    /**
+     * 查某菜单上的全部授权主体与动作集。
+     * <p>动作集在 Java 里用 parseActions 判包含，不用 SQL 的 LIKE/JSON_CONTAINS：
+     * actions 是 text 列，旧数据存在空格与形式差异，LIKE 模式 `%"view"%` 又很容易和
+     * `"view_all"` 混淆，解析失败则直接抛而不会当成“没持有”。
+     */
+    private List<Map<String, Object>> queryGrantees(String table, String ownerColumn, Long menuId) {
+        return jdbcTemplate.queryForList(
+                "SELECT " + ownerColumn + " AS owner_id, actions FROM " + table + " WHERE menu_id = ?", menuId);
+    }
+
+    /**
+     * 校验存量锚点当前声明的每个动作都有归宿（菜单已退役时空转）。
+     * <p>读的是 {@code sys_menu.actions} 实值而不是种子常量：管理员在「菜单配置」里
+     * 给该菜单加了新动作时，映射不完整会直接挡住启动。这看似严厉，但漏项的真正代价发生在
+     * 退役那天（持有者静默丢能力且无人报错），拿启动失败换一个可提前看到的原因，值得。
+     */
+    private void assertAnchorRemapCoversLiveMenu(String menuKey) {
+        List<String> raws = jdbcTemplate.queryForList(
+                "SELECT actions FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, menuKey);
+        if (raws.isEmpty()) {
+            return;
+        }
+        remapAnchorGrants(menuKey, parseActions(raws.get(0)));
     }
 
     /**
@@ -754,10 +1011,17 @@ public class RdmMenuInitializer implements CommandLineRunner {
         if (dupSorts != null && dupSorts > 0) {
             throw new IllegalStateException("RDM 同一分组内存在 " + dupSorts + " 组重复 sort_order，菜单顺序会不稳定");
         }
-        // 重排后的关键顺序必须真落地（只信 UPDATE 报的成功不算）
-        assertSortEquals("rdm-dashboard-quality", 3);
-        assertSortEquals("rdm-dashboard-risk", 2);
-        assertSortEquals("rdm-dashboard-score", 1);
+        // v3.13 重排后的关键顺序必须真落地
+        assertSortEquals("rdm-dashboard-project", 1);
+        assertSortEquals("rdm-dashboard-risk", 3);
+        assertSortEquals("rdm-delivery-test", 1);
+        assertSortEquals("rdm-dashboard-score", 5);
+        /*
+         * v3.15 验收：rdm-requirement 的可授集必须等于种子声明的完整集。
+         * <p>实查而不是信 UPDATE 回报：勾不到的动作等于不存在的动作，到退役那天才暴露就是降权事故。
+         */
+        assertMenuActionsInclude("rdm-requirement",
+                "view", "create", "edit", "export", "view_all", "dispatch", "contribute");
         // v3.7 退役验收：被收敛的菜单不得仍有存活行，也不得残留孤儿授权（残留会让授权树出现幽灵节点）
         for (String[] row : RETIRED_MENU_MERGE) {
             String retiredKey = row[0];
@@ -790,8 +1054,33 @@ public class RdmMenuInitializer implements CommandLineRunner {
         // 拿它当启动门禁会让一次正常改名把服务改崩（结构类断言仍保持硬失败）
         warnIfMenuNameDiffers(RdmConstants.MENU_INTAKE, "需求管理");
         warnIfMenuNameDiffers("rdm-intake-approval", "提交需求");
-        // 分组必须是真正的目录：带 path 的“分组”会在侧边栏变成可点叶子，两层结构退化
+        // v3.13 分组结构验收：新增分组必须是纯目录
+        assertIsDirectoryGroup("rdm-test-quality-group");
+        assertIsDirectoryGroup("rdm-release-accept-group");
         assertIsDirectoryGroup("rdm-pool-group");
+    }
+
+    /**
+     * 断言菜单行的可授动作集包含给定动作。
+     * <p>用「实查行内容」而不是「信 UPDATE 报的成功」：动作集没落库时不会报错，
+     * 只会让管理员在授权中心找不到该勾的那一项，到退役旧锚点时才暴露就已是降权事故。
+     */
+    private void assertMenuActionsInclude(String menuKey, String... actions) {
+        List<String> raws = jdbcTemplate.queryForList(
+                "SELECT actions FROM sys_menu WHERE menu_key = ? AND deleted = 0", String.class, menuKey);
+        if (raws.isEmpty()) {
+            throw new IllegalStateException(menuKey + " 菜单不存在，无法校验可授动作集");
+        }
+        Set<String> declared = parseActions(raws.get(0));
+        List<String> missing = new java.util.ArrayList<>();
+        for (String action : actions) {
+            if (!declared.contains(action)) {
+                missing.add(action);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(menuKey + " 的可授动作集缺少 " + missing + "，授权中心勾不到这些动作");
+        }
     }
 
     /** 断言菜单是一级分组（type=1、无 path、无 component） */

@@ -165,6 +165,33 @@ export const RDM_STAGE_PERCENT: Record<RdmStage, number> = {
 /** 终态（不可再流转，仅管理员重开） */
 export const RDM_FINAL_STATUS: RdmStatus[] = [RDM_STATUS.CLOSED]
 
+/**
+ * 准入前状态（与后端 RdmConstants.REQ_NOT_ADMITTED_STATUSES 同口径）：
+ * 这些行属于「提交需求」侧，不会进入「需求管理」，且**还没有正式需求编号**。
+ */
+export const RDM_PRE_ADMISSION_STATUS: RdmStatus[] = [
+  RDM_STATUS.DRAFT,
+  RDM_STATUS.INTAKE_PENDING,
+  RDM_STATUS.INTAKE_REJECTED,
+]
+
+export function isRdmPreAdmissionStatus(status?: string | null): boolean {
+  return !!status && RDM_PRE_ADMISSION_STATUS.includes(status as RdmStatus)
+}
+
+/** 尚未生成正式编号时的统一占位文案（全模块共用，避免一页一个写法） */
+export const RDM_REQ_NO_PENDING_TEXT = '尚未生成'
+
+/**
+ * 渲染正式需求编号（需求提交/需求管理拆分 · 批次1：延迟发号）。
+ * <p>准入前的行 `reqNo` 为 null，必须给可见文案而不是留白：留白会让人以为
+ * 「需求不存在」或“加载失败”，而不是“本轮还没发号”。
+ * <p>禁止用内部 id 或 XQSP 审批流程编号回填本字段——那是两个不同的事实。
+ */
+export function formatRdmReqNo(reqNo?: string | null): string {
+  return reqNo && reqNo.trim() ? reqNo : RDM_REQ_NO_PENDING_TEXT
+}
+
 /** 需求类型（字典 RDM_REQ_TYPE） */
 export const RDM_REQ_TYPE = {
   OPTIMIZE: 'OPTIMIZE',
@@ -987,6 +1014,8 @@ export const RDM_MENU_KEYS = [
   'rdm-acceptance', 'rdm-config-group',
   'rdm-config-status', 'rdm-config-routing', 'rdm-config-sla', 'rdm-config-score',
   'rdm-dashboard-project', 'rdm-delivery-test', 'rdm-delivery-release',
+  // v3.13 新建分组
+  'rdm-test-quality-group', 'rdm-release-accept-group',
 ] as const
 
 /** 通知事件码（与后端 RDM_EVENT 对齐，M1 接入） */
@@ -1534,4 +1563,279 @@ export const RDM_DEP_TYPE_LABEL: Record<string, string> = {
   start_to_start: '開始→開始（SS）',
   finish_to_finish: '完成→完成（FF）',
   start_to_finish: '開始→完成（SF）',
+}
+
+/* ==================== Batch3/4：測試/問題/發布/驗收/遷移/灰度口徑 ==================== */
+
+// ===== 裁決結論（延期裁決 / 發布裁決 / 豁免裁決共用；後端只認 approved/rejected） =====
+export const RDM_DECISION = {
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+} as const
+export type RdmDecision = (typeof RDM_DECISION)[keyof typeof RDM_DECISION]
+
+export const RDM_DECISION_LABEL: Record<string, string> = {
+  approved: '批准',
+  rejected: '駁回',
+}
+
+export const RDM_DECISION_COLOR: Record<string, string> = {
+  approved: 'success',
+  rejected: 'error',
+}
+
+// ===== 問題來源類型（對齊後端 RdmIssueDTO.Create.sourceType） =====
+export const RDM_ISSUE_SOURCE_TYPE = {
+  TEST: 'test',
+  ACCEPTANCE: 'acceptance',
+  ONLINE: 'online',
+  OTHER: 'other',
+} as const
+export type RdmIssueSourceType = (typeof RDM_ISSUE_SOURCE_TYPE)[keyof typeof RDM_ISSUE_SOURCE_TYPE]
+
+export const RDM_ISSUE_SOURCE_TYPE_LABEL: Record<string, string> = {
+  test: '測試發現',
+  acceptance: '驗收發現',
+  online: '線上問題',
+  other: '其他',
+}
+
+export const RDM_ISSUE_SOURCE_TYPE_COLOR: Record<string, string> = {
+  test: 'cyan',
+  acceptance: 'purple',
+  online: 'volcano',
+  other: 'default',
+}
+
+// ===== 延期裁決方（decideIssueDefer 的 decisionType 查詢參數） =====
+export const RDM_DEFER_DECISION_TYPE = {
+  PRODUCT: 'product',
+  BUSINESS: 'business',
+} as const
+
+export const RDM_DEFER_DECISION_TYPE_LABEL: Record<string, string> = {
+  product: '產品裁決',
+  business: '業務裁決',
+}
+
+// ===== 測試執行結果（比用例結論 RDM_CASE_RESULT 多 skip，對齊後端 Execute.result） =====
+export const RDM_TEST_EXECUTION_RESULT = {
+  PASS: 'pass',
+  FAIL: 'fail',
+  BLOCKED: 'blocked',
+  SKIP: 'skip',
+} as const
+
+export const RDM_TEST_EXECUTION_RESULT_LABEL: Record<string, string> = {
+  pass: '通過',
+  fail: '不通過',
+  blocked: '阻塞未測',
+  skip: '跳過',
+}
+
+export const RDM_TEST_EXECUTION_RESULT_COLOR: Record<string, string> = {
+  pass: 'success',
+  fail: 'error',
+  blocked: 'warning',
+  skip: 'default',
+}
+
+// ===== 發布門禁檢查項（對齊後端 RdmReleaseGateService.checkType，取代舊的前端臆造鍵） =====
+export const RDM_RELEASE_CHECK_TYPE = {
+  TEST: 'test',
+  ACCEPTANCE: 'acceptance',
+  DEFECT: 'defect',
+  DEPENDENCY: 'dependency',
+  SCOPE: 'scope',
+} as const
+
+export const RDM_RELEASE_CHECK_TYPE_LABEL: Record<string, string> = {
+  test: '測試通過',
+  acceptance: '驗收完成',
+  defect: '缺陷閉環',
+  dependency: '依賴就緒',
+  scope: '範圍一致',
+}
+
+export const RDM_RELEASE_CHECK_TYPE_COLOR: Record<string, string> = {
+  test: 'cyan',
+  acceptance: 'purple',
+  defect: 'volcano',
+  dependency: 'gold',
+  scope: 'geekblue',
+}
+
+// ===== 系統驗證狀態（對齊後端 Verify.verifyStatus） =====
+export const RDM_VERIFY_STATUS = {
+  PENDING: 'pending',
+  PASSED: 'passed',
+  FAILED: 'failed',
+} as const
+
+export const RDM_VERIFY_STATUS_LABEL: Record<string, string> = {
+  pending: '待驗證',
+  passed: '驗證通過',
+  failed: '驗證失敗',
+}
+
+export const RDM_VERIFY_STATUS_COLOR: Record<string, string> = {
+  pending: 'default',
+  passed: 'success',
+  failed: 'error',
+}
+
+// ===== 業務開放狀態（開放是獨立事實，絕不由「驗證通過」推導） =====
+export const RDM_OPEN_STATUS = {
+  PENDING: 'pending',
+  OPENED: 'opened',
+  NOT_OPENED: 'not_opened',
+} as const
+
+export const RDM_OPEN_STATUS_LABEL: Record<string, string> = {
+  pending: '待開放',
+  opened: '已開放',
+  not_opened: '未開放',
+}
+
+export const RDM_OPEN_STATUS_COLOR: Record<string, string> = {
+  pending: 'default',
+  opened: 'success',
+  not_opened: 'warning',
+}
+
+// ===== 緊急豁免裁決類型（對齊後端 ExemptionDecision.decisionType） =====
+export const RDM_EXEMPTION_DECISION_TYPE = {
+  PRODUCT_RISK: 'product_risk',
+  RELEASE: 'release',
+} as const
+
+export const RDM_EXEMPTION_DECISION_TYPE_LABEL: Record<string, string> = {
+  product_risk: '產品風險裁決',
+  release: '發布裁決',
+}
+
+// ===== 補驗單狀態（對齊後端 SupplementaryRecord.status） =====
+export const RDM_SUPPLEMENTARY_STATUS = {
+  PENDING: 'pending',
+  COMPLETED: 'completed',
+  OVERDUE: 'overdue',
+  FAILED: 'failed',
+} as const
+
+export const RDM_SUPPLEMENTARY_STATUS_LABEL: Record<string, string> = {
+  pending: '待補驗',
+  completed: '已完成',
+  overdue: '已超期',
+  failed: '補驗失敗',
+}
+
+export const RDM_SUPPLEMENTARY_STATUS_COLOR: Record<string, string> = {
+  pending: 'processing',
+  completed: 'success',
+  overdue: 'warning',
+  failed: 'error',
+}
+
+// ===== 補驗結果（對齊後端 SupplementaryComplete.result） =====
+export const RDM_SUPPLEMENTARY_RESULT = {
+  PASS: 'pass',
+  FAIL: 'fail',
+} as const
+
+export const RDM_SUPPLEMENTARY_RESULT_LABEL: Record<string, string> = {
+  pass: '通過',
+  fail: '不通過',
+}
+
+export const RDM_SUPPLEMENTARY_RESULT_COLOR: Record<string, string> = {
+  pass: 'success',
+  fail: 'error',
+}
+
+// ===== 追加式嘗試動作（部署/驗證/開放/回滾，只增不改） =====
+export const RDM_RELEASE_ATTEMPT_ACTION = {
+  DEPLOY: 'deploy',
+  VERIFY: 'verify',
+  OPEN: 'open',
+  ROLLBACK: 'rollback',
+} as const
+
+export const RDM_RELEASE_ATTEMPT_ACTION_LABEL: Record<string, string> = {
+  deploy: '部署',
+  verify: '驗證',
+  open: '開放',
+  rollback: '回滾',
+}
+
+// ===== Batch4：存量遷移批次狀態（對齊後端 RdmConstants.MIGRATION_BATCH_*） =====
+export const RDM_STOCK_MIGRATION_BATCH_STATUS = {
+  PREVIEWED: 'previewed',
+  CONFIRMED: 'confirmed',
+  RUNNING: 'running',
+  PAUSED: 'paused',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  ROLLED_BACK: 'rolled_back',
+} as const
+
+export const RDM_STOCK_MIGRATION_BATCH_STATUS_LABEL: Record<string, string> = {
+  previewed: '待確認',
+  confirmed: '已確認',
+  running: '執行中',
+  paused: '已暫停',
+  completed: '已完成',
+  failed: '執行失敗',
+  rolled_back: '已回退',
+}
+
+export const RDM_STOCK_MIGRATION_BATCH_STATUS_COLOR: Record<string, string> = {
+  previewed: 'warning',
+  confirmed: 'processing',
+  running: 'cyan',
+  paused: 'gold',
+  completed: 'success',
+  failed: 'error',
+  rolled_back: 'default',
+}
+
+// ===== Batch4：存量遷移明細狀態（對齊後端 RdmConstants.MIGRATION_ITEM_*） =====
+export const RDM_STOCK_MIGRATION_ITEM_STATUS = {
+  PREVIEWED: 'previewed',
+  CONFIRMED: 'confirmed',
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  BLOCKED: 'blocked',
+  ROLLED_BACK: 'rolled_back',
+} as const
+
+export const RDM_STOCK_MIGRATION_ITEM_STATUS_LABEL: Record<string, string> = {
+  previewed: '待確認',
+  confirmed: '已確認',
+  running: '執行中',
+  completed: '已完成',
+  failed: '執行失敗',
+  blocked: '不可遷移',
+  rolled_back: '已回退',
+}
+
+export const RDM_STOCK_MIGRATION_ITEM_STATUS_COLOR: Record<string, string> = {
+  previewed: 'warning',
+  confirmed: 'processing',
+  running: 'cyan',
+  completed: 'success',
+  failed: 'error',
+  blocked: 'volcano',
+  rolled_back: 'default',
+}
+
+// ===== Batch4：V3 灰度開關（0/1；GLOBAL 熔斷優先於項目級開啟，開啟灰度≠放開發布門禁） =====
+export const RDM_GRAYSCALE_FLAG_LABEL: Record<string, string> = {
+  '0': '關閉',
+  '1': '開啟',
+}
+
+export const RDM_GRAYSCALE_FLAG_COLOR: Record<string, string> = {
+  '0': 'default',
+  '1': 'success',
 }

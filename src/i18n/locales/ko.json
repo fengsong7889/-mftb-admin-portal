@@ -949,6 +949,8 @@
     "statScheduleStaff": "이번 주 편성 인원",
     "statScheduleScheduled": "편성된 칸 수",
     "statScheduleRest": "휴무 칸 수",
-    "statScheduleUnscheduled": "전주 미편성 인원"
+    "statScheduleUnscheduled": "전주 미편성 인원",
+    "noValidWorksheet": "파일에 유효한 워크시트가 없습니다",
+    "noValidDataRows": "파일에 유효한 데이터 행이 없습니다"
   }
 }

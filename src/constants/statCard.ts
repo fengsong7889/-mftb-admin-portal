@@ -8,6 +8,11 @@ export const STAT_COLORS = {
   brand: { main: '#E8720C', bg: '#FFF7E6' },
   /** 系統/時間 */
   system: { main: '#722ED1', bg: '#F9F0FF' },
+  /**
+   * 危险/待处理阻断项（§B.7 原色板未含红色，但 §A.1 危险色 #FF4D4F 与
+   * §K.4 统计卡红色底 #FFEBEE 均已登记，此处按已登记色值扩展，不引入新色）。
+   */
+  danger: { main: '#FF4D4F', bg: '#FFEBEE' },
 } as const
 
 export type StatColorKey = keyof typeof STAT_COLORS

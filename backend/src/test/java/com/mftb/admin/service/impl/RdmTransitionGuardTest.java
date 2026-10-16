@@ -166,6 +166,26 @@ class RdmTransitionGuardTest {
         assertTrue(service.canPerform(dispatch, techLead, Set.of()));
     }
 
+    /**
+     * 反向护栏：只有产品处理权（rdm-requirement:edit）不等于分配权。
+     * <p>为什么现在就要钉住：菜单退役那一批要把两个菜单的权限锚点合并到
+     * {@code rdm-requirement}（保留广被引用的锚点、软删几乎未投用的 rdm-intake）。
+     * 合并时如果把分配/改派也改成读 {@code rdm-requirement:edit}，受理权与分配权就砸成一个动作，
+     * 今后给产品同事开受理权会连带拿到全池分配权。今天两边都只有 admin 持有，看不出问题；
+     * 没这条断言就只能等出事才发现。保持两个动作分开（例如另设 dispatch）是合并的前提。
+     */
+    @Test
+    @DisplayName("仅有产品处理权不等于分配权（合并菜单锚点时不得坍缩）")
+    void requirementEditAloneDoesNotGrantDispatch() {
+        SysUser pm = user(5L, "MF00005", "陳雅婷");
+        when(operatorResolver.isAdmin(pm)).thenReturn(false);
+        // 只给产品处理/受理权，不给需求池（分配）编辑权
+        when(permissionService.hasPermission(pm, RdmConstants.MENU_REQUIREMENT, "edit")).thenReturn(true);
+        RdmConfigVO.Transition dispatch = rule(List.of(RdmConstants.ROLE_DISPATCHER), List.of("pm"));
+        assertFalse(service.canPerform(dispatch, pm, Set.of()),
+                "rdm-requirement:edit 是产品处理权，不得被当成需求池分配权兜底放行");
+    }
+
     @Test
     @DisplayName("必填字段缺失时拒绝，并提示中文字段名")
     void requiredFieldMustBeFilled() {

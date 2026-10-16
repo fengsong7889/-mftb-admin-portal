@@ -83,7 +83,8 @@ public class RdmAssistantController {
      */
     @PostMapping("/risk-summary")
     @Operation(summary = "逾期与阻塞风险摘要")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-dashboard-quality", "rdm-dashboard-report", "rdm-intake", "rdm-dashboard-risk"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-dashboard-quality", "rdm-dashboard-report", "rdm-intake", "rdm-dashboard-risk"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmAssistantVO.RiskSummary> riskSummary(
             @RequestParam(required = false, defaultValue = "0") Integer minStayDays) {
         String blocked = killSwitchNotice();

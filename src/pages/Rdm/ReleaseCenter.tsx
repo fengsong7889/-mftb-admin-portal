@@ -8,28 +8,23 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Button, Col, DatePicker, Form, Input, InputNumber, Modal, Progress,
-  Row, Select, Space, Statistic, Table, Tag, message,
+  Alert, Button, DatePicker, Form, Input, Progress, Select, Space, Table, Tag,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   CheckCircleOutlined, ClockCircleOutlined, CloudUploadOutlined,
-  DeleteOutlined, MinusCircleOutlined, PlusOutlined, ReloadOutlined,
+  PlusOutlined, ReloadOutlined,
   RocketOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
+import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
   fetchReleaseBatches,
-  createReleaseBatch,
-  fetchProjectPage,
-  fetchDeliveryItems,
   type RdmReleaseBatchListItem,
-  type RdmReleaseBatchCreateForm,
-  type RdmProjectListItem,
-  type RdmDeliveryItemListItem,
 } from '../../api/rdm'
-import { fetchEmployees } from '../../api/employee'
+import { fetchEmployeeIdOptions } from '../../api/employee'
 import {
   RDM_RELEASE_BATCH_STATUS,
   RDM_RELEASE_BATCH_STATUS_COLOR,
@@ -46,21 +41,24 @@ const STATUS_OPTIONS = Object.entries(RDM_RELEASE_BATCH_STATUS_LABEL).map(([valu
 }))
 
 /**
- * 员工下拉选项：选项值取数字用户 ID（sys_user.id）。
- * 注意：不能直接用 api/employee 的 fetchEmployeeOptions，其 value 为工号字符串（如 'MF00001'），
- * 提交时 Number('MF00001') 会得到 NaN，导致发布负责人 / 负责人筛选传参错误。
+ * 列配置元数据（§E.3 列表页必须可显隐/调序）。
+ * key/title 与下方 columns 逐字对应（注意发布负责人列的 key 是 owner、不是 dataIndex），
+ * 新增/改名列时两处同步，否则该列不会出现在字段设置面板。
  */
-async function fetchEmployeeIdOptions(keyword: string): Promise<{ value: string; label: string }[]> {
-  const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
-  return (res.records || []).map(e => {
-    const extra = [e.department, e.position, e.jobLevel].filter(Boolean).join(' / ')
-    return { value: String(e.id), label: `${e.name}(${e.empId})${extra ? ` · ${extra}` : ''}` }
-  })
-}
+const COLUMN_META = [
+  { key: 'batchNo', title: '批次號' },
+  { key: 'versionTag', title: '版本標識' },
+  { key: 'projectName', title: '關聯項目' },
+  { key: 'scope', title: '範圍摘要' },
+  { key: 'owner', title: '發布負責人' },
+  { key: 'planTime', title: '計劃時間' },
+  { key: 'status', title: '狀態' },
+  { key: 'progress', title: '部署進度' },
+  { key: 'action', title: '操作' },
+]
 
 export default function ReleaseCenter() {
   const navigate = useNavigate()
-  const [form] = Form.useForm()
 
   // ===== 列表状态 =====
   const [loading, setLoading] = useState(false)
@@ -76,11 +74,7 @@ export default function ReleaseCenter() {
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined)
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
 
-  // ===== 创建弹窗 =====
-  const [createOpen, setCreateOpen] = useState(false)
-  const [createLoading, setCreateLoading] = useState(false)
-  const [projects, setProjects] = useState<RdmProjectListItem[]>([])
-  const [deliveryItems, setDeliveryItems] = useState<RdmDeliveryItemListItem[]>([])
+  // 負責人筛选选项（创建表单已拆到独立页 ReleaseBatchCreate）
   const [employeeOptions, setEmployeeOptions] = useState<{ value: string; label: string }[]>([])
 
   // ===== 数据加载 =====
@@ -135,67 +129,8 @@ export default function ReleaseCenter() {
     setPageNo(1)
   }
 
-  // ===== 创建弹窗 =====
-  const handleOpenCreate = async () => {
-    setCreateOpen(true)
-    try {
-      const [projRes, empRes] = await Promise.all([
-        fetchProjectPage({ pageSize: 200 }),
-        fetchEmployeeIdOptions(''),
-      ])
-      setProjects(projRes.records ?? [])
-      setEmployeeOptions(empRes)
-    } catch {
-      message.error('載入項目或人員清單失敗')
-    }
-  }
-
-  const handleCreateSubmit = async () => {
-    try {
-      const values = await form.validateFields()
-      setCreateLoading(true)
-      const selectedEmployee = employeeOptions.find(e => e.value === String(values.releaseOwnerUserId))
-      const data: RdmReleaseBatchCreateForm = {
-        versionTag: values.versionTag,
-        projectId: values.projectId,
-        releaseOwnerUserId: Number(values.releaseOwnerUserId),
-        releaseOwnerUserName: selectedEmployee?.label?.split('(')[0] ?? '',
-        planTime: values.planTime ? values.planTime.format('YYYY-MM-DDTHH:mm:ss') : undefined,
-        deliveryItemIds: values.deliveryItemIds,
-        deployments: (values.deployments ?? []).map((d: Record<string, unknown>, i: number) => ({
-          systemCode: d.systemCode as string,
-          systemName: d.systemName as string | undefined,
-          buildId: d.buildId as string | undefined,
-          deployOrder: (d.deployOrder as number | undefined) ?? i + 1,
-        })),
-      }
-      await createReleaseBatch(data)
-      message.success('發布批次創建成功')
-      setCreateOpen(false)
-      form.resetFields()
-      loadData(1, pageSize)
-      setPageNo(1)
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'errorFields' in err) return // form validation error
-      message.error('創建發布批次失敗')
-    } finally {
-      setCreateLoading(false)
-    }
-  }
-
-  const handleProjectChange = async (projectId: number | undefined) => {
-    form.setFieldValue('deliveryItemIds', [])
-    if (!projectId) {
-      setDeliveryItems([])
-      return
-    }
-    try {
-      const res = await fetchDeliveryItems({ projectId, pageSize: 200 })
-      setDeliveryItems(res.records ?? [])
-    } catch {
-      setDeliveryItems([])
-    }
-  }
+  // ===== 創建發布批次：独立表单页（§9.1 禁止用 Modal 承载新增表单） =====
+  const openCreatePage = () => navigate('/rdm-release-create')
 
   // ===== 表格列 =====
   const columns: TableColumnsType<RdmReleaseBatchListItem> = useMemo(() => [
@@ -272,6 +207,12 @@ export default function ReleaseCenter() {
 
   const tableWidth = columns.reduce((sum, col) => sum + Number((col as { width?: number }).width ?? 120), 0)
 
+  // §E.3 列配置：字段设置面板放操作区右侧，批次号锁头、操作列锁尾
+  const { configComponent, applyConfig } = useColumnConfig('rdm-release-center', COLUMN_META, [
+    { key: 'batchNo', visible: true, locked: 'head' as const },
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+
   return (
     <div className="content-area">
       {/* 錯誤橫幅 */}
@@ -286,7 +227,7 @@ export default function ReleaseCenter() {
         />
       )}
 
-      {/* ===== 搜索區 ===== */}
+      {/* ===== 搜索區：§E.1 控件宽度由 .search-section 统一给 100%，不得内联写死 ===== */}
       <div className="search-section">
         <Form layout="inline" style={{ width: '100%' }}>
           <Form.Item label="關鍵字">
@@ -296,7 +237,6 @@ export default function ReleaseCenter() {
               onChange={e => setKeyword(e.target.value)}
               onPressEnter={handleSearch}
               allowClear
-              style={{ width: 180 }}
               prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
             />
           </Form.Item>
@@ -306,7 +246,6 @@ export default function ReleaseCenter() {
               value={statusFilter}
               onChange={v => setStatusFilter(v)}
               allowClear
-              style={{ width: 140 }}
               options={STATUS_OPTIONS}
             />
           </Form.Item>
@@ -325,7 +264,6 @@ export default function ReleaseCenter() {
                   } catch { /* ignore */ }
                 }
               }}
-              style={{ width: 160 }}
               options={employeeOptions}
             />
           </Form.Item>
@@ -333,67 +271,38 @@ export default function ReleaseCenter() {
             <RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
-              style={{ width: 240 }}
             />
           </Form.Item>
-          <Form.Item className="search-actions">
-            <Space>
+          <Form.Item label=" ">
+            <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
-            </Space>
+            </div>
           </Form.Item>
         </Form>
       </div>
 
-      {/* ===== 統計卡片（必須在搜索區下方） ===== */}
-      <div className="rdm-release-stats" key={`${statusFilter}-${keyword}`}>
-        <Row gutter={16}>
-          <Col span={6}>
-            <div className="rdm-release-stat-card">
-              <Statistic
-                title={<span><ClockCircleOutlined style={{ marginRight: 4, color: '#8C8C8C' }} />計劃中</span>}
-                value={stats.planningCount}
-                valueStyle={{ color: '#595959', fontSize: 28, fontWeight: 700 }}
-              />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-release-stat-card rdm-release-stat-card--processing">
-              <Statistic
-                title={<span><CheckCircleOutlined style={{ marginRight: 4, color: '#1890FF' }} />待審批</span>}
-                value={stats.approvedCount}
-                valueStyle={{ color: '#1890FF', fontSize: 28, fontWeight: 700 }}
-              />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-release-stat-card rdm-release-stat-card--warning">
-              <Statistic
-                title={<span><CloudUploadOutlined style={{ marginRight: 4, color: '#E8720C' }} />部署中</span>}
-                value={stats.deployingCount}
-                valueStyle={{ color: '#E8720C', fontSize: 28, fontWeight: 700 }}
-              />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-release-stat-card rdm-release-stat-card--success">
-              <Statistic
-                title={<span><RocketOutlined style={{ marginRight: 4, color: '#52C41A' }} />已發布</span>}
-                value={stats.releasedCount}
-                valueStyle={{ color: '#52C41A', fontSize: 28, fontWeight: 700 }}
-              />
-            </div>
-          </Col>
-        </Row>
+      {/* ===== 統計卡片（必須在搜索區下方）：§B.7 统一走 StatCards（计数控件动画 + hover） ===== */}
+      <div style={{ marginBottom: 16 }}>
+        <StatCards
+          animationKey={`${statusFilter ?? ''}-${keyword}-${rows.length}`}
+          items={[
+            { key: 'planning', icon: <ClockCircleOutlined />, color: 'info', value: stats.planningCount, label: '計劃中' },
+            { key: 'approved', icon: <CheckCircleOutlined />, color: 'brand', value: stats.approvedCount, label: '待審批' },
+            { key: 'deploying', icon: <CloudUploadOutlined />, color: 'system', value: stats.deployingCount, label: '部署中' },
+            { key: 'released', icon: <RocketOutlined />, color: 'success', value: stats.releasedCount, label: '已發布' },
+          ]}
+        />
       </div>
 
-      {/* ===== 操作區 ===== */}
+      {/* ===== 操作區：§E.2 新增类在右，刷新等中性动作在左 ===== */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>創建發布批次</Button>
+          <Button icon={<ReloadOutlined />} onClick={() => loadData()}>刷新</Button>
         </div>
         <div className="action-section-right">
-          <Button icon={<ReloadOutlined />} onClick={() => loadData()}>刷新</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreatePage}>創建發布批次</Button>
+          {configComponent}
         </div>
       </div>
 
@@ -402,7 +311,7 @@ export default function ReleaseCenter() {
         className="nowrap-table"
         rowKey="id"
         loading={loading}
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={rows}
         tableLayout="fixed"
         scroll={{ x: tableWidth }}
@@ -414,107 +323,10 @@ export default function ReleaseCenter() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: t => `共 ${t} 條`,
-          onChange: (p, s) => { setPageNo(p); setPageSize(s) },
+          /* §E.4：每页条数变化时必须重置到第 1 页 */
+          onChange: (p, s) => { setPageSize(s); setPageNo(s !== pageSize ? 1 : p) },
         }}
       />
-
-      {/* ===== 創建發布批次 Modal ===== */}
-      <Modal
-        title={<span><RocketOutlined style={{ marginRight: 8, color: '#E8720C' }} />創建發布批次</span>}
-        open={createOpen}
-        onCancel={() => { setCreateOpen(false); form.resetFields() }}
-        onOk={handleCreateSubmit}
-        confirmLoading={createLoading}
-        width={780}
-        okText="創建"
-        cancelText="取消"
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="versionTag" label="版本標識" rules={[{ required: true, message: '請輸入版本標識' }]}>
-                <Input placeholder="例如 v2.1.0" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="projectId" label="關聯項目">
-                <Select
-                  placeholder="選擇項目"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  onChange={handleProjectChange}
-                  options={projects.map(p => ({ value: p.id, label: `${p.projectNo} - ${p.name}` }))}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="releaseOwnerUserId" label="發布負責人" rules={[{ required: true, message: '請選擇發布負責人' }]}>
-                <Select
-                  placeholder="搜索選擇"
-                  showSearch
-                  filterOption={false}
-                  onSearch={async (val) => {
-                    try {
-                      setEmployeeOptions(await fetchEmployeeIdOptions(val))
-                    } catch { /* ignore */ }
-                  }}
-                  options={employeeOptions}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="planTime" label="計劃發布時間">
-                <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} placeholder="選擇計劃時間" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="deliveryItemIds" label="交付項">
-            <Select
-              mode="multiple"
-              placeholder="選擇交付項（依項目篩選）"
-              allowClear
-              optionFilterProp="label"
-              options={deliveryItems.map(d => ({ value: d.id, label: `${d.itemNo} - ${d.title}` }))}
-            />
-          </Form.Item>
-
-          {/* 部署系統清單（動態表單） */}
-          <Form.Item label="部署系統清單" style={{ marginBottom: 0 }}>
-            <Form.List name="deployments">
-              {(fields, { add, remove }) => (
-                <>
-                  {fields.map(({ key, name, ...restField }) => (
-                    <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-                      <Form.Item {...restField} name={[name, 'systemCode']} rules={[{ required: true, message: '必填' }]} style={{ marginBottom: 0 }}>
-                        <Input placeholder="系統編碼" style={{ width: 130 }} />
-                      </Form.Item>
-                      <Form.Item {...restField} name={[name, 'systemName']} style={{ marginBottom: 0 }}>
-                        <Input placeholder="系統名稱" style={{ width: 130 }} />
-                      </Form.Item>
-                      <Form.Item {...restField} name={[name, 'buildId']} style={{ marginBottom: 0 }}>
-                        <Input placeholder="構建標識" style={{ width: 130 }} />
-                      </Form.Item>
-                      <Form.Item {...restField} name={[name, 'deployOrder']} style={{ marginBottom: 0 }}>
-                        <InputNumber placeholder="順序" min={1} style={{ width: 80 }} />
-                      </Form.Item>
-                      <MinusCircleOutlined onClick={() => remove(name)} style={{ color: '#FF4D4F' }} />
-                    </Space>
-                  ))}
-                  <Form.Item>
-                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
-                      添加部署系統
-                    </Button>
-                  </Form.Item>
-                </>
-              )}
-            </Form.List>
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }

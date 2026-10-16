@@ -44,7 +44,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -77,8 +76,10 @@ public class RdmDeliveryItemService {
     private final SysUserMapper userMapper;
     private final BizSeqService bizSeqService;
     private final RdmAccessGuard accessGuard;
-    /** Batch 2：范围变更证据失效登记 */
+    /** Batch 2：范围变更证据失效登记（仅用于范围变更时写入失效记录 insert） */
     private final RdmEvidenceInvalidationMapper evidenceInvalidationMapper;
+    /** 任务33：范围变更「证据失效过滤」统一委派共享解析器，消除三处重复（只读失效登记） */
+    private final EvidenceValidityResolver evidenceValidityResolver;
     /** 任务19 / 缺口4：交付项写操作的 V3 流程版本分层校验 */
     private final RdmFlowVersionGuard flowVersionGuard;
     /** 任务19 / 缺口4：冻结/范围变更写操作接入原子幂等 executeOnce */
@@ -369,52 +370,24 @@ public class RdmDeliveryItemService {
      * 避免下游事实短暂抖动造成状态来回跳。
      */
     private boolean hasInvalidatedEvidence(Long deliveryItemId) {
-        if (deliveryItemId == null) {
-            return false;
-        }
-        return evidenceInvalidationMapper.selectCount(new LambdaQueryWrapper<RdmEvidenceInvalidation>()
-                .eq(RdmEvidenceInvalidation::getDeliveryItemId, deliveryItemId)) > 0;
-    }
-
-    /**
-     * 加载该交付项下「因范围变更而失效」的指定类型证据 id 集合（任务19 / 缺口4）。
-     * <p>证据失效只登记、不删除，因此所有推导状态/回显证据的查询都必须先加载本集合并剔除，
-     * 否则按旧范围验过的测试批次/验收记录会继续被当作当前范围的有效凭证。
-     */
-    private Set<Long> loadInvalidatedEvidenceIds(Long deliveryItemId, String evidenceType) {
-        if (deliveryItemId == null) {
-            return Set.of();
-        }
-        return evidenceInvalidationMapper.selectList(new LambdaQueryWrapper<RdmEvidenceInvalidation>()
-                        .eq(RdmEvidenceInvalidation::getDeliveryItemId, deliveryItemId)
-                        .eq(RdmEvidenceInvalidation::getEvidenceType, evidenceType))
-                .stream()
-                .map(RdmEvidenceInvalidation::getEvidenceId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        // 任务33：委派共享解析器（与测试/验收门禁同源同一失效登记读取口径）
+        return evidenceValidityResolver.hasAnyInvalidation(deliveryItemId);
     }
 
     /** 加载仍然有效（未因范围变更失效）的测试批次，供状态推导与测试状态回显使用。 */
     private List<RdmTestBatch> loadValidTestBatches(Long deliveryItemId) {
-        List<RdmTestBatch> all = loadTestBatchesForItem(deliveryItemId);
-        Set<Long> invalidated = loadInvalidatedEvidenceIds(deliveryItemId, RdmEvidenceInvalidation.TYPE_TEST_BATCH);
-        if (invalidated.isEmpty()) {
-            return all;
-        }
-        return all.stream().filter(b -> !invalidated.contains(b.getId())).toList();
+        // 任务33：全量批次仍按本服务口径加载（delivery_item_ids_json 关联过滤），失效过滤委派共享解析器
+        return evidenceValidityResolver.validTestBatches(deliveryItemId, loadTestBatchesForItem(deliveryItemId));
     }
 
     /** 加载仍然有效（未因范围变更失效）的验收记录，按创建时间倒序，供状态推导与验收状态回显使用。 */
     private List<RdmAcceptanceRecord> loadValidAcceptanceRecords(Long deliveryItemId) {
+        // 任务33：全量记录仍按本服务口径加载（createdAt 倒序，computeAcceptanceStatus 取首条依赖此序），失效过滤委派共享解析器
         List<RdmAcceptanceRecord> all = acceptanceRecordMapper.selectList(
                 new LambdaQueryWrapper<RdmAcceptanceRecord>()
                         .eq(RdmAcceptanceRecord::getDeliveryItemId, deliveryItemId)
                         .orderByDesc(RdmAcceptanceRecord::getCreatedAt));
-        Set<Long> invalidated = loadInvalidatedEvidenceIds(deliveryItemId, RdmEvidenceInvalidation.TYPE_ACCEPTANCE);
-        if (invalidated.isEmpty()) {
-            return all;
-        }
-        return all.stream().filter(r -> !invalidated.contains(r.getId())).toList();
+        return evidenceValidityResolver.validAcceptanceRecords(deliveryItemId, all);
     }
 
     /**

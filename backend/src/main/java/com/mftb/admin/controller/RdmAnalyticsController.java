@@ -37,7 +37,8 @@ public class RdmAnalyticsController {
      * 三处各写一句解释的结局必然是它们互相矛盾。
      */
     @GetMapping("/metrics")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-acceptance", "rdm-dashboard-risk", "rdm-efficiency-output", "rdm-dashboard-score"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-acceptance", "rdm-dashboard-risk", "rdm-efficiency-output", "rdm-dashboard-score"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<java.util.List<com.mftb.admin.constant.RdmMetricCatalog.Definition>> metrics() {
         return Result.success(com.mftb.admin.constant.RdmMetricCatalog.all());
     }
@@ -59,7 +60,8 @@ public class RdmAnalyticsController {
     @GetMapping("/overview")
     // rdm-dashboard-risk / rdm-efficiency-output 也要能读：风险明细与部门人员产出已拆成独立页，
     // 它们与总看板共用同一份取数（不能再为每个页各写一份 SQL）
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-acceptance", "rdm-dashboard-risk", "rdm-efficiency-output"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_BOARD, anyOf = {"rdm-workbench", "rdm-requirement", "rdm-intake", "rdm-acceptance", "rdm-dashboard-risk", "rdm-efficiency-output"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmDashboardVO> overview(@RequestParam(required = false, defaultValue = "month") String period) {
         return Result.success(analyticsService.overview(period));
     }
@@ -87,7 +89,8 @@ public class RdmAnalyticsController {
 
     /** 交付周报（区间/迭代维度的结果、效率、风险与下周计划） */
     @GetMapping("/weekly-report")
-    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_REPORT, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-intake"})
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_REPORT, anyOf = {"rdm-dashboard-board", "rdm-dashboard-quality", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmWeeklyReportVO> weeklyReport(@RequestParam(required = false) String startDate,
                                                   @RequestParam(required = false) String endDate,
                                                   @RequestParam(required = false) String iterationCode) {

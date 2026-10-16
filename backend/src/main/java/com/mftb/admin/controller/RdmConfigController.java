@@ -37,35 +37,51 @@ public class RdmConfigController {
 
     /** 状态定义 */
     @GetMapping("/status")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_VIEW_ALL})
     public Result<List<RdmConfigVO.StatusDef>> statuses() {
         return Result.success(configService.statusDefs());
     }
 
     /** 流转规则 */
     @GetMapping("/transition")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_VIEW_ALL})
     public Result<List<RdmConfigVO.Transition>> transitions() {
         return Result.success(configService.transitions());
     }
 
     /** SLA 与逾期规则 */
     @GetMapping("/sla")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_ACCEPTANCE, RdmConstants.MENU_DASHBOARD, RdmConstants.MENU_WORKBENCH, RdmConstants.MENU_CONFIG},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_VIEW_ALL})
     public Result<List<RdmConfigVO.Sla>> slas() {
         return Result.success(configService.slaConfigs());
     }
 
-    /** 分发矩阵 */
+    /**
+     * 分发矩阵读。
+     * <p>主锚点换成 rdm-requirement:view_all（全量可见）；原来能过的三条通道
+     * （intake:view / config:view / requirement:view）全部列进 anyPermissions，
+     * 不能放进 anyOf：anyOf 会拿同一个 action 去试别的菜单，
+     * 拿 view_all 去查 config 就等于把配管页的读权拿掉了。
+     */
     @GetMapping("/routing")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, anyOf = {RdmConstants.MENU_CONFIG, RdmConstants.MENU_REQUIREMENT})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_VIEW_ALL,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":view", RdmConstants.MENU_CONFIG + ":view",
+                    RdmConstants.MENU_REQUIREMENT + ":view"})
     public Result<List<RdmConfigVO.Routing>> routings() {
         return Result.success(configService.routingRules());
     }
 
-    /** 保存分发矩阵，返回最新列表（前端直接刷新表格） */
+    /**
+     * 保存分发矩阵，返回最新列表（前端直接刷新表格）。
+     * <p>分配权已换到 rdm-requirement:dispatch，旧 intake:edit 与配管页 edit 都是并列合法通道，
+     * 因动作名不同必须走 anyPermissions 而不是 anyOf。
+     */
     @PostMapping("/routing")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, action = "edit", anyOf = {RdmConstants.MENU_CONFIG})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit", RdmConstants.MENU_CONFIG + ":edit"})
     public Result<List<RdmConfigVO.Routing>> saveRouting(@RequestBody RdmConfigVO.Routing routing) {
         configService.saveRouting(routing, operatorResolver.currentOperatorName());
         return Result.success("已保存", configService.routingRules());
@@ -73,7 +89,8 @@ public class RdmConfigController {
 
     /** 保存 SLA 行（新增或改值），返回最新列表 */
     @PutMapping("/sla")
-    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE})
+    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_DISPATCH})
     public Result<List<RdmConfigVO.Sla>> saveSla(@RequestBody RdmConfigVO.Sla sla) {
         sla.setOperator(operatorResolver.currentOperatorName());
         configService.saveSla(sla);
@@ -100,9 +117,14 @@ public class RdmConfigController {
 
     /* ==================== 准入策略（阶段 2B） ==================== */
 
-    /** 准入策略列表（含停用项，配置页展示） */
+    /**
+     * 准入策略列表（含停用项，配置页展示）。
+     * <p>与分发矩阵读同一口径：主锚点走全量可见，其余读通道成对列出。
+     */
     @GetMapping("/intake-policy")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, anyOf = {RdmConstants.MENU_CONFIG, RdmConstants.MENU_REQUIREMENT})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_VIEW_ALL,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":view", RdmConstants.MENU_CONFIG + ":view",
+                    RdmConstants.MENU_REQUIREMENT + ":view"})
     public Result<List<RdmIntakeVO.Policy>> intakePolicies() {
         return Result.success(intakePolicyService.policies());
     }
@@ -112,7 +134,8 @@ public class RdmConfigController {
      * <p>写入只给「需求配置」编辑权或分配权：能配免审就等于能决谁可以不经公司准入。
      */
     @PostMapping("/intake-policy")
-    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE})
+    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_DISPATCH})
     public Result<List<RdmIntakeVO.Policy>> saveIntakePolicy(@RequestBody RdmIntakeVO.Policy policy) {
         intakePolicyService.savePolicy(policy, operatorResolver.currentOperatorName());
         return Result.success("已保存", intakePolicyService.policies());
@@ -120,7 +143,8 @@ public class RdmConfigController {
 
     /** 删除准入策略（逻辑删；已发生的轮次仍按快照保留命中策略与版本） */
     @DeleteMapping("/intake-policy/{id}")
-    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE})
+    @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE},
+                anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_DISPATCH})
     public Result<List<RdmIntakeVO.Policy>> deleteIntakePolicy(@PathVariable Long id) {
         intakePolicyService.deletePolicy(id);
         return Result.success("已刪除", intakePolicyService.policies());
@@ -133,7 +157,8 @@ public class RdmConfigController {
      */
     @PostMapping("/intake-policy/simulate")
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT,
-            anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_CONFIG, RdmConstants.MENU_WORKBENCH})
+            anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_CONFIG, RdmConstants.MENU_WORKBENCH},
+            anyPermissions = {RdmConstants.MENU_REQUIREMENT + ":" + RdmConstants.ACTION_VIEW_ALL})
     public Result<RdmIntakeVO.Decision> simulateIntake(@RequestBody(required = false) RdmIntakeVO.SimulateRequest request) {
         return Result.success(intakePolicyService.simulate(request));
     }

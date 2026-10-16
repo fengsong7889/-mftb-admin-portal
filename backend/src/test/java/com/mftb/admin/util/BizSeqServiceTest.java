@@ -1,5 +1,6 @@
 package com.mftb.admin.util;
 
+import com.mftb.admin.constant.RdmConstants;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -8,6 +9,37 @@ import static org.junit.jupiter.api.Assertions.*;
  * BizSeqService 静态映射方法测试（不依赖 Spring 容器和数据库）
  */
 class BizSeqServiceTest {
+
+    /**
+     * 需求准入必须路由到独立的 XQSP 审批流程编号规则（需求提交/需求管理拆分 · 批次 1）。
+     * <p>本条断言同时钉住三个事实：流程编码→规则 key 的映射、规则 key 的字面值
+     * （必须与 {@code RdmSchemaMigrationInitializer} 写入 sys_biz_seq_rule 的种子、
+     * 以及 {@code 240_rdm_delayed_req_no_and_xqsp_rule.sql} 参考文档一致）、以及它
+     * 不会静默回落成通用 OA 规则。回落的后果是「编号生成规则」页与实际发出的号对不上。
+     * <p>正式需求编号(XQ) 与审批流程编号(XQSP) 是两套互不影响的流水，也不能用同一 key。
+     */
+    @Test
+    void ruleKeyForProcess_routesRequirementIntakeToXqspRule() {
+        assertEquals(BizSeqService.RULE_RDM_INTAKE_APPROVAL,
+                BizSeqService.ruleKeyForProcess(RdmConstants.INTAKE_PROCESS_CODE));
+        assertEquals("rdm_intake_approval", BizSeqService.RULE_RDM_INTAKE_APPROVAL);
+        assertNotEquals(BizSeqService.RULE_OA_REQUEST, BizSeqService.ruleKeyForProcess(RdmConstants.INTAKE_PROCESS_CODE),
+                "需求准入不得回落通用 OA 号");
+        // 两套流水必须分 key，否则同日两个序列会互相撞号或互相推高
+        assertEquals("rdm_requirement", BizSeqService.RULE_RDM_REQUIREMENT);
+        assertNotEquals(BizSeqService.RULE_RDM_REQUIREMENT, BizSeqService.RULE_RDM_INTAKE_APPROVAL);
+    }
+
+    /** 其余流程的映射保持原口径（包括未登记流程回落通用 OA 号） */
+    @Test
+    void ruleKeyForProcess_keepsOtherProcessMapping() {
+        assertEquals(BizSeqService.RULE_EAM_PURCHASE_REQUEST, BizSeqService.ruleKeyForProcess("oa_purchase"));
+        assertEquals(BizSeqService.RULE_AI_ACCESS_REQUEST, BizSeqService.ruleKeyForProcess("ai_access"));
+        assertEquals(BizSeqService.RULE_HR_LIFECYCLE_REQUEST, BizSeqService.ruleKeyForProcess("hr_onboard"));
+        assertEquals(BizSeqService.RULE_HR_LIFECYCLE_REQUEST, BizSeqService.ruleKeyForProcess("hr_dimission"));
+        assertEquals(BizSeqService.RULE_OA_REQUEST, BizSeqService.ruleKeyForProcess("oa_travel"));
+        assertEquals(BizSeqService.RULE_OA_REQUEST, BizSeqService.ruleKeyForProcess(null));
+    }
 
     @Test
     void flowRuleKey_knownTypes() {

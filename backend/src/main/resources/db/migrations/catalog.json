@@ -946,6 +946,70 @@
       "comment": "原本一页里塞「待分配 / 待我審批 / 全部需求」三个视角，但审批人（提出人的主管或公司高层）与分配人（技术负责人/产品经理）不是同一批角色：高层进这页会误入分配区，PM 每天看到与自己无关的审批列。落地方式：新建目录菜单 rdm-pool-group（需求池，type=1 无 path/component，图标 ContainerOutlined）+ 新叶子 rdm-intake-approval（提交需求，/rdm-intake-approval，图标 SendOutlined，只授 view）；现有 rdm-intake 改名「需求管理」并挂到该分组下 —— 它的 menuKey/path/actions 全部不变，因为 rdm-intake 是 canSeeAll(view) 与全系统唯一分配权(edit) 的锚点，被 12 处服务端引用与存量 sys_role_menu/sys_department_menu 绑定，换键就得做授权平移且既可能降权也可能扩权。改名走 RENAMES（仅命中旧默认名，用户在菜单配置里自定义过的名字不被覆盖）。新菜单默认只授 admin，其他角色/部门由授权中心显式配置。后置校验：rdm-intake 名为需求管理且同时持有 view/edit、rdm-intake-approval 名为提交需求且 admin 持有 view、rdm-pool-group 必须是无 path/component 的目录（带 path 的分组会在侧边栏退化成可点叶子）。取代 rdm:menu-seed:v3.10。"
     },
     {
+      "versionKey": "rdm:menu-seed:v3.13",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.11"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "菜单结构重组：按生命周期分组重排为項目與計劃/需求中心/研發執行/測試與質量/發布與驗收/效能復盤/交付配置",
+      "author": "菜单结构调整",
+      "ticket": "rdm-menu-restructure",
+      "comment": "将旧的5个分组重排为7个分组+1个顶级单叶，按需求生命周期动线排列。新增两个纯目录分组（rdm-test-quality-group/rdm-release-accept-group），复用已有分组 key（rdm-dashboard→項目與計劃, rdm-pool-group→需求中心, rdm-delivery→研發執行, rdm-efficiency→效能復盤, rdm-config-group→交付配置）。权限锚点不变，不引入新动作码。取代 rdm:menu-seed:v3.12。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.14",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.13"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "动作集登记：为 rdm-requirement 补上 view_all/dispatch/contribute 三个可授动作，为需求入口收敛做准备",
+      "author": "菜单权限锚点收敛",
+      "ticket": "rdm-anchor-convergence",
+      "comment": "upsertMenu 对已存在的行只对齐层级/归属/启用态，故意不动 actions（尊重菜单配置自定义），所以只改种子 LIST_ACTIONS 常量对旧库无效：新动作进不了 sys_menu.actions，授权中心就勾不到它，后续退役 rdm-intake 时持有 intake:view/edit 的角色会静默降权。本轮新增 ACTION_SYNC 定向 UPDATE，语义是只并集追加（现有动作 ∪ view_all/dispatch/contribute），绝不删减也不刷回整份种子：执行时发现本环境 rdm-requirement 的实际可授集是 [view,export]（create/edit 已被摘掉），把 create/edit 补回去等于擅自重开需求侧受理权，那是扩权，必须人工决定。不改任何 sys_role_menu/sys_department_menu 授权行，不改菜单结构与路径，因此本轮零用户可见变化；RdmAccessGuard 仍是新旧锚点 OR 的双轨过渡。后置校验：assertMenuActionsInclude 实查 rdm-requirement 行已包含 view_all/dispatch/contribute，缺则不记版本。"
+    },
+    {
+      "versionKey": "rdm:menu-seed:v3.15",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.14"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "管理员裁决后恢复 rdm-requirement 的 create/edit 为可授动作，使该菜单可授集等于种子 LIST_ACTIONS",
+      "author": "菜单权限锚点收敛",
+      "ticket": "rdm-anchor-convergence",
+      "comment": "v3.14 执行时发现 rdm-requirement 实际可授集是 [view,export]，方案 §四 需要把「提需求 create」与「产品受理 edit」落在该锚点，但两者勾不到就意味着退役 rdm-intake 后需求侧受理权无处可授（静默降权）。管理员已明确选定「恢复 create/edit 可授」，因此本轮把 ACTION_SYNC 改为菜单白名单 ACTION_SYNC_FROM_SEED，对列入的菜单把种子 MENUS 声明的动作并集追加进去（动作集直读种子，避免两处字面量漂移），仍不删减现有动作。可授 ≠ 已授：只改 sys_menu.actions 元数据，不写 sys_role_menu/sys_department_menu 任何一行，本轮没有任何人获得新能力，谁能勾这两个动作仍由管理员在授权中心显式决定。单测在本地实现阶段拓出一个真 bug：错用 actionScope()（为逗号声明设计）解析种子 JSON 会抛「未登记的授权动作」，已改回 parseActions()。后置校验：assertMenuActionsInclude 实查 view/create/edit/export/view_all/dispatch/contribute 全部可授，缺则不记版本。取代 rdm:menu-seed:v3.14。"
+    },
+    {
+      "versionKey": "rdm:anchor-grant-mirror:v1",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.15"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "把 rdm-intake 上的现有授权按 ANCHOR_REMAP 镜像到 rdm-requirement/迭代排期（只增不减、只跑一次）",
+      "author": "菜单权限锚点收敛",
+      "ticket": "rdm-anchor-convergence",
+      "comment": "注解不再只认旧锚点之前，必须先把持有者的能力在新锚点上接住，否则升级当日直接 403。映射：intake:view→requirement:view_all、intake:edit→requirement:dispatch、intake:create→requirement:contribute、intake:export→requirement:export、intake:delete→iteration:delete（delete 的实际语义是删除迭代，整体搬给需求清单会把删迭代能力扫给看需求的人）。两张授权表（sys_role_menu/sys_department_menu）一起处理，漏一张就是“角色能用、部门不能用”。\n\n关键设计：本迁移用独立 versionKey 而**不进每次启动重放的 migrate()**，因为管理员事后在新锚点上撤销的授权会被重放从旧锚点又加回来（撤权不复活是红线）；RdmAnchorGrantMirrorTest 钉住了这一条。只增不减：目标已有主体时并集写入，绝不删目标动作；源菜单与源授权行完全不动（软删留给退役批次）。可见副作用（已告知）：若主体在目标菜单原本一行授权都没有，镜像会新建一行，其侧栏会多出该菜单入口——拿到的是同一能力，只是入口提前可见。后置校验：verifyAnchorMirror 实查每个旧锚点持有者都已在目标上拿到对应动作，缺则不记版本。"
+    },
+    {
       "versionKey": "rdm:access-grant:v1.1",
       "module": "rdm",
       "phase": "MENU_SEED",
@@ -1178,10 +1242,14 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": ["rdm:schema:v2.5"],
+      "dependencies": [
+        "rdm:schema:v2.5"
+      ],
       "status": "ACTIVE",
       "resource": "219_rdm_batch1_project_delivery.sql",
-      "scriptFiles": ["219_rdm_batch1_project_delivery.sql"],
+      "scriptFiles": [
+        "219_rdm_batch1_project_delivery.sql"
+      ],
       "intent": "补登记既有分层交付基础结构，不重放已应用版本",
       "comment": "实际执行与契约仅使用classpath根目录安全版，sql目录历史参考副本不可执行。"
     },
@@ -1191,10 +1259,14 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": ["rdm:schema:v3.0"],
+      "dependencies": [
+        "rdm:schema:v3.0"
+      ],
       "status": "ACTIVE",
       "resource": "220_rdm_batch2_foundation.sql",
-      "scriptFiles": ["220_rdm_batch2_foundation.sql"],
+      "scriptFiles": [
+        "220_rdm_batch2_foundation.sql"
+      ],
       "intent": "补登记范围失效和原幂等日志基础",
       "comment": "保留既有执行器与版本，不修改已应用脚本。"
     },
@@ -1204,10 +1276,14 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": ["rdm:schema:v3.1"],
+      "dependencies": [
+        "rdm:schema:v3.1"
+      ],
       "status": "ACTIVE",
       "resource": "237_rdm_batch3_test_release.sql",
-      "scriptFiles": ["237_rdm_batch3_test_release.sql"],
+      "scriptFiles": [
+        "237_rdm_batch3_test_release.sql"
+      ],
       "intent": "冻结轮次、发布申请裁决和追加尝试、豁免补验、延期闭环、原子请求占位",
       "comment": "classpath根资源由现有pom资源规则打包。命名锁内逐列逐索引逐约束条件DDL，后置检查类型/非空/默认/唯一索引列序/外键和CHECK。旧记录不回填，新发布仍禁用。"
     },
@@ -1217,10 +1293,14 @@
       "phase": "MODULE_STRUCTURE",
       "executionType": "JAVA",
       "executor": "rdmSchemaMigrationInitializer",
-      "dependencies": ["rdm:schema:v3.2"],
+      "dependencies": [
+        "rdm:schema:v3.2"
+      ],
       "status": "ACTIVE",
       "resource": "238_rdm_batch4_migration.sql",
-      "scriptFiles": ["238_rdm_batch4_migration.sql"],
+      "scriptFiles": [
+        "238_rdm_batch4_migration.sql"
+      ],
       "intent": "默认关闭的GLOBAL/项目灰度、小批迁移预览确认审计和既有通知出站去重",
       "comment": "只播种GLOBAL一条且不覆盖已有人为配置，不自动迁移任何需求。非空scope_key唯一，活动迁移按生成列唯一。缺表列与关键约束漂移均阻止初始化完成。"
     },
@@ -1641,6 +1721,40 @@
       "intent": "sys_user 補列 portal_favorites：企業門戶「我的常用」按帳號持久化，換設備/清瀏覽器緩存不再丟失",
       "author": "Qoder",
       "comment": "必須獨立版本鍵：core:schema-v10 已落庫的環境不會重跑 migrateSchema()。調用點放在 dataInitializer.run 內緊跟 163 釘釘補列之後、任何 sys_user 查詢之前——SysUser 實體已帶該欄位，MyBatis-Plus 生成的顯式欄位清單會 SELECT 它，缺欄會讓全部用戶查詢報錯。不登記 ContractRegistry：純 UI 偏好欄、非事故相關寫入路徑，缺欄由 applyOnce 後置校驗不記版本 + 下次啟動重試 + readiness 卡流量兜住。與 quick_favorites 刻意分欄：兩者都是整份覆蓋寫入（PUT 傳全量數組），共用一列會互相抹掉對方的數據。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.4",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.0",
+        "rdm:schema:v3.3"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "240_rdm_delayed_req_no_and_xqsp_rule.sql"
+      ],
+      "intent": "需求提交/需求管理拆分·批次1：正式需求编号延迟生成（rdm_requirement.req_no 放开 NOT NULL 并加两条 CHECK），同时登记 XQSP 审批流程编号规则 rdm_intake_approval",
+      "comment": "代碼把 rdm_intake 的流程發號路由到 rdm_intake_approval，與本行種子必須同批：缺行時 BizSeqService.requireRule fail-closed，每次提交直接報「編號生成規則未配置」，不回落通用 OA 號。列可空性變更與 create()/selfSubmit()/OA 終審回調的發號時機成套交付，單獨先行會讓存草稿 SQLException。後置校驗實查 IS_NULLABLE=YES、兩條 CHECK 的 ENFORCED=YES、uk_rdm_req_no 仍在、兩條規則 status=1——列存在但不為可空、或 CHECK 被靜默忽略（MySQL<8.0.16）都判失敗不記版本。不 MODIFY 存量 req_no、不重置 biz_seq 計數器：歷史預發號保留為事實，處置另審。同步登記 ContractRegistry.rdmRequirementContract（補列 DDL 為可空版本，且契約校驗器不 MODIFY 已存在列，啟動自愈不可能把 req_no 變回 NOT NULL；createTableIfMissing 故意留空以免 60+ 列副本成為第二份真值）。240 腳本只在 backend/sql 作參考文檔：執行與冪等在 Java 逐步帶存在性判斷，ADD CONSTRAINT 不可整腳本重放。"
+    },
+    {
+      "versionKey": "rdm:transition:v1.0",
+      "module": "rdm",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v1.0",
+        "rdm:schema:v3.4"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "241_rdm_exempt_pool_transition.sql"
+      ],
+      "intent": "免审批直送的落点真值回收：向 rdm_transition 补登 submit_pool / resubmit_pool，使免审批分支不再在代码里硬写 pool/assigned",
+      "comment": "仓库既定口径是「状态机真值：rdm_status_def + rdm_transition，不在代码里硬编码流转」；批次1 把免审落点写在 Java 里，管理员在「狀態與流轉」停用或改落点时免审路径仍照旧放行。现改为读配置基落点 pool，缺行/停用一律 fail-closed 拒提交（方案 §四：不得把缺配置当审批完成或免审）。assigned 细化仍留代码，与 OA 终审回调 approve_intake→pool + applyIntentPm→assigned 同形状，不另造状态机分支。后置校验要求两条 (from_status, action_code) 存在、status=1 且 to_status=pool——只校「行存在」不够，落点被改成别的状态同样不能让免审放行。submit_pool 早在 204 已种，仍走 INSERT IGNORE 做兜底（存量库被人为删行时不补就会让免审提交直接失败），且不覆盖管理员自定义名。allowed_roles 只给 SUBMITTER：免审直送是提出人自己的提交动作，不得扩给审批岗。回滚=回退代码，种子行留着无害（前端操作区按当前状态+角色过滤，不会因此多出按钮）；刻意不软删种子，否则回退代码与残留配置会给两套落点口径。"
     }
   ]
 }

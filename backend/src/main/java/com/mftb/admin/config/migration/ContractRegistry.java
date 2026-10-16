@@ -38,6 +38,8 @@ public class ContractRegistry {
         // 通知底座兩表：165 腳本長期未接入遷移框架，生產缺表直接把會議域啟動打成崩潰循環
         combined.addAll(notificationContracts());
         combined.addAll(RdmBatch34Schema.contracts());
+        // RDM 需求主表关键列：正式需求编号延迟生成后必须保持可空，不能被启动自愈送回 NOT NULL
+        combined.add(rdmRequirementContract());
         return combined;
     }
 
@@ -587,5 +589,27 @@ public class ContractRegistry {
                         new ContractSpec.ColumnSpec("scenario",
                                 "ALTER TABLE biz_ad_pricing_signboard_label ADD COLUMN scenario VARCHAR(32) DEFAULT NULL COMMENT '场景（all_macau/district/NULL）' AFTER label_type")
                 ));
+    }
+
+    /**
+     * RDM 需求主表关键列契约（{@code rdm:schema:v3.4}，需求提交/需求管理拆分 · 批次 1）。
+     * <p>为什么要把 {@code req_no} 登记进契约：延迟发号后「准入前的需求没有编号」是新代码的基本假设，
+     * 而 {@code rdm:schema:v1.0} 在已记版本的环境不会重跑。一旦某次人工运维把列改回 NOT NULL，
+     * 存草稿会直接 SQLException；登记后每次启动都会实查并（在列缺失时）按**可空**版本补回。
+     * <p>为什么 {@code createTableIfMissing} 故意留空：rdm_requirement 有 60+ 列，把建表 DDL
+     * 复制一进来就成了第二份真值，而这份副本很容易带着旧的 {@code req_no NOT NULL} 反过来覆盖
+     * 本迁移——那正是本次要消除的缺陷。表由 {@code rdm:schema:v1.0} 建立（早于本校验器），
+     * 真缺表时宁可上报漂移卡住 readiness，也不要用一份可能陈旧的副本静默重建。
+     * <p>补列 DDL 只可能把列**加成为可空**：契约校验器从不 MODIFY 已存在的列，
+     * 所以启动自愈不可能把 req_no 变回 NOT NULL。唯一键 {@code uk_rdm_req_no} 由迁移后置校验把住。
+     */
+    public static ContractSpec rdmRequirementContract() {
+        return new ContractSpec(
+                "rdm-requirement",
+                "rdm_requirement",
+                null,
+                List.of(new ContractSpec.ColumnSpec("req_no",
+                        "ALTER TABLE rdm_requirement ADD COLUMN req_no VARCHAR(32) NULL DEFAULT NULL "
+                                + "COMMENT '需求编号 XQ+YYYYMMDD+4位；仅首次准入成功时生成，准入前为 NULL'")));
     }
 }

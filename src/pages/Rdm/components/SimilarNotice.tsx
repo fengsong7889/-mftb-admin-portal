@@ -11,7 +11,7 @@ import { Alert, Button, Space, Spin, Tag, Tooltip } from 'antd'
 import { CopyOutlined, EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { fetchSimilarRequirements, type RdmSimilarItem } from '../../../api/rdm'
-import { RDM_STATUS_LABEL, type RdmStatus } from '../../../constants/rdm'
+import { RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '../../../constants/rdm'
 
 interface SimilarNoticeProps {
   /** 当前填写的标题 */
@@ -111,7 +111,7 @@ export default function SimilarNotice({ title, expectText, excludeId }: SimilarN
                   {item.title}
                 </a>
                 <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
-                  {item.reqNo} · {RDM_STATUS_LABEL[item.status as RdmStatus] ?? item.status}
+                  {formatRdmReqNo(item.reqNo)} · {RDM_STATUS_LABEL[item.status as RdmStatus] ?? item.status}
                   {item.pmName ? ` · 產品 ${item.pmName}` : ''}
                   {item.submitterName ? ` · 提出 ${item.submitterName}` : ''}
                 </span>

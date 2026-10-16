@@ -52,7 +52,8 @@ public class PermissionAspect {
             log.warn("权限拦截: 未获取到登录员工信息, menu={}, action={}", permission.menu(), permission.action());
             throw new PermissionDeniedException(permission.menu(), permission.action());
         }
-        // 1) 菜单动作校验：主菜单不通过时, 回退到 anyOf 备选菜单（OR 语义, 仍默认拒绝）
+        // 1) 菜单动作校验：主菜单不通过时，先回退到 anyOf 备选菜单（同动作换菜单），
+        //    再回退到 anyPermissions（菜单+动作成对换），三层都是 OR 且仍默认拒绝。
         String action = permission.action();
         String grantedMenu = null;
         if (permissionService.hasPermission(user, permission.menu(), action)) {
@@ -64,15 +65,44 @@ public class PermissionAspect {
                     break;
                 }
             }
+            if (grantedMenu == null) {
+                grantedMenu = matchAnyPermission(user, permission);
+            }
         }
         if (grantedMenu == null) {
-            log.warn("权限拦截: 员工 [{}] 无权访问 menu={}, anyOf={}, action={}",
-                    user.getUsername(), permission.menu(), java.util.Arrays.toString(permission.anyOf()), action);
+            log.warn("权限拦截: 员工 [{}] 无权访问 menu={}, anyOf={}, anyPermissions={}, action={}",
+                    user.getUsername(), permission.menu(), java.util.Arrays.toString(permission.anyOf()),
+                    java.util.Arrays.toString(permission.anyPermissions()), action);
             throw new PermissionDeniedException(permission.menu(), action);
         }
         // 2) 系统准入校验（Round 3；默认观察模式）——按实际授权的菜单反查归属系统
         checkSystemAccess(user, grantedMenu);
         return joinPoint.proceed();
+    }
+
+    /**
+     * 命中 {@code anyPermissions} 里的某一项时返回该项菜单（用于后续系统准入按实际授权菜单反查），
+     * 否则返回 null。
+     * <p>格式非法的条目当不命中处理并记 error：写错注解应该是“拒得下来 + 日志能看到”，
+     * 不能像拿默认值那样把未校验的跨菜单能力放出去。
+     */
+    private String matchAnyPermission(SysUser user, RequirePermission permission) {
+        for (String entry : permission.anyPermissions()) {
+            if (entry == null) {
+                continue;
+            }
+            int split = entry.indexOf(':');
+            String menuKey = split > 0 ? entry.substring(0, split).trim() : "";
+            String altAction = split > 0 ? entry.substring(split + 1).trim() : "";
+            if (menuKey.isEmpty() || altAction.isEmpty()) {
+                log.error("anyPermissions 条目格式非法（应为 menuKey:action），本次按不命中拒绝: {}", entry);
+                continue;
+            }
+            if (permissionService.hasPermission(user, menuKey, altAction)) {
+                return menuKey;
+            }
+        }
+        return null;
     }
 
     /**

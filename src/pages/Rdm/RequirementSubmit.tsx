@@ -46,6 +46,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useAuth } from '../../contexts/AuthContext'
@@ -88,6 +89,7 @@ import {
   RDM_REQUIREMENT_KIND_LABEL,
   RDM_PROJECT_STATUS,
   RDM_STATUS,
+  formatRdmReqNo,
   type RdmComplexity,
   type RdmPriority,
   type RdmReqType,
@@ -280,6 +282,8 @@ function TargetRow({ field, form, menuOptions, systemOptions, canRemove, onRemov
 
 export default function RequirementSubmit() {
   const navigate = useNavigate()
+  // 只接本批次新增的两条提示；其余繁中硬编码由 RDM 整模块 i18n 那一批统一处理
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [form] = Form.useForm<FormValues>()
@@ -310,7 +314,7 @@ export default function RequirementSubmit() {
    */
   const draftId = Number(searchParams.get('id') ?? 0)
   const isDraftEdit = Number.isInteger(draftId) && draftId > 0
-  const [draftNo, setDraftNo] = useState<string>()
+  const [draftNo, setDraftNo] = useState<string | null>()
   const [draftLoaded, setDraftLoaded] = useState(!isDraftEdit)
 
   useEffect(() => {
@@ -323,7 +327,8 @@ export default function RequirementSubmit() {
           navigate(`/rdm-detail?id=${draftId}`, { replace: true })
           return
         }
-        setDraftNo(d.reqNo)
+        // 延迟发号：草稿没有正式需求编号，不能把 null 当编号展示
+        setDraftNo(d.reqNo ?? null)
         form.setFieldsValue({
           title: d.title,
           description: d.description ?? '',
@@ -423,7 +428,7 @@ export default function RequirementSubmit() {
         const rows = (res.records ?? []).filter(r =>
           (!r.requirementKind || r.requirementKind === RDM_REQUIREMENT_KIND.AGGREGATE) &&
           (r.projectId == null || r.projectId === projectIdValue))
-        setAggregateOptions(rows.map(r => ({ value: r.id, label: `${r.reqNo} · ${r.title}` })))
+        setAggregateOptions(rows.map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} · ${r.title}` })))
       })
       .catch(() => { if (!cancelled) setAggregateOptions([]) })
     return () => { cancelled = true }
@@ -670,7 +675,12 @@ export default function RequirementSubmit() {
           } else {
             saved = await createRequirement(payload, 'submit')
           }
-          message.success(`需求已提交，編號 ${saved.reqNo}`)
+          message.success(
+            saved.reqNo
+              ? `需求已提交，編號 ${saved.reqNo}`
+              // 延迟发号：需审批的提交本轮没有编号，必须把“什么时候会有”说清楚，不能报「編號 null」
+              : t('rdm.submitApprovalPendingNoNumber'),
+          )
           navigate(`/rdm-detail?id=${saved.id}&tab=activity`)
         } catch {
           // 失败提示由请求层统一弹出，这里保留用户已填内容不丢（不清空表单、不假装成功）
@@ -713,8 +723,10 @@ export default function RequirementSubmit() {
         title={isDraftEdit ? '編輯需求草稿' : '提交需求'}
         backText={isDraftEdit ? '返回我的需求' : '返回工作台'}
         onBack={() => navigate(isDraftEdit ? '/rdm-requirement?scope=mine' : '/rdm-workbench')}
-        meta={isDraftEdit && draftNo
-          ? `草稿 ${draftNo} · 修改後可繼續保存，或提交進入準入審批（提交時會按最新內容重新裁決）`
+        meta={isDraftEdit
+          ? draftNo
+            ? `草稿 ${draftNo} · 修改後可繼續保存，或提交進入準入審批（提交時會按最新內容重新裁決）`
+            : t('rdm.draftNoNumberYet')
           : '說清「現在怎麼做、哪兒不方便、想要什麼樣」即可提交；技術方案、排期與工時由產研在受理後補充'}
       />
 

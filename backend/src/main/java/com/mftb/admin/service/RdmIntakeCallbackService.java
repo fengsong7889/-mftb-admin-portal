@@ -11,6 +11,7 @@ import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmRequirementRoleMapper;
 import com.mftb.admin.mapper.RdmStatusLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,12 @@ public class RdmIntakeCallbackService {
     private final SysUserMapper userMapper;
     /** 任务19 / 缺口1：准入通过后为执行类 V3 需求补建默认交付项（OA 回调不走 transition 状态机） */
     private final RdmDeliveryItemService deliveryItemService;
+    /**
+     * 正式需求编号发号器（需求提交/需求管理拆分 · 批次1）。
+     * <p>审批全部通过就是「首次准入成功」，需求编号只在这里（以及免审批提交、无单回退状态机）
+     * 生成一次；审批前不预占、不消费流水。
+     */
+    private final BizSeqService bizSeqService;
 
     /** 是否需求准入流程 */
     public boolean isIntakeProcess(String processCode) {
@@ -81,6 +88,12 @@ public class RdmIntakeCallbackService {
             log.info("需求准入回調跳過（狀態已變更）: reqNo={}, status={}", req.getReqNo(), req.getStatus());
             return;
         }
+        /*
+         * 延迟发号 v2：审批通过不再立即生成需求编号，需求先进入需求池（或直送受理），
+         * 编号推迟到产品经理认领（claim）时生成。此时 req_no 保持 NULL，
+         * 数据库 CHECK（ck_rdm_req_no_admitted）已放宽，pool/assigned 允许 NULL。
+         * 取号失败的场景已移到 claim() 方法中。
+         */
         boolean dispatched = applyIntentPm(req);
         if (dispatched) {
             moveToAssigned(req);
@@ -91,18 +104,32 @@ public class RdmIntakeCallbackService {
         // 重新拉取需求以取到 moveTo* 落库后的最新状态与受理人；建项失败不回滚已通过的准入流转。
         maybeCreateV3DefaultItemAfterIntake(requirementMapper.selectById(req.getId()));
         notifyService.notifyUserIds(RdmConstants.EVENT_INTAKE_PASS, req, List.of(req.getSubmitterUserId()),
-                "需求已通過准入", "### ✅ 需求准入通過\n\n- **編號**: " + req.getReqNo() + "\n- **標題**: "
+                "需求已通過准入", "### ✅ 需求准入通過\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo()) + "\n- **標題**: "
                         + req.getTitle() + "\n\n" + (dispatched
                         ? "已按提交時指定的產品經理直送受理，無需再經需求池分配。"
                         : "已進入需求池，等待技術部分配產品經理。"));
         if (!dispatched) {
             // 需求池是新需求的落点，同步提醒技术负责人，避免需求在池里静默积压
             notifyService.notifyUsers(RdmConstants.EVENT_ASSIGNED, req, List.of(),
-                    "需求池新增待分配需求", "### 📥 需求池待分配\n\n- **編號**: " + req.getReqNo()
+                    "需求池新增待分配需求", "### 📥 需求池待分配\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo())
                             + "\n- **標題**: " + req.getTitle() + "\n- **提出人**: " + req.getSubmitterName()
                             + "\n- **優先級**: " + req.getPriority() + "\n\n請盡快分配產品經理（超時將升級提醒）。"
             );
         }
+    }
+
+    /**
+     * 首次准入成功时生成正式需求编号：仅当 {@code req_no} 为空时取号，已有号原样返回。
+     * <p>幂等是硬要求：终审回调可能重复投递或人工补偿重跑，直取号会白吹流水；
+     * 已生效的需求号一律不变、不重发（历史预发号的存量也直接保留）。
+     * <p>与 {@code RdmRequirementServiceImpl} 里的同名私有方法是同一口径的两份实现：
+     * 需求服务依赖本回调做补偿推进，反向注入会形成循环依赖，所以各自保持局部自包。
+     */
+    private void ensureRequirementNumber(RdmRequirement req) {
+        if (req == null || StringUtils.hasText(req.getReqNo())) {
+            return;
+        }
+        req.setReqNo(bizSeqService.next(BizSeqService.RULE_RDM_REQUIREMENT));
     }
 
     /**
@@ -166,7 +193,7 @@ public class RdmIntakeCallbackService {
         appendLog(req, fromStatus, RdmConstants.ACTION_REJECT_INTAKE, req.getRejectReason());
 
         notifyService.notifyUserIds(RdmConstants.EVENT_INTAKE_REJECT, req, List.of(req.getSubmitterUserId()),
-                "需求被駁回", "### ⛔ 需求未通過准入\n\n- **編號**: " + req.getReqNo() + "\n- **標題**: "
+                "需求被駁回", "### ⛔ 需求未通過准入\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo()) + "\n- **標題**: "
                         + req.getTitle() + "\n- **駁回理由**: " + req.getRejectReason()
                         + "\n\n可修改後重新提交，或與審批人當面對齊。");
         log.info("需求准入已駁回: reqNo={}, reason={}", req.getReqNo(), req.getRejectReason());

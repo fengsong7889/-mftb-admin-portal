@@ -18,7 +18,7 @@ import {
   type RdmPrdItem,
   type RdmPrdSnapshotItem,
 } from '../../api/rdm'
-import { RDM_PRD_STATUS_LABEL, type RdmPrdStatus } from '../../constants/rdm'
+import { RDM_PRD_STATUS_LABEL, formatRdmReqNo, type RdmPrdStatus } from '../../constants/rdm'
 import './index.css'
 
 /** 按行统计条目数（确认框里给用户看“写了多少条”，避免空有标题） */
@@ -34,6 +34,7 @@ export default function PrdForm() {
   const reqId = Number(searchParams.get('reqId') ?? 0)
   const prdId = Number(searchParams.get('id') ?? 0)
 
+  /** 需求头部展示信息：reqNo 存的是展示串（准入前行本就没有编号，不能拼出 null） */
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; expectResult?: string | null } | null>(null)
   const [siblings, setSiblings] = useState<RdmPrdItem[]>([])
   const [saving, setSaving] = useState(false)
@@ -66,7 +67,7 @@ export default function PrdForm() {
     if (!reqId) return
     fetchRequirementDetail(reqId).then(d => {
       if (!d) return
-      setRequirement({ reqNo: d.reqNo, title: d.title, expectResult: d.expectResult })
+      setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, expectResult: d.expectResult })
     }).catch(() => message.error('需求資訊載入失敗'))
   }, [reqId])
 

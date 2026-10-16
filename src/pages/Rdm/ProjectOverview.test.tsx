@@ -1,0 +1,133 @@
+/**
+ * 項目總覽 —— 任務30 關鍵動線測試
+ *
+ * 釘死：
+ *  1. URL ↔ 篩選/分頁同步（keyword/status/pmUserId/pageNo/pageSize 進查詢）；
+ *  2. 統計卡可下鑽（點擊出現下鑽過濾 chip）；
+ *  3. 統計失敗不回零（保留上次值 / 明確錯誤態，不靜默歸零）；
+ *  4. 導出調 export-bundle 且帶當前 filters；
+ *  5. reconciliation 不一致時給出提示而非靜默導出。
+ */
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import {
+  fetchExportBundle, fetchProjectDetail, fetchProjectPage, fetchProjectStats, updateProject,
+} from '../../api/rdm'
+import { exportProjectBundle } from './projectExport'
+import ProjectOverview from './ProjectOverview'
+
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }),
+}))
+
+vi.mock('./projectExport', () => ({ exportProjectBundle: vi.fn() }))
+
+vi.mock('../../api/employee', () => ({ fetchEmployees: vi.fn() }))
+
+vi.mock('../../api/rdm', () => ({
+  fetchProjectPage: vi.fn(),
+  fetchProjectStats: vi.fn(),
+  fetchExportBundle: vi.fn(),
+  fetchProjectDetail: vi.fn(),
+  updateProject: vi.fn(),
+}))
+
+function makeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1, projectNo: 'PJ-001', name: '演示項目', objective: '目標',
+    pmUserName: '張三', productOwnerUserName: '李四',
+    planStartDate: '2026-01-01', planEndDate: '2026-06-01',
+    status: 'in_progress', pausedFlag: false, riskFlag: false, overdueFlag: false,
+    deliveredCount: 2, totalDeliveryCount: 5, nextDeliveryDate: null,
+    blockedCount: 0, pendingDecisionCount: 0, updatedAt: '2026-05-01T10:00:00',
+    ...overrides,
+  } as never
+}
+
+function renderAt(entry = '/rdm-project') {
+  return render(<MemoryRouter initialEntries={[entry]}><ProjectOverview /></MemoryRouter>)
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow()], total: 1 })
+  vi.mocked(fetchProjectStats).mockResolvedValue({ inProgressCount: 3, attentionCount: 2, pendingDecisionCount: 1 } as never)
+})
+
+describe('ProjectOverview URL ↔ 篩選/分頁同步', () => {
+  it('從 URL 還原 keyword/status/pmUserId/pageNo/pageSize 並真正進入查詢參數', async () => {
+    renderAt('/rdm-project?keyword=abc&status=in_progress&pmUserId=7&pmName=%E5%BC%B5%E4%B8%89&pageNo=2&pageSize=50')
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalled())
+    expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({
+      keyword: 'abc', status: 'in_progress', pmUserId: 7, pageNo: 2, pageSize: 50,
+    }))
+  })
+})
+
+describe('ProjectOverview 統計卡下鑽', () => {
+  it('點擊「進行中項目」卡出現下鑽過濾 chip', async () => {
+    renderAt()
+    const card = await screen.findByTitle('點擊下鑽：僅看進行中項目')
+    fireEvent.click(card)
+    expect(await screen.findByText(/下鑽：進行中項目/)).toBeInTheDocument()
+  })
+})
+
+describe('ProjectOverview 統計失敗不回零', () => {
+  it('統計接口失敗時渲染「—」明確錯誤態並給警告，不靜默歸零', async () => {
+    vi.mocked(fetchProjectStats).mockRejectedValue(new Error('boom') as never)
+    renderAt()
+    // 明確錯誤態警告
+    expect(await screen.findByText(/統計載入失敗/)).toBeInTheDocument()
+    // 不顯示為 0，而是「—」占位（至少一個統計卡為破折號）
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+  })
+})
+
+describe('ProjectOverview 全量導出', () => {
+  const bundle = (consistent: boolean, mismatches: string[]) => ({
+    scope: {}, cards: {}, projects: [], items: [], todos: [],
+    reconciliation: { consistent, mismatches, projectCount: 0, projectRowCount: 0, deliveryItemCount: 0, deliveryItemRowCount: 0, pendingDecisionSum: 0, pendingDecisionDirect: 0, deferResidualSum: 0, deferResidualDirect: 0, todoTotal: 0, todoRowCount: 0, todoBucketSum: 0, todoRawReasonHits: 0, closedProjectCount: 0, allDeliveredProjectCount: 0, computedAt: null },
+    computedAt: null,
+  } as never)
+
+  it('導出調用 export-bundle 並帶當前 filters，一致時直接導出', async () => {
+    vi.mocked(fetchExportBundle).mockResolvedValue(bundle(true, []))
+    vi.mocked(exportProjectBundle).mockResolvedValue(undefined)
+    renderAt('/rdm-project?keyword=abc&status=in_progress&pmUserId=7&pmName=張三')
+    fireEvent.click(await screen.findByRole('button', { name: /導出全量報告/ }))
+    await waitFor(() => expect(fetchExportBundle).toHaveBeenCalled())
+    expect(fetchExportBundle).toHaveBeenCalledWith(expect.objectContaining({
+      keyword: 'abc', status: 'in_progress', pmUserId: 7,
+    }))
+    await waitFor(() => expect(exportProjectBundle).toHaveBeenCalled())
+  })
+
+  it('reconciliation 不一致時給出提示而非靜默導出', async () => {
+    vi.mocked(fetchExportBundle).mockResolvedValue(bundle(false, ['項目數不一致:1!=2']))
+    renderAt()
+    fireEvent.click(await screen.findByRole('button', { name: /導出全量報告/ }))
+    // 出現對賬不一致提示（靜態 Modal.confirm 渲染到 body，稍等）
+    await waitFor(() => expect(document.body.textContent).toContain('對賬口徑不一致'), { timeout: 4000 })
+    expect(document.body.textContent).toContain('項目數不一致:1!=2')
+    // 提示階段尚未真正導出
+    expect(exportProjectBundle).not.toHaveBeenCalled()
+  })
+})
+
+describe('ProjectOverview 暫停真調後端', () => {
+  it('暫停走 updateProject（先取 version 做乐观锁），非僅消息提示', async () => {
+    vi.mocked(fetchProjectDetail).mockResolvedValue({ id: 1, version: 9 } as never)
+    vi.mocked(updateProject).mockResolvedValue(undefined)
+    renderAt()
+    await screen.findByText('演示項目')
+    // 打開行操作下拉
+    fireEvent.click(screen.getByRole('button', { name: /更多/ }))
+    fireEvent.click(await screen.findByText('暫停項目'))
+    // 二次確認
+    fireEvent.click(await screen.findByRole('button', { name: /確認暫停/ }))
+    await waitFor(() => expect(fetchProjectDetail).toHaveBeenCalledWith(1))
+    await waitFor(() => expect(updateProject).toHaveBeenCalledWith(1, expect.objectContaining({ pausedFlag: true, expectedVersion: 9 })))
+  })
+})

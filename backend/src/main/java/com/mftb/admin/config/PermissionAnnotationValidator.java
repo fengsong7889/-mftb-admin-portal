@@ -43,8 +43,24 @@ public class PermissionAnnotationValidator implements CommandLineRunner {
                 Class<?> targetClass = AopUtils.getTargetClass(bean);
                 for (Method method : targetClass.getDeclaredMethods()) {
                     RequirePermission annotation = method.getAnnotation(RequirePermission.class);
-                    if (annotation != null) {
-                        annotatedKeys.add(annotation.menu());
+                    if (annotation == null) {
+                        continue;
+                    }
+                    annotatedKeys.add(annotation.menu());
+                    // 备选菜单也要查：菜单退役（软删）后若注解里仍引用它，主菜单与 anyOf 都拿不到授权，
+                    // 不扫这里就只能等用户报「按钮全部 403」才发现。
+                    annotatedKeys.addAll(java.util.Arrays.asList(annotation.anyOf()));
+                    for (String entry : annotation.anyPermissions()) {
+                        if (entry == null) {
+                            continue;
+                        }
+                        int split = entry.indexOf(':');
+                        if (split <= 0 || split == entry.length() - 1) {
+                            log.warn("权限注解校验: anyPermissions 条目『{}』不是 menuKey:action 格式，"
+                                    + "接口将永远按不命中拒绝，请修正写法", entry);
+                            continue;
+                        }
+                        annotatedKeys.add(entry.substring(0, split));
                     }
                 }
             }
@@ -56,7 +72,7 @@ public class PermissionAnnotationValidator implements CommandLineRunner {
             if (missing.isEmpty()) {
                 log.info("权限注解校验通过: {} 个 menuKey 均存在于 sys_menu", annotatedKeys.size());
             } else {
-                log.warn("权限注解校验: 以下 menuKey 在 sys_menu 中不存在, 相关接口将对非超管全部拒绝: {}", missing);
+                log.warn("权限注解校验: 以下 menuKey 在 sys_menu 中不存在或已退役, 相关接口将对非超管全部拒绝: {}", missing);
             }
         } catch (Exception e) {
             log.error("权限注解校验失败: {}", e.getMessage(), e);

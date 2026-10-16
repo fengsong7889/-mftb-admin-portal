@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Button, Col, DatePicker, Descriptions, Form, Input, InputNumber,
+  Alert, Button, Checkbox, Col, DatePicker, Descriptions, Form, Input, InputNumber,
   Modal, Radio, Row, Select, Space, Spin, Steps, Tag, message,
 } from 'antd'
 import {
@@ -20,11 +20,14 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
+import HelpPopover from '../../components/HelpPopover'
 import {
   createIssue, fetchIssueDetail, applyIssueDefer, decideIssueDefer, resolveIssue,
+  bindIssueFollowUp, cancelIssue, mergeIssue, reassignIssue,
   fetchDeliveryItems,
   type RdmIssueDetail as RdmIssueDetailType,
   type RdmIssueCreateForm, type RdmIssueDeferApplyForm, type RdmIssueDeferDecisionForm,
+  type RdmIssueResolveForm, type RdmIssueBindForm, type RdmIssueActionForm,
   type RdmDeliveryItemListItem,
 } from '../../api/rdm'
 import { fetchRequirementPage, type RdmRequirementRow } from '../../api/rdm'
@@ -32,17 +35,14 @@ import {
   RDM_ISSUE_STATUS, RDM_ISSUE_STATUS_LABEL, RDM_ISSUE_STATUS_COLOR,
   RDM_ISSUE_SEVERITY_LABEL, RDM_ISSUE_SEVERITY_COLOR,
   RDM_DEFER_STATUS, RDM_DEFER_STATUS_LABEL, RDM_DEFER_STATUS_COLOR,
+  RDM_ISSUE_SOURCE_TYPE_LABEL, RDM_DECISION,
 } from '../../constants/rdm'
 import './index.css'
 
 const { TextArea } = Input
 
-/** 問題來源類型 */
-const SOURCE_TYPE_OPTIONS = [
-  { value: 'test', label: '測試' },
-  { value: 'product_acceptance', label: '產品驗收' },
-  { value: 'biz_acceptance', label: '業務驗收' },
-]
+/** 問題來源類型（對齊後端 RdmIssueDTO.Create.sourceType：test/acceptance/online/other） */
+const SOURCE_TYPE_OPTIONS = Object.entries(RDM_ISSUE_SOURCE_TYPE_LABEL).map(([value, label]) => ({ value, label }))
 
 /** 嚴重程度選項 */
 const SEVERITY_OPTIONS = Object.entries(RDM_ISSUE_SEVERITY_LABEL).map(([value, label]) => ({
@@ -80,6 +80,11 @@ export default function IssueDetail() {
   const [decideForm] = Form.useForm()
   const [decideType, setDecideType] = useState<'product' | 'business'>('product')
   const [decideDeferId, setDecideDeferId] = useState<number | null>(null)
+
+  // 承接 / 關閉 / 取消 / 合併 / 改派 共用 Modal
+  const [actionModal, setActionModal] = useState<'resolve' | 'bind' | 'cancel' | 'merge' | 'reassign' | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionForm] = Form.useForm()
 
   const loadDetail = useCallback(async () => {
     if (!id) return
@@ -165,7 +170,9 @@ export default function IssueDetail() {
         targetVersion: values.targetVersion,
         ownerUserId: values.ownerUserId ? Number(values.ownerUserId) : undefined,
         ownerUserName: values.ownerUserName,
-        dueAt: values.dueAt.format('YYYY-MM-DD HH:mm:ss'),
+        // 後端 dueAt 嚴格為 yyyy-MM-dd（不帶時間）；帶時間值會被拒
+        dueAt: values.dueAt.format('YYYY-MM-DD'),
+        expectedVersion: detail?.version,
       }
       await applyIssueDefer(id, payload)
       message.success('延期申請已提交')
@@ -190,10 +197,15 @@ export default function IssueDetail() {
     try {
       const values = await decideForm.validateFields()
       setDecideLoading(true)
+      const deferRecord = detail?.deferRecords?.find(r => r.id === decideDeferId)
       const payload: RdmIssueDeferDecisionForm = {
+        // decision 取值必為 approved/rejected（不是 approve/reject），與後端一字不差
         decision: values.decision,
         reason: values.reason,
         followUpReqId: values.followUpReqId ? Number(values.followUpReqId) : undefined,
+        // 產品裁決时可指定是否需業務方複決（四眼：延期需兩道裁決才解除阻斷）
+        bizDecisionRequired: decideType === 'product' ? values.bizDecisionRequired : undefined,
+        expectedVersion: deferRecord?.version,
       }
       await decideIssueDefer(decideDeferId, decideType, payload)
       message.success('決策已提交')
@@ -205,25 +217,69 @@ export default function IssueDetail() {
     } finally { setDecideLoading(false) }
   }
 
-  // ===== 標記已解決 =====
-  const handleResolve = () => {
-    Modal.confirm({
-      title: '確認標記已解決',
-      className: 'custom-confirm-modal',
-      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
-      content: '標記後問題將進入「已解決」狀態。',
-      okText: '確認',
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await resolveIssue(id)
-          message.success('已標記為解決')
-          void loadDetail()
-        } catch {
-          // request.ts 已统一弹后端返回的失败原因，这里再弹一次就是双弹（AGENTS §G.4）
+  // ===== 承接 / 關閉 / 取消 / 合併 / 改派 =====
+  const openActionModal = (type: 'resolve' | 'bind' | 'cancel' | 'merge' | 'reassign') => {
+    actionForm.resetFields()
+    if (type === 'resolve') actionForm.setFieldsValue({ conclusion: 'pass' })
+    setActionModal(type)
+  }
+
+  /**
+   * 統一提交承接/關閉/取消/合併/改派。
+   * <p><b>關閉（resolve）必須带修復證據 + 復測輪次 + 產品驗收，絕不無證據關閉；延期≠解決，承接需求完成驗收≠原問題自動解決。</b>
+   * <p>expectedVersion 取問題詳情 version（樂觀鎖）；后端四眼/唯一承接/證據門禁失败时会回明確 message。
+   */
+  const handleActionSubmit = async () => {
+    if (!actionModal) return
+    try {
+      const values = await actionForm.validateFields()
+      setActionLoading(true)
+      const expectedVersion = detail?.version
+      if (actionModal === 'resolve') {
+        const payload: RdmIssueResolveForm = {
+          repairEvidenceJson: values.repairEvidenceJson,
+          testRoundId: Number(values.testRoundId),
+          productAcceptanceId: Number(values.productAcceptanceId),
+          reason: values.reason,
+          conclusion: values.conclusion || 'pass',
+          businessAcceptanceId: values.businessAcceptanceId ? Number(values.businessAcceptanceId) : undefined,
+          followupId: values.followupId ? Number(values.followupId) : undefined,
+          deliveryItemId: values.deliveryItemId ? Number(values.deliveryItemId) : undefined,
+          buildId: values.buildId || undefined,
+          testExecutionIdsJson: values.testExecutionIdsJson || undefined,
+          expectedVersion,
         }
-      },
-    })
+        await resolveIssue(id, payload)
+        message.success('問題已按證據關閉')
+      } else if (actionModal === 'bind') {
+        const payload: RdmIssueBindForm = {
+          issueId: id,
+          followUpReqId: Number(values.followUpReqId),
+          ownerUserId: values.ownerUserId ? Number(values.ownerUserId) : undefined,
+          reason: values.reason || undefined,
+          expectedVersion,
+        }
+        await bindIssueFollowUp(payload)
+        message.success('已建立承接')
+      } else {
+        const payload: RdmIssueActionForm = {
+          reason: values.reason,
+          targetIssueId: actionModal === 'merge' ? Number(values.targetIssueId) : undefined,
+          newOwnerUserId: actionModal === 'reassign' ? Number(values.newOwnerUserId) : undefined,
+          newOwnerUserName: actionModal === 'reassign' ? values.newOwnerUserName : undefined,
+          expectedVersion,
+        }
+        if (actionModal === 'cancel') await cancelIssue(id, payload)
+        else if (actionModal === 'merge') await mergeIssue(id, payload)
+        else await reassignIssue(id, payload)
+        message.success('操作已提交')
+      }
+      setActionModal(null)
+      void loadDetail()
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'errorFields' in err) return
+      // request.ts 已統一彈後端失敗原因，不再雙彈
+    } finally { setActionLoading(false) }
   }
 
   // ===== 延期流程 Steps =====
@@ -237,15 +293,15 @@ export default function IssueDetail() {
           title: '產品決定',
           status: record.productDecision ? 'finish' as const : record.status === RDM_DEFER_STATUS.PENDING_PRODUCT ? 'process' as const : 'wait' as const,
           desc: record.productDecision
-            ? `${record.productDecideUserName || ''} · ${record.productDecision === 'approve' ? '同意' : '拒絕'} · ${record.productDecideTime ? dayjs(record.productDecideTime).format('MM-DD HH:mm') : ''}`
+            ? `${record.productDecideUserName || ''} · ${record.productDecision === RDM_DECISION.APPROVED ? '同意' : '拒絕'} · ${record.productDecideTime ? dayjs(record.productDecideTime).format('MM-DD HH:mm') : ''}`
             : record.status === RDM_DEFER_STATUS.PENDING_PRODUCT ? '等待產品經理裁決' : '',
         },
         {
           title: '業務決定',
           status: record.bizDecision ? 'finish' as const : record.status === RDM_DEFER_STATUS.PENDING_BIZ ? 'process' as const : 'wait' as const,
           desc: record.bizDecision
-            ? `${record.bizDecideUserName || ''} · ${record.bizDecision === 'approve' ? '同意' : '拒絕'} · ${record.bizDecideTime ? dayjs(record.bizDecideTime).format('MM-DD HH:mm') : ''}`
-            : record.status === RDM_DEFER_STATUS.PENDING_BIZ ? '等待業務方確認' : record.productDecision === 'reject' ? '產品已拒絕' : '',
+            ? `${record.bizDecideUserName || ''} · ${record.bizDecision === RDM_DECISION.APPROVED ? '同意' : '拒絕'} · ${record.bizDecideTime ? dayjs(record.bizDecideTime).format('MM-DD HH:mm') : ''}`
+            : record.status === RDM_DEFER_STATUS.PENDING_BIZ ? '等待業務方確認' : record.productDecision === RDM_DECISION.REJECTED ? '產品已拒絕' : '',
         },
         {
           title: '建立承接',
@@ -472,6 +528,15 @@ export default function IssueDetail() {
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#E6FFFB', color: '#13C2C2' }}><FileTextOutlined /></span>
           可用操作
+          <HelpPopover
+            title="問題閉環三原則"
+            ariaLabel="問題閉環原則說明"
+            content={[
+              { label: '延期需批准才解除阻斷', body: '延期申請必須經產品（必要時業務）裁決批准後才生效；未批准的延期不解除阻斷。', tone: 'warn' },
+              { label: '承接唯一', body: '每個問題同一時刻只有一條有效承接需求；改派/合併/取消都保留既有承接與歷史。', tone: 'info' },
+              { label: '關閉需證據', body: '按證據關閉必須带修復證據 + 復測輪次 + 產品驗收；延期≠解決，承接需求完成驗收≠原問題自動解決。', tone: 'danger' },
+            ]}
+          />
           <span className="rdm-card-title-split" />
         </div>
         <Space wrap size={12}>
@@ -488,8 +553,16 @@ export default function IssueDetail() {
               業務裁決
             </Button>
           )}
+          {pendingDefer && pendingDefer.status === RDM_DEFER_STATUS.PENDING_BIND && (
+            <Button type="primary" icon={<SendOutlined />} onClick={() => openActionModal('bind')}>建立承接</Button>
+          )}
           {(detail.status === RDM_ISSUE_STATUS.PROCESSING || detail.status === RDM_ISSUE_STATUS.OPEN) && (
-            <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleResolve}>標記已解決</Button>
+            <>
+              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => openActionModal('resolve')}>按證據關閉</Button>
+              <Button icon={<SendOutlined />} onClick={() => openActionModal('reassign')}>改派</Button>
+              <Button icon={<SendOutlined />} onClick={() => openActionModal('merge')}>合併</Button>
+              <Button danger icon={<SendOutlined />} onClick={() => openActionModal('cancel')}>取消</Button>
+            </>
           )}
           <Button onClick={() => navigate(-1)}>返回</Button>
         </Space>
@@ -530,7 +603,7 @@ export default function IssueDetail() {
             </Col>
             <Col span={12}>
               <Form.Item name="dueAt" label="截止日期" rules={[{ required: true, message: '請選擇截止日期' }]}>
-                <DatePicker showTime style={{ width: '100%' }} placeholder="選擇日期" />
+                <DatePicker style={{ width: '100%' }} placeholder="選擇日期（年-月-日）" />
               </Form.Item>
             </Col>
           </Row>
@@ -564,8 +637,8 @@ export default function IssueDetail() {
         <Form form={decideForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="decision" label="決定" rules={[{ required: true, message: '請選擇' }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
-              <Radio.Button value="approve">同意延期</Radio.Button>
-              <Radio.Button value="reject">拒絕</Radio.Button>
+              <Radio.Button value={RDM_DECISION.APPROVED}>同意延期</Radio.Button>
+              <Radio.Button value={RDM_DECISION.REJECTED}>拒絕</Radio.Button>
             </Radio.Group>
           </Form.Item>
           <Form.Item name="reason" label="原因" rules={[{ required: true, message: '請填寫原因' }]}>
@@ -574,12 +647,17 @@ export default function IssueDetail() {
           <Form.Item noStyle shouldUpdate={(prev, cur) => prev.decision !== cur.decision}>
             {({ getFieldValue }) => {
               const decision = getFieldValue('decision')
-              if (decision !== 'approve') return null
+              if (decision !== RDM_DECISION.APPROVED) return null
               return (
                 <>
                   {decideType === 'product' && (
-                    <Alert type="info" showIcon style={{ marginBottom: 16 }}
-                      message="同意後將流轉到業務方確認環節" />
+                    <>
+                      <Alert type="info" showIcon style={{ marginBottom: 16 }}
+                        message="同意後將流轉到業務方確認環節（四眼：延期需兩道裁決才解除阻斷）" />
+                      <Form.Item name="bizDecisionRequired" valuePropName="checked" label="是否需業務方複決">
+                        <Checkbox>需要業務方複決</Checkbox>
+                      </Form.Item>
+                    </>
                   )}
                   <Form.Item name="followUpReqId" label="承接需求 ID（選填）">
                     <Input placeholder="綁定後續承接需求 ID" />
@@ -587,6 +665,124 @@ export default function IssueDetail() {
                 </>
               )
             }}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* ── 承接 / 關閉 / 取消 / 合併 / 改派 Modal ── */}
+      <Modal
+        title={
+          actionModal === 'resolve' ? '按證據關閉問題'
+            : actionModal === 'bind' ? '建立承接需求'
+            : actionModal === 'cancel' ? '取消問題'
+            : actionModal === 'merge' ? '合併到目標問題'
+            : '改派負責人'
+        }
+        open={actionModal !== null}
+        onCancel={() => setActionModal(null)}
+        onOk={handleActionSubmit}
+        confirmLoading={actionLoading}
+        okText="提交"
+        cancelText="取消"
+        width={580}
+        destroyOnClose
+      >
+        {actionModal === 'resolve' && (
+          <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+            message="關閉必須带證據"
+            description="延期≠解決；承接需求完成驗收≠原問題自動解決。修復證據、復測輪次、產品驗收均為必填，後端據此校驗，缺證據一律拒絕。" />
+        )}
+        {actionModal === 'bind' && (
+          <Alert type="info" showIcon style={{ marginBottom: 16 }}
+            message="每個問題同一時刻唯一有效承接；承接需求以數值 ID 指定。" />
+        )}
+        <Form form={actionForm} layout="vertical" style={{ marginTop: 8 }}>
+          {actionModal === 'resolve' && (
+            <>
+              <Form.Item name="repairEvidenceJson" label="修復證據（JSON）" rules={[{ required: true, message: '請填寫修復證據' }]}>
+                <TextArea rows={3} placeholder='例：{"commit":"...","pr":"...","screenshots":["..."]}' />
+              </Form.Item>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item name="testRoundId" label="復測輪次ID" rules={[{ required: true, message: '請填寫' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="必填" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="productAcceptanceId" label="產品驗收ID" rules={[{ required: true, message: '請填寫' }]}>
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="必填" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item name="businessAcceptanceId" label="業務驗收ID">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="選填" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="conclusion" label="閉環結論">
+                    <Radio.Group optionType="button" buttonStyle="solid">
+                      <Radio.Button value="pass">通過</Radio.Button>
+                      <Radio.Button value="fail">不通過</Radio.Button>
+                    </Radio.Group>
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="followupId" label="承接記錄ID">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="選填" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item name="deliveryItemId" label="交付項ID">
+                    <InputNumber min={1} style={{ width: '100%' }} placeholder="選填" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item name="buildId" label="構建標識">
+                    <Input placeholder="選填" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item name="testExecutionIdsJson" label="復測執行記錄ID（JSON）">
+                <Input placeholder='例：[101,102]（選填）' />
+              </Form.Item>
+            </>
+          )}
+          {actionModal === 'bind' && (
+            <>
+              <Form.Item name="followUpReqId" label="承接需求ID" rules={[{ required: true, message: '請填寫承接需求ID' }]}>
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="必填" />
+              </Form.Item>
+              <Form.Item name="ownerUserId" label="承接負責人ID">
+                <InputNumber min={1} style={{ width: '100%' }} placeholder="選填" />
+              </Form.Item>
+            </>
+          )}
+          {actionModal === 'merge' && (
+            <Form.Item name="targetIssueId" label="目標問題ID" rules={[{ required: true, message: '請填寫目標問題ID' }]}>
+              <InputNumber min={1} style={{ width: '100%' }} placeholder="合併到該問題（必填）" />
+            </Form.Item>
+          )}
+          {actionModal === 'reassign' && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="newOwnerUserId" label="新負責人ID" rules={[{ required: true, message: '請填寫' }]}>
+                  <InputNumber min={1} style={{ width: '100%' }} placeholder="必填" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="newOwnerUserName" label="新負責人姓名">
+                  <Input placeholder="選填" />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+          <Form.Item name="reason" label={actionModal === 'resolve' ? '關閉說明' : '原因'}
+            rules={actionModal === 'bind' ? [] : [{ required: true, message: '請填寫原因' }]}>
+            <TextArea rows={3} placeholder={actionModal === 'bind' ? '說明承接原因（選填）' : '說明原因（必填）'} maxLength={500} showCount />
           </Form.Item>
         </Form>
       </Modal>

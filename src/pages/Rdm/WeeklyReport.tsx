@@ -26,6 +26,7 @@ import {
   RDM_RISK_COLOR,
   RDM_RISK_LABEL,
   RDM_STATUS_LABEL,
+  formatRdmReqNo,
   type RdmRiskType,
   type RdmStatus,
 } from '../../constants/rdm'
@@ -124,7 +125,8 @@ export default function WeeklyReport() {
   ], [navigate])
 
   const riskColumns: TableColumnsType<RdmWeeklyReport['risks'][number]> = useMemo(() => [
-    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
+    // 審批卡殼行属准入前需求，还没有正式编号：空单元格会被读成“数据丢了”
+    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150, render: (v?: string | null) => formatRdmReqNo(v) },
     {
       title: '標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
       render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,

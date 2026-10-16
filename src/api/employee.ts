@@ -113,6 +113,21 @@ export async function fetchEmployeeOptions(keyword: string): Promise<OptionItem[
   })
 }
 
+/**
+ * 员工搜索下拉选项（选项值为 sys_user.id 的数字字符串，仅在职）。
+ *
+ * 为什么不能复用 fetchEmployeeOptions：后者 value 是工号字符串（如 'MF00001'），
+ * 凡是后端要求「用户 ID」的接口（RDM 测试负责人/发布负责人等）提交时
+ * Number('MF00001') 会得到 NaN，参数静默传错。需要用户 ID 的场景一律用本函数。
+ */
+export async function fetchEmployeeIdOptions(keyword: string): Promise<OptionItem[]> {
+  const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
+  return (res.records || []).map(e => {
+    const extra = [e.department, e.position, e.jobLevel].filter(Boolean).join(' / ')
+    return { value: String(e.id), label: `${e.name}(${e.empId})${extra ? ` · ${extra}` : ''}` }
+  })
+}
+
 /** 新增员工 */
 export function createEmployee(data: EmployeePayload) {
   return request.post<unknown, EmployeeItem>('/employees', data)

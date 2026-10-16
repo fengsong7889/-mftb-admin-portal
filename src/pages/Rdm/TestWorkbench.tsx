@@ -6,24 +6,23 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Button, Col, DatePicker, Form, Input, Modal, Row,
-  Select, Space, Statistic, Table, Tag, message,
+  Button, DatePicker, Form, Input, Modal,
+  Select, Space, Table, Tag, message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined,
-  MinusCircleOutlined, PlusOutlined,
-  ReloadOutlined, SendOutlined, SyncOutlined,
+  PlusOutlined,
+  ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
+import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
 import {
-  fetchTestBatches, submitTestBatch, acceptTestBatch, returnTestBatch,
-  fetchDeliveryItems,
+  fetchTestBatches, acceptTestBatch, returnTestBatch,
   type RdmTestBatchListItem, type RdmTestBatchQuery,
-  type RdmTestBatchSubmitForm, type RdmDeliveryItemListItem,
 } from '../../api/rdm'
-import { fetchRequirementPage, type RdmRequirementRow } from '../../api/rdm'
 import {
   RDM_TEST_BATCH_STATUS, RDM_TEST_BATCH_STATUS_LABEL, RDM_TEST_BATCH_STATUS_COLOR,
 } from '../../constants/rdm'
@@ -32,11 +31,21 @@ import './index.css'
 const { RangePicker } = DatePicker
 const { TextArea } = Input
 
-/** 測試環境選項 */
-const TEST_ENV_OPTIONS = [
-  { value: 'uat', label: 'UAT 環境' },
-  { value: 'pre', label: '預發環境' },
-  { value: 'prod', label: '生產環境' },
+/**
+ * 列配置元数据（§E.3 列表页必须可显隐/调序）。
+ * key/title 与下方 columns 逐字对应，新增/改名列时两处同步。
+ */
+const COLUMN_META = [
+  { key: 'batchNo', title: '批次號' },
+  { key: 'deliveryItemTitles', title: '交付範圍' },
+  { key: 'req', title: '需求' },
+  { key: 'testEnv', title: '環境' },
+  { key: 'testLeadUserName', title: '測試負責人' },
+  { key: 'status', title: '狀態' },
+  { key: 'roundNo', title: '輪次' },
+  { key: 'planEndTime', title: '計劃結束' },
+  { key: 'ratio', title: '通過/總數' },
+  { key: 'action', title: '操作' },
 ]
 
 export default function TestWorkbench() {
@@ -55,14 +64,6 @@ export default function TestWorkbench() {
 
   // 統計
   const [stats, setStats] = useState({ pending: 0, executing: 0, failed: 0, passed: 0 })
-
-  // 發起提測 Modal
-  const [submitOpen, setSubmitOpen] = useState(false)
-  const [submitLoading, setSubmitLoading] = useState(false)
-  const [submitForm] = Form.useForm()
-  const [reqOptions, setReqOptions] = useState<RdmRequirementRow[]>([])
-  const [deliveryOptions, setDeliveryOptions] = useState<RdmDeliveryItemListItem[]>([])
-  const [buildIds, setBuildIds] = useState<string[]>([''])
 
   // 退回 Modal
   const [returnOpen, setReturnOpen] = useState(false)
@@ -154,49 +155,8 @@ export default function TestWorkbench() {
     finally { setReturnLoading(false) }
   }
 
-  // ===== 發起提測 =====
-  const openSubmitModal = async () => {
-    setSubmitOpen(true)
-    submitForm.resetFields()
-    setBuildIds([''])
-    setDeliveryOptions([])
-    try {
-      const res = await fetchRequirementPage({ size: 50, page: 1, scope: 'delivery' })
-      setReqOptions(res.records ?? [])
-    } catch { /* ignore */ }
-  }
-
-  const handleReqChange = async (reqId: number) => {
-    submitForm.setFieldsValue({ deliveryItemIds: [] })
-    try {
-      const res = await fetchDeliveryItems({ reqId, pageSize: 100 })
-      setDeliveryOptions(res.records ?? [])
-    } catch { setDeliveryOptions([]) }
-  }
-
-  const handleSubmitBatch = async () => {
-    try {
-      const values = await submitForm.validateFields()
-      setSubmitLoading(true)
-      const payload: RdmTestBatchSubmitForm = {
-        reqId: values.reqId,
-        deliveryItemIds: values.deliveryItemIds,
-        testEnv: values.testEnv,
-        testLeadUserId: values.testLeadUserId,
-        testLeadUserName: values.testLeadUserName || '',
-        executorUserIds: values.executorUserIds,
-        planEndTime: values.planEndTime ? values.planEndTime.format('YYYY-MM-DD HH:mm:ss') : undefined,
-        buildIds: buildIds.filter(b => b.trim()),
-      }
-      await submitTestBatch(payload)
-      message.success('提測批次已建立')
-      setSubmitOpen(false)
-      void loadData()
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'errorFields' in err) return // form validation
-      message.error('提交失敗')
-    } finally { setSubmitLoading(false) }
-  }
+  // ===== 發起提測：独立表单页（§9.1 禁止用 Modal 承载新增表单） =====
+  const openSubmitPage = () => navigate('/rdm-test-submit')
 
   // ===== 表格列 =====
   const columns: TableColumnsType<RdmTestBatchListItem> = useMemo(() => [
@@ -258,11 +218,17 @@ export default function TestWorkbench() {
 
   const statusOptions = Object.entries(RDM_TEST_BATCH_STATUS_LABEL).map(([value, label]) => ({ value, label }))
 
+  // §E.3 列配置：字段设置面板放操作区右侧，批次号锁头、操作列锁尾
+  const { configComponent, applyConfig } = useColumnConfig('rdm-test-workbench', COLUMN_META, [
+    { key: 'batchNo', visible: true, locked: 'head' as const },
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+
   return (
     <div className="content-area rdm-workspace">
-      {/* ── 搜索區 ── */}
+      {/* ── 搜索區：§E.1 由 .search-section + Form layout="inline" 统一提供 4 列 grid（不得写死内联 grid） ── */}
       <div className="search-section">
-        <Form layout="inline" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px 16px' }}>
+        <Form layout="inline">
           <Form.Item label="關鍵詞">
             <Input
               placeholder="批次號 / 需求標題"
@@ -296,46 +262,36 @@ export default function TestWorkbench() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item className="search-actions" style={{ gridColumn: '1 / -1' }}>
-            <Space>
+          <Form.Item label=" ">
+            <div className="search-actions">
               <Button type="primary" onClick={handleSearch}>查詢</Button>
               <Button onClick={handleReset}>重置</Button>
-            </Space>
+            </div>
           </Form.Item>
         </Form>
       </div>
 
-      {/* ── 統計卡片（必須在搜索區下方、操作區上方） ── */}
-      <div className="rdm-test-stats" key={`${keyword}-${statusFilter}`}>
-        <Row gutter={16}>
-          <Col span={6}>
-            <div className="rdm-stat-card rdm-stat-card--warning">
-              <Statistic title="待接收" value={stats.pending} prefix={<ClockCircleOutlined />} valueStyle={{ color: '#FA8C16' }} />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-stat-card rdm-stat-card--processing">
-              <Statistic title="執行中" value={stats.executing} prefix={<SyncOutlined spin />} valueStyle={{ color: '#1890FF' }} />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-stat-card rdm-stat-card--error">
-              <Statistic title="待復測" value={stats.failed} prefix={<CloseCircleOutlined />} valueStyle={{ color: '#FF4D4F' }} />
-            </div>
-          </Col>
-          <Col span={6}>
-            <div className="rdm-stat-card rdm-stat-card--success">
-              <Statistic title="已通過" value={stats.passed} prefix={<CheckCircleOutlined />} valueStyle={{ color: '#52C41A' }} />
-            </div>
-          </Col>
-        </Row>
+      {/* ── 統計卡片（必須在搜索區下方、操作區上方）：§B.7 统一走 StatCards（计数控件动画 + hover） ── */}
+      <div style={{ marginBottom: 16 }}>
+        <StatCards
+          animationKey={`${keyword}-${statusFilter}-${testLeadFilter}-${total}`}
+          items={[
+            { key: 'pending', icon: <ClockCircleOutlined />, color: 'brand', value: stats.pending, label: '待接收' },
+            { key: 'executing', icon: <SyncOutlined spin />, color: 'info', value: stats.executing, label: '執行中' },
+            { key: 'failed', icon: <CloseCircleOutlined />, color: 'danger', value: stats.failed, label: '待復測' },
+            { key: 'passed', icon: <CheckCircleOutlined />, color: 'success', value: stats.passed, label: '已通過' },
+          ]}
+        />
       </div>
 
-      {/* ── 操作區 ── */}
+      {/* ── 操作區：§E.2 新增类在右，刷新等中性动作在左 ── */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button type="primary" icon={<PlusOutlined />} onClick={openSubmitModal}>發起提測</Button>
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={openSubmitPage}>發起提測</Button>
+          {configComponent}
         </div>
       </div>
 
@@ -344,7 +300,7 @@ export default function TestWorkbench() {
         className="nowrap-table"
         rowKey="id"
         loading={loading}
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={rows}
         scroll={{ x: 1400 }}
         pagination={{
@@ -353,8 +309,10 @@ export default function TestWorkbench() {
           total,
           showSizeChanger: true,
           showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: t => `共 ${t} 條`,
-          onChange: (p, s) => { setPage(p); setPageSize(s) },
+          /* §E.4：每页条数变化时必须重置到第 1 页 */
+          onChange: (p, s) => { setPageSize(s); setPage(s !== pageSize ? 1 : p) },
         }}
       />
 
@@ -380,86 +338,6 @@ export default function TestWorkbench() {
           maxLength={500}
           showCount
         />
-      </Modal>
-
-      {/* ── 發起提測 Modal ── */}
-      <Modal
-        title={<span><SendOutlined style={{ marginRight: 8, color: '#E8720C' }} />發起提測</span>}
-        open={submitOpen}
-        onCancel={() => setSubmitOpen(false)}
-        onOk={handleSubmitBatch}
-        confirmLoading={submitLoading}
-        okText="提交"
-        cancelText="取消"
-        width={640}
-        destroyOnClose
-      >
-        <Form form={submitForm} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="reqId" label="關聯需求" rules={[{ required: true, message: '請選擇需求' }]}>
-            <Select
-              placeholder="搜索需求"
-              showSearch
-              optionFilterProp="label"
-              onChange={handleReqChange}
-              options={reqOptions.map(r => ({ value: r.id, label: `${r.reqNo} ${r.title}` }))}
-            />
-          </Form.Item>
-          <Form.Item name="deliveryItemIds" label="交付項" rules={[{ required: true, message: '請選擇交付項' }]}>
-            <Select
-              mode="multiple"
-              placeholder="選擇交付項（可多選）"
-              options={deliveryOptions.map(d => ({ value: d.id, label: `${d.itemNo} ${d.title}` }))}
-            />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="testEnv" label="測試環境" rules={[{ required: true, message: '請選擇環境' }]}>
-                <Select placeholder="選擇環境" options={TEST_ENV_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="planEndTime" label="計劃結束時間">
-                <DatePicker showTime style={{ width: '100%' }} placeholder="選擇日期" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="testLeadUserId" label="測試負責人 ID" rules={[{ required: true, message: '請輸入' }]}>
-                <Input placeholder="用戶 ID" type="number" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="testLeadUserName" label="測試負責人姓名">
-                <Input placeholder="姓名" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="executorUserIds" label="執行人員 ID（逗號分隔）">
-            <Select mode="tags" placeholder="輸入用戶 ID 後按 Enter" />
-          </Form.Item>
-          <Form.Item label="構建標識">
-            {buildIds.map((bid, idx) => (
-              <Space key={idx} style={{ display: 'flex', marginBottom: 8 }}>
-                <Input
-                  value={bid}
-                  onChange={e => {
-                    const next = [...buildIds]; next[idx] = e.target.value; setBuildIds(next)
-                  }}
-                  placeholder={`構建 ID ${idx + 1}`}
-                  style={{ width: 280 }}
-                />
-                {buildIds.length > 1 && (
-                  <Button type="link" danger size="small" icon={<MinusCircleOutlined />}
-                    onClick={() => setBuildIds(buildIds.filter((_, i) => i !== idx))} />
-                )}
-              </Space>
-            ))}
-            <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setBuildIds([...buildIds, ''])}>
-              新增構建
-            </Button>
-          </Form.Item>
-        </Form>
       </Modal>
     </div>
   )

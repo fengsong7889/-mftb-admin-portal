@@ -37,7 +37,7 @@ public class RdmSummaryController {
     @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
     @Operation(summary = "項目摘要")
     public Result<RdmSummaryService.ProjectSummary> projectSummary(@PathVariable Long id) {
-        return Result.success(summaryService.getProjectSummary(id));
+        return Result.success(summaryService.getProjectSummary(id, currentUserId()));
     }
 
     /** 需求摘要（需求詳情/列表展開行） */
@@ -45,7 +45,7 @@ public class RdmSummaryController {
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "view")
     @Operation(summary = "需求摘要")
     public Result<RdmSummaryService.RequirementSummary> requirementSummary(@PathVariable Long id) {
-        return Result.success(summaryService.getRequirementSummary(id));
+        return Result.success(summaryService.getRequirementSummary(id, currentUserId()));
     }
 
     /** 交付項摘要（交付項詳情/發布批次閘門預覽） */
@@ -53,7 +53,7 @@ public class RdmSummaryController {
     @RequirePermission(menu = RdmConstants.MENU_DELIVERY_BOARD, action = "view")
     @Operation(summary = "交付項摘要")
     public Result<RdmSummaryService.DeliveryItemSummary> deliveryItemSummary(@PathVariable Long id) {
-        return Result.success(summaryService.getDeliveryItemSummary(id));
+        return Result.success(summaryService.getDeliveryItemSummary(id, currentUserId()));
     }
 
     /** 個人工作台摘要（我參與的項目/待辦/臨期節點，按登錄人取數） */

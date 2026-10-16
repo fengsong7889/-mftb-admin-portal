@@ -3,16 +3,19 @@
  *
  * 承載「規則中心」某个子菜单对应的规则版块：顶部标题卡片 + 版块卡片（编辑/保存/取消/重置）。
  * 规则值以后端 sys_config 为真值（后端优先加载、批量落库），localStorage 作同步缓存。
- * id_generation（编号生成规则）以表格形式展示，前缀/日期/序号可编辑并存本地（其真值由后端编号表管理）。
+ * id_generation（编号生成规则）以表格形式展示；它的真值是后端 sys_biz_seq_rule（BizSeqService 发号时
+ * 读的就是这张表），所以本页必须拉 /api/biz-seq-rules 覆盖静态目录；拉不到时明记告警，
+ * 不能把静态样例当成已生效配置。
  */
-import { useState, useEffect, useCallback } from 'react'
-import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio, Spin, Form } from 'antd'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio, Spin, Form, Alert } from 'antd'
 import {
   SettingOutlined, EditOutlined, SaveOutlined, CloseOutlined, ReloadOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useRuleGroup } from '../../hooks/useSystemRules'
 import { useAuth } from '../../contexts/AuthContext'
-import type { RuleItem } from '../../constants/ruleConfig'
+import { fetchBizSeqRules, type BizSeqRuleVO } from '../../api/bizSeqRule'
+import { formatSeqExample, type RuleItem } from '../../constants/ruleConfig'
 
 /** 廣告類型子分組顯示名稱與配色 */
 const SUB_GROUP_META: Record<string, { label: string; color: string }> = {
@@ -38,6 +41,80 @@ export default function RuleGroupPage({ menuKey }: Props) {
   /* 編號生成規則搜索條件（所屬菜單 / 業務類型 / 前綴）：表单草稿 + 已应用筛选 */
   const [seqForm] = Form.useForm()
   const [seqFilters, setSeqFilters] = useState({ menu: '', type: '', prefix: '' })
+
+  /*
+   * 编号规则的后端真值（sys_biz_seq_rule）。静态目录里的前缀可能早就被管理员改过，
+   * 不读真值就会「配置页看到一个前缀、实际发出另一个号」；后端新增而静态没登记的规则
+   * 也必须出现在页面上，否则新业务的编号规则根本无处可查。
+   */
+  const [seqRules, setSeqRules] = useState<BizSeqRuleVO[] | null>(null)
+  const [seqRulesError, setSeqRulesError] = useState(false)
+  const [seqRulesLoading, setSeqRulesLoading] = useState(false)
+
+  const loadSeqRules = useCallback(async () => {
+    if (group?.key !== 'id_generation') return
+    setSeqRulesLoading(true)
+    setSeqRulesError(false)
+    try {
+      setSeqRules(await fetchBizSeqRules())
+    } catch {
+      // 不拿静态目录当成功：失败要明说，否则用户会把旧快照当成现行配置
+      setSeqRules(null)
+      setSeqRulesError(true)
+    } finally {
+      setSeqRulesLoading(false)
+    }
+  }, [group?.key])
+
+  useEffect(() => {
+    void loadSeqRules()
+  }, [loadSeqRules])
+
+  /**
+   * 把后端真值合到静态目录上：同 key 以 sys_biz_seq_rule 为准（前缀/日期/位数/起始口径/
+   * 规则名/备注/所属菜单），后端有而静态没登记的新规则追加到表尾。
+   * <p>刻意保留静态条目里后端不管理的展示元信息（如特殊人工编码的 unit 形式），
+   * 拿不到后端数据时退回静态目录但一定配告警，不假装它已生效。
+   */
+  const seqRows = useMemo<RuleItem[]>(() => {
+    const base = group ? group.rules : []
+    if (group?.key !== 'id_generation' || !seqRules) return base
+    const merged: RuleItem[] = base.map(rule => {
+      const hit = seqRules.find(r => r.ruleKey === rule.key)
+      if (!hit) return rule
+      return {
+        ...rule,
+        label: hit.ruleName || rule.label,
+        value: hit.prefix,
+        defaultValue: hit.prefix,
+        dateFormat: hit.dateFormat || '',
+        // 表内位数既是展示位也是示例位数，不跟后端走就会展错
+        min: hit.seqLength ?? rule.min,
+        max: hit.seqLength ?? rule.max,
+        seqStart: hit.seqStart ?? rule.seqStart,
+        remark: hit.remark || rule.remark,
+        menu: hit.bizMenu || rule.menu,
+      }
+    })
+    const known = new Set(base.map(r => r.key))
+    for (const r of seqRules) {
+      if (known.has(r.ruleKey)) continue
+      merged.push({
+        key: r.ruleKey,
+        label: r.ruleName || r.ruleKey,
+        type: 'table',
+        value: r.prefix,
+        defaultValue: r.prefix,
+        dateFormat: r.dateFormat || '',
+        min: r.seqLength ?? 4,
+        max: r.seqLength ?? 4,
+        seqStart: r.seqStart ?? undefined,
+        remark: r.remark || '',
+        menu: r.bizMenu || '—',
+      })
+    }
+    return merged
+  }, [group, seqRules])
 
   useEffect(() => {
     reload()
@@ -222,14 +299,11 @@ export default function RuleGroupPage({ menuKey }: Props) {
     })
   }
 
-  /* 编号生成规则表格（只读展示，示例由前缀/日期/序号推导） */
+  /* 编号生成规则表格（只读展示，示例由前缀/日期/序号/起始口径推导） */
   const renderTable = () => {
-    const computeExample = (prefix: string, df: string | undefined, sl: number | undefined) => {
-      if (prefix === '-') return ''
-      const seq = sl ? '0'.repeat(sl) : '0000'
-      const datePart = df === 'YYYYMMDD' ? '20260812' : df === 'YYYYMM' ? '202608' : df === 'YYMM' ? '2608' : ''
-      return `${prefix}${datePart}${seq}`
-    }
+    // 示例算法已抽到 constants/ruleConfig 的 formatSeqExample（纯函数可单测），
+    // 与 BizSeqService 的 seq_start 口径对齐；不再在本页重复一套。
+    const computeExample = formatSeqExample
     const menuDisplayOf = (menu: string) => {
       const idx = menu.indexOf('-')
       return idx !== -1 ? menu.substring(idx + 1) : (menu === '—' ? '—' : menu)
@@ -237,7 +311,7 @@ export default function RuleGroupPage({ menuKey }: Props) {
     const kwMenu = seqFilters.menu.trim().toLowerCase()
     const kwType = seqFilters.type.trim().toLowerCase()
     const kwPrefix = seqFilters.prefix.trim().toLowerCase()
-    const filtered = group.rules.filter(rule => {
+    const filtered = seqRows.filter(rule => {
       const prefix = ((rule.value as string) || '-').toLowerCase()
       const menu = rule.menu || '—'
       if (kwMenu && !(menu.toLowerCase().includes(kwMenu) || menuDisplayOf(menu).toLowerCase().includes(kwMenu))) return false
@@ -269,7 +343,31 @@ export default function RuleGroupPage({ menuKey }: Props) {
           </Form>
           {hasFilter && (
             <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
-              共 {filtered.length} / {group.rules.length} 條（已篩選）
+              共 {filtered.length} / {seqRows.length} 條（已篩選）
+            </div>
+          )}
+          {/*
+            真值来源必须写在页面上：后端可读时表格是 sys_biz_seq_rule 现行配置；
+            不可读时退回静态目录但明记告警，绝不能把旧快照当成已生效配置。
+          */}
+          {seqRulesLoading && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
+              <Spin size="small" /> 正在讀取後端編號規則真值…
+            </div>
+          )}
+          {!seqRulesLoading && seqRulesError && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginTop: 8 }}
+              message="未能讀取後端編號規則真值，下表為前端靜態目錄，僅供參考不代表已生效配置"
+              description="前綴/位數/起始序號以 sys_biz_seq_rule 為準；請點「重新載入真值」重試，或檢查 rule-seq:view 授權與後端服務。"
+              action={<Button size="small" icon={<ReloadOutlined />} onClick={() => void loadSeqRules()}>重新載入真值</Button>}
+            />
+          )}
+          {!seqRulesLoading && !seqRulesError && seqRules && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#52C41A' }}>
+              已同步後端真值（sys_biz_seq_rule 启用 {seqRules.length} 條），同 key 以資料庫配置為準
             </div>
           )}
         </div>
@@ -315,7 +413,7 @@ export default function RuleGroupPage({ menuKey }: Props) {
                     <span style={{ fontSize: 12, color: '#595959' }}>{isSpecial ? '—' : `${slValue} 位`}</span>
                   </td>
                   <td style={{ padding: '8px 12px', color: '#E8720C', fontFamily: 'monospace', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', borderBottom: rowBorder }}>
-                    {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue)}
+                    {isSpecial ? rule.unit : computeExample(prefix, rule.dateFormat, slValue, rule.seqStart)}
                   </td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: '#8C8C8C', maxWidth: 240, borderBottom: rowBorder }}>{remark || ''}</td>
                 </tr>

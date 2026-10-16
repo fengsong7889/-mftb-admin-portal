@@ -154,6 +154,18 @@
 }
 
 /* ========== 详情页 ========== */
+
+/* 头部主标题 = 需求名称：标题最长 200 字，单行省略（hover 原生 title 看全文），
+   避免长标题撑高头部、把状态/类型/优先级标签挤到下一行；宽度按视口夹取，右侧留给操作区 */
+.rdm-detail-header-title {
+  display: inline-block;
+  max-width: min(58vw, 760px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
 .rdm-detail-grid {
   display: flex;
   gap: 16px;

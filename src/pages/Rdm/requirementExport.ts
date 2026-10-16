@@ -8,6 +8,7 @@
 import ExcelJS from 'exceljs'
 import type { RdmRequirementRow } from '../../api/rdm'
 import {
+  formatRdmReqNo,
   getRdmPriorityLabel,
   RDM_REQ_TYPE_LABEL,
   RDM_STAGE_LABEL,
@@ -76,7 +77,8 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
 
   rows.forEach(r => {
     ws.addRow({
-      reqNo: r.reqNo,
+      // 延迟发号：准入前需求没有正式编号，导出要写「尚未生成」而不是空单元格
+      reqNo: formatRdmReqNo(r.reqNo),
       title: r.title,
       reqType: label(RDM_REQ_TYPE_LABEL, r.reqType as RdmReqType),
       priority: getRdmPriorityLabel(r.priority),

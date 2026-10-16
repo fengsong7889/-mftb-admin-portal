@@ -2,6 +2,7 @@ package com.mftb.admin.util;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.BizSeqMapper;
 import com.mftb.admin.mapper.SysBizSeqRuleMapper;
@@ -140,6 +141,22 @@ public class BizSeqService {
     /** EAM 报废编号 */
     public static final String RULE_EAM_SCRAP = "eam_scrap";
 
+    /* ==================== 产研交付（RDM） ==================== */
+
+    /**
+     * 需求准入审批流程编号（XQSP + YYYYMMDD + 至少 2 位日流水，从 01 起，超 99 自然扩位）。
+     * <p>只用于准入审批流程单本身，与「正式需求编号」(rdm_requirement) 分开两套流水：
+     * 需求号在首次准入成功（审批全部通过或免审批）时才拉取，审批前不预占。
+     * 重提新一轮需求会拉新的 XQSP 号，旧号作为历史轮次留在 rdm_intake_round。
+     */
+    public static final String RULE_RDM_INTAKE_APPROVAL = "rdm_intake_approval";
+    /**
+     * 需求编号（XQ + YYYYMMDD + 4 位日流水）。
+     * <p>拆分后只在首次准入成功（审批全部通过或服务端确认免审批）时才拉号，
+     * 审批前的草稿/待审批/审批驳回行不预占号码，也不消费流水。
+     */
+    public static final String RULE_RDM_REQUIREMENT = "rdm_requirement";
+
     /* ==================== 用车管理（EAM 车辆域） ==================== */
 
     /** 车辆编号：VH + 6 位全局自增（车辆稳定身份，车牌可换） */
@@ -251,6 +268,30 @@ public class BizSeqService {
     }
 
     /* ==================== 业务类型 → 规则 key 映射 ==================== */
+
+    /**
+     * 按 OA 流程编码取审批流程编号规则 key（需求提交/需求管理拆分 · 批次1 抽出可测）。
+     * <p>为什么不能把这段映射留在 {@code OaRequestServiceImpl} 的 switch 里：流程号前缀是对外
+     * 可识别的业务事实（XQSP 就是需求审批单），写死在实现类里就没法在没有数据库的情况下
+     * 断言它，只能靠人工看。抽成静态映射后，「哪个流程走哪条编号规则」是一个纯函数事实。
+     * <p>未登记的流程一律回落通用 OA 规则；需求准入<strong>不得</strong>回落，
+     * 否则「编号生成规则」页看到的 OA 前缀与实际发出的 XQSP 对不上。
+     *
+     * @param processCode {@code biz_oa_process.process_code}
+     * @return sys_biz_seq_rule.rule_key，永不为 null
+     */
+    public static String ruleKeyForProcess(String processCode) {
+        if (processCode == null) {
+            return RULE_OA_REQUEST;
+        }
+        return switch (processCode) {
+            case "oa_purchase" -> RULE_EAM_PURCHASE_REQUEST;
+            case "ai_access" -> RULE_AI_ACCESS_REQUEST;
+            case "hr_onboard", "hr_regular", "hr_transfer", "hr_dimission", "hr_renew" -> RULE_HR_LIFECYCLE_REQUEST;
+            case RdmConstants.INTAKE_PROCESS_CODE -> RULE_RDM_INTAKE_APPROVAL;
+            default -> RULE_OA_REQUEST;
+        };
+    }
 
     /** 按审批类型取流程编号规则 key */
     public static String flowRuleKey(String approvalType) {

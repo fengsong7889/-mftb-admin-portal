@@ -9,7 +9,7 @@
  * 5. 动作仍由服务端 allowedActions 驱动（空数组=无权，绝不回退本地推导），
  *    必填字段、二次确认、发布四眼、基线冻结等业务约束一律不因界面简化而放宽。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AutoComplete,
   Button,
@@ -104,12 +104,15 @@ import {
   RDM_SOURCE_CHANNEL_LABEL,
   RDM_STATUS,
   RDM_STATUS_LABEL,
+  formatRdmReqNo,
+  RDM_STATUS_STAGE,
   type RdmAcceptResult,
   type RdmAction,
   type RdmActionField,
   type RdmActionTone,
   type RdmRoleCode,
   type RdmSourceChannel,
+  type RdmStage,
   type RdmStatus,
 } from '../../constants/rdm'
 import './index.css'
@@ -287,26 +290,15 @@ export default function RequirementDetail() {
     setLoading(true)
     setError(null)
     /*
-     * 辅助候选（流转表 / 产品经理 / 迭代 / 版本）与正文分开取，任一失败只降级自己的下拉，
-     * 不能挡住需求内容阅读。原先捆在一个 Promise.all 里，PM 候选接口一挂
-     * 整个详情页就永远停在「載入中…」，用户以为需求丢了。
+     * 辅助候选不能再排在正文前面：原先先 await 四个辅助接口再取正文，
+     * 形成「max(辅助) + 正文」的串行瀑布；远程库上 product-managers 与 iterations
+     * 各有几十次 SQL 往返，详情页因此白屏数秒。
+     * 现在：正文单独取并直接决定首屏；流转表只是降级备胎，fire-and-forget；
+     * PM/迭代/版本三份下拉改成点开动作弹窗时才拉（见 ensureActionOptions）。
      */
-    const [trans, pms, iters, versions] = await Promise.all([
-      fetchTransitions().catch(() => null),
-      fetchProductOptions().catch(() => null),
-      fetchIterations().catch(() => null),
-      // 版本列表拉不到不能阻断详情页：AutoComplete 仍可手工输入
-      fetchVersionHistory({ page: 1, size: 20 }).catch(() => null),
-    ])
-    if (trans) setTransitions(trans)
-    if (pms) setPmOptions(pms)
-    if (iters) setIterations(iters)
-    if (versions) {
-      setVersionOptions((versions.records ?? []).map(v => ({
-        value: v.versionNo,
-        label: v.releaseDate ? `${v.versionNo}（${v.releaseDate.slice(0, 10)}）` : v.versionNo,
-      })))
-    }
+    void fetchTransitions().then(setTransitions).catch(() => {
+      // 拉不到只是少一个降级备胎（正常路径由服务端 allowedActions 驱动），不挡正文也不提示
+    })
     try {
       const data = await fetchRequirementDetail(id)
       setDetail(data)
@@ -318,7 +310,7 @@ export default function RequirementDetail() {
     }
   }, [id])
 
-  /** 交付摘要独立取：状态变化时重取，保证任务联动后的进度与页签计数一致 */
+  /** 交付摘要独立取：与正文并行，保证页签计数与任务联动后的进度一致 */
   const loadSummary = useCallback(async () => {
     if (!id) return
     setSummaryLoading(true)
@@ -333,7 +325,13 @@ export default function RequirementDetail() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
-  useEffect(() => { void loadSummary() }, [loadSummary, detail?.status])
+  /*
+   * 交付摘要只在进入页面（或切换需求）时拉一次。
+   * 旧写法依赖里带了 detail?.status：首帧 detail 还没到时先打一次，正文到达后
+   * 状态从 undefined 变成真值又打一次，同一个最重的聚合接口白打两遍。
+   * 状态真的流转时，执行动作的地方已经显式 loadSummary()（见流转弹窗与评审结论）。
+   */
+  useEffect(() => { void loadSummary() }, [loadSummary])
 
   /** V3：拉取交付項清單（只在 flowVersion=3 且有需求 ID 時） */
   useEffect(() => {
@@ -387,7 +385,7 @@ export default function RequirementDetail() {
         const rows = (res.records ?? []).filter(r =>
           r.id !== id && !existingIds.has(r.id) &&
           (!r.requirementKind || r.requirementKind === RDM_REQUIREMENT_KIND.EXECUTION))
-        setChildCandidates(rows.map(r => ({ value: r.id, label: `${r.reqNo} · ${r.title}` })))
+        setChildCandidates(rows.map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} · ${r.title}` })))
       })
       .catch(() => setChildCandidates([]))
       .finally(() => setChildCandidatesLoading(false))
@@ -537,6 +535,25 @@ export default function RequirementDetail() {
     }
     return items
   }, [detail])
+
+  /**
+   * 阶段条上每个节点的停留天数：把时间轴里细分状态的停留时长按阶段汇总。
+   * <p>不足一天按一天计（0 天会被读成「没花时间」，而实际是刚进入）；
+   * 还没走过的阶段不输出，节点下方宁可不显示也不编一个 0。
+   */
+  const stageStayDays = useMemo(() => {
+    const hoursByStage: Partial<Record<RdmStage, number>> = {}
+    for (const node of detail?.timeline ?? []) {
+      const st = RDM_STATUS_STAGE[node.status as RdmStatus]
+      if (!st || node.durationHours == null) continue
+      hoursByStage[st] = (hoursByStage[st] ?? 0) + node.durationHours
+    }
+    const days: Partial<Record<RdmStage, number>> = {}
+    for (const [st, hours] of Object.entries(hoursByStage)) {
+      if (hours && hours > 0) days[st as RdmStage] = Math.max(Math.round(hours / 24), 1)
+    }
+    return days
+  }, [detail?.timeline])
 
   /** 合并评论与流转记录成一条活动流（按时间倒序；内部记录的服务端可见性不变） */
   const activityItems = useMemo<ActivityItem[]>(() => {
@@ -711,6 +728,43 @@ export default function RequirementDetail() {
     setSearchParams(next, { replace: true })
   }
 
+  /** 动作弹窗的下拉候选（產品經理 / 迭代 / 上线版本）：拉过一次就缓存 */
+  const actionOptionsFetched = useRef(false)
+  const actionOptionsPending = useRef(false)
+  const [actionOptionsLoading, setActionOptionsLoading] = useState(false)
+
+  /**
+   * 按需拉取动作弹窗的下拉候选。
+   * <p>这三份数据只在点开动作、真正要填表时才有用，而远程库上
+   * product-managers（逐人算在途负载）与 iterations（逐个迭代算需求数/工時）
+   * 各要几十次 SQL 往返；挂在首屏会把详情页白屏时间拖到数秒。
+   * <p>失败不记入已加载，下次点开弹窗会重试（三个接口都是静默请求，不会刷 toast）。
+   */
+  const ensureActionOptions = useCallback(() => {
+    if (actionOptionsFetched.current || actionOptionsPending.current) return
+    actionOptionsPending.current = true
+    setActionOptionsLoading(true)
+    void Promise.all([
+      fetchProductOptions().catch(() => null),
+      fetchIterations().catch(() => null),
+      // 版本列表拉不到不拦人：AutoComplete 仍可手工输入
+      fetchVersionHistory({ page: 1, size: 20 }).catch(() => null),
+    ]).then(([pms, iters, versions]) => {
+      if (pms) setPmOptions(pms)
+      if (iters) setIterations(iters)
+      if (versions) {
+        setVersionOptions((versions.records ?? []).map(v => ({
+          value: v.versionNo,
+          label: v.releaseDate ? `${v.versionNo}（${v.releaseDate.slice(0, 10)}）` : v.versionNo,
+        })))
+      }
+      if (pms && iters && versions) actionOptionsFetched.current = true
+    }).finally(() => {
+      actionOptionsPending.current = false
+      setActionOptionsLoading(false)
+    })
+  }, [])
+
   /**
    * 打开动作执行弹窗。
    * <p>每次从干净字段开始——残留上一次填的日期/版本，
@@ -719,6 +773,7 @@ export default function RequirementDetail() {
   const openActionModal = (code: RdmAction) => {
     setActiveAction(code)
     clearActionFields()
+    ensureActionOptions()
   }
 
   if (!detail) {
@@ -741,15 +796,14 @@ export default function RequirementDetail() {
     )
   }
 
-  const stageHint = detail.stayHours
-    ? `已在「${RDM_STATUS_LABEL[detail.status as RdmStatus] ?? detail.status}」停留 ${Math.max(Math.round(detail.stayHours / 24), 1)} 天`
-    : undefined
-
   return (
     <div className="content-area rdm-detail">
-      {/* ── 头部：标题栏遵循全局规范（固定文案 + 数据名放 meta 行），需求标题在正文卡内做大号主标题 ── */}
+      {/* ── 头部：标题直接用需求名称（进页第一眼就知道是哪个需求），编号/提出人/提交时间放 meta 行 ── */}
       <DetailPageHeader
-        title="需求詳情"
+        title={
+          /* 需求标题最长 200 字，单行省略 + hover 看全文，避免撑高头部把状态标签挤到下一行 */
+          <span className="rdm-detail-header-title" title={detail.title}>{detail.title}</span>
+        }
         tags={
           <Space size={6}>
             <StatusTag status={detail.status} overdue={detail.overdueFlag ?? false} />
@@ -757,7 +811,7 @@ export default function RequirementDetail() {
             <PriorityTag priority={detail.priority} />
           </Space>
         }
-        meta={`${detail.reqNo} · ${detail.title} · 提出人 ${detail.submitterName}${detail.submitDeptName ? `（${detail.submitDeptName}）` : ''} · 提交於 ${detail.submitTime ?? '-'}`}
+        meta={`${formatRdmReqNo(detail.reqNo)} · 提出人 ${detail.submitterName}${detail.submitDeptName ? `（${detail.submitDeptName}）` : ''} · 提交於 ${detail.submitTime ?? '-'}`}
         onBack={() => navigate(-1)}
         extra={
           <Space>
@@ -770,7 +824,7 @@ export default function RequirementDetail() {
       <div className="rdm-action-bar">
         {/* 流程节点：提交动作到底部后处理条横向空间腾出来了，六阶段直接铺开，不再收进弹窗 */}
         <div className="rdm-action-bar-stages">
-          <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} hint={stageHint} />
+          <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} stayDays={stageStayDays} />
         </div>
         <div className="rdm-action-bar-left">
           <div className="rdm-action-bar-next">
@@ -1299,7 +1353,7 @@ export default function RequirementDetail() {
                           <span key={a.reqId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                             {idx > 0 && <RightOutlined style={{ fontSize: 10, color: '#BFBFBF' }} />}
                             <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-detail?id=${a.reqId}`)}>
-                              {a.reqNo}
+                              {formatRdmReqNo(a.reqNo)}
                             </a>
                           </span>
                         ))}
@@ -1392,7 +1446,7 @@ export default function RequirementDetail() {
         onCancel={resetActionForm}
       >
         <div className="confirm-info-card" style={{ marginBottom: 16 }}>
-          <div className="confirm-info-row"><span>需求：</span><b>{detail.reqNo} · {detail.title}</b></div>
+          <div className="confirm-info-row"><span>需求：</span><b>{formatRdmReqNo(detail.reqNo)} · {detail.title}</b></div>
           <div className="confirm-info-row"><span>當前狀態：</span><b>{RDM_STATUS_LABEL[detail.status as RdmStatus] ?? detail.status}</b></div>
           <div className="confirm-info-row">
             <span>執行後：</span>
@@ -1414,6 +1468,7 @@ export default function RequirementDetail() {
                   onChange={setPmUserId}
                   showSearch
                   optionFilterProp="label"
+                  loading={actionOptionsLoading}
                   options={pmOptions.map(pm => ({
                     value: pm.userId,
                     label: `${pm.name} · 在途 ${pm.activeCount}/${pm.capacity}`,
@@ -1449,7 +1504,7 @@ export default function RequirementDetail() {
                   options={versionOptions}
                   filterOption={(input, option) => (option?.label ?? '').includes(input)}
                 />
-                {versionOptions.length === 0 && (
+                {!actionOptionsLoading && versionOptions.length === 0 && (
                   <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{VERSION_FALLBACK_HINT}</div>
                 )}
               </div>
@@ -1462,6 +1517,7 @@ export default function RequirementDetail() {
                   allowClear
                   value={iterationCode}
                   onChange={setIterationCode}
+                  loading={actionOptionsLoading}
                   notFoundContent="暫無迭代，可先到「迭代排期」新建"
                   options={iterations.filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED).map(i => ({
                     value: i.code,

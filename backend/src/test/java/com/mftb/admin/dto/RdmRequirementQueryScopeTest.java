@@ -129,4 +129,65 @@ class RdmRequirementQueryScopeTest {
                 "该视角历史口径是「与我相关且 uat_pending」；改成按验收人收敛会缩小存量用户能看到的范围");
         assertTrue(params(query, ME).contains(RdmConstants.STATUS_UAT_PENDING));
     }
+
+    /**
+     * 治理侧「全部」只看已准入需求（需求提交/需求管理拆分 · 批次 1）。
+     * <p>这是「审批中/被驳回/草稿不得出现在需求管理」的唯一 SQL 层防线：前端隐藏不是边界，
+     * 改 URL 或直连 API 传 scope=all 就能绕过。同时它也保证治理侧每一行都有正式需求编号。
+     * <p>为何断言 `status <> ?` 而不是 `status NOT IN`：`notIn(column, Set)` 在本项目的
+     * MyBatis-Plus 版本上会渲染成 `status NOT IN ()`（零占位符、参数表也不绑定这三个值），
+     * MySQL 直接语法报错；所以实现改用逐个 ne，本测试也随之把「三个排除条件 + 三个参数都到位」
+     * 当成硬断言 —— 只验状态名出现在参数里、不验 SQL 形状的话，空 IN 召回这种错会溜过去。
+     */
+    @Test
+    @DisplayName("治理侧全部：逐条排除草稿/待审批/审批驳回三类准入前状态")
+    void managementAllExcludesPreAdmissionStatuses() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_ALL);
+        String condition = scopeCondition(query, ME);
+        Collection<Object> values = params(query, ME);
+
+        long exclusionCount = condition.split("status <> ", -1).length - 1;
+        assertTrue(exclusionCount >= 3,
+                "三个准入前状态必须各有一条排除条件，否则未准入需求会泄露到需求管理/看板/计数/导出。SQL: " + condition);
+        assertTrue(values.contains(RdmConstants.STATUS_DRAFT),
+                "排除集合未绑定到 SQL 参数上（空 IN/NOT IN 会直接报错）。SQL: " + condition + " | params: " + values);
+        assertTrue(values.contains(RdmConstants.STATUS_INTAKE_PENDING),
+                "排除集合未绑定到 SQL 参数上。SQL: " + condition + " | params: " + values);
+        assertTrue(values.contains(RdmConstants.STATUS_INTAKE_REJECTED),
+                "排除集合未绑定到 SQL 参数上。SQL: " + condition + " | params: " + values);
+    }
+
+    /**
+     * 管理视角（currentUserId=null，仅 PMO/超管）也不能因此拿到准入前需求：
+     * 不收人员条件不等于不收状态口径，否则未发号的行会进入需求管理。
+     */
+    @Test
+    @DisplayName("治理侧全部对管理视角同样收口：无人员条件但保留准入状态排除")
+    void managementAllStillExcludesPreAdmissionForUnrestrictedUser() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_ALL);
+        String condition = scopeCondition(query, null);
+
+        assertTrue(condition.contains("status <> "),
+                "准入口径对管理视角同样生效（不受人员条件收敛影响）。SQL: " + condition);
+        assertFalse(condition.contains("submitter_user_id"), "管理视角不该被提出人字段限制");
+    }
+
+    /**
+     * 「处理中」不再包含待审批：待审批是提交侧的审批待办，处理人是审批人，
+     * 不在 PM/验收人/研发负责人三个执行字段上；继续列进去会让计数与需求管理口径对不上。
+     */
+    @Test
+    @DisplayName("处理中队列：不含待审批，只含已准入的执行中状态")
+    void todoExcludesIntakePending() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_TODO);
+        String condition = scopeCondition(query, ME);
+        Collection<Object> values = params(query, ME);
+
+        assertTrue(condition.contains("status IN ("));
+        assertFalse(values.contains(RdmConstants.STATUS_INTAKE_PENDING),
+                "待审批属提交侧，不得出现在治理侧的处理中队列");
+        assertTrue(values.contains(RdmConstants.STATUS_POOL));
+        assertTrue(values.contains(RdmConstants.STATUS_ASSIGNED));
+        assertTrue(values.contains(RdmConstants.STATUS_UAT_PENDING));
+    }
 }

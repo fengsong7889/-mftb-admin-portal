@@ -15,12 +15,35 @@
  * 全量可见性与分配权都锁在需求池这个窄权限菜单上（canSeeAll 认 rdm-intake:view，
  * MENU_DISPATCHER 认 rdm-intake:edit）—— 看不到单子就分不出去，两者天然同侧；
  * 而台账是“人人可看”的宽权限，只到自己相关的切片为止，不会顺带看到全公司需求。
+ * <p>B2 锚点收敛过渡期：新锚点 rdm-requirement:view_all / :dispatch 与旧锚点**并行生效**
+ * （口径与后端 RdmAccessGuard 一致），等存量授权平移完成、rdm-intake 退役后才是唯一依据。
+ * 前端判定只决定按钮显隐，不是安全边界。
  *
  * 写操作按钮改为「行状态 + 授权」驱动（之前按视角驱动，导致无权角色在需求池
  * 也能看到分配按钮，点了才被后端拒）。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Checkbox, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
+/**
+ * 需求列表——拆分为两个职责页后仍共用一份底层实现。
+ *
+ * 历史背景：同一个列表以前同时服务「需求清单 / 提交需求 / 需求管理」三个菜单，
+ * 只靠 defaultScope 换预选项。列、看板、偏好键完全重叠，用户看不出三页职责差异；
+ * 需求池的「全部需求」把未准入需求也一并返出来，与「审批全部通过才进需求管理」的
+ * 业务口径对不上。
+ *
+ * 拆分后两个职责页（pageRole）：
+ * - intake：提交侧，只看自己提的 + 待自己审的，展示「審批流程編號 (XQSP)」、
+ *   「需求編號（未准入时显示尚未生成）」与「審批狀態」；提/重提/撤回/编辑草稿留在本侧。
+ * - management：治理侧，只展示已准入需求（未准入行前端隐藏且顶横幅告知数量）；
+ *   分配/认领/开始分析留在本侧；不提供提/审批，避免与提交侧交叉。
+ *
+ * 需求清单旧入口（pageRole=legacy）保留至阶段二菜单迁移完成，行为与拆前一致。
+ *
+ * 【UI 分界不是安全边界】：服务端仍然自己校提出人/当前审批人/资源相关人，
+ * 前端隐藏行与隐藏按钮只为了职责表达，不作为权限控制。
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Checkbox, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tag, Tooltip, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
@@ -35,6 +58,7 @@ import {
   UserSwitchOutlined,
 } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
@@ -53,11 +77,14 @@ import {
   type RdmRequirementRow,
 } from '../../api/rdm'
 import { fetchDepartments } from '../../api/department'
+import { fetchEmployeeIdOptions } from '../../api/employee'
+import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
 import RequirementKanban from './components/RequirementKanban'
 import {
   RDM_FLOW_VERSION_LABEL,
   RDM_KANBAN_SIZE,
+  RDM_PRE_ADMISSION_STATUS,
   RDM_PRIORITY_LABEL,
   RDM_REQ_TYPE_LABEL,
   RDM_REQUIREMENT_KIND_LABEL,
@@ -67,41 +94,35 @@ import {
   RDM_ACCEPTANCE_OPEN_STATUS,
   RDM_STATUS_LABEL,
   RDM_TERMINAL_STATUS,
+  formatRdmReqNo,
   type RdmScope,
   type RdmStatus,
 } from '../../constants/rdm'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
+import { EXECUTION_SCOPES, PERSONAL_SCOPES, resolveActiveScope } from './requirementScopes'
 import './index.css'
 
 /**
- * 全部合法视角（用于校验 URL 上的 ?scope=）。
- * <p>不等于清单页展示的视角：需求池/全部需求/待我驗收各有独立菜单，
- * 但作为数据切片仍会被菜单入口与深链使用（如 /rdm-intake 预选 pool）。
+ * 拆分阶段一的页面角色。
+ * - legacy：需求清单旧行为，未拆分前兼容使用（阶段二菜单迁移后删除）。
+ * - intake：提交需求侧（我的提交 + 待我审批）。
+ * - management：需求管理侧（已准入需求的统筹与分配）。
  */
-const VALID_SCOPES: RdmScope[] = [
-  RDM_SCOPE.MINE,
-  RDM_SCOPE.TODO,
-  RDM_SCOPE.APPROVING,
-  RDM_SCOPE.POOL,
-  RDM_SCOPE.PRODUCT,
-  RDM_SCOPE.DELIVERY,
-  RDM_SCOPE.ACCEPTANCE,
-  RDM_SCOPE.ALL,
-]
+export type RequirementListRole = 'legacy' | 'intake' | 'management'
 
 /**
- * 需求清单（执行侧）默认展示的视角。
- * <p>只放“已落到我手上要执行”的切片：
- * - 需求池·待分配 / 待我審批 / 全部需求 → 属于上游审批与分配环节，在「需求池」菜单；
- * - 待我驗收 → 「需求驗收」菜单。
- * <p>动线是：提出 → 准入審批 → 进需求池 → 分配 → 才进入本清单执行。
+ * 准入前状态：这些行属提交侧，不会进入治理侧列表。
+ * 口径与后端 RdmRequirementQuery 的 SCOPE_ALL 收口共用 constants/rdm 的同一名列表；
+ * 服务端已不再把准入前需求返到治理侧，本侧过滤保留为双保险（正常应为 no-op）。
  */
-const EXECUTION_SCOPES: RdmScope[] = [
-  RDM_SCOPE.MINE,
-  RDM_SCOPE.TODO,
-  RDM_SCOPE.PRODUCT,
-  RDM_SCOPE.DELIVERY,
-]
+const PRE_ADMISSION_STATUSES: RdmStatus[] = RDM_PRE_ADMISSION_STATUS
+
+/** 拆分阶段列配置页的偏好存储键（与旧清单页隔离，避免一页改列另一页也跟着变） */
+const COLUMN_PAGE_KEY: Record<RequirementListRole, string> = {
+  legacy: 'rdm-requirement-v3',
+  intake: 'rdm-requirement-intake-v1',
+  management: 'rdm-requirement-management-v1',
+}
 
 /**
  * 可撤回的状态：只有「待审批」。
@@ -128,6 +149,8 @@ interface RequirementFilters {
   deptId?: number
   pmUserId?: number
   overdueOnly?: boolean
+  /** 提出人用户 ID */
+  submitterUserId?: number
   /** V3：所属项目 */
   projectId?: number
   /** V3：需求种类 */
@@ -144,36 +167,37 @@ const RAIL_STORAGE_KEY = 'rdm-requirement:rail'
 
 type ViewMode = 'table' | 'kanban'
 
-/**
- * 视图分组：把切片按「我自己的事」和「治理别人的事」分开。
- * <p>审批人/提出人与分配人不是同一批角色，混在一排 Tab 里时高层会误入分配区、
- * PM 会看到与自己无关的审批列（这也是菜单拆分的同一动因）。
- */
-const PERSONAL_SCOPES: RdmScope[] = [
-  RDM_SCOPE.MINE,
-  RDM_SCOPE.TODO,
-  RDM_SCOPE.APPROVING,
-  RDM_SCOPE.ACCEPTANCE,
-]
-
 interface RequirementListProps {
   /**
-   * 进入时的默认视角（供「需求池」这类独立菜单入口使用）。
-   * <p>只是预选：URL 上有 `?scope=` 时以 URL 为准。
+   * 页面角色（阶段一拆分）：
+   * - legacy：旧行为，需求清单菜单拆前使用。
+   * - intake：提交侧（默认 mine + approving），展示审批流程编号与需求编号列；
+   *   提供提/重提/撤回/编辑草稿，不提供分配与认领。
+   * - management：治理侧（默认 pool + product + todo + all），仅展示已准入需求（未准入行
+   *   前端隐藏 + 顶横幅告知），提供分配/认领/开始分析；不提供提/审批。
+   */
+  pageRole?: RequirementListRole
+  /**
+   * 进入时的默认视角（供菜单入口预选）。
+   * <p>URL 上有 `?scope=` 时以 URL 为准。
    */
   defaultScope?: RdmScope
   /**
-   * 顶部展示的视角 Tab（不传则用执行侧默认集）。
-   * <p>同一个列表组件服务两种职责页：执行侧（需求清单）只给与自己相关的切片，
-   * 分配侧（需求池）给「待分配 / 待我審批 / 全部需求」。
-   * <p>传空数组表示不展示 Tab（单一切片页），此时页面会用当前视角名作标题。
+   * 顶部展示的视角 Tab（不传则用默认集）。
+   * <p>同一个列表组件服务多种职责页：不同页展示不同的 Tab 集。
+   * 传空数组表示不展示 Tab（单一切片页），此时页面会用当前视角名作标题。
    */
   scopeTabs?: readonly RdmScope[]
   /**
    * 是否展示全量检索条件（提出部门 / 产品经理 / 仅看逾期）。
-   * <p>「需求池」需要：它要在全公司范围内找待分配的单子并按部门收敛。
+   * <p>治理侧需要：它要在全公司范围内找待分配的单子并按部门收敛。
    */
   advancedFilters?: boolean
+  /**
+   * 极简模式：隐藏视图栏、视图切换（表格/看板）、导出、统计卡。
+   * <p>用于「认领/分配」页面——它只管待分配需求的中转，不需要多视图和导出。
+   */
+  minimal?: boolean
 }
 
 /** 读偏好：隐私模式下 localStorage 会抛，不能因为读偏好失败让整个页面打不开 */
@@ -197,22 +221,28 @@ function readStoredRail(): boolean {
 }
 
 export default function RequirementList({
+  pageRole = 'legacy',
   defaultScope,
   scopeTabs = EXECUTION_SCOPES,
   advancedFilters = false,
+  minimal = false,
 }: RequirementListProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const { hasPermission, user } = useAuth()
+  // 只让本批次新增的文案走 i18n；RDM 其余硬编码繁中文案由整模块统一切换那一批一次性接，
+  // 单点翻中一半反而会让页面出现两种语言来源，更难定位到底哪一份是真值
+  const { t } = useTranslation()
 
-  // 视角单一数据源是 URL；菜单入口只给默认值。非法值（手改地址栏）退回默认视角，
-  // 不能让页面停在查不到数据的条件上
-  const scopeParam = searchParams.get('scope')
-  const activeScope: RdmScope =
-    scopeParam && (VALID_SCOPES as string[]).includes(scopeParam)
-      ? (scopeParam as RdmScope)
-      : (defaultScope ?? RDM_SCOPE.MINE)
+  /** 拆分阶段一的侧划分。legacy 保持拆前行为，不过滤行也不拆列集。 */
+  const isIntakeSide = pageRole === 'intake'
+  const isManagementSide = pageRole === 'management'
+
+  // 视角单一数据源是 URL；菜单入口只给默认值，且必须落在本页实际提供的 Tab 上。
+  // 非法值或本页没有的视角（旧书签、菜单拆分前的链接）一律退回默认视角，
+  // 不能让页面停在查不到数据、或视图栏里根本选不中的条件上
+  const activeScope: RdmScope = resolveActiveScope(searchParams.get('scope'), scopeTabs, defaultScope)
   const isPoolView = activeScope === RDM_SCOPE.POOL
 
   const [view, setView] = useState<ViewMode>(readStoredView)
@@ -232,12 +262,15 @@ export default function RequirementList({
   const [filters, setFilters] = useState<RequirementFilters>({})
 
   /**
-   * 分配权只认 `rdm-intake:edit`（后端 MENU_DISPATCHER 就是这个）。
+   * 分配权认 `rdm-intake:edit`（现行锚点，后端 MENU_DISPATCHER）与 `rdm-requirement:dispatch`（收敛后的新锚点）。
+   * <p>两个锚点 OR 是有意为之，且必须与后端 RdmAccessGuard.canDispatch 一字不差：
+   * 新锚点的动作已在 v3.14 登记到 rdm-requirement 可授集里，但存量授权还没平移，
+   * 只认新锚点会让今天持有 intake:edit 的人看不到分配按钮（界面降权）。
    * <p>故意不再 OR 上 `rdm-requirement:edit`：菜单收敛后需求清单也带了 edit，
    * 但那是受理/PRD/评审的需求侧处理权，不是分配权；一并认就会把刚刚
    * 修掉的“无分配权也看到分配按钮”重新引进来。
    */
-  const canDispatch = hasPermission('rdm-intake:edit')
+  const canDispatch = hasPermission('rdm-intake:edit') || hasPermission('rdm-requirement:dispatch')
 
   /**
    * 认领资格只认受理权（rdm-requirement:edit）。
@@ -253,7 +286,7 @@ export default function RequirementList({
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>需求編號：</span><b>{row.reqNo}</b></div>
+          <div className="confirm-info-row"><span>需求編號：</span><b>{formatRdmReqNo(row.reqNo)}</b></div>
           <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
           <div className="confirm-info-row">
             <span>認領後：</span><b>你成為受理人，需求離開需求池並通知提出人；若已被他人搶先，會提示失敗</b>
@@ -401,7 +434,7 @@ export default function RequirementList({
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>需求編號：</span><b>{row.reqNo}</b></div>
+          <div className="confirm-info-row"><span>需求編號：</span><b>{formatRdmReqNo(row.reqNo)}</b></div>
           <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
           <div className="confirm-info-row">
             <span>提交後：</span>
@@ -435,7 +468,7 @@ export default function RequirementList({
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>需求編號：</span><b>{row.reqNo}</b></div>
+          <div className="confirm-info-row"><span>需求編號：</span><b>{formatRdmReqNo(row.reqNo)}</b></div>
           <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
           <div className="confirm-info-row"><span>撤回後：</span><b>退回草稿，可修改後重新提交（準入審批會重新發起）</b></div>
         </div>
@@ -489,6 +522,8 @@ export default function RequirementList({
     { key: 'submitDeptName', title: '提出部門' },
     { key: 'planReleaseDate', title: '計劃上線' },
     { key: 'reqNo', title: '需求編號' },
+    { key: 'intakeFlowNo', title: '審批流程編號' },
+    { key: 'admission', title: isIntakeSide ? '審批狀態' : '准入口徑' },
     { key: 'reqType', title: '需求類型' },
     { key: 'complexity', title: '規模' },
     { key: 'pmName', title: '產品經理' },
@@ -498,38 +533,151 @@ export default function RequirementList({
     { key: 'projectName', title: '所屬項目' },
     { key: 'deliveryProgress', title: '交付進度' },
     { key: 'action', title: '操作' },
-  ]), [])
+  ]), [isIntakeSide])
 
   /**
-   * 标题、编号、提出人和部门独立显示；其余辅助列仍可按需开启。
-   * 列配置升到 v3，避免旧偏好隐藏唯一的编号字段，或继续保留合并列布局。
+   * 默认展示列随页面角色变化：
+   * - intake：審批流程編號 + 需求編號 + 審批狀態 均默认开（服务端已延迟发号：
+   *   准入前需求編號列展「尚未生成」，流程號列展「未发起/免審批」，两列永不互填）。
+   * - management：需求編號 + 准入口徑 默认开，審批流程編號默认关（可手动开启）。
+   * - legacy：保持拆前默认。
    */
-  const { configComponent, applyConfig } = useColumnConfig('rdm-requirement-v3', columnMeta, [
-    { key: 'title', visible: true, locked: 'head' as const },
-    { key: 'status', visible: true },
-    { key: 'priority', visible: true },
-    { key: 'currentHandler', visible: true },
-    { key: 'submitter', visible: true },
-    { key: 'submitDeptName', visible: true },
-    { key: 'planReleaseDate', visible: true },
-    { key: 'reqNo', visible: true },
-    { key: 'reqType', visible: false },
-    { key: 'complexity', visible: false },
-    { key: 'pmName', visible: false },
-    { key: 'submitTime', visible: false },
-    { key: 'expectDate', visible: false },
-    { key: 'stay', visible: false },
-    { key: 'projectName', visible: false },
-    { key: 'deliveryProgress', visible: false },
-    { key: 'action', visible: true, locked: 'tail' as const },
-  ])
+  const defaultColumnVisibility = useMemo(() => {
+    if (isIntakeSide) {
+      return [
+        { key: 'title', visible: true, locked: 'head' as const },
+        { key: 'intakeFlowNo', visible: true },
+        { key: 'reqNo', visible: true },
+        { key: 'admission', visible: true },
+        { key: 'status', visible: true },
+        { key: 'priority', visible: true },
+        { key: 'submitter', visible: true },
+        { key: 'submitDeptName', visible: true },
+        { key: 'submitTime', visible: true },
+        { key: 'currentHandler', visible: false },
+        { key: 'planReleaseDate', visible: false },
+        { key: 'reqType', visible: false },
+        { key: 'complexity', visible: false },
+        { key: 'pmName', visible: false },
+        { key: 'expectDate', visible: false },
+        { key: 'stay', visible: false },
+        { key: 'projectName', visible: false },
+        { key: 'deliveryProgress', visible: false },
+        { key: 'action', visible: true, locked: 'tail' as const },
+      ]
+    }
+    if (isManagementSide) {
+      return [
+        { key: 'title', visible: true, locked: 'head' as const },
+        { key: 'reqNo', visible: true },
+        { key: 'admission', visible: true },
+        { key: 'status', visible: true },
+        { key: 'priority', visible: true },
+        { key: 'currentHandler', visible: true },
+        { key: 'pmName', visible: true },
+        { key: 'submitter', visible: true },
+        { key: 'submitDeptName', visible: false },
+        { key: 'planReleaseDate', visible: true },
+        { key: 'intakeFlowNo', visible: false },
+        { key: 'reqType', visible: false },
+        { key: 'complexity', visible: false },
+        { key: 'submitTime', visible: false },
+        { key: 'expectDate', visible: false },
+        { key: 'stay', visible: false },
+        { key: 'projectName', visible: false },
+        { key: 'deliveryProgress', visible: false },
+        { key: 'action', visible: true, locked: 'tail' as const },
+      ]
+    }
+    // legacy：拆前默认
+    return [
+      { key: 'title', visible: true, locked: 'head' as const },
+      { key: 'status', visible: true },
+      { key: 'priority', visible: true },
+      { key: 'currentHandler', visible: true },
+      { key: 'submitter', visible: true },
+      { key: 'submitDeptName', visible: true },
+      { key: 'planReleaseDate', visible: true },
+      { key: 'reqNo', visible: true },
+      { key: 'intakeFlowNo', visible: false },
+      { key: 'admission', visible: false },
+      { key: 'reqType', visible: false },
+      { key: 'complexity', visible: false },
+      { key: 'pmName', visible: false },
+      { key: 'submitTime', visible: false },
+      { key: 'expectDate', visible: false },
+      { key: 'stay', visible: false },
+      { key: 'projectName', visible: false },
+      { key: 'deliveryProgress', visible: false },
+      { key: 'action', visible: true, locked: 'tail' as const },
+    ]
+  }, [isIntakeSide, isManagementSide])
+
+  /**
+   * 列配置偏好页按角色隔离：
+   * - intake/management 各自一份，一页改列不会传染另一页。
+   * - legacy 仍用 rdm-requirement-v3，保持拆前习惯。
+   */
+  const { configComponent, applyConfig } = useColumnConfig(
+    COLUMN_PAGE_KEY[pageRole],
+    columnMeta,
+    defaultColumnVisibility,
+  )
 
   const columns: TableColumnsType<RdmRequirementRow> = [
     {
       title: '序號', key: 'index', width: 56, align: 'center', fixed: 'left',
       render: (_, __, i) => (page - 1) * size + i + 1,
     },
-    { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 148 },
+    {
+      title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 148,
+      // 延迟发号：准入前没有正式编号，必须给可见文案而不是留白（留白会被当成加载失败）
+      render: (v?: string | null) => (
+        <span style={v
+          ? { fontFamily: 'ui-monospace, Menlo, monospace' }
+          : { color: '#8C8C8C' }}>
+          {formatRdmReqNo(v)}
+        </span>
+      ),
+    },
+    {
+      title: '審批流程編號', dataIndex: 'intakeFlowNo', key: 'intakeFlowNo', width: 158,
+      render: (v?: string | null, r?: RdmRequirementRow) => {
+        if (!v) {
+          // 未发起审批时的展示按侧侧划分，避免向用户保证不会存在的 OA 单号
+          const notSubmitted = r && (r.status === RDM_STATUS.DRAFT || r.status === RDM_STATUS.INTAKE_REJECTED)
+          if (isIntakeSide && notSubmitted) {
+            return <span style={{ color: '#8C8C8C' }}>未发起</span>
+          }
+          if (r && r.status === RDM_STATUS.POOL && r.needApproval === 0) {
+            // 免审批需求不会发起 OA 准入单，直接进池
+            return <Tag color="green" style={{ margin: 0 }}>免審批</Tag>
+          }
+          return <span style={{ color: '#BFBFBF' }}>—</span>
+        }
+        return <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: '#E8720C' }}>{v}</span>
+      },
+    },
+    {
+      title: isIntakeSide ? '審批狀態' : '准入口徑', key: 'admission', width: 120,
+      render: (_, r) => {
+        const status = r.status as RdmStatus
+        // 审批中/驳回/草稿 = 未准入；免审或已进入后续环节 = 已准入
+        if (status === RDM_STATUS.DRAFT) {
+          return <Tag style={{ margin: 0 }}>草稿</Tag>
+        }
+        if (status === RDM_STATUS.INTAKE_PENDING) {
+          return <Tag color="processing" style={{ margin: 0 }}>審批中</Tag>
+        }
+        if (status === RDM_STATUS.INTAKE_REJECTED) {
+          return <Tag color="error" style={{ margin: 0 }}>審批駁回</Tag>
+        }
+        if (r.needApproval === 0) {
+          return <Tag color="green" style={{ margin: 0 }}>免審批</Tag>
+        }
+        return <Tag color="success" style={{ margin: 0 }}>已通過准入</Tag>
+      },
+    },
     {
       title: '需求標題', dataIndex: 'title', key: 'title', width: 300, fixed: 'left', ellipsis: true,
       render: (v: string, r) => (
@@ -612,12 +760,15 @@ export default function RequirementList({
         const assignable = canDispatch && status === RDM_STATUS.POOL
         const actions: React.ReactNode[] = []
         // 无人认领的池内需求才提供认领，已分配的单走「改派」
-        if (canClaim && status === RDM_STATUS.POOL && !r.pmName) {
+        // 阶段一拆分：治理侧才提供认领/分配；提交侧不提供
+        const showGovernanceActions = !isIntakeSide
+        const showSubmitterActions = !isManagementSide
+        if (showGovernanceActions && canClaim && status === RDM_STATUS.POOL && !r.pmName) {
           actions.push(
             <Button key="claim" type="link" size="small" onClick={() => handleClaim(r)}>認領</Button>,
           )
         }
-        if (assignable) {
+        if (showGovernanceActions && assignable) {
           actions.push(
             <Button key="assign" type="link" size="small"
               onClick={() => navigate(`/rdm-assign?ids=${r.id}&back=${assignBack}`)}
@@ -630,13 +781,13 @@ export default function RequirementList({
         if (!assignable && !RDM_TERMINAL_STATUS.includes(status)) {
           actions.push(<Button key="urge" type="link" size="small" onClick={() => handleUrge(r.id)}>催辦</Button>)
         }
-        if (WITHDRAWABLE.includes(r.status)) {
+        if (showSubmitterActions && WITHDRAWABLE.includes(r.status)) {
           actions.push(
             <Button key="withdraw" type="link" size="small" danger onClick={() => handleWithdraw(r)}>撤回</Button>,
           )
         }
         // 自助提交只对提出人本人开（服务端同样会拒），否则列表上会出现点了必报错的按钮
-        if (SELF_SUBMITTABLE.includes(r.status) && !!user?.empId && r.submitterEmpNo === user.empId) {
+        if (showSubmitterActions && SELF_SUBMITTABLE.includes(r.status) && !!user?.empId && r.submitterEmpNo === user.empId) {
           // 草稿先给「編輯」：没有它，存了草稿的人只能整张表单重填，保存草稿等于丢弃
           if (r.status === RDM_STATUS.DRAFT) {
             actions.push(
@@ -649,7 +800,7 @@ export default function RequirementList({
             </Button>,
           )
         }
-        if (RDM_ACCEPTANCE_OPEN_STATUS.includes(status)) {
+        if (showGovernanceActions && RDM_ACCEPTANCE_OPEN_STATUS.includes(status)) {
           actions.push(
             <Button key="accept" type="link" size="small"
               onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}`)}
@@ -671,6 +822,19 @@ export default function RequirementList({
 
   const visibleColumns = applyConfig(columns) as TableColumnsType<RdmRequirementRow>
   const tableWidth = visibleColumns.reduce((sum, col) => sum + Number(col.width ?? 120), 0)
+
+  /**
+   * 治理侧仅展示已准入需求：未准入行隐藏并顶横幅告知。
+   *
+   * 拆分批次 1 后服务端 `RdmRequirementQuery` 已按准入口径收口（scope=all 排除
+   * draft/intake_pending/intake_rejected），本侧过滤正常是 no-op；保留是为了防
+   * 旧实例未升级时把未准入行透出来——前端隐藏不是安全边界，服务端仍会自己校资源相关人。
+   */
+  const visibleRows = useMemo(() => {
+    if (!isManagementSide) return rows
+    return rows.filter(r => !PRE_ADMISSION_STATUSES.includes(r.status as RdmStatus))
+  }, [rows, isManagementSide])
+  const hiddenPreAdmissionCount = isManagementSide ? rows.length - visibleRows.length : 0
 
   /** 批量勾选只对“有分配权 + 停在需求池视角 + 表格视图”有意义：看板卡片无法勾选，
    *  列设置在看板下也没有列可设 —— 两者在不满足时直接隐藏，而不是留一个永远点不动的按钮 */
@@ -696,10 +860,8 @@ export default function RequirementList({
   return (
     <div className="content-area rdm-workspace">
       <div className="rdm-workspace-body">
-        {/* ── 视图栏：把「同一张列表的不同切片」收在左侧具名视图里 ──
-            原来这些切片同时以顶部 Tab 和多个菜单入口存在，用户要先弄清
-            「需求清單 / 提交需求 / 需求管理」哪个才是自己要的那一页。 */}
-        {scopeTabs.length > 0 && !railCollapsed && (
+        {/* ── 视图栏：极简模式不需要多视图切换 ── */}
+        {!minimal && scopeTabs.length > 0 && !railCollapsed && (
           <aside className="rdm-view-rail">
             <div className="rdm-view-rail-head">
               視圖
@@ -729,38 +891,42 @@ export default function RequirementList({
         )}
 
         <div className="rdm-workspace-main">
-          {/* ── 工具条：形态切换 + 刷新（收起状态下在这里重新展开视图栏） ── */}
+          {/* ── 工具条：极简模式整条隐藏（无需视图切换/刷新） ── */}
+          {!minimal && (
           <div className="rdm-workspace-toolbar">
-            {scopeTabs.length > 0 && railCollapsed && (
+            {!minimal && scopeTabs.length > 0 && railCollapsed && (
               <Tooltip title="展開視圖欄">
                 <Button icon={<MenuUnfoldOutlined />} onClick={toggleRail}>視圖</Button>
               </Tooltip>
             )}
-            <Segmented
-              value={view}
-              onChange={v => switchView(v as ViewMode)}
-              options={[
-                { label: '表格視圖', value: 'table' },
-                { label: '看板視圖', value: 'kanban' },
-              ]}
-            />
+            {!minimal && (
+              <Segmented
+                value={view}
+                onChange={v => switchView(v as ViewMode)}
+                options={[
+                  { label: '表格視圖', value: 'table' },
+                  { label: '看板視圖', value: 'kanban' },
+                ]}
+              />
+            )}
             {scopeTabs.length === 0 && (
               <span className="rdm-workspace-title">{RDM_SCOPE_LABEL[activeScope]}</span>
             )}
             <div style={{ flex: 1 }} />
             <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
           </div>
+          )}
 
           {/* ── 搜索区 ── */}
           <SearchBar
             advanced={advancedFilters}
+            minimal={minimal}
             onSearch={v => { setFilters(v); setPage(1) }}
             onReset={() => { setFilters({}); setPage(1) }}
           />
 
-          {/* 看板是扫视场景，需要信号卡给出分母与堵点；表格视角靠视图栏计数 + 筛选，不再多占一行。
-              统计卡必须在搜索区下方（§E.8），口径跟随当前筛选条件。 */}
-          {view === 'kanban' && (
+          {/* 统计卡：极简模式不需要（认领/分配页只看待分配，无需全局信号卡） */}
+          {!minimal && view === 'kanban' && (
             <div style={{ marginBottom: 16 }}>
               <StatCards
                 animationKey={`${activeScope}-${JSON.stringify(filters)}`}
@@ -787,12 +953,30 @@ export default function RequirementList({
                   批量分配{selectedKeys.length ? `（${selectedKeys.length}）` : ''}
                 </Button>
               )}
-              <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+              {!minimal && (
+                <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+              )}
             </div>
             <div className="action-section-right">
-              <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-submit')}>
-                提需求
-              </Button>
+              {advancedFilters && (
+                <Checkbox
+                  checked={filters.overdueOnly ?? false}
+                  onChange={e => {
+                    const next = e.target.checked
+                    setFilters(prev => ({ ...prev, overdueOnly: next }))
+                    setPage(1)
+                  }}
+                  style={{ marginRight: 8 }}
+                >
+                  僅看逾期
+                </Checkbox>
+              )}
+              {/* 拆分阶段一：「提需求」只留在提交侧；治理侧不重复提供入口，避免两页交叉 */}
+              {!isManagementSide && (
+                <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-submit')}>
+                  提需求
+                </Button>
+              )}
               {/* 列配置只作用于表格；看板视图下没有可配置的列 */}
               {view === 'table' ? configComponent : null}
             </div>
@@ -807,6 +991,17 @@ export default function RequirementList({
             />
           )}
 
+          {/* 治理侧兼容期兜底：服务端已按准入口径收口，这里还看到准入前行只可能是旧实例未升级 */}
+          {isManagementSide && hiddenPreAdmissionCount > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`本視圖已過濾 ${hiddenPreAdmissionCount} 條「未准入」需求（草稿 / 審批中 / 審批駁回），请前往「提交需求」菜单查看与处理审批。`}
+              description={t('rdm.mgmtPreAdmissionFiltered')}
+            />
+          )}
+
           {/* 分配产品经理统一走独立页 /rdm-assign（§9.1 禁弹窗承载表单） */}
           {view === 'table' ? (
             <Table<RdmRequirementRow>
@@ -814,7 +1009,7 @@ export default function RequirementList({
               rowKey="id"
               columns={visibleColumns}
               tableLayout="fixed"
-              dataSource={rows}
+              dataSource={visibleRows}
               loading={loading}
               rowSelection={rowSelection}
               scroll={{ x: tableWidth + (canBatchAssign ? 32 : 0) }}
@@ -834,7 +1029,7 @@ export default function RequirementList({
             <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
           ) : (
             <RequirementKanban
-              rows={rows}
+              rows={visibleRows}
               onOpen={id => navigate(`/rdm-detail?id=${id}&tab=activity`)}
               limitHint={kanbanTruncated
                 ? `已顯示前 ${RDM_KANBAN_SIZE} 條（共 ${total} 條），請縮小篩選範圍或切回表格視圖翻頁。`
@@ -860,22 +1055,27 @@ export default function RequirementList({
  * 低频条件收进「更多篩選」：收起时一并清掉这些字段，避免留下看不见的过滤条件
  * 让人以为列表坏了。
  */
-function SearchBar({ onSearch, onReset, advanced = false }: {
+function SearchBar({ onSearch, onReset, advanced = false, minimal = false }: {
   onSearch: (v: RequirementFilters) => void
   onReset: () => void
   advanced?: boolean
+  minimal?: boolean
 }) {
   const [form] = Form.useForm<RequirementFilters>()
-  const [deptOptions, setDeptOptions] = useState<{ value: number; label: string }[]>([])
+  const [deptTree, setDeptTree] = useState<DeptNode[]>([])
   const [pmOptions, setPmOptions] = useState<{ value: number; label: string }[]>([])
   const [projectOptions, setProjectOptions] = useState<{ value: number; label: string }[]>([])
-  const [more, setMore] = useState(false)
+  const [empOptions, setEmpOptions] = useState<{ value: number; label: string }[]>([])
+  const [empSearching, setEmpSearching] = useState(false)
+  const empTimer = useRef<ReturnType<typeof setTimeout>>()
+  /** 极简模式：查询条件全部展开，不需要收起 */
+  const [more, setMore] = useState(minimal)
 
   useEffect(() => {
     if (advanced) {
       fetchDepartments()
-        .then(list => setDeptOptions(list.map(d => ({ value: d.id, label: d.name }))))
-        .catch(() => setDeptOptions([]))
+        .then(list => setDeptTree(buildDeptTree(list ?? [])))
+        .catch(() => setDeptTree([]))
       fetchProductOptions()
         .then(list => setPmOptions(list.map(p => ({ value: p.userId, label: p.name }))))
         .catch(() => setPmOptions([]))
@@ -893,9 +1093,22 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
 
   const submit = () => onSearch(form.getFieldsValue())
 
+  /** 提出人下拉搜索（防抖 300ms） */
+  const handleEmpSearch = useCallback((kw: string) => {
+    clearTimeout(empTimer.current)
+    if (!kw.trim()) { setEmpOptions([]); return }
+    empTimer.current = setTimeout(() => {
+      setEmpSearching(true)
+      fetchEmployeeIdOptions(kw.trim())
+        .then(list => setEmpOptions(list.map(o => ({ value: Number(o.value), label: o.label }))))
+        .catch(() => setEmpOptions([]))
+        .finally(() => setEmpSearching(false))
+    }, 300)
+  }, [])
+
   /** 低频字段：收起时清空并立即重查，保证「看不见的条件」不存在 */
   const MORE_FIELDS: (keyof RequirementFilters)[] = advanced
-    ? ['reqType', 'deptId', 'pmUserId', 'overdueOnly', 'projectId', 'requirementKind', 'flowVersion']
+    ? ['reqType', 'deptId', 'pmUserId', 'submitterUserId', 'projectId', 'requirementKind', 'flowVersion']
     : ['reqType', 'projectId', 'requirementKind', 'flowVersion']
 
   const toggleMore = () => {
@@ -903,8 +1116,6 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
       form.setFieldsValue(
         MORE_FIELDS.reduce<Partial<RequirementFilters>>((acc, key) => ({ ...acc, [key]: undefined }), {}),
       )
-      // 同步清掉复选框的受控值（valuePropName=checked 时 undefined 不等于未勾选）
-      form.setFieldValue('overdueOnly', false)
       onSearch(form.getFieldsValue())
     }
     setMore(v => !v)
@@ -913,12 +1124,25 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
   return (
     <div className="search-section">
       <Form form={form} layout="inline" onFinish={submit}>
-        <Form.Item label="需求關鍵字" name="keyword">
-          <Input allowClear placeholder="標題 / 編號 / 提出人" onPressEnter={submit} />
+        <Form.Item label="需求名稱/編號" name="keyword">
+          <Input allowClear placeholder="標題或編號" onPressEnter={submit} />
         </Form.Item>
-        <Form.Item label="需求狀態" name="status">
-          <Select allowClear showSearch placeholder="全部" options={statusOptions} />
+        <Form.Item label="需求提出人" name="submitterUserId">
+          <Select
+            allowClear
+            showSearch
+            placeholder="姓名或工號"
+            filterOption={false}
+            notFoundContent={empSearching ? '搜索中...' : '請輸入關鍵字搜索'}
+            onSearch={handleEmpSearch}
+            options={empOptions}
+          />
         </Form.Item>
+        {!minimal && (
+          <Form.Item label="需求狀態" name="status">
+            <Select allowClear showSearch placeholder="全部" options={statusOptions} />
+          </Form.Item>
+        )}
         <Form.Item label="優先級" name="priority">
           <Select
             allowClear
@@ -937,17 +1161,18 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
         )}
         {advanced && more && (
           <Form.Item label="提出部門" name="deptId">
-            <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={deptOptions} />
+            <TreeSelect
+              treeData={deptTree}
+              allowClear
+              showSearch
+              treeNodeFilterProp="title"
+              placeholder="全部"
+            />
           </Form.Item>
         )}
         {advanced && more && (
           <Form.Item label="產品經理" name="pmUserId">
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={pmOptions} />
-          </Form.Item>
-        )}
-        {advanced && more && (
-          <Form.Item name="overdueOnly" valuePropName="checked">
-            <Checkbox>僅看逾期</Checkbox>
           </Form.Item>
         )}
         {more && projectOptions.length > 0 && (
@@ -986,7 +1211,7 @@ function SearchBar({ onSearch, onReset, advanced = false }: {
             >
               重置
             </Button>
-            <Button type="link" onClick={toggleMore}>{more ? '收起篩選' : '更多篩選'}</Button>
+            {!minimal && <Button type="link" onClick={toggleMore}>{more ? '收起篩選' : '更多篩選'}</Button>}
           </div>
         </Form.Item>
       </Form>

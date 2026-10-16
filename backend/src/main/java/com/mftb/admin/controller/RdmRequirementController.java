@@ -43,35 +43,40 @@ public class RdmRequirementController {
 
     /** 需求分页列表（scope 决定视角，服务端按登录人收敛数据范围） */
     @GetMapping("/requirement")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<PageResult<RdmRequirementVO>> page(RdmRequirementQuery query) {
         return Result.success(requirementService.page(query));
     }
 
     /** 各视角 Tab 数量 */
     @GetMapping("/requirement/scope-counts")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<Map<String, Long>> scopeCounts() {
         return Result.success(requirementService.scopeCounts());
     }
 
     /** 看板信号卡统计：接与列表同一组查询条件，口径跟随筛选 */
     @GetMapping("/requirement/stats")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<Map<String, Long>> stats(RdmRequirementQuery query) {
         return Result.success(requirementService.stats(query));
     }
 
     /** 需求详情 */
     @GetMapping("/requirement/{id}")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmRequirementVO> detail(@PathVariable Long id) {
         return Result.success(requirementService.detail(id));
     }
 
     /** 工作台待办聚合 */
     @GetMapping("/workbench")
-    @RequirePermission(menu = RdmConstants.MENU_WORKBENCH, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_WORKBENCH, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmWorkbenchVO> workbench() {
         return Result.success(requirementService.workbench());
     }
@@ -114,14 +119,20 @@ public class RdmRequirementController {
 
     /** 状态流转 */
     @PostMapping("/requirement/{id}/transition")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-intake", "rdm-acceptance"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-intake", "rdm-acceptance"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmRequirementVO> transition(@PathVariable Long id, @RequestBody RdmTransitionDTO dto) {
         return Result.success("狀態已更新", requirementService.transition(id, dto));
     }
 
-    /** 批量分配产品经理 */
+    /**
+     * 批量分配产品经理。
+     * <p>主锚点已换到 rdm-requirement:dispatch；旧 intake:edit 作为过渡分支保留，
+     * 等菜单软删那一批一起摘掉（现在摘会让过渡期新勾的 intake 授权直接失效）。
+     */
     @PostMapping("/requirement/batch-assign")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, action = "edit")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit"})
     public Result<Integer> batchAssign(@RequestBody BatchAssignRequest request) {
         return Result.success("分配完成",
                 requirementService.batchAssign(request.ids(), request.pmUserId()));
@@ -134,28 +145,32 @@ public class RdmRequirementController {
      */
     @PostMapping("/requirement/{id}/claim")
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit",
-            anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_DELIVERY_BOARD})
+            anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_DELIVERY_BOARD},
+            anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmRequirementVO> claim(@PathVariable Long id) {
         return Result.success("已認領該需求", requirementService.claim(id));
     }
 
     /** 改派产品经理（只有分配侧授权可用；旧受理人保留历史贡献） */
     @PostMapping("/requirement/{id}/reassign")
-    @RequirePermission(menu = RdmConstants.MENU_INTAKE, action = "edit")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit"})
     public Result<RdmRequirementVO> reassign(@PathVariable Long id, @RequestBody RdmTransitionDTO dto) {
         return Result.success("已改派", requirementService.reassignPm(id, dto));
     }
 
     /** 添加沟通记录 */
     @PostMapping("/requirement/{id}/comment")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create", anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create", anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:contribute"})
     public Result<RdmComment> addComment(@PathVariable Long id, @RequestBody CommentRequest request) {
         return Result.success(requirementService.addComment(id, request.content(), request.internal()));
     }
 
     /** 催办 */
     @PostMapping("/requirement/{id}/urge")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<Void> urge(@PathVariable Long id) {
         requirementService.urge(id);
         return Result.success();
@@ -174,7 +189,8 @@ public class RdmRequirementController {
      * <p>读权限与需求详情同口径：参与人可看，越权猜 id 会被数据范围收敛拦住。
      */
     @GetMapping("/requirement/{id}/acceptance-history")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmAcceptanceVO>> acceptanceHistory(@PathVariable Long id) {
         return Result.success(requirementService.acceptanceHistory(id));
     }
@@ -183,21 +199,24 @@ public class RdmRequirementController {
 
     /** 产品经理候选（含在途负载） */
     @GetMapping("/options/product-managers")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmOptionVO.ProductManager>> productManagers() {
         return Result.success(requirementService.productManagers());
     }
 
     /** 系统 → 菜单 级联树 */
     @GetMapping("/options/menu-tree")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmOptionVO.MenuNode>> menuTree() {
         return Result.success(requirementService.menuTree());
     }
 
     /** 菜单下的功能点候选 */
     @GetMapping("/options/function-points")
-    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"})
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmOptionVO.FunctionPoint>> functionPoints(@RequestParam(required = false) String menuKey) {
         return Result.success(requirementService.functionPoints(menuKey));
     }

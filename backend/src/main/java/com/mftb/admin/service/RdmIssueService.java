@@ -920,11 +920,17 @@ public class RdmIssueService {
         return current.getId();
     }
 
-    /** 幂等 clientRequestId：优先客户端 requestId，否则用服务端派生判别子。 */
+    /**
+     * 幂等 clientRequestId：优先客户端 requestId，否则用服务端派生判别子。
+     * <p><b>必须适配 {@code rdm_idempotent_log.client_request_id VARCHAR(64) ascii}</b>：派生判别子本身就是
+     * 64 位 hex（{@code hash}），与 {@code op+":"} 前缀拼接后会超出列宽（如 {@code applyDefer:<64hex>}≈75 字符）。
+     * 这里直接复用中心归一化 {@link RdmIdempotentService#normalizeClientRequestId}，超长或含非 ASCII 时再取一次
+     * SHA-256 得到定长 64 位 ASCII，且保持「同 op 同内容 → 同 id」的幂等语义不变；不依赖中心兜底才安全。
+     */
     private String deriveClientRequestId(String op, String requestId, String discriminator) {
         String tail = StringUtils.hasText(requestId) ? requestId.trim()
                 : (StringUtils.hasText(discriminator) ? discriminator : "na");
-        return op + ":" + tail;
+        return RdmIdempotentService.normalizeClientRequestId(op + ":" + tail);
     }
 
     /** 乐观锁预检：客户端回传版本与当前实体版本不一致即拒绝（真实并发由 @Version 兜底，任务24 验证）。 */

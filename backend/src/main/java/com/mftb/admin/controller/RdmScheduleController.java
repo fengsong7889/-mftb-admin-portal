@@ -45,28 +45,32 @@ public class RdmScheduleController {
 
     /** 需求排程（甘特 + 关键路径 + 里程碑） */
     @GetMapping("/requirement/{reqId}/plan")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmScheduleVO.Plan> plan(@PathVariable Long reqId) {
         return Result.success(scheduleService.plan(reqId));
     }
 
     /** 依赖列表 */
     @GetMapping("/requirement/{reqId}/dependencies")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmScheduleVO.Dependency>> dependencies(@PathVariable Long reqId) {
         return Result.success(scheduleService.listDependencies(reqId));
     }
 
     /** 新增依赖（成环、跨需求、自环会被拒绝） */
     @PostMapping("/dependencies")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmScheduleVO.Dependency> addDependency(@RequestBody RdmScheduleDTO.Dependency dto) {
         return Result.success("依賴已建立", scheduleService.addDependency(dto));
     }
 
     /** 删除依赖 */
     @DeleteMapping("/dependencies/{id}")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<Void> removeDependency(@PathVariable Long id) {
         scheduleService.removeDependency(id);
         return Result.success("依賴已刪除", null);
@@ -78,7 +82,8 @@ public class RdmScheduleController {
      * 同一交付项内的两个任务不是跨交付项依赖，服务端会回落到需求内依赖。
      */
     @PostMapping("/cross-delivery-dependency")
-    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "edit", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     @Operation(summary = "添加跨交付項任務依賴")
     public Result<RdmScheduleVO.Dependency> addCrossDeliveryDependency(@RequestBody CrossDependencyRequest request) {
         if (request == null || request.getPredTaskId() == null || request.getSuccTaskId() == null) {
@@ -95,7 +100,8 @@ public class RdmScheduleController {
 
     /** 获取交付项阻塞任务（因跨交付项依赖未满足而被阻断的任务） */
     @GetMapping("/blocked-tasks/{deliveryItemId}")
-    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     @Operation(summary = "獲取交付項阻塞任務")
     public Result<List<RdmScheduleServiceImpl.BlockedTaskInfo>> getBlockedTasks(@PathVariable Long deliveryItemId) {
         return Result.success(scheduleServiceImpl.getBlockedTasks(deliveryItemId));
@@ -103,7 +109,8 @@ public class RdmScheduleController {
 
     /** 资源负载（默认今天起 4 周，最长 92 天） */
     @GetMapping("/workload")
-    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<RdmScheduleVO.Workload> workload(@RequestParam(required = false) String from,
                                                    @RequestParam(required = false) String to,
                                                    @RequestParam(required = false) Long userId) {
@@ -112,14 +119,16 @@ public class RdmScheduleController {
 
     /** 某人的工作日历例外（无全量范围时只能读自己） */
     @GetMapping("/calendar")
-    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmScheduleVO.CalendarItem>> calendar(@RequestParam(required = false) Long userId) {
         return Result.success(scheduleService.calendar(userId));
     }
 
     /** 保存工作日历例外（请假/加班/自定义容量） */
     @PostMapping("/calendar")
-    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"})
+    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-delivery-iteration", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
     public Result<List<RdmScheduleVO.CalendarItem>> saveCalendar(@RequestBody RdmScheduleDTO.Calendar dto) {
         return Result.success("日曆已更新", scheduleService.saveCalendar(dto));
     }

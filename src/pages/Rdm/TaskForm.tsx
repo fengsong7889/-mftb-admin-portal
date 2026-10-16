@@ -22,7 +22,7 @@ import {
   type RdmTaskForm as RdmTaskFormValues,
   type RdmTaskOwnerCheck,
 } from '../../api/rdm'
-import { RDM_ITERATION_STATUS, RDM_TASK_TYPE_LABEL, type RdmTaskType } from '../../constants/rdm'
+import { RDM_ITERATION_STATUS, RDM_TASK_TYPE_LABEL, formatRdmReqNo, type RdmTaskType } from '../../constants/rdm'
 import './index.css'
 
 const { TextArea } = Input
@@ -90,7 +90,7 @@ export default function TaskForm() {
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: d.reqNo, title: d.title, status: d.status }))
+      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: d.status }))
       .catch(() => message.error('需求資訊載入失敗'))
     if (!taskId) return
     fetchReqTasks(reqId).then(tasks => {

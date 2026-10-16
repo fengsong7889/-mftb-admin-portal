@@ -23,8 +23,12 @@ interface StageBarProps {
   overdue?: boolean
   /** 紧凑模式（卡片/列表内使用） */
   compact?: boolean
-  /** 状态变更提示（如「已在「開發中」停留 4 天」） */
-  hint?: string
+  /**
+   * 各折叠阶段的停留天数（详情页按时间轴汇总细分状态后传入）。
+   * <p>直接标在每个节点名下方，不再靠底部一行「当前所处状态」+ hover 才能看到；
+   * 没走过的阶段不传就不显示，避免用 0 天冒充事实。
+   */
+  stayDays?: Partial<Record<RdmStage, number>>
 }
 
 /** 阶段在 6 段序列中的下标 */
@@ -32,10 +36,9 @@ function stageIndex(stage: RdmStage) {
   return RDM_STAGE_ORDER.indexOf(stage)
 }
 
-export default function RequirementStageBar({ status, overdue, compact, hint }: StageBarProps) {
+export default function RequirementStageBar({ status, overdue, compact, stayDays }: StageBarProps) {
   const stage = stageOfStatus(status)
   const currentIdx = stageIndex(stage)
-  const finished = currentIdx < 0
 
   // 紧凑模式（看板卡片）：只画 6 段细分段条 + 当前阶段名，避免列宽溢出
   if (compact) {
@@ -76,6 +79,7 @@ export default function RequirementStageBar({ status, overdue, compact, hint }: 
           const done = idx < currentIdx
           const active = idx === currentIdx
           const color = done || active ? '#E8720C' : '#D9D9D9'
+          const stay = stayDays?.[st]
           return (
             <div key={st} style={{ flex: 1, display: 'flex', alignItems: 'flex-start', minWidth: 0 }}>
               {/* 节点 */}
@@ -92,13 +96,46 @@ export default function RequirementStageBar({ status, overdue, compact, hint }: 
                 }}>
                   {done ? '✓' : idx + 1}
                 </div>
-                <div style={{
-                  marginTop: 6, fontSize: 12, whiteSpace: 'nowrap',
-                  color: active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
-                  fontWeight: active ? 600 : 400,
-                }}>
-                  {RDM_STAGE_LABEL[st]}
-                </div>
+                {/* 阶段名 + 停留天数常驻显示，hover 才展开阶段口径与细分状态 */}
+                <Popover
+                  trigger="hover"
+                  content={
+                    <div style={{ maxWidth: 320 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
+                        {RDM_STAGE_LABEL[st]}
+                        {typeof stay === 'number' ? ` · 停留 ${stay} 天` : ''}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#595959', marginBottom: active ? 8 : 0 }}>
+                        {RDM_STAGE_DESC[st]}
+                      </div>
+                      {active && (
+                        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                          細分狀態：<Tag color={overdue ? 'error' : 'orange'} style={{ margin: 0 }}>
+                            {RDM_STATUS_LABEL[status as RdmStatus] ?? status}
+                          </Tag>
+                        </div>
+                      )}
+                    </div>
+                  }
+                >
+                  <div style={{ marginTop: 6, textAlign: 'center', cursor: 'pointer' }}>
+                    <div style={{
+                      fontSize: 12, whiteSpace: 'nowrap',
+                      color: active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
+                      fontWeight: active ? 600 : 400,
+                    }}>
+                      {RDM_STAGE_LABEL[st]}
+                    </div>
+                    {typeof stay === 'number' && (
+                      <div style={{
+                        fontSize: 11, whiteSpace: 'nowrap', marginTop: 2,
+                        color: active && overdue ? '#CF1322' : '#8C8C8C',
+                      }}>
+                        停留 {stay} 天
+                      </div>
+                    )}
+                  </div>
+                </Popover>
               </div>
               {/* 连接线 */}
               {idx < RDM_STAGE_ORDER.length - 1 && (
@@ -112,38 +149,6 @@ export default function RequirementStageBar({ status, overdue, compact, hint }: 
           )
         })}
       </div>
-
-      {/* 当前状态明细（Popover 展示阶段说明 + 状态码） */}
-      {currentIdx >= 0 && (
-        <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <Popover
-            trigger="hover"
-            content={
-              <div style={{ maxWidth: 320 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
-                  當前階段：{RDM_STAGE_LABEL[RDM_STAGE_ORDER[currentIdx]]}
-                </div>
-                <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
-                  {RDM_STAGE_DESC[RDM_STAGE_ORDER[currentIdx]]}
-                </div>
-                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
-                  細分狀態：<Tag color={overdue ? 'error' : 'orange'} style={{ margin: 0 }}>
-                    {RDM_STATUS_LABEL[status as RdmStatus] ?? status}
-                  </Tag>
-                  {hint && <span style={{ marginLeft: 8 }}>{hint}</span>}
-                </div>
-              </div>
-            }
-          >
-            <span style={{
-              fontSize: 12, color: '#E8720C', cursor: 'pointer',
-              borderBottom: '1px dashed #E8720C',
-            }}>
-              當前所處狀態：{RDM_STATUS_LABEL[status as RdmStatus] ?? (finished ? status : '')}
-            </span>
-          </Popover>
-        </div>
-      )}
     </div>
   )
 }

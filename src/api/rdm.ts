@@ -64,6 +64,25 @@ import {
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
 /**
+ * 生成幂等 requestId（客户端生成，重试保持不变即可）。
+ * <p>V3 写接口统一要求 requestId：服务端据此对同一逻辑操作去重，避免网络重试造成重复裁决/重复放行。
+ * 优先 crypto.randomUUID，浏览器不支持时降级到时间戳+随机串。
+ */
+function genRequestId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/**
+ * 若调用方未显式提供 requestId，则自动补一个（已有则原样保留，保证重试幂等）。
+ * <p>expectedVersion 由调用方按读取到的 version 显式传入，此处绝不臆造。
+ */
+function withRequestId<T extends { requestId?: string }>(data: T): T {
+  return data.requestId ? data : { ...data, requestId: genRequestId() }
+}
+
+/**
  * RDM 本地演示开关（默认关）。
  * <p>读接口降级无副作用，离线也能评审界面；写接口不行：真实写入失败被换成 mock 成功，
  * 用户会看到「已提交/已分配/已验收」而服务端一条记录都没落，这种假成功比报错更难发现
@@ -82,7 +101,13 @@ function canMockWrite(err: unknown): boolean {
 /** 需求列表行 */
 export interface RdmRequirementRow {
   id: number
-  reqNo: string
+  /**
+   * 正式需求编号，**允许为 null**（需求提交/需求管理拆分 · 批次1）。
+   * 只在首次准入成功（审批全部通过或服务端免审批命中）时生成；
+   * 草稿 / 审批中 / 审批驳回阶段为 null，渲染时必须显示「尚未生成」而不是空串。
+   * 不得用内部 id 或 XQSP 审批流程编号填充本字段。
+   */
+  reqNo: string | null
   title: string
   reqType: RdmReqType | string
   priority: RdmPriority | string
@@ -586,7 +611,11 @@ export interface RdmTransitionRow {
 export interface RdmRiskItem {
   riskType: RdmRiskType | string
   reqId: number
-  reqNo: string
+  /**
+   * 允许为 null：`INTAKE_STUCK`（审批卡壳）行本身就是准入前需求，还没有正式编号。
+   * 渲染必须走 `formatRdmReqNo`，不得直接当字符串拼接。
+   */
+  reqNo: string | null
   title: string
   status?: RdmStatus | string | null
   submitterName: string
@@ -632,6 +661,8 @@ export interface RdmRequirementQuery {
   /** 产品经理用户 ID */
   pmUserId?: number
   overdueOnly?: boolean
+  /** 提出人用户 ID */
+  submitterUserId?: number
   /** V3：按所属项目过滤 */
   projectId?: number
   /** V3：按需求种类过滤 aggregate/execution */
@@ -1892,7 +1923,11 @@ export interface RdmWeeklyReport {
   byDept: { deptName: string; submitted: number; delivered: number; overdue: number; avgDays: number }[]
   byPm: { pmName: string; active: number; delivered: number; overdue: number }[]
   released: { reqId: number; reqNo: string; title: string; versionNo?: string | null; pmName?: string | null; actualReleaseDate?: string | null; acceptanceScore?: number | null }[]
-  risks: { reqId: number; reqNo: string; title: string; status: string; handler?: string | null; days: number; riskType: string }[]
+  /*
+   * 风险行的 reqNo 可空：INTAKE_STUCK 是准入前需求，还没有正式编号（延迟发号）。
+   * released/nextWeek 只会是准入后需求，保持非空。
+   */
+  risks: { reqId: number; reqNo: string | null; title: string; status: string; handler?: string | null; days: number; riskType: string }[]
   nextWeek: { reqId: number; reqNo: string; title: string; planReleaseDate?: string | null; status: string }[]
 }
 
@@ -2150,7 +2185,11 @@ export async function fetchMetricTrend(params: {
 /** 相似需求候选项 */
 export interface RdmSimilarItem {
   reqId: number
-  reqNo: string
+  /**
+   * 可空：查重候选包含他人正在审批的需求，那些行还没有正式编号。
+   * 展示必须走 `formatRdmReqNo`，不能直接拼进模板串。
+   */
+  reqNo: string | null
   title: string
   status: string
   reqType?: string | null
@@ -2202,7 +2241,8 @@ export interface RdmRiskSummary {
   highlights?: string[]
   topRisks?: {
     reqId: number
-    reqNo: string
+    /** 可空：INTAKE_STUCK 行尚未准入，没有正式需求编号 */
+    reqNo: string | null
     title: string
     status: string
     handler?: string | null
@@ -2286,6 +2326,22 @@ export interface RdmProjectSummary {
 
 export interface RdmProjectStatsCard {
   inProgressCount: number; attentionCount: number; pendingDecisionCount: number;
+  /** Batch3/4：项目总数 */
+  totalProjects?: number;
+  /** Batch3/4：全部交付完成的项目数 */
+  allDeliveredProjects?: number;
+  /** Batch3/4：已关闭项目数 */
+  closedProjects?: number;
+  /** Batch3/4：延期残留（未承接/未关闭）计数 */
+  deferResidualCount?: number;
+  /** Batch3/4：待办总数 */
+  todoTotal?: number;
+  /** Batch3/4：待办-我负责 */
+  todoMineCount?: number;
+  /** Batch3/4：待办-等他人 */
+  todoWaitingOthersCount?: number;
+  /** Batch3/4：待办-未指派 */
+  todoUnassignedCount?: number;
 }
 
 export interface RdmProjectPendingItem {
@@ -2366,12 +2422,47 @@ export interface RdmTestBatchDetail extends RdmTestBatchListItem {
   scopeSnapshotJson: string; buildIdsJson: string; executorUserIds: number[];
   executions: RdmTestExecutionRecord[]; applicantUserName: string;
   returnedReason: string | null; updatedAt: string;
+  /** Batch3：并发控制版本（乐观锁），写操作回传为 expectedVersion；非业务范围版本 */
+  version: number;
+  /** Batch3：待接收用例草稿JSON（权威冻结集合以测试轮次为准） */
+  caseSnapshotJson?: string | null;
+  /** Batch3：待接收交付项-系统-构建映射JSON */
+  buildMappingJson?: string | null;
+}
+
+/**
+ * 范围快照条目（scopeSnapshotJson 反序列化后的单项）。
+ * <p>后端 RdmTestBatchService.buildScopeSnapshot 逐交付项写入 deliveryItemId/itemNo/title/scopeVersion/acceptancePath，
+ * 是提测详情页取<b>真实 deliveryItemId</b> 的权威来源（不得用数组下标伪造 ID）。
+ */
+export interface RdmTestBatchScopeItem {
+  deliveryItemId: number;
+  itemNo?: string;
+  title?: string;
+  scopeVersion?: number;
+  acceptancePath?: string;
+}
+
+/** 冻结用例集条目（caseSnapshotJson 反序列化后的单项，受理后由服务端规范化并分配稳定 caseId） */
+export interface RdmTestBatchCaseItem {
+  caseId?: string;
+  deliveryItemId?: number;
+  caseTitle?: string;
+  mandatory?: boolean;
 }
 
 export interface RdmTestExecutionRecord {
   id: number; deliveryItemId: number; deliveryItemTitle: string;
   caseTitle: string; executorUserName: string; buildId: string;
   testEnv: string; result: string; executedAt: string; remark: string; roundNo: number;
+  /** Batch3：稳定用例ID（V3 门禁映射到冻结用例集） */
+  caseId?: string | null;
+  /** Batch3：不可变测试轮次事实ID */
+  testRoundId?: number | null;
+  /** Batch3：业务范围版本（非并发版本） */
+  scopeVersion?: number | null;
+  /** Batch3：执行证据JSON（截图/日志链接等） */
+  evidenceJson?: string | null;
 }
 
 export interface RdmTestBatchSummary {
@@ -2389,11 +2480,25 @@ export interface RdmTestBatchSubmitForm {
   reqId: number; deliveryItemIds: number[]; buildIds?: string[];
   testEnv: string; testLeadUserId: number; testLeadUserName: string;
   executorUserIds?: number[]; planEndTime?: string;
+  /** 范围快照JSON（可选，服务端可覆盖生成） */
+  scopeSnapshotJson?: string;
+  /** Batch3：用例集草稿JSON（仅提示，非门禁权威分母；受理冻结时服务端规范化） */
+  caseSnapshotJson?: string;
+  /** Batch3：交付项-系统-构建映射草稿JSON（可选） */
+  buildMappingJson?: string;
+  requestId?: string; expectedVersion?: number;
 }
 
 export interface RdmTestExecutionForm {
   deliveryItemId?: number; caseTitle: string; result: string;
   buildId?: string; testEnv?: string; remark?: string;
+  /** Batch3：稳定用例ID（V3 测试流必填，须映射到当前轮次冻结用例集） */
+  caseId?: string;
+  /** Batch3：执行证据JSON（截图/日志链接等，服务端原样留存） */
+  evidenceJson?: string;
+  /** Batch3：业务范围版本（以冻结轮次为权威，不一致即拒） */
+  scopeVersion?: number;
+  requestId?: string; expectedVersion?: number;
 }
 
 // ===== Issue 问题 =====
@@ -2408,6 +2513,8 @@ export interface RdmIssueDetail extends RdmIssueListItem {
   description: string; impact: string; scopeVersion: number;
   buildId: string; reporterUserName: string; updatedAt: string;
   deferRecords: RdmIssueDeferRecord[];
+  /** Batch3：並發控制版本（樂觀鎖），問題級寫操作（resolve/bind/cancel/merge/reassign）回傳為 expectedVersion；非範圍版本 */
+  version?: number;
 }
 
 export interface RdmIssueDeferRecord {
@@ -2419,6 +2526,18 @@ export interface RdmIssueDeferRecord {
   bizDecideTime: string; bizDecideReason: string;
   followUpReqId: number | null; followUpReqNo: string | null;
   status: string; applicantUserName: string; createdAt: string;
+  /** Batch3：并发控制版本（乐观锁）；非业务范围版本 */
+  version?: number;
+  /** Batch3：延期对应的业务范围版本 */
+  scopeVersion?: number | null;
+  /** Batch3：必要范围变更批准引用 */
+  scopeChangeId?: number | null;
+  /** Batch3：延期生效时间 */
+  effectiveAt?: string | null;
+  /** Batch3：升级时间（超期未承接时升级） */
+  escalatedAt?: string | null;
+  /** Batch3：升级级别 */
+  escalationLevel?: number | null;
 }
 
 export interface RdmIssueQuery {
@@ -2436,11 +2555,52 @@ export interface RdmIssueCreateForm {
 
 export interface RdmIssueDeferApplyForm {
   reason: string; impactDesc?: string; mitigation?: string;
-  targetVersion: string; ownerUserId?: number; ownerUserName?: string; dueAt: string;
+  targetVersion: string; ownerUserId?: number; ownerUserName?: string;
+  /** 修复期限（必填），格式严格为 yyyy-MM-dd（不带时间） */
+  dueAt: string;
+  requestId?: string; expectedVersion?: number;
 }
 
+/**
+ * 延期裁决表单（产品/业务共用，由 decisionType 区分裁决方）。
+ * <p>decision 取值必为 {@code approved}/{@code rejected}（不是 approve/reject），与后端一字不差。
+ */
 export interface RdmIssueDeferDecisionForm {
   decision: string; reason: string; followUpReqId?: number;
+  bizDecisionRequired?: boolean;
+  requestId?: string; expectedVersion?: number;
+}
+
+/**
+ * 建立承接（任务21）：延期获批后绑定承接需求，问题与承接需求均以<b>数值ID</b>表达。
+ * <p>每个问题同一时刻唯一有效承接。
+ */
+export interface RdmIssueBindForm {
+  issueId: number; followUpReqId: number;
+  ownerUserId?: number; reason?: string;
+  requestId?: string; expectedVersion?: number;
+}
+
+/**
+ * 按证据关闭问题（任务21）：<b>不得无证据关闭</b>；延期≠解决；承接需求完成验收≠原问题自动解决。
+ * <p>repairEvidenceJson / testRoundId / productAcceptanceId / reason 均为后端必填。
+ */
+export interface RdmIssueResolveForm {
+  followupId?: number; deliveryItemId?: number; buildId?: string;
+  repairEvidenceJson: string; testRoundId: number;
+  testExecutionIdsJson?: string; productAcceptanceId: number;
+  businessAcceptanceId?: number; conclusion?: string; reason: string;
+  requestId?: string; expectedVersion?: number;
+}
+
+/**
+ * 问题动作（任务21）：取消 cancel / 合并 merge / 改派 reassign，均保留已有承接关系与历史。
+ * <p>merge 必填 targetIssueId；reassign 必填 newOwnerUserId；三种动作 reason 均必填。
+ */
+export interface RdmIssueActionForm {
+  targetIssueId?: number; newOwnerUserId?: number; newOwnerUserName?: string;
+  reason: string;
+  requestId?: string; expectedVersion?: number;
 }
 
 // ===== Release Batch 发布批次 =====
@@ -2456,6 +2616,78 @@ export interface RdmReleaseBatchDetail extends RdmReleaseBatchListItem {
   deployments: RdmReleaseDeploymentRecord[];
   checkResults: RdmReleaseCheckResult[];
   updatedAt: string;
+  /** Batch3：并发控制版本（乐观锁），写操作回传为 expectedVersion；非范围版本 */
+  version?: number;
+  /** 任务27：当前放行申请的并发版本快照（与 applicationVersion 对齐），非范围版本 */
+  applicationVersion?: number | null;
+  /** 任务27：申请时冻结的范围/构建快照JSON */
+  applicationSnapshotJson?: string | null;
+  /** 任务27：裁决时冻结的快照JSON */
+  approvalSnapshotJson?: string | null;
+  /** 任务27：提交（申请放行）时间 */
+  submittedAt?: string | null;
+  /** 任务27：放行裁决过期时间（过期必须重新过闸） */
+  approvalExpiresAt?: string | null;
+  /** 任务27：是否全部系统验证通过（只读投影；验证通过≠已发布） */
+  verificationPassed?: boolean | null;
+  /** 任务27：已开放系统数（开放是独立事实） */
+  openedCount?: number | null;
+  /** 任务27：本项目 V3 发布灰度是否已开启（GLOBAL 熔断优先，两级都为1才开） */
+  v3ReleaseEnabled?: boolean | null;
+  /** 任务27：放行裁决留痕（追加式，apply/decide 各一行，不可修改） */
+  approvals?: RdmReleaseApprovalRecord[];
+  /** 任务27：紧急豁免单（只可豁免缺失的产品验收） */
+  exemptions?: RdmReleaseExemptionRecord[];
+  /** 任务27：产品补验单（按补验人真实工作日历冻结期限） */
+  supplementaries?: RdmReleaseSupplementaryRecord[];
+}
+
+/** 任务27：放行裁决留痕（对应 rdm_release_approval，只增不改） */
+export interface RdmReleaseApprovalRecord {
+  id: number; applicationVersion?: number | null;
+  /** apply/decide */
+  action: string;
+  /** approved/rejected（apply 行为空） */
+  decision?: string | null;
+  reason?: string | null; operatorUserId?: number | null;
+  evidenceHash?: string | null; createdAt?: string | null;
+}
+
+/** 任务27：紧急豁免裁决留痕（uk(exemption_id, decision_type)，只增不改） */
+export interface RdmReleaseExemptionDecisionRecord {
+  id: number;
+  /** product_risk/release */
+  decisionType: string;
+  /** approved/rejected */
+  decision: string;
+  reason?: string | null; signerUserId?: number | null; createdAt?: string | null;
+}
+
+/** 任务27：紧急豁免单（只可豁免缺失的产品验收） */
+export interface RdmReleaseExemptionRecord {
+  id: number; applicationVersion?: number | null; applicantUserId?: number | null;
+  reason?: string | null; risk?: string | null; rollbackPlan?: string | null;
+  missingAcceptanceJson?: string | null; supplementaryPlanJson?: string | null;
+  productRiskApproved?: boolean | null; releaseApproved?: boolean | null;
+  effective?: boolean | null; createdAt?: string | null;
+  decisions?: RdmReleaseExemptionDecisionRecord[];
+}
+
+/** 任务27：产品补验单（按补验人真实工作日历冻结期限） */
+export interface RdmReleaseSupplementaryRecord {
+  id: number; deliveryItemId?: number | null; deliveryItemTitle?: string | null;
+  scopeVersion?: number | null; buildId?: string | null;
+  /** product/business（本任务只产生 product） */
+  verificationType?: string | null;
+  exemptionId?: number | null; verifierUserId?: number | null; verifierUserName?: string | null;
+  deadline?: string | null; calendarVersion?: string | null;
+  /** pending/completed/overdue/failed */
+  status?: string | null;
+  /** pass/fail */
+  result?: string | null;
+  acceptanceRecordId?: number | null; escalated?: boolean | null;
+  escalationLevel?: number | null; overdueWorkingDays?: number | null;
+  completedAt?: string | null; version?: number | null;
 }
 
 export interface RdmReleaseDeploymentRecord {
@@ -2464,6 +2696,19 @@ export interface RdmReleaseDeploymentRecord {
   verifyStatus: string; verifyTime: string; openStatus: string;
   openTime: string; rollbackReason: string | null; attemptNo: number;
   operatorUserName: string;
+  /** 任务27：本系统的追加式尝试事实（部署/验证/开放/回滚，只增不改） */
+  attempts?: RdmReleaseAttemptRecord[];
+}
+
+/** 任务27：追加式尝试事实（只增不改，历史永久留痕） */
+export interface RdmReleaseAttemptRecord {
+  id: number; deploymentId?: number | null; attemptNo?: number | null;
+  /** deploy/verify/open/rollback */
+  action?: string | null;
+  /** deploying/success/failed/rolled_back/passed/opened/not_opened */
+  result?: string | null;
+  buildId?: string | null; testEnv?: string | null; approvalId?: number | null;
+  reason?: string | null; operatorUserId?: number | null; occurredAt?: string | null;
 }
 
 export interface RdmReleaseCheckResult {
@@ -2483,10 +2728,55 @@ export interface RdmReleaseBatchCreateForm {
   deployments: { systemCode: string; systemName?: string; buildId?: string; deployOrder?: number }[];
 }
 
-export interface RdmReleaseDecideForm { decision: string; reason?: string }
-export interface RdmReleaseDeployForm { systemCode: string; deployStatus: string; buildId?: string }
-export interface RdmReleaseVerifyForm { systemCode: string; verifyStatus: string; remark?: string }
-export interface RdmReleaseRollbackForm { reason: string; systemCodes?: string[] }
+export interface RdmReleaseDecideForm { decision: string; reason?: string; requestId?: string; expectedVersion?: number }
+export interface RdmReleaseDeployForm { systemCode: string; deployStatus: string; buildId?: string; requestId?: string; expectedVersion?: number }
+export interface RdmReleaseVerifyForm { systemCode: string; verifyStatus: string; remark?: string; requestId?: string; expectedVersion?: number }
+export interface RdmReleaseRollbackForm { reason: string; systemCodes?: string[]; requestId?: string; expectedVersion?: number }
+
+/**
+ * 任务27：业务开放（端点 POST /release-batch/{id}/open）。
+ * <p><b>开放是独立事实，绝不由「验证通过」推导</b>：全部验证通过后批次仍停在 verifying，
+ * 必须显式提交本动作。systemCodes 缺省=全部已验证通过系统；openStatus 缺省 opened。
+ */
+export interface RdmReleaseOpenForm {
+  systemCodes?: string[];
+  /** opened/not_opened（缺省 opened；not_opened 是止损动作，不校验硬门禁） */
+  openStatus?: string;
+  remark?: string; requestId?: string; expectedVersion?: number;
+}
+
+/** 任务27：补验计划项（紧急豁免随附，服务端据此创建补验单并冻结期限） */
+export interface RdmReleaseSupplementaryPlanItem {
+  deliveryItemId?: number; verifierUserId?: number; verifierUserName?: string;
+}
+
+/**
+ * 任务27：紧急豁免申请（端点 POST /release-batch/{id}/exemption）。
+ * <p>只可豁免「缺失的产品验收」，业务验收永不可豁免；缺失项由服务端计算，reason/risk/rollbackPlan 均必填。
+ */
+export interface RdmReleaseExemptionForm {
+  reason: string; risk: string; rollbackPlan: string;
+  supplementaryPlan?: RdmReleaseSupplementaryPlanItem[];
+  requestId?: string; expectedVersion?: number;
+}
+
+/**
+ * 任务27：紧急豁免裁决（端点 POST /release-batch/{id}/exemption/{exemptionId}/decision）。
+ * <p>decisionType 取 product_risk/release；decision 取 approved/rejected；<b>四眼</b>：裁决人不得是申请人本人，管理员亦无自批。
+ */
+export interface RdmReleaseExemptionDecisionForm {
+  decisionType: string; decision: string; reason: string;
+  requestId?: string; expectedVersion?: number;
+}
+
+/**
+ * 任务27：补验完成登记（端点 POST /release-batch/supplementary/{id}/complete）。
+ * <p>仅<b>冻结的补验人本人</b>可登记（无 admin 直通）；expectedVersion 取补验单 version；result 取 pass/fail 且须与验收记录结论一致。
+ */
+export interface RdmReleaseSupplementaryCompleteForm {
+  acceptanceRecordId: number; result: string; evidenceJson?: string;
+  requestId?: string; expectedVersion?: number;
+}
 
 // ===== Acceptance Record 验收记录（交付项级） =====
 export interface RdmAcceptanceRecordListItem {
@@ -2505,6 +2795,7 @@ export interface RdmAcceptanceRecordSubmitForm {
   acceptanceType: string; stage: string; scopeVersion?: number;
   buildId?: string; testEnv?: string; conclusion: string;
   score?: number; opinion?: string; conditionsJson?: string; evidenceJson?: string;
+  requestId?: string; expectedVersion?: number;
 }
 
 /* ==================== V3 API 函数 ==================== */
@@ -2625,8 +2916,32 @@ export async function decideIssueDefer(deferId: number, decisionType: 'product' 
   return request.post<unknown, void>(`/rdm/issue/defer/${deferId}/decide`, data, { params: { decisionType } })
 }
 
-export async function resolveIssue(id: number): Promise<void> {
-  return request.post<unknown, void>(`/rdm/issue/${id}/resolve`, {})
+/**
+ * 按证据关闭问题（任务21）：必须携带修复证据 + 复测轮次 + 必要验收，不得无证据关闭。
+ * <p>body 对齐后端 RdmIssueDTO.Resolve；requestId 缺省时自动生成幂等键。
+ */
+export async function resolveIssue(id: number, data: RdmIssueResolveForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/resolve`, withRequestId(data))
+}
+
+/** 建立承接（任务21）：以数值 ID 指定问题与承接需求，唯一有效承接 */
+export async function bindIssueFollowUp(data: RdmIssueBindForm): Promise<void> {
+  return request.post<unknown, void>('/rdm/issue/bind', withRequestId(data))
+}
+
+/** 取消问题（任务21：保留承接与历史） */
+export async function cancelIssue(id: number, data: RdmIssueActionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/cancel`, withRequestId(data))
+}
+
+/** 合并问题到目标问题（任务21：targetIssueId 必填，保留承接与历史） */
+export async function mergeIssue(id: number, data: RdmIssueActionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/merge`, withRequestId(data))
+}
+
+/** 改派问题负责人（任务21：newOwnerUserId 必填，不因改派丢失承接） */
+export async function reassignIssue(id: number, data: RdmIssueActionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/issue/${id}/reassign`, withRequestId(data))
 }
 
 // ===== 发布批次 Release Batch =====
@@ -2664,7 +2979,30 @@ export async function submitReleaseVerification(id: number, data: RdmReleaseVeri
 }
 
 export async function rollbackReleaseBatch(id: number, data: RdmReleaseRollbackForm): Promise<void> {
-  return request.post<unknown, void>(`/rdm/release-batch/${id}/rollback`, data)
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/rollback`, withRequestId(data))
+}
+
+/**
+ * 登记业务开放（任务27）：验证通过≠已发布，必须独立开放。
+ * <p>开放前重验硬门禁，且产品验收必须真实建立（紧急豁免不豁免开放）。
+ */
+export async function openReleaseBatch(id: number, data: RdmReleaseOpenForm = {}): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/open`, withRequestId(data))
+}
+
+/** 申请紧急豁免（任务27：只豁免缺失的产品验收，业务验收永不可豁免） */
+export async function applyReleaseExemption(id: number, data: RdmReleaseExemptionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/exemption`, withRequestId(data))
+}
+
+/** 裁决紧急豁免（任务27：四眼，申请人≠批准人，管理员亦不自批） */
+export async function decideReleaseExemption(id: number, exemptionId: number, data: RdmReleaseExemptionDecisionForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/${id}/exemption/${exemptionId}/decision`, withRequestId(data))
+}
+
+/** 登记产品补验完成（任务27：仅冻结的补验人本人，无 admin 直通） */
+export async function completeReleaseSupplementary(supplementaryId: number, data: RdmReleaseSupplementaryCompleteForm): Promise<void> {
+  return request.post<unknown, void>(`/rdm/release-batch/supplementary/${supplementaryId}/complete`, withRequestId(data))
 }
 
 // ===== 验收记录（交付项级） =====
@@ -2917,4 +3255,362 @@ export async function fetchBlockedTasks(deliveryItemId: number): Promise<RdmBloc
     if (isBackendUnavailable(err)) return []
     throw err
   }
+}
+
+/* ==================== Batch3/4: 統一事實投影（任務22，供項目總覽/工作台/導出/對賬共用） ==================== */
+
+/** 事實查詢條件（與項目列表同一組 filters；統計卡必須跟隨篩選，禁止卡片全量、列表已篩） */
+export interface RdmFactQuery {
+  keyword?: string; status?: string; pmUserId?: number;
+  includeTodos?: boolean; includeItems?: boolean;
+}
+
+/** 數據範圍解析結果（fail-closed；authenticated=false 時 projectIds 必為空集合） */
+export interface RdmFactScope {
+  userId: number | null; authenticated: boolean; canSeeAll: boolean;
+  restricted: boolean; projectIds: number[]; computedAt?: string | null;
+}
+
+/** 交付項事實（單一權威口徑最小粒度；testPassed/productAccepted/bizAccepted 直接承載任務20 判定，絕不由狀態推導） */
+export interface RdmItemFact {
+  itemId: number; itemNo: string; title: string; projectId: number | null; reqId: number | null;
+  status: string; scopeVersion: number; version: number; scopeFrozen: boolean;
+  coordinatorUserId: number | null; coordinatorUserName: string | null;
+  productAcceptorUserId: number | null; productAcceptorUserName: string | null;
+  bizAcceptorUserId: number | null; bizAcceptorUserName: string | null;
+  acceptancePath: string | null; planStartDate: string | null; planEndDate: string | null;
+  blocked: boolean; overdue: boolean;
+  taskTotal: number; taskCompleted: number; taskInProgress: number; blockedTaskCount: number;
+  testPassed: boolean; productAccepted: boolean; bizAccepted: boolean;
+  openIssueCount: number; criticalIssueCount: number; majorIssueCount: number;
+  deferResidualCount: number; pendingDecisionCount: number; delivered: boolean;
+  todoReasons: string[]; actionUrl: string | null;
+}
+
+/** 項目事實（總覽行/統計卡/下鑽/導出/對賬共用；allDelivered 與 closed 互不推導） */
+export interface RdmProjectFact {
+  projectId: number; projectNo: string; projectName: string; objective: string; status: string;
+  pmUserId: number | null; pmUserName: string | null;
+  productOwnerUserId: number | null; productOwnerUserName: string | null;
+  planStartDate: string | null; planEndDate: string | null;
+  pausedFlag: number | null; riskFlag: number | null; overdueFlag: number | null;
+  version: number | null; createdAt: string | null; updatedAt: string | null;
+  requirementTotal: number; deliveryItemTotal: number; deliveryItemCompleted: number;
+  deliveryItemInProgress: number; deliveryItemTesting: number; deliveryItemPendingAcceptance: number;
+  deliveryItemBlocked: number; deliveryItemOverdue: number;
+  testPassedItemCount: number; productAcceptedItemCount: number; bizAcceptedItemCount: number;
+  taskTotal: number; taskCompleted: number; taskInProgress: number; blockedTaskCount: number;
+  issueOpen: number; issueCritical: number; issueMajor: number;
+  pendingDecisionCount: number; deferResidualCount: number; testBatchTotal: number;
+  todoTotal: number; todoMineCount: number; todoWaitingOthersCount: number; todoUnassignedCount: number;
+  allDelivered: boolean; closed: boolean; attention: boolean; inProgress: boolean;
+  nextDeliveryDate: string | null; actionUrl: string | null; computedAt: string | null;
+}
+
+/** 待辦（去重後一條；key=objectType:refId；三桶 mine/waiting_others/unassigned 互斥且窮盡） */
+export interface RdmTodo {
+  key: string; objectType: string; refId: number; refNo: string; title: string;
+  projectId: number | null; refIssueId: number | null;
+  responsibleUserId: number | null; responsibleName: string | null;
+  bucket: string; reasons: string[]; dueDate: string | null;
+  overdue: boolean; overdueWorkingDays: number | null; refVersion: number | null;
+  actionUrl: string | null;
+}
+
+/** 待辦看板（mine + waitingOthers + unassigned == total） */
+export interface RdmTodoBoard {
+  projectId: number | null; userId: number | null; authenticated: boolean;
+  total: number; mineCount: number; waitingOthersCount: number; unassignedCount: number;
+  rawReasonHits: number; todos: RdmTodo[]; computedAt: string | null;
+}
+
+/** 統計卡（跟隨查詢條件；每個計數都等於對應明細行的聚合） */
+export interface RdmCardSummary {
+  totalProjects: number; inProgressCount: number; attentionCount: number; pendingDecisionCount: number;
+  activeProjects: number; allDeliveredProjects: number; closedProjects: number; pausedProjects: number;
+  totalDeliveryItems: number; deliveredItems: number; blockedCount: number;
+  testPassedItemCount: number; productAcceptedItemCount: number; bizAcceptedItemCount: number;
+  issueOpen: number; issueCritical: number; deferResidualCount: number;
+  todoTotal: number; todoMineCount: number; todoWaitingOthersCount: number; todoUnassignedCount: number;
+  computedAt: string | null;
+}
+
+/** 對賬（路徑A 逐行相加 vs 路徑B 直接查庫，不等即列 mismatches） */
+export interface RdmReconciliation {
+  projectCount: number; projectRowCount: number; deliveryItemCount: number; deliveryItemRowCount: number;
+  pendingDecisionSum: number; pendingDecisionDirect: number; deferResidualSum: number; deferResidualDirect: number;
+  todoTotal: number; todoRowCount: number; todoBucketSum: number; todoRawReasonHits: number;
+  closedProjectCount: number; allDeliveredProjectCount: number;
+  consistent: boolean; mismatches: string[]; computedAt: string | null;
+}
+
+/** 全量導出包（範圍內全部項目/交付項/待辦，非當前頁；供前端 ExcelJS 多 Sheet 導出消費） */
+export interface RdmExportBundle {
+  scope: RdmFactScope; cards: RdmCardSummary;
+  projects: RdmProjectFact[]; items: RdmItemFact[]; todos: RdmTodo[];
+  reconciliation: RdmReconciliation; computedAt: string | null;
+}
+
+/** 催辦結果（工作日口徑 + 提醒日去重 + executeOnce 幂等） */
+export interface RdmTodoNotifyResult {
+  notified: number; deduped: number; nonWorkingDay: number;
+}
+
+/** 待辦看板（id=0 哨兵=跨項目工作台視角） */
+export async function fetchTodoBoard(projectId: number): Promise<RdmTodoBoard | null> {
+  try {
+    return await request.get<unknown, RdmTodoBoard>(`/rdm/project/${projectId}/todo-board`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 逐交付項下鑽事實（與統計卡/導出同源） */
+export async function fetchItemFacts(projectId: number): Promise<RdmItemFact[]> {
+  try {
+    return await request.get<unknown, RdmItemFact[]>(`/rdm/project/${projectId}/item-facts`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 全量導出數據包（非當前頁；篩選條件與項目列表同一組） */
+export async function fetchExportBundle(params: RdmFactQuery): Promise<RdmExportBundle | null> {
+  try {
+    return await request.get<unknown, RdmExportBundle>('/rdm/project/export-bundle', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 對賬口徑校驗 */
+export async function fetchReconciliation(params: RdmFactQuery): Promise<RdmReconciliation | null> {
+  try {
+    return await request.get<unknown, RdmReconciliation>('/rdm/project/reconciliation', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 手動催辦項目待辦（僅逾期達門檻者，逐人過工作日閘門，同提醒日同對象同接收人只催一次） */
+export async function urgeProject(id: number): Promise<RdmTodoNotifyResult> {
+  return request.post<unknown, RdmTodoNotifyResult>(`/rdm/project/${id}/urge`, withRequestId({}))
+}
+
+/* ==================== Batch4: V3 灰度管理（任務29 D 段） ==================== */
+
+/** GLOBAL 行狀態（唯一种子行；缺行時 exists=false、各開關按關閉呈現） */
+export interface RdmFlowGlobalFlags {
+  exists: boolean; scopeKey: string | null;
+  v3WriteEnabled: number | null; v3ReleaseEnabled: number | null;
+  globalWritePaused: number | null; globalReleasePaused: number | null;
+  productVerificationDays: number | null; businessVerificationDays: number | null;
+  version: number | null; updatedBy: number | null; updatedAt: string | null;
+}
+
+/** 項目行狀態（scope_key=PROJECT:<id>；不存在=null，缺行即默認關閉、不自動補行） */
+export interface RdmFlowProjectFlags {
+  exists: boolean; projectId: number | null; scopeKey: string | null;
+  v3WriteEnabled: number | null; v3ReleaseEnabled: number | null;
+  version: number | null; updatedBy: number | null; updatedAt: string | null;
+}
+
+/**
+ * 灰度狀態：GLOBAL 行 +（可選）指定項目行 + 兩級合成後的有效開關。
+ * <p><b>熔斷優先</b>：effective* 僅供展示，門禁判定仍以服務層讀側權威方法為準；
+ * effectiveV3Release=true 也僅代表灰度開啟，發布仍須過任務27 全部硬門禁。
+ */
+export interface RdmGrayscaleStatus {
+  global: RdmFlowGlobalFlags; project: RdmFlowProjectFlags | null;
+  effectiveV3Write: boolean | null; effectiveV3Release: boolean | null;
+}
+
+/** 項目級開關變更（兩個獨立開關，null=不變；expectedVersion/reason 必填） */
+export interface RdmProjectFlagsUpdateForm {
+  projectId: number;
+  v3WriteEnabled?: number | null; v3ReleaseEnabled?: number | null;
+  expectedVersion: number; reason: string;
+  requestId?: string;
+}
+
+/** GLOBAL 行開關變更（總閘 + 全局熔斷，四個開關獨立，null=不變；expectedVersion/reason 必填） */
+export interface RdmGlobalFlagsUpdateForm {
+  v3WriteEnabled?: number | null; v3ReleaseEnabled?: number | null;
+  globalWritePaused?: number | null; globalReleasePaused?: number | null;
+  expectedVersion: number; reason: string;
+  requestId?: string;
+}
+
+/** 查詢灰度狀態（projectId 可選；不補建任何行） */
+export async function fetchGrayscaleStatus(projectId?: number): Promise<RdmGrayscaleStatus | null> {
+  try {
+    return await request.get<unknown, RdmGrayscaleStatus>('/rdm/flow-config/grayscale', { params: { projectId }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 變更項目級 V3 寫入/發布開關（僅管理員，審計留痕） */
+export async function updateProjectFlowFlags(data: RdmProjectFlagsUpdateForm): Promise<RdmGrayscaleStatus> {
+  return request.post<unknown, RdmGrayscaleStatus>('/rdm/flow-config/project/update', withRequestId(data))
+}
+
+/** 變更 GLOBAL 總閘/熔斷（僅管理員，審計留痕；熔斷優先於任何項目級開啟） */
+export async function updateGlobalFlowFlags(data: RdmGlobalFlagsUpdateForm): Promise<RdmGrayscaleStatus> {
+  return request.post<unknown, RdmGrayscaleStatus>('/rdm/flow-config/global/update', withRequestId(data))
+}
+
+/* ==================== Batch4: 存量安全遷移（任務29 C 段） ==================== */
+
+/** 單條需求的遷移預覽（只讀推導，不落業務事實） */
+export interface RdmMigrationItemPreview {
+  itemId: number; reqId: number | null; reqNo: string | null; title: string | null;
+  sourceFlowVersion: number | null; sourceVersion: number | null;
+  targetProjectId: number | null; targetProjectName: string | null;
+  /** previewed=可遷移；blocked=不可遷移（見 blockingReason） */
+  status: string; blockingReason: string | null; previewHash: string | null;
+  /** 影響面：將產生的結構性 V3 事實清單（絕不含測試/驗收/發布證據） */
+  impacts: string[];
+}
+
+/** 預覽結果：批次頭 + 逐項遷移預覽 */
+export interface RdmMigrationPreviewResult {
+  batchId: number; status: string; scopeType: string | null;
+  scopeProjectId: number | null; targetProjectId: number | null; targetProjectName: string | null;
+  targetProjectAutoCreate: boolean | null; chunkSize: number | null; previewHash: string | null;
+  totalItems: number | null; eligibleItems: number | null; blockedItems: number | null;
+  items: RdmMigrationItemPreview[]; createdAt: string | null;
+}
+
+/** 遷移明細詳情 */
+export interface RdmMigrationItemDetail {
+  itemId: number; reqId: number | null; targetProjectId: number | null;
+  sourceFlowVersion: number | null; sourceVersion: number | null;
+  status: string; blockingReason: string | null; resultJson: string | null;
+  confirmedBy: number | null; confirmedAt: string | null;
+  executedBy: number | null; executedAt: string | null;
+  rolledBackBy: number | null; rolledBackAt: string | null; version: number | null;
+}
+
+/** 遷移審計條目（追加式、不可覆蓋） */
+export interface RdmMigrationAuditEntry {
+  id: number; batchId: number | null; itemId: number | null; action: string | null; result: string | null;
+  operatorUserId: number | null; requestId: string | null;
+  beforeVersion: number | null; afterVersion: number | null;
+  beforeHash: string | null; afterHash: string | null;
+  resultJson: string | null; reason: string | null; createdAt: string | null;
+}
+
+/** 批次詳情：批次頭 + 全部明細 + 不可覆蓋審計 */
+export interface RdmMigrationBatchDetail {
+  batchId: number; status: string; requestId: string | null; requestedBy: number | null;
+  previewHash: string | null; chunkSize: number | null;
+  confirmedBy: number | null; confirmedAt: string | null;
+  pausedAt: string | null; pauseReason: string | null;
+  rolledBackBy: number | null; rolledBackAt: string | null;
+  resultJson: string | null; blockingReason: string | null;
+  version: number | null; createdAt: string | null; updatedAt: string | null;
+  items: RdmMigrationItemDetail[]; audits: RdmMigrationAuditEntry[];
+}
+
+/** 單個分塊執行結果 */
+export interface RdmMigrationChunkResult {
+  batchId: number; batchStatus: string; chunkSize: number | null;
+  processedInChunk: number | null; successInChunk: number | null; failedInChunk: number | null;
+  totalCompleted: number | null; totalFailed: number | null; totalBlocked: number | null; remaining: number | null;
+  succeededItemIds: number[]; failedItemIds: number[]; batchResultJson: string | null;
+}
+
+/** 對賬結果：countConsistent 與 traceable 全真才算通過 */
+export interface RdmMigrationReconcileResult {
+  batchId: number; totalItems: number | null; completed: number | null; failed: number | null;
+  blocked: number | null; pending: number | null;
+  countConsistent: boolean | null; traceable: boolean | null;
+  inconsistencies: Record<string, string> | null; reconciledAt: string | null;
+}
+
+/** 回退結果：rejected=true 即發現新 V3 事實、已拒絕回滾並自動暫停（走前滾兼容） */
+export interface RdmMigrationRollbackResult {
+  batchId: number; rejected: boolean | null; rejectReason: string | null;
+  newFactsByItem: Record<string, Record<string, number[]>> | null;
+  rolledBackItemIds: number[]; batchStatus: string | null;
+}
+
+/** 遷移預覽請求（projectId 與 reqIds 二選一；chunkSize 1..100 默認20） */
+export interface RdmMigrationPreviewForm {
+  projectId?: number; reqIds?: number[]; targetProjectId?: number;
+  chunkSize?: number; reason?: string; requestId?: string;
+}
+
+/** 主責確認請求（expectedVersion 取批次 version） */
+export interface RdmMigrationConfirmForm { expectedVersion?: number; reason?: string; requestId?: string }
+/** 小批執行請求（每次一個分塊） */
+export interface RdmMigrationExecuteForm { expectedVersion?: number; requestId?: string }
+/** 暫停請求（reason 必填） */
+export interface RdmMigrationPauseForm { expectedVersion?: number; reason: string; requestId?: string }
+/** 恢復請求 */
+export interface RdmMigrationResumeForm { expectedVersion?: number; reason?: string; requestId?: string }
+/** 回退請求（reason 必填；拒絕盲目回滾） */
+export interface RdmMigrationRollbackForm { expectedVersion?: number; reason: string; requestId?: string }
+/** 對賬請求 */
+export interface RdmMigrationReconcileForm { requestId?: string }
+
+/** 遷移批次簡表（可按狀態過濾） */
+export async function fetchMigrationBatches(status?: string): Promise<RdmMigrationBatchDetail[]> {
+  try {
+    return await request.get<unknown, RdmMigrationBatchDetail[]>('/rdm/stock-migration/batch', { params: { status }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 遷移批次詳情 */
+export async function fetchMigrationBatchDetail(id: number): Promise<RdmMigrationBatchDetail | null> {
+  try {
+    return await request.get<unknown, RdmMigrationBatchDetail>(`/rdm/stock-migration/batch/${id}`, SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 生成遷移預覽（只讀業務事實，不落任何業務變更） */
+export async function previewStockMigration(data: RdmMigrationPreviewForm): Promise<RdmMigrationPreviewResult> {
+  return request.post<unknown, RdmMigrationPreviewResult>('/rdm/stock-migration/preview', withRequestId(data))
+}
+
+/** 主責確認（previewed → confirmed；確認前執行入口一律拒絕） */
+export async function confirmMigrationBatch(id: number, data: RdmMigrationConfirmForm = {}): Promise<RdmMigrationBatchDetail> {
+  return request.post<unknown, RdmMigrationBatchDetail>(`/rdm/stock-migration/batch/${id}/confirm`, withRequestId(data))
+}
+
+/** 小批執行一個分塊（失敗項隔離標 FAILED） */
+export async function executeMigrationChunk(id: number, data: RdmMigrationExecuteForm = {}): Promise<RdmMigrationChunkResult> {
+  return request.post<unknown, RdmMigrationChunkResult>(`/rdm/stock-migration/batch/${id}/execute`, withRequestId(data))
+}
+
+/** 暫停（已執行項保留、未執行項待續；reason 必填） */
+export async function pauseMigrationBatch(id: number, data: RdmMigrationPauseForm): Promise<RdmMigrationBatchDetail> {
+  return request.post<unknown, RdmMigrationBatchDetail>(`/rdm/stock-migration/batch/${id}/pause`, withRequestId(data))
+}
+
+/** 恢復（paused → confirmed/running；被拒回退的批次不可恢復，只能前滾） */
+export async function resumeMigrationBatch(id: number, data: RdmMigrationResumeForm = {}): Promise<RdmMigrationBatchDetail> {
+  return request.post<unknown, RdmMigrationBatchDetail>(`/rdm/stock-migration/batch/${id}/resume`, withRequestId(data))
+}
+
+/** 對賬（源數量 = 成功 + 失敗 + 阻塞/跳過；目標 V3 結構逐項可追溯） */
+export async function reconcileMigrationBatch(id: number, data: RdmMigrationReconcileForm = {}): Promise<RdmMigrationReconcileResult> {
+  return request.post<unknown, RdmMigrationReconcileResult>(`/rdm/stock-migration/batch/${id}/reconcile`, withRequestId(data))
+}
+
+/** 保守回退（發現新 V3 事實即整體拒絕、自動暫停，僅結構性逆向、不刪歷史/證據/關聯） */
+export async function rollbackMigrationBatch(id: number, data: RdmMigrationRollbackForm): Promise<RdmMigrationRollbackResult> {
+  return request.post<unknown, RdmMigrationRollbackResult>(`/rdm/stock-migration/batch/${id}/rollback`, withRequestId(data))
 }

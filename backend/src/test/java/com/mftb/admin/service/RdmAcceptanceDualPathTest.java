@@ -41,7 +41,10 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>重要边界声明</b>：本测试以 mock 的 Mapper / accessGuard / executeOnce / RdmTestBatchService 驱动服务层编排逻辑，
  * 只验证「分支走向与门禁口径」，<b>不等价于真实数据库并发证明</b>；真实并发/幂等唯一约束须在任务24 集成测试验证。
- * <p>{@code isOpenFactEstablished} 为任务21 协调点，本任务保守恒 false；测试用 spy 覆盖以验证「已建立开放事实」分支。
+ * <p>{@code isOpenFactEstablished} 原为任务21 协调点（保守恒 false）；<b>任务27 已接到真实开放事实</b>
+ * （委派 {@link RdmOpenFactService} 只读判定，门禁编排与 protected 签名未变）。
+ * 本测试默认注入 mock 的 openFactService（返回 false，与任务20/21 保守语义一致），
+ * 并继续用 spy 覆盖以验证「已建立开放事实」分支；<b>既有断言一律保留，不做任何弱化</b>。
  */
 class RdmAcceptanceDualPathTest {
 
@@ -65,6 +68,8 @@ class RdmAcceptanceDualPathTest {
     private RdmTestBatchService testBatchService;
     private RdmEvidenceInvalidationMapper evidenceInvalidationMapper;
     private RdmIdempotentService idempotentService;
+    /** 任务27 新增构造依赖：开放事实只读判定（默认 mock 返回 false，与任务20 保守语义一致） */
+    private RdmOpenFactService openFactService;
     private RdmAcceptanceRecordService service;
 
     @BeforeEach
@@ -78,6 +83,7 @@ class RdmAcceptanceDualPathTest {
         testBatchService = mock(RdmTestBatchService.class);
         evidenceInvalidationMapper = mock(RdmEvidenceInvalidationMapper.class);
         idempotentService = mock(RdmIdempotentService.class);
+        openFactService = mock(RdmOpenFactService.class);
 
         when(idempotentService.executeOnce(any(), any(), any()))
                 .thenAnswer(inv -> ((Supplier<Object>) inv.getArgument(1)).get());
@@ -88,9 +94,14 @@ class RdmAcceptanceDualPathTest {
         // 默认测试已通过、无历史验收记录
         when(testBatchService.isTestPassed(ITEM_ID)).thenReturn(true);
         when(acceptanceRecordMapper.selectList(any())).thenReturn(new ArrayList<>());
+        // 任务27：开放事实默认未建立（mock 默认即 false，此处显式声明以锁死口径）
+        when(openFactService.isOpenFactEstablished(anyLong())).thenReturn(false);
 
         service = new RdmAcceptanceRecordService(acceptanceRecordMapper, deliveryItemMapper, requirementMapper,
-                bizSeqService, accessGuard, testBatchService, evidenceInvalidationMapper, idempotentService);
+                bizSeqService, accessGuard, testBatchService,
+                // 任务33：失效过滤委派共享解析器，包同一个 mock Mapper 以保持桩数据口径不变
+                new EvidenceValidityResolver(evidenceInvalidationMapper), idempotentService,
+                openFactService);
     }
 
     /* ==================== 夹具 ==================== */
@@ -251,6 +262,32 @@ class RdmAcceptanceDualPathTest {
         doReturn(true).when(spyService).isOpenFactEstablished(anyLong());
         spyService.submitAcceptance(ITEM_ID, dto(BUSINESS, POST, PASS, 5), BIZ_ACCEPTOR, "B");
         verify(acceptanceRecordMapper).insert(any(RdmAcceptanceRecord.class));
+    }
+
+    @Test
+    @DisplayName("任务27 B.4 开放事实已接真实判定：openFactService 报已建立时路径B业务验收放行（无需 spy）")
+    void pathBPostReleaseAllowedWhenOpenFactServiceReportsEstablished() {
+        givenItem(RdmConstants.PATH_B);
+        when(acceptanceRecordMapper.selectList(any())).thenReturn(
+                new ArrayList<>(List.of(rec(1, PRODUCT, PRE, PASS, SCOPE, PRODUCT_ACCEPTOR))));
+        // 不 spy：直接让真实依赖 RdmOpenFactService 报「已建立开放事实」，验证任务27 委派链路已接通
+        when(openFactService.isOpenFactEstablished(ITEM_ID)).thenReturn(true);
+        service.submitAcceptance(ITEM_ID, dto(BUSINESS, POST, PASS, 5), BIZ_ACCEPTOR, "B");
+        verify(acceptanceRecordMapper).insert(any(RdmAcceptanceRecord.class));
+    }
+
+    @Test
+    @DisplayName("任务27 B.4 回滚后开放事实回 false：路径B post_release 业务验收被重新门禁")
+    void pathBPostReleaseRejectedAgainAfterOpenFactRevoked() {
+        givenItem(RdmConstants.PATH_B);
+        when(acceptanceRecordMapper.selectList(any())).thenReturn(
+                new ArrayList<>(List.of(rec(1, PRODUCT, PRE, PASS, SCOPE, PRODUCT_ACCEPTOR))));
+        // 模拟回滚撤销开放事实后的状态：必须重新阻断，不得凭已回滚的上线继续验收
+        when(openFactService.isOpenFactEstablished(ITEM_ID)).thenReturn(false);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.submitAcceptance(
+                ITEM_ID, dto(BUSINESS, POST, PASS, 5), BIZ_ACCEPTOR, "B"));
+        assertTrue(ex.getMessage().contains("開放事實"), ex.getMessage());
+        verify(acceptanceRecordMapper, never()).insert(any(RdmAcceptanceRecord.class));
     }
 
     /* ==================== B.5 conditional 语义 ==================== */

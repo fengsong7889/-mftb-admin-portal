@@ -423,13 +423,14 @@ public class OaRequestServiceImpl implements OaRequestService {
         String applicant = operatorResolver.operatorSignature(current);
         LocalDateTime now = LocalDateTime.now();
 
-        // 生成流程编号（采购申请使用 CG 编号规则，AI 申请使用 AI 编号规则，HR入轉調離使用 RS 编号规则）
-        String flowRuleKey = switch (request.getProcessCode()) {
-            case "oa_purchase" -> BizSeqService.RULE_EAM_PURCHASE_REQUEST;
-            case "ai_access" -> BizSeqService.RULE_AI_ACCESS_REQUEST;
-            case "hr_onboard", "hr_regular", "hr_transfer", "hr_dimission", "hr_renew" -> BizSeqService.RULE_HR_LIFECYCLE_REQUEST;
-            default -> BizSeqService.RULE_OA_REQUEST;
-        };
+        /*
+         * 生成流程编号：按流程编码取对应的编号规则（采购 CG / AI 申请 / HR 入轉調離 RS /
+         * 需求准入 XQSP，其余回落通用 OA），映射本身在 BizSeqService 里保持为可测的纯函数。
+         * <p>需求准入走独立 XQSP 规则而不回落通用 OA 号：准入单号与需求编号是两套事实，
+         * 混用会让「编号生成规则」页看到的前缀与实际发出的号对不上，也无法按日重排。
+         * 规则缺行/停用时 BizSeqService.requireRule 直接抛错拒掉本次提交，fail-closed 不降级。
+         */
+        String flowRuleKey = BizSeqService.ruleKeyForProcess(request.getProcessCode());
         String flowNo = bizSeqService.next(flowRuleKey);
 
         // 创建流程实例

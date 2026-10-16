@@ -23,6 +23,7 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
+import DeliveryItemAcceptanceForm from './DeliveryItemAcceptanceForm'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RequirementStageBar from './components/RequirementStageBar'
@@ -85,6 +86,20 @@ function splitCriteria(text?: string | null): string[] {
 }
 
 export default function AcceptanceForm() {
+  const [searchParams] = useSearchParams()
+  /**
+   * V3 分批交付：入口带 deliveryItemId 时走「交付項驗收」新契约
+   * （/rdm/delivery-item/{id}/acceptance），与需求级验收彻底分离。
+   * <p>分发组件只调 useSearchParams 一个 hook，两条分支各自是独立组件，
+   * 保证 hooks 调用顺序稳定（不在同一组件里条件性提前 return 打断 hook 序列）。
+   */
+  const deliveryItemId = Number(searchParams.get('deliveryItemId') ?? 0)
+  if (deliveryItemId) return <DeliveryItemAcceptanceForm />
+  return <RequirementAcceptanceForm />
+}
+
+/** 需求级业务验收（用例化验收，M3）—— 走 /rdm/requirement/{id}/acceptance 旧契约 */
+function RequirementAcceptanceForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)

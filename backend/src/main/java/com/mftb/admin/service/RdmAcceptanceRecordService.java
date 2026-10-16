@@ -8,11 +8,9 @@ import com.mftb.admin.dto.RdmAcceptanceRecordDTO;
 import com.mftb.admin.dto.RdmAcceptanceRecordVO;
 import com.mftb.admin.entity.RdmAcceptanceRecord;
 import com.mftb.admin.entity.RdmDeliveryItem;
-import com.mftb.admin.entity.RdmEvidenceInvalidation;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.mapper.RdmAcceptanceRecordMapper;
 import com.mftb.admin.mapper.RdmDeliveryItemMapper;
-import com.mftb.admin.mapper.RdmEvidenceInvalidationMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
@@ -27,7 +25,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -66,10 +63,15 @@ public class RdmAcceptanceRecordService {
     private final RdmAccessGuard accessGuard;
     /** B.4 验收前置：测试必须已通过（单向依赖 RdmTestBatchService，无循环） */
     private final RdmTestBatchService testBatchService;
-    /** B.6 消费证据失效：范围变更后旧验收记录登记失效即不再作为门禁凭证（复刻任务19 失效过滤语义） */
-    private final RdmEvidenceInvalidationMapper evidenceInvalidationMapper;
+    /** B.6 消费证据失效：任务33 统一委派共享解析器，范围变更后旧验收记录登记失效即不再作为门禁凭证 */
+    private final EvidenceValidityResolver evidenceValidityResolver;
     /** B.10 提交验收接入原子幂等 executeOnce */
     private final RdmIdempotentService idempotentService;
+    /**
+     * 任务27 新增（增量构造变更，置于末位以免打乱既有构造参数序）：
+     * 开放事实的<b>只读</b>判定。本服务仅委派，不写任何发布表，因此不引入循环依赖。
+     */
+    private final RdmOpenFactService openFactService;
 
     /* ==================== 查询 ==================== */
 
@@ -275,12 +277,15 @@ public class RdmAcceptanceRecordService {
 
     /**
      * B.4 保守判定入口：交付项是否已建立「开放事实」（上线后开放/放量）。
-     * <p><b>任务21 协调点</b>：发布/部署/验证/开放/回滚属任务21，本任务不实现。此处保守恒 false，
-     * 令路径B 的 post_release 业务验收在无开放事实时一律 fail-closed 拒绝；任务21 落地开放事实后由其提供真实判定。
-     * <p>声明为 protected 以便单测通过 spy 覆盖验证「已建立开放事实」分支。
+     * <p><b>任务27 已接真实事实</b>：委派给 {@link RdmOpenFactService}，成立条件为
+     * 「存在 released 批次且范围快照包含本交付项 + 部署 open_status=opened
+     * + 存在 {@code action=open, result=opened} 的追加事实 + 无更晚的 rollback 事实」。
+     * <p><b>回滚后本方法回 false</b>（批次转 rolled_back 且/或存在更晚 rollback 事实），
+     * 使路径B 的 {@code post_release} 业务验收被重新门禁，不会因一次已回滚的上线而永久放行。
+     * <p>保持 protected 签名与门禁编排不变：单测仍可通过 spy 覆盖验证「已建立开放事实」分支。
      */
     protected boolean isOpenFactEstablished(Long deliveryItemId) {
-        return false;
+        return openFactService != null && openFactService.isOpenFactEstablished(deliveryItemId);
     }
 
     /** B.1 白名单校验：acceptanceType∈{product,business}；stage∈{pre_release,post_release}；conclusion∈{pass,fail,conditional}。 */
@@ -443,8 +448,9 @@ public class RdmAcceptanceRecordService {
     }
 
     /**
-     * B.6 复刻任务19 {@code loadValidAcceptanceRecords} 失效过滤语义：范围变更后登记失效的验收记录不再有效。
-     * <p><b>重复逻辑提醒</b>：与 {@link RdmDeliveryItemService} 的 private loadValid* 同源，建议任务24 抽取共享 {@code EvidenceValidityResolver}。
+     * B.6 失效过滤：范围变更后登记失效的验收记录不再有效。
+     * <p>任务33：全量记录仍按本服务口径加载，失效过滤委派共享 {@link EvidenceValidityResolver}
+     * （与 {@link RdmDeliveryItemService}、{@link RdmTestBatchService} 三处共用同一实现，杜绝漂移）。
      */
     private List<RdmAcceptanceRecord> loadValidAcceptanceRecords(Long deliveryItemId) {
         if (deliveryItemId == null) {
@@ -452,25 +458,7 @@ public class RdmAcceptanceRecordService {
         }
         List<RdmAcceptanceRecord> all = acceptanceRecordMapper.selectList(new LambdaQueryWrapper<RdmAcceptanceRecord>()
                 .eq(RdmAcceptanceRecord::getDeliveryItemId, deliveryItemId));
-        Set<Long> invalidated = loadInvalidatedAcceptanceIds(deliveryItemId);
-        if (invalidated.isEmpty()) {
-            return all;
-        }
-        return all.stream().filter(r -> !invalidated.contains(r.getId())).toList();
-    }
-
-    /** 复刻任务19 {@code loadInvalidatedEvidenceIds(itemId, TYPE_ACCEPTANCE)}。 */
-    private Set<Long> loadInvalidatedAcceptanceIds(Long deliveryItemId) {
-        if (deliveryItemId == null) {
-            return Set.of();
-        }
-        return evidenceInvalidationMapper.selectList(new LambdaQueryWrapper<RdmEvidenceInvalidation>()
-                        .eq(RdmEvidenceInvalidation::getDeliveryItemId, deliveryItemId)
-                        .eq(RdmEvidenceInvalidation::getEvidenceType, RdmEvidenceInvalidation.TYPE_ACCEPTANCE))
-                .stream()
-                .map(RdmEvidenceInvalidation::getEvidenceId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        return evidenceValidityResolver.validAcceptanceRecords(deliveryItemId, all);
     }
 
     private static String trimToNull(String value) {

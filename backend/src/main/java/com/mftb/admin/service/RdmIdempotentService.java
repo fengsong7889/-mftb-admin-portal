@@ -61,6 +61,13 @@ import java.util.function.Supplier;
 @Service
 public class RdmIdempotentService {
 
+    /**
+     * {@code rdm_idempotent_log.client_request_id} 列宽：{@code VARCHAR(64) CHARACTER SET ascii}（见 237）。
+     * <p>任何落库到该列的值都绝不可超宽或含非 ASCII，否则 MySQL 严格模式下占位 INSERT 直接失败，
+     * 进而令 {@link #executeOnce} 抛错、整个业务写操作运行期报错。
+     */
+    private static final int CLIENT_REQUEST_ID_MAX = 64;
+
     private final RdmIdempotentLogMapper idempotentLogMapper;
     private final ObjectMapper objectMapper;
     /** 稳定序列化专用 mapper：字段按字母序、Map 按 key 排序，保证同内容请求体得到同一 requestHash。 */
@@ -121,7 +128,10 @@ public class RdmIdempotentService {
                 placeholder.setBizType(key.getBizType());
                 placeholder.setUserId(key.getUserId());
                 placeholder.setResourceKey(key.getResourceKey());
-                placeholder.setClientRequestId(key.getClientRequestId());
+                // 中心 choke point：单独存储的 client_request_id 列值必须归一化到 ≤64 纯 ASCII。
+                // 注意 bindingRequestId(request_id 占位键) 仍基于「逻辑」clientRequestId 派生（见下），
+                // 绑定语义不受影响；此处只规范化写入 client_request_id 列的副本。
+                placeholder.setClientRequestId(normalizeClientRequestId(key.getClientRequestId()));
                 placeholder.setRequestHash(key.getRequestHash());
                 placeholder.setStatus(RdmConstants.IDEMPOTENT_STATUS_PROCESSING);
                 try {
@@ -211,6 +221,39 @@ public class RdmIdempotentService {
         } catch (JsonProcessingException e) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "請求體無法穩定序列化，無法生成幂等哈希");
         }
+    }
+
+    /**
+     * 归一化写入 {@code rdm_idempotent_log.client_request_id}（{@code VARCHAR(64) ascii}）的值。
+     *
+     * <p>规则：若入参 {@code length>64} 或含非可打印 ASCII 字符（超出 {@code 0x20..0x7E}），
+     * 则替换为 {@link #sha256Hex(String)}（定长 64 位小写 hex，天然 ASCII 且恰好 ≤64）；否则原样返回。
+     *
+     * <p><b>确定性 + 幂等</b>：对已 ≤64 的纯 ASCII 值不变；对归一化产出的 64 位 hex 再次归一化仍不变
+     * （hex 全落在 {@code 0x30..0x66} 且长度恰为 64）。{@code null} 原样返回（旧 V1/V2 路径不回填该列）。
+     *
+     * <p>此方法是全系统写入该列的唯一中心兜底点：即便个别调用方（如任务21 拼 {@code op+":"+64hex}）
+     * 产出超宽值，也能在此收敛，避免幂等占位 INSERT 因列宽溢出而失败。
+     */
+    public static String normalizeClientRequestId(String clientRequestId) {
+        if (clientRequestId == null) {
+            return null;
+        }
+        return fitsClientRequestIdColumn(clientRequestId) ? clientRequestId : sha256Hex(clientRequestId);
+    }
+
+    /** 是否可直接写入 {@code client_request_id VARCHAR(64) ascii}：长度 ≤64 且全为可打印 ASCII。 */
+    private static boolean fitsClientRequestIdColumn(String raw) {
+        if (raw.length() > CLIENT_REQUEST_ID_MAX) {
+            return false;
+        }
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c < 0x20 || c > 0x7E) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** SHA-256 十六进制小写摘要（固定 64 字符）。 */

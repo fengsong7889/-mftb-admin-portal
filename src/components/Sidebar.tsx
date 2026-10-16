@@ -94,6 +94,7 @@ import {
   TrophyOutlined,
   MedicineBoxOutlined,
   CloudServerOutlined,
+  CloudUploadOutlined, // 階段 A RDM 展示层「發布與驗收」合成分组图标
   ToolOutlined,
   DesktopOutlined, // AI 模型相关
   KeyOutlined, // AI 使用申請
@@ -662,6 +663,9 @@ const keyToIcon: Record<string, ReactNode> = {
   'rdm-config-status': <PartitionOutlined />,
   'rdm-config-routing': <SwapOutlined />,
   'rdm-config-sla':   <FieldTimeOutlined />,
+  // v3.13 新建分组图标
+  'rdm-test-quality-group':  <ExperimentOutlined />,
+  'rdm-release-accept-group': <CloudUploadOutlined />,
 }
 
 /** 按实际归属剪枝；跨系统挂载的节点提升到所属系统，不继承外层系统的入口。 */
@@ -798,6 +802,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         ...items.filter((item) => item?.key !== 'home'),
       ]
       : items
+    // 阶段 B 已完成（v3.13 落库），DB 直接返回正确结构，不再需要展示层重排。
     if (currentSystemCode && systemNavigation.loaded) {
       const serverItems = buildMenuItemsFromVO(scopeMenusToSystem(systemNavigation.tree, currentSystemCode, currentSystemCode))
       return withSystemHome(filterMenusByPermission(serverItems, hasMenuPermission))

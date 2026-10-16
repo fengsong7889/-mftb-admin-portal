@@ -37,7 +37,8 @@ public class RdmFileController {
 
     /** 上传需求附件/现状截图 */
     @PostMapping("/upload")
-    @RequirePermission(menu = "rdm-requirement", action = "create", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"})
+    @RequirePermission(menu = "rdm-requirement", action = "create", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:contribute"})
     public Result<Map<String, String>> upload(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             return Result.error("文件不能為空");

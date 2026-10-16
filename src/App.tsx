@@ -330,11 +330,16 @@ const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
 const RdmProjectOverview = lazy(() => import('./pages/Rdm/ProjectOverview'))
 const RdmProjectDetail = lazy(() => import('./pages/Rdm/ProjectDetail'))
 const RdmTestWorkbench = lazy(() => import('./pages/Rdm/TestWorkbench'))
+const RdmTestBatchSubmit = lazy(() => import('./pages/Rdm/TestBatchSubmit'))
 const RdmTestBatchDetail = lazy(() => import('./pages/Rdm/TestBatchDetail'))
 const RdmReleaseCenter = lazy(() => import('./pages/Rdm/ReleaseCenter'))
+const RdmReleaseBatchCreate = lazy(() => import('./pages/Rdm/ReleaseBatchCreate'))
 const RdmReleaseBatchDetail = lazy(() => import('./pages/Rdm/ReleaseBatchDetail'))
 const RdmDeliveryItemForm = lazy(() => import('./pages/Rdm/DeliveryItemForm'))
 const RdmIssueDetail = lazy(() => import('./pages/Rdm/IssueDetail'))
+// V3 存量安全遷移 / 灰度管理（接項目總覽的既有入口，不新增導航中心）
+const RdmStockMigration = lazy(() => import('./pages/Rdm/StockMigration'))
+const RdmGrayscaleConfig = lazy(() => import('./pages/Rdm/GrayscaleConfig'))
 
 // 文檔中心（階段二：真實 /api/doc/**；菜單種子已由 DocSchemaMigrationInitializer 落庫）
 const DocCenter = lazy(() => import('./pages/DocCenter'))
@@ -666,7 +671,9 @@ function AuthenticatedLayout() {
               <Route path="/rdm-delivery" element={<RdmDeliveryBoard />} />
               <Route path="/rdm-delivery-req" element={<Navigate to="/rdm-requirement?scope=delivery" replace />} />
               <Route path="/rdm-task" element={<RdmTaskForm />} />
-              {/* 分配产品经理：独立页（取代需求池弹窗），分配权现在 rdm-intake:edit，菜单合并后并到 rdm-requirement:edit */}
+              {/* 分配产品经理：独立页（取代需求池弹窗）。分配权现行锚点是 rdm-intake:edit，
+                  菜单收敛后落到 rdm-requirement:dispatch（不是 :edit，那是需求侧受理权）；
+                  过渡期两个锚点 OR 生效，口径以 RdmAccessGuard.canDispatch 为准 */}
               <Route path="/rdm-assign" element={<RdmAssignPm />} />
               <Route path="/rdm-iteration" element={<RdmIterationPlan />} />
               <Route path="/rdm-iteration-form" element={<RdmIterationForm />} />
@@ -693,9 +700,15 @@ function AuthenticatedLayout() {
               {/* V3 分批交付：项目 / 提测 / 发布 / 交付项 / 问题 */}
               <Route path="/rdm-project" element={<RdmProjectOverview />} />
               <Route path="/rdm-project-detail" element={<RdmProjectDetail />} />
+              {/* 存量遷移 / 灰度管理：無獨立菜單，入口在項目總覽操作區（僅有權限者可見）*/}
+              <Route path="/rdm-stock-migration" element={<RdmStockMigration />} />
+              <Route path="/rdm-grayscale" element={<RdmGrayscaleConfig />} />
               <Route path="/rdm-test" element={<RdmTestWorkbench />} />
+              {/* 发起提测 / 创建发布批次：独立页（§9.1 禁止用 Modal 承载新增表单） */}
+              <Route path="/rdm-test-submit" element={<RdmTestBatchSubmit />} />
               <Route path="/rdm-test-detail" element={<RdmTestBatchDetail />} />
               <Route path="/rdm-release" element={<RdmReleaseCenter />} />
+              <Route path="/rdm-release-create" element={<RdmReleaseBatchCreate />} />
               <Route path="/rdm-release-detail" element={<RdmReleaseBatchDetail />} />
               <Route path="/rdm-delivery-item" element={<RdmDeliveryItemForm />} />
               <Route path="/rdm-issue" element={<RdmIssueDetail />} />

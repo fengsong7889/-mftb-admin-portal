@@ -949,6 +949,8 @@
     "statScheduleStaff": "Участников на неделе",
     "statScheduleScheduled": "Заполнено ячеек",
     "statScheduleRest": "Выходных ячеек",
-    "statScheduleUnscheduled": "Полностью без графика"
+    "statScheduleUnscheduled": "Полностью без графика",
+    "noValidWorksheet": "В файле нет допустимых листов",
+    "noValidDataRows": "В файле нет допустимых строк данных"
   }
 }

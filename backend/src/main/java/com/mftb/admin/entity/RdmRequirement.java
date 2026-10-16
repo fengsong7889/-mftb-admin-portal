@@ -20,7 +20,13 @@ public class RdmRequirement {
     @TableId
     private Long id;
 
-    /** 需求编号 XQ+YYYYMMDD+4位 */
+    /**
+     * 需求编号 XQ+YYYYMMDD+4位。
+     * <p><b>可空</b>（需求提交/需求管理拆分 · 批次1）：正式编号只在首次准入成功
+     * （审批全部通过，或服务端免审批裁决命中）时生成一次，此后不变。
+     * 草稿 / 待审批 / 审批驳回阶段为 {@code null}，不预占也不消费流水。
+     * <p>因此禁止对未准入的行直接调用字符串方法，也禁止用内部 id 或 XQSP 审批单号冒充需求号。
+     */
     private String reqNo;
 
     /** 需求标题 */

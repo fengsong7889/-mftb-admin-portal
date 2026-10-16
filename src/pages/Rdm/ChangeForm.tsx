@@ -19,7 +19,7 @@ import {
   fetchRequirementDetail,
   type RdmPrdItem,
 } from '../../api/rdm'
-import { RDM_CHANGE_TYPE, RDM_CHANGE_TYPE_LABEL, type RdmChangeType } from '../../constants/rdm'
+import { RDM_CHANGE_TYPE, RDM_CHANGE_TYPE_LABEL, formatRdmReqNo, type RdmChangeType } from '../../constants/rdm'
 import './index.css'
 
 const { TextArea } = Input
@@ -56,7 +56,7 @@ export default function ChangeForm() {
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: d.reqNo, title: d.title, planReleaseDate: d.planReleaseDate }))
+      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, planReleaseDate: d.planReleaseDate }))
       .catch(() => message.error('需求資訊載入失敗'))
     fetchDeliverySummary(reqId).then(summary => setPrds(summary?.prds ?? [])).catch(() => setPrds([]))
   }, [reqId])

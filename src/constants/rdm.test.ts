@@ -8,6 +8,18 @@ import {
   getRdmComplexityLabel,
   RDM_PRIORITY_LABEL,
   RDM_COMPLEXITY_LABEL,
+  RDM_ACCEPT_RESULT,
+  RDM_ACCEPTANCE_TYPE,
+  RDM_ACCEPT_STAGE,
+  RDM_DECISION,
+  RDM_DECISION_LABEL,
+  RDM_RELEASE_CHECK_TYPE,
+  RDM_RELEASE_CHECK_TYPE_LABEL,
+  RDM_VERIFY_STATUS,
+  RDM_OPEN_STATUS,
+  RDM_EXEMPTION_DECISION_TYPE,
+  RDM_SUPPLEMENTARY_STATUS,
+  RDM_SUPPLEMENTARY_RESULT,
 } from './rdm'
 
 /**
@@ -88,5 +100,53 @@ describe('基线冻结入口状态口径', () => {
     expect(canFreezeBaseline(null)).toBe(false)
     expect(canFreezeBaseline('')).toBe(false)
     expect(canFreezeBaseline('not_a_status')).toBe(false)
+  })
+})
+
+/**
+ * 第三/四批枚举字面值防漂移。
+ * <p>这些常量是前后端「逐字一致」的契约：后端 DTO 只认这些字符串，前端一旦拼错
+ * （例如把 decision 写成 approve/reject、把 checkType 写成旧的前端臆造键），写操作会被
+ * 后端静默拒绝或按未知值处理。这份断言把每个枚举的**字面值**钉死，防止再次漂移。
+ */
+describe('第三/四批枚举字面值与后端契约对齐', () => {
+  it('验收类型/阶段/结论字面值逐字对齐后端 DTO', () => {
+    expect(RDM_ACCEPTANCE_TYPE.PRODUCT).toBe('product')
+    expect(RDM_ACCEPTANCE_TYPE.BUSINESS).toBe('business')
+    expect(RDM_ACCEPT_STAGE.PRE_RELEASE).toBe('pre_release')
+    expect(RDM_ACCEPT_STAGE.POST_RELEASE).toBe('post_release')
+    expect(RDM_ACCEPT_RESULT.PASS).toBe('pass')
+    expect(RDM_ACCEPT_RESULT.CONDITIONAL).toBe('conditional')
+    expect(RDM_ACCEPT_RESULT.FAIL).toBe('fail')
+  })
+
+  it('发布裁决 decision 为 approved/rejected（不是 approve/reject）', () => {
+    expect(RDM_DECISION.APPROVED).toBe('approved')
+    expect(RDM_DECISION.REJECTED).toBe('rejected')
+    expect(RDM_DECISION_LABEL.approved).toBeTruthy()
+    expect(RDM_DECISION_LABEL.rejected).toBeTruthy()
+  })
+
+  it('放行检查项 checkType 对齐后端 5 项（test/acceptance/defect/dependency/scope）', () => {
+    expect(Object.values(RDM_RELEASE_CHECK_TYPE).sort()).toEqual(
+      ['acceptance', 'defect', 'dependency', 'scope', 'test'],
+    )
+    // 每个 checkType 都必须有繁中标签，避免详情页渲染出英文键
+    Object.values(RDM_RELEASE_CHECK_TYPE).forEach(k => {
+      expect(RDM_RELEASE_CHECK_TYPE_LABEL[k]).toBeTruthy()
+    })
+  })
+
+  it('验证/开放/豁免裁决/补验枚举字面值逐字对齐后端', () => {
+    expect(RDM_VERIFY_STATUS.PASSED).toBe('passed')
+    expect(RDM_VERIFY_STATUS.FAILED).toBe('failed')
+    expect(RDM_OPEN_STATUS.OPENED).toBe('opened')
+    expect(RDM_OPEN_STATUS.NOT_OPENED).toBe('not_opened')
+    expect(RDM_EXEMPTION_DECISION_TYPE.PRODUCT_RISK).toBe('product_risk')
+    expect(RDM_EXEMPTION_DECISION_TYPE.RELEASE).toBe('release')
+    expect(RDM_SUPPLEMENTARY_STATUS.PENDING).toBe('pending')
+    expect(RDM_SUPPLEMENTARY_STATUS.OVERDUE).toBe('overdue')
+    expect(RDM_SUPPLEMENTARY_RESULT.PASS).toBe('pass')
+    expect(RDM_SUPPLEMENTARY_RESULT.FAIL).toBe('fail')
   })
 })

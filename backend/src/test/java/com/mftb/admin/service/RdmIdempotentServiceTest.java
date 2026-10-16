@@ -19,11 +19,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -295,5 +298,172 @@ class RdmIdempotentServiceTest {
                 .bizType("release_apply").resourceKey("release_batch:123")
                 .clientRequestId("c1").requestHash(HASH_A).build());
         assertEquals(ResultCode.PARAM_ERROR.getCode(), ex.getCode());
+    }
+
+    /* ==================== 任务28：client_request_id 列宽归一化（VARCHAR(64) CHARACTER SET ascii） ==================== */
+
+    /** 生产真实超宽场景：{@code op + ":" + 64位hex判别子} = 75 字符（如 {@code applyDefer:<hash>}）。 */
+    private static final String OVERLONG_LOGICAL = "applyDefer:" + HASH_A;
+    /** 含非 ASCII（中文）但长度远小于 64 的逻辑值。 */
+    private static final String NON_ASCII_LOGICAL = "延期申請:abc";
+
+    /** 断言字符串可安全写入 {@code client_request_id VARCHAR(64) ascii}：长度 ≤64 且全为可打印 ASCII(0x20..0x7E)。 */
+    private static void assertFitsClientRequestIdColumn(String value, String hint) {
+        assertNotNull(value, hint + "：归一化结果不可为 null");
+        assertTrue(value.length() <= 64, hint + "：长度须 ≤64，实际 " + value.length() + " → " + value);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            assertTrue(c >= 0x20 && c <= 0x7E,
+                    hint + "：第 " + i + " 位 0x" + Integer.toHexString(c) + " 超出可打印 ASCII(0x20..0x7E)");
+        }
+    }
+
+    private static void assertLowerHex64(String value, String hint) {
+        assertFitsClientRequestIdColumn(value, hint);
+        assertTrue(value.matches("[0-9a-f]{64}"), hint + "：须为 64 位小写 hex，实际 → " + value);
+    }
+
+    /** 以指定逻辑 clientRequestId 构造绑定键（其余四要素固定），用于验证中心归一化与占位键派生。 */
+    private static IdempotentKey keyWithClientRequestId(String clientRequestId) {
+        return IdempotentKey.builder()
+                .userId(1L)
+                .bizType("issue_defer")
+                .resourceKey("issue:1001")
+                .clientRequestId(clientRequestId)
+                .requestHash(HASH_A)
+                .build();
+    }
+
+    /** 走首次执行路径并捕获实际写入的占位实体（即真实落库到 client_request_id 列的值）。 */
+    private RdmIdempotentLog capturePersistedPlaceholder(IdempotentKey k) {
+        clearInvocations(mapper); // 支持同一用例内多次捕获（保留桩，只清调用记录）
+        when(mapper.selectOne(any())).thenReturn(null); // 预检未命中 → 首次执行
+        service.executeOnce(k, () -> CACHED, String.class);
+        ArgumentCaptor<RdmIdempotentLog> ins = ArgumentCaptor.forClass(RdmIdempotentLog.class);
+        verify(mapper, times(1)).insert(ins.capture());
+        return ins.getValue();
+    }
+
+    @Test
+    @DisplayName("归一化：≤64 纯 ASCII 原样不变（含 64 位边界、空格与 ~ 边界、空串）")
+    void normalizeKeepsShortPrintableAsciiUnchanged() {
+        assertEquals("client-req-0001", RdmIdempotentService.normalizeClientRequestId("client-req-0001"));
+        assertEquals("", RdmIdempotentService.normalizeClientRequestId(""));
+        // 可打印 ASCII 边界字符（空格 0x20 与 ~ 0x7E）不得被改写
+        String boundary = "a b~!@#$%^&*()_+-=[]{};':\",./<>?";
+        assertEquals(boundary, RdmIdempotentService.normalizeClientRequestId(boundary));
+        // 恰好 64 字符：等于列宽上限，仍原样保留
+        String exactly64 = "a".repeat(64);
+        assertEquals(exactly64.length(), 64);
+        assertEquals(exactly64, RdmIdempotentService.normalizeClientRequestId(exactly64));
+        // 已是 64 位 hex 的归一化产物必须是不动点（保证幂等）
+        assertEquals(HASH_A, RdmIdempotentService.normalizeClientRequestId(HASH_A));
+    }
+
+    @Test
+    @DisplayName("归一化：长度 >64 → 该逻辑值的 SHA-256（64 位小写 hex，确定性可复算）")
+    void normalizeHashesOverlongValue() {
+        assertEquals(75, OVERLONG_LOGICAL.length(), "前置条件：op+\":\"+64hex 确为 75 字符超宽值");
+        String normalized = RdmIdempotentService.normalizeClientRequestId(OVERLONG_LOGICAL);
+        assertLowerHex64(normalized, "超宽值归一化");
+        assertEquals(RdmIdempotentService.sha256Hex(OVERLONG_LOGICAL), normalized, "须为该逻辑值的 SHA-256");
+
+        // 65 字符（刚过界）与 200 字符（远超界）同样收敛为 64 hex
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("b".repeat(65)), "65 字符");
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("c".repeat(200)), "200 字符");
+        // 不同超宽输入不得撞成同一值（确定性 + 区分度）
+        assertNotEquals(RdmIdempotentService.normalizeClientRequestId("b".repeat(65)),
+                RdmIdempotentService.normalizeClientRequestId("c".repeat(65)));
+    }
+
+    @Test
+    @DisplayName("归一化：含非可打印 ASCII（中文/emoji/控制字符/DEL）→ 64 位小写 hex")
+    void normalizeHashesNonAsciiAndControlChars() {
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId(NON_ASCII_LOGICAL), "中文");
+        assertEquals(RdmIdempotentService.sha256Hex(NON_ASCII_LOGICAL),
+                RdmIdempotentService.normalizeClientRequestId(NON_ASCII_LOGICAL));
+
+        // emoji（代理对）、控制字符 0x01/0x1F、DEL 0x7F 均落在 0x20..0x7E 之外
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("req-\uD83D\uDE80"), "emoji");
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("req-\u0001"), "控制字符 0x01");
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("req-\u001F"), "控制字符 0x1F");
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("req-\u007F"), "DEL 0x7F");
+        // 换行/制表符（<0x20）同样必须被收敛，避免脏值写入 ascii 列
+        assertLowerHex64(RdmIdempotentService.normalizeClientRequestId("req-\n\t"), "换行制表");
+    }
+
+    @Test
+    @DisplayName("归一化幂等：normalize(normalize(x)) == normalize(x)，且任意输入结果都适配列宽")
+    void normalizeIsIdempotent() {
+        String[] inputs = {
+                "client-req-0001", "", "a".repeat(64), "b".repeat(65), "c".repeat(300),
+                OVERLONG_LOGICAL, NON_ASCII_LOGICAL, "延期-\uD83D\uDE80", "biz:\u0000\u007F", HASH_A
+        };
+        for (String input : inputs) {
+            String once = RdmIdempotentService.normalizeClientRequestId(input);
+            String twice = RdmIdempotentService.normalizeClientRequestId(once);
+            assertFitsClientRequestIdColumn(once, "输入长度 " + input.length());
+            assertEquals(once, twice, "归一化必须幂等（不动点），输入长度 " + input.length());
+        }
+    }
+
+    @Test
+    @DisplayName("归一化：null 原样返回（旧 V1/V2 路径不回填该列，不得抛 NPE）")
+    void normalizePassesThroughNull() {
+        assertNull(RdmIdempotentService.normalizeClientRequestId(null));
+    }
+
+    @Test
+    @DisplayName("executeOnce 落库：逻辑 clientRequestId 超宽/非 ASCII 时，实际写入列 ≤64 且全为可打印 ASCII")
+    void executeOncePersistsColumnSafeClientRequestId() {
+        // 1) 超宽（75 字符）：落库为 64 hex
+        RdmIdempotentLog overlongRow = capturePersistedPlaceholder(keyWithClientRequestId(OVERLONG_LOGICAL));
+        assertFitsClientRequestIdColumn(overlongRow.getClientRequestId(), "超宽落库");
+        assertEquals(RdmIdempotentService.sha256Hex(OVERLONG_LOGICAL), overlongRow.getClientRequestId(),
+                "落库值须为逻辑值的 SHA-256（中心 choke point 唯一兜底）");
+
+        // 2) 非 ASCII（中文 + emoji，长度 ≤64）：同样收敛为 64 hex
+        String nonAscii = "延期申請-\uD83D\uDE80";
+        assertTrue(nonAscii.length() <= 64, "前置条件：仅因字符集不适配而非超宽");
+        RdmIdempotentLog nonAsciiRow = capturePersistedPlaceholder(keyWithClientRequestId(nonAscii));
+        assertLowerHex64(nonAsciiRow.getClientRequestId(), "非 ASCII 落库");
+        assertEquals(RdmIdempotentService.sha256Hex(nonAscii), nonAsciiRow.getClientRequestId());
+    }
+
+    @Test
+    @DisplayName("executeOnce 落库：≤64 纯 ASCII 的逻辑值原样落库，不被无谓哈希")
+    void executeOnceKeepsShortAsciiClientRequestIdAsIs() {
+        RdmIdempotentLog row = capturePersistedPlaceholder(keyWithClientRequestId("client-req-0001"));
+        assertEquals("client-req-0001", row.getClientRequestId());
+        assertFitsClientRequestIdColumn(row.getClientRequestId(), "短 ASCII 落库");
+    }
+
+    @Test
+    @DisplayName("存储列归一化不改变绑定语义：request_id 仍由「逻辑」clientRequestId 派生且稳定为 64 hex")
+    void normalizationDoesNotChangeBindingRequestIdSemantics() {
+        IdempotentKey overlongKey = keyWithClientRequestId(OVERLONG_LOGICAL);
+        String expectedFromLogical = RdmIdempotentService.sha256Hex(
+                overlongKey.getUserId() + "|" + overlongKey.getBizType() + "|"
+                        + overlongKey.getResourceKey() + "|" + OVERLONG_LOGICAL);
+
+        // 1) bindingRequestId 基于逻辑值：与手工复算一致
+        assertEquals(expectedFromLogical, RdmIdempotentService.bindingRequestId(overlongKey));
+        // 2) 绝不基于归一化后的存储值（否则语义被偷换）
+        String normalizedStorage = RdmIdempotentService.normalizeClientRequestId(OVERLONG_LOGICAL);
+        String wouldBeFromNormalized = RdmIdempotentService.sha256Hex(
+                overlongKey.getUserId() + "|" + overlongKey.getBizType() + "|"
+                        + overlongKey.getResourceKey() + "|" + normalizedStorage);
+        assertNotEquals(wouldBeFromNormalized, RdmIdempotentService.bindingRequestId(overlongKey),
+                "占位键输入语义必须是逻辑 clientRequestId，而非归一化后的存储副本");
+        // 3) 同一逻辑键重复派生结果稳定（幂等重试仍可命中同一占位行）
+        assertEquals(RdmIdempotentService.bindingRequestId(overlongKey),
+                RdmIdempotentService.bindingRequestId(keyWithClientRequestId(OVERLONG_LOGICAL)));
+        assertLowerHex64(RdmIdempotentService.bindingRequestId(overlongKey), "占位键");
+
+        // 4) 实际落库的占位行：request_id 取自逻辑派生，client_request_id 取归一化副本，二者互不污染
+        RdmIdempotentLog row = capturePersistedPlaceholder(overlongKey);
+        assertEquals(RdmIdempotentService.bindingRequestId(overlongKey), row.getRequestId());
+        assertEquals(normalizedStorage, row.getClientRequestId());
+        assertNotEquals(row.getRequestId(), row.getClientRequestId());
     }
 }

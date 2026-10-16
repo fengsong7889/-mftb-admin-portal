@@ -1075,11 +1075,15 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
   ],
   // 需求清单：提需求（create）与需求侧处理（edit：受理/PRD/评审/变更）已从退役的提交需求/產品需求處理平移过来
+  // B2 新增 view_all（全量可见）/ dispatch（分配权）/ contribute（沟通附件）：过渡期与 rdm-intake 双锚点并行
   'rdm-requirement': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
     { key: 'export', label: '導出' },
+    { key: 'view_all', label: '全量查看' },
+    { key: 'dispatch', label: '分配' },
+    { key: 'contribute', label: '溝通' },
   ],
   // v3.11 拆分：「需求池」升为一级分组，下挂提交需求（业务侧）与需求管理（分配侧）
   'rdm-pool-group': [
@@ -1118,6 +1122,27 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     // 删除迭代也从退役的 rdm-product 平移到这里，与后端 ITERATION_ACTIONS 保持一致
     { key: 'delete', label: '刪除' },
     { key: 'export', label: '導出' },
+  ],
+  // V3 分批交付：测试工作台 / 发布中心（与后端 DELIVERY_ACTIONS 逐字一致）
+  // 发布中心兼任灰度管理的写锚点（RdmFlowConfigController 校 rdm-delivery-release:edit）
+  'rdm-delivery-test': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-release': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // v3.13 新建分组
+  'rdm-test-quality-group': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-release-accept-group': [
+    { key: 'view', label: '查看' },
   ],
   'rdm-acceptance': [
     { key: 'view', label: '查看' },
@@ -1159,6 +1184,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
   ],
   'rdm-dashboard-trend': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // V3 分批交付「項目總覽」（与后端 VIEW_EXPORT 一致）
+  'rdm-dashboard-project': [
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
@@ -1570,6 +1600,11 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'rdm-delivery',
   'rdm-delivery-board',
   'rdm-delivery-iteration',
+  'rdm-delivery-test',
+  'rdm-delivery-release',
+  // v3.13 新建分组
+  'rdm-test-quality-group',
+  'rdm-release-accept-group',
   'rdm-acceptance',
   'rdm-dashboard',
   'rdm-dashboard-board',
@@ -1581,6 +1616,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'rdm-dashboard-report',
   'rdm-dashboard-score',
   'rdm-dashboard-trend',
+  'rdm-dashboard-project',
   'rdm-config-score',
   'rdm-config-group',
   'rdm-config-status',
@@ -1864,6 +1900,19 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/rdm-config-status': 'rdm-config-status',
   '/rdm-config-routing': 'rdm-config-routing',
   '/rdm-config-sla': 'rdm-config-sla',
+  // V3 分批交付：三个菜单及其子页（子页归属同 pathToKey，按后端 @RequirePermission 锚点）
+  '/rdm-project': 'rdm-dashboard-project',
+  '/rdm-project-detail': 'rdm-dashboard-project',
+  '/rdm-test': 'rdm-delivery-test',
+  '/rdm-test-submit': 'rdm-delivery-test',
+  '/rdm-test-detail': 'rdm-delivery-test',
+  '/rdm-issue': 'rdm-delivery-test',
+  '/rdm-release': 'rdm-delivery-release',
+  '/rdm-release-create': 'rdm-delivery-release',
+  '/rdm-release-detail': 'rdm-delivery-release',
+  '/rdm-grayscale': 'rdm-delivery-release',
+  '/rdm-delivery-item': 'rdm-delivery-board',
+  '/rdm-stock-migration': 'rdm-delivery',
   // AI 智能中心（拆分后）
   '/ai-model-provider': 'ai-model-provider',
   '/ai-model-list': 'ai-model-list',
