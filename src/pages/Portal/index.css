@@ -3,10 +3,10 @@
 
 .portal-page {
   width: 100%;
-  max-width: 1920px;
   min-width: 0;
-  margin: 0 auto;
-  padding: 24px 40px 0;
+  /* 不设 max-width：大屏铺满、小屏自适应，左右留白随视口弹性伸缩（24px ~ 64px），
+     避免视口超过原 1920px 上限后两侧出现大片空白 */
+  padding: 24px clamp(24px, 2.5vw, 64px) 0;
   box-sizing: border-box;
   animation: pageFadeIn 0.3s ease;
 }
