@@ -16,7 +16,7 @@
  * 规范例外（已按 §M 登记）：本视图列集合随所选周期漂移（每周 7 个日期列），
  * 不适用 useColumnConfig 的持久化列顺序，故本页不注册列配置面板。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Modal, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -61,6 +61,9 @@ export default function AttendanceSchedule() {
   const [loading, setLoading] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const [saving, setSaving] = useState(false)
+  // 防确认弹窗重入：确认框弹出期间 saving 仍为 false（要等 onOk 里才置位），
+  // 若不拦截，连点「保存排班/複製上一週」会叠加多个 Modal.confirm 并发多次写请求。
+  const confirmBusyRef = useRef(false)
 
   /**
    * 本周一：所有日期计算都以它为基准，避免用"今天"导致跨周错位。
@@ -153,12 +156,15 @@ export default function AttendanceSchedule() {
       message.info(t('attendance.scheduleNothingToSave'))
       return
     }
+    if (confirmBusyRef.current) return
+    confirmBusyRef.current = true
     Modal.confirm({
       title: t('attendance.scheduleSaveConfirmTitle', { count: dirtyCount }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
+      afterClose: () => { confirmBusyRef.current = false },
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row">
@@ -195,6 +201,8 @@ export default function AttendanceSchedule() {
   /** 复制上一周：服务端批量写入，属不可逆覆盖，必须二次确认并说明范围 */
   const handleCopyLastWeek = () => {
     if (!groupId) return
+    if (confirmBusyRef.current) return
+    confirmBusyRef.current = true
     const sourceWeekStart = weekStart.subtract(1, 'week').format('YYYY-MM-DD')
     Modal.confirm({
       title: t('attendance.scheduleCopyConfirmTitle'),
@@ -203,6 +211,7 @@ export default function AttendanceSchedule() {
       okText: t('attendance.scheduleCopyConfirmOk'),
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
+      afterClose: () => { confirmBusyRef.current = false },
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row">

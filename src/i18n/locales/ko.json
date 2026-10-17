@@ -712,6 +712,7 @@
     "sourceSyncBatchTitle": "동기화 배치",
     "alertUnscheduled": "교대제 그룹의 {{count}}명이 이번 주({{weekStart}} ~ {{weekEnd}}) 미편성입니다",
     "alertUnfrozen": "{{month}} 월간 집계가 미확정입니다(대기 {{draftCount}}건). 확정일은 다음 달 {{freezeDay}}일, {{daysLeft}}일 남음",
+    "alertUnfrozenOverdue": "{{month}} 월간 집계가 미확정입니다(대기 {{draftCount}}건). 확정일(다음 달 {{freezeDay}}일)부터 {{daysLeft}}일 초과했습니다. 즉시 확정하세요",
     "alertNoSync": "{{date}} DingTalk 동기화 체크가 아직 없습니다(DingTalk 사용 그룹 {{groups}}개)",
     "alertDisabledGroups": "{{count}}개 근태 그룹이 비활성화 상태입니다({{names}}). 해당 구성원은 당일 근태 결과가 생성되지 않습니다",
     "colWorkDate": "근태 일자",

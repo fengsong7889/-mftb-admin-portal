@@ -216,6 +216,7 @@ export default function AttendanceShiftForm() {
         form={form}
         layout="vertical"
         disabled={isDetailMode || loading}
+        requiredMark={isDetailMode ? false : true}
         initialValues={{ flexFlag: false, crossDay: false, workHours: 8, status: ENABLE_STATUS.ENABLED }}
       >
         <div style={cardStyle}>
@@ -228,7 +229,7 @@ export default function AttendanceShiftForm() {
                 { required: true, message: t('attendance.shiftCodeRequired') },
                 { pattern: /^[A-Z]{2}\d{2,3}$/, message: t('attendance.shiftCodeRule') },
               ]}
-              extra={isEditMode ? undefined : t('attendance.shiftCodeRule')}
+              extra={(isEditMode || isDetailMode) ? undefined : t('attendance.shiftCodeRule')}
             >
               {/* 编码是稳定身份：编辑态锁定，且服务端以库中值为准 */}
               <Input placeholder="SH07" maxLength={10} disabled={isDetailMode || isEditMode} />

@@ -76,8 +76,10 @@ describe('考勤请求层：路径与参数', () => {
     vi.mocked(request.post).mockResolvedValue({})
 
     await recalculateDaily('2026-10-01', '2026-10-07', 7)
+    // 宽区间重算是同步批量计算，单独放宽超时（缺陷 M1），断言需带上 timeout
     expect(request.post).toHaveBeenCalledWith('/attendance/summaries/daily/recalculate', null, {
       params: { from: '2026-10-01', to: '2026-10-07', groupId: 7 },
+      timeout: 180000,
     })
 
     await syncPunches('2026-10-11', '2026-10-12')

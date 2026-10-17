@@ -143,9 +143,13 @@ export default function AttendanceHolidayList() {
         </div>
       ),
       onOk: async () => {
-        await changeHolidayStatus(record.id, next)
-        message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
-        refresh()
+        try {
+          await changeHolidayStatus(record.id, next)
+          message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
+          refresh()
+        } catch {
+          // 失败已由请求层 toast，吞掉异常以关闭确认框。
+        }
       },
     })
   }
@@ -166,9 +170,13 @@ export default function AttendanceHolidayList() {
         </div>
       ),
       onOk: async () => {
-        await deleteHoliday(record.id)
-        message.success(t('common.deleteSuccess'))
-        refresh()
+        try {
+          await deleteHoliday(record.id)
+          message.success(t('common.deleteSuccess'))
+          refresh()
+        } catch {
+          // 失败已由请求层 toast，吞掉异常以关闭确认框。
+        }
       },
     })
   }

@@ -93,8 +93,13 @@ export default function AttendanceWorkbench() {
 
   /** 预警文案：后端只给 params，句子在这里按 i18n 模板拼 */
   const alertText = (alert: WorkbenchAlert) => {
+    const params = alert.params ?? {}
+    // 冻结提醒逾期时改用「已逾期 N 天」模板，避免「剩 -14 天」这种把负数直出的病句（缺陷 D6/L-4）。
+    if (alert.key === 'unfrozen' && (params.overdue === true || Number(params.daysLeft ?? 0) < 0)) {
+      return t('attendance.alertUnfrozenOverdue', { ...params, daysLeft: Math.abs(Number(params.daysLeft ?? 0)) })
+    }
     const key = WORKBENCH_ALERT_KEY[alert.key]
-    return key ? t(key, alert.params) : alert.key
+    return key ? t(key, params) : alert.key
   }
 
   const stats = overview?.stats

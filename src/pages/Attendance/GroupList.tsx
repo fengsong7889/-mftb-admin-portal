@@ -155,9 +155,13 @@ export default function AttendanceGroupList() {
         </div>
       ),
       onOk: async () => {
-        await changeGroupStatus(record.id, next)
-        message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
-        refresh()
+        try {
+          await changeGroupStatus(record.id, next)
+          message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
+          refresh()
+        } catch {
+          // 失败已由请求层 toast，吞掉异常以关闭确认框（缺陷 M2）。
+        }
       },
     })
   }
@@ -178,9 +182,13 @@ export default function AttendanceGroupList() {
         </div>
       ),
       onOk: async () => {
-        await deleteGroup(record.id)
-        message.success(t('common.deleteSuccess'))
-        refresh()
+        try {
+          await deleteGroup(record.id)
+          message.success(t('common.deleteSuccess'))
+          refresh()
+        } catch {
+          // 有成员/排班时后端拒绝（改用停用）：请求层已提示，吞掉异常以关闭弹窗（缺陷 M2）。
+        }
       },
     })
   }

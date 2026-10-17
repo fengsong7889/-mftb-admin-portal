@@ -696,6 +696,9 @@ export function fetchDailyStats(params: Omit<DailyQuery, 'page' | 'size'>): Prom
 export function recalculateDaily(from: string, to: string, groupId?: number): Promise<Record<string, number>> {
   return request.post<unknown, Record<string, number>>('/attendance/summaries/daily/recalculate', null, {
     params: { from, to, groupId },
+    // 宽区间重算是同步批量计算（逐日逐人判定），跨 1~2 个月可耗 20s+，
+    // 默认 15s 会假失败（后端其实跑完）→ 单独放宽到此补数接口超时（缺陷 M1）。
+    timeout: 180000,
   })
 }
 
@@ -719,6 +722,8 @@ export function fetchMonthlyStats(params: Omit<MonthlyQuery, 'page' | 'size'>): 
 export function generateMonthly(month: string, groupId?: number): Promise<Record<string, number>> {
   return request.post<unknown, Record<string, number>>('/attendance/summaries/monthly/generate', null, {
     params: { month, groupId },
+    // 月度生成同样为整月批量计算，跨多组可耗过默认 15s → 放宽超时（缺陷 M1）。
+    timeout: 180000,
   })
 }
 

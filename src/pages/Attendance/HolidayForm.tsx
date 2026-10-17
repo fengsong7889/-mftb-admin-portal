@@ -195,6 +195,7 @@ export default function AttendanceHolidayForm() {
         form={form}
         layout="vertical"
         disabled={isDetailMode || loading}
+        requiredMark={isDetailMode ? false : true}
         initialValues={{ holidayType: HOLIDAY_TYPE.LEGAL, status: ENABLE_STATUS.ENABLED }}
       >
         <div style={cardStyle}>

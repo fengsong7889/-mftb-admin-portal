@@ -225,9 +225,10 @@ export default function AttendanceGroupForm() {
       groupName: values.groupName,
       groupType: values.groupType,
       scopeType: values.scopeType,
-      // 范围快照由成员数与范围类型拼出：它是给列表看的说明，不参与判定，
-      // 让用户手填一段与真实成员无关的文字反而会造成口径误读
-      scopeText: `${t(SCOPE_TYPE_LABEL_KEY[values.scopeType] ?? 'attendance.scopeList')} · ${memberIds.length} ${t('attendance.unitPerson')}`,
+      // 范围快照只描述「范围类型」，不内嵌成员数：成员数会经 syncMembers 独立维护，
+      // 保存后人数一变，快照里的旧数字就与实时「覆蓋人數」列自相矛盾（缺陷 M3）。
+      // 人数一律以服务端按当前生效成员算出的 memberCount 列为准。
+      scopeText: t(SCOPE_TYPE_LABEL_KEY[values.scopeType] ?? 'attendance.scopeList'),
       workPlace: values.workPlace,
       // 自由工时不绑班次：显式传 null，避免留下上一次选择的班次
       shiftId: values.groupType === GROUP_TYPE.FLEX ? null : (values.shiftId ?? null),
@@ -327,6 +328,7 @@ export default function AttendanceGroupForm() {
         form={form}
         layout="vertical"
         disabled={readOnly || loading}
+        requiredMark={isDetailMode ? false : true}
         initialValues={{
           groupType: GROUP_TYPE.FIXED,
           scopeType: SCOPE_TYPE.DEPT,
@@ -346,7 +348,7 @@ export default function AttendanceGroupForm() {
             hint={t('attendance.groupPageHint')}
           />
           <div style={gridStyle}>
-            <Form.Item label={t('attendance.groupNo')} name="groupNo" extra={isEditMode ? undefined : t('attendance.groupNoAutoHint')}>
+            <Form.Item label={t('attendance.groupNo')} name="groupNo" extra={(isEditMode || isDetailMode) ? undefined : t('attendance.groupNoAutoHint')}>
               <Input disabled placeholder={t('attendance.groupNoAuto')} />
             </Form.Item>
             <Form.Item
@@ -400,7 +402,7 @@ export default function AttendanceGroupForm() {
               <Input placeholder={t('attendance.workPlacePlaceholder')} maxLength={100} />
             </Form.Item>
             {scopeType === SCOPE_TYPE.DEPT && (
-              <Form.Item label={t('attendance.scopeDeptField')} extra={t('attendance.scopeDeptHint')}>
+              <Form.Item label={t('attendance.scopeDeptField')} extra={readOnly ? undefined : t('attendance.scopeDeptHint')}>
                 <TreeSelect
                   treeData={deptTree}
                   treeCheckable
@@ -421,7 +423,7 @@ export default function AttendanceGroupForm() {
           )}
           <Form.Item
             label={t('attendance.memberList')}
-            extra={t('attendance.memberListHint')}
+            extra={readOnly ? undefined : t('attendance.memberListHint')}
             style={{ marginBottom: 0 }}
           >
             <Select
@@ -491,7 +493,7 @@ export default function AttendanceGroupForm() {
                 ]}
               />
             </Form.Item>
-            <Form.Item label={t('attendance.sourceSyncBatchTitle')} extra={t('attendance.sourceSyncFailHint')}>
+            <Form.Item label={t('attendance.sourceSyncBatchTitle')} extra={readOnly ? undefined : t('attendance.sourceSyncFailHint')}>
               <Input value={t('attendance.sourceSyncBatch')} disabled />
             </Form.Item>
           </div>

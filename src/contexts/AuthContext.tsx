@@ -240,6 +240,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   useEffect(() => {
     const handleSessionConflict = (e: Event) => {
+      // 已有鉴权终止弹窗在展示时忽略重复/异类事件，杜绝同屏叠加（缺陷 D2）
+      if (pendingLogoutRef.current) return
       const detail = (e as CustomEvent<SessionConflictDetail>).detail
       pendingLogoutRef.current = true
       // 先清除 localStorage 中的 token，防止後續請求繼續攜帶失效 token
@@ -268,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   useEffect(() => {
     const handleForceLogout = (e: Event) => {
+      if (pendingLogoutRef.current) return
       const detail = (e as CustomEvent<ForceLogoutDetail>).detail
       pendingLogoutRef.current = true
       setForceLogoutInfo(detail)
@@ -287,6 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   useEffect(() => {
     const handleAccountDisabled = () => {
+      if (pendingLogoutRef.current) return
       pendingLogoutRef.current = true
       setAccountDisabled(true)
       localStorage.removeItem(TOKEN_KEY)
@@ -604,6 +608,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cancelButtonProps={{ style: { display: 'none' } }}
         okText={t('auth.iKnow')}
         onOk={() => {
+          pendingLogoutRef.current = false
           setConflictInfo(null)
           clearAuthState()
           navigate('/login', { replace: true })
@@ -655,6 +660,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cancelButtonProps={{ style: { display: 'none' } }}
         okText={t('auth.iKnow')}
         onOk={() => {
+          pendingLogoutRef.current = false
           setForceLogoutInfo(null)
           clearAuthState()
           navigate('/login', { replace: true })
@@ -704,6 +710,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cancelButtonProps={{ style: { display: 'none' } }}
         okText={t('auth.iKnow')}
         onOk={() => {
+          pendingLogoutRef.current = false
           setAccountDisabled(false)
           clearAuthState()
           navigate('/login', { replace: true })
