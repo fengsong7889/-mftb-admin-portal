@@ -212,7 +212,10 @@ public class MeetingRuleService {
 
         LocalDateTime now = LocalDateTime.now();
         if (start.isBefore(now.plusMinutes(global.getMinLeadMinutes()))) {
-            throw new BusinessException("會議需提前 " + global.getMinLeadMinutes() + " 分鐘以上預約");
+            // 提前量为 0 时“需提前 0 分鐘以上预约”读起来像 bug；那条规则当时的真实含义只是“不能约过去”
+            throw new BusinessException(global.getMinLeadMinutes() > 0
+                    ? "會議需提前 " + global.getMinLeadMinutes() + " 分鐘以上預約"
+                    : "會議開始時間不能早於當前時間");
         }
         if (enforceAdvanceDays && start.isAfter(now.plusDays(global.getAdvanceDays()))) {
             throw new BusinessException("最多可提前 " + global.getAdvanceDays() + " 天預約");

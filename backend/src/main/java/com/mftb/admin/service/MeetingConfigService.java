@@ -3,7 +3,10 @@ package com.mftb.admin.service;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingConfigDto;
+import com.mftb.admin.entity.MeetingEvent;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.MeetingEventMapper;
+import com.mftb.admin.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,6 +47,7 @@ public class MeetingConfigService {
     private final MeetingRuleService ruleService;
     private final MeetingAccessGuard guard;
     private final MeetingAuditRecorder auditRecorder;
+    private final MeetingEventMapper eventMapper;
 
     /** 读取当前生效规则（含"哪些键还没落库、正用代码兜底值"） */
     public MeetingConfigDto.RuleView view() {
@@ -67,6 +71,13 @@ public class MeetingConfigService {
         MeetingConfigDto.RuleView view = new MeetingConfigDto.RuleView();
         view.setRule(form);
         view.setMissingKeys(missingKeys());
+        // 最后修改人与时间：规则页必须能回答“这一屏数字是谁在哪天定的”，
+        // 不然行政之间互相覆盖后根本无从追溯（sys_config 没有 updated_by 列，取审计轨迹）
+        MeetingEvent latest = eventMapper.findLatestByTarget(AUDIT_TARGET, MeetingConstants.EVENT_CONFIG_UPDATE);
+        if (latest != null) {
+            view.setUpdatedBy(latest.getOperatorName());
+            view.setUpdatedAt(DateTimeUtils.format(latest.getOccurredAt()));
+        }
         return view;
     }
 
@@ -115,8 +126,7 @@ public class MeetingConfigService {
         diff.put("before", before);
         diff.put("after", after);
         auditRecorder.recordBooking(null, null, AUDIT_TARGET, MeetingConstants.EVENT_CONFIG_UPDATE,
-                StringUtils.hasText(form.getChangeReason()) ? form.getChangeReason().trim() : null,
-                before, after, current, null);
+                form.getChangeReason().trim(), before, after, current, null);
         log.info("全局預約規則已更新: operator={}, advanceDays={}, maxDuration={}",
                 current.getName(), form.getAdvanceDays(), form.getMaxDuration());
     }

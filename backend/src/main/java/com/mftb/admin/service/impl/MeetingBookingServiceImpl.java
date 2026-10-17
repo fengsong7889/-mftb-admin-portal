@@ -93,10 +93,11 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
     @Override
     public MeetingBookingDto.PageWithStats listWithStats(MeetingBookingDto.Query query) {
         SysUser current = guard.currentUser();
-        Scope scope = resolveScope(query.getScope(), current);
+        Scope scope = applyRespondFilter(resolveScope(query.getScope(), current), query.getRespond(), current);
         if (scope.empty()) {
             MeetingBookingDto.PageWithStats empty = new MeetingBookingDto.PageWithStats();
             empty.setPage(new PageResult<>(List.of(), 0L));
+            // Stats 用原始 long：空结果也是六个 0 而不是缺字段，统计卡不会渲染成空白
             empty.setStats(new MeetingBookingDto.Stats());
             return empty;
         }
@@ -195,7 +196,11 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                     throw new BusinessException("同一請求編號已對應另一場預約內容，請重新提交");
                 }
                 // 同键同内容：重放点击，直接回原单，绘不二次占用窗口
-                return createResult(existing, false, notifyMapper.countInviteSkipped(existing.getId()));
+                // 重放不重新登记投递，因此 inviteQueued 固定 false；场景状态回查当前配置，
+                // 否则前端会把一次正常重放读成「通知場景未啟用」
+                return createResult(existing, false,
+                        notifyDispatcher.scenarioActive(MeetingConstants.SCENARIO_INVITE),
+                        notifyMapper.countInviteSkipped(existing.getId()));
             }
         }
 
@@ -203,7 +208,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         MeetingNotifyDispatcher.EnqueueResult queued = notifyDispatcher.enqueue(booking,
                 MeetingConstants.NOTIFY_EVT_CREATED, MeetingConstants.SCENARIO_INVITE,
                 inviteReceivers(attendeeMapper.findByBooking(booking.getId())), null);
-        return createResult(booking, queued.isScenarioActive() && queued.getQueued() > 0, queued.getSkipped());
+        return createResult(booking, queued.isScenarioActive() && queued.getQueued() > 0,
+                queued.isScenarioActive(), queued.getSkipped());
     }
 
     /**
@@ -736,6 +742,12 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         if (!MeetingConstants.STATUS_OPEN.contains(booking.getStatus())) {
             throw new BusinessException("該會議已結束或已取消，無需釋放");
         }
+        if (LocalDateTime.now().isBefore(booking.getStartTime())) {
+            // 释放的事实是“已开始却无人到场”，因此必带爽约标记并写 actual_end_at；
+            // 未开始的会没有爽约事实，放行会落下 actual_end_at 早于 start_time 的矛盾数据，
+            // 还会虚增爽约次数把好好的人推向自动拉黑阈值，因此只允许走“代取消”。
+            throw new BusinessException("會議尚未開始，請改用「代取消」；釋放僅針對已開始但未到場的會議");
+        }
         requireVersion(form.getVersion(), booking);
         doRelease(booking, form.getReason().trim(), current.getId(), current.getName());
         return toVO(requireBooking(id), current, roomMapper.selectById(booking.getRoomId()));
@@ -885,6 +897,34 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         }
     }
 
+    /**
+     * 把范围收敛到"我还没表态的邀约"（「待我響應」Tab 的真值）。
+     *
+     * <p>响应属于"替自己表态"，所以它永远按登录人判定：行政视野传 {@code scope=all} 也不放宽成
+     * 全站待响应名单，否则这个 Tab 就变成别人的待办清单。
+     * <p>{@code scope=mine}（我发起的）与 {@code respond=pending} 在数据上互斥：组织者的参会行
+     * 落库即为已接受、且被口径排除，同时传两者只能为空集，这里直接给出空而不是悄悄丢一个条件。
+     * <p>取值不在白名单内直接拒绝而不是回落成"不筛"：静默回落会让前端写错的参数变成全量列表。
+     */
+    private Scope applyRespondFilter(Scope scope, String respond, SysUser current) {
+        if (!StringUtils.hasText(respond)) {
+            return scope;
+        }
+        String value = respond.trim();
+        if (!MeetingConstants.RESPOND_PENDING.equals(value)) {
+            throw new BusinessException("不支持的響應篩選：" + value);
+        }
+        if (scope.organizerId() != null) {
+            return new Scope(null, List.of());
+        }
+        List<Long> pendingIds = attendeeMapper.findPendingResponseBookingIds(current.getId());
+        if (scope.bookingIds() == null) {
+            return new Scope(null, pendingIds);
+        }
+        List<Long> bounded = pendingIds.stream().filter(scope.bookingIds()::contains).toList();
+        return new Scope(null, bounded);
+    }
+
     private LambdaQueryWrapper<MeetingBooking> buildWrapper(MeetingBookingDto.Query query, Scope scope) {
         LambdaQueryWrapper<MeetingBooking> wrapper = new LambdaQueryWrapper<>();
         applyRange(wrapper, query, scope);
@@ -896,7 +936,7 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         return wrapper;
     }
 
-    /** 列表与统计共用的条件部分（状态/Tab 维度除外，统计要看 breakdown） */
+    /** 列表与统计共用的条件部分（状态/Tab 维度也已同时传给统计，见 {@code countByStatus}） */
     private void applyRange(LambdaQueryWrapper<MeetingBooking> wrapper,
                             MeetingBookingDto.Query query, Scope scope) {
         if (scope.organizerId() != null) {
@@ -955,6 +995,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         Map<String, Object> row = bookingMapper.countByStatus(LocalDateTime.now(),
                 scope.bookingIds(), scope.organizerId(), query.getRoomId(), query.getDepartmentId(),
                 StringUtils.hasText(query.getBizType()) ? query.getBizType().trim() : null,
+                StringUtils.hasText(query.getStatus()) ? query.getStatus().trim() : null,
+                StringUtils.hasText(query.getGroup()) ? query.getGroup().trim() : null,
                 query.getFrom(), query.getTo(), keyword);
         MeetingBookingDto.Stats stats = new MeetingBookingDto.Stats();
         stats.setTotal(asLong(row, "total"));
@@ -1265,7 +1307,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         vo.setCanEdit(writable && occupying && booking.getStartTime().isAfter(now));
         vo.setCanCancel(writable && occupying && booking.getEndTime().isAfter(now));
         // 按钮可见性只看服务端结论：前端拿 canXxx 决定渲不渲染，不再自己复算一遍窗口口径
-        vo.setCanRelease(occupying && guard.canOperateRecords(current));
+        // 释放必须与 release() 的护栏同口径：未开始的会不给“釋放房間”入口，否则点了只会碰壁
+        vo.setCanRelease(occupying && !booking.getStartTime().isAfter(now) && guard.canOperateRecords(current));
         vo.setCanFinish(writable && occupying && !booking.getStartTime().isAfter(now));
         vo.setCheckinRequired(room != null && Integer.valueOf(1).equals(room.getCheckinRequired()));
         if (occupying && booking.getStartTime() != null) {
@@ -1384,11 +1427,13 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         return vo;
     }
 
-    private MeetingBookingDto.CreateResult createResult(MeetingBooking booking, boolean inviteQueued, int skipped) {
+    private MeetingBookingDto.CreateResult createResult(MeetingBooking booking, boolean inviteQueued,
+                                                       boolean scenarioActive, int skipped) {
         MeetingBookingDto.CreateResult result = new MeetingBookingDto.CreateResult();
         result.setBookingId(booking.getId());
         result.setBookingNo(booking.getBookingNo());
         result.setInviteQueued(inviteQueued);
+        result.setScenarioActive(scenarioActive);
         result.setNotifySkippedCount(skipped);
         return result;
     }

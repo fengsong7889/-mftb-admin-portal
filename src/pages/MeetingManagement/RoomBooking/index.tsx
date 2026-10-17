@@ -82,7 +82,7 @@ export default function RoomBooking() {
   /** 带着房间与点击到的时段跳到独立表单页：URL 可分享，刷新也不会丢上下文 */
   const openBooking = (room: RoomAvailability, start?: Dayjs) => {
     if (!room.bookable) {
-      message.warning('該會議室當前不可預約，請改選其他會議室')
+      message.warning(t('meeting.thisMeetingRoomCurrently', { defaultValue: '該會議室當前不可預約，請改選其他會議室' }))
       return
     }
     const params = new URLSearchParams({ roomId: String(room.roomId), date: day.format('YYYY-MM-DD') })
@@ -138,7 +138,7 @@ export default function RoomBooking() {
       </div>
 
       <MeetingStatCards key={statsKey} loading={loading} items={[
-        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: rooms.length, label: t('meeting.matchingMeetingRooms', { defaultValue: '符合條件的會議室' }), hint: '隨日期與篩選條件變化' },
+        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: rooms.length, label: t('meeting.matchingMeetingRooms', { defaultValue: '符合條件的會議室' }), hint: t('meeting.followsDateAndFilters', { defaultValue: '隨日期與篩選條件變化' }) },
         { icon: <PushpinOutlined />, color: '#E8720C', bg: '#FFF7E6', value: occupiedCount, label: t('meeting.occupiedSlotsThatDay', { defaultValue: '當日已佔用時段' }) },
         { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: freeCount, label: t('meeting.freeAllDay', { defaultValue: '當日完全空閒' }) },
       ]} />
@@ -146,7 +146,7 @@ export default function RoomBooking() {
       <div className="action-section">
         <div className="action-section-left">
           <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>
-            {day.format('YYYY-MM-DD')} 忙閒矩陣
+            {t('meeting.busyIdleMatrix', { date: day.format('YYYY-MM-DD'), defaultValue: `${day.format('YYYY-MM-DD')} 忙閒矩陣` })}
           </span>
         </div>
         <div className="action-section-right" />
@@ -191,18 +191,21 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
       <Space size={8} wrap style={{ marginBottom: 8 }}>
         <span style={{ fontWeight: 600 }}>{room.roomName}</span>
         <span style={{ color: '#8C8C8C', fontSize: 12 }}>{room.roomNo} · {room.locationText}</span>
-        <Tag>{room.capacity} 人</Tag>
+        <Tag>{t('meeting.headcount', { count: room.capacity, defaultValue: '{{count}} 人' })}</Tag>
         {room.facilities.map(code => <Tag key={code} color="blue">{facilityLabels()[code] ?? code}</Tag>)}
         {!room.bookable && <Tag color="orange">{t('meeting.notBookable', { defaultValue: '暫不可約' })}</Tag>}
         <span style={{ color: '#8C8C8C', fontSize: 12 }}>
-          可預約 {room.bookableStartTime}–{room.bookableEndTime}
+          {t('meeting.bookableWindowRange', {
+            start: room.bookableStartTime, end: room.bookableEndTime,
+            defaultValue: `可預約 ${room.bookableStartTime}–${room.bookableEndTime}`,
+          })}
         </span>
         <Button
           size="small"
           type="primary"
           disabled={!room.bookable}
           onClick={() => onPick(undefined)}
-        >預約</Button>
+        >{t('meeting.book', { defaultValue: '預約' })}</Button>
       </Space>
 
       <div
@@ -253,7 +256,9 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>
         <span>{room.bookableStartTime}</span>
-        <span>{room.slots.length === 0 ? t('meeting.freeAllDay2', { defaultValue: '全天空閒' }) : `已佔 ${room.slots.length} 段`}</span>
+        <span>{room.slots.length === 0
+          ? t('meeting.freeAllDay2', { defaultValue: '全天空閒' })
+          : t('meeting.occupiedSegments', { count: room.slots.length, defaultValue: `已佔 ${room.slots.length} 段` })}</span>
         <span>{room.bookableEndTime}</span>
       </div>
     </div>

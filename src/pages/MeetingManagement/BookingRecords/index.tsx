@@ -147,12 +147,12 @@ export default function BookingRecords() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.organizer2', { defaultValue: '組織者：' })}</span><b>{record.organizerName}</b></div>
-          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>通知組織者與全體參會人，窗口立刻還給他人</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.proxyCancelImpact', { defaultValue: '通知組織者與全體參會人（需已開啟通知場景），窗口立刻還給他人' })}</b></div>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
             <Input.TextArea
@@ -191,10 +191,10 @@ export default function BookingRecords() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.countedAsNoShow', { defaultValue: '記入爽約統計並通知組織者，窗口立刻可被他人預訂' })}</b></div>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.releaseReasonRequired', { defaultValue: '釋放原因（必填）' })}</div>
@@ -232,7 +232,7 @@ export default function BookingRecords() {
       render: (_, record) => (
         <div>
           <div>{record.timeText}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{record.durationMinutes} 分鐘</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.minutesUnit', { count: record.durationMinutes, defaultValue: '{{count}} 分鐘' })}</div>
         </div>
       ),
     },
@@ -251,7 +251,7 @@ export default function BookingRecords() {
       render: (v: string, record) => (record.delegateForName ? (
         <Space direction="vertical" size={0}>
           <span>{v}</span>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>代 {record.delegateForName} 預訂</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.proxyForUser', { name: record.delegateForName, defaultValue: `代 ${record.delegateForName} 預訂` })}</span>
         </Space>
       ) : v),
     },
@@ -261,7 +261,7 @@ export default function BookingRecords() {
     },
     {
       title: t('meeting.attendees', { defaultValue: '人數' }), key: 'attendeeCount', width: 80,
-      render: (_, record) => `${record.attendeeCount ?? 0} 人`,
+      render: (_, record) => t('meeting.headcount', { count: record.attendeeCount ?? 0, defaultValue: '{{count}} 人' }),
     },
     {
       title: t('meeting.type', { defaultValue: '類型' }), key: 'bizType', width: 100,
@@ -283,8 +283,11 @@ export default function BookingRecords() {
       title: t('meeting.remark', { defaultValue: '備註' }), key: 'remark', width: 200, ellipsis: true,
       render: (_, record) => (
         <span style={{ fontSize: 12, color: '#8C8C8C' }} title={record.cancelReason ?? record.releaseReason ?? ''}>
-          {record.cancelReason ? `取消：${record.cancelReason}`
-            : record.releaseReason ? `釋放：${record.releaseReason}` : '-'}
+          {record.cancelReason
+            ? t('meeting.cancelReasonPrefix', { reason: record.cancelReason, defaultValue: `取消：${record.cancelReason}` })
+            : record.releaseReason
+              ? t('meeting.releaseReasonPrefix', { reason: record.releaseReason, defaultValue: `釋放：${record.releaseReason}` })
+              : '-'}
         </span>
       ),
     },
@@ -393,7 +396,7 @@ export default function BookingRecords() {
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
-          showTotal: t => `共 ${t} 場`,
+          showTotal: count => t('meeting.totalMeetings', { count, defaultValue: '共 {{count}} 場' }),
           // pageSize 变化必须回到第 1 页，否则会停在一个可能不存在的页码上
           onChange: (page, size) => setQuery(q => ({ ...q, page: size !== q.size ? 1 : page, size: size || 20 })),
         }}

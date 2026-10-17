@@ -25,6 +25,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '../../../components/DetailPageHeader'
+import CardTitle from '../../../components/CardTitle'
 import {
   cancelMeeting,
   checkinMeeting,
@@ -47,6 +48,7 @@ import {
   eventLabel,
   notifyEventLabel,
   phaseMeta,
+  scenarioLabel,
 } from '../meetingMeta'
 import { useTranslation } from 'react-i18next'
 
@@ -54,24 +56,6 @@ import { useTranslation } from 'react-i18next'
 const cardStyle: CSSProperties = {
   borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-}
-
-function CardTitle({ icon, bg, color, title, note }: {
-  icon: React.ReactNode; bg: string; color: string; title: string; note?: React.ReactNode
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: 6, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <span style={{ fontSize: 14, color }}>{icon}</span>
-      </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
-      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {note && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{note}</span>}
-    </div>
-  )
 }
 
 export default function MeetingDetail() {
@@ -143,9 +127,9 @@ export default function MeetingDetail() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theRemainingSlotBecomes', { defaultValue: '結束後剩餘窗口立刻可被他人預訂，不可恢復' })}</b></div>
         </div>
       ),
@@ -166,12 +150,12 @@ export default function MeetingDetail() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.countedAsNoShow', { defaultValue: '記入爽約統計並通知組織者，窗口立刻可被他人預訂' })}</b></div>
-          <div className="confirm-info-row"><span>與取消的區別：</span><b>釋放針對已開始卻無人到場，取消針對尚未開始</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.differenceFromCancel', { defaultValue: '與取消的區別：' })}</span><b>{t('meeting.releaseTargetsStartedMeetings', { defaultValue: '釋放針對已開始卻無人到場，取消針對尚未開始' })}</b></div>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.releaseReasonRequired', { defaultValue: '釋放原因（必填）' })}</div>
             <Input.TextArea
@@ -211,11 +195,11 @@ export default function MeetingDetail() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
-          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還，參會人會收到取消通知' })}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還；若已開啟釘釘通知場景，參會人會收到取消告知' })}</b></div>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
             <Input.TextArea
@@ -296,14 +280,16 @@ export default function MeetingDetail() {
 
   const notifyColumns: TableColumnsType<MeetingNotifyVO> = [
     { title: t('meeting.event', { defaultValue: '事件' }), dataIndex: 'eventCode', key: 'eventCode', width: 150, render: (v: string) => notifyEventLabel(v) },
-    { title: t('meeting.scenario', { defaultValue: '場景' }), dataIndex: 'scenario', key: 'scenario', width: 130 },
+    { title: t('meeting.scenario', { defaultValue: '場景' }), dataIndex: 'scenario', key: 'scenario', width: 130, render: (v: string) => scenarioLabel(v) },
     {
       title: t('meeting.recipient', { defaultValue: '接收人' }), key: 'receiver', width: 150,
       render: (_, row) => `${row.receiverName}${row.receiverEmpNo ? `（${row.receiverEmpNo}）` : ''}`,
     },
     {
       title: t('meeting.dingtalk', { defaultValue: '釘釘' }), dataIndex: 'dingtalkBound', key: 'dingtalkBound', width: 90,
-      render: (v: boolean) => (v ? <Tag color="green">已綁定</Tag> : <Tag color="orange">{t('meeting.unbound', { defaultValue: '未綁定' })}</Tag>),
+      render: (v: boolean) => (v
+        ? <Tag color="green">{t('meeting.bound', { defaultValue: '已綁定' })}</Tag>
+        : <Tag color="orange">{t('meeting.unbound', { defaultValue: '未綁定' })}</Tag>),
     },
     {
       title: t('meeting.status', { defaultValue: '狀態' }), dataIndex: 'sendStatus', key: 'sendStatus', width: 110,
@@ -333,7 +319,13 @@ export default function MeetingDetail() {
     <div className="content-area">
       <DetailPageHeader
         title={t('meeting.meetingDetail', { defaultValue: '會議詳情' })}
-        tags={record ? <Tag color={phase.color}>{phase.label}</Tag> : undefined}
+        tags={record ? (
+          <Space size={4}>
+            <Tag color={phase.color}>{phase.label}</Tag>
+            {/* 爽约与“已釋放”是两件事但必须同时可见：只看状态会把问责信息弄丢 */}
+            {record.noShow === 1 && <Tag color="red">{t('meeting.noShow', { defaultValue: '爽約' })}</Tag>}
+          </Space>
+        ) : undefined}
         meta={record
           ? <>{record.bookingNo} · {record.roomName} · {record.timeText}</>
           : undefined}
@@ -347,7 +339,7 @@ export default function MeetingDetail() {
             )}
             {record.myRole !== 'organizer' && record.status === 'booked' && record.myResponse === 'pending' && (
               <>
-                <Button size="small" type="primary" onClick={() => void respond(true)}>接受邀約</Button>
+                <Button size="small" type="primary" onClick={() => void respond(true)}>{t('meeting.acceptInvitation', { defaultValue: '接受邀約' })}</Button>
                 <Button size="small" onClick={() => void respond(false)}>{t('meeting.decline', { defaultValue: '婉拒' })}</Button>
               </>
             )}
@@ -356,7 +348,7 @@ export default function MeetingDetail() {
             )}
             {record.canFinish && <Button size="small" onClick={handleFinish}>{t('meeting.finishEarly', { defaultValue: '提前結束' })}</Button>}
             {record.canRelease && <Button size="small" danger onClick={handleRelease}>{t('meeting.releaseRoom2', { defaultValue: '釋放會議室' })}</Button>}
-            {record.canCancel && <Button size="small" danger onClick={handleCancel}>取消會議</Button>}
+            {record.canCancel && <Button size="small" danger onClick={handleCancel}>{t('meeting.cancelMeeting', { defaultValue: '取消會議' })}</Button>}
           </Space>
         )}
       />
@@ -371,19 +363,22 @@ export default function MeetingDetail() {
         <>
           {/* 一、基本信息 */}
           <div style={cardStyle}>
-            <CardTitle icon={<ProfileOutlined />} bg="#e6f7ff" color="#1890ff" title={t('meeting.basicInfo', { defaultValue: '基本信息' })}
-              note={`${record.attendeeCount} 人 · ${bizTypeLabels()[record.bizType] ?? record.bizType}`} />
+            <CardTitle icon={<ProfileOutlined />} tone="info" title={t('meeting.basicInfo', { defaultValue: '基本信息' })}
+              note={t('meeting.attendeeAndType', {
+                count: record.attendeeCount, type: bizTypeLabels()[record.bizType] ?? record.bizType,
+                defaultValue: `${record.attendeeCount} 人 · ${bizTypeLabels()[record.bizType] ?? record.bizType}`,
+              })} />
             {typeof record.notifySkippedCount === 'number' && record.notifySkippedCount > 0 && (
               <Alert
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message={`${record.notifySkippedCount} 人未收到釘釘邀約`}
-                description="下方「參會人」列表的投遞列標明了每個人未送達的原因；站內日程仍然可見，不受影響。"
+                message={t('meeting.notifySkippedAlert', { count: record.notifySkippedCount, defaultValue: `{{count}} 人未收到釘釘邀約` })}
+                description={t('meeting.notifySkippedDesc', { defaultValue: '下方「參會人」列表的投遞列標明了每個人未送達的原因；站內日程仍然可見，不受影響。' })}
               />
             )}
             <Descriptions column={4} size="middle" items={[
-              { key: 'time', label: t('meeting.meetingTime', { defaultValue: '會議時間' }), span: 2, children: `${record.startTime} ~ ${record.endTime}（${record.durationMinutes} 分鐘）` },
+              { key: 'time', label: t('meeting.meetingTime', { defaultValue: '會議時間' }), span: 2, children: t('meeting.timeRangeWithMinutes', { start: record.startTime, end: record.endTime, count: record.durationMinutes, defaultValue: `${record.startTime} ~ ${record.endTime}（${record.durationMinutes} 分鐘）` }) },
               {
                 key: 'room', label: t('meeting.meetingRoom', { defaultValue: '會議室' }), span: 2,
                 children: (
@@ -406,11 +401,11 @@ export default function MeetingDetail() {
                 children: (
                   <Space size={6}>
                     <span>{record.delegateForName || t('meeting.selectedPerson', { defaultValue: '已指定人員' })}</span>
-                    <Tag color="blue">行政代訂 · 由 {record.organizerName} 預訂</Tag>
+                    <Tag color="blue">{t('meeting.proxyBookingTag', { name: record.organizerName, defaultValue: `行政代訂 · 由 ${record.organizerName} 預訂` })}</Tag>
                   </Space>
                 ),
               }] : []),
-              { key: 'count', label: t('meeting.attendeeCount', { defaultValue: '參會人數' }), children: `${record.attendeeCount} 人` },
+              { key: 'count', label: t('meeting.attendeeCount', { defaultValue: '參會人數' }), children: t('meeting.headcount', { count: record.attendeeCount, defaultValue: '{{count}} 人' }) },
               { key: 'biz', label: t('meeting.meetingType', { defaultValue: '會議類型' }), children: bizTypeLabels()[record.bizType] ?? record.bizType },
               {
                 key: 'online', label: t('meeting.onlineLink', { defaultValue: '線上鏈接' }), span: 2,
@@ -424,7 +419,7 @@ export default function MeetingDetail() {
                   ? (record.bizUrl
                     ? <a href={record.bizUrl} target="_blank" rel="noreferrer">{record.bizNo}</a>
                     : record.bizNo)
-                  : '無',
+                  : t('meeting.none', { defaultValue: '無' }),
               },
               { key: 'desc', label: t('meeting.agenda', { defaultValue: '會議議程' }), span: 4, children: record.description || '-' },
               { key: 'external', label: t('meeting.externalAttendees', { defaultValue: '外部參會人' }), span: 4, children: record.externalAttendees || '-' },
@@ -437,8 +432,8 @@ export default function MeetingDetail() {
 
           {/* 二、参会人与响应 */}
           <div style={cardStyle}>
-            <CardTitle icon={<TeamOutlined />} bg="#f6ffed" color="#52c41a" title={t('meeting.attendees2', { defaultValue: '參會人' })}
-              note={`共 ${record.attendees?.length ?? 0} 人（含組織者與外部人員）`} />
+            <CardTitle icon={<TeamOutlined />} tone="success" title={t('meeting.attendees2', { defaultValue: '參會人' })}
+              note={t('meeting.attendeeTotalNote', { count: record.attendees?.length ?? 0, defaultValue: `共 ${record.attendees?.length ?? 0} 人（含組織者與外部人員）` })} />
             <Table<MeetingAttendeeVO>
               rowKey="id"
               size="small"
@@ -451,7 +446,7 @@ export default function MeetingDetail() {
 
           {/* 三、邀约投递状态 */}
           <div style={cardStyle}>
-            <CardTitle icon={<BellOutlined />} bg="#fff7e6" color="#fa8c16" title={t('meeting.invitationDeliveryStatus', { defaultValue: '邀約投遞狀態' })}
+            <CardTitle icon={<BellOutlined />} tone="warn" title={t('meeting.invitationDeliveryStatus', { defaultValue: '邀約投遞狀態' })}
               note={t('meeting.eachInvitationIsSent', { defaultValue: '每條邀約只發一次，重試次數與失敗原因都在這裡' })} />
             <Table<MeetingNotifyVO>
               rowKey="id"
@@ -466,8 +461,8 @@ export default function MeetingDetail() {
 
           {/* 四、会议轨迹（业务事件，不是审计日志表格） */}
           <div style={cardStyle}>
-            <CardTitle icon={<HistoryOutlined />} bg="#f9f0ff" color="#722ed1" title={t('meeting.meetingTrail', { defaultValue: '會議軌跡' })}
-              note={`${events.length} 條`} />
+            <CardTitle icon={<HistoryOutlined />} tone="purple" title={t('meeting.meetingTrail', { defaultValue: '會議軌跡' })}
+              note={t('meeting.trailCount', { count: events.length, defaultValue: `${events.length} 條` })} />
             {events.length === 0 ? (
               <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('meeting.noTrail', { defaultValue: '無軌跡' })}</span>
             ) : (
@@ -482,7 +477,7 @@ export default function MeetingDetail() {
                           {item.operatorName}{item.operatorEmpNo ? `（${item.operatorEmpNo}）` : ''} · {item.occurredAt}
                         </span>
                       </Space>
-                      {item.reason && <span style={{ fontSize: 12 }}>說明：{item.reason}</span>}
+                      {item.reason && <span style={{ fontSize: 12 }}>{t('meeting.notePrefix', { reason: item.reason, defaultValue: `說明：${item.reason}` })}</span>}
                     </Space>
                   ),
                 }))}
@@ -496,12 +491,12 @@ export default function MeetingDetail() {
             border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24,
           }}>
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              最後更新人：<span style={{ color: '#595959' }}>
+              <span style={{ marginRight: 4 }}>{t('meeting.lastUpdatedBy', { defaultValue: '最後更新人：' })}</span><span style={{ color: '#595959' }}>
                 {lastEvent ? `${lastEvent.operatorName}${lastEvent.operatorEmpNo ? `（${lastEvent.operatorEmpNo}）` : ''}` : record.organizerName}
               </span>
             </span>
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              最後更新時間：<span style={{ color: '#595959' }}>{lastEvent?.occurredAt ?? record.startTime}</span>
+              <span style={{ marginRight: 4 }}>{t('meeting.lastUpdatedAtLabel', { defaultValue: '最後更新時間：' })}</span><span style={{ color: '#595959' }}>{lastEvent?.occurredAt ?? record.startTime}</span>
             </span>
           </div>
         </>
@@ -518,7 +513,7 @@ export default function MeetingDetail() {
           <div style={{ textAlign: 'center' }}>
             <QRCode value={qr.url} size={220} />
             <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
-              有效期內可在會議室門口掃碼簽到，至 {qr.expireAt}（會議結束後 2 小時失效）
+              {t('meeting.qrHint', { expireAt: qr.expireAt, defaultValue: `有效期內可在會議室門口掃碼簽到，至 ${qr.expireAt}（會議結束後 2 小時失效）` })}
             </div>
             <div style={{ marginTop: 4, fontSize: 12, color: '#8C8C8C', wordBreak: 'break-all' }}>{qr.url}</div>
           </div>

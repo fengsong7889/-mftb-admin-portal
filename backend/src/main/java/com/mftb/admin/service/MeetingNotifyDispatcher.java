@@ -90,6 +90,16 @@ public class MeetingNotifyDispatcher {
     }
 
     /**
+     * 场景是否已启用且绑定了可用应用（与本次到底投递了几个人无关）。
+     *
+     * <p>幂等重放（同一 requestKey 再点一次）不会重新登记投递，但前端仍需要知道
+     * 场景状态来选提示文案，因此单独暴露这个只读口径。
+     */
+    public boolean scenarioActive(String scenario) {
+        return appService.resolve(scenario) != null;
+    }
+
+    /**
      * 登记并投递一批会议通知。
      *
      * @param booking        会议单（内容全部从单据字段渲染，通知不接受调用方拼正文，防止把敏感值带进卡片）
@@ -204,17 +214,20 @@ public class MeetingNotifyDispatcher {
         int attempts = task.getRetryCount() == null ? 1 : task.getRetryCount() + 1;
         if (!StringUtils.hasText(task.getReceiverDingtalkId())) {
             notifyMapper.markSkipped(logId, REASON_NOT_BOUND);
+            writeBackAttendee(task, MeetingConstants.NOTIFY_SKIPPED, REASON_NOT_BOUND);
             return;
         }
         // 排队期间场景被停用或改绑：不发送，也不回退到任何默认应用
         NotificationAppService.Credentials app = appService.resolve(task.getScenario());
         if (app == null) {
             notifyMapper.markSkipped(logId, REASON_SCENARIO_OFF);
+            writeBackAttendee(task, MeetingConstants.NOTIFY_SKIPPED, REASON_SCENARIO_OFF);
             return;
         }
         MeetingBooking booking = bookingMapper.selectById(task.getBookingId());
         if (booking == null) {
             notifyMapper.markSkipped(logId, "會議單據不存在");
+            writeBackAttendee(task, MeetingConstants.NOTIFY_SKIPPED, "會議單據不存在");
             return;
         }
         String title = buildTitle(booking, task.getEventCode());
@@ -222,33 +235,66 @@ public class MeetingNotifyDispatcher {
         try {
             dingTalkAppService.sendWorkNotification(task.getScenario(), app.getId(),
                             List.of(task.getReceiverDingtalkId()), title, content)
-                    .whenComplete((accepted, error) -> applyOutcome(logId, attempts, accepted, error));
+                    .whenComplete((accepted, error) -> applyOutcome(task, attempts, accepted, error));
         } catch (RuntimeException e) {
             // 提交动作本身异常（线程池拒绝等）：按失败退避，不能让任务永久停在投遞中
-            applyOutcome(logId, attempts, false, e);
+            applyOutcome(task, attempts, false, e);
         }
     }
 
     /** 渠道回调落状态：受理即 success，未受理按退避重试，耗尽后停止等待人工补发 */
-    void applyOutcome(Long logId, int attempts, Boolean accepted, Throwable error) {
+    void applyOutcome(MeetingNotifyLog task, int attempts, Boolean accepted, Throwable error) {
+        Long logId = task == null ? null : task.getId();
+        if (logId == null) {
+            return;
+        }
         try {
             if (Boolean.TRUE.equals(accepted)) {
                 notifyMapper.markSuccess(logId);
+                // 成功也要回写参会人行：只有 log 表前进的话，详情页会长期并排展示
+                // 「参会人：待發送」与「投递明细：已送達」两套相互否定的事实
+                writeBackAttendee(task, MeetingConstants.NOTIFY_SENT, null);
                 return;
             }
             String message = error != null ? error.getClass().getSimpleName() + ": " + error.getMessage()
                     : "渠道未受理（返回 false，可能憑證失效或接收人不存在）";
             if (attempts >= MAX_ATTEMPTS) {
-                notifyMapper.markFailed(logId, truncate("重試耗盡：" + message, ERROR_MAX_LENGTH), null);
+                String exhausted = truncate("重試耗盡：" + message, ERROR_MAX_LENGTH);
+                notifyMapper.markFailed(logId, exhausted, null);
+                writeBackAttendee(task, MeetingConstants.NOTIFY_FAILED, truncate(message, NOTE_MAX_LENGTH));
                 log.error("會議通知重試耗盡，需人工補發: id={}, attempts={}, error={}", logId, attempts, message);
                 return;
             }
             int waitMinutes = BACKOFF_MINUTES[Math.min(attempts - 1, BACKOFF_MINUTES.length - 1)];
             notifyMapper.markFailed(logId, truncate(message, ERROR_MAX_LENGTH),
                     LocalDateTime.now().plusMinutes(waitMinutes));
+            // 退避中同样是“现在还没送到”，参会人行跟着标失败，回写不能只写终态
+            writeBackAttendee(task, MeetingConstants.NOTIFY_FAILED, truncate(message, NOTE_MAX_LENGTH));
             log.warn("會議通知未受理，{} 分鐘後重試: id={}, attempts={}", waitMinutes, logId, attempts);
         } catch (RuntimeException e) {
             log.error("會議通知狀態回寫失敗: id={}, error={}", logId, e.getMessage());
+        }
+    }
+
+    /**
+     * 把投递结果回写到参会人行。
+     *
+     * <p>词表翻译发生在这里：log 表用 {@code success}，而 {@code biz_meeting_attendee.notify_status}
+     * 的 DDL CHECK 只接受 pending/sent/skipped/failed，直接写 success 会撞约束。
+     *
+     * <p>无系统账号的外部参会人与组织者不在接收人名册里（enqueue 不给他们建留痕行），
+     * 因此这里天然不会抹掉「組織者本人不發送邀約」这类已定的说明。
+     */
+    private void writeBackAttendee(MeetingNotifyLog task, String status, String note) {
+        if (task == null || task.getBookingId() == null || task.getReceiverUserId() == null) {
+            return;
+        }
+        try {
+            attendeeMapper.updateNotifyForUser(task.getBookingId(), task.getReceiverUserId(), status, note);
+        } catch (RuntimeException e) {
+            // 回写失败不能把投递结果抹掉：留痕行已是事实，明细页仍可对账
+            log.warn("會議通知回寫參會人行失敗: bookingId={}, userId={}, status={}, error={}",
+                    task.getBookingId(), task.getReceiverUserId(), status, e.getMessage());
         }
     }
 

@@ -164,9 +164,9 @@ export default function MyMeeting() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theRemainingSlotBecomes', { defaultValue: '結束後剩餘窗口立刻可被他人預訂，不可恢復' })}</b></div>
         </div>
       ),
@@ -186,12 +186,13 @@ export default function MyMeeting() {
       cancelText: t('meeting.back', { defaultValue: '返回' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議主題：</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.status2', { defaultValue: '狀態：' })}</span><b>{statusMeta(record.status).label}</b></div>
-          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還，參會人會收到取消通知' })}</b></div>
+          {/* 通知是否真的送达成于场景开关，不能把话说死成“会收到”（曾经与实际不符） */}
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還；若已開啟釘釘通知場景，參會人會收到取消告知' })}</b></div>
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
             <Input.TextArea
@@ -224,7 +225,7 @@ export default function MyMeeting() {
       render: (_, record) => (
         <div>
           <div style={{ fontWeight: 500 }}>{record.timeText}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{record.durationMinutes} 分鐘</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.minutesUnit', { count: record.durationMinutes, defaultValue: '{{count}} 分鐘' })}</div>
         </div>
       ),
     },
@@ -249,7 +250,7 @@ export default function MyMeeting() {
     { title: t('meeting.organizer', { defaultValue: '組織者' }), dataIndex: 'organizerName', key: 'organizerName', width: 110 },
     {
       title: t('meeting.attendees3', { defaultValue: '參會' }), key: 'attendeeCount', width: 90,
-      render: (_, record) => `${record.attendeeCount ?? 0} 人`,
+      render: (_, record) => t('meeting.headcount', { count: record.attendeeCount ?? 0, defaultValue: '{{count}} 人' }),
     },
     {
       title: t('meeting.myRole', { defaultValue: '我的身份' }), key: 'myRole', width: 110,
@@ -321,7 +322,7 @@ export default function MyMeeting() {
           <DatePicker value={day} allowClear={false} size="small"
             disabledDate={current => !!current && current < dayjs().startOf('day')}
             onChange={value => value && setDay(value)} />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{agenda.length} 場</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.sessionCount', { count: agenda.length, defaultValue: '{{count}} 場' })}</span>
         </Space>
         {agenda.length === 0 ? (
           <div style={{ color: '#8C8C8C', fontSize: 12 }}>{t('meeting.noMeetingRelatedTo', { defaultValue: '這一天沒有與你相關的會議' })}</div>
@@ -372,7 +373,9 @@ export default function MyMeeting() {
         activeKey={tab}
         onChange={key => { setTab(key as typeof tab); setQuery(q => ({ ...q, page: 1 })) }}
         items={[
-          { key: 'todo', label: `待我響應${summary.pendingResponseCount ? `（${summary.pendingResponseCount}）` : ''}` },
+          { key: 'todo', label: summary.pendingResponseCount
+            ? `${t('meeting.waitingForMe', { defaultValue: '待我響應' })}（${summary.pendingResponseCount}）`
+            : t('meeting.waitingForMe', { defaultValue: '待我響應' }) },
           { key: 'mine', label: t('meeting.organizedByMe', { defaultValue: '我發起的' }) },
           { key: 'attended', label: t('meeting.iAttend', { defaultValue: '我參與的' }) },
           { key: 'done', label: t('meeting.finished2', { defaultValue: '已結束' }) },
@@ -409,7 +412,7 @@ export default function MyMeeting() {
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
-          showTotal: t => `共 ${t} 場`,
+          showTotal: count => t('meeting.totalMeetings', { count, defaultValue: '共 {{count}} 場' }),
           // pageSize 变化必须回到第 1 页，否则会停在一个可能不存在的页码上
           onChange: (page, size) => setQuery(q => ({ ...q, page: size !== q.size ? 1 : page, size: size || 10 })),
         }}
@@ -423,9 +426,12 @@ function buildQuery(tab: string, base: MeetingQuery): MeetingQuery {
   const withoutDerived = { ...base }
   delete withoutDerived.scope
   delete withoutDerived.group
+  delete withoutDerived.respond
   switch (tab) {
     case 'todo':
-      return { ...withoutDerived, scope: 'attended', group: 'pending', status: 'booked' }
+      // 「待我響應」按响应态筛，而不是按会议阶段筛：group=pending 是“待開會”，
+      // 会把我自己组织的会也列进来，与同页「待我響應」徽标（后台算的是未响应邀约数）永远对不上
+      return { ...withoutDerived, scope: 'attended', respond: 'pending' }
     case 'mine':
       return { ...withoutDerived, scope: 'mine' }
     case 'attended':

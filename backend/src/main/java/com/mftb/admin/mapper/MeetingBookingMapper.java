@@ -127,7 +127,11 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
      *
      * <p><b>必须与列表共用同一组条件</b>（AGENTS.md §E.8）：单独发一次不带筛选的统计，
      * 用户看到的就是一屏未被过滤的全量数字，改条件也不动。
-     * 状态维度不参与过滤（卡片展示的正是状态 breakdown），时间/房间/范围/关键字照同。
+     *
+     * <p>状态与 Tab 分组同样参与过滤：以前故意不参与，结果是“已取消”筛出 13 条而
+     * 「當前條件會議數」还写 17，“隨當前篩選條件变化”就成了假承诺。现在筛了状态就只剩
+     * 那一个桶、其余归 0，这是自洽而不是数据丢了；group 的三个分支必须与
+     * {@code MeetingBookingServiceImpl.applyGroup} 逐字一致，否则卡片与列表又变成两套口径。
      *
      * <p>{@code finished} 含“已过结束时间但尚未收尾”的占用单：收尾 Job 每分钟才跑一轮，
      * 只按 status 计会让“已完成的会”在卡片区少算一偏。
@@ -145,6 +149,11 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
             + "<if test='roomId != null'> AND room_id = #{roomId} </if>"
             + "<if test='departmentId != null'> AND department_id = #{departmentId} </if>"
             + "<if test='bizType != null'> AND biz_type = #{bizType} </if>"
+            + "<if test='status != null'> AND status = #{status} </if>"
+            + "<if test='group == \"pending\"'> AND status IN ('booked','checked_in') AND start_time &gt; #{now} </if>"
+            + "<if test='group == \"ongoing\"'> AND status IN ('booked','checked_in') AND start_time &lt;= #{now} AND end_time &gt; #{now} </if>"
+            + "<if test='group == \"done\"'> AND (status IN ('finished','cancelled','released') "
+            + "OR (status IN ('booked','checked_in') AND end_time &lt;= #{now})) </if>"
             + "<if test='from != null'> AND end_time &gt;= #{from} </if>"
             + "<if test='to != null'> AND start_time &lt;= #{to} </if>"
             + "<if test='keyword != null'> AND (booking_no LIKE #{keyword} OR title LIKE #{keyword}) </if>"
@@ -155,6 +164,8 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
                                       @Param("roomId") Long roomId,
                                       @Param("departmentId") Long departmentId,
                                       @Param("bizType") String bizType,
+                                      @Param("status") String status,
+                                      @Param("group") String group,
                                       @Param("from") LocalDateTime from,
                                       @Param("to") LocalDateTime to,
                                       @Param("keyword") String keyword);
@@ -165,12 +176,13 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
      * <p>今日与未来都走 {@code biz_meeting_attendee} 关联而不是 organizer_id：组织者也会落一行
      * {@code attendee_type=organizer}，一条 JOIN 就覆盖“我发起的 + 我参与的”，不会出现只看到自己发起的偏误。
      * <p>{@code pendingResponseCount} 只算已发出仍未结束的邀约：组织者自己不应被计入待响应。
+     * <p>今日不筛状态：页上方「我的日程」列的是当天发生的会议（含已结束的）；卡若只算未结束的，
+     * 就会出现“卡片 0 / 日程里摆着两场”的自相矛盾。即将开始仍只算未结束的（过去的不能“即将”）。
      */
     @Select("SELECT "
             + " (SELECT COUNT(*) FROM biz_meeting_booking b JOIN biz_meeting_attendee a "
             + "   ON a.booking_id = b.id AND a.deleted = 0 AND a.user_id = #{userId} "
-            + "   WHERE b.deleted = 0 AND b.status IN ('booked','checked_in') "
-            + "   AND DATE(b.start_time) = CURDATE()) AS todayCount, "
+            + "   WHERE b.deleted = 0 AND DATE(b.start_time) = CURDATE()) AS todayCount, "
             + " (SELECT COUNT(*) FROM biz_meeting_booking b JOIN biz_meeting_attendee a "
             + "   ON a.booking_id = b.id AND a.deleted = 0 AND a.user_id = #{userId} "
             + "   WHERE b.deleted = 0 AND b.status IN ('booked','checked_in') AND b.start_time > NOW() "

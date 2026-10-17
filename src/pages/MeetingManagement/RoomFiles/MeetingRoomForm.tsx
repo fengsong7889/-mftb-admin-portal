@@ -29,6 +29,7 @@ import {
 import { facilityOptions } from '../meetingMeta'
 import EmployeeSelect from '../EmployeeSelect'
 import { useTranslation } from 'react-i18next'
+import CardTitle from '../../../components/CardTitle'
 
 const MENU = 'meeting-room'
 
@@ -56,23 +57,7 @@ const cardStyle: CSSProperties = {
 /** 三列字段网格（§C.4）：vertical 布局下不给 Form.Item 设 labelCol，否则撑出大片空白 */
 const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }
 
-function CardTitle({ icon, bg, color, title, note }: {
-  icon: React.ReactNode; bg: string; color: string; title: string; note?: string
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: 6, background: bg,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <span style={{ fontSize: 14, color }}>{icon}</span>
-      </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
-      <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {note && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{note}</span>}
-    </div>
-  )
-}
+// 模块卡片标题行统一用全局共享组件（§C.3），不再在本页里另写一份结构与色值
 
 export default function MeetingRoomForm() {
   const { t } = useTranslation()
@@ -132,7 +117,7 @@ export default function MeetingRoomForm() {
           remark: data.remark ?? undefined,
         })
       })
-      .catch((e: unknown) => { if (alive) setLoadError(e instanceof Error ? e.message : '加載失敗') })
+      .catch((e: unknown) => { if (alive) setLoadError(e instanceof Error ? e.message : t('common.loadFailed', { defaultValue: '加載失敗，請重試' })) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [isEdit, editId, form])
@@ -156,13 +141,13 @@ export default function MeetingRoomForm() {
     const errors: string[] = []
     const start = values.bookableStartTime
     const end = values.bookableEndTime
-    if ((start && !end) || (!start && end)) errors.push('每日可預約起止時間需一起填寫或一起清空')
-    if (start && end && start >= end) errors.push('每日可預約結束時間必須晚於開始時間')
+    if ((start && !end) || (!start && end)) errors.push(t('meeting.windowBothOrBothEmpty', { defaultValue: '每日可預約起止時間需一起填寫或一起清空' }))
+    if (start && end && start >= end) errors.push(t('meeting.windowEndAfterStart', { defaultValue: '每日可預約結束時間必須晚於開始時間' }))
     if (values.minDuration != null && values.maxDuration != null && values.maxDuration < values.minDuration) {
-      errors.push('單場最長時長不得小於最短時長')
+      errors.push(t('meeting.maxDurationLessThanMin', { defaultValue: '單場最長時長不得小於最短時長' }))
     }
     if (values.checkinRequired && values.releaseAfterMinutes != null && values.releaseAfterMinutes < 1) {
-      errors.push('未簽到釋放分鐘必須大於 0')
+      errors.push(t('meeting.releaseMinutesMustBePositive', { defaultValue: '未簽到釋放分鐘必須大於 0' }))
     }
     if (errors.length > 0) {
       message.warning(errors[0])
@@ -172,10 +157,10 @@ export default function MeetingRoomForm() {
     try {
       if (isEdit && editId != null) {
         await updateMeetingRoom(editId, values)
-        message.success('會議室檔案已保存')
+        message.success(t('meeting.roomProfileSaved', { defaultValue: '會議室檔案已保存' }))
       } else {
         await createMeetingRoom(values)
-        message.success('會議室已創建')
+        message.success(t('meeting.roomCreated', { defaultValue: '會議室已創建' }))
       }
       // 仅保存成功时关闭当前表单页签；失败留在原页，用户改完再提交
       navigate('/meeting-room', {
@@ -184,7 +169,7 @@ export default function MeetingRoomForm() {
       })
     } catch (e) {
       // 编号撞车/并发修改的原因已由 request.ts 统一提示，这里只留日志，避免双弹
-      if (e instanceof Error && e.message) console.warn('保存會議室失敗', e.message)
+      if (e instanceof Error && e.message) console.warn(t('meeting.failedToSaveThe', { defaultValue: '保存會議室失敗' }), e.message)
     } finally {
       setSubmitting(false)
     }
@@ -219,12 +204,17 @@ export default function MeetingRoomForm() {
               }}>{t('meeting.back', { defaultValue: '返回' })}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
-              {isEdit ? '編輯會議室' : '新增會議室'}
+              {isEdit
+                ? t('meeting.editMeetingRoom', { defaultValue: '編輯會議室' })
+                : t('meeting.addMeetingRoom', { defaultValue: '新增會議室' })}
             </h2>
           </div>
           {isEdit && record && (
             <span style={{ fontSize: 12, color: '#8C8C8C' }}>
-              {record.roomNo} · 最後更新 {record.updatedAt ?? '-'}／{record.updatedBy ?? '-'}
+              {t('meeting.lastUpdatedInline', {
+                roomNo: record.roomNo, date: record.updatedAt ?? '-', by: record.updatedBy ?? '-',
+                defaultValue: `${record.roomNo} · 最後更新 ${record.updatedAt ?? '-'}／${record.updatedBy ?? '-'}`,
+              })}
             </span>
           )}
         </div>
@@ -232,32 +222,38 @@ export default function MeetingRoomForm() {
 
       {loadError && (
         <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 8, background: '#FFF1F0', border: '1px solid #FFCCC7', color: '#CF1322', fontSize: 13 }}>
-          會議室檔案加載失敗：{loadError}
+          {t('meeting.roomLoadFailedBanner', { error: loadError, defaultValue: `會議室檔案加載失敗：${loadError}` })}
         </div>
       )}
 
       <Form form={form} layout="vertical" requiredMark="optional" disabled={!canEdit || submitting}>
         {/* 一、基本信息 */}
         <div style={cardStyle}>
-          <CardTitle icon={<HomeOutlined />} bg="#e6f7ff" color="#1890ff" title={t('meeting.basicInfo', { defaultValue: '基本信息' })} />
+          <CardTitle icon={<HomeOutlined />} tone="info" title={t('meeting.basicInfo', { defaultValue: '基本信息' })} />
           <div style={gridStyle}>
             <Form.Item label={t('meeting.roomNo', { defaultValue: '會議室編號' })} name="roomNo"
-              rules={[{ required: true, message: '請填寫編號' }, { max: 32, message: '編號不得超過 32 字' }]}
-              extra={isEdit ? '編號為業務主鍵，不可修改' : t('meeting.eGMR1F', { defaultValue: '如 MR-1F-01' })}>
+              rules={[
+                { required: true, message: t('meeting.pleaseEnterRoomNo', { defaultValue: '請填寫編號' }) },
+                { max: 32, message: t('meeting.roomNoMaxLength', { defaultValue: '編號不得超過 32 字' }) },
+              ]}
+              extra={isEdit ? t('meeting.roomNoImmutableHint', { defaultValue: '編號為業務主鍵，不可修改' }) : t('meeting.eGMR1F', { defaultValue: '如 MR-1F-01' })}>
               <Input placeholder={t('meeting.eGMR1F', { defaultValue: '如 MR-1F-01' })} allowClear maxLength={32} disabled={isEdit || !canEdit || submitting} />
             </Form.Item>
             <Form.Item label={t('meeting.roomName', { defaultValue: '會議室名稱' })} name="roomName"
-              rules={[{ required: true, message: '請填寫名稱' }, { max: 64, message: '名稱不得超過 64 字' }]}>
+              rules={[
+                { required: true, message: t('meeting.pleaseEnterRoomName', { defaultValue: '請填寫名稱' }) },
+                { max: 64, message: t('meeting.roomNameMaxLength', { defaultValue: '名稱不得超過 64 字' }) },
+              ]}>
               <Input placeholder={t('meeting.eGGrandMeeting', { defaultValue: '如 大會議室' })} allowClear maxLength={64} />
             </Form.Item>
-            <Form.Item label={t('meeting.capacity', { defaultValue: '容納人數' })} name="capacity" rules={[{ required: true, message: '請填寫容納人數' }]}>
+            <Form.Item label={t('meeting.capacity', { defaultValue: '容納人數' })} name="capacity" rules={[{ required: true, message: t('meeting.pleaseEnterCapacity', { defaultValue: '請填寫容納人數' }) }]}>
               <InputNumber min={1} max={500} style={{ width: '100%' }} addonAfter={t('meeting.people', { defaultValue: '人' })} />
             </Form.Item>
             <Form.Item label={t('meeting.status', { defaultValue: '狀態' })} name="status" extra={t('meeting.roomsUnderMaintenanceTake', { defaultValue: '維護中不接受新預約' })}>
               <Select options={[
-                { value: 'active', label: '使用中' },
-                { value: 'maintenance', label: '維護中' },
-                { value: 'disabled', label: '已停用' },
+                { value: 'active', label: t('meeting.roomStatusActive', { defaultValue: '使用中' }) },
+                { value: 'maintenance', label: t('meeting.roomStatusMaintenance', { defaultValue: '維護中' }) },
+                { value: 'disabled', label: t('meeting.roomStatusDisabled', { defaultValue: '已停用' }) },
               ]} />
             </Form.Item>
             <Form.Item label={t('meeting.acceptBookings', { defaultValue: '接受預約' })} name="bookable" valuePropName="checked"
@@ -273,20 +269,20 @@ export default function MeetingRoomForm() {
 
         {/* 二、位置与设备 */}
         <div style={cardStyle}>
-          <CardTitle icon={<EnvironmentOutlined />} bg="#e6f7ff" color="#1890ff" title={t('meeting.locationFacilities', { defaultValue: '位置與設備' })}
+          <CardTitle icon={<EnvironmentOutlined />} tone="info" title={t('meeting.locationFacilities', { defaultValue: '位置與設備' })}
             note={t('meeting.usedByBookingFilters', { defaultValue: '位置用於預約頁篩選與門口指引' })} />
           <div style={gridStyle}>
-            <Form.Item label={t('meeting.campus', { defaultValue: '園區' })} name="campus" rules={[{ max: 64, message: '園區不得超過 64 字' }]}>
+            <Form.Item label={t('meeting.campus', { defaultValue: '園區' })} name="campus" rules={[{ max: 64, message: t('meeting.campusMaxLength', { defaultValue: '園區不得超過 64 字' }) }]}>
               <Input placeholder={t('meeting.eGHeadOffice', { defaultValue: '如 總部' })} allowClear maxLength={64} />
             </Form.Item>
-            <Form.Item label={t('meeting.building', { defaultValue: '樓棟' })} name="building" rules={[{ max: 64, message: '樓棟不得超過 64 字' }]}>
+            <Form.Item label={t('meeting.building', { defaultValue: '樓棟' })} name="building" rules={[{ max: 64, message: t('meeting.buildingMaxLength', { defaultValue: '樓棟不得超過 64 字' }) }]}>
               <Input placeholder={t('meeting.eGBuilding1', { defaultValue: '如 1 棟' })} allowClear maxLength={64} />
             </Form.Item>
-            <Form.Item label={t('meeting.floor', { defaultValue: '樓層' })} name="floorCode" rules={[{ max: 32, message: '樓層不得超過 32 字' }]}>
+            <Form.Item label={t('meeting.floor', { defaultValue: '樓層' })} name="floorCode" rules={[{ max: 32, message: t('meeting.floorMaxLength', { defaultValue: '樓層不得超過 32 字' }) }]}>
               <Input placeholder={t('meeting.eG1F', { defaultValue: '如 1F' })} allowClear maxLength={32} />
             </Form.Item>
           </div>
-          <Form.Item label={t('meeting.locationDescription', { defaultValue: '位置描述' })} name="locationDesc" rules={[{ max: 200, message: '位置描述不得超過 200 字' }]}>
+          <Form.Item label={t('meeting.locationDescription', { defaultValue: '位置描述' })} name="locationDesc" rules={[{ max: 200, message: t('meeting.locationDescMaxLength', { defaultValue: '位置描述不得超過 200 字' }) }]}>
             <Input placeholder={t('meeting.eGLeftOf', { defaultValue: '如 電梯左側／2 樓走廊盡頭' })} allowClear maxLength={200} />
           </Form.Item>
           <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
@@ -301,8 +297,10 @@ export default function MeetingRoomForm() {
 
         {/* 三、预约规则（留空=沿用全局默认） */}
         <div style={cardStyle}>
-          <CardTitle icon={<ClockCircleOutlined />} bg="#fff7e6" color="#fa8c16" title={t('meeting.bookingRules', { defaultValue: '預約規則' })}
-            note={record?.windowConfigured === false ? '目前全部沿用全局默認' : '留空即沿用全局默認'} />
+          <CardTitle icon={<ClockCircleOutlined />} tone="warn" title={t('meeting.bookingRules', { defaultValue: '預約規則' })}
+            note={record?.windowConfigured === false
+              ? t('meeting.windowAllGlobalNow', { defaultValue: '目前全部沿用全局默認' })
+              : t('meeting.windowBlankUsesGlobal', { defaultValue: '留空即沿用全局默認' })} />
           <div style={gridStyle}>
             <Form.Item label={t('meeting.dailyBookableStart', { defaultValue: '每日可預約開始' })} name="bookableStartTime" extra={t('meeting.emptyGlobal0800', { defaultValue: '留空＝全局 08:00' })}>
               <TimePicker format="HH:mm" minuteStep={15 as const} style={{ width: '100%' }} />
@@ -310,11 +308,11 @@ export default function MeetingRoomForm() {
             <Form.Item label={t('meeting.bookableUntil', { defaultValue: '每日可預約結束' })} name="bookableEndTime" extra={t('meeting.emptyGlobal2200', { defaultValue: '留空＝全局 22:00' })}>
               <TimePicker format="HH:mm" minuteStep={15 as const} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item label={t('meeting.minimumDuration', { defaultValue: '單場最短時長' })} name="minDuration" rules={[{ type: 'integer', min: 1, message: '最短時長需為正整數' }]}
+            <Form.Item label={t('meeting.minimumDuration', { defaultValue: '單場最短時長' })} name="minDuration" rules={[{ type: 'integer', min: 1, message: t('meeting.minDurationPositive', { defaultValue: '最短時長需為正整數' }) }]}
               extra={t('meeting.empty15MinuteGranularity', { defaultValue: '留空＝按 15 分鐘粒度' })}>
               <InputNumber min={1} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
-            <Form.Item label={t('meeting.maximumDuration', { defaultValue: '單場最長時長' })} name="maxDuration" rules={[{ type: 'integer', min: 1, message: '最長時長需為正整數' }]}
+            <Form.Item label={t('meeting.maximumDuration', { defaultValue: '單場最長時長' })} name="maxDuration" rules={[{ type: 'integer', min: 1, message: t('meeting.maxDurationPositive', { defaultValue: '最長時長需為正整數' }) }]}
               extra={t('meeting.emptyGlobal240Minutes', { defaultValue: '留空＝全局 240 分鐘' })}>
               <InputNumber min={1} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
@@ -323,7 +321,7 @@ export default function MeetingRoomForm() {
               <Switch checkedChildren={t('meeting.required2', { defaultValue: '需要' })} unCheckedChildren={t('meeting.notRequired', { defaultValue: '不需要' })} />
             </Form.Item>
             <Form.Item label={t('meeting.releaseAfterMinutes', { defaultValue: '未簽到釋放分鐘' })} name="releaseAfterMinutes"
-              rules={[{ type: 'integer', min: 1, message: '釋放分鐘需為正整數' }]} extra={t('meeting.emptyDefault15Minutes', { defaultValue: '留空＝默認 15 分鐘' })}>
+              rules={[{ type: 'integer', min: 1, message: t('meeting.releaseMinutesPositive', { defaultValue: '釋放分鐘需為正整數' }) }]} extra={t('meeting.emptyDefault15Minutes', { defaultValue: '留空＝默認 15 分鐘' })}>
               <InputNumber min={1} max={240} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} placeholder={t('meeting.default15', { defaultValue: '默認 15' })} />
             </Form.Item>
           </div>
@@ -331,13 +329,13 @@ export default function MeetingRoomForm() {
 
         {/* 四、房间管理员与备注 */}
         <div style={cardStyle}>
-          <CardTitle icon={<TeamOutlined />} bg="#f9f0ff" color="#722ed1" title={t('meeting.administratorRemark', { defaultValue: '管理員與備註' })} />
+          <CardTitle icon={<TeamOutlined />} tone="purple" title={t('meeting.administratorRemark', { defaultValue: '管理員與備註' })} />
           <Form.Item label={t('meeting.roomAdministrator', { defaultValue: '房間管理員' })} name="adminUserIds"
             extra={t('meeting.peopleWhoCanHandle', { defaultValue: '可代這間房處理現場問題的人（行政代訂讀取此列）' })}>
             <EmployeeSelect />
           </Form.Item>
           {/* 备注独占一整行（§C.4.1）：与其它字段并排时列宽变窄，三行装不下 200 字 */}
-          <Form.Item label={t('meeting.remark', { defaultValue: '備註' })} name="remark" rules={[{ max: 200, message: '備註不得超過 200 字' }]}>
+          <Form.Item label={t('meeting.remark', { defaultValue: '備註' })} name="remark" rules={[{ max: 200, message: t('meeting.remarkMaxLength', { defaultValue: '備註不得超過 200 字' }) }]}>
             <RemarkTextArea placeholder={t('meeting.eGAskAdmin', { defaultValue: '如 需行政開門、設備報修聯絡人' })} maxLength={200} />
           </Form.Item>
         </div>
@@ -346,8 +344,8 @@ export default function MeetingRoomForm() {
       {/* 底部操作栏（§C.5）：详情页/无权限时隐藏 */}
       {canEdit && (
         <div className="form-footer">
-          <Button onClick={handleBack}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={() => void handleSubmit()}>保存</Button>
+          <Button onClick={handleBack}>{t('common.cancel', { defaultValue: '取消' })}</Button>
+          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={() => void handleSubmit()}>{t('common.save', { defaultValue: '保存' })}</Button>
         </div>
       )}
     </div>

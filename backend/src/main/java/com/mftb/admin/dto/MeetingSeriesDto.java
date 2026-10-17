@@ -188,7 +188,10 @@ public final class MeetingSeriesDto {
         private String seriesNo;
         private Integer generatedCount;
         private Integer skippedCount;
+        /** 首场邀约是否真的进了投递队列（口径同单场预约，别拿它判场景是否启用） */
         private Boolean inviteQueued;
+        /** 通知场景已启用且绑定了可用企业应用（与本次是否真的投递无关） */
+        private Boolean scenarioActive;
         private Integer notifySkippedCount;
         private List<SkippedVO> skipped;
     }

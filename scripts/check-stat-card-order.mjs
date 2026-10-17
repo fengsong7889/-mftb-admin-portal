@@ -22,9 +22,11 @@ const QUIET = process.argv.includes('--quiet')
 const SEARCH_RE = /className=["'`]search-section/
 /** 组件顶层 return（本项目风格：缩进恰好 2 空格） */
 const TOP_RETURN_RE = /^  return\b/
-/** 统计卡片信号：专用组件 / 动效统计卡 hover / 计数动画 / 淡色指标底 */
+/** 统计卡片信号：专用组件 / 动效统计卡 hover / 计数动画 / 淡色指标底
+ * 组件名要同时兼容单数与复数后缀：历史上只写 `StatCard` 会漏掉 `<MeetingStatCards>`
+ * 这类命名，于是整个模块静默地不在门禁里（门禁给的是虚假安全感，比不过更糟）*/
 const STAT_SIGNAL_RE = new RegExp([
-  '<(?:StatCards?|[A-Za-z]*Stats|[A-Za-z]*StatCard|SummaryCards?|[A-Za-z]*OverviewCards?|[A-Za-z]*MetricCard)(?=[\\s/>])',
+  '<(?:StatCards?|[A-Za-z]*Stats?|[A-Za-z]*StatCards?|SummaryCards?|[A-Za-z]*OverviewCards?|[A-Za-z]*MetricCard)(?=[\\s/>])',
   '<Statistic(?=[\\s/>])',
   '<AnimatedNumber(?=[\\s/>])',
   'translateY\(-4px\)',

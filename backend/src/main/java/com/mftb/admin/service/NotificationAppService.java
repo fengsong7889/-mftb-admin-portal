@@ -41,11 +41,13 @@ public class NotificationAppService {
             CLAIM_SIGN,
             List.of("資產領用待簽署", "領用登記或重新發送簽署通知時", "領用人（已綁定釘釘用戶 ID）"),
             MEETING_INVITE,
-            List.of("會議邀約", "會議創建/改期/取消/参会人變更時", "必参与选参参会人（已綁定釘釘用戶 ID）"),
+            // 文案全站繁中，且必须读得通：「必参与选参参会人」是“必參与選參”两层意思拼坏了，
+            // 行政在通知配置页要靠这一列判断会发给谁
+            List.of("會議邀約", "會議建立/改期/取消/參會人變更時", "必參與會人與選參與會人（已綁定釘釘用戶 ID）"),
             MEETING_REMIND,
-            List.of("會議開始前提醒", "會議開始前 N 分鐘由定时作业触发（同一场会只发一次）", "必参与选参参会人与组织者"),
+            List.of("會議開始前提醒", "會議開始前 N 分鐘由定時作業觸發（同一場會只發一次）", "必參與會人與選參與會人及組織者"),
             MEETING_OPS,
-            List.of("會議室釋放告知", "超时未签到自动释放或行政手动释放时", "會議组织者"));
+            List.of("會議室釋放告知", "超時未簽到自動釋放或行政手動釋放時", "會議組織者"));
 
     public List<View> list(String name, Boolean enabled) {
         List<ScenarioView> scenarios = scenarios();

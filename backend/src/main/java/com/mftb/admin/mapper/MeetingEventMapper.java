@@ -33,4 +33,14 @@ public interface MeetingEventMapper extends BaseMapper<MeetingEvent> {
     @Select("SELECT COUNT(*) FROM biz_meeting_event WHERE operator_id = #{operatorId} "
             + "AND request_key = #{requestKey}")
     int countByIdempotencyKey(@Param("operatorId") long operatorId, @Param("requestKey") String requestKey);
+
+    /**
+     * 全站级变更的最近一条轨迹（预约规则页的「最后更新人/时间」）。
+     *
+     * <p>为什么从审计表取而不是 sys_config：后者是通用 key-value 表，没有 updated_by 列，
+     * 而规则页要回答的是“谁改的”而不是“什么时候写过行”；审计表本来就是这个事实的唯一来源。
+     */
+    @Select("SELECT * FROM biz_meeting_event WHERE target_no = #{targetNo} AND event_code = #{eventCode} "
+            + "ORDER BY occurred_at DESC, id DESC LIMIT 1")
+    MeetingEvent findLatestByTarget(@Param("targetNo") String targetNo, @Param("eventCode") String eventCode);
 }

@@ -39,8 +39,9 @@ interface Loaded { id: number; name: string; empId?: string; department?: string
 interface Option { value: number; label: ReactNode }
 
 export default function EmployeeSelect({
-  value, onChange, placeholder = '搜尋姓名或工號', excludeIds = [], maxTagCount = 6, disabled, single, onPick,
+  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick,
 }: Props) {
+  const { t } = useTranslation()
   const [options, setOptions] = useState<Option[]>([])
   const [fetching, setFetching] = useState(false)
   /** 已选中但不在当前搜索结果里的人要留档，否则一次搜索就把之前选的人从选项里挤掉 */
@@ -93,7 +94,7 @@ export default function EmployeeSelect({
       mode={single ? undefined : 'multiple'}
       allowClear
       disabled={disabled}
-      placeholder={placeholder}
+      placeholder={placeholder ?? t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
       value={single ? value?.[0] : value}
       onChange={next => {
         // 单选清空时回空数组而不是 [undefined]：调用方按"有没有值"判断，不该看到 length=1 的空项

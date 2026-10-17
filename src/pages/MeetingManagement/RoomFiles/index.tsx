@@ -44,10 +44,11 @@ const MENU = 'meeting-room'
 const EMPTY_STATS: MeetingRoomStats = { total: 0, active: 0, bookable: 0, seatsTotal: 0 }
 
 /** 状态筛选项：与后端 MeetingConstants.ROOM_* 逐字对齐 */
-const STATUS_OPTIONS = [
-  { value: 'active', label: '使用中' },
-  { value: 'maintenance', label: '維護中' },
-  { value: 'disabled', label: '已停用' },
+// 必须是函数而不是模块级常量：模块级 t() 在 import 那一刻就冻结了语言，切英文后选项仍是中文
+const STATUS_OPTIONS = (t: TFunction) => [
+  { value: 'active', label: t('meeting.roomStatusActive', { defaultValue: '使用中' }) },
+  { value: 'maintenance', label: t('meeting.roomStatusMaintenance', { defaultValue: '維護中' }) },
+  { value: 'disabled', label: t('meeting.roomStatusDisabled', { defaultValue: '已停用' }) },
 ]
 
 /** 列配置元数据（§E.3）：编号锁头、操作锁尾，其余列行政可自行显隐与排序 */
@@ -57,12 +58,12 @@ const COLUMN_META = (t: TFunction) => [
   { key: 'locationText', title: t('meeting.location', { defaultValue: '位置' }) },
   { key: 'capacity', title: t('meeting.capacity2', { defaultValue: '容納' }) },
   { key: 'facilities', title: t('meeting.facilities', { defaultValue: '設備' }) },
-  { key: 'bookableWindow', title: '可預約窗' },
-  { key: 'duration', title: '單場時長' },
+  { key: 'bookableWindow', title: t('meeting.colBookableWindow', { defaultValue: '可預約窗' }) },
+  { key: 'duration', title: t('meeting.colDurationPerSession', { defaultValue: '單場時長' }) },
   { key: 'status', title: t('meeting.status', { defaultValue: '狀態' }) },
   { key: 'bookable', title: t('meeting.acceptBookings', { defaultValue: '接受預約' }) },
-  { key: 'hideTitle', title: '主題脫敏' },
-  { key: 'updatedAt', title: '最後更新' },
+  { key: 'hideTitle', title: t('meeting.colHideTopic', { defaultValue: '主題脫敏' }) },
+  { key: 'updatedAt', title: t('meeting.colLastUpdated', { defaultValue: '最後更新' }) },
   { key: 'action', title: t('meeting.actions', { defaultValue: '操作' }) },
 ]
 
@@ -98,7 +99,7 @@ export default function RoomFiles() {
       setTotal(res.page?.total ?? 0)
       setStats(res.stats ?? EMPTY_STATS)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加載失敗')
+      setError(e instanceof Error ? e.message : t('common.loadFailed', { defaultValue: '加載失敗，請重試' }))
     } finally {
       setLoading(false)
     }
@@ -151,20 +152,27 @@ export default function RoomFiles() {
   /** 停用/启用（§B.8）：Switch 不直接调接口，先二次确认——停用会让房间立刻从预约页消失 */
   const handleToggleBookable = (record: MeetingRoomVO, checked: boolean) => {
     if (!canEdit) return
-    const actionText = checked ? t('meeting.enable', { defaultValue: '啟用' }) : t('meeting.disable', { defaultValue: '停用' })
+    const actionText = checked ? t('common.enable', { defaultValue: '啟用' }) : t('common.disable', { defaultValue: '停用' })
     Modal.confirm({
-      title: `確定要${actionText}「${record.roomName}」的預約嗎？`,
+      title: t('meeting.confirmToggleBooking', {
+        action: actionText, name: record.roomName,
+        defaultValue: `確定要${actionText}「${record.roomName}」的預約嗎？`,
+      }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: t('meeting.confirm', { defaultValue: '確認' }),
-      cancelText: t('meeting.cancel', { defaultValue: '取消' }),
+      okText: t('common.confirm', { defaultValue: '確認' }),
+      cancelText: t('common.cancel', { defaultValue: '取消' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomNo} · {record.roomName}</b></div>
-          <div className="confirm-info-row"><span>容納人數：</span><b>{record.capacity} 人</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomNo} · {record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelCapacity', { defaultValue: '容納人數：' })}</span><b>{t('meeting.headcount', { count: record.capacity, defaultValue: '{{count}} 人' })}</b></div>
           <div className="confirm-info-row">
-            <span>{checked ? '啟用後：' : '停用後：'}</span>
-            <b>{checked ? '該房間重新出現在預約頁可訂列表' : '該房間不再接受新預約，已存在的會議不受影響'}</b>
+            <span>{checked
+              ? t('meeting.afterEnable', { defaultValue: '啟用後：' })
+              : t('meeting.afterDisable', { defaultValue: '停用後：' })}</span>
+            <b>{checked
+              ? t('meeting.afterEnableEffect', { defaultValue: '該房間重新出現在預約頁可訂列表' })
+              : t('meeting.afterDisableEffect', { defaultValue: '該房間不再接受新預約，已存在的會議不受影響' })}</b>
           </div>
         </div>
       ),
@@ -173,7 +181,7 @@ export default function RoomFiles() {
           status: checked ? 'active' : 'disabled',
           version: record.version,
         })
-        message.success(`已${actionText}預約`)
+        message.success(t('meeting.bookingToggleDone', { action: actionText, defaultValue: `已${actionText}預約` }))
         void load()
       },
     })
@@ -183,19 +191,19 @@ export default function RoomFiles() {
   const handleDelete = (record: MeetingRoomVO) => {
     let reason = ''
     Modal.confirm({
-      title: `確定要刪除「${record.roomName}」嗎？`,
+      title: t('meeting.confirmDeleteRoom', { name: record.roomName, defaultValue: `確定要刪除「${record.roomName}」嗎？` }),
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      okText: '確認刪除',
+      okText: t('common.confirmDelete', { defaultValue: '確認刪除' }),
       okButtonProps: { danger: true },
-      cancelText: t('meeting.cancel', { defaultValue: '取消' }),
+      cancelText: t('common.cancel', { defaultValue: '取消' }),
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>會議室：</span><b>{record.roomNo} · {record.roomName}</b></div>
-          <div className="confirm-info-row"><span>刪除方式：</span><b>邏輯刪除，歷史會議仍保留房間快照</b></div>
-          <div className="confirm-info-row"><span>限制：</span><b>存在未結束預約時無法刪除，請先取消或改期</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomNo} · {record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelDeleteMode', { defaultValue: '刪除方式：' })}</span><b>{t('meeting.deleteModeValue', { defaultValue: '邏輯刪除，歷史會議仍保留房間快照' })}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelLimit', { defaultValue: '限制：' })}</span><b>{t('meeting.deleteLimitValue', { defaultValue: '存在未結束預約時無法刪除，請先取消或改期' })}</b></div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>刪除原因（必填）</div>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.deleteReasonRequired', { defaultValue: '刪除原因（必填）' })}</div>
             <Input.TextArea
               rows={3}
               maxLength={200}
@@ -209,12 +217,12 @@ export default function RoomFiles() {
       ),
       onOk: async () => {
         if (!reason.trim()) {
-          message.warning('請填寫刪除原因')
+          message.warning(t('meeting.pleaseEnterDeleteReason', { defaultValue: '請填寫刪除原因' }))
           // 抛出以阻止弹窗关闭：原因没填就放行，等于允许无凭据删除
           throw new Error('reason required')
         }
         await deleteMeetingRoom(record.id, { reason: reason.trim(), version: record.version })
-        message.success('會議室已刪除')
+        message.success(t('meeting.roomDeleted', { defaultValue: '會議室已刪除' }))
         void load()
       },
     })
@@ -231,28 +239,31 @@ export default function RoomFiles() {
         </Tooltip>
       ),
     },
-    { title: t('meeting.capacity2', { defaultValue: '容納' }), dataIndex: 'capacity', key: 'capacity', width: 80, render: (v: number) => `${v} 人` },
+    { title: t('meeting.capacity2', { defaultValue: '容納' }), dataIndex: 'capacity', key: 'capacity', width: 80, render: (v: number) => t('meeting.headcount', { count: v, defaultValue: '{{count}} 人' }) },
     {
       title: t('meeting.facilities', { defaultValue: '設備' }), dataIndex: 'facilities', key: 'facilities', width: 200,
       render: (list: string[]) => (list.length
         ? <Space size={4} wrap>{list.map(code => <Tag key={code}>{facilityLabels()[code] ?? code}</Tag>)}</Space>
-        : <span style={{ color: '#BFBFBF' }}>無</span>),
+        : <span style={{ color: '#BFBFBF' }}>{t('meeting.none', { defaultValue: '無' })}</span>),
     },
     {
-      title: '可預約窗', key: 'bookableWindow', width: 150,
+      title: t('meeting.colBookableWindow', { defaultValue: '可預約窗' }), key: 'bookableWindow', width: 150,
       render: (_, record) => (record.bookableStartTime || record.bookableEndTime
         ? `${record.bookableStartTime ?? '08:00'}–${record.bookableEndTime ?? '22:00'}`
         // 两个都留空时必须显式说明来源，否则行政无法判断该改房间还是改全局规则
         : <Tooltip title={t('meeting.notSetGlobalDefault', { defaultValue: '未單獨配置，沿用全局默認 08:00–22:00' })}>
-          <span style={{ color: '#8C8C8C' }}>全局默認</span>
+          <span style={{ color: '#8C8C8C' }}>{t('meeting.globalDefault', { defaultValue: '全局默認' })}</span>
         </Tooltip>),
     },
     {
-      title: '單場時長', key: 'duration', width: 130,
+      title: t('meeting.colDurationPerSession', { defaultValue: '單場時長' }), key: 'duration', width: 130,
       render: (_, record) => (record.minDuration != null || record.maxDuration != null
-        ? `${record.minDuration ?? '-'} ~ ${record.maxDuration ?? '-'} 分鐘`
+        ? t('meeting.durationRange', {
+          min: record.minDuration ?? '-', max: record.maxDuration ?? '-',
+          defaultValue: `${record.minDuration ?? '-'} ~ ${record.maxDuration ?? '-'} 分鐘`,
+        })
         : <Tooltip title={t('meeting.notSetGlobalDefault2', { defaultValue: '未單獨配置，沿用全局默認（最長 240 分鐘）' })}>
-          <span style={{ color: '#8C8C8C' }}>全局默認</span>
+          <span style={{ color: '#8C8C8C' }}>{t('meeting.globalDefault', { defaultValue: '全局默認' })}</span>
         </Tooltip>),
     },
     {
@@ -266,7 +277,8 @@ export default function RoomFiles() {
       title: t('meeting.acceptBookings', { defaultValue: '接受預約' }), dataIndex: 'bookable', key: 'bookable', width: 110,
       render: (_, record) => (
         // 维护中的房间由状态位决定不可预约，开关置灰并说明原因，避免"点了没反应"
-        <Tooltip title={record.status === 'maintenance' ? '維護中的會議室不接受預約，請先恢復狀態' : ''}>
+        <Tooltip title={record.status === 'maintenance'
+          ? t('meeting.maintenanceRoomNotBookable', { defaultValue: '維護中的會議室不接受預約，請先恢復狀態' }) : ''}>
           <Switch
             checked={record.bookable && record.status !== 'maintenance'}
             checkedChildren={t('meeting.enable', { defaultValue: '啟用' })}
@@ -278,13 +290,13 @@ export default function RoomFiles() {
       ),
     },
     {
-      title: '主題脫敏', dataIndex: 'hideTitle', key: 'hideTitle', width: 110,
+      title: t('meeting.colHideTopic', { defaultValue: '主題脫敏' }), dataIndex: 'hideTitle', key: 'hideTitle', width: 110,
       render: (v: boolean) => (v
         ? <Tooltip title={t('meeting.othersSeeTheSlot', { defaultValue: '他人在忙閒視圖只看到「已佔用」，不顯示主題與組織者' })}><Tag color="orange">{t('meeting.hidden', { defaultValue: '脫敏' })}</Tag></Tooltip>
         : <span style={{ color: '#BFBFBF' }}>{t('meeting.public', { defaultValue: '公開' })}</span>),
     },
     {
-      title: '最後更新', key: 'updatedAt', width: 190,
+      title: t('meeting.colLastUpdated', { defaultValue: '最後更新' }), key: 'updatedAt', width: 190,
       render: (_, record) => (
         <span style={{ fontSize: 12, color: '#8C8C8C' }}>
           {record.updatedAt ?? '-'}
@@ -299,9 +311,9 @@ export default function RoomFiles() {
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" disabled={!canEdit}
-            onClick={() => navigate(`/meeting-room-form?id=${record.id}`)}>編輯</Button>
+            onClick={() => navigate(`/meeting-room-form?id=${record.id}`)}>{t('common.edit', { defaultValue: '編輯' })}</Button>
           <Button type="link" size="small" danger disabled={!canEdit}
-            onClick={() => handleDelete(record)}>刪除</Button>
+            onClick={() => handleDelete(record)}>{t('common.delete', { defaultValue: '刪除' })}</Button>
         </Space>
       ),
     },
@@ -314,8 +326,8 @@ export default function RoomFiles() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="會議室檔案全員可查，僅行政可新增與修改"
-        description="「可預約窗」與「單場時長」留空表示沿用全局默認規則；需要單獨調整某間房時，在編輯頁填入即以房間配置為準。停用的房間不再接受新預約，歷史會議不受影響。"
+        message={t('meeting.roomFilesBanner', { defaultValue: '會議室檔案全員可查，僅行政可新增與修改' })}
+        description={t('meeting.roomFilesBannerDesc', { defaultValue: '「可預約窗」與「單場時長」留空表示沿用全局默認規則；需要單獨調整某間房時，在編輯頁填入即以房間配置為準。停用的房間不再接受新預約，歷史會議不受影響。' })}
       />
 
       {error && (
@@ -353,7 +365,7 @@ export default function RoomFiles() {
             <Select mode="multiple" placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }} options={facilityOptions()} />
           </Form.Item>
           <Form.Item label={t('meeting.status', { defaultValue: '狀態' })} name="status">
-            <Select placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }} options={STATUS_OPTIONS} />
+            <Select placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }} options={STATUS_OPTIONS(t)} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -366,17 +378,17 @@ export default function RoomFiles() {
 
       {/* 统计卡片：必须在搜索区之后（§E.8），口径由服务端按当前筛选条件返回 */}
       <MeetingStatCards key={filterKey} loading={loading} items={[
-        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: stats.total, label: '會議室總數', hint: '隨當前篩選條件變化' },
-        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.active, label: '使用中' },
+        { icon: <HomeOutlined />, color: '#1890FF', bg: '#E6F7FF', value: stats.total, label: t('meeting.totalRoomsLabel', { defaultValue: '會議室總數' }), hint: t('meeting.followsCurrentFilters', { defaultValue: '隨篩選條件變化' }) },
+        { icon: <CheckCircleOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.active, label: t('meeting.roomStatusActive', { defaultValue: '使用中' }) },
         { icon: <CalendarOutlined />, color: '#E8720C', bg: '#FFF7E6', value: stats.bookable, label: t('meeting.acceptBookings', { defaultValue: '接受預約' }) },
-        { icon: <TeamOutlined />, color: '#722ED1', bg: '#F9F0FF', value: stats.seatsTotal, label: '總座位數' },
+        { icon: <TeamOutlined />, color: '#722ED1', bg: '#F9F0FF', value: stats.seatsTotal, label: t('meeting.totalSeatsLabel', { defaultValue: '總座位數' }) },
       ]} />
 
       {/* 操作区（§E.2）：右侧只放「新增」与列配置 */}
       <div className="action-section">
         <div className="action-section-left" />
         <div className="action-section-right">
-          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/meeting-room-form')}>新增會議室</Button>}
+          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/meeting-room-form')}>{t('meeting.addMeetingRoom', { defaultValue: '新增會議室' })}</Button>}
           {configComponent}
         </div>
       </div>
@@ -395,7 +407,7 @@ export default function RoomFiles() {
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
-          showTotal: t => `共 ${t} 間`,
+          showTotal: count => t('meeting.totalRooms', { count, defaultValue: '共 {{count}} 間' }),
           // pageSize 变化必须回到第 1 页，否则会停在一个可能不存在的页码上
           onChange: (page, size) => setQuery(q => ({ ...q, page: size !== q.size ? 1 : page, size: size || 20 })),
         }}

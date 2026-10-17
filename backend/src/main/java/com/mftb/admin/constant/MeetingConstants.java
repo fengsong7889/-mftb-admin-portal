@@ -129,8 +129,20 @@ public final class MeetingConstants {
     public static final String RESPOND_DECLINED = "declined";
     public static final String RESPOND_INVALID = "invalid";
 
+    /**
+     * 投递态有两套词表，不能合为一个常量：
+     * <ul>
+     *   <li>{@code biz_meeting_notify_log.send_status}：pending/sending/{@link #NOTIFY_SUCCESS}/skipped/failed；</li>
+     *   <li>{@code biz_meeting_attendee.notify_status}：pending/{@link #NOTIFY_SENT}/skipped/failed，
+     *       DDL 的 ck_meeting_attendee_notify 不接受 {@code success}，回写时必须翻译成 sent。</li>
+     * </ul>
+     * pending/skipped/failed 三个值两边同字，因此共用下面的常量。
+     */
     public static final String NOTIFY_PENDING = "pending";
+    /** 参会人行的「已送達」（与 log 表的 success 同义，词表不同） */
     public static final String NOTIFY_SENT = "sent";
+    /** 投递留痕行的「渠道已受理」 */
+    public static final String NOTIFY_SUCCESS = "success";
     public static final String NOTIFY_SKIPPED = "skipped";
     public static final String NOTIFY_FAILED = "failed";
 

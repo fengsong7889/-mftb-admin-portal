@@ -44,6 +44,19 @@ public interface MeetingAttendeeMapper extends BaseMapper<MeetingAttendee> {
             + "AND a.attendee_type <> 'organizer' AND b.status = 'booked' AND b.start_time > NOW()")
     int countPendingResponse(@Param("userId") long userId);
 
+    /**
+     * 我名下待响应的邀约单号（「待我響應」Tab 的行级范围）。
+     *
+     * <p>WHERE 必须与 {@link #countPendingResponse} 逐字一致：同一个概念在徽标数字与列表内容
+     * 上算出两套口径，用户就会看到「待我響應 0」却能在 Tab 里看到一条自己组织的会。
+     * 排除 organizer 行是故意的：组织者不需要响应自己的邀约（响应落库时直接就是已接受）。
+     */
+    @Select("SELECT a.booking_id FROM biz_meeting_attendee a JOIN biz_meeting_booking b "
+            + "ON b.id = a.booking_id AND b.deleted = 0 "
+            + "WHERE a.deleted = 0 AND a.user_id = #{userId} AND a.response = 'pending' "
+            + "AND a.attendee_type <> 'organizer' AND b.status = 'booked' AND b.start_time > NOW()")
+    List<Long> findPendingResponseBookingIds(@Param("userId") long userId);
+
     /** 某场会的参会人数（详情页待办徽标与 attendee_count 对账用） */
     @Select("SELECT COUNT(*) FROM biz_meeting_attendee WHERE deleted = 0 AND booking_id = #{bookingId}")
     int countByBooking(@Param("bookingId") long bookingId);

@@ -56,8 +56,8 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
     private static final int MAX_OPTION_ROOMS = 200;
 
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
-    /** 脱敏房间的占用标题：只说"占了"，不说"谁在开什么会" */
-    private static final String OCCUPIED_LABEL = "已占用";
+    /** 脱敏房间的占用标题：只说"占了"，不说"谁在开什么会"（全系统文案用繁中，与忙闲图例的"已佔 n 段"同源） */
+    private static final String OCCUPIED_LABEL = "已佔用";
 
     private final MeetingRoomMapper roomMapper;
     private final MeetingBookingMapper bookingMapper;
@@ -178,9 +178,10 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
                 .eq(MeetingRoom::getId, id)
                 .eq(MeetingRoom::getVersion, requireVersion(change.getVersion()))
                 .set(MeetingRoom::getStatus, status)
-                // 停用与维护中的房间不再接受新预约，避免"状态停用却还能被订走"
-                .set(MeetingRoom::getBookable, MeetingConstants.ROOM_ACTIVE.equals(status)
-                        ? Objects.requireNonNullElse(before.getBookable(), 1) : 0)
+                // 不联动改写 bookable：可预约性的唯一口径是 isBookable()（bookable=1 且 status=active），
+                // 预约校验（MeetingRuleService）与忙闲过滤也各自双条件卡住，停用状态天然订不出去。
+                // 而在这里顺手清零，等于把「行政原本是否允许预约」这个意愿抹掉：
+                // 停用→启用一次就把 bookable 永久留在 0，房间从预约页彻底消失且再也点不回来。
                 .set(MeetingRoom::getUpdatedBy, current.getName())
                 .setSql("version = version + 1"));
         if (affected == 0) {
@@ -407,14 +408,25 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         return room;
     }
 
-    /** 表单 → 实体：只搬档案与规则列，审计列与预留列由服务端决定 */
+    /**
+     * 表单 → 实体：只搬档案与规则列，审计列与预留列由服务端决定。
+     *
+     * <p>空值口径按列的 DDL 分两类，不能一刀切：
+     * <ul>
+     *   <li>档案列（园区/楼栋/楼层/位置/设备/管理员）DDL 是 {@code NOT NULL DEFAULT ''}，
+     *       而 update 逐列显式 set（见 {@link #update}），实体里留 null 就会被写成 null 撞约束，
+     *       表现为「行政什么都没改、点保存就报数据库异常」。这类列一律落空串。</li>
+     *   <li>规则列（可预约窗/时长上下限/未签到释放分钟）用 NULL 表达「本房间未单独配置、回落全局」，
+     *       是业务语义而不是缺失值，必须保持 null。</li>
+     * </ul>
+     */
     private void applyForm(MeetingRoom room, MeetingRoomDto.Form form) {
         room.setRoomNo(form.getRoomNo().trim());
         room.setRoomName(form.getRoomName().trim());
-        room.setCampus(trim(form.getCampus()));
-        room.setBuilding(trim(form.getBuilding()));
-        room.setFloorCode(trim(form.getFloorCode()));
-        room.setLocationDesc(trim(form.getLocationDesc()));
+        room.setCampus(emptyToBlank(form.getCampus()));
+        room.setBuilding(emptyToBlank(form.getBuilding()));
+        room.setFloorCode(emptyToBlank(form.getFloorCode()));
+        room.setLocationDesc(emptyToBlank(form.getLocationDesc()));
         room.setCapacity(form.getCapacity());
         room.setFacilities(wrapCodes(form.getFacilities()));
         room.setPhotoUrls(form.getPhotoUrls() == null || form.getPhotoUrls().isEmpty()
@@ -565,14 +577,14 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
                 .collect(Collectors.joining(" · "));
     }
 
-    /** 设备列格式：,CODE,CODE,；空集合落 NULL，避免库里留下只剩一个逗号的"有值但无意义" */
+    /** 设备列格式：,CODE,CODE,；无设备落空串（列是 NOT NULL DEFAULT ''，落 null 会撞约束） */
     private static String wrapCodes(List<String> codes) {
         if (codes == null || codes.isEmpty()) {
-            return null;
+            return "";
         }
         String joined = codes.stream().filter(StringUtils::hasText).map(String::trim).distinct()
                 .collect(Collectors.joining(","));
-        return joined.isEmpty() ? null : "," + joined + ",";
+        return joined.isEmpty() ? "" : "," + joined + ",";
     }
 
     private static List<String> parseFacilities(String column) {
@@ -586,13 +598,14 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
                 .toList();
     }
 
+    /** 管理员列格式：,ID,ID,；无人管理落空串（同上：列 NOT NULL，且清空管理员是正当操作，不能变成保存失败） */
     private static String wrapIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
-            return null;
+            return "";
         }
         String joined = ids.stream().filter(Objects::nonNull).distinct()
                 .map(String::valueOf).collect(Collectors.joining(","));
-        return joined.isEmpty() ? null : "," + joined + ",";
+        return joined.isEmpty() ? "" : "," + joined + ",";
     }
 
     private static List<Long> parseIds(String column) {
@@ -638,5 +651,10 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
 
     private static String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    /** 档案列专用：null 与空串一律归一成空串，与 DDL 的 {@code NOT NULL DEFAULT ''} 对齐 */
+    private static String emptyToBlank(String value) {
+        return value == null ? "" : value.trim();
     }
 }

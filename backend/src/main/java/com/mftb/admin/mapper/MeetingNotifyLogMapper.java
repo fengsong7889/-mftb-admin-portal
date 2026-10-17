@@ -95,12 +95,19 @@ public interface MeetingNotifyLogMapper extends BaseMapper<MeetingNotifyLog> {
     List<MeetingNotifyLog> findByBooking(@Param("bookingId") long bookingId);
 
     /**
-     * 邀约场景下未送达人数（详情页顶部提示「N 人未收到邀約」）。
+     * 邀约场景下未送达的<b>人数</b>（详情页顶部提示「N 人未收到邀約」）。
      *
      * <p>只统计 meeting_invite：提醒与告知类通知本来就不发给个别人（未绑定钉钉等），
      * 把它们混进来会让组织者误以为「邀约没发出去」。
+     *
+     * <p>必须按人算而不是按留痕行算：一个人同时有「建立」与「取消」两条 skipped 记录时，
+     * 数行会得到「2 人未收到」而实际只有 1 人（现场踩过）。同理，只要他有过一条成功投递，
+     * 就不能再说没收到。
      */
-    @Select("SELECT COUNT(*) FROM biz_meeting_notify_log WHERE deleted = 0 AND booking_id = #{bookingId} "
-            + "AND scenario = 'meeting_invite' AND send_status = 'skipped'")
+    @Select("SELECT COUNT(*) FROM ("
+            + "SELECT receiver_user_id FROM biz_meeting_notify_log "
+            + "WHERE deleted = 0 AND booking_id = #{bookingId} AND scenario = 'meeting_invite' "
+            + "AND receiver_user_id IS NOT NULL GROUP BY receiver_user_id "
+            + "HAVING SUM(send_status = 'skipped') > 0 AND SUM(send_status = 'success') = 0) unpaid")
     int countInviteSkipped(@Param("bookingId") long bookingId);
 }

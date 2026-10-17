@@ -2,7 +2,9 @@ package com.mftb.admin.service.impl;
 
 import com.mftb.admin.common.BusinessException;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingBookingDto;
 import com.mftb.admin.entity.MeetingAttendee;
@@ -551,5 +553,130 @@ class MeetingBookingSecurityTest {
 
         assertEquals(0L, result.getPage().getTotal().longValue());
         verify(bookingMapper, never()).selectPage(any(), any());
+    }
+
+    @Test
+    @DisplayName("respond=pending 只看我未响应的邀约：没有待办时直接空页，不再打全量列表")
+    void respondPendingShortCircuitsWhenNothingPending() {
+        when(attendeeMapper.findBookingIdsByUser(ORGANIZER.getId())).thenReturn(List.of(5L, 6L));
+        when(attendeeMapper.findPendingResponseBookingIds(ORGANIZER.getId())).thenReturn(List.of());
+        MeetingBookingDto.Query query = new MeetingBookingDto.Query();
+        query.setScope("attended");
+        query.setRespond("pending");
+
+        MeetingBookingDto.PageWithStats result = service.listWithStats(query);
+
+        assertEquals(0L, result.getPage().getTotal().longValue());
+        assertEquals(0L, result.getStats().getTotal());
+        verify(bookingMapper, never()).selectPage(any(), any());
+    }
+
+    @Test
+    @DisplayName("未知响应筛选值被拒：静默回落成不筛，等于把参数写错变成全量列表")
+    void unknownRespondValueIsRejected() {
+        MeetingBookingDto.Query query = new MeetingBookingDto.Query();
+        query.setRespond("accepted");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.listWithStats(query));
+        assertTrue(ex.getMessage().contains("不支持的響應篩選"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("行政视野下 respond=pending 仍只看自己的邀约：响应是替自己表态，不是行政职权")
+    void respondPendingStaysPersonalForAdmin() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canSeeAll(ADMIN)).thenReturn(true);
+        when(attendeeMapper.findPendingResponseBookingIds(ADMIN.getId())).thenReturn(List.of(7L));
+        Page<MeetingBooking> page = new Page<>(1, 20);
+        page.setRecords(List.of());
+        when(bookingMapper.selectPage(any(), any())).thenReturn(page);
+        MeetingBookingDto.Query query = new MeetingBookingDto.Query();
+        query.setScope("all");
+        query.setRespond("pending");
+
+        service.listWithStats(query);
+
+        ArgumentCaptor<LambdaQueryWrapper<MeetingBooking>> captor = ArgumentCaptor.captor();
+        verify(bookingMapper).selectPage(any(), captor.capture());
+        // 行政视野本来是 Scope(null, null)（不限行），响应筛选必须把行范围换成自己的待响应名单
+        assertTrue(captor.getValue().getTargetSql().contains("id IN"), captor.getValue().getTargetSql());
+    }
+
+    @Test
+    @DisplayName("统计卡与列表同口径：status 与 group 也要进统计条件（AGENTS.md §E.8）")
+    void statsFollowStatusAndGroupFilters() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canSeeAll(ADMIN)).thenReturn(true);
+        Page<MeetingBooking> page = new Page<>(1, 20);
+        page.setRecords(List.of());
+        when(bookingMapper.selectPage(any(), any())).thenReturn(page);
+        MeetingBookingDto.Query query = new MeetingBookingDto.Query();
+        query.setScope("all");
+        query.setStatus("cancelled");
+        query.setGroup("done");
+
+        service.listWithStats(query);
+
+        ArgumentCaptor<String> statusCaptor = ArgumentCaptor.captor();
+        ArgumentCaptor<String> groupCaptor = ArgumentCaptor.captor();
+        // 旧版本这两个位置永远传 null：筛“已取消”得 13 条而卡片还写 17 条，
+        // 「隨當前篩選條件变化」就是个假承诺
+        verify(bookingMapper).countByStatus(any(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                statusCaptor.capture(), groupCaptor.capture(), isNull(), isNull(), isNull());
+        assertEquals("cancelled", statusCaptor.getValue());
+        assertEquals("done", groupCaptor.getValue());
+    }
+
+    /* ==================== 邀约投递契约 ==================== */
+
+    @Test
+    @DisplayName("场景已启用但没人可发：inviteQueued=false 而 scenarioActive=true")
+    void createWithoutReceiversStillReportsScenarioActive() {
+        // 只选了自己一人（没传参会人）时 enqueue 不建留痕行，queued/skipped 全为 0；
+        // 旧契约只有 inviteQueued 一个字段，前端把它读成“场景未启用”，行政会被引去乱改通知配置
+        when(userMapper.selectList(any())).thenReturn(List.of());
+        MeetingNotifyDispatcher.EnqueueResult nothing = mock(MeetingNotifyDispatcher.EnqueueResult.class);
+        when(nothing.isScenarioActive()).thenReturn(true);
+        when(nothing.getQueued()).thenReturn(0);
+        when(nothing.getSkipped()).thenReturn(0);
+        when(notifyDispatcher.enqueue(any(), any(), any(), any(), any())).thenReturn(nothing);
+        MeetingBookingDto.CreateForm form = createForm("k-no-receiver");
+        form.setAttendeeUserIds(List.of());
+
+        MeetingBookingDto.CreateResult result = service.create(form);
+
+        assertEquals(Boolean.TRUE, result.getScenarioActive());
+        assertEquals(Boolean.FALSE, result.getInviteQueued());
+        assertEquals(0, result.getNotifySkippedCount());
+    }
+
+    @Test
+    @DisplayName("场景真未启用时 scenarioActive=false：这是前端唯一能据此提示「去启用场景」的口径")
+    void createReportsScenarioInactive() {
+        MeetingNotifyDispatcher.EnqueueResult off = mock(MeetingNotifyDispatcher.EnqueueResult.class);
+        when(off.isScenarioActive()).thenReturn(false);
+        when(notifyDispatcher.enqueue(any(), any(), any(), any(), any())).thenReturn(off);
+
+        MeetingBookingDto.CreateResult result = service.create(createForm("k-scenario-off"));
+
+        assertEquals(Boolean.FALSE, result.getScenarioActive());
+        assertEquals(Boolean.FALSE, result.getInviteQueued());
+    }
+
+    @Test
+    @DisplayName("幂等重放不重新登记投递，但场景状态必须回查当前配置而不是写死 false")
+    void replayReportsLiveScenarioState() {
+        MeetingBooking existing = booking(79L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        existing.setRequestKey("k-idem2");
+        MeetingBookingDto.CreateForm form = createForm("k-idem2");
+        existing.setRequestHash(hashOf(form));
+        when(bookingMapper.findByIdempotencyKey(ORGANIZER.getId(), "k-idem2")).thenReturn(existing);
+        when(notifyDispatcher.scenarioActive(MeetingConstants.SCENARIO_INVITE)).thenReturn(true);
+
+        MeetingBookingDto.CreateResult result = service.create(form);
+
+        assertEquals(Boolean.TRUE, result.getScenarioActive());
+        assertEquals(Boolean.FALSE, result.getInviteQueued());
+        verify(notifyDispatcher, never()).enqueue(any(), any(), any(), any(), any());
     }
 }

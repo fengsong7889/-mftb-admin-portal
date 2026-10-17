@@ -63,7 +63,13 @@ public class MeetingCheckinPageController {
     public Result<MeetingCheckinDto.PublicView> sign(@RequestBody @Valid MeetingCheckinDto.TokenForm form,
                                                     HttpServletRequest request) {
         throttle(form.getToken(), request);
-        return Result.success("簽到已完成", checkinService.sign(form.getToken()));
+        MeetingCheckinDto.PublicView view = checkinService.sign(form.getToken());
+        // 信封文案必须与事实一致：业务性拒绝（未到签到时间、已被释放）不能一律回“簽到已完成”，
+        // 否则调用方与监控看到的都是成功文案，只有展开 data 才知道根本没签上
+        if (Boolean.TRUE.equals(view.getCheckedIn())) {
+            return Result.success("簽到已完成", view);
+        }
+        return Result.success(StringUtils.hasText(view.getMessage()) ? view.getMessage() : "簽到未完成，請重新掃碼", view);
     }
 
     /**

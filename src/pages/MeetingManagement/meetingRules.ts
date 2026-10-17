@@ -144,7 +144,10 @@ export function validateBookingWindow(params: {
 
   const leadMs = start.getTime() - now.getTime()
   if (leadMs < rule.minLeadMinutes * 60000) {
-    errors.push(`會議需提前 ${rule.minLeadMinutes} 分鐘以上預約`)
+    // 与后端 MeetingRuleService 同口径：提前量为 0 时不说“提前 0 分鐘”，那条规则只是“不能约过去”
+    errors.push(rule.minLeadMinutes > 0
+      ? `會議需提前 ${rule.minLeadMinutes} 分鐘以上預約`
+      : '會議開始時間不能早於當前時間')
   }
   const farthest = new Date(now.getTime() + rule.advanceDays * 24 * 60 * 60 * 1000)
   if (start.getTime() > farthest.getTime()) {

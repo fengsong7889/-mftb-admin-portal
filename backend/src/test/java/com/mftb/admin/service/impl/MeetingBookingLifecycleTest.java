@@ -279,6 +279,25 @@ class MeetingBookingLifecycleTest {
     }
 
     @Test
+    @DisplayName("未开始的会议不可手动释放：那是取消，放行会留下早于开始时间的结束数据并虚增爽约")
+    void releaseRejectsMeetingNotStartedYet() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canOperateRecords(ADMIN)).thenReturn(true);
+        LocalDateTime start = LocalDateTime.now().plusHours(2);
+        when(bookingMapper.selectForUpdate(50L))
+                .thenReturn(booking(MeetingConstants.STATUS_BOOKED, start, start.plusHours(1)));
+
+        MeetingBookingDto.ReleaseForm form = new MeetingBookingDto.ReleaseForm();
+        form.setReason("行政误操");
+        form.setVersion(0);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.release(50L, form));
+        assertTrue(ex.getMessage().contains("尚未開始"), ex.getMessage());
+        // 一行都不写：released + no_show_flag=1 + actual_end_at 三件套只能属于“已开始未到场”
+        verify(bookingMapper, never()).update(isNull(), any());
+        verify(auditRecorder, never()).recordBooking(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("自动释放触发爽约统计：手动释放不触发（帮人腾房不是处分依据）")
     void autoReleaseEvaluatesBlacklist() {
         LocalDateTime start = LocalDateTime.now().minusMinutes(30);

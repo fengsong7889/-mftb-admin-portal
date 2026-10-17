@@ -232,6 +232,11 @@ export interface MeetingQuery {
   departmentId?: number
   keyword?: string
   group?: MeetingGroup
+  /**
+   * 响应态筛选：目前只有 'pending'（只看“我还没表态”的邀约）。
+   * 不要用 group='pending' 代替 —— 那是会议阶段（待開會），与“我要不要参加”无关。
+   */
+  respond?: 'pending'
 }
 
 export interface MeetingAttendeeVO {
@@ -408,8 +413,10 @@ export interface MeetingMySummary {
 export interface MeetingCreateResult {
   bookingId: number
   bookingNo: string
-  /** false=通知场景未启用或未绑定企业应用，邀约未进入发送流程 */
+  /** 本次是否真的把邀约进了投递队列（只选自己一人时也是 false，不要拿它判场景是否启用） */
   inviteQueued: boolean
+  /** 通知场景已启用并绑定了企业应用；「場景未啟用」提示只能看这个字段 */
+  scenarioActive?: boolean
   notifySkippedCount: number
 }
 
@@ -569,6 +576,8 @@ export interface SeriesCreateResult {
   generatedCount: number
   skippedCount: number
   inviteQueued?: boolean
+  /** 通知场景已启用并绑定了企业应用；「場景未啟用」提示只能看这个字段 */
+  scenarioActive?: boolean
   notifySkippedCount?: number
   skipped?: SeriesSkipped[]
 }

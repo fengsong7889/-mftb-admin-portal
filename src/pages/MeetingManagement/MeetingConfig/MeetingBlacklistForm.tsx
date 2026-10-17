@@ -10,7 +10,7 @@
  */
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Form, InputNumber, message } from 'antd'
+import { Alert, Button, Form, InputNumber, Modal, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, StopOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -57,6 +57,30 @@ export default function MeetingBlacklistForm() {
     } catch {
       return // antd 已在字段下方标出原因
     }
+    // §B.3：拉黑属于“限制他人预约权”的高影响提交动作，必须走统一二次确认（校验 → 弹框 → 接口）
+    Modal.confirm({
+      title: t('meeting.confirmAddBlacklist', {
+        count: values.userIds.length,
+        defaultValue: `確定要為 ${values.userIds.length} 人建立預約限制？`,
+      }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('meeting.confirmAdd', { defaultValue: '確認新增' }),
+      cancelText: t('common.cancel', { defaultValue: '取消' }),
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('meeting.restrictedPerson', { defaultValue: '被限制人員' })}：</span><b>{t('meeting.headcount', { count: values.userIds.length, defaultValue: '{{count}} 人' })}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.restrictionDays', { defaultValue: '限制天數' })}：</span><b>{t('meeting.daysCount', { count: values.days, defaultValue: '{{count}} 天' })}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.reason', { defaultValue: '原因' })}：</span><b>{values.reason.trim()}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.blacklistImpactConfirm', { defaultValue: '限制期間這些人無法新建或改期預約，到期自動失效' })}</b></div>
+        </div>
+      ),
+      onOk: () => writeBlacklist(values),
+    })
+  }
+
+  /** 逐人写入并汇总结果 */
+  const writeBlacklist = async (values: FormValues) => {
     setSubmitting(true)
     setResults({ ok: [], failed: [] })
     const ok: string[] = []
@@ -73,10 +97,13 @@ export default function MeetingBlacklistForm() {
     setResults({ ok, failed })
     setSubmitting(false)
     if (ok.length > 0 && failed.length === 0) {
-      message.success(`已新增 ${ok.length} 條限制記錄`)
+      message.success(t('meeting.blacklistAddedCount', { count: ok.length, defaultValue: '已新增 {{count}} 條限制記錄' }))
       form.resetFields()
     } else if (ok.length > 0) {
-      message.warning(`已新增 ${ok.length} 條，${failed.length} 條未成功（原因見下方清單）`)
+      message.warning(t('meeting.blacklistPartialResult', {
+        added: ok.length, failedCount: failed.length,
+        defaultValue: `已新增 ${ok.length} 條，${failed.length} 條未成功（原因見下方清單）`,
+      }))
     } else {
       message.error(t('meeting.nothingWasAddedSee', { defaultValue: '未新增任何限制記錄，請檢查下方原因' }))
     }
@@ -153,7 +180,7 @@ export default function MeetingBlacklistForm() {
         <div style={{ ...cardStyle, background: '#FAFAFA', border: '1px solid #f0f0f0', boxShadow: 'none' }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('meeting.writeResult', { defaultValue: '本次寫入結果' })}</div>
           <div style={{ fontSize: 12, color: '#52C41A', marginBottom: 4 }}>
-            成功 {results.ok.length} 條
+            {t('meeting.successCount', { count: results.ok.length, defaultValue: '成功 {{count}} 條' })}
           </div>
           {results.failed.length > 0 && (
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#FF4D4F', lineHeight: 1.9 }}>
@@ -168,7 +195,7 @@ export default function MeetingBlacklistForm() {
         <Button onClick={goBack}>{t('meeting.back', { defaultValue: '返回' })}</Button>
         {canEdit && (
           <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={() => void handleSubmit()}>
-            確認新增
+            {t('meeting.confirmAdd', { defaultValue: '確認新增' })}
           </Button>
         )}
       </div>

@@ -131,6 +131,9 @@ const NOTIFY_STATUS_SOURCE: Record<string, { key: string; label: string; color: 
   pending: { key: 'meeting.meta.notify.pending', label: '待發送', color: 'blue' },
   sending: { key: 'meeting.meta.notify.sending', label: '發送中', color: 'processing' },
   success: { key: 'meeting.meta.notify.success', label: '已送達', color: 'green' },
+  // sent 是参会人行的「已送達」：该列 DDL CHECK 不接受 success，后端回写时翻译成 sent，
+  // 两张表共用这一张映射表，少一个键就是界面上直接吐英文码
+  sent: { key: 'meeting.meta.notify.sent', label: '已送達', color: 'green' },
   skipped: { key: 'meeting.meta.notify.skipped', label: '未送達', color: 'warning' },
   failed: { key: 'meeting.meta.notify.failed', label: '發送失敗', color: 'red' },
 }
@@ -149,6 +152,13 @@ const EVENT_SOURCE: Record<string, string> = {
   room_create: '新增會議室',
   room_update: '修改會議室',
   room_delete: '刪除會議室',
+  // M2 的系列/规则/黑名单事件也在同一张轨迹表里展示；漏一个码就是在轨迹上吐内部字符串
+  series_create: '創建週期會議',
+  series_update: '變更週期會議',
+  series_cancel: '取消週期會議',
+  config_update: '修改預約規則',
+  blacklist_add: '加入預約限制',
+  blacklist_revoke: '撤銷預約限制',
 }
 
 export function eventLabel(code?: string | null): string {
@@ -168,6 +178,24 @@ export function notifyEventLabel(code: string): string {
   if (code.startsWith('remind_before_start')) return tl('meeting.meta.notifyEvent.remindBeforeStart', '開始前提醒')
   if (code.startsWith('ops_released')) return tl('meeting.meta.notifyEvent.opsReleased', '會議室釋放')
   return code
+}
+
+/**
+ * 通知场景码（后端 MeetingConstants.SCENARIO_*）→ 可读名称。
+ * <p>详情页投递表的「場景」列直接给 meeting_invite 这种内部码，行政看不出哪条对应哪个开关，
+ * 而去「通知配置」启用的又是另一个名字 —— 两边必须用同一叫法才对得上。
+ */
+const SCENARIO_SOURCE: Record<string, string> = {
+  meeting_invite: '會議邀約',
+  meeting_remind: '開始前提醒',
+  meeting_ops: '會議室釋放告知',
+}
+
+export function scenarioLabel(code?: string | null): string {
+  if (!code) return '-'
+  const zh = SCENARIO_SOURCE[code]
+  if (!zh) return code
+  return tl(`meeting.meta.scenario.${code.replace('meeting_', '')}`, zh)
 }
 
 /** 会议室位置展示：园区 · 楼栋 · 楼层 · 描述，空段自动跳过 */

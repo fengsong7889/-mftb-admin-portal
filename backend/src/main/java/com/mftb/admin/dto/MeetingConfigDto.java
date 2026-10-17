@@ -81,7 +81,12 @@ public final class MeetingConfigDto {
         @Max(value = 365, message = "限制天數最多 365 天")
         private Integer blacklistDays;
 
-        /** 变更原因：全局规则一改就影响所有人的预约，必须能回答"谁在什么时候为什么改的" */
+        /**
+         * 变更原因：全局规则一改就影响所有人的预约，必须能回答"谁在什么时候为什么改的"。
+         * <p>服务端强制而不是只靠前端：前端弹框是体验，把必填只写在前端等于允许绕过 UI
+         * 直接改全站规则而不留任何说明，审计就成了一句空话。
+         */
+        @NotBlank(message = "請填寫變更原因")
         @Size(max = 300, message = "變更原因最長 300 字")
         private String changeReason;
     }

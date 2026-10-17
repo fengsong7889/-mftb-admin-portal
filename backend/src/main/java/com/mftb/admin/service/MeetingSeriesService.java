@@ -176,6 +176,7 @@ public class MeetingSeriesService {
         if (firstBooking != null && INVITE_ON_SEQ == 1) {
             MeetingNotifyDispatcher.EnqueueResult queued = bookingService.notifySeriesFirstInvite(firstBooking);
             result.setInviteQueued(queued.isScenarioActive() && queued.getQueued() > 0);
+            result.setScenarioActive(queued.isScenarioActive());
             result.setNotifySkippedCount(queued.getSkipped());
         }
         log.info("週期會議已創建: seriesNo={}, generated={}, skipped={}",

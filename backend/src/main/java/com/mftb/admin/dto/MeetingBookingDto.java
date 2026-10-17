@@ -51,6 +51,12 @@ public final class MeetingBookingDto {
         private String keyword;
         /** Tab 徽标口径：pending=待开，ongoing=进行中，done=已结束 */
         private String group;
+        /**
+         * 响应态筛选（目前只支持 pending）：只看“我还没表态”的邀约。
+         * <p>不能用 group=pending 代替：那个是会议阶段（待開會），与“我要不要参加”无关，
+         * 两者混用会让「待我響應」列出自己组织的会。
+         */
+        private String respond;
     }
 
     /* ==================== 写入 ==================== */
@@ -317,8 +323,14 @@ public final class MeetingBookingDto {
     public static class CreateResult {
         private Long bookingId;
         private String bookingNo;
-        /** 邀约投递是否已进入发送流程（场景未启用时为 false，前端据此提示） */
+        /**
+         * 本次是否真的把邀约进了投递队列（只选了自己一个人时没人可发，因此也是 false）。
+         * <p>不要拿它当「场景没启用」的依据：没选参会人时它同样是 false，
+         * 前端因此弹过「通知場景未啟用」的误导提示，把行政引去乱改通知配置。场景状态看 scenarioActive。
+         */
         private Boolean inviteQueued;
+        /** 通知场景已启用且绑定了可用企业应用（与本次是否真的投递无关） */
+        private Boolean scenarioActive;
         /** 已留痕但未送达的人数（未绑定钉钉等），详情页提供可核对名单 */
         private Integer notifySkippedCount;
     }
