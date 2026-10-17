@@ -1554,6 +1554,22 @@
       "comment": "只改 SQL 文件修不上已有环境：建表脚本与种子 INSERT 都只在首次落地时执行，跑过 meeting:seed:v1.0 的库不会重读脚本，所以文案修正必须单独登记版本键做一次性 UPDATE。UPDATE 与校验都以旧值本身作条件，管理员在界面上改过位置描述的房间不会被覆盖，也不会把繁中写法再改回去。校验查「旧值残留行数必须为 0」而不是查新值存在：残留说明 UPDATE 没打中（列名或排序规则变了），必须让启动暴露它。"
     },
     {
+      "versionKey": "meeting:access-grant:v1.0",
+      "module": "meeting",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "meetingAccessGrantInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:menu:v1.2"
+      ],
+      "scriptFiles": [],
+      "intent": "会议使用侧全员基线授权：所有启用角色 + 所有有效部门获得會議中心/我的會議/會議室預約与 meeting 系统准入，普通员工才能进会议系统订会",
+      "author": "Qoder",
+      "ticket": "meeting-b4",
+      "comment": "菜单种子只把五个菜单授给内置 admin，而会议系统的主体是全员：没基线授权时普通员工在门户里点开就是 403，业务链断在权限一环。做法与 rdm:access-grant 同法（授所有启用角色，不猜角色名），但额外铺到所有有效部门：存量员工的权限大多只来自部门授权这一条线（function_roles 为空），只铺角色等于多数人仍进不了。基线只铺使用侧三张；meeting-room/meeting-record/meeting-config 不自动授，因为会议室档案影响全部房间、预约规则影响全站口径、预约记录是跨人可见性，这些必须管理员在授权中心按角色勾选。使用侧敢给 edit 是因为写入口都有服务端资源级守卫（非行政视野列表收敛、变更/取消要求组织者或行政、详情按相关人拒 IDOR），多授一个 edit 不会让人改到别人的会。授权写入只并集补缺、绝不整行覆写：启动重放把管理员主动收窄的动作集扩回去等于静默扩权。菜单授权与系统准入两条线都要铺，缺一条门户剪枝会丢掉整棵子树。后置校验只查「已铺齐」不查「治理菜单没被铺」：后者完全可能是管理员的正常配置，当作启动不变量会让真实环境无故起不来。"
+    },
+    {
       "versionKey": "organic:com10-rename-v1",
       "module": "organic",
       "phase": "DATA_MIGRATION",
