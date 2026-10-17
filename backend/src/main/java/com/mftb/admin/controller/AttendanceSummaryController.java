@@ -44,8 +44,10 @@ public class AttendanceSummaryController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long groupId,
-            @RequestParam(required = false) Long deptId) {
-        return Result.success(summaryService.dailyPage(page, size, from, to, groupId, deptId));
+            @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(summaryService.dailyPage(page, size, from, to, groupId, deptId, sortField, sortOrder));
     }
 
     /** 日报统计（与列表同口径） */
@@ -93,8 +95,10 @@ public class AttendanceSummaryController {
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status) {
-        return Result.success(summaryService.monthlyPage(page, size, month, groupId, deptId, keyword, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(summaryService.monthlyPage(page, size, month, groupId, deptId, keyword, status, sortField, sortOrder));
     }
 
     /** 月报统计（与列表同口径） */

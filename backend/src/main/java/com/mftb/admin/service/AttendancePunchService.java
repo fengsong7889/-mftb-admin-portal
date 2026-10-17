@@ -16,9 +16,10 @@ import java.util.Map;
  */
 public interface AttendancePunchService {
 
-    /** 分页查询 */
+    /** 分页查询。sortField/sortOrder 空或非法则回落默认 punchAt 降序 */
     PageResult<AttendancePunchVO> page(long page, long size, LocalDate from, LocalDate to,
-                                       String keyword, Long groupId, Long deptId, Integer source, Integer result);
+                                       String keyword, Long groupId, Long deptId, Integer source, Integer result,
+                                       String sortField, String sortOrder);
 
     /** 与列表同口径的统计（卡片必须跟随筛选，禁止单独发无条件请求） */
     Map<String, Object> stats(LocalDate from, LocalDate to, String keyword, Long groupId, Long deptId,

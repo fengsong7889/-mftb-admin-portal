@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.AttendanceConstants;
@@ -32,6 +33,7 @@ import com.mftb.admin.service.AttendanceSummaryService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -84,6 +86,18 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
     private final AttShiftMapper shiftMapper;
     private final AttPunchLogMapper punchMapper;
     private final AttExceptionMapper exceptionMapper;
+    /** 日报可服务端排序的列白名单（列key → getter） */
+    private static final Map<String, SFunction<AttDaySummary, ?>> DAY_SORT_ALLOW = Map.of(
+            "workDate", AttDaySummary::getWorkDate,
+            "attendRate", AttDaySummary::getAttendRate,
+            "updatedAt", AttDaySummary::getUpdatedAt);
+
+    /** 月报可服务端排序的列白名单（列key → getter） */
+    private static final Map<String, SFunction<AttMonthlySummary, ?>> MONTHLY_SORT_ALLOW = Map.of(
+            "statMonth", AttMonthlySummary::getStatMonth,
+            "attendRate", AttMonthlySummary::getAttendRate,
+            "updatedAt", AttMonthlySummary::getUpdatedAt);
+
     private final AttDaySummaryMapper dayMapper;
     private final AttMonthlySummaryMapper monthlyMapper;
     private final AttHolidayMapper holidayMapper;
@@ -188,11 +202,13 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
 
     @Override
     public PageResult<AttendanceDailyVO> dailyPage(long page, long size, LocalDate from, LocalDate to,
-                                                   Long groupId, Long deptId) {
+                                                   Long groupId, Long deptId, String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttDaySummary> wrapper = dailyFilter(from, to, groupId, deptId);
+        // 白名单排序优先，再补 workDate 降序 + groupId 升序作稳定次级序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, DAY_SORT_ALLOW);
+        wrapper.orderByDesc(AttDaySummary::getWorkDate).orderByAsc(AttDaySummary::getGroupId);
         Page<AttDaySummary> result = dayMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                dailyFilter(from, to, groupId, deptId).orderByDesc(AttDaySummary::getWorkDate)
-                        .orderByAsc(AttDaySummary::getGroupId));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttendanceDailyVO> vos = result.getRecords().stream().map(AttendanceDailyVO::of).toList();
         return new PageResult<>(vos, result.getTotal());
     }
@@ -265,11 +281,13 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
 
     @Override
     public PageResult<AttendanceMonthlyVO> monthlyPage(long page, long size, String month, Long groupId, Long deptId,
-                                                       String keyword, String status) {
+                                                       String keyword, String status, String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttMonthlySummary> wrapper = monthlyFilter(month, groupId, deptId, keyword, status);
+        // 白名单排序优先，再补 statMonth 降序 + empNo 升序作稳定次级序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, MONTHLY_SORT_ALLOW);
+        wrapper.orderByDesc(AttMonthlySummary::getStatMonth).orderByAsc(AttMonthlySummary::getEmpNo);
         Page<AttMonthlySummary> result = monthlyMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                monthlyFilter(month, groupId, deptId, keyword, status)
-                        .orderByDesc(AttMonthlySummary::getStatMonth).orderByAsc(AttMonthlySummary::getEmpNo));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttendanceMonthlyVO> vos = result.getRecords().stream().map(AttendanceMonthlyVO::of).toList();
         return new PageResult<>(vos, result.getTotal());
     }

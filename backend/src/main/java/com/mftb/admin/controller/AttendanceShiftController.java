@@ -38,8 +38,10 @@ public class AttendanceShiftController {
                                                       @RequestParam(defaultValue = "20") long size,
                                                       @RequestParam(required = false) String keyword,
                                                       @RequestParam(required = false) Integer flexFlag,
-                                                      @RequestParam(required = false) String status) {
-        return Result.success(shiftService.list(page, size, keyword, flexFlag, status));
+                                                      @RequestParam(required = false) String status,
+                                                      @RequestParam(required = false) String sortField,
+                                                      @RequestParam(required = false) String sortOrder) {
+        return Result.success(shiftService.list(page, size, keyword, flexFlag, status, sortField, sortOrder));
     }
 
     /** 与列表同口径的统计（统计卡必须跟随筛选） */

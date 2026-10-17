@@ -47,8 +47,10 @@ public class AttendancePunchController {
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Integer source,
-            @RequestParam(required = false) Integer result) {
-        return Result.success(punchService.page(page, size, from, to, keyword, groupId, deptId, source, result));
+            @RequestParam(required = false) Integer result,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(punchService.page(page, size, from, to, keyword, groupId, deptId, source, result, sortField, sortOrder));
     }
 
     /** 与列表同口径的统计 */

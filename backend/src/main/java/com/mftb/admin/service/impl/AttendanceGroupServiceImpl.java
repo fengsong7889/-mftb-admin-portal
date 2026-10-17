@@ -2,6 +2,7 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AttendanceGroupVO;
@@ -20,6 +21,7 @@ import com.mftb.admin.service.AttendanceGroupService;
 import com.mftb.admin.util.AttendanceWriteGuard;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,6 +55,12 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
     private static final String STATUS_ENABLED = "enabled";
     private static final String STATUS_DISABLED = "disabled";
 
+    /** 考勤组可服务端排序的列白名单（列key → getter），未登记列一律忽略 */
+    private static final Map<String, SFunction<AttGroup, ?>> GROUP_SORT_ALLOW = Map.of(
+            "groupNo", AttGroup::getGroupNo,
+            "groupName", AttGroup::getGroupName,
+            "updatedAt", AttGroup::getUpdatedAt);
+
     private final AttGroupMapper groupMapper;
     private final AttGroupMemberMapper memberMapper;
     private final AttShiftMapper shiftMapper;
@@ -62,10 +70,14 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
     private final OperatorResolver operatorResolver;
 
     @Override
-    public PageResult<AttendanceGroupVO> list(long page, long size, String keyword, Integer groupType, String status) {
+    public PageResult<AttendanceGroupVO> list(long page, long size, String keyword, Integer groupType, String status,
+                                             String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttGroup> wrapper = filter(keyword, groupType, status);
+        // 白名单排序优先，再补 id 作稳定次级序；无有效排序时仅按 id 升序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, GROUP_SORT_ALLOW);
+        wrapper.orderByAsc(AttGroup::getId);
         Page<AttGroup> result = groupMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                filter(keyword, groupType, status).orderByAsc(AttGroup::getId));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttGroup> rows = result.getRecords();
         if (rows.isEmpty()) {
             return new PageResult<>(List.of(), result.getTotal());

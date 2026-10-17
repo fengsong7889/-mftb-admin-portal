@@ -48,8 +48,10 @@ public class AttendanceExceptionController {
             @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) Long deptId,
             @RequestParam(required = false) Integer exceptionType,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(exceptionService.page(page, size, from, to, groupId, deptId, exceptionType, status));
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false) String sortOrder) {
+        return Result.success(exceptionService.page(page, size, from, to, groupId, deptId, exceptionType, status, sortField, sortOrder));
     }
 
     /** 与列表同口径的统计（统计卡必须跟随筛选条件） */

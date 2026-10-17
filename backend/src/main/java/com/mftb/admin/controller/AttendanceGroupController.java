@@ -42,8 +42,10 @@ public class AttendanceGroupController {
                                                       @RequestParam(defaultValue = "20") long size,
                                                       @RequestParam(required = false) String keyword,
                                                       @RequestParam(required = false) Integer groupType,
-                                                      @RequestParam(required = false) String status) {
-        return Result.success(groupService.list(page, size, keyword, groupType, status));
+                                                      @RequestParam(required = false) String status,
+                                                      @RequestParam(required = false) String sortField,
+                                                      @RequestParam(required = false) String sortOrder) {
+        return Result.success(groupService.list(page, size, keyword, groupType, status, sortField, sortOrder));
     }
 
     /** 与列表同口径的统计（统计卡必须跟随筛选） */

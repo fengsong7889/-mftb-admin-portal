@@ -14,8 +14,12 @@ import java.util.Map;
  */
 public interface AttendanceShiftService {
 
-    /** 分页查询班次 */
-    PageResult<AttendanceShiftVO> list(long page, long size, String keyword, Integer flexFlag, String status);
+    /**
+     * 分页查询班次。
+     * <p>{@code sortField}/{@code sortOrder} 为服务端排序；空或不在白名单内则回落默认 shiftCode 升序。
+     */
+    PageResult<AttendanceShiftVO> list(long page, long size, String keyword, Integer flexFlag, String status,
+                                       String sortField, String sortOrder);
 
     /**
      * 与列表同口径的统计（总数 / 启用 / 弹性 / 标准工时合计）。

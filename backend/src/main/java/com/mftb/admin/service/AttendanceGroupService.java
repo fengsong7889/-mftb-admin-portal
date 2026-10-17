@@ -13,8 +13,9 @@ import java.util.Map;
  */
 public interface AttendanceGroupService {
 
-    /** 分页查询考勤组（带班次名与当前生效成员数） */
-    PageResult<AttendanceGroupVO> list(long page, long size, String keyword, Integer groupType, String status);
+    /** 分页查询考勤组（带班次名与当前生效成员数）。sortField/sortOrder 空或非法则回落默认 id 升序 */
+    PageResult<AttendanceGroupVO> list(long page, long size, String keyword, Integer groupType, String status,
+                                       String sortField, String sortOrder);
 
     /** 考勤组详情 */
     AttendanceGroupVO detail(Long id);

@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AttendanceHolidayVO;
@@ -10,6 +11,7 @@ import com.mftb.admin.mapper.AttHolidayMapper;
 import com.mftb.admin.service.AttendanceHolidayService;
 import com.mftb.admin.util.AttendanceWriteGuard;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -38,15 +40,23 @@ public class AttendanceHolidayServiceImpl implements AttendanceHolidayService {
     private static final Set<Integer> VALID_TYPES = Set.of(
             AttHoliday.TYPE_LEGAL, AttHoliday.TYPE_SWAP_WORKDAY, AttHoliday.TYPE_COMPANY);
 
+    /** 节假日可服务端排序的列白名单（列key → getter） */
+    private static final Map<String, SFunction<AttHoliday, ?>> HOLIDAY_SORT_ALLOW = Map.of(
+            "holidayDate", AttHoliday::getHolidayDate,
+            "updatedAt", AttHoliday::getUpdatedAt);
+
     private final AttHolidayMapper holidayMapper;
     private final OperatorResolver operatorResolver;
 
     @Override
     public PageResult<AttendanceHolidayVO> list(long page, long size, Integer yearNo, Integer holidayType,
-                                                String keyword, String status) {
+                                                String keyword, String status, String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttHoliday> wrapper = filter(yearNo, holidayType, keyword, status);
+        // 白名单排序优先，再补 holidayDate 升序作稳定次级序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, HOLIDAY_SORT_ALLOW);
+        wrapper.orderByAsc(AttHoliday::getHolidayDate);
         Page<AttHoliday> result = holidayMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                filter(yearNo, holidayType, keyword, status).orderByAsc(AttHoliday::getHolidayDate));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttendanceHolidayVO> vos = result.getRecords().stream().map(AttendanceHolidayVO::of).toList();
         return new PageResult<>(vos, result.getTotal());
     }

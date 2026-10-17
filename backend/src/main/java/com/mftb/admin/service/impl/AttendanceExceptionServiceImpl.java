@@ -1,7 +1,9 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.util.SortSupport;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.HrLeaveConstants;
 import com.mftb.admin.dto.AttendanceExceptionVO;
@@ -61,6 +63,11 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
     /** 处理说明上限，与 {@code att_exception.handle_remark VARCHAR(200)} 一致 */
     private static final int MAX_REMARK_LENGTH = 200;
 
+    /** 异常可服务端排序的列白名单（列key → getter） */
+    private static final Map<String, SFunction<AttException, ?>> EXCEPTION_SORT_ALLOW = Map.of(
+            "workDate", AttException::getWorkDate,
+            "updatedAt", AttException::getUpdatedAt);
+
     private final AttExceptionMapper exceptionMapper;
     private final HrLeaveRequestMapper leaveMapper;
     private final AttendancePunchService punchService;
@@ -69,12 +76,14 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
 
     @Override
     public PageResult<AttendanceExceptionVO> page(long page, long size, LocalDate from, LocalDate to, Long groupId,
-                                                  Long deptId, Integer exceptionType, Integer status) {
+                                                  Long deptId, Integer exceptionType, Integer status,
+                                                  String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttException> wrapper = filter(from, to, groupId, deptId, exceptionType, status);
+        // 白名单排序优先，再补 workDate 降序 + id 升序作稳定次级序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, EXCEPTION_SORT_ALLOW);
+        wrapper.orderByDesc(AttException::getWorkDate).orderByAsc(AttException::getId);
         Page<AttException> rows = exceptionMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                filter(from, to, groupId, deptId, exceptionType, status)
-                        .orderByDesc(AttException::getWorkDate)
-                        .orderByAsc(AttException::getId));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttendanceExceptionVO> vos = rows.getRecords().stream().map(AttendanceExceptionVO::of).toList();
         return new PageResult<>(vos, rows.getTotal());
     }

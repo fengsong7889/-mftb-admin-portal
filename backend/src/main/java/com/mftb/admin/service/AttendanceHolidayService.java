@@ -15,7 +15,8 @@ import java.util.List;
 public interface AttendanceHolidayService {
 
     /** 分页查询日历（按年度/类型/关键字/状态） */
-    PageResult<AttendanceHolidayVO> list(long page, long size, Integer yearNo, Integer holidayType, String keyword, String status);
+    PageResult<AttendanceHolidayVO> list(long page, long size, Integer yearNo, Integer holidayType, String keyword, String status,
+                                         String sortField, String sortOrder);
 
     /** 详情（编辑/详情页取数） */
     AttendanceHolidayVO detail(Long id);

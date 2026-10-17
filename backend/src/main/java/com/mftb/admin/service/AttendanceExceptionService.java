@@ -20,7 +20,7 @@ public interface AttendanceExceptionService {
 
     /** 分页列表 */
     PageResult<AttendanceExceptionVO> page(long page, long size, LocalDate from, LocalDate to, Long groupId, Long deptId,
-                                           Integer exceptionType, Integer status);
+                                           Integer exceptionType, Integer status, String sortField, String sortOrder);
 
     /** 与列表同口径的统计 */
     Map<String, Object> stats(LocalDate from, LocalDate to, Long groupId, Long deptId, Integer exceptionType,

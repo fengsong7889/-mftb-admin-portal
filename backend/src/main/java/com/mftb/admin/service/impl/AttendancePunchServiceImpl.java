@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AttendancePunchImportRow;
@@ -20,6 +21,7 @@ import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AttendancePunchService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -61,6 +63,11 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
     /** 单次导入上限：超过 5000 行让前端拆文件，避免一次请求把连接与内存吃满 */
     private static final int MAX_IMPORT_ROWS = 5000;
 
+    /** 打卡可服务端排序的列白名单（列key → getter） */
+    private static final Map<String, SFunction<AttPunchLog, ?>> PUNCH_SORT_ALLOW = Map.of(
+            "punchAt", AttPunchLog::getPunchAt,
+            "workDate", AttPunchLog::getWorkDate);
+
     private final AttPunchLogMapper punchMapper;
     private final SysUserMapper sysUserMapper;
     private final AttGroupMapper groupMapper;
@@ -71,10 +78,14 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
 
     @Override
     public PageResult<AttendancePunchVO> page(long page, long size, LocalDate from, LocalDate to, String keyword,
-                                              Long groupId, Long deptId, Integer source, Integer result) {
+                                              Long groupId, Long deptId, Integer source, Integer result,
+                                              String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttPunchLog> wrapper = filter(from, to, keyword, groupId, deptId, source, result);
+        // 白名单排序优先，再补 punchAt 降序作稳定次级序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, PUNCH_SORT_ALLOW);
+        wrapper.orderByDesc(AttPunchLog::getPunchAt);
         Page<AttPunchLog> rows = punchMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                filter(from, to, keyword, groupId, deptId, source, result).orderByDesc(AttPunchLog::getPunchAt));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttPunchLog> records = rows.getRecords();
         if (records.isEmpty()) {
             return new PageResult<>(List.of(), rows.getTotal());

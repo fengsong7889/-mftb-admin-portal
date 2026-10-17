@@ -39,8 +39,10 @@ public class AttendanceHolidayController {
                                                         @RequestParam(required = false) Integer yearNo,
                                                         @RequestParam(required = false) Integer holidayType,
                                                         @RequestParam(required = false) String keyword,
-                                                        @RequestParam(required = false) String status) {
-        return Result.success(holidayService.list(page, size, yearNo, holidayType, keyword, status));
+                                                        @RequestParam(required = false) String status,
+                                                        @RequestParam(required = false) String sortField,
+                                                        @RequestParam(required = false) String sortOrder) {
+        return Result.success(holidayService.list(page, size, yearNo, holidayType, keyword, status, sortField, sortOrder));
     }
 
     /** 与列表同口径的统计（统计卡必须跟随筛选） */

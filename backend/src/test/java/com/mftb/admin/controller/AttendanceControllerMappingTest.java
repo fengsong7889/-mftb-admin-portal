@@ -80,7 +80,7 @@ class AttendanceControllerMappingTest {
     @DisplayName("主数据路由可映射，且 /stats 不被 /{id} 模板吞掉")
     void masterDataRoutesResolve() throws Exception {
         AttendanceShiftService shiftService = mock(AttendanceShiftService.class);
-        when(shiftService.list(anyLong(), anyLong(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
+        when(shiftService.list(anyLong(), anyLong(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
         when(shiftService.stats(any(), any(), any())).thenReturn(Map.of("total", 0));
         when(shiftService.options()).thenReturn(List.of());
         MockMvc shiftMvc = MockMvcBuilders.standaloneSetup(new AttendanceShiftController(shiftService)).build();
@@ -92,7 +92,7 @@ class AttendanceControllerMappingTest {
         shiftMvc.perform(get("/api/attendance/shifts/2")).andExpect(status().isOk());
 
         AttendanceHolidayService holidayService = mock(AttendanceHolidayService.class);
-        when(holidayService.list(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
+        when(holidayService.list(anyLong(), anyLong(), any(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
         when(holidayService.stats(any(), any(), any(), any())).thenReturn(Map.of("total", 0));
         when(holidayService.listByYear(any())).thenReturn(List.of());
         MockMvc holidayMvc = MockMvcBuilders.standaloneSetup(new AttendanceHolidayController(holidayService)).build();
@@ -103,7 +103,7 @@ class AttendanceControllerMappingTest {
         holidayMvc.perform(get("/api/attendance/holidays/3")).andExpect(status().isOk());
 
         AttendanceGroupService groupService = mock(AttendanceGroupService.class);
-        when(groupService.list(anyLong(), anyLong(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
+        when(groupService.list(anyLong(), anyLong(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
         when(groupService.stats(any(), any(), any())).thenReturn(Map.of("total", 0));
         MockMvc groupMvc = MockMvcBuilders.standaloneSetup(new AttendanceGroupController(groupService)).build();
 
@@ -117,8 +117,8 @@ class AttendanceControllerMappingTest {
     @DisplayName("汇总、异常、排班、打卡、工作台、设置路由全部可映射")
     void remainingRoutesResolve() throws Exception {
         AttendanceSummaryService summaryService = mock(AttendanceSummaryService.class);
-        when(summaryService.dailyPage(anyLong(), anyLong(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
-        when(summaryService.monthlyPage(anyLong(), anyLong(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
+        when(summaryService.dailyPage(anyLong(), anyLong(), any(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
+        when(summaryService.monthlyPage(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any())).thenReturn(new PageResult<>(List.of(), 0L));
         when(summaryService.isMonthFrozen(any())).thenReturn(false);
         MockMvc summaryMvc = MockMvcBuilders.standaloneSetup(new AttendanceSummaryController(summaryService)).build();
         summaryMvc.perform(get("/api/attendance/summaries/daily")).andExpect(status().isOk());
@@ -129,7 +129,7 @@ class AttendanceControllerMappingTest {
                 .andExpect(status().isOk());
 
         AttendanceExceptionService exceptionService = mock(AttendanceExceptionService.class);
-        when(exceptionService.page(anyLong(), anyLong(), any(), any(), any(), any(), any(), any()))
+        when(exceptionService.page(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), 0L));
         when(exceptionService.pendingCount(any(), any())).thenReturn(0L);
         when(exceptionService.stats(any(), any(), any(), any(), any(), any())).thenReturn(Map.of());
@@ -159,7 +159,7 @@ class AttendanceControllerMappingTest {
         scheduleMvc.perform(get("/api/attendance/schedules/stats").param("groupId", "7")).andExpect(status().isOk());
 
         AttendancePunchService punchService = mock(AttendancePunchService.class);
-        when(punchService.page(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any()))
+        when(punchService.page(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new PageResult<>(List.of(), 0L));
         MockMvc punchMvc = MockMvcBuilders
                 .standaloneSetup(new AttendancePunchController(punchService, mock(AttendanceSyncService.class))).build();

@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AttendanceShiftVO;
@@ -14,6 +15,7 @@ import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.service.AttendanceShiftService;
 import com.mftb.admin.util.AttendanceWriteGuard;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,16 +43,27 @@ public class AttendanceShiftServiceImpl implements AttendanceShiftService {
     private static final String STATUS_ENABLED = "enabled";
     private static final String STATUS_DISABLED = "disabled";
 
+    /** 班次可服务端排序的列白名单（列key → getter）；前端 sorter.columnKey 取同名，未登记列一律忽略 */
+    private static final Map<String, SFunction<AttShift, ?>> SHIFT_SORT_ALLOW = Map.of(
+            "shiftCode", AttShift::getShiftCode,
+            "onTime", AttShift::getOnTime,
+            "workHours", AttShift::getWorkHours,
+            "updatedAt", AttShift::getUpdatedAt);
+
     private final AttShiftMapper shiftMapper;
     private final AttGroupMapper groupMapper;
     private final AttScheduleMapper scheduleMapper;
     private final OperatorResolver operatorResolver;
 
     @Override
-    public PageResult<AttendanceShiftVO> list(long page, long size, String keyword, Integer flexFlag, String status) {
+    public PageResult<AttendanceShiftVO> list(long page, long size, String keyword, Integer flexFlag, String status,
+                                             String sortField, String sortOrder) {
+        LambdaQueryWrapper<AttShift> wrapper = filter(keyword, flexFlag, status);
+        // 白名单排序优先，再补 shiftCode 作稳定次级序；无有效排序时仅按 shiftCode 升序（同原默认）
+        SortSupport.apply(wrapper, sortField, sortOrder, SHIFT_SORT_ALLOW);
+        wrapper.orderByAsc(AttShift::getShiftCode);
         Page<AttShift> result = shiftMapper.selectPage(
-                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)),
-                filter(keyword, flexFlag, status).orderByAsc(AttShift::getShiftCode));
+                new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<AttendanceShiftVO> vos = result.getRecords().stream().map(AttendanceShiftVO::of).toList();
         return new PageResult<>(vos, result.getTotal());
     }
