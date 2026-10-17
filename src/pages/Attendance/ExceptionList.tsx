@@ -25,6 +25,7 @@ import StatCards from '../../components/StatCards'
 import RemarkTextArea from '../../components/RemarkTextArea'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   EXCEPTION_STATUS, EXCEPTION_TYPE, confirmExceptions, fetchExceptionStats, fetchExceptions,
   type ExceptionVO,
@@ -85,6 +86,7 @@ export default function AttendanceExceptionList() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({})
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
   const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false, ids: [], preview: [], remark: '' })
   const [confirming, setConfirming] = useState(false)
@@ -104,7 +106,7 @@ export default function AttendanceExceptionList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchExceptions({ ...queryParams(filters), page: pagination.page, size: pagination.size })
+      const res = await fetchExceptions({ ...queryParams(filters), page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -115,7 +117,7 @@ export default function AttendanceExceptionList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size, queryParams])
+  }, [filters, pagination.page, pagination.size, queryParams, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchExceptionStats(queryParams(filters)).then(setStats).catch(() => setStats({}))
@@ -203,7 +205,7 @@ export default function AttendanceExceptionList() {
   }
 
   const columns: TableColumnsType<ExceptionVO> = [
-    { title: t(COL_KEY.workDate), dataIndex: 'workDate', key: 'workDate', width: 120 },
+    { title: t(COL_KEY.workDate), dataIndex: 'workDate', key: 'workDate', width: 120, sorter: true },
     { title: t(COL_KEY.empNo), dataIndex: 'empNo', key: 'empNo', width: 110 },
     { title: t(COL_KEY.empName), dataIndex: 'empName', key: 'empName', width: 100 },
     { title: t(COL_KEY.deptName), dataIndex: 'deptName', key: 'deptName', width: 140, ellipsis: true, render: (v?: string) => v || '-' },
@@ -372,6 +374,10 @@ export default function AttendanceExceptionList() {
         rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
         scroll={{ x: 1800 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -380,7 +386,6 @@ export default function AttendanceExceptionList() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
 

@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   ENABLE_STATUS, GROUP_TYPE, changeGroupStatus, deleteGroup, fetchGroupStats, fetchGroups,
   type GroupVO,
@@ -77,6 +78,7 @@ export default function AttendanceGroupList() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({})
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
 
   const statsKey = useMemo(
@@ -87,7 +89,7 @@ export default function AttendanceGroupList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchGroups({ ...filters, page: pagination.page, size: pagination.size })
+      const res = await fetchGroups({ ...filters, page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -98,7 +100,7 @@ export default function AttendanceGroupList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size])
+  }, [filters, pagination.page, pagination.size, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchGroupStats(filters).then(setStats).catch(() => setStats({}))
@@ -227,8 +229,8 @@ export default function AttendanceGroupList() {
   }
 
   const columns: TableColumnsType<GroupVO> = [
-    { title: t(COL_KEY.groupNo), dataIndex: 'groupNo', key: 'groupNo', width: 150 },
-    { title: t(COL_KEY.groupName), dataIndex: 'groupName', key: 'groupName', width: 200, ellipsis: true },
+    { title: t(COL_KEY.groupNo), dataIndex: 'groupNo', key: 'groupNo', width: 150, sorter: true },
+    { title: t(COL_KEY.groupName), dataIndex: 'groupName', key: 'groupName', width: 200, ellipsis: true, sorter: true },
     {
       title: t(COL_KEY.groupType), dataIndex: 'groupType', key: 'groupType', width: 110,
       render: (v: number) => {
@@ -258,7 +260,7 @@ export default function AttendanceGroupList() {
       ),
     },
     { title: t(COL_KEY.updatedBy), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v?: string) => v || '-' },
-    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, render: (v?: string) => v || '-' },
+    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, sorter: true, render: (v?: string) => v || '-' },
     {
       title: t(COL_KEY.action), key: 'action', width: 150, fixed: 'right',
       render: (_, record) => (
@@ -378,6 +380,10 @@ export default function AttendanceGroupList() {
         rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
         scroll={{ x: 1900 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -386,7 +392,6 @@ export default function AttendanceGroupList() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
     </div>

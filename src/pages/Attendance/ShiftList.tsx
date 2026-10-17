@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useServerSort } from '../../hooks/useServerSort'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   ENABLE_STATUS, changeShiftStatus, deleteShift, fetchShiftStats, fetchShifts, type ShiftVO,
@@ -68,6 +69,8 @@ export default function AttendanceShiftList() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({})
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  // 服务端排序（列key + ascend/descend）；空=后端默认排序
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
 
   /** 统计口径快照：作为 StatCards 的 animationKey，条件变了才重跑计数动画 */
@@ -79,7 +82,7 @@ export default function AttendanceShiftList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchShifts({ ...filters, page: pagination.page, size: pagination.size })
+      const res = await fetchShifts({ ...filters, page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -91,7 +94,7 @@ export default function AttendanceShiftList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size])
+  }, [filters, pagination.page, pagination.size, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     // 统计卡必须跟随筛选条件，禁止单独发一次不带条件的请求
@@ -211,12 +214,12 @@ export default function AttendanceShiftList() {
   }
 
   const columns: TableColumnsType<ShiftVO> = [
-    { title: t(COL_KEY.shiftCode), dataIndex: 'shiftCode', key: 'shiftCode', width: 120 },
+    { title: t(COL_KEY.shiftCode), dataIndex: 'shiftCode', key: 'shiftCode', width: 120, sorter: true },
     { title: t(COL_KEY.shiftName), dataIndex: 'shiftName', key: 'shiftName', width: 220, ellipsis: true },
-    { title: t(COL_KEY.onTime), dataIndex: 'onTime', key: 'onTime', width: 110, align: 'center', render: (v?: string) => v || '-' },
+    { title: t(COL_KEY.onTime), dataIndex: 'onTime', key: 'onTime', width: 110, align: 'center', sorter: true, render: (v?: string) => v || '-' },
     { title: t(COL_KEY.offTime), dataIndex: 'offTime', key: 'offTime', width: 110, align: 'center', render: (v?: string) => v || '-' },
     {
-      title: t(COL_KEY.workHours), dataIndex: 'workHours', key: 'workHours', width: 110, align: 'right',
+      title: t(COL_KEY.workHours), dataIndex: 'workHours', key: 'workHours', width: 110, align: 'right', sorter: true,
       render: (v?: number) => (v == null ? '-' : `${v} h`),
     },
     { title: t(COL_KEY.restText), key: 'restText', width: 140, align: 'center', render: (_, r) => restText(r) },
@@ -239,7 +242,7 @@ export default function AttendanceShiftList() {
       ),
     },
     { title: t(COL_KEY.updatedBy), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v?: string) => v || '-' },
-    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, render: (v?: string) => v || '-' },
+    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, sorter: true, render: (v?: string) => v || '-' },
     {
       title: t(COL_KEY.action), key: 'action', width: 160, fixed: 'right',
       render: (_, record) => (
@@ -359,6 +362,10 @@ export default function AttendanceShiftList() {
         rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
         scroll={{ x: 1560 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -367,7 +374,6 @@ export default function AttendanceShiftList() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
     </div>

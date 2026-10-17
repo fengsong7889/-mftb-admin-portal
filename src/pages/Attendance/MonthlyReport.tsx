@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   MONTHLY_STATUS, fetchMonthlyStats, fetchMonthlySummaries, freezeMonthly, generateMonthly,
   syncMonthlyToPayroll, type MonthlyVO,
@@ -78,6 +79,7 @@ export default function AttendanceMonthlyReport() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({ month: dayjs().subtract(1, 'month') })
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
   const [acting, setActing] = useState(false)
 
@@ -94,7 +96,7 @@ export default function AttendanceMonthlyReport() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchMonthlySummaries({ ...queryParams(filters), page: pagination.page, size: pagination.size })
+      const res = await fetchMonthlySummaries({ ...queryParams(filters), page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -105,7 +107,7 @@ export default function AttendanceMonthlyReport() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size, queryParams])
+  }, [filters, pagination.page, pagination.size, queryParams, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchMonthlyStats(queryParams(filters)).then(setStats).catch(() => setStats({}))
@@ -276,7 +278,7 @@ export default function AttendanceMonthlyReport() {
   })
 
   const columns: TableColumnsType<MonthlyVO> = [
-    { title: t(COL_KEY.statMonth), dataIndex: 'statMonth', key: 'statMonth', width: 100, fixed: 'left' },
+    { title: t(COL_KEY.statMonth), dataIndex: 'statMonth', key: 'statMonth', width: 100, fixed: 'left', sorter: true },
     { title: t(COL_KEY.batchNo), dataIndex: 'batchNo', key: 'batchNo', width: 150, render: (v?: string) => v || '-' },
     { title: t(COL_KEY.empNo), dataIndex: 'empNo', key: 'empNo', width: 110 },
     { title: t(COL_KEY.empName), dataIndex: 'empName', key: 'empName', width: 100 },
@@ -290,7 +292,7 @@ export default function AttendanceMonthlyReport() {
     { title: t(COL_KEY.workdayOtHours), dataIndex: 'workdayOtHours', key: 'workdayOtHours', width: 110, align: 'right', render: (v?: number) => `${v ?? 0} h` },
     { title: t(COL_KEY.restdayOtHours), dataIndex: 'restdayOtHours', key: 'restdayOtHours', width: 110, align: 'right', render: (v?: number) => `${v ?? 0} h` },
     { title: t(COL_KEY.holidayOtHours), dataIndex: 'holidayOtHours', key: 'holidayOtHours', width: 120, align: 'right', render: (v?: number) => `${v ?? 0} h` },
-    { title: t(COL_KEY.attendRate), dataIndex: 'attendRate', key: 'attendRate', width: 100, align: 'right', render: (v?: number) => `${v ?? 0}%` },
+    { title: t(COL_KEY.attendRate), dataIndex: 'attendRate', key: 'attendRate', width: 100, align: 'right', sorter: true, render: (v?: number) => `${v ?? 0}%` },
     {
       title: t(COL_KEY.status), dataIndex: 'status', key: 'status', width: 120,
       render: (v: string) => <Tag color={MONTHLY_STATUS_TAG_COLOR[v] ?? 'default'}>{statusLabel(v)}</Tag>,
@@ -439,6 +441,10 @@ export default function AttendanceMonthlyReport() {
         }}
         scroll={{ x: 2400 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -447,7 +453,6 @@ export default function AttendanceMonthlyReport() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
     </div>

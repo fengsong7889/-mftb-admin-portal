@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   ENABLE_STATUS, HOLIDAY_TYPE, changeHolidayStatus, deleteHoliday, fetchHolidayStats, fetchHolidays,
   type HolidayVO,
@@ -75,6 +76,7 @@ export default function AttendanceHolidayList() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({ yearNo: dayjs().year() })
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
 
   const statsKey = useMemo(
@@ -85,7 +87,7 @@ export default function AttendanceHolidayList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchHolidays({ ...filters, page: pagination.page, size: pagination.size })
+      const res = await fetchHolidays({ ...filters, page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -96,7 +98,7 @@ export default function AttendanceHolidayList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size])
+  }, [filters, pagination.page, pagination.size, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchHolidayStats(filters).then(setStats).catch(() => setStats({}))
@@ -213,7 +215,7 @@ export default function AttendanceHolidayList() {
   }
 
   const columns: TableColumnsType<HolidayVO> = [
-    { title: t(COL_KEY.holidayDate), dataIndex: 'holidayDate', key: 'holidayDate', width: 140 },
+    { title: t(COL_KEY.holidayDate), dataIndex: 'holidayDate', key: 'holidayDate', width: 140, sorter: true },
     {
       title: t(COL_KEY.weekday), key: 'weekday', width: 90, align: 'center',
       render: (_, record) => weekdayOf(record.holidayDate),
@@ -240,7 +242,7 @@ export default function AttendanceHolidayList() {
       ),
     },
     { title: t(COL_KEY.updatedBy), dataIndex: 'updatedBy', key: 'updatedBy', width: 120, render: (v?: string) => v || '-' },
-    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, render: (v?: string) => v || '-' },
+    { title: t(COL_KEY.updatedAt), dataIndex: 'updatedAt', key: 'updatedAt', width: 170, sorter: true, render: (v?: string) => v || '-' },
     {
       title: t(COL_KEY.action), key: 'action', width: 160, fixed: 'right',
       render: (_, record) => (
@@ -379,6 +381,10 @@ export default function AttendanceHolidayList() {
         rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
         scroll={{ x: 1240 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -387,7 +393,6 @@ export default function AttendanceHolidayList() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
     </div>

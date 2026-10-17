@@ -408,6 +408,10 @@ export interface BatchResult {
 export interface PageQuery {
   page?: number
   size?: number
+  /** 服务端排序列 key（须与后端白名单一致）；不传=默认排序 */
+  sortField?: string
+  /** 排序方向：ascend/descend（与 antd sorter 一致，后端兼容 asc/desc） */
+  sortOrder?: string
 }
 
 /* ==================== 考勤组 ==================== */

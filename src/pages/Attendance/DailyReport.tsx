@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   fetchDailyStats, fetchDailySummaries, isMonthFrozen, recalculateDaily, type DailyVO,
 } from '../../api/attendance'
@@ -70,6 +71,7 @@ export default function AttendanceDailyReport() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({})
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
   const [recalculating, setRecalculating] = useState(false)
 
@@ -85,7 +87,7 @@ export default function AttendanceDailyReport() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchDailySummaries({ ...queryParams(filters), page: pagination.page, size: pagination.size })
+      const res = await fetchDailySummaries({ ...queryParams(filters), page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -96,7 +98,7 @@ export default function AttendanceDailyReport() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size, queryParams])
+  }, [filters, pagination.page, pagination.size, queryParams, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchDailyStats(queryParams(filters)).then(setStats).catch(() => setStats({}))
@@ -211,7 +213,7 @@ export default function AttendanceDailyReport() {
   }
 
   const columns: TableColumnsType<DailyVO> = [
-    { title: t(COL_KEY.workDate), dataIndex: 'workDate', key: 'workDate', width: 120, fixed: 'left' },
+    { title: t(COL_KEY.workDate), dataIndex: 'workDate', key: 'workDate', width: 120, fixed: 'left', sorter: true },
     { title: t(COL_KEY.groupName), dataIndex: 'groupName', key: 'groupName', width: 200, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t(COL_KEY.deptName), dataIndex: 'deptName', key: 'deptName', width: 150, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t(COL_KEY.shouldCount), dataIndex: 'shouldCount', key: 'shouldCount', width: 90, align: 'right' },
@@ -226,7 +228,7 @@ export default function AttendanceDailyReport() {
       render: (v?: number) => `${v ?? 0} h`,
     },
     {
-      title: t(COL_KEY.attendRate), dataIndex: 'attendRate', key: 'attendRate', width: 100, align: 'right',
+      title: t(COL_KEY.attendRate), dataIndex: 'attendRate', key: 'attendRate', width: 100, align: 'right', sorter: true,
       render: (v?: number) => `${v ?? 0}%`,
     },
     { title: t(COL_KEY.calculatedAt), dataIndex: 'calculatedAt', key: 'calculatedAt', width: 170, render: (v?: string) => v || '-' },
@@ -333,6 +335,10 @@ export default function AttendanceDailyReport() {
           // 双击行下钻到当天该部门的打卡明细：日报是结论，明细才是解释
           onDoubleClick: () => navigate(`/attendance-punch?date=${record.workDate}`),
         })}
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -341,7 +347,6 @@ export default function AttendanceDailyReport() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
     </div>

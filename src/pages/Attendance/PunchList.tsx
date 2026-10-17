@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
+import { useServerSort } from '../../hooks/useServerSort'
 import {
   PUNCH_RESULT, PUNCH_SOURCE, fetchPunchStats, fetchPunches, importPunches, syncPunches,
   type PunchImportRow, type PunchVO,
@@ -71,6 +72,7 @@ export default function AttendancePunchList() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [filters, setFilters] = useState<FilterValues>({})
   const [pagination, setPagination] = useState({ page: 1, size: 20 })
+  const { sort, applySorter } = useServerSort()
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
 
   // 同步弹窗
@@ -101,7 +103,7 @@ export default function AttendancePunchList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchPunches({ ...queryParams(filters), page: pagination.page, size: pagination.size })
+      const res = await fetchPunches({ ...queryParams(filters), page: pagination.page, size: pagination.size, sortField: sort.field, sortOrder: sort.order })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
       setLoadFailed(false)
@@ -112,7 +114,7 @@ export default function AttendancePunchList() {
     } finally {
       setLoading(false)
     }
-  }, [filters, pagination.page, pagination.size, queryParams])
+  }, [filters, pagination.page, pagination.size, queryParams, sort.field, sort.order])
 
   const loadStats = useCallback(() => {
     fetchPunchStats(queryParams(filters)).then(setStats).catch(() => setStats({}))
@@ -234,7 +236,7 @@ export default function AttendancePunchList() {
   }
 
   const columns: TableColumnsType<PunchVO> = [
-    { title: t(COL_KEY.punchAt), dataIndex: 'punchAt', key: 'punchAt', width: 170 },
+    { title: t(COL_KEY.punchAt), dataIndex: 'punchAt', key: 'punchAt', width: 170, sorter: true },
     { title: t(COL_KEY.empNo), dataIndex: 'empNo', key: 'empNo', width: 110 },
     { title: t(COL_KEY.empName), dataIndex: 'empName', key: 'empName', width: 100 },
     { title: t(COL_KEY.deptName), dataIndex: 'deptName', key: 'deptName', width: 140, ellipsis: true, render: (v?: string) => v || '-' },
@@ -390,6 +392,10 @@ export default function AttendancePunchList() {
         rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys }}
         scroll={{ x: 1440 }}
         size="middle"
+        onChange={(pag, _filters, sorter) => {
+          const sortChanged = applySorter(sorter)
+          setPagination(p => ({ page: sortChanged ? 1 : (pag.current ?? 1), size: pag.pageSize ?? p.size }))
+        }}
         pagination={{
           current: pagination.page,
           pageSize: pagination.size,
@@ -398,7 +404,6 @@ export default function AttendancePunchList() {
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: (count) => t('common.totalRecords', { count }),
-          onChange: (page, size) => setPagination({ page: size !== pagination.size ? 1 : page, size: size || 20 }),
         }}
       />
 
