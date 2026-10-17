@@ -252,7 +252,7 @@ export default function VersionTrace() {
           dataSource={[...(trace?.requirements ?? [])].sort((a, b) => (b.reqId === sourceReqId ? 1 : 0) - (a.reqId === sourceReqId ? 1 : 0))}
           scroll={{ x: 1500 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],

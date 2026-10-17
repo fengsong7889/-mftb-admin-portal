@@ -34,9 +34,9 @@ const RANGE_PRESETS = [
 
 /** 日历类型选项（与后端 RdmWorkCalendar.TYPE_* 对应） */
 const DAY_TYPE_OPTIONS = [
-  { value: 'leave', label: '休假（当天不排活）' },
-  { value: 'overtime', label: '加班日（周末可用）' },
-  { value: 'custom', label: '自定义容量' },
+  { value: 'leave', label: '休假（當天不排活）' },
+  { value: 'overtime', label: '加班日（週末可用）' },
+  { value: 'custom', label: '自定義容量' },
 ]
 
 /** 日历编辑行 */
@@ -145,7 +145,7 @@ export default function WorkloadPanel() {
           <Space size={4}>
             <span style={{ color, fontWeight: 600 }}>{value}%</span>
             {(r.overloadedDays ?? 0) > 0 && (
-              <Tooltip title={`有 ${r.overloadedDays} 天的计划工时超过当天可用容量`}>
+              <Tooltip title={`有 ${r.overloadedDays} 天的計劃工時超過當天可用容量`}>
                 <Tag color="error" style={{ margin: 0 }}>過載 {r.overloadedDays} 天</Tag>
               </Tooltip>
             )}
@@ -222,14 +222,14 @@ export default function WorkloadPanel() {
         dataSource={data?.people ?? []}
         pagination={false}
         scroll={{ x: 'max-content' }}
-        locale={{ emptyText: '所选区间内没有已排期的任务（未填计划起止的任务不会出现在这里）' }}
+        locale={{ emptyText: '所選區間内沒有已排期的任務（未填計劃起止的任務不會出現在這裡）' }}
       />
 
       {/* 个人工作日历：排程与负载的输入，只记例外日 */}
       <div className="rdm-card">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><CalendarOutlined /></span>
-          我的工作日历
+          我的工作日曆
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
             默認為週一至週五 8 小時，這裡只登記例外；請假會直接把關鍵路徑往後推

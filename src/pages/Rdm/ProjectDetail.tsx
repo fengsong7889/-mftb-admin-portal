@@ -447,15 +447,19 @@ export default function ProjectDetail() {
             {detail.planStartDate && ` · 計劃 ${detail.planStartDate} ~ ${detail.planEndDate || '待定'}`}
           </span>
         }
-        right={
-          <Space size={8}>
-            <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
-            <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
-            <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-delivery-item?projectId=${detail.id}&mode=create`)}>新增交付項</Button>
-          </Space>
-        }
       />
+
+      {/* 头部只留返回 + 标题 + 状态/编号（§C.2）：刷新/催办/编辑/新增都属于操作区 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
+          <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
+        </div>
+        <div className="action-section-right">
+          <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-delivery-item?projectId=${detail.id}&mode=create`)}>新增交付項</Button>
+        </div>
+      </div>
 
       {/* ── 主體：左側內容 + 右側邊欄 ── */}
       <div className="rdm-detail-grid">
@@ -473,8 +477,7 @@ export default function ProjectDetail() {
             <Descriptions
               column={4}
               size="small"
-              labelStyle={{ color: '#8C8C8C', fontSize: 12 }}
-              contentStyle={{ color: '#262626', fontSize: 13 }}
+              styles={{ label: { color: '#8C8C8C', fontSize: 12 }, content: { color: '#262626', fontSize: 13 } }}
             >
               <Descriptions.Item label="項目目標" span={4}>
                 {detail.objective || <span style={{ color: '#BFBFBF' }}>未設定</span>}
@@ -783,7 +786,7 @@ export default function ProjectDetail() {
         confirmLoading={memberSubmitting}
         okText="確認添加"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
           <div>
@@ -829,8 +832,7 @@ export default function ProjectDetail() {
               message="催辦已接 executeOnce：同一提醒日重複點擊會回放首次結果，並非重複發送。"
             />
             <Descriptions column={2} size="small" bordered
-              labelStyle={{ color: '#8C8C8C', fontSize: 12 }}
-              contentStyle={{ fontSize: 13 }}
+              styles={{ label: { color: '#8C8C8C', fontSize: 12 }, content: { fontSize: 13 } }}
             >
               <Descriptions.Item label="已通知">{urgeResult.notified ?? 0}</Descriptions.Item>
               <Descriptions.Item label="已去重(同提醒日)">{urgeResult.deduped ?? 0}</Descriptions.Item>

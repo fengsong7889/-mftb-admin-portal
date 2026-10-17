@@ -132,7 +132,7 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
       {records.length > 0 && postRecords.length > 0 && (
         <div style={{ fontSize: 12, color: '#52C41A', fontWeight: 600, margin: '4px 0 6px' }}>
           {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.POST_RELEASE]}
-          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>正式满意度口径</span>
+          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>正式滿意度口徑</span>
         </div>
       )}
       {renderRecords(postRecords)}
@@ -140,7 +140,7 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
       {records.length > 0 && preRecords.length > 0 && (
         <div style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 600, margin: '10px 0 6px' }}>
           {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.PRE_RELEASE]}
-          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>不計入正式满意度</span>
+          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>不計入正式滿意度</span>
         </div>
       )}
       {renderRecords(preRecords)}

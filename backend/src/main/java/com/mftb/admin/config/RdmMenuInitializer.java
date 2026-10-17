@@ -108,8 +108,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 3) 需求中心：业务侧提出与审批 + 分配侧统筹（复用 rdm-pool-group key）
             {"rdm-pool-group", "需求中心", "Requirement Center", null, null, "ContainerOutlined", "1", "18", null, VIEW_ONLY},
             {"rdm-intake-approval", "提需求", "Submit Requirement", "/rdm-intake-approval", "RequirementIntake", "SendOutlined", "2", "1", "rdm-pool-group", VIEW_ONLY},
-            {"rdm-intake", "认领/分配", "Claim & Assign", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "2", "rdm-pool-group", FULL_ACTIONS},
-            {"rdm-requirement", "需求跟进清单", "Requirement Follow-up", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "3", "rdm-pool-group", LIST_ACTIONS},
+            {"rdm-intake", "認領/分配", "Claim & Assign", "/rdm-intake", "RequirementPool", "InboxOutlined", "2", "2", "rdm-pool-group", FULL_ACTIONS},
+            {"rdm-requirement", "需求跟進清單", "Requirement Follow-up", "/rdm-requirement", "RequirementList", "FileTextOutlined", "2", "3", "rdm-pool-group", LIST_ACTIONS},
             // 4) 研發執行：研发同学日常任务与工时上报（复用 rdm-delivery key）
             {"rdm-delivery", "研發執行", "Development", null, null, "NodeIndexOutlined", "1", "19", null, VIEW_ONLY},
             {"rdm-delivery-board", "研發工作台", "Dev Workbench", "/rdm-delivery", "DeliveryBoard", "RocketOutlined", "2", "1", "rdm-delivery", DELIVERY_ACTIONS},
@@ -153,10 +153,16 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 历史改名保留（确保未升级环境也能改过来）
             {"rdm-requirement", "需求清單", "需求台賬"},
             {"rdm-requirement", "需求清單", "我的需求"},
-            {"rdm-requirement", "需求跟进清单", "需求清單"},
+            {"rdm-requirement", "需求跟進清單", "需求清單"},
+            {"rdm-requirement", "需求跟進清單", "需求台賬"},
+            {"rdm-requirement", "需求跟進清單", "我的需求"},
+            // 种子名曾误写简体（菜单名会写进 DB 并对用户可见，界面文案必须繁体）：
+            // upsert 对已存在行不改 name，所以存量环境必须靠这里的旧名条件 UPDATE 才能改过来。
+            {"rdm-requirement", "需求跟進清單", "需求跟进清单"},
             {"rdm-intake", "需求管理", "需求池·分配"},
             {"rdm-intake", "需求管理", "需求池/分配"},
-            {"rdm-intake", "认领/分配", "需求管理"},
+            {"rdm-intake", "認領/分配", "需求管理"},
+            {"rdm-intake", "認領/分配", "认领/分配"},
             {"rdm-intake-approval", "提需求", "提交需求"},
     };
 

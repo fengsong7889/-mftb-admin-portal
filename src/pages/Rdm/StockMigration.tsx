@@ -12,7 +12,7 @@
  * 權限：rdm-delivery:view 可讀；rdm-delivery:edit 才可執行寫動作（與後端 @RequirePermission 一致）。
  * 危險動作（執行/暫停/回退）一律走 Modal.confirm + custom-confirm-modal。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert, Button, Descriptions, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message,
 } from 'antd'
@@ -22,6 +22,9 @@ import {
   ReloadOutlined, RollbackOutlined, SafetyCertificateOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
+import { formatRdmDateTime } from './datetime'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -154,7 +157,7 @@ export default function StockMigration() {
           setDetail(res)
           message.success('已主責確認，可開始小批執行')
           loadBatches(statusFilter)
-        } catch { /* request.ts 已统一弹 */ } finally { setActing(false) }
+        } catch { /* request.ts 已統一彈 */ } finally { setActing(false) }
       },
     })
   }
@@ -176,7 +179,7 @@ export default function StockMigration() {
           setChunkResult(res)
           message.success(`分塊執行完成：成功 ${res.successInChunk ?? 0}、失敗 ${res.failedInChunk ?? 0}、剩餘 ${res.remaining ?? 0}`)
           await openDetail(batch.batchId); loadBatches(statusFilter)
-        } catch { /* request.ts 已统一弹 */ } finally { setActing(false) }
+        } catch { /* request.ts 已統一彈 */ } finally { setActing(false) }
       },
     })
   }
@@ -189,7 +192,7 @@ export default function StockMigration() {
       setDetail(res)
       message.success('已恢復遷移')
       loadBatches(statusFilter)
-    } catch { /* request.ts 已统一弹 */ } finally { setActing(false) }
+    } catch { /* request.ts 已統一彈 */ } finally { setActing(false) }
   }
 
   // ── 對賬 ──
@@ -200,7 +203,7 @@ export default function StockMigration() {
       setReconcileResult(res)
       if (res.countConsistent && res.traceable) message.success('對賬通過：數量一致且逐項可追溯')
       else message.warning('對賬發現不一致，請查看詳情')
-    } catch { /* request.ts 已统一弹 */ } finally { setActing(false) }
+    } catch { /* request.ts 已統一彈 */ } finally { setActing(false) }
   }
 
   // ── 暫停/回退：先在表單 Modal 收集原因，再 Modal.confirm 二次確認 ──
@@ -243,7 +246,7 @@ export default function StockMigration() {
             setReasonModal({ open: false, action })
             reasonForm.resetFields()
             loadBatches(statusFilter)
-          } catch { /* request.ts 已统一弹 */ } finally { setActing(false) }
+          } catch { /* request.ts 已統一彈 */ } finally { setActing(false) }
         },
       })
     } catch (err) {
@@ -252,7 +255,7 @@ export default function StockMigration() {
   }
 
   // ── 預覽項列 ──
-  const previewColumns: TableColumnsType<RdmMigrationItemPreview> = [
+  const previewColumns: TableColumnsType<RdmMigrationItemPreview> = useMemo(() => [
     { title: '交付項ID', dataIndex: 'itemId', key: 'itemId', width: 90 },
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 130, render: (v?: string | null) => v || '-' },
     { title: '標題', dataIndex: 'title', key: 'title', ellipsis: true, render: (v?: string | null) => v || '-' },
@@ -265,10 +268,11 @@ export default function StockMigration() {
       title: '影響面（結構性 V3 事實，不含證據）', dataIndex: 'impacts', key: 'impacts',
       render: (impacts: string[]) => (impacts?.length ? impacts.join('；') : '-'),
     },
-  ]
+    // 列定义包进 useMemo：下面要用它做「字段設置」候选的依赖，不包会每渲染都变
+  ], [])
 
   // ── 明細項列 ──
-  const itemColumns: TableColumnsType<RdmMigrationItemDetail> = [
+  const itemColumns: TableColumnsType<RdmMigrationItemDetail> = useMemo(() => [
     { title: '交付項ID', dataIndex: 'itemId', key: 'itemId', width: 90 },
     { title: '需求ID', dataIndex: 'reqId', key: 'reqId', width: 90, render: (v?: number | null) => v ?? '-' },
     { title: '目標項目ID', dataIndex: 'targetProjectId', key: 'targetProjectId', width: 110, render: (v?: number | null) => v ?? '-' },
@@ -281,10 +285,10 @@ export default function StockMigration() {
       render: () => <Tag color="gold" style={{ margin: 0 }}>遷移生成·未測試/未驗收/未發布</Tag>,
     },
     { title: '阻塞原因', dataIndex: 'blockingReason', key: 'blockingReason', render: (v?: string | null) => v || '-' },
-  ]
+  ], [])
 
   // ── 批次列表列 ──
-  const batchColumns: TableColumnsType<RdmMigrationBatchDetail> = [
+  const batchColumns: TableColumnsType<RdmMigrationBatchDetail> = useMemo(() => [
     { title: '批次', dataIndex: 'batchId', key: 'batchId', width: 80, render: (v: number) => `#${v}` },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
@@ -293,12 +297,35 @@ export default function StockMigration() {
     { title: '分塊大小', dataIndex: 'chunkSize', key: 'chunkSize', width: 90, render: (v?: number | null) => v ?? '-' },
     { title: '預覽哈希', dataIndex: 'previewHash', key: 'previewHash', width: 160, ellipsis: true, render: (v?: string | null) => v || '-' },
     { title: '確認人', dataIndex: 'confirmedBy', key: 'confirmedBy', width: 90, render: (v?: number | null) => v ?? '未確認' },
-    { title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v?: string | null) => v?.slice(0, 16).replace('T', ' ') || '-' },
+    { title: '創建時間', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v?: string | number | null) => formatRdmDateTime(v) },
     {
       title: '操作', key: 'action', width: 90, fixed: 'right',
       render: (_, record) => <Button type="link" size="small" onClick={() => openDetail(record.batchId)}>查看詳情</Button>,
     },
-  ]
+  ], [openDetail])
+
+  /*
+   * 三张表各自一份列配置（§E.3）：预览表讲“能不能迁”（阻塞原因/影响面）、
+   * 明细表讲“迁成了什么”、批次表是操作入口；列集不同，共用 pageKey 会互相干扰。
+   */
+  const previewMeta = useMemo(() => deriveRdmColumnMeta(previewColumns), [previewColumns])
+  const itemMeta = useMemo(() => deriveRdmColumnMeta(itemColumns), [itemColumns])
+  const batchMeta = useMemo(() => deriveRdmColumnMeta(batchColumns), [batchColumns])
+  const { configComponent: previewConfig, applyConfig: applyPreview } = useColumnConfig(
+    'rdm-stock-preview-items', previewMeta,
+    [{ key: 'itemId', visible: true, locked: 'head' as const }],
+  )
+  const { configComponent: itemConfig, applyConfig: applyItem } = useColumnConfig(
+    'rdm-stock-detail-items', itemMeta,
+    [{ key: 'itemId', visible: true, locked: 'head' as const }],
+  )
+  const { configComponent: batchConfig, applyConfig: applyBatch } = useColumnConfig(
+    'rdm-stock-batches', batchMeta,
+    [{ key: 'batchId', visible: true, locked: 'head' as const }, { key: 'action', visible: true, locked: 'tail' as const }],
+  )
+  const visiblePreviewColumns = applyPreview(previewColumns) as typeof previewColumns
+  const visibleItemColumns = applyItem(itemColumns) as typeof itemColumns
+  const visibleBatchColumns = applyBatch(batchColumns) as typeof batchColumns
 
   const status = detail?.status
   const canExecute = !!detail && EXECUTABLE_STATUS.includes(status ?? '')
@@ -357,7 +384,7 @@ export default function StockMigration() {
         {preview && (
           <div style={{ marginTop: 16 }}>
             <Descriptions size="small" column={4} bordered style={{ marginBottom: 12 }}
-              labelStyle={{ color: '#8C8C8C', fontSize: 12 }} contentStyle={{ fontSize: 13 }}>
+              styles={{ label: { color: '#8C8C8C', fontSize: 12 }, content: { fontSize: 13 } }}>
               <Descriptions.Item label="批次">#{preview.batchId}</Descriptions.Item>
               <Descriptions.Item label="狀態">
                 <Tag color={RDM_STOCK_MIGRATION_BATCH_STATUS_COLOR[preview.status] ?? 'default'}>{RDM_STOCK_MIGRATION_BATCH_STATUS_LABEL[preview.status] ?? preview.status}</Tag>
@@ -370,10 +397,17 @@ export default function StockMigration() {
               <Descriptions.Item label="預覽哈希">{preview.previewHash ?? '-'}</Descriptions.Item>
             </Descriptions>
             <Table<RdmMigrationItemPreview>
-              rowKey="itemId" size="small" columns={previewColumns} dataSource={preview.items ?? []}
-              pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }} scroll={{ x: 900 }}
+              rowKey="itemId" size="small" columns={visiblePreviewColumns} dataSource={preview.items ?? []}
+              pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showTotal: t => `共 ${t} 條`,
+              }} scroll={{ x: 900 }}
             />
             <Space style={{ marginTop: 12 }}>
+              {previewConfig}
               <Button icon={<ThunderboltOutlined />} disabled={!canEdit} onClick={() => openDetail(preview.batchId)}>
                 進入批次詳情主責確認
               </Button>
@@ -394,11 +428,18 @@ export default function StockMigration() {
               value={statusFilter} onChange={v => setStatusFilter(v)}
             />
             <Button icon={<ReloadOutlined />} onClick={() => loadBatches(statusFilter)}>刷新</Button>
+            {batchConfig}
           </Space>
         </div>
         <Table<RdmMigrationBatchDetail>
-          rowKey="batchId" size="small" loading={listLoading} columns={batchColumns} dataSource={batches}
-          pagination={{ pageSize: 10, showTotal: t => `共 ${t} 個批次` }} scroll={{ x: 800 }}
+          rowKey="batchId" size="small" loading={listLoading} columns={visibleBatchColumns} dataSource={batches}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 個批次`,
+          }} scroll={{ x: 800 }}
           locale={{ emptyText: <Empty description="暫無遷移批次" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         />
       </div>
@@ -450,14 +491,14 @@ export default function StockMigration() {
           </Space>
 
           <Descriptions size="small" column={4} bordered style={{ marginBottom: 16 }}
-            labelStyle={{ color: '#8C8C8C', fontSize: 12 }} contentStyle={{ fontSize: 13 }}>
+            styles={{ label: { color: '#8C8C8C', fontSize: 12 }, content: { fontSize: 13 } }}>
             <Descriptions.Item label="分塊大小">{detail.chunkSize ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="版本">v{detail.version ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="預覽哈希">{detail.previewHash ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="請求ID">{detail.requestId ?? '-'}</Descriptions.Item>
             <Descriptions.Item label="確認人">{detail.confirmedBy ?? '未確認'}</Descriptions.Item>
-            <Descriptions.Item label="確認時間">{detail.confirmedAt?.slice(0, 16).replace('T', ' ') || '-'}</Descriptions.Item>
-            <Descriptions.Item label="暫停時間">{detail.pausedAt?.slice(0, 16).replace('T', ' ') || '-'}</Descriptions.Item>
+            <Descriptions.Item label="確認時間">{formatRdmDateTime(detail.confirmedAt)}</Descriptions.Item>
+            <Descriptions.Item label="暫停時間">{formatRdmDateTime(detail.pausedAt)}</Descriptions.Item>
             <Descriptions.Item label="暫停原因">{detail.pauseReason || '-'}</Descriptions.Item>
           </Descriptions>
 
@@ -509,24 +550,39 @@ export default function StockMigration() {
           )}
 
           {/* 明細項（標注未測試/未驗收/未發布） */}
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '8px 0' }}>遷移明細（{detail.items?.length ?? 0}）</div>
+          <div style={{ fontSize: 13, fontWeight: 600, margin: '8px 0' }}>
+            <span style={{ marginRight: 8 }}>遷移明細（{detail.items?.length ?? 0}）</span>
+            {itemConfig}
+          </div>
           <Table<RdmMigrationItemDetail>
-            rowKey="itemId" size="small" columns={itemColumns} dataSource={detail.items ?? []}
-            pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }} scroll={{ x: 900 }}
+            rowKey="itemId" size="small" columns={visibleItemColumns} dataSource={detail.items ?? []}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: t => `共 ${t} 條`,
+            }} scroll={{ x: 900 }}
           />
 
           {/* 審計（追加式、不可覆蓋） */}
           <div style={{ fontSize: 13, fontWeight: 600, margin: '16px 0 8px' }}>審計軌跡（{detail.audits?.length ?? 0}）</div>
           <Table
             rowKey="id" size="small" dataSource={detail.audits ?? []}
-            pagination={{ pageSize: 5 }}
+            pagination={{
+              defaultPageSize: 5,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: ['5', '10', '20', '50'],
+              showTotal: t => `共 ${t} 條`,
+            }}
             columns={[
               { title: '動作', dataIndex: 'action', key: 'action', width: 120 },
               { title: '結果', dataIndex: 'result', key: 'result', width: 120 },
               { title: '操作人', dataIndex: 'operatorUserId', key: 'op', width: 90, render: (v?: number | null) => v ?? '-' },
               { title: '版本', key: 'ver', width: 110, render: (_, r) => `${r.beforeVersion ?? '-'} → ${r.afterVersion ?? '-'}` },
               { title: '原因', dataIndex: 'reason', key: 'reason', render: (v?: string | null) => v || '-' },
-              { title: '時間', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v?: string | null) => v?.slice(0, 16).replace('T', ' ') || '-' },
+              { title: '時間', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: (v?: string | number | null) => formatRdmDateTime(v) },
             ]}
           />
         </div>
@@ -541,7 +597,7 @@ export default function StockMigration() {
         confirmLoading={acting}
         okText="下一步"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={reasonForm} layout="vertical">
           <Form.Item name="reason" label="原因" rules={[{ required: true, message: '請填寫原因（審計留痕）' }]}>

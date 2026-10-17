@@ -40,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -761,7 +762,7 @@ public class RdmDeliveryItemService {
     }
 
     private Map<Long, Integer> computeTaskProgressBatch(List<Long> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) return Map.of();
+        if (itemIds == null || itemIds.isEmpty()) return Collections.emptyMap();
         List<RdmWorkTask> tasks = taskMapper.selectList(new LambdaQueryWrapper<RdmWorkTask>()
                 .in(RdmWorkTask::getDeliveryItemId, itemIds));
         Map<Long, List<RdmWorkTask>> grouped = tasks.stream()
@@ -776,7 +777,7 @@ public class RdmDeliveryItemService {
     }
 
     private Map<Long, String> computeTestStatusBatch(List<Long> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) return Map.of();
+        if (itemIds == null || itemIds.isEmpty()) return Collections.emptyMap();
         // 简化：对每个 itemId 独立计算（批量场景可优化为单次全查后分组）
         return itemIds.stream().collect(Collectors.toMap(id -> id, id -> {
             String s = computeTestStatus(id);
@@ -785,42 +786,64 @@ public class RdmDeliveryItemService {
     }
 
     private Map<Long, String> computeAcceptanceStatusBatch(List<Long> itemIds) {
-        if (itemIds == null || itemIds.isEmpty()) return Map.of();
+        if (itemIds == null || itemIds.isEmpty()) return Collections.emptyMap();
         return itemIds.stream().collect(Collectors.toMap(id -> id, id -> {
             String s = computeAcceptanceStatus(id);
             return s == null ? "" : s;
         }, (a, b) -> a));
     }
 
+    /**
+     * 批量装配的空集兜底一律用 {@code Collections.emptyMap()}，禁止 {@code Map.of()}：
+     * 调用方用可能为 NULL 的外键回取（如 {@code item.getProjectId()}），而 JDK 不可变 Map 的
+     * {@code get(null)} 会抛 NPE（HashMap 只返回 null）。整页结果的关联外键全为 NULL 时，
+     * 列表接口就会 500「系統繁忙」——真实原因被 GlobalExceptionHandler 兜住，用户与监控都看不到。
+     */
     private Map<Long, String> loadReqTitles(List<Long> reqIds) {
-        if (reqIds == null || reqIds.isEmpty()) return Map.of();
+        if (reqIds == null || reqIds.isEmpty()) return Collections.emptyMap();
         return requirementMapper.selectBatchIds(reqIds).stream()
                 .collect(Collectors.toMap(RdmRequirement::getId, r -> r.getTitle() == null ? "" : r.getTitle(), (a, b) -> a));
     }
 
     private Map<Long, String> loadReqNos(List<Long> reqIds) {
-        if (reqIds == null || reqIds.isEmpty()) return Map.of();
+        if (reqIds == null || reqIds.isEmpty()) return Collections.emptyMap();
         return requirementMapper.selectBatchIds(reqIds).stream()
                 .collect(Collectors.toMap(RdmRequirement::getId, r -> r.getReqNo() == null ? "" : r.getReqNo(), (a, b) -> a));
     }
 
     private Map<Long, String> loadProjectNames(List<Long> projectIds) {
-        if (projectIds == null || projectIds.isEmpty()) return Map.of();
+        if (projectIds == null || projectIds.isEmpty()) return Collections.emptyMap();
         return projectMapper.selectBatchIds(projectIds).stream()
                 .collect(Collectors.toMap(RdmProject::getId, p -> p.getName() == null ? "" : p.getName(), (a, b) -> a));
     }
 
+    /**
+     * 验收路径解析：DTO > 项目默认 > A。
+     *
+     * <p>必须在此收敛枚举：库里 acceptance_path 是 VARCHAR(10) 且只有 A/B 两种语义，
+     * 旧写法把任意传入值大写后直接落库，超长的字符串会撞 MysqlDataTruncation，
+     * 被 GlobalExceptionHandler 兜成「數據庫操作異常, 請稍後重試」——用户看不到是自己选错了路径，
+     * 监控里也只有一条无业务语义的 500（端到端实跑时送 acceptancePath=PRODUCT_ONLY 即复现）。
+     * 不能只靠前端下拉兜底：接口是边界。
+     */
     private String resolveAcceptancePath(String dtoPath, Long projectId) {
         if (StringUtils.hasText(dtoPath)) {
-            return dtoPath.toUpperCase();
+            return requireAcceptancePath(dtoPath.toUpperCase());
         }
         if (projectId != null) {
             RdmProject project = projectMapper.selectById(projectId);
             if (project != null && StringUtils.hasText(project.getDefaultAcceptancePath())) {
-                return project.getDefaultAcceptancePath();
+                return requireAcceptancePath(project.getDefaultAcceptancePath().toUpperCase());
             }
         }
         return RdmConstants.PATH_A;
+    }
+
+    private String requireAcceptancePath(String path) {
+        if (!RdmConstants.PATH_A.equals(path) && !RdmConstants.PATH_B.equals(path)) {
+            throw new BusinessException("驗收路徑只支持 A（先驗收後上線）或 B（先上線後驗收），當前值：" + path);
+        }
+        return path;
     }
 
     private String resolveUserName(Long userId, String fallback) {

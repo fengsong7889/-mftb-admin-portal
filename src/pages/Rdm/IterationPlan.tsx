@@ -177,6 +177,21 @@ export default function IterationPlan() {
 
   return (
     <div className="content-area">
+      {/* 統計卡必須在操作區上方（§E.8）：先給口徑數字，再給動作入口 */}
+      <div style={{ marginBottom: 16 }}>
+        <StatCards
+          animationKey="iteration"
+          items={[
+            { key: 'total', icon: <FieldTimeOutlined />, value: stats.total, label: '迭代總數', color: 'info' },
+            { key: 'active', icon: <FieldTimeOutlined />, value: stats.active, label: '進行中', color: 'brand' },
+            { key: 'planning', icon: <FieldTimeOutlined />, value: stats.planning, label: '規劃中', color: 'system' },
+            { key: 'over', icon: <AlertOutlined />, value: stats.overloaded, label: '超載迭代', color: 'system' },
+            { key: 'req', icon: <FieldTimeOutlined />, value: stats.reqs, label: '已排需求', color: 'success' },
+            { key: 'hours', icon: <FieldTimeOutlined />, value: Number(stats.hours.toFixed(1)), decimals: 1, suffix: ' h', label: '已排工時', color: 'info' },
+          ]}
+        />
+      </div>
+
       <div className="action-section">
         <div className="action-section-left">
           <Tag icon={<FieldTimeOutlined />} color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', padding: '0 12px', borderRadius: 6 }}>
@@ -193,20 +208,6 @@ export default function IterationPlan() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <StatCards
-          animationKey="iteration"
-          items={[
-            { key: 'total', icon: <FieldTimeOutlined />, value: stats.total, label: '迭代總數', color: 'info' },
-            { key: 'active', icon: <FieldTimeOutlined />, value: stats.active, label: '進行中', color: 'brand' },
-            { key: 'planning', icon: <FieldTimeOutlined />, value: stats.planning, label: '規劃中', color: 'system' },
-            { key: 'over', icon: <AlertOutlined />, value: stats.overloaded, label: '超載迭代', color: 'system' },
-            { key: 'req', icon: <FieldTimeOutlined />, value: stats.reqs, label: '已排需求', color: 'success' },
-            { key: 'hours', icon: <FieldTimeOutlined />, value: Number(stats.hours.toFixed(1)), decimals: 1, suffix: ' h', label: '已排工時', color: 'info' },
-          ]}
-        />
-      </div>
-
       <Table<RdmIterationItem>
         className="nowrap-table"
         rowKey="id"
@@ -215,7 +216,7 @@ export default function IterationPlan() {
         dataSource={rows}
         scroll={{ x: 1500 }}
         pagination={{
-          pageSize: 10,
+          defaultPageSize: 10,
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],

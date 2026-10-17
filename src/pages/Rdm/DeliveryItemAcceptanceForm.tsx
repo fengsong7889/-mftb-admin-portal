@@ -134,7 +134,7 @@ export default function DeliveryItemAcceptanceForm() {
     }
     if (needStructuredConditions) {
       const valid = conditions.filter(c => c.condition.trim() && c.deadline.trim() && c.owner.trim())
-      if (valid.length === 0) return '有條件通過必須至少填寫一條整改條件（條件/期限/責任人齐全）'
+      if (valid.length === 0) return '有條件通過必須至少填寫一條整改條件（條件/期限/責任人齊全）'
       if (valid.length !== conditions.length) return '每條整改條件都必須含 條件/期限/責任人，請補全或刪除空行'
     }
     if (evidenceJson.trim()) {

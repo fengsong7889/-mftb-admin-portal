@@ -27,6 +27,7 @@ import {
   type RdmTestBatchSubmitForm,
 } from '../../api/rdm'
 import { fetchEmployeeIdOptions } from '../../api/employee'
+import { formatRdmReqNo } from '../../constants/rdm'
 
 /** 测试环境选项（提测页唯一消费方，故随页定义，不进全局常量） */
 const TEST_ENV_OPTIONS = [
@@ -57,12 +58,18 @@ export default function TestBatchSubmit() {
   const [leadName, setLeadName] = useState('')
   const [executorOptions, setExecutorOptions] = useState<{ value: string; label: string }[]>([])
 
-  /** 需求清单：与列表页原行为一致，取研发交付范围内前 50 条本地模糊匹配 */
+  /**
+   * 需求清单：取研发交付范围内前 50 条本地模糊匹配。
+   * <p>必须带 flowVersion=3：提测批次是 V3 分批交付专属入口，服务端准入会直接拒
+   * flow_version != 3 的需求（「該需求非新版交付流程，無法使用提測批次」）。
+   * 不在候选侧同源过滤，用户会在下拉里选得到、提交时被拒，两侧口径必须一致。
+   */
   const loadRequirements = useCallback(async () => {
     if (reqOptions.length) return
     try {
-      const res = await fetchRequirementPage({ size: 50, page: 1, scope: 'delivery' })
-      setReqOptions((res.records ?? []).map(r => ({ value: r.id, label: `${r.reqNo} ${r.title}` })))
+      const res = await fetchRequirementPage({ size: 50, page: 1, scope: 'delivery', flowVersion: 3 })
+      // reqNo 在认领前为 null（延迟发号），统一走占位文案，不渲染出 "null"
+      setReqOptions((res.records ?? []).map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} ${r.title}` })))
     } catch {
       // request.ts 已统一弹后端错误，此处不双弹（§G.4）
     }
@@ -82,7 +89,7 @@ export default function TestBatchSubmit() {
   const searchExecutors = async (keyword: string) => {
     try {
       setExecutorOptions(await fetchEmployeeIdOptions(keyword))
-    } catch { /* 下拉搜索失败保持原选项，不打断填写 */ }
+    } catch { /* 下拉搜索失敗保持原選項，不打斷填寫 */ }
   }
 
   const handleSubmit = async () => {
@@ -90,7 +97,7 @@ export default function TestBatchSubmit() {
     try {
       values = await form.validateFields()
     } catch {
-      message.warning('請先補全帶 * 的必填項')
+      message.warning('請先補全提測表單帶 * 的必填項')
       return
     }
     if (!values.testLeadUserId) {

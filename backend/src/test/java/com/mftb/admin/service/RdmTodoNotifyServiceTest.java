@@ -603,6 +603,13 @@ class RdmTodoNotifyServiceTest {
     void manualUrgeActuallyRunsBusinessAction() {
         givenProjectBoard(project(PROJECT_ID, PM), PM,
                 board(todo(RdmConstants.NOTIFY_OBJECT_DELIVERY_ITEM, 11L, OWNER, 2, 1)));
+        /*
+         * 手动催办内部用 LocalDate.now() 当提醒日，而「今天必须是责任人真实工作日」是第一道闸门：
+         * 不排日历时周末跑本用例会因闸门拦下所有人而得到 notified=0（用例本身与星期无关）。
+         * 这里把「今天」显式排成 OWNER 的加班支援日，使用例在任何日期都稳定，
+         * 且不放宽断言（仍然要求真正跑完业务动作、真正发出通知）。
+         */
+        calendarRow(OWNER, LocalDate.now(), RdmWorkCalendar.TYPE_OVERTIME, "8");
         doReturn(null).when(idempotentService).executeOnce(any(IdempotentKey.class), any(Supplier.class), any());
         ArgumentCaptor<Supplier<RdmTodoNotifyService.TodoNotifyResult>> supplier =
                 ArgumentCaptor.forClass(Supplier.class);

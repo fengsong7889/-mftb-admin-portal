@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.RdmConfigVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,9 @@ import java.util.Map;
 /**
  * RDM 配置服务：状态定义、流转规则、SLA、分发矩阵。
  * <p>配置表读写走 JdbcTemplate（低频、结构稳定），业务单据仍由各实体 Mapper 负责。
+ * <p><b>校验与业务规则失败一律抛 {@link BusinessException}</b>：抛 IllegalArgumentException 会落到
+ * GlobalExceptionHandler 的兜底分支，前端只看到「系統繁忙, 請稍後重試」，
+ * 真实原因（如「尚有 N 個需求處於該狀態，不能停用」）对用户完全不可见。
  */
 @Slf4j
 @Service
@@ -187,32 +191,92 @@ public class RdmConfigService {
         return list;
     }
 
-    /** 保存分发矩阵（id 为空视为新增）；operator 为登录人签名 */
+    /**
+     * 保存分发矩阵（id 为空视为新增）；operator 为登录人签名。
+     *
+     * <p><b>enabled 必须一路到底</b>：新增分支原先把 status 写死 1，用户在界面上勾「停用」新建，
+     * 刷新后却变成啟用，且这条规则会立刻参与分发命中（{@link #matchRouting} 只认 status=1）——
+     * 等于配管页的开关是假的。
+     *
+     * <p><b>软删行会占住唯一键</b>：{@code uk_rdm_routing(scope_type, scope_value, pm_user_id)} 不含 deleted，
+     * 「删掉再建同一条」直接撞 Duplicate entry 变成 500，所以新增前先找同名软删行复活，而不是新插。
+     */
     public void saveRouting(RdmConfigVO.Routing r, String operator) {
         if (!StringUtils.hasText(r.getScopeType()) || !StringUtils.hasText(r.getScopeValue())
                 || r.getPmUserId() == null) {
-            throw new IllegalArgumentException("匹配范围、匹配对象与产品经理为必填");
+            throw new BusinessException("匹配范围、匹配对象与产品经理为必填");
         }
+        int status = resolveRoutingStatus(r.getEnabled());
+        int loadCapacity = r.getLoadCapacity() == null ? 8 : r.getLoadCapacity();
+        int priority = r.getPriority() == null ? 100 : r.getPriority();
         if (r.getId() == null) {
+            List<Long> deletedIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM rdm_routing_rule WHERE scope_type = ? AND scope_value = ? AND pm_user_id = ? "
+                            + "AND deleted = 1 ORDER BY id DESC LIMIT 1",
+                    Long.class, r.getScopeType(), r.getScopeValue(), r.getPmUserId());
+            if (!deletedIds.isEmpty()) {
+                jdbcTemplate.update(
+                        "UPDATE rdm_routing_rule SET scope_name = ?, pm_name = ?, backup_pm_user_id = ?, "
+                                + "backup_pm_name = ?, load_capacity = ?, priority = ?, status = ?, "
+                                + "deleted = 0, updated_by = ? WHERE id = ?",
+                        r.getScopeName(), r.getPmName(), r.getBackupPmUserId(), r.getBackupPmName(),
+                        loadCapacity, priority, status, operator, deletedIds.get(0));
+                return;
+            }
             jdbcTemplate.update(
                     "INSERT INTO rdm_routing_rule (scope_type, scope_value, scope_name, pm_user_id, pm_name, "
                             + "backup_pm_user_id, backup_pm_name, load_capacity, priority, status, created_by, updated_by) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     r.getScopeType(), r.getScopeValue(), r.getScopeName(), r.getPmUserId(), r.getPmName(),
-                    r.getBackupPmUserId(), r.getBackupPmName(),
-                    r.getLoadCapacity() == null ? 8 : r.getLoadCapacity(),
-                    r.getPriority() == null ? 100 : r.getPriority(), operator, operator);
+                    r.getBackupPmUserId(), r.getBackupPmName(), loadCapacity, priority, status, operator, operator);
             return;
         }
-        jdbcTemplate.update(
-                "UPDATE rdm_routing_rule SET scope_type = ?, scope_value = ?, scope_name = ?, pm_user_id = ?, "
-                        + "pm_name = ?, backup_pm_user_id = ?, backup_pm_name = ?, load_capacity = ?, "
-                        + "priority = ?, status = ?, updated_by = ? WHERE id = ? AND deleted = 0",
-                r.getScopeType(), r.getScopeValue(), r.getScopeName(), r.getPmUserId(), r.getPmName(),
-                r.getBackupPmUserId(), r.getBackupPmName(),
-                r.getLoadCapacity() == null ? 8 : r.getLoadCapacity(),
-                r.getPriority() == null ? 100 : r.getPriority(),
-                Boolean.TRUE.equals(r.getEnabled()) ? 1 : 0, operator, r.getId());
+        /*
+         * 更新分支：enabled 为 null 表示「本次不碰启停」，不能像旧写法那样把 null 兜成 0 ——
+         * 那会让只想改容量/优先级的请求顺手把一条啟用规则静默停用。
+         */
+        int updated;
+        if (r.getEnabled() == null) {
+            updated = jdbcTemplate.update(
+                    "UPDATE rdm_routing_rule SET scope_type = ?, scope_value = ?, scope_name = ?, pm_user_id = ?, "
+                            + "pm_name = ?, backup_pm_user_id = ?, backup_pm_name = ?, load_capacity = ?, "
+                            + "priority = ?, updated_by = ? WHERE id = ? AND deleted = 0",
+                    r.getScopeType(), r.getScopeValue(), r.getScopeName(), r.getPmUserId(), r.getPmName(),
+                    r.getBackupPmUserId(), r.getBackupPmName(), loadCapacity, priority, operator, r.getId());
+        } else {
+            updated = jdbcTemplate.update(
+                    "UPDATE rdm_routing_rule SET scope_type = ?, scope_value = ?, scope_name = ?, pm_user_id = ?, "
+                            + "pm_name = ?, backup_pm_user_id = ?, backup_pm_name = ?, load_capacity = ?, "
+                            + "priority = ?, status = ?, updated_by = ? WHERE id = ? AND deleted = 0",
+                    r.getScopeType(), r.getScopeValue(), r.getScopeName(), r.getPmUserId(), r.getPmName(),
+                    r.getBackupPmUserId(), r.getBackupPmName(), loadCapacity, priority, status, operator, r.getId());
+        }
+        // 影响 0 行不能继续回「已保存」：那正是前端「提示成功、刷新即消失」的根因之一
+        if (updated == 0) {
+            throw new BusinessException("該分發規則不存在或已被移除，請刷新後重試");
+        }
+    }
+
+    /**
+     * 删除分发矩阵行（逻辑删）。
+     * <p>只做「这行还在不在」的服务端校验：需求表存的是 pm_user_id 快照，不引用规则 id，
+     * 所以删规则不会产生孤儿数据；但规则被并发删除时前端拿到 200 会以为还在，必须报错让它刷新。
+     */
+    public void deleteRouting(Long id, String operator) {
+        if (id == null) {
+            throw new BusinessException("請選擇要移除的分發規則");
+        }
+        int updated = jdbcTemplate.update(
+                "UPDATE rdm_routing_rule SET deleted = 1, updated_by = ? WHERE id = ? AND deleted = 0",
+                operator, id);
+        if (updated == 0) {
+            throw new BusinessException("該分發規則不存在或已被移除，請刷新後重試");
+        }
+    }
+
+    /** enabled 三态：null=未表态（新增按启用、更新沿用现值口径按启用）；true/false 明确落 1/0。 */
+    private int resolveRoutingStatus(Boolean enabled) {
+        return Boolean.FALSE.equals(enabled) ? 0 : 1;
     }
 
     /**
@@ -221,16 +285,16 @@ public class RdmConfigService {
      */
     public void saveSla(RdmConfigVO.Sla sla) {
         if (!StringUtils.hasText(sla.getStatusCode())) {
-            throw new IllegalArgumentException("狀态編碼不能為空");
+            throw new BusinessException("狀態編碼不能為空");
         }
         if (sla.getSlaHours() == null || sla.getSlaHours() <= 0) {
-            throw new IllegalArgumentException("標準時效必須大於 0 小時");
+            throw new BusinessException("標準時效必須大於 0 小時");
         }
         if (sla.getWarnHours() == null || sla.getWarnHours() <= 0 || sla.getWarnHours() >= sla.getSlaHours()) {
-            throw new IllegalArgumentException("預警閾值必須大於 0 且小於標準時效");
+            throw new BusinessException("預警閾值必須大於 0 且小於標準時效");
         }
         if (!StringUtils.hasText(sla.getEscalateRole())) {
-            throw new IllegalArgumentException("請選擇逾期升級通知對象");
+            throw new BusinessException("請選擇逾期升級通知對象");
         }
         String priority = sla.getPriority() == null ? "" : sla.getPriority();
         int updated = jdbcTemplate.update(
@@ -251,13 +315,13 @@ public class RdmConfigService {
     /** 启用/停用一条流转规则（停用后详情页按钮立即消失，无需发版） */
     public void setTransitionEnabled(Long id, boolean enabled, String operator) {
         if (id == null) {
-            throw new IllegalArgumentException("流轉規則 id 不能為空");
+            throw new BusinessException("流轉規則 id 不能為空");
         }
         int changed = jdbcTemplate.update(
                 "UPDATE rdm_transition SET status = ?, updated_by = ? WHERE id = ? AND deleted = 0",
                 enabled ? 1 : 0, operator, id);
         if (changed == 0) {
-            throw new IllegalArgumentException("流轉規則不存在或已刪除: id=" + id);
+            throw new BusinessException("流轉規則不存在或已刪除: id=" + id);
         }
     }
 
@@ -267,20 +331,20 @@ public class RdmConfigService {
      */
     public void setStatusEnabled(String code, boolean enabled, String operator) {
         if (!StringUtils.hasText(code)) {
-            throw new IllegalArgumentException("狀態編碼不能為空");
+            throw new BusinessException("狀態編碼不能為空");
         }
         if (!enabled) {
             Integer occupying = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM rdm_requirement WHERE deleted = 0 AND status = ?", Integer.class, code);
             if (occupying != null && occupying > 0) {
-                throw new IllegalArgumentException("尚有 " + occupying + " 個需求處於該狀態，不能停用；請先推進或歸檔");
+                throw new BusinessException("尚有 " + occupying + " 個需求處於該狀態，不能停用；請先推進或歸檔");
             }
         }
         int changed = jdbcTemplate.update(
                 "UPDATE rdm_status_def SET status = ?, updated_at = NOW() WHERE code = ? AND deleted = 0",
                 enabled ? 1 : 0, code);
         if (changed == 0) {
-            throw new IllegalArgumentException("狀態定義不存在: " + code);
+            throw new BusinessException("狀態定義不存在: " + code);
         }
     }
 

@@ -50,6 +50,7 @@ import type {
   RdmRequirementRow,
   RdmRoleMember,
   RdmRoutingRow,
+  RdmRoutingSaveForm,
   RdmScoreBoardData,
   RdmPrdDraft,
   RdmRiskSummary,
@@ -896,10 +897,22 @@ export function mockDashboard(): RdmDashboardData {
   }
 }
 
-export function mockSaveRoutingRule(rowData: RdmRoutingRow): RdmRoutingRow[] {
-  const idx = ROUTING_ROWS.findIndex(r => r.id === rowData.id)
-  if (idx >= 0) ROUTING_ROWS[idx] = rowData
-  else ROUTING_ROWS.push({ ...rowData, id: Date.now() })
+export function mockSaveRoutingRule(rowData: RdmRoutingSaveForm): RdmRoutingRow[] {
+  // id 为空就是新增：不能拿 undefined 去 findIndex，否则会命中第一个 id 为 undefined 的行
+  const idx = rowData.id == null ? -1 : ROUTING_ROWS.findIndex(r => r.id === rowData.id)
+  if (idx >= 0) {
+    ROUTING_ROWS[idx] = { ...ROUTING_ROWS[idx], ...rowData, id: ROUTING_ROWS[idx].id }
+  } else {
+    const { isNew: _isNew, ...rest } = rowData as RdmRoutingRow & { isNew?: boolean }
+    ROUTING_ROWS.push({ ...rest, id: Date.now() })
+  }
+  return [...ROUTING_ROWS]
+}
+
+/** 移除分发规则（mock：与后端一致做真删除，不能只改本地 state） */
+export function mockDeleteRoutingRule(id: number): RdmRoutingRow[] {
+  const idx = ROUTING_ROWS.findIndex(r => r.id === id)
+  if (idx >= 0) ROUTING_ROWS.splice(idx, 1)
   return [...ROUTING_ROWS]
 }
 

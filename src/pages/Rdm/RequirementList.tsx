@@ -438,7 +438,7 @@ export default function RequirementList({
           <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
           <div className="confirm-info-row">
             <span>提交後：</span>
-            <b>{resubmit ? '发起新的一轮准入审批（旧单已终态，不会沿用）' : '进入准入审批，由上级或指定人审批后送達技术部'}</b>
+            <b>{resubmit ? '發起新的一輪準入審批（舊單已終態，不會沿用）' : '進入準入審批，由上級或指定人審批後送達技術部'}</b>
           </div>
         </div>
       ),
@@ -447,7 +447,7 @@ export default function RequirementList({
       onOk: async () => {
         try {
           await submitRequirement(row.id)
-          message.success(resubmit ? '已重新提交，等待审批' : '已提交，等待审批')
+          message.success(resubmit ? '已重新提交，等待審批' : '已提交，等待審批')
           void load()
         } catch (err) {
           message.error(err instanceof Error && err.message ? err.message : '提交失敗，請重試')
@@ -523,7 +523,7 @@ export default function RequirementList({
     { key: 'planReleaseDate', title: '計劃上線' },
     { key: 'reqNo', title: '需求編號' },
     { key: 'intakeFlowNo', title: '審批流程編號' },
-    { key: 'admission', title: isIntakeSide ? '審批狀態' : '准入口徑' },
+    { key: 'admission', title: isIntakeSide ? '審批狀態' : '準入口徑' },
     { key: 'reqType', title: '需求類型' },
     { key: 'complexity', title: '規模' },
     { key: 'pmName', title: '產品經理' },
@@ -647,7 +647,7 @@ export default function RequirementList({
           // 未发起审批时的展示按侧侧划分，避免向用户保证不会存在的 OA 单号
           const notSubmitted = r && (r.status === RDM_STATUS.DRAFT || r.status === RDM_STATUS.INTAKE_REJECTED)
           if (isIntakeSide && notSubmitted) {
-            return <span style={{ color: '#8C8C8C' }}>未发起</span>
+            return <span style={{ color: '#8C8C8C' }}>未發起</span>
           }
           if (r && r.status === RDM_STATUS.POOL && r.needApproval === 0) {
             // 免审批需求不会发起 OA 准入单，直接进池
@@ -659,7 +659,7 @@ export default function RequirementList({
       },
     },
     {
-      title: isIntakeSide ? '審批狀態' : '准入口徑', key: 'admission', width: 120,
+      title: isIntakeSide ? '審批狀態' : '準入口徑', key: 'admission', width: 120,
       render: (_, r) => {
         const status = r.status as RdmStatus
         // 审批中/驳回/草稿 = 未准入；免审或已进入后续环节 = 已准入
@@ -675,7 +675,7 @@ export default function RequirementList({
         if (r.needApproval === 0) {
           return <Tag color="green" style={{ margin: 0 }}>免審批</Tag>
         }
-        return <Tag color="success" style={{ margin: 0 }}>已通過准入</Tag>
+        return <Tag color="success" style={{ margin: 0 }}>已通過準入</Tag>
       },
     },
     {
@@ -997,7 +997,7 @@ export default function RequirementList({
               type="warning"
               showIcon
               style={{ marginBottom: 12 }}
-              message={`本視圖已過濾 ${hiddenPreAdmissionCount} 條「未准入」需求（草稿 / 審批中 / 審批駁回），请前往「提交需求」菜单查看与处理审批。`}
+              message={`本視圖已過濾 ${hiddenPreAdmissionCount} 條「未準入」需求（草稿 / 審批中 / 審批駁回），請前往「提交需求」菜單查看與處理審批。`}
               description={t('rdm.mgmtPreAdmissionFiltered')}
             />
           )}

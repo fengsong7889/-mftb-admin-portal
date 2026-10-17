@@ -22,6 +22,8 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import GanttChart from './components/GanttChart'
 import WorkloadPanel from './components/WorkloadPanel'
 import { useAuth } from '../../contexts/AuthContext'
@@ -255,6 +257,38 @@ export default function DeliveryBoard() {
         : '標記阻塞必須填寫阻塞原因')
       return
     }
+    /*
+     * 完成與阻塞會寫入驗收與績效依據的事實，按 §B.3 必須二次確認（custom-confirm-modal）；
+     * 開始/解除阻塞只是可立即改回的狀態推進，不再加確認以免干擾填報節奏。
+     * 順序固定為「校驗 → 弹確認框 → 調接口」，不得先弹框後校驗。
+     */
+    if (action === RDM_TASK_ACTION.DONE || action === RDM_TASK_ACTION.BLOCK) {
+      const confirmed = await new Promise<boolean>(resolve => {
+        Modal.confirm({
+          title: action === RDM_TASK_ACTION.DONE ? '確認完成該任務？' : '確認標記阻塞？',
+          className: 'custom-confirm-modal',
+          icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+          content: (
+            <div className="confirm-info-card">
+              <div className="confirm-info-row"><span>任務：</span><b>{task.taskNo}</b></div>
+              <div className="confirm-info-row"><span>所屬需求：</span><b>{task.reqTitle ?? '-'}</b></div>
+              <div className="confirm-info-row"><span>上報進度：</span><b>{action === RDM_TASK_ACTION.DONE ? '100%' : `${progress}%`}</b></div>
+              <div className="confirm-info-row"><span>實際工時：</span><b>{actualHours ?? 0} h</b></div>
+              <div className="confirm-info-row">
+                <span>{action === RDM_TASK_ACTION.DONE ? '交付說明：' : '阻塞原因：'}</span><b>{remark}</b>
+              </div>
+            </div>
+          ),
+          okText: '確認上報',
+          cancelText: '取消',
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        })
+      })
+      if (!confirmed) {
+        return
+      }
+    }
     setSaving(true)
     try {
       await reportTask(task.id, {
@@ -269,7 +303,8 @@ export default function DeliveryBoard() {
       setActualHours(null)
       await load()
     } catch {
-      message.error('上報失敗，請重試')
+      // request.ts 已统一弹后端失败原因，此处不再双弹（§G.4）
+      console.error('任務上報失敗', task.id, action)
     } finally {
       setSaving(false)
     }
@@ -339,35 +374,29 @@ export default function DeliveryBoard() {
     { title: '迭代', dataIndex: 'iterationCode', key: 'iterationCode', width: 110, render: (v?: string | null) => v ?? '-' },
     {
       title: '操作', key: 'action', width: 230, fixed: 'right',
-      render: (_, r) => (
-        <Space size={0}>
-          {r.status !== RDM_TASK_STATUS.DONE && (
-            <>
-              <Button type="link" size="small" onClick={() => { setExpandedId(expandedId === r.id ? null : r.id); setProgress(r.progress ?? 0); setActualHours(null); setRemark('') }}>
-                上報進度
-              </Button>
-              <span className="action-split">|</span>
-            </>
-          )}
-          {r.status === RDM_TASK_STATUS.TODO && (
-            <>
-              <Button type="link" size="small" icon={<PlayCircleOutlined />} onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始</Button>
-              <span className="action-split">|</span>
-            </>
-          )}
-          {r.status === RDM_TASK_STATUS.DOING && (
-            <>
-              <Button type="link" size="small" icon={<CheckCircleOutlined />} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
-              <span className="action-split">|</span>
-            </>
-          )}
-          {r.status === RDM_TASK_STATUS.BLOCKED ? (
-            <Button type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.UNBLOCK)}>解除阻塞</Button>
+      // §B.9：操作列只用纯文字 + 竖线分隔，禁止图标；危险动作（阻塞）放最后
+      render: (_, r) => {
+        const actions = [
+          r.status !== RDM_TASK_STATUS.DONE && (
+            <Button key="report" type="link" size="small"
+              onClick={() => { setExpandedId(expandedId === r.id ? null : r.id); setProgress(r.progress ?? 0); setActualHours(null); setRemark('') }}>
+              上報進度
+            </Button>
+          ),
+          r.status === RDM_TASK_STATUS.TODO && (
+            <Button key="start" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始</Button>
+          ),
+          r.status === RDM_TASK_STATUS.DOING && (
+            <Button key="done" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
+          ),
+          r.status === RDM_TASK_STATUS.BLOCKED ? (
+            <Button key="unblock" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.UNBLOCK)}>解除阻塞</Button>
           ) : (
-            <Button type="link" size="small" danger icon={<PauseCircleOutlined />} onClick={() => setExpandedId(r.id)}>阻塞</Button>
-          )}
-        </Space>
-      ),
+            <Button key="block" type="link" size="small" danger onClick={() => setExpandedId(r.id)}>阻塞</Button>
+          ),
+        ].filter(Boolean)
+        return <Space size={0} split={<span className="action-split">|</span>}>{actions}</Space>
+      },
     },
   ]
 
@@ -411,23 +440,54 @@ export default function DeliveryBoard() {
     ),
   }
 
+  /**
+   * 列配置（§E.3）：本工作台一行信息密度高（需求/工时/迭代/类型都挤在一张表），
+   * 不同角色关心的列差别很大（研发看进度、协调人看交付项），必须能自己收起不看的列。
+   * 候选清单从 columns 派生，不手写，避免和真实列漂移。
+   */
+  const columnMeta = useMemo(() => deriveRdmColumnMeta(columns), [columns])
+  const { configComponent, applyConfig } = useColumnConfig('rdm-delivery-board-task', columnMeta, [
+    { key: 'taskNo', visible: true, locked: 'head' as const },
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+  const visibleColumns = applyConfig(columns) as TableColumnsType<RdmTaskItem>
+
   /** 渲染任务表：paged=true 为平铺视图（分页），false 为分组内嵌视图（不分页） */
   const renderTaskTable = (data: RdmTaskItem[], paged: boolean, extraLoading = false) => (
     <Table<RdmTaskItem>
       className="nowrap-table"
       rowKey="id"
       loading={loading || extraLoading}
-      columns={columns}
+      columns={visibleColumns}
       dataSource={data}
       scroll={{ x: 1500 }}
       expandable={expandableConfig}
-      pagination={paged ? { pageSize: 10, showTotal: t => `共 ${t} 條` } : false}
+      pagination={paged ? {
+        // 客户端分页用 defaultPageSize：写死 pageSize 会变成受控常量，
+        // 用户选 20/50 会被下一次渲染打回 10（“每页条数”选了没反应）
+        defaultPageSize: 10,
+        showSizeChanger: true,
+        showQuickJumper: true,
+        pageSizeOptions: ['10', '20', '50', '100'],
+        showTotal: t => `共 ${t} 條`,
+      } : false}
     />
   )
 
   return (
     <div className="content-area">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+      {/* 頁面說明横幅：不屬統計卡，按 §E.8 留在搜索區上方（僅任務形態需要這段口徑說明） */}
+      {mode === 'task' && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="任務全部完成後，需求才會沿當前狀態可走的路徑聯動（需求尚在排期/設計階段時不會直接跳到驗收，必須先在需求詳情逐段流轉）；實際工時用於產出量化與績效對接，請如實填報。"
+        />
+      )}
+
+      {/* 視圖/形態切換屬於篩選的一部分（§E.8）：統一放進 .search-section，不再與操作按鈕擠在同一行 */}
+      <div className="search-section">
         <Space size={12} wrap>
           <Segmented value={mode} onChange={v => setMode(v as string)} options={MODE_OPTIONS} />
           {mode === 'task' && (
@@ -442,12 +502,6 @@ export default function DeliveryBoard() {
             />
           )}
         </Space>
-        <Space size={8} wrap>
-          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
-          <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
-          <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
-          <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>
-        </Space>
       </div>
 
       {mode === 'gantt' && <GanttChart editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')} />}
@@ -456,6 +510,7 @@ export default function DeliveryBoard() {
 
       {mode !== 'task' ? null : (
       <>
+      {/* 統計卡：必須在搜索區下方、操作區上方（§E.8） */}
       <div style={{ marginBottom: 16 }}>
         <StatCards
           animationKey={view}
@@ -470,12 +525,18 @@ export default function DeliveryBoard() {
         />
       </div>
 
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 12 }}
-        message="任務全部完成後，需求才會沿當前狀態可走的路徑聯動（需求尚在排期/設計階段時不會直接跳到驗收，必須先在需求詳情逐段流轉）；實際工時用於產出量化與績效對接，請如實填報。"
-      />
+      {/* 操作區：中性動作在左，新增類在右（§E.2），不得插在統計卡之前 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+          <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
+          <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>
+          {configComponent}
+        </div>
+      </div>
 
       {groupMode === 'deliveryItem' && groupedByDeliveryItem ? (
         <div className="rdm-v3-groups">

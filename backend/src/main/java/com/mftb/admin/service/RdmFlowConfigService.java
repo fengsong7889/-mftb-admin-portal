@@ -10,6 +10,7 @@ import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmFlowConfigMapper;
 import com.mftb.admin.mapper.RdmProjectMapper;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -348,7 +349,7 @@ public class RdmFlowConfigService {
         vo.setBusinessVerificationDays(row.getBusinessVerificationDays());
         vo.setVersion(row.getVersion());
         vo.setUpdatedBy(row.getUpdatedBy());
-        vo.setUpdatedAt(row.getUpdatedAt());
+        vo.setUpdatedAt(DateTimeUtils.format(row.getUpdatedAt()));
         return vo;
     }
 
@@ -367,7 +368,7 @@ public class RdmFlowConfigService {
         vo.setV3ReleaseEnabled(row.getV3ReleaseEnabled());
         vo.setVersion(row.getVersion());
         vo.setUpdatedBy(row.getUpdatedBy());
-        vo.setUpdatedAt(row.getUpdatedAt());
+        vo.setUpdatedAt(DateTimeUtils.format(row.getUpdatedAt()));
         return vo;
     }
 

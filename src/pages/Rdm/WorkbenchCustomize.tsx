@@ -96,7 +96,7 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
         <HelpPopover
           title="工作台佈局說明"
-          ariaLabel="工作台布局说明"
+          ariaLabel="工作台佈局說明"
           placement="topLeft"
           width={360}
           content={LAYOUT_HELP}

@@ -18,6 +18,8 @@ import {
 } from '@ant-design/icons'
 import { Line } from '@ant-design/charts'
 import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchMetricTrend, type RdmMetricPoint } from '../../api/rdm'
 import { RDM_METRIC_DIM, RDM_METRIC_DIM_LABEL, type RdmMetricDim } from '../../constants/rdm'
 import './index.css'
@@ -129,6 +131,16 @@ export default function MetricTrend() {
     { title: '變更', dataIndex: 'changeCount', key: 'changeCount', width: 80 },
   ], [])
 
+  /*
+   * 快照明細有 13 列而一屏装不下，不同口径关心不同指标（交付看周期、质量看一次通過率），
+   * 按 §E.3 提供字段設置；快照日期是行身份，锁在最前不可隐藏。
+   */
+  const columnMeta = useMemo(() => deriveRdmColumnMeta(columns), [columns])
+  const { configComponent, applyConfig } = useColumnConfig('rdm-metric-trend-detail', columnMeta, [
+    { key: 'statDate', visible: true, locked: 'head' as const },
+  ])
+  const visibleColumns = applyConfig(columns) as TableColumnsType<RdmMetricPoint>
+
   return (
     <div className="content-area">
       <div style={{
@@ -227,15 +239,23 @@ export default function MetricTrend() {
           快照明細
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>最新一天排在最前</span>
+          <span style={{ marginLeft: 'auto' }}>{configComponent}</span>
         </div>
         <Table<RdmMetricPoint>
           rowKey="statDate"
           size="small"
           loading={loading}
-          columns={columns}
+          columns={visibleColumns}
           dataSource={[...points].reverse()}
           scroll={{ x: 1400 }}
-          pagination={{ pageSize: 10, showTotal: t => `共 ${t} 天` }}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            // 本表一行是一天，计量单位用「天」而不是「條」
+            showTotal: t => `共 ${t} 天`,
+          }}
         />
       </div>
     </div>

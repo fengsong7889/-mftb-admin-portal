@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, InputNumber, Select, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ClockCircleOutlined, SaveOutlined } from '@ant-design/icons'
+import { ClockCircleOutlined } from '@ant-design/icons'
 import StatusSwitch from '../components/StatusSwitch'
 import { fetchSlaConfigs, saveSlaConfig, type RdmSlaRow } from '../../../api/rdm'
 import {
@@ -116,11 +116,11 @@ export default function SlaConfig() {
     },
     {
       title: '操作', key: 'action', width: 110, fixed: 'right',
+      // §B.9：操作列只用纯文字，禁止图标（保存状态靠文案「保存修改/已保存」+ disabled 表达）
       render: (_, r) => (
         <Button
           type="link"
           size="small"
-          icon={<SaveOutlined />}
           disabled={!dirty[r.statusCode]}
           onClick={() => void handleSave(r)}
         >
@@ -145,7 +145,13 @@ export default function SlaConfig() {
         loading={loading}
         columns={columns}
         dataSource={rows}
-        pagination={false}
+        pagination={{
+          defaultPageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: t => `共 ${t} 條`,
+        }}
         scroll={{ x: 1240 }}
       />
     </div>

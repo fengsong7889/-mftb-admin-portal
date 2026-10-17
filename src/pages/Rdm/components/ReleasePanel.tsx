@@ -57,7 +57,7 @@ function CheckIcon({ check }: { check: RdmReleaseCheck }) {
     return <MinusCircleOutlined style={{ color: '#8C8C8C' }} />
   }
   if (check.waived) {
-    return <Tooltip title="已豁免：理由随放行单永久留痕"><SafetyCertificateOutlined style={{ color: '#FA8C16' }} /></Tooltip>
+    return <Tooltip title="已豁免：理由隨放行單永久留痕"><SafetyCertificateOutlined style={{ color: '#FA8C16' }} /></Tooltip>
   }
   return check.passed
     ? <CheckCircleOutlined style={{ color: '#52C41A' }} />

@@ -23,7 +23,6 @@ import {
   Select,
   Space,
   Tag,
-  Tooltip,
   Typography,
   Upload,
   message,
@@ -36,7 +35,6 @@ import {
   CheckCircleOutlined,
   DeleteOutlined,
   FileTextOutlined,
-  InfoCircleOutlined,
   NodeIndexOutlined,
   PlusOutlined,
   RollbackOutlined,
@@ -49,6 +47,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
+import HelpPopover from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
 import { fetchEmployees, type EmployeeItem } from '../../api/employee'
 import {
@@ -108,7 +107,7 @@ const ANCHOR_KIND_LABEL: Record<AnchorKind, string> = {
 }
 
 /** 「新增」时建议同步的需求类型，只提示不改用户已选的值 */
-const NEW_HINT_TEXT = '全新入口會连带權限、菜單位置與數據口徑，產品受理時會補齊方案；此處只需你說清想要什麼。'
+const NEW_HINT_TEXT = '全新入口會連帶權限、菜單位置與數據口徑，產品受理時會補齊方案；此處只需你說清想要什麼。'
 
 interface TargetValues {
   kind: AnchorKind
@@ -448,7 +447,7 @@ export default function RequirementSubmit() {
           prev.some(o => o.value === me.id) ? prev : [{ value: me.id, label: `${me.name}（${me.empId}）` }, ...prev]
         ))
       })
-      .catch(() => { /* 取不到本人就留空，验收人可手输姓名搜索补选 */ })
+      .catch(() => { /* 取不到本人就留空，驗收人可手輸姓名搜索補選 */ })
   }, [user?.empId, draftLoaded, form])
 
   /** 验收人远程搜索：按工号/姓名模糊查在职员工 */
@@ -461,7 +460,7 @@ export default function RequirementSubmit() {
           ;(res.records ?? []).forEach((e: EmployeeItem) => map.set(e.id, `${e.name}（${e.empId}${e.department ? ` · ${e.department}` : ''}）`))
           return [...map.entries()].map(([value, label]) => ({ value, label }))
         }))
-        .catch(() => { /* 搜索失败保留已有候选 */ })
+        .catch(() => { /* 搜索失敗保留已有候選 */ })
     }, 300)
   }
 
@@ -747,9 +746,12 @@ export default function RequirementSubmit() {
           <div className="rdm-form-section-title">
             <span className="rdm-icon-block" style={{ background: '#E6FFFB', color: '#13C2C2' }}><NodeIndexOutlined /></span>
             流程版本
-            <Tooltip title="V2 為傳統整需求交付；V3 支持把大需求拆成聚合需求 + 執行需求，掛到項目下分批並行交付">
-              <InfoCircleOutlined style={{ color: '#8C8C8C', fontSize: 12 }} />
-            </Tooltip>
+            {/* 多句规则说明用 HelpPopover（可停留、有层次），禁止用 Tooltip 承载长文本 */}
+            <HelpPopover
+              title="流程版本怎麼選"
+              ariaLabel="流程版本說明"
+              content={'V2 為傳統整需求交付；V3 支持把大需求拆成聚合需求 + 執行需求，掛到項目下分批並行交付。'}
+            />
           </div>
           <div className="rdm-more-settings-fields">
             <Form.Item label="交付流程" name="flowVersion" extra={isV3 ? '分批並行交付：可掛項目、區分聚合 / 執行需求' : '傳統整需求交付'}>
@@ -828,9 +830,11 @@ export default function RequirementSubmit() {
           <div className="rdm-form-section-title">
             <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AimOutlined /></span>
             需求對象
-            <Tooltip title="指明這條需求打在哪裡，產研可直達現場；跨菜單的需求可一次加多條">
-              <InfoCircleOutlined style={{ color: '#8C8C8C', fontSize: 12 }} />
-            </Tooltip>
+            <HelpPopover
+              title="需求對象怎麼填"
+              ariaLabel="需求對象說明"
+              content={'指明這條需求打在哪裡，產研可直達現場；跨菜單的需求可一次加多條。'}
+            />
             <span className="rdm-todo-hint">可選多條；完全不清楚位置也能提交</span>
           </div>
           <Form.List name="targets">
@@ -923,7 +927,7 @@ export default function RequirementSubmit() {
                 onSearch={handleAcceptorSearch}
                 onFocus={() => handleAcceptorSearch('')}
                 options={acceptorOptions}
-                placeholder="搜索姓名 / 工号選擇"
+                placeholder="搜索姓名 / 工號選擇"
                 notFoundContent={null}
               />
             </Form.Item>

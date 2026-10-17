@@ -34,11 +34,11 @@ export type RdmIdentity =
 
 export const RDM_IDENTITY_LABEL: Record<RdmIdentity, string> = {
   submitter: '需求提出人',
-  approver: '准入審批人',
+  approver: '準入審批人',
   dispatcher: '技術負責人',
   product: '產品經理',
-  developer: '研發工程师',
-  tester: '測試工程师',
+  developer: '研發工程師',
+  tester: '測試工程師',
   acceptor: '業務驗收人',
   releaser: '發布負責人',
   projectMgr: '項目管理者',

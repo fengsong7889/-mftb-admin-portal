@@ -2,7 +2,6 @@ package com.mftb.admin.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +11,11 @@ import java.util.Map;
  * <p>所有类型都会被 {@code RdmIdempotentService.executeOnce} 序列化为 result_json 缓存、
  * 重复请求时反序列化回放，因此必须是 Jackson 友好的 POJO（无参构造 + getter/setter），
  * 且不携带任何数据库连接/懒加载引用。
+ *
+ * <p><b>时间字段一律输出字符串（yyyy-MM-dd HH:mm:ss）</b>：全局 {@code JacksonConfig}
+ * 会把裸 {@code LocalDateTime} 序列化成毫秒数字，而前端按字符串裁剪展示
+ * （{@code v?.slice(0, 16)}），数字上调用字符串方法会直接整页崩溃。
+ * 与本模块其他 VO（如 {@code RdmDeliveryItemVO}）保持同一口径：VO 层格式化，不把时间类型泄给前端。
  */
 public final class RdmStockMigrationVO {
 
@@ -38,7 +42,7 @@ public final class RdmStockMigrationVO {
         /** 不可迁移（blocked，附原因；执行时跳过） */
         private Integer blockedItems;
         private List<ItemPreview> items;
-        private LocalDateTime createdAt;
+        private String createdAt;
     }
 
     /** 单条需求的迁移预览：只读推导，不落业务事实。 */
@@ -72,16 +76,16 @@ public final class RdmStockMigrationVO {
         private String previewHash;
         private Integer chunkSize;
         private Long confirmedBy;
-        private LocalDateTime confirmedAt;
-        private LocalDateTime pausedAt;
+        private String confirmedAt;
+        private String pausedAt;
         private String pauseReason;
         private Long rolledBackBy;
-        private LocalDateTime rolledBackAt;
+        private String rolledBackAt;
         private String resultJson;
         private String blockingReason;
         private Integer version;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
+        private String createdAt;
+        private String updatedAt;
         private List<ItemDetail> items;
         private List<AuditEntry> audits;
     }
@@ -98,11 +102,11 @@ public final class RdmStockMigrationVO {
         private String blockingReason;
         private String resultJson;
         private Long confirmedBy;
-        private LocalDateTime confirmedAt;
+        private String confirmedAt;
         private Long executedBy;
-        private LocalDateTime executedAt;
+        private String executedAt;
         private Long rolledBackBy;
-        private LocalDateTime rolledBackAt;
+        private String rolledBackAt;
         private Integer version;
     }
 
@@ -122,7 +126,7 @@ public final class RdmStockMigrationVO {
         private String afterHash;
         private String resultJson;
         private String reason;
-        private LocalDateTime createdAt;
+        private String createdAt;
     }
 
     /** 单个分块执行结果。 */
@@ -166,7 +170,7 @@ public final class RdmStockMigrationVO {
         private Boolean traceable;
         /** 不可追溯明细：itemId → 原因 */
         private Map<String, String> inconsistencies;
-        private LocalDateTime reconciledAt;
+        private String reconciledAt;
     }
 
     /**

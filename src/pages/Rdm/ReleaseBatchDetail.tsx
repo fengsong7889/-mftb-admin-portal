@@ -32,6 +32,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import HelpPopover from '../../components/HelpPopover'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchReleaseBatchDetail,
@@ -191,7 +193,7 @@ export default function ReleaseBatchDetail() {
       await applyReleaseBatch(batchId)
       message.success('已提交發布申請')
       loadDetail()
-    } catch { /* request.ts 已统一弹后端原因（灰度/门禁），不双弹 */ }
+    } catch { /* request.ts 已統一彈後端原因（灰度/門禁），不雙彈 */ }
   }
 
   const handleDecideSubmit = async () => {
@@ -602,6 +604,18 @@ export default function ReleaseBatchDetail() {
     return items
   }, [detail, checkResults])
 
+  /*
+   * 系统部署表列配置（§E.3）：部署表动辄十列（顺序/代码/名称/构建/状态/版本/耗时/操作人/时间/备注），
+   * 一屏装不下；且 scroll.x 必须按可见列合计，否则收起列后仍按全列宽撑出大片空白横向滚动。
+   */
+  const deployMeta = useMemo(() => deriveRdmColumnMeta(deployColumns), [deployColumns])
+  const { configComponent: deployConfig, applyConfig: applyDeploy } = useColumnConfig(
+    'rdm-release-deployments', deployMeta,
+    [{ key: 'order', visible: true, locked: 'head' as const }],
+  )
+  const visibleDeployColumns = applyDeploy(deployColumns) as typeof deployColumns
+  const deployScrollX = visibleDeployColumns.reduce((sum, c) => sum + Number((c as { width?: number }).width ?? 100), 0)
+
   // ===== 渲染 =====
   if (loading) {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="載入中..." /></div>
@@ -627,26 +641,31 @@ export default function ReleaseBatchDetail() {
         title={`發布批次 ${detail.batchNo}`}
         onBack={() => navigate(-1)}
         badge={<Tag color={RDM_RELEASE_BATCH_STATUS_COLOR[s] ?? 'default'}>{RDM_RELEASE_BATCH_STATUS_LABEL[s] ?? s}</Tag>}
-        right={
-          <Space wrap>
-            {actionButton(ACTION.ADD_ITEM, () => navigate(`/rdm-delivery-item?mode=create&batchId=${batchId}${projectId ? `&projectId=${projectId}` : ''}`))}
-            {(s === RDM_RELEASE_BATCH_STATUS.PLANNING || s === RDM_RELEASE_BATCH_STATUS.CHECKING) && canEdit && (
-              <Button icon={<SafetyCertificateOutlined />} loading={checking} onClick={handleCheck}>執行檢查</Button>
-            )}
-            {actionButton(ACTION.APPLY, handleApply)}
-            {actionButton(ACTION.DECIDE, () => { decideForm.resetFields(); setDecideModalOpen(true) })}
-            {actionButton(ACTION.DEPLOY, () => { deployForm.resetFields(); setDeployModalOpen(true) })}
-            {actionButton(ACTION.VERIFY, () => { verifyForm.resetFields(); setVerifyModalOpen(true) })}
-            {actionButton(ACTION.OPEN, () => { openForm.resetFields(); setOpenModalOpen(true) })}
-            {actionButton(ACTION.EXEMPTION_APPLY, () => { exemptionForm.resetFields(); setExemptionModalOpen(true) })}
-            {actionButton(ACTION.EXEMPTION_DECIDE, openExemptionDecide)}
-            {actionButton(ACTION.SUPPLEMENTARY_COMPLETE, openSupplementary)}
-            {/* rollback 是止损例外：只要后端下发即渲染（不受灰度门控影响） */}
-            {actionButton(ACTION.ROLLBACK, () => { rollbackForm.resetFields(); setRollbackModalOpen(true) }, { danger: true })}
-            <Button icon={<ReloadOutlined />} onClick={loadDetail}>刷新</Button>
-          </Space>
-        }
       />
+
+      {/*
+        推進動作（申請/裁決/部署/驗證/開放/豁免/補驗/回滾）一律不放頁面頭部右側（§C.2 / §9.1）：
+        頭部只留返回 + 標題 + 狀態，動作收進緊接頭部的操作區，按鈕與權限門控邏輯完全不變。
+      */}
+      <div className="action-section">
+        <Space wrap>
+          {actionButton(ACTION.ADD_ITEM, () => navigate(`/rdm-delivery-item?mode=create&batchId=${batchId}${projectId ? `&projectId=${projectId}` : ''}`))}
+          {(s === RDM_RELEASE_BATCH_STATUS.PLANNING || s === RDM_RELEASE_BATCH_STATUS.CHECKING) && canEdit && (
+            <Button icon={<SafetyCertificateOutlined />} loading={checking} onClick={handleCheck}>執行檢查</Button>
+          )}
+          {actionButton(ACTION.APPLY, handleApply)}
+          {actionButton(ACTION.DECIDE, () => { decideForm.resetFields(); setDecideModalOpen(true) })}
+          {actionButton(ACTION.DEPLOY, () => { deployForm.resetFields(); setDeployModalOpen(true) })}
+          {actionButton(ACTION.VERIFY, () => { verifyForm.resetFields(); setVerifyModalOpen(true) })}
+          {actionButton(ACTION.OPEN, () => { openForm.resetFields(); setOpenModalOpen(true) })}
+          {actionButton(ACTION.EXEMPTION_APPLY, () => { exemptionForm.resetFields(); setExemptionModalOpen(true) })}
+          {actionButton(ACTION.EXEMPTION_DECIDE, openExemptionDecide)}
+          {actionButton(ACTION.SUPPLEMENTARY_COMPLETE, openSupplementary)}
+          {/* rollback 是止损例外：只要后端下发即渲染（不受灰度门控影响） */}
+          {actionButton(ACTION.ROLLBACK, () => { rollbackForm.resetFields(); setRollbackModalOpen(true) }, { danger: true })}
+          <Button icon={<ReloadOutlined />} onClick={loadDetail}>刷新</Button>
+        </Space>
+      </div>
 
       {/* 灰度未开启说明：推进码后端不下发，前端自然不渲染；rollback 例外 */}
       {grayscaleOff && (
@@ -742,16 +761,23 @@ export default function ReleaseBatchDetail() {
 
       {/* ===== Section 3: 系統部署 ===== */}
       <div className="rdm-release-section">
-        <h3 className="rdm-release-section-title"><CloudUploadOutlined style={{ marginRight: 6 }} />系統部署</h3>
+        <h3 className="rdm-release-section-title"><CloudUploadOutlined style={{ marginRight: 6 }} />系統部署{deployConfig}</h3>
         {detail.deployments?.length > 0 ? (
           <Table<RdmReleaseDeploymentRecord>
             className="nowrap-table"
             rowKey="id"
-            columns={deployColumns}
+            columns={visibleDeployColumns}
             dataSource={detail.deployments}
-            pagination={false}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: t => `共 ${t} 個系統`,
+              hideOnSinglePage: true,
+            }}
             size="small"
-            scroll={{ x: deployColumns.reduce((sum, c) => sum + Number((c as { width?: number }).width ?? 100), 0) }}
+            scroll={{ x: deployScrollX }}
           />
         ) : (
           <Alert type="info" showIcon message="尚無部署系統記錄" />
@@ -840,7 +866,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={deployForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="systemCode" label="系統" rules={[{ required: true, message: '請選擇系統' }]}>
@@ -867,7 +893,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={verifyForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="systemCode" label="系統" rules={[{ required: true, message: '請選擇系統' }]}>
@@ -894,7 +920,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="info" showIcon style={{ marginBottom: 16 }}
           message="開放是獨立事實，絕不由「驗證通過」推導"
@@ -925,7 +951,7 @@ export default function ReleaseBatchDetail() {
         okText="確認回滾"
         okType="danger"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="warning" showIcon icon={<ExclamationCircleOutlined />}
           message="回滾是不可逆的止損操作，將影響已部署的系統"
@@ -959,7 +985,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="info" showIcon message="四眼原則：裁決人不能是申請人本人，管理員亦不得自批" style={{ marginBottom: 16 }} />
         <Form form={decideForm} layout="vertical" initialValues={{ decision: RDM_DECISION.APPROVED }}>
@@ -984,7 +1010,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交申請"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}
           message="只可豁免缺失的產品驗收，業務驗收永不可豁免"
@@ -1011,7 +1037,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交裁決"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="info" showIcon style={{ marginBottom: 16 }}
           message="四眼：裁決人不得是豁免申請人本人，管理員亦無自批"
@@ -1045,7 +1071,7 @@ export default function ReleaseBatchDetail() {
         confirmLoading={submitting}
         okText="提交登記"
         cancelText="取消"
-        destroyOnClose
+        destroyOnHidden
       >
         <Alert type="info" showIcon style={{ marginBottom: 16 }}
           message="僅凍結的補驗人本人可登記（無 admin 直通）"
@@ -1061,7 +1087,7 @@ export default function ReleaseBatchDetail() {
             />
           </Form.Item>
           <Form.Item name="acceptanceRecordId" label="真實驗收記錄ID" rules={[{ required: true, message: '請填寫已存在的驗收記錄ID' }]}>
-            <InputNumber style={{ width: '100%' }} min={1} placeholder="必须是已存在的真实产品验收记录" />
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="必須是已存在的真實產品驗收記錄" />
           </Form.Item>
           <Form.Item name="result" label="補驗結果" rules={[{ required: true, message: '請選擇補驗結果' }]}>
             <Radio.Group>

@@ -210,7 +210,7 @@ export default function RdmDashboard() {
           </Space>
         </div>
         <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
-          風險按「当前狀態停留時長」統計；逐條明細跟催請進風險中心，部門與個人負載在另一頁復盤。
+          風險按「當前狀態停留時長」統計；逐條明細跟催請進風險中心，部門與個人負載在另一頁復盤。
         </div>
         <Space size={8} wrap>
           <Button type="primary" ghost icon={<AlertOutlined />} onClick={() => navigate('/rdm-risk')}>

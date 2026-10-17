@@ -391,7 +391,13 @@ export default function AcceptanceList() {
         tableLayout="fixed"
         dataSource={diRows}
         scroll={{ x: 1400 }}
-        pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }}
+        pagination={{
+          defaultPageSize: 10,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: t => `共 ${t} 條`,
+        }}
       />
 
       {diRows.length === 0 && !diLoading && (
@@ -432,7 +438,7 @@ export default function AcceptanceList() {
             <Tag icon={<ClockCircleOutlined />} color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', padding: '0 12px', borderRadius: 6 }}>
               {tab === 'pre'
                 ? '此處為上線前預驗收：逐項判定用例後才能發起發布放行，不通過會退回研發返工'
-                : '此處為上線後正式驗收：需給 1-5 分滿意度，這才是質量口徑裡的正式分数'}
+                : '此處為上線後正式驗收：需給 1-5 分滿意度，這才是質量口徑裡的正式分數'}
             </Tag>
           )}
           <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出本頁</Button>
@@ -459,7 +465,7 @@ export default function AcceptanceList() {
         dataSource={rows}
         scroll={{ x: tableWidth }}
         pagination={{
-          pageSize: 10,
+          defaultPageSize: 10,
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],

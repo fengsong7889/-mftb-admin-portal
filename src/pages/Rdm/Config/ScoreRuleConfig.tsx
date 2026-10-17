@@ -289,11 +289,11 @@ export default function ScoreRuleConfig() {
     },
     {
       title: '操作', key: 'action', width: 100, fixed: 'right',
+      // §B.9：操作列禁止图标，只用纯文字
       render: (_, r) => (
         <Button
           type="link"
           size="small"
-          icon={<SaveOutlined />}
           disabled={!dirty[r.id]}
           onClick={() => handleSave(r)}
         >
@@ -434,7 +434,15 @@ export default function ScoreRuleConfig() {
           loading={loading}
           columns={columns}
           dataSource={rules}
-          pagination={false}
+          pagination={{
+            defaultPageSize: 20,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+            // 规则表通常只有几行，单页时不占版面；行数增长后自动出分页
+            hideOnSinglePage: true,
+          }}
           scroll={{ x: 1500 }}
         />
       </div>

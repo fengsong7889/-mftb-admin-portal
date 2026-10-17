@@ -6,7 +6,7 @@
  * 再给返工 TOP 需求与部门对比，让项目经理能定位到具体单据去追因。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Progress, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Progress, Space, Spin, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
@@ -20,6 +20,9 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Column, Pie } from '@ant-design/charts'
 import StatCards from '../../components/StatCards'
+import HelpPopover from '../../components/HelpPopover'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchQualityData, type RdmQualityData } from '../../api/rdm'
 import { RDM_DEFECT_SEVERITY_COLOR, RDM_DEFECT_SEVERITY_LABEL, type RdmDefectSeverity } from '../../constants/rdm'
 import './index.css'
@@ -95,6 +98,23 @@ export default function QualityBoard() {
     { title: '缺陷數', dataIndex: 'defectCount', key: 'defectCount', width: 90, render: (v: number) => <span style={{ color: v > 3 ? '#CF1322' : '#595959' }}>{v}</span> },
   ], [])
 
+  /*
+   * 两张表各自一份列配置（§E.3）：pageKey 必须分开，否则在返工榜上收起的列
+   * 会把部门对比表同名概念的列一起改掉，两边列集并不相同。
+   */
+  const reworkMeta = useMemo(() => deriveRdmColumnMeta(reworkColumns), [reworkColumns])
+  const deptMeta = useMemo(() => deriveRdmColumnMeta(deptColumns), [deptColumns])
+  const { configComponent: reworkConfig, applyConfig: applyRework } = useColumnConfig(
+    'rdm-quality-rework-rank', reworkMeta,
+    [{ key: 'title', visible: true, locked: 'head' as const }, { key: 'action', visible: true, locked: 'tail' as const }],
+  )
+  const { configComponent: deptConfig, applyConfig: applyDept } = useColumnConfig(
+    'rdm-quality-dept-compare', deptMeta,
+    [{ key: 'deptName', visible: true, locked: 'head' as const }],
+  )
+  const visibleReworkColumns = applyRework(reworkColumns) as typeof reworkColumns
+  const visibleDeptColumns = applyDept(deptColumns) as typeof deptColumns
+
   if (loading || !data) {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
   }
@@ -152,11 +172,16 @@ export default function QualityBoard() {
             <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><BugOutlined /></span>
             缺陷嚴重度分佈
             <span className="rdm-card-title-split" />
-            <Tooltip title="致命/嚴重缺陷佔比過高時，即使按期上線也會帶來返工與客訴">
+            {/* 口径说明（带因果）用 HelpPopover，不用 Tooltip 承载（AGENTS.md 问号规范） */}
+            <HelpPopover
+              title="嚴重佔比口徑"
+              ariaLabel="缺陷嚴重度分佈說明"
+              content={'致命/嚴重缺陷佔比過高時，即使按期上線也會帶來返工與客訴。'}
+            >
               <span style={{ fontSize: 12, color: majorRate > 0.25 ? '#CF1322' : '#8C8C8C', fontWeight: 400 }}>
                 嚴重佔比 {pct(majorRate)}
               </span>
-            </Tooltip>
+            </HelpPopover>
           </div>
           <div style={{ height: 240 }}>
             <Pie
@@ -205,14 +230,23 @@ export default function QualityBoard() {
           返工 TOP 需求
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>返工次數來自驗收退回（uat_rejected）累計，點需求看退回原因</span>
+          <span style={{ marginLeft: 'auto' }}>{reworkConfig}</span>
         </div>
         <Table
           rowKey="reqId"
           size="small"
-          columns={reworkColumns}
+          columns={visibleReworkColumns}
           scroll={{ x: 1160 }}
           dataSource={data.reworkRank}
-          pagination={false}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+            // TOP 榜通常不足一页，单页时不占版面；行数增长后自动出分页
+            hideOnSinglePage: true,
+          }}
           locale={{ emptyText: '本期沒有驗收退回，全部一次通過' }}
         />
       </div>
@@ -222,13 +256,21 @@ export default function QualityBoard() {
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><BarChartOutlined /></span>
           部門質量對比
           <span className="rdm-card-title-split" />
+          <span style={{ marginLeft: 'auto' }}>{deptConfig}</span>
         </div>
         <Table
           rowKey="deptName"
           size="small"
-          columns={deptColumns}
+          columns={visibleDeptColumns}
           dataSource={data.deptQuality}
-          pagination={false}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 個部門`,
+            hideOnSinglePage: true,
+          }}
           scroll={{ x: 760 }}
         />
       </div>

@@ -512,6 +512,21 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 延迟发号 v2 的补号闸门：目标状态不在「允许无号」白名单时，必须在同一条 UPDATE 里补号。
+     * <p>为什么放在流转收口点而不是每个入口各发一次号：进入 assigned 有「认领」与「分配/改派」
+     * 多条路径，认领发号、分配不发号（RdmSelfServiceTest 已钉住「免审批直送受理不立即生成编号」），
+     * 于是分配路径上的需求推进到 evaluating 会被数据库 CHECK {@code ck_rdm_req_no_admitted} 打回，
+     * 用户只看到「數據庫操作異常, 請稍後重試」。本方法是唯一必经收口点，顺带自愈存量无号数据。
+     * <p>白名单与 CHECK 同源（{@link RdmConstants#REQ_NO_NULLABLE_STATUSES}），避免代码与库口径漂移。
+     * <p>包内可见仅为让单测能直接钉住「何时发号 / 何时不消费流水」，不对外暴露。
+     */
+    void ensureReqNoForTargetStatus(RdmRequirement req, String toStatus) {
+        if (req == null || !RdmConstants.REQ_NO_NULLABLE_STATUSES.contains(toStatus)) {
+            ensureRequirementNumber(req);
+        }
+    }
+
+    /**
      * 免审批需求的执行起点：基落点从 {@code rdm_transition} 读（状态机真值），
      * 再按「提交时已指定且仍有效的意向产品」细化为直送受理；两种落点都在同一次调用里首次发号。
      * <p>为什么不再在代码里硬写 pool：仓库口径是「状态机真值：rdm_status_def + rdm_transition，
@@ -1048,6 +1063,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             req.setProgress(dto.getProgress());
         }
         req.setStatus(rule.getToStatus());
+        ensureReqNoForTargetStatus(req, rule.getToStatus());
         req.setStatusEnterTime(now);
         req.setOverdueFlag(0);
         req.setCurrentHandlerName(computeHandler(req, null));
@@ -2318,6 +2334,13 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         Set<String> seen = new LinkedHashSet<>();
         for (RdmConfigVO.Transition rule : configService.transitionsFrom(req.getStatus())) {
             if (!canPerform(rule, current, myRoles) || !seen.add(rule.getActionCode())) {
+                continue;
+            }
+            /*
+             * 读侧必须跟写侧同一白名单：V3 需求的交付/测试/验收/发布类动作由交付项推进，
+             * transition 会拒；以前不过滤导致详情页列出「開始寫 PRD」等一按就必失败的按钮。
+             */
+            if (!flowVersionGuard.isTransitionActionAllowed(req.getFlowVersion(), rule.getActionCode())) {
                 continue;
             }
             RdmRequirementVO.AllowedAction action = new RdmRequirementVO.AllowedAction();

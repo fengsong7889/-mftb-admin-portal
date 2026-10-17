@@ -491,7 +491,47 @@ public class RdmTestBatchService {
         detail.setFailCount(counts[1]);
         detail.setTotalCount(counts[2]);
         detail.setExecutions(execs.stream().map(e -> toExecutionRecord(e, itemTitleMap)).toList());
+        detail.setFrozenCases(frozenCaseEntries(batch, execs, itemTitleMap));
         return detail;
+    }
+
+    /**
+     * 把当前轮次的冻结用例集连同服务端 caseId 输出给前端。
+     * <p>为什么是读接口而不是让前端自己算：caseId 由 {@link #deriveCaseId} 用 sha256 截位生成，
+     * 前端重算等于把服务端的去重/跳轮对齐规则复制一份（必然漂移）；不输出则前端根拿不到合法值，
+     * 而 submitExecution 又 fail-closed 地要求 caseId 必须命中冻结集 —— 两者叠加就是「提测结录不进去」。
+     * <p>未受理（无冻结轮次）时返回空列表，不抛错：详情页在 pending 阶段也要能打开。
+     */
+    private List<RdmTestBatchVO.CaseEntry> frozenCaseEntries(RdmTestBatch batch,
+                                                            List<RdmTestExecution> execs,
+                                                            Map<Long, String> itemTitleMap) {
+        RdmTestRound round = currentFrozenRound(batch);
+        if (round == null) {
+            return List.of();
+        }
+        List<RdmTestBatchVO.CaseEntry> out = new ArrayList<>();
+        for (Map<String, Object> c : JsonUtils.parseMapList(round.getCaseSnapshotJson())) {
+            Long itemId = toLong(Objects.toString(c.get("deliveryItemId"), null));
+            String caseId = Objects.toString(c.get("caseId"), null);
+            if (itemId == null || !StringUtils.hasText(caseId)) {
+                continue;
+            }
+            RdmTestBatchVO.CaseEntry entry = new RdmTestBatchVO.CaseEntry();
+            entry.setDeliveryItemId(itemId);
+            entry.setDeliveryItemTitle(itemTitleMap.getOrDefault(itemId, ""));
+            entry.setCaseId(caseId);
+            entry.setCaseTitle(Objects.toString(c.get("caseTitle"), null));
+            entry.setScopeVersion(toInt(c.get("scopeVersion")));
+            entry.setMandatory(toBool(c.get("mandatory")));
+            List<RdmTestExecution> caseExecs = execs.stream()
+                    .filter(x -> itemId.equals(x.getDeliveryItemId())
+                            && caseId.equals(x.getCaseId())
+                            && Objects.equals(round.getRoundNo(), x.getRoundNo()))
+                    .toList();
+            entry.setEffectiveResult(effectiveCaseResult(caseExecs));
+            out.add(entry);
+        }
+        return out;
     }
 
     /** 批次执行摘要统计（按当前轮次口径，供测试工作台进度条使用）。 */

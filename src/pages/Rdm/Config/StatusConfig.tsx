@@ -153,7 +153,13 @@ export default function StatusConfig() {
                   loading={loading}
                   columns={statusColumns}
                   dataSource={statusDefs}
-                  pagination={false}
+                  pagination={{
+                    defaultPageSize: 20,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showTotal: t => `共 ${t} 條`,
+                  }}
                   scroll={{ x: 720 }}
                 />
               </>
@@ -177,7 +183,13 @@ export default function StatusConfig() {
                   loading={loading}
                   columns={transitionColumns}
                   dataSource={transitions}
-                  pagination={false}
+                  pagination={{
+                    defaultPageSize: 20,
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    showTotal: t => `共 ${t} 條`,
+                  }}
                   scroll={{ x: 1000 }}
                 />
               </>

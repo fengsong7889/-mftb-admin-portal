@@ -153,7 +153,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
       className: 'custom-confirm-modal',
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>影響：</span><b>兩張任務變成可並行，關鍵路徑與預計完工日会重算</b></div>
+          <div className="confirm-info-row"><span>影響：</span><b>兩張任務變成可並行，關鍵路徑與預計完工日會重算</b></div>
           <div className="confirm-info-row"><span>前置：</span><b>{dep.predTaskTitle ?? `#${dep.predTaskId}`}</b></div>
           <div className="confirm-info-row"><span>後續：</span><b>{dep.succTaskTitle ?? `#${dep.succTaskId}`}</b></div>
         </div>
@@ -175,7 +175,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
   }
 
   if (!reqId) {
-    return <Alert type="info" showIcon message="請先選擇需求" description="甘圖按單條需求展開：跨需求的时间线由迭代排期负责。" />
+    return <Alert type="info" showIcon message="請先選擇需求" description="甘圖按單條需求展開：跨需求的時間線由迭代排期負責。" />
   }
 
   return (
@@ -194,7 +194,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
         <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button>
         {plan?.forecastFinish && (
           <Tag color="processing" style={{ margin: 0 }}>
-            按現行依賴與日历，預計 {plan.forecastFinish} 完成
+            按現行依賴與日曆，預計 {plan.forecastFinish} 完成
           </Tag>
         )}
       </Space>
@@ -204,15 +204,15 @@ export default function GanttChart({ editable }: GanttChartProps) {
           type="error"
           showIcon
           message="依賴存在循環（A→B→…→A），無法計算關鍵路徑"
-          description="请先删除成环的依赖再查看排程；这时下方只画人工计划日期，不画推演结果。"
+          description="請先刪除成環的依賴再查看排程；這時下方只畫人工計劃日期，不畫推演結果。"
         />
       )}
 
       {!bars.length && !loading ? (
-        <Alert type="info" showIcon message="該需求尚未拆解任務" description="拆解任務後甘特图才会出现条形与依赖。" />
+        <Alert type="info" showIcon message="該需求尚未拆解任務" description="拆解任務後甘特圖才會出現條形與依賴。" />
       ) : (
         <div className="rdm-gantt-scroll">
-          <svg width={width} height={height} role="img" aria-label="需求甘特图">
+          <svg width={width} height={height} role="img" aria-label="需求甘特圖">
             {/* 顶部：日期刻度与里程碑泳道 */}
             {Array.from({ length: days }).map((_, i) => {
               const day = start.add(i, 'day')
@@ -341,7 +341,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
           任務依賴
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
-            只支持「完成→開始」（FS），可加減工作日延遲；成環會被服务端拒绝
+            只支持「完成→開始」（FS），可加減工作日延遲；成環會被服務端拒絕
           </span>
         </div>
         {deps.length === 0 && (

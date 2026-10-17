@@ -2,8 +2,6 @@ package com.mftb.admin.dto;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 /**
  * V3 灰度管理（任务29 D 段）响应 VO。
  *
@@ -11,6 +9,11 @@ import java.time.LocalDateTime;
  * <p><b>effective* 字段仅供任务23 前端管理页展示</b>，按任务27 读侧同一口径镜像计算
  * （GLOBAL 熔断优先、缺行/null/非 1 一律关闭）；任何门禁判定仍以
  * {@code RdmFlowVersionGuard.isV3ReleaseEnabled} 等读侧权威方法为准，本 VO 不作为放行依据。
+ *
+ * <p><b>时间字段输出字符串（yyyy-MM-dd HH:mm:ss）</b>：全局 {@code JacksonConfig} 会把裸
+ * {@code LocalDateTime} 序列化成毫秒数字，而前端（GrayscaleConfig.tsx）按字符串裁剪展示，
+ * 数字上调用 {@code .slice()} 会直接抛 TypeError 并把整页交给 RouteErrorBoundary，
+ * 导致灰度/熔断开关在 UI 上完全不可操作。
  */
 public final class RdmFlowConfigVO {
 
@@ -42,7 +45,7 @@ public final class RdmFlowConfigVO {
         private Integer businessVerificationDays;
         private Integer version;
         private Long updatedBy;
-        private LocalDateTime updatedAt;
+        private String updatedAt;
     }
 
     /** 项目行状态（scope_key=PROJECT:&lt;id&gt;）。 */
@@ -55,6 +58,6 @@ public final class RdmFlowConfigVO {
         private Integer v3ReleaseEnabled;
         private Integer version;
         private Long updatedBy;
-        private LocalDateTime updatedAt;
+        private String updatedAt;
     }
 }

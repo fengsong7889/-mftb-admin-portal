@@ -135,7 +135,7 @@ export default function MilestonePlan() {
           ;(res.records ?? []).forEach(e => map.set(e.id, `${e.name}（${e.empId}）`))
           return [...map.entries()].map(([value, label]) => ({ value, label }))
         }))
-        .catch(() => { /* 搜索失败不影响已加载的负责人，界面上保留原有候选 */ })
+        .catch(() => { /* 搜索失敗不影響已加載的負責人，界面上保留原有候選 */ })
     }, 300)
   }
 
@@ -235,7 +235,7 @@ export default function MilestonePlan() {
           showIcon
           style={{ marginBottom: 16 }}
           message="初步計劃 = 受理時的承諾；基線 = 評審通過、各角色估時確認後凍結的版本"
-          description="改期只动「当前预测」，基线不会被覆盖——否则按时率会被自己改考卷改出来。不适用节点必须写明原因，空着不算处理过。"
+          description="改期只動「當前預測」，基線不會被覆蓋——否則按時率會被自己改考卷改出來。不適用節點必須寫明原因，空著不算處理過。"
         />
 
         {rows.map(row => (
@@ -251,7 +251,7 @@ export default function MilestonePlan() {
                  * 未冻结也要显式标出来：之前只有冻结后才有标签，
                  * PM 在这个页面上看不出“自己还没冻结基线”，上线闸门只能靠豁免（阶段 4 实测）。
                  */
-                <Tooltip title="基线尚未冻结：排好初步计划后点底部「冻结基线」，之后按时率就以这份基线计算">
+                <Tooltip title="基線尚未凍結：排好初步計劃後點底部「凍結基線」，之後按時率就以這份基線計算">
                   <Tag color="default" style={{ margin: 0 }}>基線未凍結</Tag>
                 </Tooltip>
               )}

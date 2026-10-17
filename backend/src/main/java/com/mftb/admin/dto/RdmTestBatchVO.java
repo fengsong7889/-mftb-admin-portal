@@ -66,9 +66,36 @@ public class RdmTestBatchVO {
         private Integer version;
         /** 待接收用例草稿JSON（权威冻结集合以测试轮次为准） */
         private String caseSnapshotJson;
+        /**
+         * 当前轮次的<b>冻结用例集</b>（含服务端派生的稳定 caseId 与每用例有效结果）。
+         * <p>必须有这个字段：录结果接口只认 caseId，而 caseId 是受理时在服务端派生的
+         * （{@code C-<交付项Id>-<sha12>}，为了跨轮对齐故意不由前端自定、也不可预测）。
+         * 只有草稿 caseSnapshotJson（无 caseId）时，任何客户端都拿不到合法 caseId，
+         * 只能在界面上手输一个猜的值 → 提测链路在 UI 上永远录不进结果。
+         * <p>未冻结（还没受理）时为空列表。
+         */
+        private List<CaseEntry> frozenCases = new ArrayList<>();
         /** 待接收交付项-系统-构建映射JSON */
         private String buildMappingJson;
         private String updatedAt;
+    }
+
+    /**
+     * 冻结用例条目（任务20 测试流：把服务端权威 caseId 交给前端选用）。
+     */
+    @Data
+    public static class CaseEntry {
+        private Long deliveryItemId;
+        private String deliveryItemTitle;
+        /** 服务端派生的稳定用例 ID（录结果必须原样带上） */
+        private String caseId;
+        private String caseTitle;
+        /** 业务范围版本（冻结时快照，非并发版本） */
+        private Integer scopeVersion;
+        /** 是否必测（参与通过判定） */
+        private Boolean mandatory;
+        /** 本用例在本轮的有效结果：pass/fail/not_passed/not_executed */
+        private String effectiveResult;
     }
 
     /** 测试执行记录 */

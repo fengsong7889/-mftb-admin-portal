@@ -20,6 +20,8 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchIterations, fetchWeeklyReport, type RdmIterationItem, type RdmWeeklyReport } from '../../api/rdm'
 import { exportWeeklyReport } from './weeklyReportExport'
 import {
@@ -176,6 +178,39 @@ export default function WeeklyReport() {
     },
   ], [navigate])
 
+  /*
+   * 四个区块各自一份列配置（§E.3）：上線清單/風險清單/部门产出/下周计划列集完全不同，
+   * 共用一个 pageKey 会让一个区块的勾选传染到其它区块。
+   */
+  const releasedMeta = useMemo(() => deriveRdmColumnMeta(releasedColumns), [releasedColumns])
+  const riskMeta = useMemo(() => deriveRdmColumnMeta(riskColumns), [riskColumns])
+  const deptMeta = useMemo(() => deriveRdmColumnMeta(deptColumns), [deptColumns])
+  const nextMeta = useMemo(() => deriveRdmColumnMeta(nextColumns), [nextColumns])
+  // 需求編號是这三张表的行身份，锁在最前；部门表的部門同理
+  const headLocked = (key: string) => [{ key, visible: true, locked: 'head' as const }]
+  const { configComponent: releasedConfig, applyConfig: applyReleased } = useColumnConfig('rdm-weekly-released', releasedMeta, headLocked('reqNo'))
+  const { configComponent: riskConfig, applyConfig: applyRisk } = useColumnConfig('rdm-weekly-risk', riskMeta, headLocked('reqNo'))
+  const { configComponent: deptConfig, applyConfig: applyDept } = useColumnConfig('rdm-weekly-by-dept', deptMeta, headLocked('deptName'))
+  const { configComponent: nextConfig, applyConfig: applyNext } = useColumnConfig('rdm-weekly-next-week', nextMeta, headLocked('reqNo'))
+  const visibleReleased = applyReleased(releasedColumns) as typeof releasedColumns
+  const visibleRisk = applyRisk(riskColumns) as typeof riskColumns
+  const visibleDept = applyDept(deptColumns) as typeof deptColumns
+  const visibleNext = applyNext(nextColumns) as typeof nextColumns
+
+  /**
+   * 报表区块统一分页配置（§E.4）：三件套齐全，行数少时不占版面。
+   * 用 defaultPageSize 而非 pageSize：本批报表表都是客户端分页（dataSource 为全量），
+   * 写死 pageSize 会变成受控常量，用户选 20/50 会被下一次渲染打回 10（“每页条数”失效）。
+   */
+  const blockPagination = (unit = '條') => ({
+    defaultPageSize: 10,
+    showSizeChanger: true,
+    showQuickJumper: true,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    showTotal: (t: number) => `共 ${t} ${unit}`,
+    hideOnSinglePage: true,
+  })
+
   if (loading && !report) {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>
   }
@@ -194,51 +229,7 @@ export default function WeeklyReport() {
           </span>
         )}
         meta="先看結論再下鑽明細；導出的 Excel 與頁面同一份數據，不會出現兩套數字"
-        right={(
-          <Space size={8} wrap>
-            <RangePicker
-              value={range}
-              allowClear={false}
-              onChange={v => { if (v?.[0] && v[1]) setRange([v[0], v[1]]) }}
-            />
-            <Select
-              style={{ width: 200 }}
-              allowClear
-              placeholder="按迭代統計（可選）"
-              value={iterationCode}
-              onChange={setIterationCode}
-              options={iterations.map(i => ({ value: i.code, label: i.name }))}
-            />
-          </Space>
-        )}
       />
-
-      {/* 刷新与导出属于操作区（§E.2），不放页面头部右侧 */}
-      <div className="action-section">
-        <div className="action-section-left">
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          <Button className="btn-export" icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>導出週報</Button>
-        </div>
-      </div>
-
-      <Space size={8} wrap style={{ marginBottom: 16 }}>
-        {PRESETS.map(p => {
-          const presetRange = p.range()
-          const active = sameRange(range, presetRange)
-          return (
-            <Tag
-              key={p.label}
-              color={active ? 'orange' : 'default'}
-              style={{ cursor: 'pointer', padding: '2px 10px', height: 26, display: 'inline-flex', alignItems: 'center' }}
-              onClick={() => setRange(presetRange)}
-            >
-              {p.label}
-            </Tag>
-          )
-        })}
-        <Button type="link" size="small" onClick={() => navigate('/rdm-quality')}>看質量口徑</Button>
-        <Button type="link" size="small" onClick={() => navigate('/rdm-version-trace')}>看版本追溯</Button>
-      </Space>
 
       {/* 加载失败要给可见原因与重试入口，不能只留一个转圈或一句 toast 过后就什么都不说 */}
       {error && !report && (
@@ -254,21 +245,70 @@ export default function WeeklyReport() {
         />
       )}
 
+      {/* 筛选区：时间区间、迭代与快捷区间都是查询条件（§E.1/§E.8），不再放页面头部右侧 */}
+      <div className="search-section">
+        <Space size={8} wrap>
+          <RangePicker
+            value={range}
+            allowClear={false}
+            onChange={v => { if (v?.[0] && v[1]) setRange([v[0], v[1]]) }}
+          />
+          <Select
+            style={{ width: 200 }}
+            allowClear
+            placeholder="按迭代統計（可選）"
+            value={iterationCode}
+            onChange={setIterationCode}
+            options={iterations.map(i => ({ value: i.code, label: i.name }))}
+          />
+        </Space>
+        <Space size={8} wrap>
+          {PRESETS.map(p => {
+            const presetRange = p.range()
+            const active = sameRange(range, presetRange)
+            return (
+              <Tag
+                key={p.label}
+                color={active ? 'orange' : 'default'}
+                style={{ cursor: 'pointer', padding: '2px 10px', height: 26, display: 'inline-flex', alignItems: 'center' }}
+                onClick={() => setRange(presetRange)}
+              >
+                {p.label}
+              </Tag>
+            )
+          })}
+          <Button type="link" size="small" onClick={() => navigate('/rdm-quality')}>看質量口徑</Button>
+          <Button type="link" size="small" onClick={() => navigate('/rdm-version-trace')}>看版本追溯</Button>
+        </Space>
+      </div>
+
+      {/* 統計卡：必須在搜索區下方、操作區上方（§E.8） */}
+      {s && (
+        <div style={{ marginBottom: 16 }}>
+          <StatCards
+            animationKey={`${report?.range.startDate}-${report?.range.endDate}`}
+            items={[
+              { key: 'submitted', icon: <RiseOutlined />, value: s.submitted, label: '本週新提交', color: 'info' },
+              { key: 'accepted', icon: <CheckCircleOutlined />, value: s.accepted, label: '產品受理', color: 'brand' },
+              { key: 'released', icon: <CheckCircleOutlined />, value: s.released, label: '已上線', color: 'success' },
+              { key: 'ontime', icon: <FieldTimeOutlined />, value: Math.round(s.onTimeRate * 100), suffix: ' %', label: '按時上線率', color: s.onTimeRate >= 0.8 ? 'success' : 'brand' },
+              { key: 'firstpass', icon: <CheckCircleOutlined />, value: Math.round(s.firstPassRate * 100), suffix: ' %', label: '驗收一次通過率', color: s.firstPassRate >= 0.8 ? 'success' : 'system' },
+              { key: 'overdue', icon: <AlertOutlined />, value: s.overdue, label: '逾期需求', color: 'system' },
+            ]}
+          />
+        </div>
+      )}
+
+      {/* 刷新与导出属于操作区（§E.2），不放页面头部右侧 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
+          <Button className="btn-export" icon={<DownloadOutlined />} loading={exporting} onClick={handleExport}>導出週報</Button>
+        </div>
+      </div>
+
       {s && (
         <>
-          <div style={{ marginBottom: 16 }}>
-            <StatCards
-              animationKey={`${report?.range.startDate}-${report?.range.endDate}`}
-              items={[
-                { key: 'submitted', icon: <RiseOutlined />, value: s.submitted, label: '本週新提交', color: 'info' },
-                { key: 'accepted', icon: <CheckCircleOutlined />, value: s.accepted, label: '產品受理', color: 'brand' },
-                { key: 'released', icon: <CheckCircleOutlined />, value: s.released, label: '已上線', color: 'success' },
-                { key: 'ontime', icon: <FieldTimeOutlined />, value: Math.round(s.onTimeRate * 100), suffix: ' %', label: '按時上線率', color: s.onTimeRate >= 0.8 ? 'success' : 'brand' },
-                { key: 'firstpass', icon: <CheckCircleOutlined />, value: Math.round(s.firstPassRate * 100), suffix: ' %', label: '驗收一次通過率', color: s.firstPassRate >= 0.8 ? 'success' : 'system' },
-                { key: 'overdue', icon: <AlertOutlined />, value: s.overdue, label: '逾期需求', color: 'system' },
-              ]}
-            />
-          </div>
 
           {s.rework > 0 && (
             <Alert
@@ -286,13 +326,14 @@ export default function WeeklyReport() {
               本期上線清單（{report?.released.length ?? 0}）
               <span className="rdm-card-title-split" />
               <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>每條都可點進需求看驗收結論與所屬版本</span>
+              {releasedConfig}
             </div>
             <Table
               rowKey="reqId"
               size="small"
-              columns={releasedColumns}
+              columns={visibleReleased}
               dataSource={report?.released ?? []}
-              pagination={false}
+              pagination={blockPagination()}
               locale={{ emptyText: '本期無上線需求' }}
             />
           </div>
@@ -302,13 +343,14 @@ export default function WeeklyReport() {
               <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
               風險清單（{report?.risks.length ?? 0}）
               <span className="rdm-card-title-split" />
+              {riskConfig}
             </div>
             <Table
               rowKey="reqId"
               size="small"
-              columns={riskColumns}
+              columns={visibleRisk}
               dataSource={report?.risks ?? []}
-              pagination={false}
+              pagination={blockPagination()}
               scroll={{ x: 900 }}
               locale={{ emptyText: '當前沒有逾期或阻塞需求' }}
             />
@@ -320,13 +362,14 @@ export default function WeeklyReport() {
                 <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RiseOutlined /></span>
                 部門產出
                 <span className="rdm-card-title-split" />
+                {deptConfig}
               </div>
               <Table
                 rowKey="deptName"
                 size="small"
-                columns={deptColumns}
+                columns={visibleDept}
                 dataSource={report?.byDept ?? []}
-                pagination={false}
+                pagination={blockPagination('個部門')}
                 scroll={{ x: 620 }}
               />
             </div>
@@ -335,13 +378,14 @@ export default function WeeklyReport() {
                 <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><CalendarOutlined /></span>
                 下週預計上線（{report?.nextWeek.length ?? 0}）
                 <span className="rdm-card-title-split" />
+                {nextConfig}
               </div>
               <Table
                 rowKey="reqId"
                 size="small"
-                columns={nextColumns}
+                columns={visibleNext}
                 dataSource={report?.nextWeek ?? []}
-                pagination={false}
+                pagination={blockPagination()}
                 locale={{ emptyText: '下週暫無計劃上線的需求' }}
               />
             </div>

@@ -243,7 +243,7 @@ export default function PrdForm() {
           message={`本版 PRD 已${currentStatus === 'approved' ? '評審通過' : '進入評審'}，內容已凍結`}
           description={(
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <span>需要修改請勾選下方「以新版本修改」：新版本会生成一份草稿并保留原版，开发与验收才不会各认一版。</span>
+              <span>需要修改請勾選下方「以新版本修改」：新版本會生成一份草稿并保留原版，開發與驗收才不會各認一版。</span>
               <Checkbox checked={newVersion} onChange={e => setNewVersion(e.target.checked)}>
                 以新版本修改
               </Checkbox>

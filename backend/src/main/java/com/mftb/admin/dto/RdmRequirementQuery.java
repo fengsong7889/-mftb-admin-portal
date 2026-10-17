@@ -47,6 +47,27 @@ public class RdmRequirementQuery {
     /** 提出人用户ID（精确匹配） */
     private Long submitterUserId;
 
+    /**
+     * 流程版本（1/2/3）过滤。
+     * <p>为什么需要它：提测批次、发布批次等 V3 专属入口的服务端准入会直接拒绝
+     * {@code flow_version != 3} 的需求，但 {@code scope=delivery} 的候选列表并不按版本收敛，
+     * 于是用户在下拉里选得到、提交时被拒（且报错是 500），两侧口径必须同源。
+     * <p>不把它写死进 SCOPE_DELIVERY：研发工作台/交付看板同样用该视角，
+     * 强加版本条件会让存量 V2 需求从这些页面消失。
+     */
+    private Integer flowVersion;
+
+    /**
+     * 所属项目 ID / 需求种类（aggregate / execution）过滤。
+     * <p>两个参数前端一直在传（RequirementSubmit 的聚合需求下拉、RequirementDetail 的执行需求列表），
+     * 但本 DTO 从未声明，于是被 Spring 静默丢弃，只能靠前端再过滤一次兜底。
+     * 补齐后两侧口径一致：服务端收敛结果集，前端兜底过滤变成幂等的多余保险。
+     */
+    private Long projectId;
+
+    /** 需求种类：aggregate（聚合需求）/ execution（执行需求） */
+    private String requirementKind;
+
     /** 交付中状态集合（研发视角） */
     private static final List<String> DELIVERY_STATUS = List.of(
             RdmConstants.STATUS_SCHEDULED, RdmConstants.STATUS_DESIGNING, RdmConstants.STATUS_DEVELOPING,
@@ -100,6 +121,15 @@ public class RdmRequirementQuery {
         }
         if (submitterUserId != null) {
             wrapper.eq(RdmRequirement::getSubmitterUserId, submitterUserId);
+        }
+        if (flowVersion != null) {
+            wrapper.eq(RdmRequirement::getFlowVersion, flowVersion);
+        }
+        if (projectId != null) {
+            wrapper.eq(RdmRequirement::getProjectId, projectId);
+        }
+        if (StringUtils.hasText(requirementKind)) {
+            wrapper.eq(RdmRequirement::getRequirementKind, requirementKind);
         }
         if (Boolean.TRUE.equals(overdueOnly)) {
             wrapper.eq(RdmRequirement::getOverdueFlag, 1);

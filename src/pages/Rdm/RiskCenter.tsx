@@ -240,7 +240,7 @@ export default function RiskCenter() {
           dataSource={risks}
           scroll={{ x: 1100 }}
           pagination={{
-            pageSize: 20,
+            defaultPageSize: 20,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],

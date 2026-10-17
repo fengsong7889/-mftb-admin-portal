@@ -29,6 +29,7 @@ import {
   mockAddComment,
   mockBatchAssign,
   mockCreateRequirement,
+  mockDeleteRoutingRule,
   mockDashboard,
   mockFunctionPoints,
   mockGetRequirement,
@@ -579,7 +580,17 @@ export interface RdmRoutingRow {
   activeCount: number
   priority: number
   enabled: boolean
+  /**
+   * 仅前端使用：行内「新增規則」尚未落库的标记。
+   * <p>为什么需要它：表格 rowKey 需要一个本地唯一值，以前直接用 Date.now() 当 id 并原样送给后端，
+   * 后端看到 id 非空就走 UPDATE，影响 0 行却仍回「已保存」——新增规则永远存不下来。
+   * 提交前必须把本标记去掉并把 id 置 null。
+   */
+  isNew?: boolean
 }
+
+/** 保存分发矩阵行的请求体：id 为 null/缺省 表示新增（后端按 null 走 INSERT，带 id 走 UPDATE） */
+export type RdmRoutingSaveForm = Omit<RdmRoutingRow, 'id' | 'isNew'> & { id?: number | null }
 
 /** 状态定义行 */
 export interface RdmStatusDefRow {
@@ -667,6 +678,12 @@ export interface RdmRequirementQuery {
   projectId?: number
   /** V3：按需求种类过滤 aggregate/execution */
   requirementKind?: string
+  /**
+   * 流程版本过滤（1/2/3）。
+   * 提测、发布等 V3 专属入口必须传 3：服务端准入会拒 flow_version != 3 的需求，
+   * 候选列表不同源过滤会造成「选得到、提交被拒」。
+   */
+  flowVersion?: number
 }
 
 /* ==================== 查询 ==================== */
@@ -922,12 +939,26 @@ export async function fetchRoutingRules(): Promise<RdmRoutingRow[]> {
   }
 }
 
-/** 保存：POST /rdm/config/routing */
-export async function saveRoutingRule(rowData: RdmRoutingRow): Promise<RdmRoutingRow[]> {
+/** 保存：POST /rdm/config/routing（id 为 null 时后端新增，否则按 id 更新） */
+export async function saveRoutingRule(rowData: RdmRoutingSaveForm): Promise<RdmRoutingRow[]> {
   try {
     return await request.post<unknown, RdmRoutingRow[]>('/rdm/config/routing', rowData, SILENT)
   } catch (err) {
     if (canMockWrite(err)) return mockSaveRoutingRule(rowData)
+    throw err
+  }
+}
+
+/**
+ * 移除分发规则：DELETE /rdm/config/routing/{id}（服务端逻辑删）。
+ * <p>必须有真接口：原先界面的「移除」只 filter 本地 state，刷新后规则又回来，
+ * 而它仍然参与后端分发命中 —— 用户以为已下线，实际还在往那位产品经理派单。
+ */
+export async function deleteRoutingRule(id: number): Promise<RdmRoutingRow[]> {
+  try {
+    return await request.delete<unknown, RdmRoutingRow[]>(`/rdm/config/routing/${id}`, SILENT)
+  } catch (err) {
+    if (canMockWrite(err)) return mockDeleteRoutingRule(id)
     throw err
   }
 }
@@ -2428,6 +2459,24 @@ export interface RdmTestBatchDetail extends RdmTestBatchListItem {
   caseSnapshotJson?: string | null;
   /** Batch3：待接收交付项-系统-构建映射JSON */
   buildMappingJson?: string | null;
+  /**
+   * 当前轮次的冻结用例集（含服务端派生的稳定 caseId 与每用例有效结果）。
+   * 录入结果必须从这里选：caseId 由服务端受理时派生且不可预测，手输永远对不上。
+   * 空数组 = 还没受理（无冻结轮次）。
+   */
+  frozenCases?: RdmTestBatchFrozenCase[];
+}
+
+/** 冻结用例条目（后端 RdmTestBatchVO.CaseEntry）：权威 caseId + 本轮有效结果 */
+export interface RdmTestBatchFrozenCase {
+  deliveryItemId: number
+  deliveryItemTitle?: string | null
+  caseId: string
+  caseTitle?: string | null
+  scopeVersion?: number | null
+  mandatory?: boolean
+  /** pass / fail / not_passed / not_executed */
+  effectiveResult?: string | null
 }
 
 /**
@@ -3429,19 +3478,23 @@ export interface RdmGrayscaleStatus {
   effectiveV3Write: boolean | null; effectiveV3Release: boolean | null;
 }
 
-/** 項目級開關變更（兩個獨立開關，null=不變；expectedVersion/reason 必填） */
+/**
+ * 項目級開關變更（兩個獨立開關，null=不變；reason 必填）。
+ * <p>expectedVersion 為乐观锁版本，**僅在灰度行已存在時攜帶**：行不存在時必須以「新建」語義提交，
+ * 後端會拒絕帶 expectedVersion 的首次建行請求（哪怕值是 0），所以這裡必須可省略。
+ */
 export interface RdmProjectFlagsUpdateForm {
   projectId: number;
   v3WriteEnabled?: number | null; v3ReleaseEnabled?: number | null;
-  expectedVersion: number; reason: string;
+  expectedVersion?: number; reason: string;
   requestId?: string;
 }
 
-/** GLOBAL 行開關變更（總閘 + 全局熔斷，四個開關獨立，null=不變；expectedVersion/reason 必填） */
+/** GLOBAL 行開關變更（總閘 + 全局熔斷，四個開關獨立，null=不變；reason 必填，expectedVersion 同上僅在行存在時攜帶） */
 export interface RdmGlobalFlagsUpdateForm {
   v3WriteEnabled?: number | null; v3ReleaseEnabled?: number | null;
   globalWritePaused?: number | null; globalReleasePaused?: number | null;
-  expectedVersion: number; reason: string;
+  expectedVersion?: number; reason: string;
   requestId?: string;
 }
 

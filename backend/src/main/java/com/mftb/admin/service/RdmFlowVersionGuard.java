@@ -120,6 +120,23 @@ public class RdmFlowVersionGuard {
         throw new BusinessException("V3 分批交付需求的交付/測試/驗收/發布以交付項為推進單位，"
                 + "不能通過整需求流轉執行動作「" + actionCode + "」，請使用交付項接口");
     }
+
+    /**
+     * 判定某个整需求流转动作对给定流程版本<b>是否真的可执行</b>（只读版裁决，不抛异常）。
+     *
+     * <p>给 {@code allowedActions} 用：写入口按 {@link #V3_TRANSITION_ALLOWED_ACTIONS} 拒绝 V3 的
+     * 交付/测试/验收/发布类动作，但读入口以前没同一份白名单，于是 V3 需求详情页仍会列出
+     * 「開始寫 PRD」这类一按就必被拒的按钮（绕端实测：返 500「請使用交付項接口」）。
+     * 按钮能点、点了必失败，比不列按钮更坑人：用户会反复试并当成系统故障上报。
+     *
+     * <p>非 V3（含 flowVersion 为空的存量）一律返回 true，旧链路语义不变。
+     */
+    public boolean isTransitionActionAllowed(Integer flowVersion, String actionCode) {
+        if (!isV3(flowVersion)) {
+            return true;
+        }
+        return actionCode != null && V3_TRANSITION_ALLOWED_ACTIONS.contains(actionCode);
+    }
     /**
      * 获取需求的实际流程版本。
      * <p>历史数据 flowVersion 可能为空，统一按 V1 兜底（最宽松口径，不误卡存量需求）。

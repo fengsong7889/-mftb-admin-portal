@@ -138,8 +138,8 @@ const VERSION_FALLBACK_HINT = '無發布版本記錄，可直接輸入版本號�
  * <p>只写能从流转配置确定的事实，不写「計不計失敗」这类系统未定义的判断。
  */
 const ACTION_EFFECT_HINT: Partial<Record<RdmAction, string>> = {
-  [RDM_ACTION.SUBMIT]: '進入准入審批，由審批人決定是否受理',
-  [RDM_ACTION.SUBMIT_POOL]: '跳過准入審批，需求直接進入需求池等待分配產品經理',
+  [RDM_ACTION.SUBMIT]: '進入準入審批，由審批人決定是否受理',
+  [RDM_ACTION.SUBMIT_POOL]: '跳過準入審批，需求直接進入需求池等待分配產品經理',
 }
 
 /** 审批节点状态文案 */
@@ -167,7 +167,7 @@ const PRIMARY_ACTION_ORDER: RdmAction[] = [
 /** 主动作对应的「现在轮到你做什么」，只写动作名等于没提示 */
 const ACTION_HINT: Partial<Record<RdmAction, string>> = {
   [RDM_ACTION.SUBMIT]: '需求仍是草稿，補充內容後提交才會開始流轉',
-  [RDM_ACTION.RESUBMIT]: '准入審批被駁回，按理由修改後重新提交（會發起新一輪審批）',
+  [RDM_ACTION.RESUBMIT]: '準入審批被駁回，按理由修改後重新提交（會發起新一輪審批）',
   [RDM_ACTION.SUBMIT_POOL]: '免審直送：確認內容無誤後提交即進入需求池等待分配',
   [RDM_ACTION.APPROVE_INTAKE]: '你是當前審批人：確認必要性、範圍與是否重複後裁決',
   [RDM_ACTION.DISPATCH]: '需求在池中等待指派：按負責域與剩餘容量選產品經理',
@@ -196,13 +196,13 @@ const ACTION_HINT: Partial<Record<RdmAction, string>> = {
 /** 无动作时按状态解释「球在谁手上」，避免用户以为页面坏了 */
 const STATUS_WAIT_HINT: Partial<Record<RdmStatus, string>> = {
   [RDM_STATUS.DRAFT]: '草稿只有自己能看到，提交後才會進入審批或需求池',
-  [RDM_STATUS.INTAKE_PENDING]: '准入審批中，等待當前審批人裁決',
-  [RDM_STATUS.INTAKE_REJECTED]: '准入審批被駁回，需提出人修改後重新提交',
+  [RDM_STATUS.INTAKE_PENDING]: '準入審批中，等待當前審批人裁決',
+  [RDM_STATUS.INTAKE_REJECTED]: '準入審批被駁回，需提出人修改後重新提交',
   [RDM_STATUS.POOL]: '需求在池中等待技術負責人分配產品經理',
   [RDM_STATUS.ASSIGNED]: '已分配，等待產品經理受理',
   [RDM_STATUS.EVALUATING]: '產品經理評估中，結論出來後會通知你',
   [RDM_STATUS.REJECTED]: '產品駁回了需求，可查看理由後決定是否重開',
-  [RDM_STATUS.ON_HOLD]: '需求被掛起暂缓，等待確認是否繼續推進',
+  [RDM_STATUS.ON_HOLD]: '需求被掛起暫緩，等待確認是否繼續推進',
   [RDM_STATUS.ACCEPTED]: '已受理，等待產品經理編寫 PRD',
   [RDM_STATUS.PRD_DESIGNING]: 'PRD 編寫中',
   [RDM_STATUS.REVIEWING]: '評審中，等待評審人給出結論',
@@ -397,11 +397,11 @@ export default function RequirementDetail() {
     setChildSubmitting(true)
     try {
       await addStructureChild({ parentReqId: id, childReqId: childSelected })
-      message.success('子需求已挂接')
+      message.success('子需求已掛接')
       setChildModalOpen(false)
       await loadStructureTree()
     } catch (err) {
-      message.error(err instanceof Error && err.message ? err.message : '挂接失败')
+      message.error(err instanceof Error && err.message ? err.message : '掛接失敗')
     } finally {
       setChildSubmitting(false)
     }
@@ -415,7 +415,7 @@ export default function RequirementDetail() {
       message.success('子需求已移除')
       await loadStructureTree()
     } catch (err) {
-      message.error(err instanceof Error && err.message ? err.message : '移除失败')
+      message.error(err instanceof Error && err.message ? err.message : '移除失敗')
     }
   }
 
@@ -833,7 +833,7 @@ export default function RequirementDetail() {
             {/* 阶段口径是多句说明，按规范走 HelpPopover；原「查看流程」弹窗已被顶部直铺的阶段条取代 */}
             <HelpPopover
               title="階段口徑說明"
-              ariaLabel="阶段口径说明"
+              ariaLabel="階段口徑說明"
               placement="bottomLeft"
               width={400}
               content={[
@@ -887,7 +887,7 @@ export default function RequirementDetail() {
           <div className="rdm-action-bar-judge">
             <HelpPopover
               title="審批判斷口徑"
-              ariaLabel="审批判断口径说明"
+              ariaLabel="審批判斷口徑說明"
               placement="bottomLeft"
               width={420}
               content={[

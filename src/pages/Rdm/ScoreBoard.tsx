@@ -23,6 +23,8 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 /** 阶段 6：页内展开预算、HR 建议与指标口径（不新建路由，避开菜单页名兜底表上限） */
 import GovernancePanel from './components/GovernancePanel'
 import { useAuth } from '../../contexts/AuthContext'
@@ -257,6 +259,23 @@ export default function ScoreBoard() {
     },
   ], [navigate])
 
+  /*
+   * 两张主表各自一份列配置（§E.3）：排名表关心构成明细、流水表关心成因与关联单据，
+   * 列集不同必须分 pageKey；第一名/序號类身份列锁在最前。
+   */
+  const rankMeta = useMemo(() => deriveRdmColumnMeta(rankColumns), [rankColumns])
+  const recordMeta = useMemo(() => deriveRdmColumnMeta(recordColumns), [recordColumns])
+  const { configComponent: rankConfig, applyConfig: applyRank } = useColumnConfig(
+    'rdm-score-rank', rankMeta,
+    [{ key: rankMeta[0]?.key ?? '', visible: true, locked: 'head' as const }].filter(c => c.key),
+  )
+  const { configComponent: recordConfig, applyConfig: applyRecord } = useColumnConfig(
+    'rdm-score-record', recordMeta,
+    [{ key: 'action', visible: true, locked: 'tail' as const }].filter(() => recordMeta.some(m => m.key === 'action')),
+  )
+  const visibleRankColumns = applyRank(rankColumns) as typeof rankColumns
+  const visibleRecordColumns = applyRecord(recordColumns) as typeof recordColumns
+
   if (!data && !loading) {
     return <div className="content-area"><Alert type="error" showIcon message="積分數據不可用" /></div>
   }
@@ -345,14 +364,21 @@ export default function ScoreBoard() {
           人員積分排名
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>展開行可看每條分的計算式與成因（績效申訴依據）</span>
+          <span style={{ marginLeft: 'auto' }}>{rankConfig}</span>
         </div>
         <Table<RdmPersonalScore>
           rowKey="userName"
           size="small"
           loading={loading}
-          columns={rankColumns}
+          columns={visibleRankColumns}
           dataSource={data?.ranking ?? []}
-          pagination={false}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+          }}
           scroll={{ x: 1020 }}
           expandable={{
             expandedRowRender: r => <ScoreTracePanel records={recordsByPerson.get(r.userName) ?? []} />,
@@ -386,7 +412,14 @@ export default function ScoreBoard() {
             },
           ]}
           dataSource={data?.deptRank ?? []}
-          pagination={false}
+          pagination={{
+            defaultPageSize: 20,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+            hideOnSinglePage: true,
+          }}
         />
       </div>
 
@@ -396,14 +429,21 @@ export default function ScoreBoard() {
           積分明細流水
           <span className="rdm-card-title-split" />
           <Button size="small" icon={<ExportOutlined />} onClick={() => navigate('/rdm-weekly-report')}>週報導出</Button>
+          {recordConfig}
         </div>
         <Table<RdmScoreRecord>
           rowKey="id"
           size="small"
-          columns={recordColumns}
+          columns={visibleRecordColumns}
           dataSource={data?.records ?? []}
           scroll={{ x: 1000 }}
-          pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }}
+          pagination={{
+            defaultPageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            showTotal: t => `共 ${t} 條`,
+          }}
           expandable={{ expandedRowRender: r => <ScoreTracePanel records={[r]} /> }}
           locale={{ emptyText: '還沒有積分流水，可點「按當前規則重算」生成' }}
         />

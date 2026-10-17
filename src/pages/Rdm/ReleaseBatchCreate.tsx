@@ -11,7 +11,7 @@
  * 校验顺序：validateFields → 组装 payload → 调 API（§B.3 禁止先弹后校验）。
  */
 import { useCallback, useState } from 'react'
-import { Button, DatePicker, Form, Input, InputNumber, Select, Space, message } from 'antd'
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd'
 import {
   MinusCircleOutlined, PlusOutlined, SendOutlined,
 } from '@ant-design/icons'
@@ -82,7 +82,7 @@ export default function ReleaseBatchCreate() {
     try {
       values = await form.validateFields()
     } catch {
-      message.warning('請先補全帶 * 的必填項')
+      message.warning('請先補全發布批次帶 * 的必填項')
       return
     }
     if (!values.releaseOwnerUserId) {
@@ -102,6 +102,33 @@ export default function ReleaseBatchCreate() {
         buildId: d.buildId,
         deployOrder: d.deployOrder ?? i + 1,
       })).filter(d => d.systemCode),
+    }
+    /*
+     * 发布批次一旦创建就会进入放行门禁与四眼裁决链路，按 §B.3 必须二次确认；
+     * 顺序固定为「校验 → 弹确认框 → 调接口」，确认框里把范围与部署清单数量摊开给人看。
+     */
+    const confirmed = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: '確認創建發布批次？',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: (
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>版本標識：</span><b>{data.versionTag}</b></div>
+            <div className="confirm-info-row"><span>發布負責人：</span><b>{data.releaseOwnerUserName || data.releaseOwnerUserId}</b></div>
+            <div className="confirm-info-row"><span>交付項數：</span><b>{(data.deliveryItemIds ?? []).length}</b></div>
+            <div className="confirm-info-row"><span>部署系統數：</span><b>{data.deployments.length}</b></div>
+            <div className="confirm-info-row"><span>計劃發布：</span><b>{data.planTime ?? '未填'}</b></div>
+          </div>
+        ),
+        okText: '確認創建',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) {
+      return
     }
     setSaving(true)
     try {

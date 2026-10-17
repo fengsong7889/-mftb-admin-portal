@@ -534,7 +534,7 @@ export default function IssueDetail() {
             content={[
               { label: '延期需批准才解除阻斷', body: '延期申請必須經產品（必要時業務）裁決批准後才生效；未批准的延期不解除阻斷。', tone: 'warn' },
               { label: '承接唯一', body: '每個問題同一時刻只有一條有效承接需求；改派/合併/取消都保留既有承接與歷史。', tone: 'info' },
-              { label: '關閉需證據', body: '按證據關閉必須带修復證據 + 復測輪次 + 產品驗收；延期≠解決，承接需求完成驗收≠原問題自動解決。', tone: 'danger' },
+              { label: '關閉需證據', body: '按證據關閉必須帶修復證據 + 復測輪次 + 產品驗收；延期≠解決，承接需求完成驗收≠原問題自動解決。', tone: 'danger' },
             ]}
           />
           <span className="rdm-card-title-split" />
@@ -583,7 +583,7 @@ export default function IssueDetail() {
         okText="提交申請"
         cancelText="取消"
         width={580}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={deferForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="reason" label="延期原因" rules={[{ required: true, message: '請填寫延期原因' }]}>
@@ -632,7 +632,7 @@ export default function IssueDetail() {
         okText="提交決策"
         cancelText="取消"
         width={520}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={decideForm} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="decision" label="決定" rules={[{ required: true, message: '請選擇' }]}>
@@ -685,11 +685,11 @@ export default function IssueDetail() {
         okText="提交"
         cancelText="取消"
         width={580}
-        destroyOnClose
+        destroyOnHidden
       >
         {actionModal === 'resolve' && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-            message="關閉必須带證據"
+            message="關閉必須帶證據"
             description="延期≠解決；承接需求完成驗收≠原問題自動解決。修復證據、復測輪次、產品驗收均為必填，後端據此校驗，缺證據一律拒絕。" />
         )}
         {actionModal === 'bind' && (

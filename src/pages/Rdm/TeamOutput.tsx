@@ -186,7 +186,7 @@ export default function TeamOutput() {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="負載與周期已偏出常態"
+          message="負載與週期已偏出常態"
           description={(
             <span>
               {overloaded.length > 0 && `在途偏多：${overloaded.map(p => p.pmName).join('、')}。`}
@@ -213,7 +213,7 @@ export default function TeamOutput() {
           dataSource={deptRank}
           scroll={{ x: 900 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],
@@ -238,7 +238,7 @@ export default function TeamOutput() {
           dataSource={pmRank}
           scroll={{ x: 700 }}
           pagination={{
-            pageSize: 10,
+            defaultPageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],

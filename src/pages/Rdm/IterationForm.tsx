@@ -5,7 +5,7 @@
  * 与「已排工时」并列展示，编辑态实时提示负载率。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Select, Space, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -82,26 +82,60 @@ export default function IterationForm() {
   const loadRate = capacity && capacity > 0 ? Math.round((scheduledHours / capacity) * 100) : 0
 
   const handleSave = async () => {
-    const values = await form.validateFields()
+    // 校验失败要给可见提示，不能变成无人接的 rejection（点了保存什么都没发生）
+    let values: Awaited<ReturnType<typeof form.validateFields>>
+    try {
+      values = await form.validateFields()
+    } catch {
+      message.warning('請先補全迭代表單帶 * 的必填項')
+      return
+    }
+    const payload: RdmIterationPayload = {
+      id: iterationId || undefined,
+      code: values.code.trim(),
+      name: values.name.trim(),
+      iterationType: values.iterationType,
+      startDate: values.range?.[0]?.format('YYYY-MM-DD') ?? '',
+      endDate: values.range?.[1]?.format('YYYY-MM-DD') ?? '',
+      capacityHours: values.capacityHours,
+      ownerUserId: values.owner ? Number(values.owner) : undefined,
+      status: values.status,
+      remark: values.remark,
+    }
+    /*
+     * 迭代是排期与产能的对账基准，创建/修改会立即影响负载与逾期判定，
+     * 按 §B.3 走「校验 → 二次确认 → 调接口」，确认框给出关键上下文。
+     */
+    const confirmed = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: iterationId ? '確認保存迭代變更？' : '確認創建迭代？',
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        content: (
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>迭代編號：</span><b>{payload.code}</b></div>
+            <div className="confirm-info-row"><span>迭代名稱：</span><b>{payload.name}</b></div>
+            <div className="confirm-info-row"><span>起止日期：</span><b>{payload.startDate} ~ {payload.endDate}</b></div>
+            <div className="confirm-info-row"><span>容納工時：</span><b>{payload.capacityHours} h</b></div>
+          </div>
+        ),
+        okText: '確認保存',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) {
+      return
+    }
     setSaving(true)
     try {
-      const payload: RdmIterationPayload = {
-        id: iterationId || undefined,
-        code: values.code.trim(),
-        name: values.name.trim(),
-        iterationType: values.iterationType,
-        startDate: values.range?.[0]?.format('YYYY-MM-DD') ?? '',
-        endDate: values.range?.[1]?.format('YYYY-MM-DD') ?? '',
-        capacityHours: values.capacityHours,
-        ownerUserId: values.owner ? Number(values.owner) : undefined,
-        status: values.status,
-        remark: values.remark,
-      }
       await saveIteration(payload)
       message.success(iterationId ? '迭代已更新' : '迭代已創建')
       navigate('/rdm-iteration')
     } catch {
-      message.error('保存失敗，請重試')
+      // request.ts 已统一弹后端失败原因，此处不再双弹（§G.4）
+      console.error('迭代保存失敗', payload.code)
     } finally {
       setSaving(false)
     }

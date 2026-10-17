@@ -1740,6 +1740,22 @@
       "comment": "代碼把 rdm_intake 的流程發號路由到 rdm_intake_approval，與本行種子必須同批：缺行時 BizSeqService.requireRule fail-closed，每次提交直接報「編號生成規則未配置」，不回落通用 OA 號。列可空性變更與 create()/selfSubmit()/OA 終審回調的發號時機成套交付，單獨先行會讓存草稿 SQLException。後置校驗實查 IS_NULLABLE=YES、兩條 CHECK 的 ENFORCED=YES、uk_rdm_req_no 仍在、兩條規則 status=1——列存在但不為可空、或 CHECK 被靜默忽略（MySQL<8.0.16）都判失敗不記版本。不 MODIFY 存量 req_no、不重置 biz_seq 計數器：歷史預發號保留為事實，處置另審。同步登記 ContractRegistry.rdmRequirementContract（補列 DDL 為可空版本，且契約校驗器不 MODIFY 已存在列，啟動自愈不可能把 req_no 變回 NOT NULL；createTableIfMissing 故意留空以免 60+ 列副本成為第二份真值）。240 腳本只在 backend/sql 作參考文檔：執行與冪等在 Java 逐步帶存在性判斷，ADD CONSTRAINT 不可整腳本重放。"
     },
     {
+      "versionKey": "rdm:schema:v3.5",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.4"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "242_rdm_claim_delayed_req_no_relax.sql"
+      ],
+      "intent": "延迟发号 v2：正式需求编号改为产品经理「认领」时生成，CHECK ck_rdm_req_no_admitted 白名单扩到 pool / assigned",
+      "comment": "代碼已在 RdmSchemaMigrationInitializer 用 applyOnce(VERSION_CLAIM_REQ_NO) 執行，但本行曾漏登記：未登記的遷移不參與清单一致性校验，发布前无法从 catalog 看出该版本存在，也没法被依赖引用。MySQL 8 无 DROP CHECK IF EXISTS，Java 侧先查 TABLE_CONSTRAINTS（ENFORCED='YES'）再 DROP + 重建，可重入；后置校验实查 CHECK_CLAUSE 必含 pool/assigned，否则不记版本。白名单唯一真值是 RdmConstants.REQ_NO_NULLABLE_STATUSES，服务侧 transitionInternal 的补号闸门与它同源：进入 assigned 有认领与分配/改派两条路径，只有认领发号，分配路径上的需求若不在推进时补号，会被本 CHECK 打回成「數據庫操作異常」。242 腳本僅作參考文檔，不可整腳本重放。"
+    },
+    {
       "versionKey": "rdm:transition:v1.0",
       "module": "rdm",
       "phase": "DATA_MIGRATION",
@@ -1747,7 +1763,8 @@
       "executor": "rdmSchemaMigrationInitializer",
       "dependencies": [
         "rdm:schema:v1.0",
-        "rdm:schema:v3.4"
+        "rdm:schema:v3.4",
+        "rdm:schema:v3.5"
       ],
       "status": "ACTIVE",
       "scriptFiles": [

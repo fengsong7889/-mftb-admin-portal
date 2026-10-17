@@ -19,10 +19,13 @@ import {
   MinusCircleOutlined, PlusOutlined, SendOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import StatCards from '../../components/StatCards'
 import HelpPopover from '../../components/HelpPopover'
+import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import {
   fetchTestBatchDetail, fetchTestBatchSummary, acceptTestBatch, returnTestBatch,
   submitTestExecution, retestBatch,
@@ -51,6 +54,7 @@ const RESULT_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function TestBatchDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)
 
@@ -136,6 +140,10 @@ export default function TestBatchDetail() {
       const values = await execForm.validateFields()
       setExecLoading(true)
       const diId = values.deliveryItemId ? Number(values.deliveryItemId) : undefined
+      // 范围版本优先取选中冻结用例自带的（权威），没选时才回落到范围快照
+      const picked = frozenCases.find(c => c.caseId === values.caseId)
+      const scopeVersion = picked?.scopeVersion
+        ?? (diId != null ? scopeVersionByItem.get(diId) : undefined)
       const payload: RdmTestExecutionForm = {
         caseTitle: values.caseTitle,
         deliveryItemId: diId,
@@ -146,7 +154,7 @@ export default function TestBatchDetail() {
         // Batch3：V3 测试流字段——稳定 caseId + 证据 + 冻结范围版本（按选中交付项自动带出）
         caseId: values.caseId || undefined,
         evidenceJson: values.evidenceJson || undefined,
-        scopeVersion: diId != null ? scopeVersionByItem.get(diId) : undefined,
+        scopeVersion,
         expectedVersion: detail?.version,
       }
       await submitTestExecution(id, payload)
@@ -219,7 +227,32 @@ export default function TestBatchDetail() {
     return m
   }, [scopeItems])
 
-  const execColumns: TableColumnsType<RdmTestExecutionRecord> = [
+  /*
+   * 冻结用例候选（服务端受理时派生稳定 caseId）。
+   * 以前这里只有一个让 QA 手输的「用例ID」输入框，但 caseId 是 sha256 截位生成的
+   * （C-<交付项>-<12位>）且没有任何地方可查 → 手输必然被服务端拒，提测结果永远录不进去。
+   * 现在改成从服务端返回的冻结集里选，同时自动带出标题/交付项/范围版本，避免人与库对不上。
+   */
+  const frozenCases = useMemo(() => detail?.frozenCases ?? [], [detail?.frozenCases])
+  const frozenCaseOptions = useMemo(
+    () => frozenCases.map(c => ({
+      value: c.caseId,
+      label: `${c.caseTitle || c.caseId}${c.mandatory === false ? '（非必測）' : ''}`,
+    })),
+    [frozenCases],
+  )
+  /** 选用例后一次性带回标题/交付项/范围版本（都以冻结集为权威） */
+  const pickFrozenCase = (caseId: string) => {
+    const c = frozenCases.find(x => x.caseId === caseId)
+    if (!c) return
+    execForm.setFieldsValue({
+      caseId: c.caseId,
+      caseTitle: c.caseTitle ?? '',
+      deliveryItemId: c.deliveryItemId != null ? String(c.deliveryItemId) : undefined,
+    })
+  }
+
+  const execColumns: TableColumnsType<RdmTestExecutionRecord> = useMemo(() => [
     { title: '交付項', dataIndex: 'deliveryItemTitle', key: 'deliveryItemTitle', width: 160, ellipsis: true },
     { title: '用例ID', dataIndex: 'caseId', key: 'caseId', width: 130, ellipsis: true, render: (v: string | null) => v || '-' },
     { title: '用例標題', dataIndex: 'caseTitle', key: 'caseTitle', width: 220, ellipsis: true },
@@ -238,8 +271,19 @@ export default function TestBatchDetail() {
       render: (v: string) => v ? dayjs(v).format('MM-DD HH:mm') : '-',
     },
     { title: '備註', dataIndex: 'remark', key: 'remark', width: 180, ellipsis: true, render: (v: string) => v || '-' },
-  ]
+  // 列定义包进 useMemo：下面拿它做「字段設置」候选的依赖，不包会每渲染都变
+  ], [])
 
+  /*
+   * 執行記錄列配置（§E.3）：10 列且一屏装不下，QA 关心用例结果、研发关心交付项与构建，
+   * 得能各自收起不看的那几列。必须与其它 hook 一样放在 early return 之前。
+   */
+  const execMeta = useMemo(() => deriveRdmColumnMeta(execColumns), [execColumns])
+  const { configComponent: execConfig, applyConfig: applyExec } = useColumnConfig(
+    'rdm-test-batch-execution', execMeta,
+    [{ key: 'caseTitle', visible: true, locked: 'head' as const }],
+  )
+  const visibleExecColumns = applyExec(execColumns) as typeof execColumns
   // ===== 構建標識解析 =====
   const parsedBuildIds = useMemo(() => {
     if (!detail?.buildIdsJson) return []
@@ -293,7 +337,7 @@ export default function TestBatchDetail() {
           <Descriptions.Item label={(
             <span>輪次
               <HelpPopover
-                title="凍結輪次與稳定用例ID"
+                title="凍結輪次與穩定用例ID"
                 ariaLabel="凍結輪次說明"
                 content={[
                   { label: '輪次不可變', body: '接收後本輪範圍與用例集即凍結（roundNo 固定），修改範圍必須走變更流程、開新一輪。', tone: 'info' },
@@ -408,16 +452,17 @@ export default function TestBatchDetail() {
               allowClear
               options={executorOptions}
             />
+            {execConfig}
           </Space>
         </div>
         <Table<RdmTestExecutionRecord>
           rowKey="id"
           size="small"
-          columns={execColumns}
+          columns={visibleExecColumns}
           dataSource={filteredExecutions}
           scroll={{ x: 1100 }}
           pagination={{
-            pageSize: 20,
+            defaultPageSize: 20,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: ['10', '20', '50', '100'],
@@ -477,19 +522,33 @@ export default function TestBatchDetail() {
         okText="提交"
         cancelText="取消"
         width={560}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={execForm} layout="vertical" style={{ marginTop: 16 }}>
+          {frozenCases.length > 0 ? (
+            <Form.Item name="caseId" label={t('rdm.testBatch.frozenCaseLabel', { defaultValue: '凍結用例' })}
+              rules={[{ required: true, message: t('rdm.testBatch.frozenCaseRequired', { defaultValue: '請從凍結用例集選擇' }) }]}
+              tooltip={t('rdm.testBatch.frozenCaseTooltip', { defaultValue: '服務端受理時凍結的本輪必測用例，門禁逐 caseId 判定通過；選定後自動帶出標題與交付項' })}>
+              <Select
+                placeholder={t('rdm.testBatch.frozenCasePlaceholder', { defaultValue: `選擇本輪凍結用例（共 ${frozenCases.length} 條）`, count: frozenCases.length })}
+                showSearch
+                optionFilterProp="label"
+                options={frozenCaseOptions}
+                onChange={pickFrozenCase}
+              />
+            </Form.Item>
+          ) : (
+            <Form.Item name="caseId" label={t('rdm.testBatch.caseIdLabel', { defaultValue: '用例ID' })}
+              tooltip={t('rdm.testBatch.caseIdFallbackTooltip', { defaultValue: '尚未受理凍結，沒有可用的穩定用例ID；先受理提測批次再錄結果' })}>
+              <Input placeholder={t('rdm.testBatch.caseIdFallbackPlaceholder', { defaultValue: '例：CASE-LOGIN-001（受理後請改為下拉選擇）' })} maxLength={64} />
+            </Form.Item>
+          )}
           <Form.Item name="caseTitle" label="用例標題" rules={[{ required: true, message: '請輸入用例標題' }]}>
             <Input placeholder="例：用戶登入後跳轉首頁" maxLength={200} />
           </Form.Item>
           <Form.Item name="deliveryItemId" label="交付項">
             <Select placeholder="選擇交付項（可選）" allowClear options={deliveryItemOptions}
               notFoundContent="無可用交付項（缺範圍快照）" />
-          </Form.Item>
-          <Form.Item name="caseId" label="用例ID"
-            tooltip="V3 凍結輪次的稳定用例ID；門禁按此ID逐用例判定通過，建議填寫">
-            <Input placeholder="例：CASE-LOGIN-001（選填）" maxLength={64} />
           </Form.Item>
           <Form.Item name="result" label="執行結果" rules={[{ required: true, message: '請選擇結果' }]}>
             <Radio.Group optionType="button" buttonStyle="solid">
@@ -530,7 +589,7 @@ export default function TestBatchDetail() {
         okText="確認復測"
         cancelText="取消"
         width={520}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>復測原因（必填）</div>

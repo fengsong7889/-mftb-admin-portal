@@ -161,8 +161,8 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       className: 'custom-confirm-modal',
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>依據：</span><b>當前周期的積分流水</b></div>
-          <div className="confirm-info-row"><span>已確認的建議：</span><b>分數變化時會退回「待復核」，不會带着旧确认推送新数字</b></div>
+          <div className="confirm-info-row"><span>依據：</span><b>當前週期的積分流水</b></div>
+          <div className="confirm-info-row"><span>已確認的建議：</span><b>分數變化時會退回「待復核」，不會帶著舊確認推送新數字</b></div>
         </div>
       ),
       okText: '開始聚合',
@@ -214,7 +214,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>人數：</span><b>{confirmed.length} 位（僅推「已確認」狀態）</b></div>
-          <div className="confirm-info-row"><span>寫入通道：</span><b>只寫考核單的「建議值」，自評/主管評/最終分由 HR 校准</b></div>
+          <div className="confirm-info-row"><span>寫入通道：</span><b>只寫考核單的「建議值」，自評/主管評/最終分由 HR 校準</b></div>
           <div className="confirm-info-row"><span>可撤回：</span><b>推送後可在本頁撤回，撤回會清空建議值並留原因</b></div>
         </div>
       ),
@@ -281,7 +281,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
     { title: '預算上限', dataIndex: 'scoreBudget', key: 'scoreBudget', width: 110 },
     { title: '已產生', dataIndex: 'used', key: 'used', width: 100 },
     {
-      title: '占用',
+      title: '佔用',
       key: 'ratio',
       width: 190,
       render: (_, r) => (
@@ -441,7 +441,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
           dataSource={budgets}
           pagination={false}
           loading={busy === 'load'}
-          locale={{ emptyText: '本周期還沒有預算（不配也能出分，只是没有超限预警）' }}
+          locale={{ emptyText: '本週期還沒有預算（不配也能出分，只是沒有超限預警）' }}
         />
 
         {editable && (
@@ -503,7 +503,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
           HR 績效建議
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
-            積分 → 人工復核 → 推送建議值；自評/主管評/最終分仍由 HR 校准
+            積分 → 人工復核 → 推送建議值；自評/主管評/最終分仍由 HR 校準
           </span>
           <Space size={8} style={{ marginLeft: 'auto' }}>
             {editable && (
@@ -528,8 +528,8 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
           <Alert
             type="info"
             showIcon
-            message="本周期還沒有績效建議"
-            description="需先完成積分重算，再點「聚合建議」；没有流水依据时不会生成建议，避免把没有证据的数字送进考核。"
+            message="本週期還沒有績效建議"
+            description="需先完成積分重算，再點「聚合建議」；沒有流水依據時不會生成建議，避免把沒有證據的數字送進考核。"
           />
         ) : (
           <Table<RdmHrSuggestionItem>
@@ -539,7 +539,13 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
             dataSource={suggestions}
             loading={busy === 'load'}
             scroll={{ x: 1050 }}
-            pagination={{ pageSize: 10, showTotal: t => `共 ${t} 條` }}
+            pagination={{
+              defaultPageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showTotal: t => `共 ${t} 條`,
+            }}
           />
         )}
 
@@ -554,7 +560,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 value={reviewRemark}
                 placeholder={reviewDraft.confirmed
                   ? '復核說明（超限人員必填），例：本迭代含兩次線上支援，分數已核對流水'
-                  : '駁回原因（必填），例：工時漏報導致分數偏低，下个周期重算'}
+                  : '駁回原因（必填），例：工時漏報導致分數偏低，下個週期重算'}
                 onChange={e => setReviewRemark(e.target.value)}
               />
               <Space>
@@ -596,7 +602,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
           指標口徑字典
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
-            每個数都應能回答：怎麼算的、能不能回算、哪里会误读
+            每個數都應能回答：怎麼算的、能不能回算、哪裡會誤讀
           </span>
           {editable && (
             <Button size="small" style={{ marginLeft: 'auto' }} onClick={() => setRecomputeOpen(true)}>重算歷史快照</Button>
@@ -620,7 +626,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 content: (
                   <div className="confirm-info-card">
                     <div className="confirm-info-row"><span>區間：</span><b>{recomputeRange ? `${recomputeRange[0].format('YYYY-MM-DD')} 至 ${recomputeRange[1].format('YYYY-MM-DD')}` : '-'}</b></div>
-                    <div className="confirm-info-row"><span>影響：</span><b>会覆盖这些日期的快照行，但不改需求與流水原始數據</b></div>
+                    <div className="confirm-info-row"><span>影響：</span><b>會覆蓋這些日期的快照行，但不改需求與流水原始數據</b></div>
                   </div>
                 ),
                 okText: '開始重算',
@@ -628,7 +634,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 onOk: () => handleRecompute(),
               })}>開注重算</Button>
               <Button onClick={() => { setRecomputeOpen(false); setRecomputeRange(null) }}>取消</Button>
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>只覆盖快照表，不改需求與流水原始數據</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>只覆蓋快照表，不改需求與流水原始數據</span>
             </Space>
           </div>
         )}

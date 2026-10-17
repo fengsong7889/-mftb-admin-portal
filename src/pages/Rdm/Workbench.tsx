@@ -131,10 +131,10 @@ const SUBMITTER_ACTION_STATUS: string[] = [
 
 /** 上面每个状态该配一句「现在轮到你做什么」，只写状态名等于没提示 */
 const SUBMITTER_ACTION_HINT: Record<string, string> = {
-  [RDM_STATUS.DRAFT]: '仍是草稿，補充內容後提交才会開始流轉',
-  [RDM_STATUS.INTAKE_REJECTED]: '准入審批被駁回，修改後可重新提交',
+  [RDM_STATUS.DRAFT]: '仍是草稿，補充內容後提交才會開始流轉',
+  [RDM_STATUS.INTAKE_REJECTED]: '準入審批被駁回，修改後可重新提交',
   [RDM_STATUS.REJECTED]: '產品駁回了需求，可查看理由後決定是否重開',
-  [RDM_STATUS.ON_HOLD]: '需求被挂起暂缓，確認是否仍需推進',
+  [RDM_STATUS.ON_HOLD]: '需求被掛起暫緩，確認是否仍需推進',
 }
 
 /**

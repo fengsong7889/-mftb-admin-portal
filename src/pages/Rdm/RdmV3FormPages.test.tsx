@@ -79,6 +79,18 @@ afterEach(() => {
   message.destroy()
 })
 
+/**
+ * 断言“弹了这条警告”，而不是“只弹了一条”。
+ * antd message 的节点挂在 document.body 上，不属于 cleanup() 能 unmount 的容器；
+ * message.destroy() 后节点停在离场动画，而 jsdom 不触发 animationend，旧节点不会消失，
+ * 同一个页面的两个前后用例就会叠成多条。直接把 .ant-message 整棵摸掉会把 antd 的 holder 一并拔了，
+ * 导致后续用例的 toast 根本不再渲染。本用例集真正要钉的是“拦住并提示 + 不得调接口”，
+ * 所以这里容忍重复节点，只要求至少出现一条。
+ */
+const expectWarning = (text: string) => {
+  expect(screen.getAllByText(text).length).toBeGreaterThan(0)
+}
+
 describe('提测工作台：發起提測改为独立页', () => {
   it('点击「發起提測」跳转到 /rdm-test-submit，且不弹 Modal', async () => {
     page(<TestWorkbench />)
@@ -109,7 +121,7 @@ describe('發起提測独立页', () => {
   it('必填未齐时只提示、绝不调用提测接口', async () => {
     page(<TestBatchSubmit />, '/rdm-test-submit')
     fireEvent.click(await screen.findByRole('button', { name: /提交提測/ }))
-    await waitFor(() => expect(screen.getByText('請先補全帶 * 的必填項')).toBeInTheDocument())
+    await waitFor(() => expectWarning('請先補全提測表單帶 * 的必填項'))
     expect(submitTestBatch).not.toHaveBeenCalled()
   })
 })
@@ -125,7 +137,7 @@ describe('創建發布批次独立页', () => {
   it('必填未齐时只提示、绝不调用创建接口', async () => {
     page(<ReleaseBatchCreate />, '/rdm-release-create')
     fireEvent.click(await screen.findByRole('button', { name: /創建批次/ }))
-    await waitFor(() => expect(screen.getByText('請先補全帶 * 的必填項')).toBeInTheDocument())
+    await waitFor(() => expectWarning('請先補全發布批次帶 * 的必填項'))
     expect(createReleaseBatch).not.toHaveBeenCalled()
   })
 
@@ -135,7 +147,7 @@ describe('創建發布批次独立页', () => {
     fireEvent.change(version, { target: { value: 'v9.9.9' } })
     // 负责人是远程搜索下拉，未选择前提交必须被拦住
     fireEvent.click(screen.getByRole('button', { name: /創建批次/ }))
-    await waitFor(() => expect(screen.getByText('請先補全帶 * 的必填項')).toBeInTheDocument())
+    await waitFor(() => expectWarning('請先補全發布批次帶 * 的必填項'))
     expect(createReleaseBatch).not.toHaveBeenCalled()
     expect(version).toHaveValue('v9.9.9')
   })

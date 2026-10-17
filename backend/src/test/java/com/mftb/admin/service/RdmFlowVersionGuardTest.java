@@ -121,6 +121,32 @@ class RdmFlowVersionGuardTest {
         assertThrows(BusinessException.class, () -> guard.ensureReleaseDisabledForV3(1L));
     }
 
+    /* ==================== 读侧白名单（allowedActions 过滤） ==================== */
+
+    @Test
+    @DisplayName("只读谓词与写入口同一白名单：V3 后段动作返回 false，供详情页不列必败按钮")
+    void predicateMirrorsWriteSideWhitelistForV3() {
+        // 前段：写入口放行 → 谓词必须 true，否则按钮会从详情页消失（那才是真回归）
+        assertTrue(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_SUBMIT));
+        assertTrue(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_APPROVE_INTAKE));
+        assertTrue(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_START_EVALUATE));
+        assertTrue(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_ACCEPT));
+        // 后段：写入口拒绝 → 谓词必须 false（绕端实测 prd_start 在 accepted 下必 500）
+        assertFalse(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_PRD_START));
+        assertFalse(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_DEV_START));
+        assertFalse(guard.isTransitionActionAllowed(3, RdmConstants.ACTION_SUBMIT_UAT));
+        assertFalse(guard.isTransitionActionAllowed(3, null));
+    }
+
+    @Test
+    @DisplayName("非 V3 与 flowVersion 为空的存量一律 true：旧链路按钮不得因为过滤而消失")
+    void predicateKeepsLegacySemanticsForNonV3() {
+        assertTrue(guard.isTransitionActionAllowed(2, RdmConstants.ACTION_PRD_START));
+        assertTrue(guard.isTransitionActionAllowed(1, RdmConstants.ACTION_RELEASE));
+        assertTrue(guard.isTransitionActionAllowed(null, RdmConstants.ACTION_VERIFY));
+        assertTrue(guard.isTransitionActionAllowed(null, null));
+    }
+
     /* ==================== 任务27：V3 发布灰度（默认关闭） ==================== */
 
     @Test

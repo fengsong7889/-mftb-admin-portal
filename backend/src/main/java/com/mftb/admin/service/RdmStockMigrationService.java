@@ -54,6 +54,7 @@ import com.mftb.admin.mapper.RdmTestExecutionMapper;
 import com.mftb.admin.mapper.RdmTestRoundMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -364,7 +365,7 @@ public class RdmStockMigrationService {
         vo.setEligibleItems(eligible);
         vo.setBlockedItems(blocked);
         vo.setItems(previews);
-        vo.setCreatedAt(batch.getCreatedAt() == null ? LocalDateTime.now() : batch.getCreatedAt());
+        vo.setCreatedAt(DateTimeUtils.format(batch.getCreatedAt() == null ? LocalDateTime.now() : batch.getCreatedAt()));
         log.info("存量遷移預覽已生成（等待主責確認，未執行任何業務變更）: batchId={}, total={}, eligible={}, blocked={}",
                 batch.getId(), items.size(), eligible, blocked);
         return vo;
@@ -897,7 +898,7 @@ public class RdmStockMigrationService {
         vo.setCountConsistent(total == completed + failed + blocked + rolledBack + pending && pending >= 0);
         vo.setTraceable(inconsistencies.isEmpty());
         vo.setInconsistencies(inconsistencies);
-        vo.setReconciledAt(LocalDateTime.now());
+        vo.setReconciledAt(DateTimeUtils.format(LocalDateTime.now()));
         insertAudit(batchId, null, RdmConstants.MIGRATION_ACTION_RECONCILE,
                 inconsistencies.isEmpty() && Boolean.TRUE.equals(vo.getCountConsistent())
                         ? RdmConstants.MIGRATION_RESULT_SUCCESS : RdmConstants.MIGRATION_RESULT_FAILED,
@@ -1119,15 +1120,15 @@ public class RdmStockMigrationService {
         vo.setPreviewHash(batch.getPreviewHash());
         vo.setChunkSize(batch.getChunkSize());
         vo.setConfirmedBy(batch.getConfirmedBy());
-        vo.setConfirmedAt(batch.getConfirmedAt());
-        vo.setPausedAt(batch.getPausedAt());
+        vo.setConfirmedAt(DateTimeUtils.format(batch.getConfirmedAt()));
+        vo.setPausedAt(DateTimeUtils.format(batch.getPausedAt()));
         vo.setPauseReason(batch.getPauseReason());
         vo.setRolledBackAt(null);
         vo.setResultJson(batch.getPreviewSummaryJson());
         vo.setBlockingReason(batch.getPauseReason());
         vo.setVersion(batch.getVersion());
-        vo.setCreatedAt(batch.getCreatedAt());
-        vo.setUpdatedAt(batch.getUpdatedAt());
+        vo.setCreatedAt(DateTimeUtils.format(batch.getCreatedAt()));
+        vo.setUpdatedAt(DateTimeUtils.format(batch.getUpdatedAt()));
         vo.setItems(itemsOfBatch(batchId).stream().map(i -> {
             RdmStockMigrationVO.ItemDetail d = new RdmStockMigrationVO.ItemDetail();
             d.setItemId(i.getId());
@@ -1139,11 +1140,11 @@ public class RdmStockMigrationService {
             d.setBlockingReason(i.getBlockingReason());
             d.setResultJson(i.getResultJson());
             d.setConfirmedBy(i.getConfirmedBy());
-            d.setConfirmedAt(i.getConfirmedAt());
+            d.setConfirmedAt(DateTimeUtils.format(i.getConfirmedAt()));
             d.setExecutedBy(i.getExecutedBy());
-            d.setExecutedAt(i.getExecutedAt());
+            d.setExecutedAt(DateTimeUtils.format(i.getExecutedAt()));
             d.setRolledBackBy(i.getRolledBackBy());
-            d.setRolledBackAt(i.getRolledBackAt());
+            d.setRolledBackAt(DateTimeUtils.format(i.getRolledBackAt()));
             d.setVersion(i.getVersion());
             return d;
         }).collect(Collectors.toList()));
@@ -1165,7 +1166,7 @@ public class RdmStockMigrationService {
             e.setAfterHash(a.getAfterHash());
             e.setResultJson(a.getResultJson());
             e.setReason(a.getReason());
-            e.setCreatedAt(a.getCreatedAt());
+            e.setCreatedAt(DateTimeUtils.format(a.getCreatedAt()));
             return e;
         }).collect(Collectors.toList()));
         return vo;
@@ -1189,10 +1190,10 @@ public class RdmStockMigrationService {
             d.setPreviewHash(b.getPreviewHash());
             d.setChunkSize(b.getChunkSize());
             d.setConfirmedBy(b.getConfirmedBy());
-            d.setConfirmedAt(b.getConfirmedAt());
+            d.setConfirmedAt(DateTimeUtils.format(b.getConfirmedAt()));
             d.setVersion(b.getVersion());
-            d.setCreatedAt(b.getCreatedAt());
-            d.setUpdatedAt(b.getUpdatedAt());
+            d.setCreatedAt(DateTimeUtils.format(b.getCreatedAt()));
+            d.setUpdatedAt(DateTimeUtils.format(b.getUpdatedAt()));
             return d;
         }).collect(Collectors.toList());
     }

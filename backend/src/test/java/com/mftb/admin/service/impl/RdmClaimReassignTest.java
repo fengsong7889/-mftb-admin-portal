@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,16 +45,19 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * 认领与改派测试（阶段 2C）。
- * <p>锁死三件事：
+ * <p>锁死四件事：
  * <ol>
  *   <li>认领是原子抢单：条件更新拿不到行就必须失败，不能覆盖别人的认领；</li>
  *   <li>认领人与改派目标都必须有受理资格（在职 + rdm-requirement:edit）；</li>
- *   <li>改派只停用旧受理人的操作资格，不删他的历史参与记录。</li>
+ *   <li>改派只停用旧受理人的操作资格，不删他的历史参与记录；</li>
+ *   <li>正式需求编号只在「离开允许无号白名单」时补发：分配路径留下的无号需求
+ *       推进时必须补号（否则被 CHECK 打回成 500），而停在 pool/assigned 时不得提前消费流水。</li>
  * </ol>
  */
 class RdmClaimReassignTest {
@@ -64,6 +69,7 @@ class RdmClaimReassignTest {
     private PermissionService permissionService;
     private OperatorResolver operatorResolver;
     private RdmNotifyService notifyService;
+    private BizSeqService bizSeqService;
     private RdmRequirementServiceImpl service;
 
     @BeforeEach
@@ -75,6 +81,7 @@ class RdmClaimReassignTest {
         permissionService = mock(PermissionService.class);
         operatorResolver = mock(OperatorResolver.class);
         notifyService = mock(RdmNotifyService.class);
+        bizSeqService = mock(BizSeqService.class);
         RdmConfigService configService = mock(RdmConfigService.class);
         RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
                 mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
@@ -88,7 +95,7 @@ class RdmClaimReassignTest {
                 mock(RdmCommentMapper.class), mock(RdmAttachmentMapper.class),
                 mock(RdmAcceptanceMapper.class), mock(RdmAcceptanceCaseMapper.class),
                 userMapper, mock(SysDepartmentMapper.class),
-                mock(BizSeqService.class), operatorResolver,
+                bizSeqService, operatorResolver,
                 configService, notifyService,
                 mock(OaRequestService.class), mock(RdmIntakeCallbackService.class),
                 permissionService, jdbcTemplate, accessGuard,
@@ -230,5 +237,27 @@ class RdmClaimReassignTest {
                 contains("UPDATE rdm_requirement_role SET is_active = 0"), any(Object[].class));
         verify(notifyService, atLeastOnce()).notifyUserIds(eq(RdmConstants.EVENT_ASSIGNED), any(),
                 eq(List.of(31L, 41L, 11L)), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("推进到白名单外状态时补号；停在 pool/assigned 不消费流水，且已有号不重发")
+    void reqNoIssuedOnlyWhenLeavingNullableStatuses() {
+        when(bizSeqService.next(BizSeqService.RULE_RDM_REQUIREMENT)).thenReturn("XQ202610170009");
+
+        // 分配（非认领）路径留下的需求：已 assigned 但还没编号
+        RdmRequirement assigned = poolRequirement();
+        assigned.setReqNo(null);
+        assigned.setStatus(RdmConstants.STATUS_ASSIGNED);
+
+        service.ensureReqNoForTargetStatus(assigned, RdmConstants.STATUS_ASSIGNED);
+        assertNull(assigned.getReqNo(), "assigned 仍在「允许无号」白名单内，不得提前消费流水");
+
+        service.ensureReqNoForTargetStatus(assigned, RdmConstants.STATUS_EVALUATING);
+        assertEquals("XQ202610170009", assigned.getReqNo(),
+                "离开白名单必须补号，否则 CHECK ck_rdm_req_no_admitted 会把推进打回成「數據庫操作異常」");
+
+        // 幂等：OA 回调/重试可能重复推进，已发号不得重发（否则每天白吹流水）
+        service.ensureReqNoForTargetStatus(assigned, RdmConstants.STATUS_EVALUATING);
+        verify(bizSeqService, times(1)).next(BizSeqService.RULE_RDM_REQUIREMENT);
     }
 }

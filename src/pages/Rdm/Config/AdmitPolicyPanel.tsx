@@ -82,7 +82,7 @@ export default function AdmitPolicyPanel() {
     try {
       setPolicies(await fetchIntakePolicies())
     } catch (err) {
-      message.error(err instanceof Error && err.message ? err.message : '准入策略載入失敗')
+      message.error(err instanceof Error && err.message ? err.message : '準入策略載入失敗')
       setPolicies([])
     } finally {
       setLoading(false)
@@ -92,7 +92,19 @@ export default function AdmitPolicyPanel() {
   useEffect(() => {
     void load()
     fetchDepartments()
-      .then(list => setDeptOptions(list.map(d => ({ value: d.name, label: d.name }))))
+      // 同名部门对「按部门名匹配」是同一个值，去重后当下拉选项：
+      // 否则 Select 会出现重复 key（React 警告）与两个一模一样的选项，选了也分不清是哪个
+      .then(list => {
+        const seen = new Set<string>()
+        const opts: { value: string; label: string }[] = []
+        list.forEach(d => {
+          if (d.name && !seen.has(d.name)) {
+            seen.add(d.name)
+            opts.push({ value: d.name, label: d.name })
+          }
+        })
+        setDeptOptions(opts)
+      })
       .catch(() => setDeptOptions([]))
   }, [load])
 
@@ -169,7 +181,7 @@ export default function AdmitPolicyPanel() {
       render: (_, r, i) => <Input size="small" value={r.name} onChange={e => update(i, { name: e.target.value })} />,
     },
     {
-      title: '准入動作', key: 'mode', width: 150,
+      title: '準入動作', key: 'mode', width: 150,
       render: (_, r, i) => (
         <Select
           size="small"
@@ -279,7 +291,7 @@ export default function AdmitPolicyPanel() {
           checked={!!r.enabled}
           target={`${r.name} → ${RDM_INTAKE_MODE_LABEL[r.mode]}`}
           impact={r.mode === 'EXEMPT'
-            ? '啟用後這些人提的需求將跳過准入審批，直接送達技術部'
+            ? '啟用後這些人提的需求將跳過準入審批，直接送達技術部'
             : '啟用後新需求提交時按本策略判定是否需審批；在途單據不受影響'}
           onConfirm={async next => {
             const saved = await saveIntakePolicy({ ...r, enabled: next })
@@ -306,11 +318,11 @@ export default function AdmitPolicyPanel() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="准入裁决已在服务端生效"
+        message="準入裁決已在服務端生效"
         description={
           <span>
-            「要不要审批」由服务端按提交人的部门与角色裁决，并连同策略名称、版本与命中链路写进需求；
-            客户端参数不再生效。策略变更只影响之后的新提交，已在途的审批单继续按其发起时的版本走完。
+            「要不要審批」由服務端按提交人的部門與角色裁決，并連同策略名稱、版本與命中鏈路寫進需求；
+            客戶端參數不再生效。策略變更只影響之後的新提交，已在途的審批單繼續按其發起時的版本走完。
           </span>
         }
       />
@@ -320,7 +332,7 @@ export default function AdmitPolicyPanel() {
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ExperimentOutlined /></span>
           規則模擬
-          <span className="rdm-todo-hint">按服务端同一套裁决逻辑演算，结果与真实提交一致</span>
+          <span className="rdm-todo-hint">按服務端同一套裁決邏輯演算，結果與真實提交一致</span>
           <span className="rdm-card-title-split" />
         </div>
         <Space size={12} wrap align="start">
@@ -371,8 +383,8 @@ export default function AdmitPolicyPanel() {
               {(simResult.explain || []).map((line, idx) => <li key={idx}>{line}</li>)}
             </ol>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
-              真实提交时，以上判定链路会同策略版本一起写进本轮准入记录（rdm_intake_round），
-              方便事后追查「为什么这单免了审」。
+              真實提交時，以上判定鏈路會同策略版本一起寫進本輪準入記錄（rdm_intake_round），
+              方便事後追查「為什么這單免了審」。
             </div>
           </div>
         )}
@@ -382,8 +394,8 @@ export default function AdmitPolicyPanel() {
         <div className="action-section-left">
           <HelpPopover
             title="策略匹配順序說明"
-            content={'强制审批约束优先于免审；\n同优先级且条件重叠的策略服务端拒绝保存；\n未命中任何策略时默认需审批。'}
-            ariaLabel="匹配顺序说明"
+            content={'強制審批約束優先于免審；\n同優先級且條件重疊的策略服務端拒絕保存；\n未命中任何策略時默認需審批。'}
+            ariaLabel="匹配順序說明"
             placement="bottomLeft"
           >
             <Tag color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', borderRadius: 6, cursor: 'pointer' }}>

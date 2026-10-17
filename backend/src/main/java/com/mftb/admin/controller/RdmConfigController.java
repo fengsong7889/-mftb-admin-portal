@@ -87,6 +87,19 @@ public class RdmConfigController {
         return Result.success("已保存", configService.routingRules());
     }
 
+    /**
+     * 移除分发矩阵行（逻辑删），返回最新列表。
+     * <p>写权与新增/修改完全同源：能建规则的人才能删，不给「只能改不能删」的中间态。
+     * 界面原先只有本地 state 的「移除」按钮（刷新即复活），本接口把它变成真删除。
+     */
+    @DeleteMapping("/routing/{id}")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit", RdmConstants.MENU_CONFIG + ":edit"})
+    public Result<List<RdmConfigVO.Routing>> deleteRouting(@PathVariable Long id) {
+        configService.deleteRouting(id, operatorResolver.currentOperatorName());
+        return Result.success("已移除", configService.routingRules());
+    }
+
     /** 保存 SLA 行（新增或改值），返回最新列表 */
     @PutMapping("/sla")
     @RequirePermission(menu = RdmConstants.MENU_CONFIG, action = "edit", anyOf = {RdmConstants.MENU_INTAKE},
