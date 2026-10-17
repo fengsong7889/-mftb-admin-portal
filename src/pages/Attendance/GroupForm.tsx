@@ -466,10 +466,10 @@ export default function AttendanceGroupForm() {
               />
             </Form.Item>
             <Form.Item label={t('attendance.lateGrace')} name="lateGraceMin" rules={[{ required: true }]}>
-              <InputNumber min={0} max={120} style={{ width: '100%' }} addonAfter={t('attendance.unitMinute')} />
+              <InputNumber min={0} max={120} style={{ width: '100%' }} suffix={t('attendance.unitMinute')} />
             </Form.Item>
             <Form.Item label={t('attendance.earlyGrace')} name="earlyGraceMin" rules={[{ required: true }]}>
-              <InputNumber min={0} max={120} style={{ width: '100%' }} addonAfter={t('attendance.unitMinute')} />
+              <InputNumber min={0} max={120} style={{ width: '100%' }} suffix={t('attendance.unitMinute')} />
             </Form.Item>
           </div>
         </div>

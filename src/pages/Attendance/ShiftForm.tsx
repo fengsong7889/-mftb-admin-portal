@@ -297,7 +297,7 @@ export default function AttendanceShiftForm() {
               name="workHours"
               rules={[{ required: true, message: t('attendance.shiftWorkHoursRequired') }]}
             >
-              <InputNumber min={0.5} max={24} step={0.5} style={{ width: '100%' }} addonAfter={t('attendance.unitHour')} />
+              <InputNumber min={0.5} max={24} step={0.5} style={{ width: '100%' }} suffix={t('attendance.unitHour')} />
             </Form.Item>
             <Form.Item label={t('attendance.shiftRestStart')} name="restStart">
               <TimePicker format="HH:mm" style={{ width: '100%' }} placeholder={t('common.placeholderSelect')} />
