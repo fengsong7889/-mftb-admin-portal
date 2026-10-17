@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.PermissionDeniedException;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.constant.HrPerfConstants;
 import com.mftb.admin.dto.HrPerfAssessmentVO;
 import com.mftb.admin.dto.HrPerfCycleSaveDTO;
@@ -361,6 +362,8 @@ public class HrPerfServiceImpl implements HrPerfService {
         require(HrPerfConstants.MENU_CALIBRATION, "view");
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getStatus, 1)
+                // 内置系统管理员不是员工，不能当评估人候选（无工号，按 empId 升序时会占首位）
+                .ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME)
                 .orderByAsc(SysUser::getEmpId)
                 .last("LIMIT 30");
         if (StringUtils.hasText(keyword)) {

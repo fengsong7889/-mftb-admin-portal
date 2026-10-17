@@ -65,7 +65,11 @@ export interface EmployeePayload {
   rank?: string | null
   /** 任职公司（新增时自动写入初始「入职」职务记录） */
   company?: string | null
-  role?: string
+  /**
+   * 刻意不提供 sys_user.role：该字段只用于标识内置系统超管（admin 账号），
+   * 后端不接受前端传入（否则有 employee-management 权限就能把自己提成超管）。
+   * 员工权限一律走 functionRoleIds（功能角色）与部门授权。
+   */
   functionRoleIds?: number[]
 }
 

@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.dto.AiEmpPermissionDTO;
 import com.mftb.admin.entity.*;
 import com.mftb.admin.mapper.*;
@@ -54,9 +55,10 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
             String queryName, String queryDept, String queryUpdatedBy,
             String queryUpdateTimeStart, String queryUpdateTimeEnd) {
 
-        // 1. 查询全部启用员工
+        // 1. 查询全部启用员工（排除内置系统管理员：它不是员工，不参与 AI 额度授予与用量统计）
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getStatus, 1);
+                .eq(SysUser::getStatus, 1)
+                .ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME);
         if (queryName != null && !queryName.isBlank()) {
             String name = queryName.trim();
             wrapper.and(w -> w.like(SysUser::getName, name).or().like(SysUser::getEmpId, name));

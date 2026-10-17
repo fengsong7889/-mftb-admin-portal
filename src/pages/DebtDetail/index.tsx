@@ -251,7 +251,7 @@ export default function DebtDetail() {
     }
     /** 後端不可用時寫入本地（靜態演示賬單僅更新當前頁面） */
     const addLocal = () => {
-      const operator = user ? `${user.name}(${user.empId})` : '--'
+      const operator = user ? (user.empId ? `${user.name}(${user.empId})` : user.name) : '--'
       const operateTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
       const repayment = {
         date,

@@ -291,7 +291,7 @@ export default function AiAccessApply() {
       cancelText: '取消',
       centered: true,
       onOk: () => {
-        const applicant = user ? `${user.name}(${user.empId})` : '未知'
+        const applicant = user ? (user.empId ? `${user.name}(${user.empId})` : user.name) : '未知'
         const flowNo = generateFlowNo('ai_access')
         const record: ApprovalRecord = {
           key: `ai_draft_${Date.now()}`,
@@ -506,7 +506,7 @@ export default function AiAccessApply() {
           <Col span={8}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applicant')}</div>
             <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
-              {user ? `${user.name}(${user.empId})` : '-'}
+              {user ? (user.empId ? `${user.name}(${user.empId})` : user.name) : '-'}
             </div>
           </Col>
           <Col span={8}>

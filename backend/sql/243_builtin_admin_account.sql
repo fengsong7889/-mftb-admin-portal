@@ -1,0 +1,109 @@
+-- ============================================================
+-- 243: 恢复独立的内置系统管理员账号 admin，并把存量超管降级为普通员工账号
+-- ------------------------------------------------------------
+-- 【本文件为一次性参考文档，不用于直接执行】
+-- 实际的幂等执行 + 后置校验 + 版本登记由 Java 迁移负责：
+--   迁移键   : core:builtin-admin-account-v1
+--   执行入口 : com.mftb.admin.config.DataInitializer#migrateBuiltinAdminAccount
+--   后置校验 : com.mftb.admin.config.DataInitializer#verifyBuiltinAdminAccount
+--   登记表   : src/main/resources/db/migrations/catalog.json
+--   单测     : src/test/java/com/mftb/admin/config/BuiltinAdminAccountMigrationTest.java
+--
+-- 【背景】
+-- sql/01_init_system.sql 最初种子的超管登录账号就是 'admin'（role='admin'）。
+-- 后来 DataInitializer.migrateEmpIdToMF()（每次启动执行）把所有非 ^MF[0-9]+$ 的登录账号
+-- 按 id 升序重编号为 MF00001+，于是 id=1 的 'admin' 被改名成 'MF00001'，
+-- 超管账号就此并入员工工号序列，后果：
+--   1) sys_user.role='admin' 是硬直通（PermissionServiceImpl / DataScopeServiceImpl /
+--      OperatorResolver.isAdmin 都只看这个字段），MF00001 无法做任何权限收敛；
+--   2) 系统级高危操作（改权限、重置密码、菜单配置）与某个员工的业务操作共用同一审计签名；
+--   3) 员工离职/调岗牵动超管入口，MF00001 这个工号也被超管占用、无法分配给真实员工。
+--
+-- 【口径】系统账号不是员工：无工号、无部门、无职位，不进员工名册
+--        （员工管理 / AI 权额管理 / 绩效评估人候选 / 入转调离人员搜索 / 职务记录补录均排除）。
+--        唯一真值来源：com.mftb.admin.constant.BuiltinAccounts
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 步骤 1：建立内置系统管理员账号 admin
+--   密码策略（按优先级，Java 侧实现）：
+--     a) 已存在且密码为合法 BCrypt（$2 前缀且长度 >= 60）→ 原样保留，不打强制改密标记；
+--     b) 继承存量超管的 BCrypt 哈希 → 当前管理员用原密码即可接管，
+--        同时置 must_change_password=1 强制首登改密，立即关闭「两账号共用一个密码」的窗口；
+--     c) 全新库只有 01_init_system.sql 的占位哈希（'$2a$10$placeholder'，无可继承对象）
+--        → 用引导密码兜底，同样强制首登改密。
+--   注意：明文密码与哈希均不得写入本文件、日志或提交记录（安全规范：禁止硬编码密钥、日志脱敏）。
+-- ------------------------------------------------------------
+-- 参考语义（真实执行走 Java，含软删残留复活与回读校验）：
+-- INSERT INTO sys_user (username, password, name, emp_id, avatar, role,
+--                       department, position, status, deleted, must_change_password, updated_by)
+-- VALUES ('admin', '<继承自存量超管的 BCrypt 哈希>', '系統管理員', NULL, 'pikachu-default', 'admin',
+--         NULL, NULL, 1, 0, 1, 'system-builtin-admin');
+
+-- ------------------------------------------------------------
+-- 步骤 2：把除系统账号以外的所有超管降级为普通账号
+--   只改 sys_user.role，不动姓名/部门/工号 —— 它仍是可用员工账号，
+--   后续权限由 HR 在界面上按角色（function_roles）与部门授权正常授予。
+-- ------------------------------------------------------------
+-- UPDATE sys_user
+--    SET role = 'guest', updated_by = 'system-builtin-admin'
+--  WHERE LOWER(role) = 'admin' AND deleted = 0 AND username <> 'admin';
+
+-- ------------------------------------------------------------
+-- 步骤 3：剥离降级账号 function_roles 里绑定的 admin 角色
+--   必须执行：PermissionServiceImpl.load() 里「绑定 code='admin' 的启用角色」同样超管直通，
+--   只改 role 不清绑定 = 降级形同虚设。复用 core:super-admin-dedup-v1 的收敛逻辑
+--   （逐行 JSON 重写，兼容 H2），清理后 permissionService.evictAll() 全局失效权限缓存。
+--   另：降级本身也改变权限判定结果，demoted > 0 时 Java 侧无条件再 evictAll 一次。
+-- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 后置校验（verifyBuiltinAdminAccount，不通过则不记版本、下次启动重试）
+--   1) 存活超管账号有且仅有 1 个；
+--   2) 该账号 username = 'admin'；
+--   3) 该账号 status = 1（停用态无法登录接管 = 锁死）；
+--   4) 该账号 password 为合法 BCrypt 值；
+--   5) 复核 verifySuperAdminDedup：非超管账号不得再绑定 admin 角色。
+-- ------------------------------------------------------------
+-- SELECT username, status, LENGTH(password) FROM sys_user WHERE LOWER(role) = 'admin' AND deleted = 0;
+
+-- ============================================================
+-- 配套改动（同一次交付，缺一不可）
+-- ============================================================
+-- 1. DataInitializer.migrateEmpIdToMF()  排除 username='admin'
+--    ★ 头号风险：该方法每次启动执行，不排除会在下次重启把 admin 改名成 MFxxxxx，
+--      超管入口随之消失，且工号序列被占位（这正是历史上 admin 变成 MF00001 的原因）。
+-- 2. DataInitializer.backfillInitialPositionRecords()  排除 username='admin'
+--    系统账号不应拿到「入职」职务记录。
+-- 3. DataInitializer.resetPasswordIfNeeded(...)  目标由 MF00001 改为 admin
+--    启动期密码兜底只服务于内置系统账号。
+-- 4. EmployeeServiceImpl  内置账号保护白名单由 MF00001 改为 admin；
+--    update/updateStatus/delete/resetPassword 一律拒绝系统账号
+--    （尤其重置密码：该接口由 employee-management:edit 授权，放行系统账号
+--      等于「有员工编辑权就能重置超管密码并接管全系统」——权限提升）；
+--    create/update 不再接受前端传入 role（否则有员工编辑权就能把自己提成超管）。
+-- 5. 员工名册类查询排除系统账号：
+--    EmployeeServiceImpl.list / AiEmpPermissionServiceImpl.listSummaries
+--    / HrPerfServiceImpl.evaluatorOptions / HrLifecycleServiceImpl.searchEmployees。
+-- 6. 前端 src/pages/Permission/Employee/index.tsx 的 BUILTIN_ADMIN 改为 'admin'；
+--    src/components/UserMenu.tsx 对无工号账号不再渲染空括号。
+--
+-- 【上线须知】
+--   * 迁移后 MF00001 立即失去全部超管直通权限，必须先用 admin 登录，
+--     再在「角色管理 / 部门授权」里给 MF00001 授予其实际需要的功能角色。
+--   * admin 首次登录使用「原 MF00001 的密码」，登录后被强制改密（改完即为独立密码）。
+--   * 迁移与降级在同一次启动内完成且顺序固定（先建后降），任一步失败都不会出现「无超管」的锁死态。
+-- ============================================================
+
+-- ============================================================
+-- 回滚（仅在确认需要退回旧口径时执行；执行后需删除迁移版本记录使其可重跑）
+-- ============================================================
+-- -- 1) 把超管权限还给 MF00001
+-- UPDATE sys_user SET role = 'admin', updated_by = 'rollback-243'
+--  WHERE username = 'MF00001' AND deleted = 0;
+-- -- 2) 下线新建的系统账号（逻辑删除，保留审计痕迹，禁止物理 DELETE）
+-- UPDATE sys_user SET deleted = 1, updated_by = 'rollback-243'
+--  WHERE username = 'admin';
+-- -- 3) 清除迁移版本记录，避免下次启动跳过（回滚后代码也需一并 revert）
+-- DELETE FROM sys_schema_version WHERE version_key = 'core:builtin-admin-account-v1';
+-- -- 4) 权限缓存需重启或调用 evictAll 才会生效

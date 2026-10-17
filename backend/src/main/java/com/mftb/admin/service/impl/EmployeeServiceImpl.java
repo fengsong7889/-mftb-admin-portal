@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.dto.BasicInfoRequest;
 import com.mftb.admin.dto.EmployeeRequest;
 import com.mftb.admin.dto.EmployeeVO;
@@ -57,8 +58,12 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final PermissionService permissionService;
     private final BizSeqService bizSeqService;
 
-    /** 内置管理员登录账号(工号), 禁止停用/删除 */
-    private static final String BUILTIN_ADMIN = "MF00001";
+    /**
+     * 员工账号在 {@code sys_user.role} 上的唯一取值。
+     * <p>{@code role='admin'} 是内置系统超管直通标记，只能由系统账号 {@link BuiltinAccounts#ADMIN_USERNAME}
+     * 持有；员工权限一律走 function_roles（角色）与部门授权。
+     */
+    private static final String NORMAL_USER_ROLE = "guest";
 
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus,
@@ -69,6 +74,8 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         // 先按 DB 侧可下推条件过滤全部匹配用户（不分页），再对派生状态过滤 + 内存分页
         LambdaQueryWrapper<SysUser> baseWrapper = new LambdaQueryWrapper<>();
+        // 内置系统管理员不是员工：不进员工名册（工号/部门/职位均为空，且不应被 HR 建档或统计）
+        baseWrapper.ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME);
         if (StringUtils.hasText(keyword)) {
             baseWrapper.and(w -> w.like(SysUser::getUsername, keyword)
                     .or().like(SysUser::getName, keyword)
@@ -190,7 +197,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         user.setName(request.getName());
         user.setEmpId(empId);
         user.setAvatar("pikachu-default");
-        user.setRole(StringUtils.hasText(request.getRole()) ? request.getRole() : "guest");
+        // role 不接受前端传入：允许写入等于「有 employee-management:create 就能直接造一个超管」。
+        // 员工固定为普通账号，超管只有内置系统账号一个（见 core:builtin-admin-account-v1 后置校验）。
+        user.setRole(NORMAL_USER_ROLE);
         // Round 6：新员工未显式绑定角色时，默认绑“员工自助”基底角色，
         // 保证统一门户上线后普通员工能默认进入 OA；已绑其他角色的不覆盖。
         java.util.List<Long> roleIds = request.getFunctionRoleIds() == null
@@ -232,7 +241,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     /**
      * 禁止员工账号绑定内置超级管理员角色（code=admin）。
      * 后端权限判定中绑定该角色即超管直通（PermissionServiceImpl.SUPER_ADMIN_ROLE_CODE），
-     * 全系统只允许内置管理员账号（sys_user.role=admin）持有，防止权限旁路扩散。
+     * 全系统只允许内置系统管理员账号（sys_user.role=admin）持有，防止权限旁路扩散。
      */
     private void assertNoSuperAdminBinding(java.util.List<Long> roleIds) {
         if (roleIds == null || roleIds.isEmpty()) {
@@ -240,13 +249,26 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
         Long adminRoleId = lookupRoleIdByCode("admin");
         if (adminRoleId != null && roleIds.contains(adminRoleId)) {
-            throw new BusinessException("不允許綁定「超級管理員」角色：超管權限僅由內置管理員賬號持有，請選擇其他功能角色");
+            throw new BusinessException("不允許綁定「超級管理員」角色：超管權限僅由內置系統管理員賬號持有，請選擇其他功能角色");
+        }
+    }
+
+    /**
+     * 内置系统账号不属于员工档案，禁止经员工管理入口做任何变更。
+     * <p>尤其是重置密码：该接口由 {@code employee-management:edit} 授权，若放行系统账号，
+     * 等于「有员工编辑权就能重置超管密码并接管全系统」——典型的权限提升。
+     * 超管密码只能通过本人登录后的自助改密接口变更。
+     */
+    private void assertNotSystemAccount(SysUser user, String action) {
+        if (user != null && BuiltinAccounts.isSystemAccount(user.getUsername())) {
+            throw new BusinessException("內置系統管理員賬號不是員工檔案，不允許" + action);
         }
     }
 
     @Override
     public EmployeeVO update(Long id, EmployeeRequest request) {
         SysUser user = requireUser(id);
+        assertNotSystemAccount(user, "編輯");
         String oldName = user.getName();
         String oldDept = user.getDepartment();
         user.setName(request.getName());
@@ -254,9 +276,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         applyDepartment(user, request.getDepartmentId());
         applyPosition(user, request.getPositionId());
         // 职等由 applyPosition 从职位配置自动带出，不再接受前端传入
-        if (StringUtils.hasText(request.getRole()) && !BUILTIN_ADMIN.equals(user.getUsername())) {
-            user.setRole(request.getRole());
-        }
+        // role 同样不接受前端传入且不回写：否则有 employee-management:edit 就能把自己提成超管。
+        // 权限变更一律走 functionRoleIds（下方已禁止绑超管角色）与部门授权。
         if (request.getFunctionRoleIds() != null) {
             assertNoSuperAdminBinding(request.getFunctionRoleIds());
             user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds()));
@@ -276,6 +297,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void resetPassword(Long id, String password) {
         SysUser user = requireUser(id);
+        assertNotSystemAccount(user, "重置密碼");
         // 定向更新，避免整实体回写覆盖并发变更；同时：
         //  1) 置强制改密标记——管理员设定的密码不属于「本人已知密码」，首次登录必须改
         //  2) 清空 active_token——被重置者当前会话立即失效，下次请求即被踢回登录页
@@ -293,9 +315,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void updateStatus(Long id, Integer status) {
         SysUser user = requireUser(id);
-        if (BUILTIN_ADMIN.equals(user.getUsername()) && status != null && status == 0) {
-            throw new BusinessException("內置管理員賬號不允許停用");
-        }
+        assertNotSystemAccount(user, "變更狀態");
         user.setStatus(status);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
@@ -335,9 +355,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public void delete(Long id) {
         SysUser user = requireUser(id);
-        if (BUILTIN_ADMIN.equals(user.getUsername())) {
-            throw new BusinessException("內置管理員賬號不允許刪除");
-        }
+        assertNotSystemAccount(user, "刪除");
         sysUserMapper.deleteById(id);
         permissionService.evictAll();
     }

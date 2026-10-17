@@ -865,7 +865,7 @@ export default function OaPurchaseRequest() {
             <Col span={8}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>申請人</div>
               <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
-                {user ? `${user.name}(${user.empId})` : '-'}
+                {user ? (user.empId ? `${user.name}(${user.empId})` : user.name) : '-'}
               </div>
             </Col>
             <Col span={8}>

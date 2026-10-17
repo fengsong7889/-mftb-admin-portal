@@ -28,8 +28,12 @@ const EMPLOYMENT_STATUS = {
   RESIGNED: 'resigned',
 } as const
 
-/** 内置管理员登录账号（工号，禁止停用/删除） */
-const BUILTIN_ADMIN = 'MF00001'
+/**
+ * 内置系统管理员登录账号（非员工工号）。
+ * 后端已把它排除在员工名册之外（EmployeeServiceImpl.list），正常不会出现在本列表；
+ * 此处仅作为前端兜底，禁止把它当员工档案删除/停用（后端会再校验一次）。
+ */
+const BUILTIN_ADMIN = 'admin'
 
 /** 查询表单值 */
 interface EmployeeSearchValues {

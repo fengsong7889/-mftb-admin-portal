@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.PermissionDeniedException;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.constant.HrLifecycleConstants;
 import com.mftb.admin.dto.HrEmployeeBriefVO;
 import com.mftb.admin.dto.HrLifecycleRequestSaveDTO;
@@ -228,6 +229,9 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
         requireTypePermission(type, "view");
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getStatus, 1)
+                // 内置系统管理员不是员工：本查询按 id 倒序取 20 条，而系统账号是最后插入的（id 最大），
+                // 不排除会直接占掉入转调离人员搜索的首位
+                .ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME)
                 .orderByDesc(SysUser::getId)
                 .last("LIMIT 20");
         if (StringUtils.hasText(keyword)) {

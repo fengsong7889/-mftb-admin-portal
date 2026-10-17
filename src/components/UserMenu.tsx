@@ -303,9 +303,9 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
             <Avatar size={32} icon={<UserOutlined />} className="header-avatar" />
           )}
           <div className="header-user-text">
-            {/* 第一行: 姓名（工號）-職級 — 英文模式显示拼音名 */}
+            {/* 第一行: 姓名（工號）-職級 — 英文模式显示拼音名；系统管理员账号无工号，不渲染空括号 */}
             <span className="header-user-name">
-              {isNonZh ? chineseNameToPinyinEnglish(user?.name || '') : user?.name}（{user?.empId}）{user?.jobLevel ? `-${user.jobLevel}` : ''}
+              {isNonZh ? chineseNameToPinyinEnglish(user?.name || '') : user?.name}{user?.empId ? `（${user.empId}）` : ''}{user?.jobLevel ? `-${user.jobLevel}` : ''}
             </span>
             {/* 第二行: 職位名稱 — 英文模式只显示英文名 */}
             {user?.position && (
