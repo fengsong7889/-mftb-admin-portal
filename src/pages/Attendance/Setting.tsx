@@ -189,7 +189,9 @@ export default function AttendanceSetting() {
                         rules={[{ required: true, message: t('attendance.settingValueRequired') }]}
                         style={{ marginBottom: 0 }}
                       >
-                        <InputNumber min={0} style={{ width: '100%' }} stringMode={false} />
+                        {/* 可见标题是上方独立 span（为控制网格字号/颜色），Form.Item 未带 label，
+                            故给输入框显式 aria-label，保证读屏/表单可访问名称不为空（缺陷 D12）。 */}
+                        <InputNumber min={0} style={{ width: '100%' }} stringMode={false} aria-label={labelOf(item)} />
                       </Form.Item>
                     ) : (
                       <span style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{displayValue(item)}</span>

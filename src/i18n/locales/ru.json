@@ -940,6 +940,7 @@
     "scheduleSaveEffect": "Записываются только изменённые ячейки (upsert по сотруднику и дате); остальные сохраняют значения и не очищаются",
     "scheduleSaveResult": "Сохранено ячеек: {{saved}} (из них выходных: {{rest}})",
     "scheduleCopyLastWeek": "Копировать прошлую неделю",
+    "scheduleCopyNeedEditHint": "Сначала нажмите «Перейти к редактированию», чтобы скопировать график прошлой недели",
     "scheduleCopyConfirmTitle": "Перезаписать эту неделю графиком прошлой?",
     "scheduleCopyConfirmOk": "Подтвердить перезапись",
     "scheduleCopySourceLabel": "Неделя-источник: ",

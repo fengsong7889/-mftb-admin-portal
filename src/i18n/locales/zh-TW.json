@@ -9998,6 +9998,7 @@
     "scheduleSaveEffect": "只寫入改動過的格子（按 人+日期 逐條 upsert），未改動的格子保持原樣，不會被覆蓋成空",
     "scheduleSaveResult": "已保存 {{saved}} 格排班（其中排休 {{rest}} 格）",
     "scheduleCopyLastWeek": "複製上一週",
+    "scheduleCopyNeedEditHint": "請先點「進入編輯」後才能複製上一週排班",
     "scheduleCopyConfirmTitle": "確定要用上一週排班覆蓋本週嗎？",
     "scheduleCopyConfirmOk": "確認覆蓋",
     "scheduleCopySourceLabel": "來源週：",

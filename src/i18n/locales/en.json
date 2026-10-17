@@ -9998,6 +9998,7 @@
     "scheduleSaveEffect": "Only the changed cells are written (upsert per employee and date); untouched cells keep their current value and are never cleared",
     "scheduleSaveResult": "Saved {{saved}} cell(s), including {{rest}} day(s) off",
     "scheduleCopyLastWeek": "Copy last week",
+    "scheduleCopyNeedEditHint": "Click “Enter edit” first before copying last week's schedule",
     "scheduleCopyConfirmTitle": "Overwrite this week with last week's schedule?",
     "scheduleCopyConfirmOk": "Confirm overwrite",
     "scheduleCopySourceLabel": "Source week: ",

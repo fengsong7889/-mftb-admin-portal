@@ -940,6 +940,7 @@
     "scheduleSaveEffect": "変更したセルのみ書き込みます（人 + 日付で upsert）。未変更のセルは元のまま維持され、空に上書きされません",
     "scheduleSaveResult": "{{saved}} セルを保存しました（うち休日 {{rest}} セル）",
     "scheduleCopyLastWeek": "前週をコピー",
+    "scheduleCopyNeedEditHint": "先に「編集に入る」をクリックすると前週のスケジュールをコピーできます",
     "scheduleCopyConfirmTitle": "前週のシフト表で今週を上書きしますか？",
     "scheduleCopyConfirmOk": "上書きする",
     "scheduleCopySourceLabel": "コピー元週：",

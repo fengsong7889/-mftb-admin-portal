@@ -17,7 +17,7 @@
  * 不适用 useColumnConfig 的持久化列顺序，故本页不注册列配置面板。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Modal, Select, Space, Table, Tag, message } from 'antd'
+import { Alert, Button, Form, Modal, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   CheckCircleOutlined, CopyOutlined, ExportOutlined, LeftOutlined, ReloadOutlined,
@@ -423,9 +423,11 @@ export default function AttendanceSchedule() {
                 >
                   {editing ? t('attendance.scheduleExitEdit') : t('attendance.scheduleEnterEdit')}
                 </Button>
-                <Button icon={<CopyOutlined />} disabled={!editing} loading={saving} onClick={handleCopyLastWeek}>
-                  {t('attendance.scheduleCopyLastWeek')}
-                </Button>
+                <Tooltip title={editing ? undefined : t('attendance.scheduleCopyNeedEditHint')}>
+                  <Button icon={<CopyOutlined />} disabled={!editing} loading={saving} onClick={handleCopyLastWeek}>
+                    {t('attendance.scheduleCopyLastWeek')}
+                  </Button>
+                </Tooltip>
               </>
             )}
           </Space>

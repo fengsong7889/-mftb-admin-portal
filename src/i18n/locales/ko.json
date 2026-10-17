@@ -940,6 +940,7 @@
     "scheduleSaveEffect": "변경한 칸만 기록합니다(직원 + 일자 단위 upsert). 변경하지 않은 칸은 그대로 유지되며 비워지지 않습니다",
     "scheduleSaveResult": "{{saved}}칸을 저장했습니다(휴무 {{rest}}칸 포함)",
     "scheduleCopyLastWeek": "지난주 복사",
+    "scheduleCopyNeedEditHint": "먼저 「편집 진입」을 클릭하면 지난주 근무표를 복사할 수 있습니다",
     "scheduleCopyConfirmTitle": "지난주 편성으로 이번 주를 덮어쓸까요?",
     "scheduleCopyConfirmOk": "덮어쓰기 확인",
     "scheduleCopySourceLabel": "원본 주: ",
