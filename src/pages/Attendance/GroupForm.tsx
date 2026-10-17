@@ -225,9 +225,10 @@ export default function AttendanceGroupForm() {
       groupName: values.groupName,
       groupType: values.groupType,
       scopeType: values.scopeType,
-      // 范围快照由成员数与范围类型拼出：它是给列表看的说明，不参与判定，
-      // 让用户手填一段与真实成员无关的文字反而会造成口径误读
-      scopeText: `${t(SCOPE_TYPE_LABEL_KEY[values.scopeType] ?? 'attendance.scopeList')} · ${memberIds.length} ${t('attendance.unitPerson')}`,
+      // 范围快照只描述「范围类型」，不内嵌成员数：成员数会经 syncMembers 独立维护，
+      // 保存后人数一变，快照里的旧数字就与实时「覆蓋人數」列自相矛盾（缺陷 M3）。
+      // 人数一律以服务端按当前生效成员算出的 memberCount 列为准。
+      scopeText: t(SCOPE_TYPE_LABEL_KEY[values.scopeType] ?? 'attendance.scopeList'),
       workPlace: values.workPlace,
       // 自由工时不绑班次：显式传 null，避免留下上一次选择的班次
       shiftId: values.groupType === GROUP_TYPE.FLEX ? null : (values.shiftId ?? null),
