@@ -143,7 +143,8 @@ bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口
 | 使用方 | Sealos 生产后端 | 本地 `backend/run-local.sh` |
 
 > 注意：SQLPub 网站登录密码（邮箱账号）≠ 数据库连接密码，二者独立。
-> 无 mysql 客户端时可用 `.qoder/temp/SqlRunner.java`（JDBC 脚本执行器）导入 SQL。
+> 执行 SQL 的正式入口：开发库用任意 MySQL 客户端（`mysql -h mysql3.sqlpub.com -P 3308 -u <用户> -p`）或 SQLPub 网页控制台；
+> 生产库（阿里云 RDS）的整库结构导入用 `scripts/import_schema_to_rds.py`（需 export `RDS_HOST`/`RDS_USER`，密码作为第一个参数传入，凭据不得写入仓库；脚本内 `SQL_FILE` 为硬编码的 `fengsong_schema.sql` 路径，执行前按本机位置调整）。
 
 ### 3.1 本地 MySQL（已废弃，不再需要）
 
@@ -158,7 +159,8 @@ bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口
 ### 3.2 开发库初始化步骤（换电脑后）
 
 > 开发库 `fengsong`（SQLPub 开发版）已在 SQLPub 上维护，通常无需重新初始化。
-> 如需重建，使用 `.qoder/temp/SqlRunner.java` 或任意 MySQL 客户端连接 SQLPub 后按顺序执行 `backend/sql/*.sql`。
+> 如需重建，用任意 MySQL 客户端（或 SQLPub 网页控制台）连接 SQLPub 开发库后按顺序执行 `backend/sql/*.sql`；
+> 增量表结构/种子数据无需手工执行，由后端启动期迁移机制自愈（见 §2.4）。
 
 ### 3.3 数据库表清单（核心业务表）
 
