@@ -22,10 +22,17 @@ public interface MeetingRoomMapper extends BaseMapper<MeetingRoom> {
     @Select("SELECT * FROM biz_meeting_room WHERE id = #{id} AND deleted = 0 FOR UPDATE")
     MeetingRoom selectForUpdate(@Param("id") long id);
 
-    /** 已启用的园区清单（筛选项数据源，避免前端硬编码园区名） */
-    @Select("SELECT DISTINCT campus FROM biz_meeting_room "
-            + "WHERE deleted = 0 AND campus <> '' ORDER BY campus")
-    List<String> listCampuses();
+    /** 已启用的城市清单（筛选项与表单候选数据源，避免前端硬编码城市名） */
+    @Select("SELECT DISTINCT city FROM biz_meeting_room "
+            + "WHERE deleted = 0 AND city <> '' ORDER BY city")
+    List<String> listCities();
+
+    /** 园区清单；传城市则收窄到该城市（跨城同名园区不串候选） */
+    @Select("<script>SELECT DISTINCT campus FROM biz_meeting_room "
+            + "WHERE deleted = 0 AND campus &lt;&gt; '' "
+            + "<if test='city != null and city != \"\"'> AND city = #{city} </if>"
+            + "ORDER BY campus</script>")
+    List<String> listCampuses(@Param("city") String city);
 
     /** 指定园区下的楼栋清单 */
     @Select("SELECT DISTINCT building FROM biz_meeting_room "

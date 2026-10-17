@@ -134,6 +134,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
                 // 不显式 set 就永远清不掉，行政只能改大不能改小
                 .set(MeetingRoom::getRoomNo, after.getRoomNo())
                 .set(MeetingRoom::getRoomName, after.getRoomName())
+                .set(MeetingRoom::getCity, after.getCity())
                 .set(MeetingRoom::getCampus, after.getCampus())
                 .set(MeetingRoom::getBuilding, after.getBuilding())
                 .set(MeetingRoom::getFloorCode, after.getFloorCode())
@@ -225,6 +226,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
 
         MeetingRoomDto.Query filter = new MeetingRoomDto.Query();
         filter.setRoomIds(query.getRoomIds());
+        filter.setCity(query.getCity());
         filter.setMinCapacity(query.getMinCapacity());
         filter.setFacilities(query.getFacilities());
         filter.setBookableOnly(Boolean.TRUE);
@@ -246,7 +248,9 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
             item.setRoomId(room.getId());
             item.setRoomNo(room.getRoomNo());
             item.setRoomName(room.getRoomName());
-            item.setLocationText(locationText(room));
+            // 城市单独回传字段（预约页蓝色徽章），locationText 只拼园区以下，避免“深圳 · 深圳 · …”双写
+            item.setCity(room.getCity());
+            item.setLocationText(locationBody(room));
             item.setCapacity(room.getCapacity());
             item.setFacilities(parseFacilities(room.getFacilities()));
             item.setBookable(isBookable(room));
@@ -308,8 +312,13 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
     }
 
     @Override
-    public List<String> campuses() {
-        return roomMapper.listCampuses();
+    public List<String> cities() {
+        return roomMapper.listCities();
+    }
+
+    @Override
+    public List<String> campuses(String city) {
+        return roomMapper.listCampuses(StringUtils.hasText(city) ? city.trim() : null);
     }
 
     @Override
@@ -337,7 +346,11 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
             String kw = query.getKeyword().trim();
             wrapper.and(w -> w.like(MeetingRoom::getRoomNo, kw)
                     .or().like(MeetingRoom::getRoomName, kw)
+                    .or().like(MeetingRoom::getCity, kw)
                     .or().like(MeetingRoom::getLocationDesc, kw));
+        }
+        if (StringUtils.hasText(query.getCity())) {
+            wrapper.eq(MeetingRoom::getCity, query.getCity().trim());
         }
         if (StringUtils.hasText(query.getCampus())) {
             wrapper.eq(MeetingRoom::getCampus, query.getCampus().trim());
@@ -368,7 +381,9 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         if (Boolean.TRUE.equals(query.getBookableOnly())) {
             wrapper.eq(MeetingRoom::getBookable, 1).eq(MeetingRoom::getStatus, MeetingConstants.ROOM_ACTIVE);
         }
-        wrapper.orderByAsc(MeetingRoom::getCampus).orderByAsc(MeetingRoom::getBuilding)
+        // 排序从城市开始：跨城办公时同一列表里先按城市聚拢，行政不会看串栋
+        wrapper.orderByAsc(MeetingRoom::getCity)
+                .orderByAsc(MeetingRoom::getCampus).orderByAsc(MeetingRoom::getBuilding)
                 .orderByAsc(MeetingRoom::getFloorCode).orderByAsc(MeetingRoom::getRoomNo);
         return wrapper;
     }
@@ -423,6 +438,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
     private void applyForm(MeetingRoom room, MeetingRoomDto.Form form) {
         room.setRoomNo(form.getRoomNo().trim());
         room.setRoomName(form.getRoomName().trim());
+        room.setCity(emptyToBlank(form.getCity()));
         room.setCampus(emptyToBlank(form.getCampus()));
         room.setBuilding(emptyToBlank(form.getBuilding()));
         room.setFloorCode(emptyToBlank(form.getFloorCode()));
@@ -501,6 +517,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         vo.setId(room.getId());
         vo.setRoomNo(room.getRoomNo());
         vo.setRoomName(room.getRoomName());
+        vo.setCity(room.getCity());
         vo.setCampus(room.getCampus());
         vo.setBuilding(room.getBuilding());
         vo.setFloorCode(room.getFloorCode());
@@ -533,6 +550,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         Map<String, Object> map = new java.util.LinkedHashMap<>();
         map.put("roomNo", room.getRoomNo());
         map.put("roomName", room.getRoomName());
+        map.put("city", room.getCity());
         map.put("campus", room.getCampus());
         map.put("building", room.getBuilding());
         map.put("floorCode", room.getFloorCode());
@@ -570,7 +588,16 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         }
     }
 
+    /** 城市+园区+楼栋+楼层+描述：城市必须在最前，跨城同名会议室靠它区分 */
     private static String locationText(MeetingRoom room) {
+        return Stream.of(room.getCity(), room.getCampus(), room.getBuilding(), room.getFloorCode(), room.getLocationDesc())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.joining(" · "));
+    }
+
+    /** 不含城市的位置串：城市单独成字段展示时用，避免与 locationText 里的城市双写 */
+    private static String locationBody(MeetingRoom room) {
         return Stream.of(room.getCampus(), room.getBuilding(), room.getFloorCode(), room.getLocationDesc())
                 .filter(StringUtils::hasText)
                 .map(String::trim)

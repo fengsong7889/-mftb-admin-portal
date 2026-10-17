@@ -19,7 +19,7 @@ import {
   Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, message,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ClockCircleOutlined, ProfileOutlined, SendOutlined, TeamOutlined,
+  ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, ProfileOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -392,7 +392,7 @@ export default function MeetingBookingForm() {
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{payload.title}</b></div>
-          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{room.roomNo} · {room.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{room.roomNo} · {room.roomName}{room.locationText ? ` · ${room.locationText}` : ''}</b></div>
           <div className="confirm-info-row">
             <span>{t('meeting.time2', { defaultValue: '時間：' })}</span>
             <b>{t('meeting.confirmTimeValue', {
@@ -451,6 +451,8 @@ export default function MeetingBookingForm() {
             <Space size={6} wrap>
               <Tag color="blue">{room.roomNo}</Tag>
               <Tag>{room.roomName}</Tag>
+              {/* 提交前最后一道提醒：跨城/跨大厦会议室同名常态，位置带上避免订错 */}
+              {room.locationText && <Tag color="orange" icon={<EnvironmentOutlined />}>{room.locationText}</Tag>}
               <Tag color={attendeeCount > room.capacity ? 'red' : 'green'}>
                 {t('meeting.currentCapacityNote', { count: attendeeCount, capacity: room.capacity, defaultValue: `當前 ${attendeeCount} 人／容納 ${room.capacity} 人` })}
               </Tag>

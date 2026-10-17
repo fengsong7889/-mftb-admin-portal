@@ -30,7 +30,6 @@ import static org.mockito.Mockito.verify;
  */
 class MeetingAccessGrantInitializerTest {
 
-    private static final long MENU_GROUP = 100L;
     private static final long MENU_MY = 101L;
     private static final long MENU_BOOKING = 102L;
     private static final long MENU_ROOM = 103L;
@@ -48,7 +47,6 @@ class MeetingAccessGrantInitializerTest {
         jdbc.execute("CREATE TABLE sys_menu (id BIGINT PRIMARY KEY, menu_key VARCHAR(100), name VARCHAR(100), "
                 + "status INT DEFAULT 1, deleted INT DEFAULT 0, system_code VARCHAR(32))");
         jdbc.execute("INSERT INTO sys_menu (id, menu_key, name, system_code) VALUES "
-                + "(" + MENU_GROUP + ", 'meeting-management', '會議中心', 'meeting'), "
                 + "(" + MENU_MY + ", 'meeting-my', '我的會議', 'meeting'), "
                 + "(" + MENU_BOOKING + ", 'meeting-booking', '會議室預約', 'meeting'), "
                 + "(" + MENU_ROOM + ", 'meeting-room', '會議室檔案', 'meeting'), "
@@ -61,7 +59,6 @@ class MeetingAccessGrantInitializerTest {
                 + "(3, 'ATTENDANCE_ADMIN', 0, 1), (4, 'retired_role', 0, 0)");
         jdbc.execute("CREATE TABLE sys_role_menu (role_id BIGINT, menu_id BIGINT, actions VARCHAR(255), "
                 + "PRIMARY KEY (role_id, menu_id))");
-        jdbc.execute("INSERT INTO sys_role_menu VALUES (1, " + MENU_GROUP + ", '[\"view\"]')");
         jdbc.execute("INSERT INTO sys_role_menu VALUES (1, " + MENU_MY + ", '[\"view\",\"edit\"]')");
         jdbc.execute("INSERT INTO sys_role_menu VALUES (1, " + MENU_BOOKING + ", '[\"view\",\"edit\"]')");
         jdbc.execute("INSERT INTO sys_role_menu VALUES (1, " + MENU_ROOM + ", '[\"view\",\"create\",\"edit\"]')");
@@ -112,19 +109,17 @@ class MeetingAccessGrantInitializerTest {
     }
 
     @Test
-    @DisplayName("使用侧三张菜单铺到所有启用角色与有效部门，系统准入两条线随行")
+    @DisplayName("使用侧两张菜单铺到所有启用角色与有效部门，系统准入两条线随行（v1.3 拍平后无分组行）")
     void baselineCoversEveryEnabledRoleAndDepartment() {
         migrate();
 
         for (long roleId : new long[]{1L, 2L, 3L}) {
-            assertNotNull(actionsOfRole(roleId, MENU_GROUP), "角色 " + roleId + " 缺少會議中心分组授权");
             assertNotNull(actionsOfRole(roleId, MENU_MY), "角色 " + roleId + " 缺少我的會議授权");
             assertNotNull(actionsOfRole(roleId, MENU_BOOKING), "角色 " + roleId + " 缺少會議室預約授权");
             assertEquals(1, count("SELECT COUNT(*) FROM sys_role_system WHERE role_id = " + roleId
                     + " AND system_code = 'meeting'"), "角色 " + roleId + " 缺少 meeting 系统准入");
         }
         for (long deptId : new long[]{4L, 28L}) {
-            assertNotNull(actionsOfDept(deptId, MENU_GROUP), "部门 " + deptId + " 缺少會議中心分组授权");
             assertNotNull(actionsOfDept(deptId, MENU_MY), "部门 " + deptId + " 缺少我的會議授权");
             assertNotNull(actionsOfDept(deptId, MENU_BOOKING), "部门 " + deptId + " 缺少會議室預約授权");
             assertEquals(1, count("SELECT COUNT(*) FROM sys_department_system WHERE dept_id = " + deptId
@@ -212,7 +207,7 @@ class MeetingAccessGrantInitializerTest {
     }
 
     @Test
-    @DisplayName("基线只含使用侧三张（防止后来者往映射里塞治理菜单）")
+    @DisplayName("基线只含使用侧两张（防止后来者往映射里塞治理菜单或已删的分组行）")
     void baselineMenuKeysAreUsageSideOnly() {
         List<String> keys = new ArrayList<>();
         @SuppressWarnings("unchecked")
@@ -221,7 +216,7 @@ class MeetingAccessGrantInitializerTest {
         assertNotNull(menus);
         keys.addAll(menus.keySet());
 
-        assertEquals(List.of("meeting-management", "meeting-my", "meeting-booking"), keys);
+        assertEquals(List.of("meeting-my", "meeting-booking"), keys);
         assertTrue(menus.get("meeting-my").contains("edit"), "响应邀约与签到走 MY:edit，缺它员工点不动接受/拒绝");
         assertTrue(menus.get("meeting-booking").contains("edit"), "新建/变更/取消预约走 BOOKING:edit");
     }

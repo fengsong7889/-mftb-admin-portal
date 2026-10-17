@@ -1,0 +1,306 @@
+/* 我的会议 · 日历视图：月历网格 + 当日日程面板
+   色值一律取自设计令牌（§A.1）：品牌橙 #E8720C、暖橙面板 #FFF7F0/#FFE7D1、
+   中性边框 #f0f0f0、弱文本 #8C8C8C；周末表头沿用 AdSales 日历的 #FA8C16 口径。 */
+
+.meeting-cal-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* 工具条：月份标题 + 翻月/今天 + 阶段图例 */
+.meeting-cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.meeting-cal-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.meeting-cal-month {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  min-width: 96px;
+}
+
+.meeting-cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.meeting-cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meeting-cal-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* 月历网格：7 列固定，週日开头（与 dayjs locale 解耦，JS 侧自行推算） */
+.meeting-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid #f0f0f0;
+  border-left: 1px solid #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.meeting-cal-weekday {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #595959;
+  background: #fafafa;
+  border-right: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.meeting-cal-weekday--weekend {
+  color: #fa8c16;
+}
+
+.meeting-cal-cell {
+  min-height: 116px;
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #fff;
+  border-right: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-cal-cell:hover,
+.meeting-cal-cell--weekend:hover {
+  background: #fff7f0;
+}
+
+.meeting-cal-cell--weekend {
+  background: #fafafa;
+}
+
+.meeting-cal-cell--selected {
+  background: #fff7f0;
+  box-shadow: inset 0 0 0 1px #ffe7d1;
+}
+
+/* 非本月日期整体淡化：用透明度而不是新色值，避免令牌外颜色 */
+.meeting-cal-cell--other .meeting-cal-date {
+  color: #8c8c8c;
+}
+
+.meeting-cal-cell--other .meeting-cal-chip,
+.meeting-cal-cell--other .meeting-cal-count {
+  opacity: 0.55;
+}
+
+.meeting-cal-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.meeting-cal-date {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.meeting-cal-date--today {
+  background: #e8720c;
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+}
+
+.meeting-cal-count {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 会议条：阶段色点 + 时间 + 主题（单行截断，悬浮原生 title 看全） */
+.meeting-cal-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-cal-chip:hover {
+  background: #f0f0f0;
+}
+
+.meeting-cal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.meeting-cal-time {
+  color: #595959;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.meeting-cal-title {
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 会议条状态变体：让用户在月历上一眼分清「没开始 / 进行中 / 已结束 / 已取消 / 已釋放」。
+   待開會=浅蓝底、進行中=浅橙底+呼吸圆点、已結束=浅绿底；
+   已取消/已釋放灰化+删除线（两者都是“这场会不开了”），已釋放保留警告橙圆点与已取消区分。 */
+.meeting-cal-chip--pending {
+  background: #e6f7ff;
+}
+
+.meeting-cal-chip--ongoing {
+  background: #fff7e6;
+}
+
+/* 复用 global.css 已注册的 statusPulse（品牌橙涟漪），不重复定义 keyframes */
+.meeting-cal-chip--ongoing .meeting-cal-dot {
+  animation: statusPulse 2s ease infinite;
+}
+
+.meeting-cal-chip--ended {
+  background: #f6ffed;
+}
+
+.meeting-cal-chip--cancelled,
+.meeting-cal-chip--released {
+  background: #fafafa;
+}
+
+.meeting-cal-chip--cancelled .meeting-cal-title,
+.meeting-cal-chip--released .meeting-cal-title {
+  text-decoration: line-through;
+  color: #8c8c8c;
+}
+
+.meeting-cal-chip--cancelled .meeting-cal-time,
+.meeting-cal-chip--released .meeting-cal-time {
+  color: #8c8c8c;
+}
+
+.meeting-cal-more {
+  padding-left: 6px;
+  font-size: 12px;
+  color: #e8720c;
+}
+
+.meeting-cal-more:hover {
+  text-decoration: underline;
+}
+
+/* 当日日程面板：图标色块 + 标题 + 行数，行内复用列表页操作按钮 */
+.meeting-cal-daypanel {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.meeting-cal-daypanel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.meeting-cal-daypanel-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #e6f7ff;
+  color: #1890ff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.meeting-cal-daypanel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.meeting-cal-daypanel-count {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.meeting-cal-dayrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.meeting-cal-dayrow:hover {
+  background: #fafafa;
+}
+
+.meeting-cal-dayrow + .meeting-cal-dayrow {
+  margin-top: 4px;
+}
+
+.meeting-cal-dayrow-time {
+  min-width: 104px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #595959;
+  font-variant-numeric: tabular-nums;
+}
+
+.meeting-cal-dayrow-title {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meeting-cal-dayrow-room {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.meeting-cal-dayrow-actions {
+  margin-left: auto;
+}

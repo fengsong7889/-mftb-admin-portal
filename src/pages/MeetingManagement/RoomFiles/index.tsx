@@ -28,6 +28,7 @@ import {
   deleteMeetingRoom,
   fetchBuildings,
   fetchCampuses,
+  fetchCities,
   fetchFloors,
   fetchMeetingRooms,
   type MeetingRoomQuery,
@@ -81,6 +82,7 @@ export default function RoomFiles() {
   const [query, setQuery] = useState<MeetingRoomQuery>({ page: 1, size: 20 })
   const [form] = Form.useForm()
 
+  const [cities, setCities] = useState<string[]>([])
   const [campuses, setCampuses] = useState<string[]>([])
   const [buildings, setBuildings] = useState<string[]>([])
   const [floors, setFloors] = useState<string[]>([])
@@ -108,8 +110,13 @@ export default function RoomFiles() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    void fetchCampuses().then(setCampuses).catch(() => setCampuses([]))
+    void fetchCities().then(setCities).catch(() => setCities([]))
   }, [])
+
+  // 园区候选随城市联动收窄（按已提交的筛选条件取数）：跨城同名园区不该串进候选
+  useEffect(() => {
+    void fetchCampuses(query.city ?? undefined).then(setCampuses).catch(() => setCampuses([]))
+  }, [query.city])
 
   const campusFilter = query.campus
   const buildingFilter = query.building
@@ -345,6 +352,10 @@ export default function RoomFiles() {
         <Form form={form} layout="inline">
           <Form.Item label={t('meeting.keyword', { defaultValue: '關鍵字' })} name="keyword">
             <Input placeholder={t('meeting.noNameLocation', { defaultValue: '編號／名稱／位置' })} allowClear style={{ width: '100%' }} onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item label={t('meeting.city', { defaultValue: '城市' })} name="city">
+            <Select placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }}
+              options={cities.map(c => ({ value: c, label: c }))} />
           </Form.Item>
           <Form.Item label={t('meeting.campus', { defaultValue: '園區' })} name="campus">
             <Select placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }}

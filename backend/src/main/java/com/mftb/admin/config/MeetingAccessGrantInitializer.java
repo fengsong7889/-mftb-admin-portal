@@ -24,8 +24,8 @@ import java.util.Map;
  * 授到<b>所有启用角色 + 所有有效部门</b>，而不是只授 {@code employee_self_service} 基底角色
  * （存量员工多数没有绑功能角色，他们的权限来自部门授权那条线，只授基底角色等于只有新人能用）。
  *
- * <p><b>只铺使用侧三张</b>：{@code meeting-management}（會議中心分组）/ {@code meeting-my} /
- * {@code meeting-booking}。治理侧的 {@code meeting-room}、{@code meeting-record}、
+ * <p><b>只铺使用侧两张</b>：{@code meeting-my} / {@code meeting-booking}（v1.3 起两者已是
+ * 一级菜单，「會議中心」分组已删）。治理侧的 {@code meeting-room}、{@code meeting-record}、
  * {@code meeting-config} 一律不自动授 —— 会议室档案影响所有房间、预约规则影响全站口径、
  * 预约记录是跨人可见性，这些必须由管理员在「授權中心 · 功能授權」按角色勾选。
  *
@@ -47,7 +47,8 @@ import java.util.Map;
  * <p><b>启动顺序</b>：取 29，必须晚于 {@code MeetingSchemaMigrationInitializer(@Order 28)}
  * —— 菜单行没落地就授权等于往不存在的 menu_id 写行。
  *
- * <p>版本键 {@code meeting:access-grant:v1.0}；与其他基线初始化器一样每次启动重放自愈
+ * <p>版本键 {@code meeting:access-grant:v1.1}（v1.0 含已删除的會議中心分组，v1.3 拍平后去分组行重铺）；
+ * 与其他基线初始化器一样每次启动重放自愈
  * （新建部门、新建角色、授权中心误删都能在下一次启动补回），代价是管理员若想
  * <b>长期</b>禁止某角色使用会议系统，必须停用该系统准入而不是删菜单行。
  */
@@ -57,26 +58,20 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MeetingAccessGrantInitializer implements CommandLineRunner {
 
-    static final String VERSION_KEY = "meeting:access-grant:v1.0";
+    static final String VERSION_KEY = "meeting:access-grant:v1.1";
 
     private static final String SYSTEM_CODE = SystemCode.MEETING.code();
 
     /**
-     * 使用侧分组 menu_key。
-     * <p>分组行由 {@code meeting:menu:v1.0} 建立、{@code meeting:menu:v1.2} 更名为「會議中心」，
-     * 刻意复用同一行不换新 key：换 key 等于换 menu_id，已授权的角色/部门全都要重铺一遍。
-     */
-    private static final String MENU_GROUP_USAGE = "meeting-management";
-
-    /**
      * 全员基线菜单：menu_key → 动作集。
+     * <p>v1.3 拍平后使用侧只剩两张一级菜单；会议入口不再依赖任何分组行，
+     * 分组授权行已由迁移清干净，这里加回去只会往不存在的菜单上写授权。
      * <p>meeting-my 带 edit 是「接受/拒绝邀约」与「签到」的入口（控制器标的是 MY:edit），
      * meeting-booking 带 edit 是「新建/变更/取消预约」的入口（BOOKING:edit）。
      */
     private static final Map<String, String> BASELINE_MENUS = new LinkedHashMap<>();
 
     static {
-        BASELINE_MENUS.put(MENU_GROUP_USAGE, "[\"view\"]");
         BASELINE_MENUS.put(MeetingConstants.MENU_MY, "[\"view\",\"edit\"]");
         BASELINE_MENUS.put(MeetingConstants.MENU_BOOKING, "[\"view\",\"edit\"]");
     }
