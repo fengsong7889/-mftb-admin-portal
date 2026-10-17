@@ -54,7 +54,10 @@ public class EmployeeController {
 
     /** 分页查询员工 */
     @GetMapping
-    @RequirePermission(menu = "employee-management")
+    // anyOf：EmployeeVO 是脱敏花名册（无证件/薪资/通讯），考勤組與規則的成员选择器必须能读它，
+    // 否则只有 attendance-group 授权、没有 HR 档案菜单的考勤管理员，成员下拉永远「無此資料」且 403 被静默吞。
+    // 仅放宽这一个只读列表，不授予 employee-management 菜单本身（增删改/详情仍受限）。
+    @RequirePermission(menu = "employee-management", anyOf = {"attendance-group"})
     public Result<PageResult<EmployeeVO>> list(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,

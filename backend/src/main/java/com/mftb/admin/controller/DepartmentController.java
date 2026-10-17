@@ -33,7 +33,11 @@ public class DepartmentController {
 
     /** 查询全部部门 */
     @GetMapping
-    @RequirePermission(menu = "org-structure")
+    // anyOf：部门树是脱敏基础数据（仅 id/名称/层级），考勤系统六个页都用它做部门筛选项；
+    // 只持 attendance 菜单、无 org-structure 菜单的考勤管理员应能读部门树，否则筛选区部门下拉恒为空。
+    @RequirePermission(menu = "org-structure", anyOf = {
+            "attendance-workbench", "attendance-group", "attendance-schedule", "attendance-punch",
+            "attendance-exception", "attendance-daily", "attendance-monthly"})
     public Result<List<DepartmentVO>> list() {
         return Result.success(departmentService.list());
     }

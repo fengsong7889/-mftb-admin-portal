@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -98,6 +99,8 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         String empName = "";
         Long deptId;
         String deptName = "";
+        Long groupId;
+        String groupName = "";
         LocalDate date;
         boolean shouldAttend;
         boolean attended;
@@ -136,7 +139,22 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         if (from == null || to == null || from.isAfter(to)) {
             throw new BusinessException("重算日期區間不合法");
         }
-        if (from.plusDays(92).isBefore(to)) {
+        // 未来日期尚无打卡事实，重算会把它们判成旷工并落异常，污染报表（缺陷 L-6）：
+        // 把重算区间钳制到「今天」，未来部分整体跳过并回报被裁掉的天数供界面提示。
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveTo = to.isAfter(today) ? today : to;
+        long clippedFutureDays = to.isAfter(today) ? ChronoUnit.DAYS.between(today, to) : 0;
+        if (from.isAfter(effectiveTo)) {
+            // 整段区间都在未来：没有任何可重算的历史/当日数据，直接返回 0（不产未来旷工）。
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("groups", targetGroups(groupId).size());
+            empty.put("recalculated", 0);
+            empty.put("skippedFrozen", 0);
+            empty.put("exceptions", 0);
+            empty.put("clippedFutureDays", clippedFutureDays);
+            return empty;
+        }
+        if (from.plusDays(92).isBefore(effectiveTo)) {
             throw new BusinessException("單次重算區間不得超過 92 天");
         }
         List<AttGroup> groups = targetGroups(groupId);
@@ -146,7 +164,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         int exceptions = 0;
         String operator = operatorResolver.currentOperatorName();
         for (AttGroup group : groups) {
-            for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            for (LocalDate date = from; !date.isAfter(effectiveTo); date = date.plusDays(1)) {
                 if (frozenMonths.contains(YearMonth.from(date).toString())) {
                     skippedFrozen++;
                     continue;
@@ -162,8 +180,9 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         summary.put("recalculated", days);
         summary.put("skippedFrozen", skippedFrozen);
         summary.put("exceptions", exceptions);
-        log.info("考勤日報重算完成: 組數={}, 重算日數={}, 跳過已凍結={}, 異常落庫={}",
-                groups.size(), days, skippedFrozen, exceptions);
+        summary.put("clippedFutureDays", clippedFutureDays);
+        log.info("考勤日報重算完成: 組數={}, 重算日數={}, 跳過已凍結={}, 異常落庫={}, 未來裁剪={}",
+                groups.size(), days, skippedFrozen, exceptions, clippedFutureDays);
         return summary;
     }
 
@@ -306,7 +325,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
             AttSchedule schedule = ctx.scheduleByUser.get(member.getUserId());
             // 排班制没有排班记录 = 漏排；固定班制没有排班记录时回落到组默认班次
             if (schedule == null && Objects.equals(group.getGroupType(), AttGroup.TYPE_ROTATION)) {
-                PersonalDay day = newPersonalDay(member, date);
+                PersonalDay day = newPersonalDay(group, member, date);
                 day.unscheduled = true;
                 day.punches = ctx.punchesByUser.getOrDefault(member.getUserId(), List.of());
                 results.add(day);
@@ -315,7 +334,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
             Long shiftId = schedule != null ? schedule.getShiftId() : group.getShiftId();
             if (schedule != null && schedule.getShiftId() == null) {
                 // 显式排休：不计应出勤；若当天真的打了卡，按休息日加班处理
-                PersonalDay rest = newPersonalDay(member, date);
+                PersonalDay rest = newPersonalDay(group, member, date);
                 rest.shouldAttend = false;
                 List<AttPunchLog> punches = ctx.punchesByUser.getOrDefault(member.getUserId(), List.of());
                 rest.punches = punches;
@@ -328,7 +347,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
                 continue;
             }
             if (holidayOff && schedule == null) {
-                PersonalDay off = newPersonalDay(member, date);
+                PersonalDay off = newPersonalDay(group, member, date);
                 off.shouldAttend = false;
                 off.punches = ctx.punchesByUser.getOrDefault(member.getUserId(), List.of());
                 results.add(off);
@@ -341,7 +360,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
 
     private PersonalDay judge(AttGroup group, AttGroupMember member, LocalDate date, Long shiftId,
                               DayContext ctx, boolean holidayOff) {
-        PersonalDay day = newPersonalDay(member, date);
+        PersonalDay day = newPersonalDay(group, member, date);
         day.shouldAttend = true;
         List<AttPunchLog> punches = new ArrayList<>(ctx.punchesByUser.getOrDefault(member.getUserId(), List.of()));
         punches.sort(Comparator.comparing(AttPunchLog::getPunchAt, Comparator.nullsLast(Comparator.naturalOrder())));
@@ -387,13 +406,15 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         return day;
     }
 
-    private PersonalDay newPersonalDay(AttGroupMember member, LocalDate date) {
+    private PersonalDay newPersonalDay(AttGroup group, AttGroupMember member, LocalDate date) {
         PersonalDay day = new PersonalDay();
         day.userId = member.getUserId();
         day.empNo = member.getEmpNo();
         day.empName = member.getEmpName();
         day.deptId = member.getDeptId();
         day.deptName = member.getDeptName();
+        day.groupId = group.getId();
+        day.groupName = group.getGroupName();
         day.date = date;
         return day;
     }
@@ -668,6 +689,10 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         row.setEmpName(first.empName);
         row.setDeptId(first.deptId);
         row.setDeptName(first.deptName);
+        // 月度汇总必须落组归属：日报走 att_day_summary 已带组，月报若不写就会出现
+        // 「同人同月：日报有组、月报组列为空」的口径不一致（历史缺陷 D8）。
+        row.setGroupId(first.groupId);
+        row.setGroupName(first.groupName);
         row.setShouldDays(sum(days, d -> d.shouldAttend ? BigDecimal.ONE : BigDecimal.ZERO));
         row.setActualDays(sum(days, d -> d.attended ? BigDecimal.ONE : BigDecimal.ZERO));
         row.setLateTimes((int) days.stream().filter(d -> d.lateMinutes > 0).count());

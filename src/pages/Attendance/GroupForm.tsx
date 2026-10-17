@@ -327,6 +327,7 @@ export default function AttendanceGroupForm() {
         form={form}
         layout="vertical"
         disabled={readOnly || loading}
+        requiredMark={isDetailMode ? false : true}
         initialValues={{
           groupType: GROUP_TYPE.FIXED,
           scopeType: SCOPE_TYPE.DEPT,
@@ -346,7 +347,7 @@ export default function AttendanceGroupForm() {
             hint={t('attendance.groupPageHint')}
           />
           <div style={gridStyle}>
-            <Form.Item label={t('attendance.groupNo')} name="groupNo" extra={isEditMode ? undefined : t('attendance.groupNoAutoHint')}>
+            <Form.Item label={t('attendance.groupNo')} name="groupNo" extra={(isEditMode || isDetailMode) ? undefined : t('attendance.groupNoAutoHint')}>
               <Input disabled placeholder={t('attendance.groupNoAuto')} />
             </Form.Item>
             <Form.Item
@@ -400,7 +401,7 @@ export default function AttendanceGroupForm() {
               <Input placeholder={t('attendance.workPlacePlaceholder')} maxLength={100} />
             </Form.Item>
             {scopeType === SCOPE_TYPE.DEPT && (
-              <Form.Item label={t('attendance.scopeDeptField')} extra={t('attendance.scopeDeptHint')}>
+              <Form.Item label={t('attendance.scopeDeptField')} extra={readOnly ? undefined : t('attendance.scopeDeptHint')}>
                 <TreeSelect
                   treeData={deptTree}
                   treeCheckable
@@ -421,7 +422,7 @@ export default function AttendanceGroupForm() {
           )}
           <Form.Item
             label={t('attendance.memberList')}
-            extra={t('attendance.memberListHint')}
+            extra={readOnly ? undefined : t('attendance.memberListHint')}
             style={{ marginBottom: 0 }}
           >
             <Select
@@ -491,7 +492,7 @@ export default function AttendanceGroupForm() {
                 ]}
               />
             </Form.Item>
-            <Form.Item label={t('attendance.sourceSyncBatchTitle')} extra={t('attendance.sourceSyncFailHint')}>
+            <Form.Item label={t('attendance.sourceSyncBatchTitle')} extra={readOnly ? undefined : t('attendance.sourceSyncFailHint')}>
               <Input value={t('attendance.sourceSyncBatch')} disabled />
             </Form.Item>
           </div>

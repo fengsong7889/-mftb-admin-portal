@@ -101,6 +101,13 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   },
   // 搜索校验（动态路由 /search-verify-detail/:id）
   '/search-verify-detail': { fixed: 'i18n:searchVerifyDetail.title' },
+  // 考勤假勤系统：表单页(新增/编辑按 ?id 区分)与详情页分开登记，避免列表/新增/详情三个页签同名
+  '/attendance-shift-form': { add: 'i18n:attendance.shiftAdd', edit: 'i18n:attendance.shiftEdit' },
+  '/attendance-shift-detail': { fixed: 'i18n:attendance.shiftDetail' },
+  '/attendance-group-form': { add: 'i18n:attendance.groupAdd', edit: 'i18n:attendance.groupEdit' },
+  '/attendance-group-detail': { fixed: 'i18n:attendance.groupDetail' },
+  '/attendance-holiday-form': { add: 'i18n:attendance.holidayAdd', edit: 'i18n:attendance.holidayEdit' },
+  '/attendance-holiday-detail': { fixed: 'i18n:attendance.holidayDetail' },
   // 商家推广工具
   '/promotion-algorithm-add': {
     add: 'i18n:recommend.addAlgo',
@@ -363,6 +370,10 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/hr-dict-edit',
   '/purchase-order',
   '/menu-config/setting',
+  // 考勤假勤：表单/详情页保留 query 以区分新增/编辑/不同详情，并与页签标题联动
+  '/attendance-shift-form', '/attendance-shift-detail',
+  '/attendance-group-form', '/attendance-group-detail',
+  '/attendance-holiday-form', '/attendance-holiday-detail',
 ])
 
 /** Tab 路径：特定路径保留 query string 以区分新增/编辑 */

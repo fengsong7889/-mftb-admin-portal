@@ -114,7 +114,15 @@ public class AttendanceMenuInitializer implements CommandLineRunner {
             migrate();
         }
         versionTracker.applyOnce(VERSION_KEY_DAILY_ACTIONS, this::alignDailyActions, this::verifyDailyActions);
-        versionTracker.applyOnce(VERSION_KEY_V2, this::groupMenus, this::verifyV2);
+        // v2.0 分组必须与 v1.0 一样「每次启动重放自愈」，不能只靠 applyOnce 跑一次。
+        // 根因：migrate() 每次启动都把 10 个叶子菜单的 parent_id 拍回顶级（ensureMenu 无条件对齐
+        // parent_id/sort_order，用于防止入口丢失的自愈重放）；若 groupMenus 只在首次 applyOnce 执行，
+        // 则此后每次重启都会被 migrate() 平铺、分组结构永久丢失（历史上侧边栏平铺的根因）。
+        // groupMenus 幂等：ensureGroup 对齐分组、moveUnderGroup 带「parent_id IS NULL」条件只搬平铺项，
+        // 不会覆盖管理员在「菜单配置」里自定义过的归属，可安全每次重放。
+        if (!versionTracker.applyOnce(VERSION_KEY_V2, this::groupMenus, this::verifyV2)) {
+            groupMenus();
+        }
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -216,10 +224,15 @@ public class AttendanceMenuInitializer implements CommandLineRunner {
                     MENU_TYPE_LEAF, sortOrder, actions, SYSTEM_CODE);
             log.info("已創建考勤假勤菜單: {} ({})", name, menuKey);
         } else {
+            // 已存在时只对齐结构/归属/启用态，绝不覆盖 parent_id 与 sort_order：
+            // v2.0 把这 10 个叶子归入 4 个分组，归属由 groupMenus() 与 DataInitializer.reconcileMenuMasterData
+            // 负责；若这里把 parent_id 强行拍回顶级、sort 改回 26..37，就会与分组互相打架，
+            // 导致每次启动都先把菜单平铺、再依赖重放抢回（历史上侧边栏反复回退成平铺的根因）。
+            // 新建分支仍按 v1.0 顶级声明落库，随后 groupMenus 会立即归组。
             jdbcTemplate.update(
-                    "UPDATE sys_menu SET parent_id = ?, path = ?, component = ?, icon = ?, system_code = ?, "
-                            + "sort_order = ?, status = 1, deleted = 0, updated_by = 'system' WHERE id = ?",
-                    parentId, path, component, icon, SYSTEM_CODE, sortOrder, id);
+                    "UPDATE sys_menu SET path = ?, component = ?, icon = ?, system_code = ?, "
+                            + "status = 1, deleted = 0, updated_by = 'system' WHERE id = ?",
+                    path, component, icon, SYSTEM_CODE, id);
             jdbcTemplate.update("UPDATE sys_menu SET name_en = ? WHERE id = ? AND (name_en IS NULL OR name_en = '')",
                     nameEn, id);
         }

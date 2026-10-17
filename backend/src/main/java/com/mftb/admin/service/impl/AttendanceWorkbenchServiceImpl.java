@@ -206,12 +206,22 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
         Long draft = monthlyMapper.selectCount(new LambdaQueryWrapper<AttMonthlySummary>()
                 .eq(AttMonthlySummary::getStatMonth, month)
                 .eq(AttMonthlySummary::getStatus, AttMonthlySummary.STATUS_DRAFT));
+        long draftCount = draft == null ? 0L : draft;
+        // 没有任何待确认(draft)记录时无需催办冻结：该月要么没生成汇总、要么都已同步/冻结，
+        // 继续弹「待確認 0 條…快去處理」属误报（缺陷 D6/L-4）。
+        if (draftCount == 0) {
+            return java.util.Optional.empty();
+        }
         int freezeDay = freezeDay();
         LocalDate deadline = lastMonth.plusMonths(1).atDay(Math.min(freezeDay, lastMonth.plusMonths(1).lengthOfMonth()));
         long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(date, deadline);
-        return java.util.Optional.of(alert("unfrozen", daysLeft < 0 ? LEVEL_WARN : LEVEL_INFO, "/attendance-monthly",
+        boolean overdue = daysLeft < 0;
+        // 同时下发 overdue 标记与绝对天数：前端据此在逾期时改用「已逾期 N 天」模板，
+        // 避免把负数直接塞进「剩 {{daysLeft}} 天」渲染出「剩 -14 天」。
+        return java.util.Optional.of(alert("unfrozen", overdue ? LEVEL_WARN : LEVEL_INFO, "/attendance-monthly",
                 Map.of("month", month, "freezeDay", freezeDay, "daysLeft", daysLeft,
-                        "draftCount", draft == null ? 0L : draft)));
+                        "overdue", overdue, "overdueDays", Math.abs(daysLeft),
+                        "draftCount", draftCount)));
     }
 
     /**

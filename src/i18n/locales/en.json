@@ -9770,6 +9770,7 @@
     "sourceSyncBatchTitle": "Sync batches",
     "alertUnscheduled": "{{count}} members of rotating groups have no schedule this week ({{weekStart}} – {{weekEnd}})",
     "alertUnfrozen": "{{month}} monthly summary is not frozen yet ({{draftCount}} drafts); the freeze day is the {{freezeDay}}th of the next month, {{daysLeft}} days left",
+    "alertUnfrozenOverdue": "{{month}} monthly summary is not frozen yet ({{draftCount}} drafts); the freeze day was the {{freezeDay}}th of the next month, {{daysLeft}} days overdue — please freeze it ASAP",
     "alertNoSync": "No DingTalk punches synced for {{date}} ({{groups}} groups have the DingTalk source enabled)",
     "alertDisabledGroups": "{{count}} attendance groups are disabled ({{names}}); their members produce no attendance results",
     "colWorkDate": "Attendance date",

@@ -712,6 +712,7 @@
     "sourceSyncBatchTitle": "Сеансы синхронизации",
     "alertUnscheduled": "У {{count}} сотрудников сменных групп нет графика на неделю ({{weekStart}} – {{weekEnd}})",
     "alertUnfrozen": "Месячный отчёт {{month}} не заморожен (черновиков: {{draftCount}}); день заморозки — {{freezeDay}}-е след. месяца, осталось {{daysLeft}} дн.",
+    "alertUnfrozenOverdue": "Месячный отчёт {{month}} не заморожен (черновиков: {{draftCount}}); день заморозки был {{freezeDay}}-е след. месяца, просрочка {{daysLeft}} дн. — заморозьте как можно скорее",
     "alertNoSync": "За {{date}} нет ни одной отметки из DingTalk (групп с этим источником: {{groups}})",
     "alertDisabledGroups": "Групп учёта отключено: {{count}} ({{names}}); для их участников результаты не формируются",
     "colWorkDate": "Дата учёта",

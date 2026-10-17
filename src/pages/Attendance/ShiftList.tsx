@@ -136,9 +136,14 @@ export default function AttendanceShiftList() {
         </div>
       ),
       onOk: async () => {
-        await changeShiftStatus(record.id, next)
-        message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
-        refresh()
+        try {
+          await changeShiftStatus(record.id, next)
+          message.success(enabling ? t('common.enableSuccess') : t('common.disableSuccess'))
+          refresh()
+        } catch {
+          // 失败原因（班次被引用等）已由请求层 toast；此处吞掉异常让确认框正常关闭，
+          // 否则 reject 会让 antd 保持弹窗挂屏并抛未捕获异常。
+        }
       },
     })
   }
@@ -159,9 +164,13 @@ export default function AttendanceShiftList() {
         </div>
       ),
       onOk: async () => {
-        await deleteShift(record.id)
-        message.success(t('common.deleteSuccess'))
-        refresh()
+        try {
+          await deleteShift(record.id)
+          message.success(t('common.deleteSuccess'))
+          refresh()
+        } catch {
+          // 被考勤组引用时后端拒绝：请求层已提示，吞掉异常以关闭弹窗（缺陷 M2）。
+        }
       },
     })
   }

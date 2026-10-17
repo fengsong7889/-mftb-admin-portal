@@ -190,7 +190,10 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
         requireGroup(id);
         Long members = memberMapper.selectCount(new LambdaQueryWrapper<AttGroupMember>().eq(AttGroupMember::getGroupId, id));
         if (members != null && members > 0) {
-            throw new BusinessException("該考勤組已有成員記錄，請先停用；刪除會切斷歷史歸屬追溯");
+            // 历史口径曾写「請先停用」，但停用并不能让删除通过（本方法只看成员/排班记录，与状态无关），
+            // 用户照做后再删仍被同样文案拒绝 → 自相矛盾。停用是这类有归属追溯的考勤组的终态，
+            // 文案统一指向「請改用停用」，如实说明阻塞原因是成员记录而非启用状态。
+            throw new BusinessException("該考勤組已有成員記錄，刪除會切斷歷史歸屬追溯，請改用停用");
         }
         Long schedules = scheduleMapper.selectCount(new LambdaQueryWrapper<AttSchedule>().eq(AttSchedule::getGroupId, id));
         if (schedules != null && schedules > 0) {

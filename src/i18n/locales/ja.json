@@ -712,6 +712,7 @@
     "sourceSyncBatchTitle": "同期バッチ",
     "alertUnscheduled": "シフト制グループの {{count}} 人が今週（{{weekStart}} 〜 {{weekEnd}}）未設定です",
     "alertUnfrozen": "{{month}} の月次集計が未確定です（確認待ち {{draftCount}} 件）。確定日は翌月 {{freezeDay}} 日、残り {{daysLeft}} 日",
+    "alertUnfrozenOverdue": "{{month}} の月次集計が未確定です（確認待ち {{draftCount}} 件）。確定日（翌月 {{freezeDay}} 日）から {{daysLeft}} 日超過しています。至急確定してください",
     "alertNoSync": "{{date}} の DingTalk 同期打刻がまだありません（DingTalk 利用グループ {{groups}} 件）",
     "alertDisabledGroups": "{{count}} 件の勤怠グループが無効です（{{names}}）。当該成員は当日の勤怠結果を生成しません",
     "colWorkDate": "勤怠日",
