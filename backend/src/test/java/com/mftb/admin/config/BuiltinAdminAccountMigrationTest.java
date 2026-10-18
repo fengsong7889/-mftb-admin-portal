@@ -278,4 +278,74 @@ class BuiltinAdminAccountMigrationTest {
         List<String> problems = MigrationCatalog.validate(MigrationCatalog.readAll());
         assertTrue(problems.isEmpty(), "迁移登记表存在不一致: " + problems);
     }
+
+    @Test
+    @DisplayName("工号重编号不吞超管：即使 username 已丢失(非 admin), role='admin' 仍受保护")
+    void empNoMigrationNeverRenamesSuperAdminEvenIfUsernameLost() {
+        setUpSchema();
+        // 事故根因态：内置 admin 的 username 已不是 'admin'(仅靠 username 排除会失效), 但 role 仍是 admin
+        jdbc.execute("INSERT INTO sys_user (username, password, name, emp_id, role, status, deleted) VALUES "
+                + "('old-super', '" + VALID_HASH + "', '系統管理員', NULL, 'admin', 1, 0), "
+                + "('MF00001', '" + VALID_HASH + "', '員工A', 'MF00001', 'guest', 1, 0)");
+
+        ReflectionTestUtils.invokeMethod(initializer, "migrateEmpIdToMF");
+
+        // role='admin' 的超管即使 username 不是 admin 也不得进入重编号集合(加固后 WHERE 排除 role='admin');
+        // 若未加固, old-super 会被选中、username 被改成 MFxxxxx、超管入口消失
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'old-super'", Integer.class),
+                "超管被工号化意味着超管入口消失");
+        assertEquals("admin", jdbc.queryForObject(
+                "SELECT role FROM sys_user WHERE username = 'old-super'", String.class));
+        // 已是 MF 格式的员工不受影响
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'MF00001'", Integer.class));
+    }
+
+    @Test
+    @DisplayName("自愈：唯一存活超管被工号化后, 每次启动恢复为 admin 并清空工号")
+    void reconcileRestoresRenamedBuiltinAdmin() {
+        setUpSchema();
+        // 事故态：唯一超管被工号化成 MF00032, 系统里再无 username='admin'
+        jdbc.execute("INSERT INTO sys_user (username, password, name, emp_id, role, status, deleted) VALUES "
+                + "('MF00032', '" + VALID_HASH + "', '系統管理員', 'MF00032', 'admin', 1, 0), "
+                + "('MF00001', '" + VALID_HASH + "', '員工A', 'MF00001', 'guest', 1, 0)");
+
+        ReflectionTestUtils.invokeMethod(initializer, "reconcileBuiltinAdminAccount");
+
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'admin'", Integer.class));
+        assertNull(jdbc.queryForObject("SELECT emp_id FROM sys_user WHERE username = 'admin'", String.class),
+                "自愈必须清空被误分配的工号");
+        assertEquals("admin", jdbc.queryForObject(
+                "SELECT role FROM sys_user WHERE username = 'admin'", String.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'MF00032'", Integer.class));
+        // 无关员工零改动
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'MF00001'", Integer.class));
+        // 自愈改变了超管身份, 必须失效权限缓存
+        verify(permissionService, atLeastOnce()).evictAll();
+        // 幂等：再跑一次不报错、不新增
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(initializer, "reconcileBuiltinAdminAccount"));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'admin'", Integer.class));
+        assertDoesNotThrow(this::verifyMigration);
+    }
+
+    @Test
+    @DisplayName("自愈保守边界：0 个或多个存活超管时只告警不擅动")
+    void reconcileDoesNotActWhenSuperAdminCountUnsafe() {
+        setUpSchema();
+        // 两个存活超管且都不是 admin → 异常态, 不得擅选一个改成 admin
+        jdbc.execute("INSERT INTO sys_user (username, password, name, role, status, deleted) VALUES "
+                + "('MF00032', '" + VALID_HASH + "', '系統管理員', 'admin', 1, 0), "
+                + "('MF00033', '" + VALID_HASH + "', 'X', 'admin', 1, 0)");
+
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(initializer, "reconcileBuiltinAdminAccount"));
+
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = 'admin'", Integer.class),
+                "多个存活超管属异常态, 自愈不得擅自选一个改成 admin");
+    }
 }

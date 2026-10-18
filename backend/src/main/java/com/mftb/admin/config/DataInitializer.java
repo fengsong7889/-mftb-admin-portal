@@ -209,6 +209,10 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:notification-channel-refactor-v1", this::migrateNotificationChannel);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
+        // 内置系统管理员账号自愈: 一次性迁移 core:builtin-admin-account-v1 的 verify 记版本后不再运行,
+        // 若 admin 在运行期被改名/工号化(历史事故: 唯一超管 username 变成 MFxxxxx, admin 登录提示账号不存在),
+        // 每次启动兜底恢复。必须紧随 migrateEmpIdToMF 之后、resetPasswordIfNeeded(按 username='admin' 查)之前
+        reconcileBuiltinAdminAccount();
         migrateDeptCodeToBM();
         resetPasswordIfNeeded(BuiltinAccounts.ADMIN_USERNAME, BUILTIN_BOOTSTRAP_PASSWORD);
         ensureDeptAdSalesPermission();
@@ -490,13 +494,18 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * 存量工号迁移: 将所有非 MF 格式登录账号的员工(含逻辑删除记录)按 id 升序重编号为 MF00001+,
      * 登录账号与工号同步更新; 已是 MF 格式的记录不变, 重复启动幂等
      * <p>
-     * <b>必须排除内置系统账号</b>: 本方法每次启动执行, 而 {@code admin} 天然不匹配 {@code ^MF[0-9]+$},
+     * <b>必须排除内置系统账号与超管</b>: 本方法每次启动执行, 而 {@code admin} 天然不匹配 {@code ^MF[0-9]+$},
      * 不排除会在下次重启把系统管理员改名成 MFxxxxx —— 超管入口随之消失, 且工号序列被占位。
      * 这正是历史上 {@code admin} 变成 {@code MF00001} 的原因。
+     * <p>
+     * 除 {@code username='admin'} 外, 还额外排除 {@code role='admin'} 的超管(双保险): 一旦内置 admin 的
+     * username 因任何原因丢失(被改成非 admin 值), 仅靠 username 排除会失效, 超管仍会被工号化;
+     * 而超管本就不是员工, 任何情况下都不应进入工号重编号。与 {@link #reconcileBuiltinAdminAccount()} 形成兜底闭环。
      */
     private void migrateEmpIdToMF() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MF[0-9]+$' AND username <> ? ORDER BY id",
+                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MF[0-9]+$' AND username <> ? "
+                        + "AND LOWER(role) <> 'admin' ORDER BY id",
                 Long.class, BuiltinAccounts.ADMIN_USERNAME);
         if (ids.isEmpty()) {
             return;
@@ -511,6 +520,42 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = ? WHERE id = ?", empId, empId, id);
         }
         log.info("已将 {} 个存量员工工号迁移为 MF 自增格式", ids.size());
+    }
+
+    /**
+     * 内置系统管理员账号自愈(每次启动执行, 不受 {@code core:builtin-admin-account-v1} 的 applyOnce 门控)。
+     * <p>
+     * 该迁移是一次性的: 首次执行并记版本后, 其 {@link #verifyBuiltinAdminAccount()} 不再运行。
+     * 一旦 {@code admin} 账号在运行期被改名/工号化(历史事故: 唯一存活超管的 username 变成 {@code MFxxxxx},
+     * 用 {@code admin} 登录命中不到、提示"账号不存在", 系统失去超管入口), 一次性迁移无法自愈。
+     * 本方法每次启动兜底, 与 {@link #migrateEmpIdToMF()} 排除超管形成双保险。
+     * <p>
+     * <b>保守边界</b>(避免误伤/越权): 仅当 username={@code admin} 完全不存在(含软删), 且恰好有 1 个存活
+     * 超管时, 才把它恢复为系统账号口径(username=admin, emp_id=NULL); 0 个或多个存活超管属异常态,
+     * 只告警不擅动, 交由人工介入。正常态直接返回, 幂等。刻意不打印密码/哈希(日志脱敏)。
+     */
+    private void reconcileBuiltinAdminAccount() {
+        Integer adminExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = ?",
+                Integer.class, BuiltinAccounts.ADMIN_USERNAME);
+        if (adminExists != null && adminExists > 0) {
+            // 已存在 username=admin(含软删): 复活/归一交给一次性迁移的 ensureBuiltinAdminAccount, 此处不介入
+            return;
+        }
+        List<Map<String, Object>> alive = jdbcTemplate.queryForList(
+                "SELECT id, username FROM sys_user WHERE LOWER(role) = 'admin' AND deleted = 0 ORDER BY id");
+        if (alive.size() != 1) {
+            log.error("内置系统管理员账号异常: 无 username={} 的账号且存活超管为 {} 个, 需人工介入(不擅自改动)",
+                    BuiltinAccounts.ADMIN_USERNAME, alive.size());
+            return;
+        }
+        long id = ((Number) alive.get(0).get("id")).longValue();
+        String staleUsername = String.valueOf(alive.get(0).get("username"));
+        jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = NULL, updated_by = ? WHERE id = ?",
+                BuiltinAccounts.ADMIN_USERNAME, BUILTIN_ADMIN_OPERATOR, id);
+        permissionService.evictAll();
+        log.warn("内置系统管理员账号被改名({}), 已自愈恢复为 {}: id={}",
+                staleUsername, BuiltinAccounts.ADMIN_USERNAME, id);
     }
 
     /**
