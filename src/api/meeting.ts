@@ -44,6 +44,7 @@ export interface MeetingRoomQuery {
   page?: number
   size?: number
   keyword?: string
+  city?: string
   campus?: string
   building?: string
   floorCode?: string
@@ -58,6 +59,8 @@ export interface MeetingRoomVO {
   id: number
   roomNo: string
   roomName: string
+  /** 所在城市：跨城办公场景下防订错（后端第二阶段落库，当前仅前端透传） */
+  city?: string | null
   campus?: string | null
   building?: string | null
   floorCode?: string | null
@@ -93,6 +96,7 @@ export interface MeetingRoomVO {
 export interface MeetingRoomForm {
   roomNo: string
   roomName: string
+  city?: string
   campus?: string
   building?: string
   floorCode?: string
@@ -125,6 +129,8 @@ export interface MeetingRoomStats {
 export interface AvailabilityQuery {
   from: string
   to: string
+  /** 按城市收窄房间候选（跨城办公防订错） */
+  city?: string
   roomIds?: number[]
   minCapacity?: number
   facilities?: string[]
@@ -144,6 +150,8 @@ export interface RoomAvailability {
   roomId: number
   roomNo: string
   roomName: string
+  /** 所在城市：预约页单独蓝色徽章，locationText 不含城市 */
+  city?: string | null
   locationText: string
   capacity: number
   facilities: string[]
@@ -184,8 +192,13 @@ export function fetchRoomUpcoming(id: number): Promise<RoomUpcoming[]> {
   return request.get<unknown, RoomUpcoming[]>(`/meeting/rooms/${id}/upcoming`)
 }
 
-export function fetchCampuses(): Promise<string[]> {
-  return request.get<unknown, string[]>('/meeting/rooms/campuses')
+export function fetchCities(): Promise<string[]> {
+  return request.get<unknown, string[]>('/meeting/rooms/cities')
+}
+
+/** 园区清单；传 city 则只返回该城市下的园区（跨城同名园区不串候选） */
+export function fetchCampuses(city?: string): Promise<string[]> {
+  return request.get<unknown, string[]>('/meeting/rooms/campuses', { params: { city } })
 }
 
 export function fetchBuildings(campus?: string): Promise<string[]> {

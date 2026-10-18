@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Button, ConfigProvider, Form, Input, InputNumber, type FormInstance } from 'antd'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,7 +31,14 @@ function Harness({ id = '', readOnly = false, bind }: HarnessProps) {
   const [form] = Form.useForm()
   const [meta, setMeta] = useState<{ updatedBy?: string; updatedAt?: string } | null>(null)
   const controller = useTrafficAlgorithmForm({ enabled: true, algorithmId: id, readOnly, form, onLoaded: setMeta, onSaved: mocks.saved })
-  useEffect(() => bind(form, controller), [form, controller, bind])
+  // 渲染期间同步更新 ref，保证 bind / getter 始终读到最新 controller。
+  // 原写法 bind 是每次渲染重建的 inline fn → useEffect 依赖变化 → 每渲染重跑。
+  // 过去这会导致无限循环：bind→setMeta→重渲染→新 bind→effect→…
+  // 修复 useTrafficAlgorithmForm 后，其 effect 依赖稳定（ref 模式），
+  // form.resetFields() 只调一次，循环被打破，这里恢复“每渲染调 bind”的原行为即可。
+  const controllerRef = useRef(controller)
+  controllerRef.current = controller
+  useEffect(() => bind(form, controllerRef.current), [form, controllerRef.current, bind])
   return (
     <>
       <output aria-label="加载状态">{controller.loadState}</output>
@@ -49,10 +56,10 @@ function Harness({ id = '', readOnly = false, bind }: HarnessProps) {
 }
 
 function mountConfig(props: Omit<HarnessProps, 'bind'> = {}) {
-  let form: FormInstance
-  let controller: Controller
-  const view = render(<ConfigProvider theme={{ token: { motion: false } }}><Harness {...props} bind={(nextForm, nextController) => { form = nextForm; controller = nextController }} /></ConfigProvider>)
-  return { ...view, get form() { return form }, get controller() { return controller } }
+  const formRef = { current: undefined as FormInstance | undefined }
+  const controllerRef = { current: undefined as Controller | undefined }
+  const view = render(<ConfigProvider theme={{ token: { motion: false } }}><Harness {...props} bind={(f, c) => { formRef.current = f; controllerRef.current = c }} /></ConfigProvider>)
+  return { ...view, get form() { return formRef.current as FormInstance }, get controller() { return controllerRef.current as Controller } }
 }
 const fixture = (params: Record<string, unknown> = {}): AdAlgorithm => ({
   id: 7, algoCode: 'SFTL0007', algoName: '午餐投流', algoType: 15, brand: 'flashBee', updatedBy: '测试运营',

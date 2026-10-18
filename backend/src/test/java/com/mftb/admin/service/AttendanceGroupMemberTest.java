@@ -63,7 +63,7 @@ class AttendanceGroupMemberTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceGroupServiceImpl(groupMapper, memberMapper, shiftMapper, scheduleMapper,
-                sysUserMapper, bizSeqService, operatorResolver);
+                sysUserMapper, bizSeqService, operatorResolver, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
         when(groupMapper.selectById(1L)).thenReturn(group());
     }

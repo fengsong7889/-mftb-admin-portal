@@ -72,6 +72,17 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
      */
     static final String VERSION_SEED_V11 = "meeting:seed:v1.1";
 
+    /**
+     * 一级菜单拍平：删除「會議中心」分组，「我的會議」与「會議室預約」直接升为一级菜单。
+     *
+     * <p>为什么升而不是留分组：使用侧只剩两项，分组层级是纯开销——员工每次都要展开分组才看得到自己的会；
+     * 治理侧保留分组（三项值得收纳）。
+     *
+     * <p>分组行与其授权行必须一起清：{@code MeetingAccessGrantInitializer} 已同步改为基线不含分组（v1.1），
+     * 旧的分组授权行由本迁移物理删除——留着会让授权中心列表出现幽灵菜单。
+     */
+    static final String VERSION_MENU_V13 = "meeting:menu:v1.3";
+
     private static final String SCHEMA_SCRIPT = "230_meeting_core_tables.sql";
     private static final String SCHEMA_SCRIPT_M2 = "231_meeting_series_blacklist.sql";
 
@@ -107,6 +118,10 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
     private static final String[][] REQUIRED_ADDED_COLUMNS = {
             {"biz_meeting_booking", "cancel_scope",
                     "ADD COLUMN cancel_scope VARCHAR(16) NULL COMMENT '取消範圍：this/future/all（周期會議三檔取消語義留痕）' AFTER cancel_reason"},
+            // 244：城市列（跨城办公防订错）；档案列与 campus/building 同口径 NOT NULL DEFAULT ''，
+            // 因为 update 逐列显式 set，实体里留 null 会撞约束（P0 踩过同一个坑）
+            {"biz_meeting_room", "city",
+                    "ADD COLUMN city VARCHAR(64) NOT NULL DEFAULT '' COMMENT '所在城市（如 深圳；跨城辦公防訂錯）' AFTER room_name"},
     };
 
     private static final String[][] REQUIRED_INDEXES = {
@@ -140,6 +155,7 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
      * 把这类漂移钉进启动校验，而不是等用户打开列表页才发现。
      */
     private static final String[][] REQUIRED_COLUMNS = {
+            {"biz_meeting_room", "city"},
             {"biz_meeting_room", "floor_code"},
             {"biz_meeting_room", "hide_title"},
             {"biz_meeting_room", "checkin_required"},
@@ -238,6 +254,7 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_MENU_M2, this::doMenuMigrateM2, this::verifyMenusM2);
         versionTracker.applyOnce(VERSION_MENU_V12, this::doMenuRestructure, this::verifyMenuRestructure);
         versionTracker.applyOnce(VERSION_SEED_V11, this::doSeedCopyFix, this::verifySeedCopyFix);
+        versionTracker.applyOnce(VERSION_MENU_V13, this::doMenuPromoteUsage, this::verifyMenuPromoteUsage);
         // 移出 applyOnce 的部分每次启动重放：版本已记录的库不会重跑 task，
         // 编号规则/场景/配置的展示元数据若只写在 task 里，改动永远不会落到已有环境
         syncSeqRule();
@@ -752,6 +769,82 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
     private Long parentIdOf(String menuKey) {
         return jdbcTemplate.query("SELECT parent_id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
                 rs -> rs.next() ? ((Number) rs.getObject(1)).longValue() : null, menuKey);
+    }
+
+    /* ==================== 5. 使用侧菜单升为一级（v1.3） ==================== */
+
+    /**
+     * 删「會議中心」分组，两个使用侧叶子继承分组原顶级位置。
+     *
+     * <p>排序只动“原本紧挨着分组”的會議治理（v1.2 按 centerSort+1 定价的默认形态）：
+     * 管理员在菜单配置里调过顺序后不该被打回，所以治理分组只在 sort <= 新叶子占位时才后移一位。
+     */
+    private void doMenuPromoteUsage() {
+        Long centerId = queryMenuId(MENU_GROUP);
+        if (centerId == null) {
+            // task 跑到一半崩溃后重进：分组已软删但叶子还没升顶时不能静默放行
+            if (isTopLeaf(MeetingConstants.MENU_MY) && isTopLeaf(MeetingConstants.MENU_BOOKING)) {
+                return;
+            }
+            throw new IllegalStateException("會議中心分组不存在且使用侧菜单未在一级，无法拍平（請先跑 " + VERSION_MENU_V12 + "）");
+        }
+        Integer centerSort = jdbcTemplate.query(
+                "SELECT sort_order FROM sys_menu WHERE id = ?", rs -> rs.next() ? (Integer) rs.getObject(1) : null,
+                centerId);
+        int base = centerSort == null ? 0 : centerSort;
+        promoteToTop(MeetingConstants.MENU_MY, base);
+        promoteToTop(MeetingConstants.MENU_BOOKING, base + 1);
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = ?, updated_by = 'system' "
+                        + "WHERE menu_key = ? AND deleted = 0 AND sort_order <= ?",
+                base + 2, MENU_GROUP_ADMIN, base + 1);
+        // 分组软删 + 授权行物理清理：分组不再是导航目标，留着只是幽灵菜单
+        jdbcTemplate.update("UPDATE sys_menu SET deleted = 1, updated_by = 'system' WHERE id = ?", centerId);
+        jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id = ?", centerId);
+        jdbcTemplate.update("DELETE FROM sys_department_menu WHERE menu_id = ?", centerId);
+        permissionService.evictAll();
+        log.info("會議中心分组已删除：我的會議/會議室預約升为一级菜单（sort {} / {}）", base, base + 1);
+    }
+
+    /** 叶子升为一级（parent_id=NULL）；仅在确有变化时写库，重启重放不产生无谓 UPDATE */
+    private void promoteToTop(String menuKey, int sortOrder) {
+        Long menuRowId = queryMenuId(menuKey);
+        if (menuRowId == null) {
+            throw new IllegalStateException("會議叶子菜单不存在，无法升为一级: " + menuKey);
+        }
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET parent_id = NULL, sort_order = ?, updated_by = 'system' "
+                        + "WHERE id = ? AND (parent_id IS NOT NULL OR sort_order <> ?)",
+                sortOrder, menuRowId, sortOrder);
+    }
+
+    private boolean isTopLeaf(String menuKey) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND parent_id IS NULL",
+                Integer.class, menuKey);
+        return n != null && n > 0;
+    }
+
+    /** 后置校验钉三件事：分组已删、两个使用侧叶子在一级且归属正确、分组授权行无残留 */
+    private void verifyMenuPromoteUsage() {
+        if (queryMenuId(MENU_GROUP) != null) {
+            throw new IllegalStateException("會議中心分组未删除（v1.3 未生效）");
+        }
+        for (String leaf : List.of(MeetingConstants.MENU_MY, MeetingConstants.MENU_BOOKING)) {
+            Integer ok = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND status = 1 "
+                            + "AND parent_id IS NULL AND system_code = ?",
+                    Integer.class, leaf, SYSTEM_CODE);
+            if (ok == null || ok == 0) {
+                throw new IllegalStateException("使用侧菜单未升为一级: " + leaf);
+            }
+        }
+        Integer ghost = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_role_menu rm JOIN sys_menu m ON m.id = rm.menu_id "
+                        + "WHERE m.menu_key = ? AND m.deleted = 1",
+                Integer.class, MENU_GROUP);
+        if (ghost != null && ghost > 0) {
+            throw new IllegalStateException("會議中心分组仍残留 " + ghost + " 条角色授权幽灵行");
+        }
     }
 
     /* ==================== M2：預約規則菜單 ==================== */

@@ -32,6 +32,7 @@ import { MONTHLY_STATUS_LABEL_KEY, MONTHLY_STATUS_TAG_COLOR } from './meta'
 import { useAttendanceOptions } from './useAttendanceOptions'
 import { exportToCSV } from '../../utils/exportCSV'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */
 const COL_KEY: Record<string, string> = {
@@ -326,6 +327,7 @@ export default function AttendanceMonthlyReport() {
           action={<Button size="small" onClick={refresh}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       <Alert type="warning" showIcon message={t('attendance.monthlyPageHint')} style={{ marginBottom: 16 }} />
 
       <div className="search-section">

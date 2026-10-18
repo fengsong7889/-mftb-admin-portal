@@ -71,6 +71,19 @@ export const HR_LIFECYCLE_STATUS = {
 
 export type HrLifecycleStatus = (typeof HR_LIFECYCLE_STATUS)[keyof typeof HR_LIFECYCLE_STATUS]
 
+/**
+ * 业务执行状态（与审批状态正交，方案 §7.2）。
+ * 单看 status=approved 会被误读为「已经生效」，所以界面必须同时给执行态。
+ */
+export const HR_EXECUTION_STATUS = {
+  PENDING: 'PENDING',
+  DONE: 'DONE',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+} as const
+
+export type HrExecutionStatus = (typeof HR_EXECUTION_STATUS)[keyof typeof HR_EXECUTION_STATUS]
+
 /** 离职类型 */
 export const HR_DIMISSION_TYPE = {
   VOLUNTARY: 'voluntary',
@@ -94,6 +107,13 @@ export interface HrLifecycleItem {
   positionName?: string | null
   effectiveDate?: string | null
   reason?: string | null
+
+  // 执行（生效）状态：无待生效任务时为空
+  executionStatus?: HrExecutionStatus | null
+  scheduledDate?: string | null
+  executionAttempts?: number | null
+  executionError?: string | null
+  executedAt?: string | null
 
   // 入职明细
   offerDate?: string | null
@@ -239,6 +259,14 @@ export function submitLifecycleRequest(id: number) {
 /** 撤销审批（单据回到草稿） */
 export function cancelLifecycleRequest(id: number) {
   return request.post<unknown, void>(`/hr/lifecycle/${id}/cancel`)
+}
+
+/**
+ * 重试到期未执行或执行失败的单据。
+ * <p>未到生效日会被后端拒（不能提前生效），所以这不是「强制生效」按钮。
+ */
+export function retryLifecycleExecution(id: number) {
+  return request.post<unknown, HrLifecycleItem>(`/hr/lifecycle/${id}/retry-execute`)
 }
 
 /** 删除单据 */

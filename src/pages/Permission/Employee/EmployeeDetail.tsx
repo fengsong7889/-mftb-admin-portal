@@ -24,6 +24,16 @@ import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api
 import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
 import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
 import { fetchRoles, type RoleItem } from '../../../api/role'
+import HrAuditTrail from './HrAuditTrail'
+import EmploymentPeriods from './EmploymentPeriods'
+import {
+  HR_OPERATION,
+  HR_OPERATION_LABEL_KEY,
+  HR_OPERATION_OPTIONS,
+  hrOperationCodeFromName,
+  hrOperationColor,
+  hrOperationLabel,
+} from '../../../constants/hrOperation'
 import { useAuth } from '../../../contexts/AuthContext'
 import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '../../Permission/types'
 
@@ -36,7 +46,10 @@ interface PositionRecord {
   id: number
   effectiveDate: string
   effectiveSeq: number
+  /** 动作名称快照（展示与历史回溯） */
   operation: string
+  /** 异动动作 code（判定与配色用）；历史未回填时为空 */
+  operationCode?: string
   reason: string
   serviceDept?: string
   position?: string
@@ -132,6 +145,7 @@ interface RewardPunishRecord {
 /** 职务弹窗表单值（表单字段名；与后端 PositionRecordPayload 通过 buildPositionPayload 显式转换） */
 interface PositionFormValues {
   effectiveDate?: dayjs.Dayjs | string
+  /** 表单存的是 code（HR_OPERATION），不再存中文名 */
   operation: string
   reason?: string
   serviceDept?: string
@@ -157,6 +171,7 @@ function mapPositionRecord(r: PositionRecordItem): PositionRecord {
     effectiveDate: r.effectiveDate,
     effectiveSeq: r.effectiveSeq,
     operation: r.operation,
+    operationCode: r.operationCode,
     reason: r.reason ?? '',
     serviceDept: r.serviceDept,
     position: r.positionName,
@@ -182,7 +197,8 @@ function buildPositionPayload(values: PositionFormValues): PositionRecordPayload
   const effectiveDate = values.effectiveDate
   return {
     effectiveDate: dayjs.isDayjs(effectiveDate) ? effectiveDate.format('YYYY-MM-DD') : (effectiveDate ?? ''),
-    operation: values.operation,
+    // 只提交 code：名称快照由服务端按 code 规范化，避免前端写出繁体名把在职派生判失灵
+    operationCode: values.operation,
     reason: values.reason,
     serviceDept: values.serviceDept,
     sequenceType: values.sequence,
@@ -411,8 +427,23 @@ export default function EmployeeDetail() {
   /* ── Tab 状态 ── */
   const [activeTab, setActiveTab] = useState('position')
 
-  /* ── 各 Tab 最后更新追蹤 ── */
+  /* ── 各 Tab 最后更新追踪 ── */
   const { user, hasPermission } = useAuth()
+  /**
+   * 权限拆分后的能力开关（后端同步以 @RequirePermission 裁决，界面隐藏只是 UX）。
+   * 关键是不让「有人事编辑权」的人看到薪酬、明文、改密码、发角色四个入口：
+   * 点下去只会拿到 403，比看不到更令人困惑。
+   */
+  const canEditProfile = hasPermission('employee-management:edit')
+  const canSalaryView = hasPermission('employee-management:salaryView')
+  const canSalaryEdit = hasPermission('employee-management:salaryEdit')
+  const canViewSensitive = hasPermission('employee-management:sensitiveView')
+  const canAccountEdit = hasPermission('employee-management:accountEdit')
+  const canAuthorize = hasPermission('employee-management:authorize')
+  /** 人事操作審計查看：单独动作，能看档案不等于能看「谁动过档案」 */
+  const canAuditView = hasPermission('employee-management:auditView')
+  /** 可写薪酬：既要进入编辑态，又要单独持有 salaryEdit */
+  const salaryWritable = isEdit && canSalaryEdit
   const [tabUpdateInfo, setTabUpdateInfo] = useState<Record<string, { updatedBy: string; updatedAt: string }>>({})
 
   /** 标记某个 Tab 已更新（仅页面内反馈；不再写 localStorage 伪审计，列表统一用服务端 updatedBy/updatedAt） */
@@ -657,23 +688,29 @@ export default function EmployeeDetail() {
     fetchPositionRecords(numId).then(list => {
       setPositionRecords(list.map(mapPositionRecord))
     }).catch(() => { /* 静默 */ })
-    // 費用信息: 收入項 / 扣除項 / 薪資配置
-    fetchSalaryIncomes(numId).then(setSalaryIncome).catch(() => { /* 静默 */ })
-    fetchSalaryDeductions(numId).then(setSalaryDeduction).catch(() => { /* 静默 */ })
-    fetchSalaryConfig(numId).then(config => {
-      setSalaryConfig(prev => ({ ...prev, ...config }))
-    }).catch(() => { /* 静默 */ })
+    // 費用信息: 收入項 / 扣除項 / 薪資配置（仅在持有 salaryView 时取数：
+    // 请求层对 403 会弹错误 toast，无权限还去请求会造成“页面报错”假象）
+    if (canSalaryView) {
+      fetchSalaryIncomes(numId).then(setSalaryIncome).catch(() => { /* 静默 */ })
+      fetchSalaryDeductions(numId).then(setSalaryDeduction).catch(() => { /* 静默 */ })
+      fetchSalaryConfig(numId).then(config => {
+        setSalaryConfig(prev => ({ ...prev, ...config }))
+      }).catch(() => { /* 静默 */ })
+    }
     // 合同台账 (P1-B)
     fetchContracts(numId).then(list => setContracts(list.map(toContractRecord))).catch(() => { /* 静默 */ })
-  }, [empId, isEdit])
+  }, [empId, isEdit, canSalaryView])
 
   /* ── 加载下拉数据（新增模式）── */
   useEffect(() => {
     if (isEdit) return
     fetchDepartments().then(setDepartments).catch(() => { /* 静默 */ })
     fetchPositions().then(setPositions).catch(() => { /* 静默 */ })
-    fetchRoles().then(setRoles).catch(() => { /* 静默 */ })
-  }, [isEdit])
+    // 角色列表只供「角色授权」字段使用；没有 authorize 时不拉（也不发多余的受控请求）
+    if (canAuthorize) {
+      fetchRoles().then(setRoles).catch(() => { /* 静默 */ })
+    }
+  }, [isEdit, canAuthorize])
 
   /** 部门树数据（新增模式，停用部门不可选） */
   const deptTreeData = useMemo(() => {
@@ -736,7 +773,9 @@ export default function EmployeeDetail() {
       positionId: values.positionId ?? null,
       rank: values.rank ?? null,
       company: values.company?.trim() || null,
-      functionRoleIds: values.functionRoleIds ?? [],
+      // 建档时指定角色 = 授权动作：后端会拿 authorize 硬拦，所以没这个权限时
+      // 不渲染该字段也不提交，否则正常的建档会被一个无关的 403 打断。
+      ...(canAuthorize ? { functionRoleIds: values.functionRoleIds ?? [] } : {}),
     }
     setCreating(true)
     try {
@@ -785,26 +824,18 @@ export default function EmployeeDetail() {
     return eligible[0] ?? null
   }, [positionRecords])
 
-  /** 最新一条记录（按日期+同日序号）的操作类型，用于判断是否允许“重新入职” */
-  const latestPosOperation = useMemo(() => {
+  /** 最新一条记录（按生效日+同日序号）的动作 code，用于判断是否允许「重新入职」 */
+  const latestPosOperationCode = useMemo(() => {
     if (!positionRecords.length) return ''
     const latest = [...positionRecords].sort((a, b) => (b.effectiveDate || '').localeCompare(a.effectiveDate || '') || (b.effectiveSeq ?? 0) - (a.effectiveSeq ?? 0))[0]
-    return latest?.operation ?? ''
+    return latest?.operationCode ?? hrOperationCodeFromName(latest?.operation) ?? ''
   }, [positionRecords])
-  const canRehire = !latestPosOperation || /离职/.test(latestPosOperation)
+  // 按 code 判定，不再用正则匹配中文：名称存繁体或简体都曾让这条规则静默失效
+  const canRehire = !latestPosOperationCode || latestPosOperationCode === HR_OPERATION.DIMISSION
 
-  /** 职务操作類型 → 标签顏色 */
-  const posOpColor = (op?: string) => {
-    if (!op) return 'default'
-    if (/離职|离职/.test(op)) return 'red'
-    if (/晉升|晋升/.test(op)) return 'gold'
-    if (/转正/.test(op)) return 'geekblue'
-    if (/降职|降职/.test(op)) return 'orange'
-    if (/調动|调动/.test(op)) return 'blue'
-    if (/入职|入职/.test(op)) return 'green'
-    if (/重新/.test(op)) return 'cyan'
-    return 'blue'
-  }
+  /** 职务操作类型 → 标签颜色：按 code 查表，不再用正则匹配中文（方案 §5.3） */
+  const posOpColor = (code?: string, name?: string) =>
+    hrOperationColor(code ?? hrOperationCodeFromName(name))
 
   const handleAddPos = () => {
     setEditingPos(null)
@@ -816,7 +847,8 @@ export default function EmployeeDetail() {
     setEditingPos(record)
     posForm.setFieldsValue({
       effectiveDate: record.effectiveDate ? dayjs(record.effectiveDate) : undefined,
-      operation: record.operation,
+      // 预填 code：历史行没回填时从名称快照反推，两者都推不出才退回原值
+      operation: record.operationCode ?? hrOperationCodeFromName(record.operation) ?? record.operation,
       reason: record.reason,
       serviceDept: record.serviceDept,
       sequence: record.sequence,
@@ -863,7 +895,8 @@ export default function EmployeeDetail() {
         effectiveSeq: editingPos
           ? (editingPos.effectiveSeq ?? 0) + 1
           : Math.max(...positionRecords.map(r => r.effectiveSeq ?? 0), -1) + 1,
-        operation: payload.operation,
+        operation: hrOperationLabel(payload.operationCode, undefined, t),
+        operationCode: payload.operationCode,
         reason: payload.reason ?? '',
         serviceDept: payload.serviceDept,
         position: payload.positionName,
@@ -918,9 +951,10 @@ export default function EmployeeDetail() {
     { title: t('employeeDetail.colAmountCny'), dataIndex: 'amount', key: 'amount', width: 140,
       render: (v: number) => <span style={{ fontWeight: 600 }}>¥{v.toLocaleString()}</span> },
     { title: t('employeeDetail.colRemark'), dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
-    {
+    // 操作列只在 salaryEdit 下出现：无写权的人看到可点的新增/删除只会换来一句 403
+    ...(salaryWritable ? [{
       title: t('common.colAction'), key: 'action', width: 120,
-      render: (_, record) => (
+      render: (_: unknown, record: SalaryIncomeItem) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEditIncome(record)}>{t('common.edit')}</Button>
           <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteIncome(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
@@ -928,7 +962,7 @@ export default function EmployeeDetail() {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ]
 
   const deductionColumns: TableColumnsType<SalaryDeductionItem> = [
@@ -938,9 +972,9 @@ export default function EmployeeDetail() {
     { title: t('employeeDetail.colAmountCny'), dataIndex: 'amount', key: 'amount', width: 140,
       render: (v: number) => v > 0 ? <span style={{ color: '#ff4d4f', fontWeight: 600 }}>¥{v.toLocaleString()}</span> : '-' },
     { title: t('employeeDetail.colRemark'), dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
-    {
+    ...(salaryWritable ? [{
       title: t('common.colAction'), key: 'action', width: 120,
-      render: (_, record) => (
+      render: (_: unknown, record: SalaryDeductionItem) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => handleEditDeduction(record)}>{t('common.edit')}</Button>
           <Popconfirm title={t('common.confirmDelete')} onConfirm={() => handleDeleteDeduction(record.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
@@ -948,7 +982,7 @@ export default function EmployeeDetail() {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ]
 
   const handleAddIncome = () => {
@@ -1480,7 +1514,12 @@ export default function EmployeeDetail() {
 
   function renderPositionTab() {
     return (
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* 雇佣期间先占满整行，再下接原有的「职务详情 + 异动时间轴」两列：
+            时间轴回答「发生过哪些异动」，雇佣期间回答「这段雇佣从哪天到哪天、是第几段」（方案 §7.1） */}
+        <div style={{ flexBasis: '100%', minWidth: 0 }}>
+          <EmploymentPeriods userId={Number(empId)} />
+        </div>
         {/* 左侧：當前选中节点的职务變动详情（各节点部門/职位可能不同） */}
         <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1488,16 +1527,21 @@ export default function EmployeeDetail() {
               <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.posDetailTitle')}</span>
-            {selectedPos && <Tag color={posOpColor(selectedPos.operation)} style={{ marginLeft: 4 }}>{selectedPos.operation}</Tag>}
+            {selectedPos && <Tag color={posOpColor(selectedPos.operationCode, selectedPos.operation)} style={{ marginLeft: 4 }}>{hrOperationLabel(selectedPos.operationCode, selectedPos.operation, t)}</Tag>}
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Space size={8}>
-              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddPos}>{t('employeeDetail.addPos')}</Button>
-              {selectedPos && (
+              {/* 整个异动操作区只在持有人事编辑权时渲染（查看者不该看到新增/编辑/删除） */}
+              {canEditProfile && (
                 <>
-                  <Button size="small" icon={<EditOutlined />} onClick={() => handleEditPos(selectedPos)}>{t('common.edit')}</Button>
-                  <Popconfirm title={t('common.confirmDelete')} description={t('employeeDetail.deletePosConfirm')} onConfirm={() => handleDeletePos(selectedPos.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
-                    <Button size="small" danger icon={<DeleteOutlined />}>{t('common.delete')}</Button>
-                  </Popconfirm>
+                  <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddPos}>{t('employeeDetail.addPos')}</Button>
+                  {selectedPos && (
+                    <>
+                      <Button size="small" icon={<EditOutlined />} onClick={() => handleEditPos(selectedPos)}>{t('common.edit')}</Button>
+                      <Popconfirm title={t('common.confirmDelete')} description={t('employeeDetail.deletePosConfirm')} onConfirm={() => handleDeletePos(selectedPos.id)} okText={t('common.confirm')} cancelText={t('common.cancel')}>
+                        <Button size="small" danger icon={<DeleteOutlined />}>{t('common.delete')}</Button>
+                      </Popconfirm>
+                    </>
+                  )}
                 </>
               )}
             </Space>
@@ -1507,7 +1551,7 @@ export default function EmployeeDetail() {
               {renderPosSection(t('employeeDetail.posGroupChange'), [
                 { label: t('employeeDetail.colEffectiveDate'), value: selectedPos.effectiveDate },
                 { label: t('employeeDetail.colEffectiveSeq'), value: String(selectedPos.effectiveSeq ?? '-') },
-                { label: t('employeeDetail.colOperation'), value: selectedPos.operation },
+                { label: t('employeeDetail.colOperation'), value: hrOperationLabel(selectedPos.operationCode, selectedPos.operation, t) },
                 { label: t('common.colReason'), value: selectedPos.reason },
               ])}
               {renderPosSection(t('employeeDetail.posGroupAppointment'), [
@@ -1572,7 +1616,7 @@ export default function EmployeeDetail() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#E8720C' : '#262626' }}>{r.effectiveDate}</span>
-                          <Tag color={posOpColor(r.operation)} style={{ marginRight: 0, fontSize: 11, lineHeight: '18px' }}>{r.operation}</Tag>
+                          <Tag color={posOpColor(r.operationCode, r.operation)} style={{ marginRight: 0, fontSize: 11, lineHeight: '18px' }}>{hrOperationLabel(r.operationCode, r.operation, t)}</Tag>
                         </div>
                         <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
                           {[r.serviceDept, r.position].filter(Boolean).join(' · ') || '-'}
@@ -1623,7 +1667,9 @@ export default function EmployeeDetail() {
               <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.incomeTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
-            <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddIncome}>{t('employeeDetail.addIncome')}</Button>
+            {salaryWritable && (
+              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddIncome}>{t('employeeDetail.addIncome')}</Button>
+            )}
           </div>
           <Table columns={incomeColumns} dataSource={salaryIncome} rowKey="id" pagination={false} size="small" />
         </div>
@@ -1638,7 +1684,9 @@ export default function EmployeeDetail() {
               <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.deductionTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
-            <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddDeduction}>{t('employeeDetail.addDeduction')}</Button>
+            {salaryWritable && (
+              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddDeduction}>{t('employeeDetail.addDeduction')}</Button>
+            )}
           </div>
           <Table columns={deductionColumns} dataSource={salaryDeduction} rowKey="id" pagination={false} size="small" />
         </div>
@@ -1653,7 +1701,9 @@ export default function EmployeeDetail() {
               <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.configTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
-            <Button icon={<EditOutlined />} onClick={handleEditConfig}>{t('employeeDetail.editConfig')}</Button>
+            {salaryWritable && (
+              <Button icon={<EditOutlined />} onClick={handleEditConfig}>{t('employeeDetail.editConfig')}</Button>
+            )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
@@ -1698,7 +1748,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.personalInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <Button icon={<EditOutlined />} onClick={handleEditPersonal}>{t('common.edit')}</Button>
+            {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditPersonal}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
@@ -1744,10 +1794,10 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.idInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            {hasPermission('employee-management:edit') && !piiRevealed && (
+            {canViewSensitive && !piiRevealed && (
               <Button type="link" size="small" onClick={handleRevealPII}>查看明文</Button>
             )}
-            <Button icon={<EditOutlined />} onClick={handleEditIdInfo}>{t('common.edit')}</Button>
+            {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditIdInfo}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
@@ -1785,7 +1835,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.contactInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <Button icon={<EditOutlined />} onClick={handleEditContact}>{t('common.edit')}</Button>
+            {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditContact}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
@@ -1819,7 +1869,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.emergencyInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddEmergency}>{t('common.add')}</Button>
+            {canEditProfile && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddEmergency}>{t('common.add')}</Button>}
           </div>
           <Table
             size="small"
@@ -1880,7 +1930,7 @@ export default function EmployeeDetail() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.thirdPartyAccountGroup')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <Button icon={<EditOutlined />} onClick={handleEditThirdParty}>{t('common.edit')}</Button>
+            {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditThirdParty}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 16, columnGap: 24 }}>
             {THIRD_PARTY_ACCOUNT_FIELDS.map(f => (
@@ -1909,7 +1959,7 @@ export default function EmployeeDetail() {
         />
         {/* Tab 下方操作按鈕 */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAddContract}>{t('employeeDetail.addContract')}</Button>
+          {canEditProfile && <Button type="primary" icon={<PlusOutlined />} onClick={handleAddContract}>{t('employeeDetail.addContract')}</Button>}
         </div>
         {renderTabUpdateBar('contract')}
       </div>
@@ -1961,10 +2011,20 @@ export default function EmployeeDetail() {
 
   const tabItems: TabsProps['items'] = [
     { key: 'position', label: t('employeeDetail.tabPosition'), children: renderPositionTab(), disabled: !isEdit },
-    { key: 'salary', label: t('employeeDetail.tabSalary'), children: renderSalaryTab(), disabled: !isEdit },
+    // 薪酬与账号 Tab 按拆分后的动作条件挂载（antd 5 的 Tab 类型没有 hidden 字段，
+    // 用条件展开而不是传 hidden：不渲染才是“看不到”，渲染了再隐藏会骗不过直接请求）
+    ...(canSalaryView
+      ? [{ key: 'salary', label: t('employeeDetail.tabSalary'), children: renderSalaryTab(), disabled: !isEdit }]
+      : []),
     { key: 'basic', label: t('employeeDetail.tabBasic'), children: renderBasicTab(), disabled: !isEdit },
-    { key: 'account', label: t('employeeDetail.tabAccount'), children: renderAccountTab(), disabled: !isEdit },
+    ...(canAccountEdit
+      ? [{ key: 'account', label: t('employeeDetail.tabAccount'), children: renderAccountTab(), disabled: !isEdit }]
+      : []),
     { key: 'contract', label: t('employeeDetail.tabContract'), children: renderContractTab(), disabled: !isEdit },
+    // 審計 Tab 只在持有 auditView 時挂载（antd 5 Tabs 没有 hidden 字段，条件展开才是「看不到」）
+    ...(canAuditView
+      ? [{ key: 'audit', label: t('employeeDetail.tabAudit'), children: <HrAuditTrail userId={Number(empId)} /> }]
+      : []),
     { key: 'reward', label: t('employeeDetail.tabReward'), children: renderRewardTab(), disabled: !isEdit },
   ]
 
@@ -2165,11 +2225,12 @@ export default function EmployeeDetail() {
               <Form.Item name="company" label={t('employeeDetail.colPosCompany')} extra={t('employee.companyExtra')}>
                 <Select placeholder={t('employee.companyPlaceholder')} allowClear options={companyOptions} />
               </Form.Item>
-              <Form.Item
-                name="functionRoleIds"
-                label={t('employee.roleAuthLabel')}
-                extra={t('employee.roleAuthExtra')}
-              >
+              {canAuthorize && (
+                <Form.Item
+                  name="functionRoleIds"
+                  label={t('employee.roleAuthLabel')}
+                  extra={t('employee.roleAuthExtra')}
+                >
                 <Select
                   mode="multiple"
                   placeholder={t('employee.roleAuthPlaceholder')}
@@ -2185,7 +2246,8 @@ export default function EmployeeDetail() {
                   }))}
                   maxTagCount="responsive"
                 />
-              </Form.Item>
+                </Form.Item>
+              )}
             </div>
           </Form>
         )}
@@ -2244,15 +2306,12 @@ export default function EmployeeDetail() {
               <DatePicker style={{ width: '100%' }} placeholder={t('employeeDetail.effectiveDatePh')} format="YYYY-MM-DD" />
             </Form.Item>
             <Form.Item name="operation" label={t('employeeDetail.colOperation')} rules={[{ required: true, message: t('employeeDetail.operationRequired') }]}>
-              <Select options={[
-                { value: '入职', label: '入职' },
-                { value: '转正', label: '转正' },
-                { value: '调动', label: '调动' },
-                { value: '晋升', label: '晋升' },
-                { value: '降职', label: '降职' },
-                { value: '离职', label: '离职' },
-                { value: '重新入职', label: '重新入职', disabled: !canRehire },
-              ]} />
+              <Select options={HR_OPERATION_OPTIONS.map(code => ({
+                value: code,
+                label: t(HR_OPERATION_LABEL_KEY[code]),
+                // 重新入职只在上一次异动是「离职」时开放（按 code 判定）
+                disabled: code === HR_OPERATION.REHIRE && !canRehire,
+              }))} />
             </Form.Item>
           </div>
           <Form.Item name="reason" label={t('common.colReason')} rules={[{ required: true, message: t('employeeDetail.reasonRequired') }]}>

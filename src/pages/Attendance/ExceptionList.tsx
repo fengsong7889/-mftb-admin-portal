@@ -34,6 +34,7 @@ import { EXCEPTION_STATUS_LABEL_KEY, EXCEPTION_STATUS_TAG_COLOR, EXCEPTION_TYPE_
 import { useAttendanceOptions } from './useAttendanceOptions'
 import { exportToCSV } from '../../utils/exportCSV'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */
 const COL_KEY: Record<string, string> = {
@@ -270,6 +271,7 @@ export default function AttendanceExceptionList() {
           action={<Button size="small" onClick={refresh}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       {/* 页面说明横幅：异常页最容易被误解成"可以在这里审批"，边界必须写在界面上 */}
       <Alert type="info" showIcon message={t('attendance.exceptionPageHint')} style={{ marginBottom: 16 }} />
 

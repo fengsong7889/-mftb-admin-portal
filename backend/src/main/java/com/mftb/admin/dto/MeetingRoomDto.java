@@ -34,8 +34,9 @@ public final class MeetingRoomDto {
     public static class Query {
         private Integer page = 1;
         private Integer size = 20;
-        /** 编号 / 名称 / 位置描述 */
+        /** 编号 / 名称 / 城市 / 位置描述 */
         private String keyword;
+        private String city;
         private String campus;
         private String building;
         private String floorCode;
@@ -60,6 +61,9 @@ public final class MeetingRoomDto {
         @NotBlank(message = "請填寫會議室名稱")
         @Size(max = 64, message = "會議室名稱最長 64 字")
         private String roomName;
+
+        @Size(max = 64, message = "城市最長 64 字")
+        private String city;
 
         @Size(max = 64, message = "園區最長 64 字")
         private String campus;
@@ -123,6 +127,8 @@ public final class MeetingRoomDto {
         private Long id;
         private String roomNo;
         private String roomName;
+        /** 所在城市：跨城办公防订错；空串=未填 */
+        private String city;
         private String campus;
         private String building;
         private String floorCode;
@@ -192,6 +198,9 @@ public final class MeetingRoomDto {
         /** 留空=全部可预约房间；预约页按需只传筛中的房间 */
         private List<Long> roomIds;
 
+        /** 按城市收窄房间候选（跨城办公防订错） */
+        private String city;
+
         private Integer minCapacity;
 
         private List<String> facilities;
@@ -215,6 +224,8 @@ public final class MeetingRoomDto {
         private Long roomId;
         private String roomNo;
         private String roomName;
+        /** 所在城市：预约页单独展示蓝色徽章，locationText 不再重复拼城市 */
+        private String city;
         private String locationText;
         private Integer capacity;
         private List<String> facilities;

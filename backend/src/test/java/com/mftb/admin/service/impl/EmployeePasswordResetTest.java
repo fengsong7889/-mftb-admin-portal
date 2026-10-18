@@ -49,7 +49,7 @@ class EmployeePasswordResetTest {
         OperatorResolver operatorResolver = mock(OperatorResolver.class);
         when(operatorResolver.currentOperatorName()).thenReturn("管理員");
         service = new EmployeeServiceImpl(sysUserMapper, mock(SysDepartmentMapper.class),
-                mock(SysPositionMapper.class), mock(SysLoginLogMapper.class), mock(EmpPositionRecordMapper.class),
+                mock(SysPositionMapper.class), mock(SysLoginLogMapper.class), mock(EmpPositionRecordMapper.class), mock(com.mftb.admin.service.HrAssignmentQuery.class), mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class),
                 passwordEncoder, mock(JdbcTemplate.class), operatorResolver,
                 mock(com.mftb.admin.service.PermissionService.class), mock(BizSeqService.class));
         when(sysUserMapper.selectById(USER_ID)).thenReturn(user());

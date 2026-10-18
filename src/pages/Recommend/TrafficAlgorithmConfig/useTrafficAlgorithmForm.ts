@@ -25,6 +25,13 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
   const submitting = useRef(false)
   const originalParams = useRef<Record<string, unknown>>({})
   const mounted = useRef(true)
+  // 回调 ref：调用方每次渲染可能传入新引用（如 inline arrow），
+  // 用 ref 持有最新回调但稳定 effect 依赖，避免 effect 每次渲染重跑 →
+  // form.resetFields() → Form.useWatch 触发重渲染 → 新回调 → effect 再跑 → 死循环。
+  const onLoadedRef = useRef(onLoaded)
+  onLoadedRef.current = onLoaded
+  const onSavedRef = useRef(onSaved)
+  onSavedRef.current = onSaved
 
   useEffect(() => {
     mounted.current = true
@@ -36,7 +43,7 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
     let active = true
     setErrors([])
     setLoadError('')
-    onLoaded(null)
+    onLoadedRef.current(null)
     originalParams.current = {}
     form.resetFields([...TRAFFIC_FIELD_NAMES, 'name', 'brand'])
     if (!algorithmId) {
@@ -57,7 +64,7 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
         if (!isParamsObject(raw)) throw new Error('投流配置格式无效')
         originalParams.current = raw
         form.setFieldsValue({ ...restored, name: detail.algoName, brand: brandToAppType(detail.brand) })
-        onLoaded({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
+        onLoadedRef.current({ updatedBy: detail.updatedBy, updatedAt: detail.updatedAt })
         setLoadState('ready')
       } catch (error) {
         if (!active) return
@@ -67,7 +74,8 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
     }
     void fetchConfig()
     return () => { active = false }
-  }, [enabled, algorithmId, form, onLoaded, reloadKey])
+    // onLoaded 通过 ref 持有，不放入依赖——调用方每次渲染传入新引用时不应重跑加载
+  }, [enabled, algorithmId, form, reloadKey])
 
   const handleSave = async () => {
     if (!enabled || readOnly || loadState !== 'ready' || submitting.current) return
@@ -89,7 +97,7 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
       else await createAdAlgorithm(payload)
       if (!mounted.current) return
       message.success(t(algorithmId ? 'recommend.algoUpdateSuccess' : 'recommend.algoAddSuccess'))
-      onSaved()
+      onSavedRef.current()
     } catch (error) {
       if (!mounted.current) return
       const fieldErrors = form.getFieldsError().filter(field => field.errors.length > 0).map(field => ({

@@ -32,6 +32,7 @@ import {
 } from './meta'
 import { useAttendanceOptions } from './useAttendanceOptions'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 待办异常只取最近 N 条：工作台是导航页，不是异常列表页，全量渲染会盖过指标 */
 const PENDING_LIMIT = 10
@@ -150,6 +151,7 @@ export default function AttendanceWorkbench() {
           action={<Button size="small" onClick={load}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       {/* 未重算时必须显式说明：0 人应出勤与"还没算"是两件事，混在一起会让人以为今天全员休息 */}
       {stats && stats.calculated === false && (
         <Alert

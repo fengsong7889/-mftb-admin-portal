@@ -18,6 +18,13 @@ public class RoleVO {
     private String description;
     private Integer status;
     private List<MenuPermissionDTO> permissions;
+    /**
+     * 数据范围（人员可见范围）: 1仅本人 2本部门 3本部门及以下 4自定部门 5全部。
+     * 存量行为 NULL 时按最严的「仅本人」返回，不向上暴露未配置的模糊状态。
+     */
+    private Integer dataScope;
+    /** 自定部门 id 列表（仅 dataScope=4 有值） */
+    private List<Long> deptIds;
     /** 绑定的账号数 */
     private Long userCount;
     private LocalDateTime createdAt;

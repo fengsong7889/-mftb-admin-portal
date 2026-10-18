@@ -13,10 +13,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Empty, Form, InputNumber, Select, Space, Spin, Tag, message } from 'antd'
-import { CheckCircleOutlined, HomeOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, EnvironmentOutlined, GlobalOutlined, HomeOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import {
+  fetchCities,
   fetchRoomAvailability,
   toMeetingIso,
   type RoomAvailability,
@@ -37,9 +38,10 @@ export default function RoomBooking() {
   const [rooms, setRooms] = useState<RoomAvailability[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
+  const [cities, setCities] = useState<string[]>([])
 
   /** 当前查询条件快照：统计卡片口径与重载依据 */
-  const [criteria, setCriteria] = useState<{ minCapacity?: number; facilities?: string[] }>({})
+  const [criteria, setCriteria] = useState<{ city?: string; minCapacity?: number; facilities?: string[] }>({})
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,6 +52,7 @@ export default function RoomBooking() {
       const list = await fetchRoomAvailability({
         from: toMeetingIso(from) ?? from.format('YYYY-MM-DDTHH:mm:ss'),
         to: toMeetingIso(to) ?? to.format('YYYY-MM-DDTHH:mm:ss'),
+        city: criteria.city,
         minCapacity: criteria.minCapacity,
         facilities: criteria.facilities?.length ? criteria.facilities : undefined,
       })
@@ -64,9 +67,14 @@ export default function RoomBooking() {
 
   useEffect(() => { void load() }, [load])
 
+  useEffect(() => {
+    void fetchCities().then(setCities).catch(() => setCities([]))
+  }, [])
+
   const handleSearch = () => {
     const values = form.getFieldsValue()
     setCriteria({
+      city: values.city ?? undefined,
       minCapacity: values.minCapacity ?? undefined,
       facilities: values.facilities?.length ? values.facilities : undefined,
     })
@@ -122,11 +130,17 @@ export default function RoomBooking() {
               onChange={value => value && setDay(value)}
             />
           </Form.Item>
+          {/* 城市筛选放最前：跨城办公先锁城市再选房，避免看错栋 */}
+          <Form.Item label={t('meeting.city', { defaultValue: '城市' })} name="city">
+            <Select placeholder={t('meeting.all', { defaultValue: '全部' })} allowClear style={{ width: '100%' }}
+              options={cities.map(c => ({ value: c, label: c }))} />
+          </Form.Item>
           <Form.Item label={t('meeting.minimumCapacity', { defaultValue: '最少人數' })} name="minCapacity">
-            <InputNumber min={1} placeholder={t('meeting.any', { defaultValue: '不限' })} style={{ width: 100 }} addonAfter={t('meeting.people', { defaultValue: '人' })} />
+            {/* §E.1：搜索区控件一律 100% 宽末端对齐，不写死像素宽（参考 RoomFiles 同名字段） */}
+            <InputNumber min={1} placeholder={t('meeting.any', { defaultValue: '不限' })} style={{ width: '100%' }} addonAfter={t('meeting.people', { defaultValue: '人' })} />
           </Form.Item>
           <Form.Item label={t('meeting.facilities', { defaultValue: '設備' })} name="facilities">
-            <Select mode="multiple" allowClear placeholder={t('meeting.all', { defaultValue: '全部' })} style={{ minWidth: 220 }} options={facilityOptions()} />
+            <Select mode="multiple" allowClear placeholder={t('meeting.all', { defaultValue: '全部' })} style={{ width: '100%' }} options={facilityOptions()} />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
@@ -190,7 +204,18 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
     <div style={{ border: '1px solid #F0F0F0', borderRadius: 8, padding: '12px 16px', background: '#FAFAFA' }}>
       <Space size={8} wrap style={{ marginBottom: 8 }}>
         <span style={{ fontWeight: 600 }}>{room.roomName}</span>
-        <span style={{ color: '#8C8C8C', fontSize: 12 }}>{room.roomNo} · {room.locationText}</span>
+        <span style={{ color: '#8C8C8C', fontSize: 12 }}>{room.roomNo}</span>
+        {/* 城市单独蓝色徽章：跨城办公第一眼先确认城市，再往下看位置 */}
+        {room.city && <Tag color="blue" icon={<GlobalOutlined />}>{room.city}</Tag>}
+        {/* 位置醒目徽章：跨城市/大厦的会议室名往往雷同（如都叫“會議室 A”），订错多半栽在位置不够显眼 */}
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '1px 10px', borderRadius: 6, fontSize: 13, fontWeight: 600,
+          color: '#E8720C', background: '#FFF7F0', border: '1px solid #FFE7D1',
+        }}>
+          <EnvironmentOutlined style={{ fontSize: 13 }} />
+          {room.locationText}
+        </span>
         <Tag>{t('meeting.headcount', { count: room.capacity, defaultValue: '{{count}} 人' })}</Tag>
         {room.facilities.map(code => <Tag key={code} color="blue">{facilityLabels()[code] ?? code}</Tag>)}
         {!room.bookable && <Tag color="orange">{t('meeting.notBookable', { defaultValue: '暫不可約' })}</Tag>}
@@ -212,7 +237,7 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
         onClick={room.bookable ? pickFromClick : undefined}
         style={{
           position: 'relative',
-          height: 30,
+          height: 46,
           borderRadius: 6,
           background: '#FFFFFF',
           border: '1px solid #E8E8E8',
@@ -239,16 +264,20 @@ function RoomRow({ room, onPick }: { room: RoomAvailability; onPick: (start?: Da
                 background: '#FFF7E6',
                 borderLeft: '1px solid #FA8C16',
                 borderRight: '1px solid #FA8C16',
-                fontSize: 11,
-                fontWeight: 500,
-                color: '#E8720C',
-                padding: '6px 4px',
-                whiteSpace: 'nowrap',
+                padding: '5px 6px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis',
               }}
             >
-              {slot.title}
+              {/* 两行展示：主题 + 起止时间，窄段靠省略号收尾，悬浮 title 看全量信息 */}
+              <div style={{ fontSize: 11, fontWeight: 500, color: '#E8720C', lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {slot.title}
+              </div>
+              <div style={{ fontSize: 10, color: '#FA8C16', lineHeight: '14px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {slot.startTime.slice(11, 16)}–{slot.endTime.slice(11, 16)}
+              </div>
             </div>
           )
         })}

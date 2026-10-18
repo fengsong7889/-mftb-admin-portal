@@ -12,7 +12,7 @@
  *   3. 时间的起止倒挂、上下限倒挂在前端就拦下（后端同样各有一道，那是安全边界）。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Form, Input, InputNumber, Select, Spin, Switch, TimePicker, message } from 'antd'
+import { AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, TimePicker, message } from 'antd'
 import type { CSSProperties } from 'react'
 import {
   ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, HomeOutlined,
@@ -23,7 +23,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import RemarkTextArea from '../../../components/RemarkTextArea'
 import {
-  createMeetingRoom, fetchMeetingRoomDetail, updateMeetingRoom,
+  createMeetingRoom, fetchCities, fetchMeetingRoomDetail, updateMeetingRoom,
   type MeetingRoomForm as MeetingRoomPayload, type MeetingRoomVO,
 } from '../../../api/meeting'
 import { facilityOptions } from '../meetingMeta'
@@ -76,6 +76,12 @@ export default function MeetingRoomForm() {
   const [loading, setLoading] = useState(isEdit)
   const [record, setRecord] = useState<MeetingRoomVO>()
   const [loadError, setLoadError] = useState<string>()
+  // 城市候选：已有房间用过的城市，可选也可输入新城市（候选接口失败不阻断表单）
+  const [cityOptions, setCityOptions] = useState<{ value: string }[]>([])
+
+  useEffect(() => {
+    void fetchCities().then(list => setCityOptions(list.map(c => ({ value: c })))).catch(() => setCityOptions([]))
+  }, [])
 
   const handleBack = useCallback(() => {
     navigate('/meeting-room', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
@@ -97,6 +103,7 @@ export default function MeetingRoomForm() {
         form.setFieldsValue({
           roomNo: data.roomNo,
           roomName: data.roomName,
+          city: data.city ?? undefined,
           campus: data.campus ?? undefined,
           building: data.building ?? undefined,
           floorCode: data.floorCode ?? undefined,
@@ -271,7 +278,11 @@ export default function MeetingRoomForm() {
         <div style={cardStyle}>
           <CardTitle icon={<EnvironmentOutlined />} tone="info" title={t('meeting.locationFacilities', { defaultValue: '位置與設備' })}
             note={t('meeting.usedByBookingFilters', { defaultValue: '位置用於預約頁篩選與門口指引' })} />
-          <div style={gridStyle}>
+          {/* 四列一行：城市→园区→楼栋→楼层，与地址从大到小的阅读顺序一致 */}
+          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <Form.Item label={t('meeting.city', { defaultValue: '城市' })} name="city" rules={[{ max: 64, message: t('meeting.cityMaxLength', { defaultValue: '城市不得超過 64 字' }) }]}>
+              <AutoComplete placeholder={t('meeting.eGCity', { defaultValue: '如 深圳' })} allowClear options={cityOptions} />
+            </Form.Item>
             <Form.Item label={t('meeting.campus', { defaultValue: '園區' })} name="campus" rules={[{ max: 64, message: t('meeting.campusMaxLength', { defaultValue: '園區不得超過 64 字' }) }]}>
               <Input placeholder={t('meeting.eGHeadOffice', { defaultValue: '如 總部' })} allowClear maxLength={64} />
             </Form.Item>

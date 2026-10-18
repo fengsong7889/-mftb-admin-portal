@@ -94,6 +94,18 @@ public abstract class SecurityTestBase {
     protected PositionRecordService positionRecordService;
     @MockBean(name = "employeeContractService")
     protected EmployeeContractService employeeContractService;
+    /** 雇佣期间（P4 双轨）：EmployeeController 已依赖它，WebMvc 切片必须给出 Bean */
+    @MockBean(name = "hrEmploymentPeriodService")
+    protected HrEmploymentPeriodService hrEmploymentPeriodService;
+    /** 花名册人员范围收敛（P6）：EmployeeController 用它解析可见集 */
+    @MockBean(name = "orgScopeService")
+    protected OrgScopeService orgScopeService;
+    /** 人事操作审计：EmployeeController 的全量导出等端点落审计，切片必须提供 Bean */
+    @MockBean(name = "hrAuditService")
+    protected HrAuditService hrAuditService;
+    /** 花名册查询（范围收敛 + 默认列富化）：/employees/roster* 端点依赖它 */
+    @MockBean(name = "hrRosterQueryService")
+    protected HrRosterQueryService hrRosterQueryService;
     @MockBean(name = "roleService")
     protected RoleService roleService;
     @MockBean(name = "menuService")

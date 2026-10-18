@@ -98,7 +98,7 @@ class AttendanceJudgeWriteBackTest {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceSummaryServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper,
                 punchMapper, exceptionMapper, dayMapper, monthlyMapper, holidayMapper, leaveMapper,
-                bizSeqService, operatorResolver, sysConfigService);
+                bizSeqService, operatorResolver, sysConfigService, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
         when(sysConfigService.getConfigValueCached(anyString())).thenReturn(null);
         when(groupMapper.selectById(GROUP_ID)).thenReturn(fixedGroup());

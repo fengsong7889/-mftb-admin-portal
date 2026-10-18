@@ -179,9 +179,9 @@ describe('算法页签切换状态隔离', () => {
     expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('')
   }
 
-  it.each([AlgorithmType.ORGANIC_TRAFFIC, AlgorithmType.TRAFFIC_AD])('从类型 %s 双向切换和前进后退时，标题、参数区与表单保持一致', firstType => {
+  it.each([AlgorithmType.ORGANIC_TRAFFIC, AlgorithmType.TRAFFIC_AD])('从类型 %s 双向切换和前进后退时，标题、参数区与表单保持一致', async firstType => {
     const secondType = firstType === AlgorithmType.ORGANIC_TRAFFIC ? AlgorithmType.TRAFFIC_AD : AlgorithmType.ORGANIC_TRAFFIC
-    mountPage(`type=${firstType}`, [organicQuery, trafficQuery])
+    await act(async () => { mountPage(`type=${firstType}`, [organicQuery, trafficQuery]) })
     expectAlgorithmPage(firstType)
     fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '前一页未保存的名称' } })
     fireEvent.click(screen.getByRole('link', { name: `type=${secondType}` }))

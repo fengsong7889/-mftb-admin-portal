@@ -2,15 +2,21 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.OrgDataScope;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.dto.RoleRequest;
 import com.mftb.admin.dto.RoleVO;
+import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysRole;
+import com.mftb.admin.entity.SysRoleDept;
 import com.mftb.admin.entity.SysRoleMenu;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.SysDepartmentMapper;
+import com.mftb.admin.mapper.SysRoleDeptMapper;
 import com.mftb.admin.mapper.SysRoleMapper;
 import com.mftb.admin.mapper.SysRoleMenuMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.service.PermissionAuditService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.RoleService;
@@ -30,6 +36,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,11 +54,14 @@ public class RoleServiceImpl implements RoleService {
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final SysRoleDeptMapper sysRoleDeptMapper;
+    private final SysDepartmentMapper sysDepartmentMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
     private final JdbcTemplate jdbcTemplate;
     private final PermissionService permissionService;
     private final PermissionAuditService permissionAuditService;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public List<RoleVO> list() {
@@ -67,9 +77,11 @@ public class RoleServiceImpl implements RoleService {
         }
         Map<Long, List<MenuPermissionDTO>> permissionsMap = loadPermissionsMap(
                 roles.stream().map(SysRole::getId).toList());
+        Map<Long, List<Long>> deptIdsMap = loadDeptIdsMap(roles.stream().map(SysRole::getId).toList());
         return roles.stream()
                 .map(role -> toVO(role, countMap.getOrDefault(role.getId(), 0L),
-                        permissionsMap.getOrDefault(role.getId(), List.of())))
+                        permissionsMap.getOrDefault(role.getId(), List.of()),
+                        deptIdsMap.getOrDefault(role.getId(), List.of())))
                 .toList();
     }
 
@@ -82,24 +94,50 @@ public class RoleServiceImpl implements RoleService {
         // code 唯一约束, 自动生成
         role.setCode("role_" + System.currentTimeMillis());
         role.setDescription(request.getDescription());
+        // 新建角色缺省「仅本人」：未显式配置范围时绝不能默认放开成全公司可见
+        role.setDataScope(OrgDataScope.orDefault(request.getDataScope()));
         role.setStatus(1);
         role.setDeleted(0);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.insert(role);
         saveRoleMenus(role.getId(), request.getPermissions());
+        saveRoleDepts(role.getId(), role.getDataScope(), request.getDeptIds());
         permissionService.evictAll();
-        return toVO(role, 0L, loadPermissions(role.getId()));
+        orgScopeService.evictAll();
+        return toVO(role, 0L, loadPermissions(role.getId()), loadDeptIds(role.getId()));
     }
 
     @Override
+    @Transactional
     public RoleVO update(Long id, RoleRequest request) {
         SysRole role = requireRole(id);
         assertNameUnique(request.getName(), id);
+        Integer oldScope = OrgDataScope.orDefault(role.getDataScope());
+        List<Long> oldDeptIds = loadDeptIds(id);
         role.setName(request.getName());
         role.setDescription(request.getDescription());
+        // dataScope 为 null = 调用方没提交这一项（旧版表单/其它入口），保持原值，
+        // 不得把「未提供」当成「改成仅本人」，也不得当成「改成全部」。
+        boolean scopeProvided = request.getDataScope() != null;
+        if (scopeProvided) {
+            role.setDataScope(OrgDataScope.orDefault(request.getDataScope()));
+        }
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.updateById(role);
-        return toVO(role, null, loadPermissions(role.getId()));
+        if (scopeProvided || request.getDeptIds() != null) {
+            saveRoleDepts(id, OrgDataScope.orDefault(role.getDataScope()), request.getDeptIds());
+        }
+        Integer newScope = OrgDataScope.orDefault(role.getDataScope());
+        List<Long> newDeptIds = loadDeptIds(id);
+        if (!newScope.equals(oldScope) || !newDeptIds.equals(oldDeptIds)) {
+            // 数据范围是权限变更，必须留前后快照（与菜单授权同标准）
+            permissionAuditService.record(PermissionAuditService.TARGET_ROLE, id, role.getName(), null,
+                    PermissionAuditService.CHANGE_UPDATE,
+                    Map.of("dataScope", oldScope, "deptIds", oldDeptIds),
+                    Map.of("dataScope", newScope, "deptIds", newDeptIds));
+            orgScopeService.evictAll();
+        }
+        return toVO(role, null, loadPermissions(role.getId()), newDeptIds);
     }
 
     @Override
@@ -156,6 +194,9 @@ public class RoleServiceImpl implements RoleService {
         // 清理角色菜单关联
         sysRoleMenuMapper.delete(
                 new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id));
+        // 清理自定部门行：残留会让后续复用同 id 的角色意外继承旧范围
+        sysRoleDeptMapper.delete(
+                new LambdaQueryWrapper<SysRoleDept>().eq(SysRoleDept::getRoleId, id));
         jdbcTemplate.update("DELETE FROM sys_role_system WHERE role_id = ?", id);
         // 从所有员工的绑定中移除该角色
         List<SysUser> users = sysUserMapper.selectList(null);
@@ -181,6 +222,8 @@ public class RoleServiceImpl implements RoleService {
         role.setCode("role_" + System.currentTimeMillis());
         role.setDescription(StringUtils.hasText(request.getDescription())
                 ? request.getDescription() : "復制自：" + source.getName());
+        // 数据范围随角色一起克隆：不带过来会让新角色静默变成「仅本人」，副本上线即缺数据
+        role.setDataScope(OrgDataScope.orDefault(source.getDataScope()));
         role.setStatus(1);
         role.setDeleted(0);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -194,14 +237,19 @@ public class RoleServiceImpl implements RoleService {
                 "INSERT IGNORE INTO sys_role_system (role_id, system_code) "
                         + "SELECT ?, system_code FROM sys_role_system WHERE role_id = ?",
                 role.getId(), id);
+        int deptCopied = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_role_dept (role_id, dept_id) "
+                        + "SELECT ?, dept_id FROM sys_role_dept WHERE role_id = ?",
+                role.getId(), id);
         permissionAuditService.record(PermissionAuditService.TARGET_ROLE, role.getId(), role.getName(), null,
                 PermissionAuditService.CHANGE_COPY,
                 Map.of("fromRoleId", id, "fromRoleName", source.getName()),
                 Map.of("menuCopied", menuCopied, "systemCopied", systemCopied));
         permissionService.evictAll();
-        log.info("角色已复制: source={}({}) -> new={}({}), menu={}, system={}",
-                source.getName(), id, role.getName(), role.getId(), menuCopied, systemCopied);
-        return toVO(role, 0L, loadPermissions(role.getId()));
+        orgScopeService.evictAll();
+        log.info("角色已复制: source={}({}) -> new={}({}), menu={}, system={}, dept={}",
+                source.getName(), id, role.getName(), role.getId(), menuCopied, systemCopied, deptCopied);
+        return toVO(role, 0L, loadPermissions(role.getId()), loadDeptIds(role.getId()));
     }
 
     @Override
@@ -338,7 +386,7 @@ public class RoleServiceImpl implements RoleService {
         return menuId;
     }
 
-    private RoleVO toVO(SysRole role, Long userCount, List<MenuPermissionDTO> permissions) {
+    private RoleVO toVO(SysRole role, Long userCount, List<MenuPermissionDTO> permissions, List<Long> deptIds) {
         RoleVO vo = new RoleVO();
         vo.setId(role.getId());
         vo.setName(role.getName());
@@ -346,11 +394,71 @@ public class RoleServiceImpl implements RoleService {
         vo.setDescription(role.getDescription());
         vo.setStatus(role.getStatus());
         vo.setPermissions(permissions == null ? List.of() : permissions);
+        // 存量行 data_scope 为 NULL 时按最严档返回，与 OrgScopeServiceImpl 的解析口径一致
+        vo.setDataScope(OrgDataScope.orDefault(role.getDataScope()));
+        vo.setDeptIds(OrgDataScope.orDefault(role.getDataScope()) == OrgDataScope.CUSTOM_DEPT
+                ? (deptIds == null ? List.of() : deptIds) : List.of());
         vo.setUserCount(userCount);
         vo.setCreatedAt(role.getCreatedAt());
         vo.setUpdatedBy(role.getUpdatedBy());
         vo.setUpdatedAt(role.getUpdatedAt());
         return vo;
+    }
+
+    /**
+     * 保存自定部门集合（先清空再批量插入，与 {@link #saveRoleMenus} 同语义）。
+     * <p>
+     * 只有 {@code data_scope = 4} 才写行：其余档位必须清空，否则「档位改成全部、
+     * 部门行还留着」会让下一次误改回自定部门时静默复活旧范围。
+     * 部门 id 必须逐个验存在：前端传的 id 不可信，写入不存在/已删部门会让范围解析结果凭空变小。
+     */
+    private void saveRoleDepts(Long roleId, Integer dataScope, List<Long> deptIds) {
+        if (OrgDataScope.orDefault(dataScope) != OrgDataScope.CUSTOM_DEPT) {
+            sysRoleDeptMapper.delete(
+                    new LambdaQueryWrapper<SysRoleDept>().eq(SysRoleDept::getRoleId, roleId));
+            return;
+        }
+        if (CollectionUtils.isEmpty(deptIds)) {
+            throw new BusinessException("自定部門模式下必須至少選擇一個部門");
+        }
+        List<Long> distinct = deptIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (distinct.isEmpty()) {
+            throw new BusinessException("自定部門模式下必須至少選擇一個部門");
+        }
+        long existing = sysDepartmentMapper.selectCount(
+                new LambdaQueryWrapper<SysDepartment>().in(SysDepartment::getId, distinct));
+        if (existing != distinct.size()) {
+            throw new BusinessException("所選部門不存在或已停用");
+        }
+        sysRoleDeptMapper.delete(
+                new LambdaQueryWrapper<SysRoleDept>().eq(SysRoleDept::getRoleId, roleId));
+        for (Long deptId : distinct) {
+            SysRoleDept relation = new SysRoleDept();
+            relation.setRoleId(roleId);
+            relation.setDeptId(deptId);
+            sysRoleDeptMapper.insert(relation);
+        }
+    }
+
+    private List<Long> loadDeptIds(Long roleId) {
+        return sysRoleDeptMapper.selectList(
+                        new LambdaQueryWrapper<SysRoleDept>().eq(SysRoleDept::getRoleId, roleId))
+                .stream().map(SysRoleDept::getDeptId).sorted().toList();
+    }
+
+    /** 批量加载多个角色的自定部门, 按 roleId 分组（列表页避免 N+1） */
+    private Map<Long, List<Long>> loadDeptIdsMap(List<Long> roleIds) {
+        Map<Long, List<Long>> result = new HashMap<>();
+        if (CollectionUtils.isEmpty(roleIds)) {
+            return result;
+        }
+        List<SysRoleDept> rows = sysRoleDeptMapper.selectList(
+                new LambdaQueryWrapper<SysRoleDept>().in(SysRoleDept::getRoleId, roleIds));
+        for (SysRoleDept row : rows) {
+            result.computeIfAbsent(row.getRoleId(), k -> new ArrayList<>()).add(row.getDeptId());
+        }
+        result.values().forEach(list -> list.sort(Long::compareTo));
+        return result;
     }
 
     /** 从 sys_role_menu + sys_menu 加载角色权限 */

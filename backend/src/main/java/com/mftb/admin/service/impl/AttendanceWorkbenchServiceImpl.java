@@ -18,7 +18,9 @@ import com.mftb.admin.mapper.AttPunchLogMapper;
 import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.service.AttendanceSummaryService;
 import com.mftb.admin.service.AttendanceWorkbenchService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.service.SysConfigService;
+import com.mftb.admin.util.ScopeFilters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -68,6 +70,7 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
     private final AttMonthlySummaryMapper monthlyMapper;
     private final AttendanceSummaryService summaryService;
     private final SysConfigService sysConfigService;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public Map<String, Object> overview(LocalDate date, LocalDate rangeFrom, LocalDate rangeTo) {
@@ -94,16 +97,20 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
     /* ==================== 指标 ==================== */
 
     private Map<String, Object> stats(LocalDate date, LocalDate from, LocalDate to) {
-        List<AttDaySummary> today = dayMapper.selectList(new LambdaQueryWrapper<AttDaySummary>()
-                .eq(AttDaySummary::getWorkDate, date));
+        LambdaQueryWrapper<AttDaySummary> todayWrapper = new LambdaQueryWrapper<AttDaySummary>()
+                .eq(AttDaySummary::getWorkDate, date);
+        ScopeFilters.applyDepts(todayWrapper, AttDaySummary::getDeptId, orgScopeService.resolveVisibleDeptIds());
+        List<AttDaySummary> today = dayMapper.selectList(todayWrapper);
         int should = today.stream().mapToInt(r -> nz(r.getShouldCount())).sum();
         int actual = today.stream().mapToInt(r -> nz(r.getActualCount())).sum();
 
         // 区间异常按状态与类型分别计数：与异常处理页的统计卡同源同口径
-        List<AttException> range = exceptionMapper.selectList(new LambdaQueryWrapper<AttException>()
+        LambdaQueryWrapper<AttException> rangeWrapper = new LambdaQueryWrapper<AttException>()
                 .ge(AttException::getWorkDate, from)
                 .le(AttException::getWorkDate, to)
-                .select(AttException::getStatus, AttException::getExceptionType));
+                .select(AttException::getStatus, AttException::getExceptionType);
+        ScopeFilters.applyUsers(rangeWrapper, AttException::getUserId, orgScopeService.resolveVisibleUserIds());
+        List<AttException> range = exceptionMapper.selectList(rangeWrapper);
         long pending = range.stream()
                 .filter(r -> r.getStatus() == null || r.getStatus() == AttException.STATUS_PENDING).count();
         long late = range.stream()
@@ -173,10 +180,12 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
         }
         LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekEnd = weekStart.plusDays(6);
-        List<AttGroupMember> members = memberMapper.selectList(new LambdaQueryWrapper<AttGroupMember>()
+        LambdaQueryWrapper<AttGroupMember> memberWrapper = new LambdaQueryWrapper<AttGroupMember>()
                 .in(AttGroupMember::getGroupId, rotationIds)
                 .le(AttGroupMember::getValidFrom, weekEnd)
-                .and(w -> w.isNull(AttGroupMember::getValidTo).or().ge(AttGroupMember::getValidTo, weekStart)));
+                .and(w -> w.isNull(AttGroupMember::getValidTo).or().ge(AttGroupMember::getValidTo, weekStart));
+        ScopeFilters.applyUsers(memberWrapper, AttGroupMember::getUserId, orgScopeService.resolveVisibleUserIds());
+        List<AttGroupMember> members = memberMapper.selectList(memberWrapper);
         if (members.isEmpty()) {
             return java.util.Optional.empty();
         }
@@ -203,9 +212,11 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
         if (summaryService.isMonthFrozen(month)) {
             return java.util.Optional.empty();
         }
-        Long draft = monthlyMapper.selectCount(new LambdaQueryWrapper<AttMonthlySummary>()
+        LambdaQueryWrapper<AttMonthlySummary> draftWrapper = new LambdaQueryWrapper<AttMonthlySummary>()
                 .eq(AttMonthlySummary::getStatMonth, month)
-                .eq(AttMonthlySummary::getStatus, AttMonthlySummary.STATUS_DRAFT));
+                .eq(AttMonthlySummary::getStatus, AttMonthlySummary.STATUS_DRAFT);
+        ScopeFilters.applyUsers(draftWrapper, AttMonthlySummary::getUserId, orgScopeService.resolveVisibleUserIds());
+        Long draft = monthlyMapper.selectCount(draftWrapper);
         long draftCount = draft == null ? 0L : draft;
         // 没有任何待确认(draft)记录时无需催办冻结：该月要么没生成汇总、要么都已同步/冻结，
         // 继续弹「待確認 0 條…快去處理」属误报（缺陷 D6/L-4）。
@@ -235,9 +246,11 @@ public class AttendanceWorkbenchServiceImpl implements AttendanceWorkbenchServic
         if (dingtalkGroups == 0) {
             return java.util.Optional.empty();
         }
-        Long synced = punchMapper.selectCount(new LambdaQueryWrapper<AttPunchLog>()
+        LambdaQueryWrapper<AttPunchLog> syncedWrapper = new LambdaQueryWrapper<AttPunchLog>()
                 .eq(AttPunchLog::getWorkDate, date)
-                .eq(AttPunchLog::getSource, AttPunchLog.SOURCE_DINGTALK));
+                .eq(AttPunchLog::getSource, AttPunchLog.SOURCE_DINGTALK);
+        ScopeFilters.applyUsers(syncedWrapper, AttPunchLog::getUserId, orgScopeService.resolveVisibleUserIds());
+        Long synced = punchMapper.selectCount(syncedWrapper);
         if (synced != null && synced > 0) {
             return java.util.Optional.empty();
         }

@@ -20,7 +20,9 @@ import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AttendancePunchService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.ScopeFilters;
 import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +77,7 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
     private final AttScheduleMapper scheduleMapper;
     private final AttShiftMapper shiftMapper;
     private final OperatorResolver operatorResolver;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public PageResult<AttendancePunchVO> page(long page, long size, LocalDate from, LocalDate to, String keyword,
@@ -142,6 +145,9 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
         }
         Map<String, SysUser> byEmpNo = loadUsersByEmpNo(rows);
         String operator = operatorResolver.currentOperatorName();
+        // 导入是按工号写别人的打卡，属于跨人写入：必须逐个校验人员在可见范围内，
+        // 否则「能看自己」的角色可以凭一份 Excel 把全公司的打卡都补进去。
+        Set<Long> visibleUsers = orgScopeService.resolveVisibleUserIds();
         List<Map<String, Object>> errors = new ArrayList<>();
         List<AttPunchLog> prepared = new ArrayList<>();
         for (int index = 0; index < rows.size(); index++) {
@@ -152,6 +158,10 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
                 continue;
             }
             SysUser user = byEmpNo.get(row.getEmpNo().trim());
+            if (visibleUsers != null && !visibleUsers.contains(user.getId())) {
+                errors.add(Map.of("row", index + 1, "reason", "無權導入該人員的打卡記錄"));
+                continue;
+            }
             LocalDateTime at = LocalDateTime.parse(row.getPunchAt().trim(), PUNCH_AT);
             String location = row.getLocation() == null ? "" : row.getLocation().trim();
             AttPunchLog record = new AttPunchLog();
@@ -249,6 +259,9 @@ public class AttendancePunchServiceImpl implements AttendancePunchService {
             wrapper.and(w -> w.like(AttPunchLog::getEmpNo, kw).or().like(AttPunchLog::getEmpName, kw)
                     .or().like(AttPunchLog::getLocation, kw));
         }
+        // 组织人员数据范围：列表、统计卡、导出共用本方法，所以三处口径天然一致；
+        // 只在前端隐藏列或只过滤分页都是假安全。
+        ScopeFilters.applyUsers(wrapper, AttPunchLog::getUserId, orgScopeService.resolveVisibleUserIds());
         return wrapper;
     }
 

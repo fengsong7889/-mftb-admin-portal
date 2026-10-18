@@ -1,6 +1,7 @@
 package com.mftb.admin.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.dto.MenuPermissionDTO;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -28,7 +29,9 @@ import java.util.stream.Collectors;
 /**
  * 数据初始化器: 启动时自动执行字段迁移与内置账号迁移, 并将 SQL 中的占位密码重置为正确的 BCrypt 加密值
  * <p>
- * 登录账号统一为工号, 工号按 MF 前缀自增(MF00001 起), 内置管理员工号 MF00001 (初始密码见部署交付物, 不写入代码注释)
+ * 员工登录账号统一为工号, 工号按 MF 前缀自增(MF00001 起);
+ * 内置系统管理员为独立系统账号 {@link BuiltinAccounts#ADMIN_USERNAME}(非工号, 不占员工序列),
+ * 初始密码见部署交付物, 不写入代码注释
  */
 @Slf4j
 @Component
@@ -49,6 +52,16 @@ public class DataInitializer implements CommandLineRunner {
      *  — patch: 向下兼容的问题修复
      * ────────────────────────────────────────────────────────── */
     public static final String PRODUCT_VERSION = "1.0.0";
+
+    /**
+     * 内置账号引导密码: 仅当密码列不是合法 BCrypt 值(全新库执行 01_init_system.sql 留下的占位符)时写入,
+     * 同时置 must_change_password=1 强制首次登录改密。与 {@link #resetPasswordIfNeeded} 同一口径,
+     * 属既有历史约定(非本次新增密钥); 存量库走「继承超管密码哈希」路径, 不会用到该值。
+     */
+    private static final String BUILTIN_BOOTSTRAP_PASSWORD = "111222";
+
+    /** 内置账号迁移的 updated_by 签名, 便于事后区分「系统迁移改动」与「人工改动」 */
+    private static final String BUILTIN_ADMIN_OPERATOR = "system-builtin-admin";
 
     /** 结构迁移版本: 建表/补列等一次性 schema 变更, 变更时递增 minor 版本号 */
     // v5.0: 重跑幂等补列（修复存量库 ai_dept_auth_group 缺 description 列的漂移）
@@ -162,6 +175,12 @@ public class DataInitializer implements CommandLineRunner {
         // 历史上仅 198_dedup_super_admin.sql 手动在开发库执行(affected=19)，未进迁移框架，
         // 导致生产角色管理仍见大量绑定成员且被判定超管直通(权限旁路)。登记后各环境启动自动收敛。
         versionTracker.applyOnce("core:super-admin-dedup-v1", this::dedupSuperAdminBindings, this::verifySuperAdminDedup);
+        // 恢复独立的内置系统管理员账号 admin, 并把存量超管(历史上是员工工号 MF00001)降级为普通账号。
+        // 顺序不变量: 必须晚于 core:super-admin-dedup-v1(复用其收敛逻辑剥离降级账号的 admin 角色绑定),
+        // 且必须早于 migrateEmpIdToMF()——后者每次启动把所有非 MF 格式登录账号重编号,
+        // 未排除系统账号会让 admin 在下次重启被改名成 MFxxxxx、系统失去超管入口。
+        versionTracker.applyOnce("core:builtin-admin-account-v1",
+                this::migrateBuiltinAdminAccount, this::verifyBuiltinAdminAccount);
         // 为所有缺少职务记录的员工补一条默认「入职」记录
         versionTracker.applyOnce("core:emp-position-backfill-v1", this::backfillInitialPositionRecords);
         // v24b: 恢复被 v23 清理逻辑误删的 asset-claim / asset-return 菜单
@@ -190,8 +209,12 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         versionTracker.applyOnce("core:notification-channel-refactor-v1", this::migrateNotificationChannel);
         // 以下为低成本兜底逻辑(无待迁移数据时仅 1~2 条查询), 每次启动保留执行
         migrateEmpIdToMF();
+        // 内置系统管理员账号自愈: 一次性迁移 core:builtin-admin-account-v1 的 verify 记版本后不再运行,
+        // 若 admin 在运行期被改名/工号化(历史事故: 唯一超管 username 变成 MFxxxxx, admin 登录提示账号不存在),
+        // 每次启动兜底恢复。必须紧随 migrateEmpIdToMF 之后、resetPasswordIfNeeded(按 username='admin' 查)之前
+        reconcileBuiltinAdminAccount();
         migrateDeptCodeToBM();
-        resetPasswordIfNeeded("MF00001", "111222");
+        resetPasswordIfNeeded(BuiltinAccounts.ADMIN_USERNAME, BUILTIN_BOOTSTRAP_PASSWORD);
         ensureDeptAdSalesPermission();
         fixAssetMenuGrouping();
         // v40: 菜单真值自愈（每次启动幂等）——名称正名/繁体化、空目录清理、sort 唯一化、
@@ -318,12 +341,172 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     /**
+     * 恢复独立的内置系统管理员账号 {@code admin}，并把存量超管（历史上是员工工号 MF00001）降级为普通账号。
+     * <p>
+     * 背景见 {@link BuiltinAccounts}。三步顺序经过刻意安排，任何一步失败都不会让系统失去超管：
+     * <ol>
+     *   <li>先建好/修复 {@code admin} 账号（密码继承存量超管的 BCrypt 哈希，不新增硬编码密钥）；</li>
+     *   <li>再把其余 {@code role='admin'} 的账号降级为 {@code guest}；</li>
+     *   <li>最后复用 {@link #dedupSuperAdminBindings()} 剥离降级账号 function_roles 里可能绑定的 admin 角色
+     *       ——否则它仍会走「绑定超管角色」这条直通路径（{@code PermissionServiceImpl.load}），降级形同虚设。</li>
+     * </ol>
+     * 降级改变了权限判定结果，必须 {@code evictAll()}（含全局 revision 递增，多副本实例下次读自动重载）。
+     * 失败不吞异常：applyOnce 不记版本，下次启动重试。
+     */
+    private void migrateBuiltinAdminAccount() {
+        boolean bootstrapped = ensureBuiltinAdminAccount();
+        int demoted = demoteLegacySuperAdmins();
+        dedupSuperAdminBindings();
+        if (demoted > 0 || bootstrapped) {
+            permissionService.evictAll();
+        }
+        log.info("内置系统管理员账号 [{}] 已就绪(引导密码={}), 存量超管降级 {} 个, 权限缓存已全局失效",
+                BuiltinAccounts.ADMIN_USERNAME, bootstrapped, demoted);
+    }
+
+    /**
+     * 确保 {@code admin} 系统账号存在且符合系统账号口径（无工号/无部门职位/超管/启用）。
+     * <p>
+     * 密码来源按优先级：
+     * <ol>
+     *   <li>账号已存在且密码是合法 BCrypt → 原样保留，不强制改密（避免重复迁移把人已改的密码又打上强制标记）；</li>
+     *   <li>继承存量超管（{@code role='admin'} 且非 admin）的密码哈希 → 当前管理员用原密码即可接管，
+     *       同时置 {@code must_change_password=1} 强制首登改密，把「两个账号共用一个密码」的窗口立即关掉；</li>
+     *   <li>全新库只有 {@code 01_init_system.sql} 的占位哈希（无可继承对象）→ 用引导密码兜底，同样强制首登改密。</li>
+     * </ol>
+     * 刻意不打印任何密码值或哈希（安全规范：日志脱敏）。
+     *
+     * @return true=本次写入了引导密码（占位符/无可继承哈希），false=密码来自继承或原有合法值
+     */
+    private boolean ensureBuiltinAdminAccount() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, password FROM sys_user WHERE username = ?", BuiltinAccounts.ADMIN_USERNAME);
+        if (!rows.isEmpty()) {
+            Map<String, Object> row = rows.get(0);
+            long id = ((Number) row.get("id")).longValue();
+            String password = (String) row.get("password");
+            // 复活软删残留并归一为系统账号口径；工号/部门/职位一律清空，防止被当成员工统计
+            jdbcTemplate.update("UPDATE sys_user SET role = 'admin', status = 1, deleted = 0, emp_id = NULL, "
+                            + "name = ?, department = NULL, department_id = NULL, position = NULL, position_id = NULL, "
+                            + "updated_by = ? WHERE id = ?",
+                    BuiltinAccounts.ADMIN_DISPLAY_NAME, BUILTIN_ADMIN_OPERATOR, id);
+            if (isValidBcrypt(password)) {
+                return false;
+            }
+            bootstrapPassword(id, true);
+            return true;
+        }
+        String inherited = lookupInheritablePasswordHash();
+        if (inherited != null) {
+            jdbcTemplate.update("INSERT INTO sys_user (username, password, name, emp_id, avatar, role, "
+                            + "department, position, status, deleted, must_change_password, updated_by) "
+                            + "VALUES (?, ?, ?, NULL, 'pikachu-default', 'admin', NULL, NULL, 1, 0, 1, ?)",
+                    BuiltinAccounts.ADMIN_USERNAME, inherited, BuiltinAccounts.ADMIN_DISPLAY_NAME,
+                    BUILTIN_ADMIN_OPERATOR);
+            return false;
+        }
+        Long id = insertBuiltinAdminShell();
+        bootstrapPassword(id, true);
+        return true;
+    }
+
+    /** 无可继承哈希时先落一行（password 列 NOT NULL，先占位再由 {@link #bootstrapPassword} 覆盖） */
+    private Long insertBuiltinAdminShell() {
+        jdbcTemplate.update("INSERT INTO sys_user (username, password, name, emp_id, avatar, role, "
+                        + "department, position, status, deleted, must_change_password, updated_by) "
+                        + "VALUES (?, ?, ?, NULL, 'pikachu-default', 'admin', NULL, NULL, 1, 0, 1, ?)",
+                BuiltinAccounts.ADMIN_USERNAME, "", BuiltinAccounts.ADMIN_DISPLAY_NAME, BUILTIN_ADMIN_OPERATOR);
+        Long id = jdbcTemplate.queryForObject("SELECT id FROM sys_user WHERE username = ?",
+                Long.class, BuiltinAccounts.ADMIN_USERNAME);
+        if (id == null) {
+            throw new IllegalStateException("内置系统管理员账号写入后回读缺失: " + BuiltinAccounts.ADMIN_USERNAME);
+        }
+        return id;
+    }
+
+    /** 写入引导密码（BCrypt）并置强制首登改密标记。失败抛出，不吞异常。 */
+    private void bootstrapPassword(long userId, boolean mustChangePassword) {
+        int updated = jdbcTemplate.update(
+                "UPDATE sys_user SET password = ?, must_change_password = ?, updated_by = ? WHERE id = ?",
+                passwordEncoder.encode(BUILTIN_BOOTSTRAP_PASSWORD), mustChangePassword ? 1 : 0,
+                BUILTIN_ADMIN_OPERATOR, userId);
+        if (updated != 1) {
+            throw new IllegalStateException("内置系统管理员账号引导密码写入失败: id=" + userId);
+        }
+    }
+
+    /**
+     * 取存量超管的密码哈希作为新系统账号的初始密码：不新增硬编码密钥，
+     * 且当前持有超管权限的人无需换密码即可接管 {@code admin}。
+     * 多个候选时按 id 升序取第一个合法哈希（口径确定、可重放）；无合法哈希返回 null。
+     */
+    private String lookupInheritablePasswordHash() {
+        List<String> hashes = jdbcTemplate.queryForList(
+                "SELECT password FROM sys_user WHERE LOWER(role) = 'admin' AND deleted = 0 AND username <> ? ORDER BY id",
+                String.class, BuiltinAccounts.ADMIN_USERNAME);
+        return hashes.stream().filter(this::isValidBcrypt).findFirst().orElse(null);
+    }
+
+    /**
+     * 把除内置系统账号以外的所有超管降级为普通账号。
+     * <p>只改 {@code sys_user.role}，不动 function_roles（角色绑定由随后的 dedup 统一收敛），
+     * 也不动姓名/部门/工号——它仍是可用员工账号，后续权限由 HR 在界面上按角色/部门正常授予。
+     */
+    private int demoteLegacySuperAdmins() {
+        return jdbcTemplate.update("UPDATE sys_user SET role = 'guest', updated_by = ? "
+                        + "WHERE LOWER(role) = 'admin' AND deleted = 0 AND username <> ?",
+                BUILTIN_ADMIN_OPERATOR, BuiltinAccounts.ADMIN_USERNAME);
+    }
+
+    /**
+     * 后置校验：存活超管必须唯一且就是内置系统账号 {@code admin}、处于启用状态、密码可登录。
+     * <p>校验不过 → applyOnce 不记版本、写失败审计、下次启动重试，杜绝「超管被降级但 admin 没建起来」的锁死态。
+     */
+    private void verifyBuiltinAdminAccount() {
+        List<Map<String, Object>> alive = jdbcTemplate.queryForList(
+                "SELECT username, password, status FROM sys_user WHERE LOWER(role) = 'admin' AND deleted = 0");
+        if (alive.size() != 1) {
+            throw new IllegalStateException("内置超管收敛未完成: 存活超管账号应为 1 个, 实际 " + alive.size());
+        }
+        Map<String, Object> admin = alive.get(0);
+        String username = admin.get("username") == null ? "" : String.valueOf(admin.get("username"));
+        if (!BuiltinAccounts.ADMIN_USERNAME.equalsIgnoreCase(username)) {
+            throw new IllegalStateException("存活超管账号不是内置系统账号 " + BuiltinAccounts.ADMIN_USERNAME
+                    + ", 实际为: " + username);
+        }
+        Object status = admin.get("status");
+        if (status == null || ((Number) status).intValue() != 1) {
+            throw new IllegalStateException("内置系统管理员账号处于停用状态, 无法登录接管");
+        }
+        if (!isValidBcrypt((String) admin.get("password"))) {
+            throw new IllegalStateException("内置系统管理员账号密码不是合法 BCrypt 值, 无法登录接管");
+        }
+        // 降级账号不得再经角色绑定拿到超管直通
+        verifySuperAdminDedup();
+    }
+
+    /** 是否合法 BCrypt 哈希（$2a/$2b/$2y 前缀且长度达标）；用于区分「真实密码」与 SQL 脚本里的占位符 */
+    private boolean isValidBcrypt(String hash) {
+        return hash != null && hash.startsWith("$2") && hash.length() >= 60;
+    }
+
+    /**
      * 存量工号迁移: 将所有非 MF 格式登录账号的员工(含逻辑删除记录)按 id 升序重编号为 MF00001+,
      * 登录账号与工号同步更新; 已是 MF 格式的记录不变, 重复启动幂等
+     * <p>
+     * <b>必须排除内置系统账号与超管</b>: 本方法每次启动执行, 而 {@code admin} 天然不匹配 {@code ^MF[0-9]+$},
+     * 不排除会在下次重启把系统管理员改名成 MFxxxxx —— 超管入口随之消失, 且工号序列被占位。
+     * 这正是历史上 {@code admin} 变成 {@code MF00001} 的原因。
+     * <p>
+     * 除 {@code username='admin'} 外, 还额外排除 {@code role='admin'} 的超管(双保险): 一旦内置 admin 的
+     * username 因任何原因丢失(被改成非 admin 值), 仅靠 username 排除会失效, 超管仍会被工号化;
+     * 而超管本就不是员工, 任何情况下都不应进入工号重编号。与 {@link #reconcileBuiltinAdminAccount()} 形成兜底闭环。
      */
     private void migrateEmpIdToMF() {
         List<Long> ids = jdbcTemplate.queryForList(
-                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MF[0-9]+$' ORDER BY id", Long.class);
+                "SELECT id FROM sys_user WHERE username NOT REGEXP '^MF[0-9]+$' AND username <> ? "
+                        + "AND LOWER(role) <> 'admin' ORDER BY id",
+                Long.class, BuiltinAccounts.ADMIN_USERNAME);
         if (ids.isEmpty()) {
             return;
         }
@@ -337,6 +520,42 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = ? WHERE id = ?", empId, empId, id);
         }
         log.info("已将 {} 个存量员工工号迁移为 MF 自增格式", ids.size());
+    }
+
+    /**
+     * 内置系统管理员账号自愈(每次启动执行, 不受 {@code core:builtin-admin-account-v1} 的 applyOnce 门控)。
+     * <p>
+     * 该迁移是一次性的: 首次执行并记版本后, 其 {@link #verifyBuiltinAdminAccount()} 不再运行。
+     * 一旦 {@code admin} 账号在运行期被改名/工号化(历史事故: 唯一存活超管的 username 变成 {@code MFxxxxx},
+     * 用 {@code admin} 登录命中不到、提示"账号不存在", 系统失去超管入口), 一次性迁移无法自愈。
+     * 本方法每次启动兜底, 与 {@link #migrateEmpIdToMF()} 排除超管形成双保险。
+     * <p>
+     * <b>保守边界</b>(避免误伤/越权): 仅当 username={@code admin} 完全不存在(含软删), 且恰好有 1 个存活
+     * 超管时, 才把它恢复为系统账号口径(username=admin, emp_id=NULL); 0 个或多个存活超管属异常态,
+     * 只告警不擅动, 交由人工介入。正常态直接返回, 幂等。刻意不打印密码/哈希(日志脱敏)。
+     */
+    private void reconcileBuiltinAdminAccount() {
+        Integer adminExists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = ?",
+                Integer.class, BuiltinAccounts.ADMIN_USERNAME);
+        if (adminExists != null && adminExists > 0) {
+            // 已存在 username=admin(含软删): 复活/归一交给一次性迁移的 ensureBuiltinAdminAccount, 此处不介入
+            return;
+        }
+        List<Map<String, Object>> alive = jdbcTemplate.queryForList(
+                "SELECT id, username FROM sys_user WHERE LOWER(role) = 'admin' AND deleted = 0 ORDER BY id");
+        if (alive.size() != 1) {
+            log.error("内置系统管理员账号异常: 无 username={} 的账号且存活超管为 {} 个, 需人工介入(不擅自改动)",
+                    BuiltinAccounts.ADMIN_USERNAME, alive.size());
+            return;
+        }
+        long id = ((Number) alive.get(0).get("id")).longValue();
+        String staleUsername = String.valueOf(alive.get(0).get("username"));
+        jdbcTemplate.update("UPDATE sys_user SET username = ?, emp_id = NULL, updated_by = ? WHERE id = ?",
+                BuiltinAccounts.ADMIN_USERNAME, BUILTIN_ADMIN_OPERATOR, id);
+        permissionService.evictAll();
+        log.warn("内置系统管理员账号被改名({}), 已自愈恢复为 {}: id={}",
+                staleUsername, BuiltinAccounts.ADMIN_USERNAME, id);
     }
 
     /**
@@ -1270,10 +1489,11 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * - 其余字段为空
      */
     private void backfillInitialPositionRecords() {
-        // 查询所有未删除的员工
+        // 查询所有未删除的员工（排除内置系统账号：它不是员工，不应拿到职务/入职记录）
         List<Map<String, Object>> users = jdbcTemplate.queryForList(
                 "SELECT id, department, position, position_en, sequence, job_level, `rank`, created_at "
-                        + "FROM sys_user WHERE deleted = 0");
+                        + "FROM sys_user WHERE deleted = 0 AND username <> ?",
+                BuiltinAccounts.ADMIN_USERNAME);
         if (users.isEmpty()) return;
 
         // 查询已有职务记录的 user_id 集合
@@ -1310,6 +1530,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                             + "VALUES (?, ?, 0, '入职', ?, ?, ?, ?, '中国', 0, NOW(), NOW())",
                     userId, effectiveDate,
                     serviceDept, sequenceType, positionLevel, rankCode);
+            // 刻意不写 operation_code：本方法在 @Order(5) 执行，早于 hr:effective-engine:v1.0（@Order(31)）
+            // 的加列与回填，先写会让首次启动报 Unknown column；插入后由该迁移回填成 ONBOARD。
             count++;
         }
         if (count > 0) {
@@ -3482,9 +3704,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         if (user == null) {
             return;
         }
-        String pwd = user.getPassword();
-        boolean validBcrypt = pwd != null && pwd.startsWith("$2") && pwd.length() >= 60;
-        if (!validBcrypt) {
+        if (!isValidBcrypt(user.getPassword())) {
             user.setPassword(passwordEncoder.encode(rawPassword));
             sysUserMapper.updateById(user);
             log.info("已初始化用户 [{}] 的默认密码", username);

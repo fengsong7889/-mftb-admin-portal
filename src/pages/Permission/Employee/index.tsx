@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
+import { Button, DatePicker, Dropdown, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DownOutlined, PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { Dayjs } from 'dayjs'
@@ -9,7 +9,8 @@ import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
   deleteEmployee,
-  fetchEmployees,
+  fetchRosterEmployees,
+  fetchRosterExport,
   resetEmployeePassword,
 } from '../../../api/employee'
 import type { EmployeeItem, EmployeeQuery } from '../../../api/employee'
@@ -20,6 +21,7 @@ import type { DepartmentItem } from '../../../api/department'
 import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
 import type { PositionItem } from '../../../api/position'
 import { exportToCSV } from '../../../utils/exportCSV'
+import EmploymentDiffModal from './EmploymentDiffModal'
 
 
 /** 员工在职状态枚举 */
@@ -28,8 +30,12 @@ const EMPLOYMENT_STATUS = {
   RESIGNED: 'resigned',
 } as const
 
-/** 内置管理员登录账号（工号，禁止停用/删除） */
-const BUILTIN_ADMIN = 'MF00001'
+/**
+ * 内置系统管理员登录账号（非员工工号）。
+ * 后端已把它排除在员工名册之外（EmployeeServiceImpl.list），正常不会出现在本列表；
+ * 此处仅作为前端兜底，禁止把它当员工档案删除/停用（后端会再校验一次）。
+ */
+const BUILTIN_ADMIN = 'admin'
 
 /** 查询表单值 */
 interface EmployeeSearchValues {
@@ -122,6 +128,12 @@ export default function EmployeeManagement() {
   const [roles, setRoles] = useState<RoleItem[]>([])
   // 功能权限校验（菜单 key: employee-management）
   const { hasPermission } = useAuth()
+  /**
+   * 雇佣数据核对清单（方案 §7.1 双轨阶段的唯一入口）。
+   * 它和「新增员工」不同级：不改人事数据，只把账号快照与任职事实对不上的地方列出来，
+   * 拿到 view 权就能看；但报告里的「登记」按钮只给持有 edit 的人（与后端 @RequirePermission 一致）。
+   */
+  const [diffModalOpen, setDiffModalOpen] = useState(false)
   // 部门列表（查询筛选）
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
   // 职位列表（查询筛选职级/职等选项）
@@ -142,7 +154,7 @@ export default function EmployeeManagement() {
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await fetchEmployees({
+      const result = await fetchRosterEmployees({
         page, size: pageSize, keyword, employmentStatus,
         departmentId: deptFilter, sequence: sequenceFilter, jobLevel: jobLevelFilter,
         rank: rankFilter, roleId: roleIdFilter, updatedBy: updatedByFilter,
@@ -296,49 +308,73 @@ export default function EmployeeManagement() {
     fetchRoleList()
   }
 
-  /** 导出全部符合筛选条件的记录（逐页拉取，避免只导出当前页） */
-  const handleExport = async () => {
-    const baseParams: EmployeeQuery = {
-      page: 1, size: 200, keyword, employmentStatus,
-      departmentId: deptFilter, sequence: sequenceFilter, jobLevel: jobLevelFilter,
-      rank: rankFilter, roleId: roleIdFilter, updatedBy: updatedByFilter,
-      updatedAtFrom: updatedAtRange?.[0], updatedAtTo: updatedAtRange?.[1],
-    }
-    setLoading(true)
-    let all: EmployeeItem[] = []
-    try {
-      let p = 1
-      // size 上限 200，逐页拉取直到覆盖 total（p>=50 为安全上限，防止异常时死循环）
-      for (;;) {
-        const res = await fetchEmployees({ ...baseParams, page: p })
-        all = all.concat(res.records)
-        if (res.records.length === 0 || all.length >= res.total || p >= 50) break
-        p += 1
-      }
-    } catch {
-      message.error(t('employee.noDataToExport'))
-      return
-    } finally {
-      setLoading(false)
-    }
-    if (all.length === 0) {
+  /**
+   * 导出列定义：三档导出共用，避免「屏幕上看到的列」与「导出的列」不一致。
+   */
+  const exportColumns = useMemo(() => [
+    { title: t('employee.colEmpId'), dataIndex: 'empId' },
+    { title: t('employee.colName'), dataIndex: 'name' },
+    { title: t('employee.colEmployerCompany'), dataIndex: 'employerCompany' },
+    { title: t('employee.colDepartment'), dataIndex: 'department' },
+    { title: t('employee.colPositionZh'), dataIndex: 'position' },
+    { title: t('employee.colEmployeeCategory'), dataIndex: 'employeeCategory' },
+    {
+      title: t('employee.employmentStatus'),
+      dataIndex: 'employmentStatus',
+      render: (v: string) => (v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive')),
+    },
+    {
+      title: t('employee.colProbation'),
+      dataIndex: 'probationStatus',
+      render: (v: string) => (v === 'REGULAR' ? t('employee.probationRegular')
+        : v === 'PROBATION' ? t('employee.probationInProgress') : t('employee.probationUnknown')),
+    },
+    {
+      // 导出不带来源标注，HR 就会把未核实的行当真数用；两列一起带走
+      title: t('employee.colHireDate'),
+      dataIndex: 'hireDate',
+      render: (v: string, row: EmployeeItem) => v || `${t('employee.hireDateUnverified')}（${row.hireDateSource ?? ''}）`,
+    },
+    { title: t('employee.colWorkLocation'), dataIndex: 'workLocation' },
+    { title: t('employee.colDirectSuperior'), dataIndex: 'directSuperior' },
+    { title: t('employee.colPositionEn'), dataIndex: 'positionEn' },
+    { title: t('employee.colSequence'), dataIndex: 'sequence' },
+    { title: t('employee.colJobLevel'), dataIndex: 'jobLevel' },
+    { title: t('employee.colRank'), dataIndex: 'rank' },
+    { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
+    { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
+  ], [t])
+
+  const downloadRows = (rows: EmployeeItem[], fileName: string) => {
+    if (rows.length === 0) {
       message.warning(t('employee.noDataToExport'))
       return
     }
-    const exportColumns = [
-      { title: t('employee.colEmpId'), dataIndex: 'empId' },
-      { title: t('employee.colName'), dataIndex: 'name' },
-      { title: t('employee.colDepartment'), dataIndex: 'department' },
-      { title: t('employee.colPositionZh'), dataIndex: 'position' },
-      { title: t('employee.colPositionEn'), dataIndex: 'positionEn' },
-      { title: t('employee.colSequence'), dataIndex: 'sequence' },
-      { title: t('employee.colJobLevel'), dataIndex: 'jobLevel' },
-      { title: t('employee.colRank'), dataIndex: 'rank' },
-      { title: t('employee.employmentStatus'), dataIndex: 'employmentStatus', render: (v: string) => v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive') },
-      { title: t('employee.colUpdatedBy'), dataIndex: 'updatedBy' },
-      { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
-    ]
-    exportToCSV(t('employee.pageTitle'), exportColumns, all)
+    exportToCSV(fileName, exportColumns, rows)
+  }
+
+  const currentFilterParams: Omit<EmployeeQuery, 'page' | 'size'> = {
+    keyword, employmentStatus,
+    departmentId: deptFilter, sequence: sequenceFilter, jobLevel: jobLevelFilter,
+    rank: rankFilter, roleId: roleIdFilter, updatedBy: updatedByFilter,
+    updatedAtFrom: updatedAtRange?.[0], updatedAtTo: updatedAtRange?.[1],
+  }
+
+  /**
+   * 导出全部筛选结果：一次请全量而不是逐页拼（方案 §5.1）。
+   * 服务端会按当前人员范围收敛、卡单次上限并落一条 ROSTER_EXPORT 审计。
+   */
+  const handleExportAll = async () => {
+    setLoading(true)
+    try {
+      const rows = await fetchRosterExport(currentFilterParams)
+      downloadRows(rows, t('employee.pageTitle'))
+    } catch {
+      // 超上限/无权限都以后端文案为准（request 拦截器已弹），这里不假装成功
+      message.error(t('employee.exportFailed'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   /** 根据角色ID渲染角色名称标签（单行展示，禁止换行） */
@@ -359,8 +395,47 @@ export default function EmployeeManagement() {
   const columns: TableColumnsType<EmployeeItem> = [
     { title: t('employee.colEmpId'), dataIndex: 'empId', key: 'empId', width: 100 },
     { title: t('employee.colName'), dataIndex: 'name', key: 'name', width: 100 },
+    // 默认列按方案 §5.1 的顺序：工号·姓名·雇主法人·部门·职位·人员类别·在职·试用·入职日·工作地点·直属上级
+    // 其余（职位英文名/序列/职等/职级/授权列/更新人/时间）保留为可配置列，由列配置面板控制是否展示
+    { title: t('employee.colEmployerCompany'), dataIndex: 'employerCompany', key: 'employerCompany', width: 180, render: (v: string) => v || '-' },
     { title: t('employee.colDepartment'), dataIndex: 'department', key: 'department', width: 140, render: (v: string) => v || '-' },
     { title: t('employee.colPositionZh'), dataIndex: 'position', key: 'position', width: 140, render: (v: string) => v || '-' },
+    { title: t('employee.colEmployeeCategory'), dataIndex: 'employeeCategory', key: 'employeeCategory', width: 110, render: (v: string) => v || '-' },
+    {
+      title: t('employee.employmentStatus'),
+      dataIndex: 'employmentStatus',
+      key: 'employmentStatus',
+      width: 90,
+      render: (v: string) => (
+        <Tag color={v === 'resigned' ? 'default' : 'success'}>
+          {v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('employee.colProbation'),
+      dataIndex: 'probationStatus',
+      key: 'probationStatus',
+      width: 100,
+      // UNKNOWN 不是「没数据」的遮羞布，而是正确的答案：没转正记录不等于还在试用期
+      render: (v: string) => {
+        if (v === 'REGULAR') return <Tag color="success">{t('employee.probationRegular')}</Tag>
+        if (v === 'PROBATION') return <Tag color="processing">{t('employee.probationInProgress')}</Tag>
+        return <Tag color="default">{t('employee.probationUnknown')}</Tag>
+      },
+    },
+    {
+      title: t('employee.colHireDate'),
+      dataIndex: 'hireDate',
+      key: 'hireDate',
+      width: 150,
+      // 来源跟在同一格：只给日期不给来源，HR 会把「任职登记日」当成已核实的真实入职日
+      render: (v: string | null, record: EmployeeItem) => (v
+        ? <span style={{ whiteSpace: 'nowrap' }}>{v}<Tag style={{ marginLeft: 6 }}>{t(`employee.hireSource.${record.hireDateSource ?? 'UNVERIFIED'}`)}</Tag></span>
+        : <Tag color="warning">{t('employee.hireDateUnverified')}</Tag>),
+    },
+    { title: t('employee.colWorkLocation'), dataIndex: 'workLocation', key: 'workLocation', width: 110, render: (v: string) => v || '-' },
+    { title: t('employee.colDirectSuperior'), dataIndex: 'directSuperior', key: 'directSuperior', width: 110, render: (v: string) => v || '-' },
     { title: t('employee.colPositionEn'), dataIndex: 'positionEn', key: 'positionEn', width: 170, render: (v: string) => v || '-' },
     {
       title: t('employee.colSequence'),
@@ -395,17 +470,6 @@ export default function EmployeeManagement() {
       },
     },
     {
-      title: t('employee.employmentStatus'),
-      dataIndex: 'employmentStatus',
-      key: 'employmentStatus',
-      width: 90,
-      render: (v: string) => (
-        <Tag color={v === 'resigned' ? 'default' : 'success'}>
-          {v === 'resigned' ? t('employee.statusResigned') : t('employee.statusActive')}
-        </Tag>
-      ),
-    },
-    {
       title: t('employee.colUpdatedBy'),
       dataIndex: 'updatedBy',
       key: 'updatedBy',
@@ -427,12 +491,14 @@ export default function EmployeeManagement() {
         const isBuiltinAdmin = record.username === BUILTIN_ADMIN
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
-            {hasPermission('employee-management:edit') && (
+            {/* 详情是只读入口，只看权（view）就该能进；旧实现挂在 edit 上，
+                导致花名册读者点不到详情，只能靠授权人临时给编辑权。 */}
+            {hasPermission('employee-management:view') && (
               <Button type="link" size="small" onClick={() => handleEdit(record)}>
                 詳情
               </Button>
             )}
-            {hasPermission('employee-management:edit') && (
+            {hasPermission('employee-management:accountEdit') && (
               <Button type="link" size="small" onClick={() => handleOpenResetPwd(record)}>
                 {t('employee.resetPassword')}
               </Button>
@@ -528,7 +594,36 @@ export default function EmployeeManagement() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('common.export')}</Button>
+          {/* 三档导出（方案 §5.1）：当前页与选中项在本地落文件，全部筛选结果走服务端且需单独 export 授权 */}
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'page', label: t('employee.exportCurrentPage') },
+                ...(selectedRowKeys.length > 0
+                  ? [{ key: 'selected', label: t('employee.exportSelected', { count: selectedRowKeys.length }) }]
+                  : []),
+                ...(hasPermission('employee-management:export')
+                  ? [{ key: 'all', label: t('employee.exportAllFiltered') }]
+                  : []),
+              ],
+              onClick: ({ key }) => {
+                if (key === 'page') downloadRows(dataSource, t('employee.pageTitle'))
+                if (key === 'selected') {
+                  downloadRows(dataSource.filter(row => selectedRowKeys.includes(row.id)), t('employee.pageTitle'))
+                }
+                if (key === 'all') void handleExportAll()
+              },
+            }}
+          >
+            <Button className="btn-export" icon={<ExportOutlined />} loading={loading}>
+              {t('common.export')} <DownOutlined />
+            </Button>
+          </Dropdown>
+          {hasPermission('employee-management:view') && (
+            <Button icon={<SafetyCertificateOutlined />} onClick={() => setDiffModalOpen(true)}>
+              {t('hrEmployment.open')}
+            </Button>
+          )}
         </div>
         <div className="action-section-right">
           {hasPermission('employee-management:create') && (
@@ -590,6 +685,12 @@ export default function EmployeeManagement() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <EmploymentDiffModal
+        open={diffModalOpen}
+        onClose={() => setDiffModalOpen(false)}
+        canRegister={hasPermission('employee-management:edit')}
+      />
     </div>
   )
 }

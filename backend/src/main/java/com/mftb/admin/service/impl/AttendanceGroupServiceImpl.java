@@ -18,9 +18,11 @@ import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AttendanceGroupService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.AttendanceWriteGuard;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.ScopeFilters;
 import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,6 +70,7 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
     private final SysUserMapper sysUserMapper;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public PageResult<AttendanceGroupVO> list(long page, long size, String keyword, Integer groupType, String status,
@@ -146,9 +149,13 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
     public AttendanceGroupVO detail(Long id) {
         AttGroup group = requireGroup(id);
         String shiftName = group.getShiftId() == null ? null : shiftName(group.getShiftId());
-        long count = memberMapper.selectCount(new LambdaQueryWrapper<AttGroupMember>()
+        // 人数与成员清单同口径：不收敛的话，详情头显示「12 人」而成员页一条都没有，
+        // 用户会当成数据坏了而不是权限不够。
+        LambdaQueryWrapper<AttGroupMember> countWrapper = new LambdaQueryWrapper<AttGroupMember>()
                 .eq(AttGroupMember::getGroupId, id)
-                .isNull(AttGroupMember::getValidTo));
+                .isNull(AttGroupMember::getValidTo);
+        ScopeFilters.applyUsers(countWrapper, AttGroupMember::getUserId, orgScopeService.resolveVisibleUserIds());
+        long count = memberMapper.selectCount(countWrapper);
         return AttendanceGroupVO.of(group, shiftName, count);
     }
 
@@ -217,10 +224,12 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
     @Override
     public List<AttGroupMember> currentMembers(Long groupId) {
         requireGroup(groupId);
-        return memberMapper.selectList(new LambdaQueryWrapper<AttGroupMember>()
+        LambdaQueryWrapper<AttGroupMember> wrapper = new LambdaQueryWrapper<AttGroupMember>()
                 .eq(AttGroupMember::getGroupId, groupId)
-                .isNull(AttGroupMember::getValidTo)
-                .orderByAsc(AttGroupMember::getEmpNo));
+                .isNull(AttGroupMember::getValidTo);
+        // 成员名单就是「谁属于哪个考勤组」的人员维信息，按可见人员收敛
+        ScopeFilters.applyUsers(wrapper, AttGroupMember::getUserId, orgScopeService.resolveVisibleUserIds());
+        return memberMapper.selectList(wrapper.orderByAsc(AttGroupMember::getEmpNo));
     }
 
     @Override
@@ -232,6 +241,9 @@ public class AttendanceGroupServiceImpl implements AttendanceGroupService {
         if (target.contains(null)) {
             throw new BusinessException("成員清單存在空值");
         }
+        // 把人拉进考勤组是跨人写入：逐个校验目标人员在可见范围内。
+        // 当前名单走已收敛的 currentMembers()，所以「范围外的人」既不会被看见，也不会被误闭合。
+        target.forEach(orgScopeService::requireVisibleUser);
 
         List<AttGroupMember> current = currentMembers(groupId);
         Set<Long> currentIds = current.stream().map(AttGroupMember::getUserId).collect(Collectors.toSet());

@@ -26,7 +26,6 @@ import {
   AccountBookOutlined,
   // 会议管理（meeting）菜单兜底图标：后端菜单树未返回 icon 时仍能渲染，
   // check-menu-consistency 会逐字比对这里与 sys_menu.icon
-  VideoCameraOutlined,
   UsergroupAddOutlined,
   PlusSquareOutlined,
   LayoutOutlined,
@@ -622,8 +621,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'attendance-monthly':    <PayCircleOutlined />,
   'attendance-setting':    <FunctionOutlined />,
   // 会议管理系统（独立入口，菜单归属 sys_menu.system_code=meeting）
-  // 两个一级菜单：會議中心（使用侧）与會議治理（行政侧），图标必须与后端 v1.2 迁移写入的一致
-  'meeting-management':  <VideoCameraOutlined />,
+  // v1.3 拍平后使用侧两张一级菜单（我的會議/會議室預約）+ 會議治理分组，图标必须与后端迁移写入的一致
   'meeting-admin':       <MonitorOutlined />,
   'meeting-my':          <UsergroupAddOutlined />,
   'meeting-booking':     <PlusSquareOutlined />,

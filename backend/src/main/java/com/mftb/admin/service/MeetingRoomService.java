@@ -49,8 +49,11 @@ public interface MeetingRoomService {
     /** 预约页房间候选（只返回可预约且启用的房间，携带生效规则便于前端预校验） */
     List<MeetingRoomDto.VO> bookableOptions();
 
-    /** 园区清单（筛选项数据源，避免前端硬编码园区名） */
-    List<String> campuses();
+    /** 城市清单（筛选项与表单候选数据源，避免前端硬编码城市名） */
+    List<String> cities();
+
+    /** 园区清单；传城市则只返回该城市下的园区 */
+    List<String> campuses(String city);
 
     /** 指定园区下的楼栋清单 */
     List<String> buildings(String campus);

@@ -56,7 +56,7 @@ class AttendanceExceptionServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceExceptionServiceImpl(exceptionMapper, leaveMapper, punchService, summaryService,
-                operatorResolver);
+                operatorResolver, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
     }
 

@@ -33,6 +33,9 @@ public class MeetingRoom {
 
     private String roomName;
 
+    /** 所在城市：跨城办公场景下防订错；档案列 NOT NULL DEFAULT ''，空串=未填 */
+    private String city;
+
     private String campus;
 
     private String building;

@@ -18,7 +18,10 @@ public class PositionRecordVO {
     // 变动信息
     private LocalDate effectiveDate;
     private Integer effectiveSeq;
+    /** 动作名称快照（展示用；判定看 {@link #operationCode}） */
     private String operation;
+    /** 异动动作 code（{@link com.mftb.admin.constant.HrOperationCode}）；历史未回填时可能为 null */
+    private String operationCode;
     private String reason;
 
     // 任职信息
@@ -51,6 +54,7 @@ public class PositionRecordVO {
         vo.setEffectiveDate(entity.getEffectiveDate());
         vo.setEffectiveSeq(entity.getEffectiveSeq());
         vo.setOperation(entity.getOperation());
+        vo.setOperationCode(entity.getOperationCode());
         vo.setReason(entity.getReason());
         vo.setServiceDept(entity.getServiceDept());
         vo.setSequenceType(entity.getSequenceType());

@@ -97,7 +97,7 @@ class AttendanceSummaryFreezeTest {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceSummaryServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper,
                 punchMapper, exceptionMapper, dayMapper, monthlyMapper, holidayMapper, leaveMapper,
-                bizSeqService, operatorResolver, sysConfigService);
+                bizSeqService, operatorResolver, sysConfigService, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
         // 口径参数未配置：引擎必须回退默认值而不是抛错（定时任务里没人能看到异常）
         when(sysConfigService.getConfigValueCached(anyString())).thenReturn(null);

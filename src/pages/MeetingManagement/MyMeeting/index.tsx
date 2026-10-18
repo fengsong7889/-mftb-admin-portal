@@ -1,26 +1,25 @@
 /**
- * 我的会议（会议管理 → 會議中心 → 我的會議）
+ * 我的会议（会议管理 → 我的會議，v1.3 拍平后为一级菜单）
  *
- * 三个入口共用同一批接口，只是范围参数不同：
- *   - 今日日程：GET /meeting/my/schedule?date= （组织者也是参会人行，一次 JOIN 覆盖我发起+我参与）
- *   - 分页清单：GET /meeting/bookings?scope=mine|attended&group=pending|ongoing|done
- *   - 顶部摘要：GET /meeting/my/summary（首页工作台卡片复用）
- *
- * 「待我響應」只列我作为参会人且尚未表态的邀约：组织者不该给自己响应，外部人无账号，
- * 这一条判定由服务端给出，前端不重复实现（重复一次就多一处会漂移的口径）。
+ * 列表与日历共用同一批接口，只是范围参数与呈现形态不同：
+ *   - 分页清单 / 日历月取数：GET /meeting/bookings?scope=mine|attended&group=...
+ *     （日历在列表口径之上再加 from/to 月份窗，复用重叠语义）
+ *   - 顶部摘要：GET /meeting/my/summary（首页工作台卡片与本頁统计卡复用）
  *
  * 界面口径：
- *   1. 「日程日期」只影响上方的今日日程面板，不影响下方列表——所以它放在日程面板里，
- *      不放进搜索区：混在搜索区会让人以为改了日期表格也会跟着变；
- *   2. Tab 属于筛选的一部分，紧贴搜索区；统计卡片在其后（§E.8）；
- *   3. 取消必填原因，写入审计并附在通知里。
+ *   1. 默认日历视图，列表只是呈现形态切换，口径不变；
+ *   2. Tab 属于筛选的一部分，紧贴搜索区，统计卡片在其后（§E.8）；「我參與的」为默认 Tab，
+ *      我发起的与我被邀请的会议一并列在其中；
+ *   3. 只要会议没开始（phase=pending），参会人就能确认或婉拒参会，且开始前可改表态：
+ *      后端 respond 接口本就允许覆盖响应，前端只收窄按钮展示窗口、不放宽；
+ *   4. 取消必填原因，写入审计并附在通知里。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, Tabs, Tag, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  CalendarOutlined, FolderOpenOutlined, HourglassOutlined, NotificationOutlined,
-  PlusOutlined, ReloadOutlined, SearchOutlined,
+  CalendarOutlined, FolderOpenOutlined, HourglassOutlined, LeftOutlined, NotificationOutlined,
+  PlusOutlined, ReloadOutlined, RightOutlined, SearchOutlined, UnorderedListOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
@@ -31,10 +30,9 @@ import {
   fetchMeetings,
   finishMeeting,
   fetchMyMeetingSummary,
-  fetchMySchedule,
   respondMeeting,
+  toMeetingIso,
   type MeetingQuery,
-  type MeetingScheduleVO,
   type MeetingStats,
   type MeetingVO,
 } from '../../../api/meeting'
@@ -42,8 +40,33 @@ import { phaseMeta, statusMeta } from '../meetingMeta'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import './index.css'
 
 const EMPTY_STATS: MeetingStats = { total: 0, pending: 0, ongoing: 0, finished: 0, cancelled: 0, released: 0 }
+
+/**
+ * 日历圆点色：与 phaseMeta 的 Tag 语义一一对应（蓝=待開會、品牌橙=進行中、绿=已结束、
+ * 灰=已取消、警告橙=已釋放），色值全部取自设计令牌（§A.1），不引新色。
+ */
+const PHASE_DOT: Record<string, string> = {
+  pending: '#1890FF',
+  ongoing: '#E8720C',
+  ended: '#52C41A',
+  finished: '#52C41A',
+  cancelled: '#D9D9D9',
+  released: '#FA8C16',
+}
+
+/** 图例只列会出现在格子上的五种阶段态 */
+const CALENDAR_LEGEND_PHASES = ['pending', 'ongoing', 'ended', 'cancelled', 'released']
+
+const phaseDot = (phase?: string | null): string => PHASE_DOT[phase ?? ''] ?? '#D9D9D9'
+
+/** 日历会议条样式变体：finished 与 ended 共用绿色变体，未知阶段回落待開會 */
+const phaseChipVariant = (phase?: string | null): string => {
+  if (phase === 'finished') return 'ended'
+  return phase && phase in PHASE_DOT ? phase : 'pending'
+}
 
 /** 列配置元数据（§E.3）：时间锁头、操作锁尾 */
 const COLUMN_META = (t: TFunction) => [
@@ -60,10 +83,9 @@ const COLUMN_META = (t: TFunction) => [
 export default function MyMeeting() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [day, setDay] = useState<Dayjs>(dayjs())
-  const [agenda, setAgenda] = useState<MeetingScheduleVO[]>([])
   const [summary, setSummary] = useState({ todayCount: 0, upcomingCount: 0, pendingResponseCount: 0 })
-  const [tab, setTab] = useState<'todo' | 'mine' | 'attended' | 'done'>('todo')
+  // 默认 Tab 为「我參與的」：我发起的与我被邀请的会议一并列在其中，不再单设「待我響應」入口
+  const [tab, setTab] = useState<'mine' | 'attended' | 'done'>('attended')
   const [rows, setRows] = useState<MeetingVO[]>([])
   const [stats, setStats] = useState<MeetingStats>(EMPTY_STATS)
   const [total, setTotal] = useState(0)
@@ -71,25 +93,30 @@ export default function MyMeeting() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [form] = Form.useForm()
+  // 视图模式：列表表格 vs 月历，默认日历视图。日历复用同一批筛选口径，两个视图的数字永远对得上
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('calendar')
+  // 选中日与面板月共用一个值：点日期既切当日日程，也驱动面板所在月
+  const [calValue, setCalValue] = useState<Dayjs>(dayjs())
+  const [calRows, setCalRows] = useState<MeetingVO[]>([])
+  const [calLoading, setCalLoading] = useState(false)
 
   const { configComponent, applyConfig } = useColumnConfig('meeting-my', COLUMN_META(t), [
     { key: 'timeText', visible: true, locked: 'head' },
     { key: 'action', visible: true, locked: 'tail' },
   ])
 
-  const loadAgenda = useCallback(async () => {
+  const loadSummary = useCallback(async () => {
     try {
-      const [list, sum] = await Promise.all([fetchMySchedule(day.format('YYYY-MM-DD')), fetchMyMeetingSummary()])
-      setAgenda(list ?? [])
+      const sum = await fetchMyMeetingSummary()
       setSummary({
         todayCount: sum.todayCount ?? 0,
         upcomingCount: sum.upcomingCount ?? 0,
         pendingResponseCount: sum.pendingResponseCount ?? 0,
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe3', { defaultValue: '日程加載失敗' }))
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadData', { defaultValue: '數據加載失敗' }))
     }
-  }, [day])
+  }, [])
 
   const loadList = useCallback(async () => {
     setLoading(true)
@@ -107,12 +134,62 @@ export default function MyMeeting() {
     }
   }, [tab, query])
 
-  useEffect(() => { void loadAgenda() }, [loadAgenda])
+  // 日历月取数口径 = 列表口径 + 月份窗：后端 from/to 是重叠语义（end_time >= from AND start_time <= to），
+  // size 取分页上限 200；单月超上限属于异常数据量，日历不再为其做二次分页
+  const calMonthKey = calValue.format('YYYY-MM')
+  const loadCalendar = useCallback(async () => {
+    setCalLoading(true)
+    try {
+      const month = dayjs(`${calMonthKey}-01`)
+      const scoped = buildQuery(tab, { page: 1, size: 200, keyword: query.keyword, group: query.group })
+      const res = await fetchMeetings({
+        ...scoped,
+        from: toMeetingIso(month.startOf('month')),
+        to: toMeetingIso(month.endOf('month')),
+      })
+      setCalRows(res.page?.records ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe4', { defaultValue: '會議列表加載失敗' }))
+    } finally {
+      setCalLoading(false)
+    }
+  }, [calMonthKey, tab, query.keyword, query.group])
+
+  useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => { void loadList() }, [loadList])
+  useEffect(() => { if (viewMode === 'calendar') void loadCalendar() }, [loadCalendar, viewMode])
 
-  const refresh = () => { void loadAgenda(); void loadList() }
+  /** 按开始日期分组并排序：月历格子与当日日程面板共用这一份，不各自再算一遍 */
+  const calByDate = useMemo(() => {
+    const map: Record<string, MeetingVO[]> = {}
+    for (const row of calRows) {
+      const key = row.startTime.slice(0, 10)
+      if (!map[key]) map[key] = []
+      map[key].push(row)
+    }
+    for (const list of Object.values(map)) list.sort((a, b) => a.startTime.localeCompare(b.startTime))
+    return map
+  }, [calRows])
 
-  const statsKey = useMemo(() => `${tab}-${JSON.stringify(query)}`, [tab, query])
+  /** 6 周 × 7 天固定网格、週日开头：手工推算不依赖 dayjs locale，表头与格子不会错位 */
+  const calCells = useMemo(() => {
+    const first = dayjs(`${calMonthKey}-01`)
+    const start = first.subtract(first.day(), 'day')
+    return Array.from({ length: 42 }, (_, i) => start.add(i, 'day'))
+  }, [calMonthKey])
+
+  const weekdays = t('meeting.calendarWeekdays', { returnObjects: true }) as string[]
+  const dayList = calByDate[calValue.format('YYYY-MM-DD')] ?? []
+
+  // 操作后的刷新必须覆盖日历：否则在当日日程里响应邀约后，网格上的标签还是旧状态
+  const refresh = () => {
+    void loadSummary()
+    void loadList()
+    if (viewMode === 'calendar') void loadCalendar()
+  }
+
+  // 口径快照带上视图与月份：翻月/切视图时统计卡重挂载、重跑计数动画（§E.8）
+  const statsKey = useMemo(() => `${tab}-${JSON.stringify(query)}-${viewMode}-${calMonthKey}`, [tab, query, viewMode, calMonthKey])
 
   const search = () => {
     const values = form.getFieldsValue()
@@ -219,6 +296,30 @@ export default function MyMeeting() {
     })
   }
 
+  /** 操作集合由列表操作列与日历当日日程行共用：只留一份，两个入口的按钮显隐口径不会漂移 */
+  const renderActions = (record: MeetingVO) => (
+    // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作（取消）在最后
+    <Space size={0} wrap split={<span className="action-split">|</span>}>
+      <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
+      {/* 没开始就能确认或婉拒，且开始前可改表态：只看 phase，不看已有响应 */}
+      {record.myRole !== 'organizer' && record.myRole !== 'none' && record.phase === 'pending' && (
+        <>
+          <Button type="link" size="small" onClick={() => void handleRespond(record, true)}>{t('meeting.accept', { defaultValue: '接受' })}</Button>
+          <Button type="link" size="small" onClick={() => void handleRespond(record, false)}>{t('meeting.decline', { defaultValue: '婉拒' })}</Button>
+        </>
+      )}
+      {record.canCheckin && (
+        <Button type="link" size="small" onClick={() => void act(record.id, checkinMeeting, t('meeting.checkedIn', { defaultValue: '已簽到' }))}>{t('meeting.checkIn', { defaultValue: '簽到' })}</Button>
+      )}
+      {record.canFinish && (
+        <Button type="link" size="small" onClick={() => handleFinish(record)}>{t('meeting.finishEarly', { defaultValue: '提前結束' })}</Button>
+      )}
+      {record.canCancel && (
+        <Button type="link" size="small" danger onClick={() => handleCancel(record)}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
+      )}
+    </Space>
+  )
+
   const columns: TableColumnsType<MeetingVO> = [
     {
       title: t('meeting.time', { defaultValue: '時間' }), key: 'timeText', width: 200, fixed: 'left',
@@ -269,41 +370,12 @@ export default function MyMeeting() {
     },
     {
       title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 300, fixed: 'right',
-      // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作（取消）在最后
-      render: (_, record) => (
-        <Space size={0} wrap split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
-          {record.myRole !== 'organizer' && record.status === 'booked' && record.myResponse === 'pending' && (
-            <>
-              <Button type="link" size="small" onClick={() => void handleRespond(record, true)}>{t('meeting.accept', { defaultValue: '接受' })}</Button>
-              <Button type="link" size="small" onClick={() => void handleRespond(record, false)}>{t('meeting.decline', { defaultValue: '婉拒' })}</Button>
-            </>
-          )}
-          {record.canCheckin && (
-            <Button type="link" size="small" onClick={() => void act(record.id, checkinMeeting, t('meeting.checkedIn', { defaultValue: '已簽到' }))}>{t('meeting.checkIn', { defaultValue: '簽到' })}</Button>
-          )}
-          {record.canFinish && (
-            <Button type="link" size="small" onClick={() => handleFinish(record)}>{t('meeting.finishEarly', { defaultValue: '提前結束' })}</Button>
-          )}
-          {record.canCancel && (
-            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
-          )}
-        </Space>
-      ),
+      render: (_, record) => renderActions(record),
     },
   ]
 
   return (
     <div className="content-area">
-      {/* 页面说明横幅：把"我能看到什么、能做什么"写在最前面，减少权限相关的答疑 */}
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={t('meeting.onlyMeetingsRelatedTo', { defaultValue: '這裡只顯示與你相關的會議：你發起的、你被邀請的' })}
-        description={t('meeting.theOrganizerCanReschedule', { defaultValue: '組織者可改期與取消，參會人僅能響應邀約、簽到與查看。開啟簽到保留的會議，開始後超過保留分鐘未簽到將被行政或系統釋放。' })}
-      />
-
       {error && (
         <Alert
           type="error"
@@ -314,34 +386,6 @@ export default function MyMeeting() {
           action={<Button size="small" icon={<ReloadOutlined />} onClick={refresh}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
         />
       )}
-
-      {/* 今日日程：日期选择器放在面板内，因为它只影响这块，不影响下方列表 */}
-      <div style={{ marginBottom: 16, padding: '12px 16px', background: '#FAFAFA', border: '1px solid #F0F0F0', borderRadius: 8 }}>
-        <Space style={{ marginBottom: 8 }} wrap>
-          <strong style={{ fontSize: 13, color: '#262626' }}>{t('meeting.mySchedule', { defaultValue: '我的日程' })}</strong>
-          <DatePicker value={day} allowClear={false} size="small"
-            disabledDate={current => !!current && current < dayjs().startOf('day')}
-            onChange={value => value && setDay(value)} />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.sessionCount', { count: agenda.length, defaultValue: '{{count}} 場' })}</span>
-        </Space>
-        {agenda.length === 0 ? (
-          <div style={{ color: '#8C8C8C', fontSize: 12 }}>{t('meeting.noMeetingRelatedTo', { defaultValue: '這一天沒有與你相關的會議' })}</div>
-        ) : (
-          <Space direction="vertical" size={4} style={{ width: '100%' }}>
-            {agenda.map(item => (
-              <Space key={item.bookingId} size={8} wrap>
-                <span style={{ fontSize: 12, color: '#595959', minWidth: 110 }}>
-                  {item.startTime.slice(11, 16)}–{item.endTime.slice(11, 16)}
-                </span>
-                <a onClick={() => navigate(`/meeting-detail?id=${item.bookingId}`)}>{item.title}</a>
-                <span style={{ fontSize: 12, color: '#8C8C8C' }}>{item.roomName}</span>
-                <Tag color={phaseMeta(item.phase).color}>{phaseMeta(item.phase).label}</Tag>
-                {item.myResponse === 'pending' && <Tag color="orange">{t('meeting.pendingResponse', { defaultValue: '待響應' })}</Tag>}
-              </Space>
-            ))}
-          </Space>
-        )}
-      </div>
 
       <div className="search-section">
         <Form form={form} layout="inline" initialValues={{ group: query.group ?? 'all' }}>
@@ -372,10 +416,18 @@ export default function MyMeeting() {
       <Tabs
         activeKey={tab}
         onChange={key => { setTab(key as typeof tab); setQuery(q => ({ ...q, page: 1 })) }}
+        // 视图切换放 Tab 栏右侧：它是呈现形态开关而非筛选口径，不占操作区（§E.2 只允许新增与列配置）
+        tabBarExtraContent={
+          <Segmented
+            value={viewMode}
+            onChange={value => setViewMode(value as 'list' | 'calendar')}
+            options={[
+              { value: 'list', label: t('meeting.listView', { defaultValue: '列表視圖' }), icon: <UnorderedListOutlined /> },
+              { value: 'calendar', label: t('meeting.calendarView', { defaultValue: '日曆視圖' }), icon: <CalendarOutlined /> },
+            ]}
+          />
+        }
         items={[
-          { key: 'todo', label: summary.pendingResponseCount
-            ? `${t('meeting.waitingForMe', { defaultValue: '待我響應' })}（${summary.pendingResponseCount}）`
-            : t('meeting.waitingForMe', { defaultValue: '待我響應' }) },
           { key: 'mine', label: t('meeting.organizedByMe', { defaultValue: '我發起的' }) },
           { key: 'attended', label: t('meeting.iAttend', { defaultValue: '我參與的' }) },
           { key: 'done', label: t('meeting.finished2', { defaultValue: '已結束' }) },
@@ -386,7 +438,10 @@ export default function MyMeeting() {
         { icon: <CalendarOutlined />, color: '#1890FF', bg: '#E6F7FF', value: summary.todayCount, label: t('meeting.today', { defaultValue: '今日會議' }), hint: t('meeting.organizedByMePlus', { defaultValue: '我發起 + 我參與，按開始日期統計' }) },
         { icon: <HourglassOutlined />, color: '#E8720C', bg: '#FFF7E6', value: summary.upcomingCount, label: t('meeting.meetingsInTheNext', { defaultValue: '未來 7 天會議' }) },
         { icon: <NotificationOutlined />, color: '#722ED1', bg: '#F9F0FF', value: summary.pendingResponseCount, label: t('meeting.waitingForMe', { defaultValue: '待我響應' }) },
-        { icon: <FolderOpenOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.total, label: t('meeting.meetingsUnderCurrentFilters', { defaultValue: '當前條件會議數' }) },
+        // 日历态第 4 卡切当月口径：用户眼里是月网格，卡片不能再报全量合计
+        viewMode === 'calendar'
+          ? { icon: <FolderOpenOutlined />, color: '#52C41A', bg: '#F6FFED', value: calRows.length, label: t('meeting.currentMonthMeetings', { defaultValue: '當月會議' }), hint: t('meeting.currentMonthMeetingsHint', { defaultValue: '當前月份 + 當前篩選條件' }) }
+          : { icon: <FolderOpenOutlined />, color: '#52C41A', bg: '#F6FFED', value: stats.total, label: t('meeting.meetingsUnderCurrentFilters', { defaultValue: '當前條件會議數' }) },
       ]} />
 
       {/* 操作区（§E.2）：右侧只放「新增」与列配置 */}
@@ -394,10 +449,12 @@ export default function MyMeeting() {
         <div className="action-section-left" />
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/meeting-booking')}>{t('meeting.bookAMeeting', { defaultValue: '預約新會議' })}</Button>
-          {configComponent}
+          {/* 列配置只对列表表格有意义，日历态展示它会误导 */}
+          {viewMode === 'list' && configComponent}
         </div>
       </div>
 
+      {viewMode === 'list' ? (
       <Table<MeetingVO>
         rowKey="id"
         columns={applyConfig(columns)}
@@ -417,6 +474,102 @@ export default function MyMeeting() {
           onChange: (page, size) => setQuery(q => ({ ...q, page: size !== q.size ? 1 : page, size: size || 10 })),
         }}
       />
+      ) : (
+        <>
+          <div className="meeting-cal-card">
+            <div className="meeting-cal-toolbar">
+              <div className="meeting-cal-toolbar-left">
+                <span className="meeting-cal-month">
+                  {t('meeting.calendarMonthTitle', { defaultValue: '{{year}} 年 {{month}} 月', year: calValue.year(), month: calValue.month() + 1 })}
+                </span>
+                <Space size={4}>
+                  <Button size="small" icon={<LeftOutlined />} aria-label={t('meeting.previousMonth', { defaultValue: '上個月' })} onClick={() => setCalValue(v => v.subtract(1, 'month'))} />
+                  <Button size="small" onClick={() => setCalValue(dayjs())}>{t('meeting.calendarToday', { defaultValue: '今天' })}</Button>
+                  <Button size="small" icon={<RightOutlined />} aria-label={t('meeting.nextMonth', { defaultValue: '下個月' })} onClick={() => setCalValue(v => v.add(1, 'month'))} />
+                </Space>
+              </div>
+              <div className="meeting-cal-legend">
+                {CALENDAR_LEGEND_PHASES.map(phase => (
+                  <span key={phase} className="meeting-cal-legend-item">
+                    <i className="meeting-cal-legend-dot" style={{ background: phaseDot(phase) }} />
+                    {phaseMeta(phase).label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <Spin spinning={calLoading}>
+              <div className="meeting-cal-grid">
+                {weekdays.map((label, i) => (
+                  <div key={label} className={`meeting-cal-weekday${i === 0 || i === 6 ? ' meeting-cal-weekday--weekend' : ''}`}>{label}</div>
+                ))}
+                {calCells.map(date => {
+                  const list = calByDate[date.format('YYYY-MM-DD')] ?? []
+                  const cellClass = [
+                    'meeting-cal-cell',
+                    date.day() === 0 || date.day() === 6 ? 'meeting-cal-cell--weekend' : '',
+                    date.isSame(calValue, 'month') ? '' : 'meeting-cal-cell--other',
+                    date.isSame(calValue, 'day') ? 'meeting-cal-cell--selected' : '',
+                  ].filter(Boolean).join(' ')
+                  return (
+                    <div key={date.format('YYYY-MM-DD')} className={cellClass} onClick={() => setCalValue(date)}>
+                      <div className="meeting-cal-cell-head">
+                        <span className={`meeting-cal-date${date.isSame(dayjs(), 'day') ? ' meeting-cal-date--today' : ''}`}>{date.date()}</span>
+                        {list.length > 0 && <span className="meeting-cal-count">{list.length}</span>}
+                      </div>
+                      {list.slice(0, 3).map(item => (
+                        <div
+                          key={item.id}
+                          className={`meeting-cal-chip meeting-cal-chip--${phaseChipVariant(item.phase)}`}
+                          title={`${item.startTime.slice(11, 16)} ${item.title}`}
+                          onClick={e => { e.stopPropagation(); navigate(`/meeting-detail?id=${item.id}`) }}
+                        >
+                          <span className="meeting-cal-dot" style={{ background: phaseDot(item.phase) }} />
+                          <span className="meeting-cal-time">{item.startTime.slice(11, 16)}</span>
+                          <span className="meeting-cal-title">{item.title}</span>
+                        </div>
+                      ))}
+                      {list.length > 3 && (
+                        <div className="meeting-cal-more">
+                          {t('meeting.calendarMore', { count: list.length - 3, defaultValue: '還有 {{count}} 場' })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </Spin>
+          </div>
+
+          {/* 当日日程：选中日展开完整清单，操作复用列表操作列，不另做第二套入口 */}
+          <div className="meeting-cal-daypanel">
+            <div className="meeting-cal-daypanel-head">
+              <div className="meeting-cal-daypanel-icon"><CalendarOutlined /></div>
+              <span className="meeting-cal-daypanel-title">
+                {t('meeting.calendarDayTitle', { defaultValue: '{{month}} 月 {{day}} 日日程', month: calValue.month() + 1, day: calValue.date() })}
+              </span>
+              <span className="meeting-cal-daypanel-count">
+                {t('meeting.sessionCount', { count: dayList.length, defaultValue: '{{count}} 場' })}
+              </span>
+            </div>
+            {dayList.length === 0 ? (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('meeting.noMeetingRelatedTo', { defaultValue: '這一天沒有與你相關的會議' })} />
+            ) : (
+              dayList.map(item => (
+                <div key={item.id} className="meeting-cal-dayrow">
+                  <span className="meeting-cal-dayrow-time">{item.startTime.slice(11, 16)}–{item.endTime.slice(11, 16)}</span>
+                  <a className="meeting-cal-dayrow-title" onClick={() => navigate(`/meeting-detail?id=${item.id}`)}>{item.title}</a>
+                  <span className="meeting-cal-dayrow-room">{item.roomName}</span>
+                  <Tag color={phaseMeta(item.phase).color}>{phaseMeta(item.phase).label}</Tag>
+                  {item.myRole !== 'organizer' && item.myResponse === 'pending' && (
+                    <Tag color="orange">{t('meeting.pendingResponse', { defaultValue: '待響應' })}</Tag>
+                  )}
+                  <div className="meeting-cal-dayrow-actions">{renderActions(item)}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -428,10 +581,6 @@ function buildQuery(tab: string, base: MeetingQuery): MeetingQuery {
   delete withoutDerived.group
   delete withoutDerived.respond
   switch (tab) {
-    case 'todo':
-      // 「待我響應」按响应态筛，而不是按会议阶段筛：group=pending 是“待開會”，
-      // 会把我自己组织的会也列进来，与同页「待我響應」徽标（后台算的是未响应邀约数）永远对不上
-      return { ...withoutDerived, scope: 'attended', respond: 'pending' }
     case 'mine':
       return { ...withoutDerived, scope: 'mine' }
     case 'attended':

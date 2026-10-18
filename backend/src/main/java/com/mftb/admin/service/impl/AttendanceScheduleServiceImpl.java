@@ -13,7 +13,9 @@ import com.mftb.admin.mapper.AttGroupMemberMapper;
 import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.service.AttendanceScheduleService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.ScopeFilters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class AttendanceScheduleServiceImpl implements AttendanceScheduleService 
     private final AttScheduleMapper scheduleMapper;
     private final AttShiftMapper shiftMapper;
     private final OperatorResolver operatorResolver;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public AttendanceScheduleVO week(Long groupId, LocalDate weekStart) {
@@ -115,6 +118,8 @@ public class AttendanceScheduleServiceImpl implements AttendanceScheduleService 
             if (entry.getUserId() == null || entry.getWorkDate() == null) {
                 throw new BusinessException("排班條目缺少員工或日期");
             }
+            // 排班是给别人的日历写结论：逐条校验人员在可见范围内
+            orgScopeService.requireVisibleUser(entry.getUserId());
             requireMemberOnDate(group.getId(), entry.getUserId(), entry.getWorkDate());
             AttShift shift = resolveShift(entry.getShiftId(), shiftCache);
             if (shift != null && !STATUS_ENABLED.equals(shift.getStatus())) {
@@ -169,6 +174,9 @@ public class AttendanceScheduleServiceImpl implements AttendanceScheduleService 
         if (source.isEmpty()) {
             throw new BusinessException("來源週沒有排班記錄");
         }
+        // 整周复制是跨人批量写入：源周里只要有一个不在可见范围就整批拒绝，
+        // 静默少几行会让人以为“别人的班也跟着我的审批结论走了”。
+        source.forEach(row -> orgScopeService.requireVisibleUser(row.getUserId()));
         // 目标周只覆盖「源周里有的人」，其余人的既有排班保持不动
         Map<String, AttSchedule> target = loadSchedules(
                 source.stream().map(s -> memberStub(s.getUserId())).toList(),
@@ -288,12 +296,18 @@ public class AttendanceScheduleServiceImpl implements AttendanceScheduleService 
     }
 
     /** 该周区间内的成员：按生效区间过滤，而不是按今天在册 */
-    private List<AttGroupMember> membersInRange(Long groupId, LocalDate start, LocalDate end) {
-        return memberMapper.selectList(new LambdaQueryWrapper<AttGroupMember>()
+    private LambdaQueryWrapper<AttGroupMember> memberScopeWrapper(Long groupId, LocalDate start, LocalDate end) {
+        LambdaQueryWrapper<AttGroupMember> wrapper = new LambdaQueryWrapper<AttGroupMember>()
                 .eq(AttGroupMember::getGroupId, groupId)
                 .le(AttGroupMember::getValidFrom, end)
-                .and(w -> w.isNull(AttGroupMember::getValidTo).or().ge(AttGroupMember::getValidTo, start))
-                .orderByAsc(AttGroupMember::getEmpNo));
+                .and(w -> w.isNull(AttGroupMember::getValidTo).or().ge(AttGroupMember::getValidTo, start));
+        // 班表网格的每一行就是一个人名：按可见人员收敛，列表与 stats()（走同一个 week()）自然同口径
+        ScopeFilters.applyUsers(wrapper, AttGroupMember::getUserId, orgScopeService.resolveVisibleUserIds());
+        return wrapper.orderByAsc(AttGroupMember::getEmpNo);
+    }
+
+    private List<AttGroupMember> membersInRange(Long groupId, LocalDate start, LocalDate end) {
+        return memberMapper.selectList(memberScopeWrapper(groupId, start, end));
     }
 
     private void requireMemberOnDate(Long groupId, Long userId, LocalDate date) {

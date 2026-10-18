@@ -14,7 +14,8 @@ import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 export interface UserInfo {
   username: string
   name: string
-  empId: string
+  /** 员工工号。内置系统管理员账号（admin）不是员工、没有工号，后端不下发该字段 */
+  empId?: string
   avatar: string
   role: 'admin' | 'guest' // 用户角色
   department?: string // 所在部门

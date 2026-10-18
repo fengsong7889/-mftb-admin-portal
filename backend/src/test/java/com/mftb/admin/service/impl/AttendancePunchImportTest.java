@@ -72,6 +72,8 @@ class AttendancePunchImportTest {
     private DingTalkAppService dingTalkAppService;
     @Mock
     private SysConfigService sysConfigService;
+    @Mock
+    private com.mftb.admin.service.OrgScopeService orgScopeService;
 
     private AttendancePunchService punchService;
     private AttendanceSyncService syncService;
@@ -79,10 +81,15 @@ class AttendancePunchImportTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // 本用例测的是导入校验与同步取数，不是数据范围：把范围显式置为「不限制」（null）。
+        // 必须显式 stub：Mockito 对返回 Set 的方法默认给空集，而空集在本域含义是「谁也看不见」，
+        // 不写这一行会让导入逐行判成越权（静默错账而不是显式报错）。
+        when(orgScopeService.resolveVisibleUserIds()).thenReturn(null);
+        when(orgScopeService.resolveVisibleDeptIds()).thenReturn(null);
         punchService = new AttendancePunchServiceImpl(punchMapper, sysUserMapper, groupMapper, memberMapper,
-                scheduleMapper, shiftMapper, operatorResolver);
+                scheduleMapper, shiftMapper, operatorResolver, orgScopeService);
         syncService = new AttendanceSyncServiceImpl(dingTalkAppService, sysConfigService, sysUserMapper,
-                groupMapper, memberMapper, punchService);
+                groupMapper, memberMapper, punchService, orgScopeService);
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
     }
 

@@ -16,8 +16,18 @@ public class PositionRecordRequest {
     @NotNull(message = "生效日期不能為空")
     private LocalDate effectiveDate;
 
-    @NotBlank(message = "操作類型不能為空")
+    /**
+     * 异动动作名称（中文，展示与历史快照）。
+     * <p>与 {@link #operationCode} 至少给一个：code 缺失时服务端按名称归一出 code，
+     * 两者都不给则拒绝——因为「在职/离职」完全由这个动作派生。
+     */
     private String operation;
+
+    /**
+     * 异动动作 code（真值见 {@link com.mftb.admin.constant.HrOperationCode}）。
+     * <p>新前端优先传 code；传 code 时以 code 为准（名称仅作展示快照）。
+     */
+    private String operationCode;
 
     private String reason;
 

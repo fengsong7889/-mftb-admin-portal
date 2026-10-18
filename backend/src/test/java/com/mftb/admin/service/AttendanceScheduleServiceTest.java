@@ -59,7 +59,7 @@ class AttendanceScheduleServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new AttendanceScheduleServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper, operatorResolver);
+        service = new AttendanceScheduleServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper, operatorResolver, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("李大偉");
         when(groupMapper.selectById(1L)).thenReturn(group());
     }

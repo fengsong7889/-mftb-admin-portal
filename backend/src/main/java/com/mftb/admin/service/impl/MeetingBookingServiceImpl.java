@@ -1455,8 +1455,9 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         booking.setDepartmentName(Objects.toString(organizer.getDepartment(), ""));
     }
 
+    /** 房间位置快照：城市在最前，跨城同名会议室靠它区分（与 MeetingRoomServiceImpl.locationText 同口径） */
     private static String roomLocation(MeetingRoom room) {
-        return java.util.stream.Stream.of(room.getCampus(), room.getBuilding(),
+        return java.util.stream.Stream.of(room.getCity(), room.getCampus(), room.getBuilding(),
                         room.getFloorCode(), room.getLocationDesc())
                 .filter(StringUtils::hasText)
                 .map(String::trim)

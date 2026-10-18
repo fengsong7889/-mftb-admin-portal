@@ -14,10 +14,13 @@ import {
   fetchLifecycleRequests,
   fetchLifecycleStats,
   deleteLifecycleRequest,
+  retryLifecycleExecution,
+  HR_LIFECYCLE_STATUS,
   type HrLifecycleItem,
   type HrLifecycleType,
 } from '../../../api/hrLifecycle'
-import { STATUS_LABEL_KEY, STATUS_TABS, STATUS_TAG_COLOR, EDITABLE_STATUSES, DIMISSION_TYPE_LABEL_KEY } from './meta'
+import { STATUS_LABEL_KEY, STATUS_TABS, STATUS_TAG_COLOR, EDITABLE_STATUSES, DIMISSION_TYPE_LABEL_KEY, EXECUTION_LABEL_KEY, EXECUTION_TAG_COLOR } from './meta'
+import OffboardingModal from './OffboardingModal'
 
 interface Props {
   type: HrLifecycleType
@@ -49,6 +52,8 @@ export default function LifecycleList({ type }: Props) {
   /** 入职单列名差异化（候选人/计划入职日期，其余类型用员工/生效日期；续签显示新旧合同号） */
   const isOnboard = type === 'onboard'
   const isDimission = type === 'dimission'
+  /** 离职才有的交接联动面板（资产交接 + OA 待办改派） */
+  const [offboardingFor, setOffboardingFor] = useState<HrLifecycleItem | null>(null)
   const isRenew = type === 'renew'
 
   const fetchList = useCallback(async () => {
@@ -122,6 +127,45 @@ export default function LifecycleList({ type }: Props) {
     })
   }
 
+  /**
+   * 可重试：执行失败，或「已批准 + 已到生效日」（定时任务挂了或未启用时的兜底）。
+   * 未到生效日不给重试按钮：界面先挡住，服务层还会再拒一道，不靠前端做安全边界。
+   */
+  const canRetry = (record: HrLifecycleItem) => {
+    if (record.status !== HR_LIFECYCLE_STATUS.APPROVED) return false
+    if (record.executionStatus === 'FAILED') return true
+    if (record.executionStatus === 'PENDING' && record.scheduledDate)
+      return record.scheduledDate <= dayjs().format('YYYY-MM-DD')
+    return false
+  }
+
+  const handleRetryExecution = (record: HrLifecycleItem) => {
+    Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('hrLifecycle.retryExecuteConfirm'),
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('hrLifecycle.reqNo')}：</span><b>{record.reqNo}</b></div>
+          <div className="confirm-info-row"><span>{t('hrLifecycle.empName')}：</span><b>{record.empName}</b></div>
+          <div className="confirm-info-row">
+            <span>{t('hrLifecycle.effectiveDate')}：</span><b>{record.scheduledDate || record.effectiveDate || '-'}</b>
+          </div>
+          {record.executionError && (
+            <div className="confirm-info-row"><span>{t('hrLifecycle.executionError')}：</span><b>{record.executionError}</b></div>
+          )}
+        </div>
+      ),
+      okText: t('hrLifecycle.retryExecute'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        await retryLifecycleExecution(record.id)
+        message.success(t('hrLifecycle.retryExecuted'))
+        refresh()
+      },
+    })
+  }
+
   const baseColumns = useMemo<TableColumnsType<HrLifecycleItem>>(() => [
     { title: t('hrLifecycle.reqNo'), dataIndex: 'reqNo', key: 'reqNo', width: 150, fixed: 'left' },
     {
@@ -153,9 +197,19 @@ export default function LifecycleList({ type }: Props) {
       render: (v: string) => (v ? dayjs(v).format('YYYY-MM-DD') : '-'),
     },
     {
-      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
-      render: (v: HrLifecycleItem['status']) => (
-        <Tag color={STATUS_TAG_COLOR[v]}>{STATUS_LABEL_KEY[v] ? t(STATUS_LABEL_KEY[v]) : v}</Tag>
+      title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 160,
+      render: (v: HrLifecycleItem['status'], r: HrLifecycleItem) => (
+        <Space size={4}>
+          <Tag color={STATUS_TAG_COLOR[v]}>{STATUS_LABEL_KEY[v] ? t(STATUS_LABEL_KEY[v]) : v}</Tag>
+          {/* 执行态跟在同一格：分开两列会让用户以为是不相关的两个字段，
+              而「已批准 + 待生效」必须读成一个完整意思：批了但还没生效 */}
+          {r.executionStatus && (
+            <Tag color={EXECUTION_TAG_COLOR[r.executionStatus] ?? 'default'}>
+              {EXECUTION_LABEL_KEY[r.executionStatus] ? t(EXECUTION_LABEL_KEY[r.executionStatus]) : r.executionStatus}
+              {r.executionStatus === 'PENDING' && r.scheduledDate ? ` · ${r.scheduledDate}` : ''}
+            </Tag>
+          )}
+        </Space>
       ),
     },
     {
@@ -184,6 +238,23 @@ export default function LifecycleList({ type }: Props) {
                 </Button>
               </>
             )}
+            {/* 交接联动只对离职单开放：它是离职办理后产生的跨模块任务，其他单据没有这个概念 */}
+            {isDimission && (
+              <>
+                <span className="action-split">|</span>
+                <Button type="link" size="small" onClick={() => setOffboardingFor(r)}>
+                  {t('hrOffboarding.open')}
+                </Button>
+              </>
+            )}
+            {canEdit && canRetry(r) && (
+              <>
+                <span className="action-split">|</span>
+                <Button type="link" size="small" onClick={() => handleRetryExecution(r)}>
+                  {t('hrLifecycle.retryExecute')}
+                </Button>
+              </>
+            )}
             {canDelete && editable && (
               <>
                 <span className="action-split">|</span>
@@ -197,7 +268,7 @@ export default function LifecycleList({ type }: Props) {
       },
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [t, type, page, status, keyword, canEdit, canDelete])
+  ], [t, type, page, status, keyword, canEdit, canDelete, isDimission])
 
   const { configComponent, applyConfig } = useColumnConfig(menuKey, baseColumns.map(col => ({ key: String(col.key), title: String(col.title) })), [
     { key: 'action', visible: true, locked: 'tail' },
@@ -267,6 +338,14 @@ export default function LifecycleList({ type }: Props) {
             setSize(s)
           },
         }}
+      />
+
+      <OffboardingModal
+        open={offboardingFor != null}
+        requestId={offboardingFor?.id ?? null}
+        reqNo={offboardingFor?.reqNo}
+        canManage={canEdit}
+        onClose={() => setOffboardingFor(null)}
       />
     </div>
   )

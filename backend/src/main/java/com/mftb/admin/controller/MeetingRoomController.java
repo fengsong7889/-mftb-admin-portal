@@ -61,11 +61,18 @@ public class MeetingRoomController {
         return Result.success(roomService.availability(query));
     }
 
-    /** 园区清单（筛选项数据源，禁止前端硬编码园区名） */
+    /** 城市清单（筛选项与表单候选数据源，禁止前端硬编码城市名） */
+    @GetMapping("/cities")
+    @RequirePermission(menu = ROOM, anyOf = {BOOKING})
+    public Result<List<String>> cities() {
+        return Result.success(roomService.cities());
+    }
+
+    /** 园区清单；传 city 则只返回该城市下的园区（筛选项数据源，禁止前端硬编码园区名） */
     @GetMapping("/campuses")
     @RequirePermission(menu = ROOM, anyOf = {BOOKING})
-    public Result<List<String>> campuses() {
-        return Result.success(roomService.campuses());
+    public Result<List<String>> campuses(@RequestParam(required = false) String city) {
+        return Result.success(roomService.campuses(city));
     }
 
     /** 指定园区下的楼栋清单 */
