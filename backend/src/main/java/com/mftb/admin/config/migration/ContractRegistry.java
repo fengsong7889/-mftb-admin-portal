@@ -51,6 +51,8 @@ public class ContractRegistry {
         combined.addAll(hrAuditContracts());
         // 离职联动：HrOffboardingTask 实体与离职回调都依赖该表；缺交接接收人列则联动永远停在等待态
         combined.addAll(hrOffboardingContracts());
+        // 系統權限申請：门户「我要申請」的唯一落库表，缺表会让提交与审批兑现同时 500
+        combined.add(systemAccessRequestContract());
         return combined;
     }
 
@@ -295,6 +297,98 @@ public class ContractRegistry {
                                         "ALTER TABLE sys_role_dept ADD COLUMN role_id BIGINT NOT NULL COMMENT '角色ID(sys_role.id)'"),
                                 new ContractSpec.ColumnSpec("dept_id",
                                         "ALTER TABLE sys_role_dept ADD COLUMN dept_id BIGINT NOT NULL COMMENT '部门ID(sys_department.id)'"))));
+    }
+
+    /**
+     * 系統權限申請單契約（DDL 引用 {@code SystemAccessSchemaInitializer.CREATE_TABLE_SQL} 唯一副本）。
+     * <p>
+     * 建表由 {@code SystemAccessSchemaInitializer}（{@code oa:system-access:v1.0}，@Order 32）负责；
+     * 本契約是第二道閘：表被人为删除或列漂移时启动自愈，自愈不了就把实例置为 not-ready，
+     * 而不是等员工在门户点「我要申請」才 500。
+     * <p>
+     * 身份列（flow_no / system_code / user_id / applicant_name / reason）刻意不给补列 DDL：
+     * 它们缺失说明这张表根本不是本业务的表，补成可空列只会让「看似就绪实则写不进」更难查，
+     * 判漂移 + not-ready 才是正确响应。其余列（含 2026-10 补的诉求 5 列）均可空，给出可安全执行的补列 DDL。
+     * <p>
+     * {@code requested_menus} 是历史列（2026-10 后新单不再写入）：仍给自愈 DDL，因为旧单据的
+     * 申请事实存在这一列，表被重建后不补列会让旧单回看直接报错。
+     */
+    public static ContractSpec systemAccessRequestContract() {
+        return new ContractSpec(
+                "system-access-request",
+                "biz_system_access_request",
+                com.mftb.admin.config.SystemAccessSchemaInitializer.CREATE_TABLE_SQL,
+                List.of(
+                        new ContractSpec.ColumnSpec("flow_no", null),
+                        new ContractSpec.ColumnSpec("system_code", null),
+                        new ContractSpec.ColumnSpec("user_id", null),
+                        new ContractSpec.ColumnSpec("applicant_name", null),
+                        new ContractSpec.ColumnSpec("reason", null),
+                        new ContractSpec.ColumnSpec("requested_menus",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN requested_menus MEDIUMTEXT "
+                                        + "COMMENT '【历史列】勾选菜单JSON,2026-10后新单不再写入'"),
+                        new ContractSpec.ColumnSpec("scenarios",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN scenarios VARCHAR(255) DEFAULT NULL "
+                                        + "COMMENT '使用场景code,逗号分隔'"),
+                        new ContractSpec.ColumnSpec("duration_type",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN duration_type VARCHAR(16) DEFAULT NULL "
+                                        + "COMMENT '使用期限类型: permanent/until'"),
+                        new ContractSpec.ColumnSpec("duration_until",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN duration_until DATE DEFAULT NULL "
+                                        + "COMMENT '期限截止日(到期次日起自动回收,permanent为NULL)'"),
+                        new ContractSpec.ColumnSpec("preferred_role_id",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN preferred_role_id BIGINT DEFAULT NULL "
+                                        + "COMMENT '申请人建议的参考角色 sys_role.id'"),
+                        new ContractSpec.ColumnSpec("preferred_role_name",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN preferred_role_name VARCHAR(64) DEFAULT NULL "
+                                        + "COMMENT '参考角色名称快照'"),
+                        new ContractSpec.ColumnSpec("attachments",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN attachments MEDIUMTEXT "
+                                        + "COMMENT '相关凭证JSON [{name,type,size,contentType,dataUrl}]'"),
+                        new ContractSpec.ColumnSpec("status",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'pending' "
+                                        + "COMMENT '状态: pending/approved/rejected/cancelled'"),
+                        new ContractSpec.ColumnSpec("grant_target_type",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN grant_target_type VARCHAR(16) DEFAULT NULL "
+                                        + "COMMENT '授权对象类型: role'"),
+                        new ContractSpec.ColumnSpec("grant_target_id",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN grant_target_id BIGINT DEFAULT NULL "
+                                        + "COMMENT '授权角色 sys_role.id'"),
+                        new ContractSpec.ColumnSpec("grant_target_name",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN grant_target_name VARCHAR(64) DEFAULT NULL "
+                                        + "COMMENT '授权角色名称快照'"),
+                        new ContractSpec.ColumnSpec("grant_status",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN grant_status VARCHAR(16) NOT NULL DEFAULT 'none' "
+                                        + "COMMENT '授权兑现状态: none/granted'"),
+                        // 到期回收四列（v1.2）：默认值与迁移一致，grant_newly_bound 默认 0 是 fail-safe，
+                        // 自愈补列时不能把它当普通可空列处理（存量单据一旦被默认成 1 就可被误回收）
+                        new ContractSpec.ColumnSpec("grant_newly_bound",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN grant_newly_bound TINYINT NOT NULL DEFAULT 0 "
+                                        + "COMMENT '本次兌现是否真的新绑角色:1=本单绑上(仅此有到期回收资格),0=此前已持有/存量'"),
+                        new ContractSpec.ColumnSpec("revoke_status",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN revoke_status VARCHAR(16) NOT NULL DEFAULT 'none' "
+                                        + "COMMENT '到期回收状态: none/revoked/kept'"),
+                        new ContractSpec.ColumnSpec("revoked_at",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN revoked_at DATETIME DEFAULT NULL "
+                                        + "COMMENT '回收时间'"),
+                        new ContractSpec.ColumnSpec("revoked_by",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN revoked_by VARCHAR(64) DEFAULT NULL "
+                                        + "COMMENT '回收执行者(system-expiry)'"),
+                        new ContractSpec.ColumnSpec("granted_at",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN granted_at DATETIME DEFAULT NULL "
+                                        + "COMMENT '授权兑现时间'"),
+                        new ContractSpec.ColumnSpec("granted_by",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN granted_by VARCHAR(64) DEFAULT NULL "
+                                        + "COMMENT '兑现时的审批人签名'"),
+                        new ContractSpec.ColumnSpec("reject_reason",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN reject_reason VARCHAR(500) DEFAULT NULL "
+                                        + "COMMENT '驳回理由'"),
+                        new ContractSpec.ColumnSpec("apply_time",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN apply_time DATETIME DEFAULT NULL "
+                                        + "COMMENT '申请时间'"),
+                        new ContractSpec.ColumnSpec("complete_time",
+                                "ALTER TABLE biz_system_access_request ADD COLUMN complete_time DATETIME DEFAULT NULL "
+                                        + "COMMENT '审结时间'")));
     }
 
     /**

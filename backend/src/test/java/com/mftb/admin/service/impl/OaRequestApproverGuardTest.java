@@ -56,7 +56,8 @@ class OaRequestApproverGuardTest {
                 mock(com.mftb.admin.service.AttendanceCallbackService.class),
                 mock(HrCertificateCallbackService.class), mock(HrPerfCallbackService.class),
                 mock(com.mftb.admin.service.RdmIntakeCallbackService.class),
-                mock(com.mftb.admin.service.RdmChangeCallbackService.class));
+                mock(com.mftb.admin.service.RdmChangeCallbackService.class),
+                mock(com.mftb.admin.service.SystemAccessGrantService.class));
     }
 
     private static SysUser user(long id, String empId, String name, String role) {

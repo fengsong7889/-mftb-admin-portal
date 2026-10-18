@@ -42,6 +42,15 @@ public interface PermissionAuditService {
                 String systemCode, String changeType, Object before, Object after);
 
     /**
+     * 同一笔审计，但显式指定操作人。
+     * <p>用于<b>无登录上下文的线程</b>（定时作业、异步任务）：七参版本的 operator 取自当前登录人，
+     * 后台线程里它是空的，“谁把这条权限收走的”就查不出来了。这类调用必须自己传
+     * （如 {@code system-expiry}），且与业务表上的回收人字段保持一致口径。
+     */
+    void record(String targetType, Long targetId, String targetName,
+                String systemCode, String changeType, Object before, Object after, String operator);
+
+    /**
      * 分页查询审计日志（按时间倒序）。
      *
      * @param targetType 可选，role / department

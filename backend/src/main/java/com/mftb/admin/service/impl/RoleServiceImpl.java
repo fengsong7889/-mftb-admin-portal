@@ -96,6 +96,7 @@ public class RoleServiceImpl implements RoleService {
         role.setDescription(request.getDescription());
         // 新建角色缺省「仅本人」：未显式配置范围时绝不能默认放开成全公司可见
         role.setDataScope(OrgDataScope.orDefault(request.getDataScope()));
+        role.setSelfServiceRequestable(normalizeSelfServiceFlag(role.getCode(), request.getSelfServiceRequestable()));
         role.setStatus(1);
         role.setDeleted(0);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -121,6 +122,12 @@ public class RoleServiceImpl implements RoleService {
         boolean scopeProvided = request.getDataScope() != null;
         if (scopeProvided) {
             role.setDataScope(OrgDataScope.orDefault(request.getDataScope()));
+        }
+        // 传 null 表示本次不动该开关（旧客户端不传此字段）：不能写成 0，否则一次改名就把
+        // 已开放的自助申请目录静默关掉，而操作人根本不知道自己动了它
+        if (request.getSelfServiceRequestable() != null) {
+            role.setSelfServiceRequestable(
+                    normalizeSelfServiceFlag(role.getCode(), request.getSelfServiceRequestable()));
         }
         role.setUpdatedBy(operatorResolver.currentOperatorName());
         sysRoleMapper.updateById(role);
@@ -224,6 +231,9 @@ public class RoleServiceImpl implements RoleService {
                 ? request.getDescription() : "復制自：" + source.getName());
         // 数据范围随角色一起克隆：不带过来会让新角色静默变成「仅本人」，副本上线即缺数据
         role.setDataScope(OrgDataScope.orDefault(source.getDataScope()));
+        // 复制不继承「开放自助申请」：新角色应该由管理员确认过业务说明后再主动开放，
+        // 否则一次复制就把暴露面静默扩散到门户自助目录
+        role.setSelfServiceRequestable(0);
         role.setStatus(1);
         role.setDeleted(0);
         role.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -386,12 +396,28 @@ public class RoleServiceImpl implements RoleService {
         return menuId;
     }
 
+    /**
+     * 自助申请开关归一化：只认 0/1，其余值（负数、2、null）一律当 0；内置 admin 角色强制 0。
+     * <p>为何对 admin 强制：开放自助申请意味着该角色会出现在门户申请页的参考角色目录里，
+     * 员工可以指名申请；admin 一旦进目录，等于把「申请整个平台」做成自助入口，
+     * 审批人误点一次就交出全部权限（与绑定/删除/停用对 admin 的禁令同一口径）。
+     * <p>本开关不授予任何权限（只是让角色在目录里可见），真正绑定仍需走审批，
+     * 故不单独记权限审计，变更人与时间由 {@code sys_role.updated_by/updated_at} 记录。
+     */
+    private static int normalizeSelfServiceFlag(String roleCode, Integer requested) {
+        if (requested == null || BUILTIN_ADMIN_ROLE_CODE.equalsIgnoreCase(roleCode)) {
+            return 0;
+        }
+        return requested == 1 ? 1 : 0;
+    }
+
     private RoleVO toVO(SysRole role, Long userCount, List<MenuPermissionDTO> permissions, List<Long> deptIds) {
         RoleVO vo = new RoleVO();
         vo.setId(role.getId());
         vo.setName(role.getName());
         vo.setCode(role.getCode());
         vo.setDescription(role.getDescription());
+        vo.setSelfServiceRequestable(role.getSelfServiceRequestable());
         vo.setStatus(role.getStatus());
         vo.setPermissions(permissions == null ? List.of() : permissions);
         // 存量行 data_scope 为 NULL 时按最严档返回，与 OrgScopeServiceImpl 的解析口径一致

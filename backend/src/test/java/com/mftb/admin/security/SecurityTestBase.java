@@ -128,6 +128,8 @@ public abstract class SecurityTestBase {
     protected AiEmpQuotaService aiEmpQuotaService;
     @MockBean(name = "oaRequestService")
     protected OaRequestService oaRequestService;
+    @MockBean(name = "systemAccessRequestService")
+    protected SystemAccessRequestService systemAccessRequestService;
     @MockBean(name = "oaProcessService")
     protected OaProcessService oaProcessService;
     @MockBean(name = "departmentService")

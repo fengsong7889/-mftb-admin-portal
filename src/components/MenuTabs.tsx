@@ -97,8 +97,12 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
       merge: 'i18n:approvalDetail.typeTitleMerge',
       gift: 'i18n:approvalDetail.typeTitleGift',
       ai_access: 'i18n:approvalDetail.typeTitleAiAccess',
+      // 系統權限申請（門戶「我要申請」發起的流程），漏登記會讓審批頁簽顯示成充值詳情
+      system_access: 'i18n:approvalDetail.typeTitleSystemAccess',
     },
   },
+  // 系統權限申請頁：無菜單記錄的門戶自助頁，頁簽名走語言包而不是路徑名兜底
+  '/system-access-apply': { fixed: 'i18n:systemAccessApply.pageTitle' },
   // 搜索校验（动态路由 /search-verify-detail/:id）
   '/search-verify-detail': { fixed: 'i18n:searchVerifyDetail.title' },
   // 考勤假勤系统：表单页(新增/编辑按 ?id 区分)与详情页分开登记，避免列表/新增/详情三个页签同名

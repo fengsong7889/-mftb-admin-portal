@@ -107,6 +107,16 @@ public class RdmProjectService {
         vo.setObjective(project.getObjective());
         vo.setPmUserName(project.getPmUserName());
         vo.setProductOwnerUserName(project.getProductOwnerUserName());
+        vo.setPmUserId(project.getPmUserId());
+        vo.setProductOwnerUserId(project.getProductOwnerUserId());
+        vo.setTechLeadUserId(project.getTechLeadUserId());
+        vo.setTechLeadUserName(project.getTechLeadUserName());
+        vo.setUiDesignerUserId(project.getUiDesignerUserId());
+        vo.setUiDesignerUserName(project.getUiDesignerUserName());
+        vo.setQaLeadUserId(project.getQaLeadUserId());
+        vo.setQaLeadUserName(project.getQaLeadUserName());
+        vo.setOpsLeadUserId(project.getOpsLeadUserId());
+        vo.setOpsLeadUserName(project.getOpsLeadUserName());
         vo.setPlanStartDate(DateTimeUtils.format(project.getPlanStartDate()));
         vo.setPlanEndDate(DateTimeUtils.format(project.getPlanEndDate()));
         vo.setStatus(project.getStatus());
@@ -309,6 +319,14 @@ public class RdmProjectService {
         project.setPmUserName(resolveUserName(dto.getPmUserId(), dto.getPmUserName()));
         project.setProductOwnerUserId(dto.getProductOwnerUserId());
         project.setProductOwnerUserName(resolveUserName(dto.getProductOwnerUserId(), dto.getProductOwnerUserName()));
+        project.setTechLeadUserId(dto.getTechLeadUserId());
+        project.setTechLeadUserName(resolveUserName(dto.getTechLeadUserId(), dto.getTechLeadUserName()));
+        project.setUiDesignerUserId(dto.getUiDesignerUserId());
+        project.setUiDesignerUserName(resolveUserName(dto.getUiDesignerUserId(), dto.getUiDesignerUserName()));
+        project.setQaLeadUserId(dto.getQaLeadUserId());
+        project.setQaLeadUserName(resolveUserName(dto.getQaLeadUserId(), dto.getQaLeadUserName()));
+        project.setOpsLeadUserId(dto.getOpsLeadUserId());
+        project.setOpsLeadUserName(resolveUserName(dto.getOpsLeadUserId(), dto.getOpsLeadUserName()));
         project.setPlanStartDate(parseDate(dto.getPlanStartDate(), "計劃開始日期"));
         project.setPlanEndDate(parseDate(dto.getPlanEndDate(), "計劃結束日期"));
         project.setDefaultAcceptancePath(normalizePath(dto.getDefaultAcceptancePath()));
@@ -356,6 +374,24 @@ public class RdmProjectService {
         if (dto.getProductOwnerUserId() != null) {
             project.setProductOwnerUserId(dto.getProductOwnerUserId());
             project.setProductOwnerUserName(resolveUserName(dto.getProductOwnerUserId(), dto.getProductOwnerUserName()));
+        }
+        // 四组负责人以「userName 非 null」为提供哨兵：表单恒传字符串（清空传空串），
+        // 支持清空；暂停/风险等局部更新不传这些 key，不会误清
+        if (dto.getTechLeadUserName() != null) {
+            project.setTechLeadUserId(dto.getTechLeadUserId());
+            project.setTechLeadUserName(resolveUserName(dto.getTechLeadUserId(), dto.getTechLeadUserName()));
+        }
+        if (dto.getUiDesignerUserName() != null) {
+            project.setUiDesignerUserId(dto.getUiDesignerUserId());
+            project.setUiDesignerUserName(resolveUserName(dto.getUiDesignerUserId(), dto.getUiDesignerUserName()));
+        }
+        if (dto.getQaLeadUserName() != null) {
+            project.setQaLeadUserId(dto.getQaLeadUserId());
+            project.setQaLeadUserName(resolveUserName(dto.getQaLeadUserId(), dto.getQaLeadUserName()));
+        }
+        if (dto.getOpsLeadUserName() != null) {
+            project.setOpsLeadUserId(dto.getOpsLeadUserId());
+            project.setOpsLeadUserName(resolveUserName(dto.getOpsLeadUserId(), dto.getOpsLeadUserName()));
         }
         if (dto.getPlanStartDate() != null) {
             project.setPlanStartDate(parseDate(dto.getPlanStartDate(), "計劃開始日期"));

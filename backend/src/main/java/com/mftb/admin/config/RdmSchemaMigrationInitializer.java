@@ -178,6 +178,41 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final String VERSION_CLAIM_REQ_NO = "rdm:schema:v3.5";
     /**
+     * 迭代編碼系統發號：登記 rdm_iteration_sprint / rdm_iteration_version / rdm_iteration_hotfix
+     * 三條編號規則（SP+YYYYMM+3位 / VER+YYYYMM+3位 / HF+YYYYMMDD+2位）。
+     * <p>與代碼側 {@code BizSeqService.ruleKeyForIterationType} 同批原子交付：缺行時
+     * requireRule fail-closed，新建迭代直接報「編號生成規則未配置」。
+     * <p>参考文档：{@code backend/sql/244_rdm_iteration_code_rules.sql}。
+     */
+    private static final String VERSION_ITERATION_CODE = "rdm:schema:v3.6";
+    /**
+     * 项目主表补四组负责人列（技术/UI 设计/测试/运维，各 userId+姓名快照共 8 列）。
+     * <p>前端新增项目表单已收这四组选人字段（EmployeeSelect 双写 userId+userName），
+     * 缺列时服务层写入报“未知列”，代码与列必须同批交付。
+     * <p>参考文档：{@code backend/sql/245_rdm_project_lead_columns.sql}。
+     */
+    private static final String VERSION_PROJECT_LEADS = "rdm:schema:v3.7";
+
+    /** 项目主表负责人列 {表, 列, DDL}：ADD COLUMN 不可重复执行，逐列先查再加 */
+    private static final String[][] PROJECT_LEAD_COLUMNS = {
+            {"rdm_project", "tech_lead_user_id",
+                    "ALTER TABLE rdm_project ADD COLUMN tech_lead_user_id BIGINT DEFAULT NULL COMMENT '技术负责人用户ID' AFTER product_owner_user_name"},
+            {"rdm_project", "tech_lead_user_name",
+                    "ALTER TABLE rdm_project ADD COLUMN tech_lead_user_name VARCHAR(64) DEFAULT NULL COMMENT '技术负责人姓名快照' AFTER tech_lead_user_id"},
+            {"rdm_project", "ui_designer_user_id",
+                    "ALTER TABLE rdm_project ADD COLUMN ui_designer_user_id BIGINT DEFAULT NULL COMMENT 'UI设计负责人用户ID' AFTER tech_lead_user_name"},
+            {"rdm_project", "ui_designer_user_name",
+                    "ALTER TABLE rdm_project ADD COLUMN ui_designer_user_name VARCHAR(64) DEFAULT NULL COMMENT 'UI设计负责人姓名快照' AFTER ui_designer_user_id"},
+            {"rdm_project", "qa_lead_user_id",
+                    "ALTER TABLE rdm_project ADD COLUMN qa_lead_user_id BIGINT DEFAULT NULL COMMENT '测试/QA负责人用户ID' AFTER ui_designer_user_name"},
+            {"rdm_project", "qa_lead_user_name",
+                    "ALTER TABLE rdm_project ADD COLUMN qa_lead_user_name VARCHAR(64) DEFAULT NULL COMMENT '测试/QA负责人姓名快照' AFTER qa_lead_user_id"},
+            {"rdm_project", "ops_lead_user_id",
+                    "ALTER TABLE rdm_project ADD COLUMN ops_lead_user_id BIGINT DEFAULT NULL COMMENT '运维/DevOps负责人用户ID' AFTER qa_lead_user_name"},
+            {"rdm_project", "ops_lead_user_name",
+                    "ALTER TABLE rdm_project ADD COLUMN ops_lead_user_name VARCHAR(64) DEFAULT NULL COMMENT '运维/DevOps负责人姓名快照' AFTER ops_lead_user_id"},
+    };
+    /**
      * 允许 req_no IS NULL 的状态集合的 SQL IN 列表（延迟发号 v2）。
      * <p>使用 {@code RdmConstants.REQ_NO_NULLABLE_STATUSES} 而非 {@code REQ_NOT_ADMITTED_STATUSES}：
      * 后者只含准入前三态，前者额外包含 pool/assigned（认领前允许暂无编号）。
@@ -392,6 +427,8 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         batch34Schema.verify(RdmBatch34Schema.SCRIPT_4);
         versionTracker.applyOnce(VERSION_DELAYED_REQ_NO, this::doDelayedReqNoMigrate, this::verifyDelayedReqNo);
         versionTracker.applyOnce(VERSION_CLAIM_REQ_NO, this::doClaimReqNoMigrate, this::verifyClaimReqNo);
+        versionTracker.applyOnce(VERSION_ITERATION_CODE, this::doIterationCodeMigrate, this::verifyIterationCode);
+        versionTracker.applyOnce(VERSION_PROJECT_LEADS, this::doProjectLeadsMigrate, this::verifyProjectLeads);
         versionTracker.applyOnce(VERSION_EXEMPT_TRANSITION, this::doExemptTransitionSeed, this::verifyExemptTransitionSeed);
     }
 
@@ -512,6 +549,61 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      * 因此 pool 和 assigned 状态在认领前允许暂无编号。
      * <p>操作：DROP 旧约束 → 用扩展后的状态集重建。DROP IF EXISTS + ADD 可重复执行。
      */
+    /**
+     * v3.6：迭代編碼改系統發號，登記三條編號規則（INSERT IGNORE 兜底，不覆蓋管理員自定義）。
+     */
+    private void doIterationCodeMigrate() {
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, "
+                        + "seq_length, seq_start, status, remark) VALUES "
+                        + "('" + BizSeqService.RULE_RDM_ITERATION_SPRINT + "', '迭代編碼－常規迭代', '產研交付', 'SP', 'YYYYMM', 3, 1, 1, "
+                        + "'{prefix} + YYYYMM + {n}位自增序號：新建迭代時系統統一發號（如 SP202610001），前端不收手工輸入；按月重置流水'), "
+                        + "('" + BizSeqService.RULE_RDM_ITERATION_VERSION + "', '迭代編碼－版本專項', '產研交付', 'VER', 'YYYYMM', 3, 1, 1, "
+                        + "'{prefix} + YYYYMM + {n}位自增序號：新建迭代時系統統一發號（如 VER202610001），前端不收手工輸入；按月重置流水'), "
+                        + "('" + BizSeqService.RULE_RDM_ITERATION_HOTFIX + "', '迭代編碼－緊急修復', '產研交付', 'HF', 'YYYYMMDD', 2, 1, 1, "
+                        + "'{prefix} + YYYYMMDD + {n}位自增序號：hotfix 講時效按日出號（如 HF2026101801），前端不收手工輸入')");
+        log.info("RDM v3.6 迭代編碼規則遷移完成：新增 {} 行規則", inserted);
+    }
+
+    /**
+     * v3.6 后置校验：三条规则必须存在且启用、前缀与位数正确。
+     * <p>只校「行存在」不够：规则被停用或前缀被改时，发号口径与规则页展示会对不上。
+     */
+    private void verifyIterationCode() {
+        requireAtLeast("迭代編碼規則 rdm_iteration_sprint", 1,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = '" + BizSeqService.RULE_RDM_ITERATION_SPRINT + "' "
+                        + "AND prefix = 'SP' AND date_format = 'YYYYMM' AND seq_length = 3 AND status = 1");
+        requireAtLeast("迭代編碼規則 rdm_iteration_version", 1,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = '" + BizSeqService.RULE_RDM_ITERATION_VERSION + "' "
+                        + "AND prefix = 'VER' AND date_format = 'YYYYMM' AND seq_length = 3 AND status = 1");
+        requireAtLeast("迭代編碼規則 rdm_iteration_hotfix", 1,
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = '" + BizSeqService.RULE_RDM_ITERATION_HOTFIX + "' "
+                        + "AND prefix = 'HF' AND date_format = 'YYYYMMDD' AND seq_length = 2 AND status = 1");
+    }
+
+    /**
+     * v3.7：项目主表补四组负责人列（逐列先查再加，ADD COLUMN 重跑必撞 duplicate column）。
+     */
+    private void doProjectLeadsMigrate() {
+        for (String[] col : PROJECT_LEAD_COLUMNS) {
+            if (columnExists(col[0], col[1])) {
+                continue;
+            }
+            // 不吞异常：缺列会让项目保存报“未知列”，失败必须抛出并不记版本，下次启动重试
+            jdbcTemplate.execute(col[2]);
+            log.info("已添加项目负责人列: {}.{}", col[0], col[1]);
+        }
+    }
+
+    /** v3.7 后置校验：八列齐备，缺任何一列都无法证明负责人能落库 */
+    private void verifyProjectLeads() {
+        for (String[] col : PROJECT_LEAD_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("RDM v3.7 核验失败：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
+    }
+
     private void doClaimReqNoMigrate() {
         // DROP 旧约束（如果存在）
         if (checkConstraintExists("ck_rdm_req_no_admitted")) {

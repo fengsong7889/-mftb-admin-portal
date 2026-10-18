@@ -46,8 +46,24 @@ public class RdmProjectVO {
         private String projectNo;
         private String name;
         private String objective;
+        /** 项目经理用户ID（编辑回显 EmployeeSelect 需要） */
+        private Long pmUserId;
         private String pmUserName;
+        /** 产品负责人用户ID（编辑回显 EmployeeSelect 需要） */
+        private Long productOwnerUserId;
         private String productOwnerUserName;
+        /** 技术负责人 */
+        private Long techLeadUserId;
+        private String techLeadUserName;
+        /** UI 设计负责人 */
+        private Long uiDesignerUserId;
+        private String uiDesignerUserName;
+        /** 测试/QA 负责人 */
+        private Long qaLeadUserId;
+        private String qaLeadUserName;
+        /** 运维/DevOps 负责人 */
+        private Long opsLeadUserId;
+        private String opsLeadUserName;
         private String planStartDate;
         private String planEndDate;
         private String status;

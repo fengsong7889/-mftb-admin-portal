@@ -72,6 +72,12 @@ npm run check:confirm-modal
    后端运行时凭据（`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`）统一放 `backend/.env.local`（已 gitignore），
    参考 `backend/.env.local.example`。**任何受版本控制的文件禁止写入明文凭据**，由 `npm run secret-scan` 拦截。
 4. **路径别名**：`@/` 映射到 `src/`，在 `tsconfig.json` 和 `vite.config.ts` 中同步配置。
+5. **员工选择统一用 `EmployeeSelect` 组件**：凡表单中需要选择员工/人员的字段，一律使用
+   `src/pages/MeetingManagement/EmployeeSelect.tsx`（`single` 模式单选），禁止使用普通 `<Input>` 文本框。
+   选项显示格式为 `姓名(工号)` 如 `张三(MF00001)`，数据源为在职员工远程搜索接口。
+   表单需同时存储 `*UserId`（sys_user.id）和 `*UserName`（姓名快照）两个字段，
+   通过 `onChange` 写 userId、`onPick` 写 userName 实现双写。
+   参考实现：`src/pages/Rdm/ProjectDetail.tsx`（项目基本信息负责人字段）。
 
 ## 项目结构
 

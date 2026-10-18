@@ -9,6 +9,11 @@ export interface RoleItem {
   /** 角色编码（用于审批人解析匹配 sys_user.function_roles） */
   code?: string
   description?: string
+  /**
+   * 是否开放员工自助申请：1=出现在门户「系統權限申請」的参考角色目录，0=不开放。
+   * 它不授予任何权限，只决定角色在自助目录里是否可见；内置 admin 角色后端强制为 0。
+   */
+  selfServiceRequestable?: number
   status: number
   permissions: MenuPermission[]
   /** 数据范围档位 */
@@ -27,6 +32,8 @@ export interface RoleItem {
 export interface RolePayload {
   name: string
   description?: string
+  /** 不传表示本次不修改该开关（后端 null-skip）；传 0/1 才会真的改 */
+  selfServiceRequestable?: number
   permissions?: MenuPermission[]
   dataScope?: DataScope
   deptIds?: number[]

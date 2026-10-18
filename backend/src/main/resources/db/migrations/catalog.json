@@ -1784,6 +1784,23 @@
       "comment": "必須獨立版本鍵：core:schema-v10 已落庫的環境不會重跑 migrateSchema()。調用點放在 dataInitializer.run 內緊跟 163 釘釘補列之後、任何 sys_user 查詢之前——SysUser 實體已帶該欄位，MyBatis-Plus 生成的顯式欄位清單會 SELECT 它，缺欄會讓全部用戶查詢報錯。不登記 ContractRegistry：純 UI 偏好欄、非事故相關寫入路徑，缺欄由 applyOnce 後置校驗不記版本 + 下次啟動重試 + readiness 卡流量兜住。與 quick_favorites 刻意分欄：兩者都是整份覆蓋寫入（PUT 傳全量數組），共用一列會互相抹掉對方的數據。"
     },
     {
+      "versionKey": "iam:role-self-service-v1",
+      "module": "iam",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "246_system_access_demand_based.sql"
+      ],
+      "intent": "sys_role 補列 self_service_requestable：門戶「系統權限申請」參考角色目錄的開放開關（默認不開放）",
+      "author": "Qoder",
+      "comment": "必須獨立版本鍵：core:schema-v10 已落庫的環境不會重跑 migrateSchema()。調用點放在 dataInitializer.run 內緊跟 core:portal-favorites-v1 之後、任何 sys_role 實體查詢之前——SysRole 實體已帶該欄位，MyBatis-Plus 生成的顯式欄位清單會 SELECT 它，缺欄會讓全部角色查詢報 Unknown column（與 sys_user.portal_favorites 同一陷阱）。欄位語義：1=該角色出現在門戶「系統權限申請」頁的參考角色目錄（仍需已持目標系統准入、啟用中、非內置 admin），0=不開放。它不授予任何權限，只決定角色在自助目錄裡是否可見；員工選中也只是「建議」，最終由審批人在流程上指定授權角色，兌現前 requireGrantableRole 會再校驗一次。NOT NULL DEFAULT 0 是安全下限：若可空或默認 1，存量角色會在一次結構遷移裡默默變成「已開放自助申請」，把全量角色清單推到零權限員工面前，故後置校驗連 IS_NULLABLE 與 COLUMN_DEFAULT 一起查，不滿足即不記版本 + readiness 卡流量。不登記 ContractRegistry：sys_role 沒有 Java 側建表 DDL 唯一副本（由 sql/01_init_system.sql 基線建），為單列補一條契約會讓契約校驗誤判整表；缺列由 applyOnce 後置校驗兜住。回滾=回退代碼；欄位保留不刪（刪列會丟失管理員已做的開放決定），需要關閉目錄時 UPDATE sys_role SET self_service_requestable=0 即可，不影響已提交的申請單與已兌現的角色綁定。"
+    },
+    {
       "versionKey": "rdm:schema:v3.4",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",
@@ -1965,6 +1982,94 @@
       "intent": "新建离职联动任务表 hr_offboarding_task（EAM 资产交接 / OA 待办改派）+ hr_lifecycle_request 补交接接收人两列",
       "author": "Qoder",
       "comment": "对应方案 §7.4「账号停用、权限撤销、OA 待办转交、资产交接…分别有执行状态、失败原因和重试入口；重试不得重复生成业务单」与 §7.2「离职增加交接责任人任务」。为什么需要表而不是离职事务里同步调用：交接接收人常常在离职办理之后才被指定，EAM 也可能拒登记（资产状态不符）；同步做会把「离职办理成功」绑死在「外部模块此刻可用」上。为什么不复用 hr_effective_task：那张表是一单一行的到期执行凭据，本表是一单多行的跨模块动作清单（uk 为 (request_id, task_type)），混用会让两个唯一键与「到期」语义都失去含义。真实事故面：biz_oa_approval_task.approver 存「姓名(工号)」字符串且没有任何改派入口，而 requireNodeApprover 是 fail-closed——审批人离职后他名下的 pending 节点会永久卡死，本迁移是它唯一的出路。不回填历史离职单据：那些单据的资产与待办早已人工处置，凭空补一批 PENDING 只会制造无法判断真伪的待办。hr_lifecycle_request 的 createTableIfMissing 故意留空（存量核心表不能让启动自愈凭空建表）。接收人不由代码默认取直属上级：那是把人没同意的事做成看起来已授权。@Order(34) 晚于雇佣期间(32)与人事审计(33)。"
+    },
+    {
+      "versionKey": "oa:system-access:v1.0",
+      "module": "oa",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "systemAccessSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "system-access-request",
+      "scriptFiles": [
+        "243_system_access_request.sql"
+      ],
+      "intent": "企業門戶「我要申請」落地：建 biz_system_access_request，登记 XTSQ 编号规则与 system_access 流程定义/配置",
+      "comment": "四件事必须同批落地，缺一件链路就断在不同位置：(1) 申请单表承载申请业务事实与授权兑现结果（OA 流程实例只承载审批流转），凭证/勾选菜单用 MEDIUMTEXT，因为 biz_oa_request.form_data 是 TEXT(64KB)，base64 凭证会静默截断；(2) sys_biz_seq_rule 登记 system_access_request（XTSQ + YYYYMMDD + 2 位日流水，seq_start=1 首号 01，超 99 自然扩位），该行同时是平台支撐系統「編號生成規則」页的展示真值，缺行/停用时 BizSeqService.requireRule fail-closed，提交直接报「編號生成規則未配置」而不回落通用 OA 号（回落会让规则页看到的前缀与实际发出的号对不上）；(3) biz_oa_process.system_access 让流程中心/流程事项识别类型；(4) biz_workflow_config.system_access 的节点与路由刻意留空，引擎降级为单节点「主管審批」（与 rdm_intake 同口径），管理员可在「流程配置」随时编排而不必改代码。@Order(32) 晚于 DataInitializer(5) 与 SystemPortalSchemaInitializer(15)，否则 INSERT 打在还不存在的表上。后置校验实查表存在、规则行 prefix=XTSQ 且 status=1、流程定义 status=1、流程配置行存在——只校表存在不够，规则被停用时表还在但每次提交都失败。DDL 唯一副本在 SystemAccessSchemaInitializer.CREATE_TABLE_SQL，ContractRegistry 直接引用它做启动自愈，不另抄一份以免结构漂移。243 腳本僅作參考文檔，不進鏡像、不可整腳本重放。回滚=回退代码；停用走 UPDATE status=0（流程定义与编号规则），存量单据与已兑现的角色绑定不受影响，已绑定角色按 sys_permission_audit_log 的 CHANGE_BIND 记录（含 flowNo）人工回收。"
+    },
+    {
+      "versionKey": "oa:system-access:v1.1",
+      "module": "oa",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "systemAccessSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "oa:system-access:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "system-access-request",
+      "scriptFiles": [
+        "246_system_access_demand_based.sql"
+      ],
+      "intent": "系統權限申請口徑改造：申請人不再勾選菜單，改陳述使用場景+期限，可選指向開放自助申請的參考角色",
+      "author": "Qoder",
+      "comment": "申請口徑改造（用戶決策 A+B）：申請人不再勾選目標系統的菜單功能，改為陳述使用訴求（場景多選 + 使用期限 + 說明 + 憑證），可選地指向一個「開放自助申請」的參考角色（見 iam:role-self-service-v1）。三條理由：(1) 架構洩露——勾選樹把目標系統整棵功能樹攤給一個對該系統零權限的人，含內部治理類菜單，等於向全員發放各系統功能地圖；(2) 誘導過度授權——勾選樹加「全選」與最小權限原則反向（深測中執行者自己就順手全選 12 項）；(3) 責任錯位——「需要哪些功能」本屬審批人/權限管理員的專業判斷，讓申請人猜菜單雙方都費勁。對齊 Entra ID Access Packages / SailPoint business role / Okta Group 的口徑：申請對像是角色或權限包而非權限點，理由必填，目錄按可申請範圍裁剪（本實作即 self_service_requestable 開關）。補 5 列到 biz_system_access_request：scenarios（場景 code 逗號分隔）、duration_type（permanent/until）、duration_until（DATE）、preferred_role_id、preferred_role_name（名稱快照），全部可空——歷史單據沒有這些事實，給默認值反而是偽造（例如給舊單填 permanent，審批人會把「未採集」誤讀為「申請人說要長期」）。requested_menus 刻意不刪也不改：它是歷史單據的申請事實，刪列等於毀證據；新單留 NULL，審批頁對舊單仍按只讀展示，ContractRegistry 也保留它的自愈 DDL（表被重建後不補列會讓舊單回看報錯）。同批 UPDATE biz_oa_process.description 為新口徑文案（原文案寫著「勾選需要的菜單功能」，留著會把審批人指錯方向），並納入後置校驗：只校列存在會讓「結構就緒但說明誤導」的半就緒狀態靜默過關。審批側同步改口徑：grant-options 不再返回 coveredMenuCount/missingMenuNames（菜單明細清單），改為 grantedMenuCount（只有數量）+ preferred 標記 + 角色業務說明，排序改為 preferred 優先、再按已授權功能數降序。本期不做到期自動回收：duration_until 只是審批人的判斷依據，前端已如實告知，不得當成權限有效期承諾。回滾=回退代碼；5 列保留不刪（回退後舊代碼不讀它們，刪列會毀掉已提交的申請事實）；biz_oa_process.description 不會隨代碼回退自動改回（applyOnce 已記版本），如需回退須人工執行一條 UPDATE，該項只影響流程中心一行說明文字。"
+    },
+    {
+      "versionKey": "oa:system-access:v1.2",
+      "module": "oa",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "systemAccessSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "oa:system-access:v1.1"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "system-access-request",
+      "scriptFiles": [
+        "247_system_access_expiry.sql"
+      ],
+      "intent": "系統權限申請到期自動回收：申請單補 grant_newly_bound/revoke_status/revoked_at/revoked_by 四列與掃描索引",
+      "author": "Qoder",
+      "comment": "到期自动回收（用户决策：到期需要回收）。补 4 列 + 一个扫描索引：grant_newly_bound=本次兑现是否真的新绑了角色、revoke_status(none/revoked/kept)、revoked_at、revoked_by。三条不可省的设计：(1) 回收资格只认 grant_newly_bound=1——申请人本来就持有同一角色时绑定是空操作，到期若把它抽走，等于用一张权限申请单收掉管理员从别处给的权限；(2) 存量单据默认 grant_newly_bound=0 是 fail-safe：不能因为上线了一个定时任务就静默收回别人已有的权限，要回收存量必须管理员自己核完清单回填，代码不提供自动回填；(3) 回收前先查同一申请人是否还有其他「未回收且未过期」的单据授予同一角色，有则标 kept 不动绑定——库里权限只有「有/无」一位，先到期的那张不能把后到期的那张打没。执行由 SystemAccessExpiryJob 每日 03:20 一轮（cron/开关均可配：system-access.expiry-cron、system-access.expiry.enabled）；每条单据一个独立事务，靠 revoke_status='none' 的条件更新做认领锁，多实例并发与补跑都不会产生第二份回收，中途失败回滚后状态回到 none 由下一轮重试，不会出现「标了已回收但权限还在身上」的假回收。后置校验连列的默认值一起查（grant_newly_bound 必须 NOT NULL DEFAULT 0、revoke_status 必须 NOT NULL DEFAULT 'none'）：默认值写错就是权限动作而不是结构动作，必须 fail-closed 不记版本。建表 DDL 唯一副本（SystemAccessSchemaInitializer.CREATE_TABLE_SQL）已含这 4 列，ContractRegistry 同步给自愈 DDL。247 腳本僅作參考文檔，不進鏡像、不可整腳本重放。回滚=回退代碼；4 列保留不刪（回退後舊代碼不讀它們，刪列會丟掉回收歷史）；緊急停機用 system-access.expiry.enabled=false（不需發版）；已被回收的權限按 sys_permission_audit_log 的 REVOKE 記錄（含 flowNo 與前後快照）逐條人工重授，把 revoke_status 改回 none 會讓作業重掃但不會自動重授已解綁的角色。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.6",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.5"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "244_rdm_iteration_code_rules.sql"
+      ],
+      "intent": "迭代編碼改系統發號：登記 rdm_iteration_sprint（SP+YYYYMM+3位）/ rdm_iteration_version（VER+YYYYMM+3位）/ rdm_iteration_hotfix（HF+YYYYMMDD+2位）三條編號規則",
+      "comment": "迭代編碼是需求/任務掛接的穩定鍵（rdm_requirement.iteration_code / rdm_work_task.iteration_code 按 code 字符串關聯），手工填寫曾出現格式漂移與同期撞號風險，改爲保存時由 BizSeqService 服務端發號、前端表单不再收 code。代碼側 BizSeqService.ruleKeyForIterationType 與本批種子必須同批原子交付：缺行時 requireRule fail-closed，新建迭代直接報「編號生成規則未配置」，不回落任何規則（回落會讓不同格式的號混進同一條流水）。編輯不改編碼（改碼會斷開需求/任務掛接）。發號後再查 uk_rdm_iteration_code 兜底存量手工碼撞號，撞則順延重試 5 次。後置校驗實查三條規則 prefix/date_format/seq_length/status 全對——只校行存在不夠，規則被停用或前綴被改時發號口徑與規則頁展示會對不上。244 腳本僅作參考文檔，不進鏡像、不可整腳本重放。回滚=回退代码，種子行留著無害（無引用方時不發號）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.7",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.6"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "245_rdm_project_lead_columns.sql"
+      ],
+      "intent": "项目主表补四组负责人列：tech_lead / ui_designer / qa_lead / ops_lead 各 user_id + user_name 共 8 列（可空）",
+      "comment": "前端新增项目表单已收四组 EmployeeSelect 选人字段（双写 userId+userName），后端实体/DTO/VO/服务层同批补齐；缺列时服务层 insert/update 报「未知列」，故代码与列必须原子交付。逐列先查再加（ADD COLUMN 重跑必撞 duplicate column，不能整脚本重放）；后置校验八列齐备，缺任何一列不记版本。更新语义以「userName 非 null」为提供哨兵：表单恒传字符串（清空传空串）支持清空负责人，暂停/风险等局部更新不传这些 key 不会误清。Detail 同批补回 pmUserId/productOwnerUserId（前端编辑回显 EmployeeSelect 早已依赖但后端一直漏返，回显只能靠姓名快照猜）。列均可空：存量项目无负责人为合法事实，不做回填。245 腳本僅作參考文檔，不進鏡像。回滚=回退代码，列留著無害（服务层不读不写）。"
     }
   ]
 }

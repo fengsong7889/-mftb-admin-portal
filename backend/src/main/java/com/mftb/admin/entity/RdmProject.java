@@ -41,6 +41,30 @@ public class RdmProject {
     /** 产品负责人姓名 */
     private String productOwnerUserName;
 
+    /** 技术负责人用户ID */
+    private Long techLeadUserId;
+
+    /** 技术负责人姓名 */
+    private String techLeadUserName;
+
+    /** UI 设计负责人用户ID */
+    private Long uiDesignerUserId;
+
+    /** UI 设计负责人姓名 */
+    private String uiDesignerUserName;
+
+    /** 测试/QA 负责人用户ID */
+    private Long qaLeadUserId;
+
+    /** 测试/QA 负责人姓名 */
+    private String qaLeadUserName;
+
+    /** 运维/DevOps 负责人用户ID */
+    private Long opsLeadUserId;
+
+    /** 运维/DevOps 负责人姓名 */
+    private String opsLeadUserName;
+
     /** 计划开始日期 */
     private LocalDate planStartDate;
 

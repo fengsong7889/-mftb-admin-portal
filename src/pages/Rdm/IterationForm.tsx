@@ -4,14 +4,13 @@
  * 产能（工时）是排期对账的分母：填 0 就等于放弃超载预警，因此页面把「产能」
  * 与「已排工时」并列展示，编辑态实时提示负载率。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, message } from 'antd'
-import { SaveOutlined } from '@ant-design/icons'
+import { useEffect, useState } from 'react'
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd'
+import { CalendarOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import { fetchEmployees } from '../../api/employee'
 import { fetchIterations, saveIteration, type RdmIterationForm as RdmIterationPayload, type RdmIterationItem } from '../../api/rdm'
 import {
   RDM_ITERATION_STATUS,
@@ -25,14 +24,13 @@ import './index.css'
 
 const { TextArea } = Input
 
-/** 表单内部结构（日期用组件类型，提交时转字符串） */
+/** 表单内部结构（日期用组件类型，提交时转字符串；编码系统发号，不在表单内） */
 interface FormValues {
-  code: string
   name: string
   iterationType: RdmIterationType
   range?: [dayjs.Dayjs, dayjs.Dayjs]
   capacityHours?: number
-  owner?: string
+  owner?: number[]
   status: RdmIterationStatus
   remark?: string
 }
@@ -45,8 +43,6 @@ export default function IterationForm() {
   const [form] = Form.useForm<FormValues>()
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
   const [saving, setSaving] = useState(false)
-  const capacity = Form.useWatch('capacityHours', form)
-  const owner = Form.useWatch('owner', form)
 
   useEffect(() => {
     fetchIterations().then(list => {
@@ -54,35 +50,24 @@ export default function IterationForm() {
       const current = list.find(i => i.id === iterationId)
       if (!current) return
       form.setFieldsValue({
-        code: current.code,
         name: current.name,
         iterationType: (current.iterationType ?? RDM_ITERATION_TYPE.SPRINT) as RdmIterationType,
         range: current.startDate && current.endDate ? [dayjs(current.startDate), dayjs(current.endDate)] : undefined,
         capacityHours: current.capacityHours ?? 0,
-        owner: current.ownerUserId ? String(current.ownerUserId) : undefined,
+        owner: current.ownerUserId ? [current.ownerUserId] : undefined,
         status: (current.status ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus,
         remark: current.remark ?? undefined,
       })
     }).catch(() => message.error('迭代資訊載入失敗'))
   }, [iterationId, form])
 
-  const fetchOwnerOptions = useCallback(async (keyword: string) => {
-    const res = await fetchEmployees({ page: 1, size: 20, keyword: keyword || undefined, employmentStatus: 'active' })
-    return (res.records ?? []).map(e => ({ value: String(e.id), label: `${e.name}（${e.empId}${e.department ? ` · ${e.department}` : ''}）` }))
-  }, [])
-
-  const ownerOptions = useMemo(() => {
-    if (!owner) return []
-    const current = iterations.find(i => i.id === iterationId)
-    return [{ value: String(owner), label: current?.ownerName ? `${current.ownerName}（${owner}）` : String(owner) }]
-  }, [owner, iterations, iterationId])
-
-  /** 编辑态已排工时（负载率提示用），新增态为 0 */
-  const scheduledHours = iterations.find(i => i.id === iterationId)?.taskHours ?? 0
+  /** 编辑态当前迭代（负载率提示与编码展示用） */
+  const currentIteration = iterations.find(i => i.id === iterationId)
+  const scheduledHours = currentIteration?.taskHours ?? 0
+  const capacity = Form.useWatch('capacityHours', form)
   const loadRate = capacity && capacity > 0 ? Math.round((scheduledHours / capacity) * 100) : 0
 
   const handleSave = async () => {
-    // 校验失败要给可见提示，不能变成无人接的 rejection（点了保存什么都没发生）
     let values: Awaited<ReturnType<typeof form.validateFields>>
     try {
       values = await form.validateFields()
@@ -90,15 +75,15 @@ export default function IterationForm() {
       message.warning('請先補全迭代表單帶 * 的必填項')
       return
     }
+    const ownerIds = values.owner as number[] | undefined
     const payload: RdmIterationPayload = {
       id: iterationId || undefined,
-      code: values.code.trim(),
       name: values.name.trim(),
       iterationType: values.iterationType,
       startDate: values.range?.[0]?.format('YYYY-MM-DD') ?? '',
       endDate: values.range?.[1]?.format('YYYY-MM-DD') ?? '',
       capacityHours: values.capacityHours,
-      ownerUserId: values.owner ? Number(values.owner) : undefined,
+      ownerUserId: ownerIds?.[0] ?? undefined,
       status: values.status,
       remark: values.remark,
     }
@@ -113,7 +98,7 @@ export default function IterationForm() {
         icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         content: (
           <div className="confirm-info-card">
-            <div className="confirm-info-row"><span>迭代編號：</span><b>{payload.code}</b></div>
+            <div className="confirm-info-row"><span>迭代編號：</span><b>{iterationId ? currentIteration?.code ?? '-' : '系統自動發號'}</b></div>
             <div className="confirm-info-row"><span>迭代名稱：</span><b>{payload.name}</b></div>
             <div className="confirm-info-row"><span>起止日期：</span><b>{payload.startDate} ~ {payload.endDate}</b></div>
             <div className="confirm-info-row"><span>容納工時：</span><b>{payload.capacityHours} h</b></div>
@@ -125,13 +110,11 @@ export default function IterationForm() {
         onCancel: () => resolve(false),
       })
     })
-    if (!confirmed) {
-      return
-    }
+    if (!confirmed) return
     setSaving(true)
     try {
-      await saveIteration(payload)
-      message.success(iterationId ? '迭代已更新' : '迭代已創建')
+      const saved = await saveIteration(payload)
+      message.success(iterationId ? '迭代已更新' : `迭代已創建：${saved.code}`)
       navigate('/rdm-iteration')
     } catch {
       // request.ts 已统一弹后端失败原因，此处不再双弹（§G.4）
@@ -146,7 +129,9 @@ export default function IterationForm() {
       <RdmFormHeader
         title={iterationId ? '編輯迭代' : '新增迭代'}
         onBack={() => navigate(-1)}
-        meta="迭代編碼建議帶年份與批次，如 SP2026-10A；產能按團隊可投入工時填寫"
+        meta={iterationId
+          ? `迭代編碼 ${currentIteration?.code ?? '-'} 由系統發號、不可修改；產能按團隊可投入工時填寫`
+          : '迭代編碼保存時由系統按類型自動發號（常規 SP／版本專項 VER／緊急修復 HF）；產能按團隊可投入工時填寫'}
       />
 
       {iterationId > 0 && (
@@ -161,52 +146,50 @@ export default function IterationForm() {
         />
       )}
 
-      <Form form={form} layout="vertical" style={{ maxWidth: 720 }} initialValues={{ iterationType: RDM_ITERATION_TYPE.SPRINT, status: RDM_ITERATION_STATUS.PLANNING }}>
-        <div className="rdm-form-section">
-          <div className="rdm-form-section-title">迭代信息</div>
-          <Space size={16} wrap>
-            <Form.Item label="迭代編碼" name="code" rules={[{ required: true, message: '請填寫迭代編碼' }, { max: 32, message: '不超過 32 字' }]}>
-              <Input placeholder="例：SP2026-10A" maxLength={32} style={{ width: 200 }} />
-            </Form.Item>
+      <Form form={form} layout="vertical" initialValues={{ iterationType: RDM_ITERATION_TYPE.SPRINT, status: RDM_ITERATION_STATUS.PLANNING }}>
+        {/* 迭代信息 */}
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#E6F7FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CalendarOutlined style={{ fontSize: 14, color: '#1890FF' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>迭代信息</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item label="迭代名稱" name="name" rules={[{ required: true, message: '請填寫迭代名稱' }, { max: 64, message: '不超過 64 字' }]}>
-              <Input placeholder="例：10 月上半迭代" maxLength={64} style={{ width: 260 }} />
+              <Input placeholder="例：10 月上半迭代" maxLength={64} />
             </Form.Item>
-          </Space>
-          <Space size={16} wrap>
             <Form.Item label="類型" name="iterationType" rules={[{ required: true, message: '請選擇類型' }]}>
-              <Select
-                style={{ width: 160 }}
-                options={Object.entries(RDM_ITERATION_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
-              />
+              <Select options={Object.entries(RDM_ITERATION_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
             <Form.Item label="起止日期" name="range" rules={[{ required: true, message: '請選擇起止日期' }]}>
-              <DatePicker.RangePicker style={{ width: 260 }} />
+              <DatePicker.RangePicker style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label="狀態" name="status" rules={[{ required: true, message: '請選擇狀態' }]}>
-              <Select
-                style={{ width: 140 }}
-                options={Object.entries(RDM_ITERATION_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
-              />
+              <Select options={Object.entries(RDM_ITERATION_STATUS_LABEL).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
-          </Space>
+          </div>
         </div>
 
-        <div className="rdm-form-section">
-          <div className="rdm-form-section-title">產能與負責人</div>
-          <Space size={16} wrap>
+        {/* 產能與負責人 */}
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#FFF7E6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TeamOutlined style={{ fontSize: 14, color: '#FA8C16' }} />
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>產能與負責人</span>
+            <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item label="產能（工時）" name="capacityHours" rules={[{ required: true, message: '請填寫產能' }]}>
-              <InputNumber min={0} step={8} style={{ width: 160 }} placeholder="例：400" />
+              <InputNumber min={0} step={8} style={{ width: '100%' }} placeholder="例：400" />
             </Form.Item>
             <Form.Item label="迭代負責人" name="owner">
-              <RemoteSearchSelect
-                placeholder="輸入姓名/工號搜索在職員工"
-                fetchOptions={fetchOwnerOptions}
-                initialOptions={ownerOptions}
-                style={{ width: 300 }}
-              />
+              <EmployeeSelect single placeholder="搜尋姓名或工號" />
             </Form.Item>
-          </Space>
-          <Form.Item label="說明" name="remark">
+          </div>
+          <Form.Item label="說明" name="remark" style={{ marginTop: 16 }}>
             <TextArea rows={3} maxLength={500} showCount placeholder="例：含報表專項與移動端適配，預留 20% 處理線上問題" />
           </Form.Item>
         </div>

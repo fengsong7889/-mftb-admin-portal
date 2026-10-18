@@ -614,8 +614,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public RdmDeliveryVO.Iteration saveIteration(RdmDeliveryDTO.Iteration dto) {
-        if (dto == null || !StringUtils.hasText(dto.getCode()) || !StringUtils.hasText(dto.getName())) {
-            throw new BusinessException("迭代編碼與名稱必填");
+        if (dto == null || !StringUtils.hasText(dto.getName())) {
+            throw new BusinessException("迭代名稱必填");
         }
         LocalDate start = parseDate(dto.getStartDate());
         LocalDate end = parseDate(dto.getEndDate());
@@ -624,24 +624,22 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         SysUser current = operatorResolver.currentUser();
         SysUser owner = dto.getOwnerUserId() == null ? null : userMapper.selectById(dto.getOwnerUserId());
+        String type = StringUtils.hasText(dto.getIterationType()) ? dto.getIterationType() : "sprint";
         RdmIteration entity;
         if (dto.getId() == null) {
-            Long dup = iterationMapper.selectCount(new LambdaQueryWrapper<RdmIteration>()
-                    .eq(RdmIteration::getCode, dto.getCode().trim()));
-            if (dup != null && dup > 0) {
-                throw new BusinessException("迭代編碼已存在: " + dto.getCode());
-            }
             entity = new RdmIteration();
             entity.setCreatedBy(operatorResolver.operatorSignature(current));
+            // 編碼系統發號：前端傳入的 code 一律忽略，避免手工填號撞號與格式漂移
+            entity.setCode(nextIterationCode(type));
         } else {
             entity = iterationMapper.selectById(dto.getId());
             if (entity == null) {
                 throw new BusinessException("迭代不存在");
             }
+            // 編輯不改編碼：需求/任務以 iteration_code 掛接迭代，改碼會斷鏈
         }
-        entity.setCode(dto.getCode().trim());
         entity.setName(dto.getName().trim());
-        entity.setIterationType(StringUtils.hasText(dto.getIterationType()) ? dto.getIterationType() : "sprint");
+        entity.setIterationType(type);
         entity.setStartDate(start);
         entity.setEndDate(end);
         entity.setCapacityHours(dto.getCapacityHours() == null ? 0 : dto.getCapacityHours());
@@ -657,6 +655,24 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         return listIterations().stream().filter(i -> i.getId().equals(entity.getId())).findFirst()
                 .orElseThrow(() -> new BusinessException("迭代保存後讀取失敗"));
+    }
+
+    /**
+     * 按類型發迭代編碼（系統生成，前端不再收手工輸入）。
+     * <p>取號後再查唯一鍵兜底：存量手工編碼理論上可能佔用同形狀號（如早年手工錄過
+     * SP202610001），撞號則順延取下一個，重試 5 次仍撞則 fail-closed。
+     */
+    private String nextIterationCode(String iterationType) {
+        String ruleKey = BizSeqService.ruleKeyForIterationType(iterationType);
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String code = bizSeqService.next(ruleKey);
+            Long dup = iterationMapper.selectCount(new LambdaQueryWrapper<RdmIteration>()
+                    .eq(RdmIteration::getCode, code));
+            if (dup == null || dup == 0) {
+                return code;
+            }
+        }
+        throw new BusinessException("迭代編碼連續撞號，請重試或聯繫管理員");
     }
 
     /* ==================== 需求变更 ==================== */

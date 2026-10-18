@@ -51,6 +51,14 @@ import java.util.Map;
  * 与其他基线初始化器一样每次启动重放自愈
  * （新建部门、新建角色、授权中心误删都能在下一次启动补回），代价是管理员若想
  * <b>长期</b>禁止某角色使用会议系统，必须停用该系统准入而不是删菜单行。
+ *
+ * <p><b>基线菜单被退役时跳过，不阻断启动</b>：本类的菜单基线只取「当前仍启用」的那部分
+ * ——行存在但已软删（{@code deleted=1}）或已停用（{@code status=0}）视为管理员一次有意的
+ * 治理动作（仓库既定口径：菜单退役走软删），跳过即可；只有「行根本不存在」才 fail-closed，
+ * 因为那才是种子没落地，此时授权会写到不存在的 menu_id 上。
+ * 不加这层区分时，一次正常的菜单退役会让一个每次启动都重放的初始化器抛异常，
+ * 把<b>整个后端</b>打成起不来（真实事故：{@code meeting-management} 分组被退役并把它
+ * 的子菜单改挂到 {@code meeting-admin} 后，与会议无关的改动也无法重启验证）。
  */
 @Slf4j
 @Component
@@ -89,16 +97,10 @@ public class MeetingAccessGrantInitializer implements CommandLineRunner {
     }
 
     private void migrate() {
-        Map<String, Long> menuIds = new LinkedHashMap<>();
-        for (String menuKey : BASELINE_MENUS.keySet()) {
-            Long menuId = jdbcTemplate.queryForList(
-                            "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND status = 1 LIMIT 1",
-                            Long.class, menuKey)
-                    .stream().findFirst().orElse(null);
-            if (menuId == null) {
-                throw new IllegalStateException("會議菜單未就緒，無法授權: " + menuKey);
-            }
-            menuIds.put(menuKey, menuId);
+        Map<String, Long> menuIds = resolveActiveBaselineMenus();
+        if (menuIds.isEmpty()) {
+            log.warn("會議使用側基線菜單均已退役，跳過本次基線授權: baseline={}", BASELINE_MENUS.keySet());
+            return;
         }
 
         List<Long> roleIds = jdbcTemplate.queryForList(
@@ -129,6 +131,36 @@ public class MeetingAccessGrantInitializer implements CommandLineRunner {
         permissionService.evictAll();
         log.info("會議使用側基線授權完成: roles={}, departments={}, 新建={} 條, 補空動作={} 條, menus={}",
                 roleIds.size(), deptIds.size(), granted, filled, BASELINE_MENUS.keySet());
+    }
+
+    /**
+     * 取基线中「当前仍然启用」的菜单：退役的跳过并留日志，真缺行的才 fail-closed。
+     * <p>为什么必须区分：{@code deleted=1 / status=0} 与「查无此行」在 SQL 里都是「一行都查不到」，
+     * 但业务含义相反——前者是管理员主动退役（本类不该把它复活，也不该因它罢工），
+     * 后者是种子未落地（往不存在的 menu_id 写授权等于埋一颗雷）。两者一律抛异常的话，
+     * 任何一次菜单退役都会让这个每次启动重放的初始化器把整个应用启动打断。
+     */
+    private Map<String, Long> resolveActiveBaselineMenus() {
+        Map<String, Long> active = new LinkedHashMap<>();
+        for (String menuKey : BASELINE_MENUS.keySet()) {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT id, deleted, status FROM sys_menu WHERE menu_key = ? LIMIT 1", menuKey);
+            if (rows.isEmpty()) {
+                throw new IllegalStateException("會議菜單未就緒，無法授權: " + menuKey);
+            }
+            Map<String, Object> row = rows.get(0);
+            Object deleted = row.get("deleted");
+            Object status = row.get("status");
+            boolean retired = (deleted instanceof Number deletedFlag && deletedFlag.intValue() != 0)
+                    || (status instanceof Number statusFlag && statusFlag.intValue() == 0);
+            if (retired) {
+                log.info("會議基線菜單已退役，跳過授權: menuKey={}, deleted={}, status={}",
+                        menuKey, deleted, status);
+                continue;
+            }
+            active.put(menuKey, ((Number) row.get("id")).longValue());
+        }
+        return active;
     }
 
     /**
@@ -169,8 +201,14 @@ public class MeetingAccessGrantInitializer implements CommandLineRunner {
     }
 
     private void verify() {
-        for (Map.Entry<String, String> entry : BASELINE_MENUS.entrySet()) {
-            String menuKey = entry.getKey();
+        // 后置校验必须与 migrate 同一口径：只校当前启用的基线菜单，
+        // 否则退役掉的菜单会因「角色没授权」永远校不过，把启动再次打死。
+        Map<String, Long> activeMenus = resolveActiveBaselineMenus();
+        if (activeMenus.isEmpty()) {
+            log.warn("會議使用側基線菜單均已退役，跳過基線授權校驗");
+            return;
+        }
+        for (String menuKey : activeMenus.keySet()) {
             Integer missingRoles = jdbcTemplate.queryForObject(
                     "SELECT COUNT(*) FROM sys_role r WHERE r.deleted = 0 AND r.status = 1 AND NOT EXISTS ("
                             + "SELECT 1 FROM sys_role_menu rm JOIN sys_menu m ON m.id = rm.menu_id "

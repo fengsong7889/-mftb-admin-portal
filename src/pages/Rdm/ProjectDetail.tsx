@@ -39,12 +39,14 @@ import {
   PauseCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SaveOutlined,
   StopOutlined,
   TeamOutlined,
   ThunderboltOutlined,
   UserAddOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import {
   addProjectMember,
@@ -183,8 +185,18 @@ export default function ProjectDetail() {
           form.setFieldsValue({
             name: detailRes.name,
             objective: detailRes.objective || '',
+            pmUserId: detailRes.pmUserId ?? undefined,
             pmUserName: detailRes.pmUserName || '',
+            productOwnerUserId: detailRes.productOwnerUserId ?? undefined,
             productOwnerUserName: detailRes.productOwnerUserName || '',
+            techLeadUserId: detailRes.techLeadUserId ?? undefined,
+            techLeadUserName: detailRes.techLeadUserName || '',
+            uiDesignerUserId: detailRes.uiDesignerUserId ?? undefined,
+            uiDesignerUserName: detailRes.uiDesignerUserName || '',
+            qaLeadUserId: detailRes.qaLeadUserId ?? undefined,
+            qaLeadUserName: detailRes.qaLeadUserName || '',
+            opsLeadUserId: detailRes.opsLeadUserId ?? undefined,
+            opsLeadUserName: detailRes.opsLeadUserName || '',
             planStartDate: detailRes.planStartDate ? dayjs(detailRes.planStartDate) : null,
             planEndDate: detailRes.planEndDate ? dayjs(detailRes.planEndDate) : null,
             defaultAcceptancePath: detailRes.defaultAcceptancePath || 'A',
@@ -293,8 +305,18 @@ export default function ProjectDetail() {
       const payload = {
         name: values.name,
         objective: values.objective || undefined,
+        pmUserId: values.pmUserId || undefined,
         pmUserName: values.pmUserName || undefined,
+        productOwnerUserId: values.productOwnerUserId || undefined,
         productOwnerUserName: values.productOwnerUserName || undefined,
+        techLeadUserId: values.techLeadUserId ?? null,
+        techLeadUserName: values.techLeadUserName ?? '',
+        uiDesignerUserId: values.uiDesignerUserId ?? null,
+        uiDesignerUserName: values.uiDesignerUserName ?? '',
+        qaLeadUserId: values.qaLeadUserId ?? null,
+        qaLeadUserName: values.qaLeadUserName ?? '',
+        opsLeadUserId: values.opsLeadUserId ?? null,
+        opsLeadUserName: values.opsLeadUserName ?? '',
         planStartDate: values.planStartDate ? values.planStartDate.format('YYYY-MM-DD') : undefined,
         planEndDate: values.planEndDate ? values.planEndDate.format('YYYY-MM-DD') : undefined,
         defaultAcceptancePath: values.defaultAcceptancePath || 'A',
@@ -364,36 +386,65 @@ export default function ProjectDetail() {
           onBack={() => backToList()}
           backText="返回項目"
         />
-        <div className="rdm-card">
+        <div className="rdm-card" style={{ padding: '20px 24px' }}>
           <div className="rdm-card-title">
             <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
-              <FileTextOutlined />
+              <FileTextOutlined style={{ fontSize: 14 }} />
             </span>
-            基本信息
+            <span>基本信息</span>
+            <div className="rdm-card-title-split" />
           </div>
-          <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
-            <Form.Item name="name" label="項目名稱" rules={[{ required: true, message: '請輸入項目名稱' }]}>
-              <Input placeholder="輸入項目名稱" maxLength={100} />
-            </Form.Item>
-            <Form.Item name="objective" label="項目目標">
-              <TextArea placeholder="描述項目的核心目標與交付成果" rows={3} maxLength={500} />
-            </Form.Item>
-            <Space size={24} style={{ display: 'flex' }}>
-              <Form.Item name="pmUserName" label="項目經理" style={{ flex: 1 }}>
-                <Input placeholder="項目經理姓名" />
+          <Form form={form} layout="vertical">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <Form.Item name="name" label="項目名稱" rules={[{ required: true, message: '請輸入項目名稱' }]}>
+                <Input placeholder="輸入項目名稱" maxLength={100} />
               </Form.Item>
-              <Form.Item name="productOwnerUserName" label="產品負責人" style={{ flex: 1 }}>
-                <Input placeholder="產品負責人姓名" />
+              <Form.Item name="pmUserName" label="項目經理">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('pmUserId') ? [form.getFieldValue('pmUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ pmUserId: ids[0] ?? undefined, pmUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ pmUserName: items[0]?.name ?? '' }) }} />
               </Form.Item>
-            </Space>
-            <Space size={24} style={{ display: 'flex' }}>
-              <Form.Item name="planStartDate" label="計劃開始日期" style={{ flex: 1 }}>
+              <Form.Item name="productOwnerUserName" label="產品負責人">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('productOwnerUserId') ? [form.getFieldValue('productOwnerUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ productOwnerUserId: ids[0] ?? undefined, productOwnerUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ productOwnerUserName: items[0]?.name ?? '' }) }} />
+              </Form.Item>
+              <Form.Item name="techLeadUserName" label="技術負責人">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('techLeadUserId') ? [form.getFieldValue('techLeadUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ techLeadUserId: ids[0] ?? undefined, techLeadUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ techLeadUserName: items[0]?.name ?? '' }) }} />
+              </Form.Item>
+              <Form.Item name="uiDesignerUserName" label="UI 設計負責人">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('uiDesignerUserId') ? [form.getFieldValue('uiDesignerUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ uiDesignerUserId: ids[0] ?? undefined, uiDesignerUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ uiDesignerUserName: items[0]?.name ?? '' }) }} />
+              </Form.Item>
+              <Form.Item name="qaLeadUserName" label="測試負責人">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('qaLeadUserId') ? [form.getFieldValue('qaLeadUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ qaLeadUserId: ids[0] ?? undefined, qaLeadUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ qaLeadUserName: items[0]?.name ?? '' }) }} />
+              </Form.Item>
+              <Form.Item name="opsLeadUserName" label="運維負責人">
+                <EmployeeSelect single placeholder="搜尋姓名或工號"
+                  value={form.getFieldValue('opsLeadUserId') ? [form.getFieldValue('opsLeadUserId')] : undefined}
+                  onChange={(ids: number[]) => { form.setFieldsValue({ opsLeadUserId: ids[0] ?? undefined, opsLeadUserName: undefined }) }}
+                  onPick={(items) => { form.setFieldsValue({ opsLeadUserName: items[0]?.name ?? '' }) }} />
+              </Form.Item>
+              <Form.Item name="planStartDate" label="計劃開始日期">
                 <DatePicker style={{ width: '100%' }} placeholder="選擇開始日期" />
               </Form.Item>
-              <Form.Item name="planEndDate" label="計劃結束日期" style={{ flex: 1 }}>
+              <Form.Item name="planEndDate" label="計劃結束日期">
                 <DatePicker style={{ width: '100%' }} placeholder="選擇結束日期" />
               </Form.Item>
-            </Space>
+            </div>
+            <Form.Item name="objective" label="項目目標" style={{ marginTop: 16 }}>
+              <TextArea placeholder="描述項目的核心目標與交付成果" rows={3} maxLength={500} />
+            </Form.Item>
             <Form.Item name="defaultAcceptancePath" label="默認驗收路徑">
               <Radio.Group>
                 <Radio value="A">路徑A（先驗收後上線）</Radio>
@@ -404,7 +455,7 @@ export default function ProjectDetail() {
         </div>
         <div className="form-footer">
           <Button onClick={() => backToList()}>取消</Button>
-          <Button type="primary" loading={submitting} onClick={handleFormSubmit}>
+          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleFormSubmit}>
             {mode === 'edit' ? '保存修改' : '創建項目'}
           </Button>
         </div>

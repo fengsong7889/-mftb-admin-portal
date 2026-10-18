@@ -5,7 +5,9 @@
  *  1. 待办看板（任务30）：mine/waiting_others/unassigned 三桶、去重计数用 todo-board.total、
  *     rawReasonHits > total 时展示「已去重 N 条」；
  *  2. 角色化改造：首屏区块由菜单权限推导的身份决定，且「区块不可见 == 不发该区块的请求」——
- *     这条是角色化的实质收益，如果只是渲染层隐藏而仍在后台打接口，就等于没做。
+ *     这条是角色化的实质收益，如果只是渲染层隐藏而仍在后台打接口，就等于没做；
+ *  3. 横幅口径：只做「工作视图 + 今日焦点 + 三个动作」，不重复首页的头像/姓名/日期，
+ *     也不抄侧边栏已有的工作台直达入口。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
@@ -32,6 +34,17 @@ const mockAuth = vi.hoisted(() => ({
   menus: new Set<string>(),
   actions: new Set<string>(),
   empId: 'MF0001',
+}))
+
+/**
+ * i18n 在测试环境未初始化（useTranslation 拿不到实例时 t 会掉回 key），
+ * 这里直接返回 defaultValue 原繁体，使横幅断言与浏览器里看到的文字一致。
+ */
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => String(options?.defaultValue ?? key),
+    i18n: { language: 'zh-TW', changeLanguage: () => undefined },
+  }),
 }))
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -81,6 +94,14 @@ const board = {
   computedAt: null,
 } as never
 
+/** 零待办看板：横幅焦点区应该收起所有标签，改给「没有紧急事项」的安抚文案 */
+const quietBoard = {
+  projectId: 0, userId: 1, authenticated: true,
+  total: 0, mineCount: 0, waitingOthersCount: 0, unassignedCount: 0, rawReasonHits: 0,
+  todos: [],
+  computedAt: null,
+} as never
+
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
@@ -108,20 +129,30 @@ function heroOf(container: HTMLElement) {
   return within(hero as HTMLElement)
 }
 
-/** 等首屏加载完（loading 分支只渲染 Spin，hero 还不存在） */
+/** 等首屏加载完（loading 分支只渲染 Spin，hero 还不存在）；横幅已撤页名，改等稳定的视图标题 */
 async function waitForHero(container: HTMLElement) {
-  await within(container).findByText('個人工作台')
+  await within(container).findByText('我的工作視圖')
   return heroOf(container)
+}
+
+/** 待办看板区（区块 wrapper 的 id 同时是横幅「今日焦點」的滚动锚点） */
+function boardOf(container: HTMLElement) {
+  const board = container.querySelector('#rdm-wb-todo-board')
+  if (!board) throw new Error('待办看板区未渲染')
+  return within(board as HTMLElement)
 }
 
 describe('Workbench 三桶待辦', () => {
   it('展示 mine/waiting_others/unassigned 三桶（含「等待他人」）', async () => {
-    renderWb()
-    expect(await screen.findByText('我負責')).toBeInTheDocument()
-    expect(screen.getByText('等待他人')).toBeInTheDocument()
-    expect(screen.getByText('未指派')).toBeInTheDocument()
+    // 桶名必须在看板范围内查：横幅今日焦點也用同一个词，全局 getByText 会撞车
+    const { container } = renderWb()
+    await waitForHero(container)
+    const area = boardOf(container)
+    expect(await area.findByText('我負責')).toBeInTheDocument()
+    expect(area.getByText('等待他人')).toBeInTheDocument()
+    expect(area.getByText('未指派')).toBeInTheDocument()
     // 各桶內的待辦標題
-    expect(screen.getByText('等待他人C')).toBeInTheDocument()
+    expect(area.getByText('等待他人C')).toBeInTheDocument()
   })
 
   it('去重計數用 todo-board 的 total（4），不用分組相加（5）', async () => {
@@ -183,17 +214,29 @@ describe('Workbench 角色化区块', () => {
     expect(fetchMyTasks).not.toHaveBeenCalled()
   })
 
-  it('hero 的主入口按身份切換：測試看到測試工作台，業務方看到自己的提交', async () => {
+  it('hero 不再抄工作台直达入口：测试工作台归侧边菜单与个性区块，横幅只留提需求/刷新/个性化', async () => {
     mockAuth.menus.add('rdm-delivery-test')
-    const first = renderWb()
-    const firstHero = await waitForHero(first.container)
+    const hero = await waitForHero(renderWb().container)
     // 按钮带图标时 accessible name 会把图标 aria-label 拼在前面，故用正则包含匹配
-    expect(await firstHero.findByRole('button', { name: /測試工作台/ })).toBeInTheDocument()
+    expect(hero.getByRole('button', { name: /我要提需求/ })).toBeInTheDocument()
+    expect(hero.getByRole('button', { name: /個性化配置/ })).toBeInTheDocument()
+    // 身份直达与全局看板都是侧边栏已有的菜单，横幅重复挂入口会把第一屏钉死
+    expect(hero.queryByRole('button', { name: /測試工作台/ })).not.toBeInTheDocument()
+    expect(hero.queryByRole('button', { name: /全局看板/ })).not.toBeInTheDocument()
+    // 但对应区块照旧按身份上屏，该看的内容没被砍掉
+    expect(await screen.findByText('我的測試批次')).toBeInTheDocument()
+  })
+
+  it('hero 今日焦點只收非零项，全零时给「没有紧急事项」而不是一排 0', async () => {
+    const first = renderWb()
+    const hero = await waitForHero(first.container)
+    // 默认 mock：待办看板 waitingOthersCount=2、stats 全 0 → 只出一枚焦点标签
+    expect(hero.getByText('等待他人')).toBeInTheDocument()
+    expect(hero.queryByText('待我處理')).not.toBeInTheDocument()
     first.unmount()
 
-    mockAuth.menus.delete('rdm-delivery-test')
+    vi.mocked(fetchTodoBoard).mockResolvedValue(quietBoard)
     const second = await waitForHero(renderWb().container)
-    expect(await second.findByRole('button', { name: /我的提交/ })).toBeInTheDocument()
-    expect(second.queryByRole('button', { name: /測試工作台/ })).not.toBeInTheDocument()
+    expect(second.getByText('目前沒有需要你立即處理的事')).toBeInTheDocument()
   })
 })

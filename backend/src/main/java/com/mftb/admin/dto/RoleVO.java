@@ -16,6 +16,11 @@ public class RoleVO {
     /** 角色编码（用于审批人解析匹配 sys_user.function_roles） */
     private String code;
     private String description;
+    /**
+     * 是否开放员工自助申请：1=开放（会出现在门户系統權限申請的参考角色目录），0=不开放。
+     * <p>内置 admin 角色恒为 0（服务端强制），不得经自助入口暴露。
+     */
+    private Integer selfServiceRequestable;
     private Integer status;
     private List<MenuPermissionDTO> permissions;
     /**

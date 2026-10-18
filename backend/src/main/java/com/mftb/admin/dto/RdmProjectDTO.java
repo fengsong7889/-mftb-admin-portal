@@ -21,6 +21,18 @@ public class RdmProjectDTO {
         private String pmUserName;
         private Long productOwnerUserId;
         private String productOwnerUserName;
+        /** 技术负责人（userId 为权威键，userName 仅展示快照） */
+        private Long techLeadUserId;
+        private String techLeadUserName;
+        /** UI 设计负责人 */
+        private Long uiDesignerUserId;
+        private String uiDesignerUserName;
+        /** 测试/QA 负责人 */
+        private Long qaLeadUserId;
+        private String qaLeadUserName;
+        /** 运维/DevOps 负责人 */
+        private Long opsLeadUserId;
+        private String opsLeadUserName;
         /** yyyy-MM-dd */
         private String planStartDate;
         /** yyyy-MM-dd */
@@ -38,6 +50,19 @@ public class RdmProjectDTO {
         private String pmUserName;
         private Long productOwnerUserId;
         private String productOwnerUserName;
+        /**
+         * 技术负责人等四组负责人：以「userName 非 null」为提供哨兵（表单恒传字符串，
+         * 清空传空串），userId 随之同步（清空传 null）；暂停/风险等局部更新不传这些 key，
+         * 不会误清负责人。
+         */
+        private Long techLeadUserId;
+        private String techLeadUserName;
+        private Long uiDesignerUserId;
+        private String uiDesignerUserName;
+        private Long qaLeadUserId;
+        private String qaLeadUserName;
+        private Long opsLeadUserId;
+        private String opsLeadUserName;
         /** yyyy-MM-dd */
         private String planStartDate;
         /** yyyy-MM-dd */

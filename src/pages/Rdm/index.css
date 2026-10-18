@@ -3,13 +3,15 @@
  * 全局类名以 rdm- 前缀隔离，遵循原生 CSS + 设计令牌规范
  */
 
-/* ========== 工作台 ========== */
+/* ========== 工作台顶部横幅 ========== */
+/* 结构：左橙渐变条 + 上行（头像/问候/身份事实 · 操作组）+ 虚线分隔 + 下行（工作视图 · 今日焦点）。
+   设计意图：横幅只承担「我是谁 + 现在处理什么」，工作台直达交还给侧边栏与个性化配置。 */
 .rdm-hero {
   position: relative;
   border-radius: 12px;
   background: linear-gradient(135deg, #FFF7F0 0%, #FFFDFB 55%, #FFFFFF 100%);
   border: 1px solid #FFE7D1;
-  padding: 16px 24px;
+  padding: 18px 24px 14px;
   margin-bottom: 16px;
   overflow: hidden;
   animation: headerFadeSlideIn 0.5s ease;
@@ -25,26 +27,181 @@
   background: linear-gradient(180deg, #E8720C, #F59432);
 }
 
-.rdm-hero-title {
-  font-size: 18px;
-  font-weight: 700;
+/* 第一带：左边「我的工作視圖」，右边操作组 */
+.rdm-hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.rdm-hero-block {
+  min-width: 0;
+}
+
+/* 组标题：視圖与焦點两带共用，13px 半粗体主文本色 */
+.rdm-hero-label {
+  font-size: 13px;
+  font-weight: 600;
   color: #262626;
+}
+
+/* 第二带右侧的身份上下文（部门 · 工号 · 职位）：只解释“这些待算在谁头上”，不重复首页的姓名/头像 */
+.rdm-hero-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #8C8C8C;
+  margin-left: auto;
+}
+
+.rdm-hero-context-bit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rdm-hero-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #D9D9D9;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.rdm-hero-actions {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.rdm-hero-sub {
-  font-size: 12px;
-  color: #8C8C8C;
-  margin-top: 4px;
+/* 主操作按钮：样式从原来的内联写法下沉到类，遵循 §B.1 主色实心 + hover 上浮 */
+.rdm-hero-primary.ant-btn {
+  height: 36px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: #E8720C;
+  border-color: #E8720C;
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.rdm-hero-actions {
+.rdm-hero-primary.ant-btn:hover {
+  background: #F59432;
+  border-color: #F59432;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(232, 114, 12, 0.35);
+}
+
+/* 第二带：左边「今日焦點」，右边身份上下文，靠虚线与第一带隔开 */
+.rdm-hero-band {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #FFE7D1;
+}
+
+.rdm-hero-views {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.rdm-hero-focus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 工作视图标签：比 antd Tag 更轻，只表身份不参与状态语义 */
+.rdm-hero-viewchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #FFE7D1;
+  color: #E8720C;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 今日焦点标签：底色/描边取自 §B.7 的「主色 + 13% 透明度」描边口径 */
+.rdm-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #D9D9D9;
+  background: #fff;
+  color: #595959;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: default;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-hero-chip b {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.rdm-hero-chip--jump {
+  cursor: pointer;
+}
+
+.rdm-hero-chip--jump:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.rdm-hero-chip--brand {
+  color: #E8720C;
+  background: #FFF7E6;
+  border-color: rgba(232, 114, 12, 0.13);
+}
+
+.rdm-hero-chip--purple {
+  color: #722ED1;
+  background: #F9F0FF;
+  border-color: rgba(114, 46, 209, 0.13);
+}
+
+.rdm-hero-chip--danger {
+  color: #FF4D4F;
+  background: #FFF1F0;
+  border-color: rgba(255, 77, 79, 0.13);
+}
+
+.rdm-hero-chip--warn {
+  color: #FA8C16;
+  background: #FFF7F0;
+  border-color: rgba(250, 140, 22, 0.13);
+}
+
+.rdm-hero-calm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #52C41A;
 }
 
 /* 待办分组卡片 */

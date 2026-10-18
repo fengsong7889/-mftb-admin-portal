@@ -18,6 +18,7 @@ import {
   ScheduleOutlined,
   ThunderboltOutlined,
   ShoppingCartOutlined,
+  SafetyCertificateOutlined,
   DownOutlined,
   RightOutlined,
   InboxOutlined,
@@ -132,6 +133,19 @@ const PROCESS_CATALOG: ProcessCategory[] = [
         description: 'processCenter.procConsumableClaimDesc',
         icon: <InboxOutlined />,
         route: '/consumable-claim',
+        enabled: true,
+      },
+      {
+        /*
+         * 系統權限申請：企業門戶「我要申請」的同一张表单页。
+         * 放在流程中心是为了让已授权 OA 的员工也能从流程目录发起（不必先回门户）；
+         * 不带 ?system= 时页面会展示「可申请系统」下拉，目录同样取后端。
+         */
+        key: 'system_access',
+        name: 'processCenter.procSystemAccess',
+        description: 'processCenter.procSystemAccessDesc',
+        icon: <SafetyCertificateOutlined />,
+        route: '/system-access-apply',
         enabled: true,
       },
     ],

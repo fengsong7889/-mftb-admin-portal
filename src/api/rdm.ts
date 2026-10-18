@@ -1842,7 +1842,8 @@ export function applyChange(form: RdmChangeForm) {
 /** 迭代表单 */
 export interface RdmIterationForm {
   id?: number
-  code: string
+  /** 迭代編碼：系統發號，前端不傳（編輯時後端保留原碼） */
+  code?: string
   name: string
   iterationType?: string
   startDate: string
@@ -2338,7 +2339,12 @@ export interface RdmProjectListItem {
 }
 
 export interface RdmProjectDetail extends RdmProjectListItem {
-  pmUserId: number; productOwnerUserId: number;
+  pmUserId: number | null; productOwnerUserId: number | null;
+  /** 四组负责人（后端 rdm:schema:v3.7 起随列返回） */
+  techLeadUserId: number | null; techLeadUserName: string | null;
+  uiDesignerUserId: number | null; uiDesignerUserName: string | null;
+  qaLeadUserId: number | null; qaLeadUserName: string | null;
+  opsLeadUserId: number | null; opsLeadUserName: string | null;
   defaultAcceptancePath: string; scopeSummaryJson: string | null;
   version: number; createdAt: string;
   members: RdmProjectMemberItem[];
@@ -2399,6 +2405,14 @@ export interface RdmProjectQuery {
 export interface RdmProjectCreateForm {
   name: string; objective?: string; pmUserId?: number; pmUserName?: string;
   productOwnerUserId?: number; productOwnerUserName?: string;
+  /** 技术负责人（userId 为权威键；清空时 userId 传 null、userName 传空串） */
+  techLeadUserId?: number | null; techLeadUserName?: string | null;
+  /** UI 设计负责人 */
+  uiDesignerUserId?: number | null; uiDesignerUserName?: string | null;
+  /** 测试/QA 负责人 */
+  qaLeadUserId?: number | null; qaLeadUserName?: string | null;
+  /** 运维/DevOps 负责人 */
+  opsLeadUserId?: number | null; opsLeadUserName?: string | null;
   planStartDate?: string; planEndDate?: string; defaultAcceptancePath?: string;
 }
 

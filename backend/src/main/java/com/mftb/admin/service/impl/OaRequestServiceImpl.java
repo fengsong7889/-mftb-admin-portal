@@ -33,6 +33,7 @@ import com.mftb.admin.service.HrLeaveCallbackService;
 import com.mftb.admin.service.HrPerfCallbackService;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.OaRequestService;
+import com.mftb.admin.service.SystemAccessGrantService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.DateTimeUtils;
@@ -101,6 +102,12 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final com.mftb.admin.service.RdmIntakeCallbackService rdmIntakeCallbackService;
     /** 需求变更审批回调：通过→计变更次数并按需回填排期，驳回→变更单退回 */
     private final com.mftb.admin.service.RdmChangeCallbackService rdmChangeCallbackService;
+    /**
+     * 系統權限申請回调：节点审批时合并授权角色配置，终审通过→把角色绑定到申请人。
+     * <p>兑现失败<b>不</b>吞异常：与 AI「审批即授权」同口径，让整个审批事务回滚，
+     * 避免留下「审批已通过但权限没下发」——那种状态申请人和审批人都不会再去推动。
+     */
+    private final SystemAccessGrantService systemAccessGrantService;
 
     /* ==================== 查询 ==================== */
 
@@ -735,6 +742,23 @@ public class OaRequestServiceImpl implements OaRequestService {
             log.info("AI 申请审批数据已更新：flowNo={}", flowNo);
         }
 
+        /*
+         * 系統權限申請审批：把审批人配置的授权角色合并进 form_data（终审回调据此兑现）。
+         * 只合并 approvedGrant 一个键，申请内容原样保留：审批人不能借审批接口改写申请事实。
+         * 校验（角色存在/启用/非 admin/已持该系统准入）在这里就做，配置不可用当场拒绝，
+         * 不等终审兑现时才失败。本次审批未携带授权配置时返回 null，不动 form_data。
+         */
+        if (systemAccessGrantService.isSystemAccessProcess(request.getProcessCode())) {
+            String mergedFormData = systemAccessGrantService.mergeGrantConfig(request, formData);
+            if (mergedFormData != null) {
+                oaRequestMapper.update(null,
+                        new LambdaUpdateWrapper<OaRequest>()
+                                .eq(OaRequest::getId, request.getId())
+                                .set(OaRequest::getFormData, mergedFormData));
+                request.setFormData(mergedFormData);
+            }
+        }
+
         // 查找下一个待审节点：优先取已存在的 pending 任务（兼容旧的全量创建数据）；
         // 懒创建模式下实时读取最新流程配置创建下一节点，保证后续审批人始终为最新配置
         OaApprovalTask nextTask = findNextPendingTask(request.getId(), currentTask.getSortOrder());
@@ -826,6 +850,16 @@ public class OaRequestServiceImpl implements OaRequestService {
                 } catch (Exception e) {
                     log.error("需求變更審批回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
                 }
+            }
+
+            /*
+             * 系統權限申請：审批全部通过 → 绑定审批人指定的授权角色并刷新权限缓存。
+             * 这里<b>刻意不包 try/catch</b>：兑现失败必须让审批整体回滚（与 ai_access 同口径），
+             * 否则流程显示已通过、门户卡片却还锁着，申请人和审批人都不会再去推动它。
+             */
+            if (systemAccessGrantService.isSystemAccessProcess(request.getProcessCode())) {
+                systemAccessGrantService.onFlowApproved(flowNo, approver);
+                log.info("系統權限申請审批已全部通过并完成授权：flowNo={}", flowNo);
             }
 
             // 钉钉通知：流程全部通过，通知发起人
@@ -961,6 +995,15 @@ public class OaRequestServiceImpl implements OaRequestService {
             }
         }
 
+        // 系統權限申請：驳回→申请单同步为 rejected，不兑现任何授权（失败仅记日志，不阻断驳回）
+        if (systemAccessGrantService.isSystemAccessProcess(request.getProcessCode())) {
+            try {
+                systemAccessGrantService.onFlowRejected(flowNo, reason);
+            } catch (Exception e) {
+                log.error("系統權限申請駁回回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
+
         // 钉钉通知：驳回通知发起人
         try {
             String text = String.format("### ❌ 流程已驳回\n\n"
@@ -1019,6 +1062,15 @@ public class OaRequestServiceImpl implements OaRequestService {
                         .set(OaApprovalTask::getComment, "申請人撤銷"));
 
         log.info("OA流程已撤销: flowNo={}", flowNo);
+
+        // 系統權限申請：撤销→申请单同步为 cancelled，否则单据会永远停在审批中
+        if (systemAccessGrantService.isSystemAccessProcess(request.getProcessCode())) {
+            try {
+                systemAccessGrantService.onFlowCancelled(flowNo);
+            } catch (Exception e) {
+                log.error("系統權限申請撤銷回調失敗: flowNo={}, error={}", flowNo, e.getMessage(), e);
+            }
+        }
 
         // 钉钉通知：撤销通知
         try {

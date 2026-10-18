@@ -150,6 +150,12 @@ public class DataInitializer implements CommandLineRunner {
         //      必须用独立版本键：core:schema-v10 已落库的环境不会重跑 migrateSchema()。
         versionTracker.applyOnce("core:portal-favorites-v1",
                 this::migratePortalFavoritesColumn, this::verifyPortalFavoritesColumn);
+        // 246: sys_role.self_service_requestable——門戶「系統權限申請」参考角色目录的开放开关。
+        //      与 portal_favorites 同一陷阱：SysRole 实体已带该字段，MyBatis-Plus 生成的显式列清单
+        //      会 SELECT 它，故必须位于任何 sys_role 实体查询之前，否则启动期报 Unknown column。
+        //      默认 0（不开放）：存量角色一律不进自助目录，需管理员逐个打开并补写业务说明。
+        versionTracker.applyOnce("iam:role-self-service-v1",
+                this::migrateRoleSelfServiceColumn, this::verifyRoleSelfServiceColumn);
         // 机翻引擎配置表 + 种子数据（每次启动幂等检查, 不受 V_SCHEMA 版本门控）
         migrateMtEngineTable();
         // 迁移旧表数据到统一 OA 表
@@ -1944,6 +1950,41 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     private void verifyPortalFavoritesColumn() {
         if (!columnExists("sys_user", "portal_favorites")) {
             throw new IllegalStateException("sys_user.portal_favorites 列未就绪");
+        }
+    }
+
+    /**
+     * 246: sys_role 补 self_service_requestable 列（是否开放员工自助申请）。
+     * <p>语义：1 = 该角色会出现在門戶「系統權限申請」页的参考角色目录里（仍需已持目标系统准入、
+     * 启用中、非内置 admin）；0 = 不开放。它<b>不授予任何权限</b>，只决定角色在自助目录里是否可见；
+     * 员工选中后也只是「建议」，最终由审批人在流程上指定授权角色。
+     * <p>NOT NULL DEFAULT 0：存量角色一律不开放，避免加列瞬间把全量角色清单推到零权限员工面前。
+     */
+    private void migrateRoleSelfServiceColumn() {
+        addColumnIfAbsent("sys_role", "self_service_requestable",
+                "ALTER TABLE sys_role ADD COLUMN self_service_requestable TINYINT(1) NOT NULL DEFAULT 0 "
+                        + "COMMENT '是否开放员工自助申请：1=出现在门户系统权限申请的参考角色目录，0=不开放' "
+                        + "AFTER description");
+    }
+
+    /**
+     * 后置校验：列存在、且 NOT NULL DEFAULT 0。
+     * <p>为何连默认值一起校：若列可空或默认为 1，存量角色会默默变成「已开放自助申请」，
+     * 等于一次结构迁移就把全量角色暴露到门户目录——这是权限面变更，必须 fail-closed。
+     */
+    private void verifyRoleSelfServiceColumn() {
+        if (!columnExists("sys_role", "self_service_requestable")) {
+            throw new IllegalStateException("sys_role.self_service_requestable 列未就绪");
+        }
+        Integer closedByDefault = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_role' "
+                        + "AND COLUMN_NAME = 'self_service_requestable' "
+                        + "AND IS_NULLABLE = 'NO' AND COLUMN_DEFAULT = '0'",
+                Integer.class);
+        if (closedByDefault == null || closedByDefault == 0) {
+            throw new IllegalStateException(
+                    "sys_role.self_service_requestable 必须 NOT NULL DEFAULT 0（防止存量角色被默认开放自助申请）");
         }
     }
 

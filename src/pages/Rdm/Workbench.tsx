@@ -9,9 +9,15 @@
  * 3. 区块候选集只包含本人有菜单权限的页面，配置动作不会扩权；
  * 4. 专业执行操作仍留在研发/测试/发布各自的工作台，本页只做概览与直达。
  *
- * i18n：本轮按高效开发模式只交界面，文案暂沿用繁中硬编码（待界面确认后的第二阶段统一抽键）。
+ * 顶部横幅口径（本轮重设计）：横幅只回答「我在哪个身份上 + 现在该处理什么」——
+ * 身份事实（日期/工号/部门/职位）、工作视图（解释首屏区块从哪来）、今日焦点（需要立即动手的少数几项）。
+ * 不重复问候与姓名：首页工作台已经写过一句，侧边栏与页签也已经标出页名。
+ * 原先放在横幅右侧的「研发/测试工作台」身份直达已撤销：那些页面在侧边栏菜单里就有，
+ * 对应的内容块也能在「个性化配置」里开关，横幅再抄一遍等于把菜单钉死在第一屏。
+ *
+ * i18n：横幅文案已走 rdm.workbench.* 双语键；页面其余区块仍是存量硬编码，按棘轮分批清理。
  */
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Empty, Space, Spin, Tag, message } from 'antd'
 import {
   AlertOutlined,
@@ -20,16 +26,20 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   FileAddOutlined,
+  HourglassOutlined,
   InboxOutlined,
   ProjectOutlined,
+  ReloadOutlined,
   RightOutlined,
   RocketOutlined,
   SolutionOutlined,
-  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchProjectPage,
@@ -60,9 +70,9 @@ import {
   RDM_IDENTITY_LABEL,
   deriveRdmIdentities,
   useRdmWorkbenchLayout,
-  type RdmIdentity,
   type RdmSectionKey,
 } from './workbenchLayout'
+import { DEFAULT_IDENTITY_ICON, RDM_IDENTITY_ICON } from './workbenchSectionIcons'
 import { MyDevTasksPanel, MyReleaseBatchesPanel, MyTestBatchesPanel, OpenIssuesPanel } from './WorkbenchPanels'
 import WorkbenchCustomize from './WorkbenchCustomize'
 import './index.css'
@@ -100,20 +110,31 @@ const TODO_ICON: Record<string, { icon: React.ReactNode; color: string; bg: stri
 }
 
 /**
- * 主身份的直达入口（hero 右侧主按钮）。
- * <p>每个身份只留一个「今天干活去哪儿」的按钮，其余靠区块里的「查看全部」跳转，
- * 否则会退化成把整条菜单抄一遍。menuKey 再次校验，避免推荐与授权不一致时点出 403。
+ * 横幅上「工作视图」那一排身份标签的说明。
+ * <p>为什么用 HelpPopover 而不是 Tooltip：这是「定义 + 依据 + 怎么改」的多句说明，
+ * 悬停即隐的白底长文本读不完（见 AGENTS.md「问号/提示说明规范」）。
+ * <p>做成工厂而不是模块常量：文案要走 i18n，模块顶层求值时拿不到 t。
  */
-const PRIMARY_ENTRY: Partial<Record<RdmIdentity, { label: string; path: string; menuKey: string }>> = {
-  developer: { label: '研發工作台', path: '/rdm-delivery', menuKey: 'rdm-delivery-board' },
-  tester: { label: '測試工作台', path: '/rdm-test', menuKey: 'rdm-delivery-test' },
-  releaser: { label: '發布中心', path: '/rdm-release', menuKey: 'rdm-delivery-release' },
-  acceptor: { label: '驗收中心', path: '/rdm-acceptance', menuKey: 'rdm-acceptance' },
-  product: { label: '需求跟進清單', path: '/rdm-requirement?scope=product', menuKey: 'rdm-requirement' },
-  dispatcher: { label: '認領/分配', path: '/rdm-intake?scope=pool', menuKey: 'rdm-intake' },
-  projectMgr: { label: '項目總覽', path: '/rdm-project', menuKey: 'rdm-dashboard-project' },
-  approver: { label: '待我審批', path: '/rdm-intake-approval?scope=approving', menuKey: 'rdm-intake-approval' },
-  submitter: { label: '我的提交', path: '/rdm-requirement?scope=mine', menuKey: 'rdm-requirement' },
+function identityHelpSections(t: TFunction): HelpSection[] {
+  return [
+    { tone: 'info', label: t('rdm.workbench.identityHelpFromTitle', { defaultValue: '身份怎麼來' }), body: t('rdm.workbench.identityHelpFromBody', { defaultValue: '由你持有的菜單權限與後端角色標籤推導，不是另設的一套權限。' }) },
+    { tone: 'neutral', label: t('rdm.workbench.identityHelpScopeTitle', { defaultValue: '身份決定什麼' }), body: t('rdm.workbench.identityHelpScopeBody', { defaultValue: '只決定首屏區塊的推薦順序與默認顯隱；多身份者拿到的是幾個角色區塊的合集。' }) },
+    { tone: 'warn', label: t('rdm.workbench.identityHelpAdjustTitle', { defaultValue: '想調整看這裡' }), body: t('rdm.workbench.identityHelpAdjustBody', { defaultValue: '右上「個性化配置」可開關、排序區塊；關掉的區塊不再渲染，也不會再打它的接口。' }) },
+    { tone: 'success', label: t('rdm.workbench.identityHelpSafeTitle', { defaultValue: '不影響權限' }), body: t('rdm.workbench.identityHelpSafeBody', { defaultValue: '能進哪個頁面仍由後端鑒權與數據範圍決定，這裡不會擴權。' }) },
+  ]
+}
+
+/** 今日焦点 chips 的语义配色，取值限定在 §A.1 已登记令牌 */
+type FocusTone = 'brand' | 'purple' | 'danger' | 'warn'
+
+interface FocusItem {
+  key: string
+  label: string
+  value: number
+  tone: FocusTone
+  icon: React.ReactNode
+  /** 点击落点的候选区块（按优先级取第一个已上屏的） */
+  targets: RdmSectionKey[]
 }
 
 /**
@@ -163,6 +184,7 @@ function StageTrack({ status }: { status: string }) {
 
 export default function RdmWorkbench() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { user, hasMenuPermission, hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
@@ -230,7 +252,37 @@ export default function RdmWorkbench() {
   // 需要我补充：从我的提交里按提出人可动作的状态过滤，并把原因带上（无原因就不堵人）
   const needAction = mineRows.filter(r => SUBMITTER_ACTION_STATUS.includes(String(r.status)))
   const tracking = mineRows.filter(r => !SUBMITTER_ACTION_STATUS.includes(String(r.status)))
-  const primaryEntry = PRIMARY_ENTRY[identities[0] ?? 'submitter']
+
+  /**
+   * 横幅身份上下文：部门/工号以后端 workbench 接口为准，职位取登录态员工档案。
+   * <p>头像、姓名、日期星期都不进横幅：首页工作台与顶部用户菜单已经写过，侧边栏与页签也已标出页名。
+   * <p>系统角色标签（roleNames）同样不单独占一行：它和「工作視圖」是同一件事的两种口径，
+   * 而工作视图是推导结果、直接对应首屏区块，两个口径并排只会让人对不上号。
+   */
+  const empNo = identity.empNo ?? user?.empId
+  const deptName = identity.deptName ?? user?.department
+  const position = user?.position
+  // 只拼非空项，避免出现「· · 測試部」这种断头分隔符
+  const contextBits = [deptName, empNo, position].filter((v): v is string => Boolean(v))
+
+  /**
+   * 今日焦点：只收「现在就该动手」的四项，与下方「需求指標/交付聚合指標」区块不同口径——
+   * 那两个是六格全量计数且可被个人配置关掉，横幅这排保证任何时候都有下一步动作。
+   */
+  const focusItems: FocusItem[] = ([
+    { key: 'todo', label: t('rdm.workbench.focusTodo', { defaultValue: '待我處理' }), value: stats.todoTotal, tone: 'brand', icon: <AuditOutlined />, targets: ['todo-board', 'role-todos'] },
+    { key: 'waiting', label: t('rdm.workbench.focusWaiting', { defaultValue: '等待他人' }), value: todoBoard?.waitingOthersCount ?? 0, tone: 'purple', icon: <HourglassOutlined />, targets: ['todo-board'] },
+    { key: 'supplement', label: t('rdm.workbench.focusSupplement', { defaultValue: '需要我補充' }), value: needAction.length, tone: 'danger', icon: <ExclamationCircleOutlined />, targets: ['need-action'] },
+    { key: 'overdue', label: t('rdm.workbench.focusOverdue', { defaultValue: '逾期預警' }), value: stats.overdueTotal, tone: 'warn', icon: <AlertOutlined />, targets: ['role-todos', 'todo-board', 'my-tracking'] },
+  ] as FocusItem[]).filter(item => item.value > 0)
+
+  /** 落点必须真在屏上：区块被个人配置关掉时不给跳转，免得点了滚到空白 */
+  const resolveFocusTarget = (targets: RdmSectionKey[]): RdmSectionKey | undefined =>
+    targets.find(key => layout.visibleKeys.includes(key))
+
+  const handleFocusJump = (key: RdmSectionKey) => {
+    document.getElementById(`rdm-wb-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   /**
    * 区块渲染表：key 与 workbenchLayout 的区块注册表一一对应。
@@ -555,56 +607,84 @@ export default function RdmWorkbench() {
 
   return (
     <div className="content-area">
-      {/* ── 顶部欢迎区：身份可见 + 主入口只有一个 ── */}
-      <div className="rdm-hero">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-          <div>
-            <div className="rdm-hero-title">
-              <RocketOutlined style={{ color: '#E8720C' }} />
-              個人工作台
-              <Tag color="orange" style={{ margin: 0 }}>產研交付</Tag>
-            </div>
-            <div className="rdm-hero-sub">
-              {identity.name}
-              {identity.deptName ? ` · ${identity.deptName}` : ''}
-              {' · 我的角色：'}{identity.roleNames.join(' / ')}
-            </div>
-            {/* 工作台视图名：解释「为什么我看到的是这几块」，与配置面板口径一致 */}
-            <div style={{ marginTop: 6 }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', marginRight: 6 }}>工作台視圖</span>
+      {/* ── 顶部横幅：上带「我的工作視圖 + 操作」，下带「今日焦點 + 身份上下文」 ── */}
+      <header className="rdm-hero">
+        <div className="rdm-hero-head">
+          <div className="rdm-hero-block">
+            <div className="rdm-hero-label">{t('rdm.workbench.viewLabel', { defaultValue: '我的工作視圖' })}</div>
+            <div className="rdm-hero-views">
               {identities.map(id => (
-                <Tag key={id} style={{ margin: '0 4px 0 0' }}>{RDM_IDENTITY_LABEL[id]}</Tag>
+                <span key={id} className="rdm-hero-viewchip">
+                  {RDM_IDENTITY_ICON[id] ?? DEFAULT_IDENTITY_ICON}
+                  {RDM_IDENTITY_LABEL[id]}
+                </span>
               ))}
+              <HelpPopover
+                title={t('rdm.workbench.viewHelpTitle', { defaultValue: '工作視圖怎麼來的' })}
+                ariaLabel={t('rdm.workbench.viewHelpAria', { defaultValue: '工作視圖說明' })}
+                placement="bottomLeft"
+                width={380}
+                content={identityHelpSections(t)}
+              />
             </div>
           </div>
           <div className="rdm-hero-actions">
             <Button
               type="primary"
+              className="rdm-hero-primary"
               icon={<FileAddOutlined />}
               onClick={() => navigate('/rdm-submit')}
-              style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
-                height: 36, padding: '0 20px', boxShadow: '0 2px 6px rgba(232,114,12,0.3)',
-              }}
             >
-              我要提需求
+              {t('rdm.workbench.submitRequirement', { defaultValue: '我要提需求' })}
             </Button>
-            {primaryEntry && hasMenuPermission(primaryEntry.menuKey) && (
-              <Button icon={<ThunderboltOutlined />} onClick={() => navigate(primaryEntry.path)}>
-                {primaryEntry.label}
-              </Button>
-            )}
-            <Button icon={<AlertOutlined />} onClick={() => navigate('/rdm-dashboard')}>
-              全局看板
-            </Button>
+            <Button icon={<ReloadOutlined />} onClick={load}>{t('rdm.workbench.refresh', { defaultValue: '刷新' })}</Button>
             <WorkbenchCustomize layout={layout} />
           </div>
         </div>
-      </div>
 
-      {/* ── 按个人布局渲染区块（未上屏的面板不取数）── */}
+        {/* 下带：左边回答「先处理哪个」（可点滚到对应区块），右边只补一句「算在谁头上」 */}
+        <div className="rdm-hero-band">
+          <div className="rdm-hero-focus">
+            {focusItems.length === 0 ? (
+              <span className="rdm-hero-calm"><CheckCircleOutlined /> {t('rdm.workbench.focusCalm', { defaultValue: '目前沒有需要你立即處理的事' })}</span>
+            ) : (
+              <>
+                <span className="rdm-hero-label">{t('rdm.workbench.focusLabel', { defaultValue: '今日焦點' })}</span>
+                {focusItems.map(item => {
+                  const target = resolveFocusTarget(item.targets)
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={`rdm-hero-chip rdm-hero-chip--${item.tone}${target ? ' rdm-hero-chip--jump' : ''}`}
+                      onClick={target ? () => handleFocusJump(target) : undefined}
+                      aria-label={target
+                        ? t('rdm.workbench.focusAriaJump', { defaultValue: '{{label}} {{value}} 項，前往對應區塊', label: item.label, value: item.value })
+                        : t('rdm.workbench.focusAria', { defaultValue: '{{label}} {{value}} 項', label: item.label, value: item.value })}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                      <b>{item.value}</b>
+                    </button>
+                  )
+                })}
+              </>
+            )}
+          </div>
+          <div className="rdm-hero-context">
+            {contextBits.map((bit, idx) => (
+              <span key={bit} className="rdm-hero-context-bit">
+                {idx > 0 && <i className="rdm-hero-dot" />}
+                <span>{bit}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {/* ── 按个人布局渲染区块（未上屏的面板不取数）；id 供横幅「今日焦點」滚动定位 ── */}
       {layout.visibleKeys.map(key => (
-        <Fragment key={key}>{sections[key] ?? null}</Fragment>
+        <div key={key} id={`rdm-wb-${key}`}>{sections[key] ?? null}</div>
       ))}
     </div>
   )

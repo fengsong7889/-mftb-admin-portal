@@ -28,6 +28,7 @@ import {
   ALL_DATA_SCOPES,
   type DataScope,
 } from '../../../constants/dataScope'
+import HelpPopover from '../../../components/HelpPopover'
 
 const { TextArea } = Input
 
@@ -79,6 +80,8 @@ interface RoleFormValues {
   description?: string
   dataScope: DataScope
   deptIds?: number[]
+  /** 是否开放员工自助申请（表单里是 boolean，提交时折回后端的 0/1） */
+  selfServiceRequestable?: boolean
 }
 
 export default function RoleManagement() {
@@ -206,6 +209,8 @@ export default function RoleManagement() {
       description: record.description,
       dataScope: record.dataScope ?? DATA_SCOPE.SELF,
       deptIds: record.deptIds ?? [],
+      // 开关走 boolean（valuePropName=checked），提交时再折回后端的 0/1
+      selfServiceRequestable: record.selfServiceRequestable === 1,
     })
     ensureDeptTree()
     setEditModalVisible(true)
@@ -220,6 +225,7 @@ export default function RoleManagement() {
       dataScope: values.dataScope,
       // 非自定部门档不传部门集合：后端会按档位收敛残留行
       deptIds: values.dataScope === DATA_SCOPE.CUSTOM_DEPT ? values.deptIds ?? [] : undefined,
+      selfServiceRequestable: values.selfServiceRequestable ? 1 : 0,
     }
     setSubmitting(true)
     try {
@@ -361,6 +367,17 @@ export default function RoleManagement() {
       ),
     },
     { title: t('roleManagement.colDescription'), dataIndex: 'description', key: 'description', ellipsis: true, render: (v: string) => v || '-' },
+    {
+      // 开放后该角色会出现在门户「系統權限申請」的参考角色目录里；列上给个标记，
+      // 免得管理员开完就忘、事后靠点开每个角色才能查
+      title: t('roleManagement.colSelfService'),
+      dataIndex: 'selfServiceRequestable',
+      key: 'selfServiceRequestable',
+      width: 110,
+      render: (value: number | undefined) => (value === 1
+        ? <Tag color="green" style={{ margin: 0 }}>{t('roleManagement.selfServiceOn')}</Tag>
+        : <span style={{ color: '#bfbfbf' }}>-</span>),
+    },
     {
       title: t('common.colStatus'),
       dataIndex: 'status',
@@ -585,6 +602,31 @@ export default function RoleManagement() {
               />
             </Form.Item>
           )}
+          <Form.Item
+            name="selfServiceRequestable"
+            valuePropName="checked"
+            label={(
+              <Space size={4}>
+                {t('roleManagement.selfServiceLabel')}
+                <HelpPopover
+                  title={t('roleManagement.selfServiceHelpTitle')}
+                  ariaLabel={t('roleManagement.selfServiceHelpAria')}
+                  width={400}
+                  content={[
+                    { tone: 'info', label: t('roleManagement.selfServiceHelpWhatLabel'), body: t('roleManagement.selfServiceHelpWhat') },
+                    { tone: 'warn', label: t('roleManagement.selfServiceHelpCondLabel'), body: t('roleManagement.selfServiceHelpCond') },
+                    { tone: 'neutral', label: t('roleManagement.selfServiceHelpLimitLabel'), body: t('roleManagement.selfServiceHelpLimit') },
+                  ]}
+                />
+              </Space>
+            )}
+            extra={editing && isBuiltinAdminRole(editing)
+              ? t('roleManagement.selfServiceAdminDisabled')
+              : t('roleManagement.selfServiceExtra')}
+          >
+            {/* 内置超管角色强制关闭（后端也一道）：把它放进自助目录等于将「申请整个平台」做成自助入口 */}
+            <Switch disabled={!!editing && isBuiltinAdminRole(editing)} />
+          </Form.Item>
         </Form>
       </Modal>
 

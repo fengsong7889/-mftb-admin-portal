@@ -53,6 +53,12 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
     @Override
     public void record(String targetType, Long targetId, String targetName,
                        String systemCode, String changeType, Object before, Object after) {
+        record(targetType, targetId, targetName, systemCode, changeType, before, after, null);
+    }
+
+    @Override
+    public void record(String targetType, Long targetId, String targetName, String systemCode,
+                       String changeType, Object before, Object after, String operator) {
         if (!StringUtils.hasText(targetType) || targetId == null || !StringUtils.hasText(changeType)) {
             throw new BusinessException("審計記錄缺少必要字段(targetType/targetId/changeType)");
         }
@@ -60,14 +66,15 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
         if (name != null && name.length() > TARGET_NAME_MAX_LEN) {
             name = name.substring(0, TARGET_NAME_MAX_LEN);
         }
+        // 操作人：调用方没传时回退到当前登录人；定时作业等无登录线程必须自己传，否则审计里查不到是谁做的
+        String actor = StringUtils.hasText(operator) ? operator : operatorResolver.currentOperatorName();
         jdbcTemplate.update(
                 "INSERT INTO sys_permission_audit_log "
                         + "(target_type, target_id, target_name, system_code, change_type, before_snapshot, after_snapshot, operator) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 targetType, targetId, name,
                 StringUtils.hasText(systemCode) ? systemCode : null,
-                changeType, truncate(toJson(before)), truncate(toJson(after)),
-                operatorResolver.currentOperatorName());
+                changeType, truncate(toJson(before)), truncate(toJson(after)), actor);
     }
 
     @Override

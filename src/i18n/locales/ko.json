@@ -151,6 +151,7 @@
     "unauthorized": "권한 없음",
     "enter": "시스템 열기",
     "requestAccess": "권한 신청",
+    "cardPendingRequest": "신청이 승인 대기 중",
     "requestTitle": "이 시스템의 권한이 없습니다",
     "requestDesc": "{{system}} 이용 권한이 없습니다. 권한 신청을 제출하면 승인 후 이용할 수 있습니다.",
     "requestApplyBtn": "신청하기",

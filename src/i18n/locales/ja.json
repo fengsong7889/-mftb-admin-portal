@@ -151,6 +151,7 @@
     "unauthorized": "権限未付与",
     "enter": "システムを開く",
     "requestAccess": "アクセスを申請",
+    "cardPendingRequest": "申請は承認待ち",
     "requestTitle": "このシステムの権限がありません",
     "requestDesc": "「{{system}}」の利用権限がありません。権限申請を送信し、承認されると利用できます。",
     "requestApplyBtn": "申請する",

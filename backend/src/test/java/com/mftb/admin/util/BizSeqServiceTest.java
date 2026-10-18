@@ -30,6 +30,26 @@ class BizSeqServiceTest {
         assertNotEquals(BizSeqService.RULE_RDM_REQUIREMENT, BizSeqService.RULE_RDM_INTAKE_APPROVAL);
     }
 
+    /**
+     * 系統權限申請（企业门户「我要申請」）必须路由到独立的 XTSQ 编号规则。
+     * <p>与 XQSP 同理：前缀是对外可识别的业务事实，回落通用 OA 号会让「編號生成規則」页
+     * 看到的 OA 前缀与实际发出的 XTSQ 对不上，也无法按日重排。本用例同时钉住规则 key 字面值
+     * （必须与 {@code SystemAccessSchemaInitializer} 写入 sys_biz_seq_rule 的种子、
+     * 以及 {@code 243_system_access_request.sql} 参考文档一致）。
+     */
+    @Test
+    void ruleKeyForProcess_routesSystemAccessRequestToXtsqRule() {
+        assertEquals(BizSeqService.RULE_SYSTEM_ACCESS_REQUEST,
+                BizSeqService.ruleKeyForProcess(com.mftb.admin.constant.SystemAccessConstants.PROCESS_CODE));
+        assertEquals("system_access_request", BizSeqService.RULE_SYSTEM_ACCESS_REQUEST);
+        assertEquals("system_access", com.mftb.admin.constant.SystemAccessConstants.PROCESS_CODE);
+        assertNotEquals(BizSeqService.RULE_OA_REQUEST,
+                BizSeqService.ruleKeyForProcess(com.mftb.admin.constant.SystemAccessConstants.PROCESS_CODE),
+                "系統權限申請不得回落通用 OA 号");
+        // 与 AI 使用申请也是两套流水：两者都是「申请开通权限」，但单号必须能一眼分辨
+        assertNotEquals(BizSeqService.RULE_AI_ACCESS_REQUEST, BizSeqService.RULE_SYSTEM_ACCESS_REQUEST);
+    }
+
     /** 其余流程的映射保持原口径（包括未登记流程回落通用 OA 号） */
     @Test
     void ruleKeyForProcess_keepsOtherProcessMapping() {

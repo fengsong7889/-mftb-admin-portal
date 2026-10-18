@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { useMenu } from '../contexts/MenuContext'
-import { ROUTE_MENU_KEY_MAP, resolveFirstAccessiblePath } from '../pages/Permission/types'
+import { ROUTE_MENU_KEY_MAP, ROUTE_MENU_ANY_OF_MAP, resolveFirstAccessiblePath } from '../pages/Permission/types'
 import { isBackendConnected, pathToKey } from '../constants/menuDataSource'
 
 /**
@@ -11,7 +11,8 @@ import { isBackendConnected, pathToKey } from '../constants/menuDataSource'
  * 1. 後端離線時，已接入後端 API 的菜單展示「服務不可用」提示頁，
  *    原型菜單（搜索管理/流量沙盤/推廣報表）照常放行；
  * 2. 在線時，受控路由（見 ROUTE_MENU_KEY_MAP）需持有對應菜單權限方可訪問，
- *    無權限時展示 403 提示頁；非受控路由直接放行。
+ *    無權限時展示 403 提示頁；多业务共用的路由可在 ROUTE_MENU_ANY_OF_MAP 里声明
+ *    「持有其中任一菜单即可」；非受控路由直接放行。
  */
 export default function MenuPermissionGuard({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
@@ -43,8 +44,11 @@ export default function MenuPermissionGuard({ children }: { children: React.Reac
     )
   }
 
-  // 權限阻斷
-  if (menuKey && !hasMenuPermission(menuKey)) {
+  // 權限阻斷：主菜单不满足时再查「任一即可」豁免表（跨业务共用的详情页，见 ROUTE_MENU_ANY_OF_MAP）
+  const anyOfKeys = ROUTE_MENU_ANY_OF_MAP[location.pathname]
+  const permitted = !!menuKey && (hasMenuPermission(menuKey)
+    || (anyOfKeys?.some((key) => hasMenuPermission(key)) ?? false))
+  if (menuKey && !permitted) {
     const fallbackPath = resolveFirstAccessiblePath(
       user?.role === 'admin',
       hasMenuPermission,

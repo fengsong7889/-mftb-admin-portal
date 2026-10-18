@@ -10,6 +10,7 @@ import SystemArtwork from './SystemArtwork'
 import PortalTopBar from '../../components/PortalTopBar'
 import HeaderBar from '../../components/HeaderBar'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { fetchMySystemAccessRequests } from '../../api/systemAccessRequest'
 import { fetchPortalFavorites, savePortalFavorites } from '../../api/auth'
 import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '../../api/translation'
 import { loadSystemNavigation } from '../../hooks/useSystemNavigation'
@@ -39,6 +40,15 @@ vi.mock('../../api/translation', async importOriginal => ({
   fetchLanguages: vi.fn(),
 }))
 vi.mock('../../api/notification', () => ({ fetchNotifications: vi.fn().mockResolvedValue({ items: [], unreadCount: 0 }) }))
+// 门户多拉一个「我的在途权限申請」只为卡片标「審批中」，默认空列表：
+// 不 mock 会让每个门户用例都发一次真 axios 请求，而准入判定绝不允许依赖它。
+vi.mock('../../api/systemAccessRequest', () => ({
+  fetchMySystemAccessRequests: vi.fn(),
+  submitSystemAccessRequest: vi.fn(),
+  fetchRequestableSystems: vi.fn(),
+  fetchSystemAccessRequestByFlow: vi.fn(),
+  fetchSystemAccessGrantOptions: vi.fn(),
+}))
 vi.mock('../../hooks/useSystemNavigation', async importOriginal => ({
   ...await importOriginal<typeof import('../../hooks/useSystemNavigation')>(),
   loadSystemNavigation: vi.fn(),
@@ -66,6 +76,12 @@ function SystemPage() {
   return <><HeaderBar collapsed={false} onToggle={() => undefined} /><h1>{t('portal.systems.finance.name')}</h1><output data-testid="system-route">{location.pathname}:{instance.language}</output></>
 }
 
+/** 系統權限申請页桩：只回显路由与查询参数，用于断言「我要申請」带系统编码跳转 */
+function SystemAccessApplyPage() {
+  const location = useLocation()
+  return <output data-testid="apply-route">{location.pathname}{location.search}</output>
+}
+
 function mount(path = '/portal') {
   return render(
     <I18nextProvider i18n={i18n}>
@@ -75,7 +91,7 @@ function mount(path = '/portal') {
             <Route path="/portal" element={<><PortalTopBar /><Portal /><output data-testid="portal-route">/portal</output></>} />
             <Route path="/" element={<SystemPage />} />
             <Route path="/account-balance" element={<SystemPage />} />
-            <Route path="/process-center" element={<SystemPage />} />
+            <Route path="/system-access-apply" element={<SystemAccessApplyPage />} />
           </Routes>
         </MemoryRouter>
       </ConfigProvider>
@@ -96,6 +112,8 @@ beforeEach(async () => {
   vi.mocked(fetchLanguages).mockResolvedValue(configuredLanguages)
   await i18n.changeLanguage('zh-TW')
   vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [finance], superAdmin: false })
+  // 在途权限申請默认空：卡片仍展示「我要申請」，与无在途时的口径一致
+  vi.mocked(fetchMySystemAccessRequests).mockResolvedValue([])
   // clearAllMocks 只清调用记录不清实现，逐用例改过的云端返回值必须在这里复位
   vi.mocked(fetchPortalFavorites).mockResolvedValue(null)
   vi.mocked(loadSystemNavigation).mockResolvedValue([
@@ -193,7 +211,7 @@ describe('门户场景卡片与授权边界', () => {
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
-  it('未授权卡片点击弹出申请弹窗，确认申请进入流程中心', async () => {
+  it('未授权卡片点击弹出申请弹窗，确认申请带系统编码进入系統權限申請页', async () => {
     mount()
     await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
@@ -201,7 +219,44 @@ describe('门户场景卡片与授权边界', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('您尚未獲得「流程審批系統」的使用權限')
     fireEvent.click(within(dialog).getByRole('button', { name: /我要申請|申請/ }))
-    await waitFor(() => expect(screen.getByTestId('system-route')).toHaveTextContent('/process-center'))
+    /*
+     * 必须是带 system 参数的申请页，不能是 /process-center：
+     * 后者是 OA 系统内的受控菜单，连 OA 都未授权的员工跳过去只会看到 403（原缺陷）。
+     */
+    await waitFor(() => {
+      const route = screen.getByTestId('apply-route').textContent ?? ''
+      expect(route).toContain('/system-access-apply')
+      expect(route).toContain('system=oa')
+    })
+    // 未真正进入系统：不拉系统导航、不写当前系统编码
+    expect(loadSystemNavigation).not.toHaveBeenCalled()
+    expect(localStorage.getItem('current_system_code')).toBeNull()
+  })
+
+  /**
+   * 提交后回到门户，卡片不能再写「我要申請」（否则看着像没生效、逼人再点一次）。
+   * 但卡片仍可点：进申请页后由在途提示 + 禁用提交兜住，「審批中」只是状态展示，
+   * 绝不能反过来参与准入判定（准入永远只看 /portal/context 的返回）。
+   */
+  it('已有在途权限申請的卡片标「審批中」，其它未授权卡片仍是「我要申請」', async () => {
+    vi.mocked(fetchMySystemAccessRequests).mockResolvedValue([
+      { systemCode: 'eam', status: 'pending', flowNo: 'XTSQ2026101801' },
+      { systemCode: 'search', status: 'approved', flowNo: 'XTSQ2026101802' },
+    ] as never)
+    const { container } = mount()
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
+    // 直接等标出现（/我要申請/ 会命中15 张卡中的多张，不能当就绪信号用）
+    await screen.findByText(zh.portal.cardPendingRequest)
+
+    const promptOf = (code: string) => container.querySelector(`button[data-system="${code}"] .portal-card-locked-prompt`)
+    expect(promptOf('eam')).toHaveTextContent(zh.portal.cardPendingRequest)
+    // 已审结的单子不再占「審批中」，否则用户永远等不到下一步
+    expect(promptOf('search')).toHaveTextContent(zh.portal.requestAccess)
+
+    // 点击仍进申请页（页内展示在途单号并禁用提交）
+    fireEvent.click(container.querySelector('button[data-system="eam"]')!)
+    expect(await screen.findByRole('dialog')).toHaveTextContent(zh.portal.requestTitle)
   })
 
   it('申请弹窗取消只关闭弹窗，不进入系统也不切换当前系统', async () => {

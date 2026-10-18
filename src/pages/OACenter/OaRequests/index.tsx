@@ -38,6 +38,8 @@ const APPROVAL_TYPE_I18N: Record<string, string> = {
   gift: 'approvalCenter.typeGift',
   ai_access: 'oaRequests.aiAccessType',
   oa_purchase: 'oaRequests.typePurchase',
+  // 系統權限申請（門戶「我要申請」發起）：漏登記會讓類型列裸露 processCode
+  system_access: 'oaRequests.typeSystemAccess',
   rdm_intake: 'oaRequests.typeRdmIntake',
   rdm_change: 'oaRequests.typeRdmChange',
   hr_onboard: 'hrLifecycle.typeOnboard',
@@ -55,6 +57,9 @@ const FLOW_TAG_COLOR: Record<string, string> = {
   gift: '#722ED1',
   ai_access: '#1677FF',
   oa_purchase: '#FA8C16',
+  // 系統權限申請取 §A.1 登记的信息蓝：色板里未被占用的色相已用尽，
+  // 不为了“看起来不一样”而引入令牌表之外的新色值（标签文字已能区分流程类型）
+  system_access: '#1890FF',
   // 產研需求类走主品牌橙（RDM 单据与广告业务单据要一眼分得开）
   rdm_intake: '#E8720C',
   rdm_change: '#E8720C',
@@ -73,6 +78,8 @@ const FLOW_NAME_PREFIX: Record<string, string> = {
   oa_purchase: '採購申請',
   oa_seal: '用章申請',
   oa_general: '通用審批',
+  // 系統權限申請：門戶未授權系統卡片「我要申請」發起的流程
+  system_access: '系統權限申請',
   hr_onboard: '入職手續',
   hr_regular: '轉正申請',
   hr_transfer: '調動申請',
@@ -131,6 +138,7 @@ const PROCESS_TO_TYPE: Record<string, string> = {
   oa_purchase: 'oa_purchase',
   oa_seal: 'oa_seal',
   oa_general: 'oa_general',
+  system_access: 'system_access',
   rdm_intake: 'rdm_intake',
   rdm_change: 'rdm_change',
 }
@@ -646,6 +654,7 @@ export default function OaRequests() {
     { label: t('approvalCenter.typeGift'), value: 'gift' },
     { label: t('oaRequests.aiAccessType'), value: 'ai_access' },
     { label: t('oaRequests.typePurchase'), value: 'oa_purchase' },
+    { label: t('oaRequests.typeSystemAccess'), value: 'system_access' },
   ], [t])
 
   const flowStatusOptions = useMemo(() => [

@@ -23,6 +23,10 @@ import java.util.Map;
 
 /**
  * OA流程事项接口（流程实例管理 + 审批流转）
+ * <p>
+ * <b>已登记的控制例外</b>：{@code POST /{flowNo}/cancel} 不带 {@code @RequirePermission}，
+ * 只靠服务层的资源归属性校验放行——详见该方法注释。其余读接口与 approve/reject 仍按
+ * {@code oa-requests} 菜单权限控制，未放宽。
  */
 @RestController
 @RequestMapping("/api/oa/requests")
@@ -85,9 +89,25 @@ public class OaRequestController {
         return Result.success("「" + nodeName + "」已驳回", null);
     }
 
-    /** 撤销申请 */
+    /**
+     * 撤銷申請
+     * <p>
+     * <b>刻意不带 {@code @RequirePermission}（例外已登记）</b>：撤銷自己的申请是「资源所有权」动作，
+     * 不是「审批人动作」。原先挂的 {@code oa-requests:edit} 在实际上把“申请入口只给零权限员工”
+     * 的门户用户全拦在外（基底角色只有 view），已端到端实测报
+     * 「没有 [oa-requests] 的[编辑]权限」：申请人看得见自己的在途单却撤不回。
+     * <p>补偿控制全部在 {@code OaRequestServiceImpl.cancel}，一条没减：
+     * <ul>
+     *   <li>流程必须还在审批中（否则「僅審批中的流程可以撤銷」）；</li>
+     *   <li>已有节点通过 → 拒（「已有審批人通過，無法撤銷，請聯繫審批人駁回」），
+     *       避开“别人已承责的单子被申请人抽走”；</li>
+     *   <li>身份必为申请人本人或超管（signature 精确比对口径未变，本次只删菜单权限判定，
+     *       没放宽任何一条），否则报「僅申請人或管理員可以撤銷流程」。</li>
+     * </ul>
+     * 反查能力：{@code biz_oa_request} 自带 applicant 字段，撑得住事后追溯；
+     * OA 各类型（含系統權限申請）的撤销回调已在服务层分发，单据不会停在 pending。
+     */
     @PostMapping("/{flowNo}/cancel")
-    @RequirePermission(menu = "oa-requests", action = "edit")
     public Result<Void> cancel(@PathVariable String flowNo) {
         oaRequestService.cancel(flowNo);
         return Result.success("申請已撤銷", null);

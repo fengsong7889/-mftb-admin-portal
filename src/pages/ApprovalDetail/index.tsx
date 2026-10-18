@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Tag, Input, Modal, Table, message } from 'antd'
+import { Button, Tag, Input, Modal, Table, Image, message } from 'antd'
 import {
   UndoOutlined,
   SendOutlined,
@@ -21,9 +21,11 @@ import {
   WarningOutlined,
   GiftOutlined,
   RobotOutlined,
+  SafetyCertificateOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../components/DetailPageHeader'
+import { translateMenuName } from '../../i18n/menuNameEn'
 import BrandTag from '../../components/BrandTag'
 import './ApprovalDetail.css'
 import {
@@ -46,6 +48,12 @@ import type { FinApproval } from '../../api/finance'
 import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, submitDraftOaRequest, type OaRequestVO } from '../../api/oaRequest'
 import { fetchCategoryList } from '../../api/eam'
 import AiApprovalActionPanel from './AiApprovalActionPanel'
+import SystemAccessApprovalPanel from './SystemAccessApprovalPanel'
+import { getDurationLabel, getScenarioLabel } from '../../constants/systemAccess'
+import {
+  fetchSystemAccessRequestByFlow, fetchSystemAccessGrantOptions,
+  type SystemAccessRequestVO, type SystemAccessGrantOption, type SystemAccessAttachment,
+} from '../../api/systemAccessRequest'
 import {
   type AiGrantDraft,
   emptyGrantDraft,
@@ -101,6 +109,8 @@ const typeTitleMapKeys: Record<string, string> = {
   gift: 'approvalDetail.typeTitleGift',
   ai_access: 'approvalDetail.typeTitleAiAccess',
   oa_purchase: 'approvalDetail.typeTitlePurchase',
+  // 系統權限申請（門戶「我要申請」發起）：漏登記會讓頁頭與頁簽都回到充值標題
+  system_access: 'approvalDetail.typeTitleSystemAccess',
   rdm_intake: 'approvalDetail.typeTitleRdmIntake',
   rdm_change: 'approvalDetail.typeTitleRdmChange',
 }
@@ -110,9 +120,11 @@ const typeTitleMapKeys: Record<string, string> = {
  * <p>这些类型不在 biz_fin_approval 里：一旦落到财务分支，页面会降级成充值 mock，
  * 审批人既看不到内容也没有同意/驳回入口（RDM 需求准入/变更单实测如此）。
  */
-const OA_ENGINE_TYPES: string[] = ['oa_purchase', 'rdm_intake', 'rdm_change']
+const OA_ENGINE_TYPES: string[] = ['oa_purchase', 'rdm_intake', 'rdm_change', 'system_access']
 const isOaEngineType = (t?: string) => !!t && OA_ENGINE_TYPES.includes(t)
 const isRdmFlowType = (t?: string) => t === 'rdm_intake' || t === 'rdm_change'
+/** 系統權限申請：审批人在本页直接指定授权角色，通过即绑定 */
+const isSystemAccessType = (t?: string) => t === 'system_access'
 
 /** 流程狀態映射（i18n key，value 為英文枚舉碼） */
 const flowStatusLabelMapKeys: Record<string, string> = {
@@ -293,6 +305,17 @@ export default function ApprovalDetail() {
   /** 授權草稿：第二節點優先讀取第一節點保存的 draftGrant */
   const [grantDraft, setGrantDraft] = useState<AiGrantDraft | null>(null)
 
+  /* ---- 系統權限申請：申请内容 + 审批人授权配置 ---- */
+  /** 申请单详情（系统/勾选菜单/说明/凭证/兑现结果），取专用接口而不是 form_data（凭证不在里面） */
+  const [saRequest, setSaRequest] = useState<SystemAccessRequestVO | null>(null)
+  /** 授权角色候选（只含已持该系统准入的启用角色）；后端 403 时置 denied，面板改成「仅审批人可配」提示 */
+  const [saGrantOptions, setSaGrantOptions] = useState<SystemAccessGrantOption[]>([])
+  const [saGrantDenied, setSaGrantDenied] = useState(false)
+  /** 审批人选定的授权角色 ID */
+  const [saGrantRoleId, setSaGrantRoleId] = useState<number | null>(null)
+  /** PDF 凭证预览（图片走 antd Image 自带预览；PDF 用弹框 iframe，因为浏览器禁止顶层打开 data: URL） */
+  const [saPreview, setSaPreview] = useState<SystemAccessAttachment | null>(null)
+
   /**
    * 審批類型判定：URL 明说是 OA 引擎類（採購/RDM 准入/變更/AI 申請）時以 URL 為準。
    * <p>原先写 `data.approvalType || urlType`，而初始 data 来自 fallback/mock，
@@ -328,7 +351,14 @@ export default function ApprovalDetail() {
     } catch { return false }
   }, [data.applicant])
 
-  /** 是否可撤銷：流程審批中 + 無已通過節點 + 當前用戶為申請人或管理員 */
+  /**
+   * 是否可撤銷：流程審批中 + 無已通過節點 + 當前用戶為申請人或管理員。
+   * <p>不要再在这里叠菜单编辑权判定：OA 引擎类流程的 cancel 已改为
+   * 「只校资源归属」（服务端校验申请人本人/超管 + pending + 无已通过节点），
+   * 前端多加一条就会把「申请人撤自己的单」重新挡回去（历史上就这样：
+   * 门户申请人只有 oa-requests:view，按钮亮了也是 403）。
+   * 列表页「我發起的」同样只按流程状态判定是否显示撤銷，两处口径保持一致。
+   */
   const canRevoke = isPending && !hasApprovedNode && isApplicant
 
   /** 記錄已從後端成功載入詳情的 oa_purchase 流程號：防止 fallbackDetail（依賴異步 refReady）
@@ -593,6 +623,113 @@ export default function ApprovalDetail() {
     return () => { cancelled = true }
   }, [type, flowNo])
 
+  /**
+   * 系統權限申請：审批进度取 OA 统一接口，申请内容取专用接口（凭证是 base64，
+   * 不存在 biz_oa_request.form_data 里，那里只放数量）。
+   * <p>两个请求分开而不是合并：非本人/非审批人时专用接口会 403，但审批进度仍应该能看。
+   * <p>documents/notes 在这里清空是必须的：初始 fallback 是充值 mock，不覆写就会在权限申请单上
+   * 透出假凭证与假备注（RDM 单子已踩过同一个坑）。
+   */
+  useEffect(() => {
+    if (!isSystemAccessType(type) || !flowNo) return
+    let cancelled = false
+    fetchOaRequestDetail(flowNo)
+      .then((oaVo: OaRequestVO) => {
+        if (cancelled) return
+        oaLoadedFlowNoRef.current = flowNo
+        const timeline: ApprovalTimelineItem[] = [{
+          node: 'created',
+          time: oaVo.applyTime || '',
+          approver: oaVo.applicant || '--',
+          status: 'submitted',
+          comment: '',
+        }]
+        oaVo.approvalTasks?.forEach((task) => {
+          timeline.push({
+            node: task.nodeName || '',
+            time: task.approveTime || '',
+            approver: task.approver || '--',
+            status: task.taskStatus === 'approved'
+              ? 'approved'
+              : task.taskStatus === 'rejected' ? 'rejected' : 'pending',
+            comment: task.comment || '',
+          })
+        })
+        setData((prev) => ({
+          ...prev,
+          approvalType: 'system_access',
+          flowNo: oaVo.flowNo || prev.flowNo,
+          applicant: oaVo.applicant || prev.applicant,
+          applyDate: oaVo.applyTime || prev.applyDate,
+          flowStatus: oaVo.flowStatus || prev.flowStatus,
+          notes: '',
+          documents: [],
+          hasRevoke: oaVo.flowStatus === 'pending',
+          timeline,
+        }))
+      })
+      .catch(() => { /* 後端不可用時保留基礎展示，不降级到充值字段 */ })
+    return () => { cancelled = true }
+  }, [type, flowNo])
+
+  /** 申请单详情（系统/勾选菜单/说明/凭证/兑现结果） */
+  useEffect(() => {
+    if (!isSystemAccessType(type) || !flowNo) return
+    let cancelled = false
+    fetchSystemAccessRequestByFlow(flowNo)
+      .then((vo) => {
+        if (cancelled) return
+        setSaRequest(vo)
+        /*
+         * 公司/部门/职位一律以申请单快照为准：初始 fallback 是充值 mock，不覆写就会在
+         * 权限申请单的基本信息里透出别人的部门与公司（与 documents/notes 同一个坑）。
+         * 本流程不采集公司与职位，置空让界面展示 '--' 而不是假值。
+         */
+        setData((prev) => ({
+          ...prev,
+          department: vo.deptName || '',
+          company: '',
+          position: '',
+        }))
+      })
+      .catch(() => { if (!cancelled) setSaRequest(null) })
+    return () => { cancelled = true }
+  }, [type, flowNo])
+
+  /**
+   * 授权角色候选：后端只给「当前待审节点审批人 / 超管」读，其他人 403。
+   * <p>403 与「真的没候选角色」必须区分开：前者是给非审批人看的只读提示，
+   * 后者是审批人需要先去权限管理系统配角色的阻断态，两者混成一个空列表会把人指错方向。
+   * <p>默认选中申请人建议的角色（后端已排到首位并标 preferred）：审批人仍可不选或改选，
+   * 但默认值该给「最可能正确的那个」而不是空白。
+   * <p>只在看清楚「这张单确实还在审批中」之后才发请求：data.flowStatus 在首屏 fallback 里可能
+   * 是 pending，已审结的单会因此白打一次接口并弹「您不是當前節點的審批人」（只读查看者会被误导）。
+   * saRequest.status 是后端 detailByFlowNo 结合 OA 侧真值修正过的状态，以它为准。
+   */
+  useEffect(() => {
+    if (!isSystemAccessType(type) || !flowNo) return
+    if (!saRequest || saRequest.status !== 'pending') return
+    let cancelled = false
+    fetchSystemAccessGrantOptions(flowNo)
+      .then((rows) => {
+        if (cancelled) return
+        const options = Array.isArray(rows) ? rows : []
+        setSaGrantOptions(options)
+        setSaGrantDenied(false)
+        setSaGrantRoleId((prev) => {
+          if (prev) return prev
+          const preferred = options.find((option) => option.preferred && !option.alreadyBound)
+          return preferred ? preferred.targetId : null
+        })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setSaGrantOptions([])
+        setSaGrantDenied(true)
+      })
+    return () => { cancelled = true }
+  }, [type, flowNo, saRequest])
+
   /** AI 申請審批操作區草稿初始化：第二節點讀取第一節點保存的 draftGrant，否則按申請內容初始化 */
   useEffect(() => {
     if (type !== 'ai_access' || !isPending || grantDraft) return
@@ -636,13 +773,33 @@ export default function ApprovalDetail() {
         return
       }
     }
+    /*
+     * 系統權限申請：未选授权角色不得通过。
+     * <p>这是前端的 UX 闸门，后端同样 fail-closed（终审时读不到 approvedGrant 就报错并回滚审批）；
+     * 先在前端拦是为了让审批人看到「该选什么」而不是一个事务回滚后的错。
+     * <p>候选为空时给的是可操作指引：说明还没任何角色持有该系统准入，得先去权限管理系统配。
+     */
+    if (isSystemAccessType(type)) {
+      if (saGrantOptions.length === 0) {
+        message.warning(t(saGrantDenied ? 'approvalDetail.saGrantDenied' : 'approvalDetail.saGrantNoOption'))
+        return
+      }
+      if (!saGrantRoleId) {
+        message.warning(t('approvalDetail.saGrantRequired'))
+        return
+      }
+    }
     Modal.confirm({
       title: t('approvalDetail.approveConfirm'),
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       content: type === 'ai_access'
         ? t('approvalDetail.aiApproveContent')
-        : t('approvalDetail.approveContent'),
+        : isSystemAccessType(type)
+          ? t('approvalDetail.saApproveContent', {
+              role: saGrantOptions.find((option) => option.targetId === saGrantRoleId)?.targetName ?? '',
+            })
+          : t('approvalDetail.approveContent'),
       okText: t('approvalDetail.approveOk'),
       cancelText: t('common.cancel'),
       onOk: async () => {
@@ -672,8 +829,22 @@ export default function ApprovalDetail() {
           // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批；OA 採購走 OA 審批 API
           const isFrontendFlow = type === 'gift' || type === 'ai_access'
           const oaApproved = isOaEngineType(type)
+          /*
+           * 系統權限申請：把审批人选定的授权角色随审批一并提交（复用 AI 申请的 formData 通道）。
+           * 后端只取 approvedGrant 合并进 form_data，申请内容不会被审批接口改写；
+           * 全部节点通过后由回调把该角色绑定到申请人并刷新权限缓存。
+           */
+          const saFormData = isSystemAccessType(type) && saGrantRoleId
+            ? JSON.stringify({
+                approvedGrant: {
+                  targetType: 'role',
+                  targetId: saGrantRoleId,
+                  targetName: saGrantOptions.find((option) => option.targetId === saGrantRoleId)?.targetName ?? null,
+                },
+              })
+            : undefined
           const result = oaApproved
-            ? ((await approveOaRequest(flowNo, approvalComment)), null)
+            ? ((await approveOaRequest(flowNo, approvalComment, saFormData)), null)
             : isFrontendFlow
               ? approveCurrentNode(flowNo)
               : await approveFinApproval(flowNo)
@@ -933,7 +1104,10 @@ export default function ApprovalDetail() {
                 <Button danger onClick={handleDelete}>刪除</Button>
               </>
             )}
-            {isPending && !hasApprovedNode && (
+            {/* 撤銷是「申请人本人或超管」的动作（后端 cancel 同口径）：不能用「待审 + 无已通过节点」
+                就亮按钮，否则审批人点了只会拿到「僅申請人或管理員可以撤銷流程」。
+                底部操作条早已用 canRevoke，顶部条之前漏了身份判定，此处对齐。 */}
+            {canRevoke && (
               <Button icon={<UndoOutlined />} onClick={handleRevoke}>{t('approvalCenter.cancel')}</Button>
             )}
             {isPending && isCurrentApprover && (
@@ -1576,6 +1750,148 @@ export default function ApprovalDetail() {
             </div>
           )}
 
+          {/* 系統權限申請：申请内容（系统 + 使用场景 + 期限 + 参考角色 + 诉求） */}
+          {isSystemAccessType(type) && saRequest && (
+            <div className="approval-section">
+              {renderSectionTitle(
+                <SafetyCertificateOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+                t('approvalDetail.saInfoTitle'),
+                'blue',
+              )}
+              <div className="approval-info-grid">
+                <div className="approval-info-item">
+                  <span className="approval-info-label">{t('systemAccessApply.targetSystem')}</span>
+                  <span className="approval-info-value">
+                    <Tag color="blue" style={{ margin: 0 }}>{saRequest.systemName || saRequest.systemCode}</Tag>
+                  </span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">{t('systemAccessApply.department')}</span>
+                  <span className="approval-info-value">{saRequest.deptName || '--'}</span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">{t('approvalDetail.saDuration')}</span>
+                  <span className="approval-info-value">
+                    {getDurationLabel(t, saRequest.durationType, saRequest.durationUntil)}
+                  </span>
+                </div>
+                <div className="approval-info-item">
+                  <span className="approval-info-label">{t('approvalDetail.saPreferredRole')}</span>
+                  <span className="approval-info-value">
+                    {saRequest.preferredRoleName
+                      ? <Tag color="orange" style={{ margin: 0 }}>{saRequest.preferredRoleName}</Tag>
+                      : t('approvalDetail.saPreferredRoleNone')}
+                  </span>
+                </div>
+                {saRequest.scenarios.length > 0 && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('approvalDetail.saScenarios')}</span>
+                    <span className="approval-info-value">
+                      {saRequest.scenarios.map((code) => (
+                        <Tag key={code} color="geekblue" style={{ marginRight: 4, marginBottom: 4 }}>
+                          {getScenarioLabel(t, code)}
+                        </Tag>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                  <span className="approval-info-label">{t('approvalDetail.saReason')}</span>
+                  <span className="approval-info-value">{saRequest.reason || '--'}</span>
+                </div>
+                {/* 2026-10 前的旧单采集过勾选菜单：保留只读展示（那是当时真实的申请事实），新单不渲染 */}
+                {saRequest.requestedMenus.length > 0 && (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('approvalDetail.saRequestedMenus')}</span>
+                    <span className="approval-info-value">
+                      {saRequest.requestedMenus.map((menu) => (
+                        <Tag key={menu.menuKey} color="default" style={{ marginRight: 4, marginBottom: 4 }}>
+                          {/* 入库的是申请当时的菜单名快照（中文），英文界面要过全局取名入口才能译出来 */}
+                          {translateMenuName(menu.menuKey, menu.name || menu.menuKey)}
+                        </Tag>
+                      ))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 系統權限申請：审批操作區（指定授权角色，通过即绑定）；申请单没 load 成功时不渲染，
+              否则只会给出一句误导的「尚无授权角色」 */}
+          {isSystemAccessType(type) && isPending && saRequest && (
+            <SystemAccessApprovalPanel
+              options={saGrantOptions}
+              denied={saGrantDenied}
+              value={saGrantRoleId}
+              onChange={setSaGrantRoleId}
+              systemName={saRequest?.systemName || saRequest?.systemCode || ''}
+            />
+          )}
+
+          {/* 系統權限申請：授权结果（已审结后回看：绑了哪个角色、谁批的、什么时候生效） */}
+          {isSystemAccessType(type) && !isPending && saRequest && (
+            <div className="approval-section">
+              {renderSectionTitle(
+                <CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />,
+                t('approvalDetail.saResultTitle'),
+                'green',
+              )}
+              <div className="approval-info-grid">
+                {saRequest.grantStatus === 'granted' ? (
+                  <>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.saGrantedRole')}</span>
+                      <span className="approval-info-value">
+                        <Tag color="green" style={{ margin: 0 }}>{saRequest.grantTargetName || '--'}</Tag>
+                      </span>
+                    </div>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.saGrantedAt')}</span>
+                      <span className="approval-info-value">{saRequest.grantedAt || '--'}</span>
+                    </div>
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalCenter.colApprover')}</span>
+                      <span className="approval-info-value">{saRequest.grantedBy || '--'}</span>
+                    </div>
+                    {/* 权限有效期是申请人最关心的一件事：到期的会被作业自动收回，必须在这里看出来，
+                        不能只给一个「已授权」让人以为永久有效 */}
+                    <div className="approval-info-item">
+                      <span className="approval-info-label">{t('approvalDetail.saValidity')}</span>
+                      <span className="approval-info-value">
+                        {saRequest.revokeStatus === 'revoked' && (
+                          <Tag color="default" style={{ margin: 0 }}>{t('approvalDetail.saRevokedTag')}</Tag>
+                        )}
+                        {saRequest.revokeStatus === 'kept' && (
+                          <Tag color="blue" style={{ margin: 0 }}>{t('approvalDetail.saKeptTag')}</Tag>
+                        )}
+                        {saRequest.revokeStatus !== 'revoked' && saRequest.revokeStatus !== 'kept' && (
+                          <Tag color="green" style={{ margin: 0 }}>
+                            {getDurationLabel(t, saRequest.durationType, saRequest.durationUntil)}
+                          </Tag>
+                        )}
+                        {saRequest.revokeStatus === 'revoked' && saRequest.revokedAt && (
+                          <span style={{ marginLeft: 8, fontSize: 12, color: '#8c8c8c' }}>
+                            {t('approvalDetail.saRevokedAt')}: {saRequest.revokedAt}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
+                    <span className="approval-info-label">{t('approvalDetail.saGrantNone')}</span>
+                    <span className="approval-info-value">
+                      {saRequest.status === 'rejected'
+                        ? (saRequest.rejectReason || t('approvalDetail.saGrantNoneRejected'))
+                        : t('approvalDetail.saGrantNoneCancelled')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 採購申請類型：採購明細表格 */}
           {type === 'oa_purchase' && data.purchaseItems && data.purchaseItems.length > 0 && (
             <div className="approval-section">
@@ -1611,8 +1927,59 @@ export default function ApprovalDetail() {
             </div>
           </div>
 
-          {/* 备注信息 / 採購事由（AI 申請的用途說明已在 AI 申請資訊中展示，此處不重複） */}
-          {type !== 'ai_access' && (
+          {/*
+            系統權限申請凭证：存的是 base64 Data URL，直接给可预览的缩图而不是一个图标。
+            共用的「相关凭证」区只能渲染图标（它的 documents 不带内容），权限申请单里审批人
+            需要真看到附件才能判断理由是否成立，故单独渲染一区。
+          */}
+          {isSystemAccessType(type) && saRequest && saRequest.attachments.length > 0 && (
+            <div className="approval-section">
+              {renderSectionTitle(
+                <FileImageOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />,
+                t('systemAccessApply.attachmentSection'),
+              )}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {saRequest.attachments.map((item, index) => (
+                  item.type === 'pdf' ? (
+                    <button
+                      key={`${item.name}_${index}`}
+                      type="button"
+                      onClick={() => setSaPreview(item)}
+                      style={{
+                        width: 96, height: 96, border: '1px solid #e8e8e8', borderRadius: 8, background: '#fafafa',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', gap: 4,
+                      }}
+                      aria-label={`${t('approvalDetail.saPreviewAria')} ${item.name}`}
+                    >
+                      <FilePdfOutlined style={{ fontSize: 28, color: '#e53935' }} />
+                      <span style={{
+                        fontSize: 10, color: '#999', maxWidth: 84,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{item.name}</span>
+                    </button>
+                  ) : (
+                    <div key={`${item.name}_${index}`} style={{ textAlign: 'center' }}>
+                      <Image
+                        src={item.dataUrl}
+                        alt={item.name}
+                        width={96}
+                        height={96}
+                        style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8' }}
+                      />
+                      <div style={{
+                        fontSize: 10, color: '#999', maxWidth: 96,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{item.name}</div>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 备注信息 / 採購事由（AI 申請的用途說明已在 AI 申請資訊中展示，系統權限申請的申请说明同理，此處不重複） */}
+          {type !== 'ai_access' && !isSystemAccessType(type) && (
           <div className="approval-section">
             {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, type === 'oa_purchase' ? '採購事由' : t('approvalDetail.notesTitle'))}
             <div className="approval-notes">{data.notes}</div>
@@ -1857,6 +2224,24 @@ export default function ApprovalDetail() {
               </div>
             ))}
           </div>
+        )}
+      </Modal>
+
+      {/* 系統權限申請：PDF 凭证预览（data: URL 不能顶层导航，用 iframe 内嵌） */}
+      <Modal
+        open={!!saPreview}
+        title={saPreview?.name}
+        footer={null}
+        width={860}
+        onCancel={() => setSaPreview(null)}
+        destroyOnClose
+      >
+        {saPreview && (
+          <iframe
+            title={saPreview.name}
+            src={saPreview.dataUrl}
+            style={{ width: '100%', height: '70vh', border: 'none' }}
+          />
         )}
       </Modal>
     </div>

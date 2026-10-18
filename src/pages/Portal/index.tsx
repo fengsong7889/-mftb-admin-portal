@@ -3,7 +3,7 @@
  *
  * 已授权系统以 `/api/portal/context` 为准；未授权展示目录仅供前端界面确认。
  * 已授权卡片整体可点击，进入对应系统首页；未授权卡片不可进入系统，
- * 卡片下方展示「我要申请」，点击弹出确认框引导用户进入权限申请流程。
+ * 卡片下方展示「我要申请」，点击弹出确认框，确认后进入系統權限申請页发起 XTSQ 审批流程。
  * 权限请求失败时展示重试，不将接口异常误判为全部未授权。
  *
  * 整体版式参考企业门户通行做法（顶部横幅 + 概览指标 + 业务域分组应用墙 + 指引带），
@@ -20,6 +20,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchPortalContext, type PortalSystem } from '../../api/portal'
+import { fetchMySystemAccessRequests } from '../../api/systemAccessRequest'
 import { fetchPortalFavorites, savePortalFavorites } from '../../api/auth'
 import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useCurrentSystem } from '../../hooks/useCurrentSystem'
@@ -321,6 +322,13 @@ export default function Portal() {
   /** 常用与最近使用只决定「谁排在第一屏」，不决定谁能进系统，准入判定始终只看后端返回。 */
   const [favorites, setFavorites] = useState<string[]>([])
   const [recent, setRecent] = useState<string[]>([])
+  /**
+   * 已有在途权限申請的系统编码：给未授权卡片一标「審批中」。
+   * <p>没这个标记时，提交完回到门户卡片仍写「我要申請」，用户会以为提交没生效、
+   * 反过来又点一次（后端虽会拒重复提交，但体验上是“按钮骗人”）。仅展示用，
+   * 不参与任何准入判定；拉不到就当成无在途（不打断门户渲染）。
+   */
+  const [pendingRequestSystems, setPendingRequestSystems] = useState<Set<string>>(new Set())
 
   /**
    * 按当前登录用户加载个人常用/最近使用；无 username（含测试桩）时保持为空，避免串号。
@@ -362,6 +370,20 @@ export default function Portal() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 只看当前登录人自己的在途单（/my 接口服务端按登录态过滤，不信任前端参数） */
+  useEffect(() => {
+    let cancelled = false
+    fetchMySystemAccessRequests()
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return
+        setPendingRequestSystems(new Set(
+          rows.filter((row) => row.status === 'pending').map((row) => row.systemCode),
+        ))
+      })
+      .catch(() => { /* 后端不可用时不标记，也不能因此让门户打不开 */ })
+    return () => { cancelled = true }
+  }, [])
 
   const unauthorizedSystems = useMemo(() => {
     const authorizedCodes = new Set(systems.map((system) => system.code))
@@ -436,10 +458,18 @@ export default function Portal() {
     navigate('/')
   }
 
-  /** 确认申请：进入 OA 流程中心发起权限申请（申请表单流程后续接入）。 */
+  /**
+   * 确认申请：进入系統權限申請页，携带系统编码发起 XTSQ 流程。
+   * <p>不再跳 /process-center：那是 OA 系统内的受控菜单，「未获得权限」页签里的用户
+   * 很可能连 OA 都没授权，跳过去只会看到 403——这正是「我要申請」看起来没实现的原因。
+   * 申请页是仅需登录态的自助页，任何员工都能打开。
+   * <p>name 只作语言包缺失时的展示兜底，系统是否存在、是否已授权一律由后端判定。
+   */
   const handleConfirmRequest = () => {
+    const target = requestSystem
     setRequestSystem(null)
-    navigate('/process-center')
+    if (!target) return
+    navigate(`/system-access-apply?system=${encodeURIComponent(target.code)}&name=${encodeURIComponent(target.name)}`)
   }
 
   /** 卡片文案跟随界面语言，artworkName 保留原始名称以锁定插画场景。 */
@@ -469,6 +499,7 @@ export default function Portal() {
   /** 单卡结构保持原样（整卡即按钮、卡内无独立操作按钮与图标）；收藏按钮挂在卡片外壳上，与卡按钮同级。 */
   const renderCard = (sys: ViewSystem, hasAccess: boolean) => {
     const favorited = favorites.includes(sys.code)
+    const pendingRequest = !hasAccess && pendingRequestSystems.has(sys.code)
     return (
     <div
       key={sys.code}
@@ -481,9 +512,9 @@ export default function Portal() {
         type="button"
         className={`portal-card${hasAccess ? '' : ' is-locked'}`}
         data-system={sys.code}
-        title={!hasAccess ? t('portal.requestAccess') : undefined}
+        title={!hasAccess ? (pendingRequest ? t('portal.cardPendingRequest') : t('portal.requestAccess')) : undefined}
         onClick={() => handleEnter(sys)}
-        aria-label={`${sys.name} · ${hasAccess ? t('portal.enter') : t('portal.requestAccess')}`}
+        aria-label={`${sys.name} · ${hasAccess ? t('portal.enter') : pendingRequest ? t('portal.cardPendingRequest') : t('portal.requestAccess')}`}
       >
         <span className="portal-card-cover">
           <SystemArtwork code={sys.code} name={sys.artworkName} active={hoveredSystem === sys.code} style={artworkStyle} />
@@ -494,8 +525,8 @@ export default function Portal() {
           {sys.description ? <span className="portal-card-desc">{sys.description}</span> : null}
           {!hasAccess && (
             <span className="portal-card-locked-prompt">
-              <SafetyCertificateOutlined aria-hidden="true" />
-              <span>{t('portal.requestAccess')}</span>
+              {pendingRequest ? <ClockCircleOutlined aria-hidden="true" /> : <SafetyCertificateOutlined aria-hidden="true" />}
+              <span>{pendingRequest ? t('portal.cardPendingRequest') : t('portal.requestAccess')}</span>
             </span>
           )}
         </span>

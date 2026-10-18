@@ -221,6 +221,11 @@ const AiEmpPermissionDetail = lazy(() => import('./pages/AiEmpPermission/AiEmpPe
 const OaRequests = lazy(() => import('./pages/OACenter/OaRequests'))
 const ProcessCenter = lazy(() => import('./pages/OACenter/ProcessCenter'))
 const OaPurchaseRequest = lazy(() => import('./pages/OACenter/OaPurchaseRequest'))
+// 系統權限申請：門戶「我要申請」的落地頁。刻意不登記為受控菜單路由（不入
+// ROUTE_MENU_KEY_MAP / CONTROLLED_MENU_KEYS）：使用者正是「對所申請系統沒有任何權限」的員工，
+// 掛上菜單權限會讓門戶的「我要申請」變成 403 死鏈。補償控制在後端（申請人只取登錄態、
+// 系統/菜單/憑證全部服務端校驗、提交只產生待審批單據而不改任何權限）。
+const SystemAccessApply = lazy(() => import('./pages/OACenter/SystemAccessApply'))
 // 物資管理（EAM 完整子菜單）
 const AssetList = lazy(() => import('./pages/AssetManagement/AssetList'))
 const AssetAdd = lazy(() => import('./pages/AssetManagement/AssetAdd'))
@@ -654,6 +659,8 @@ function AuthenticatedLayout() {
               <Route path="/oa-requests" element={<OaRequests />} />
               <Route path="/process-center" element={<ProcessCenter />} />
               <Route path="/oa-purchase-request" element={<OaPurchaseRequest />} />
+              {/* 系統權限申請（門戶自助入口，僅需登錄態；見上方 lazy 聲明的例外說明） */}
+              <Route path="/system-access-apply" element={<SystemAccessApply />} />
               {/* 產研交付（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
               <Route path="/rdm-workbench" element={<RdmWorkbench />} />
               <Route path="/rdm-submit" element={<RdmRequirementSubmit />} />

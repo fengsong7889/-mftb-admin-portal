@@ -3,6 +3,7 @@ package com.mftb.admin.util;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.constant.SystemAccessConstants;
 import com.mftb.admin.entity.SysBizSeqRule;
 import com.mftb.admin.mapper.BizSeqMapper;
 import com.mftb.admin.mapper.SysBizSeqRuleMapper;
@@ -102,6 +103,14 @@ public class BizSeqService {
     public static final String RULE_HR_LIFECYCLE_REQUEST = "hr_lifecycle_request";
     /** AI 使用申请流程编号 */
     public static final String RULE_AI_ACCESS_REQUEST = "ai_access_request";
+    /**
+     * 系统权限申请流程编号（XTSQ + YYYYMMDD + 2 位日流水，从 01 起，超 99 自然扩位）。
+     * <p>企业门户「我要申請」未授权系统时发起，与通用 OA 号分开两套流水：
+     * 前缀是对外可识别的业务事实（XTSQ 就是系统权限申请单），回落通用 OA 号会让
+     * 「編號生成規則」页看到的前缀与实际发出的号对不上，也无法按日重排。
+     * <p>规则行由 {@code SystemAccessSchemaInitializer} 种子，缺行时 requireRule fail-closed 拒提交。
+     */
+    public static final String RULE_SYSTEM_ACCESS_REQUEST = "system_access_request";
     /** EAM 采购申请 */
     public static final String RULE_EAM_PURCHASE_REQUEST = "eam_purchase_request";
     /** EAM 采购订单 */
@@ -156,6 +165,16 @@ public class BizSeqService {
      * 审批前的草稿/待审批/审批驳回行不预占号码，也不消费流水。
      */
     public static final String RULE_RDM_REQUIREMENT = "rdm_requirement";
+    /**
+     * 迭代編碼－常規迭代（SP + YYYYMM + 3 位月流水，如 SP202610001）。
+     * <p>迭代編碼一律系統發號、前端不再收手工輸入：編碼是需求/任務掛接的穩定鍵，
+     * 手工填寫會同期撞號與格式漂移（歷史曾出現 SP2026-10A 與 SP2026-10B 並存兩種寫法）。
+     */
+    public static final String RULE_RDM_ITERATION_SPRINT = "rdm_iteration_sprint";
+    /** 迭代編碼－版本專項（VER + YYYYMM + 3 位月流水，如 VER202610001） */
+    public static final String RULE_RDM_ITERATION_VERSION = "rdm_iteration_version";
+    /** 迭代編碼－緊急修復（HF + YYYYMMDD + 2 位日流水，如 HF2026101801；hotfix 講時效按日出號） */
+    public static final String RULE_RDM_ITERATION_HOTFIX = "rdm_iteration_hotfix";
 
     /* ==================== 用车管理（EAM 车辆域） ==================== */
 
@@ -289,7 +308,26 @@ public class BizSeqService {
             case "ai_access" -> RULE_AI_ACCESS_REQUEST;
             case "hr_onboard", "hr_regular", "hr_transfer", "hr_dimission", "hr_renew" -> RULE_HR_LIFECYCLE_REQUEST;
             case RdmConstants.INTAKE_PROCESS_CODE -> RULE_RDM_INTAKE_APPROVAL;
+            // 系统权限申请同样不得回落通用 OA 号（XTSQ 已登记在「編號生成規則」页）
+            case SystemAccessConstants.PROCESS_CODE -> RULE_SYSTEM_ACCESS_REQUEST;
             default -> RULE_OA_REQUEST;
+        };
+    }
+
+    /**
+     * 按迭代類型取迭代編碼規則 key（sprint/version/hotfix 三種格式各走獨立流水）。
+     * <p>未知類型 fail-closed 拋異常，不回落任何規則： silently 回落會讓不同格式的號
+     * 混進同一條迭代流水，規則頁看到的前綴與實際發出的號對不上。
+     *
+     * @param iterationType {@code rdm_iteration.iteration_type}
+     * @return sys_biz_seq_rule.rule_key
+     */
+    public static String ruleKeyForIterationType(String iterationType) {
+        return switch (iterationType == null ? "" : iterationType) {
+            case "sprint" -> RULE_RDM_ITERATION_SPRINT;
+            case "version" -> RULE_RDM_ITERATION_VERSION;
+            case "hotfix" -> RULE_RDM_ITERATION_HOTFIX;
+            default -> throw new BusinessException("未知的迭代類型: " + iterationType);
         };
     }
 
