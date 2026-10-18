@@ -197,6 +197,10 @@ public class DocService {
         } else {
             log.setUserName(username);
         }
+        // viewedAt 标了 @TableField(fill = FieldFill.INSERT)，MyBatis-Plus 会把该列无条件写进 INSERT，
+        // 而项目的 MetaObjectHandler 只按名字填 createdAt/updatedAt → 不赋值就是显式 NULL，
+        // 会盖掉 DDL 的 DEFAULT CURRENT_TIMESTAMP（同类缺陷刚在 hr_operation_audit.occurred_at 上修过）。
+        log.setViewedAt(java.time.LocalDateTime.now());
         viewLogMapper.insert(log);
     }
 

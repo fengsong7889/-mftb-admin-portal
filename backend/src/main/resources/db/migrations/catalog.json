@@ -2070,6 +2070,24 @@
       ],
       "intent": "项目主表补四组负责人列：tech_lead / ui_designer / qa_lead / ops_lead 各 user_id + user_name 共 8 列（可空）",
       "comment": "前端新增项目表单已收四组 EmployeeSelect 选人字段（双写 userId+userName），后端实体/DTO/VO/服务层同批补齐；缺列时服务层 insert/update 报「未知列」，故代码与列必须原子交付。逐列先查再加（ADD COLUMN 重跑必撞 duplicate column，不能整脚本重放）；后置校验八列齐备，缺任何一列不记版本。更新语义以「userName 非 null」为提供哨兵：表单恒传字符串（清空传空串）支持清空负责人，暂停/风险等局部更新不传这些 key 不会误清。Detail 同批补回 pmUserId/productOwnerUserId（前端编辑回显 EmployeeSelect 早已依赖但后端一直漏返，回显只能靠姓名快照猜）。列均可空：存量项目无负责人为合法事实，不做回填。245 腳本僅作參考文檔，不進鏡像。回滚=回退代码，列留著無害（服务层不读不写）。"
+    },
+    {
+      "versionKey": "hr:rehire-process:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hrRehireProcessInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:lifecycle-schema:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "252_hr_rehire_process.sql"
+      ],
+      "intent": "为入转调离引擎新增「重新入職」单据类型的 OA 流程种子 hr_rehire（不加列、不加菜单、不加动作）",
+      "author": "Qoder",
+      "comment": "对应方案 §5.3（入职/转正/调动/离职/重新入职全部登记为人事流程）与 §8 验收门槛「从待入职到离职再入职可完整追溯」。为什么需要这个类型而不用「入职」代过：入职单据会新建账号，把同一个人拆成两份档案（工号、历史单据、资产归属全断开），而返聘本质上是同一个人的新一段雇佣（复用 P4 的 hr_employment_period 递增 period_seq）。为什么仍要单独 versionKey：只改 Java 常量不会落到存量库，缺流程定义时提交单据会在 OaRequestService.submit 报「流程不存在」——属于配置类缺失，必须后置校验卡住而不是默默降级。不新增菜单也不新增动作：按 §6.1「人事类流程是流程中心页面内分类」，授权锚在 hr-onboarding（与续签挂 contract-ledger 同一处理法）；表也不加列，复职沿用调动的 new_dept_id/new_position_id/effective_date。办理口径三条：真离职走统一 as-of（不看账号 status、不看会被未来离职单骗到的最新记录）、复用原 userId、复职必须强制改密并清会话。@Order(35)。"
     }
   ]
 }

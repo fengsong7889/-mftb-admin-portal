@@ -25,6 +25,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.HrEffectiveTaskService;
+import com.mftb.admin.service.HrAssignmentQuery;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.HrLifecycleService;
 import com.mftb.admin.service.OaRequestService;
@@ -68,6 +69,7 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
     private final OperatorResolver operatorResolver;
     private final PermissionService permissionService;
     private final HrEffectiveTaskService effectiveTaskService;
+    private final HrAssignmentQuery hrAssignmentQuery;
     private final HrLifecycleCallbackService lifecycleCallbackService;
 
     @Override
@@ -272,18 +274,33 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
             throw new BusinessException("無效的單據類型: " + type);
         }
         requireTypePermission(type, "view");
+        // 重新入職的候选恰好相反：要的是已离职的人。但**不能拿账号状态当离职依据**——
+        // 被冻结的在职员工 status 也是 0，混进候选会让人把在职者再建一段雇佣。
+        // status=0 只做粗筛，最终由统一的 as-of 口径（任职事实）判定。
+        boolean rehiring = HrLifecycleConstants.TYPE_REHIRE.equals(type);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getStatus, 1)
+                .eq(SysUser::getStatus, rehiring ? 0 : 1)
                 // 内置系统管理员不是员工：本查询按 id 倒序取 20 条，而系统账号是最后插入的（id 最大），
                 // 不排除会直接占掉入转调离人员搜索的首位
                 .ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME)
                 .orderByDesc(SysUser::getId)
-                .last("LIMIT 20");
+                // 离职候选可能远多于在职，多取后过滤再取前 20，避免返聘搜索“搜不到人”
+                .last(rehiring ? "LIMIT 100" : "LIMIT 20");
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(SysUser::getName, keyword)
                     .or().like(SysUser::getEmpId, keyword));
         }
-        return sysUserMapper.selectList(wrapper).stream().map(this::toBrief).toList();
+        List<SysUser> users = sysUserMapper.selectList(wrapper);
+        if (rehiring) {
+            List<Long> ids = users.stream().map(SysUser::getId).toList();
+            Map<Long, String> statusById = hrAssignmentQuery.employmentStatusOf(ids, LocalDate.now());
+            users = users.stream()
+                    .filter(u -> HrAssignmentQuery.STATUS_RESIGNED
+                            .equals(statusById.getOrDefault(u.getId(), HrAssignmentQuery.STATUS_ACTIVE)))
+                    .limit(20)
+                    .toList();
+        }
+        return users.stream().map(this::toBrief).toList();
     }
 
     /** 员工实体 → 概要 VO（含最新职务记录的公司/上级/在职状态） */
@@ -385,6 +402,17 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
                 if (!StringUtils.hasText(entity.getDimissionType())
                         || !HrLifecycleConstants.ALL_DIMISSION_TYPES.contains(entity.getDimissionType())) {
                     throw new BusinessException("離職單需要選擇離職類型");
+                }
+            }
+            case HrLifecycleConstants.TYPE_REHIRE -> {
+                if (entity.getUserId() == null) {
+                    throw new BusinessException("重新入職單需要選擇已離職員工");
+                }
+                if (entity.getEffectiveDate() == null) {
+                    throw new BusinessException("重新入職單需要復職生效日期");
+                }
+                if (entity.getNewDeptId() == null && entity.getNewPositionId() == null) {
+                    throw new BusinessException("重新入職單需要入職部門或職位");
                 }
             }
             case HrLifecycleConstants.TYPE_RENEW -> {
@@ -570,6 +598,7 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
             case HrLifecycleConstants.TYPE_TRANSFER -> "調動";
             case HrLifecycleConstants.TYPE_DIMISSION -> "離職";
             case HrLifecycleConstants.TYPE_RENEW -> "合同續簽";
+            case HrLifecycleConstants.TYPE_REHIRE -> "重新入職";
             default -> "人事";
         };
         return typeLabel + "手續-" + entity.getEmpName() + "(" + entity.getReqNo() + ")";

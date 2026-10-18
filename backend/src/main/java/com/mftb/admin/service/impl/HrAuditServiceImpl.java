@@ -112,6 +112,11 @@ public class HrAuditServiceImpl implements HrAuditService {
         row.setEffectiveDate(entry.getEffectiveDate());
         row.setSensitive(sensitive ? 1 : 0);
         row.setOperator(truncate(operator, 64));
+        // 必须显式赋值：字段标了 @TableField(fill = FieldFill.INSERT)，MyBatis-Plus 会把该列
+        // 无条件写进 INSERT，而项目的 MetaObjectHandler 只按名字填 createdAt/updatedAt，
+        // 结果是用显式 NULL 覆盖了 DDL 的 DEFAULT CURRENT_TIMESTAMP（审计时间因此全空）。
+        // 同一陷阱在 VehicleUseServiceImpl 已踩过，修式一致：写入前自己赋值。
+        row.setOccurredAt(java.time.LocalDateTime.now());
         return row;
     }
 

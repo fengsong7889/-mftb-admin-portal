@@ -11,6 +11,7 @@ import {
   deleteEmployee,
   fetchRosterEmployees,
   fetchRosterExport,
+  logRosterExport,
   resetEmployeePassword,
 } from '../../../api/employee'
 import type { EmployeeItem, EmployeeQuery } from '../../../api/employee'
@@ -345,12 +346,24 @@ export default function EmployeeManagement() {
     { title: t('employee.colUpdatedAt'), dataIndex: 'updatedAt' },
   ], [t])
 
-  const downloadRows = (rows: EmployeeItem[], fileName: string) => {
+  /**
+   * 当前页 / 选中行两档在浏览器落文件，但**先拿服务端留痕再生成文件**：
+   * 留痕登记不上就放弃导出，否则这两档就是花名册唯一不需留痕的批量出口（上一轮实测就是这样）。
+   */
+  const downloadRows = async (rows: EmployeeItem[], fileName: string, scope: 'PAGE' | 'SELECTION') => {
     if (rows.length === 0) {
       message.warning(t('employee.noDataToExport'))
       return
     }
+    try {
+      await logRosterExport(scope, rows.map(row => row.id))
+    } catch {
+      // 以后端文案为准（拦截器已弹错），这里只负责“不留痕就不导出”
+      message.error(t('employee.exportTraceFailed'))
+      return
+    }
     exportToCSV(fileName, exportColumns, rows)
+    message.success(t('employee.exportSuccess', { count: rows.length }))
   }
 
   const currentFilterParams: Omit<EmployeeQuery, 'page' | 'size'> = {
@@ -368,7 +381,13 @@ export default function EmployeeManagement() {
     setLoading(true)
     try {
       const rows = await fetchRosterExport(currentFilterParams)
-      downloadRows(rows, t('employee.pageTitle'))
+      // 这一档服务端取数时已经落过 ROSTER_EXPORT 审计，不能再走 downloadRows 重复记一条
+      if (rows.length === 0) {
+        message.warning(t('employee.noDataToExport'))
+        return
+      }
+      exportToCSV(t('employee.pageTitle'), exportColumns, rows)
+      message.success(t('employee.exportSuccess', { count: rows.length }))
     } catch {
       // 超上限/无权限都以后端文案为准（request 拦截器已弹），这里不假装成功
       message.error(t('employee.exportFailed'))
@@ -607,9 +626,13 @@ export default function EmployeeManagement() {
                   : []),
               ],
               onClick: ({ key }) => {
-                if (key === 'page') downloadRows(dataSource, t('employee.pageTitle'))
+                if (key === 'page') void downloadRows(dataSource, t('employee.pageTitle'), 'PAGE')
                 if (key === 'selected') {
-                  downloadRows(dataSource.filter(row => selectedRowKeys.includes(row.id)), t('employee.pageTitle'))
+                  void downloadRows(
+                    dataSource.filter(row => selectedRowKeys.includes(row.id)),
+                    t('employee.pageTitle'),
+                    'SELECTION',
+                  )
                 }
                 if (key === 'all') void handleExportAll()
               },

@@ -85,6 +85,13 @@ export default function SliderCaptcha({ onSuccess, onClose }: SliderCaptchaProps
   const [cutY, setCutY] = useState(0)
   const [sliderX, setSliderX] = useState(0)
   const [status, setStatus] = useState<Status>('idle')
+  /**
+   * 缺口坐标是否已生成。cutX 的初始值是 0，而滑块起点也是 0，
+   * 所以上图未就绪时一次“按下+抬起”会因 |0-0| <= 容差 直接判定通过（实测被绕过就是这个）。
+   */
+  const [ready, setReady] = useState(false)
+  /** 本轮是否发生过真实拖动：只碰一下不算“对齐了缺口” */
+  const dragMoved = useRef(false)
 
   /** 生成/刷新拼图 */
   useEffect(() => {
@@ -100,6 +107,7 @@ export default function SliderCaptcha({ onSuccess, onClose }: SliderCaptchaProps
     setCutY(y)
     setSliderX(0)
     setStatus('idle')
+    setReady(true)
 
     /* 背景画布（按 devicePixelRatio 放大保证清晰度） */
     bgCanvas.width = CANVAS_W * dpr
@@ -139,6 +147,7 @@ export default function SliderCaptcha({ onSuccess, onClose }: SliderCaptchaProps
     if (status === 'success') return
     e.preventDefault()
     dragStartX.current = e.clientX - sliderX
+    dragMoved.current = false
     setStatus('dragging')
     e.currentTarget.setPointerCapture(e.pointerId)
   }
@@ -147,6 +156,7 @@ export default function SliderCaptcha({ onSuccess, onClose }: SliderCaptchaProps
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (dragStartX.current === null) return
     const next = Math.min(Math.max(e.clientX - dragStartX.current, 0), SLIDER_MAX)
+    if (next !== sliderX) dragMoved.current = true
     setSliderX(next)
   }
 
@@ -155,7 +165,8 @@ export default function SliderCaptcha({ onSuccess, onClose }: SliderCaptchaProps
     if (dragStartX.current === null) return
     dragStartX.current = null
     if (status === 'success') return
-    if (Math.abs(sliderX - cutX) <= TOLERANCE) {
+    // 三个条件缺一不可：缺口已生成 + 确实拖动过 + 位置对齐
+    if (ready && dragMoved.current && Math.abs(sliderX - cutX) <= TOLERANCE) {
       setSliderX(cutX)
       setStatus('success')
       setTimeout(onSuccess, 600)

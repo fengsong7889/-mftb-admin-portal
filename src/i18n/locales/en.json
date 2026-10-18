@@ -5721,7 +5721,8 @@
       "LIFECYCLE_EXECUTE": "Request executed",
       "ROSTER_EXPORT": "Roster export",
       "UNKNOWN": "Unknown action"
-    }
+    },
+    "timeMissing": "Time not recorded (legacy)"
   },
   "hrOffboarding": {
     "open": "Handover tasks",
@@ -5766,7 +5767,9 @@
       "SKIPPED": "Skipped",
       "FAILED": "Failed",
       "UNKNOWN": "Unknown"
-    }
+    },
+    "execute": "Execute",
+    "inProgress": "In progress"
   },
   "orgScope": {
     "self": "Self only",
@@ -5943,7 +5946,9 @@
       "POSITION_RECORD": "Assignment fact",
       "MANUAL": "Manually confirmed",
       "UNVERIFIED": "Unverified"
-    }
+    },
+    "exportSuccess": "Exported {{count}} records",
+    "exportTraceFailed": "Export audit could not be recorded; export cancelled"
   },
   "employeeDetail": {
     "pageTitleEdit": "Employee Detail",
@@ -6153,7 +6158,8 @@
     "tabLastUpdatedBy": "Last Updated By",
     "tabLastUpdatedAt": "Last Updated At",
     "noUpdateRecord": "No update record",
-    "tabAudit": "HR operations log"
+    "tabAudit": "HR operations log",
+    "salaryNotConnected": "Payroll is not connected yet: amounts below are only meaningful once income/deduction items are registered. \"--\" means no data, not zero."
   },
   "organization": {
     "colDeptStatus": "Status",
@@ -9422,7 +9428,9 @@
     "linkedRequestTitle": "Linked Request",
     "type": "Request Type",
     "contractNo": "Contract No.",
-    "transferFrom": "From → To"
+    "transferFrom": "From → To",
+    "handoverReceiver": "Handover receiver",
+    "handoverReceiverUnset": "Not set — choose a receiver in the offboarding handover panel, otherwise assets and to-dos stay pending"
   },
   "hrLeave": {
     "typeAnnual": "Annual",

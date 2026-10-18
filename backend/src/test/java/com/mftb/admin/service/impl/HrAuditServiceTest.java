@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,6 +75,20 @@ class HrAuditServiceTest {
         assertEquals("MF00055", rows.get(0).getEmpNo());
         assertEquals("HR專員", rows.get(0).getOperator());
         assertEquals(0, rows.get(0).getSensitive());
+        // 发生时间必须自带：它标了 @TableField(fill = FieldFill.INSERT)，列会被无条件写进 INSERT，
+        // 靠 MetaObjectHandler 或 DDL 默认值都会得到 NULL（真实事故：审计列表时间列全空）。
+        assertNotNull(rows.get(0).getOccurredAt(), "审计行必须自带发生时间");
+        assertNotNull(rows.get(1).getOccurredAt());
+    }
+
+    @Test
+    @DisplayName("无字段变更的动作（如明文查看）也要有发生时间")
+    void detailOnlyEntryStillCarriesOccurredAt() {
+        service.record(HrAuditEntry.of(HrAuditAction.SENSITIVE_VIEW, USER_ID).detail("查看明文：證件號"));
+
+        HrOperationAudit row = insertedRows().get(0);
+        assertNotNull(row.getOccurredAt(), "只记 detail 的动作同样不能丢时间，否则留痕无法归日");
+        assertNull(row.getFieldName(), "未改字段就不应有列名（前端展示为“—”而不是伪造一个）");
     }
 
     @Test

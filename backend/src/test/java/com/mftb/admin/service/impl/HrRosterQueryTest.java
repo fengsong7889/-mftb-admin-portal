@@ -11,6 +11,7 @@ import com.mftb.admin.service.HrAssignmentQuery;
 import com.mftb.admin.service.HrEmploymentPeriodService;
 import com.mftb.admin.service.HrRosterQueryService;
 import com.mftb.admin.service.OrgScopeService;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,7 @@ class HrRosterQueryTest {
     private HrAssignmentQuery hrAssignmentQuery;
     private HrEmploymentPeriodService employmentPeriodService;
     private OrgScopeService orgScopeService;
+    private com.mftb.admin.service.HrAuditService hrAuditService;
     private HrRosterQueryServiceImpl service;
 
     @BeforeEach
@@ -57,8 +59,9 @@ class HrRosterQueryTest {
         hrAssignmentQuery = mock(HrAssignmentQuery.class);
         employmentPeriodService = mock(HrEmploymentPeriodService.class);
         orgScopeService = mock(OrgScopeService.class);
+        hrAuditService = mock(com.mftb.admin.service.HrAuditService.class);
         service = new HrRosterQueryServiceImpl(employeeService, hrAssignmentQuery,
-                employmentPeriodService, orgScopeService);
+                employmentPeriodService, orgScopeService, hrAuditService);
 
         when(employeeService.list(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(),
                 any(), any(), any(), any(), any())).thenReturn(new PageResult<>(
@@ -191,5 +194,40 @@ class HrRosterQueryTest {
         record.setWorkCity("珠海");
         record.setDirectSuperior("王上級");
         return record;
+    }
+
+    // ── 导出留痕（P0-2：人数不采信前端自报）──
+
+    @Test
+    @DisplayName("导出留痕只统计范围内的人，超出部分剔除并写进同一句留痕")
+    void exportTraceCountsOnlyVisibleRows() {
+        when(orgScopeService.resolveVisibleUserIds()).thenReturn(Set.of(USER_ID));
+
+        int counted = service.recordExportTrace("SELECTION", java.util.List.of(USER_ID, 99L, 98L));
+
+        assertEquals(1, counted, "只有 1 人在调用者范围内，不能拿前端传的 3 当结果");
+        ArgumentCaptor<com.mftb.admin.dto.HrAuditEntry> captor =
+                ArgumentCaptor.forClass(com.mftb.admin.dto.HrAuditEntry.class);
+        verify(hrAuditService).record(captor.capture());
+        assertTrue(captor.getValue().getDetail().contains("導出 1 人（選中行）"), captor.getValue().getDetail());
+        assertTrue(captor.getValue().getDetail().contains("剔除超出人員範圍 2 人"),
+                "被剔除的数量必须同句记录，否则越界导出看不出来：" + captor.getValue().getDetail());
+    }
+
+    @Test
+    @DisplayName("超管（范围为 null = 不受限）全部计入，与空集不同")
+    void exportTraceTreatsUnlimitedAsAllVisible() {
+        when(orgScopeService.resolveVisibleUserIds()).thenReturn(null);
+
+        assertEquals(3, service.recordExportTrace("PAGE",
+                java.util.List.of(1L, 2L, 3L)));
+    }
+
+    @Test
+    @DisplayName("未知档位直接拒：留痕入口不能接受任意字符串")
+    void exportTraceRejectsUnknownScope() {
+        assertThrows(com.mftb.admin.common.BusinessException.class,
+                () -> service.recordExportTrace("ALL", java.util.List.of(USER_ID)));
+        verify(hrAuditService, never()).record(any());
     }
 }

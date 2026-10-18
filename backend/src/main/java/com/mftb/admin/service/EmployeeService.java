@@ -57,6 +57,13 @@ public interface EmployeeService {
     /** 启用/停用 */
     void updateStatus(Long id, Integer status);
 
+    /**
+     * 复职启用：重新启用账号 + 要求首次登录改密 + 清除旧会话。
+     * <p>不等同 {@code updateStatus(id, 1)}：启用就只是启用，而离职后返聘必须同时处理
+     * 「密码可能被离职期间的人留存」这件事，只把 status 改回 1 等于默认把账号交还回去。
+     */
+    void reactivate(Long id);
+
     /** 删除员工 */
     void delete(Long id);
 

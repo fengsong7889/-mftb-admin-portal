@@ -89,6 +89,12 @@ public class HrLifecycleVO {
     /** 实际执行完成时间 */
     private java.time.LocalDateTime executedAt;
 
+    /** 交接接收人（离职联动任务把资产/待办转给他）：未指定时前端要能看出来 */
+    private Long handoverToUserId;
+
+    /** 交接接收人姓名快照 */
+    private String handoverToName;
+
     /** 把待生效任务信息贴到单据视图上（无任务时保持 null，表示「不需要到点执行」） */
     public void attachTask(com.mftb.admin.entity.HrEffectiveTask task) {
         if (task == null) {
@@ -147,6 +153,8 @@ public class HrLifecycleVO {
         vo.setUpdatedBy(e.getUpdatedBy());
         vo.setCreatedAt(e.getCreatedAt());
         vo.setUpdatedAt(e.getUpdatedAt());
+        vo.setHandoverToUserId(e.getHandoverToUserId());
+        vo.setHandoverToName(e.getHandoverToName());
         return vo;
     }
 }

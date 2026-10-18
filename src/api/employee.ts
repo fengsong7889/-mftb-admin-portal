@@ -135,6 +135,18 @@ export async function fetchRosterExport(params: Omit<EmployeeQuery, 'page' | 'si
   return request.get<unknown, EmployeeItem[]>('/employees/roster/export', { params })
 }
 
+/**
+ * 为一次「當前分頁 / 所選行」导出登记人事审计留痕。
+ * <p>人数由服务端按当前人员范围重核后得出（返回被认可的人数），前端自报的数字不作数；
+ * 此调用失败时应放弃导出，不能留下无痕的批量数据出口。
+ */
+export async function logRosterExport(
+  scope: 'PAGE' | 'SELECTION',
+  userIds: number[],
+): Promise<number> {
+  return request.post<unknown, number>('/employees/roster/export-trace', { scope, userIds })
+}
+
 /** 按 ID 查询单个员工详情（含派生在职状态） */
 export function fetchEmployee(id: number) {
   return request.get<unknown, EmployeeItem>(`/employees/${id}`)

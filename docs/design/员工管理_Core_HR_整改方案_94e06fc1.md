@@ -553,7 +553,7 @@ cd backend && bash restart-service.sh --rebuild
 |---|---|---|
 | ~~P1~~ | ~~§7.1 员工主档 + **雇佣期间**分层、任职记录改存稳定 ID~~ **已完成双轨第一阶段（2026-10-18）** | 采「先建表 + 先出差异清单、存量不自动物化」的走法，既不阻塞也不会造出假数据；代码地图与口径见 **11.4**。**剩下的唯一人工环节**：HR 逐条看完「僱傭數據核對」清单后，对「可派生但未登记」的行点「按任職事實登記」 |
 | P1 | §5.1 花名册默认列（雇主法人/工作地点/直属上级/试用状态/入职日期）、导入预校验、全量导出端点 | 纯工程量，无外部依赖；`export` 动作已登记，端点待建 |
-| P1 | §5.3 重新入职/资料变更/历史更正 三类单据 + §5.4 合同签订/变更/解除 | `REHIRE` code 已就位，加单据类型是机械扩展；但「历史更正」必须先定 §7.2 要求的**影响预检**（改历史会不会翻案后续结论），口径需确认 |
+| ~~P1~~ 部分 | §5.3 **重新入职（后端已完成，见 11.9，前端待补）** / 资料变更 / 历史更正 + §5.4 合同签订/变更/解除 | `REHIRE` code 已就位，加单据类型是机械扩展；但「历史更正」必须先定 §7.2 要求的**影响预检**（改历史会不会翻案后续结论），口径需确认 |
 | P1 | §5.5 薪酬 Tab 改名「薪酬档案」、汇总改口径 | 「實發工資」文案仍在，改动含 i18n 五语言与既有页面说明；属界面口径修正，随时可做 |
 | ~~P1~~ | ~~§7.4 离职联动 EAM 资产交接 / OA 待办转交~~ **已完成（2026-10-18）** | 以 `hr_offboarding_task` 轻量 outbox 接入（交接接收人需人工指定），详见 **11.6** |
 | P2 | §10.6 考勤剩余待办：补卡/加班流程编码、日报月报自动重算调度、钉钉回写、留存归档 | 补卡/加班需要先在 `biz_oa_process` 加流程编码（OA 域迁移），`markHandledByFlow` 已就绪无调用方 |
@@ -743,3 +743,37 @@ GET /api/employees/roster/export → 收敛 + 单独 export 动作 + 落 ROSTER_
 
 - **导入预校验 / 重复身份提示 / 错误行下载**：前提是「导入功能本身」，而花名册至今**没有导入入口**（只能逐人建档）。这是新建能力而非改造，需单独一批做（含 `import` 动作、模板、异步任务化）
 - 合同台账 `contract-ledger` 的全量清单尚未按人员范围收敛（它是台账不是花名册，需单独定口径）
+
+### 11.9 P5-1「重新入職」单据类型 · 后端已完成（本轮，**前端未做**）
+
+§11.2 里 P5 的三类单据按依赖顺序先做**重新入职**：它是 §8 验收门槛「从待入职到离职再入职可完整追溯」唯一缺的一环。资料变更 / 历史更正 / 合同三类仍待后续批次。
+
+**已完成（仅后端）**：
+- 类型：新增 `rehire`（`ALL_TYPES` / `TYPE_TO_PROCESS_CODE=hr_rehire` / `PROCESS_CODE_TO_TYPE` / `TYPE_TO_MENU_KEY=hr-onboarding`）。**不加菜单、不加动作、不加列**——按 §6.1「人事类流程是流程中心页面内分类」，授权锚在 `hr-onboarding`（与续签挂 `contract-ledger` 同一处理法）；复职沿用调动的 `new_dept_id / new_position_id / effective_date`。
+- 办理（`applyRehire`）三条口径：① 是否真离职走**统一 as-of**（`HrAssignmentQuery.isResignedAt`），不看账号 `status`（被冻结的在职员工 status 也是 0），也不看「最新一条记录」（会被一张未来生效的离职单骗到，把在职者再开一段雇佣）；② **复用原 userId、绝不新建账号**——新建会把同一个人拆成两份档案（工号 / 历史单据 / 资产归属全断开），返聘本质是同一人的新一段雇佣，由 P4 的 `hr_employment_period` 递增 `period_seq` 表达；③ 异动写 `operation_code=REHIRE`（派生新一段只看 code）。
+- 复职启用：`EmployeeService.reactivate(id)` = 启用 + `must_change_password=1` + 清 `active_token`，并落 `ACCOUNT_ENABLE` 审计。不复用 `updateStatus(id,1)`：启用就只是启用，把「密码可能被离职期间的人留存」隐式跳过，等于默认把账号交还给不确定的人。用定向 update 而非整实体回写（MP NOT_NULL 策略跳过 null 字段，回写清不掉 token）。
+- 取人搜索：`searchEmployees(type='rehire')` 反转为取 status=0（`LIMIT 100` 粗筛），再用 `employmentStatusOf` **批量**判真离职后取前 20；其它类型行为不变。
+- 迁移：`hr:rehire-process:v1.0`（`HrRehireProcessInitializer` @Order(35)，只种子 `biz_oa_process.hr_rehire`，`verify` 要求流程存在且 `status=1` 否则抛错）+ `sql/252_hr_rehire_process.sql` + catalog 登记。
+- 复用生效日引擎：复职日期在未来 → 审批通过只登记 `hr_effective_task`，**不提前启用账号**（到点由每日任务执行）。
+
+**⚠ 本批只有后端**：前端 `hrLifecycle.ts` 类型映射、`LifecycleForm` 返聘字段块、路由与入职页入口、i18n、前端测试**均未做**；当前没有创建 `rehire` 单据的入口，下一批补完前端才可用。
+
+**门禁**：后端全量 **1665 例 0 失败**（新增 `HrRehireLifecycleTest` 3 例：复用原账号 + REHIRE code + reactivate、在职者拒办、未来生效只登记任务；`HrRehireSearchTest` 2 例：返聘候选剔除「停用但未离职」且判定必须批量、其它类型行为不变）。开发库重启：`hr_rehire` 种子新插入 1 条，迁移 21/21「执行并校验完成」，结构契约 **55 项全通过**。
+
+### 11.10 深度UI测试后的 P0 修复（2026-10-18，浏览器端到端测试暴露）
+
+端到端测试（admin 超管视角，19 个页面）暴露 6 个 P0，六个全部闭合（其中滑块只闭合了前端一半，服务端挑战态仍待单独一批）：
+
+| 缺陷 | 根因 | 修法 | 状态 |
+|---|---|---|---|
+| 审计列表「发生时间/字段/前后值」全 `-` | `occurredAt` 标了 `@TableField(fill=FieldFill.INSERT)`，MP **无条件把该列写进 INSERT**，而项目 MetaObjectHandler 只按名字填 `createdAt/updatedAt` → 用显式 NULL 覆盖 DDL 的 `DEFAULT CURRENT_TIMESTAMP` | 写入前显式 `setOccurredAt(now())`（与 `VehicleUseServiceImpl` 既有修式一致）+ 前端时间缺失显示「時間未記錄（舊資料）」而非 `-` | 已修，`HrAuditServiceTest` 2 例钉住 |
+| 分頁/选中导出**零留痕** | 两档走前端 `exportToCSV`，不经后端 | 新增 `POST /employees/roster/export-trace`：CSV 仍在前端生成，但**人数与可见性由服务端按 OrgScope 重核**，且前端**先拿留痕再落文件、留痕失败就放弃导出** | 已修，`HrRosterQueryTest` 3 例 |
+| 滑块**未拖动即通过** | `cutX` 初始 0、滑块起点也 0，拼图 effect 未跑完时 `|0-0|<=容差` 成立 | 通过需三条件齐：`ready`（缺口已生成）+ 本轮真实 `dragMoved` + 位置对齐 | 前端已修（4 例）。**仍留架构缺口**：`GET /auth/captcha` 给任何请求者发 token，无服务端挑战态 → 脚本可直接取 token 绕过；需单独一批做服务端拼图挑战 |
+| 薪酬 Tab `¥0` 无来源说明 | 无数据时把 0 当金额渲染 | 收入/扣除项皆空 → 金额显示 `--` + 顶部说明「尚未接入薪酬核算系統…-- 代表無資料而非 0」 | 已修（5 语言键已加，ja/ko/ru 无该 block 沿用回退） |
+| 差异清单等值键顺序不确定（翻页可能重复/漏行） | 只按 severity+姓名排序，同名或 emp_id 为空时落到输入顺序 | 末档用唯一键 `userId` 兜底成全序 | 已修 |
+| 交接联动 `PENDING/RUNNING` 都给「重試」 | 前端只区分终态；后端只拦终态 | 前端：PENDING→「執行」、RUNNING→无按钮、FAILED→「重試」；**后端：新鲜 RUNNING（<10 分钟）拒重入**，陈旧 RUNNING 允许人工恢复（否则进程挂掉即死锁） | 已修，后端 2 例 + 前端 1 例 |
+| 离职详情页**无交接责任人区** | 列实际叫 `handover_to_user_id/handover_to_name`，联动执行已在读，但 `HrLifecycleVO` 没映射 → 详情页只剩三个「-」，HR 误以为交接已安排 | VO 补两字段 + `from()` 映射 + 離職明細加「交接接收人」；未指定时用警示文案指明去哪一步 | 已修，`HrLifecycleVOHandoverTest` 2 例 |
+
+**门禁**：后端全量 **1738 例 0 失败**；前端本轮 4 个改动文件 17/17，`npm run verify` 全量 887 passed，仅 3 个**既有 flaky**（TrafficAlgorithmConfig / WaterfallForm / AlgorithmAdd.traffic）在并行下超时、单独跑 89/89 绿——它们是 CI `test:run` 的既存风险，与本批无关。开发库重启：新端点未认证 401、结构契约 55 项通过。
+
+**同类陷阱已扫**：全库非标准 `FieldFill` 字段只剩 `DocViewLog.viewedAt` 未被显式赋值（同 bug 第二例，既有代码），已在 `DocService` 写入点补 `setViewedAt(now())` 并注明原因；扫描确认再无第三例。

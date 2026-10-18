@@ -55,6 +55,32 @@ describe('OffboardingModal', () => {
     expect(await screen.findByText(/尚未指定交接接收人/)).toBeInTheDocument()
   })
 
+  it('PENDING 叫「執行」，RUNNING 不给按钮（不能抢定时任务正在跑的那一条）', async () => {
+    mockedFetch.mockResolvedValue([
+      {
+        id: 3, requestId: 88, reqNo: 'HR202610180088', taskType: 'EAM_ASSET_HANDOVER',
+        status: 'PENDING', attempts: 0, lastError: null, resultSummary: null,
+        targetRef: null, effectiveDate: '2026-10-18',
+      },
+      {
+        id: 4, requestId: 88, reqNo: 'HR202610180088', taskType: 'OA_TODO_TRANSFER',
+        status: 'RUNNING', attempts: 1, lastError: null, resultSummary: null,
+        targetRef: null, effectiveDate: '2026-10-18',
+      },
+    ])
+    render(<OffboardingModal open requestId={88} onClose={vi.fn()} canManage />)
+    await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1))
+
+    const labels = Array.from(document.querySelectorAll('button'))
+      .map(btn => btn.textContent?.trim())
+    // 首次执行不能写成「重试」：它还没失败过
+    expect(labels).toContain('執行')
+    expect(labels).not.toContain('重試')
+    // RUNNING 只给状态文字；给它按钮就是允许和定时任务抢同一条
+    expect(document.body.textContent).toContain('執行中')
+    expect(labels.filter(l => l === '執行')).toHaveLength(1)
+  })
+
   it('已完成的任务不给重试，失败的任务给', async () => {
     render(<OffboardingModal open requestId={88} onClose={vi.fn()} canManage />)
     await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1))

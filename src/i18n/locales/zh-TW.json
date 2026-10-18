@@ -5601,7 +5601,8 @@
       "LIFECYCLE_EXECUTE": "單據辦理",
       "ROSTER_EXPORT": "花名冊匯出",
       "UNKNOWN": "未知動作"
-    }
+    },
+    "timeMissing": "時間未記錄（舊資料）"
   },
   "hrOffboarding": {
     "open": "交接聯動",
@@ -5646,7 +5647,9 @@
       "SKIPPED": "無需執行",
       "FAILED": "執行失敗",
       "UNKNOWN": "未知狀態"
-    }
+    },
+    "execute": "執行",
+    "inProgress": "執行中"
   },
   "orgScope": {
     "self": "僅本人",
@@ -5823,7 +5826,9 @@
       "POSITION_RECORD": "任職事實",
       "MANUAL": "人工確認",
       "UNVERIFIED": "未核實"
-    }
+    },
+    "exportSuccess": "已導出 {{count}} 筆記錄",
+    "exportTraceFailed": "導出留痕登記失敗，已取消導出"
   },
   "employeeDetail": {
     "pageTitleEdit": "員工詳情",
@@ -6033,7 +6038,8 @@
     "tabLastUpdatedBy": "最後更新人",
     "tabLastUpdatedAt": "最後更新時間",
     "noUpdateRecord": "暫無更新記錄",
-    "tabAudit": "人事操作記錄"
+    "tabAudit": "人事操作記錄",
+    "salaryNotConnected": "尚未接入薪酬核算系統：以下金額僅在登記了收入/扣除項後才成立，-- 代表「無資料」而非 0"
   },
   "organization": {
     "colDeptStatus": "部門狀態",
@@ -9422,7 +9428,9 @@
     "linkedRequestTitle": "關聯單據",
     "type": "單據類型",
     "contractNo": "合同編號",
-    "transferFrom": "調動前 → 調動後"
+    "transferFrom": "調動前 → 調動後",
+    "handoverReceiver": "交接接收人",
+    "handoverReceiverUnset": "尚未指定 —— 請到離職單「交接聯動」指定接收人，否則資產與待辦不會轉出"
   },
   "hrLeave": {
     "title": "請假管理",

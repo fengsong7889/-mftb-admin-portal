@@ -1641,19 +1641,35 @@ export default function EmployeeDetail() {
   function renderSalaryTab() {
     return (
       <div>
+        {/* 薪酬数据尚未接入时不能把 0 当金额渲染：¥0 会被读成「这人工资是 0」（方案 §5.1 口径）。
+            有任一收入/扣除项才用金额口径，否则一律用 -- 加来源说明。 */}
+        {(salaryIncome.length === 0 && salaryDeduction.length === 0) && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={t('employeeDetail.salaryNotConnected')}
+          />
+        )}
         {/* 薪資概覽卡片 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
           <div style={{ padding: 20, borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' }}>
             <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.grossSalary')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#52C41A' }}>¥{totalIncome.toLocaleString()}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#52C41A' }}>
+              {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalIncome.toLocaleString()}`}
+            </div>
           </div>
           <div style={{ padding: 20, borderRadius: 8, background: '#FFF2F0', border: '1px solid #FFCCC7' }}>
             <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.totalDeduction')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#FF4D4F' }}>¥{totalDeduction.toLocaleString()}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#FF4D4F' }}>
+              {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalDeduction.toLocaleString()}`}
+            </div>
           </div>
           <div style={{ padding: 20, borderRadius: 8, background: '#E6F7FF', border: '1px solid #91D5FF' }}>
             <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.netSalary')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#1890FF' }}>¥{netSalary.toLocaleString()}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#1890FF' }}>
+              {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${netSalary.toLocaleString()}`}
+            </div>
           </div>
         </div>
 

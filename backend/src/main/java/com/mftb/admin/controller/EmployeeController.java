@@ -9,6 +9,7 @@ import com.mftb.admin.dto.EmergencyContactRequest;
 import com.mftb.admin.dto.EmergencyContactVO;
 import com.mftb.admin.dto.EmployeeRequest;
 import com.mftb.admin.dto.EmployeeVO;
+import com.mftb.admin.dto.RosterExportLogRequest;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.EmploymentPeriodVO;
 import com.mftb.admin.dto.PositionRecordRequest;
@@ -142,6 +143,17 @@ public class EmployeeController {
                         employmentStatus, departmentId, sequence, jobLevel, rank, roleId,
                         updatedBy, updatedAtFrom, updatedAtTo)));
         return Result.success(rows);
+    }
+
+    /**
+     * 花名册「當前分頁 / 所選行」导出的审计留痕。
+     * <p>CSV 仍在浏览器生成（这两档的数据本来就在屏幕上），但**人数与可见性由服务端按
+     * 组织数据范围重新判定**，不采信前端自报：否则导出留痕就成了想写多少写多少的日志。
+     */
+    @PostMapping("/roster/export-trace")
+    @RequirePermission(menu = EmployeeConstants.MENU_EMPLOYEE, action = EmployeeConstants.ACTION_EXPORT)
+    public Result<Integer> rosterExportTrace(@Valid @RequestBody RosterExportLogRequest request) {
+        return Result.success(rosterQueryService.recordExportTrace(request.getScope(), request.getUserIds()));
     }
 
     /** 审计里的筛选摘要：只记「用了哪些条件」，不记条件值以外的内容 */

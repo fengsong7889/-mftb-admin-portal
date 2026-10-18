@@ -79,9 +79,13 @@ public class HrProfileDiffServiceImpl implements HrProfileDiffService {
                 registerable++;
             }
         }
+        // 排序必须在全键上确定：只按 severity + name 排时，同名或 emp_id 为空的人会落在
+        // 「谁的输入顺序谁在前」，而分页假定第 1 页和第 2 页是同一全序——否则会重复行或漏行。
+        // 最后一档用 userId（唯一）兜底。
         rows.sort(Comparator
                 .comparingInt((ProfileDiffItemVO r) -> HrProfileDiff.severityRank(r.getSeverity())).reversed()
-                .thenComparing(r -> r.getName() == null ? "" : r.getName()));
+                .thenComparing(r -> r.getName() == null ? "" : r.getName())
+                .thenComparingLong(ProfileDiffItemVO::getUserId));
 
         report.setDiffUsers(rows.size());
         report.setRegisterableUsers(registerable);

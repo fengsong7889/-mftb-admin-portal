@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Descriptions, Modal, Space, Spin, Tag, Timeline, message } from 'antd'
+import { Button, Card, Descriptions, Modal, Space, Spin, Tag, Timeline, Typography, message } from 'antd'
 import {
   CheckOutlined, CloseOutlined, DeleteOutlined, EditOutlined, SendOutlined, UndoOutlined,
 } from '@ant-design/icons'
@@ -264,6 +264,15 @@ export default function LifecycleDetail() {
                 ? t(DIMISSION_TYPE_LABEL_KEY[item.dimissionType]) : (item.dimissionType || '-')}
             </Descriptions.Item>
             <Descriptions.Item label={t('hrLifecycle.lastWorkDate')}>{fmtDate(item.lastWorkDate)}</Descriptions.Item>
+            {/* 交接接收人：联动任务的资产与待办都转给他。**未指定必须显式标出**：
+                之前详情页只给三个「-」，HR 看完以为已经办完，而实际上两条任务永远停在待处理。 */}
+            <Descriptions.Item label={t('hrLifecycle.handoverReceiver')} span={2}>
+              {item.handoverToName ? (
+                item.handoverToName
+              ) : (
+                <Typography.Text type="warning">{t('hrLifecycle.handoverReceiverUnset')}</Typography.Text>
+              )}
+            </Descriptions.Item>
             <Descriptions.Item label={t('hrLifecycle.assetReturn')}>{(settlement.assetReturn as string) || '-'}</Descriptions.Item>
             <Descriptions.Item label={t('hrLifecycle.salarySettlement')} span={3}>
               {(settlement.salarySettlement as string) || '-'}

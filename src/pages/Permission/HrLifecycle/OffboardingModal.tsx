@@ -195,12 +195,19 @@ export default function OffboardingModal({ open, requestId, reqNo, onClose, canM
       key: 'action',
       width: 90,
       render: (_: unknown, r: OffboardingTaskItem) => (
-        // 终态不给重试按钮：后端同样会拒，按钮在这里只是少让 HR 白点一次
+        // 按状态给不同措辞，而不是统一一个「重試」：
+        //   PENDING 是首次执行（还什么都没做过，叫“重试”会让人以为已失败过）
+        //   RUNNING 是定时任务正在跳，此处再发一次就是抢同一个任务
+        //   FAILED 才是重试；DONE/SKIPPED 是终态（后端也会拒，这里只是不让 HR 白点）
         r.status === OFFBOARDING_TASK_STATUS.DONE || r.status === OFFBOARDING_TASK_STATUS.SKIPPED ? (
           <Typography.Text type="secondary">-</Typography.Text>
+        ) : r.status === OFFBOARDING_TASK_STATUS.RUNNING ? (
+          <Typography.Text type="secondary">{t('hrOffboarding.inProgress')}</Typography.Text>
         ) : (
           <Button type="link" size="small" loading={working} onClick={() => void handleRetry(r)}>
-            {t('hrOffboarding.retry')}
+            {r.status === OFFBOARDING_TASK_STATUS.PENDING
+              ? t('hrOffboarding.execute')
+              : t('hrOffboarding.retry')}
           </Button>
         )
       ),

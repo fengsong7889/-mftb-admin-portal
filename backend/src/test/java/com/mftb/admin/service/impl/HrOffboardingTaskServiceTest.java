@@ -351,4 +351,37 @@ class HrOffboardingTaskServiceTest {
         task.setApprover(approver);
         return task;
     }
+
+    // ── 执行中任务不能抢跑（P0-6）──
+
+    @Test
+    @DisplayName("刚变成 RUNNING 的任务拒绝重入：避免 EAM 重复建单 / OA 重复改派")
+    void freshRunningTaskCannotBeGrabbed() {
+        service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
+        HrOffboardingTask task = table.get(0);
+        task.setStatus(HrOffboardingTask.STATUS_RUNNING);
+        task.setUpdatedAt(java.time.LocalDateTime.now());
+
+        com.mftb.admin.common.BusinessException ex = assertThrows(
+                com.mftb.admin.common.BusinessException.class,
+                () -> service.execute(task.getId(), "HR專員"));
+        assertTrue(ex.getMessage().contains("正在執行中"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("RUNNING 足够陈旧时允许人工重入（否则进程挂掉就死锁）")
+    void staleRunningTaskCanBeRecovered() {
+        service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
+        HrOffboardingTask task = table.get(0);
+        task.setStatus(HrOffboardingTask.STATUS_RUNNING);
+        task.setUpdatedAt(java.time.LocalDateTime.now().minusMinutes(
+                HrOffboardingTaskServiceImpl.RUNNING_STALE_MINUTES + 1));
+
+        // 不再报「正在執行中」；后续能不能跑完取决于接收人，本例只验证闸门已开
+        try {
+            service.execute(task.getId(), "HR專員");
+        } catch (com.mftb.admin.common.BusinessException e) {
+            assertTrue(!e.getMessage().contains("正在執行中"), e.getMessage());
+        }
+    }
 }

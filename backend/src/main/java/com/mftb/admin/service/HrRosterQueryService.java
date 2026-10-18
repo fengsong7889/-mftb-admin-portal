@@ -37,4 +37,14 @@ public interface HrRosterQueryService {
     List<EmployeeVO> rosterForExport(String keyword, String employmentStatus,
                                      Long departmentId, String sequence, String jobLevel, String rank,
                                      Long roleId, String updatedBy, String updatedAtFrom, String updatedAtTo);
+    /**
+     * 为「當前分頁 / 所選行」两档前端导出登记审计留痕。
+     * <p>人数由服务端按调用者的组细数据范围重新过滤后得出，**不采信前端自报**：
+     * 否则导出的留痕就变成“前端想写多少就写多少”，恰好失去审计意义。
+     *
+     * @param scope   PAGE / SELECTION（全部筛选结果走 {@code rosterForExport}，它自己会落审计）
+     * @param userIds 本次导出的员工 id
+     * @return 落在权限范围内的实际人数
+     */
+    int recordExportTrace(String scope, List<Long> userIds);
 }

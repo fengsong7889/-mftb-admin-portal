@@ -2,6 +2,8 @@ package com.mftb.admin.service.impl;
 
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.HrOperationCode;
+import com.mftb.admin.constant.HrAuditAction;
+import com.mftb.admin.dto.HrAuditEntry;
 import com.mftb.admin.dto.EmployeeVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EmpPositionRecord;
@@ -16,7 +18,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 花名册查询实现：先按人员范围取数，再用三张事实源批量富化（各一次查询，不按人 N+1）。
@@ -36,6 +41,10 @@ public class HrRosterQueryServiceImpl implements HrRosterQueryService {
     private final HrAssignmentQuery hrAssignmentQuery;
     private final HrEmploymentPeriodService employmentPeriodService;
     private final OrgScopeService orgScopeService;
+    private final com.mftb.admin.service.HrAuditService hrAuditService;
+
+    /** 前端可自行落文件的档位白名单；第三档（全部筛选结果）走 rosterForExport 开子服务端生成开关 */
+    private static final Set<String> TRACE_SCOPES = Set.of("PAGE", "SELECTION");
 
     @Override
     public PageResult<EmployeeVO> roster(long page, long size, String keyword, String employmentStatus,
@@ -143,5 +152,24 @@ public class HrRosterQueryServiceImpl implements HrRosterQueryService {
                 .anyMatch(r -> HrOperationCode.REGULAR.equals(HrOperationCode.resolve(
                         r.getOperationCode() == null ? r.getOperation() : r.getOperationCode())));
         vo.setProbationStatus(regularized ? REGULAR : PROBATION_UNKNOWN);
+    }
+
+    @Override
+    public int recordExportTrace(String scope, List<Long> userIds) {
+        String normalized = scope == null ? "" : scope.trim().toUpperCase(Locale.ROOT);
+        if (!TRACE_SCOPES.contains(normalized)) {
+            throw new BusinessException("不支持的導出範圍類型");
+        }
+        List<Long> ids = userIds == null ? List.of()
+                : userIds.stream().filter(Objects::nonNull).distinct().toList();
+        // null = 不受限（超管）；空集 = 谁也看不见，两者不能混
+        Set<Long> visible = orgScopeService.resolveVisibleUserIds();
+        List<Long> allowed = visible == null ? ids : ids.stream().filter(visible::contains).toList();
+        int withheld = ids.size() - allowed.size();
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.ROSTER_EXPORT, null)
+                .detail("導出 " + allowed.size() + " 人（"
+                        + ("PAGE".equals(normalized) ? "當前分頁" : "選中行") + "）"
+                        + (withheld > 0 ? "；已剔除超出人員範圍 " + withheld + " 人" : "")));
+        return allowed.size();
     }
 }

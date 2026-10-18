@@ -114,6 +114,9 @@ export interface HrLifecycleItem {
   executionAttempts?: number | null
   executionError?: string | null
   executedAt?: string | null
+  /** 交接接收人（离职联动把资产与待办转给他）；未指定时为空 */
+  handoverToUserId?: number | null
+  handoverToName?: string | null
 
   // 入职明细
   offerDate?: string | null

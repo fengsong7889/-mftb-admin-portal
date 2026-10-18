@@ -61,7 +61,7 @@ class HrEffectiveSchedulingTest {
         service = new HrLifecycleCallbackServiceImpl(
                 lifecycleMapper, userMapper, mock(SysDepartmentMapper.class), mock(SysPositionMapper.class),
                 positionRecordMapper, mock(EmpContractMapper.class), mock(EmployeeService.class),
-                operatorResolver, taskService, mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class), mock(com.mftb.admin.service.HrOffboardingTaskService.class));
+                operatorResolver, taskService, mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class), mock(com.mftb.admin.service.HrOffboardingTaskService.class), mock(com.mftb.admin.service.HrAssignmentQuery.class));
         when(userMapper.selectById(USER_ID)).thenReturn(user());
         when(positionRecordMapper.selectOne(any())).thenReturn(null);
     }
@@ -143,7 +143,7 @@ class HrEffectiveSchedulingTest {
         service = new HrLifecycleCallbackServiceImpl(
                 lifecycleMapper, userMapper, mock(SysDepartmentMapper.class), mock(SysPositionMapper.class),
                 positionRecordMapper, mock(EmpContractMapper.class), employeeService,
-                mock(OperatorResolver.class), taskService, mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class), mock(com.mftb.admin.service.HrOffboardingTaskService.class));
+                mock(OperatorResolver.class), taskService, mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class), mock(com.mftb.admin.service.HrOffboardingTaskService.class), mock(com.mftb.admin.service.HrAssignmentQuery.class));
         stubFind(req);
 
         service.onFlowApproved(req.getFlowNo());

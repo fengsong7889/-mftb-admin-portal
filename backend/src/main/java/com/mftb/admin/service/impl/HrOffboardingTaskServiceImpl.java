@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -54,6 +55,9 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
     private static final String TASK_STATUS_PENDING = "pending";
     private static final int MAX_REF_LENGTH = 64;
     private static final int MAX_SUMMARY_LENGTH = 500;
+
+    /** RUNNING 超过这么久就视为执行者已挂掉，允许人工重入（定时任务每小时一轮，10 分钟足够区分） */
+    static final int RUNNING_STALE_MINUTES = 10;
     private static final int MAX_ERROR_LENGTH = 480;
 
     private final HrOffboardingTaskMapper taskMapper;
@@ -128,6 +132,14 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
         if (HrOffboardingTask.TERMINAL_STATUSES.contains(task.getStatus())) {
             // 终态拒绝重跑：这是「重试不得重复生成业务单」的最后一道闸（§7.4）
             throw new BusinessException("該任務已結束（" + task.getStatus() + "），不能重複執行");
+        }
+        // RUNNING 且刚刚更新过 = 定时任务/他人正在跑，此时再进一次就是抢同一个任务，
+        // 会造成 EAM 重复建单或 OA 重复改派。但长期停在 RUNNING（进程中途挂掉）不能变成死锁，
+        // 所以只拦“新鲜”的 RUNNING，超过 10 分钟视为陈旧、允许人工重入。
+        if (HrOffboardingTask.STATUS_RUNNING.equals(task.getStatus())
+                && task.getUpdatedAt() != null
+                && task.getUpdatedAt().isAfter(LocalDateTime.now().minusMinutes(RUNNING_STALE_MINUTES))) {
+            throw new BusinessException("該任務正在執行中，請稍後再試");
         }
         // 人工重试时校离职人归属；定时任务没有 SecurityContext，requireVisibleUser 按「不限制」放行
         orgScopeService.requireVisibleUser(task.getUserId());

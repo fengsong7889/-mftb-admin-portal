@@ -71,6 +71,7 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
     private final HrEmploymentPeriodService employmentPeriodService;
     private final HrAuditService hrAuditService;
     private final HrOffboardingTaskService offboardingTaskService;
+    private final com.mftb.admin.service.HrAssignmentQuery hrAssignmentQuery;
 
     @Override
     public boolean isHrLifecycleProcess(String processCode) {
@@ -145,6 +146,7 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
             case HrLifecycleConstants.TYPE_REGULAR -> applyRegular(req);
             case HrLifecycleConstants.TYPE_TRANSFER -> applyTransfer(req);
             case HrLifecycleConstants.TYPE_DIMISSION -> applyDimission(req);
+            case HrLifecycleConstants.TYPE_REHIRE -> applyRehire(req);
             case HrLifecycleConstants.TYPE_RENEW -> applyRenew(req);
             default -> throw new BusinessException("無效的單據類型: " + req.getType());
         }
@@ -254,27 +256,7 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
     /** 调动：更新 sys_user 部门/职位快照，追加一条「調動」职务记录 */
     private void applyTransfer(HrLifecycleRequest req) {
         SysUser user = requireUser(req);
-        if (req.getNewDeptId() != null) {
-            SysDepartment dept = sysDepartmentMapper.selectById(req.getNewDeptId());
-            if (dept == null) {
-                throw new BusinessException("調入部門不存在");
-            }
-            user.setDepartmentId(dept.getId());
-            user.setDepartment(dept.getName());
-            user.setDepartmentEn(dept.getNameEn());
-        }
-        if (req.getNewPositionId() != null) {
-            SysPosition position = sysPositionMapper.selectById(req.getNewPositionId());
-            if (position == null) {
-                throw new BusinessException("調入職位不存在");
-            }
-            user.setPositionId(position.getId());
-            user.setPosition(position.getName());
-            user.setPositionEn(position.getNameEn());
-            user.setSequence(position.getSequence());
-            user.setJobLevel(position.getJobLevel());
-            user.setRank(position.getRank());
-        }
+        applyTargetAssignment(user, req);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
 
@@ -333,6 +315,88 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
 
         req.setEmpNo(user.getEmpId());
         req.setRemark(trimRemark("離職辦理完成，最後工作日 " + record.getEffectiveDate() + "，賬號已停用"));
+    }
+
+    /**
+     * 把单据上的「调入部门/调入职位」写到员工投影上（异动与复职共用）。
+     * <p>抽成一个方法而不是抄一份：调动与重新入职都要做同一件事，两处写必然漂移
+     * （职位带的序列/职级/职等漏一个，列表与异动记录就对不上）。
+     */
+    private void applyTargetAssignment(SysUser user, HrLifecycleRequest req) {
+        if (req.getNewDeptId() != null) {
+            SysDepartment dept = sysDepartmentMapper.selectById(req.getNewDeptId());
+            if (dept == null) {
+                throw new BusinessException("調入部門不存在");
+            }
+            user.setDepartmentId(dept.getId());
+            user.setDepartment(dept.getName());
+            user.setDepartmentEn(dept.getNameEn());
+        }
+        if (req.getNewPositionId() != null) {
+            SysPosition position = sysPositionMapper.selectById(req.getNewPositionId());
+            if (position == null) {
+                throw new BusinessException("調入職位不存在");
+            }
+            user.setPositionId(position.getId());
+            user.setPosition(position.getName());
+            user.setPositionEn(position.getNameEn());
+            user.setSequence(position.getSequence());
+            user.setJobLevel(position.getJobLevel());
+            user.setRank(position.getRank());
+        }
+    }
+
+    /**
+     * 重新入职：复用离职员工的**同一个账号**（不新建人），写 REHIRE 异动并重新启用。
+     * <p>三条口径：
+     * <ol>
+     *   <li>是否真离职走统一 as-of 口径，不看账号状态也不看「最新一条记录」——
+     *       后者会被一张未来生效的离职单骗到，把还在职的人再开一段雇佣。</li>
+     *   <li>不新建账号：工号/历史单据/资产归属/授权记录全部挂在原 userId 上，
+     *       重新建号会把同一个人拆成两份档案（P4 雇佣期间的「一人多段」就是为这个而存在的）。</li>
+     *   <li>复职必须强制改密：离职期间密码可能被任何人留存，沿用旧密码等于把账号默认交还。</li>
+     * </ol>
+     */
+    private void applyRehire(HrLifecycleRequest req) {
+        SysUser user = requireUser(req);
+        if (!hrAssignmentQuery.isResignedAt(user.getId(), LocalDate.now())) {
+            throw new BusinessException("所選員工當前並非離職狀態，無需重新入職");
+        }
+        applyTargetAssignment(user, req);
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
+        sysUserMapper.updateById(user);
+
+        EmpPositionRecord latest = latestPositionRecord(user.getId());
+        EmpPositionRecord record = latest != null ? copyAppointment(latest) : new EmpPositionRecord();
+        record.setUserId(user.getId());
+        record.setEffectiveDate(req.getEffectiveDate());
+        record.setEffectiveSeq(nextSeq(user.getId()));
+        // code 与名称同时写：派生雇佣新段只看 code（方案 §5.3）
+        record.setOperation(HrOperationCode.CODE_TO_NAME.get(HrOperationCode.REHIRE));
+        record.setOperationCode(HrOperationCode.REHIRE);
+        record.setReason(req.getReason());
+        record.setServiceDept(user.getDepartment());
+        record.setSequenceType(user.getSequence());
+        record.setPositionLevel(user.getJobLevel());
+        record.setRankCode(user.getRank());
+        record.setPositionName(user.getPosition());
+        if (StringUtils.hasText(req.getNewCompany())) {
+            record.setCompany(req.getNewCompany());
+        }
+        if (StringUtils.hasText(req.getNewSuperior())) {
+            record.setDirectSuperior(req.getNewSuperior());
+        }
+        record.setCreatedBy(operatorResolver.currentOperatorName());
+        record.setUpdatedBy(operatorResolver.currentOperatorName());
+        record.setDeleted(0);
+        writePositionRecord(record, req.getReqNo());
+
+        // 启用账号（含强制首次改密）；雇佣期间由 writePositionRecord 里的 sync 自动开出新一段
+        employeeService.reactivate(user.getId());
+
+        req.setEmpNo(user.getEmpId());
+        req.setRemark(trimRemark("重新入職辦理完成，復職日期 " + record.getEffectiveDate()
+                + "，賬號已重新啟用且首次登錄必須改密"));
     }
 
     /**

@@ -14,7 +14,7 @@ const mockedFetch = vi.mocked(fetchHrAudit)
 
 function page(over: Partial<HrAuditPage> = {}): HrAuditPage {
   return {
-    total: 2,
+    total: 3,
     records: [
       {
         id: 1, userId: 7, empNo: 'MF00007', action: 'PROFILE_UPDATE', fieldName: 'idNumber',
@@ -27,6 +27,13 @@ function page(over: Partial<HrAuditPage> = {}): HrAuditPage {
         beforeValue: null, afterValue: null, detail: '查看明文：证件号/证件地址/详细住址',
         reason: null, sourceReqNo: null, effectiveDate: null, occurredAt: '2026-10-16T10:00:00',
         sensitive: 1, operator: 'HR專員',
+      },
+      {
+        // 旧记录：发生时间从未写入（MP 把 fill 列显式写成 NULL 覆盖了 DDL 默认值）
+        id: 3, userId: 7, empNo: 'MF00007', action: 'ACCOUNT_ENABLE', fieldName: 'status',
+        beforeValue: '0', afterValue: '1', detail: null, reason: null,
+        sourceReqNo: null, effectiveDate: null, occurredAt: null,
+        sensitive: 0, operator: '系統管理員',
       },
     ],
     ...over,
@@ -60,6 +67,8 @@ describe('HrAuditTrail', () => {
     expect(screen.getByText('HR202610150001')).toBeInTheDocument()
     // 界面上不存在任何还原原文的入口
     expect(screen.queryByText('顯示原文')).not.toBeInTheDocument()
+    // 时间缺失必须说清是「未记录」，不能打一个 `-` 让人读成「没有时间这个属性」
+    expect(await screen.findAllByText(/時間未記錄/)).toHaveLength(1)
   })
 
   it('取数失败显示错误而不是空数据', async () => {

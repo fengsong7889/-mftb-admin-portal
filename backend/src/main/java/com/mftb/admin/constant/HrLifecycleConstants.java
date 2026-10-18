@@ -26,10 +26,16 @@ public final class HrLifecycleConstants {
     public static final String TYPE_DIMISSION = "dimission";
     /** 合同续签（P0：复用同一引擎，入口与授权归属合同台账） */
     public static final String TYPE_RENEW = "renew";
+    /**
+     * 重新入职（离职后返聘）：针对**已离职**员工重新启用账号并开启新一段雇佣。
+     * <p>不单独建菜单：它是「入職」的一个分支，授权锚在 {@code hr-onboarding} 上（方案 §6.1：
+     * 人事类流程是页面内分类，不是新增侧边栏菜单）。
+     */
+    public static final String TYPE_REHIRE = "rehire";
 
     /** 全部合法类型 */
     public static final Set<String> ALL_TYPES =
-            Set.of(TYPE_ONBOARD, TYPE_REGULAR, TYPE_TRANSFER, TYPE_DIMISSION, TYPE_RENEW);
+            Set.of(TYPE_ONBOARD, TYPE_REGULAR, TYPE_TRANSFER, TYPE_DIMISSION, TYPE_RENEW, TYPE_REHIRE);
 
     /** 单据类型 → 关联 OA 流程编码（biz_oa_process.process_code） */
     public static final Map<String, String> TYPE_TO_PROCESS_CODE = Map.of(
@@ -37,7 +43,8 @@ public final class HrLifecycleConstants {
             TYPE_REGULAR, "hr_regular",
             TYPE_TRANSFER, "hr_transfer",
             TYPE_DIMISSION, "hr_dimission",
-            TYPE_RENEW, "hr_renew");
+            TYPE_RENEW, "hr_renew",
+            TYPE_REHIRE, "hr_rehire");
 
     /** OA 流程编码 → 单据类型（回调分发用） */
     public static final Map<String, String> PROCESS_CODE_TO_TYPE = Map.of(
@@ -45,7 +52,8 @@ public final class HrLifecycleConstants {
             "hr_regular", TYPE_REGULAR,
             "hr_transfer", TYPE_TRANSFER,
             "hr_dimission", TYPE_DIMISSION,
-            "hr_renew", TYPE_RENEW);
+            "hr_renew", TYPE_RENEW,
+            "hr_rehire", TYPE_REHIRE);
 
     /** 单据类型 → 前端功能授权菜单 key（sys_menu.menu_key） */
     public static final Map<String, String> TYPE_TO_MENU_KEY = Map.of(
@@ -54,7 +62,9 @@ public final class HrLifecycleConstants {
             TYPE_TRANSFER, "hr-transfer",
             TYPE_DIMISSION, "hr-dimission",
             // 续签不单独建菜单：入口、列表与数据都在合同台账页
-            TYPE_RENEW, "contract-ledger");
+            TYPE_RENEW, "contract-ledger",
+            // 重新入职同上：归属入職菜单，不新增侧边栏入口
+            TYPE_REHIRE, "hr-onboarding");
 
     // ==================== 单据状态 ====================
 

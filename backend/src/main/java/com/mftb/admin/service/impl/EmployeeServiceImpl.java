@@ -400,6 +400,26 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .change("status", previousStatus, status));
     }
     
+    @Override
+    @Transactional
+    public void reactivate(Long id) {
+        SysUser user = requireUser(id);
+        assertNotSystemAccount(user, "復職啟用");
+        Integer previousStatus = user.getStatus();
+        // 定向更新而不是整实体回写：与 resetPassword 同理，且 null 字段在 NOT_NULL 策略下会被跳过，
+        // 拿 user 回写清不了 activeToken（旧会话会继续有效）
+        sysUserMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, id)
+                .set(SysUser::getStatus, 1)
+                .set(SysUser::getMustChangePassword, true)
+                .set(SysUser::getActiveToken, null)
+                .set(SysUser::getActiveLoginIp, null)
+                .set(SysUser::getUpdatedBy, operatorResolver.currentOperatorName()));
+        hrAuditService.record(com.mftb.admin.dto.HrAuditEntry.of(HrAuditAction.ACCOUNT_ENABLE, id)
+                .change("status", previousStatus, 1)
+                .detail("復職啟用，首次登錄必須改密；舊會話已失效"));
+    }
+
     /**
      * 停用账号时强制下线: 清除 activeToken, 设置强制下线标记（原因为账号被停用）,
      * 同时将该用户当前的在线登录日志标记为强制下线。

@@ -55,7 +55,8 @@ export default function HrAuditTrail({ userId }: Props) {
       dataIndex: 'occurredAt',
       key: 'occurredAt',
       width: 165,
-      render: (v?: string | null) => (v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      render: (v?: string | null) =>
+        v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : <Typography.Text type="warning">{t('hrAudit.timeMissing')}</Typography.Text>,
     },
     {
       title: t('hrAudit.colAction'),
