@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -210,6 +211,12 @@ class HrEmploymentPeriodTest {
         String sqlSet = captor.getAllValues().get(0).getSqlSet();
         assertTrue(sqlSet != null && sqlSet.contains("employment_period_id"),
                 "未下推雇佣期间列: " + sqlSet);
+        // D3：回填段归属不是一次业务修改。emp_position_record.updated_at 带
+        // ON UPDATE CURRENT_TIMESTAMP，不把原值钉住就会把该人全部历史记录刷成本次时间，
+        // 异动轨迹与列表「最后更新时间」从此失真。
+        assertNotNull(sqlSet, "回填未生成 SET 子句");
+        assertTrue(sqlSet.contains("updated_at = updated_at"),
+                "回填必须保持历史记录的 updated_at 原值: " + sqlSet);
     }
 
     // ── 夹具 ──
