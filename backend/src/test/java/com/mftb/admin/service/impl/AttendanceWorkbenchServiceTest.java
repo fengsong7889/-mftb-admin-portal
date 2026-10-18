@@ -86,7 +86,7 @@ class AttendanceWorkbenchServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceWorkbenchServiceImpl(dayMapper, exceptionMapper, groupMapper, memberMapper,
-                scheduleMapper, punchMapper, monthlyMapper, summaryService, sysConfigService);
+                scheduleMapper, punchMapper, monthlyMapper, summaryService, sysConfigService, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(sysConfigService.getConfigValueCached(anyString())).thenReturn(null);
     }
 

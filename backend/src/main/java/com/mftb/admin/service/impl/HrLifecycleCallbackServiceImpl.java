@@ -3,6 +3,9 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.HrLifecycleConstants;
+import com.mftb.admin.constant.HrAuditAction;
+import com.mftb.admin.constant.HrOperationCode;
+import com.mftb.admin.dto.HrAuditEntry;
 import com.mftb.admin.dto.BasicInfoRequest;
 import com.mftb.admin.dto.EmployeeRequest;
 import com.mftb.admin.dto.EmployeeVO;
@@ -19,6 +22,11 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EmployeeService;
+import com.mftb.admin.service.HrAuditService;
+import com.mftb.admin.service.HrEffectiveTaskService;
+import com.mftb.admin.service.HrEmploymentPeriodService;
+import com.mftb.admin.service.HrMasterDataResolver;
+import com.mftb.admin.service.HrOffboardingTaskService;
 import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.JsonUtils;
@@ -40,6 +48,10 @@ import java.util.Map;
  * <p>
  * 独立事务（REQUIRES_NEW）：办理动作失败只回滚本回调，不影响 OA 流程状态落库，
  * 失败信息写入单据 remark 供 HR 排查；OA 侧调用方 catch 后记录 error 日志。
+ * <p>
+ * <b>生效日口径</b>（方案 §7.2）：审批通过不等于生效。生效日晚于今天时，单据停在
+ * {@code approved}（待生效）并登记一条 {@code hr_effective_task}，由定时任务到点回调本类
+ * 的同一个入口执行；否则会把「下周一离职」的人今天就读成已离职、今天就把账号停掉。
  */
 @Slf4j
 @Service
@@ -54,6 +66,11 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
     private final EmpContractMapper empContractMapper;
     private final EmployeeService employeeService;
     private final OperatorResolver operatorResolver;
+    private final HrEffectiveTaskService effectiveTaskService;
+    private final HrMasterDataResolver masterDataResolver;
+    private final HrEmploymentPeriodService employmentPeriodService;
+    private final HrAuditService hrAuditService;
+    private final HrOffboardingTaskService offboardingTaskService;
 
     @Override
     public boolean isHrLifecycleProcess(String processCode) {
@@ -85,21 +102,29 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         req.setUpdatedAt(LocalDateTime.now());
         hrLifecycleRequestMapper.updateById(req);
 
+        // 待生效：审批通过但生效日未到，只登记任务，绝不提前改写任职投影与账号状态。
+        LocalDate today = LocalDate.now();
+        LocalDate effective = effectiveDateOf(req);
+        if (effective != null && effective.isAfter(today)) {
+            effectiveTaskService.schedule(req, effective, operatorResolver.currentOperatorName());
+            req.setRemark(trimRemark("審批通過，待生效日期 " + effective + " 自動辦理"));
+            req.setUpdatedAt(LocalDateTime.now());
+            hrLifecycleRequestMapper.updateById(req);
+            log.info("HR lifecycle approved and scheduled: reqNo={}, type={}, effectiveDate={}",
+                    req.getReqNo(), req.getType(), effective);
+            return;
+        }
+
         try {
-            switch (req.getType()) {
-                case HrLifecycleConstants.TYPE_ONBOARD -> applyOnboard(req);
-                case HrLifecycleConstants.TYPE_REGULAR -> applyRegular(req);
-                case HrLifecycleConstants.TYPE_TRANSFER -> applyTransfer(req);
-                case HrLifecycleConstants.TYPE_DIMISSION -> applyDimission(req);
-                case HrLifecycleConstants.TYPE_RENEW -> applyRenew(req);
-                default -> throw new BusinessException("無效的單據類型: " + req.getType());
-            }
+            executeApply(req);
         } catch (Exception e) {
-            // 办理失败：单据停在 approved 并记录原因，不阻断审批流转
+            // 办理失败：单据停在 approved 并记录原因，不阻断审批流转；
+            // 同时把任务落成 FAILED，否则“办理失败”只存在 remark 里，没人看得见也没法重试。
             req.setRemark(trimRemark("辦理失敗: " + e.getMessage()));
             req.setUpdatedBy(operatorResolver.currentOperatorName());
             req.setUpdatedAt(LocalDateTime.now());
             hrLifecycleRequestMapper.updateById(req);
+            effectiveTaskService.markFailed(req.getId(), req, e.getMessage(), operatorResolver.currentOperatorName());
             log.error("HR lifecycle apply failed: reqNo={}, type={}, error={}", req.getReqNo(), req.getType(), e.getMessage(), e);
             throw e;
         }
@@ -109,7 +134,35 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         // MetaObjectHandler.strictUpdateFill 在实体已带非空 updatedAt 时会跳过，需显式刷新
         req.setUpdatedAt(LocalDateTime.now());
         hrLifecycleRequestMapper.updateById(req);
+        effectiveTaskService.markDone(req.getId(), operatorResolver.currentOperatorName());
         log.info("HR lifecycle completed: reqNo={}, type={}, flowNo={}", req.getReqNo(), req.getType(), flowNo);
+    }
+
+    /** 按单据类型分发办理动作（回调与到点定时任务共用同一入口，保证两条路径结果一致） */
+    private void executeApply(HrLifecycleRequest req) {
+        switch (req.getType()) {
+            case HrLifecycleConstants.TYPE_ONBOARD -> applyOnboard(req);
+            case HrLifecycleConstants.TYPE_REGULAR -> applyRegular(req);
+            case HrLifecycleConstants.TYPE_TRANSFER -> applyTransfer(req);
+            case HrLifecycleConstants.TYPE_DIMISSION -> applyDimission(req);
+            case HrLifecycleConstants.TYPE_RENEW -> applyRenew(req);
+            default -> throw new BusinessException("無效的單據類型: " + req.getType());
+        }
+    }
+
+    /**
+     * 该单据的生效日。
+     * <p>离职取「最后在职日」（账号也在那天之后才停），续签取新合同开始日，
+     * 其余取单据生效日；都没填时返回 null 表示「立即办理」，保持旧行为不变成永久待生效。
+     */
+    private LocalDate effectiveDateOf(HrLifecycleRequest req) {
+        if (HrLifecycleConstants.TYPE_DIMISSION.equals(req.getType()) && req.getLastWorkDate() != null) {
+            return req.getLastWorkDate();
+        }
+        if (HrLifecycleConstants.TYPE_RENEW.equals(req.getType())) {
+            return req.getNewContractStartDate();
+        }
+        return req.getEffectiveDate();
     }
 
     @Override
@@ -128,6 +181,8 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         // MetaObjectHandler.strictUpdateFill 在实体已带非空 updatedAt 时会跳过，需显式刷新
         req.setUpdatedAt(LocalDateTime.now());
         hrLifecycleRequestMapper.updateById(req);
+        // 驳回同时作废待生效任务：已驳回的单据到点仍改任职事实，是比不执行更糟的错账
+        effectiveTaskService.cancel(req.getId(), operatorResolver.currentOperatorName());
         log.info("HR lifecycle rejected, back to editable: reqNo={}, flowNo={}", req.getReqNo(), flowNo);
     }
 
@@ -186,11 +241,12 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         record.setEffectiveDate(req.getEffectiveDate() != null ? req.getEffectiveDate() : LocalDate.now());
         record.setEffectiveSeq(nextSeq(user.getId()));
         record.setOperation(HrLifecycleConstants.OPERATION_REGULAR);
+        record.setOperationCode(HrOperationCode.REGULAR);
         record.setReason(req.getReason());
         record.setCreatedBy(operatorResolver.currentOperatorName());
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
-        empPositionRecordMapper.insert(record);
+        writePositionRecord(record, req.getReqNo());
         req.setEmpNo(user.getEmpId());
         req.setRemark(trimRemark("轉正辦理完成，生效日期 " + record.getEffectiveDate()));
     }
@@ -228,6 +284,7 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         record.setEffectiveDate(req.getEffectiveDate() != null ? req.getEffectiveDate() : LocalDate.now());
         record.setEffectiveSeq(nextSeq(user.getId()));
         record.setOperation(HrLifecycleConstants.OPERATION_TRANSFER);
+        record.setOperationCode(HrOperationCode.TRANSFER);
         record.setReason(req.getReason());
         record.setServiceDept(user.getDepartment());
         record.setSequenceType(user.getSequence());
@@ -243,7 +300,7 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         record.setCreatedBy(operatorResolver.currentOperatorName());
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
-        empPositionRecordMapper.insert(record);
+        writePositionRecord(record, req.getReqNo());
 
         req.setEmpNo(user.getEmpId());
         req.setRemark(trimRemark("調動辦理完成：" + req.getOldDeptName() + " → " + user.getDepartment()
@@ -259,14 +316,20 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         record.setEffectiveDate(req.getLastWorkDate() != null ? req.getLastWorkDate() : LocalDate.now());
         record.setEffectiveSeq(nextSeq(user.getId()));
         record.setOperation(HrLifecycleConstants.OPERATION_DIMISSION);
+        record.setOperationCode(HrOperationCode.DIMISSION);
         record.setReason(req.getReason());
         record.setCreatedBy(operatorResolver.currentOperatorName());
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
-        empPositionRecordMapper.insert(record);
+        writePositionRecord(record, req.getReqNo());
 
         // 停用账号（禁止登录）；离职态由「离职」职务记录派生（EmployeeServiceImpl 比较简体）
         employeeService.updateStatus(user.getId(), 0);
+
+        // 跨模块联动与离职事实同事务登记（方案 §7.4）：资产交接与待办改派不能在这里同步做完——
+        // 接收人常常还没定，EAM 也可能拒登记，把它们做成任务才能追踪与重试。
+        offboardingTaskService.scheduleForDimission(req, record.getEffectiveDate(),
+                operatorResolver.currentOperatorName());
 
         req.setEmpNo(user.getEmpId());
         req.setRemark(trimRemark("離職辦理完成，最後工作日 " + record.getEffectiveDate() + "，賬號已停用"));
@@ -364,10 +427,29 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         return user;
     }
 
+    /**
+     * 任职记录写入的统一收口：先按名称解析稳定 ID（必须在落库前），落库后同步雇佣期间并记审计。
+     * <p>审批回调是人事事实最重要的写入源，漏了这一步，新表就永远只有手工录入那一份数据。
+     * 审计带上来源单号：「这份异动是哪张单子批出来的」必须能反查（方案 §7.4）。
+     */
+    private void writePositionRecord(EmpPositionRecord record, String sourceReqNo) {
+        masterDataResolver.applyStableIds(record);
+        empPositionRecordMapper.insert(record);
+        employmentPeriodService.syncFromRecords(record.getUserId(), operatorResolver.currentOperatorName());
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.POSITION_WRITE, record.getUserId())
+                .detail("单据办理写入异动 " + record.getOperationCode() + " @ " + record.getEffectiveDate())
+                .reason(record.getReason())
+                .sourceReqNo(sourceReqNo)
+                .effectiveDate(record.getEffectiveDate()));
+    }
+
     private EmpPositionRecord latestPositionRecord(Long userId) {
         return empPositionRecordMapper.selectOne(
                 new LambdaQueryWrapper<EmpPositionRecord>()
                         .eq(EmpPositionRecord::getUserId, userId)
+                        // 先按生效日再按同日序号：跨日期只比 effectiveSeq 会挑中旧记录
+                        //（序号只在同一天内递增，方案 §3.2 「错误派生」那一行）
+                        .orderByDesc(EmpPositionRecord::getEffectiveDate)
                         .orderByDesc(EmpPositionRecord::getEffectiveSeq)
                         .last("LIMIT 1"));
     }

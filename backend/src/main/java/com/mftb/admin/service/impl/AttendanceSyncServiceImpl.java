@@ -12,6 +12,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AttendancePunchService;
 import com.mftb.admin.service.AttendanceSyncService;
 import com.mftb.admin.service.DingTalkAppService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,11 +64,18 @@ public class AttendanceSyncServiceImpl implements AttendanceSyncService {
     private final AttGroupMapper groupMapper;
     private final AttGroupMemberMapper memberMapper;
     private final AttendancePunchService punchService;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public Map<String, Object> sync(LocalDate from, LocalDate to, Long groupId) {
         if (from == null || to == null || from.isAfter(to)) {
             throw new BusinessException("同步日期區間不合法");
+        }
+        // 同步是从钉钉按整组人员拉事实并落库，属组织级运维动作：按人收敛会做出「半天有卡、
+        // 半天没卡」的隐性错账，所以只允许范围不限制的角色手动触发。
+        // 夜间定时任务没有 SecurityContext，OrgScopeServiceImpl 按「不限制」放行，不受本门槛影响。
+        if (orgScopeService.resolveVisibleUserIds() != null) {
+            throw new BusinessException("打卡同步為整組作業，需具備「全部」數據範圍的角色才能手動觸發");
         }
         long appId = requireAppId();
         List<AttGroupMember> members = membersInRange(groupId, from, to);

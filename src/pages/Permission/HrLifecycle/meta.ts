@@ -38,6 +38,25 @@ export const STATUS_TAG_COLOR: Record<HrLifecycleStatus, string> = {
   completed: 'success',
 }
 
+/**
+ * 执行（生效）状态 → 名称 i18n key。
+ * <p>与审批状态分开显示：只看到「已批准」会误以为人已按新部门生效。
+ */
+export const EXECUTION_LABEL_KEY: Record<string, string> = {
+  PENDING: 'hrLifecycle.execPending',
+  DONE: 'hrLifecycle.execDone',
+  FAILED: 'hrLifecycle.execFailed',
+  CANCELLED: 'hrLifecycle.execCancelled',
+}
+
+/** 执行状态 → Tag 颜色 */
+export const EXECUTION_TAG_COLOR: Record<string, string> = {
+  PENDING: 'warning',
+  DONE: 'success',
+  FAILED: 'error',
+  CANCELLED: 'default',
+}
+
 /** 列表页状态 Tab（all=全部） */
 export const STATUS_TABS: Array<{ key: string }> = [
   { key: 'all' },

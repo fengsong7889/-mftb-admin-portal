@@ -66,10 +66,40 @@ public class HrLifecycleVO {
     private LocalDate newContractEndDate;
 
     private String remark;
+
     private String createdBy;
     private String updatedBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // ==================== 执行（生效）状态 ====================
+    /*
+     * 审批状态与业务执行状态必须分开返（方案 §7.2）：否则「已批准」会被当成「已生效」，
+     * HR 看到 approved 就以为人的账号已经按新部门生效了。
+     */
+
+    /** 执行状态：PENDING 待生效/执行中、DONE 已生效、FAILED 办理失败、CANCELLED 已作废；null = 无需执行 */
+    private String executionStatus;
+    /** 计划生效日（待生效时非空） */
+    private java.time.LocalDate scheduledDate;
+    /** 已尝试次数 */
+    private Integer executionAttempts;
+    /** 最近一次失败原因 */
+    private String executionError;
+    /** 实际执行完成时间 */
+    private java.time.LocalDateTime executedAt;
+
+    /** 把待生效任务信息贴到单据视图上（无任务时保持 null，表示「不需要到点执行」） */
+    public void attachTask(com.mftb.admin.entity.HrEffectiveTask task) {
+        if (task == null) {
+            return;
+        }
+        this.executionStatus = task.getStatus();
+        this.scheduledDate = task.getEffectiveDate();
+        this.executionAttempts = task.getAttempts();
+        this.executionError = task.getLastError();
+        this.executedAt = task.getExecutedAt();
+    }
 
     public static HrLifecycleVO from(HrLifecycleRequest e) {
         HrLifecycleVO vo = new HrLifecycleVO();

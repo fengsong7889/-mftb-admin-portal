@@ -16,7 +16,9 @@ import com.mftb.admin.mapper.HrLeaveRequestMapper;
 import com.mftb.admin.service.AttendanceExceptionService;
 import com.mftb.admin.service.AttendancePunchService;
 import com.mftb.admin.service.AttendanceSummaryService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.ScopeFilters;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -73,6 +75,7 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
     private final AttendancePunchService punchService;
     private final AttendanceSummaryService summaryService;
     private final OperatorResolver operatorResolver;
+    private final OrgScopeService orgScopeService;
 
     @Override
     public PageResult<AttendanceExceptionVO> page(long page, long size, LocalDate from, LocalDate to, Long groupId,
@@ -371,10 +374,13 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
 
     @Override
     public long pendingCount(LocalDate from, LocalDate to) {
-        Long count = exceptionMapper.selectCount(new LambdaQueryWrapper<AttException>()
+        LambdaQueryWrapper<AttException> wrapper = new LambdaQueryWrapper<AttException>()
                 .eq(AttException::getStatus, AttException.STATUS_PENDING)
                 .ge(from != null, AttException::getWorkDate, from)
-                .le(to != null, AttException::getWorkDate, to));
+                .le(to != null, AttException::getWorkDate, to);
+        // 待办计数也是人员维数据：不收敛的话，受限角色能从工作台卡片读出全公司待处理量
+        ScopeFilters.applyUsers(wrapper, AttException::getUserId, orgScopeService.resolveVisibleUserIds());
+        Long count = exceptionMapper.selectCount(wrapper);
         return count == null ? 0L : count;
     }
 
@@ -394,6 +400,8 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
                 .eq(deptId != null, AttException::getDeptId, deptId)
                 .eq(exceptionType != null, AttException::getExceptionType, exceptionType)
                 .eq(status != null, AttException::getStatus, status);
+        // 组织人员数据范围：与 stats() 同一个构造器，统计卡不会越过列表
+        ScopeFilters.applyUsers(wrapper, AttException::getUserId, orgScopeService.resolveVisibleUserIds());
         return wrapper;
     }
 
@@ -405,6 +413,8 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
         if (row == null) {
             throw new BusinessException("考勤異常不存在或已刪除");
         }
+        // 按 id 的单条读写必须二次校验归属：只过滤列表的话，改一下 URL 里的 id 就绕过去了
+        orgScopeService.requireVisibleUser(row.getUserId());
         return row;
     }
 
@@ -417,6 +427,9 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
             throw new BusinessException("請至少選擇一條異常");
         }
         List<AttException> rows = exceptionMapper.selectBatchIds(ids);
+        // 越权不能像「已处理行」那样静默过滤：批量确认是全量选中产生的，
+        // 默默少确认几条会让管理员误以为别人也被确认了，因此整批拒绝。
+        rows.forEach(row -> orgScopeService.requireVisibleUser(row.getUserId()));
         List<AttException> pending = rows.stream()
                 .filter(row -> row.getStatus() == null || row.getStatus() == AttException.STATUS_PENDING)
                 .toList();

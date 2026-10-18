@@ -2,7 +2,9 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.HrAuditAction;
 import com.mftb.admin.dto.ContractExpirySummaryVO;
+import com.mftb.admin.dto.HrAuditEntry;
 import com.mftb.admin.dto.ContractLedgerVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EmpContract;
@@ -10,6 +12,7 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.EmpContractMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.EmployeeContractService;
+import com.mftb.admin.service.HrAuditService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +50,7 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
     private final EmpContractMapper contractMapper;
     private final SysUserMapper sysUserMapper;
     private final OperatorResolver operatorResolver;
+    private final HrAuditService hrAuditService;
 
     @Override
     public List<EmpContract> listByUserId(Long userId) {
@@ -196,6 +200,13 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
         contract.setUpdatedBy(operator);
         contract.setDeleted(0);
         contractMapper.insert(contract);
+        // 台账写入现阶段记动作级（含关键值）而不是字段级 diff：
+        // 合同本身是「一行一份」的台账，行号+号号+起止+主体已足以事后重建；字段级留痕等 P5 单据化后一并接入。
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
+                .detail("新增合同 " + contract.getContractNo() + "［" + contract.getContractType() + "］ "
+                        + contract.getStartDate() + "~" + contract.getEndDate() + " 主体=" + contract.getCompany())
+                .reason(contract.getRemark())
+                .effectiveDate(contract.getStartDate()));
         return contract;
     }
 
@@ -214,14 +225,24 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
         existing.setRemark(contract.getRemark());
         existing.setUpdatedBy(operatorResolver.currentOperatorName());
         contractMapper.updateById(existing);
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
+                .detail("编辑合同 #" + id + " " + existing.getContractNo() + "［" + existing.getContractType() + "］ "
+                        + existing.getStartDate() + "~" + existing.getEndDate() + " 主体=" + existing.getCompany())
+                .reason(existing.getRemark())
+                .effectiveDate(existing.getStartDate()));
         return existing;
     }
 
     @Override
     public void delete(Long userId, Long id) {
         requireUser(userId);
-        requireOwned(userId, id);
+        EmpContract existing = requireOwned(userId, id);
         contractMapper.deleteById(id);
+        // 删除后行只剩软删标记，审计是唯一能说「当时那份合同是什么」的地方
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
+                .detail("删除合同 #" + id + " " + existing.getContractNo() + " "
+                        + existing.getStartDate() + "~" + existing.getEndDate())
+                .effectiveDate(existing.getStartDate()));
     }
 
     private void validate(EmpContract contract) {

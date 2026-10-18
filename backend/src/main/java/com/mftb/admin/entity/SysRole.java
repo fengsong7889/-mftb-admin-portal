@@ -31,6 +31,12 @@ public class SysRole {
     /** 菜单权限 JSON数组: [{"menuKey":"xxx","actions":["view","edit"]}] */
     private String permissions;
 
+    /**
+     * 数据范围（组织人员可见范围）: 1仅本人 2本部门 3本部门及以下 4自定部门 5全部。
+     * 真值见 {@link com.mftb.admin.constant.OrgDataScope}；自定部门的具体部门集合存 sys_role_dept。
+     */
+    private Integer dataScope;
+
     /** 状态: 1=启用 0=停用 */
     private Integer status;
 

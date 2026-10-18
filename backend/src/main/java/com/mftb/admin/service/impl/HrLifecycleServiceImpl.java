@@ -13,6 +13,7 @@ import com.mftb.admin.dto.OaRequestCreateDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EmpContract;
 import com.mftb.admin.entity.EmpPositionRecord;
+import com.mftb.admin.entity.HrEffectiveTask;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysPosition;
@@ -23,6 +24,8 @@ import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.HrEffectiveTaskService;
+import com.mftb.admin.service.HrLifecycleCallbackService;
 import com.mftb.admin.service.HrLifecycleService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
@@ -64,6 +67,8 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final PermissionService permissionService;
+    private final HrEffectiveTaskService effectiveTaskService;
+    private final HrLifecycleCallbackService lifecycleCallbackService;
 
     @Override
     public PageResult<HrLifecycleVO> page(long page, long size, String type, String status, String keyword) {
@@ -86,7 +91,20 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
         Page<HrLifecycleRequest> result = hrLifecycleRequestMapper.selectPage(
                 new Page<>(PageResult.normalizePage(page), PageResult.normalizeSize(size)), wrapper);
         List<HrLifecycleVO> records = result.getRecords().stream().map(HrLifecycleVO::from).toList();
+        attachTasks(records);
         return new PageResult<>(records, result.getTotal());
+    }
+
+    /**
+     * 批量贴执行状态（一次 IN 查完，不在循环里逐单查）。
+     * <p>列表不贴就看不出哪单在「等生效」、哪单「办理失败」，只能一个个点迚详情看。 */
+    private void attachTasks(List<HrLifecycleVO> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        Map<Long, HrEffectiveTask> tasks =
+                effectiveTaskService.ofRequests(records.stream().map(HrLifecycleVO::getId).toList());
+        records.forEach(vo -> vo.attachTask(tasks.get(vo.getId())));
     }
 
     @Override
@@ -116,7 +134,9 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
     public HrLifecycleVO detail(Long id) {
         HrLifecycleRequest entity = require(id);
         requireTypePermission(entity.getType(), "view");
-        return HrLifecycleVO.from(entity);
+        HrLifecycleVO vo = HrLifecycleVO.from(entity);
+        vo.attachTask(effectiveTaskService.ofRequest(entity.getId()).orElse(null));
+        return vo;
     }
 
     @Override
@@ -201,6 +221,31 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
         // MetaObjectHandler.strictUpdateFill 在实体已带非空 updatedAt 时会跳过，需显式刷新
         entity.setUpdatedAt(LocalDateTime.now());
         hrLifecycleRequestMapper.updateById(entity);
+        // 撤销同时作废待生效任务：否则单据回到草稿后到点仍会被定时任务执行，等于绕过审批改人事数据
+        effectiveTaskService.cancel(entity.getId(), operatorResolver.currentOperatorName());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public HrLifecycleVO retryExecution(Long id) {
+        HrLifecycleRequest entity = require(id);
+        requireTypePermission(entity.getType(), "edit");
+        if (!HrLifecycleConstants.STATUS_APPROVED.equals(entity.getStatus())) {
+            throw new BusinessException("僅「審批通過待辦理」的單據可以重試");
+        }
+        HrEffectiveTask task = effectiveTaskService.ofRequest(id).orElse(null);
+        if (task != null && HrEffectiveTask.STATUS_PENDING.equals(task.getStatus())
+                && task.getEffectiveDate() != null && task.getEffectiveDate().isAfter(LocalDate.now())) {
+            throw new BusinessException("尚未到生效日 " + task.getEffectiveDate() + "，不可提前辦理");
+        }
+        if (!StringUtils.hasText(entity.getFlowNo())) {
+            throw new BusinessException("單據未關聯審批流程，無法執行辦理");
+        }
+        // 复用审批回调入口：到点执行与人工重试走完全相同的代码，不养出第二套办理逻辑
+        lifecycleCallbackService.onFlowApproved(entity.getFlowNo());
+        HrLifecycleVO vo = HrLifecycleVO.from(require(id));
+        vo.attachTask(effectiveTaskService.ofRequest(id).orElse(null));
+        return vo;
     }
 
     @Override

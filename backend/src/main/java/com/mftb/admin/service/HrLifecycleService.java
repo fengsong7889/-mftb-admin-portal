@@ -34,6 +34,12 @@ public interface HrLifecycleService {
     /** 撤销审批（pending → draft，联动撤销在途 OA 流程） */
     void cancel(Long id);
 
+    /**
+     * 立即重试「已批准但未生效」的单据（方案 §7.4：失败联动可追踪可重试）。
+     * <p>未到生效日时拒绝：能提前点一下就生效，等于把生效日引擎绕过。
+     */
+    HrLifecycleVO retryExecution(Long id);
+
     /** 删除单据（仅 draft/rejected/cancelled 可删） */
     void delete(Long id);
 

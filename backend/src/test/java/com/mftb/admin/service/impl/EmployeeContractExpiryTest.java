@@ -34,7 +34,8 @@ class EmployeeContractExpiryTest {
     void setUp() {
         contractMapper = mock(EmpContractMapper.class);
         service = new EmployeeContractServiceImpl(
-                contractMapper, mock(SysUserMapper.class), mock(OperatorResolver.class));
+                contractMapper, mock(SysUserMapper.class), mock(OperatorResolver.class),
+                mock(com.mftb.admin.service.HrAuditService.class));
     }
 
     private EmpContract contract(long id, Long userId, LocalDate endDate, String status) {

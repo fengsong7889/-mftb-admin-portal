@@ -103,10 +103,20 @@ public class HrLifecycleController {
 
     /** 撤销审批（单据回到草稿，联动撤销在途 OA 流程） */
     @PostMapping("/{id}/cancel")
-    @RequirePermission(menu = "hr-onboarding", anyOf = {"hr-regularization", "hr-transfer", "hr-dimission"}, action = "edit")
+    @RequirePermission(menu = "hr-onboarding", anyOf = {"hr-regularization", "hr-transfer", "hr-dimission", "contract-ledger"}, action = "edit")
     public Result<Void> cancel(@PathVariable Long id) {
         hrLifecycleService.cancel(id);
         return Result.success("已撤銷，單據回到草稿", null);
+    }
+
+    /**
+     * 重试到期未执行或执行失败的单据（正常路径是定时任务到点自动执行）。
+     * <p>未到生效日会被服务层拒：能提前点一下就生效，等于给重试按钮开后门绕过生效日引擎。
+     */
+    @PostMapping("/{id}/retry-execute")
+    @RequirePermission(menu = "hr-onboarding", anyOf = {"hr-regularization", "hr-transfer", "hr-dimission", "contract-ledger"}, action = "edit")
+    public Result<HrLifecycleVO> retryExecution(@PathVariable Long id) {
+        return Result.success("已重新執行辦理", hrLifecycleService.retryExecution(id));
     }
 
     /** 删除单据（仅草稿/驳回/已撤销） */

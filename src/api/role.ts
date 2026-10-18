@@ -1,5 +1,6 @@
 import request from './request'
 import type { MenuPermission } from '../pages/Permission/types'
+import type { DataScope } from '../constants/dataScope'
 
 /** 功能角色（后端返回） */
 export interface RoleItem {
@@ -10,6 +11,10 @@ export interface RoleItem {
   description?: string
   status: number
   permissions: MenuPermission[]
+  /** 数据范围档位 */
+  dataScope?: DataScope
+  /** 自定部门 id（仅 dataScope=CUSTOM_DEPT 时有值） */
+  deptIds?: number[]
   userCount: number
   createdAt?: string
   /** 最后更新人 */
@@ -23,6 +28,8 @@ export interface RolePayload {
   name: string
   description?: string
   permissions?: MenuPermission[]
+  dataScope?: DataScope
+  deptIds?: number[]
 }
 
 /** 查询全部角色 */

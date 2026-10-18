@@ -1485,6 +1485,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                             + "VALUES (?, ?, 0, '入职', ?, ?, ?, ?, '中国', 0, NOW(), NOW())",
                     userId, effectiveDate,
                     serviceDept, sequenceType, positionLevel, rankCode);
+            // 刻意不写 operation_code：本方法在 @Order(5) 执行，早于 hr:effective-engine:v1.0（@Order(31)）
+            // 的加列与回填，先写会让首次启动报 Unknown column；插入后由该迁移回填成 ONBOARD。
             count++;
         }
         if (count > 0) {

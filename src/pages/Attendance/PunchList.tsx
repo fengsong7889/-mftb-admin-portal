@@ -32,6 +32,7 @@ import { useAttendanceOptions } from './useAttendanceOptions'
 import { generatePunchImportTemplate, parsePunchExcel } from './punchImport'
 import { exportToCSV } from '../../utils/exportCSV'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */
 const COL_KEY: Record<string, string> = {
@@ -280,6 +281,7 @@ export default function AttendancePunchList() {
           action={<Button size="small" onClick={refresh}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       {/* 只读账本的边界必须写在界面上，否则用户会一直找"编辑打卡"的入口 */}
       <Alert type="info" showIcon message={t('attendance.punchPageHint')} style={{ marginBottom: 16 }} />
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, TreeSelect, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -14,13 +14,53 @@ import {
   fetchRoles,
   updateRole,
   updateRoleStatus,
+  type RolePayload,
 } from '../../../api/role'
 import type { RoleItem } from '../../../api/role'
 import { copyRole } from '../../../api/authorizationCenter'
 import { fetchEmployees } from '../../../api/employee'
 import type { EmployeeItem } from '../../../api/employee'
+import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+import {
+  DATA_SCOPE,
+  DATA_SCOPE_HINT_KEY,
+  DATA_SCOPE_LABEL_KEY,
+  ALL_DATA_SCOPES,
+  type DataScope,
+} from '../../../constants/dataScope'
 
 const { TextArea } = Input
+
+/** 部门树节点（TreeSelect 只关心 value/title/children） */
+interface DeptTreeNode {
+  value: number
+  title: string
+  children?: DeptTreeNode[]
+}
+
+/** 半铺部门列表 → 全深度树。
+ * <p>
+ * 不用仓内已有的两层 buildDeptTree：自定部门要能勾到第三级以下的部门，
+ * 只展开两层会让管理员找不到目标部门，然后随手勾一个上级部门凑数（那是错授权不是近似）。
+ */
+function toDeptTreeNodes(depts: DepartmentItem[]): DeptTreeNode[] {
+  const childrenMap = new Map<number, DepartmentItem[]>()
+  const roots: DepartmentItem[] = []
+  depts.forEach(d => {
+    if (d.parentId && d.parentId !== 0) {
+      const list = childrenMap.get(d.parentId) ?? []
+      list.push(d)
+      childrenMap.set(d.parentId, list)
+    } else {
+      roots.push(d)
+    }
+  })
+  const walk = (nodes: DepartmentItem[]): DeptTreeNode[] => nodes.map(n => {
+    const children = childrenMap.get(n.id)
+    return { value: n.id, title: n.name, ...(children && children.length ? { children: walk(children) } : {}) }
+  })
+  return walk(roots)
+}
 
 /** 角色状态枚举 */
 const ROLE_STATUS = {
@@ -37,6 +77,8 @@ const isBuiltinAdminRole = (record: RoleItem) =>
 interface RoleFormValues {
   name: string
   description?: string
+  dataScope: DataScope
+  deptIds?: number[]
 }
 
 export default function RoleManagement() {
@@ -80,6 +122,25 @@ export default function RoleManagement() {
   const [copyModalVisible, setCopyModalVisible] = useState(false)
   const [copyTarget, setCopyTarget] = useState<RoleItem | null>(null)
   const [copyForm] = Form.useForm<RoleFormValues>()
+
+  // 数据范围：自定部门档需要部门树，打开表单时按需拉一次
+  const [deptNodes, setDeptNodes] = useState<DeptTreeNode[]>([])
+  const watchDataScope = Form.useWatch('dataScope', form)
+
+  /** 档位选项（文案随语言切换） */
+  const SCOPE_OPTIONS = useMemo(
+    () => ALL_DATA_SCOPES.map(value => ({ value, label: t(DATA_SCOPE_LABEL_KEY[value]) })),
+    [t],
+  )
+
+  /** 预拉部门树：只在自定部门档用得到，但提前拉好避免勾选瞬间下拉空白 */
+  const ensureDeptTree = useCallback(() => {
+    if (deptNodes.length > 0) return
+    fetchDepartments()
+      .then(list => setDeptNodes(toDeptTreeNodes(list)))
+      // 静默：拉不到部门时下拉为空，提交仍由后端校验兜住（部门 id 不可信）
+      .catch(() => { /* noop */ })
+  }, [deptNodes.length])
 
   /** 加载角色列表 */
   const fetchList = useCallback(async () => {
@@ -130,6 +191,10 @@ export default function RoleManagement() {
   const handleCreate = () => {
     setEditing(null)
     form.resetFields()
+    // 新建默认落在最严的一档：与后端 OrgDataScope.orDefault(null) 同口径，
+    // 让管理员看见「不设范围等于只能看自己」，而不是提交后才发现数据少了一半
+    form.setFieldsValue({ dataScope: DATA_SCOPE.SELF })
+    ensureDeptTree()
     setEditModalVisible(true)
   }
 
@@ -139,16 +204,22 @@ export default function RoleManagement() {
     form.setFieldsValue({
       name: record.name,
       description: record.description,
+      dataScope: record.dataScope ?? DATA_SCOPE.SELF,
+      deptIds: record.deptIds ?? [],
     })
+    ensureDeptTree()
     setEditModalVisible(true)
   }
 
   /** 提交新增/编辑 */
   const handleSubmit = async () => {
     const values = await form.validateFields()
-    const payload = {
+    const payload: RolePayload = {
       name: values.name.trim(),
       description: values.description?.trim() || '',
+      dataScope: values.dataScope,
+      // 非自定部门档不传部门集合：后端会按档位收敛残留行
+      deptIds: values.dataScope === DATA_SCOPE.CUSTOM_DEPT ? values.deptIds ?? [] : undefined,
     }
     setSubmitting(true)
     try {
@@ -486,6 +557,34 @@ export default function RoleManagement() {
           <Form.Item name="description" label={t('roleManagement.descLabel')}>
             <TextArea rows={3} placeholder={t('roleManagement.descPlaceholder')} />
           </Form.Item>
+          <Form.Item
+            name="dataScope"
+            label={t('orgScope.dataScopeLabel')}
+            initialValue={DATA_SCOPE.SELF}
+            rules={[{ required: true, message: t('orgScope.dataScopeRequired') }]}
+            extra={t(DATA_SCOPE_HINT_KEY[watchDataScope ?? DATA_SCOPE.SELF])}
+          >
+            <Select options={SCOPE_OPTIONS} />
+          </Form.Item>
+          {watchDataScope === DATA_SCOPE.CUSTOM_DEPT && (
+            <Form.Item
+              name="deptIds"
+              label={t('orgScope.customDeptLabel')}
+              rules={[{ required: true, message: t('orgScope.customDeptRequired') }]}
+              extra={t('orgScope.customDeptHint')}
+            >
+              <TreeSelect
+                treeData={deptNodes}
+                treeCheckable
+                showCheckedStrategy={TreeSelect.SHOW_PARENT}
+                treeNodeFilterProp="title"
+                allowClear
+                maxTagCount={3}
+                placeholder={t('orgScope.customDeptPlaceholder')}
+                style={{ width: '100%' }}
+              />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 

@@ -40,7 +40,261 @@ public class ContractRegistry {
         combined.addAll(RdmBatch34Schema.contracts());
         // RDM 需求主表关键列：正式需求编号延迟生成后必须保持可空，不能被启动自愈送回 NOT NULL
         combined.add(rdmRequirementContract());
+        // 组织数据权限（数据范围）：SysRole 实体已带 dataScope 字段，缺列会让所有角色查询报错
+        combined.addAll(orgScopeContracts());
+        // HR 生效日引擎：在职/离职判定改成 code 驱动后，缺 operation_code 列会直接报错；
+        // 待生效任务表缺失则让「批准后到期生效」静默退化为不执行
+        combined.addAll(hrEffectiveEngineContracts());
+        // 雇佣期间分层：HrEmploymentPeriod 实体已带新字段，缺表/缺列会让雇佣期间相关读写直接报错
+        combined.addAll(hrEmploymentPeriodContracts());
+        // 人事操作审计：审计写入与业务写入同事务，缺表会让任何一次人事保存直接失败
+        combined.addAll(hrAuditContracts());
+        // 离职联动：HrOffboardingTask 实体与离职回调都依赖该表；缺交接接收人列则联动永远停在等待态
+        combined.addAll(hrOffboardingContracts());
         return combined;
+    }
+
+    /**
+     * HR 生效日引擎契约（DDL 与 {@code HrEffectiveEngineInitializer} 同构）：
+     * {@code emp_position_record.operation_code} 列 + {@code hr_effective_task} 表。
+     * <p>
+     * 只契约化列与表：{@code ck_position_op_code} 这个 CHECK 不参与启动自愈（在部分
+     * MySQL 版本上 ENFORCED 为 NO，自愈无法证明安全），它由初始化器的后置校验卡住。
+     */
+    public static List<ContractSpec> hrEffectiveEngineContracts() {
+        return List.of(
+                new ContractSpec(
+                        "hr-position-op-code-column",
+                        "emp_position_record",
+                        null,
+                        List.of(new ContractSpec.ColumnSpec("operation_code",
+                                "ALTER TABLE emp_position_record ADD COLUMN operation_code VARCHAR(24) DEFAULT NULL"
+                                        + " COMMENT '异动动作 code: ONBOARD/REGULAR/PROMOTION/TRANSFER/DEMISSION/DIMISSION/REHIRE/OTHER'"
+                                        + " AFTER operation"))),
+                new ContractSpec(
+                        "hr-effective-task-table",
+                        "hr_effective_task",
+                        "CREATE TABLE IF NOT EXISTS hr_effective_task ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                                + "request_id BIGINT NOT NULL COMMENT '关联 hr_lifecycle_request.id', "
+                                + "req_no VARCHAR(32) DEFAULT NULL COMMENT '单据编号快照', "
+                                + "request_type VARCHAR(16) DEFAULT NULL COMMENT '单据类型快照', "
+                                + "user_id BIGINT DEFAULT NULL COMMENT '目标员工；入职单办理前可为空', "
+                                + "effective_date DATE NOT NULL COMMENT '生效日，到这天才算到期', "
+                                + "status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/DONE/FAILED/CANCELLED', "
+                                + "attempts INT NOT NULL DEFAULT 0 COMMENT '已尝试次数', "
+                                + "last_error VARCHAR(500) DEFAULT NULL COMMENT '最近一次失败原因', "
+                                + "executed_at DATETIME DEFAULT NULL COMMENT '实际执行完成时间', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                                + "UNIQUE KEY uk_effective_request (request_id), "
+                                + "KEY idx_effective_status_date (status, effective_date)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='HR 待生效任务（轻量 outbox）'",
+                        List.of(new ContractSpec.ColumnSpec("request_id",
+                                        "ALTER TABLE hr_effective_task ADD COLUMN request_id BIGINT NOT NULL COMMENT '关联 hr_lifecycle_request.id'"),
+                                new ContractSpec.ColumnSpec("effective_date",
+                                        "ALTER TABLE hr_effective_task ADD COLUMN effective_date DATE NULL COMMENT '生效日，到这天才算到期'"),
+                                new ContractSpec.ColumnSpec("status",
+                                        "ALTER TABLE hr_effective_task ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/DONE/FAILED/CANCELLED'"))));
+    }
+
+    /**
+     * 雇佣期间分层契约（DDL 与 {@code HrEmploymentPeriodInitializer} 同构）：
+     * {@code hr_employment_period} 表 + {@code emp_position_record} 的 7 个稳定 ID 列。
+     * <p>
+     * 三个 CHECK 不进启动自愈（部分 MySQL 上 ENFORCED 为 NO，自愈无法证明安全），
+     * 由初始化器的后置校验卡住；契约只保结构存在，保证实体映射不报 Unknown column。
+     */
+    public static List<ContractSpec> hrEmploymentPeriodContracts() {
+        return List.of(
+                new ContractSpec(
+                        "hr-employment-period-table",
+                        "hr_employment_period",
+                        "CREATE TABLE IF NOT EXISTS hr_employment_period ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                                + "user_id BIGINT NOT NULL COMMENT '员工身份锚点(sys_user.id)，允许一人为多段雇佣', "
+                                + "period_seq INT NOT NULL COMMENT '第几次雇佣，从1递增；重新入职开新段', "
+                                + "employer_company VARCHAR(128) DEFAULT NULL COMMENT '雇主法人名称快照', "
+                                + "employer_company_id BIGINT DEFAULT NULL COMMENT '雇主法人字典ID(sys_hr_dict EMPLOYER_COMPANY)', "
+                                + "work_location VARCHAR(128) DEFAULT NULL COMMENT '工作地点名称快照', "
+                                + "work_location_id BIGINT DEFAULT NULL COMMENT '工作地点字典ID(sys_hr_dict WORK_LOCATION)', "
+                                + "employee_category VARCHAR(64) DEFAULT NULL COMMENT '人员类别(正式/实习/派遣/外包)', "
+                                + "start_date DATE DEFAULT NULL COMMENT '真实入职日；来源必须看 start_date_source', "
+                                + "start_date_source VARCHAR(24) NOT NULL DEFAULT 'POSITION_RECORD'"
+                                + " COMMENT '入职日来源: POSITION_RECORD任职事实 / MANUAL人工确认 / UNVERIFIED未核实', "
+                                + "probation_end_date DATE DEFAULT NULL COMMENT '试用期结束日', "
+                                + "regular_date DATE DEFAULT NULL COMMENT '转正日期', "
+                                + "end_date DATE DEFAULT NULL COMMENT '雇佣结束日(离职生效日)', "
+                                + "end_reason VARCHAR(255) DEFAULT NULL COMMENT '雇佣结束原因快照', "
+                                + "status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE在职段 / ENDED已结束段', "
+                                + "source_req_no VARCHAR(32) DEFAULT NULL COMMENT '产生本段的单据号', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除', "
+                                + "active_scope VARCHAR(40) GENERATED ALWAYS AS ("
+                                + "CASE WHEN deleted = 0 THEN CONCAT(user_id, '-', period_seq) ELSE NULL END) STORED, "
+                                + "UNIQUE KEY uk_period_active_scope (active_scope), "
+                                + "KEY idx_period_user_status (user_id, status)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='雇佣期间(一人多段，重入职新开段)'",
+                        List.of(new ContractSpec.ColumnSpec("user_id",
+                                        "ALTER TABLE hr_employment_period ADD COLUMN user_id BIGINT NOT NULL COMMENT '员工身份锚点(sys_user.id)'"),
+                                new ContractSpec.ColumnSpec("period_seq",
+                                        "ALTER TABLE hr_employment_period ADD COLUMN period_seq INT NOT NULL COMMENT '第几次雇佣，从1递增'"),
+                                new ContractSpec.ColumnSpec("start_date_source",
+                                        "ALTER TABLE hr_employment_period ADD COLUMN start_date_source VARCHAR(24) NOT NULL DEFAULT 'POSITION_RECORD'"
+                                                + " COMMENT '入职日来源: POSITION_RECORD/MANUAL/UNVERIFIED'"),
+                                new ContractSpec.ColumnSpec("status",
+                                        "ALTER TABLE hr_employment_period ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE'"
+                                                + " COMMENT 'ACTIVE在职段 / ENDED已结束段'"))),
+                new ContractSpec(
+                        "hr-position-stable-ids",
+                        "emp_position_record",
+                        null,
+                        List.of(new ContractSpec.ColumnSpec("employment_period_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN employment_period_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '所属雇佣期间ID(hr_employment_period.id)'"),
+                                new ContractSpec.ColumnSpec("dept_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN dept_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '服务部门ID(sys_department.id)，名称快照留在 service_dept'"),
+                                new ContractSpec.ColumnSpec("position_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN position_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '职位ID(sys_position.id)，名称快照留在 position_name'"),
+                                new ContractSpec.ColumnSpec("employer_company_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN employer_company_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '雇主法人字典ID(sys_hr_dict EMPLOYER_COMPANY)'"),
+                                new ContractSpec.ColumnSpec("work_location_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN work_location_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '工作地点字典ID(sys_hr_dict WORK_LOCATION)'"),
+                                new ContractSpec.ColumnSpec("manager_user_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN manager_user_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '直属上级员工ID(sys_user.id)'"),
+                                new ContractSpec.ColumnSpec("mentor_user_id",
+                                        "ALTER TABLE emp_position_record ADD COLUMN mentor_user_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '导师员工ID(sys_user.id)'"))));
+    }
+
+    /**
+     * 人事操作审计契约（DDL 与 {@code HrAuditSchemaInitializer} 同构）：{@code hr_operation_audit} 表。
+     * <p>{@code ck_hr_audit_action} 不进自愈（低版 MySQL 上 CHECK 可能 ENFORCED=NO），
+     * 由初始化器后置校验卡住；自愈只保证表与关键列存在。
+     */
+    public static List<ContractSpec> hrAuditContracts() {
+        return List.of(new ContractSpec(
+                "hr-operation-audit-table",
+                "hr_operation_audit",
+                "CREATE TABLE IF NOT EXISTS hr_operation_audit ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                        + "user_id BIGINT NOT NULL COMMENT '被操作员工ID(sys_user.id)', "
+                        + "emp_no VARCHAR(32) DEFAULT NULL COMMENT '员工工号快照', "
+                        + "action VARCHAR(32) NOT NULL COMMENT '动作', "
+                        + "field_name VARCHAR(64) DEFAULT NULL COMMENT '变更字段名', "
+                        + "before_value VARCHAR(500) DEFAULT NULL COMMENT '变更前值（已脱敏）', "
+                        + "after_value VARCHAR(500) DEFAULT NULL COMMENT '变更后值（已脱敏）', "
+                        + "detail VARCHAR(500) DEFAULT NULL COMMENT '动作补充说明', "
+                        + "reason VARCHAR(255) DEFAULT NULL COMMENT '原因', "
+                        + "source_req_no VARCHAR(32) DEFAULT NULL COMMENT '来源单据号', "
+                        + "effective_date DATE DEFAULT NULL COMMENT '业务生效日', "
+                        + "`sensitive` TINYINT NOT NULL DEFAULT 0 COMMENT '是否涉及敏感面', "
+                        + "operator VARCHAR(64) DEFAULT NULL COMMENT '操作人快照', "
+                        + "occurred_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间', "
+                        + "KEY idx_hr_audit_user (user_id, occurred_at), "
+                        + "KEY idx_hr_audit_action (action, occurred_at), "
+                        + "KEY idx_hr_audit_operator (operator, occurred_at)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='人事操作审计'",
+                List.of(new ContractSpec.ColumnSpec("user_id",
+                                "ALTER TABLE hr_operation_audit ADD COLUMN user_id BIGINT NOT NULL COMMENT '被操作员工ID'"),
+                        new ContractSpec.ColumnSpec("action",
+                                "ALTER TABLE hr_operation_audit ADD COLUMN action VARCHAR(32) NOT NULL COMMENT '动作码'"),
+                        new ContractSpec.ColumnSpec("operator",
+                                "ALTER TABLE hr_operation_audit ADD COLUMN operator VARCHAR(64) DEFAULT NULL COMMENT '操作人快照'"))));
+    }
+
+    /**
+     * 离职联动契约（DDL 与 {@code HrOffboardingSchemaInitializer} 同构）：
+     * {@code hr_offboarding_task} 表 + {@code hr_lifecycle_request} 的交接接收人列。
+     * <p>两个 CHECK 不进启动自愈（低版 MySQL 上 ENFORCED 可能为 NO），由初始化器后置校验卡住。
+     * hr_lifecycle_request 是存量表，createTableIfMissing 留空：不能让自愈凭空建出一份缺主表定义的列。
+     */
+    public static List<ContractSpec> hrOffboardingContracts() {
+        return List.of(
+                new ContractSpec(
+                        "hr-offboarding-task-table",
+                        "hr_offboarding_task",
+                        "CREATE TABLE IF NOT EXISTS hr_offboarding_task ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                                + "request_id BIGINT NOT NULL COMMENT '关联离职单据 hr_lifecycle_request.id', "
+                                + "req_no VARCHAR(32) DEFAULT NULL COMMENT '单据编号快照', "
+                                + "user_id BIGINT DEFAULT NULL COMMENT '离职员工ID(sys_user.id)', "
+                                + "emp_no VARCHAR(32) DEFAULT NULL COMMENT '离职工号快照', "
+                                + "task_type VARCHAR(32) NOT NULL COMMENT 'EAM_ASSET_HANDOVER / OA_TODO_TRANSFER', "
+                                + "status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/RUNNING/DONE/SKIPPED/FAILED', "
+                                + "attempts INT NOT NULL DEFAULT 0 COMMENT '已尝试次数', "
+                                + "last_error VARCHAR(500) DEFAULT NULL COMMENT '最近一次失败原因', "
+                                + "result_summary VARCHAR(500) DEFAULT NULL COMMENT '执行结果摘要', "
+                                + "target_ref VARCHAR(64) DEFAULT NULL COMMENT '跨模块产物引用', "
+                                + "effective_date DATE DEFAULT NULL COMMENT '计划执行日', "
+                                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人', "
+                                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                                + "UNIQUE KEY uk_offboarding_request_type (request_id, task_type), "
+                                + "KEY idx_offboarding_status_date (status, effective_date), "
+                                + "KEY idx_offboarding_user (user_id)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='离职联动任务（轻量 outbox）'",
+                        List.of(new ContractSpec.ColumnSpec("request_id",
+                                        "ALTER TABLE hr_offboarding_task ADD COLUMN request_id BIGINT NOT NULL COMMENT '关联离职单据 id'"),
+                                new ContractSpec.ColumnSpec("task_type",
+                                        "ALTER TABLE hr_offboarding_task ADD COLUMN task_type VARCHAR(32) NOT NULL COMMENT '任务类型'"),
+                                new ContractSpec.ColumnSpec("status",
+                                        "ALTER TABLE hr_offboarding_task ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT '执行状态'"))),
+                new ContractSpec(
+                        "hr-lifecycle-handover-receiver",
+                        "hr_lifecycle_request",
+                        null,
+                        List.of(new ContractSpec.ColumnSpec("handover_to_user_id",
+                                        "ALTER TABLE hr_lifecycle_request ADD COLUMN handover_to_user_id BIGINT DEFAULT NULL"
+                                                + " COMMENT '交接接收人ID(sys_user.id)'"),
+                                new ContractSpec.ColumnSpec("handover_to_name",
+                                        "ALTER TABLE hr_lifecycle_request ADD COLUMN handover_to_name VARCHAR(128) DEFAULT NULL"
+                                                + " COMMENT '交接接收人姓名快照'"))));
+    }
+
+    /**
+     * 组织数据权限契约（与 {@code OrgScopeSchemaInitializer} 逐字同构）：
+     * sys_role.data_scope 列 + sys_role_dept 表。
+     * <p>
+     * sys_role 是核心存量表，{@code createTableIfMissing} 故意留空：宁可作为不可自愈的漂移置
+     * not-ready，也不能由启动自愈建出一份缺主表的列定义、把真正的表缺失伪装成“已修复”。
+     * 校验器只补不存在的列、不 MODIFY 已存在列，因此不会把已调优的默认值/可空性送回旧版。
+     */
+    public static List<ContractSpec> orgScopeContracts() {
+        return List.of(
+                new ContractSpec(
+                        "org-scope-role-column",
+                        "sys_role",
+                        null,
+                        List.of(new ContractSpec.ColumnSpec("data_scope",
+                                "ALTER TABLE sys_role ADD COLUMN data_scope TINYINT NOT NULL DEFAULT 1"
+                                        + " COMMENT '数据范围: 1仅本人 2本部门 3本部门及以下 4自定部门 5全部' AFTER permissions"))),
+                new ContractSpec(
+                        "org-scope-role-dept-table",
+                        "sys_role_dept",
+                        "CREATE TABLE IF NOT EXISTS sys_role_dept ("
+                                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                                + "role_id BIGINT NOT NULL COMMENT '角色ID(sys_role.id)', "
+                                + "dept_id BIGINT NOT NULL COMMENT '部门ID(sys_department.id)', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间', "
+                                + "UNIQUE KEY uk_role_dept (role_id, dept_id), "
+                                + "KEY idx_role_dept_role (role_id)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色-自定部门数据范围关联表'",
+                        List.of(new ContractSpec.ColumnSpec("role_id",
+                                        "ALTER TABLE sys_role_dept ADD COLUMN role_id BIGINT NOT NULL COMMENT '角色ID(sys_role.id)'"),
+                                new ContractSpec.ColumnSpec("dept_id",
+                                        "ALTER TABLE sys_role_dept ADD COLUMN dept_id BIGINT NOT NULL COMMENT '部门ID(sys_department.id)'"))));
     }
 
     /**

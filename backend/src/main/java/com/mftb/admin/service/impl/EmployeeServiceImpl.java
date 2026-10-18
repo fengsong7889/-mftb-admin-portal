@@ -5,8 +5,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.BuiltinAccounts;
+import com.mftb.admin.constant.EmployeeConstants;
+import com.mftb.admin.constant.HrAuditAction;
+import com.mftb.admin.constant.HrOperationCode;
 import com.mftb.admin.dto.BasicInfoRequest;
 import com.mftb.admin.dto.EmployeeRequest;
+import com.mftb.admin.dto.HrAuditEntry;
 import com.mftb.admin.dto.EmployeeVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EmpPositionRecord;
@@ -21,6 +25,10 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.entity.SysLoginLog;
 import com.mftb.admin.mapper.SysLoginLogMapper;
 import com.mftb.admin.service.EmployeeService;
+import com.mftb.admin.service.HrAssignmentQuery;
+import com.mftb.admin.service.HrAuditService;
+import com.mftb.admin.service.HrEmploymentPeriodService;
+import com.mftb.admin.service.HrMasterDataResolver;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
@@ -30,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -37,6 +46,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +62,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final SysPositionMapper sysPositionMapper;
     private final SysLoginLogMapper sysLoginLogMapper;
     private final EmpPositionRecordMapper empPositionRecordMapper;
+    private final HrAssignmentQuery hrAssignmentQuery;
+    private final HrMasterDataResolver masterDataResolver;
+    private final HrEmploymentPeriodService employmentPeriodService;
+    private final HrAuditService hrAuditService;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
     private final OperatorResolver operatorResolver;
@@ -68,14 +82,24 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public PageResult<EmployeeVO> list(long page, long size, String keyword, String employmentStatus,
                                        Long departmentId, String sequence, String jobLevel, String rank,
-                                       Long roleId, String updatedBy, String updatedAtFrom, String updatedAtTo) {
+                                       Long roleId, String updatedBy, String updatedAtFrom, String updatedAtTo,
+                                       Set<Long> visibleUserIds) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
+        // 范围收敛先于一切：空集就是「谁也看不见」，不能落到后面的内存过滤上拿成全量
+        if (visibleUserIds != null && visibleUserIds.isEmpty()) {
+            return new PageResult<>(List.of(), 0L);
+        }
 
         // 先按 DB 侧可下推条件过滤全部匹配用户（不分页），再对派生状态过滤 + 内存分页
         LambdaQueryWrapper<SysUser> baseWrapper = new LambdaQueryWrapper<>();
         // 内置系统管理员不是员工：不进员工名册（工号/部门/职位均为空，且不应被 HR 建档或统计）
         baseWrapper.ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME);
+        // 花名册入口传可见集合（null=不收敛）；下推到 SQL 而不是拿全量到内存里筛，
+        // 否则列表、总数、导出三处口径会因截断上限而不一致
+        if (visibleUserIds != null) {
+            baseWrapper.in(SysUser::getId, visibleUserIds);
+        }
         if (StringUtils.hasText(keyword)) {
             baseWrapper.and(w -> w.like(SysUser::getUsername, keyword)
                     .or().like(SysUser::getName, keyword)
@@ -101,17 +125,17 @@ public class EmployeeServiceImpl implements EmployeeService {
             return new PageResult<>(List.of(), 0L);
         }
 
-        // 批量获取最新职务记录，派生 employmentStatus（已排除未来生效记录）
+        // 批量派生 employmentStatus：口径统一走 HrAssignmentQuery（未来生效不提前参与判定）。
+        // 以前此处自写一份「取最新一条再看中文名」，与详情/回调各有一套，同一个人在不同页面答案不同。
         List<Long> userIds = allUsers.stream().map(SysUser::getId).toList();
-        Map<Long, String> latestOps = getLatestOperations(userIds);
+        Map<Long, String> statusById = hrAssignmentQuery.employmentStatusOf(userIds, LocalDate.now());
 
         // 按 employmentStatus 过滤（派生字段，内存过滤）
         if (StringUtils.hasText(employmentStatus)) {
-            allUsers = allUsers.stream().filter(u -> {
-                String op = latestOps.get(u.getId());
-                boolean isResigned = "离职".equals(op);
-                return "resigned".equals(employmentStatus) ? isResigned : !isResigned;
-            }).toList();
+            allUsers = allUsers.stream()
+                    .filter(u -> employmentStatus.equals(
+                            statusById.getOrDefault(u.getId(), HrAssignmentQuery.STATUS_ACTIVE)))
+                    .toList();
         }
 
         // 手动分页（total 为筛选+派生过滤后的完整数量）
@@ -122,8 +146,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                 ? allUsers.subList(from, to).stream()
                     .map(u -> {
                         EmployeeVO vo = EmployeeVO.from(u, JsonUtils.parseLongList(u.getFunctionRoles()));
-                        String op = latestOps.get(u.getId());
-                        vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
+                        vo.setEmploymentStatus(statusById.getOrDefault(u.getId(),
+                                HrAssignmentQuery.STATUS_ACTIVE));
                         return vo;
                     })
                     .toList()
@@ -153,36 +177,24 @@ public class EmployeeServiceImpl implements EmployeeService {
         return ids;
     }
 
-    /** 批量查询多个用户的最新职务记录操作类型（仅统计生效日 <= 今天的记录，未来异动不提前生效） */
-    private Map<Long, String> getLatestOperations(List<Long> userIds) {
-        if (userIds == null || userIds.isEmpty()) return Map.of();
-        LambdaQueryWrapper<EmpPositionRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(EmpPositionRecord::getUserId, userIds)
-                .le(EmpPositionRecord::getEffectiveDate, LocalDate.now())
-                .orderByDesc(EmpPositionRecord::getEffectiveDate)
-                .orderByDesc(EmpPositionRecord::getEffectiveSeq);
-        List<EmpPositionRecord> records = empPositionRecordMapper.selectList(wrapper);
-        // 按 userId 分组，取每组日期最新、序号最大的记录的 operation
-        return records.stream()
-                .collect(Collectors.groupingBy(EmpPositionRecord::getUserId))
-                .entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e -> e.getValue().get(0).getOperation()
-                ));
+    /**
+     * 在职状态统一由 {@link HrAssignmentQuery} 派生（花名册列表、详情、异动自动停号共用一份口径）。
+     * 本类不再自写「取最新一条 + 匹配中文名」的算法：那正是方案 §3.2 列的「当前任职存在多个事实来源」。
+     */
+    private String employmentStatusOf(Long userId) {
+        return hrAssignmentQuery.employmentStatusOf(userId, LocalDate.now());
     }
 
     @Override
     public EmployeeVO getDetail(Long id) {
         SysUser user = requireUser(id);
         EmployeeVO vo = EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
-        Map<Long, String> latestOps = getLatestOperations(List.of(user.getId()));
-        String op = latestOps.get(user.getId());
-        vo.setEmploymentStatus("离职".equals(op) ? "resigned" : "active");
+        vo.setEmploymentStatus(employmentStatusOf(user.getId()));
         return vo;
     }
 
     @Override
+    @Transactional
     public EmployeeVO create(EmployeeRequest request) {
         if (!StringUtils.hasText(request.getPassword()) || request.getPassword().length() < 6) {
             throw new BusinessException("登錄密碼不能為空且長度不少於 6 位");
@@ -205,6 +217,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         java.util.List<Long> roleIds = request.getFunctionRoleIds() == null
                 ? new java.util.ArrayList<>()
                 : new java.util.ArrayList<>(request.getFunctionRoleIds());
+        // 建档时指定角色本质上是授权动作：必须单独持有 authorize（方案 §7.3：
+        // 人事编辑不能隐式获得角色授予能力）。服务端自己补的默认“员工自助”不在本拦截范围。
+        if (!roleIds.isEmpty()) {
+            assertCanAuthorize();
+        }
         if (roleIds.isEmpty()) {
             Long selfServiceRoleId = lookupRoleIdByCode("employee_self_service");
             if (selfServiceRoleId != null) {
@@ -227,6 +244,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         insertInitialPositionRecord(user, request.getCompany());
         // 默认角色绑定同样需要 bump revision，确保本实例/其他实例下次读能看到新权限
         permissionService.evictAll();
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.EMPLOYEE_CREATE, user.getId())
+                .detail("工号 " + empId + "，默认绑定功能角色 " + roleIds)
+                .effectiveDate(LocalDate.now()));
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
     }
 
@@ -266,11 +286,13 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    @Transactional
     public EmployeeVO update(Long id, EmployeeRequest request) {
         SysUser user = requireUser(id);
         assertNotSystemAccount(user, "編輯");
         String oldName = user.getName();
         String oldDept = user.getDepartment();
+        Map<String, Object> beforeAssignment = assignmentSnapshot(user);
         user.setName(request.getName());
         // 工号即登录账号, 由系统生成后不允许修改
         applyDepartment(user, request.getDepartmentId());
@@ -279,6 +301,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         // role 同样不接受前端传入且不回写：否则有 employee-management:edit 就能把自己提成超管。
         // 权限变更一律走 functionRoleIds（下方已禁止绑超管角色）与部门授权。
         if (request.getFunctionRoleIds() != null) {
+            // 改功能角色 = 授权动作，需单独持有 authorize；走 PUT /{id}/roles 是同一道门。
+            // 这里不静默丢弃也不默默应用：前者会让前端以为改了，后者等于越权提权。
+            assertCanAuthorize();
             assertNoSuperAdminBinding(request.getFunctionRoleIds());
             user.setFunctionRoles(JsonUtils.toJson(request.getFunctionRoleIds()));
         }
@@ -291,7 +316,50 @@ public class EmployeeServiceImpl implements EmployeeService {
         // 姓名或部门变更时，同步更新登录日志中该员工的快照字段
         syncLoginLogSnapshot(user, oldName, oldDept);
 
+        Map<String, Object> afterAssignment = assignmentSnapshot(user);
+        HrAuditEntry assignmentChange = HrAuditEntry.of(HrAuditAction.EMPLOYEE_UPDATE, id);
+        for (String field : beforeAssignment.keySet()) {
+            assignmentChange.change(field, beforeAssignment.get(field), afterAssignment.get(field));
+        }
+        hrAuditService.record(assignmentChange);
+
         return EmployeeVO.from(user, JsonUtils.parseLongList(user.getFunctionRoles()));
+    }
+
+    @Override
+    @Transactional
+    public EmployeeVO bindRoles(Long id, List<Long> functionRoleIds) {
+        SysUser user = requireUser(id);
+        assertNotSystemAccount(user, "調整功能角色");
+        // authorize 由 controller 的 @RequirePermission 单点裁决（PUT /{id}/roles），
+        // 服务层再校验一次会拒绝 OA 回调等无登录上下文的内部调用，所以不在这里重复。
+        List<Long> targets = new java.util.ArrayList<>(
+                functionRoleIds == null ? List.of() : functionRoleIds);
+        assertNoSuperAdminBinding(targets);
+        List<Long> before = JsonUtils.parseLongList(user.getFunctionRoles());
+        user.setFunctionRoles(JsonUtils.toJson(targets));
+        user.setUpdatedBy(operatorResolver.currentOperatorName());
+        sysUserMapper.updateById(user);
+        permissionService.evictAll();
+        // 提权动作必须进审计表而不是只写应用日志：日志会被轮转、不可按人检索，
+        // 而「谁把这个人加成管理员」是事后唯一需要回答的问题
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.ROLE_BIND, id)
+                .change("functionRoles", before, targets));
+        return EmployeeVO.from(user, targets);
+    }
+
+    /**
+     * 改功能角色 = 授权动作，必须单独持有 {@code authorize}（方案 §7.3）。
+     * <p>超管在 {@code PermissionServiceImpl.hasPermission} 内直通，所以不需要额外分支；
+     * 拿不到当前登录人时一律拒绝（fail-closed），不得因为“看不清是谁”而放行。
+     */
+    private void assertCanAuthorize() {
+        SysUser operator = operatorResolver.currentUser();
+        if (operator == null
+                || !permissionService.hasPermission(operator, EmployeeConstants.MENU_EMPLOYEE,
+                        EmployeeConstants.ACTION_AUTHORIZE)) {
+            throw new BusinessException("調整功能角色需要單獨的「角色與菜單授權」權限，請改用員工授權入口或聯繫管理員");
+        }
     }
 
     @Override
@@ -308,14 +376,17 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .set(SysUser::getActiveToken, null)
                 .set(SysUser::getActiveLoginIp, null)
                 .set(SysUser::getUpdatedBy, operatorResolver.currentOperatorName()));
-        log.info("管理員重置員工密碼並要求首次登錄改密: userId={}, empId={}, operator={}",
-                id, user.getEmpId(), operatorResolver.currentOperatorName());
+        // 不记密码本身也不记其长度/摘要：审计需要回答的是「谁在什么时候重置了谁的登录凭据」
+        hrAuditService.record(HrAuditEntry.of(HrAuditAction.PASSWORD_RESET, id)
+                .detail("重置登录密码并强制首次登录改密；会话已失效"));
     }
 
     @Override
     public void updateStatus(Long id, Integer status) {
         SysUser user = requireUser(id);
         assertNotSystemAccount(user, "變更狀態");
+        // 先拿旧值：user.setStatus 已在同一对象上就地修改，事后再取就前后一样了
+        Integer previousStatus = user.getStatus();
         user.setStatus(status);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
@@ -324,6 +395,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (status != null && status == 0 && user.getActiveToken() != null) {
             forceLogoutOnDisable(user);
         }
+        hrAuditService.record(HrAuditEntry.of(
+                status != null && status == 0 ? HrAuditAction.ACCOUNT_DISABLE : HrAuditAction.ACCOUNT_ENABLE, id)
+                .change("status", previousStatus, status));
     }
     
     /**
@@ -375,13 +449,15 @@ public class EmployeeServiceImpl implements EmployeeService {
         return String.format("%s%0" + seqLength + "d", prefix, (maxSeq == null ? 0 : maxSeq) + 1);
     }
 
-    /** 新增员工时自动写入初始职务记录: operation 固定「入职」, 任职信息映射自新增表单填写的基础信息 */
+    /** 新增员工时自动写入初始职务记录: 动作固定「入职」（ONBOARD）, 任职信息映射自新增表单填写的基础信息 */
     private void insertInitialPositionRecord(SysUser user, String company) {
         EmpPositionRecord record = new EmpPositionRecord();
         record.setUserId(user.getId());
         record.setEffectiveDate(LocalDate.now());
         record.setEffectiveSeq(0);
-        record.setOperation("入职");
+        record.setOperation(HrOperationCode.CODE_TO_NAME.get(HrOperationCode.ONBOARD));
+        // code 与名称同时写：缺 code 会让在职派生退回名称判定（方案 §5.3）
+        record.setOperationCode(HrOperationCode.ONBOARD);
         record.setServiceDept(user.getDepartment());
         record.setSequenceType(user.getSequence());
         record.setPositionLevel(user.getJobLevel());
@@ -393,7 +469,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         record.setCreatedBy(operatorResolver.currentOperatorName());
         record.setUpdatedBy(operatorResolver.currentOperatorName());
         record.setDeleted(0);
+        // 建档就是本次雇佣的起点：先归一稳定 ID，落库后马上开出一段雇佣期间。
+        // 与主写入同事务（不吞异常）是方案 §7.4 的要求：不允许出现「人已建档但投影跟不上」的静默错账。
+        masterDataResolver.applyStableIds(record);
         empPositionRecordMapper.insert(record);
+        employmentPeriodService.syncFromRecords(user.getId(), operatorResolver.currentOperatorName());
         log.info("新增员工自动写入初始职务记录: userId={}, operation=入职, serviceDept={}, company={}",
                 user.getId(), record.getServiceDept(), company);
     }
@@ -466,8 +546,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     public Map<String, Object> getBasicInfo(Long id, boolean reveal) {
         SysUser user = requireUser(id);
         if (reveal) {
-            // P1-D 受控明文查看留痕（调用方已通过 employee-management:edit 权限校验）
-            log.info("明文查看员工敏感信息: operator={}, targetUserId={}", operatorResolver.currentOperatorName(), id);
+            // 受控明文查看留痕→人事审计表（不是应用日志）：§5.5 要求「必要明文查看单独留痕」，
+            // 而调用方已经过 employee-management:sensitiveView 权限校验，审计记的是「看了哪些字段」而不是看到的内容。
+            hrAuditService.record(HrAuditEntry.of(HrAuditAction.SENSITIVE_VIEW, id)
+                    .detail("查看明文：证件号/证件地址/详细住址"));
         }
         Map<String, Object> result = new HashMap<>();
         // 个人信息
@@ -504,25 +586,22 @@ public class EmployeeServiceImpl implements EmployeeService {
         return result;
     }
 
-    /** 证件号脱敏：保留前4后4，其余打码；过短则全码 */
+    /** 证件号脱敏：统一走 {@link com.mftb.admin.util.SensitiveMask}，不在本类再养一份规则 */
     private static String maskIdNumber(String v) {
-        if (v == null || v.isBlank()) return v;
-        String t = v.trim();
-        if (t.length() <= 8) return "******";
-        return t.substring(0, 4) + "*".repeat(t.length() - 8) + t.substring(t.length() - 4);
+        return com.mftb.admin.util.SensitiveMask.maskIdNumber(v);
     }
 
-    /** 地址脱敏：保留前缀（区划）其余打码 */
+    /** 地址脱敏：同上 */
     private static String maskAddress(String v) {
-        if (v == null || v.isBlank()) return v;
-        String t = v.trim();
-        int keep = Math.min(6, t.length());
-        return t.substring(0, keep) + "****";
+        return com.mftb.admin.util.SensitiveMask.maskAddress(v);
     }
 
     @Override
     public void saveBasicInfo(Long id, BasicInfoRequest request) {
         SysUser user = requireUser(id);
+        // 审计要记「哪个字段从什么改成什么」，所以先把旧值抓下来；
+        // 下面是一串 if-not-null 覆盖，事后读实体只能看到新值。
+        Map<String, Object> beforeProfile = profileSnapshot(user);
         // 个人信息
         if (request.getName() != null) user.setName(request.getName());
         if (request.getGender() != null) user.setGender(request.getGender());
@@ -550,6 +629,55 @@ public class EmployeeServiceImpl implements EmployeeService {
 
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
+
+        Map<String, Object> afterProfile = profileSnapshot(user);
+        HrAuditEntry profileChange = HrAuditEntry.of(HrAuditAction.PROFILE_UPDATE, id);
+        for (String field : beforeProfile.keySet()) {
+            profileChange.change(field, beforeProfile.get(field), afterProfile.get(field));
+        }
+        hrAuditService.record(profileChange);
+    }
+
+    /**
+     * 主表单（部门/职位/功能角色）的可审计快照。
+     * <p>字段名与前端一致（不是数据库列名）：审计要直接给人读，名字对不上只会多一层误解。
+     */
+    private Map<String, Object> assignmentSnapshot(SysUser user) {
+        Map<String, Object> snapshot = new java.util.LinkedHashMap<>();
+        snapshot.put("name", user.getName());
+        snapshot.put("department", user.getDepartment());
+        snapshot.put("position", user.getPosition());
+        snapshot.put("sequence", user.getSequence());
+        snapshot.put("jobLevel", user.getJobLevel());
+        snapshot.put("rank", user.getRank());
+        snapshot.put("functionRoles", JsonUtils.parseLongList(user.getFunctionRoles()));
+        return snapshot;
+    }
+
+    /** 基本资料/证件/通讯/账号绑定的可审计快照（敏感字段在写入审计时统一脱敏） */
+    private Map<String, Object> profileSnapshot(SysUser user) {
+        Map<String, Object> snapshot = new java.util.LinkedHashMap<>();
+        snapshot.put("name", user.getName());
+        snapshot.put("gender", user.getGender());
+        snapshot.put("nationality", user.getNationality());
+        snapshot.put("ethnicity", user.getEthnicity());
+        snapshot.put("birthDate", user.getBirthDate());
+        snapshot.put("maritalStatus", user.getMaritalStatus());
+        snapshot.put("politicalStatus", user.getPoliticalStatus());
+        snapshot.put("religion", user.getReligion());
+        snapshot.put("idType", user.getIdType());
+        snapshot.put("idNumber", user.getIdNumber());
+        snapshot.put("idAddress", user.getIdAddress());
+        snapshot.put("householdType", user.getHouseholdType());
+        snapshot.put("householdLocation", user.getHouseholdLocation());
+        snapshot.put("nativePlace", user.getNativePlace());
+        snapshot.put("mobile", user.getMobile());
+        snapshot.put("email", user.getEmail());
+        snapshot.put("addressCountry", user.getAddressCountry());
+        snapshot.put("addressCity", user.getAddressCity());
+        snapshot.put("addressDetail", user.getAddressDetail());
+        snapshot.put("dingtalkUserId", user.getDingtalkUserId());
+        return snapshot;
     }
 
     private SysUser requireUser(Long id) {

@@ -34,6 +34,7 @@ import {
 import { useAttendanceOptions } from './useAttendanceOptions'
 import { exportToCSV } from '../../utils/exportCSV'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 「显式排休」在编辑控件里的哨兵值：不能与 shiftId（数字）冲突，故用字符串 */
 const REST_VALUE = '__rest__'
@@ -363,6 +364,7 @@ export default function AttendanceSchedule() {
           action={<Button size="small" onClick={load}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       <Alert type="info" showIcon message={t('attendance.schedulePageHint')} style={{ marginBottom: 16 }} />
 
       <div className="search-section">

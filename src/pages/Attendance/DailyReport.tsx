@@ -28,6 +28,7 @@ import {
 import { useAttendanceOptions } from './useAttendanceOptions'
 import { exportToCSV } from '../../utils/exportCSV'
 import '@/styles/components.css'
+import OrgScopeNotice from '../../components/OrgScopeNotice'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */
 const COL_KEY: Record<string, string> = {
@@ -254,6 +255,7 @@ export default function AttendanceDailyReport() {
           action={<Button size="small" onClick={refresh}>{t('common.reset')}</Button>}
         />
       )}
+      <OrgScopeNotice />
       <Alert type="info" showIcon message={t('attendance.dailyPageHint')} style={{ marginBottom: 16 }} />
 
       <div className="search-section">

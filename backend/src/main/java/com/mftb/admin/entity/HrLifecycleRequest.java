@@ -127,6 +127,16 @@ public class HrLifecycleRequest {
     /** 离职结算 JSON（资产归还/薪资结算/交接说明等） */
     private String settlementInfo;
 
+    /**
+     * 交接接收人 id（sys_user.id）。
+     * <p>资产交接与 OA 待办改派都需要显式接收人：代码不能猜（默认给直属上级会让人误以为对方同意接）。
+     * 未指定时联动任务停在等待态并给出可读原因。
+     */
+    private Long handoverToUserId;
+
+    /** 交接接收人姓名快照：事后还能知道「当时指定的是谁」 */
+    private String handoverToName;
+
     // ── 合同续签明细（type=renew） ──
 
     /** 被续签的原合同ID（emp_contract.id） */

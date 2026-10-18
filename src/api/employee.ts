@@ -24,6 +24,22 @@ export interface EmployeeItem {
   /** 在职状态（由职务数据派生：active=在职, resigned=离职） */
   employmentStatus?: string
 
+  // ── 花名册默认列（仅 /employees/roster* 返回；由服务端从任职事实与雇佣期间批量派生） ──
+  /** 雇主法人 */
+  employerCompany?: string | null
+  /** 人员类别 */
+  employeeCategory?: string | null
+  /** 工作地点 */
+  workLocation?: string | null
+  /** 直属上级（姓名快照） */
+  directSuperior?: string | null
+  /** 本次雇佣起点；null = 尚未核实 */
+  hireDate?: string | null
+  /** 雇佣起点来源：POSITION_RECORD / MANUAL / UNVERIFIED */
+  hireDateSource?: string | null
+  /** 试用状态：PROBATION / REGULAR / UNKNOWN */
+  probationStatus?: string | null
+
   // ── 个人信息 ──
   nationality?: string
   ethnicity?: string
@@ -101,6 +117,22 @@ export interface PageResult<T> {
 /** 分页查询员工 */
 export async function fetchEmployees(params: EmployeeQuery) {
   return request.get<unknown, PageResult<EmployeeItem>>('/employees', { params })
+}
+
+/**
+ * 花名册列表：与 fetchEmployees 同一套筛选，但服务端按当前登录人的组织数据范围收敛。
+ * 下拉选人不走这里（它们需要引用全公司任何一个人，见 fetchEmployeeOptions）。
+ */
+export async function fetchRosterEmployees(params: EmployeeQuery) {
+  return request.get<unknown, PageResult<EmployeeItem>>('/employees/roster', { params })
+}
+
+/**
+ * 花名册全量导出取数（当前筛选结果 + 当前人员范围，需 employee-management:export）。
+ * 服务端会卡单次上限并落人事审计，所以这里不再逐页拼装。
+ */
+export async function fetchRosterExport(params: Omit<EmployeeQuery, 'page' | 'size'>) {
+  return request.get<unknown, EmployeeItem[]>('/employees/roster/export', { params })
 }
 
 /** 按 ID 查询单个员工详情（含派生在职状态） */
@@ -248,7 +280,10 @@ export interface PositionRecordItem {
   userId: number
   effectiveDate: string
   effectiveSeq: number
+  /** 动作名称快照（展示用） */
   operation: string
+  /** 异动动作 code（判定用）；历史未回填时可能为空 */
+  operationCode?: string
   reason?: string
   serviceDept?: string
   sequenceType?: string
@@ -273,7 +308,10 @@ export interface PositionRecordItem {
 /** 职务记录请求 */
 export interface PositionRecordPayload {
   effectiveDate: string
-  operation: string
+  /** 名称快照：可不传，服务端会按 code 补齐规范名 */
+  operation?: string
+  /** 异动动作 code（HR_OPERATION），提交端的主字段 */
+  operationCode?: string
   reason?: string
   serviceDept?: string
   sequenceType?: string

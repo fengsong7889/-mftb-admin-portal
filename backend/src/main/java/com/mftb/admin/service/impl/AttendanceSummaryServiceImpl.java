@@ -30,9 +30,11 @@ import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.mapper.AttShiftMapper;
 import com.mftb.admin.mapper.HrLeaveRequestMapper;
 import com.mftb.admin.service.AttendanceSummaryService;
+import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.service.SysConfigService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import com.mftb.admin.util.ScopeFilters;
 import com.mftb.admin.util.SortSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -105,6 +107,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final SysConfigService sysConfigService;
+    private final OrgScopeService orgScopeService;
 
     /** 单人单日的考勤结论 */
     static class PersonalDay {
@@ -757,6 +760,9 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
                 skipped++;
                 continue;
             }
+            // 冻结/同步会把结论交给薪酬，属于跨人写：逐行校验归属，改 URL 里的 id 绕不过去。
+            // 越权不能和「状态不符」同归于 skipped：后者是幂等跳过，前者必须让操作者知道。
+            orgScopeService.requireVisibleUser(row.getUserId());
             if (assignBatch) {
                 // 同一批冻结共用一个批次号，薪酬侧按批次对账；跨月时按月各取一号
                 String key = row.getStatMonth();
@@ -797,6 +803,12 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
         if (deptId != null) {
             wrapper.eq(AttDaySummary::getDeptId, deptId);
         }
+        // 日报是「日 × 组」群体聚合，行上没有 user_id，只能按可见部门收敛；
+        // 「仅本人」档拿到的是空集——聚合行数拆不到个人，宁可不给，也不能把整部门汇总当个人可见。
+        // 已知偏差（不造成越权，只会少行）：dept_id 是「组内主部门」快照且可空，
+        // 一个组只落一个部门，所以跨部门组对部分管理员会整行不显示；dept_id 为 NULL 的行同理。
+        // 能唯一定位到人的口径是月报（att_monthly_summary，按 userId 收敛），它也是薪酬取数源。
+        ScopeFilters.applyDepts(wrapper, AttDaySummary::getDeptId, orgScopeService.resolveVisibleDeptIds());
         return wrapper;
     }
 
@@ -819,6 +831,8 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
             String kw = keyword.trim();
             wrapper.and(w -> w.like(AttMonthlySummary::getEmpNo, kw).or().like(AttMonthlySummary::getEmpName, kw));
         }
+        // 月报一人一月一条，直接按可见人员收敛；monthlyStats() 共用本方法，统计卡不会越过列表
+        ScopeFilters.applyUsers(wrapper, AttMonthlySummary::getUserId, orgScopeService.resolveVisibleUserIds());
         return wrapper;
     }
 

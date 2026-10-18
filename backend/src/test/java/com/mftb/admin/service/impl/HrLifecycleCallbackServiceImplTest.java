@@ -51,7 +51,9 @@ class HrLifecycleCallbackServiceImplTest {
         employeeService = mock(EmployeeService.class);
         service = new HrLifecycleCallbackServiceImpl(
                 lifecycleMapper, userMapper, mock(SysDepartmentMapper.class), mock(SysPositionMapper.class),
-                positionRecordMapper, contractMapper, employeeService, mock(OperatorResolver.class));
+                positionRecordMapper, contractMapper, employeeService, mock(OperatorResolver.class),
+                // 待生效任务登记与办理同事务；本类用例不验证调度，给个 mock 即可（默认返回 void）
+                mock(com.mftb.admin.service.HrEffectiveTaskService.class), mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class), mock(com.mftb.admin.service.HrOffboardingTaskService.class));
     }
 
     private HrLifecycleRequest request(String type, String status) {

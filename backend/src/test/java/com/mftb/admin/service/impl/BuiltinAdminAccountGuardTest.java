@@ -70,7 +70,7 @@ class BuiltinAdminAccountGuardTest {
         rule.setSeqLength(5);
         when(bizSeqService.getRule(BizSeqService.RULE_EMPLOYEE_NO)).thenReturn(rule);
         service = new EmployeeServiceImpl(sysUserMapper, mock(SysDepartmentMapper.class),
-                mock(SysPositionMapper.class), mock(SysLoginLogMapper.class), mock(EmpPositionRecordMapper.class),
+                mock(SysPositionMapper.class), mock(SysLoginLogMapper.class), mock(EmpPositionRecordMapper.class), mock(com.mftb.admin.service.HrAssignmentQuery.class), mock(com.mftb.admin.service.HrMasterDataResolver.class), mock(com.mftb.admin.service.HrEmploymentPeriodService.class), mock(com.mftb.admin.service.HrAuditService.class),
                 passwordEncoder, jdbcTemplate, operatorResolver, permissionService, bizSeqService);
     }
 

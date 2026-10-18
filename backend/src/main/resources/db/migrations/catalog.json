@@ -1833,6 +1833,138 @@
       ],
       "intent": "免审批直送的落点真值回收：向 rdm_transition 补登 submit_pool / resubmit_pool，使免审批分支不再在代码里硬写 pool/assigned",
       "comment": "仓库既定口径是「状态机真值：rdm_status_def + rdm_transition，不在代码里硬编码流转」；批次1 把免审落点写在 Java 里，管理员在「狀態與流轉」停用或改落点时免审路径仍照旧放行。现改为读配置基落点 pool，缺行/停用一律 fail-closed 拒提交（方案 §四：不得把缺配置当审批完成或免审）。assigned 细化仍留代码，与 OA 终审回调 approve_intake→pool + applyIntentPm→assigned 同形状，不另造状态机分支。后置校验要求两条 (from_status, action_code) 存在、status=1 且 to_status=pool——只校「行存在」不够，落点被改成别的状态同样不能让免审放行。submit_pool 早在 204 已种，仍走 INSERT IGNORE 做兜底（存量库被人为删行时不补就会让免审提交直接失败），且不覆盖管理员自定义名。allowed_roles 只给 SUBMITTER：免审直送是提出人自己的提交动作，不得扩给审批岗。回滚=回退代码，种子行留着无害（前端操作区按当前状态+角色过滤，不会因此多出按钮）；刻意不软删种子，否则回退代码与残留配置会给两套落点口径。"
+    },
+    {
+      "versionKey": "iam:org-scope:v1.0",
+      "module": "iam",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "orgScopeSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "org-scope-role-column,org-scope-role-dept-table",
+      "scriptFiles": [
+        "245_org_data_scope.sql"
+      ],
+      "intent": "组织数据权限（数据范围）平台能力：sys_role 补 data_scope 五档列 + 新建 sys_role_dept 自定部门关联表，补齐「功能权限 × 人员范围」里一直缺失的第二维",
+      "author": "Qoder",
+      "comment": "设计口径见 docs/design/员工管理_Core_HR_整改方案_94e06fc1.md §10.9；考勤是其第一个消费方。必須 @Order(2) 早於 PasswordPolicySchemaInitializer(3) 與 DataInitializer(5)：SysRole 實體已帶 dataScope 欄位，MyBatis-Plus 顯式欄清單會 SELECT 它，缺欄時啟動期查超管角色就直接報 Unknown column。後置校驗實查欄位存在 + IS_NULLABLE=NO + 表存在 + uk_role_dept 唯一鍵，任一不滿足就不記版本並向上拋（缺欄比缺表更致命，不得靜默續跑）。預設 1（僅本人）是刻意的嚴格模式，與 DataScopeService「無授權返回空集合」同取向：存量角色收緊為僅本人但當前僅 admin 持有考勤菜單且走代碼直通，存量行為不變；反過來說，任何角色一旦被勾上 attendance-*:view 就立刻只能看自己的資料，這是設計意圖而非回歸。不復用 sys_data_authorization：那張表管的是「能看哪些商家集團編碼」（業務資源維），不是「能看哪些人」。245 腳本僅作參考文檔，ALTER/CREATE 的冪等在 Java 側帶存在性判斷執行。"
+    },
+    {
+      "versionKey": "hr:employee-perm-split:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "employeePermSplitMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "iam:org-scope:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "246_employee_perm_split.sql"
+      ],
+      "intent": "员工接口权限拆分：把 employee-management 的可授权动作集从 view/create/edit/delete 纠正为细分动作（新增 salaryView/salaryEdit/sensitiveView/accountEdit/export）",
+      "author": "Qoder",
+      "comment": "对应方案 §7.3「操作权限 × 人员范围 × 字段权限」与 P0「人事编辑与账号高危权限混用」。拆动作而不新建菜单：授权中心能勾什么唯一来自 sys_menu.actions，而敏感明文/账号操作不是可路由页面，建成菜单会多出侧边栏幽灵入口。必须独立 versionKey：ensureMenu 对已存在菜单不覆盖 actions，只改声明存量库不会变（考勤 attendance:menu:v1.1 实测踩过）。开发库实测：menu.actions 原为 NULL（前端静态回退 view/create/edit/delete），唯一持有授权的是 admin 角色，因此本次收紧不伤及任何存量非超管角色。后置校验逐个比对动作全部落地；落地后 evictAll 避免跨实例拿旧动作集。代价是显式的：其他角色若要继续看薪酬/重置密码/改角色，必须在授权中心单独补授（默认拒绝，符合「旧菜单权限不能自动扩展为敏感权限」）。"
+    },
+    {
+      "versionKey": "hr:effective-engine:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrEffectiveEngineInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:lifecycle-schema:v1.0",
+        "hr:lifecycle-renew:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-position-op-code-column,hr-effective-task-table",
+      "scriptFiles": [
+        "247_hr_effective_engine.sql"
+      ],
+      "intent": "HR 生效日引擎：emp_position_record 补 operation_code（判定不再匹配中文名）+ 新建 hr_effective_task 待生效任务表（批准后到生效日前不改写任职投影）",
+      "author": "Qoder",
+      "comment": "对应方案 §5.3（稳定动作 code）、§7.2（批准后到生效日前为待生效）、§7.4（状态变更与待执行任务同事务写入的轻量 outbox）。operation_code 刻意可空而不是 DEFAULT 'OTHER'：已分类的行与「尚未回填」必须可区分，否则无法判断要不要再回填；code 为 NULL/OTHER 时派生退回名称判定，不改判历史事实。回填在加列之后、同一事务外顺序执行（MySQL 无 UPDATE IF，WHERE operation_code IS NULL 天然幂等）。CHECK 约束先查 TABLE_CONSTRAINTS 再 ADD（MySQL 8 无 DROP CHECK IF EXISTS）；契约只自愈列与表、不自愈 CHECK，因为低版 MySQL 上 ENFORCED 可能为 NO，启动自愈无法证明安全。hr_effective_task 不带 deleted 列：它是执行留痕，唯一键 uk_effective_request 因此不需要像 att_* 那样把软删标记折进生成列；这个唯一键就是「同一单据不会被执行两遍」的全部依据（另一个保障是回调内的 completed 短路）。@Order(31) 晚于菜单种子与 DataInitializer 的历史补录（那批记录不带 code，靠本次回填补上）。"
+    },
+    {
+      "versionKey": "hr:employment-period:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrEmploymentPeriodInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:effective-engine:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-employment-period-table,hr-position-stable-ids",
+      "scriptFiles": [
+        "248_hr_employment_period.sql"
+      ],
+      "intent": "雇佣期间分层（方案 §7.1 双轨第一阶段）：新建 hr_employment_period（一人多段）+ emp_position_record 补 7 个稳定 ID 列并按名称唯一命中回填",
+      "author": "Qoder",
+      "comment": "对应方案 §7.1「增加独立员工主档和雇佣期间实体…补部门/职位/上级/导师/法人/地点 ID，保留历史名称快照」。两条不能让步的口径：① 本迁移不物化任何雇佣期间历史行——方案自己设了业务门禁「差异清单先由 HR 确认冲突来源，不把账号创建日批量改认成真实入职日」，所以登记只能走 POST /api/hr/employment/periods/sync（逐人点名 + 逐人校 OrgScope），派生器只从 ONBOARD/REHIRE 锚点取起点，无锚点就返回空集不写库；② 稳定 ID 回填的子查询一律带 HAVING COUNT(*)=1，同名多条时整行不参与回填。错挂一次的代价是把异动永久绑到别人的部门上，而留 NULL 会被差异报告（GET /api/hr/employment/diff-report）看见并可追补，两者后果不对称。唯一键 uk_period_active_scope 把 deleted 折进生成列（与 att_* 同范式）：同一 (user_id, period_seq) 只能有一条有效行，这是「重跑同步不会长出重复雇佣段」的全部依据。CHECK ck_period_active_no_end 禁止在职段带结束日——未来生效的离职只能登记任务、不能提前把今天这段关掉。emp_position_record 的 createTableIfMissing 故意留空：存量核心表不能让启动自愈凭空建出一份缺主表定义的列。@Order(32) 晚于 hr:effective-engine:v1.0(31)，因为按名称派生雇佣段的前提是 operation_code 已回填。双轨期间本表是旁路投影：列表/详情仍以 sys_user 快照 + as-of 任职解析为准。"
+    },
+    {
+      "versionKey": "hr:audit-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrAuditSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:employment-period:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-operation-audit-table",
+      "scriptFiles": [
+        "249_hr_operation_audit.sql"
+      ],
+      "intent": "新建人事操作审计表 hr_operation_audit（操作者/发生时间/生效时间/原因/变更前后值/来源单号）",
+      "author": "Qoder",
+      "comment": "对应方案 §5.5「新增人事操作审计，不能用登录日志或 localStorage 更新时间代替」与 §7.4 审计字段清单。不迁旧数据：登录日志与详情页的本地「最后更新」都不是人事审计事实，把它们搬进审计表等于伪造一份看起来完整的审计史。一行=一个字段变更，动作级信息（原因/来源单号/生效日）在每行重复存，让审计行能脱离单据独立解读。关键取舍：before/after 在**写入时**就走 SensitiveMask 脱敏而不是查询时——审计表本身不该持有明文副本，否则任何拿到库权限的人都能绕过字段权限；也因此把脱敏从员工服务私有方法提成单一实现 util/SensitiveMask，两份规则迟早漂移，漂移的后果是「列表看不到证件号、审计里看得到」。无 deleted 列：给软删标记就是给自己留「让某次操作从报表消失」的后门。不并入 sys_permission_audit_log：那张表缺生效日/原因/来源单号且 target_type 口径是 role/department。SALARY_WRITE/LIFECYCLE_EXECUTE/ROSTER_EXPORT 是预留动作码（写入点分别在后续批次接入）；预留方向是安全的——危险的是有写入点无动作码。"
+    },
+    {
+      "versionKey": "hr:employee-audit-action:v1.0",
+      "module": "hr",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "employeeAuditActionMenuInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:employee-perm-split:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "250_employee_audit_action.sql"
+      ],
+      "intent": "employee-management 补登 auditView 动作（人事操作审计查看），以并集方式写入 sys_menu.actions 并同步补授内置 admin 角色",
+      "author": "Qoder",
+      "comment": "审计查看不挂在 view 上：能看花名册不等于能看「谁动过花名册」（§7.3 未显式授权默认拒绝）。与 hr:employee-perm-split:v1.0 的分工：那版是一次性换血（直接写全集），本版负责「后续新增动作能落到存量库」，所以写法是并集而不是覆盖——覆盖会抹掉管理员在授权中心手工加的动作，而且事后没人能解释「上周还能勾这周勾不到」。后置校验逐个比对 GRANTABLE_ACTIONS 全部落地；落地后 evictAll 避免跨实例拿旧动作集。再加新动作时必须再开一个 versionKey（applyOnce 不重跑）。@Order(9) 晚于拆分器(7)与菜单种子(5)。"
+    },
+    {
+      "versionKey": "hr:offboarding-schema:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrOffboardingSchemaInitializer",
+      "dependencies": [
+        "core:schema-v10",
+        "hr:lifecycle-schema:v1.0",
+        "hr:effective-engine:v1.0"
+      ],
+      "status": "ACTIVE",
+      "selfHealContract": "hr-offboarding-task-table,hr-lifecycle-handover-receiver",
+      "scriptFiles": [
+        "251_hr_offboarding_task.sql"
+      ],
+      "intent": "新建离职联动任务表 hr_offboarding_task（EAM 资产交接 / OA 待办改派）+ hr_lifecycle_request 补交接接收人两列",
+      "author": "Qoder",
+      "comment": "对应方案 §7.4「账号停用、权限撤销、OA 待办转交、资产交接…分别有执行状态、失败原因和重试入口；重试不得重复生成业务单」与 §7.2「离职增加交接责任人任务」。为什么需要表而不是离职事务里同步调用：交接接收人常常在离职办理之后才被指定，EAM 也可能拒登记（资产状态不符）；同步做会把「离职办理成功」绑死在「外部模块此刻可用」上。为什么不复用 hr_effective_task：那张表是一单一行的到期执行凭据，本表是一单多行的跨模块动作清单（uk 为 (request_id, task_type)），混用会让两个唯一键与「到期」语义都失去含义。真实事故面：biz_oa_approval_task.approver 存「姓名(工号)」字符串且没有任何改派入口，而 requireNodeApprover 是 fail-closed——审批人离职后他名下的 pending 节点会永久卡死，本迁移是它唯一的出路。不回填历史离职单据：那些单据的资产与待办早已人工处置，凭空补一批 PENDING 只会制造无法判断真伪的待办。hr_lifecycle_request 的 createTableIfMissing 故意留空（存量核心表不能让启动自愈凭空建表）。接收人不由代码默认取直属上级：那是把人没同意的事做成看起来已授权。@Order(34) 晚于雇佣期间(32)与人事审计(33)。"
     }
   ]
 }

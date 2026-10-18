@@ -13,9 +13,26 @@ export const PERMISSION_ACTIONS = [
   { key: 'disable', label: '停用' },
 ] as const
 
+/**
+ * 敏感能力专用动作（只挂在确实需要它的菜单上，不进 PERMISSION_ACTIONS）。
+ *
+ * 为什么不能把它们加进全局枚举：PERMISSION_ACTIONS 同时是「菜单没配 actions 时的默认动作集」
+ * 与「全部菜单·全部權限」批量勾选的展开源，把 salaryView/sensitiveView 这类能力放进去
+ * 等于给每个新菜单默认授予敏感读权 —— 与方案 §7.3「未显式授权默认拒绝」直接相反。
+ * 真值与后端 EmployeeConstants.GRANTABLE_ACTIONS 逐字对齐。
+ */
+export const SENSITIVE_ACTIONS = [
+  { key: 'salaryView', label: '薪酬查看' },
+  { key: 'salaryEdit', label: '薪酬編輯' },
+  { key: 'sensitiveView', label: '敏感明文' },
+  { key: 'accountEdit', label: '賬號操作' },
+  { key: 'authorize', label: '角色授權' },
+  { key: 'auditView', label: '人事審計查看' },
+] as const
+
 /** 动作 key → 中文标签查找表（后端只下发 key 时渲染标签用） */
 export const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
-  PERMISSION_ACTIONS.map(a => [a.key, a.label]),
+  [...PERMISSION_ACTIONS, ...SENSITIVE_ACTIONS].map(a => [a.key, a.label]),
 )
 
 /** 菜单功能映射（每个菜单实际包含的功能操作） */
@@ -306,11 +323,20 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'forceLogout', label: '下線' },
   ],
   // 员工管理
+  // 动作拆分（方案 §7.3）：edit 不再隐含薪酬/明文/账号/授权四种能力，逐条单独授予
   'employee-management': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+    { key: 'salaryView', label: '薪酬查看' },
+    { key: 'salaryEdit', label: '薪酬編輯' },
+    { key: 'sensitiveView', label: '敏感明文' },
+    { key: 'accountEdit', label: '賬號操作' },
+    { key: 'authorize', label: '角色授權' },
+    // 审计查看单独一个动作：能看花名册不等于能看「谁动过花名册」（后端 HrAuditController 同值）
+    { key: 'auditView', label: '人事審計查看' },
   ],
   // 入轉調離（入職/轉正/調動/離職四菜单共享后端端点, 功能操作对齐员工管理）
   'hr-onboarding': [

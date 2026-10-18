@@ -407,7 +407,7 @@ OA 中心（复用现有菜单）
 
 | 优先级 | 待办 | 说明 |
 |---|---|---|
-| **P0 安全** | **考勤查询未做数据范围收敛** | **11 个 `Attendance*ServiceImpl` 全部未引用** `DataScopeService`/`scopedUserId()`（已逐个 grep 核实，命中数 0），只要持有 `attendance-punch:view` 就能看全公司打卡与异常；而 `HrLeaveServiceImpl` 是有范围收敛的。**已于 2026-10-12 决定：不在考勤侧做局部收敛，改由平台级「组织数据权限」重构统一解决，设计口径与现状核实见 10.9** |
+| **P0 安全** | ~~考勤查询未做数据范围收敛~~ **已完成（2026-10-18）** | 11 个 `Attendance*ServiceImpl` 已全部消费 `OrgScopeService`：列表/统计卡同口径下推，`requireVisibleUser` 在按 id 的单条读写处二次校验归属。实施细节与新增的口径约束见 **10.10** |
 | **P0** | 补卡/加班接入流程中心 | `biz_oa_process` 里没有 `oa_reissue`/`oa_overtime`；`AttendanceExceptionService.markHandledByFlow` 已就绪但没有调用方。需先新增 OA 流程编码与单据类型（属 OA 域迁移，不是考勤侧能单独完成的） |
 | P1 | 薪酬侧消费月报冻结批次 | 月报已按工作日/休息日/法定节假日三类加班分列并输出 `batch_no`，但没任何下游读取；异常表保留 `late_minutes` 供扣减口径 |
 | P1 | 日报/月报无自动重算调度 | 目前只有手动重算；`AttendancePunchSyncJob` 只同步打卡不算结论。长假（>31 天）的请假抵扣也只记异常不回算，依赖夜间任务 |
@@ -441,7 +441,9 @@ cd backend && bash restart-service.sh --rebuild
 
 ### 10.9 组织数据权限（数据范围）重构 —— 交接说明
 
-**决定（2026-10-12）**：本节只交设计，本次不实现。考勤的 P0 缺口保持开放，由后续重构统一承接。
+> **状态（2026-10-18）：本节设计已实现，实现结果与新增约束见 10.10。以下内容保留作设计依据与市面对照，不要按「尚未做」理解。**
+
+**决定（2026-10-12）**：本节交设计，本次不实现。考勤的 P0 缺口保持开放，由后续重构统一承接。
 
 **为什么不能小修**：正确模型是「功能权限 × 数据范围」两个正交维度，属平台级能力，考勤只是第一个消费方。在考勤里糊一个 `scopedUserId()` 能堆住漏洞，但会把错模型坐实，下个模块还得重做。
 
@@ -490,3 +492,254 @@ cd backend && bash restart-service.sh --rebuild
 #### 验收要求
 
 新增服务层范围测试，五档（仅本人/本部门/部门及以下/自定部门/全部）+ 无授权各至少一条**拒绝断言**；不要只做控制器 Mock 测试 —— 仓内现有员工权限测试存在“未对越权结果建立拒绝断言”的同类不足（见第八节必测场景最后一条）。
+
+### 10.10 组织数据权限已实现（2026-10-18）——代码地图与新增口径
+
+10.9 的设计已落地。下面只写**实现时新确定的口径**（与 10.9 有出入的地方以本节为准）和接手人必须知道的要点。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 数据库 | `backend/sql/245_org_data_scope.sql`（参考文档）；`config/OrgScopeSchemaInitializer`（`iam:org-scope:v1.0`，**@Order(2)**）；已登记 catalog.json + `ContractRegistry.orgScopeContracts()` |
+| 常量 | `constant/OrgDataScope`（五档唯一真值，脏值回落 SELF） |
+| 平台服务 | `service/OrgScopeService` + `service/impl/OrgScopeServiceImpl`；`util/ScopeFilters`（三态条件折叠） |
+| 消费方 | punch / exception / summary(daily+monthly) / schedule / workbench / group / sync 七个服务；`RoleServiceImpl` 写 `sys_role_dept` 并记审计 |
+| 接口 | `GET /api/org-scope/mine`（只需登录，不需菜单）；角色接口新增 `dataScope`/`deptIds` |
+| 前端 | `constants/dataScope.ts`（档位真值）、`api/orgScope.ts`、`components/OrgScopeNotice.tsx`、角色表单（档位 + 自定部门 TreeSelect） |
+| 测试 | `OrgScopeServiceTest`（19 例）、`AttendanceScopeGuardTest`（12 例）、`RoleDataScopeTest`（8 例） |
+
+#### 与 10.9 设计的五处口径差异（都是有意偏离，不是遗漏）
+
+1. **无 SecurityContext 返回“不限制”而不是空集**。定时任务/启动期/内部回调没有登录上下文，按空集处理会让 `AttendancePunchSyncJob` 一条都不写 —— 把越权收敛做成可用性事故。HTTP 请求走不到这条路：Jwt 过滤器 + `@RequirePermission` 已先把住（`AttendanceControllerMappingTest` 钉住每个 handler 带注解）。
+2. **本人数据恒定可见**：解析结果总是并上自己的 user id。人员范围管的是“别人的数据”，不是把自己锁在外面；没部门的人走“本部门”档也不会看到全公司。
+3. **自定部门连同下级展开**（10.9 未定）。勾“营运中心”的直觉是“中心下面的人都归我管”，只展开勾选节点会被读成数据丢了。
+4. **日×组聚合按 deptId 收敛，行上没有 user_id**：`att_day_summary` 是群体聚合行，“仅本人”档拿到的是**空集**（聚合数拆不到个人，宁可不给）。个人维度看月报（一人一月一条，按 userId 收敛）与打卡/异常明细。**已知偏差**：`dept_id` 是「组内主部门」快照且可空，一个组只落一个部门，跨部门组对部分管理员会整行不显示、`dept_id IS NULL` 的行对所有受限角色都不显示 —— 它只会“少行”不会“多给”，且薪酬取数用的是月报（按人精确收敛），所以接受这个偏差；要彻底消除得把日报改成日×人×组粒度，那属于日报表结构重做。
+5. **重算/生成月报不设范围门槛**：它们不改变事实、只从事实重新推导结论；而补卡/假单抵扣在审批回调里会连带重算整组，加门槛会让正常业务动作直接失败。真正需要拦的是“把人送进薪酬”的**冻结/同步**，以及按人的写入（排班/成员/导入/确认/补卡）——这些已全部按 id 二次校验。手动钉钉同步反而加了门槛（整组作业，按人收敛会做出“半天有卡、半天没卡”的隐性错账）。
+
+#### 硬约束状态
+
+10.9 末尾的“在给非 admin 角色授权考勤菜单之前，必须先完成本节”**已解除**。但请注意两个反直觉行为：
+
+- 存量角色的 `data_scope` 统一为 **1（仅本人）**。给 HRBP/门店经理勾上 `attendance-*:view` 后，他默认**只能看自己**；要管人就去角色管理把该角色的资料范围改成“本部门及以下”或“自定部门”。
+- 角色表单**不提交 dataScope 等于不改原值**（旧入口只改名称/描述时不会静默收窄权限）；非“自定部门”档保存时会**清空** `sys_role_dept` 残留行。
+
+#### 下一个消费方
+
+按 10.9 建议顺序：HR 花名册（`employee-management` 列表与详情）→ 绩效 → 薪酬。接入时照考勤的做法：查询走 `ScopeFilters.applyUsers/applyDepts`，按 id 读写走 `requireVisibleUser`，统计卡与导出共用同一个条件构造器；不要在菜单的 view 动作上焊死范围。
+---
+
+## 十一、整改进度核对（2026-10-18，按第八节推荐顺序执行）
+
+本轮把 P0 的**权限与生效日**两条主线做完并在开发库落地验证；P0 之后的 P1 分层改造尚未开始，逐项列清「已做 / 未做 / 卡在哪」。
+
+### 11.1 已交付
+
+| 方案条目 | 交付内容 | 验证方式 |
+|---|---|---|
+| §3.2 P0「人事查看权限过宽」+ §7.3 字段权限 | `employee-management` 拆动作：`salaryView`/`salaryEdit`/`sensitiveView`/`accountEdit`/`authorize`/`export`；薪酬、明文、账号、授权四类端点不再被 `edit` 隐含 | `EmployeePermissionSplitTest` 15 例（每条既有 403 拒绝断言又有 200 放行断言）；开发库 `sys_menu.actions` 已登记全部 10 个动作 |
+| §3.2 P0「人事编辑与账号高危权限混用」 | 冻结/重置密码 → `accountEdit`；改功能角色 → 新 `PUT /employees/{id}/roles` + `authorize`；`create/update` 带 `functionRoleIds` 时服务层再校验一次（不静默丢弃也不默默应用） | `EmployeeRoleAuthorizeTest` 6 例 |
+| §10.9 组织数据权限 | 平台级 `OrgScopeService`（五档 + 部门闭包 + 多角色取最大 + 本人恒可见）；考勤 7 个服务全部消费；授权中心角色表单可配范围；`OrgScopeNotice` 顶部横幅 | `OrgScopeServiceTest` 19 例、`AttendanceScopeGuardTest` 12 例、`RoleDataScopeTest` 8 例 |
+| §3.2 P0「生效日期口径分裂」 | 统一 as-of：`HrAssignmentQuery` 成为唯一口径，`EmployeeServiceImpl` 删掉自写算法，`latestPositionRecord` 改为「生效日 DESC + 同日序号 DESC」（原来跨日期只比序号会挑中旧记录） | `HrAssignmentQueryTest` 7 例（同日两笔、未来不提前、重入新开雇佣、无记录=在职、legacy 无 code 退回名称） |
+| §5.3「禁止用字符串判定状态」 | `emp_position_record.operation_code` 落库（CHECK 约束 + 存量回填），`operation` 降级为名称快照；前端表单提交 code，Tag 颜色与「允许重新入职」判定全部按 code | 开发库 38 条记录全部回填（ONBOARD 30 / TRANSFER 3 / PROMOTION 2 / DIMISSION 2 / REGULAR 1），无 OTHER 无 NULL |
+| §7.2「批准后到生效日前为待生效」 | `hr_effective_task` 轻量 outbox：批准后生效日在未来的单据**只登记任务、不改任职投影也不停账号**，`HrEffectiveTaskJob` 每小时到期执行；驳回/撤销作废任务；失败落 FAILED+attempts+原因；`POST /hr/lifecycle/{id}/retry-execute` 人工重试（未到生效日拒执行）；列表与详情同格显示「已批准 · 待生效 2026-10-28」 | `HrEffectiveSchedulingTest` 5 例（含「未来不动」的 never() 断言） |
+| §3.2 P1「列表详情依赖 edit」 | 花名册「詳情」改为 `view` 可进；重置密码按钮改 `accountEdit`；详情各 Tab 写按钮按 `edit`/`salaryEdit` 隐藏 | `npm run verify` 全绿（lint/typecheck/menu/i18n/secret-scan/vitest） |
+
+迁移登记：`iam:org-scope:v1.0`、`hr:employee-perm-split:v1.0`、`hr:effective-engine:v1.0`、`hr:employment-period:v1.0`，四者均已进 `catalog.json` + `ContractRegistry`，开发库执行结果 SUCCESS、`ready=200`、契约 52 项通过。
+
+### 11.2 未做，以及各自卡在哪
+
+| 优先级 | 缺口 | 未动原因 / 需要的输入 |
+|---|---|---|
+| ~~P1~~ | ~~§7.1 员工主档 + **雇佣期间**分层、任职记录改存稳定 ID~~ **已完成双轨第一阶段（2026-10-18）** | 采「先建表 + 先出差异清单、存量不自动物化」的走法，既不阻塞也不会造出假数据；代码地图与口径见 **11.4**。**剩下的唯一人工环节**：HR 逐条看完「僱傭數據核對」清单后，对「可派生但未登记」的行点「按任職事實登記」 |
+| P1 | §5.1 花名册默认列（雇主法人/工作地点/直属上级/试用状态/入职日期）、导入预校验、全量导出端点 | 纯工程量，无外部依赖；`export` 动作已登记，端点待建 |
+| P1 | §5.3 重新入职/资料变更/历史更正 三类单据 + §5.4 合同签订/变更/解除 | `REHIRE` code 已就位，加单据类型是机械扩展；但「历史更正」必须先定 §7.2 要求的**影响预检**（改历史会不会翻案后续结论），口径需确认 |
+| P1 | §5.5 薪酬 Tab 改名「薪酬档案」、汇总改口径 | 「實發工資」文案仍在，改动含 i18n 五语言与既有页面说明；属界面口径修正，随时可做 |
+| ~~P1~~ | ~~§7.4 离职联动 EAM 资产交接 / OA 待办转交~~ **已完成（2026-10-18）** | 以 `hr_offboarding_task` 轻量 outbox 接入（交接接收人需人工指定），详见 **11.6** |
+| P2 | §10.6 考勤剩余待办：补卡/加班流程编码、日报月报自动重算调度、钉钉回写、留存归档 | 补卡/加班需要先在 `biz_oa_process` 加流程编码（OA 域迁移），`markHandledByFlow` 已就绪无调用方 |
+| P2 | §6.2 人事工作台、人事报表、岗位编制、扩展档案（教育/资质/奖惩）、电子签 | 报表与工作台的取数依赖雇佣期间与审计表，建议排在 P1 之后 |
+
+### 11.3 本轮新增的、后续必须遵守的口径
+
+1. **无登录上下文 = 不收敛**：定时任务/内部回调没有 SecurityContext，`OrgScopeService` 返回「不限制」。新增消费方不得把「空集」当默认值处理，否则后台作业会被做成 0 结果。
+2. **`att_day_summary` 按 dept_id 收敛且「仅本人」得空集**，日报有「组内主部门」快照导致的少行偏差（见 10.10 第 4 条）。薪酬只允许按月报（按人）取数。
+3. **动作集三元组 (角色, 菜单, 动作)** 是权限锚点；新增敏感能力优先加动作而不是加菜单，且必须同步 `sys_menu.actions`（独立 versionKey）+ 前端 `MENU_ACTIONS_MAP` + 后端常量三处，`EmployeePermissionSplitTest` 会反射拦漏登记。
+4. **生效日语义**：任何「批准后要改人事事实」的新单据类型，都必须走 `hr_effective_task` 登记 + 回调同一入口执行，不允许在审批回调里直接改投影；`REHIRE` 会开启新的雇佣起点，写历史更正类功能时别把它当普通调动。
+
+### 11.4 雇佣期间分层已实现（2026-10-18）——代码地图与双轨口径
+
+§7.1 的主档分层采**双轨第一阶段**交付：新表先旁路积累，不切主读路径，历史数据不自动物化。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 数据库 | `backend/sql/248_hr_employment_period.sql`（参考文档）；`config/HrEmploymentPeriodInitializer`（`hr:employment-period:v1.0`，**@Order(32)**）；已进 catalog.json + `ContractRegistry.hrEmploymentPeriodContracts()` |
+| 实体 | `HrEmploymentPeriod`（`STATUS_ACTIVE/ENDED`、`SOURCE_POSITION_RECORD/MANUAL/UNVERIFIED` 是唯一真值）；`EmpPositionRecord` 新增 7 个稳定 ID 列 |
+| 派生 | `service/impl/HrEmploymentPeriodCalculator`（**无状态纯函数**，只吃记录列表 + 查询日） |
+| 服务 | `HrEmploymentPeriodService`（derive / syncFromRecords / listByUser(s) / currentPeriod）；`HrMasterDataResolver`（名称→稳定 ID，只认唯一命中）；`HrProfileDiffService`（差异报告） |
+| 接口 | `GET /api/hr/employment/diff-report`（view）、`POST /api/hr/employment/periods/sync`（edit，逐人校 OrgScope）、`GET /api/employees/{id}/employment-periods`（view） |
+| 前端 | `src/api/hrEmployment.ts`、`src/constants`无新增（类别码在 api 里）、`src/pages/Permission/Employee/EmploymentDiffModal.tsx` + 花名册工具条「僱傭數據核對」入口 |
+| 类别码 | `constant/HrProfileDiff`（10 类 + 严重度 + 名称）；前端 `hrEmployment.diff.*` 与逐值对齐 |
+
+#### 六条口径（接手前必读）
+
+1. **迁移不物化雇佣期间**。启动只做：建表 + 加列 + 按名称回填稳定 ID。段只能由 `syncFromRecords` 产生，且只从 `ONBOARD/REHIRE` 取起点——**绝不拿 `sys_user.created_at` 补一个起点**（§7.1 的业务门禁）。无锚点时 `syncFromRecords` 返回 0，什么都不写。
+2. **派生器是纯函数且只看 `effectiveDate <= asOf`**。未来生效的离职不会提前把本段关掉；新增字段要从这里加，不要在服务层再写一份循环。
+3. **段内字段继承**：法人/地点/人员类别取段内最后一条**有值**的记录（调动只写变化字段，逐条覆盖会把空值当事实）。被后续入职截断但找不到离职记录的段，`ENDED + end_date IS NULL + end_reason=MISSING_DIMISSION_RECORD`，不编造结束日；CHECK `ck_period_active_no_end` 禁止 ACTIVE 段带结束日。
+4. **登记不是覆盖登记**：`start_date_source=MANUAL` 的行，`sync` 不得改写其入职日。HR 人工确认过的值优先级高于派生值。
+5. **所有写任职事实的入口必须走同一条收口**：`PositionRecordServiceImpl`（手工异动）、`HrLifecycleCallbackServiceImpl.writePositionRecord`（审批办理）、`EmployeeServiceImpl.insertInitialPositionRecord`（建档）三处都先 `applyStableIds` 再落库、落库后 `syncFromRecords`，**与主写入同事务且不吞异常**。新增加写入口同理；漏一处就是「人有异动但段没跟上」。
+6. **差异报告只读、且按 OrgScope 收敛**；`registerableUsers` 与前端可勾选行用同一判据（仅 `PERIOD_NOT_REGISTERED`）。`RESIGNED_ACCOUNT_ACTIVE` 是唯一 ERROR 级：已离职但账号还能登录。
+
+#### 开发库实测（本轮）
+
+- `hr_employment_period` = **0 行**（证明双轨没自动物化）
+- 稳定 ID 回填：部门 24/38、职位 7/38、法人 4/38、工作地点 0/38——**工作地点 0 是因为存量 `work_city` 全为空**，不是匹配失败
+- 待 HR 判定：无入职锚点 2 人（`START_ANCHOR_MISSING`）、部门快照≠任职事实 2 人（`DEPT_MISMATCH`）
+- 测试：后端全量 `mvn -o clean test` **1615 例 0 失败**（新增 23 例：`HrEmploymentPeriodTest` 9、`HrProfileDiffTest` 9、`HrEmploymentControllerMappingTest` 5）；前端 `npm run verify` lint/typecheck/menu/stat-order/confirm-modal/i18n/secret-scan 全过，新页 4 例通过（全量 vitest 在并行高压下 `AlgorithmAdd.traffic`/`WaterfallForm`/`TrafficAlgorithmConfig` 三个无关文件会超时，单独跑 4 文件 102 例全绿）
+
+#### 下一步（尚未做）
+
+- 员工详情开「雇佣与任职」展示段列表（排在 11.2 的 P1 花名册/档案改造一并做）
+- `MANUAL` 录入入口：只能走 P5 的「资料变更/历史更正」单据，不能开自由编辑框
+- 花名册/详情主读路径仍走 `sys_user` 投影；切读到雇佣期间需要 HR 确认完差异清单后再评估
+
+### 11.5 人事操作审计已实现（2026-10-18）——代码地图与口径
+
+补齐 §5.5「新增人事操作审计」与 §7.4 的审计字段清单（操作者 / 发生时间 / 生效时间 / 原因 / 变更前后值 / 来源单号）。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 数据库 | `backend/sql/249_hr_operation_audit.sql`；`config/HrAuditSchemaInitializer`（`hr:audit-schema:v1.0`，@Order(33)）；`config/EmployeeAuditActionMenuInitializer`（`hr:employee-audit-action:v1.0`，@Order(9)，**并集**写入 sys_menu.actions） |
+| 常量 | `constant/HrAuditAction`（15 个动作码 + 敏感动作/敏感字段集，CHECK 与它同源） |
+| 脱敏 | `util/SensitiveMask`（**唯一实现**；`EmployeeServiceImpl` 的私有 mask 已改为委派它） |
+| 服务 | `HrAuditService` + `HrAuditServiceImpl`（写入时脱敏、一行一字段、无变更不落行）；`dto/HrAuditEntry`（链式 change/detail/reason/sourceReqNo/effectiveDate） |
+| 写入口钩子 | `EmployeeServiceImpl`（EMPLOYEE_CREATE / EMPLOYEE_UPDATE / PROFILE_UPDATE / SENSITIVE_VIEW / PASSWORD_RESET / ACCOUNT_DISABLE・ENABLE / ROLE_BIND）、`PositionRecordServiceImpl`（三处 POSITION_WRITE）、`HrLifecycleCallbackServiceImpl.writePositionRecord`（带来源单号的 POSITION_WRITE）、`EmployeeContractServiceImpl`（三处 CONTRACT_WRITE）、`HrEmploymentController.syncPeriods`（PERIOD_REGISTER） |
+| 接口 | `GET /api/hr/audit`、`GET /api/hr/audit/actions`（两者都挂 `employee-management:auditView`） |
+| 前端 | `src/api/hrAudit.ts`、`pages/Permission/Employee/HrAuditTrail.tsx`（档案新增「人事操作記錄」Tab，仅持有 auditView 时挂载）、`hrAuditMeta.ts`、`types.ts` 的 SENSITIVE_ACTIONS + MENU_ACTIONS_MAP 已补 auditView |
+
+#### 五条口径
+
+1. **审计与业务写入同事务且不吞异常**：审计失败就让业务回滚（§7.4「可追溯性优先于可用性」）。
+2. **敏感值在写入时就脱敏**，审计表不留明文副本；因此查询端不存在「显示原文」开关，前端也不许做。
+3. **一行 = 一个字段**；「提交了但什么都没改」不落行（否则真实变更会被噪声淹没）。
+4. **auditView 是独立动作**，不挂在 view 上；新增动作必须同时改 `EmployeeConstants.GRANTABLE_ACTIONS` + 前端 `SENSITIVE_ACTIONS`/`MENU_ACTIONS_MAP` + 一个**新 versionKey** 的并集登记初始化器（`applyOnce` 不重跑，改声明落不到存量库）。
+5. **不迁旧数据**：登录日志与 localStorage 的「最后更新」不是审计事实，回溯入库等于伪造审计史。
+
+#### 已知缺口（下一批接入）
+
+- `SALARY_WRITE`（薪酬 8 个写入端点）与 `ROSTER_EXPORT`（花名册全量导出）的动作码已预留、**写入点尚未接入**；它们分别排在薪酬台账口径修正（§5.5）与花名册改造（§5.1）里一起做。
+- 单据类动作的 `source_req_no` 目前只有异动写入接了；转正/调动/离职的「单据办理」本身（LIFECYCLE_EXECUTE）靠单据表 + 待生效任务表可追溯，未重复落审计。
+
+#### 开发库实测
+
+- `hr_operation_audit` 已建（含 `ck_hr_audit_action`）；`sys_menu.actions` 已含 `auditView`（11 个动作）；两个新 versionKey 已登记；契约 53 项通过、`ready=200`
+- 踩到的新坑：**`sensitive` 是 MySQL 8 保留字**，不加反引号时 `CREATE TABLE` 直接语法错、启动失败（已在 DDL、契约与实体 `@TableField("`sensitive`")` 三处同步修正，与仓内 `rank_code` 同一处理法）
+- 测试：后端全量 `mvn -o clean test` **1630 例 0 失败**（本轮新增 `HrAuditServiceTest` 7 + `EmployeeAuditHookTest` 5 + `HrAuditControllerMappingTest` 3）；前端 lint/typecheck/menu/stat-order/confirm-modal/i18n/secret-scan 全过，`HrAuditTrail` 4 例与 `EmploymentDiffModal` 4 例均绿
+
+### 11.6 离职联动已实现（2026-10-18）——代码地图与口径
+
+§7.4 最后一块（离职后的跨模块动作）以轻量 outbox 落地，顺手补上了 OA 一直没有的「待办改派」能力。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 数据库 | `backend/sql/251_hr_offboarding_task.sql`；`config/HrOffboardingSchemaInitializer`（`hr:offboarding-schema:v1.0`，@Order(34)）；已进 catalog.json + `ContractRegistry.hrOffboardingContracts()` |
+| 实体 | `HrOffboardingTask`（TYPE_/STATUS_ 常量即 CHECK 同源）；`HrLifecycleRequest` 新增 `handoverToUserId/handoverToName` |
+| 服务 | `HrOffboardingTaskService(+Impl)`：登记/执行/指定接收人/到期拾取；`HrOffboardingTaskJob`（cron `hr.offboarding-task.cron`，默认每小时第 25 分） |
+| 登记点 | `HrLifecycleCallbackServiceImpl.applyDimission` 末尾与离职事实**同事务**登记两类任务 |
+| 接口 | `GET /api/hr/offboarding/requests/{id}/tasks`、`GET /task-types`（view）、`POST /requests/{id}/receiver`、`POST /tasks/{id}/retry`（edit），菜单 `hr-dimission` + anyOf 其他人事菜单 |
+| 前端 | `src/api/hrOffboarding.ts`、`pages/Permission/HrLifecycle/OffboardingModal.tsx`（离职单列表操作列「交接聯動」） |
+
+#### 五条口径
+
+1. **终态不重跑**：`execute` 对 DONE/SKIPPED 直接抛错，`uk_offboarding_request_type(request_id, task_type)` 是库层兜底——这两处共同保证「重试不会重复建交接单」。
+2. **无事可做是 `SKIPPED` 而不是 `DONE`**：名下无在用资产 / 无待办节点与「已交接完」必须能在界面上区分。
+3. **定时只拾 `PENDING`**：`FAILED` 必须人工重试（不自动刷同一份错账）；`last_error` 携带可读原因（包括「还没指定接收人」）。
+4. **接收人不由代码猜**：未指定时任务停在等待态；`assignReceiver` 拒绝系统服务账号与离职人本人，姓名由服务端反查后落快照。
+5. **OA 改派按整段签名匹配且等长替换**：`biz_oa_approval_task.approver` 是「姓名(工号)」逗号串，子串匹配会把 `李大仁(MF000110)` 的待办抢走；会签(all) 按 `approvedBy` 数量判断是否审完，删 token 会造成提前通过。
+6. **只创建交接任务，不越过 EAM**：不改 `eam_asset.current_holder_id`，实际归还仍由资产台合法动作完成（§7.4 原边界）。
+
+#### 开发库实测
+
+- `hr_offboarding_task` 已建：16 列 + `uk_offboarding_request_type` 唯一键 + 2 个 CHECK；`hr_lifecycle_request.handover_to_*` 已就位；行数 0（尚未办理过新离职单）
+- 契约 **55 项**通过、`ready=200`；新端点未登录 401
+- 测试：后端全量 **1645 例 0 失败**（新增 `HrOffboardingTaskServiceTest` 11 + `HrOffboardingControllerMappingTest` 4）；前端 `npm run verify` 各门禁全过（stat-order 144 页 / confirm-modal 244 处 / i18n / secret-scan），新增 `OffboardingModal` 4 例绿。⚠ 全量 vitest 在并行高压下 `AlgorithmAdd.traffic` 与 `TrafficAlgorithmConfig` 依旧超时报错，单独跑 7 文件 109 例全绿（与人事无关的老 flaky）
+
+#### 尚未做
+
+- 未做浏览器端离职办理→交接单的端到端回归（需一个真实有人使用的资产 + 一张离职单）
+- 钉钉待办/群通知联动未接入（可继续往 `hr_offboarding_task` 加 `task_type`，执行器与重试入口不需再改）
+
+### 11.7 花名册人员范围与三档导出已实现（2026-10-18）
+
+§5.1/§7.3 的花名册第一步。**本次不改表、不加菜单、不加动作**（`export` 动作 P2 已登记），因此没有新 versionKey。
+
+#### 入口拆分（关键口径，接手人最容易改错的一处）
+
+```text
+GET /api/employees           → 不收敛：OA/EAM/会议/RDM/考勤 的「选个人」下拉数据源（前端 fetchEmployeeOptions）
+GET /api/employees/roster    → 收敛：花名册页专用（employee-management:view）
+GET /api/employees/roster/export → 收敛 + 单独 export 动作 + 落 ROSTER_EXPORT 审计
+```
+
+为什么不直接把收敛加在 `GET /employees` 上：那个接口被≈30 个页面调用，收敛后受限角色会在其它模块
+突然选不到审批人/领用人。人员范围约束的是「按人划权限看名单」，不是「引用一个人」（§7.3）。
+服务层 `EmployeeService.list(..., Set<Long> visibleUserIds)` 由**调用方**传集合：
+`null` = 不收敛，**空集 = 不查库直接空**（写反一次就是把越权当不限制、或把后台作业做成 0 结果）。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 切面 | `annotation/EnsureEmployeeScope` + `aspect/EmployeeScopeAspect`：类级注解一次覆盖 `EmployeeController` 全部 `/{id}` 端点（手动改 30+ 个方法必漏）；只认名为 `id` 的 Long 参数，取不到就不猜 |
+| 为何不在服务层 | 异动自动停号、离职办理也走 `EmployeeServiceImpl.requireUser`；在那里加人员范围会把正常办理拒掉，收敛只属于 HTTP 入口 |
+| 导出 | `EmployeeService.ROSTER_EXPORT_MAX_ROWS = 5000`：多取一条判上限，超限**拒绝**而不是默默截断；取数与列表共用 `queryRoster`，避免两套口径 |
+| 审计 | `ROSTER_EXPORT`（记录导出人数 + 筛选条件摘要，不记条件以外的敏感内容） |
+| 前端 | `src/api/employee.ts` 新增 `fetchRosterEmployees` / `fetchRosterExport`；花名册页取数已切到 roster；导出按钮改成三档 Dropdown（當前頁 / 選中項 / 全部篩選結果，后者无 export 权时不渲染） |
+
+#### 仍未做的花名册部分（下一批）
+
+- ~~默认列改造~~ → **已完成，见 11.8**
+- ~~详情「雇佣与任职」Tab 展示雇佣期间~~ → **已完成，见 11.8**
+- 导入预校验（重复身份提示、错误行下载）——前提是导入功能本身还不存在，见 11.8 末尾说明
+- 合同台账 `contract-ledger` 的全量清单尚未按人员范围收敛（它是台账不是花名册，需单独定口径）
+
+#### 验证
+
+- `EmployeeRosterScopeTest` 3 例：空集不查库、可见集下推成 `id IN`、不传范围时**不带**该条件（反例断言，防误伤下拉）
+- `EmployeeScopeAspectTest` 3 例：带 `id` 就校验、无 `id` 不乱猜、越权时业务方法不被执行
+- `EmployeePermissionSplitTest` 补 2 条断言：viewer 可以进 `/roster`，但 `/roster/export` 必须 403
+- 后端全量 **1651 例 0 失败**；前端各门禁全过，新增/改动页单独跑 8 文件 43 例全绿（全量并行时仍是那两个老 flaky）；重启后日志无 ERROR、`ready=200`、新端点未登录 401（路由存在）
+### 11.8 花名册默认列与雇佣期间展示已实现（2026-10-18，P6-2）
+
+补齐 §5.1 默认列与 P4 欠的展示，仍然**不改表、不加动作**。
+
+#### 代码地图
+
+| 层 | 产物 |
+|---|---|
+| 服务 | `HrRosterQueryService(+Impl)`：先按人员范围取数，再用 as-of 任职 + 全部历史 + 已登记雇佣期间**各一次批查**富化默认列（不按人 N+1）；导出上限判定的唯一所在地 |
+| VO | `EmployeeVO` 新增 7 个花名册列（`employerCompany` / `employeeCategory` / `workLocation` / `directSuperior` / `hireDate` / `hireDateSource` / `probationStatus`），**仅 roster 链路填充** |
+| 接口 | `/employees/roster` 与 `/roster/export` 改为委派 `HrRosterQueryService`；控制器只留「筛选摘要 + 审计」 |
+| 前端 | `Employee/index.tsx` 默认列按 §5.1 顺序重排（其余降为可配置列）；`EmployeeDetail` 的「職務記錄」Tab 顶部新增 [EmploymentPeriods](../../../../src/pages/Permission/Employee/EmploymentPeriods.tsx) 区块 |
+
+#### 三条口径
+
+1. **不敢说就不说**：缺入职锚点→`hireDate=null + UNVERIFIED`（**绝不回落到 `sys_user.created_at`**）；没有转正事实→`UNKNOWN` 而不是 `PROBATION`（老员工转正往往未补录，猜错会直接影响薪酬/福利筛选）。
+2. **入职日与来源同格显示**，并且**导出也带来源列**：只给日期不给来源，等于把「任职登记日」包装成已核实的真实入职日。
+3. **列表与导出共用同一个取数方法**（`roster` / `rosterForExport`）：两处口径一分叉，导出就成了绕过范围收敛的出口。
+
+#### 验证
+
+- `HrRosterQueryTest` 6 例：法人/类别/地点/上级来自 as-of 任职、已登记期间（含 MANUAL）优先于任职登记日、缺锚点=UNVERIFIED、无转正事实=UNKNOWN、超上限拒绝、空集不取富化数据
+- 前端 `EmploymentPeriods.test.tsx` 4 例（含「失败不得伪装成空态」与来源标注）
+- 后端全量 **1657 例 0 失败**；前端 verify 各门禁全过（仅 `TrafficAlgorithmConfig` 全量并行超时报错，单独跑 9 例全绿）；重启 `ready=200`，`/roster*` 未登录 401（路由存在）
+
+#### 花名册仍剩下的部分
+
+- **导入预校验 / 重复身份提示 / 错误行下载**：前提是「导入功能本身」，而花名册至今**没有导入入口**（只能逐人建档）。这是新建能力而非改造，需单独一批做（含 `import` 动作、模板、异步任务化）
+- 合同台账 `contract-ledger` 的全量清单尚未按人员范围收敛（它是台账不是花名册，需单独定口径）
