@@ -118,6 +118,10 @@ class HrEmploymentPeriodTest {
         assertEquals(2, periods.size());
         assertEquals(HrEmploymentPeriod.STATUS_ENDED, periods.get(0).getStatus());
         assertEquals(LocalDate.of(2023, 4, 30), periods.get(0).getEndDate());
+        // 上一段已经由离职记录正常闭合：返聘锚点不能把它改写成「缺离职记录」，
+        // 否则真实离职原因被覆盖，并在核对清单里给 HR 一条假告警（端到端实测缺陷）。
+        assertEquals("個人原因", periods.get(0).getEndReason(),
+                "已闭合段落的离职原因必须保留，不能被 MISSING_DIMISSION_RECORD 覆掉");
         assertEquals(2, periods.get(1).getPeriodSeq());
         assertEquals(LocalDate.of(2024, 1, 2), periods.get(1).getStartDate());
         assertEquals("珠海麥峰科技有限公司", periods.get(1).getEmployerCompany());

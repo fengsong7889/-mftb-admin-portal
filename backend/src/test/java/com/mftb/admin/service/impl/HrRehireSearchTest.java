@@ -89,6 +89,14 @@ class HrRehireSearchTest {
         ArgumentCaptor<List<Long>> ids = ArgumentCaptor.forClass(List.class);
         verify(hrAssignmentQuery).employmentStatusOf(ids.capture(), any());
         assertEquals(List.of(11L, 12L, 13L), ids.getValue(), "判定必须批量做，不能逐个人查库");
+
+        // 返聘不能拿 status 当离职依据：status=0 里混着「冻结的在职者」，
+        // 而「已离职但账号被重新启用」的人会被 status=0 完全漏掉（端到端实测缺陷）。
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser>> wrapper =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(userMapper).selectList(wrapper.capture());
+        assertTrue(!wrapper.getValue().getSqlSegment().toLowerCase().contains("status"),
+                "返聘候选的 SQL 不该出现账号状态条件: " + wrapper.getValue().getSqlSegment());
     }
 
     @Test

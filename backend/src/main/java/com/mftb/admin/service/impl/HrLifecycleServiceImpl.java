@@ -275,11 +275,12 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
         }
         requireTypePermission(type, "view");
         // 重新入職的候选恰好相反：要的是已离职的人。但**不能拿账号状态当离职依据**——
-        // 被冻结的在职员工 status 也是 0，混进候选会让人把在职者再建一段雇佣。
-        // status=0 只做粗筛，最终由统一的 as-of 口径（任职事实）判定。
+        // 一来被冻结的在职员工 status 也是 0（混进来会给在职者凭空开一段雇佣），
+        // 二来“已离职但账号被重新启用”的人（返聘失败后留启用、或尚未走到停号）用 status=0 根本搜不到。
+        // 所以返聘**不加账号状态条件**，只拉宽窗口做粗筛，离职与否全部交给统一的 as-of 口径判定。
         boolean rehiring = HrLifecycleConstants.TYPE_REHIRE.equals(type);
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getStatus, rehiring ? 0 : 1)
+                .eq(!rehiring, SysUser::getStatus, 1)
                 // 内置系统管理员不是员工：本查询按 id 倒序取 20 条，而系统账号是最后插入的（id 最大），
                 // 不排除会直接占掉入转调离人员搜索的首位
                 .ne(SysUser::getUsername, BuiltinAccounts.ADMIN_USERNAME)

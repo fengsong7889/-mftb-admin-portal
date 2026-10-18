@@ -163,6 +163,10 @@ public class HrEmploymentPeriodServiceImpl implements HrEmploymentPeriodService 
         idsByPeriod.forEach((periodId, recordIds) -> positionRecordMapper.update(null,
                 new LambdaUpdateWrapper<EmpPositionRecord>()
                         .set(EmpPositionRecord::getEmploymentPeriodId, periodId)
+                        // 回填段归属属于“补链接”，不是一次业务修改：不写这一句的话，
+                        // 列上的 ON UPDATE CURRENT_TIMESTAMP 会把历史异动记录的 updatedAt 全部刷成本次时间，
+                        // 轨迹与列表的「最后更新时间」从此失真（实测缺陷）。
+                        .setSql("updated_at = updated_at")
                         .in(EmpPositionRecord::getId, recordIds)));
     }
 

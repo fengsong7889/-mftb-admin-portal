@@ -63,7 +63,7 @@ final class HrEmploymentPeriodCalculator {
 
         for (EmpPositionRecord record : timeline) {
             if (HrOperationCode.isEmploymentStart(record.getOperationCode(), record.getOperation())) {
-                if (open != null) {
+                if (open != null && open.getEndDate() == null) {
                     // 上一段还没等到离职记录就来了新的入职：截断但不编造结束日
                     open.setStatus(HrEmploymentPeriod.STATUS_ENDED);
                     open.setEndReason(END_REASON_MISSING_DIMISSION);
@@ -81,6 +81,9 @@ final class HrEmploymentPeriodCalculator {
                 open.setStatus(HrEmploymentPeriod.STATUS_ENDED);
                 open.setEndDate(record.getEffectiveDate());
                 open.setEndReason(record.getReason());
+                // 本段已由离职记录正常闭合：置空开段指针，否则下一张入职/返聘锚点会把它当成
+                // 「没等到离职记录」，用 MISSING_DIMISSION_RECORD 覆掉真实离职原因（实测缺陷）。
+                open = null;
                 continue;
             }
             if (HrOperationCode.REGULAR.equals(HrOperationCode.resolve(
