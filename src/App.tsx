@@ -475,6 +475,10 @@ function AuthenticatedLayout() {
               <Route path="/hr-onboarding" element={<HrLifecycle type="onboard" />} />
               <Route path="/hr-onboarding-form" element={<LifecycleForm type="onboard" />} />
               <Route path="/hr-onboarding-detail" element={<LifecycleDetail />} />
+              {/* 返聘单：不新增侧边栏菜单，路由挂在入職菜单的授权下（见 menuDataSource pathToKey） */}
+              <Route path="/hr-rehire" element={<HrLifecycle type="rehire" />} />
+              <Route path="/hr-rehire-form" element={<LifecycleForm type="rehire" />} />
+              <Route path="/hr-rehire-detail" element={<LifecycleDetail />} />
               <Route path="/hr-regularization" element={<HrLifecycle type="regular" />} />
               <Route path="/hr-regularization-form" element={<LifecycleForm type="regular" />} />
               <Route path="/hr-regularization-detail" element={<LifecycleDetail />} />

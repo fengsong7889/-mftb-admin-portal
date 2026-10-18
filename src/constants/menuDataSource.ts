@@ -329,6 +329,10 @@ pathToKey['/rdm-review'] = 'rdm-requirement'
 pathToKey['/rdm-change'] = 'rdm-requirement'
 // 入转调离表单/详情为各菜单子页面（非独立菜单），归入各自列表菜单
 pathToKey['/hr-onboarding-form'] = 'hr-onboarding'
+// 返聘（重新入职）不是新菜单：三个路由都授权到 hr-onboarding
+pathToKey['/hr-rehire'] = 'hr-onboarding'
+pathToKey['/hr-rehire-form'] = 'hr-onboarding'
+pathToKey['/hr-rehire-detail'] = 'hr-onboarding'
 pathToKey['/hr-onboarding-detail'] = 'hr-onboarding'
 pathToKey['/hr-regularization-form'] = 'hr-regularization'
 pathToKey['/hr-regularization-detail'] = 'hr-regularization'

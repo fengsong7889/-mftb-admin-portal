@@ -7,6 +7,7 @@ export const TYPE_LABEL_KEY: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: 'hrLifecycle.typeTransfer',
   [HR_LIFECYCLE_TYPE.DIMISSION]: 'hrLifecycle.typeDimission',
   [HR_LIFECYCLE_TYPE.RENEW]: 'hrLifecycle.typeRenew',
+  [HR_LIFECYCLE_TYPE.REHIRE]: 'hrLifecycle.typeRehire',
 }
 
 /** 单据类型 → 品牌色 Tag 颜色 */
@@ -16,6 +17,7 @@ export const TYPE_TAG_COLOR: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: 'purple',
   [HR_LIFECYCLE_TYPE.DIMISSION]: 'red',
   [HR_LIFECYCLE_TYPE.RENEW]: 'cyan',
+  [HR_LIFECYCLE_TYPE.REHIRE]: 'orange',
 }
 
 /** 状态 → 名称 i18n key */

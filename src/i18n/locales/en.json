@@ -9430,7 +9430,12 @@
     "contractNo": "Contract No.",
     "transferFrom": "From → To",
     "handoverReceiver": "Handover receiver",
-    "handoverReceiverUnset": "Not set — choose a receiver in the offboarding handover panel, otherwise assets and to-dos stay pending"
+    "handoverReceiverUnset": "Not set — choose a receiver in the offboarding handover panel, otherwise assets and to-dos stay pending",
+    "typeRehire": "Rehire",
+    "rehireFormTitle": "Rehire Request",
+    "gotoRehire": "Rehire Records",
+    "gotoOnboard": "Back to Onboarding",
+    "addRehire": "New Rehire"
   },
   "hrLeave": {
     "typeAnnual": "Annual",

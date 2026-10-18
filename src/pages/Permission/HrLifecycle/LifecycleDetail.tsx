@@ -242,7 +242,7 @@ export default function LifecycleDetail() {
       )}
 
       {/* 调动明细 */}
-      {type === HR_LIFECYCLE_TYPE.TRANSFER && (
+      {(type === HR_LIFECYCLE_TYPE.TRANSFER || type === HR_LIFECYCLE_TYPE.REHIRE) && (
         <Card size="small" className="detail-card" title={t('hrLifecycle.sectionTransfer')} style={{ marginBottom: 16 }}>
           <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small">
             <Descriptions.Item label={t('hrLifecycle.oldDept')}>{item.oldDeptName || '-'}</Descriptions.Item>

@@ -9430,7 +9430,12 @@
     "contractNo": "合同編號",
     "transferFrom": "調動前 → 調動後",
     "handoverReceiver": "交接接收人",
-    "handoverReceiverUnset": "尚未指定 —— 請到離職單「交接聯動」指定接收人，否則資產與待辦不會轉出"
+    "handoverReceiverUnset": "尚未指定 —— 請到離職單「交接聯動」指定接收人，否則資產與待辦不會轉出",
+    "typeRehire": "重新入職",
+    "rehireFormTitle": "重新入職申請",
+    "gotoRehire": "重新入職記錄",
+    "gotoOnboard": "返回入職記錄",
+    "addRehire": "新增重新入職"
   },
   "hrLeave": {
     "title": "請假管理",

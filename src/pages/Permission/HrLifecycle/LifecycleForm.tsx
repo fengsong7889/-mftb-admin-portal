@@ -67,6 +67,14 @@ interface FormValues {
 }
 
 /** 入转调离单据表单页（新增/编辑草稿共用，按 type 渲染字段块；提交走 OA 审批） */
+/**
+ * 重新入职（返聘）与调动共用同一套表单字段：选员工 + 调入部门/职位 + 生效日 + 原因。
+ * 两者的差异只在**人员候选集**（后端按 type 对 rehire 返回已离职者）与**办理动作**
+ * （复职复用原账号并开启新一段雇佣），不在表单结构 —— 所以复用分支而不是抄一份表单，
+ * 抄一份的结果是两边校验慢慢漂移（调动改了必填、返聘忘了跟）。
+ */
+const isTransferish = (type: HrLifecycleType) => type === 'transfer' || type === 'rehire'
+
 export default function LifecycleForm({ type }: Props) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -237,7 +245,7 @@ export default function LifecycleForm({ type }: Props) {
       deptId: brief.departmentId ?? undefined,
       positionId: brief.positionId ?? undefined,
     })
-    if (type === 'transfer') {
+    if (isTransferish(type)) {
       form.setFieldsValue({
         newDeptId: brief.departmentId ?? undefined,
         newPositionId: brief.positionId ?? undefined,
@@ -291,7 +299,7 @@ export default function LifecycleForm({ type }: Props) {
       payload.newContractStartDate = values.newContractStartDate?.format('YYYY-MM-DD')
       payload.newContractEndDate = values.newContractEndDate?.format('YYYY-MM-DD')
     }
-    if (type === 'transfer') {
+    if (isTransferish(type)) {
       payload.newDeptId = values.newDeptId
       payload.newPositionId = values.newPositionId
       payload.newCompany = values.newCompany
@@ -321,7 +329,7 @@ export default function LifecycleForm({ type }: Props) {
     if (type === 'regular') {
       rows.push([t('hrLifecycle.effectiveDate'), values.effectiveDate?.format('YYYY-MM-DD') ?? '-'])
     }
-    if (type === 'transfer') {
+    if (isTransferish(type)) {
       rows.push([t('hrLifecycle.newDept'), deptTitle(values.newDeptId)])
       rows.push([t('hrLifecycle.newPosition'), positionTitle(values.newPositionId)])
       rows.push([t('hrLifecycle.effectiveDate'), values.effectiveDate?.format('YYYY-MM-DD') ?? '-'])
@@ -390,8 +398,9 @@ export default function LifecycleForm({ type }: Props) {
   const titleKey = type === 'renew' ? 'hrLifecycle.renewFormTitle'
     : type === 'onboard' ? 'hrLifecycle.onboardFormTitle'
     : type === 'regular' ? 'hrLifecycle.regularFormTitle'
-      : type === 'transfer' ? 'hrLifecycle.transferFormTitle'
-        : 'hrLifecycle.dimissionFormTitle'
+      : type === 'rehire' ? 'hrLifecycle.rehireFormTitle'
+        : type === 'transfer' ? 'hrLifecycle.transferFormTitle'
+          : 'hrLifecycle.dimissionFormTitle'
 
   const sectionCardStyle = { marginBottom: 16, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }
 
@@ -535,7 +544,7 @@ export default function LifecycleForm({ type }: Props) {
         )}
 
         {/* 调动信息 */}
-        {type === 'transfer' && (
+        {isTransferish(type) && (
           <Card size="small" style={sectionCardStyle} title={t('hrLifecycle.sectionTransfer')}>
             <Space size={16} wrap>
               <Form.Item
@@ -636,7 +645,7 @@ export default function LifecycleForm({ type }: Props) {
             {type !== 'onboard' && (
               <Form.Item
                 name="effectiveDate" label={t('hrLifecycle.effectiveDate')}
-                rules={type === 'regular' || type === 'transfer'
+                rules={type === 'regular' || isTransferish(type)
                   ? [{ required: true, message: t('hrLifecycle.effectiveDateRequired') }] : undefined}
               >
                 <DatePicker style={{ width: 200 }} />

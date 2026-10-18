@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Modal, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { HistoryOutlined, PlusOutlined, ReloadOutlined, RollbackOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -51,6 +51,7 @@ export default function LifecycleList({ type }: Props) {
 
   /** 入职单列名差异化（候选人/计划入职日期，其余类型用员工/生效日期；续签显示新旧合同号） */
   const isOnboard = type === 'onboard'
+  const isRehire = type === 'rehire'
   const isDimission = type === 'dimission'
   /** 离职才有的交接联动面板（资产交接 + OA 待办改派） */
   const [offboardingFor, setOffboardingFor] = useState<HrLifecycleItem | null>(null)
@@ -300,11 +301,24 @@ export default function LifecycleList({ type }: Props) {
 
       {/* 操作区 */}
       <div className="action-section">
-        <div className="action-section-left" />
+        <div className="action-section-left">
+          {/* 入職與返聘共用同一套异动表单，但**人员候选集相反**（在册 / 已离职），所以拆成两个列表入口：
+              混在一个列表里，「新增」该提交哪个 type、状态 Tab 在统计谁的数据都会有歧义。 */}
+          {isOnboard && (
+            <Button icon={<HistoryOutlined />} onClick={() => navigate('/hr-rehire')}>
+              {t('hrLifecycle.gotoRehire')}
+            </Button>
+          )}
+          {isRehire && (
+            <Button icon={<RollbackOutlined />} onClick={() => navigate('/hr-onboarding')}>
+              {t('hrLifecycle.gotoOnboard')}
+            </Button>
+          )}
+        </div>
         <div className="action-section-right">
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${routeBase}-form`)}>
-              {isOnboard ? t('hrLifecycle.addOnboard') : t('hrLifecycle.addRequest')}
+              {isOnboard ? t('hrLifecycle.addOnboard') : isRehire ? t('hrLifecycle.addRehire') : t('hrLifecycle.addRequest')}
             </Button>
           )}
           {configComponent}

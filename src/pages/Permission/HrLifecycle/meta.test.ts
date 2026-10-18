@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   HR_LIFECYCLE_MENU_KEY,
+  HR_LIFECYCLE_PROCESS_CODE,
   HR_LIFECYCLE_TYPE,
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_ROUTE,
@@ -10,9 +11,10 @@ import { EDITABLE_STATUSES, STATUS_TABS, STATUS_TAG_COLOR, TYPE_LABEL_KEY, build
 
 /** 入转调离共享元数据：菜单/路由映射与状态机常量的自洽性（与后端 HrLifecycleConstants 同口径） */
 describe('HR 入转调离 meta', () => {
-  it('四类单据都有独立的授权菜单与列表路由', () => {
+  it('六类单据都有独立的授权菜单与列表路由', () => {
     const types = Object.values(HR_LIFECYCLE_TYPE)
-    expect(new Set(types)).toEqual(new Set(['onboard', 'regular', 'transfer', 'dimission', 'renew']))
+    expect(new Set(types)).toEqual(
+      new Set(['onboard', 'regular', 'transfer', 'dimission', 'renew', 'rehire']))
     for (const type of types) {
       expect(TYPE_LABEL_KEY[type]).toContain('hrLifecycle.')
       expect(HR_LIFECYCLE_MENU_KEY[type]).toBeTruthy()
@@ -27,6 +29,12 @@ describe('HR 入转调离 meta', () => {
     expect(HR_LIFECYCLE_MENU_KEY.renew).toBe('contract-ledger')
     expect(HR_LIFECYCLE_LIST_PATH.renew).toBe('/contract-ledger')
     expect(HR_LIFECYCLE_ROUTE.renew).toBe('/hr-contract-renew')
+    // 返聘同样不建新菜单（挂 hr-onboarding），但列表/表单/详情走自己的 /hr-rehire 路由；
+    // 所以 LIST_PATH 不等于 `/${MENU_KEY}`，不能放进上面那个循环
+    expect(HR_LIFECYCLE_MENU_KEY.rehire).toBe('hr-onboarding')
+    expect(HR_LIFECYCLE_LIST_PATH.rehire).toBe('/hr-rehire')
+    expect(HR_LIFECYCLE_ROUTE.rehire).toBe('/hr-rehire')
+    expect(HR_LIFECYCLE_PROCESS_CODE.rehire).toBe('hr_rehire')
   })
 
   it('状态 Tab 覆盖全部可筛选状态且不重复', () => {

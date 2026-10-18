@@ -13,6 +13,11 @@ export const HR_LIFECYCLE_TYPE = {
   DIMISSION: 'dimission',
   /** 合同续签（入口与授权归属合同台账） */
   RENEW: 'renew',
+  /**
+   * 重新入职（离职后返聘）：针对已离职员工复用原账号、开启新一段雇佣。
+   * 授权贴在职入職菜单，不新增侧边栏入口（后端 TYPE_TO_MENU_KEY 同步这一口径）。
+   */
+  REHIRE: 'rehire',
 } as const
 
 export type HrLifecycleType = (typeof HR_LIFECYCLE_TYPE)[keyof typeof HR_LIFECYCLE_TYPE]
@@ -24,6 +29,7 @@ export const HR_LIFECYCLE_PROCESS_CODE: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: 'hr_transfer',
   [HR_LIFECYCLE_TYPE.DIMISSION]: 'hr_dimission',
   [HR_LIFECYCLE_TYPE.RENEW]: 'hr_renew',
+  [HR_LIFECYCLE_TYPE.REHIRE]: 'hr_rehire',
 }
 
 /** OA 流程编码 → 单据类型：审批详情页据此判定 bizId 属于哪张单据，禁止跨域猜测 */
@@ -39,6 +45,7 @@ export const HR_LIFECYCLE_MENU_KEY: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: 'hr-transfer',
   [HR_LIFECYCLE_TYPE.DIMISSION]: 'hr-dimission',
   [HR_LIFECYCLE_TYPE.RENEW]: 'contract-ledger',
+  [HR_LIFECYCLE_TYPE.REHIRE]: 'hr-onboarding',
 }
 
 /** 单据类型 → 列表页路由（续签回到合同台账页） */
@@ -48,6 +55,8 @@ export const HR_LIFECYCLE_LIST_PATH: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: '/hr-transfer',
   [HR_LIFECYCLE_TYPE.DIMISSION]: '/hr-dimission',
   [HR_LIFECYCLE_TYPE.RENEW]: '/contract-ledger',
+  // 返聘单回归入職菜单页：不新建侧边栏菜单
+  [HR_LIFECYCLE_TYPE.REHIRE]: '/hr-rehire',
 }
 
 /** 单据类型 → 表单/详情路由前缀（续签有独立路由，其余为 /hr-xx） */
@@ -57,6 +66,7 @@ export const HR_LIFECYCLE_ROUTE: Record<HrLifecycleType, string> = {
   [HR_LIFECYCLE_TYPE.TRANSFER]: '/hr-transfer',
   [HR_LIFECYCLE_TYPE.DIMISSION]: '/hr-dimission',
   [HR_LIFECYCLE_TYPE.RENEW]: '/hr-contract-renew',
+  [HR_LIFECYCLE_TYPE.REHIRE]: '/hr-rehire',
 }
 
 /** 单据状态（与后端状态机对齐） */

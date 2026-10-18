@@ -756,7 +756,15 @@ GET /api/employees/roster/export → 收敛 + 单独 export 动作 + 落 ROSTER_
 - 迁移：`hr:rehire-process:v1.0`（`HrRehireProcessInitializer` @Order(35)，只种子 `biz_oa_process.hr_rehire`，`verify` 要求流程存在且 `status=1` 否则抛错）+ `sql/252_hr_rehire_process.sql` + catalog 登记。
 - 复用生效日引擎：复职日期在未来 → 审批通过只登记 `hr_effective_task`，**不提前启用账号**（到点由每日任务执行）。
 
-**⚠ 本批只有后端**：前端 `hrLifecycle.ts` 类型映射、`LifecycleForm` 返聘字段块、路由与入职页入口、i18n、前端测试**均未做**；当前没有创建 `rehire` 单据的入口，下一批补完前端才可用。
+**前端已收口（同日第二批）**：
+- `hrLifecycle.ts` 补 `REHIRE` 与四张映射（流程码 `hr_rehire`、授权菜单 `hr-onboarding`、列表/表单路由 `/hr-rehire`）；`meta.ts` 补类型名与 Tag 色。
+- **路由不建新菜单**：`/hr-rehire`、`/hr-rehire-form`、`/hr-rehire-detail` 三个 path 在 `menuDataSource.pathToKey` 里全部授权到 `hr-onboarding`，与后端 `TYPE_TO_MENU_KEY` 同口径（菜单一致性门禁通过）。
+- `LifecycleForm` 用 `isTransferish(type)` 让返聘**复用调动那套字段与校验**（选员工 + 调入部门/职位 + 生效日 + 原因），而不是抄一份表单——抄一份迟早漂移（调动改必填、返聘忘了跟）。人员候选集由后端按 `type` 返回已离职者，前端无需额外分支。
+- `LifecycleDetail` 的异动信息卡对返聘同样显示；`LifecycleList` 在入职页加「重新入職記錄」入口、返聘页加返回入口（**两个列表不混类型**：混了以后「新增」提交哪个 type、状态 Tab 统计谁的数据都会有歧义）。
+- i18n：`hrLifecycle` 的 typeRehire / rehireFormTitle / gotoRehire / gotoOnboard / addRehire（zh-TW + en）。
+- `meta.test.ts` 从「四类」改为「六类」，并钉住返聘的 `LIST_PATH ≠ /${MENU_KEY}` 这个例外（因此不能放进那个循环）。
+
+门禁：typecheck 通过；HR 域 6 文件 25 例、HrLifecycle 全绿；`npm run verify` 全量 884 passed，5 例失败集中在 NotificationConfig / Rdm-StockMigration / TrafficAlgorithmConfig 三个**与本批无关**的文件，单独跑 26/26 绿（并行负载超时的既存 flaky）。
 
 **门禁**：后端全量 **1665 例 0 失败**（新增 `HrRehireLifecycleTest` 3 例：复用原账号 + REHIRE code + reactivate、在职者拒办、未来生效只登记任务；`HrRehireSearchTest` 2 例：返聘候选剔除「停用但未离职」且判定必须批量、其它类型行为不变）。开发库重启：`hr_rehire` 种子新插入 1 条，迁移 21/21「执行并校验完成」，结构契约 **55 项全通过**。
 
