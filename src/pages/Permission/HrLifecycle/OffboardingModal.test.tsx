@@ -69,7 +69,8 @@ describe('OffboardingModal', () => {
       },
     ])
     render(<OffboardingModal open requestId={88} onClose={vi.fn()} canManage />)
-    await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1))
+    // 等任务行真正渲染落地再取按钮：只等 fetch 被调用会拿先 footer 按钮，CI 慢渲染管线下曾拁出过竞态
+    expect(await screen.findByText('資產交接')).toBeInTheDocument()
 
     const labels = Array.from(document.querySelectorAll('button'))
       .map(btn => btn.textContent?.trim())
@@ -83,7 +84,8 @@ describe('OffboardingModal', () => {
 
   it('已完成的任务不给重试，失败的任务给', async () => {
     render(<OffboardingModal open requestId={88} onClose={vi.fn()} canManage />)
-    await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1))
+    // 同上：等任务行渲染落地，避免同步取按钮的竞态
+    expect(await screen.findByText('資產交接')).toBeInTheDocument()
 
     // Modal 在 body portal 里，从 document 取；「重試」只出现在行内操作列（刷新叫「重新取數」）
     const retryButtons = Array.from(document.querySelectorAll('button'))
