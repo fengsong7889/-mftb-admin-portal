@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { Space } from 'antd'
+import BrandLogo from './BrandLogo'
 import {
   // 侧边栏菜单图标（按菜单 key 使用）
   HomeOutlined,
@@ -308,9 +309,20 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
 /** 全部可用图标名称（用于图标选择器） */
 export const MENU_ICON_NAMES = Object.keys(ICON_COMPONENTS)
 
-/** 按图标名称渲染图标组件；未注册或空名称返回 null */
-export function renderMenuIcon(name?: string | null): ReactNode {
+/**
+ * 品牌圖標註冊表：sys_system.icon 與 menu.icon 共用同一字符串字段，
+ * 配置為品牌標識名（如 'BrandLogo'）時渲染自定義 SVG 品牌圖標。
+ * 系統圖標完全由 DB 配置驅動，代碼不對特定系統做例外。
+ */
+const BRAND_ICON_COMPONENTS: Record<string, ComponentType<{ size?: number }>> = {
+  BrandLogo,
+}
+
+/** 按图标名称渲染图标组件；未注册或空名称返回 null。size 仅对品牌 SVG 图标生效。 */
+export function renderMenuIcon(name?: string | null, size?: number): ReactNode {
   if (!name) return null
+  const BrandComp = BRAND_ICON_COMPONENTS[name]
+  if (BrandComp) return createElement(BrandComp, { size: size ?? 20 })
   const Comp = ICON_COMPONENTS[name]
   return Comp ? createElement(Comp) : null
 }

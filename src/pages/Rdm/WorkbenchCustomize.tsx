@@ -9,6 +9,7 @@
  * 依赖 columnMeta 的显隐/锁定语义），本面板管理的是页面区块顺序，不是表格列。
  */
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Checkbox, Popover, Space, Tag } from 'antd'
 import { ArrowDownOutlined, ArrowUpOutlined, SettingOutlined } from '@ant-design/icons'
 import type { HelpSection } from '../../components/HelpPopover'
@@ -17,14 +18,15 @@ import { RDM_IDENTITY_LABEL, type WorkbenchLayout } from './workbenchLayout'
 import { DEFAULT_SECTION_ICON, RDM_SECTION_ICON } from './workbenchSectionIcons'
 
 /** 面板底部的说明：把「谁决定区块」讲清楚，避免用户以为是自己权限不够 */
-const LAYOUT_HELP: HelpSection[] = [
-  { tone: 'info', label: '推薦從哪來', body: '系統按你的工作身份推薦區塊順序；身份由菜單權限與後端角色標籤推導。' },
-  { tone: 'neutral', label: '候選清單', body: '這裡只列出你已持有菜單權限的區塊，點不出進不去的頁面。' },
-  { tone: 'warn', label: '保存範圍', body: '佈局只存在本機瀏覽器（按工號隔離），不寫庫、不跨設備同步。' },
-  { tone: 'success', label: '不影響權限', body: '這裡只改顯示順序；能看什麼仍由後端鑒權與數據範圍決定。' },
+const LAYOUT_HELP = (t: (key: string) => string): HelpSection[] => [
+  { tone: 'info', label: t('rdm.workbenchCustomize.helpFromLabel'), body: t('rdm.workbenchCustomize.helpFromBody') },
+  { tone: 'neutral', label: t('rdm.workbenchCustomize.helpCandidatesLabel'), body: t('rdm.workbenchCustomize.helpCandidatesBody') },
+  { tone: 'success', label: t('rdm.workbenchCustomize.helpScopeLabel'), body: t('rdm.workbenchCustomize.helpScopeBody') },
+  { tone: 'success', label: t('rdm.workbenchCustomize.helpPermLabel'), body: t('rdm.workbenchCustomize.helpPermBody') },
 ]
 
 export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const { visibleKeys, candidates, toggle, move, reset, customized, identities } = layout
 
@@ -99,7 +101,7 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
           ariaLabel="工作台佈局說明"
           placement="topLeft"
           width={360}
-          content={LAYOUT_HELP}
+          content={LAYOUT_HELP(t)}
         />
         <Button size="small" disabled={!customized} onClick={reset} style={{ marginLeft: 'auto' }}>
           恢復推薦佈局

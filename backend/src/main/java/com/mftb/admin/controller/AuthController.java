@@ -276,6 +276,142 @@ public class AuthController {
         return result;
     }
 
+    /* ────────────── AI 助手偏好设置 ────────────── */
+
+    /** AI 设置 JSON 体最大长度（10KB，远大于当前 4 个字段，只为挡恶意超大请求） */
+    private static final int AI_SETTINGS_MAX_LEN = 10 * 1024;
+
+    /** AI 设置合法字段白名单 */
+    private static final java.util.Set<String> AI_SETTINGS_ALLOWED_KEYS = java.util.Set.of(
+            "engineMode", "contextWindow", "thinkingEnabled", "thinkingDepth");
+
+    /**
+     * 获取当前用户 AI 助手偏好设置。
+     * 从未同步过时 data 为 null（Jackson non_null 会省略该字段），前端据此回退本地缓存；
+     * 同步过且已清空则返回空对象，覆盖本地缓存。
+     */
+    @GetMapping("/ai-settings")
+    public Result<Object> getAiSettings() {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        String json = authService.getAiSettings(username);
+        if (json == null || json.isBlank()) {
+            // 返回 null，Jackson non_null 会省略 data 字段，前端据此判断「从未同步过」
+            return Result.success(null);
+        }
+        try {
+            Object parsed = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .readValue(json, Object.class);
+            return Result.success(parsed);
+        } catch (Exception e) {
+            log.warn("解析 ai_settings 失败: {}", e.getMessage());
+            return Result.success(null);
+        }
+    }
+
+    /** 保存当前用户 AI 助手偏好设置（整份覆盖，只允许改自己的设置——username 取自 JWT） */
+    @SuppressWarnings("unchecked")
+    @PutMapping("/ai-settings")
+    public Result<Void> saveAiSettings(@RequestBody Object body) {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        if (!(body instanceof java.util.Map)) {
+            return Result.error("設置格式不正確");
+        }
+        java.util.Map<String, Object> raw = (java.util.Map<String, Object>) body;
+        // 字段白名单过滤 + 基本校验
+        java.util.Map<String, Object> cleaned = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> entry : raw.entrySet()) {
+            String key = entry.getKey();
+            if (!AI_SETTINGS_ALLOWED_KEYS.contains(key)) continue;
+            Object val = entry.getValue();
+            if (!isValidAiSettingValue(key, val)) {
+                return Result.error("設置值不正確: " + key);
+            }
+            cleaned.put(key, val);
+        }
+        String json = toJsonMap(cleaned);
+        if (json.length() > AI_SETTINGS_MAX_LEN) {
+            return Result.error("設置數據過大");
+        }
+        authService.saveAiSettings(username, json);
+        return Result.success();
+    }
+
+    /** 校验单个 AI 设置值的类型和范围 */
+    private boolean isValidAiSettingValue(String key, Object value) {
+        if (value == null) return true; // null 表示重置为默认
+        return switch (key) {
+            case "engineMode" -> value instanceof String s
+                    && (s.equals("auto") || s.equals("primary") || s.equals("off-peak"));
+            case "contextWindow" -> value == null
+                    || value instanceof Number n && n.longValue() > 0 && n.longValue() <= 10_000_000;
+            case "thinkingEnabled" -> value instanceof Boolean;
+            case "thinkingDepth" -> value instanceof String s
+                    && (s.equals("low") || s.equals("medium") || s.equals("high")
+                    || s.equals("xhigh") || s.equals("max"));
+            default -> false;
+        };
+    }
+
+    private String toJsonMap(java.util.Map<String, Object> map) {
+        try {
+            return com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .writeValueAsString(map);
+        } catch (Exception e) {
+            throw new RuntimeException("JSON 序列化失败", e);
+        }
+    }
+
+    /* ────────────── 产研交付个人工作台布局 ────────────── */
+
+    /** 工作台布局 JSON 体最大长度（10KB，区块列表有限，远大于实际需求） */
+    private static final int WORKBENCH_LAYOUT_MAX_LEN = 10 * 1024;
+
+    /**
+     * 获取当前用户产研交付个人工作台布局偏好。
+     * 从未同步过时 data 为 null（Jackson non_null 会省略该字段），前端据此回退 localStorage。
+     */
+    @GetMapping("/workbench-layout")
+    public Result<Object> getWorkbenchLayout() {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        String json = authService.getWorkbenchLayout(username);
+        if (json == null || json.isBlank()) {
+            return Result.success(null);
+        }
+        try {
+            Object parsed = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .readValue(json, Object.class);
+            return Result.success(parsed);
+        } catch (Exception e) {
+            log.warn("解析 workbench_layout 失败: {}", e.getMessage());
+            return Result.success(null);
+        }
+    }
+
+    /** 保存当前用户产研交付个人工作台布局偏好（整份覆盖，username 取自 JWT） */
+    @PutMapping("/workbench-layout")
+    public Result<Void> saveWorkbenchLayout(@RequestBody Object body) {
+        String username = currentUsername();
+        if (username == null) return Result.error(ResultCode.UNAUTHORIZED);
+        if (!(body instanceof java.util.Map)) {
+            return Result.error("布局格式不正确");
+        }
+        String json;
+        try {
+            json = com.fasterxml.jackson.databind.json.JsonMapper.builder().build()
+                    .writeValueAsString(body);
+        } catch (Exception e) {
+            return Result.error("布局序列化失败");
+        }
+        if (json.length() > WORKBENCH_LAYOUT_MAX_LEN) {
+            return Result.error("布局数据过大");
+        }
+        authService.saveWorkbenchLayout(username, json);
+        return Result.success();
+    }
+
     /**
      * 保存用户选中的在线头像 URL（IconFont 等外部 URL）
      * @param request

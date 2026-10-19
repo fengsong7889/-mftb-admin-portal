@@ -94,6 +94,12 @@ public class RdmProjectDTO {
         private String keyword;
         private Long pmUserId;
         private String status;
+        /**
+         * 统计卡下钻口径：inProgress / attention / pending（空值不下钻）。
+         * <p>只作用于列表分页；统计卡、导出、对账均忽略此字段，否则点一次卡片
+         * 数字就会变成自己筛出来的那个值（自我实现），也拿不到全量口径的导出。
+         */
+        private String drill;
         private Integer pageNo = 1;
         private Integer pageSize = 20;
     }

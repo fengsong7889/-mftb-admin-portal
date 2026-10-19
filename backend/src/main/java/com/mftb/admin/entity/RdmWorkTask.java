@@ -86,6 +86,13 @@ public class RdmWorkTask {
     /** 所属迭代编码 */
     private String iterationCode;
 
+    /**
+     * 排期版本（乐观锁）：甘特图拖拽调期与任务表单改期共用。
+     * <p>每次计划起止或负责人变更自增；更新时以 expected version 作条件，
+     * 防止两个入口并发互相覆盖（last-write-wins 会静默丢排期）。
+     */
+    private Integer planVersion;
+
     private String createdBy;
 
     private String updatedBy;

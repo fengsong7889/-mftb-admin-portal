@@ -20,12 +20,12 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import GanttChart from './components/GanttChart'
-import WorkloadPanel from './components/WorkloadPanel'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   addCrossDeliveryDependency,
@@ -69,11 +69,10 @@ const VIEW_OPTIONS = [
   { label: '全部', value: 'all' },
 ]
 
-/** 视图模式（阶段 5）：任务列表 / 甘特与关键路径 / 资源负载 */
+/** 视图模式（阶段 5）：任务列表 / 甘特与关键路径；资源负载已升级为独立菜单「團隊負載」（/rdm-resource-load） */
 const MODE_OPTIONS = [
   { label: '任務列表', value: 'task' },
   { label: '甘特與關鍵路徑', value: 'gantt' },
-  { label: '資源負載', value: 'load' },
 ]
 
 /** V3：任务分组视角（按任务 / 按交付项） */
@@ -84,8 +83,9 @@ const GROUP_MODE_OPTIONS = [
 
 export default function DeliveryBoard() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
-  /** 三个视图共用一个页面：新建路由会撞 MenuTabs 的非菜单页名兜底表上限（已达 20/20） */
+  /** 两个视图共用一个页面：新建路由会撞 MenuTabs 的非菜单页名兜底表上限（已达 20/20） */
   const [mode, setMode] = useState('task')
   const [view, setView] = useState('open')
   const [rows, setRows] = useState<RdmTaskItem[]>([])
@@ -506,8 +506,6 @@ export default function DeliveryBoard() {
 
       {mode === 'gantt' && <GanttChart editable={hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')} />}
 
-      {mode === 'load' && <WorkloadPanel />}
-
       {mode !== 'task' ? null : (
       <>
       {/* 統計卡：必須在搜索區下方、操作區上方（§E.8） */}
@@ -531,6 +529,7 @@ export default function DeliveryBoard() {
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
           <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
           <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
+          <Button onClick={() => navigate('/rdm-resource-load')}>{t('rdm.deliveryBoard.btnTeamLoad')}</Button>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>

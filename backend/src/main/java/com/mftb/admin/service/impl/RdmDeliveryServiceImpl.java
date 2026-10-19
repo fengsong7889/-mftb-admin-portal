@@ -1,7 +1,9 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.OaRequestCreateDTO;
 import com.mftb.admin.dto.RdmDeliveryDTO;
@@ -50,6 +52,7 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -92,6 +95,9 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private static final String PRD_REVIEWING = "reviewing";
     private static final String PRD_APPROVED = "approved";
     private static final String PRD_REJECTED = "rejected";
+
+    /** 迭代状态白名单：与前端 constants/rdm.ts 的 RDM_ITERATION_STATUS 同源 */
+    private static final Set<String> ITERATION_STATUSES = Set.of("planning", "active", "closed");
 
     private final RdmPrdMapper prdMapper;
     private final RdmReviewMapper reviewMapper;
@@ -177,7 +183,13 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         prd.setTitle(dto.getTitle().trim());
         prd.setTargetUsers(dto.getTargetUsers());
         prd.setFeatureList(dto.getFeatureList());
-        prd.setAcceptanceCriteria(dto.getAcceptanceCriteria());
+        /*
+         * 验收标准以富文本为唯一事实源：正文写了独立「驗收標準」节就自动抽取回写结构化列，
+         * 业务验收导入 / 定稿快照等下游消费方零改动；正文没有该节时保留传入值
+         * （旧 PRD 的结构化存量数据原样回合），避免把历史数据抽没。
+         */
+        String derivedCriteria = extractAcceptanceCriteria(dto.getContentRich());
+        prd.setAcceptanceCriteria(derivedCriteria != null ? derivedCriteria : dto.getAcceptanceCriteria());
         prd.setContentRich(dto.getContentRich());
         prd.setPrototypeUrl(dto.getPrototypeUrl());
         prd.setUpdatedBy(operatorResolver.operatorSignature(current));
@@ -192,6 +204,71 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             tryTransition(prd.getReqId(), RdmConstants.ACTION_PRD_START, null);
         }
         return toPrdVO(prdMapper.selectById(prd.getId()));
+    }
+
+    /** 标题行哨兵：htmlToLines 用它保留「这行是标题」的信息，供验收标准节判定边界 */
+    private static final String HEADING_MARK = "\u0001";
+
+    /** PRD 正文其它节标题（判定验收标准节结束；带不带【】都算，AI 草稿与人工书写都覆盖） */
+    private static final Set<String> PRD_SECTION_TITLES = Set.of(
+            "目標用戶與使用場景", "功能清單", "範圍邊界", "風險與依賴");
+
+    /**
+     * 从 PRD 富文本正文抽取「驗收標準」节为逐行验收标准。
+     * <p>表单精简后验收标准不再是独立录入项：产品经理在需求说明里以「驗收標準」
+     * （或 Acceptance Criteria）为独立标题写成一节（清单尤佳），保存时在此抽回结构化列。
+     * <p>节的结束边界：下一个标题行、下一个【…】标记行、或其它已知节标题。
+     *
+     * @return 抽到的逐行文本（节存在但为空时返回空串）；正文没有该节时返回 null（调用方保留旧值）
+     */
+    static String extractAcceptanceCriteria(String contentRich) {
+        if (!StringUtils.hasText(contentRich)) {
+            return null;
+        }
+        List<String> criteria = new ArrayList<>();
+        boolean inSection = false;
+        for (String raw : htmlToLines(contentRich)) {
+            String line = raw.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            String bare = stripBrackets(line.startsWith(HEADING_MARK) ? line.substring(1) : line).trim();
+            if (bare.equals("驗收標準") || bare.equalsIgnoreCase("acceptance criteria")) {
+                inSection = true;
+                continue;
+            }
+            if (!inSection) {
+                continue;
+            }
+            // 已进入验收节：标题行 / 【…】标记行 / 其它已知节标题都代表本节结束
+            if (line.startsWith(HEADING_MARK) || isBracketMarker(line) || PRD_SECTION_TITLES.contains(bare)) {
+                break;
+            }
+            criteria.add(line);
+        }
+        return inSection ? String.join("\n", criteria) : null;
+    }
+
+    /** 块级标签换行 + 去标签 + 实体还原，把富文本变成状态机可读的行序列；标题行带哨兵前缀 */
+    private static List<String> htmlToLines(String html) {
+        String s = html.replaceAll("(?i)<h[1-6][^>]*>", HEADING_MARK)
+                .replaceAll("(?i)</(li|p|h[1-6]|blockquote|div|tr)>", "\n")
+                .replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("<[^>]+>", "");
+        s = s.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'")
+                .replace("&amp;", "&");
+        return Arrays.asList(s.split("\n", -1));
+    }
+
+    /** 【…】全角括号标记行（AI 草稿的节标记形态） */
+    private static boolean isBracketMarker(String line) {
+        return line.startsWith("【") && line.endsWith("】") && line.length() > 2;
+    }
+
+    /** 去掉【】括号取节标题裸文 */
+    private static String stripBrackets(String line) {
+        return isBracketMarker(line) ? line.substring(1, line.length() - 1) : line;
     }
 
     @Override
@@ -223,16 +300,14 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         RdmRequirement req = requireRequirement(dto.getReqId());
         accessGuard.requireDeliveryWriter(req.getId(), "發起評審");
-        if (!StringUtils.hasText(dto.getReviewType())) {
-            throw new BusinessException("請選擇評審類型");
-        }
+        String reviewType = normalizeReviewType(dto.getReviewType());
         SysUser current = operatorResolver.currentUser();
         List<Long> participants = dto.getParticipantIds() == null ? List.of() : dto.getParticipantIds();
         RdmReview review = new RdmReview();
         review.setReviewNo(bizSeqService.next(SEQ_REVIEW));
         review.setReqId(req.getId());
         review.setPrdId(dto.getPrdId());
-        review.setReviewType(dto.getReviewType());
+        review.setReviewType(reviewType);
         review.setReviewTime(parseDateTime(dto.getReviewTime()));
         review.setParticipants(joinNames(participants));
         review.setParticipantIds(joinIds(participants));
@@ -252,7 +327,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         notifyService.notifyUserIds(RdmConstants.EVENT_REVIEW_TODO, req, participants,
                 "需求評審邀約", "### 📝 需求評審邀約\n\n- **編號**: " + req.getReqNo()
                         + "\n- **標題**: " + req.getTitle()
-                        + "\n- **評審類型**: " + reviewTypeLabel(dto.getReviewType())
+                        + "\n- **評審類型**: " + reviewTypeLabel(reviewType)
                         + "\n- **發起人**: " + (current == null ? "-" : current.getName())
                         + "\n\n請按時參加並預先閱覽 PRD。");
         return toReviewVO(reviewMapper.selectById(review.getId()));
@@ -361,6 +436,10 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             // 改已有任务时以任务上的需求为准，不信前端传的 reqId（否则可以把任务挂到别人需求下）
             accessGuard.requireDeliveryWriter(task.getReqId(), "編輯任務");
         }
+        // 排期乐观锁快照：记录改前日期/负责人，用于判断是否需要自增 plan_version
+        java.time.LocalDate oldPlanStart = task.getPlanStartDate();
+        java.time.LocalDate oldPlanFinish = task.getPlanFinishDate();
+        Long oldOwner = task.getOwnerUserId();
         if (task.getId() == null) {
             task.setTaskNo(bizSeqService.next(SEQ_TASK));
             task.setReqId(req.getId());
@@ -384,6 +463,14 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         task.setPlanFinishDate(parseDate(dto.getPlanFinishDate()));
         task.setIterationCode(dto.getIterationCode());
         task.setUpdatedBy(operatorResolver.operatorSignature(current));
+        // 排期乐观锁：新建初始版本 1；改期/改负责人自增，与甘特拖拽共用同一版本防互盖
+        if (task.getId() == null) {
+            task.setPlanVersion(1);
+        } else if (!java.util.Objects.equals(oldPlanStart, task.getPlanStartDate())
+                || !java.util.Objects.equals(oldPlanFinish, task.getPlanFinishDate())
+                || !java.util.Objects.equals(oldOwner, task.getOwnerUserId())) {
+            task.setPlanVersion((task.getPlanVersion() == null ? 1 : task.getPlanVersion()) + 1);
+        }
         if (task.getId() == null) {
             taskMapper.insert(task);
         } else {
@@ -399,6 +486,56 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                             + (task.getPlanFinishDate() == null ? "" : "\n- **計劃完成**: " + task.getPlanFinishDate()));
         }
         return toTaskVO(taskMapper.selectById(task.getId()), req);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmDeliveryVO.Task assignTaskOwner(Long taskId, Long ownerUserId, Integer expectedPlanVersion) {
+        if (taskId == null || ownerUserId == null) {
+            throw new BusinessException("請選擇要指派的任務與被指派人");
+        }
+        RdmWorkTask task = requireTask(taskId);
+        if ("done".equals(task.getStatus()) || "cancelled".equals(task.getStatus())) {
+            throw new BusinessException("任務已完成或已取消，不能再指派負責人");
+        }
+        // 以任务上的需求为准反查裁决，权限与 saveTask「指派/維護任務」同源（不信前端传需求）
+        RdmRequirement req = requireRequirement(task.getReqId());
+        accessGuard.requireDeliveryWriter(req.getId(), "指派任務");
+
+        SysUser owner = userMapper.selectById(ownerUserId);
+        if (owner == null) {
+            throw new BusinessException("被指派人不存在或已停用");
+        }
+        requireTaskOwnerActive(owner);
+        String roleCode = roleOfTaskType(task.getTaskType());
+
+        SysUser current = operatorResolver.currentUser();
+        int expected = expectedPlanVersion != null ? expectedPlanVersion
+                : (task.getPlanVersion() == null ? 1 : task.getPlanVersion());
+        // 乐观锁：以 expected 版本为条件写 owner 快照并自增版本；affected==0 说明已被他人改，拒。
+        int affected = taskMapper.update(null, new LambdaUpdateWrapper<RdmWorkTask>()
+                .eq(RdmWorkTask::getId, task.getId())
+                .eq(RdmWorkTask::getPlanVersion, expected)
+                .set(RdmWorkTask::getOwnerUserId, owner.getId())
+                .set(RdmWorkTask::getOwnerEmpNo, owner.getEmpId())
+                .set(RdmWorkTask::getOwnerName, owner.getName())
+                .set(RdmWorkTask::getRoleCode, roleCode)
+                .set(RdmWorkTask::getPlanVersion, expected + 1)
+                .set(RdmWorkTask::getUpdatedBy, operatorResolver.operatorSignature(current)));
+        if (affected == 0) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "任務已被他人修改，請刷新後重試");
+        }
+        // 被指派人自动成为需求参与人（与 saveTask 同源），否则他在详情页看不到可执行动作
+        bindParticipant(req.getId(), owner, roleCode);
+        RdmWorkTask saved = taskMapper.selectById(task.getId());
+        notifyService.notifyUserIds(RdmConstants.EVENT_TASK_ASSIGNED, req, List.of(owner.getId()),
+                "新任務已指派給你", "### 🧩 新任務待處理\n\n- **需求**: " + req.getReqNo() + " " + req.getTitle()
+                        + "\n- **任務**: " + saved.getTitle()
+                        + "\n- **類型**: " + taskTypeLabel(saved.getTaskType())
+                        + (saved.getPlanFinishDate() == null ? "" : "\n- **計劃完成**: " + saved.getPlanFinishDate()));
+        log.info("RDM 负载页任务指派: task={}, owner={}, operator={}", saved.getTaskNo(), owner.getName(),
+                operatorResolver.operatorSignature(current));
+        return toTaskVO(saved, req);
     }
 
     /**
@@ -658,6 +795,34 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     }
 
     /**
+     * 列表直改迭代状态。
+     * <p>故意不走 {@link #saveIteration}：那条路径会把前端列表快照里的旧产能/旧起止一起回写，
+     * 并发下等于拿过期数据覆盖别人的编辑；这里只回写 status 与操作人，
+     * MyBatis-Plus updateById 默认跳过 null 字段，其余列原封不动。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateIterationStatus(Long id, String status) {
+        if (id == null) {
+            throw new BusinessException("請選擇迭代");
+        }
+        // 状态直接决定需求排期下拉能否选中本迭代，非法值必须在落库前挡掉
+        if (!StringUtils.hasText(status) || !ITERATION_STATUSES.contains(status)) {
+            throw new BusinessException("迭代狀態取值不正確");
+        }
+        RdmIteration current = iterationMapper.selectById(id);
+        if (current == null) {
+            throw new BusinessException("迭代不存在");
+        }
+        RdmIteration patch = new RdmIteration();
+        patch.setId(id);
+        patch.setStatus(status);
+        patch.setUpdatedBy(operatorResolver.operatorSignature(operatorResolver.currentUser()));
+        iterationMapper.updateById(patch);
+        log.info("迭代狀態直改: code={}, {} -> {}", current.getCode(), current.getStatus(), status);
+    }
+
+    /**
      * 按類型發迭代編碼（系統生成，前端不再收手工輸入）。
      * <p>取號後再查唯一鍵兜底：存量手工編碼理論上可能佔用同形狀號（如早年手工錄過
      * SP202610001），撞號則順延取下一個，重試 5 次仍撞則 fail-closed。
@@ -890,12 +1055,53 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         };
     }
 
-    private static String reviewTypeLabel(String reviewType) {
-        return switch (reviewType == null ? "" : reviewType) {
-            case "requirement" -> "需求評審";
-            case "dev" -> "研發評審";
-            case "ui" -> "UI 評審";
-            case "test" -> "測試評審";
+    /**
+     * 归一化评审类型：前端支持多选，逗号拼接后送入 review_type 列（VARCHAR(24)）。
+     * 这里逐 token 去空格、去重并按白名单校验，未知 token 直接拒绝，
+     * 避免任意字符串落库后展示端反查标签失败（安全边界在服务端，不信任前端传值）。
+     */
+    private static String normalizeReviewType(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            throw new BusinessException("請選擇評審類型");
+        }
+        LinkedHashSet<String> types = new LinkedHashSet<>();
+        for (String token : raw.split(",")) {
+            String t = token.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            if (!RdmConstants.REVIEW_TYPES.contains(t)) {
+                throw new BusinessException("評審類型不正確: " + t);
+            }
+            types.add(t);
+        }
+        if (types.isEmpty()) {
+            throw new BusinessException("請選擇評審類型");
+        }
+        return String.join(",", types);
+    }
+
+    /** 评审类型标签：支持逗号拼接多值（多选发起），单值标签以「 / 」连接；空值返回占位符 */
+    static String reviewTypeLabel(String reviewType) {
+        if (reviewType == null || reviewType.isBlank()) {
+            return "-";
+        }
+        List<String> labels = new ArrayList<>();
+        for (String token : reviewType.split(",")) {
+            String t = token.trim();
+            if (!t.isEmpty()) {
+                labels.add(singleReviewTypeLabel(t));
+            }
+        }
+        return String.join(" / ", labels);
+    }
+
+    private static String singleReviewTypeLabel(String reviewType) {
+        return switch (reviewType) {
+            case RdmConstants.REVIEW_TYPE_REQUIREMENT -> "需求評審";
+            case RdmConstants.REVIEW_TYPE_DEV -> "研發評審";
+            case RdmConstants.REVIEW_TYPE_UI -> "UI 評審";
+            case RdmConstants.REVIEW_TYPE_TEST -> "測試評審";
             default -> reviewType;
         };
     }

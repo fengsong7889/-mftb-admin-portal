@@ -8,6 +8,7 @@ import com.mftb.admin.service.RdmDeliveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -213,6 +214,19 @@ public class RdmDeliveryController {
                 anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmDeliveryVO.Iteration> saveIteration(@RequestBody RdmDeliveryDTO.Iteration dto) {
         return Result.success("迭代已保存", deliveryService.saveIteration(dto));
+    }
+
+    /**
+     * 列表操作列直改迭代状态（只动状态，产能/起止仍走编辑表单）。
+     * <p>权限锚点与保存迭代完全一致，不新增可授动作。
+     */
+    @PatchMapping("/iteration/{id}/status")
+    @RequirePermission(menu = "rdm-delivery-iteration", action = "edit", anyOf = {"rdm-intake", "rdm-delivery-board"},
+                anyPermissions = {"rdm-requirement:dispatch"})
+    public Result<Void> updateIterationStatus(@PathVariable Long id,
+                                             @RequestBody RdmDeliveryDTO.IterationStatus body) {
+        deliveryService.updateIterationStatus(id, body == null ? null : body.getStatus());
+        return Result.success("迭代狀態已更新", null);
     }
 
     /* ── 需求变更 ── */

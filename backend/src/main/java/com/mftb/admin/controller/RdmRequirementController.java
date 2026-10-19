@@ -49,12 +49,13 @@ public class RdmRequirementController {
         return Result.success(requirementService.page(query));
     }
 
-    /** 各视角 Tab 数量 */
+    /** 各视角 Tab 数量（executionOnly=true 时按需求跟进清单的执行侧地板计数，与列表同口径） */
     @GetMapping("/requirement/scope-counts")
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
                 anyPermissions = {"rdm-requirement:view_all"})
-    public Result<Map<String, Long>> scopeCounts() {
-        return Result.success(requirementService.scopeCounts());
+    public Result<Map<String, Long>> scopeCounts(
+            @RequestParam(name = "executionOnly", required = false, defaultValue = "false") boolean executionOnly) {
+        return Result.success(requirementService.scopeCounts(executionOnly));
     }
 
     /** 看板信号卡统计：接与列表同一组查询条件，口径跟随筛选 */

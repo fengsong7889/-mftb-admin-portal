@@ -11,7 +11,8 @@ import {
 } from '@ant-design/icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { fetchCaptchaToken } from '../../api/auth'
-import BrandLogo from '../../components/BrandLogo'
+import { getBrandTitle } from '../../constants/portalSystems'
+import GroupLogo from '../../components/GroupLogo'
 import SliderCaptcha from '../../components/SliderCaptcha'
 import { useTranslation } from 'react-i18next'
 import { changeAppLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
@@ -92,7 +93,7 @@ function VideoBackground() {
       <div className="video-overlay" />
 
       <div className="video-brand">
-        <BrandLogo size={36} style={{ margin: '0 auto 8px' }} />
+        <GroupLogo size={44} style={{ margin: '0 auto 8px' }} />
         <span className="video-brand-text">{t('login.videoBrand')}</span>
       </div>
     </div>
@@ -112,6 +113,12 @@ export default function Login() {
   // 登录页独立的国家/语言选择（与首页互不干扰，数据与多语言配置一致）
   const [loginCountry, setLoginCountry] = useState('usa')
   const [loginLanguage, setLoginLanguage] = useState<string>('en')
+
+  // 退出登录等 SPA 内跳转不会重载 index.html，页签标题会残留上一个系统名；
+  // 登录页必须把标题拉回门户名（与 index.html 静态标题同一真值）
+  useEffect(() => {
+    document.title = getBrandTitle(t, i18nInstance.language)
+  }, [t, i18nInstance.language])
 
   // 国家选项：与顶部/多语言配置的国家数据一致，名称跟随全局语言
   const countryOptions = useMemo(() =>
@@ -308,7 +315,7 @@ export default function Login() {
           <div className="login-title-v2">
             {/* 品牌 Logo 徽章 */}
             <div className="login-brand-badge">
-              <BrandLogo size={44} />
+              <GroupLogo size={64} />
             </div>
             <h2>{t('login.welcomeTitle')}</h2>
           </div>

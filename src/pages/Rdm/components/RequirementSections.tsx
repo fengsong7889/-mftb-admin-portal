@@ -10,6 +10,7 @@ import { useState } from 'react'
 import { Button, Input, Progress, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
+  BarChartOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   FileTextOutlined,
@@ -21,6 +22,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '../../../api/rdm'
 import {
@@ -32,17 +34,16 @@ import {
   RDM_REVIEW_CONCLUSION,
   RDM_REVIEW_CONCLUSION_COLOR,
   RDM_REVIEW_CONCLUSION_LABEL,
-  RDM_REVIEW_TYPE_LABEL,
   RDM_TASK_STATUS,
   RDM_TASK_STATUS_COLOR,
   RDM_TASK_STATUS_LABEL,
   RDM_TASK_TYPE_COLOR,
   RDM_TASK_TYPE_LABEL,
+  formatRdmReviewTypes,
   type RdmChangeStatus,
   type RdmChangeType,
   type RdmPrdStatus,
   type RdmReviewConclusion,
-  type RdmReviewType,
   type RdmTaskStatus,
   type RdmTaskType,
 } from '../../../constants/rdm'
@@ -128,6 +129,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
   canCreate: boolean
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const tasks = summary?.tasks ?? []
 
   const columns: TableColumnsType<RdmTaskItem> = [
@@ -212,11 +214,17 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
       <SectionTitle
         icon={<ProfileOutlined />} color="#2F54EB" bg="#F0F5FF"
         text={`研發任務（${tasks.length}）`}
-        extra={canCreate && (
-          <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-task?reqId=${reqId}`)}>
-            新增任務
-          </Button>
-        )}
+        extra={
+          <Space size={8}>
+            {/* 排期甘特图：看本需求全部角色的计划起止，与清单行内「排期」同一入口 */}
+            <Button size="small" icon={<BarChartOutlined />} onClick={() => navigate(`/rdm-gantt?mode=single&reqId=${reqId}`)}>{t('rdm.reqSections.btnScheduleGantt')}</Button>
+            {canCreate && (
+              <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-task?reqId=${reqId}`)}>
+                {t('rdm.reqSections.addTask')}
+              </Button>
+            )}
+          </Space>
+        }
       />
       {tasks.length === 0
         ? <EmptyHint text="尚未拆解任務。產品經理或研發負責人受理需求後拆任務，需求會自動進入「開發中」。" />
@@ -288,7 +296,7 @@ function ReviewRow({ review, editable, onDecide }: {
           {RDM_REVIEW_CONCLUSION_LABEL[key] ?? review.conclusion}
         </Tag>
         <span className="rdm-delivery-row-main">
-          <b style={{ fontWeight: 500 }}>{RDM_REVIEW_TYPE_LABEL[review.reviewType as RdmReviewType] ?? review.reviewType}</b>
+          <b style={{ fontWeight: 500 }}>{formatRdmReviewTypes(review.reviewType)}</b>
           <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
             {review.reviewNo}
             {review.prdTitle ? ` · ${review.prdTitle}` : ''}

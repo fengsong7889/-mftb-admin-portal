@@ -8,14 +8,20 @@
  *  4. 導出調 export-bundle 且帶當前 filters；
  *  5. reconciliation 不一致時給出提示而非靜默導出。
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import i18n from '../../i18n'
 import {
   fetchExportBundle, fetchProjectDetail, fetchProjectPage, fetchProjectStats, updateProject,
 } from '../../api/rdm'
 import { exportProjectBundle } from './projectExport'
 import ProjectOverview from './ProjectOverview'
+
+// 操作列/下鑽文案已接入 i18n，用例固定走繁體語境（無 localStorage 記錄時默認 en）
+beforeAll(async () => {
+  await i18n.changeLanguage('zh-TW')
+})
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }),
@@ -38,7 +44,8 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     id: 1, projectNo: 'PJ-001', name: '演示項目', objective: '目標',
     pmUserName: '張三', productOwnerUserName: '李四',
     planStartDate: '2026-01-01', planEndDate: '2026-06-01',
-    status: 'in_progress', pausedFlag: false, riskFlag: false, overdueFlag: false,
+    // 后端 VO 的标记是 Integer(0/1)，测试桩必须与真实后端同形，否则布尔型回归测不出来
+    status: 'in_progress', pausedFlag: 0, riskFlag: 0, overdueFlag: 0,
     deliveredCount: 2, totalDeliveryCount: 5, nextDeliveryDate: null,
     blockedCount: 0, pendingDecisionCount: 0, updatedAt: '2026-05-01T10:00:00',
     ...overrides,
@@ -71,6 +78,42 @@ describe('ProjectOverview 統計卡下鑽', () => {
     const card = await screen.findByTitle('點擊下鑽：僅看進行中項目')
     fireEvent.click(card)
     expect(await screen.findByText(/下鑽：進行中項目/)).toBeInTheDocument()
+  })
+
+  it('下钻交给服务端：列表带 drill，统计卡不带 drill（否则卡片数字会被自己筛小）', async () => {
+    renderAt()
+    await screen.findByText('演示項目')
+    // 服务端按 drill 回 4 行（与卡片 inProgressCount 同源），前端不再自己筛本页
+    vi.mocked(fetchProjectPage).mockClear()
+    vi.mocked(fetchProjectPage).mockResolvedValue({
+      records: Array.from({ length: 4 }, (_, i) => makeRow({ id: i + 1, name: `進行中的項目${i + 1}` })),
+      total: 4,
+    })
+    vi.mocked(fetchProjectStats).mockClear()
+    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看進行中項目'))
+    // 过去是纯前端过滤「已加载的本页」，跳页时卡片说 4 行、表格只给本页命中的行；
+    // 现在必须把口径下发后端，让 total 与卡片同源
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'inProgress' })))
+    expect(fetchProjectStats).toHaveBeenCalledWith(expect.not.objectContaining({ drill: 'inProgress' }))
+    // chip 与分页总数都用服务端返回的 total（不再是本页行数）
+    expect(await screen.findByText(/下鑽：進行中項目（4 個項目）/)).toBeInTheDocument()
+    expect(screen.getByText('下鑽過濾：4 個項目')).toBeInTheDocument()
+    expect(screen.getByText('進行中的項目4')).toBeInTheDocument()
+  })
+
+  it('需關注與待裁決卡各自下发自己的口径码，再点取消则不下发', async () => {
+    renderAt()
+    await screen.findByText('演示項目')
+    vi.mocked(fetchProjectPage).mockClear()
+    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看風險/逾期/已暫停項目'))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'attention' })))
+    vi.mocked(fetchProjectPage).mockClear()
+    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看待裁決項目'))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'pending' })))
+    // 再點同口徑卡 = 取消下钻，drill 不得残留在列表请求里
+    vi.mocked(fetchProjectPage).mockClear()
+    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看待裁決項目'))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: undefined })))
   })
 })
 
@@ -116,18 +159,48 @@ describe('ProjectOverview 全量導出', () => {
   })
 })
 
+describe('ProjectOverview 行操作栏（不再收进「更多」）', () => {
+  it('編輯/暫停直接渲染在操作列，无需先点下拉', async () => {
+    renderAt()
+    await screen.findByText('演示項目')
+    expect(screen.queryByRole('button', { name: /更多/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '詳情' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '編輯' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '暫停項目' })).toBeInTheDocument()
+  })
+
+  it('已暂停的行给出「恢復推進」而不是「暫停項目」', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow({ pausedFlag: 1 })], total: 1 })
+    renderAt()
+    await screen.findByText('演示項目')
+    expect(screen.getByRole('button', { name: '恢復推進' })).toBeInTheDocument()
+    // 已暂停标记只以 Tag 呈现，状态列不再把 0/1 数字渲染成文本
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+})
+
 describe('ProjectOverview 暫停真調後端', () => {
   it('暫停走 updateProject（先取 version 做乐观锁），非僅消息提示', async () => {
     vi.mocked(fetchProjectDetail).mockResolvedValue({ id: 1, version: 9 } as never)
     vi.mocked(updateProject).mockResolvedValue(undefined)
     renderAt()
     await screen.findByText('演示項目')
-    // 打開行操作下拉
-    fireEvent.click(screen.getByRole('button', { name: /更多/ }))
-    fireEvent.click(await screen.findByText('暫停項目'))
-    // 二次確認
+    // 行操作直接點暫停，再二次確認
+    fireEvent.click(screen.getByRole('button', { name: '暫停項目' }))
     fireEvent.click(await screen.findByRole('button', { name: /確認暫停/ }))
     await waitFor(() => expect(fetchProjectDetail).toHaveBeenCalledWith(1))
-    await waitFor(() => expect(updateProject).toHaveBeenCalledWith(1, expect.objectContaining({ pausedFlag: true, expectedVersion: 9 })))
+    // 钉死后端契约：pausedFlag 上送 Integer 0/1，给布尔会被 Jackson 拒成 400「請求參數格式錯誤」
+    await waitFor(() => expect(updateProject).toHaveBeenCalledWith(1, { pausedFlag: 1, expectedVersion: 9 }))
+  })
+
+  it('恢復推進上送 pausedFlag: 0', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow({ pausedFlag: 1 })], total: 1 })
+    vi.mocked(fetchProjectDetail).mockResolvedValue({ id: 1, version: 4 } as never)
+    vi.mocked(updateProject).mockResolvedValue(undefined)
+    renderAt()
+    await screen.findByText('演示項目')
+    fireEvent.click(screen.getByRole('button', { name: '恢復推進' }))
+    fireEvent.click(await screen.findByRole('button', { name: /確認恢復/ }))
+    await waitFor(() => expect(updateProject).toHaveBeenCalledWith(1, { pausedFlag: 0, expectedVersion: 4 }))
   })
 })

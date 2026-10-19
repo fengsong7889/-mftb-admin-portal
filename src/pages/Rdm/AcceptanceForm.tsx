@@ -10,6 +10,7 @@
  * 5. 历次验收记录直接展示第几次验收，attempt>1 即返工，责任链清晰。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Alert, Button, Checkbox, Input, Modal, Radio, Rate, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -100,6 +101,7 @@ export default function AcceptanceForm() {
 
 /** 需求级业务验收（用例化验收，M3）—— 走 /rdm/requirement/{id}/acceptance 旧契约 */
 function RequirementAcceptanceForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)
@@ -189,7 +191,7 @@ function RequirementAcceptanceForm() {
 
   const handleImportPrd = () => {
     if (prdCriteria.length === 0) {
-      message.warning('PRD 未填寫驗收標準，請先讓產品經理補充再導入')
+      message.warning(t('rdm.acceptance.importEmptyWarn', { defaultValue: 'PRD 未填寫驗收標準，請先讓產品經理補充再導入' }))
       return
     }
     // 导入的只是「要验什么」，“过没过”必须现场逐条判，所以不带预选结论
@@ -454,7 +456,7 @@ function RequirementAcceptanceForm() {
             showIcon
             style={{ marginBottom: 12 }}
             message="該需求沒有 PRD 驗收標準，當前用例來自需求的原始期望"
-            description="沒有可驗證的驗收標準，驗收就會變成主觀判斷；建議先讓產品經理補齊 PRD 的驗收標準。"
+            description={t('rdm.acceptance.noPrdCriteriaDesc', { defaultValue: '沒有可驗證的驗收標準，驗收就會變成主觀判斷；建議先讓產品經理在 PRD 需求說明中以「驗收標準」為節補齊。' })}
           />
         )}
         <Table<RdmAcceptanceCaseForm & { key: number }>

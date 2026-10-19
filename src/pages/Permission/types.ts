@@ -1213,9 +1213,22 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'export', label: '導出' },
   ],
-  // V3 分批交付「項目總覽」（与后端 VIEW_EXPORT 一致）
+  // V3 分批交付「項目總覽」（与后端种子 PROJECT_ACTIONS 一致：新增挂 create、
+  // 编辑/暂停恢复挂 edit；后端真值源 sys_menu.actions 优先，本表只是它为空时的回退）
   'rdm-dashboard-project': [
     { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // 团队负载（rdm-resource-load）：与后端种子 RESOURCE_LOAD_ACTIONS 一致
+  // view=查看本人；view_all=查看全员；edit=维护本人剩余工时/日历；dispatch=分派工作；manage=名册与容量维护；export=导出
+  'rdm-resource-load': [
+    { key: 'view', label: '查看' },
+    { key: 'view_all', label: '查看全员' },
+    { key: 'edit', label: '編輯' },
+    { key: 'dispatch', label: '分派' },
+    { key: 'manage', label: '名册维护' },
     { key: 'export', label: '導出' },
   ],
   'rdm-config-score': [
@@ -1643,6 +1656,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'rdm-dashboard-score',
   'rdm-dashboard-trend',
   'rdm-dashboard-project',
+  // 团队负载（rdm-resource-load）：从研发工作台资源负载 Tab 升级为独立菜单
+  'rdm-resource-load',
   'rdm-config-score',
   'rdm-config-group',
   'rdm-config-status',
@@ -1914,9 +1929,13 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/rdm-acceptance': 'rdm-acceptance',
   '/rdm-acceptance-form': 'rdm-acceptance',
   '/rdm-detail': 'rdm-requirement',
+  // 需求甘特图：与需求跟进清单同一菜单锚点（全局视角的全量可见另由页内 canSeeAll 与后端收敛）
+  '/rdm-gantt': 'rdm-requirement',
   '/rdm-dashboard': 'rdm-dashboard-board',
   '/rdm-risk': 'rdm-dashboard-risk',
   '/rdm-output': 'rdm-efficiency-output',
+  // 团队负载（项目与计划分组下）
+  '/rdm-resource-load': 'rdm-resource-load',
   '/rdm-quality': 'rdm-dashboard-quality',
   '/rdm-version-trace': 'rdm-dashboard-version',
   '/rdm-weekly-report': 'rdm-dashboard-report',

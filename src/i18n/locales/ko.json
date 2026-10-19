@@ -10,7 +10,7 @@
     "refreshHint": "새로 고침 후 현재 페이지로 돌아오며, 저장하지 않은 입력 내용은 사라질 수 있습니다."
   },
   "portal": {
-    "title": "기업 포털",
+    "title": "그룹 포털",
     "appCenter": "애플리케이션 센터",
     "quotes": [
       "쉬운 일을 끝까지 해내는 것이 곧 비범함입니다",
@@ -95,7 +95,7 @@
     "guideLocaleDesc": "상단 바에서 국가와 언어를 전환할 수 있으며, 시스템 이름과 설명은 UI 언어를 따릅니다.",
     "guideSearch": "검색 및 필터",
     "guideSearchDesc": "시스템 이름과 설명으로 검색하고 업무 영역 칩으로 빠르게 좁힐 수 있습니다.",
-    "footerBrand": "Maifeng 기업 포털 · 비즈니스 시스템 통합 입구",
+    "footerBrand": "Maifeng 그룹 포털 · 비즈니스 시스템 통합 입구",
     "footerCopy": "© {{year}} Maifeng Tech",
     "artwork": {
       "rdmSubmit": "제출",
@@ -140,7 +140,7 @@
       "docArchiveFiles": "아카이브 자료"
     },
     "businessSystems": "업무 시스템",
-    "backToPortal": "기업 포털로 돌아가기",
+    "backToPortal": "그룹 포털로 돌아가기",
     "selectSystem": "시스템 선택",
     "switchSystemTip": "업무 시스템 전환",
     "subtitle": "모든 업무 시스템을 한곳에서 이용하세요. 카드를 선택하면 시작할 수 있습니다.",

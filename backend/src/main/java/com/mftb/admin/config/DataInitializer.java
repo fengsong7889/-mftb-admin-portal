@@ -150,6 +150,17 @@ public class DataInitializer implements CommandLineRunner {
         //      必须用独立版本键：core:schema-v10 已落库的环境不会重跑 migrateSchema()。
         versionTracker.applyOnce("core:portal-favorites-v1",
                 this::migratePortalFavoritesColumn, this::verifyPortalFavoritesColumn);
+        // 254: AI 助手偏好设置持久化列 sys_user.ai_settings。
+        //      与 portal_favorites 同一模式：SysUser 实体已带该字段，
+        //      MyBatis-Plus 生成的显式列清单会 SELECT 它，缺列会让全部用户查询报错。
+        //      必须用独立版本键，不可复用 core:schema-v10。
+        versionTracker.applyOnce("core:ai-settings-v1",
+                this::migrateAiSettingsColumn, this::verifyAiSettingsColumn);
+        // 255: 产研交付个人工作台布局持久化列 sys_user.workbench_layout。
+        //      与 ai_settings 同一模式：SysUser 实体已带该字段，
+        //      MyBatis-Plus 生成的显式列清单会 SELECT 它，缺列会让全部用户查询报错。
+        versionTracker.applyOnce("core:workbench-layout-v1",
+                this::migrateWorkbenchLayoutColumn, this::verifyWorkbenchLayoutColumn);
         // 246: sys_role.self_service_requestable——門戶「系統權限申請」参考角色目录的开放开关。
         //      与 portal_favorites 同一陷阱：SysRole 实体已带该字段，MyBatis-Plus 生成的显式列清单
         //      会 SELECT 它，故必须位于任何 sys_role 实体查询之前，否则启动期报 Unknown column。
@@ -1950,6 +1961,40 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     private void verifyPortalFavoritesColumn() {
         if (!columnExists("sys_user", "portal_favorites")) {
             throw new IllegalStateException("sys_user.portal_favorites 列未就绪");
+        }
+    }
+
+    /**
+     * 254: AI 助手偏好设置持久化列。用 TEXT 而非 VARCHAR，
+     * 设置字段可能随产品迭代增加，不设长度上限避免截断。
+     */
+    private void migrateAiSettingsColumn() {
+        addColumnIfAbsent("sys_user", "ai_settings",
+                "ALTER TABLE sys_user ADD COLUMN ai_settings TEXT NULL "
+                        + "COMMENT 'AI 助手偏好设置，JSON 格式' AFTER portal_favorites");
+    }
+
+    /** 后置校验：列没真的建出来就不记成功版本，下次启动重试 */
+    private void verifyAiSettingsColumn() {
+        if (!columnExists("sys_user", "ai_settings")) {
+            throw new IllegalStateException("sys_user.ai_settings 列未就绪");
+        }
+    }
+
+    /**
+     * 255: 产研交付个人工作台布局持久化列。用 TEXT 而非 VARCHAR，
+     * 布局 JSON 随区块增减可能变长，不设上限避免截断。
+     */
+    private void migrateWorkbenchLayoutColumn() {
+        addColumnIfAbsent("sys_user", "workbench_layout",
+                "ALTER TABLE sys_user ADD COLUMN workbench_layout TEXT NULL "
+                        + "COMMENT '产研交付个人工作台布局偏好，JSON 格式' AFTER ai_settings");
+    }
+
+    /** 后置校验：列没真的建出来就不记成功版本，下次启动重试 */
+    private void verifyWorkbenchLayoutColumn() {
+        if (!columnExists("sys_user", "workbench_layout")) {
+            throw new IllegalStateException("sys_user.workbench_layout 列未就绪");
         }
     }
 

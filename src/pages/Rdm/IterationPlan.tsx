@@ -5,8 +5,8 @@
  * 因此每行直接给出产能、已排任务工时与负载率，超载标红，避免拍脑袋承诺。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Progress, Space, Table, Tag, Tooltip, message } from 'antd'
-import type { TableColumnsType } from 'antd'
+import { Button, Dropdown, Modal, Progress, Space, Table, Tag, Tooltip, message } from 'antd'
+import type { MenuProps, TableColumnsType } from 'antd'
 import {
   AlertOutlined,
   FieldTimeOutlined,
@@ -14,11 +14,12 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchIterations, type RdmIterationItem } from '../../api/rdm'
+import { fetchIterations, updateIterationStatus, type RdmIterationItem } from '../../api/rdm'
 import {
   RDM_ITERATION_STATUS,
   RDM_ITERATION_STATUS_COLOR,
@@ -39,6 +40,7 @@ function loadRate(row: RdmIterationItem): number {
 
 export default function IterationPlan() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const [rows, setRows] = useState<RdmIterationItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +74,48 @@ export default function IterationPlan() {
     reqs: rows.reduce((s, r) => s + (r.reqCount ?? 0), 0),
     hours: rows.reduce((s, r) => s + (r.taskHours ?? 0), 0),
   }), [rows])
+
+  /** 目标状态的影响说明：写进二次确认框，让用户在点下去之前就知道会锁住什么 */
+  const statusImpact = (next: RdmIterationStatus): string => {
+    if (next === RDM_ITERATION_STATUS.CLOSED) return t('rdm.iteration.statusImpactClosed')
+    if (next === RDM_ITERATION_STATUS.ACTIVE) return t('rdm.iteration.statusImpactActive')
+    return t('rdm.iteration.statusImpactPlanned')
+  }
+
+  /**
+   * 列表直改状态：下拉只给「不是当前值」的目标态，选定后按 §B.3 走二次确认再调接口。
+   * <p>不跳编辑表单：改一个状态要填完整张表单（名称/起止/产能）是纯摩擦，
+   * 而只回写状态这一个字段也顺手避开了拿列表旧数据覆盖别人的编辑。
+   */
+  const handleChangeStatus = (row: RdmIterationItem, next: RdmIterationStatus) => {
+    const current = (row.status ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus
+    if (current === next) return
+    Modal.confirm({
+      title: t('rdm.iteration.changeStatusTitle'),
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('rdm.iteration.confirmIter')}</span><b>{row.name}（{row.code}）</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.iteration.confirmCurrentStatus')}</span><b>{RDM_ITERATION_STATUS_LABEL[current]}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.iteration.confirmNextStatus')}</span><b>{RDM_ITERATION_STATUS_LABEL[next]}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.iteration.confirmImpact')}</span><b>{statusImpact(next)}</b></div>
+        </div>
+      ),
+      okText: t('rdm.iteration.confirmOk'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await updateIterationStatus(row.id, next)
+          message.success(t('rdm.iteration.statusUpdated'))
+          // 重取列表：状态同时决定卡片口径与排序（进行中优先），本地改写会两头不一致
+          await load()
+        } catch {
+          // request.ts 已统一弹后端失败原因，这里不再双弹
+        }
+      },
+    })
+  }
 
   const columns: TableColumnsType<RdmIterationItem> = [
     {
@@ -145,12 +189,27 @@ export default function IterationPlan() {
       title: '說明', dataIndex: 'remark', key: 'remark', ellipsis: true, render: (v?: string | null) => v ?? '-'
     },
     {
-      title: '操作', key: 'action', width: 90, fixed: 'right',
-      render: (_, r) => (
-        canEdit
-          ? <Button type="link" size="small" onClick={() => navigate(`/rdm-iteration-form?id=${r.id}`)}>編輯</Button>
-          : <span style={{ color: '#8C8C8C', fontSize: 12 }}>僅查看</span>
-      ),
+      title: t('common.colAction'), key: 'action', width: 160, fixed: 'right',
+      /** §B.9 操作列纯文字 + 竖线分隔：詳情→編輯→其他动作，状态直改不藏图标按钮 */
+      render: (_, r) => {
+        if (!canEdit) return <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('rdm.iteration.viewOnly')}</span>
+        const current = (r.status ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus
+        const items: MenuProps['items'] = Object.values(RDM_ITERATION_STATUS)
+          .filter(s => s !== current)
+          .map(s => ({ key: s, label: RDM_ITERATION_STATUS_LABEL[s] }))
+        return (
+          <Space size={0} split={<span className="action-split">|</span>}>
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-iteration-form?id=${r.id}`)}>{t('common.edit')}</Button>
+            <Dropdown
+              menu={{ items, onClick: ({ key }) => handleChangeStatus(r, key as RdmIterationStatus) }}
+              trigger={['click']}
+              placement="bottomRight"
+            >
+              <Button type="link" size="small">{t('rdm.iteration.changeStatus')}</Button>
+            </Dropdown>
+          </Space>
+        )
+      },
     },
   ]
 
@@ -214,7 +273,7 @@ export default function IterationPlan() {
         loading={loading}
         columns={applyConfig(columns) as TableColumnsType<RdmIterationItem>}
         dataSource={rows}
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1570 }}
         pagination={{
           defaultPageSize: 10,
           showSizeChanger: true,

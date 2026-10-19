@@ -31,4 +31,10 @@ public interface RdmScheduleService {
 
     /** 保存日历例外（同人同日重复视为修订） */
     List<RdmScheduleVO.CalendarItem> saveCalendar(RdmScheduleDTO.Calendar dto);
+
+    /** 需求甘特图（阶段二）：三视角 + 筛选 + 按需求分页，任务/角色批量取数防 N+1 */
+    RdmScheduleVO.GanttPage gantt(RdmScheduleDTO.GanttQuery query);
+
+    /** 甘特图调期（阶段二）：本人任务计划起止批量更新，乐观锁 + 审计 + 幂等，整批原子 */
+    RdmScheduleVO.TaskPlanResult updateTaskPlans(RdmScheduleDTO.TaskPlanBatch batch);
 }

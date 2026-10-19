@@ -102,6 +102,18 @@ public class SysUser {
      */
     private String portalFavorites;
 
+    /**
+     * AI 助手偏好设置，JSON 格式如 {"engineMode":"auto","contextWindow":128000,"thinkingEnabled":false,"thinkingDepth":"xhigh"}。
+     * 与 quickFavorites / portalFavorites 分列：三者语义不同，整份覆盖写入，共用会互相抹掉。
+     */
+    private String aiSettings;
+
+    /**
+     * 产研交付个人工作台布局偏好，JSON 格式如 {"v":1,"order":["metrics","dev-tasks"],"dismissed":["activity"]}。
+     * 与 aiSettings 分列：两者语义不同，整份覆盖写入，共用会互相抹掉。
+     */
+    private String workbenchLayout;
+
     /** 用户选中的在线头像 URL（IconFont/DiceBear 等外部 URL） */
     private String avatarUrl;
 

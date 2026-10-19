@@ -13,7 +13,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Layout, Empty, Select, Spin } from 'antd'
 import { GlobalOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import BrandLogo from './BrandLogo'
+import GroupLogo from './GroupLogo'
 import UserMenu from './UserMenu'
 import { changeAppLanguage, ensureLanguageBundle } from '../i18n'
 import { getBrandTitle } from '../constants/portalSystems'
@@ -140,8 +140,8 @@ export default function PortalTopBar() {
     <Header className="portal-top-bar">
       <div className="portal-top-bar-inner">
         <div className="portal-top-bar-left">
-          <span aria-hidden="true"><BrandLogo size={30} /></span>
-          <span className="portal-top-bar-title">{t('portal.title', '企業門戶')}</span>
+          <span aria-hidden="true"><GroupLogo size={30} /></span>
+          <span className="portal-top-bar-title">{t('portal.title', '集團門戶')}</span>
         </div>
         <div className="portal-top-bar-right">
           <PortalLocaleControls />

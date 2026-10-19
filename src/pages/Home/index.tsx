@@ -11,7 +11,8 @@ import { useRotatingMotivationQuote } from '../../hooks/useMotivationQuote'
 import { useSystemNavigation } from '../../hooks/useSystemNavigation'
 import { getSystemDisplayName } from '../../constants/portalSystems'
 import { renderMenuIcon } from '../../components/MenuIcon'
-import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
+import { fetchQuickFavorites, saveQuickFavorites, fetchAiSettings, saveAiSettings } from '../../api/auth'
+import type { AiSettings } from '../../api/auth'
 import { pinyin } from 'pinyin-pro'
 import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
@@ -408,6 +409,9 @@ export default function Home() {
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [thinkingDepth, setThinkingDepth] = useState<ThinkingDepth>('xhigh')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  /** 标记 AI 设置首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
+  const aiSettingsLoadedRef = useRef(false)
+  const aiSettingsSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   /* ── 我的用量 ── */
   const [usageOpen, setUsageOpen] = useState(false)
@@ -539,6 +543,67 @@ export default function Home() {
     })
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 从后端加载当前用户的 AI 助手偏好设置（后端不可用或返回空时回退 localStorage） */
+  useEffect(() => {
+    let cancelled = false
+    const AI_SETTINGS_LS_KEY = `ai_settings:${user?.username ?? ''}`
+    const loadFromLocal = () => {
+      if (!cancelled && user?.username) {
+        try {
+          const raw = localStorage.getItem(AI_SETTINGS_LS_KEY)
+          if (raw) {
+            const parsed = JSON.parse(raw) as AiSettings
+            if (parsed.engineMode) setEngineMode(parsed.engineMode)
+            if (parsed.contextWindow) setContextWindow(parsed.contextWindow)
+            if (parsed.thinkingEnabled !== undefined) setThinkingEnabled(parsed.thinkingEnabled)
+            if (parsed.thinkingDepth) setThinkingDepth(parsed.thinkingDepth)
+          }
+        } catch { /* 损坏数据忽略，使用默认值 */ }
+      }
+    }
+    fetchAiSettings().then((settings) => {
+      if (cancelled) return
+      if (settings && Object.keys(settings).length > 0) {
+        // 后端有数据，应用到状态
+        if (settings.engineMode) setEngineMode(settings.engineMode)
+        if (settings.contextWindow) setContextWindow(settings.contextWindow)
+        if (settings.thinkingEnabled !== undefined) setThinkingEnabled(settings.thinkingEnabled)
+        if (settings.thinkingDepth) setThinkingDepth(settings.thinkingDepth)
+      } else {
+        // 后端返回空，回退 localStorage
+        loadFromLocal()
+      }
+    }).catch(() => {
+      // 后端不可用，回退 localStorage
+      loadFromLocal()
+    }).finally(() => {
+      if (!cancelled) aiSettingsLoadedRef.current = true
+    })
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 持久化 AI 设置：防抖写后端 + localStorage */
+  useEffect(() => {
+    if (!aiSettingsLoadedRef.current) return // 首次加载未完成前不写回
+    if (!user?.username) return
+    // 防抖 1 秒，避免用户快速切换时频繁请求
+    if (aiSettingsSaveTimerRef.current) clearTimeout(aiSettingsSaveTimerRef.current)
+    aiSettingsSaveTimerRef.current = setTimeout(() => {
+      const settings: AiSettings = {
+        engineMode: getEngineMode(),
+        contextWindow,
+        thinkingEnabled,
+        thinkingDepth,
+      }
+      // 同时写 localStorage 作为离线缓存
+      localStorage.setItem(`ai_settings:${user.username}`, JSON.stringify(settings))
+      saveAiSettings(settings).catch(() => { /* 后端不可用时仅保留 localStorage */ })
+    }, 1000)
+    return () => {
+      if (aiSettingsSaveTimerRef.current) clearTimeout(aiSettingsSaveTimerRef.current)
+    }
+  }, [contextWindow, thinkingEnabled, thinkingDepth, engine?.mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 后端菜单树已从 MenuContext 共享获取，无需单独 fetch
 

@@ -193,6 +193,21 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      */
     private static final String VERSION_PROJECT_LEADS = "rdm:schema:v3.7";
 
+    /**
+     * 甘特图调期（阶段二）：rdm_work_task 补 plan_version 乐观锁列 + 新增 rdm_task_plan_log 审计表。
+     * <p>拖拽调期与任务表单改期共用 plan_version 防并发互盖；审计只追加，供追溯谁改了哪条排期。
+     * <p>参考文档：{@code backend/sql/246_rdm_task_plan_version_audit.sql}。
+     */
+    private static final String VERSION_TASK_PLAN = "rdm:schema:v3.8";
+
+    /**
+     * 团队负载（阶段 B-2）：新增 rdm_resource_member 资源名册表。
+     * <p>把「谁纳入团队负载」显式化，纳入 B-1 无法覆盖的「已进名册但当前无在途单据」的人；
+     * 只 ADD 新表、不改任何现有表，与 v3.8 的 rdm_task_plan_log（任务排期审计）无语义交集。
+     * <p>参考文档：{@code backend/sql/253_rdm_resource_member.sql}。
+     */
+    private static final String VERSION_RESOURCE_MEMBER = "rdm:schema:v3.9";
+
     /** 项目主表负责人列 {表, 列, DDL}：ADD COLUMN 不可重复执行，逐列先查再加 */
     private static final String[][] PROJECT_LEAD_COLUMNS = {
             {"rdm_project", "tech_lead_user_id",
@@ -429,6 +444,8 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_CLAIM_REQ_NO, this::doClaimReqNoMigrate, this::verifyClaimReqNo);
         versionTracker.applyOnce(VERSION_ITERATION_CODE, this::doIterationCodeMigrate, this::verifyIterationCode);
         versionTracker.applyOnce(VERSION_PROJECT_LEADS, this::doProjectLeadsMigrate, this::verifyProjectLeads);
+        versionTracker.applyOnce(VERSION_TASK_PLAN, this::doTaskPlanMigrate, this::verifyTaskPlan);
+        versionTracker.applyOnce(VERSION_RESOURCE_MEMBER, this::doResourceMemberMigrate, this::verifyResourceMember);
         versionTracker.applyOnce(VERSION_EXEMPT_TRANSITION, this::doExemptTransitionSeed, this::verifyExemptTransitionSeed);
     }
 
@@ -602,6 +619,75 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 throw new IllegalStateException("RDM v3.7 核验失败：" + col[0] + "." + col[1] + " 列缺失");
             }
         }
+    }
+
+    /**
+     * v3.8：补 plan_version 乐观锁列 + 建排期审计表。
+     * <p>不吞异常：缺列会让调期更新报「未知列」，失败必须抛出并不记版本，下次启动重试。
+     */
+    private void doTaskPlanMigrate() {
+        if (!columnExists("rdm_work_task", "plan_version")) {
+            jdbcTemplate.execute("ALTER TABLE rdm_work_task ADD COLUMN plan_version INT NOT NULL DEFAULT 1 "
+                    + "COMMENT '排期版本(乐观锁):计划起止/负责人变更自增' AFTER iteration_code");
+            log.info("已添加 rdm_work_task.plan_version 列");
+        }
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS rdm_task_plan_log ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                + "task_id BIGINT NOT NULL COMMENT '任务ID rdm_work_task.id', "
+                + "task_no VARCHAR(32) DEFAULT NULL COMMENT '任务编号快照', "
+                + "req_id BIGINT NOT NULL COMMENT '需求ID(冗余便于追溯)', "
+                + "user_id BIGINT NOT NULL COMMENT '操作人 sys_user.id', "
+                + "user_name VARCHAR(64) DEFAULT NULL COMMENT '操作人姓名快照', "
+                + "old_start_date DATE DEFAULT NULL COMMENT '原计划开始', "
+                + "old_finish_date DATE DEFAULT NULL COMMENT '原计划完成', "
+                + "new_start_date DATE DEFAULT NULL COMMENT '新计划开始', "
+                + "new_finish_date DATE DEFAULT NULL COMMENT '新计划完成', "
+                + "old_version INT DEFAULT NULL COMMENT '变更前版本', "
+                + "new_version INT DEFAULT NULL COMMENT '变更后版本', "
+                + "client_request_id VARCHAR(64) DEFAULT NULL COMMENT '幂等请求标识', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '变更时间', "
+                + "KEY idx_tpl_task (task_id), KEY idx_tpl_req (req_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RDM任务排期变更审计(只追加)'");
+        log.info("RDM v3.8 调期迁移完成：plan_version 列与 rdm_task_plan_log 审计表就绪");
+    }
+
+    /** v3.8 后置校验：列与审计表齐备，缺任一项不记版本 */
+    private void verifyTaskPlan() {
+        if (!columnExists("rdm_work_task", "plan_version")) {
+            throw new IllegalStateException("RDM v3.8 核验失败：rdm_work_task.plan_version 列缺失");
+        }
+        requireTables(new String[]{"rdm_task_plan_log"});
+    }
+
+    /**
+     * v3.9：建资源名册表 rdm_resource_member（团队负载纳入人员）。
+     * <p>只 ADD 新表、不改任何现有表，CREATE TABLE IF NOT EXISTS 可安全重放；
+     * 不吞异常：建表失败必须抛出且不记版本，下次启动重试。
+     */
+    private void doResourceMemberMigrate() {
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS rdm_resource_member ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                + "user_id BIGINT NOT NULL COMMENT '员工 sys_user.id', "
+                + "emp_no VARCHAR(32) DEFAULT NULL COMMENT '工号快照', "
+                + "user_name VARCHAR(64) DEFAULT NULL COMMENT '姓名快照', "
+                + "dept VARCHAR(128) DEFAULT NULL COMMENT '部门快照', "
+                + "role_codes VARCHAR(255) DEFAULT NULL COMMENT '岗位角色JSON数组:pm/product/dev/designer/qa/ops/pmo', "
+                + "weekly_capacity_hours DECIMAL(5,2) DEFAULT NULL COMMENT '每周默认容量(人时);空则按工作日8h推算', "
+                + "status TINYINT NOT NULL DEFAULT 1 COMMENT '1=纳入名册 0=移出', "
+                + "remark VARCHAR(255) DEFAULT NULL COMMENT '备注', "
+                + "created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人', "
+                + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '更新人', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除(兜底;正常用status移出)', "
+                + "UNIQUE KEY uk_rrm_user (user_id), KEY idx_rrm_status (status, deleted)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RDM资源名册(团队负载纳入人员)'");
+        log.info("RDM v3.9 资源名册迁移完成：rdm_resource_member 表就绪");
+    }
+
+    /** v3.9 后置校验：名册表存在，缺则不记版本 */
+    private void verifyResourceMember() {
+        requireTables(new String[]{"rdm_resource_member"});
     }
 
     private void doClaimReqNoMigrate() {

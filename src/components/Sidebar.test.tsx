@@ -140,6 +140,15 @@ describe('Sidebar 系统品牌', () => {
     expect(container.querySelector('.sidebar-system-icon .anticon-account-book')).toBeInTheDocument()
   })
 
+  it('系统图标完全由 sys_system.icon 驱动：配置 BrandLogo 时渲染品牌搜索镜', async () => {
+    // 搜索運營系統的品牌搜索鏡不再由代碼強制，而是種子把 sys_system.icon 配置為 'BrandLogo'
+    writeCurrentSystemCode('search')
+    vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [{ code: 'search', name: zh.portal.systems.search.name, icon: 'BrandLogo' }], superAdmin: false })
+    const { container } = renderSidebar()
+    await waitFor(() => expect(container.querySelector('.sidebar-system-icon svg')).toBeInTheDocument())
+    expect(container.querySelector('.sidebar-system-icon .anticon-account-book')).not.toBeInTheDocument()
+  })
+
   it('自定义系统使用后端名称，避免重复 MFTB 前缀，非法图标使用通用图标', async () => {
     writeCurrentSystemCode('custom')
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [{ code: 'custom', name: 'MFTB測試系統', icon: 'UnknownIcon' }], superAdmin: false })
@@ -479,6 +488,48 @@ describe('廣告銷售查看訂單不切換系統', () => {
     expect(readCurrentSystemCode()).toBe('seller')
     expect(await screen.findByRole('menuitem', { name: /店鋪隨心推/ })).toHaveClass('ant-menu-item-selected')
   })
+})
+
+/**
+ * 需求詳情頁的侧栏高亮跟随进入菜单。
+ * <p>回归背景：/rdm-detail 是「提需求 / 認領分配 / 需求跟進清單」三张列表共用的落地页，
+ * 而 pathToKey 一个 path 只能登记一个归属，所以从「提需求」点进详情，左侧却亮【需求跟進清單】，
+ * 用户以为跳错了菜单。解法与共用订单路由同法：由 from 参数决定归属（白名单外一律回落默认归属），
+ * 高亮纯粹是视觉归属，能不能进详情仍由路由守卫与后端判定。
+ */
+describe('Sidebar 需求详情来源归属', () => {
+  const rdmTree: MenuVO[] = [{
+    id: 60, parentId: null, menuKey: 'rdm-pool-group', name: '需求中心', type: 1, status: 1, sort: 1, children: [
+      { id: 61, parentId: 60, menuKey: 'rdm-intake-approval', name: '提需求', path: '/rdm-intake-approval', type: 2, status: 1, sort: 1 },
+      { id: 62, parentId: 60, menuKey: 'rdm-intake', name: '認領分配', path: '/rdm-intake', type: 2, status: 1, sort: 2 },
+      { id: 63, parentId: 60, menuKey: 'rdm-requirement', name: '需求跟進清單', path: '/rdm-requirement', type: 2, status: 1, sort: 3 },
+    ],
+  }]
+
+  /** 当前高亮的那一项叫什么：只看唯一真值 .ant-menu-item-selected，不去猜 accessible name 的拼接 */
+  const selectedMenuText = (container: HTMLElement) =>
+    container.querySelector('.ant-menu-item-selected')?.textContent ?? ''
+
+  /** 三张列表共用同一落地页：高亮必须落在用户实际点进来的那张菜单上 */
+  it.each([
+    ['rdm-intake-approval', '提需求'],
+    ['rdm-intake', '認領分配'],
+    ['rdm-requirement', '需求跟進清單'],
+  ])('带 from=%s 进入详情时高亮「%s」', async (from, name) => {
+    setMenuState(rdmTree, 'online')
+    const { container } = renderSidebar(`/rdm-detail?id=91&from=${from}`)
+    await waitFor(() => expect(selectedMenuText(container)).toContain(name))
+  })
+
+  it.each(['', '&tab=activity', '&from=asset-list', '&from='])(
+    'query「%s」不带合法来源时回落默认归属需求跟進清單',
+    async search => {
+      setMenuState(rdmTree, 'online')
+      const { container } = renderSidebar(`/rdm-detail?id=91${search}`)
+      await waitFor(() => expect(selectedMenuText(container)).toContain('需求跟進清單'))
+      expect(selectedMenuText(container)).not.toContain('提需求')
+    },
+  )
 })
 
 /**

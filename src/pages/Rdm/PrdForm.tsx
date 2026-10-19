@@ -1,13 +1,18 @@
 /**
  * PRD 编写 —— 独立表单页
  *
- * 产品经理把业务需求拆成可交付的 PRD：目标用户、功能清单、验收标准是必填三件套，
- * 验收标准会直接成为业务验收页的检查项来源（写不清 = 验收扯皮）。
+ * 表单只保留两个录入项：「需求说明」（富文本）与「原型 / 設計稿連結」，
+ * 目标用户 / 功能清单 / 验收标准等口径统一写进需求说明的富文本里。
+ * 标题不再手填：新建 PRD 取需求标题作为列表展示名（编辑态保留原标题），
+ * 后端 savePrd 仍强校验 title 非空，故提交前自动兜底。
  */
 import { useEffect, useState } from 'react'
-import { Alert, Button, Checkbox, Input, Modal, Select, Space, Tag, message } from 'antd'
+import { Alert, Button, Checkbox, Input, Modal, Space, Tag, message } from 'antd'
 import { BulbOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons'
+import DOMPurify from 'dompurify'
+import { useTranslation } from 'react-i18next'
 import RdmFormHeader from './components/RdmFormHeader'
+import RichTextEditor from '../../components/RichTextEditor'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchDeliverySummary,
@@ -18,18 +23,36 @@ import {
   type RdmPrdItem,
   type RdmPrdSnapshotItem,
 } from '../../api/rdm'
-import { RDM_PRD_STATUS_LABEL, formatRdmReqNo, type RdmPrdStatus } from '../../constants/rdm'
+import { formatRdmReqNo } from '../../constants/rdm'
 import './index.css'
 
-/** 按行统计条目数（确认框里给用户看“写了多少条”，避免空有标题） */
-function countLines(text: string): number {
-  return text.split('\n').map(s => s.trim()).filter(Boolean).length
+/** HTML 转义，用于把纯文本旧数据 / AI 草稿文字拼进 HTML 片段 */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-const { TextArea } = Input
+/** 旧 PRD 正文是纯文本（老 TextArea 产物），按行转段落 HTML 才能在富文本编辑器回显；已是 HTML 的原样返回 */
+function toEditorHtml(content: string): string {
+  const trimmed = content.trim()
+  if (!trimmed) return ''
+  if (/<[a-z][\s\S]*>/i.test(trimmed)) return trimmed
+  return trimmed.split('\n').map(line => `<p>${escapeHtml(line)}</p>`).join('')
+}
+
+/** 去标签取纯文本（需求说明判空与确认框字数展示） */
+function plainText(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .trim()
+}
 
 export default function PrdForm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const reqId = Number(searchParams.get('reqId') ?? 0)
   const prdId = Number(searchParams.get('id') ?? 0)
@@ -90,7 +113,7 @@ export default function PrdForm() {
           featureList: current.featureList ?? '',
           acceptanceCriteria: current.acceptanceCriteria ?? '',
           prototypeUrl: current.prototypeUrl ?? '',
-          contentRich: current.contentRich ?? '',
+          contentRich: toEditorHtml(current.contentRich ?? ''),
         })
       }
     }).catch(() => message.error('PRD 資訊載入失敗'))
@@ -118,17 +141,28 @@ export default function PrdForm() {
         setAiNotice({ text: draft.notice ?? 'AI 暫不可用，請手工填寫', ok: false })
         return
       }
+      // AI 草稿全部写进可见的需求说明富文本：不写隐藏字段，避免用户看不到的数据流进验收检查项
+      const blocks: string[] = []
+      if (draft.targetUsers) blocks.push(`<p><b>${t('rdm.prdForm.sectionTargetUsers')}</b>${escapeHtml(draft.targetUsers)}</p>`)
+      if (draft.featureList?.length) {
+        blocks.push(`<p><b>${t('rdm.prdForm.sectionFeatureList')}</b></p><ol>${draft.featureList.map(li => `<li>${escapeHtml(li)}</li>`).join('')}</ol>`)
+      }
+      if (draft.acceptanceCriteria?.length) {
+        blocks.push(`<p><b>${t('rdm.prdForm.sectionAcceptance')}</b></p><ol>${draft.acceptanceCriteria.map(li => `<li>${escapeHtml(li)}</li>`).join('')}</ol>`)
+      }
+      if (draft.boundary) blocks.push(`<p><b>${t('rdm.prdForm.sectionBoundary')}</b>${escapeHtml(draft.boundary)}</p>`)
+      if (draft.risks) blocks.push(`<p><b>${t('rdm.prdForm.sectionRisks')}</b>${escapeHtml(draft.risks)}</p>`)
       setForm(prev => ({
         ...prev,
         title: prev.title || draft.title || '',
-        targetUsers: draft.targetUsers ?? prev.targetUsers,
-        featureList: (draft.featureList ?? []).map((s, i) => `${i + 1}. ${s}`).join('\n'),
-        acceptanceCriteria: (draft.acceptanceCriteria ?? []).map((s, i) => `${i + 1}. ${s}`).join('\n'),
-        contentRich: [prev.contentRich, draft.boundary ? `【範圍邊界】${draft.boundary}` : '', draft.risks ? `【風險與依賴】${draft.risks}` : '']
-          .filter(Boolean).join('\n'),
+        contentRich: [prev.contentRich, ...blocks].filter(Boolean).join(''),
       }))
       setAiNotice({
-        text: `已由 ${draft.model ?? 'AI'} 生成草稿（消耗 ${draft.tokens ?? 0} tokens），請逐條核實後再保存，尤其是驗收標準必須可判定。`,
+        text: t('rdm.prdForm.aiDraftDone', {
+          model: draft.model ?? 'AI',
+          tokens: draft.tokens ?? 0,
+          defaultValue: '已由 {{model}} 生成草稿（消耗 {{tokens}} tokens），內容已填入需求說明，請核實後再保存。',
+        }),
         ok: true,
       })
     } catch {
@@ -143,15 +177,13 @@ export default function PrdForm() {
       message.warning('請先選擇需求')
       return
     }
-    if (!form.title.trim()) {
-      message.warning('請填寫 PRD 標題')
+    // 标题不再手填：新建取需求标题作列表展示名，编辑态保留原标题
+    const effectiveTitle = form.title.trim() || requirement?.title?.trim() || 'PRD'
+    if (!plainText(form.contentRich)) {
+      message.warning(t('rdm.prdForm.descRequired', { defaultValue: '請填寫需求說明' }))
       return
     }
-    if (!form.acceptanceCriteria.trim()) {
-      message.warning('請填寫驗收標準（業務驗收頁的檢查項來源）')
-      return
-    }
-    // 验收标准会直接变成业务验收页的检查项，保存前必须让人先确认条目数
+    // 需求说明是评审与验收的唯一正文事实，保存前必须让人先确认内容体量
     Modal.confirm({
       title: advance ? '確認保存 PRD 並推進需求？' : '確認保存 PRD？',
       className: 'custom-confirm-modal',
@@ -159,20 +191,20 @@ export default function PrdForm() {
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>需求：</span><b>{requirement ? `${requirement.reqNo} · ${requirement.title}` : `#${reqId}`}</b></div>
-          <div className="confirm-info-row"><span>PRD 標題：</span><b>{form.title.trim()}</b></div>
-          <div className="confirm-info-row"><span>功能清單：</span><b>{countLines(form.featureList)} 條</b></div>
-          <div className="confirm-info-row"><span>驗收標準：</span><b>{countLines(form.acceptanceCriteria)} 條（將成為驗收檢查項）</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.prdForm.confirmPrdTitle')}</span><b>{effectiveTitle}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.prdForm.confirmDescLabel', { defaultValue: '需求說明：' })}</span><b>{t('rdm.prdForm.confirmDescValue', { count: plainText(form.contentRich).length, defaultValue: '{{count}} 字' })}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.prdForm.confirmProtoLabel', { defaultValue: '原型 / 設計稿：' })}</span><b>{form.prototypeUrl.trim() ? t('rdm.prdForm.confirmProtoFilled', { defaultValue: '已填連結' }) : t('rdm.prdForm.confirmProtoEmpty', { defaultValue: '未填' })}</b></div>
           {advance && <div className="confirm-info-row"><span>額外動作：</span><b>保存後需求將推進至下一環節</b></div>}
         </div>
       ),
       okText: '確認保存',
       cancelText: '取消',
-      onOk: () => submitPrd(advance),
+      onOk: () => submitPrd(advance, effectiveTitle),
     })
   }
 
   /** 确认后才落库 */
-  const submitPrd = async (advance: boolean) => {
+  const submitPrd = async (advance: boolean, title: string) => {
     if (!reqId) return
     if (isLocked && !newVersion) {
       message.warning('該 PRD 已定稿，請先勾選「以新版本修改」')
@@ -188,12 +220,13 @@ export default function PrdForm() {
         id: prdId || undefined,
         reqId,
         parentPrdId: form.parentPrdId,
-        title: form.title.trim(),
+        title,
         targetUsers: form.targetUsers,
         featureList: form.featureList,
         acceptanceCriteria: form.acceptanceCriteria,
         prototypeUrl: form.prototypeUrl,
-        contentRich: form.contentRich,
+        // 富文本入库前统一净化，防粘贴内容携带脚本标签（UI 规范 B.6）
+        contentRich: DOMPurify.sanitize(form.contentRich),
         advanceRequirement: advance,
         newVersion: newVersion || undefined,
         changeReason: newVersion ? changeReason.trim() : undefined,
@@ -216,7 +249,7 @@ export default function PrdForm() {
         badge={siblings.length > 0 ? (
           <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>同需求已有 {siblings.length} 份 PRD</span>
         ) : undefined}
-        meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '寫清目標用戶、功能清單與可驗證的驗收標準'}
+        meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : t('rdm.prdForm.metaFallback', { defaultValue: '需求說明支援富文本編輯' })}
       />
 
       {aiNotice && (
@@ -296,63 +329,25 @@ export default function PrdForm() {
               草稿只填入表單，不會自動保存；模型只寫描述，複雜度與排期仍由人定
             </span>
           </Space>
-          <LabeledField label="PRD 標題" required>
-            <Input
-              value={form.title}
-              maxLength={200}
-              placeholder="例：推薦報表自定義時間區間導出"
-              onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
+          {/* fieldset 的 disabled 管不到 contentEditable，锁定态必须显式传 disabled */}
+          <LabeledField label={t('rdm.prdForm.descLabel', { defaultValue: '需求說明' })} required>
+            <RichTextEditor
+              value={form.contentRich}
+              minHeight={360}
+              disabled={isLocked && !newVersion}
+              ariaLabel={t('rdm.prdForm.descLabel', { defaultValue: '需求說明' })}
+              placeholder={t('rdm.prdForm.descPlaceholder', { defaultValue: '目標用戶、功能清單、驗收標準、交互細節與邊界異常都寫在這裡；支援標題 / 清單 / 粗體等富文本格式' })}
+              onChange={html => setForm(prev => ({ ...prev, contentRich: html }))}
             />
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+              {t('rdm.prdForm.descHint', { defaultValue: '以「驗收標準」為獨立標題寫成一節（清單尤佳），保存時自動抽取為業務驗收檢查項' })}
+            </div>
           </LabeledField>
-          <LabeledField label="父 PRD（逐級拆解時選擇）">
-            <Select
-              style={{ width: 420 }}
-              allowClear
-              placeholder="不拆解則留空"
-              value={form.parentPrdId}
-              onChange={v => setForm(prev => ({ ...prev, parentPrdId: v }))}
-              options={siblings.map(p => ({ value: p.id, label: `${p.prdNo} ${p.title}（${RDM_PRD_STATUS_LABEL[p.status as RdmPrdStatus] ?? p.status}）` }))}
-            />
-          </LabeledField>
-          <LabeledField label="目標用戶與使用場景">
-            <TextArea
-              rows={2}
-              value={form.targetUsers}
-              placeholder="例：財務/運營在月末跨月對帳場景"
-              onChange={e => setForm(prev => ({ ...prev, targetUsers: e.target.value }))}
-            />
-          </LabeledField>
-          <LabeledField label="功能清單">
-            <TextArea
-              rows={4}
-              value={form.featureList}
-              placeholder="逐條列出功能點與優先級，例：&#10;1. 時間區間選擇器（必填）&#10;2. 導出文件名帶區間（必）"
-              onChange={e => setForm(prev => ({ ...prev, featureList: e.target.value }))}
-            />
-          </LabeledField>
-          <LabeledField label="驗收標準（逐條可驗證）" required>
-            <TextArea
-              rows={3}
-              value={form.acceptanceCriteria}
-              placeholder={requirement?.expectResult
-                ? `需求原始期望：${requirement.expectResult}\n逐條轉寫為可驗證的驗收標準`
-                : '例：可選任意起止日期，單次最長 90 天，導出文件名含區間'}
-              onChange={e => setForm(prev => ({ ...prev, acceptanceCriteria: e.target.value }))}
-            />
-          </LabeledField>
-          <LabeledField label="原型 / 設計稿連結">
+          <LabeledField label={t('rdm.prdForm.protoLabel', { defaultValue: '原型 / 設計稿連結' })}>
             <Input
               value={form.prototypeUrl}
               placeholder="https://..."
               onChange={e => setForm(prev => ({ ...prev, prototypeUrl: e.target.value }))}
-            />
-          </LabeledField>
-          <LabeledField label="PRD 正文">
-            <TextArea
-              rows={8}
-              value={form.contentRich}
-              placeholder="交互細節、字段口徑、邊界與異常處理、埋點與灰度方案（富文本編輯器後續接入）"
-              onChange={e => setForm(prev => ({ ...prev, contentRich: e.target.value }))}
             />
           </LabeledField>
         </Space>

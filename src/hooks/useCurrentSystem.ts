@@ -104,6 +104,15 @@ export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, stri
 }
 
 /**
+ * 非菜单路由的系统归属硬编码：这些路由刻意不登记在菜单树中（如系统权限申请页的使用者
+ * 正是对所申请系统零权限的员工，挂菜单权限会变成 403 死链），但 Sidebar 仍需知道它们
+ * 属于哪个业务系统才能正确剪枝，否则 currentSystemCode 为 null 会展示全量菜单。
+ */
+const PATH_TO_SYSTEM_OVERRIDE: Record<string, string> = {
+  '/system-access-apply': 'oa', // 系统权限申请 → 流程审批系统
+}
+
+/**
  * 依据 pathname(+query) 反查系统 code；未匹配返回 null。
  * search 仅用于共用訂單路由的來源歸屬：from=ad-sales 歸廣告系統，否則歸店鋪經營系統；
  * 歸屬菜單不在服务端菜单树时（菜单缺失/停用）退回按 path 反查的既有行为。
@@ -113,6 +122,8 @@ export function resolveSystemFromPathname(
   tree: MenuVO[] | null,
   search = '',
 ): string | null {
+  // 非菜单路由优先走硬编码归属（不依赖 tree，避免 tree 未就绪时 Sidebar 闪烁全量菜单）
+  if (PATH_TO_SYSTEM_OVERRIDE[pathname]) return PATH_TO_SYSTEM_OVERRIDE[pathname]
   if (!tree) return null
   const { systemByKey, pathToSystem } = buildSystemIndex(tree)
   const ownerKey = resolveOrderRouteMenuKey(pathname, search)

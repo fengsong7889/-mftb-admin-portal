@@ -51,6 +51,26 @@ public class RdmScheduleController {
         return Result.success(scheduleService.plan(reqId));
     }
 
+    /** 需求甘特图（三视角 + 筛选 + 按需求分页；全局视角服务端按 canSeeAll 裁决） */
+    @GetMapping("/gantt")
+    @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
+    public Result<RdmScheduleVO.GanttPage> gantt(RdmScheduleDTO.GanttQuery query) {
+        return Result.success(scheduleService.gantt(query));
+    }
+
+    /**
+     * 甘特图调期：本人任务计划起止批量更新（乐观锁 + 审计 + 幂等，整批原子）。
+     * <p>菜单锚点与「上报进度」同源（rdm-delivery-board:edit）：任务负责人本就需要能写自己的排期；
+     * 能否改某条仍由服务层按「负责人本人/管理员 + 任务与需求状态」重裁。
+     */
+    @PostMapping("/task-plans")
+    @RequirePermission(menu = "rdm-delivery-board", action = "edit", anyOf = {"rdm-requirement", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:dispatch"})
+    public Result<RdmScheduleVO.TaskPlanResult> updateTaskPlans(@RequestBody RdmScheduleDTO.TaskPlanBatch batch) {
+        return Result.success("排期已保存", scheduleService.updateTaskPlans(batch));
+    }
+
     /** 依赖列表 */
     @GetMapping("/requirement/{reqId}/dependencies")
     @RequirePermission(menu = "rdm-requirement", anyOf = {"rdm-delivery-board", "rdm-delivery-iteration", "rdm-requirement", "rdm-intake"},

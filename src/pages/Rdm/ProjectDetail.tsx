@@ -46,6 +46,7 @@ import {
   UserAddOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import {
@@ -104,6 +105,7 @@ type FormMode = 'create' | 'edit' | 'view'
 
 export default function ProjectDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const mode: FormMode = (searchParams.get('mode') as FormMode) || 'view'
   const projectId = searchParams.get('id') ? Number(searchParams.get('id')) : NaN
@@ -300,7 +302,13 @@ export default function ProjectDetail() {
   // ── 表單提交 ──
   const handleFormSubmit = async () => {
     try {
-      const values = await form.validateFields()
+      // validateFields 只返回「已注册 Form.Item」的字段，所以用它做校验；
+      // 但六个负责人是按 EmployeeSelect 的 onChange/onPick 双写的，*UserId 并没有注册字段、
+      // 只存在于 form store 里。过去直接拿 validateFields 的返回值拼 payload，
+      // pmUserId 等六个 ID 恒为 undefined（端到端实测：POST/PATCH 体里根本没有 pmUserId），
+      // 后果是项目没有 PM → 不会被自动拉进成员表 → 创建人自己也改不动自己建的项目。
+      await form.validateFields()
+      const values = form.getFieldsValue(true)
       setSubmitting(true)
       const payload = {
         name: values.name,
@@ -486,9 +494,10 @@ export default function ProjectDetail() {
         badge={
           <Space size={4}>
             <Tag color={statusColor} style={{ margin: 0 }}>{statusLabel}</Tag>
-            {detail.pausedFlag && <Tag color="warning" icon={<PauseCircleOutlined />} style={{ margin: 0 }}>已暫停</Tag>}
-            {detail.riskFlag && <Tag color="error" icon={<AlertOutlined />} style={{ margin: 0 }}>風險</Tag>}
-            {detail.overdueFlag && <Tag color="red" style={{ margin: 0 }}>已逾期</Tag>}
+            {/* 标记是后端 Integer 的 0/1，必须 === 1 判定；写成 `flag && <Tag/>` 会把 0 当成文本渲染到头部 */}
+            {detail.pausedFlag === 1 && <Tag color="warning" icon={<PauseCircleOutlined />} style={{ margin: 0 }}>{t('rdm.projDetail.tagPaused')}</Tag>}
+            {detail.riskFlag === 1 && <Tag color="error" icon={<AlertOutlined />} style={{ margin: 0 }}>{t('rdm.projDetail.tagRisk')}</Tag>}
+            {detail.overdueFlag === 1 && <Tag color="red" style={{ margin: 0 }}>{t('rdm.projDetail.tagOverdue')}</Tag>}
           </Space>
         }
         meta={

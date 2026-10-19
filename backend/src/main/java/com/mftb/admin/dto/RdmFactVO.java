@@ -42,6 +42,12 @@ public class RdmFactVO {
         private String status;
         /** 項目經理篩選 */
         private Long pmUserId;
+        /**
+         * 统计卡下钻口径（inProgress / attention / pending）；空值不下钻。
+         * <p><b>只对 {@code projectFactPage} 生效</b>：卡片/导出/对账必须继续按未下钻的
+         * 全量口径出数，否则被下钻的那张卡会只显示自己筛出的数，三张卡之间也失去可比性。
+         */
+        private String drill;
         /** 是否連帶計算待辦看板（導出/對賬需要；純卡片可關掉以省開銷） */
         private boolean includeTodos = true;
         /** 是否輸出逐交付項明細（下鑽/導出需要） */

@@ -12,6 +12,8 @@ import { writeCurrentSystemCode } from '../hooks/useCurrentSystem'
 import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
 export interface UserInfo {
+  /** sys_user 主键（后端登录/会话接口下发）：按登录人裁决的业务字段（任务负责人等）依赖它 */
+  id?: number
   username: string
   name: string
   /** 员工工号。内置系统管理员账号（admin）不是员工、没有工号，后端不下发该字段 */
@@ -314,6 +316,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then((info) => {
         setUser((prev) => {
           const refreshed: UserInfo = {
+            id: info.id,
             username: info.username,
             name: info.name,
             empId: info.empId,
@@ -434,6 +437,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const backendUser = result.userInfo
       const mappedUser: UserInfo = {
+        // id 是下游按登录人裁决的根基（如甘特图 mine/canAdjust 展示），丢失会退化成「永不命中」
+        id: backendUser.id,
         username: backendUser.username,
         name: backendUser.name,
         empId: backendUser.empId,

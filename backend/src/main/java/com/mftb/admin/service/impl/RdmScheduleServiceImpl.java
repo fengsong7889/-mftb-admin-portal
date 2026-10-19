@@ -1,21 +1,30 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.RdmRequirementQuery;
 import com.mftb.admin.dto.RdmScheduleDTO;
 import com.mftb.admin.dto.RdmScheduleVO;
 import com.mftb.admin.entity.RdmDeliveryItem;
 import com.mftb.admin.entity.RdmMilestone;
 import com.mftb.admin.entity.RdmRequirement;
+import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmTaskDependency;
+import com.mftb.admin.entity.RdmTaskPlanLog;
 import com.mftb.admin.entity.RdmWorkCalendar;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmDeliveryItemMapper;
 import com.mftb.admin.mapper.RdmMilestoneMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
+import com.mftb.admin.mapper.RdmRequirementRoleMapper;
 import com.mftb.admin.mapper.RdmTaskDependencyMapper;
+import com.mftb.admin.mapper.RdmTaskPlanLogMapper;
 import com.mftb.admin.mapper.RdmWorkCalendarMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -46,6 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -100,6 +110,15 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
      * 同一能力另供问题延期期限、逾期升级与任务27 紧急补验复用。
      */
     private final RdmWorkingDayCalculator workingDayCalculator;
+    /** 阶段二：甘特图需按需求批量取参与角色，判定未排期角色 */
+    private final RdmRequirementRoleMapper roleMapper;
+    /** 阶段二：调期审计（只追加） */
+    private final RdmTaskPlanLogMapper taskPlanLogMapper;
+
+    /** executeOnce 业务类型：甘特图调期（阶段二） */
+    private static final String BIZ_TASK_PLAN = "rdm_task_plan";
+    /** 调期批量上限：防止一次请求摊平海量任务 */
+    private static final int MAX_TASK_PLAN_ITEMS = 100;
 
     /** executeOnce 业务类型：需求内任务依赖（任务19 / 缺口3） */
     private static final String BIZ_TASK_DEPENDENCY = "rdm_task_dependency";
@@ -1148,6 +1167,272 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
             case RdmTaskDependency.BLOCK_RELEASE -> "上線";
             default -> "開工";
         };
+    }
+
+    /* ==================== 阶段二：需求甘特图（真实数据） ==================== */
+
+    @Override
+    public RdmScheduleVO.GanttPage gantt(RdmScheduleDTO.GanttQuery q) {
+        SysUser current = operatorResolver.currentUser();
+        boolean unrestricted = accessGuard.canSeeAll(current);
+        RdmScheduleVO.GanttPage page = new RdmScheduleVO.GanttPage();
+        String mode = StringUtils.hasText(q.getMode()) ? q.getMode() : "personal";
+        page.setMode(mode);
+
+        List<RdmRequirement> reqs;
+        if ("single".equals(mode)) {
+            RdmRequirement req = accessGuard.requireById(q.getReqId());
+            accessGuard.requireVisible(req, current, "查看排期甘特");
+            reqs = List.of(req);
+            page.setTotal(1L);
+        } else {
+            // 全局视角必须全量授权；无权者明确拒绝，不静默降级为个人结果
+            if ("global".equals(mode) && !unrestricted) {
+                throw new BusinessException("您沒有全量查看權限，無法查看全局甘特圖");
+            }
+            RdmRequirementQuery query = new RdmRequirementQuery();
+            query.setScope(RdmConstants.SCOPE_ALL);
+            long pageNum = PageResult.normalizePage(q.getPage() == null ? 1 : q.getPage());
+            long pageSize = Math.min(PageResult.normalizeSize(q.getSize() == null ? 20 : q.getSize()), 100);
+            query.setPage((int) pageNum);
+            query.setSize((int) pageSize);
+            query.setKeyword(q.getKeyword());
+            query.setProjectId(q.getProjectId());
+            // 跟进清单口径：只看已分配到产品的执行侧需求，不把准入前/需求池混入排期
+            query.setExecutionOnly(true);
+            Long userId = unrestricted ? null : current.getId();
+            Page<RdmRequirement> p = requirementMapper.selectPage(
+                    new Page<>(pageNum, pageSize), query.toWrapper(userId, true));
+            reqs = p.getRecords();
+            page.setTotal(p.getTotal());
+        }
+        page.setLoaded(reqs.size());
+        if (reqs.isEmpty()) {
+            return page;
+        }
+
+        List<Long> reqIds = reqs.stream().map(RdmRequirement::getId).toList();
+        // 批量取任务与参与角色：两次 IN 查询，避免逐需求 N+1
+        List<RdmWorkTask> allTasks = taskMapper.selectList(new LambdaQueryWrapper<RdmWorkTask>()
+                .in(RdmWorkTask::getReqId, reqIds)
+                .ne(RdmWorkTask::getStatus, "cancelled")
+                .orderByAsc(RdmWorkTask::getId));
+        List<RdmRequirementRole> allRoles = roleMapper.selectList(new LambdaQueryWrapper<RdmRequirementRole>()
+                .in(RdmRequirementRole::getReqId, reqIds)
+                .eq(RdmRequirementRole::getIsActive, 1));
+        Map<Long, List<RdmWorkTask>> tasksByReq = new LinkedHashMap<>();
+        allTasks.forEach(t -> tasksByReq.computeIfAbsent(t.getReqId(), k -> new ArrayList<>()).add(t));
+        Map<Long, List<RdmRequirementRole>> rolesByReq = new LinkedHashMap<>();
+        allRoles.forEach(r -> rolesByReq.computeIfAbsent(r.getReqId(), k -> new ArrayList<>()).add(r));
+
+        Long myId = current == null ? null : current.getId();
+        for (RdmRequirement req : reqs) {
+            RdmScheduleVO.GanttRequirement gr = new RdmScheduleVO.GanttRequirement();
+            gr.setId(req.getId());
+            gr.setReqNo(req.getReqNo());
+            gr.setTitle(req.getTitle());
+            gr.setStatus(req.getStatus());
+            // 项目/迭代名称在实体上不存在（VO 联表字段），甘特暂不展示，避免额外 join
+            LocalDate spanStart = null;
+            LocalDate spanEnd = null;
+            Set<Long> scheduledUserIds = new HashSet<>();
+            for (RdmWorkTask t : tasksByReq.getOrDefault(req.getId(), List.of())) {
+                if (!taskMatchesFilter(t, q, myId)) {
+                    continue;
+                }
+                gr.getTasks().add(toGanttTask(t, req, myId));
+                if (t.getPlanStartDate() != null && t.getPlanFinishDate() != null) {
+                    spanStart = min(spanStart, t.getPlanStartDate());
+                    spanEnd = max(spanEnd, t.getPlanFinishDate());
+                    if (t.getOwnerUserId() != null) {
+                        scheduledUserIds.add(t.getOwnerUserId());
+                    }
+                }
+            }
+            gr.setSpanStart(DateTimeUtils.format(spanStart));
+            gr.setSpanEnd(DateTimeUtils.format(spanEnd));
+            // 已参与但尚无完整排期的角色：保留占位，不让角色从图中消失
+            Set<String> unscheduled = new LinkedHashSet<>();
+            for (RdmRequirementRole role : rolesByReq.getOrDefault(req.getId(), List.of())) {
+                if (role.getUserId() != null && !scheduledUserIds.contains(role.getUserId())
+                        && StringUtils.hasText(role.getRoleCode())) {
+                    unscheduled.add(role.getRoleCode());
+                }
+            }
+            gr.setUnscheduledRoles(new ArrayList<>(unscheduled));
+            page.getRequirements().add(gr);
+        }
+        return page;
+    }
+
+    /** 任务级筛选（视角/工具栏共用） */
+    private boolean taskMatchesFilter(RdmWorkTask t, RdmScheduleDTO.GanttQuery q, Long myId) {
+        if (Boolean.TRUE.equals(q.getOnlyMine()) && !Objects.equals(t.getOwnerUserId(), myId)) {
+            return false;
+        }
+        if (q.getOwnerUserId() != null && !q.getOwnerUserId().equals(t.getOwnerUserId())) {
+            return false;
+        }
+        if (StringUtils.hasText(q.getTaskType()) && !q.getTaskType().equals(t.getTaskType())) {
+            return false;
+        }
+        if (StringUtils.hasText(q.getIterationCode()) && !q.getIterationCode().equals(t.getIterationCode())) {
+            return false;
+        }
+        if (StringUtils.hasText(q.getStatus()) && !q.getStatus().equals(t.getStatus())) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(q.getOnlyOverdue()) && !isOverdue(t)) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(q.getOnlyUnscheduled())
+                && t.getPlanStartDate() != null && t.getPlanFinishDate() != null) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isOverdue(RdmWorkTask t) {
+        return !"done".equals(t.getStatus()) && t.getPlanFinishDate() != null
+                && t.getPlanFinishDate().isBefore(LocalDate.now());
+    }
+
+    private RdmScheduleVO.GanttTask toGanttTask(RdmWorkTask t, RdmRequirement req, Long myId) {
+        RdmScheduleVO.GanttTask g = new RdmScheduleVO.GanttTask();
+        g.setId(t.getId());
+        g.setTaskNo(t.getTaskNo());
+        g.setTitle(t.getTitle());
+        g.setTaskType(t.getTaskType());
+        g.setRoleCode(t.getRoleCode());
+        g.setOwnerUserId(t.getOwnerUserId());
+        g.setOwnerName(t.getOwnerName());
+        g.setOwnerEmpNo(t.getOwnerEmpNo());
+        g.setPlanStartDate(DateTimeUtils.format(t.getPlanStartDate()));
+        g.setPlanFinishDate(DateTimeUtils.format(t.getPlanFinishDate()));
+        g.setStatus(t.getStatus());
+        g.setProgress(t.getProgress());
+        g.setOverdue(isOverdue(t));
+        g.setPlanVersion(t.getPlanVersion() == null ? 1 : t.getPlanVersion());
+        boolean reqOpen = !RdmConstants.STATUS_CLOSED.equals(req.getStatus())
+                && !RdmConstants.STATUS_VERIFIED.equals(req.getStatus());
+        boolean ownerMine = myId != null && myId.equals(t.getOwnerUserId());
+        boolean statusOk = !"done".equals(t.getStatus()) && !"cancelled".equals(t.getStatus());
+        boolean canAdjust = ownerMine && statusOk && reqOpen;
+        g.setCanAdjust(canAdjust);
+        if (!canAdjust) {
+            g.setReadOnlyReason(!ownerMine ? "僅任務負責人可調整自己的排期"
+                    : !statusOk ? "任務已完成或已取消，排期只讀"
+                    : "需求已歸檔/已確認交付，排期只讀");
+        }
+        return g;
+    }
+
+    @Override
+    public RdmScheduleVO.TaskPlanResult updateTaskPlans(RdmScheduleDTO.TaskPlanBatch batch) {
+        if (batch == null || batch.getItems() == null || batch.getItems().isEmpty()) {
+            throw new BusinessException("請選擇要調整的排期任務");
+        }
+        if (batch.getItems().size() > MAX_TASK_PLAN_ITEMS) {
+            throw new BusinessException("一次最多調整 " + MAX_TASK_PLAN_ITEMS + " 項排期");
+        }
+        Set<Long> seen = new HashSet<>();
+        for (RdmScheduleDTO.TaskPlanItem item : batch.getItems()) {
+            if (item == null || item.getTaskId() == null) {
+                throw new BusinessException("任務ID不能為空");
+            }
+            if (!seen.add(item.getTaskId())) {
+                throw new BusinessException("同一批次不能重複調整同一任務");
+            }
+            if (!StringUtils.hasText(item.getPlanStartDate()) || !StringUtils.hasText(item.getPlanFinishDate())) {
+                throw new BusinessException("計劃起止日期不能為空");
+            }
+            if (parsePlanDate(item.getPlanStartDate()).isAfter(parsePlanDate(item.getPlanFinishDate()))) {
+                throw new BusinessException("開始日期不能晚於結束日期");
+            }
+        }
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        String resourceKey = batch.getItems().stream()
+                .map(i -> String.valueOf(i.getTaskId())).sorted()
+                .collect(java.util.stream.Collectors.joining(","));
+        IdempotentKey key = IdempotentKey.builder()
+                .userId(current.getId())
+                .bizType(BIZ_TASK_PLAN)
+                .resourceKey("task_plan:" + resourceKey)
+                .clientRequestId(StringUtils.hasText(batch.getClientRequestId())
+                        ? batch.getClientRequestId() : "auto:" + resourceKey)
+                .requestHash(idempotentService.stableRequestHash(batch.getItems()))
+                .build();
+        // executeOnce 自身即事务边界：整批原子，任一项越权/冲突全部回滚；不得再包外层事务
+        return idempotentService.executeOnce(key, () -> doUpdateTaskPlans(batch, current),
+                RdmScheduleVO.TaskPlanResult.class);
+    }
+
+    private RdmScheduleVO.TaskPlanResult doUpdateTaskPlans(RdmScheduleDTO.TaskPlanBatch batch, SysUser current) {
+        RdmScheduleVO.TaskPlanResult result = new RdmScheduleVO.TaskPlanResult();
+        result.setUpdated(0);
+        for (RdmScheduleDTO.TaskPlanItem item : batch.getItems()) {
+            RdmWorkTask task = taskMapper.selectById(item.getTaskId());
+            if (task == null) {
+                throw new BusinessException("任務不存在或已刪除");
+            }
+            RdmRequirement req = accessGuard.requireById(task.getReqId());
+            accessGuard.requireVisible(req, current, "調整排期");
+            boolean ownerMine = current.getId().equals(task.getOwnerUserId());
+            // 方案约定：全局查看权不自动获得代改权，首版仅任务负责人本人可调整（管理者也不例外）
+            if (!ownerMine) {
+                throw new BusinessException("僅任務負責人本人可調整自己的排期");
+            }
+            if ("done".equals(task.getStatus()) || "cancelled".equals(task.getStatus())) {
+                throw new BusinessException("任務已完成或已取消，不能調整排期");
+            }
+            if (RdmConstants.STATUS_CLOSED.equals(req.getStatus())
+                    || RdmConstants.STATUS_VERIFIED.equals(req.getStatus())) {
+                throw new BusinessException("需求已歸檔/已確認交付，不能調整排期");
+            }
+            LocalDate ns = parsePlanDate(item.getPlanStartDate());
+            LocalDate nf = parsePlanDate(item.getPlanFinishDate());
+            if (ns.isAfter(nf)) {
+                throw new BusinessException("開始日期不能晚於結束日期");
+            }
+            int expected = item.getExpectedPlanVersion() != null ? item.getExpectedPlanVersion()
+                    : (task.getPlanVersion() == null ? 1 : task.getPlanVersion());
+            int affected = taskMapper.update(null, new LambdaUpdateWrapper<RdmWorkTask>()
+                    .eq(RdmWorkTask::getId, task.getId())
+                    .eq(RdmWorkTask::getPlanVersion, expected)
+                    .set(RdmWorkTask::getPlanStartDate, ns)
+                    .set(RdmWorkTask::getPlanFinishDate, nf)
+                    .set(RdmWorkTask::getPlanVersion, expected + 1)
+                    .set(RdmWorkTask::getUpdatedBy, operatorResolver.operatorSignature(current)));
+            if (affected == 0) {
+                throw new BusinessException(ResultCode.CONFLICT.getCode(), "排期已被他人修改，請刷新後重試");
+            }
+            RdmTaskPlanLog audit = new RdmTaskPlanLog();
+            audit.setTaskId(task.getId());
+            audit.setTaskNo(task.getTaskNo());
+            audit.setReqId(task.getReqId());
+            audit.setUserId(current.getId());
+            audit.setUserName(current.getName());
+            audit.setOldStartDate(task.getPlanStartDate());
+            audit.setOldFinishDate(task.getPlanFinishDate());
+            audit.setNewStartDate(ns);
+            audit.setNewFinishDate(nf);
+            audit.setOldVersion(expected);
+            audit.setNewVersion(expected + 1);
+            audit.setClientRequestId(RdmIdempotentService.normalizeClientRequestId(batch.getClientRequestId()));
+            taskPlanLogMapper.insert(audit);
+            result.setUpdated(result.getUpdated() + 1);
+            result.getTasks().add(toGanttTask(taskMapper.selectById(task.getId()), req, current.getId()));
+        }
+        log.info("RDM 甘特图调期已保存: {} 项, operator={}", result.getUpdated(),
+                operatorResolver.operatorSignature(current));
+        return result;
+    }
+
+    private LocalDate parsePlanDate(String s) {
+        return LocalDate.parse(s.trim());
     }
 
     /** 被阻塞任务信息 */

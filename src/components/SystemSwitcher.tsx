@@ -26,7 +26,7 @@ import './SystemSwitcher.css'
 /** 图标以门户接口配置为准；未登记或缺失时回退该系统默认图标，保证列表每项都有图标。 */
 function resolveSystemIcon(system: PortalSystem): ReactNode {
   const key = getPortalSystemKey(system.code, system.name)
-  return renderMenuIcon(system.icon)
+  return renderMenuIcon(system.icon, 16)
     ?? renderMenuIcon(key ? PORTAL_SYSTEM_ICONS[key] : 'AppstoreOutlined')
     ?? <AppstoreOutlined />
 }

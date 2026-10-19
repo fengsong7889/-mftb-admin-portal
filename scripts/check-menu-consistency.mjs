@@ -80,7 +80,9 @@ if (/^const menuItems: MenuItem\[\] = \{$/m.test(sidebar)) {
 const menuTabs = read('src/components/MenuTabs.tsx')
 const subPageName = menuTabs.match(/const SUB_PAGE_NAME: Record<string, string> = \{([\s\S]*?)\n\}/)
 const subPageCount = subPageName ? [...subPageName[1].matchAll(/'[^']+':\s*'[^']+'/g)].length : 0
-const SUB_PAGE_NAME_LIMIT = 20
+// 棘轮上限：表内只允许详情页/独立页（无菜单记录的路由）；每新增一个合法独立页 +1 并在此登记原因
+// 20 → 21：v3.18 新增独立页 /rdm-gantt（需求甘特圖，无后端菜单记录，侧栏高亮归 rdm-requirement）
+const SUB_PAGE_NAME_LIMIT = 21
 if (!subPageName) {
   fail('未能解析 MenuTabs.SUB_PAGE_NAME（菜单名兜底表应仅保留非菜单页, 不得回填菜单名）')
 } else if (subPageCount > SUB_PAGE_NAME_LIMIT) {

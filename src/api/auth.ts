@@ -112,6 +112,52 @@ export function savePortalFavorites(codes: string[]) {
   return request.put<unknown, void>('/auth/portal-favorites', codes)
 }
 
+/** AI 助手偏好设置（与后端 ai_settings 列字段白名单一致） */
+export interface AiSettings {
+  engineMode?: 'auto' | 'primary' | 'off-peak'
+  contextWindow?: number | null
+  thinkingEnabled?: boolean
+  thinkingDepth?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+}
+
+/**
+ * 获取当前用户 AI 助手偏好设置。
+ * null 表示该账号从未同步过（后端列为空，Jackson non_null 会省略 data），
+ * 与「同步过且已清空」返回的空对象语义不同，调用方必须区分处理。
+ */
+export function fetchAiSettings() {
+  return request.get<unknown, AiSettings | null>('/auth/ai-settings', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+/** 保存当前用户 AI 助手偏好设置（整份覆盖） */
+export function saveAiSettings(settings: AiSettings) {
+  return request.put<unknown, void>('/auth/ai-settings', settings)
+}
+
+/** 产研交付个人工作台布局偏好（与后端 workbench_layout 列格式一致） */
+export interface WorkbenchLayoutData {
+  v: 1
+  order: string[]
+  dismissed: string[]
+}
+
+/**
+ * 获取当前用户产研交付个人工作台布局偏好。
+ * null 表示该账号从未同步过，前端据此回退 localStorage 缓存。
+ */
+export function fetchWorkbenchLayout() {
+  return request.get<unknown, WorkbenchLayoutData | null>('/auth/workbench-layout', {
+    headers: { [SILENT_HEADER]: '1' },
+  })
+}
+
+/** 保存当前用户产研交付个人工作台布局偏好（整份覆盖） */
+export function saveWorkbenchLayout(layout: WorkbenchLayoutData) {
+  return request.put<unknown, void>('/auth/workbench-layout', layout)
+}
+
 /** 更新当前用户头像（持久化到后端） */
 export function updateAvatarApi(avatar: string) {
   return request.put<unknown, void>('/auth/avatar', { avatar })

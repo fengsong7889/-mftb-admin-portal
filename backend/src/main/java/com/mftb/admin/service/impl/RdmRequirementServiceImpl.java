@@ -146,13 +146,18 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         Page<RdmRequirement> page = new Page<>(
                 (int) PageResult.normalizePage(query.getPage() == null ? 1 : query.getPage()),
                 (int) PageResult.normalizeSize(query.getSize() == null ? 10 : query.getSize()));
-        // 「待我審批」的关联关系在 OA 审批任务表里，不在需求表的四个人员字段上；
-        // 这一视角不按 relatedOnly 收敛，改由下面的审批待办 id 集合决定范围，
+        // 「待我審批」与「提交侧合并视图」的关联关系在 OA 审批任务表里，不在需求表的四个人员字段上；
+        // 这两个视角不按 relatedOnly 收敛，改由下面的审批待办 id 集合决定范围，
         // 否则审批人只会看到自己提的单，出现「待办计数 3 条、点进去空列表」。
-        boolean relatedOnly = !RdmConstants.SCOPE_APPROVING.equals(query.getScope());
+        boolean approvingScope = RdmConstants.SCOPE_APPROVING.equals(query.getScope());
+        boolean intakeScope = RdmConstants.SCOPE_INTAKE.equals(query.getScope());
+        boolean relatedOnly = !(approvingScope || intakeScope);
         var wrapper = query.toWrapper(scopeUserId(current, unrestricted), relatedOnly);
-        // 待我審批需要 join OA 审批任务表才能定出审批人，LambdaQueryWrapper 表达不了：先取 id 再收敛
-        if (RdmConstants.SCOPE_APPROVING.equals(query.getScope())) {
+        if (intakeScope) {
+            // 合并视图：本人提交的 ∪ 该我审的。待办为空时等价于「我提的」，不用提前返回空集
+            applySubmitterUnion(wrapper, selfUserId(current), approvingRequirementIds(current));
+        } else if (approvingScope) {
+            // 待我審批需要 join OA 审批任务表才能定出审批人，LambdaQueryWrapper 表达不了：先取 id 再收敛
             List<Long> approvingIds = approvingRequirementIds(current);
             if (approvingIds.isEmpty()) {
                 return new PageResult<>(List.<RdmRequirementVO>of(), 0L);
@@ -168,29 +173,101 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     @Override
-    public Map<String, Long> scopeCounts() {
+    public Map<String, Long> scopeCounts(boolean executionOnly) {
         SysUser current = operatorResolver.currentUser();
         Long userId = scopeUserId(current, canSeeAll(current));
         Map<String, Long> counts = new LinkedHashMap<>();
-        counts.put(RdmConstants.SCOPE_MINE, countByScope(RdmConstants.SCOPE_MINE, userId));
-        counts.put(RdmConstants.SCOPE_TODO, countByScope(RdmConstants.SCOPE_TODO, userId));
+        // 审批待办只算一次，intake 与 approving 两个计数共用（与列表同一口径）
+        List<Long> approvingIds = approvingRequirementIds(current);
+        counts.put(RdmConstants.SCOPE_MINE, countByScope(RdmConstants.SCOPE_MINE, userId, executionOnly));
+        // 提交侧合并视图：本人提交的 ∪ 该我审的，与列表同一口径（并集去重，不是两个数字相加）。
+        // 故意不吃 executionOnly：并集是「提需求」菜单的计数，那边要看到草稿/待审批，不能被执行侧地板收窄。
+        counts.put(RdmConstants.SCOPE_INTAKE, intakeUnionCount(selfUserId(current), approvingIds));
+        counts.put(RdmConstants.SCOPE_TODO, countByScope(RdmConstants.SCOPE_TODO, userId, executionOnly));
         // 审批待办不在需求表的任何人字段上，只能走 OA 口径（与工作台待办组共用同一个方法）
-        counts.put(RdmConstants.SCOPE_APPROVING, (long) approvingRequirementIds(current).size());
-        counts.put(RdmConstants.SCOPE_POOL, countByScope(RdmConstants.SCOPE_POOL, userId));
-        counts.put(RdmConstants.SCOPE_PRODUCT, countByScope(RdmConstants.SCOPE_PRODUCT, userId));
-        counts.put(RdmConstants.SCOPE_DELIVERY, countByScope(RdmConstants.SCOPE_DELIVERY, userId));
-        counts.put(RdmConstants.SCOPE_ACCEPTANCE, countByScope(RdmConstants.SCOPE_ACCEPTANCE, userId));
+        counts.put(RdmConstants.SCOPE_APPROVING, (long) approvingIds.size());
+        counts.put(RdmConstants.SCOPE_POOL, countByScope(RdmConstants.SCOPE_POOL, userId, executionOnly));
+        counts.put(RdmConstants.SCOPE_PRODUCT, countByScope(RdmConstants.SCOPE_PRODUCT, userId, executionOnly));
+        counts.put(RdmConstants.SCOPE_DELIVERY, countByScope(RdmConstants.SCOPE_DELIVERY, userId, executionOnly));
+        counts.put(RdmConstants.SCOPE_ACCEPTANCE, countByScope(RdmConstants.SCOPE_ACCEPTANCE, userId, executionOnly));
         // 上线后待評分与我的验收记录：与列表同一口径（同一 applyScope 分支），避免计数与点进去不一致
-        counts.put(RdmConstants.SCOPE_ACCEPTANCE_POST, countByScope(RdmConstants.SCOPE_ACCEPTANCE_POST, userId));
-        counts.put(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, countByScope(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, userId));
-        counts.put(RdmConstants.SCOPE_ALL, countByScope(RdmConstants.SCOPE_ALL, userId));
+        counts.put(RdmConstants.SCOPE_ACCEPTANCE_POST, countByScope(RdmConstants.SCOPE_ACCEPTANCE_POST, userId, executionOnly));
+        counts.put(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, countByScope(RdmConstants.SCOPE_ACCEPTANCE_HISTORY, userId, executionOnly));
+        counts.put(RdmConstants.SCOPE_ALL, countByScope(RdmConstants.SCOPE_ALL, userId, executionOnly));
         return counts;
     }
 
+    /**
+     * 默认不带执行侧地板的计数（工作台待办分组等消费方）。
+     * <p>需要与需求跟进清单同口径（排除准入前/需求池）的调用方走三参重载传 {@code true}。
+     */
     private Long countByScope(String scope, Long userId) {
+        return countByScope(scope, userId, false);
+    }
+
+    private Long countByScope(String scope, Long userId, boolean executionOnly) {
         RdmRequirementQuery q = new RdmRequirementQuery();
         q.setScope(scope);
+        q.setExecutionOnly(executionOnly);
         return requirementMapper.selectCount(q.toWrapper(userId));
+    }
+
+    /**
+     * 该视角是否需要叠 OA 审批待办的 id 集合（并因此不能按 relatedOnly 收敛）。
+     * <p>page / stats / countStatsSubset 三处共用同一个判定：一旦各写各的，
+     * 就会出现「看板信号卡与列表行数对不上」这种最难排查的口径分叉。
+     */
+    private static boolean requiresOaPendingIds(String scope) {
+        return RdmConstants.SCOPE_APPROVING.equals(scope) || RdmConstants.SCOPE_INTAKE.equals(scope);
+    }
+
+    /**
+     * 提交侧合并视图的数据范围：本人提交的 ∪ 该我审的。
+     * <p>relatedOnly 的四字段并集表达不了这个并集（审批待办不在需求表人员字段上），
+     * 所以这两个视角关掉 relatedOnly，由这里显式拼那一条 OR 条件。
+     * <p><b>本视角故意不跟随 canSeeAll 放宽成全量</b>（与其他视角不同）：
+     * 「提交需求」菜单的职责就是一条“我的提交 + 我的审批待办”，合并前给分配侧持权者
+     * 展示的也只有其 OA 待办；改成全量会把一个专用窄菜单变成另一个需求池，
+     * 既不符合本菜单职责，也是对现状的可见范围放大。要看全量请走需求管理（all）。
+     * <p>{@code userId} 必须是 {@link #selfUserId} 解析后的非空 id（未登录为 -1 哨兵，
+     * 收敛为空集）；无审批待办时退化为「本人提交的」。
+     * <p>static + 包内可见：不依赖实例状态，单测可直接验证各分支的 SQL 形状，
+     * 不必拼起 26 个构造参数。
+     */
+    static void applySubmitterUnion(LambdaQueryWrapper<RdmRequirement> wrapper, Long userId, List<Long> approvingIds) {
+        if (approvingIds == null || approvingIds.isEmpty()) {
+            wrapper.eq(RdmRequirement::getSubmitterUserId, userId);
+            return;
+        }
+        wrapper.and(w -> w.eq(RdmRequirement::getSubmitterUserId, userId)
+                .or().in(RdmRequirement::getId, approvingIds));
+    }
+
+    /**
+     * 提交侧合并视图的计数（与 {@link #applySubmitterUnion} 同一口径）。
+     * <p>故意不用 SQL UNION：这个并集按主键去重，本人提交的单也可能正是该我审的
+     * （自审兼提交人），两个 count 相加会把同一条算两次。
+     * <p>只拉 id 列一次取回本人提交集，同时充当计数与去重集合，不必再跑一次 COUNT。
+     */
+    private long intakeUnionCount(Long userId, List<Long> approvingIds) {
+        RdmRequirementQuery mine = new RdmRequirementQuery();
+        mine.setScope(RdmConstants.SCOPE_MINE);
+        List<Long> mineIds = requirementMapper.selectList(mine.toWrapper(userId).select(RdmRequirement::getId))
+                .stream().map(RdmRequirement::getId).toList();
+        return mergeUnionCount(mineIds.size(), new LinkedHashSet<>(mineIds), approvingIds);
+    }
+
+    /**
+     * 并集去重的纯函数部分：总数 = 本人提交的 + 待办里不属于本人的那几条。
+     * <p>单独抽出来是因为“相加再减交集”这类算术最容易写错（尤其自审兼提交人的场景），
+     * 直接对函数做断言比对数据库轻得多。
+     */
+    static long mergeUnionCount(long mineCount, Set<Long> mineIds, List<Long> approvingIds) {
+        if (approvingIds == null || approvingIds.isEmpty()) {
+            return mineCount;
+        }
+        long outsideMine = approvingIds.stream().filter(id -> !mineIds.contains(id)).count();
+        return mineCount + outsideMine;
     }
 
     /**
@@ -212,6 +289,15 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 只取“登录人自己”的 id，不受 canSeeAll 影响（永远不返回 null）。
+     * <p>提交侧合并视图用它：那一半“本人提交的”必须绑在真实身份上，
+     * 拿不到身份时同样返回 {@code UNAUTHENTICATED_SCOPE_ID} 哨兵收敛为空集。
+     */
+    private Long selfUserId(SysUser current) {
+        return current == null || current.getId() == null ? UNAUTHENTICATED_SCOPE_ID : current.getId();
+    }
+
+    /**
      * 看板信号卡统计：与列表共用同一套条件构造，口径不可能分叉。
      *
      * <p>以前看板卡是对已加载的行做 filter().length 算的，而看板一次只拉固定上限条数，
@@ -222,35 +308,40 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         SysUser current = operatorResolver.currentUser();
         boolean unrestricted = canSeeAll(current);
         Long userId = scopeUserId(current, unrestricted);
-        boolean approvingScope = RdmConstants.SCOPE_APPROVING.equals(query.getScope());
-        // 待我審批的 id 集合只算一次、四个指标共用：每算一个指标重查一轮 OA 太浪费
-        List<Long> approvingIds = approvingScope ? approvingRequirementIds(current) : null;
+        boolean oaPendingScope = requiresOaPendingIds(query.getScope());
+        boolean intakeScope = RdmConstants.SCOPE_INTAKE.equals(query.getScope());
+        // 审批待办的 id 集合只算一次、四个指标共用：每算一个指标重查一轮 OA 太浪费
+        List<Long> approvingIds = oaPendingScope ? approvingRequirementIds(current) : null;
         Map<String, Long> counts = new LinkedHashMap<>();
-        if (approvingScope && approvingIds.isEmpty()) {
+        // approving 待办为空 ⇒ 整个范围为空；intake 为空只是「没有该我审的」，自己提的照算
+        if (oaPendingScope && !intakeScope && approvingIds.isEmpty()) {
             counts.put("total", 0L);
             counts.put("overdue", 0L);
             counts.put("toAccept", 0L);
             counts.put("pool", 0L);
             return counts;
         }
-        counts.put("total", countStatsSubset(query, userId, approvingIds, q -> { }));
-        counts.put("overdue", countStatsSubset(query, userId, approvingIds, q -> q.setOverdueOnly(true)));
-        counts.put("toAccept", countStatsSubset(query, userId, approvingIds,
+        counts.put("total", countStatsSubset(query, userId, current, approvingIds, q -> { }));
+        counts.put("overdue", countStatsSubset(query, userId, current, approvingIds, q -> q.setOverdueOnly(true)));
+        counts.put("toAccept", countStatsSubset(query, userId, current, approvingIds,
                 q -> q.setStatus(RdmConstants.STATUS_UAT_PENDING)));
-        counts.put("pool", countStatsSubset(query, userId, approvingIds,
+        counts.put("pool", countStatsSubset(query, userId, current, approvingIds,
                 q -> q.setStatus(RdmConstants.STATUS_POOL)));
         return counts;
     }
 
     /** 复制一份查询条件再叠加单个指标的条件，避免四个指标互相污染 */
-    private long countStatsSubset(RdmRequirementQuery base, Long userId, List<Long> approvingIds,
+    private long countStatsSubset(RdmRequirementQuery base, Long userId, SysUser current, List<Long> approvingIds,
                                   java.util.function.Consumer<RdmRequirementQuery> tweak) {
         RdmRequirementQuery q = copyFiltersForStats(base);
         tweak.accept(q);
-        // 与 page() 保持同一收敛规则：待我審批的关联关系在 OA 任务表上，不按 relatedOnly 收敛
-        boolean relatedOnly = !RdmConstants.SCOPE_APPROVING.equals(q.getScope());
+        // 与 page() 保持同一收敛规则：待我審批（含提交侧合并视图）的关联关系在 OA 任务表上，不按 relatedOnly 收敛
+        boolean relatedOnly = !requiresOaPendingIds(q.getScope());
         var wrapper = q.toWrapper(userId, relatedOnly);
-        if (approvingIds != null) {
+        if (RdmConstants.SCOPE_INTAKE.equals(q.getScope())) {
+            // 与 page() 同一身份口径：用本人 id，不吃 canSeeAll 的全量放宽
+            applySubmitterUnion(wrapper, selfUserId(current), approvingIds);
+        } else if (approvingIds != null) {
             wrapper.in(RdmRequirement::getId, approvingIds);
         }
         Long n = requirementMapper.selectCount(wrapper);
@@ -267,6 +358,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         q.setDeptId(src.getDeptId());
         q.setPmUserId(src.getPmUserId());
         q.setOverdueOnly(src.getOverdueOnly());
+        // 执行侧地板必须跟着复制：否则需求跟进清单的看板信号卡会比列表多算准入前/需求池的单
+        q.setExecutionOnly(src.getExecutionOnly());
         return q;
     }
 
@@ -1658,25 +1751,26 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             List<RdmRequirementVO> pool = listByStatus(RdmConstants.STATUS_POOL, stageOf);
             if (!pool.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("pool", "需求池待分配（我是技術負責人）",
-                        "分配產品經理後進入受理", countByScope(RdmConstants.SCOPE_POOL, scopeUserId), pool));
+                        "分配產品經理後進入受理", countByScope(RdmConstants.SCOPE_POOL, scopeUserId, false), pool));
             }
         }
         if (userId != null) {
             List<RdmRequirementVO> mine = listByColumn(RdmRequirement::getAssigneePmUserId, userId, stageOf);
             if (!mine.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("product", "我負責的產品需求（我是產品經理）",
-                        "需盡快給出受理結論與排期", countByScope(RdmConstants.SCOPE_PRODUCT, scopeUserId), mine));
+                        "需盡快給出受理結論與排期", countByScope(RdmConstants.SCOPE_PRODUCT, scopeUserId, false), mine));
             }
             List<RdmRequirementVO> toAccept = listAcceptanceTodo(userId, stageOf);
             if (!toAccept.isEmpty()) {
                 groups.add(new RdmWorkbenchVO.TodoGroup("acceptance", "待我驗收（我是業務驗收人）",
-                        "驗收通過後才可確認上線", countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId), toAccept));
+                        "驗收通過後才可確認上線", countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId, false), toAccept));
             }
         }
         vo.setTodos(groups);
 
         RdmWorkbenchVO.Stats stats = new RdmWorkbenchVO.Stats();
-        stats.setMineTotal(countByScope(RdmConstants.SCOPE_MINE, scopeUserId));
+        // 工作台不是执行侧视图：不吃 executionOnly 地板，保持与列表默认口径一致
+        stats.setMineTotal(countByScope(RdmConstants.SCOPE_MINE, scopeUserId, false));
         stats.setMineProgress(userId == null ? 0L : requirementMapper.selectCount(
                 new LambdaQueryWrapper<RdmRequirement>().eq(RdmRequirement::getSubmitterUserId, userId)
                         .notIn(RdmRequirement::getStatus, List.of(RdmConstants.STATUS_CLOSED,
@@ -1691,7 +1785,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         RdmRequirementQuery overdueQuery = new RdmRequirementQuery();
         overdueQuery.setOverdueOnly(true);
         stats.setOverdueTotal(requirementMapper.selectCount(overdueQuery.toWrapper(scopeUserId)));
-        stats.setToAcceptTotal(countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId));
+        stats.setToAcceptTotal(countByScope(RdmConstants.SCOPE_ACCEPTANCE, scopeUserId, false));
         stats.setDeliveredTotal(userId == null ? 0L : requirementMapper.selectCount(
                 new LambdaQueryWrapper<RdmRequirement>().eq(RdmRequirement::getSubmitterUserId, userId)
                         .in(RdmRequirement::getStatus, List.of(RdmConstants.STATUS_RELEASED,

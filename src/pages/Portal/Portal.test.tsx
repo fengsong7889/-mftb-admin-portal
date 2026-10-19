@@ -902,6 +902,6 @@ describe('门户多语言与系统继承', () => {
     expect(document.title).toBe(`MFTB${zh.portal.title}`)
     await selectLanguage('English')
     await screen.findByRole('button', { name: 'Finance & Settlement · Enter system' })
-    expect(document.title).toBe('MFTB Enterprise Portal')
+    expect(document.title).toBe('MFTB Group Portal')
   })
 })

@@ -77,6 +77,6 @@ export function getBrandTitle(
 ): string {
   const systemName = system?.code
     ? getSystemDisplayName(t, system, language)
-    : t('portal.title', { defaultValue: '企業門戶' })
+    : t('portal.title', { defaultValue: '集團門戶' })
   return `MFTB${language.startsWith('zh') ? '' : ' '}${systemName.replace(/^MFTB\s*/i, '')}`
 }

@@ -50,7 +50,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>本轮仍保持双锚点过渡：rdm-intake 的 view/edit 仍是全量可见与分配权的现行判定依据，
      * RdmAccessGuard 同时认新锚点，迁移完成前不拆旧。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.15";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.18";
     /**
      * v3.16 授权镜像登记号：与菜单结构迁移分号登记，因为它**只能跑一次**。
      * <p>不能放进每次启动重放的 migrate()：管理员事后在新锚点上撤销的授权，
@@ -78,11 +78,14 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 可授动作集「以种子为准」的菜单白名单：{菜单 key}。
      * <p>v3.15 列入 rdm-requirement：管理员已裁决恢复 create/edit 可授，叠加 v3.14 的三个新锚点，
      * 该菜单的可授集应等于种子 {@code LIST_ACTIONS}。
+     * <p>v3.17 列入 rdm-dashboard-project：项目写接口（新增/编辑/暂停恢复）的锚点，
+     * 不列入则存量行的 [view,export] 不会被补齐，非超管永远用不了项目写流程。
      * <p>语义仍是**只并集追加、绝不删减**：管理员额外自定义出来的动作会被保留。
      * <p>只有显式授权的菜单才进这张表：默认不刷，否则会把别人特意摘掉的能力悄悄补回去，那是扩权。
      */
     private static final String[] ACTION_SYNC_FROM_SEED = {
             RdmConstants.MENU_REQUIREMENT,
+            RdmConstants.MENU_DASHBOARD_PROJECT,
     };
     /**
      * 迭代排期额外带 delete：菜单收敛后「删除迭代」接口的锚点从已退役的 rdm-product 移到这里。
@@ -90,6 +93,23 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 这个能力，接口就只剩超管能用（他靠代码直通，不依赖授权行）。
      */
     private static final String ITERATION_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
+    /**
+     * 項目總覽（v3.17）：可授集必须含 create/edit。
+     * <p>RdmProjectController 的新增挂 create、编辑挂 edit，而「暫停/恢復推進」就是走编辑
+     * PATCH 改 pausedFlag；种子只列 view/export 时授权中心勾不到写权，
+     * 实测非超管账号点暂停/新增一律 403「没有 [rdm-dashboard-project] 的[编辑]权限」。
+     * <p>可授 ≠ 已授：本改动只动 sys_menu.actions 元数据，谁能勾仍由管理员显式决定。
+     */
+    private static final String PROJECT_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
+
+    /**
+     * 團隊負載（rdm-resource-load）：可授动作集。
+     * <p>view=查看本人；view_all=查看全员（不授予其他项目业务正文/验收/签署权限）；
+     * edit=维护本人剩余工时/个人例外日历；dispatch=分派工作（每次写入还需满足来源业务动作权限）；
+     * manage=名册与容量维护（不包含业务派单或验收权）；export=导出有权查看的负载数据。
+     * <p>可授 ≠ 已授：本改动只动 sys_menu.actions 元数据，谁能勾仍由管理员显式决定。
+     */
+    private static final String RESOURCE_LOAD_ACTIONS = "[\"view\",\"view_all\",\"edit\",\"dispatch\",\"manage\",\"export\"]";
 
     /**
      * 菜单种子：{menuKey, 中文名, 英文名, path, component, icon, type, sort, parentKey, actions}。
@@ -102,9 +122,11 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-workbench", "個人工作台", "Personal Workbench", "/rdm-workbench", "RdmWorkbench", "HistoryOutlined", "2", "16", null, VIEW_ONLY},
             // 2) 項目與計劃：先建项目再挂靠需求（复用 rdm-dashboard key）
             {"rdm-dashboard", "項目與計劃", "Projects & Planning", null, null, "RiseOutlined", "1", "17", null, VIEW_ONLY},
-            {"rdm-dashboard-project", "項目總覽", "Project Overview", "/rdm-project", "ProjectOverview", "ProjectOutlined", "2", "1", "rdm-dashboard", VIEW_EXPORT},
+            {"rdm-dashboard-project", "項目總覽", "Project Overview", "/rdm-project", "ProjectOverview", "ProjectOutlined", "2", "1", "rdm-dashboard", PROJECT_ACTIONS},
             {"rdm-delivery-iteration", "迭代排期", "Iteration Planning", "/rdm-iteration", "IterationPlan", "ScheduleOutlined", "2", "2", "rdm-dashboard", ITERATION_ACTIONS},
-            {"rdm-dashboard-risk", "風險中心", "Risk Center", "/rdm-risk", "RiskCenter", "AlertOutlined", "2", "3", "rdm-dashboard", VIEW_EXPORT},
+            // 團隊負載：从研发工作台资源负载 Tab 升级为独立菜单，放在项目与计划分组下（sort=3，風險中心后移为 4）
+            {"rdm-resource-load", "團隊負載", "Team Workload", "/rdm-resource-load", "ResourceLoad", "TeamOutlined", "2", "3", "rdm-dashboard", RESOURCE_LOAD_ACTIONS},
+            {"rdm-dashboard-risk", "風險中心", "Risk Center", "/rdm-risk", "RiskCenter", "AlertOutlined", "2", "4", "rdm-dashboard", VIEW_EXPORT},
             // 3) 需求中心：业务侧提出与审批 + 分配侧统筹（复用 rdm-pool-group key）
             {"rdm-pool-group", "需求中心", "Requirement Center", null, null, "ContainerOutlined", "1", "18", null, VIEW_ONLY},
             {"rdm-intake-approval", "提需求", "Submit Requirement", "/rdm-intake-approval", "RequirementIntake", "SendOutlined", "2", "1", "rdm-pool-group", VIEW_ONLY},
@@ -228,6 +250,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 項目與計劃组内：project(15→1), risk(2→3), iteration 迁入后保持 2
             {"rdm-dashboard-project", "15", "1"},
             {"rdm-dashboard-risk", "2", "3"},
+            // v3.18 團隊負載升级为独立菜单占 sort=3，風險中心后移为 4（与种子注释同一意图）
+            {"rdm-dashboard-risk", "3", "4"},
             // 需求中心组内：requirement(19→3), intake 已在 2
             {"rdm-requirement", "19", "3"},
             {"rdm-intake", "20", "2"},
@@ -242,6 +266,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-dashboard-score", "1", "5"},
             {"rdm-dashboard-trend", "2", "4"},
             {"rdm-dashboard-report", "5", "2"},
+            // v3.18 rdm-dashboard 组插入團隊負載(sort=3)：risk 让位 3→4，否则同组撞 sort 启动校验失败
+            {"rdm-dashboard-risk", "3", "4"},
             // 顶级排序：workbench(18→16)
             {"rdm-workbench", "18", "16"},
     };
@@ -327,7 +353,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研交付(RDM) 菜单已就绪（v3.15 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS；结构仍为 v3.13 生命周期分组）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研交付(RDM) 菜单已就绪（v3.17 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS，rdm-dashboard-project = 种子 PROJECT_ACTIONS）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
     }
 
     /**
@@ -1019,7 +1045,8 @@ public class RdmMenuInitializer implements CommandLineRunner {
         }
         // v3.13 重排后的关键顺序必须真落地
         assertSortEquals("rdm-dashboard-project", 1);
-        assertSortEquals("rdm-dashboard-risk", 3);
+        assertSortEquals("rdm-dashboard-risk", 4);
+        assertSortEquals("rdm-resource-load", 3);
         assertSortEquals("rdm-delivery-test", 1);
         assertSortEquals("rdm-dashboard-score", 5);
         /*
@@ -1028,6 +1055,10 @@ public class RdmMenuInitializer implements CommandLineRunner {
          */
         assertMenuActionsInclude("rdm-requirement",
                 "view", "create", "edit", "export", "view_all", "dispatch", "contribute");
+        // v3.17：項目總覽的写权锚点。缺 create/edit 不会报错，只会让非超管永远勾不到
+        // 「新增/编辑/暂停项目」，所以它必须和 rdm-requirement 一样进后置校验
+        assertMenuActionsInclude(RdmConstants.MENU_DASHBOARD_PROJECT,
+                "view", "create", "edit", "export");
         // v3.7 退役验收：被收敛的菜单不得仍有存活行，也不得残留孤儿授权（残留会让授权树出现幽灵节点）
         for (String[] row : RETIRED_MENU_MERGE) {
             String retiredKey = row[0];

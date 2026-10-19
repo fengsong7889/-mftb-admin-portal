@@ -45,6 +45,13 @@ class RdmRequirementQueryScopeTest {
         return query;
     }
 
+    private RdmRequirementQuery withScope(String scope, boolean executionOnly) {
+        RdmRequirementQuery query = new RdmRequirementQuery();
+        query.setScope(scope);
+        query.setExecutionOnly(executionOnly);
+        return query;
+    }
+
     /**
      * 只取「视角自身的条件」，剥掉 relatedOnly 追加的那一段。
      * <p>必须剥：relatedOnly 是「提出人 OR 產品經理 OR 研發負責人 OR 驗收人」四字段并集，
@@ -131,6 +138,29 @@ class RdmRequirementQueryScopeTest {
     }
 
     /**
+     * 提交侧合并视角（本人提交的 ∪ 待本人審批的）在查询层必须是空实现。
+     * <p>为什么只断言「什么都没加」：并集的一半（审批待办）只存在于 OA 审批任务表，
+     * {@code LambdaQueryWrapper} 在 DTO 层拿不到，所以收敛条件由服务层拼，
+     * 并与 {@code relatedOnly=false} 一起调本方法（否则四字段并集会把待办那半砍掉）。
+     * <p>关键风险是静默落 default：default 会按提出人收敛，审批待办从列表里消失，
+     * 界面看上去正常、数据却是错的（与 approving 同一个坑），所以必须显式登记断言。
+     */
+    @Test
+    @DisplayName("提交侧合并视角：按服务层真实调法（relatedOnly=false）不加任何人员/状态条件")
+    void intakeScopeLeavesUnionToServiceLayer() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_INTAKE);
+        // 必须用与 RdmRequirementServiceImpl.page 同一调法：relatedOnly=false
+        String condition = query.toWrapper(ME, false).getSqlSegment();
+
+        assertFalse(condition.contains("submitter_user_id"),
+                "按提出人收敛等于把待我審批的那半砍掉，必须留给服务层的 OR 条件。SQL: " + condition);
+        assertFalse(condition.contains("acceptor_user_id"),
+                "落回 relatedOnly 会把审批待办以外的执行人需求也放进来。SQL: " + condition);
+        assertFalse(condition.contains("status"),
+                "该视角不预收状态，草稿/已准入行都该出现在合并视图里。SQL: " + condition);
+    }
+
+    /**
      * 治理侧「全部」只看已准入需求（需求提交/需求管理拆分 · 批次 1）。
      * <p>这是「审批中/被驳回/草稿不得出现在需求管理」的唯一 SQL 层防线：前端隐藏不是边界，
      * 改 URL 或直连 API 传 scope=all 就能绕过。同时它也保证治理侧每一行都有正式需求编号。
@@ -189,5 +219,45 @@ class RdmRequirementQueryScopeTest {
         assertTrue(values.contains(RdmConstants.STATUS_POOL));
         assertTrue(values.contains(RdmConstants.STATUS_ASSIGNED));
         assertTrue(values.contains(RdmConstants.STATUS_UAT_PENDING));
+    }
+
+    /**
+     * 执行侧地板（需求跟进清单专用）：只留「已分配到产品」的需求。
+     * <p>这是「待审批/待分配不得出现在需求跟进清单」的 SQL 层防线：准入前三态归「提需求」，
+     * 需求池归「认领/分配」，跟进清单只看分配之后。前端隐藏不是边界，改 URL 传 scope=mine 就能绕过，
+     * 所以地板必须落在查询层。
+     * <p>为何断言 {@code status <>} 而非 {@code NOT IN}：同 SCOPE_ALL，{@code notIn(Set)} 会渲染成空 IN 报错。
+     */
+    @Test
+    @DisplayName("执行侧地板：mine+executionOnly 逐条排除准入前三态与需求池，保留已分配")
+    void executionFloorExcludesPreAdmissionAndPool() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_MINE, true);
+        String condition = scopeCondition(query, ME);
+        Collection<Object> values = params(query, ME);
+
+        long exclusionCount = condition.split("status <> ", -1).length - 1;
+        assertTrue(exclusionCount >= 4,
+                "准入前三态 + 需求池各需一条排除条件，否则待审批/待分配会漏进需求跟进清单。SQL: " + condition);
+        assertTrue(values.contains(RdmConstants.STATUS_DRAFT), "排除集合未绑定到 SQL 参数上。params: " + values);
+        assertTrue(values.contains(RdmConstants.STATUS_INTAKE_PENDING), "params: " + values);
+        assertTrue(values.contains(RdmConstants.STATUS_INTAKE_REJECTED), "params: " + values);
+        assertTrue(values.contains(RdmConstants.STATUS_POOL), "待分配归认领/分配菜单，跟进清单必须排除。params: " + values);
+        assertFalse(values.contains(RdmConstants.STATUS_ASSIGNED),
+                "已分配·待受理是执行侧第一态，绝不能被地板排除。params: " + values);
+    }
+
+    /**
+     * 地板默认关闭：不带 executionOnly 的 mine 保持原语义（不加任何状态条件）。
+     * <p>钉住这条是因为工作台「我的提交」也走 scope=mine，且必须看到草稿/被驳回（提出人待补充）；
+     * 一旦地板被误设为默认，工作台的「需要我补充」会静默变空。
+     */
+    @Test
+    @DisplayName("执行侧地板默认关闭：mine 不带 executionOnly 时不加状态条件")
+    void executionFloorOffByDefaultKeepsMineUnfiltered() {
+        RdmRequirementQuery query = withScope(RdmConstants.SCOPE_MINE, false);
+        String condition = scopeCondition(query, ME);
+
+        assertTrue(condition.contains("submitter_user_id"), "mine 仍按提出人收敛");
+        assertFalse(condition.contains("status"), "默认不加地板，工作台「我的提交」要能看到草稿/被驳回。SQL: " + condition);
     }
 }

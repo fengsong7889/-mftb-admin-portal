@@ -1006,6 +1006,22 @@
       "comment": "v3.14 执行时发现 rdm-requirement 实际可授集是 [view,export]，方案 §四 需要把「提需求 create」与「产品受理 edit」落在该锚点，但两者勾不到就意味着退役 rdm-intake 后需求侧受理权无处可授（静默降权）。管理员已明确选定「恢复 create/edit 可授」，因此本轮把 ACTION_SYNC 改为菜单白名单 ACTION_SYNC_FROM_SEED，对列入的菜单把种子 MENUS 声明的动作并集追加进去（动作集直读种子，避免两处字面量漂移），仍不删减现有动作。可授 ≠ 已授：只改 sys_menu.actions 元数据，不写 sys_role_menu/sys_department_menu 任何一行，本轮没有任何人获得新能力，谁能勾这两个动作仍由管理员在授权中心显式决定。单测在本地实现阶段拓出一个真 bug：错用 actionScope()（为逗号声明设计）解析种子 JSON 会抛「未登记的授权动作」，已改回 parseActions()。后置校验：assertMenuActionsInclude 实查 view/create/edit/export/view_all/dispatch/contribute 全部可授，缺则不记版本。取代 rdm:menu-seed:v3.14。"
     },
     {
+      "versionKey": "rdm:menu-seed:v3.17",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.15"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "項目總覽(rdm-dashboard-project) 可授动作集补 create/edit，使非超管能被授予项目新增/编辑/暂停恢复",
+      "author": "菜单权限锚点补齐",
+      "ticket": "rdm-project-write-anchor",
+      "comment": "RdmProjectController 的新增挂 create、编辑挂 edit，而「暂停/恢复推进」就是走编辑 PATCH 改 paused_flag。v3.15 的 ACTION_SYNC 白名单只列了 rdm-requirement，所以 rdm-dashboard-project 的存量行一直停在 [view,export]：授权中心勾不到写动作，端到端实测非超管点「暫停項目」一律 403「没有 [rdm-dashboard-project] 的[编辑]权限」，新增/编辑同死（超管靠代码直通所以从来看不出来）。本轮把该菜单列入 ACTION_SYNC_FROM_SEED，并把种子动作常量从 VIEW_EXPORT 改为 PROJECT_ACTIONS=[view,create,edit,export]；语义仍是只并集追加、不删减管理员额外自定义的动作。可授 ≠ 已授：不往 sys_role_menu/sys_department_menu 写任何一行，具体授给哪个角色/部门仍由管理员裁决（本次开发环境按管理员指示先授给董事長兼首席執行官辦公室）。后置校验：assertMenuActionsInclude 实查 rdm-dashboard-project 行已包含 view/create/edit/export，缺则不记版本。取代 rdm:menu-seed:v3.15。"
+    },
+    {
       "versionKey": "rdm:anchor-grant-mirror:v1",
       "module": "rdm",
       "phase": "MENU_SEED",
@@ -2088,6 +2104,74 @@
       "intent": "为入转调离引擎新增「重新入職」单据类型的 OA 流程种子 hr_rehire（不加列、不加菜单、不加动作）",
       "author": "Qoder",
       "comment": "对应方案 §5.3（入职/转正/调动/离职/重新入职全部登记为人事流程）与 §8 验收门槛「从待入职到离职再入职可完整追溯」。为什么需要这个类型而不用「入职」代过：入职单据会新建账号，把同一个人拆成两份档案（工号、历史单据、资产归属全断开），而返聘本质上是同一个人的新一段雇佣（复用 P4 的 hr_employment_period 递增 period_seq）。为什么仍要单独 versionKey：只改 Java 常量不会落到存量库，缺流程定义时提交单据会在 OaRequestService.submit 报「流程不存在」——属于配置类缺失，必须后置校验卡住而不是默默降级。不新增菜单也不新增动作：按 §6.1「人事类流程是流程中心页面内分类」，授权锚在 hr-onboarding（与续签挂 contract-ledger 同一处理法）；表也不加列，复职沿用调动的 new_dept_id/new_position_id/effective_date。办理口径三条：真离职走统一 as-of（不看账号 status、不看会被未来离职单骗到的最新记录）、复用原 userId、复职必须强制改密并清会话。@Order(35)。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.8",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.7"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "246_rdm_task_plan_version_audit.sql"
+      ],
+      "intent": "甘特图调期（阶段二）：rdm_work_task 补 plan_version 乐观锁列（NOT NULL DEFAULT 1）+ 新增 rdm_task_plan_log 排期变更审计表（只追加）",
+      "author": "Qoder",
+      "comment": "拖拽调期与任务表单改期共用 plan_version 防并发互盖（update 以 expected version 为条件，affected=0 即冲突回滚整批）；审计表记录 old/new 起止与版本、操作人、幂等请求标识，只追加不修改不软删。逐列先查再加 + CREATE TABLE IF NOT EXISTS，后置校验列与表齐备，缺任一项不记版本。246 腳本僅作參考文檔，不進鏡像。回滚=回退代码，列与表留著無害（服务层不读不写时不影响存量查询）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.9",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.8"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "253_rdm_resource_member.sql"
+      ],
+      "intent": "团队负载（阶段 B-2）：新增 rdm_resource_member 资源名册表，把「谁纳入团队负载」显式化，纳入已进名册但当前无在途单据的人",
+      "author": "Qoder",
+      "comment": "只 ADD 新表、不改任何现有表，CREATE TABLE IF NOT EXISTS 可安全重放；uk_rrm_user(user_id) 保证一人一条，status(1纳入/0移出) 管理名册而非物理删；与 v3.8 rdm_task_plan_log（任务排期审计）无语义交集。后置校验 requireTables(rdm_resource_member)，缺则不记版本。253 脚本仅作参照文档，不进镜像。回滚=回退代码，表留着无害（无服务读写时不影响存量查询）。"
+    },
+    {
+      "versionKey": "core:ai-settings-v1",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "254_user_ai_settings.sql"
+      ],
+      "intent": "个人工作台 AI 助手偏好设置持久化：sys_user.ai_settings TEXT 列，存储引擎模式/上下文窗口/思考模式等用户级配置，替代原先仅存 localStorage 导致刷新丢失",
+      "author": "Qoder",
+      "comment": "与 portal_favorites 同一模式：SysUser 实体已带该字段，MyBatis-Plus 显式列清单会 SELECT 它，缺列让全部用户查询报错。addColumnIfAbsent 幂等 + 后置校验 columnExists，缺列不记版本下次重试。254 脚本仅作参照文档。回滚=回退代码，列留着无害（不被读写不影响存量查询）。"
+    },
+    {
+      "versionKey": "core:workbench-layout-v1",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "255_user_workbench_layout.sql"
+      ],
+      "intent": "产研交付个人工作台布局持久化：sys_user.workbench_layout TEXT 列，存储区块显隐与排序偏好，替代原先仅存 localStorage 导致刷新/换设备丢失",
+      "author": "Qoder",
+      "comment": "与 ai_settings 同一模式：SysUser 实体已带该字段，MyBatis-Plus 显式列清单会 SELECT 它，缺列让全部用户查询报错。addColumnIfAbsent 幂等 + 后置校验 columnExists，缺列不记版本下次重试。255 脚本仅作参照文档。回滚=回退代码，列留着无害。"
     }
   ]
 }

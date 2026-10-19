@@ -72,6 +72,14 @@ public final class RdmConstants {
     public static final String ACTION_REVIEW_START = "review_start";
     public static final String ACTION_REVIEW_PASS = "review_pass";
     public static final String ACTION_REVIEW_REJECT = "review_reject";
+    /** 評審類型單值枚舉：前端多選發起時以逗號拼接存入 review_type（VARCHAR(24)，四類全選恰好容納） */
+    public static final String REVIEW_TYPE_REQUIREMENT = "requirement";
+    public static final String REVIEW_TYPE_DEV = "dev";
+    public static final String REVIEW_TYPE_UI = "ui";
+    public static final String REVIEW_TYPE_TEST = "test";
+    /** 評審類型白名單：後端逐 token 校驗，防止任意字符串進入 review_type 導致展示端反查標籤失敗 */
+    public static final Set<String> REVIEW_TYPES = Set.of(
+            REVIEW_TYPE_REQUIREMENT, REVIEW_TYPE_DEV, REVIEW_TYPE_UI, REVIEW_TYPE_TEST);
     public static final String ACTION_DESIGN_START = "design_start";
     public static final String ACTION_DESIGN_DONE = "design_done";
     public static final String ACTION_DEV_START = "dev_start";
@@ -116,6 +124,15 @@ public final class RdmConstants {
      * 而审批人只存在于 OA 审批任务表；两者混用会造成工作台显示 3 条、点进去列表为空。
      */
     public static final String SCOPE_APPROVING = "approving";
+    /**
+     * 视角：提交侧合并视图（我提交的 ∪ 待我审批的）。
+     * <p>存在的理由：「提交需求」菜单原先只有 approving 一个切片，提出人看不到自己提的单，
+     * 只能再去「需求清单」另一个菜单找；两页各持一半事实，用户必须自己拼。
+     * <p>不能复用 {@code SCOPE_MINE} 再并 approving：并集的一半（审批待办）只存在于 OA 审批任务表，
+     * LambdaQueryWrapper 表达不了，必须由服务层先取待办 id 再 {@code or().in(...)}，
+     * 因此该视角在 {@code applyScope} 里是空实现，收敛规则全在服务层。
+     */
+    public static final String SCOPE_INTAKE = "intake";
     public static final String SCOPE_POOL = "pool";
     public static final String SCOPE_PRODUCT = "product";
     public static final String SCOPE_DELIVERY = "delivery";
@@ -271,6 +288,12 @@ public final class RdmConstants {
     public static final String MENU_EFFICIENCY_OUTPUT = "rdm-efficiency-output";
     /** 菜单：積分規則配置（需求配置分组下） */
     public static final String MENU_CONFIG_SCORE = "rdm-config-score";
+    /**
+     * 菜单：團隊負載（项目与计划分组下，从研发工作台资源负载 Tab 升级为独立菜单）。
+     * <p>跨岗位统一负载视图：聚合产品需求/研发任务/测试批次的真实在途工作，按人汇总参考负载率。
+     * 读接口沿用交付类菜单 anyOf 授权，数据范围在服务端按 canSeeAll 收敛（无全量权只返回本人）。
+     */
+    public static final String MENU_RESOURCE_LOAD = "rdm-resource-load";
 
     /* ==================== 验收用例（M3） ==================== */
 

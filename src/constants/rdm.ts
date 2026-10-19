@@ -540,6 +540,11 @@ export const RDM_SCOPE = {
   TODO: 'todo',
   /** 待我審批：审批人只存在于 OA 审批任务表，与 todo（PM/验收人/研发负责人）不是同一口径 */
   APPROVING: 'approving',
+  /**
+   * 提交侧合并视图：本人提交的 ∪ 待本人審批的（口径由后端 RdmConstants.SCOPE_INTAKE 接住）。
+   * <p>「提需求」菜单的唯一视角：一页看完自己相关的全部需求（含草稿/待审批，不受执行侧地板收窄）。
+   */
+  INTAKE: 'intake',
   POOL: 'pool',
   PRODUCT: 'product',
   DELIVERY: 'delivery',
@@ -557,6 +562,7 @@ export const RDM_SCOPE_LABEL: Record<RdmScope, string> = {
   [RDM_SCOPE.MINE]: '我提的需求',
   [RDM_SCOPE.TODO]: '待我處理',
   [RDM_SCOPE.APPROVING]: '待我審批',
+  [RDM_SCOPE.INTAKE]: '我的提交與待審',
   [RDM_SCOPE.POOL]: '需求池·待分配',
   [RDM_SCOPE.PRODUCT]: '我負責的產品需求',
   [RDM_SCOPE.DELIVERY]: '研發交付中',
@@ -600,6 +606,7 @@ export const RDM_SCOPE_DEFAULT_STATUS: Record<RdmScope, RdmStatus | undefined> =
   [RDM_SCOPE.MINE]: undefined,
   [RDM_SCOPE.TODO]: undefined,
   [RDM_SCOPE.APPROVING]: undefined,
+  [RDM_SCOPE.INTAKE]: undefined,
   [RDM_SCOPE.POOL]: RDM_STATUS.POOL,
   [RDM_SCOPE.PRODUCT]: undefined,
   [RDM_SCOPE.DELIVERY]: undefined,
@@ -866,6 +873,20 @@ export const RDM_REVIEW_TYPE_LABEL: Record<RdmReviewType, string> = {
   [RDM_REVIEW_TYPE.DEV]: '研發評審',
   [RDM_REVIEW_TYPE.UI]: 'UI 評審',
   [RDM_REVIEW_TYPE.TEST]: '測試評審',
+}
+
+/**
+ * 评审类型存储为逗号分隔字符串（多选发起时前端 join），展示统一走这里反查标签。
+ * 单值历史数据同样适用；未知值原样返回，避免展示空白。
+ */
+export function formatRdmReviewTypes(value?: string | null): string {
+  if (!value) return '-'
+  return value
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean)
+    .map(v => RDM_REVIEW_TYPE_LABEL[v as RdmReviewType] ?? v)
+    .join(' / ')
 }
 
 /** 评审结论 */

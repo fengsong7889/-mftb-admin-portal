@@ -42,4 +42,44 @@ public class RdmScheduleDTO {
         /** 需要删除的日期（取消请假） */
         private List<String> removeDays;
     }
+
+    /* ==================== 阶段二：甘特图调期 ==================== */
+
+    /** 甘特图查询条件（三视角 + 筛选 + 分页） */
+    @Data
+    public static class GanttQuery {
+        /** personal / single / global */
+        private String mode;
+        private Long reqId;
+        private Integer page;
+        private Integer size;
+        private String keyword;
+        private Long projectId;
+        private String iterationCode;
+        private Long ownerUserId;
+        private String taskType;
+        private String status;
+        private Boolean onlyOverdue;
+        private Boolean onlyUnscheduled;
+        private Boolean onlyMine;
+    }
+
+    /** 调期单项：只允许改计划起止，携带期望版本做乐观锁 */
+    @Data
+    public static class TaskPlanItem {
+        private Long taskId;
+        private Integer expectedPlanVersion;
+        /** yyyy-MM-dd */
+        private String planStartDate;
+        /** yyyy-MM-dd */
+        private String planFinishDate;
+    }
+
+    /** 调期批量（一次最多 100 项、任务不重复，整批原子） */
+    @Data
+    public static class TaskPlanBatch {
+        /** 客户端幂等请求ID（重试保持不变） */
+        private String clientRequestId;
+        private List<TaskPlanItem> items;
+    }
 }

@@ -90,15 +90,16 @@ const TODO_ROUTE: Record<string, string> = {
 }
 
 /**
- * 审批待办的落点：有「提需求」菜单授权的人落该页的「待我審批」视角；
+ * 审批待办的落点：有「提需求」菜单授权的人落该页；
  * <p>准入审批人常常是申请人的上级主管，不是产品总监 —— 他们未必持有分配侧授权，
  * 把所有人都固定落需求池会让他们点「查看全部」直接进不来。这类人走 OA 中心的待我审批，
  * 那边本来就是审批的单一事实源（准入审批已接 OA 回调）。
- * <p>v3.11 菜单拆分后必须改认 rdm-intake-approval：「待我審批」视角已从需求池整块移走，
- * 再跳 /rdm-intake?scope=approving 会落在一个没有对应页签的视角上。
+ * <p>v3.11 菜单拆分后必须改认 rdm-intake-approval：「待我審批」视角已从需求池整块移走。
+ * <p>不再带 ?scope=approving：该页已改为单一合并视角（本人提交的 ∪ 待本人審批的），
+ * 旧参数会被 resolveActiveScope 判为本页没有的视角并回落，带上只会让人误以为还能切回单切片。
  */
 function intakeTodoRoute(canOpenApproval: boolean): string {
-  return canOpenApproval ? '/rdm-intake-approval?scope=approving' : '/oa-requests'
+  return canOpenApproval ? '/rdm-intake-approval' : '/oa-requests'
 }
 
 /** 待办分组图标与主色 */
@@ -188,7 +189,12 @@ export default function RdmWorkbench() {
   const { user, hasMenuPermission, hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
-  /** 我提的需求（含草稿与被驳回的），走列表接口 scope=mine，与待办分区不同口径 */
+  /**
+   * 我提的需求（含草稿与被驳回的），走列表接口 scope=mine（不带执行侧地板），与待办分区不同口径。
+   * <p>工作台需要全状态来分「需要我補充」（草稿/被驳回）与「我的提交追蹤」，故取数不收窄；
+   * 但各分区的「查看全部」深链改指「提需求」（/rdm-intake-approval，本人提交的合并视角），
+   * 因为需求跟进清单已收窄为「已分配到产品」，草稿/待审批/待分配都不再在那里。
+   */
   const [mineRows, setMineRows] = useState<RdmRequirementRow[]>([])
   /** V3：我參與的項目（PM 或成員） */
   const [myProjects, setMyProjects] = useState<RdmProjectListItem[]>([])
@@ -453,7 +459,7 @@ export default function RdmWorkbench() {
           <Tag color="red" style={{ margin: 0 }}>{needAction.length}</Tag>
           <span className="rdm-todo-hint">這些需求在等提出人補内容或做決定，不處理會停在原地</span>
           <span className="rdm-card-title-split" />
-          <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+          <Button type="link" size="small" onClick={() => navigate('/rdm-intake-approval')}>
             查看全部 <RightOutlined style={{ fontSize: 11 }} />
           </Button>
         </div>
@@ -538,7 +544,7 @@ export default function RdmWorkbench() {
           我的提交追蹤
           <span className="rdm-todo-hint">只看到自己提的需求，進展與責任人一目了然</span>
           <span className="rdm-card-title-split" />
-          <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+          <Button type="link" size="small" onClick={() => navigate('/rdm-intake-approval')}>
             查看全部 <RightOutlined style={{ fontSize: 11 }} />
           </Button>
         </div>
@@ -586,7 +592,7 @@ export default function RdmWorkbench() {
           </span>
           最近交付動態
           <span className="rdm-card-title-split" />
-          <Button type="link" size="small" onClick={() => navigate('/rdm-requirement?scope=mine')}>
+          <Button type="link" size="small" onClick={() => navigate('/rdm-intake-approval')}>
             查看我的需求進度
           </Button>
         </div>

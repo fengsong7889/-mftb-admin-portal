@@ -47,6 +47,14 @@ public interface RdmDeliveryService {
     RdmDeliveryVO.Task saveTask(RdmDeliveryDTO.Task dto);
 
     /**
+     * 从团队负载页把任务指派给某人（仅换负责人）。
+     * <p>权限与 {@code saveTask}「指派/維護任務」同源（{@code requireDeliveryWriter}）；
+     * 并发以 {@code expectedPlanVersion} 作乐观锁条件（不一致则 {@code CONFLICT}）。
+     * 幂等由调用方（负载服务 {@code executeOnce}）包裹，本方法不自带幂等。
+     */
+    RdmDeliveryVO.Task assignTaskOwner(Long taskId, Long ownerUserId, Integer expectedPlanVersion);
+
+    /**
      * 任务负责人资格预检（选人时即时提醒用）。
      * <p>不抛异常、只回结果：无研发交付权限属于「可以派活、随后补权限」，
      * 保存时也只记日志不阻断。
@@ -69,6 +77,9 @@ public interface RdmDeliveryService {
 
     /** 新增/编辑迭代 */
     RdmDeliveryVO.Iteration saveIteration(RdmDeliveryDTO.Iteration dto);
+
+    /** 列表直改迭代状态（只更新状态与操作人，不回写其它字段） */
+    void updateIterationStatus(Long id, String status);
 
     /* ── 需求变更 ── */
 

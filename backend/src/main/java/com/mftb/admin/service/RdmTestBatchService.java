@@ -1,8 +1,10 @@
 package com.mftb.admin.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmTestBatchDTO;
 import com.mftb.admin.dto.RdmTestBatchVO;
@@ -208,6 +210,46 @@ public class RdmTestBatchService {
         batchMapper.updateById(batch);
         log.info("提測批次已接收並進入執行、輪次已凍結: batchNo={}, round={}, testLead={}",
                 batch.getBatchNo(), roundNo, currentUserId);
+    }
+
+    /**
+     * 团队负载页分派：把选定人员追加为「待受理(pending)」提测批次的执行人。
+     * <p><b>轮次冻结保护</b>：仅 pending 可改执行人；一旦受理（executing/passed/failed/returned）用例集与
+     * 执行人已冻结到 rdm_test_round，绝不可从负载页临时加人（换人走已有复测新轮路径，旧轮次只读保留）。
+     * <p>权限与受理同源的 {@code requireTestLead}（仅本批次测试负责人或全量授权者）；并发以 {@code @Version}
+     * 乐观锁条件（expected 不一致则 {@code CONFLICT}），不靠读后写。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void assignExecutors(Long batchId, List<Long> executorUserIds, Integer expectedVersion, Long currentUserId) {
+        if (batchId == null || executorUserIds == null || executorUserIds.isEmpty()) {
+            throw new BusinessException("請選擇批次與被指派的執行人");
+        }
+        RdmTestBatch batch = requireBatch(batchId);
+        // 权威守卫：只有本批次测试负责人（或全量授权）可指派执行人
+        requireTestLead(batch, currentUserId, "指派測試執行人");
+        // 冻结轮次保护：仅待受理批次可改执行人
+        if (!RdmConstants.TB_PENDING.equals(batch.getStatus())) {
+            throw new BusinessException("僅「待受理」的提測批次可從負載頁指派執行人；已受理的輪次已凍結，换人請走複測新輪");
+        }
+        // 合并现有执行人 + 去重（保留已登记的，追加新指派的）
+        List<Long> merged = new ArrayList<>(JsonUtils.parseLongList(batch.getExecutorUserIdsJson()));
+        for (Long uid : executorUserIds) {
+            if (uid != null && !merged.contains(uid)) {
+                merged.add(uid);
+            }
+        }
+        int expected = expectedVersion != null ? expectedVersion : (batch.getVersion() == null ? 0 : batch.getVersion());
+        int affected = batchMapper.update(null, new LambdaUpdateWrapper<RdmTestBatch>()
+                .eq(RdmTestBatch::getId, batch.getId())
+                .eq(RdmTestBatch::getVersion, expected)
+                .eq(RdmTestBatch::getStatus, RdmConstants.TB_PENDING)
+                .set(RdmTestBatch::getExecutorUserIdsJson, JsonUtils.toJson(merged))
+                .set(RdmTestBatch::getVersion, expected + 1));
+        if (affected == 0) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "批次已被他人修改或已受理，請刷新後重試");
+        }
+        log.info("负载页指派測試執行人: batchNo={}, executors={}, operator={}",
+                batch.getBatchNo(), merged, currentUserId);
     }
 
     /**

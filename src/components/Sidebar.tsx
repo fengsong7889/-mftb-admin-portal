@@ -3,7 +3,7 @@ import { Layout, Menu, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import BrandLogo from './BrandLogo'
+import GroupLogo from './GroupLogo'
 import { useAuth } from '../contexts/AuthContext'
 import { useMenu } from '../contexts/MenuContext'
 import {
@@ -17,7 +17,7 @@ import type { MenuVO } from '../api/menu'
 import { fetchPortalContext, type PortalSystem } from '../api/portal'
 import { getBrandTitle, getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
 import { OFFLINE_MENUS } from '../constants/offlineMenus'
-import { keyToPath, pathToKey } from '../constants/menuDataSource'
+import { keyToPath, pathToKey, resolveRdmDetailMenuKey } from '../constants/menuDataSource'
 import type { OfflineMenuNode } from '../constants/offlineMenus'
 import { translateMenuName } from '../i18n/menuNameEn'
 import { renderMenuIcon } from './MenuIcon'
@@ -759,7 +759,9 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     ? { code: currentSystemCode, name: currentSystem?.name ?? currentSystemCode, nameEn: currentSystem?.nameEn }
     : null
   const brandTitle = getBrandTitle(t, i18nInstance.language, currentSystemSource)
-  const systemIcon = renderMenuIcon(currentSystem?.icon)
+  // 系統圖標以 sys_system.icon 為準（搜索運營系統種子值為 'BrandLogo' 品牌搜索鏡），
+  // 缺失時回落系統默認圖標；代碼不對特定系統做例外，改圖標只需改 DB 配置。
+  const systemIcon = renderMenuIcon(currentSystem?.icon, 28)
     ?? renderMenuIcon(systemKey ? PORTAL_SYSTEM_ICONS[systemKey] : 'AppstoreOutlined')
 
   // 浏览器标签页标题与侧栏品牌名保持同一真值：index.html 的静态标题在切换系统后不会更新，
@@ -816,8 +818,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
   /** 訂單列表 / 訂單詳情按來源歸屬菜單（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）；
-   *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。 */
+   *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。
+   *  需求詳情同理：三張需求列表（提需求/認領分配/需求跟進清單）共用落地頁，
+   *  按 from 跟隨進入菜單，不得一律釘在默認歸屬上。 */
   const orderRouteMenuKey = resolveOrderRouteMenuKey(location.pathname, location.search)
+  const rdmDetailMenuKey = resolveRdmDetailMenuKey(location.pathname, location.search)
 
   const selectedKey = location.pathname === '/' ? 'home'
     : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
@@ -826,7 +831,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     // 審批流程編輯頁：高亮「審批流程」
     : location.pathname.startsWith('/workflow-config/') ? 'workflow-config'
     : location.pathname.startsWith('/version-history-detail') ? 'version-history'
-    : (orderRouteMenuKey || pathToKey[location.pathname] || 'home')
+    : (orderRouteMenuKey || rdmDetailMenuKey || pathToKey[location.pathname] || 'home')
 
   /** 路由變化時自動展開對應的父級菜單（刷新/直接跳轉均生效） */
   useEffect(() => {
@@ -860,7 +865,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     >
       <div className="sidebar-logo" title={brandTitle} aria-label={brandTitle}>
         <span className="sidebar-system-icon" aria-hidden="true">
-          {currentSystemCode ? systemIcon : <BrandLogo size={28} />}
+          {currentSystemCode ? systemIcon : <GroupLogo size={28} />}
         </span>
         {!collapsed && <span className="logo-text-main">{brandTitle}</span>}
       </div>

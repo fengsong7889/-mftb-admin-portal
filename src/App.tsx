@@ -309,6 +309,7 @@ const RdmRequirementIntake = lazy(() => import('./pages/Rdm/RequirementIntake'))
 const RdmRequirementDetail = lazy(() => import('./pages/Rdm/RequirementDetail'))
 const RdmDeliveryBoard = lazy(() => import('./pages/Rdm/DeliveryBoard'))
 const RdmTaskForm = lazy(() => import('./pages/Rdm/TaskForm'))
+const RdmRequirementGantt = lazy(() => import('./pages/Rdm/RequirementGantt'))
 const RdmAssignPm = lazy(() => import('./pages/Rdm/AssignPm'))
 const RdmIterationPlan = lazy(() => import('./pages/Rdm/IterationPlan'))
 const RdmIterationForm = lazy(() => import('./pages/Rdm/IterationForm'))
@@ -328,6 +329,7 @@ const RdmAcceptanceForm = lazy(() => import('./pages/Rdm/AcceptanceForm'))
 const RdmDashboard = lazy(() => import('./pages/Rdm/Dashboard'))
 const RdmRiskCenter = lazy(() => import('./pages/Rdm/RiskCenter'))
 const RdmTeamOutput = lazy(() => import('./pages/Rdm/TeamOutput'))
+const RdmResourceLoad = lazy(() => import('./pages/Rdm/ResourceLoad'))
 const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
@@ -682,6 +684,8 @@ function AuthenticatedLayout() {
               <Route path="/rdm-delivery" element={<RdmDeliveryBoard />} />
               <Route path="/rdm-delivery-req" element={<Navigate to="/rdm-requirement?scope=delivery" replace />} />
               <Route path="/rdm-task" element={<RdmTaskForm />} />
+              {/* 需求甘特图（阶段一预览）：不新增侧栏菜单，归属需求跟进清单，用 ?mode= 区分个人/单需求/全局 */}
+              <Route path="/rdm-gantt" element={<RdmRequirementGantt />} />
               {/* 分配产品经理：独立页（取代需求池弹窗）。分配权现行锚点是 rdm-intake:edit，
                   菜单收敛后落到 rdm-requirement:dispatch（不是 :edit，那是需求侧受理权）；
                   过渡期两个锚点 OR 生效，口径以 RdmAccessGuard.canDispatch 为准 */}
@@ -699,6 +703,8 @@ function AuthenticatedLayout() {
               {/* 風險中心 / 部門與人員產出：从总看板拆出的两个独立菜单页 */}
               <Route path="/rdm-risk" element={<RdmRiskCenter />} />
               <Route path="/rdm-output" element={<RdmTeamOutput />} />
+              {/* 团队负载：从研发工作台资源负载 Tab 升级为独立菜单（项目与计划分组下） */}
+              <Route path="/rdm-resource-load" element={<RdmResourceLoad />} />
               <Route path="/rdm-quality" element={<RdmQualityBoard />} />
               <Route path="/rdm-version-trace" element={<RdmVersionTrace />} />
               <Route path="/rdm-weekly-report" element={<RdmWeeklyReport />} />

@@ -1,12 +1,16 @@
 package com.mftb.admin.service.impl;
 
 import com.mftb.admin.common.BusinessException;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmDeliveryDTO;
 import com.mftb.admin.dto.RdmDeliveryVO;
+import com.mftb.admin.entity.RdmIteration;
 import com.mftb.admin.entity.RdmMilestone;
 import com.mftb.admin.entity.RdmPrd;
 import com.mftb.admin.entity.RdmRequirement;
+import com.mftb.admin.entity.RdmReview;
 import com.mftb.admin.entity.RdmWorkLog;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.mapper.RdmChangeRequestMapper;
@@ -31,6 +35,8 @@ import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,11 +45,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -66,12 +74,23 @@ import static org.mockito.Mockito.when;
  */
 class RdmDeliveryGuardTest {
 
+    /** assignTaskOwner 用 LambdaUpdateWrapper 需要 RdmWorkTask 的 TableInfo 缓存（纯 Mockito 环境不会自动建） */
+    @BeforeAll
+    static void initTableInfo() {
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, RdmWorkTask.class);
+    }
+
     private RdmAccessGuard accessGuard;
     private RdmPrdMapper prdMapper;
     private RdmWorkTaskMapper taskMapper;
     private RdmMilestoneMapper milestoneMapper;
     private RdmWorkLogMapper workLogMapper;
+    private RdmIterationMapper iterationMapper;
     private RdmRequirementMapper requirementMapper;
+    private RdmReviewMapper reviewMapper;
+    /** createReview 落库实体捕獲：多选评审类型归一化后必须原样进 review_type */
+    private final List<RdmReview> insertedReviews = new ArrayList<>();
     private OperatorResolver operatorResolver;
     private SysUserMapper userMapper;
     private PermissionService permissionService;
@@ -83,7 +102,9 @@ class RdmDeliveryGuardTest {
         taskMapper = mock(RdmWorkTaskMapper.class);
         milestoneMapper = mock(RdmMilestoneMapper.class);
         workLogMapper = mock(RdmWorkLogMapper.class);
+        iterationMapper = mock(RdmIterationMapper.class);
         requirementMapper = mock(RdmRequirementMapper.class);
+        reviewMapper = mock(RdmReviewMapper.class);
         accessGuard = mock(RdmAccessGuard.class);
         operatorResolver = mock(OperatorResolver.class);
         userMapper = mock(SysUserMapper.class);
@@ -92,8 +113,8 @@ class RdmDeliveryGuardTest {
         // 当前登录人固定为任务负责人：工时明细只允许本人填报，多个用例要走到真实分支
         when(operatorResolver.currentUser()).thenReturn(owner41());
         service = new RdmDeliveryServiceImpl(
-                prdMapper, mock(RdmReviewMapper.class), taskMapper,
-                mock(RdmIterationMapper.class), mock(RdmChangeRequestMapper.class),
+                prdMapper, reviewMapper, taskMapper,
+                iterationMapper, mock(RdmChangeRequestMapper.class),
                 requirementMapper, mock(RdmRequirementRoleMapper.class), userMapper,
                 mock(BizSeqService.class), operatorResolver, mock(RdmConfigService.class),
                 mock(RdmNotifyService.class), mock(RdmRequirementService.class),
@@ -107,6 +128,16 @@ class RdmDeliveryGuardTest {
         when(milestoneMapper.selectOne(any())).thenReturn(null);
         when(prdMapper.selectById(any())).thenReturn(frozenPrd());
         when(taskMapper.selectById(any())).thenReturn(task());
+        // createReview 链路：插入捕获 + 回读同一条实体，joinNames 需要真实姓名
+        when(reviewMapper.insert(any(RdmReview.class))).thenAnswer(i -> {
+            RdmReview r = i.getArgument(0);
+            r.setId(100L + insertedReviews.size());
+            insertedReviews.add(r);
+            return 1;
+        });
+        when(reviewMapper.selectById(any())).thenAnswer(i ->
+                insertedReviews.isEmpty() ? null : insertedReviews.get(insertedReviews.size() - 1));
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(owner41()));
     }
 
     /** 任务负责人（ownerUserId=41，与 task() 一致） */
@@ -142,6 +173,44 @@ class RdmDeliveryGuardTest {
         return prd;
     }
 
+    @Test
+    @DisplayName("负载页任务指派：乐观锁版本一致则改负责人成功")
+    void assignTaskOwnerSucceedsOnVersionMatch() {
+        when(userMapper.selectById(any())).thenReturn(owner41());
+        when(taskMapper.update(any(), any())).thenReturn(1);
+        RdmDeliveryVO.Task vo = service.assignTaskOwner(5L, 41L, 1);
+        assertNotNull(vo, "乐观锁命中则返回更新后的任务");
+        verify(taskMapper).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("负载页任务指派：乐观锁版本不一致（他人已改）抛 CONFLICT，两改派仅一笔成功")
+    void assignTaskOwnerRejectsVersionConflict() {
+        when(userMapper.selectById(any())).thenReturn(owner41());
+        when(taskMapper.update(any(), any())).thenReturn(0);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.assignTaskOwner(5L, 41L, 99));
+        assertTrue(ex.getMessage().contains("已被他人修改"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("负载页任务指派：目标负责人已停用时拒绝")
+    void assignTaskOwnerRejectsInactiveTarget() {
+        com.mftb.admin.entity.SysUser inactive = owner41();
+        inactive.setStatus(0);
+        when(userMapper.selectById(any())).thenReturn(inactive);
+        assertThrows(BusinessException.class, () -> service.assignTaskOwner(5L, 41L, 1));
+    }
+
+    @Test
+    @DisplayName("负载页任务指派：无交付写权（requireDeliveryWriter 拒）则不能指派")
+    void assignTaskOwnerRequiresWriter() {
+        when(userMapper.selectById(any())).thenReturn(owner41());
+        when(accessGuard.requireDeliveryWriter(anyLong(), anyString()))
+                .thenThrow(new BusinessException("您不是該需求的參與人"));
+        assertThrows(BusinessException.class, () -> service.assignTaskOwner(5L, 41L, 1));
+    }
+
     private static RdmWorkTask task() {
         RdmWorkTask task = new RdmWorkTask();
         task.setId(5L);
@@ -171,6 +240,40 @@ class RdmDeliveryGuardTest {
         m.setPreliminaryDate(preliminary);
         m.setNaReason(reason);
         return m;
+    }
+
+    private static RdmDeliveryDTO.Review reviewDto(String reviewType) {
+        RdmDeliveryDTO.Review dto = new RdmDeliveryDTO.Review();
+        dto.setReqId(1L);
+        dto.setReviewType(reviewType);
+        dto.setParticipantIds(List.of(41L));
+        return dto;
+    }
+
+    @Test
+    @DisplayName("未知评审类型 token 直接拒绝：不落库也不进通知文案")
+    void unknownReviewTypeTokenIsRejected() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.createReview(reviewDto("dev,security")));
+        assertTrue(ex.getMessage().contains("評審類型不正確"), ex.getMessage());
+        assertTrue(insertedReviews.isEmpty());
+    }
+
+    @Test
+    @DisplayName("多选评审类型去空格去重后逗号拼接落库")
+    void multiReviewTypesAreNormalizedBeforePersist() {
+        RdmDeliveryVO.Review vo = service.createReview(reviewDto(" test , dev,dev "));
+        assertEquals("test,dev", vo.getReviewType());
+        assertEquals("test,dev", insertedReviews.get(0).getReviewType());
+    }
+
+    @Test
+    @DisplayName("评审类型标签：多值逐段连接，单值与空值兼容历史数据")
+    void reviewTypeLabelSupportsMultiAndLegacyValues() {
+        assertEquals("測試評審 / 研發評審", RdmDeliveryServiceImpl.reviewTypeLabel("test,dev"));
+        assertEquals("UI 評審", RdmDeliveryServiceImpl.reviewTypeLabel("ui"));
+        assertEquals("-", RdmDeliveryServiceImpl.reviewTypeLabel(null));
+        assertEquals("-", RdmDeliveryServiceImpl.reviewTypeLabel("  "));
     }
 
     @Test
@@ -357,5 +460,36 @@ class RdmDeliveryGuardTest {
         verify(workLogMapper).insert(captor.capture());
         assertEquals(LocalDate.now().minusDays(1), captor.getValue().getWorkDate());
         assertEquals(new BigDecimal("6"), captor.getValue().getHours());
+    }
+
+    /**
+     * 列表直改迭代状态：只回写状态与操作人。
+     * <p>防线：若这条路径改回整条记录回写（走 saveIteration），列表快照里的旧产能/旧起止
+     * 会盖掉别人刚保存的值——界面看着只是“改了个状态”，实际是一次全量覆盖。
+     */
+    @Test
+    @DisplayName("列表直改迭代状态只写状态，非法值与不存在的迭代被拦下")
+    void iterationStatusPatchOnlyWritesStatus() {
+        RdmIteration stored = new RdmIteration();
+        stored.setId(3L);
+        stored.setCode("SP202610001");
+        stored.setName("十月常規迭代");
+        stored.setStatus("planning");
+        when(iterationMapper.selectById(3L)).thenReturn(stored);
+
+        service.updateIterationStatus(3L, "active");
+
+        ArgumentCaptor<RdmIteration> captor = ArgumentCaptor.forClass(RdmIteration.class);
+        verify(iterationMapper).updateById(captor.capture());
+        assertEquals(Long.valueOf(3L), captor.getValue().getId());
+        assertEquals("active", captor.getValue().getStatus());
+        assertEquals("MF00041|李四", captor.getValue().getUpdatedBy());
+        assertNull(captor.getValue().getName(), "只回写状态，不得带上其它列去覆盖");
+
+        // 非法状态与空状态都不应落库，迭代不存在同样拒绝
+        assertThrows(BusinessException.class, () -> service.updateIterationStatus(3L, "done"));
+        assertThrows(BusinessException.class, () -> service.updateIterationStatus(3L, null));
+        assertThrows(BusinessException.class, () -> service.updateIterationStatus(99L, "closed"));
+        verify(iterationMapper).updateById(any(RdmIteration.class));
     }
 }

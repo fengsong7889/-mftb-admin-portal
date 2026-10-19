@@ -9,7 +9,7 @@ import { ComplexityTag, PriorityTag } from './components/Tags'
 
 vi.mock('../../api/rdm', () => ({
   fetchRequirementPage: vi.fn(),
-  fetchScopeCounts: vi.fn().mockResolvedValue({}),
+  fetchScopeCounts: vi.fn().mockResolvedValue({ mine: 7, todo: 2, product: 1, delivery: 3 }),
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
   fetchProductOptions: vi.fn().mockResolvedValue([]),
   fetchProjectPage: vi.fn().mockResolvedValue({ records: [], total: 0 }),
@@ -79,6 +79,40 @@ describe('需求列表展示回归', () => {
     expect(screen.getByText('阻塞')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '認領' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '分配' })).not.toBeInTheDocument()
+  })
+
+  /**
+   * 三张职责页共用详情落地页，进详情的链接必须带上来源菜单，
+   * 侧栏高亮才跟得上用户点进来的那一张（见 menuDataSource.resolveRdmDetailMenuKey）。
+   * <p>legacy（需求跟进清单）不额外挂参数：它就是默认归属，上方用例已钉住 href 不变。
+   */
+  it.each([
+    ['intake', 'rdm-intake-approval'] as const,
+    ['management', 'rdm-intake'] as const,
+  ])('%s 侧进详情时带上 from=%s', async (pageRole, menuKey) => {
+    render(
+      <MemoryRouter>
+        <RequirementList pageRole={pageRole} defaultScope={RDM_SCOPE.INTAKE} scopeTabs={[RDM_SCOPE.INTAKE]} />
+      </MemoryRouter>,
+    )
+    const link = await screen.findByRole('link', { name: title })
+    expect(link).toHaveAttribute('href', `#/rdm-detail?id=91&tab=activity&from=${menuKey}`)
+  })
+
+  /**
+   * 多切片页的视图栏必须还在：“只有 1 个切片才隐去视图栏”不是为了好看而删功能，
+   * 需求清单有 mine/todo/product/delivery 四个切片，用户靠它切数据范围与看各自行数。
+   */
+  it('需求清单（多切片）仍渲染视图栏与各切片计数', async () => {
+    // jsdom 视口宽 1024 < 1440，未存过偏好时视图栏默认收起，这里显式展开
+    localStorage.setItem('rdm-requirement:rail', '0')
+    render(<MemoryRouter><RequirementList /></MemoryRouter>)
+    await screen.findByRole('link', { name: title })
+
+    const rail = document.querySelector('.rdm-view-rail')
+    expect(rail).not.toBeNull()
+    expect(within(rail as HTMLElement).getByText('我提的需求')).toBeInTheDocument()
+    expect(within(rail as HTMLElement).getByText('7')).toBeInTheDocument()
   })
 
   it('验收三个页签均保持字段独立和中文优先级', async () => {

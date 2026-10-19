@@ -29,7 +29,7 @@ const detail = {
   id: 5, projectNo: 'PJ-005', name: '演示項目', objective: '目標', status: 'in_progress',
   pmUserName: '張三', pmUserId: 7, productOwnerUserName: '李四', productOwnerUserId: 8,
   planStartDate: '2026-01-01', planEndDate: '2026-06-01',
-  pausedFlag: false, riskFlag: false, overdueFlag: false,
+  pausedFlag: 0, riskFlag: 0, overdueFlag: 0,
   deliveredCount: 2, totalDeliveryCount: 5, nextDeliveryDate: null,
   blockedCount: 0, pendingDecisionCount: 0, defaultAcceptancePath: 'A',
   version: 3, createdAt: '2026-01-02T09:00:00', updatedAt: '2026-04-30T10:00:00',

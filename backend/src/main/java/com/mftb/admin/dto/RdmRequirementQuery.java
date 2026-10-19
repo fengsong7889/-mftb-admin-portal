@@ -20,7 +20,7 @@ public class RdmRequirementQuery {
     /** 每页条数 */
     private Integer size = 10;
 
-    /** 视角: mine/todo/pool/product/delivery/acceptance/all */
+    /** 视角: mine/intake/todo/pool/product/delivery/acceptance/all */
     private String scope;
 
     /** 关键字（标题/编号/提出人） */
@@ -67,6 +67,17 @@ public class RdmRequirementQuery {
 
     /** 需求种类：aggregate（聚合需求）/ execution（执行需求） */
     private String requirementKind;
+
+    /**
+     * 执行侧地板：只保留「已分配到产品」的需求（需求跟进清单专用）。
+     * <p>为真时在当前 scope 之上再排除准入前（草稿/待审批/审批驳回）与需求池（待分配）——
+     * 准入前归「提需求」菜单（{@code SCOPE_INTAKE}），待分配归「认领/分配」菜单（{@code SCOPE_POOL}），
+     * 需求跟进清单只看「分配之后」的执行进展。三张菜单由此形成不重叠的状态分区。
+     * <p>为什么用独立标志而不是直接改 {@code SCOPE_MINE}：工作台「我的提交」也走 scope=mine，
+     * 且必须看到草稿/被驳回（提出人待补充），收窄 MINE 会打断它；标志是正交开关，默认 false 不影响任何存量视角。
+     * <p>这是 SQL 层的数据口径收敛，不是安全边界（提出人本就只看得到与自己相关的单）。
+     */
+    private Boolean executionOnly;
 
     /** 交付中状态集合（研发视角） */
     private static final List<String> DELIVERY_STATUS = List.of(
@@ -140,11 +151,28 @@ public class RdmRequirementQuery {
                     .or().like(RdmRequirement::getReqNo, kw));
         }
         applyScope(wrapper, currentUserId);
+        if (Boolean.TRUE.equals(executionOnly)) {
+            applyExecutionFloor(wrapper);
+        }
         if (currentUserId != null && relatedOnly) {
             applyRelatedOnly(wrapper, currentUserId);
         }
         wrapper.orderByDesc(RdmRequirement::getUpdatedAt).orderByDesc(RdmRequirement::getId);
         return wrapper;
+    }
+
+    /**
+     * 执行侧地板：排除「尚未分配到产品」的四态（准入前三态 + 需求池）。
+     * <p>用逐个 {@code ne} 而不是 {@code notIn(column, Set)}：与 {@link #applyScope} 的 SCOPE_ALL 同一原因——
+     * 后者在本项目的 MyBatis-Plus 版本上会渲染成 {@code status NOT IN ()}（零占位符），MySQL 直接语法报错。
+     * <p>状态用 {@code RdmConstants.STATUS_*} 编译期常量直接写，不读运行时 Set（类初始化时序坑，见 SCOPE_ALL 注释）。
+     * 保留 assigned 及其之后的所有状态（含 rejected/on_hold：那是分配后被产品驳回/暂缓，仍属执行侧）。
+     */
+    private void applyExecutionFloor(LambdaQueryWrapper<RdmRequirement> wrapper) {
+        wrapper.ne(RdmRequirement::getStatus, RdmConstants.STATUS_DRAFT)
+                .ne(RdmRequirement::getStatus, RdmConstants.STATUS_INTAKE_PENDING)
+                .ne(RdmRequirement::getStatus, RdmConstants.STATUS_INTAKE_REJECTED)
+                .ne(RdmRequirement::getStatus, RdmConstants.STATUS_POOL);
     }
 
     /** 非管理视角：只允许命中与自己相关的单据 */
@@ -226,6 +254,14 @@ public class RdmRequirementQuery {
             case RdmConstants.SCOPE_APPROVING -> {
                 // 待我审批：范围由服务层拿 OA 待办 id 后以 in(...) 收敛，这里不加人员字段条件；
                 // 一旦落到 default 分支，审批人就只会看到自己提的单，造成计数与列表不一致
+            }
+            case RdmConstants.SCOPE_INTAKE -> {
+                /*
+                 * 提交侧合并视图（我提交的 ∪ 待我审批的）：与 approving 同理是空实现，
+                 * 并集由服务层用「submitter_user_id = 本人 OR id IN (审批待办)」一条条件接住。
+                 * 必须显式登记：落到 default 分支会只剩「按提出人收敛」，审批待办从列表里静默消失，
+                 * 界面看上去正常、数据却是错的（与 approving 同一个坑）。
+                 */
             }
             default -> {
                 if (currentUserId != null) {

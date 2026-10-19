@@ -128,6 +128,13 @@ public class RdmDeliveryDTO {
         private String remark;
     }
 
+    /** 迭代状态直改（列表操作列用，只带状态一个字段） */
+    @Data
+    public static class IterationStatus {
+        /** planning/active/closed */
+        private String status;
+    }
+
     /** 需求变更申请 */
     @Data
     public static class Change {

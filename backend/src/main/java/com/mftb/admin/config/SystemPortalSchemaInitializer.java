@@ -438,7 +438,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 {SystemCode.SELLER.code(), "店鋪經營系統", "Store Operations",
                         "門店經營、訂單處理與營業數據，一站式商家自運空間", "ShopOutlined", 25},
                 {SystemCode.SEARCH.code(), "搜索運營系統", "Search Operations",
-                        "管理搜索詞庫、引導策略與效果分析", "SearchOutlined", 30},
+                        "管理搜索詞庫、引導策略與效果分析", "BrandLogo", 30},
                 {SystemCode.FINANCE.code(), "財務結算系統", "Finance & Settlement",
                         "賬戶資金、收支明細與財務對賬，盡在掌握", "AccountBookOutlined", 40},
                 {SystemCode.AI.code(), "人工智能系統", "Artificial Intelligence",

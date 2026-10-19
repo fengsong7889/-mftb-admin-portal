@@ -6,7 +6,7 @@
  * 任務30 強化：
  * 1. URL 保留篩選與分頁（keyword/status/pmUserId/pageNo/pageSize 同步 Hash query，刷新/返回不丟）；
  * 2. 負責人 pmUserId 真正進入查詢參數（此前只收集不查）；
- * 3. 三張統計卡可下鑽（點擊按該口徑過濾清單，再點取消）；
+ * 3. 三張統計卡可下鑽（服务端按与卡片同一批事实位过滤，分页与计数同口径）；
  * 4. 統計失敗不回零（保留上次值 + 明確錯誤態）；
  * 5. 全量報告導出（export-bundle 全量 + ExcelJS 多 Sheet，帶當前 filters，導出前校 reconciliation）；
  * 6. 暫停/恢復真調後端（updateProject，先取 version 做乐观锁）。
@@ -15,7 +15,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Button,
-  Dropdown,
   Empty,
   Form,
   Input,
@@ -40,6 +39,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
@@ -68,15 +68,9 @@ const STATUS_OPTIONS = Object.entries(RDM_PROJECT_STATUS_LABEL).map(([value, lab
 /** 分頁默認值 */
 const DEFAULT_PAGE_SIZE = 20
 
-/** 下鑽口徑（點擊統計卡過濾清單） */
+/** 下鑽口徑（點擊統計卡過濾清單）；三个码与后端 RdmProjectFactService.DRILL_* 逐字对齐 */
 type DrillKey = 'inProgress' | 'attention' | 'pending'
 
-/** 各下鑽口徑的客戶端判定（在當前 filters 結果集內再按口徑收窄） */
-const DRILL_PREDICATE: Record<DrillKey, (r: RdmProjectListItem) => boolean> = {
-  inProgress: r => r.status === 'in_progress',
-  attention: r => !!r.riskFlag || r.blockedCount > 0 || !!r.overdueFlag,
-  pending: r => r.pendingDecisionCount > 0,
-}
 const DRILL_LABEL: Record<DrillKey, string> = {
   inProgress: '進行中項目',
   attention: '需關注項目',
@@ -101,6 +95,7 @@ const COLUMN_META = [
 
 export default function ProjectOverview() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -155,6 +150,18 @@ export default function ProjectOverview() {
     [keyword, status, pmUserId, pageNo, pageSize],
   )
 
+  /**
+   * 列表请求 = 同一组 filters + drill。
+   * <p>下钻口径必须交给服务端筛：前端过去只能筛「已加载的本页」，卡片说的是全量项目数、
+   * 表格只给本页命中行，跳页时两个数永远对不上（实测出现过「卡片 4 / 下钻空表」）。
+   * <p>统计卡与导出固定不带 drill：否则点一次卡片就把该卡数字刷成自己筛出的值，
+   * 三张卡之间失去可比性，也导不到全量口径。
+   */
+  const listQuery = useMemo<RdmProjectQuery>(
+    () => ({ ...queryParams, drill: drill ?? undefined }),
+    [queryParams, drill],
+  )
+
   // ── 載入列表 ──
   const loadList = useCallback(async (params: RdmProjectQuery) => {
     setLoading(true)
@@ -190,9 +197,9 @@ export default function ProjectOverview() {
   }, [])
 
   useEffect(() => {
-    loadList(queryParams)
+    loadList(listQuery)
     loadStats(queryParams)
-  }, [queryParams, loadList, loadStats])
+  }, [listQuery, queryParams, loadList, loadStats])
 
   // ── 負責人搜索（員工接口，labelInValue → pmUserId 進查詢） ──
   const handlePmSearch = useCallback(async (kw: string) => {
@@ -234,7 +241,7 @@ export default function ProjectOverview() {
 
   // ── 暫停 / 恢復（真調後端；RdmProjectListItem 無 version，先取詳情拿乐观锁版本） ──
   const handleTogglePause = (record: RdmProjectListItem) => {
-    const nextPaused = !record.pausedFlag
+    const nextPaused = record.pausedFlag !== 1
     Modal.confirm({
       title: nextPaused ? '確認暫停項目' : '確認恢復推進',
       className: 'custom-confirm-modal',
@@ -248,7 +255,8 @@ export default function ProjectOverview() {
       onOk: async () => {
         try {
           const detail = await fetchProjectDetail(record.id)
-          await updateProject(record.id, { pausedFlag: nextPaused, expectedVersion: detail.version })
+          // 后端 DTO 的 pausedFlag 是 Integer(TINYINT)，上送布尔会被 Jackson 拒成 400「請求參數格式錯誤」
+          await updateProject(record.id, { pausedFlag: nextPaused ? 1 : 0, expectedVersion: detail.version })
           message.success(nextPaused ? '已暫停項目' : '已恢復推進')
           loadList(queryParams)
           loadStats(queryParams)
@@ -309,16 +317,7 @@ export default function ProjectOverview() {
     }
   }
 
-  // ── 行操作下拉菜單 ──
-  const getRowMenuItems = (record: RdmProjectListItem) => [
-    { key: 'edit', label: '編輯項目', onClick: () => navigate(`/rdm-project-detail?id=${record.id}&mode=edit&${searchParams.toString()}`) },
-    { key: 'pause', label: record.pausedFlag ? '恢復推進' : '暫停項目', onClick: () => handleTogglePause(record) },
-  ]
-
-  // ── 下鑽過濾後的行（在當前 filters 結果集內按口徑收窄） ──
-  const visibleRows = useMemo(() => (drill ? rows.filter(DRILL_PREDICATE[drill]) : rows), [rows, drill])
-
-  // ── 表格排序 ──
+  // ── 表格排序（服务端已按 drill 筛过，本页不再做客户端过滤） ──
   const [sortField, setSortField] = useState<string>('updatedAt')
   const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>('descend')
   const handleTableChange = (_p: unknown, _f: unknown, sorter: unknown) => {
@@ -327,8 +326,8 @@ export default function ProjectOverview() {
     else { setSortField('updatedAt'); setSortOrder('descend') }
   }
   const sortedRows = useMemo(() => {
-    if (!visibleRows.length) return visibleRows
-    const sorted = [...visibleRows]
+    if (!rows.length) return rows
+    const sorted = [...rows]
     sorted.sort((a, b) => {
       const av = (a as unknown as Record<string, unknown>)[sortField]
       const bv = (b as unknown as Record<string, unknown>)[sortField]
@@ -339,7 +338,7 @@ export default function ProjectOverview() {
       return sortOrder === 'ascend' ? cmp : -cmp
     })
     return sorted
-  }, [visibleRows, sortField, sortOrder])
+  }, [rows, sortField, sortOrder])
 
   // ── 統計卡數值（無數據渲染「—」，不回零） ──
   const statVal = (v: number | undefined) => (stats ? (v ?? 0) : '—')
@@ -402,21 +401,23 @@ export default function ProjectOverview() {
       render: (v: string, record) => (
         <Space size={4}>
           <Tag color={RDM_PROJECT_STATUS_COLOR[v] ?? 'default'} style={{ margin: 0 }}>{RDM_PROJECT_STATUS_LABEL[v] ?? v}</Tag>
-          {record.pausedFlag && <Tag color="warning" style={{ margin: 0 }}>已暫停</Tag>}
-          {record.riskFlag && <Tag color="error" style={{ margin: 0 }}>風險</Tag>}
+          {/* 标记是 0/1 数字，必须用 === 1 判定；写成 `flag && <Tag/>` 会把 0 当成文本渲染出来 */}
+          {record.pausedFlag === 1 && <Tag color="warning" style={{ margin: 0 }}>{t('rdm.projOverview.tagPaused')}</Tag>}
+          {record.riskFlag === 1 && <Tag color="error" style={{ margin: 0 }}>{t('rdm.projOverview.tagRisk')}</Tag>}
         </Space>
       ),
     },
     { title: '更新時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 120, sorter: true, defaultSortOrder: 'descend', render: (v?: string) => v?.slice(0, 10) || '-' },
     {
-      title: '操作', key: 'action', width: 130, fixed: 'right',
+      title: t('common.colAction'), key: 'action', width: 220, fixed: 'right',
+      /** §B.9 操作列纯文字 + 竖线分隔；原先收进「更多」的编辑/暂停直接放出来，省一次点击与误点下拉 */
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}>詳情</Button>
-          {/* §B.9 操作列禁止图标，「更多」保持纯文字（Dropdown 靠点击） */}
-          <Dropdown menu={{ items: getRowMenuItems(record) }} trigger={['click']}>
-            <Button type="link" size="small">更多</Button>
-          </Dropdown>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&mode=edit&${searchParams.toString()}`)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" onClick={() => handleTogglePause(record)}>
+            {record.pausedFlag === 1 ? t('rdm.projOverview.btnResume') : t('rdm.projOverview.btnPause')}
+          </Button>
         </Space>
       ),
     },
@@ -512,7 +513,7 @@ export default function ProjectOverview() {
               {
                 key: 'attention', icon: <AlertOutlined />, value: statVal(stats?.attentionCount),
                 label: '需關注項目', color: 'brand', active: drill === 'attention',
-                title: '點擊下鑽：僅看風險/阻塞/逾期項目', onClick: () => handleDrill('attention'),
+                title: t('rdm.projOverview.drillTitleAttention'), onClick: () => handleDrill('attention'),
               },
               {
                 key: 'pending', icon: <ClockCircleOutlined />, value: statVal(stats?.pendingDecisionCount),
@@ -536,7 +537,7 @@ export default function ProjectOverview() {
           )}
           {drill && (
             <Tag color="blue" closable onClose={() => commitQuery({ drill: undefined })}>
-              下鑽：{DRILL_LABEL[drill]}（{visibleRows.length}）
+              {t('rdm.projOverview.drillCount', { label: DRILL_LABEL[drill], total })}
             </Tag>
           )}
         </div>
@@ -578,7 +579,8 @@ export default function ProjectOverview() {
           showSizeChanger: true,
           showQuickJumper: true,
           pageSizeOptions: ['10', '20', '50', '100'],
-          showTotal: t => `共 ${t} 個項目`,
+          // drill 已在服务端参与筛选与计数，分页总数就是下钻后的项目数（无需再标注「僅當前頁」）
+          showTotal: (total: number) => (drill ? t('rdm.projOverview.pageDrill', { total }) : t('rdm.projOverview.pageAll', { total })),
           onChange: handlePageChange,
         }}
       />

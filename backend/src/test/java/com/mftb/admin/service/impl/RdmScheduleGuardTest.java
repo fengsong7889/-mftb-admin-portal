@@ -91,7 +91,10 @@ class RdmScheduleGuardTest {
                 mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class), idempotentService,
                 // 任务21：工作日计算已抽取为公共组件。测试注入真实实例包裹同一 mocked calendarMapper，
                 // 保证请假/周末支援等真实工作日数学与原私有实现逐字等价。
-                new com.mftb.admin.service.RdmWorkingDayCalculator(calendarMapper));
+                new com.mftb.admin.service.RdmWorkingDayCalculator(calendarMapper),
+                // 预存工作区改动：RdmScheduleServiceImpl 构造器新增需求角色/任务计划日志两个依赖，补 mock 解除 test-compile 阻塞
+                mock(com.mftb.admin.mapper.RdmRequirementRoleMapper.class),
+                mock(com.mftb.admin.mapper.RdmTaskPlanLogMapper.class));
 
         SysUser current = new SysUser();
         current.setId(OWNER);

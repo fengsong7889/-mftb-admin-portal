@@ -50,10 +50,12 @@ import {
   SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import HelpPopover from '../../components/HelpPopover'
 import RemarkTextArea from '../../components/RemarkTextArea'
+import { buildRdmDetailPath, resolveRdmDetailBackPath } from '../../constants/menuDataSource'
 import { useAuth } from '../../contexts/AuthContext'
 import RequirementStageBar from './components/RequirementStageBar'
 import AcceptanceTraceCard from './components/AcceptanceTraceCard'
@@ -232,11 +234,21 @@ type ActivityItem =
 
 export default function RequirementDetail() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)
   const tabParam = searchParams.get('tab') as DetailTab | null
   const activeTab: DetailTab = tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'activity'
+
+  /**
+   * 站内再跳详情（子需求 / 主需求 / 结构祖先）时把来源菜单带过去：
+   * <p>详情是提需求/認領分配/需求跟進清單三张列表共用的落地页，侧栏高亮跟随 from（见
+   * menuDataSource.resolveRdmDetailMenuKey）；丢了 from 就会在用户没换菜单的情况下跳高亮。
+   */
+  const goDetail = (reqId: number) => navigate(buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }))
+  /** 正文加载失败时的返回落点：跟随进入来源，无来源才回需求跟进清单 */
+  const backListPath = resolveRdmDetailBackPath(searchParams.toString())
 
   const [detail, setDetail] = useState<RdmRequirementDetail | null>(null)
   /** 正文取数状态：失败要能说清为什么，不能伪装成「一直在载入」 */
@@ -789,7 +801,7 @@ export default function RequirementDetail() {
             </div>
           )}
           <div style={{ marginTop: 16 }}>
-            <Button onClick={() => navigate('/rdm-requirement')}>返回需求清單</Button>
+            <Button onClick={() => navigate(backListPath)}>{t('rdm.reqDetail.backToList')}</Button>
           </div>
         </div>
       </div>
@@ -1130,7 +1142,7 @@ export default function RequirementDetail() {
                                 {
                                   title: '標題', dataIndex: 'title', key: 'title', ellipsis: true,
                                   render: (v: string, r) => (
-                                    <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-detail?id=${r.reqId}`)}>{v}</a>
+                                    <a style={{ color: '#2F54EB' }} onClick={() => goDetail(r.reqId)}>{v}</a>
                                   ),
                                 },
                                 {
@@ -1341,7 +1353,7 @@ export default function RequirementDetail() {
                   )}
                   {detail.structureParentReqId && (
                     <PropRow label="主需求" value={
-                      <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-detail?id=${detail.structureParentReqId}`)}>
+                      <a style={{ color: '#2F54EB' }} onClick={() => goDetail(detail.structureParentReqId!)}>
                         {detail.structureParentReqNo ?? `需求 #${detail.structureParentReqId}`}
                       </a>
                     } />
@@ -1352,7 +1364,7 @@ export default function RequirementDetail() {
                         {ancestors.map((a, idx) => (
                           <span key={a.reqId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                             {idx > 0 && <RightOutlined style={{ fontSize: 10, color: '#BFBFBF' }} />}
-                            <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-detail?id=${a.reqId}`)}>
+                            <a style={{ color: '#2F54EB' }} onClick={() => goDetail(a.reqId)}>
                               {formatRdmReqNo(a.reqNo)}
                             </a>
                           </span>

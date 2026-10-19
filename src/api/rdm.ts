@@ -15,6 +15,7 @@ import type {
   RdmActionField,
   RdmAnchorType,
   RdmComplexity,
+  RdmIterationStatus,
   RdmPriority,
   RdmReqType,
   RdmRiskType,
@@ -684,6 +685,13 @@ export interface RdmRequirementQuery {
    * 候选列表不同源过滤会造成「选得到、提交被拒」。
    */
   flowVersion?: number
+  /**
+   * 执行侧地板（需求跟进清单专用）：为真时服务端只返回「已分配到产品」的需求，
+   * 排除准入前（草稿/待审批/审批驳回）与需求池（待分配）。
+   * <p>准入前归「提需求」菜单、待分配归「认领/分配」菜单，跟进清单只看分配之后的执行进展。
+   * 默认 false，不影响工作台「我的提交」等需要全状态的调用方。
+   */
+  executionOnly?: boolean
 }
 
 /* ==================== 查询 ==================== */
@@ -701,10 +709,11 @@ export async function fetchRequirementPage(query: RdmRequirementQuery): Promise<
   }
 }
 
-/** 各视角（Tab）数量 */
-export async function fetchScopeCounts(): Promise<Record<string, number>> {
+/** 各视角（Tab）数量。executionOnly=true 时按需求跟进清单的执行侧地板计数，与列表同口径 */
+export async function fetchScopeCounts(executionOnly = false): Promise<Record<string, number>> {
   try {
-    return await request.get<unknown, Record<string, number>>('/rdm/requirement/scope-counts', SILENT)
+    const config = executionOnly ? { params: { executionOnly: true }, ...SILENT } : SILENT
+    return await request.get<unknown, Record<string, number>>('/rdm/requirement/scope-counts', config)
   } catch (err) {
     if (isBackendUnavailable(err)) return mockScopeCounts()
     throw err
@@ -1696,6 +1705,262 @@ export function saveCalendar(form: {
   return request.post<unknown, RdmCalendarItem[]>('/rdm/schedule/calendar', form)
 }
 
+/* ── 需求甘特图（阶段二：真实数据，对应后端 RdmScheduleVO.Gantt* / TaskPlan*）── */
+
+/** 甘特图任务条（服务端裁决 canAdjust） */
+export interface RdmGanttTask {
+  id: number
+  taskNo: string
+  title: string
+  taskType: string
+  roleCode: string
+  ownerUserId: number | null
+  ownerName: string | null
+  ownerEmpNo: string | null
+  planStartDate: string | null
+  planFinishDate: string | null
+  status: string
+  progress: number
+  overdue: boolean
+  planVersion: number
+  canAdjust: boolean
+  readOnlyReason?: string | null
+}
+
+/** 甘特图需求分组 */
+export interface RdmGanttRequirement {
+  id: number
+  reqNo: string | null
+  title: string
+  status: string
+  projectName?: string | null
+  iterationName?: string | null
+  spanStart: string | null
+  spanEnd: string | null
+  tasks: RdmGanttTask[]
+  unscheduledRoles: string[]
+}
+
+/** 甘特图分页结果 */
+export interface RdmGanttPage {
+  mode: string
+  total: number
+  loaded: number
+  requirements: RdmGanttRequirement[]
+}
+
+/** 甘特图查询条件（三视角 + 筛选 + 分页） */
+export interface RdmGanttQuery {
+  mode: 'personal' | 'single' | 'global'
+  reqId?: number
+  page?: number
+  size?: number
+  keyword?: string
+  projectId?: number
+  iterationCode?: string
+  ownerUserId?: number
+  taskType?: string
+  status?: string
+  onlyOverdue?: boolean
+  onlyUnscheduled?: boolean
+  onlyMine?: boolean
+}
+
+/** 拉取需求甘特图（全局视角由服务端 canSeeAll 裁决，无权会报错而非降级） */
+export function fetchRdmGantt(params: RdmGanttQuery): Promise<RdmGanttPage> {
+  return request.get<unknown, RdmGanttPage>('/rdm/schedule/gantt', { params })
+}
+
+/** 调期单项（携带期望版本做乐观锁） */
+export interface RdmTaskPlanItem {
+  taskId: number
+  expectedPlanVersion: number
+  planStartDate: string
+  planFinishDate: string
+}
+
+/** 调期批量结果 */
+export interface RdmTaskPlanResult {
+  updated: number
+  tasks: RdmGanttTask[]
+}
+
+/** 保存甘特图调期（整批原子 + 幂等 + 审计） */
+export function saveRdmTaskPlans(clientRequestId: string, items: RdmTaskPlanItem[]): Promise<RdmTaskPlanResult> {
+  return request.post<unknown, RdmTaskPlanResult>('/rdm/schedule/task-plans', { clientRequestId, items })
+}
+
+/* ── 团队负载（阶段 B-1：跨岗位统一只读负载聚合，对应后端 RdmResourceVO）── */
+
+/** 负载状态（与后端 RdmResourceVO.LOAD_* 同源） */
+export type RdmLoadStatus = 'available' | 'normal' | 'near_full' | 'overloaded' | 'data_incomplete'
+
+/** 岗位角色（与后端 RdmResourceVO.ROLE_* 同源） */
+export type RdmResourceRole = 'pm' | 'product' | 'dev' | 'designer' | 'qa' | 'ops' | 'pmo'
+
+/** 单日负载 */
+export interface RdmResourceDay {
+  day: string
+  capacity?: number | null
+  planned?: number | null
+  actual?: number | null
+  leave?: boolean | null
+  weekend?: boolean | null
+  overloaded?: boolean | null
+}
+
+/** 一个人的跨岗位负载 */
+export interface RdmResourcePerson {
+  userId: number
+  userName?: string | null
+  empNo?: string | null
+  dept?: string | null
+  roles: RdmResourceRole[]
+  /** 各岗位在途件数 */
+  productReqs?: number | null
+  devTasks?: number | null
+  designTasks?: number | null
+  testTasks?: number | null
+  testBatches?: number | null
+  coordItems?: number | null
+  /** 工时口径 */
+  totalCapacity?: number | null
+  totalPlanned?: number | null
+  totalActual?: number | null
+  loadRate?: number | null
+  overloadedDays?: number | null
+  /** 数据完整性 */
+  loadStatus: RdmLoadStatus
+  hasOverdue?: boolean | null
+  hasBlocked?: boolean | null
+  dataIncompleteReason?: string | null
+  days: RdmResourceDay[]
+}
+
+/** 统计卡（跟随筛选口径，服务端聚合） */
+export interface RdmResourceSummary {
+  total?: number | null
+  available?: number | null
+  overloaded?: number | null
+  dataIncomplete?: number | null
+}
+
+/** 团队负载总览 */
+export interface RdmResourceWorkload {
+  from: string
+  to: string
+  selfOnly?: boolean | null
+  people: RdmResourcePerson[]
+  summary: RdmResourceSummary
+}
+
+/** 团队负载（默认今天起 2 周，含首尾最长 92 天；无全量权时服务端收敛为本人） */
+export async function fetchResourceWorkload(params?: { from?: string; to?: string }): Promise<RdmResourceWorkload | null> {
+  try {
+    return await request.get<unknown, RdmResourceWorkload>('/rdm/resource/workload', { params, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return null
+    throw err
+  }
+}
+
+/** 资源名册成员（对应后端 RdmResourceMember） */
+export interface RdmResourceMember {
+  id?: number
+  userId: number
+  empNo?: string | null
+  userName?: string | null
+  dept?: string | null
+  /** 岗位角色 JSON 数组字符串：pm/product/dev/designer/qa/ops/pmo */
+  roleCodes?: string | null
+  weeklyCapacityHours?: number | null
+  status?: number
+  remark?: string | null
+}
+
+/** 名册列表（含已移出，status 区分；需 rdm-resource-load:manage） */
+export async function fetchResourceMembers(): Promise<RdmResourceMember[]> {
+  try {
+    return await request.get<unknown, RdmResourceMember[]>('/rdm/resource/members', SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/** 纳入/编辑名册成员（按 userId upsert；roleCodes 传数组，后端序列化） */
+export function saveResourceMember(form: {
+  userId: number
+  roleCodes?: string[]
+  weeklyCapacityHours?: number
+  remark?: string
+  status?: number
+}) {
+  return request.post<unknown, RdmResourceMember>('/rdm/resource/members', form)
+}
+
+/** 移出名册（status=0，不物理删） */
+export function removeResourceMember(id: number) {
+  return request.delete<unknown, void>(`/rdm/resource/members/${id}`)
+}
+
+/* ── 待分配工作（阶段 B-3.1：真实需求池/未指派任务/待接收批次，只读）── */
+
+/** 待分配来源类型（与后端 RdmResourceVO.UnassignedItem.source 同源） */
+export type RdmUnassignedSource = 'requirement' | 'dev_task' | 'design_task' | 'test_batch'
+
+/** 一条待分配单据（对应后端 UnassignedItem） */
+export interface RdmUnassignedItem {
+  source: RdmUnassignedSource
+  itemId: number
+  code?: string | null
+  title?: string | null
+  reqTitle?: string | null
+  planHours?: number | null
+  currentOwner?: string | null
+  /** 排期乐观锁版本（任务回带，分派写回时回传做并发保护） */
+  planVersion?: number | null
+}
+
+/** 待分配工作聚合（后端按来源分组） */
+export interface RdmUnassigned {
+  canDispatch?: boolean
+  requirements?: RdmUnassignedItem[]
+  devTasks?: RdmUnassignedItem[]
+  designTasks?: RdmUnassignedItem[]
+  testBatches?: RdmUnassignedItem[]
+}
+
+/** 待分配工作真实聚合（需 rdm-resource-load:dispatch；后端无权收敛为空） */
+export async function fetchResourceUnassigned(): Promise<RdmUnassigned> {
+  try {
+    return await request.get<unknown, RdmUnassigned>('/rdm/resource/unassigned', SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) {
+      return { canDispatch: false, requirements: [], devTasks: [], designTasks: [], testBatches: [] }
+    }
+    throw err
+  }
+}
+
+/** 任务指派写回请求体（对应后端 RdmResourceDTO.Assign） */
+export interface RdmAssignRequest {
+  source: 'dev_task' | 'design_task' | 'requirement' | 'test_batch'
+  itemId: number
+  assigneeUserId: number
+  expectedPlanVersion?: number | null
+  clientRequestId?: string
+}
+
+/**
+ * 从负载页把研发/设计任务指派给某人（仅换负责人）。
+ * <p>后端带乐观锁（expectedPlanVersion 不匹配回 1006 CONFLICT）+ 幂等（clientRequestId）。
+ * 失败按普通错误抛出（含 CONFLICT），由调用方提示刷新重试。
+ */
+export function assignResource(form: RdmAssignRequest) {
+  return request.post<unknown, unknown>('/rdm/resource/assign', form)
+}
+
 /* ── 阶段 6：指标字典、快照重算、预算与 HR 建议 ── */
 
 /** 单条指标定义（口径唯一出处，后端 constant/RdmMetricCatalog） */
@@ -1857,6 +2122,15 @@ export interface RdmIterationForm {
 /** 保存迭代（新增/编辑，产能与起止由项目经理/技术负责人维护） */
 export function saveIteration(form: RdmIterationForm) {
   return request.post<unknown, RdmIterationItem>('/rdm/delivery/iteration', form)
+}
+
+/**
+ * 列表直改迭代状态。
+ * <p>只上送状态一个字段：整条记录回写（走 saveIteration）会把列表快照里的旧产能/旧起止
+ * 一起盖回去，别人刚改完就被这次点击还原，所以后端单独开只更新状态的端点。
+ */
+export function updateIterationStatus(id: number, status: RdmIterationStatus) {
+  return request.patch<unknown, void>(`/rdm/delivery/iteration/${id}/status`, { status })
 }
 
 /* ==================== M3：验收历史、质量口径、版本追溯、周报 ==================== */
@@ -2328,11 +2602,19 @@ export async function fetchRiskSummary(minStayDays = 0): Promise<RdmRiskSummary 
 /* ==================== V3 分批交付：项目 / 交付项 / 提测 / 问题 / 发布 / 验收 ==================== */
 
 // ===== Project 项目 =====
+/**
+ * 项目状态标记：后端 VO/DTO 均为 Integer(TINYINT 0/1)，不是 boolean。
+ * 写侧踩过坑：TS 宣告 boolean 就上送 `pausedFlag: true`，Jackson 无法把布尔塞进 Integer，
+ * 直接 HttpMessageNotReadableException → 400「請求參數格式錯誤，請檢查數據類型後重試」。
+ * 因此读写两侧都钉成 0|1，渲染处一律用 `=== 1` 判定（`flag && <Tag/>` 会把 0 渲染成字符）。
+ */
+export type RdmTriStateFlag = 0 | 1
+
 export interface RdmProjectListItem {
   id: number; projectNo: string; name: string; objective: string;
   pmUserName: string; productOwnerUserName: string;
   planStartDate: string; planEndDate: string;
-  status: string; pausedFlag: boolean; riskFlag: boolean; overdueFlag: boolean;
+  status: string; pausedFlag: RdmTriStateFlag; riskFlag: RdmTriStateFlag; overdueFlag: RdmTriStateFlag;
   deliveredCount: number; totalDeliveryCount: number;
   nextDeliveryDate: string | null; blockedCount: number; pendingDecisionCount: number;
   updatedAt: string;
@@ -2400,6 +2682,12 @@ export interface RdmChecklistItem {
 export interface RdmProjectQuery {
   keyword?: string; pmUserId?: number; status?: string;
   pageNo?: number; pageSize?: number;
+  /**
+   * 统计卡下钻口径（inProgress / attention / pending），由服务端按与卡片同一批事实位过滤。
+   * <p>码值必须与后端 RdmProjectFactService.DRILL_* 逐字一致；未知值服务端直接拒。
+   * <p>只给列表接口；统计卡与导出带上了反而会把卡片口径筛成自己筛出的数。
+   */
+  drill?: string;
 }
 
 export interface RdmProjectCreateForm {
@@ -2417,7 +2705,7 @@ export interface RdmProjectCreateForm {
 }
 
 export interface RdmProjectUpdateForm extends Partial<RdmProjectCreateForm> {
-  status?: string; pausedFlag?: boolean; riskFlag?: boolean; expectedVersion: number;
+  status?: string; pausedFlag?: RdmTriStateFlag; riskFlag?: RdmTriStateFlag; expectedVersion: number;
 }
 
 // ===== Delivery Item 交付项 =====

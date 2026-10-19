@@ -705,9 +705,11 @@ export default function RequirementSubmit() {
         message.success('草稿已更新，可繼續編輯或點「提交需求」送出')
       } else {
         await createRequirement(payload, 'draft')
-        message.success('草稿已保存，可在「我提的需求」裡點「編輯」繼續填、「提交」送出')
+        message.success(t('rdm.reqSubmit.draftSaved'))
       }
-      navigate('/rdm-requirement?scope=mine')
+      // 草稿属准入前状态，只在「提需求」菜单（合并视角）展示；需求跟进清单已收窄为「已分配到产品」，
+      // 再跳 /rdm-requirement?scope=mine 会让用户找不到刚存的草稿，故改指提需求
+      navigate('/rdm-intake-approval')
     } catch {
       // 同上：请求层已统一提示，保留表单内容让用户能重试
     } finally {
@@ -720,8 +722,8 @@ export default function RequirementSubmit() {
       {/* ── 页面头部（统一组件）── */}
       <RdmFormHeader
         title={isDraftEdit ? '編輯需求草稿' : '提交需求'}
-        backText={isDraftEdit ? '返回我的需求' : '返回工作台'}
-        onBack={() => navigate(isDraftEdit ? '/rdm-requirement?scope=mine' : '/rdm-workbench')}
+        backText={isDraftEdit ? t('rdm.reqSubmit.backToSubmit') : t('rdm.reqSubmit.backToWorkbench')}
+        onBack={() => navigate(isDraftEdit ? '/rdm-intake-approval' : '/rdm-workbench')}
         meta={isDraftEdit
           ? draftNo
             ? `草稿 ${draftNo} · 修改後可繼續保存，或提交進入準入審批（提交時會按最新內容重新裁決）`

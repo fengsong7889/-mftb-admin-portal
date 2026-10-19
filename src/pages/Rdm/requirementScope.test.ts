@@ -5,25 +5,28 @@ import { resolveActiveScope } from './requirementScopes'
 /**
  * 视角参数解析测试：菜单拆分后三页各锁一组 Tab，URL 参数必须落在本页真有的视角上。
  *
- * 钉住两件事：
- *  1. 「我提的需求」去重后，旧链接 `/rdm-intake-approval?scope=mine` 不能把页面停在
- *     一个没有 Tab 的视角上（视图栏选不中、用户点不回来）；
- *  2. 清单页的 mine 必须原样保留 —— 它是提出人对自己需求进展的唯一自查入口
- *     （rdm-intake-approval 目前只有 admin 被授权），去重不能去成断链。
+ * 钉住三件事：
+ *  1. 提需求页已改成单一合并视角 intake：旧链接 `/rdm-intake-approval?scope=mine|approving`
+ *     必须回落到合并视角，不能把页面停在半个切片上（视图栏选不中、用户点不回来）；
+ *  2. 清单页的 mine 必须原样保留 —— 它仍是执行侧清单的第一个切片；
+ *  3. intake 是合法 scope（会被服务层按「本人提交 ∪ 审批待办」接住），
+ *     漏登记 VALID_SCOPES 就等于把本页锁死在回落不上的参数上。
  */
-const INTAKE_TABS = [RDM_SCOPE.APPROVING] as const
+const INTAKE_TABS = [RDM_SCOPE.INTAKE] as const
 const LIST_TABS = [RDM_SCOPE.MINE, RDM_SCOPE.TODO, RDM_SCOPE.PRODUCT, RDM_SCOPE.DELIVERY] as const
 
 describe('resolveActiveScope', () => {
-  it('提需求页只给 approving：旧书签的 mine 回落到默认视角', () => {
-    expect(resolveActiveScope('mine', INTAKE_TABS, RDM_SCOPE.APPROVING)).toBe(RDM_SCOPE.APPROVING)
+  it('提需求页只有合并视角：旧书签的 mine/approving 都回落到 intake', () => {
+    expect(resolveActiveScope('mine', INTAKE_TABS, RDM_SCOPE.INTAKE)).toBe(RDM_SCOPE.INTAKE)
+    expect(resolveActiveScope('approving', INTAKE_TABS, RDM_SCOPE.INTAKE)).toBe(RDM_SCOPE.INTAKE)
+    expect(resolveActiveScope(null, INTAKE_TABS, RDM_SCOPE.INTAKE)).toBe(RDM_SCOPE.INTAKE)
   })
 
-  it('本页有的视角照常采纳（URL 仍是单一数据源）', () => {
-    expect(resolveActiveScope('approving', INTAKE_TABS, RDM_SCOPE.APPROVING)).toBe(RDM_SCOPE.APPROVING)
+  it('intake 是合法 scope（不被当成非法值丢掉）', () => {
+    expect(resolveActiveScope('intake', INTAKE_TABS, RDM_SCOPE.MINE)).toBe(RDM_SCOPE.INTAKE)
   })
 
-  it('清单页的 mine 不受影响（去重不能断掉提出人自查入口）', () => {
+  it('清单页的 mine 不受影响（合并不能断掉执行侧的自查入口）', () => {
     expect(resolveActiveScope('mine', LIST_TABS, RDM_SCOPE.MINE)).toBe(RDM_SCOPE.MINE)
   })
 

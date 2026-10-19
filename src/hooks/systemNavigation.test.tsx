@@ -68,6 +68,11 @@ describe('不含 path 的后端菜单', () => {
     expect(resolveMenuPath({ menuKey: 'unknown' })).toBeNull()
     expect(resolveMenuPath({ menuKey: 'unknown', path: '//external.test' })).toBeNull()
   })
+  it('非菜单路由（系统权限申请）硬编码归属流程审批系统，不依赖菜单树', () => {
+    expect(resolveSystemFromPathname('/system-access-apply', [])).toBe('oa')
+    expect(resolveSystemFromPathname('/system-access-apply', null)).toBe('oa')
+    expect(resolveSystemFromPathname('/system-access-apply', [hr])).toBe('oa')
+  })
   it('服务端有效自定义路径优先，动态子路径匹配最长前缀', () => {
     const menu = { ...finance, path: '/custom-account' }
     expect(resolveMenuPath(menu)).toBe('/custom-account')

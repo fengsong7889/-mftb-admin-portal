@@ -22,8 +22,13 @@ public interface RdmRequirementService {
     /** 需求分页列表（按登录人身份收敛数据范围） */
     PageResult<RdmRequirementVO> page(RdmRequirementQuery query);
 
-    /** 各视角 Tab 数量 */
-    Map<String, Long> scopeCounts();
+    /**
+     * 各视角 Tab 数量。
+     *
+     * @param executionOnly 为真时按「执行侧地板」计数（排除准入前 + 需求池），
+     *                      与需求跟进清单列表同口径，避免视图栏计数与列表行数分叉。
+     */
+    Map<String, Long> scopeCounts(boolean executionOnly);
 
     /**
      * 看板信号卡统计（total/overdue/toAccept/pool）。

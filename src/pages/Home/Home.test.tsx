@@ -40,7 +40,12 @@ vi.mock('../../hooks/useSystemNavigation', () => ({ useSystemNavigation: (code: 
   refetch: state.refetch,
 }) }))
 vi.mock('../../api/portal', () => ({ fetchPortalContext: vi.fn() }))
-vi.mock('../../api/auth', () => ({ fetchQuickFavorites: vi.fn(), saveQuickFavorites: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('../../api/auth', () => ({
+  fetchQuickFavorites: vi.fn(),
+  saveQuickFavorites: vi.fn().mockResolvedValue(undefined),
+  fetchAiSettings: vi.fn().mockResolvedValue(null),
+  saveAiSettings: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('../../api/agent', () => ({
   sendAgentMessage: vi.fn().mockResolvedValue({ text: '測試回答', tokens: 0, model: 'test' }),
   fetchEngineStatus: vi.fn().mockResolvedValue(null),

@@ -10,7 +10,7 @@
     "refreshHint": "再読み込み後は現在のページに戻ります。保存していない入力内容は失われる場合があります。"
   },
   "portal": {
-    "title": "企業ポータル",
+    "title": "グループポータル",
     "appCenter": "アプリケーションセンター",
     "quotes": [
       "簡単なことを確実にやり遂げることが、不平凡への道",
@@ -95,7 +95,7 @@
     "guideLocaleDesc": "トップバーで国と言語を切り替えられます。システム名と説明はUI言語に追従します。",
     "guideSearch": "検索と絞り込み",
     "guideSearchDesc": "システム名と説明で検索でき、業務領域チップで素早く絞り込めます。",
-    "footerBrand": "麦峰企業ポータル · ビジネスシステムの統一入口",
+    "footerBrand": "麦峰グループポータル · ビジネスシステムの統一入口",
     "footerCopy": "© {{year}} 麦峰テクノロジー",
     "artwork": {
       "rdmSubmit": "申請",
@@ -140,7 +140,7 @@
       "docArchiveFiles": "アーカイブ資料"
     },
     "businessSystems": "業務システム",
-    "backToPortal": "企業ポータルに戻る",
+    "backToPortal": "グループポータルに戻る",
     "selectSystem": "システムを選択",
     "switchSystemTip": "業務システムを切り替える",
     "subtitle": "業務システムを一か所に。カードを選んで作業を始めましょう。",

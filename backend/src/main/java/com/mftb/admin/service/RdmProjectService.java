@@ -87,8 +87,12 @@ public class RdmProjectService {
      */
     public Page<RdmProjectVO.ListItem> listProjects(RdmProjectDTO.Query query, Long currentUserId) {
         RdmProjectDTO.Query q = query == null ? new RdmProjectDTO.Query() : query;
+        RdmFactVO.FactQuery fact = toFactQuery(q);
+        // 下钻只加在列表条件上，不进 toFactQuery：统计卡/导出/对账必须继续走未下钻的全量口径，
+        // 否则点一次卡片就把那张卡的数字刷成自己筛出来的值，三张卡之间也失去可比性
+        fact.setDrill(q.getDrill());
         Page<RdmFactVO.ProjectFact> factPage =
-                factService.projectFactPage(toFactQuery(q), currentUserId, q.getPageNo(), q.getPageSize());
+                factService.projectFactPage(fact, currentUserId, q.getPageNo(), q.getPageSize());
         Page<RdmProjectVO.ListItem> voPage =
                 new Page<>(factPage.getCurrent(), factPage.getSize(), factPage.getTotal());
         voPage.setRecords(factPage.getRecords().stream().map(this::toListItem).toList());

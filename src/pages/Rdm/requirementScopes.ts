@@ -16,6 +16,8 @@ export const VALID_SCOPES: RdmScope[] = [
   RDM_SCOPE.MINE,
   RDM_SCOPE.TODO,
   RDM_SCOPE.APPROVING,
+  // 提交侧合并视图（本人提交的 ∪ 待本人審批的）：「提交需求」菜单的唯一视角
+  RDM_SCOPE.INTAKE,
   RDM_SCOPE.POOL,
   RDM_SCOPE.PRODUCT,
   RDM_SCOPE.DELIVERY,

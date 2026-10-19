@@ -457,6 +457,48 @@ public class AuthServiceImpl implements AuthService {
                         .set(SysUser::getPortalFavorites, json));
     }
 
+    /**
+     * AI 助手偏好设置：列为空表示该账号从未同步过，返回 null（而非空 JSON），
+     * 前端据此保留本地缓存；「同步过且被清空」存的是 "{}"，会正常解析覆盖本地。
+     */
+    @Override
+    public String getAiSettings(String username) {
+        SysUser user = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .select(SysUser::getAiSettings));
+        return user != null ? user.getAiSettings() : null;
+    }
+
+    @Override
+    public void saveAiSettings(String username, String json) {
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .set(SysUser::getAiSettings, json));
+    }
+
+    /**
+     * 产研交付个人工作台布局：列为空表示该账号从未同步过，返回 null，
+     * 前端据此保留本地缓存；「同步过且被清空」存的是 "{}"，会正常解析覆盖本地。
+     */
+    @Override
+    public String getWorkbenchLayout(String username) {
+        SysUser user = sysUserMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .select(SysUser::getWorkbenchLayout));
+        return user != null ? user.getWorkbenchLayout() : null;
+    }
+
+    @Override
+    public void saveWorkbenchLayout(String username, String json) {
+        sysUserMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SysUser>()
+                        .eq(SysUser::getUsername, username)
+                        .set(SysUser::getWorkbenchLayout, json));
+    }
+
     @Override
     public void saveAvatarUrl(String username, String avatarUrl) {
         try {

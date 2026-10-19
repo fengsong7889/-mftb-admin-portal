@@ -96,10 +96,20 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class RdmProjectFactService {
 
-    /** 未指派 / 無責任人時的去重佔位，與 {@link RdmTodoBoardService} 保持同一顆粒度 */
+    /** 未指派 / 無責任人時的去重占位，与 {@link RdmTodoBoardService} 保持同一顆粒度 */
     private static final String TASK_STATUS_DONE = "done";
     private static final String TASK_STATUS_DOING = "doing";
     private static final String TASK_STATUS_CANCELLED = "cancelled";
+
+    /**
+     * 统计卡下钻口径码（与前端 ProjectOverview 的 DrillKey 逐字对齐）。
+     * <p>放在服务端而不是常量类里，是因为它只服务于本类的事实位过滤；
+     * 真正的口径（哪些项目算进行中/需关注）依然由 {@code toProjectFact} 的
+     * isInProgress / isAttention 定义，这里不重新写一份判定条件。
+     */
+    static final String DRILL_IN_PROGRESS = "inProgress";
+    static final String DRILL_ATTENTION = "attention";
+    static final String DRILL_PENDING = "pending";
 
     private final RdmProjectMapper projectMapper;
     private final RdmProjectMemberMapper memberMapper;
@@ -249,7 +259,7 @@ public class RdmProjectFactService {
      */
     public com.baomidou.mybatisplus.extension.plugins.pagination.Page<RdmFactVO.ProjectFact> projectFactPage(
             RdmFactVO.FactQuery query, Long userId, Integer pageNo, Integer pageSize) {
-        List<RdmFactVO.ProjectFact> all = projectFacts(query, userId);
+        List<RdmFactVO.ProjectFact> all = applyDrill(projectFacts(query, userId), query == null ? null : query.getDrill());
         long current = pageNo == null || pageNo < 1 ? 1L : pageNo;
         long size = pageSize == null || pageSize < 1 ? 20L : Math.min(pageSize, 200L);
         com.baomidou.mybatisplus.extension.plugins.pagination.Page<RdmFactVO.ProjectFact> page =
@@ -258,6 +268,34 @@ public class RdmProjectFactService {
         int to = (int) Math.min(from + size, all.size());
         page.setRecords(new ArrayList<>(all.subList(from, to)));
         return page;
+    }
+
+    /**
+     * 统计卡下钻的口径过滤（仅列表走这里）。
+     *
+     * <p><b>为什么必须在服务端</b>：前端过去只能过滤“当前已加载的那一页”，
+     * 卡片说的是范围内全部项目的数、表格只给本页命中的行，跳页时两个数永远对不上；
+     * 口径一旦分别写在两端（前端谓词 vs {@link #toProjectFacts} 的 inProgress/attention）就一定漂移，
+     * 实测出现过「卡片 4 / 下钻 0 行」。现在卡片与下钻共用 {@link RdmFactVO.ProjectFact} 上的同一批布尔位。
+     *
+     * <p>未知口径一律抛错而不是“当没传”：静默返回全量会让用户以为看到的就是该口径。
+     */
+    static List<RdmFactVO.ProjectFact> applyDrill(List<RdmFactVO.ProjectFact> facts, String drill) {
+        if (!StringUtils.hasText(drill)) {
+            return facts;
+        }
+        String key = drill.trim();
+        List<RdmFactVO.ProjectFact> kept = facts.stream().filter(f -> switch (key) {
+            // 与卡片 inProgressCount 同源：preparing + in_progress
+            case DRILL_IN_PROGRESS -> f.isInProgress();
+            // 与卡片 attentionCount 同源：风险 / 逾期 / 已暂停（不含阻塞数）
+            case DRILL_ATTENTION -> f.isAttention();
+            // 卡片是“待裁决事项总数”，下钻行是“持有待裁决事项的项目”；
+            // 两个数天生不等位（一个是事项数、一个是项目数），前端已负责把口径文案区分开
+            case DRILL_PENDING -> f.getPendingDecisionCount() > 0;
+            default -> throw new BusinessException("不支援的下钻口径: " + key);
+        }).toList();
+        return new ArrayList<>(kept);
     }
 
     /**

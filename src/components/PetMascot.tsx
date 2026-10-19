@@ -290,15 +290,57 @@ const randomHideSpot = (exclude?: HideSpot | null): HideSpot => {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
-/** 從躲藏位置跳出來時，只出現在右側邊緣（不會出現在屏幕中間或底部） */
+/**
+ * 宠物禁止停靠的交互热区。
+ * <p>背景（端到端实测）：蜜蜂会随机漂到列表页右上工具栏（新增項目 / 字段設置）正上方，
+ * 它 z-index:900 + pointer-events:auto，会把真实点击吞掉（elementFromPoint 返回 pet-body），
+ * 用户表现为「字段設置点了没反应」；拖拽落点同样能停在按钮上。
+ * 这是全站共享组件，不能要求每个页面自己避让，所以由宠物自己保证不落进热区。
+ */
+const BLOCKING_SELECTOR = [
+  'button', 'a[href]', 'input', 'select', 'textarea', '[role="button"]',
+  '.search-section', '.action-section', '.form-footer', '.ant-table', '.ant-pagination',
+  '.ant-modal', '.ant-drawer', '.detail-header',
+].join(', ')
+
+/** 落点中心是否压在交互热区上（命中宠物自身不算） */
+const coversInteractiveZone = (x: number, y: number): boolean => {
+  // jsdom / 老浏览器没有这个 API，直接当作无障碍，不能让宠物因为探测失败而卡住
+  if (typeof document.elementsFromPoint !== 'function') return false
+  const cx = x + BODY_WIDTH / 2
+  const cy = y + BODY_HEIGHT / 2
+  const stack = document.elementsFromPoint(cx, cy)
+  const hit = stack.find(node => !(node as HTMLElement).closest?.('.pet-mascot-wrapper'))
+  return !!hit && !!hit.closest(BLOCKING_SELECTOR)
+}
+
+/** 落点压住热区时：先沿垂直方向找最近空位，实在找不到就回退到上一个合法位置 */
+const nearestFreePos = (
+  x: number, y: number, fallback: { x: number; y: number },
+): { x: number; y: number } | null => {
+  if (!coversInteractiveZone(x, y)) return null
+  const maxY = window.innerHeight - BODY_HEIGHT - 24
+  for (const delta of [60, -60, 120, -120, 180, -180]) {
+    const ny = Math.max(0, Math.min(maxY, y + delta))
+    if (!coversInteractiveZone(x, ny)) return { x, y: ny }
+  }
+  return fallback
+}
+
+/** 從躲藏位置跳出來時，只出現在右側邊緣，且避开交互热区 */
 const randomFreePos = () => {
   const w = window.innerWidth
   const h = window.innerHeight
   const margin = 24
   const maxX = w - BODY_WIDTH - margin
   const maxY = h - BODY_HEIGHT - margin
-  // 右側邊緣：隨機高度
-  return { x: maxX, y: Math.round(maxY * (0.1 + Math.random() * 0.8)) }
+  // 右側邊緣：隨機高度，但不得落在工具栏/查询区/表格上（实测会吞掉「字段設置」的点击）
+  for (let i = 0; i < 8; i += 1) {
+    const candidate = { x: maxX, y: Math.round(maxY * (0.1 + Math.random() * 0.8)) }
+    if (!coversInteractiveZone(candidate.x, candidate.y)) return candidate
+  }
+  // 候选位全被占时贴右下角：工具栏与表格头部都在上方，右下角最少与人争位
+  return { x: maxX, y: maxY }
 }
 
 export default function PetMascot() {
@@ -480,6 +522,12 @@ export default function PetMascot() {
     const onUp = () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      // 松手时如果停在按钮/工具栏上，把宠物推离热区（推不开就回到拖拽起点），
+      // 否则它会一直吸住那个按钮的点击，用户只能先把它拖走才能操作页面
+      if (hasDragged) {
+        const nudged = nearestFreePos(posRef.current.x, posRef.current.y, { x: origPosX, y: origPosY })
+        if (nudged) setPos(nudged)
+      }
       setTimeout(() => setIsDragging(false), 150)
     }
 

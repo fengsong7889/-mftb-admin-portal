@@ -47,11 +47,13 @@ import { Alert, Button, Checkbox, Form, Input, Modal, Segmented, Select, Space, 
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
+  BarChartOutlined,
   CheckCircleOutlined,
   ExportOutlined,
   FileAddOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  PartitionOutlined,
   ReloadOutlined,
   SearchOutlined,
   UserAddOutlined,
@@ -235,15 +237,33 @@ export default function RequirementList({
   // 单点翻中一半反而会让页面出现两种语言来源，更难定位到底哪一份是真值
   const { t } = useTranslation()
 
-  /** 拆分阶段一的侧划分。legacy 保持拆前行为，不过滤行也不拆列集。 */
+  /** 拆分阶段一的侧划分。legacy = 需求跟进清单（执行侧），intake = 提需求，management = 认领/分配。 */
   const isIntakeSide = pageRole === 'intake'
   const isManagementSide = pageRole === 'management'
+  const isFollowUpSide = pageRole === 'legacy'
+  /**
+   * 执行侧地板：只有需求跟进清单（legacy）开启。
+   * <p>开启后服务端只返回「已分配到产品」的需求，排除准入前（草稿/待审批/审批驳回）与需求池（待分配）：
+   * 准入前归「提需求」菜单、待分配归「认领/分配」菜单，三张菜单形成不重叠的状态分区（用户明确要求的口径）。
+   * <p>提需求（intake）要看本人提交的全状态、认领/分配（management）只看需求池，两者都不能开这个地板。
+   */
+  const executionOnly = isFollowUpSide
 
   // 视角单一数据源是 URL；菜单入口只给默认值，且必须落在本页实际提供的 Tab 上。
   // 非法值或本页没有的视角（旧书签、菜单拆分前的链接）一律退回默认视角，
   // 不能让页面停在查不到数据、或视图栏里根本选不中的条件上
   const activeScope: RdmScope = resolveActiveScope(searchParams.get('scope'), scopeTabs, defaultScope)
   const isPoolView = activeScope === RDM_SCOPE.POOL
+
+  /**
+   * 详情落地页的来源菜单标记：提需求/认领分配/需求跟进清单三张页共用 /rdm-detail，
+   * 侧栏高亮按 from 跟随用户点进来的那张菜单（见 menuDataSource.resolveRdmDetailMenuKey / Sidebar.test）。
+   * <p>legacy（需求跟进清单）是默认归属，不挂参数，以免把存量书签/通知链接的 href 改坏。
+   */
+  const detailFrom = pageRole === 'intake' ? 'rdm-intake-approval'
+    : pageRole === 'management' ? 'rdm-intake'
+      : ''
+  const detailFromQuery = detailFrom ? `&from=${detailFrom}` : ''
 
   const [view, setView] = useState<ViewMode>(readStoredView)
   /** 视图栏收起偏好：宽屏看列表时想多留宽度给表格，窄屏默认收起 */
@@ -277,6 +297,12 @@ export default function RequirementList({
    * <p>不要求分配权：否则产品经理只能等着被分配，需求池就会堆成无人认领的积压区。
    */
   const canClaim = hasPermission('rdm-requirement:edit')
+
+  /**
+   * 全量可见（决定「全局甘特图」入口是否出现）：与后端 RdmAccessGuard.canSeeAll 同口径。
+   * <p>前端只决定入口显隐，不是安全边界；全局数据在阶段二由服务端按同一 canSeeAll 收敛。
+   */
+  const canSeeAll = hasPermission('rdm-requirement:view_all') || hasPermission('rdm-intake:view') || canDispatch
 
   /** 认领：服务端条件更新保证只有一人成功，抢到前必须二次确认 */
   const handleClaim = (row: RdmRequirementRow) => {
@@ -319,6 +345,7 @@ export default function RequirementList({
         page: view === 'kanban' ? 1 : page,
         size: querySize,
         scope: activeScope,
+        executionOnly,
         ...filters,
       })
       setRows(res.records ?? [])
@@ -328,13 +355,16 @@ export default function RequirementList({
     } finally {
       setLoading(false)
     }
-  }, [view, page, querySize, activeScope, filters])
+  }, [view, page, querySize, activeScope, filters, executionOnly])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    fetchScopeCounts().then(setCounts).catch(() => setCounts({}))
-  }, [activeScope])
+    // 计数只被视图栏消费：单切片页（提需求）与极简页（认领/分配）不渲染视图栏，没消费方就不必多打一次请求。
+    // 有视图栏时口径必须与列表一致：跟进清单开启执行侧地板时，视图栏计数也跟着排除准入前/需求池。
+    if (minimal || scopeTabs.length <= 1) return
+    fetchScopeCounts(executionOnly).then(setCounts).catch(() => setCounts({}))
+  }, [activeScope, executionOnly, minimal, scopeTabs.length])
 
   /**
    * 看板信号卡：服务端按当前筛选条件出数，只在看板视图下取。
@@ -346,11 +376,11 @@ export default function RequirementList({
     if (view !== 'kanban') return
     let alive = true
     setStatsReady(false)
-    fetchRequirementStats({ scope: activeScope, ...filters })
+    fetchRequirementStats({ scope: activeScope, executionOnly, ...filters })
       .then(s => { if (alive) { setStats(s); setStatsReady(true) } })
       .catch(() => { if (alive) { setStats({}); setStatsReady(false) } })
     return () => { alive = false }
-  }, [view, activeScope, filters])
+  }, [view, activeScope, filters, executionOnly])
 
   /** 切换视角：写回 URL（而不是另存一份 state），否则刷新就丢，也无法从工作台深链带进来 */
   const switchScope = (key: string) => {
@@ -682,7 +712,7 @@ export default function RequirementList({
       title: '需求標題', dataIndex: 'title', key: 'title', width: 300, fixed: 'left', ellipsis: true,
       render: (v: string, r) => (
         <div className="rdm-table-title">
-          <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.id}&tab=activity`}>{v}</a>
+          <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.id}&tab=activity${detailFromQuery}`}>{v}</a>
           {r.blockedFlag && <Tag color="purple" style={{ margin: 0 }}>阻塞</Tag>}
         </div>
       ),
@@ -812,7 +842,10 @@ export default function RequirementList({
         }
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
-            <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}`)}>詳情</Button>
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}${detailFromQuery}`)}>{t('common.detail')}</Button>
+            {isFollowUpSide && (
+              <Button type="link" size="small" onClick={() => navigate(`/rdm-gantt?mode=single&reqId=${r.id}`)}>{t('rdm.reqList.btnSchedule')}</Button>
+            )}
             {actions}
           </Space>
         )
@@ -824,17 +857,24 @@ export default function RequirementList({
   const tableWidth = visibleColumns.reduce((sum, col) => sum + Number(col.width ?? 120), 0)
 
   /**
-   * 治理侧仅展示已准入需求：未准入行隐藏并顶横幅告知。
-   *
-   * 拆分批次 1 后服务端 `RdmRequirementQuery` 已按准入口径收口（scope=all 排除
-   * draft/intake_pending/intake_rejected），本侧过滤正常是 no-op；保留是为了防
-   * 旧实例未升级时把未准入行透出来——前端隐藏不是安全边界，服务端仍会自己校资源相关人。
+   * 客户端应隐藏的状态（双保险，正常为 no-op —— 服务端已按同一口径收口）。
+   * <p>保留是为了防旧实例未升级时把不该出现的行透出来（滚动发布期）——前端隐藏不是安全边界，
+   * 服务端仍会自己校资源相关人。各页口径：
+   * - 跟进清单（legacy）：执行侧地板，隐藏准入前 + 需求池（只留已分配到产品）；
+   * - 认领/分配（management）：隐藏准入前（该页只看需求池，服务端 SCOPE_ALL/POOL 已收口）；
+   * - 提需求（intake）：不隐藏（本人提交的全状态都要看到）。
    */
+  const clientHiddenStatuses = useMemo<RdmStatus[]>(() => {
+    if (isFollowUpSide) return [...PRE_ADMISSION_STATUSES, RDM_STATUS.POOL]
+    if (isManagementSide) return PRE_ADMISSION_STATUSES
+    return []
+  }, [isFollowUpSide, isManagementSide])
+
   const visibleRows = useMemo(() => {
-    if (!isManagementSide) return rows
-    return rows.filter(r => !PRE_ADMISSION_STATUSES.includes(r.status as RdmStatus))
-  }, [rows, isManagementSide])
-  const hiddenPreAdmissionCount = isManagementSide ? rows.length - visibleRows.length : 0
+    if (clientHiddenStatuses.length === 0) return rows
+    return rows.filter(r => !clientHiddenStatuses.includes(r.status as RdmStatus))
+  }, [rows, clientHiddenStatuses])
+  const hiddenRowCount = clientHiddenStatuses.length > 0 ? rows.length - visibleRows.length : 0
 
   /** 批量勾选只对“有分配权 + 停在需求池视角 + 表格视图”有意义：看板卡片无法勾选，
    *  列设置在看板下也没有列可设 —— 两者在不满足时直接隐藏，而不是留一个永远点不动的按钮 */
@@ -861,7 +901,7 @@ export default function RequirementList({
     <div className="content-area rdm-workspace">
       <div className="rdm-workspace-body">
         {/* ── 视图栏：极简模式不需要多视图切换 ── */}
-        {!minimal && scopeTabs.length > 0 && !railCollapsed && (
+        {!minimal && scopeTabs.length > 1 && !railCollapsed && (
           <aside className="rdm-view-rail">
             <div className="rdm-view-rail-head">
               視圖
@@ -894,7 +934,7 @@ export default function RequirementList({
           {/* ── 工具条：极简模式整条隐藏（无需视图切换/刷新） ── */}
           {!minimal && (
           <div className="rdm-workspace-toolbar">
-            {!minimal && scopeTabs.length > 0 && railCollapsed && (
+            {!minimal && scopeTabs.length > 1 && railCollapsed && (
               <Tooltip title="展開視圖欄">
                 <Button icon={<MenuUnfoldOutlined />} onClick={toggleRail}>視圖</Button>
               </Tooltip>
@@ -909,7 +949,7 @@ export default function RequirementList({
                 ]}
               />
             )}
-            {scopeTabs.length === 0 && (
+            {scopeTabs.length <= 1 && (
               <span className="rdm-workspace-title">{RDM_SCOPE_LABEL[activeScope]}</span>
             )}
             <div style={{ flex: 1 }} />
@@ -921,6 +961,7 @@ export default function RequirementList({
           <SearchBar
             advanced={advancedFilters}
             minimal={minimal}
+            expandAll
             onSearch={v => { setFilters(v); setPage(1) }}
             onReset={() => { setFilters({}); setPage(1) }}
           />
@@ -955,6 +996,15 @@ export default function RequirementList({
               )}
               {!minimal && (
                 <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+              )}
+              {/* 甘特图入口：仅需求跟进清单（legacy）提供，不侵入提需求/认领分配页 */}
+              {!minimal && isFollowUpSide && (
+                <>
+                  <Button icon={<BarChartOutlined />} onClick={() => navigate('/rdm-gantt?mode=personal')}>{t('rdm.reqList.btnMyGantt')}</Button>
+                  {canSeeAll && (
+                    <Button icon={<PartitionOutlined />} onClick={() => navigate('/rdm-gantt?mode=global')}>{t('rdm.reqList.btnGlobalGantt')}</Button>
+                  )}
+                </>
               )}
             </div>
             <div className="action-section-right">
@@ -991,14 +1041,18 @@ export default function RequirementList({
             />
           )}
 
-          {/* 治理侧兼容期兜底：服务端已按准入口径收口，这里还看到准入前行只可能是旧实例未升级 */}
-          {isManagementSide && hiddenPreAdmissionCount > 0 && (
+          {/* 兼容期兜底：服务端已按口径收口，这里还看到被隐藏的行只可能是旧实例未升级 */}
+          {hiddenRowCount > 0 && (
             <Alert
               type="warning"
               showIcon
               style={{ marginBottom: 12 }}
-              message={`本視圖已過濾 ${hiddenPreAdmissionCount} 條「未準入」需求（草稿 / 審批中 / 審批駁回），請前往「提交需求」菜單查看與處理審批。`}
-              description={t('rdm.mgmtPreAdmissionFiltered')}
+              message={isFollowUpSide
+                ? t('rdm.reqList.legacyFilteredMsg', { count: hiddenRowCount })
+                : t('rdm.reqList.intakeFilteredMsg', { count: hiddenRowCount })}
+              description={isFollowUpSide
+                ? t('rdm.reqList.intakeHint')
+                : t('rdm.mgmtPreAdmissionFiltered')}
             />
           )}
 
@@ -1055,12 +1109,15 @@ export default function RequirementList({
  * 低频条件收进「更多篩選」：收起时一并清掉这些字段，避免留下看不见的过滤条件
  * 让人以为列表坏了。
  */
-function SearchBar({ onSearch, onReset, advanced = false, minimal = false }: {
+function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expandAll = false }: {
   onSearch: (v: RequirementFilters) => void
   onReset: () => void
   advanced?: boolean
   minimal?: boolean
+  /** 为 true 时所有筛选条件一次性平铺，不渲染「更多篩選/收起篩選」按钮 */
+  expandAll?: boolean
 }) {
+  const { t } = useTranslation()
   const [form] = Form.useForm<RequirementFilters>()
   const [deptTree, setDeptTree] = useState<DeptNode[]>([])
   const [pmOptions, setPmOptions] = useState<{ value: number; label: string }[]>([])
@@ -1068,8 +1125,8 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false }: {
   const [empOptions, setEmpOptions] = useState<{ value: number; label: string }[]>([])
   const [empSearching, setEmpSearching] = useState(false)
   const empTimer = useRef<ReturnType<typeof setTimeout>>()
-  /** 极简模式：查询条件全部展开，不需要收起 */
-  const [more, setMore] = useState(minimal)
+  /** 极简模式或 expandAll：查询条件全部展开，不需要收起 */
+  const [more, setMore] = useState(minimal || expandAll)
 
   useEffect(() => {
     if (advanced) {
@@ -1211,7 +1268,7 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false }: {
             >
               重置
             </Button>
-            {!minimal && <Button type="link" onClick={toggleMore}>{more ? '收起篩選' : '更多篩選'}</Button>}
+            {!minimal && !expandAll && <Button type="link" onClick={toggleMore}>{more ? t('rdm.reqList.collapseFilter') : t('rdm.reqList.moreFilter')}</Button>}
           </div>
         </Form.Item>
       </Form>

@@ -1,5 +1,5 @@
 /**
- * 產研交付（RDM）个人工作台 —— 角色化布局配置层（阶段一：纯前端）
+ * 产研交付（RDM）个人工作台 —— 角色化布局配置层
  *
  * 为什么需要这一层：个人工作台是所有人进入 RDM 的第一屏，但研发、测试、项目经理、
  * 业务方关心的对象完全不同（任务 / 测试批次 / 项目进度 / 我的提交）。旧版把 9 个区块
@@ -11,9 +11,12 @@
  * 口径边界（严格遵守）：
  * - 身份只用于**界面编排**，不作为授权依据；后端每个端点仍独立鉴权与收敛数据范围。
  * - 区块声明 menuKey，未持有该菜单权限的区块既不进推荐，也不出现在可勾选清单。
- * - 个人布局只写 localStorage（按工号隔离），不入库、不跨设备同步 —— 本轮不碰后端。
+ * - 个人布局优先从后端加载（按账号隔离），localStorage 作为离线缓存；
+ *   后端不可用时回退 localStorage，确保页面仍能正常展示。
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { fetchWorkbenchLayout, saveWorkbenchLayout } from '../../api/auth'
+import type { WorkbenchLayoutData } from '../../api/auth'
 
 /* ==================== 工作身份 ==================== */
 
@@ -342,6 +345,8 @@ export interface WorkbenchLayout {
  *   有权限但没被推荐的区块一律不自动上屏（那是用户没要的）。
  * <p>可访问集合每次渲染重算：管理员中途改授权后刷新页面即可反映，不必重新登录；
  * 计算量是个位数数组过滤，不缓存以免闭包拿到过期权限。
+ * <p>持久化：优先从后端加载，后端不可用或返回空时回退 localStorage；
+ * 保存时同时写后端和 localStorage，确保跨设备同步 + 离线可用。
  */
 export function useRdmWorkbenchLayout(input: {
   empId?: string
@@ -350,6 +355,45 @@ export function useRdmWorkbenchLayout(input: {
 }): WorkbenchLayout {
   const { empId, identities, access } = input
   const [stored, setStored] = useState<StoredLayout | null>(() => readStored(empId))
+  /** 标记首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
+  const loadedRef = useRef(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 从后端加载布局（后端不可用时回退 localStorage）
+  useEffect(() => {
+    let cancelled = false
+    fetchWorkbenchLayout().then((data) => {
+      if (cancelled) return
+      if (data && data.v === 1 && Array.isArray(data.order) && data.order.length > 0) {
+        // 后端有数据，转换为 StoredLayout
+        const order = data.order.filter(isSectionKey)
+        const dismissed = (data.dismissed ?? []).filter(isSectionKey)
+        if (order.length > 0) {
+          setStored({ v: 1, order, dismissed })
+          // 同时更新 localStorage 缓存
+          writeStored(empId, { v: 1, order, dismissed })
+        }
+      }
+      // 后端返回空或格式不对：保留 localStorage 里已加载的值（readStored 在 useState 初始化时已执行）
+    }).catch(() => {
+      // 后端不可用：localStorage 已在 useState 初始化时加载，无需额外处理
+    }).finally(() => {
+      if (!cancelled) loadedRef.current = true
+    })
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 保存布局到后端 + localStorage（防抖 1 秒）
+  const persistToBackend = (next: StoredLayout) => {
+    if (!loadedRef.current) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      const data: WorkbenchLayoutData = { v: 1, order: next.order, dismissed: next.dismissed }
+      // 同时写 localStorage 作为离线缓存
+      writeStored(empId, next)
+      saveWorkbenchLayout(data).catch(() => { /* 后端不可用时仅保留 localStorage */ })
+    }, 1000)
+  }
 
   const candidates = RDM_SECTIONS.filter(meta => isSectionAccessible(meta, access))
   const allowed = candidates.map(meta => meta.key)
@@ -371,6 +415,7 @@ export function useRdmWorkbenchLayout(input: {
   const persist = (next: StoredLayout) => {
     setStored(next)
     writeStored(empId, next)
+    persistToBackend(next)
   }
 
   const layout: WorkbenchLayout = {
@@ -404,6 +449,10 @@ export function useRdmWorkbenchLayout(input: {
     reset: () => {
       clearStored(empId)
       setStored(null)
+      // 同时清空后端布局（写空对象，区别于 null 表示“同步过且已清空”）
+      if (loadedRef.current) {
+        saveWorkbenchLayout({ v: 1, order: [], dismissed: [] }).catch(() => {})
+      }
     },
   }
   return layout

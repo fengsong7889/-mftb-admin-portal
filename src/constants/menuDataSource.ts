@@ -222,6 +222,8 @@ export const keyToPath: Record<string, string> = {
   'rdm-dashboard-board':    '/rdm-dashboard',
   // v3.5 拆分：風險明细与部门/人员负载各自成页；新分组折叠态跳首个子页（与其他分组同法）
   'rdm-dashboard-risk':     '/rdm-risk',
+  // 团队负载（rdm-resource-load）：从研发工作台资源负载 Tab 升级为独立菜单，放在项目与计划分组下
+  'rdm-resource-load':      '/rdm-resource-load',
   'rdm-efficiency':         '/rdm-score',
   'rdm-efficiency-output':  '/rdm-output',
   'rdm-dashboard-quality':  '/rdm-quality',
@@ -303,12 +305,16 @@ Object.entries(keyToPath).forEach(([key, path]) => {
 pathToKey['/hr-dict-edit'] = 'hr-dict'
 // RDM 詳情/驗收表單/交付子頁歸入對應菜單，供側邊欄高亮與標籤名使用
 pathToKey['/rdm-detail'] = 'rdm-requirement'
+// 需求甘特图：不单独建菜单，侧栏高亮归属需求跟进清单（与详情页同锚点）
+pathToKey['/rdm-gantt'] = 'rdm-requirement'
 pathToKey['/rdm-acceptance-form'] = 'rdm-acceptance'
 // 交付中需求、產品需求處理、提交需求已随菜单收敛退役（不再出现在 keyToPath）；任务/迭代表单仍为子页
 pathToKey['/rdm-task'] = 'rdm-delivery-board'
 // 分配产品经理独立页：后端 batch-assign 校 rdm-intake 的 edit，此处归属保持一致
 pathToKey['/rdm-assign'] = 'rdm-intake'
 pathToKey['/rdm-iteration-form'] = 'rdm-delivery-iteration'
+// 团队负载子页（人员详情/分派表单）归属同一菜单
+pathToKey['/rdm-resource-load'] = 'rdm-resource-load'
 // V3 分批交付子页（非独立菜单）：归属按后端 @RequirePermission 的菜单锚点，守卫与页签高亮才有锚点
 // RdmProjectController=rdm-dashboard-project，RdmTestBatch/RdmIssue=rdm-delivery-test，
 // RdmReleaseBatch/RdmFlowConfig=rdm-delivery-release，RdmDeliveryItem=rdm-delivery-board，RdmStockMigration=rdm-delivery
@@ -329,10 +335,6 @@ pathToKey['/rdm-review'] = 'rdm-requirement'
 pathToKey['/rdm-change'] = 'rdm-requirement'
 // 入转调离表单/详情为各菜单子页面（非独立菜单），归入各自列表菜单
 pathToKey['/hr-onboarding-form'] = 'hr-onboarding'
-// 返聘（重新入职）不是新菜单：三个路由都授权到 hr-onboarding
-pathToKey['/hr-rehire'] = 'hr-onboarding'
-pathToKey['/hr-rehire-form'] = 'hr-onboarding'
-pathToKey['/hr-rehire-detail'] = 'hr-onboarding'
 pathToKey['/hr-onboarding-detail'] = 'hr-onboarding'
 pathToKey['/hr-regularization-form'] = 'hr-regularization'
 pathToKey['/hr-regularization-detail'] = 'hr-regularization'
@@ -399,6 +401,59 @@ pathToKey['/doc-space/form'] = 'doc-space'
 // 學習路徑子頁（詳情/策展表單）：守衛與頁簽高亮錨點
 pathToKey['/doc-learning/detail'] = 'doc-learning'
 pathToKey['/doc-learning/form'] = 'doc-learning'
+
+/** ────────────────────────────────────────────────────────────
+ *  2.1 共用落地頁的來源歸屬（側邊欄高亮跟隨進入的菜單）
+ *
+ *  需求詳情頁是三張需求列表（提需求 / 認領分配 / 需求跟進清單）共用的落地頁。
+ *  pathToKey 只能表達「一個 path 歸一個菜單」，若只按 pathname 反查，從任何一側
+ *  進詳情都會把高亮釘在默認歸屬（需求跟進清單）上，用戶會以為跳錯了菜單。
+ *  與共用訂單路由同一解法：由進入時攜帶的 from 參數決定歸屬（見 Sidebar）。
+ *
+ *  【只影響高亮，不影響鑒權】：能否進詳情仍由 ROUTE_MENU_KEY_MAP + 後端逐個校驗決定。
+ *  ──────────────────────────────────────────────────────────── */
+
+/** 需求詳情頁 pathname（三張需求列表共用的落地頁） */
+export const RDM_DETAIL_PATH = '/rdm-detail'
+
+/** 需求詳情默認歸屬菜單（需求跟進清單，即 pathToKey 裡登記的歸屬）與其列表頁路徑 */
+const RDM_DETAIL_DEFAULT_MENU_KEY = 'rdm-requirement'
+
+/** 允許作為需求詳情歸屬的來源菜單白名單：只列那三張會跳詳情的列表頁所掛的菜單 key */
+export const RDM_DETAIL_FROM_MENUS: readonly string[] = ['rdm-intake-approval', 'rdm-intake', 'rdm-requirement']
+
+/**
+ * 白名單校驗：只有那三張需求列表的菜單 key 才能作為來源。
+ * <p>拼錯/偽造的 from 一律視為沒有來源，不得讓 URL 參數把側欄高亮指到用戶根本沒點過的菜單上。
+ */
+function isRdmDetailFromMenu(menuKey: string | null | undefined): menuKey is string {
+  return !!menuKey && RDM_DETAIL_FROM_MENUS.includes(menuKey)
+}
+
+/** 解析需求詳情頁的歸屬菜單 key；非該路由返回 null，交由調用方按 path 反查 */
+export function resolveRdmDetailMenuKey(pathname: string, search = ''): string | null {
+  if (pathname !== RDM_DETAIL_PATH) return null
+  const from = new URLSearchParams(search).get('from')
+  return (isRdmDetailFromMenu(from) && from) || pathToKey[RDM_DETAIL_PATH] || RDM_DETAIL_DEFAULT_MENU_KEY
+}
+
+/**
+ * 生成需求詳情頁的路徑 + query（列表頁用 `#${...}` 拼 href 亦可）。
+ * <p>來源菜單不在白名單（如需求跟進清單自身）時不帶 from，URL 與歷史鏈接保持一致。
+ */
+export function buildRdmDetailPath(query: { id: number; tab?: string; from?: string | null }): string {
+  const params = new URLSearchParams({ id: String(query.id) })
+  if (query.tab) params.set('tab', query.tab)
+  if (isRdmDetailFromMenu(query.from)) params.set('from', query.from)
+  return `${RDM_DETAIL_PATH}?${params.toString()}`
+}
+
+/** 詳情頁取不到數據時的返回落點：跟隨進入來源，無來源才回需求跟進清單 */
+export function resolveRdmDetailBackPath(search: string): string {
+  const from = new URLSearchParams(search).get('from')
+  const backPath = isRdmDetailFromMenu(from) ? keyToPath[from] : undefined
+  return backPath || keyToPath[RDM_DETAIL_DEFAULT_MENU_KEY] || '/rdm-requirement'
+}
 
 /** ────────────────────────────────────────────────────────────
  *  3. 已接入后端 API 的菜单 key 集合

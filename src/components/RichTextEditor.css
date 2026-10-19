@@ -1,0 +1,107 @@
+/* 轻量富文本编辑器私有样式（组件级隔离，不污染全局） */
+.rte {
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.rte:focus-within {
+  border-color: #E8720C;
+  box-shadow: 0 0 0 2px rgba(232, 114, 12, 0.12);
+}
+
+.rte__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.rte__btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #595959;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rte__btn:hover {
+  background: #FFF7E6;
+  color: #E8720C;
+}
+
+.rte__split {
+  width: 1px;
+  height: 18px;
+  background: #e8e8e8;
+  margin: 0 4px;
+}
+
+.rte__editor {
+  padding: 12px 16px;
+  outline: none;
+  font-size: 14px;
+  color: #262626;
+  line-height: 1.8;
+  overflow-y: auto;
+  max-height: 640px;
+}
+
+.rte__editor:empty::before {
+  content: attr(data-placeholder);
+  color: #bfbfbf;
+  pointer-events: none;
+}
+
+/* 编辑区内部排版：与展示端口径一致 */
+.rte__editor p {
+  margin: 0 0 6px;
+}
+
+.rte__editor h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 12px 0 6px;
+}
+
+.rte__editor h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+}
+
+.rte__editor ul,
+.rte__editor ol {
+  padding-left: 22px;
+  margin: 4px 0;
+}
+
+.rte__editor blockquote {
+  margin: 6px 0;
+  padding: 6px 12px;
+  border-left: 3px solid #F59432;
+  background: #FFF7F0;
+  color: #595959;
+}
+
+/* 只读态：工具栏不可点、编辑区灰底（fieldset 的 disabled 管不到 contentEditable） */
+.rte--disabled .rte__toolbar {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.rte--disabled .rte__editor {
+  background: #f5f5f5;
+  color: #595959;
+}

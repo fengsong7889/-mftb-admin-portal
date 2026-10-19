@@ -254,6 +254,7 @@ const SUB_PAGE_NAME: Record<string, string> = {
    */
   '/rdm-submit': '提交需求',
   '/rdm-detail': '需求詳情',
+  '/rdm-gantt': '需求甘特圖',
   '/rdm-assign': '分配產品經理',
   '/rdm-prd': '編寫 PRD',
   '/rdm-review': '需求評審',

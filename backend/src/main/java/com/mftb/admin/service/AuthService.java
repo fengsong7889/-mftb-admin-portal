@@ -72,6 +72,27 @@ public interface AuthService {
     /** 保存用户企业门户「我的常用」系统编码列表 */
     void savePortalFavorites(String username, String json);
 
+    /**
+     * 获取用户 AI 助手偏好设置。
+     *
+     * @return 从未同步过时返回 {@code null}（区别于「同步过且清空了」的空对象），
+     *         前端据此决定是回退本地缓存还是照云端覆盖
+     */
+    String getAiSettings(String username);
+
+    /** 保存用户 AI 助手偏好设置（整份覆盖） */
+    void saveAiSettings(String username, String json);
+
+    /**
+     * 获取用户产研交付个人工作台布局偏好。
+     *
+     * @return 从未同步过时返回 {@code null}，前端据此回退 localStorage 缓存
+     */
+    String getWorkbenchLayout(String username);
+
+    /** 保存用户产研交付个人工作台布局偏好（整份覆盖） */
+    void saveWorkbenchLayout(String username, String json);
+
     /** 保存用户在线头像 URL（含 fallback） */
     void saveAvatarUrl(String username, String avatarUrl);
 

@@ -159,4 +159,61 @@ public class RdmScheduleVO {
         private BigDecimal availableHours;
         private String reason;
     }
+
+    /* ==================== 阶段二：需求甘特图（真实数据） ==================== */
+
+    /** 甘特图任务条（真实数据；canAdjust 由服务端裁决） */
+    @Data
+    public static class GanttTask {
+        private Long id;
+        private String taskNo;
+        private String title;
+        private String taskType;
+        private String roleCode;
+        private Long ownerUserId;
+        private String ownerName;
+        private String ownerEmpNo;
+        private String planStartDate;
+        private String planFinishDate;
+        private String status;
+        private Integer progress;
+        private Boolean overdue;
+        private Integer planVersion;
+        /** 当前登录人能否在图上调整（前端只作 UX 提示，写入时服务端重裁） */
+        private Boolean canAdjust;
+        private String readOnlyReason;
+    }
+
+    /** 甘特图需求分组 */
+    @Data
+    public static class GanttRequirement {
+        private Long id;
+        private String reqNo;
+        private String title;
+        private String status;
+        private String projectName;
+        private String iterationName;
+        /** 需求整体跨度（任务计划日期汇总，只读） */
+        private String spanStart;
+        private String spanEnd;
+        private List<GanttTask> tasks = new ArrayList<>();
+        /** 已参与但尚无完整排期的角色编码 */
+        private List<String> unscheduledRoles = new ArrayList<>();
+    }
+
+    /** 甘特图分页结果 */
+    @Data
+    public static class GanttPage {
+        private String mode;
+        private Long total;
+        private Integer loaded;
+        private List<GanttRequirement> requirements = new ArrayList<>();
+    }
+
+    /** 调期批量结果 */
+    @Data
+    public static class TaskPlanResult {
+        private Integer updated;
+        private List<GanttTask> tasks = new ArrayList<>();
+    }
 }
