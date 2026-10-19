@@ -159,6 +159,37 @@ describe('ProjectOverview 全量導出', () => {
   })
 })
 
+describe('ProjectOverview 三層進度與剩餘工作口徑', () => {
+  it('交付進度同格呈現需求／交付項／研發任務三層計數（一律取自行事實，前端不换算）', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({
+      records: [makeRow({ requirementTotal: 4, deliveredCount: 2, totalDeliveryCount: 5, taskCompleted: 7, taskTotal: 30 })],
+      total: 1,
+    })
+    renderAt()
+    expect(await screen.findByText('需求 4 條 · 交付項 已交 2／承諾 5 · 任務 7／30')).toBeInTheDocument()
+  })
+
+  it('还没承诺交付项的新项目不得显示成「全部完成」', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({
+      records: [makeRow({ deliveredCount: 0, totalDeliveryCount: 0 })], total: 1,
+    })
+    renderAt()
+    await screen.findByText('演示項目')
+    expect(screen.getByText('尚未承諾交付項')).toBeInTheDocument()
+    expect(screen.queryByText('全部完成')).not.toBeInTheDocument()
+  })
+
+  it('最後更新人取 updatedBy；列名已改名為「最後更新時間」', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow({ updatedBy: '古月' })], total: 1 })
+    renderAt()
+    await screen.findByText('演示項目')
+    expect(screen.getByText('古月')).toBeInTheDocument()
+    // 表头在横向滚动/冻结列下会渲染出多份副本，所以按「至少出现一次」断言列名
+    expect(screen.getAllByText('最後更新人').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('最後更新時間').length).toBeGreaterThan(0)
+  })
+})
+
 describe('ProjectOverview 行操作栏（不再收进「更多」）', () => {
   it('編輯/暫停直接渲染在操作列，无需先点下拉', async () => {
     renderAt()

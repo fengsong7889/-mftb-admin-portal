@@ -123,6 +123,17 @@ tencent:
     sync-enabled: ${TENCENT_DOCS_SYNC_ENABLED:false}
     sync-cron: ${TENCENT_DOCS_SYNC_CRON:0 30 3,15 * * ?}
 
+# 產研交付（RDM）每日日報推送
+rdm:
+  daily-report:
+    # 環境級總開關：默認關閉，避免聯調/本地把測試消息推到真實釘釘群。
+    # 業務啟停另有頁面開關（交付配置 > 日報推送）；是否真發還受 rdm.notify.dry-run 約束。
+    # 三層開關互不弱化：任一關閉都不會讓另外兩個失效。
+    enabled: ${RDM_DAILY_REPORT_ENABLED:false}
+    # 每分鐘 tick 一次，比對頁面配置的晨/晚報 HH:mm（改推送時間無需重啟）。
+    # 冪等由「當日該檔快照已存在則跳過」保證，因此每分鐘掃一次不會重複推送。
+    tick-cron: ${RDM_DAILY_REPORT_TICK_CRON:0 * * * * ?}
+
 
 logging:
   level:

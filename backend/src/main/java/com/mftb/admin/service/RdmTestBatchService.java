@@ -521,6 +521,8 @@ public class RdmTestBatchService {
         detail.setScopeSnapshotJson(batch.getScopeSnapshotJson());
         detail.setBuildIdsJson(batch.getBuildIdsJson());
         detail.setExecutorUserIds(JsonUtils.parseLongList(batch.getExecutorUserIdsJson()));
+        // 执行人只存了 ID，展示签名由服务端一次 IN 查补齐：前端拿裸 ID 只能显成数字串
+        detail.setExecutorUserNames(operatorResolver.signaturesByIds(detail.getExecutorUserIds()));
         detail.setApplicantUserName(batch.getApplicantUserName());
         detail.setReturnedReason(batch.getReturnedReason());
         // Batch 3 新事实字段（供任务23 前端回传 expectedVersion / 展示草稿）

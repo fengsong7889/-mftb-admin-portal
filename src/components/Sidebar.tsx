@@ -661,6 +661,12 @@ const keyToIcon: Record<string, ReactNode> = {
   'rdm-config-status': <PartitionOutlined />,
   'rdm-config-routing': <SwapOutlined />,
   'rdm-config-sla':   <FieldTimeOutlined />,
+  // 進度日報：一级分组 + 四个二级页（与后端种子声明的图标保持一致）
+  'rdm-daily-report-group': <BellOutlined />,
+  'rdm-daily-report-rule': <SettingOutlined />,
+  'rdm-daily-report-template': <FileTextOutlined />,
+  'rdm-daily-report-record': <HistoryOutlined />,
+  'rdm-daily-report-trigger': <SendOutlined />,
   // v3.13 新建分组图标
   'rdm-test-quality-group':  <ExperimentOutlined />,
   'rdm-release-accept-group': <CloudUploadOutlined />,

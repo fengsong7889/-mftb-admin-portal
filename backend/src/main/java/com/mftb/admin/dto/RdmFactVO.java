@@ -42,6 +42,15 @@ public class RdmFactVO {
         private String status;
         /** 項目經理篩選 */
         private Long pmUserId;
+        /** 產品負責人篩選（精確匹配 product_owner_user_id） */
+        private Long productOwnerUserId;
+        /**
+         * 計劃日期區間（yyyy-MM-dd）：與項目「計劃開始~計劃結束」區間求交集（overlap），
+         * 即 {@code plan_start_date <= planDateTo AND plan_end_date >= planDateFrom}；只給一側就只卡一側。
+         * <p>必須在 SQL 側收窄（而非記憶體過濾），否則分頁 total 與統計卡都會錯。
+         */
+        private String planDateFrom;
+        private String planDateTo;
         /**
          * 统计卡下钻口径（inProgress / attention / pending）；空值不下钻。
          * <p><b>只对 {@code projectFactPage} 生效</b>：卡片/导出/对账必须继续按未下钻的
@@ -175,6 +184,8 @@ public class RdmFactVO {
         private Integer version;
         private String createdAt;
         private String updatedAt;
+        /** 最後更新人姓名快照（與 updatedAt 同為一對事實，列表與導出共用同一行） */
+        private String updatedBy;
 
         private int requirementTotal;
         private int deliveryItemTotal;

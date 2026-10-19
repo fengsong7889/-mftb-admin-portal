@@ -71,20 +71,25 @@ import {
   fetchRequirementStats,
   fetchProductOptions,
   fetchProjectPage,
+  fetchIterations,
   claimRequirement,
   submitRequirement,
   urgeRequirement,
   withdrawRequirement,
   type RdmProjectListItem,
+  type RdmHandlerPerson,
   type RdmRequirementRow,
 } from '../../api/rdm'
 import { fetchDepartments } from '../../api/department'
 import { fetchEmployeeIdOptions } from '../../api/employee'
+import { buildRdmSubmitPath } from '../../constants/menuDataSource'
 import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
+import { formatPerson, splitHandlers } from './handlerDisplay'
 import RequirementKanban from './components/RequirementKanban'
 import {
   RDM_FLOW_VERSION_LABEL,
+  RDM_ITERATION_STATUS,
   RDM_KANBAN_SIZE,
   RDM_PRE_ADMISSION_STATUS,
   RDM_PRIORITY_LABEL,
@@ -153,8 +158,12 @@ interface RequirementFilters {
   overdueOnly?: boolean
   /** 提出人用户 ID */
   submitterUserId?: number
+  /** 當前處理人用户 ID（命中未完成任務負責人） */
+  handlerUserId?: number
   /** V3：所属项目 */
   projectId?: number
+  /** 所属迭代（归属体系改造：任务迭代继承需求后，需求与任务可按同一迭代对账） */
+  iterationCode?: string
   /** V3：需求种类 */
   requirementKind?: string
   /** V3：流程版本 */
@@ -264,6 +273,15 @@ export default function RequirementList({
     : pageRole === 'management' ? 'rdm-intake'
       : ''
   const detailFromQuery = detailFrom ? `&from=${detailFrom}` : ''
+
+  /**
+   * 提交需求表的来源标记：「提需求」入口在提需求与需求跟进清单两张页都挂着（治理侧不提供），
+   * 表单页的返回要回到点进来的那张——写死跳工作台会让从提需求菜单进来的人找不到自己刚存的草稿。
+   * <p>只有白名单内的 key 会被拼进 URL（见 menuDataSource.buildRdmSubmitPath）。
+   */
+  const submitFrom = pageRole === 'intake' ? 'rdm-intake-approval'
+    : pageRole === 'legacy' ? 'rdm-requirement'
+      : null
 
   const [view, setView] = useState<ViewMode>(readStoredView)
   /** 视图栏收起偏好：宽屏看列表时想多留宽度给表格，窄屏默认收起 */
@@ -733,13 +751,30 @@ export default function RequirementList({
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v: string, r) => <StatusTag status={v} overdue={r.overdueFlag ?? false} />,
     },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 110, ellipsis: true, render: (v?: string | null) => v || '-' },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 150, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
       title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100,
       render: (v?: string | null) => v ?? <span style={{ color: '#FF4D4F' }}>未分配</span>,
     },
-    { title: '當前處理人', dataIndex: 'currentHandler', key: 'currentHandler', width: 100, render: (v?: string | null) => v ?? '-' },
+    {
+      title: '當前處理人', dataIndex: 'handlers', key: 'currentHandler', width: 190,
+      render: (v: RdmHandlerPerson[] | null | undefined, r) => {
+        // 前 2 位直出、其余折成 +N 懸浮看全部；无未完成任务时回退流程推演值（口径与看板/导出同源）
+        const parts = splitHandlers(v)
+        if (!parts) return r.currentHandler ?? '-'
+        return (
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {parts.shown.map(formatPerson).join('、')}
+            {parts.rest.length > 0 && (
+              <Tooltip title={parts.rest.map(formatPerson).join('、')}>
+                <Tag color="default" style={{ marginLeft: 4, marginInlineEnd: 0 }}>+{parts.rest.length}</Tag>
+              </Tooltip>
+            )}
+          </span>
+        )
+      },
+    },
     {
       title: '提交時間', dataIndex: 'submitTime', key: 'submitTime', width: 150,
       render: (v?: string | null) => <span style={{ whiteSpace: 'nowrap' }}>{v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'}</span>,
@@ -821,7 +856,7 @@ export default function RequirementList({
           // 草稿先给「編輯」：没有它，存了草稿的人只能整张表单重填，保存草稿等于丢弃
           if (r.status === RDM_STATUS.DRAFT) {
             actions.push(
-              <Button key="edit" type="link" size="small" onClick={() => navigate(`/rdm-submit?id=${r.id}`)}>編輯</Button>,
+              <Button key="edit" type="link" size="small" onClick={() => navigate(buildRdmSubmitPath({ id: r.id, from: submitFrom }))}>編輯</Button>,
             )
           }
           actions.push(
@@ -1023,7 +1058,7 @@ export default function RequirementList({
               )}
               {/* 拆分阶段一：「提需求」只留在提交侧；治理侧不重复提供入口，避免两页交叉 */}
               {!isManagementSide && (
-                <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-submit')}>
+                <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate(buildRdmSubmitPath({ from: submitFrom }))}>
                   提需求
                 </Button>
               )}
@@ -1122,9 +1157,14 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
   const [deptTree, setDeptTree] = useState<DeptNode[]>([])
   const [pmOptions, setPmOptions] = useState<{ value: number; label: string }[]>([])
   const [projectOptions, setProjectOptions] = useState<{ value: number; label: string }[]>([])
+  const [iterationOptions, setIterationOptions] = useState<{ value: string; label: string }[]>([])
   const [empOptions, setEmpOptions] = useState<{ value: number; label: string }[]>([])
   const [empSearching, setEmpSearching] = useState(false)
   const empTimer = useRef<ReturnType<typeof setTimeout>>()
+  /** 當前處理人：与提出人是两个独立搜索源，不能共用 options（选了一个会覆盖另一个） */
+  const [handlerOptions, setHandlerOptions] = useState<{ value: number; label: string }[]>([])
+  const [handlerSearching, setHandlerSearching] = useState(false)
+  const handlerTimer = useRef<ReturnType<typeof setTimeout>>()
   /** 极简模式或 expandAll：查询条件全部展开，不需要收起 */
   const [more, setMore] = useState(minimal || expandAll)
 
@@ -1141,6 +1181,12 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
     fetchProjectPage({ pageNo: 1, pageSize: 200 })
       .then(res => setProjectOptions((res.records ?? []).map((p: RdmProjectListItem) => ({ value: p.id, label: p.name }))))
       .catch(() => setProjectOptions([]))
+    // 归属体系改造：迭代筛选（只给未关闭的迭代，已关闭的历史迭代不进候选）
+    fetchIterations()
+      .then(list => setIterationOptions(list
+        .filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED)
+        .map(i => ({ value: i.code, label: `${i.name}（${i.code}）` }))))
+      .catch(() => setIterationOptions([]))
   }, [advanced])
 
   const statusOptions = (Object.keys(RDM_STATUS_LABEL) as RdmStatus[]).map(k => ({
@@ -1160,6 +1206,19 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
         .then(list => setEmpOptions(list.map(o => ({ value: Number(o.value), label: o.label }))))
         .catch(() => setEmpOptions([]))
         .finally(() => setEmpSearching(false))
+    }, 300)
+  }, [])
+
+  /** 當前處理人搜索：姓名或工號 → userId（服务端 EXISTS 命中未完成任务负责人） */
+  const handleHandlerSearch = useCallback((kw: string) => {
+    clearTimeout(handlerTimer.current)
+    if (!kw.trim()) { setHandlerOptions([]); return }
+    handlerTimer.current = setTimeout(() => {
+      setHandlerSearching(true)
+      fetchEmployeeIdOptions(kw.trim())
+        .then(list => setHandlerOptions(list.map(o => ({ value: Number(o.value), label: o.label }))))
+        .catch(() => setHandlerOptions([]))
+        .finally(() => setHandlerSearching(false))
     }, 300)
   }, [])
 
@@ -1193,6 +1252,17 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
             notFoundContent={empSearching ? '搜索中...' : '請輸入關鍵字搜索'}
             onSearch={handleEmpSearch}
             options={empOptions}
+          />
+        </Form.Item>
+        <Form.Item label="當前處理人" name="handlerUserId">
+          <Select
+            allowClear
+            showSearch
+            placeholder="姓名或工號"
+            filterOption={false}
+            notFoundContent={handlerSearching ? '搜索中...' : '請輸入關鍵字搜索'}
+            onSearch={handleHandlerSearch}
+            options={handlerOptions}
           />
         </Form.Item>
         {!minimal && (
@@ -1235,6 +1305,11 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
         {more && projectOptions.length > 0 && (
           <Form.Item label="所屬項目" name="projectId">
             <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={projectOptions} />
+          </Form.Item>
+        )}
+        {more && iterationOptions.length > 0 && (
+          <Form.Item label="所屬迭代" name="iterationCode">
+            <Select allowClear showSearch optionFilterProp="label" placeholder="全部" options={iterationOptions} />
           </Form.Item>
         )}
         {more && (

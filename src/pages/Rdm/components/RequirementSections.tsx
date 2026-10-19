@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '../../../api/rdm'
+import { useTaskTypeDict } from '../../../hooks/useTaskTypeDict'
 import {
   RDM_CHANGE_STATUS_COLOR,
   RDM_CHANGE_STATUS_LABEL,
@@ -37,15 +38,12 @@ import {
   RDM_TASK_STATUS,
   RDM_TASK_STATUS_COLOR,
   RDM_TASK_STATUS_LABEL,
-  RDM_TASK_TYPE_COLOR,
-  RDM_TASK_TYPE_LABEL,
   formatRdmReviewTypes,
   type RdmChangeStatus,
   type RdmChangeType,
   type RdmPrdStatus,
   type RdmReviewConclusion,
   type RdmTaskStatus,
-  type RdmTaskType,
 } from '../../../constants/rdm'
 
 /** 浅色描边标签（类型类字段统一用这套，避免与状态语义色混淆） */
@@ -130,6 +128,8 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  // 任务类型字典（业务可配置）：类型标签/颜色从接口取，未知 code 兑底原文
+  const { labelOf: taskTypeLabelOf, colorOf: taskTypeColorOf } = useTaskTypeDict()
   const tasks = summary?.tasks ?? []
 
   const columns: TableColumnsType<RdmTaskItem> = [
@@ -147,7 +147,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
     },
     {
       title: '類型', dataIndex: 'taskType', key: 'taskType', width: 90,
-      render: (v: string) => <SoftTag color={RDM_TASK_TYPE_COLOR[v as RdmTaskType]} text={RDM_TASK_TYPE_LABEL[v as RdmTaskType] ?? v} />,
+      render: (v: string) => <SoftTag color={taskTypeColorOf(v)} text={taskTypeLabelOf(v)} />,
     },
     { title: '負責人', dataIndex: 'ownerName', key: 'ownerName', width: 100, render: (v?: string | null) => v ?? '-' },
     /*

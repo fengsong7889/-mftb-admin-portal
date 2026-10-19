@@ -57,6 +57,13 @@ public class RdmTestBatchVO {
         private String scopeSnapshotJson;
         private String buildIdsJson;
         private List<Long> executorUserIds = new ArrayList<>();
+        /**
+         * 执行人展示签名「姓名(工号)」，与 {@link #executorUserIds} 同序。
+         * <p>为什么由服务端把名字算好下发：执行人只存了 ID 列表，让前端自己按 ID 回查
+         * 要么依赖员工管理菜单的查询权限（普通研发/QA 拿不到 → 详情空白），
+         * 要么逐 id 发请求。账户已注销的 id 会被剔除，因此本列表可能短于 ID 列表。
+         */
+        private List<String> executorUserNames = new ArrayList<>();
         /** 执行记录（按执行时间升序） */
         private List<ExecutionRecord> executions = new ArrayList<>();
         private String applicantUserName;

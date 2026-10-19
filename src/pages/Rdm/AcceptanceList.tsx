@@ -15,11 +15,13 @@
  * 且不会因此看到别人的单。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Alert, Button, Segmented, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import HelpPopover from '../../components/HelpPopover'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import { fetchDeliveryItems, fetchRequirementPage, fetchScopeCounts, type RdmDeliveryItemListItem, type RdmRequirementRow } from '../../api/rdm'
 import { exportRequirementRows } from './requirementExport'
@@ -59,7 +61,19 @@ const RESULT_TAG: Record<string, { text: string; color: string }> = {
   [RDM_ACCEPT_RESULT.FAIL]: { text: '驗收不通過', color: 'error' },
 }
 
+/**
+ * 验收中心的统一来源标记：
+ * 1. 验收表单页据此决定「返回」回本列表还是回需求详情（见 AcceptanceForm）；
+ * 2. 需求详情是多个列表共用的落地页，带 from 才能让侧栏高亮留在验收中心，
+ *    而不是被钉回默认归属（需求跟进清单）。只影响高亮，不参与鉴权。
+ */
+const ACCEPTANCE_FROM_QUERY = 'from=rdm-acceptance'
+/** 详情落地页：href 形式给 <a>，path 形式给 navigate */
+const detailHref = (reqId: number) => `#/rdm-detail?id=${reqId}&tab=gate&${ACCEPTANCE_FROM_QUERY}`
+const detailPath = (reqId: number) => `/rdm-detail?id=${reqId}&tab=gate&${ACCEPTANCE_FROM_QUERY}`
+
 export default function AcceptanceList() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [tab, setTab] = useState('pre')
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
@@ -114,7 +128,7 @@ export default function AcceptanceList() {
       title: '需求標題', dataIndex: 'title', key: 'title', width: 280, ellipsis: true,
       render: (v: string, r) => (
         <span className="rdm-v3-req-title-cell">
-          <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.id}&tab=gate`}>{v}</a>
+          <a className="rdm-table-title__link" title={v} href={detailHref(r.id)}>{v}</a>
           {r.flowVersion === 3 && <Tag className="rdm-v3-di-badge" color="geekblue">交付項級</Tag>}
         </span>
       ),
@@ -144,8 +158,8 @@ export default function AcceptanceList() {
       title: '操作', key: 'action', width: 160, fixed: 'right',
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}&tab=gate`)}>去預驗收</Button>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}&tab=gate`)}>詳情</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}&tab=gate&${ACCEPTANCE_FROM_QUERY}`)}>去預驗收</Button>
+          <Button type="link" size="small" onClick={() => navigate(detailPath(r.id))}>詳情</Button>
         </Space>
       ),
     },
@@ -170,10 +184,10 @@ export default function AcceptanceList() {
       title: '操作', key: 'action', width: 170, fixed: 'right',
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}&tab=gate`)}>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-acceptance-form?id=${r.id}&tab=gate&${ACCEPTANCE_FROM_QUERY}`)}>
             業務驗收（已上線）
           </Button>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}&tab=gate`)}>詳情</Button>
+          <Button type="link" size="small" onClick={() => navigate(detailPath(r.id))}>詳情</Button>
         </Space>
       ),
     },
@@ -197,7 +211,7 @@ export default function AcceptanceList() {
     { title: '上線時間', dataIndex: 'actualReleaseDate', key: 'actualReleaseDate', width: 120, render: (v?: string | null) => v ?? '-' },
     {
       title: '操作', key: 'action', width: 100, fixed: 'right',
-      render: (_, r) => <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}&tab=gate`)}>詳情</Button>,
+      render: (_, r) => <Button type="link" size="small" onClick={() => navigate(detailPath(r.id))}>詳情</Button>,
     },
   ]
 
@@ -316,7 +330,7 @@ export default function AcceptanceList() {
       title: '需求', key: 'req', width: 220, ellipsis: true,
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <a className="rdm-table-title__link" title={r.reqTitle} href={`#/rdm-detail?id=${r.reqId}&tab=gate`}>{r.reqTitle}</a>
+          <a className="rdm-table-title__link" title={r.reqTitle} href={detailHref(r.reqId)}>{r.reqTitle}</a>
           <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.reqNo}</div>
         </div>
       ),
@@ -410,13 +424,25 @@ export default function AcceptanceList() {
 
   return (
     <div className="content-area">
-      <Segmented
-        className="rdm-v3-acceptance-mode"
-        value={acceptanceMode}
-        onChange={v => setAcceptanceMode(v as 'requirement' | 'deliveryItem')}
-        options={[{ label: '需求驗收', value: 'requirement' }, { label: '交付項驗收', value: 'deliveryItem' }]}
-        style={{ marginBottom: 12 }}
-      />
+      <div className="rdm-v3-acceptance-mode" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Segmented
+          value={acceptanceMode}
+          onChange={v => setAcceptanceMode(v as 'requirement' | 'deliveryItem')}
+          options={[{ label: '需求驗收', value: 'requirement' }, { label: '交付項驗收', value: 'deliveryItem' }]}
+        />
+        {/* 两种验收粒度长期并存，不解释清楚就会变成用户二选一的猜谜 */}
+        <HelpPopover
+          title={t('rdm.acceptance.viewHelpTitle')}
+          ariaLabel="驗收視角區別說明"
+          placement="bottomLeft"
+          width={440}
+          content={[
+            { tone: 'info', label: t('rdm.acceptance.viewHelpReqLabel'), body: t('rdm.acceptance.viewHelpReqBody') },
+            { tone: 'success', label: t('rdm.acceptance.viewHelpDiLabel'), body: t('rdm.acceptance.viewHelpDiBody') },
+            { tone: 'neutral', label: t('rdm.acceptance.viewHelpWhichLabel'), body: t('rdm.acceptance.viewHelpWhichBody') },
+          ]}
+        />
+      </div>
 
       {acceptanceMode === 'deliveryItem' ? (
         renderDeliveryItemAcceptance()
@@ -437,7 +463,7 @@ export default function AcceptanceList() {
           {tab !== 'history' && (
             <Tag icon={<ClockCircleOutlined />} color="orange" style={{ height: 32, display: 'inline-flex', alignItems: 'center', padding: '0 12px', borderRadius: 6 }}>
               {tab === 'pre'
-                ? '此處為上線前預驗收：逐項判定用例後才能發起發布放行，不通過會退回研發返工'
+                ? '此處為上線前預驗收：逐項判定檢查項後才能發起發布放行，不通過會退回研發返工'
                 : '此處為上線後正式驗收：需給 1-5 分滿意度，這才是質量口徑裡的正式分數'}
             </Tag>
           )}

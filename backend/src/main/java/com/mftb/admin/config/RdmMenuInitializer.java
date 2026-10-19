@@ -94,6 +94,13 @@ public class RdmMenuInitializer implements CommandLineRunner {
      */
     private static final String ITERATION_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\"]";
     /**
+     * 進度日報「手動觸發」頁的可授動作集：view + trigger。
+     * <p>為什麼 trigger 不併進 edit：手動觸發會向釘釘群與多位負責人發<b>不可撤回</b>的訊息，
+     * 「能改規則/模板」與「能刷群」是兩種權力，必須可分開授予；
+     * 不列上 trigger 則管理員在授權中心永遠夠不到這個能力，接口就只剩超管能用。
+     */
+    private static final String TRIGGER_ACTIONS = "[\"view\",\"trigger\"]";
+    /**
      * 項目總覽（v3.17）：可授集必须含 create/edit。
      * <p>RdmProjectController 的新增挂 create、编辑挂 edit，而「暫停/恢復推進」就是走编辑
      * PATCH 改 pausedFlag；种子只列 view/export 时授权中心勾不到写权，
@@ -157,6 +164,15 @@ public class RdmMenuInitializer implements CommandLineRunner {
             {"rdm-config-routing", "分發矩陣", "Assignment Matrix", "/rdm-config-routing", "RoutingConfig", "SwapOutlined", "2", "2", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-sla", "SLA 與逾期", "SLA & Overdue", "/rdm-config-sla", "SlaConfig", "FieldTimeOutlined", "2", "3", "rdm-config-group", VIEW_EDIT},
             {"rdm-config-score", "積分規則", "Score Rules", "/rdm-score-rule", "ScoreRuleConfig", "CalculatorOutlined", "2", "4", "rdm-config-group", VIEW_EDIT},
+            {"rdm-task-type-config", "任務類型", "Task Types", "/rdm-task-type-config", "TaskTypeConfig", "TagsOutlined", "2", "5", "rdm-config-group", VIEW_EDIT},
+            // 9) 進度日報（一级菜单，sort=24 接在交付配置 23 之后）：
+            // 这是一套独立业务（多规则推送 + 模板库 + 记录 + 补发），面向项目经理/产品负责人，
+            // 不应埋在「交付配置」下。四个二级菜单按职责拆开，权限也就能按职责拆开。
+            {"rdm-daily-report-group", "進度日報", "Progress Digest", null, null, "BellOutlined", "1", "24", null, VIEW_ONLY},
+            {"rdm-daily-report-rule", "推送配置", "Push Rules", "/rdm-daily-report-rules", "DailyReportRules", "SettingOutlined", "2", "1", "rdm-daily-report-group", VIEW_EDIT},
+            {"rdm-daily-report-template", "模板配置", "Templates", "/rdm-daily-report-templates", "DailyReportTemplates", "FileTextOutlined", "2", "2", "rdm-daily-report-group", VIEW_EDIT},
+            {"rdm-daily-report-record", "發送記錄", "Send History", "/rdm-daily-report-records", "DailyReportRecords", "HistoryOutlined", "2", "3", "rdm-daily-report-group", VIEW_ONLY},
+            {"rdm-daily-report-trigger", "手動觸發", "Manual Trigger", "/rdm-daily-report-trigger", "DailyReportTrigger", "SendOutlined", "2", "4", "rdm-daily-report-group", TRIGGER_ACTIONS},
     };
 
     /** 改名意图：只当现名仍是旧默认名时才改，用户走「菜单配置」自定义的名字永远不被覆盖 */
@@ -209,6 +225,13 @@ public class RdmMenuInitializer implements CommandLineRunner {
             // 分配权必然蕴含可见权，两者应同一个窄权限菜单。rdm-query 的 view 平移到 intake 的 view 上，
             // 能力等价，不会新增动作。
             {"rdm-query", "rdm-intake", "*"},
+            // v3.20：日報推送升级为一级菜单「進度日報」并拆四个二级页后，旧单页菜单退役。
+            // 授权按动作分流平移：能改配置的→能改规则+模板（等价能力，不扩权）；能触发的→能手动触发。
+            // 两阶段：先搬授权再软删源行，中途失败会让 applyOnce 不记版本、下次重跑。
+            {"rdm-config-daily-report", "rdm-daily-report-rule", "view,edit"},
+            {"rdm-config-daily-report", "rdm-daily-report-template", "view,edit"},
+            {"rdm-config-daily-report", "rdm-daily-report-trigger", "trigger"},
+            {"rdm-config-daily-report", "rdm-daily-report-record", "view"},
     };
 
     /**
@@ -313,7 +336,10 @@ public class RdmMenuInitializer implements CommandLineRunner {
      */
     private static final List<String> ACTION_ORDER = List.of(
             "view", "create", "edit", "delete", "export", "import", "enable", "disable",
-            "view_all", "dispatch", "contribute");
+            "view_all", "dispatch", "contribute",
+            // trigger：日報推送的「手動觸發」专用动作。不併入 edit 是因为它会向釘釘群與多位
+            // 負責人發不可撤回的訊息，「能改配置」與「能刷群」必須可分開授予。
+            "trigger");
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -1049,6 +1075,20 @@ public class RdmMenuInitializer implements CommandLineRunner {
         assertSortEquals("rdm-resource-load", 3);
         assertSortEquals("rdm-delivery-test", 1);
         assertSortEquals("rdm-dashboard-score", 5);
+        /*
+         * 進度日報（一级 + 四二级）：sort 与动作集都要实查。
+         * <p>缺 trigger 不会报错，只会让非超管在授权中心永远夠不到「手動觸發」，
+         * 而该动作正是「漏发后补发」的唯一入口，因此必须进后置校验。
+         */
+        assertSortEquals(RdmConstants.MENU_DAILY_REPORT_GROUP, 24);
+        assertSortEquals(RdmConstants.MENU_DAILY_REPORT_RULE, 1);
+        assertSortEquals(RdmConstants.MENU_DAILY_REPORT_TEMPLATE, 2);
+        assertSortEquals(RdmConstants.MENU_DAILY_REPORT_RECORD, 3);
+        assertSortEquals(RdmConstants.MENU_DAILY_REPORT_TRIGGER, 4);
+        assertMenuActionsInclude(RdmConstants.MENU_DAILY_REPORT_RULE, "view", "edit");
+        assertMenuActionsInclude(RdmConstants.MENU_DAILY_REPORT_TEMPLATE, "view", "edit");
+        assertMenuActionsInclude(RdmConstants.MENU_DAILY_REPORT_RECORD, "view");
+        assertMenuActionsInclude(RdmConstants.MENU_DAILY_REPORT_TRIGGER, "view", "trigger");
         /*
          * v3.15 验收：rdm-requirement 的可授集必须等于种子声明的完整集。
          * <p>实查而不是信 UPDATE 回报：勾不到的动作等于不存在的动作，到退役那天才暴露就是降权事故。

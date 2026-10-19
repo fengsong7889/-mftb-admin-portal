@@ -11,8 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Checkbox, Input, Modal, Radio, Rate, Select, Space, Table, Tag, Tooltip, message } from 'antd'
-import type { TableColumnsType } from 'antd'
+import { Alert, Button, Checkbox, Image, Input, Modal, Radio, Rate, Select, Space, Tag, Tooltip, Upload, message } from 'antd'
 import {
   AimOutlined,
   CheckCircleOutlined,
@@ -20,10 +19,13 @@ import {
   DeleteOutlined,
   HistoryOutlined,
   ImportOutlined,
+  PictureOutlined,
   PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
+import EvidenceThumb from './components/CaseEvidenceThumb'
+import HelpPopover from '../../components/HelpPopover'
 import DeliveryItemAcceptanceForm from './DeliveryItemAcceptanceForm'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -31,10 +33,11 @@ import RequirementStageBar from './components/RequirementStageBar'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import {
   fetchAcceptanceHistory,
-  fetchDeliverySummary,
   fetchRequirementDetail,
   submitAcceptance,
+  uploadAttachment,
   type RdmAcceptanceCaseForm,
+  type RdmAcceptanceEvidencePayload,
   type RdmAcceptanceRecord,
   type RdmRequirementDetail,
 } from '../../api/rdm'
@@ -46,12 +49,13 @@ import {
   RDM_CASE_RESULT_LABEL,
   RDM_DEFECT_SEVERITY,
   RDM_DEFECT_SEVERITY_LABEL,
-  RDM_PRD_STATUS,
+  RDM_SCORE_TIERS,
   RDM_TEST_ENV_LABEL,
   RDM_STATUS_LABEL,
   RDM_STATUS,
   type RdmAcceptResult,
   type RdmAcceptStage,
+  type RdmCaseResult,
   type RdmStatus,
   type RdmTestEnv,
 } from '../../constants/rdm'
@@ -67,7 +71,7 @@ const { TextArea } = Input
 
 /** 验收结论选项（可选范围会被用例结果反向约束） */
 const RESULT_OPTIONS = [
-  { value: RDM_ACCEPT_RESULT.PASS, label: '驗收通過', desc: '全部用例通過，可正式上線交付' },
+  { value: RDM_ACCEPT_RESULT.PASS, label: '驗收通過', desc: '全部檢查項通過，可正式上線交付' },
   { value: RDM_ACCEPT_RESULT.CONDITIONAL, label: '有條件通過', desc: '僅允許一般/輕微遺留問題，且必須轉後續需求跟蹤' },
   { value: RDM_ACCEPT_RESULT.FAIL, label: '驗收不通過', desc: '退回研發修復，計入該需求的返工次數' },
 ]
@@ -78,13 +82,10 @@ const CASE_RESULT_OPTIONS = Object.entries(RDM_CASE_RESULT_LABEL).map(([value, l
 /** 缺陷严重度选项（颜色语义化） */
 const SEVERITY_OPTIONS = Object.entries(RDM_DEFECT_SEVERITY_LABEL).map(([value, label]) => ({ value, label }))
 
-/** 把多行文本拆成验收标准条目（PRD 里通常一行一条） */
-function splitCriteria(text?: string | null): string[] {
-  return (text ?? '')
-    .split(/[\n；;。]/)
-    .map(s => s.replace(/^\s*\d+[.、)\]]?\s*/, '').trim())
-    .filter(Boolean)
-}
+/** 单条用例证据上限：与后端 RdmRequirementServiceImpl.MAX_CASE_EVIDENCES 同口径，前端先拦一次免得白跑 */
+const MAX_CASE_EVIDENCES = 6
+/** 单张证据体积上限（MB）：与上传接口一致 */
+const MAX_EVIDENCE_MB = 5
 
 export default function AcceptanceForm() {
   const [searchParams] = useSearchParams()
@@ -111,10 +112,15 @@ function RequirementAcceptanceForm() {
    * 写死 tab 会让从处理条进来的人被丢到验收页签，找不到刚才看的进度条。
    */
   const backTab = searchParams.get('tab') ?? 'gate'
+  /**
+   * 来源感知返回：从验收中心列表进来就返回列表，从需求详情进来就回详情。
+   * <p>只认 rdm-acceptance 一个合法来源（白名单），拼错/伪造一律回落详情页，
+   * 不得让 URL 参数把用户丢到没来过的页面。
+   */
+  const fromAcceptanceList = searchParams.get('from') === 'rdm-acceptance'
 
   const [detail, setDetail] = useState<RdmRequirementDetail | null>(null)
   const [history, setHistory] = useState<RdmAcceptanceRecord[]>([])
-  const [prdCriteria, setPrdCriteria] = useState<string[]>([])
   const [cases, setCases] = useState<RdmAcceptanceCaseForm[]>([])
   const [result, setResult] = useState<RdmAcceptResult>(RDM_ACCEPT_RESULT.PASS)
   /** 满意度不预置分数：预置 5 分会让「必填满意度」校验永远提前满足，等于替业务方打分 */
@@ -125,6 +131,10 @@ function RequirementAcceptanceForm() {
   const [createFollowUp, setCreateFollowUp] = useState(true)
   const [followUpTitle, setFollowUpTitle] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  /** 正在上传证据的用例下标：只给对应卡片转圈，不让整页按钮都进入 loading */
+  const [uploadingCase, setUploadingCase] = useState<number | null>(null)
+  /** 被展开查看用例明细的验收记录 id */
+  const [expandedHistory, setExpandedHistory] = useState<Record<number, boolean>>({})
 
   const load = useCallback(async () => {
     if (!id) return
@@ -134,22 +144,12 @@ function RequirementAcceptanceForm() {
     ])
     setDetail(data)
     setHistory(records)
-    // 用例默认来自 PRD 验收标准；没有 PRD 时退回需求原始期望，保证验收有对照物
-    const summary = await fetchDeliverySummary(id).catch(() => null)
-    const prds = summary?.prds ?? []
     /*
-     * 验收标准只取「最新定稿版本」那一份：同一需求的 v1.0/v1.1 里 AC 大量同名，
-     * 扁平合并会导入成倍重复的用例（端到端实测：6 条 AC 变成 20 条，前 9 行与后 9 行完全重复）。
-     * 开发中的新版本不算依据 —— 未经评审的改动不该提前进入验收项。
+     * 用例不再从 PRD 验收标准或 QA 测试用例自动带入：业务验收人看不懂技术化的用例，
+     * 塞一堆他判不了的条目只会逼他闭眼勾「通過」，验收退化成盖章。
+     * 改为空白起步，由验收人对照上方「需求與期望對照」自己写要验什么。
      */
-    const finalized = prds.filter(p => p.status === RDM_PRD_STATUS.APPROVED)
-    const sourcePrd = finalized.length ? finalized[finalized.length - 1] : prds[prds.length - 1]
-    const fromPrd = [...new Set(splitCriteria(sourcePrd?.acceptanceCriteria))]
-    setPrdCriteria(fromPrd)
-    const fallback = splitCriteria(data?.expectResult)
-    const seeds = fromPrd.length ? fromPrd : fallback.length ? fallback : [data?.title ?? '需求功能可用']
-    // 不预选「通過」：验收人必须逐条给结论（未判定会被校验拦住）
-    setCases(seeds.map(title => ({ title, expect: title })))
+    setCases([])
   }, [id])
 
   useEffect(() => { void load() }, [load])
@@ -187,16 +187,6 @@ function RequirementAcceptanceForm() {
 
   const updateCase = (index: number, patch: Partial<RdmAcceptanceCaseForm>) => {
     setCases(prev => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
-  }
-
-  const handleImportPrd = () => {
-    if (prdCriteria.length === 0) {
-      message.warning(t('rdm.acceptance.importEmptyWarn', { defaultValue: 'PRD 未填寫驗收標準，請先讓產品經理補充再導入' }))
-      return
-    }
-    // 导入的只是「要验什么」，“过没过”必须现场逐条判，所以不带预选结论
-    setCases(prdCriteria.map(title => ({ title, expect: title })))
-    message.success(`已從 PRD 導入 ${prdCriteria.length} 條驗收標準`)
   }
 
   /** 提交前校验（顺序：表单校验 → 二次确认 → 调接口） */
@@ -244,7 +234,7 @@ function RequirementAcceptanceForm() {
           <div className="confirm-info-row"><span>本次驗收：</span><b>{RDM_ACCEPT_STAGE_LABEL[stage as RdmAcceptStage] ?? '-'} 第 {attempt} 次{attempt > 1 ? '（返工復驗）' : ''}</b></div>
           <div className="confirm-info-row"><span>驗收環境：</span><b>{envLabel}</b></div>
           <div className="confirm-info-row"><span>驗收結論：</span><b>{label}</b></div>
-          <div className="confirm-info-row"><span>用例：</span><b>{stat.passed}/{stat.total} 通過，缺陷 {stat.defects} 個（致命/嚴重 {stat.blocking}）</b></div>
+          <div className="confirm-info-row"><span>檢查項：</span><b>{stat.passed}/{stat.total} 通過，缺陷 {stat.defects} 個（致命/嚴重 {stat.blocking}）</b></div>
           <div className="confirm-info-row"><span>滿意度：</span><b>{score} / 5</b></div>
           {issues && <div className="confirm-info-row"><span>問題/遺留：</span><b>{issues}</b></div>}
           {result === RDM_ACCEPT_RESULT.CONDITIONAL && createFollowUp && (
@@ -280,7 +270,7 @@ function RequirementAcceptanceForm() {
               && followUpTitle.trim() ? followUpTitle.trim() : undefined,
           })
           message.success('驗收結論已提交')
-          navigate(`/rdm-detail?id=${id}&tab=${backTab}`)
+          navigate(fromAcceptanceList ? '/rdm-acceptance' : `/rdm-detail?id=${id}&tab=${backTab}`)
         } catch {
           message.error('提交失敗，請重試')
           throw new Error('acceptance submit failed')
@@ -308,74 +298,59 @@ function RequirementAcceptanceForm() {
     )
   }
 
-  const caseColumns: TableColumnsType<RdmAcceptanceCaseForm & { key: number }> = [
-    { title: '序號', key: 'idx', width: 56, align: 'center', render: (_, __, i) => i + 1 },
-    {
-      title: '驗收用例', dataIndex: 'title', key: 'title', width: 220,
-      render: (v: string, _, i) => (
-        <Input value={v} maxLength={200} placeholder="例：可自選任意起止日期" onChange={e => updateCase(i, { title: e.target.value })} />
-      ),
-    },
-    {
-      title: '預期結果', dataIndex: 'expect', key: 'expect', width: 200,
-      render: (v: string | undefined, _, i) => (
-        <Input value={v} maxLength={300} placeholder="可驗證的口徑" onChange={e => updateCase(i, { expect: e.target.value })} />
-      ),
-    },
-    {
-      title: '實際結果', dataIndex: 'actual', key: 'actual', width: 200,
-      render: (v: string | undefined, _, i) => (
-        <Input value={v} maxLength={300} placeholder="實際看到什麼" onChange={e => updateCase(i, { actual: e.target.value })} />
-      ),
-    },
-    {
-      title: '結論', dataIndex: 'result', key: 'result', width: 110,
-      render: (v: string | undefined, _, i) => (
-        <Select
-          style={{ width: 100 }}
-          value={v}
-          placeholder="未判定"
-          onChange={val => updateCase(i, {
-            result: val,
-            // 通过时清空缺陷严重度，避免统计口径出现"通过但有缺陷"的脏数据
-            severity: val === RDM_CASE_RESULT.PASS ? undefined : (v === RDM_CASE_RESULT.PASS ? RDM_DEFECT_SEVERITY.MINOR : undefined),
-          })}
-          options={CASE_RESULT_OPTIONS}
-        />
-      ),
-    },
-    {
-      title: '缺陷等級', dataIndex: 'severity', key: 'severity', width: 110,
-      render: (v: string | undefined, r, i) => !r.result || r.result === RDM_CASE_RESULT.PASS
-        ? <span style={{ color: '#8C8C8C', fontSize: 12 }}>—</span>
-        : (
-          <Select
-            style={{ width: 96 }}
-            value={v}
-            placeholder="必選"
-            status={v ? undefined : 'error'}
-            onChange={val => updateCase(i, { severity: val })}
-            options={SEVERITY_OPTIONS}
-          />
-        ),
-    },
-    {
-      title: '操作', key: 'action', width: 70,
-      render: (_, __, i) => (
-        <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => setCases(prev => prev.filter((_, idx) => idx !== i))}>
-          刪除
-        </Button>
-      ),
-    },
-  ]
+  /** 用例卡片的结论变更：通过时清空缺陷严重度，避免统计口径出现"通过但有缺陷"的脏数据 */
+  const updateCaseResult = (index: number, val?: string) => {
+    const prevResult = cases[index]?.result
+    updateCase(index, {
+      result: val,
+      severity: val === RDM_CASE_RESULT.PASS ? undefined : (prevResult === RDM_CASE_RESULT.PASS ? RDM_DEFECT_SEVERITY.MINOR : undefined),
+    })
+  }
+
+  /**
+   * 上传用例证据。
+   * <p>前端只拦明显超限的（条数/体积），类型与 magic bytes 的权威校验在后端上传接口；
+   * 后端拒收时 request.ts 已统一弹原因，这里不双弹。
+   */
+  const handleUploadEvidence = async (index: number, file: File) => {
+    const current = cases[index]?.evidences ?? []
+    if (current.length >= MAX_CASE_EVIDENCES) {
+      message.warning(t('rdm.acceptance.evidenceLimitWarn', { count: MAX_CASE_EVIDENCES }))
+      return
+    }
+    if (file.size > MAX_EVIDENCE_MB * 1024 * 1024) {
+      message.warning(t('rdm.acceptance.evidenceTooLargeWarn', { size: MAX_EVIDENCE_MB }))
+      return
+    }
+    setUploadingCase(index)
+    try {
+      const uploaded = await uploadAttachment(file)
+      const payload: RdmAcceptanceEvidencePayload = {
+        name: uploaded.name,
+        type: uploaded.fileType,
+        size: uploaded.fileSize,
+        dataUrl: uploaded.dataUrl,
+      }
+      updateCase(index, { evidences: [...current, payload] })
+    } catch {
+      // 失败原因已由 request.ts 弹出，保持当前已上传列表不变即可
+    } finally {
+      setUploadingCase(null)
+    }
+  }
+
+  const handleRemoveEvidence = (index: number, evidenceIndex: number) => {
+    const current = cases[index]?.evidences ?? []
+    updateCase(index, { evidences: current.filter((_, ei) => ei !== evidenceIndex) })
+  }
 
   return (
     <div className="content-area">
       {/* ── 头部（统一组件；只读标签放 badge，不放操作按鈕）── */}
       <RdmFormHeader
         title="業務驗收"
-        backText="返回詳情"
-        onBack={() => navigate(`/rdm-detail?id=${detail.id}&tab=${backTab}`)}
+        backText={fromAcceptanceList ? t('rdm.acceptance.backToList') : t('rdm.acceptance.backToDetail')}
+        onBack={() => navigate(fromAcceptanceList ? '/rdm-acceptance' : `/rdm-detail?id=${detail.id}&tab=${backTab}`)}
         badge={(
           <>
             <Tag color={attempt > 1 ? 'error' : 'green'} style={{ margin: 0 }}>第 {attempt} 次驗收{attempt > 1 ? ' · 返工復驗' : ''}</Tag>
@@ -426,48 +401,155 @@ function RequirementAcceptanceForm() {
         <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} />
       </div>
 
-      {/* ── 验收用例 ── */}
+      {/* ── 验收检查项（卡片流：每条一项一张卡，长文本完整可见） ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><CheckCircleOutlined /></span>
-          驗收用例
+          {t('rdm.acceptance.caseCardTitle')}
+          {/* 检查项全由验收人自己写，就得告诉他写成什么样才可判；长说明走 HelpPopover（§问号说明规范） */}
+          <HelpPopover
+            title={t('rdm.acceptance.caseHowToTitle')}
+            ariaLabel="驗收檢查項寫法說明"
+            placement="bottomLeft"
+            width={420}
+            content={[
+              { tone: 'info', label: t('rdm.acceptance.caseHowToRuleLabel'), body: t('rdm.acceptance.caseHowToRuleBody') },
+              { tone: 'success', label: t('rdm.acceptance.caseHowToExpectLabel'), body: t('rdm.acceptance.caseHowToExpectBody') },
+              { tone: 'warn', label: t('rdm.acceptance.caseHowToJudgeLabel'), body: t('rdm.acceptance.caseHowToJudgeBody') },
+            ]}
+          />
           <span className="rdm-card-title-split" />
           <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
             通過 {stat.passed}/{stat.total}
             {stat.defects > 0 && <span style={{ color: '#CF1322', marginLeft: 8 }}>缺陷 {stat.defects}（致命/嚴重 {stat.blocking}）</span>}
           </span>
-          <Space size={8} style={{ marginLeft: 12 }}>
-            <Button size="small" icon={<ImportOutlined />} disabled={prdCriteria.length === 0} onClick={handleImportPrd}>
-              從 PRD 導入（{prdCriteria.length}）
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCases(prev => [...prev, { title: '', expect: '' }])}
-            >
-              新增用例
-            </Button>
-          </Space>
+          <Button
+            size="small"
+            type="primary"
+            icon={<PlusOutlined />}
+            style={{ marginLeft: 12 }}
+            onClick={() => setCases(prev => [...prev, { title: '', expect: '' }])}
+          >
+            {t('rdm.acceptance.addCase')}
+          </Button>
         </div>
-        {prdCriteria.length === 0 && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 12 }}
-            message="該需求沒有 PRD 驗收標準，當前用例來自需求的原始期望"
-            description={t('rdm.acceptance.noPrdCriteriaDesc', { defaultValue: '沒有可驗證的驗收標準，驗收就會變成主觀判斷；建議先讓產品經理在 PRD 需求說明中以「驗收標準」為節補齊。' })}
-          />
-        )}
-        <Table<RdmAcceptanceCaseForm & { key: number }>
-          rowKey={(_, i) => String(i)}
-          size="small"
-          columns={caseColumns}
-          dataSource={cases.map((c, i) => ({ ...c, key: i }))}
-          pagination={false}
-          scroll={{ x: 1100 }}
-          locale={{ emptyText: '尚無驗收用例，請從 PRD 導入或手工新增' }}
-        />
+        {cases.length === 0 ? (
+          <div className="rdm-case-empty">{t('rdm.acceptance.caseEmpty')}</div>
+        ) : cases.map((c, i) => (
+          <div key={i} className="rdm-case-card">
+            <div className="rdm-case-head">
+              <span className="rdm-case-no">{i + 1}</span>
+              <span className="rdm-case-inline-field">
+                <span className="rdm-case-field-label">{t('rdm.acceptance.resultField')}</span>
+                <Select
+                  style={{ width: 110 }}
+                  value={c.result}
+                  placeholder={t('rdm.acceptance.resultUnjudged')}
+                  onChange={val => updateCaseResult(i, val)}
+                  options={CASE_RESULT_OPTIONS}
+                />
+              </span>
+              {!!c.result && c.result !== RDM_CASE_RESULT.PASS && (
+                <span className="rdm-case-inline-field">
+                  <span className="rdm-case-field-label">{t('rdm.acceptance.severityField')}</span>
+                  <Select
+                    style={{ width: 100 }}
+                    value={c.severity}
+                    placeholder={t('rdm.acceptance.severityRequired')}
+                    status={c.severity ? undefined : 'error'}
+                    onChange={val => updateCase(i, { severity: val })}
+                    options={SEVERITY_OPTIONS}
+                  />
+                </span>
+              )}
+              <span className="rdm-case-head-tail" />
+              <Button type="link" size="small" danger onClick={() => setCases(prev => prev.filter((_, idx) => idx !== i))}>
+                {t('common.delete')}
+              </Button>
+            </div>
+            <div className="rdm-case-field">
+              <div className="rdm-case-field-label">{t('rdm.acceptance.caseField')}</div>
+              <TextArea
+                value={c.title}
+                autoSize={{ minRows: 1, maxRows: 6 }}
+                maxLength={200}
+                placeholder={t('rdm.acceptance.caseTitlePlaceholder')}
+                onChange={e => updateCase(i, { title: e.target.value })}
+              />
+            </div>
+            <div className="rdm-case-fields-grid">
+              <div className="rdm-case-field">
+                <div className="rdm-case-field-label">{t('rdm.acceptance.expectField')}</div>
+                {/* 不用 autoSize：它会把高度交给组件计算、拿掉手动拖拽把手；
+                    预期口径经常是一段长文本，给固定初始高 + 纵向可拖让用户自己拉高看全 */}
+                <TextArea
+                  value={c.expect}
+                  rows={3}
+                  maxLength={300}
+                  style={{ resize: 'vertical' }}
+                  placeholder={t('rdm.acceptance.expectPlaceholder')}
+                  onChange={e => updateCase(i, { expect: e.target.value })}
+                />
+              </div>
+              <div className="rdm-case-field">
+                <div className="rdm-case-field-label">{t('rdm.acceptance.actualField')}</div>
+                <TextArea
+                  value={c.actual}
+                  rows={3}
+                  maxLength={300}
+                  style={{ resize: 'vertical' }}
+                  placeholder={t('rdm.acceptance.actualPlaceholder')}
+                  onChange={e => updateCase(i, { actual: e.target.value })}
+                />
+              </div>
+            </div>
+            {/* 证据区：待提交的图 dataUrl 还在内存里，直接渲染缩略图，不需要回后端取 */}
+            <div className="rdm-case-field">
+              <div className="rdm-case-field-label">{t('rdm.acceptance.evidenceCaseField')}</div>
+              <div className="rdm-case-evidence-row">
+                {(c.evidences ?? []).map((ev, ei) => (
+                  <span key={ei} className="rdm-case-evidence-item">
+                    {ev.type.startsWith('image/') ? (
+                      <Image
+                        src={ev.dataUrl}
+                        width={56}
+                        height={56}
+                        alt={ev.name}
+                        style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #e8eaed' }}
+                      />
+                    ) : (
+                      <a href={ev.dataUrl} download={ev.name} style={{ fontSize: 12 }}>{ev.name}</a>
+                    )}
+                    <Tooltip title={t('common.delete')}>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        aria-label={`${t('common.delete')}：${ev.name}`}
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleRemoveEvidence(i, ei)}
+                      />
+                    </Tooltip>
+                  </span>
+                ))}
+                <Upload
+                  accept="image/*"
+                  showUploadList={false}
+                  beforeUpload={file => { void handleUploadEvidence(i, file); return false }}
+                >
+                  <Button
+                    size="small"
+                    icon={<PictureOutlined />}
+                    loading={uploadingCase === i}
+                    disabled={(c.evidences?.length ?? 0) >= MAX_CASE_EVIDENCES}
+                  >
+                    {t('rdm.acceptance.evidenceUpload')}
+                  </Button>
+                </Upload>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── 结论 ── */}
@@ -490,7 +572,7 @@ function RequirementAcceptanceForm() {
             options={RESULT_OPTIONS.map(o => ({
               value: o.value,
               label: resultDisabled[o.value] ? (
-                <Tooltip title={o.value === RDM_ACCEPT_RESULT.PASS ? '存在未通過用例' : '存在致命/嚴重缺陷，或沒有需要遺留的問題'}>
+                <Tooltip title={o.value === RDM_ACCEPT_RESULT.PASS ? '存在未通過的檢查項' : '存在致命/嚴重缺陷，或沒有需要遺留的問題'}>
                   {o.label}
                 </Tooltip>
               ) : o.label,
@@ -512,10 +594,20 @@ function RequirementAcceptanceForm() {
                 options={Object.entries(RDM_TEST_ENV_LABEL).map(([value, label]) => ({ value, label }))}
               />
             </span>
-            <span>
+            {/* inline-flex 锁同行：antd Rate 渲染为块级 ul，不包一层会把说明挤到下一行 */}
+            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>交付滿意度</span>
-              <Rate value={score} onChange={setScore} />
-              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6 }}>分（1=很不滿意）</span>
+              <Rate
+                value={score}
+                onChange={setScore}
+                tooltips={RDM_SCORE_TIERS.map(x => `${t(x.short)}：${t(x.desc)}`)}
+              />
+              {/* 每档口径常驻显示在星星右侧：光靠悬停的话，业务方打完分就忘了自己为什么选 3 分 */}
+              <span style={{ fontSize: 12, color: score ? '#E8720C' : '#8C8C8C', marginLeft: 10 }}>
+                {score
+                  ? `${score} 分 · ${t(RDM_SCORE_TIERS[score - 1].short)}：${t(RDM_SCORE_TIERS[score - 1].desc)}`
+                  : t('rdm.acceptance.scoreHintUnrated')}
+              </span>
             </span>
           </Space>
 
@@ -532,7 +624,7 @@ function RequirementAcceptanceForm() {
                 style={{ paddingLeft: 0, marginTop: 4 }}
                 onClick={() => setIssues(draftIssuesText(cases))}
               >
-                把 {stat.defects} 條未通過用例填入問題描述
+                把 {stat.defects} 條未通過的檢查項填入問題描述
               </Button>
             )}
           </div>
@@ -589,7 +681,7 @@ function RequirementAcceptanceForm() {
                 <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
                   {h.acceptTime ? dayjs(h.acceptTime).format('MM-DD HH:mm') : ''}
                   {h.testEnv ? ` · ${RDM_TEST_ENV_LABEL[h.testEnv as RdmTestEnv] ?? h.testEnv}` : ''}
-                  {h.caseTotal != null ? ` · 用例 ${h.casePass ?? 0}/${h.caseTotal}` : ''}
+                  {h.caseTotal != null ? ` · 檢查項 ${h.casePass ?? 0}/${h.caseTotal}` : ''}
                   {h.score != null ? ` · 滿意度 ${h.score}/5` : ''}
                 </span>
                 {(h.issues || h.opinion) && (
@@ -597,6 +689,53 @@ function RequirementAcceptanceForm() {
                 )}
                 {h.followUpReqNo && (
                   <div style={{ fontSize: 12, color: '#1890FF', marginTop: 2 }}>遺留事項已轉後續需求：{h.followUpReqNo}</div>
+                )}
+                {/* 用例明细默认折叠：返工链上的全部用例一次性展开会掉信息密度，
+                    而证据正文由 EvidenceThumb 按 index 懒取，展开也不会自动拉图 */}
+                {!!h.cases?.length && (
+                  <div style={{ marginTop: 4 }}>
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ paddingLeft: 0, fontSize: 12 }}
+                      onClick={() => setExpandedHistory(prev => ({ ...prev, [h.id]: !prev[h.id] }))}
+                    >
+                      {expandedHistory[h.id]
+                        ? t('rdm.acceptance.historyCaseCollapse')
+                        : t('rdm.acceptance.historyCaseToggle', { count: h.cases.length })}
+                    </Button>
+                    {expandedHistory[h.id] && (
+                      <div className="rdm-history-cases">
+                        {h.cases.map(cs => (
+                          <div key={cs.id} className="rdm-history-case">
+                            <span className="rdm-case-no">{cs.seq}</span>
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: '#262626' }}>{cs.title}</div>
+                              {cs.actual && (
+                                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                                  {t('rdm.acceptance.actualField')}：{cs.actual}
+                                </div>
+                              )}
+                              {!!cs.evidences?.length && (
+                                <div className="rdm-case-evidence-row" style={{ marginTop: 4 }}>
+                                  {cs.evidences.map(ev => (
+                                    <EvidenceThumb key={ev.index} reqId={id} caseId={cs.id} meta={ev} />
+                                  ))}
+                                </div>
+                              )}
+                            </span>
+                            <Tag
+                              color={cs.result === RDM_CASE_RESULT.PASS ? 'success' : cs.result === RDM_CASE_RESULT.FAIL ? 'error' : 'warning'}
+                              style={{ margin: 0, flexShrink: 0 }}
+                            >
+                              {/* 落库结论可能是历史枚举外的值，查不到时直显原文而不是报错 */}
+                              {RDM_CASE_RESULT_LABEL[cs.result as RdmCaseResult] ?? cs.result}
+                            </Tag>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </span>
             </div>

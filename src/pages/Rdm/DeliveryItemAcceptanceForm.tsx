@@ -16,6 +16,7 @@
  * 8. 结论门禁只认 pass —— 产品验收 conditional 不建立「产品验收通过」事实。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Alert, Button, DatePicker, Descriptions, Input, Modal, Radio, Rate,
   Select, Space, Spin, Table, Tag, message,
@@ -36,6 +37,7 @@ import {
   RDM_ACCEPT_STAGE, RDM_ACCEPT_STAGE_LABEL,
   RDM_ACCEPT_RESULT, RDM_ACCEPT_RESULT_LABEL, RDM_ACCEPT_RESULT_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL, RDM_DELIVERY_ITEM_STATUS_COLOR,
+  RDM_SCORE_TIERS,
   RDM_TEST_ENV_LABEL,
 } from '../../constants/rdm'
 import './index.css'
@@ -58,7 +60,17 @@ const CONCLUSION_OPTIONS = [
 
 const TEST_ENV_OPTIONS = Object.entries(RDM_TEST_ENV_LABEL).map(([value, label]) => ({ value, label }))
 
+/**
+ * 根据扩展名判定证据类型（仅用于展示与结构化存储，不作安全校验）。
+ * <p>验收人是业务/产品同学，界面不暴露 JSON：用户只贴链接，类型与包装结构由前端组装。
+ */
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i
+function evidenceTypeOf(url: string): 'screenshot' | 'link' {
+  return IMAGE_EXT_RE.test(url) ? 'screenshot' : 'link'
+}
+
 export default function DeliveryItemAcceptanceForm() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const deliveryItemId = Number(searchParams.get('deliveryItemId') ?? 0)
@@ -75,7 +87,8 @@ export default function DeliveryItemAcceptanceForm() {
   const [testEnv, setTestEnv] = useState<string | undefined>()
   const [buildId, setBuildId] = useState('')
   const [opinion, setOpinion] = useState('')
-  const [evidenceJson, setEvidenceJson] = useState('')
+  /** 验收证据：用户只贴链接，提交时由前端组装成后端要的 evidenceJson，不让业务方手写 JSON */
+  const [evidenceLinks, setEvidenceLinks] = useState<string[]>([''])
   const [conditions, setConditions] = useState<ConditionRow[]>([{ condition: '', deadline: '', owner: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -127,6 +140,13 @@ export default function DeliveryItemAcceptanceForm() {
     setConditions(prev => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
   }
 
+  const updateEvidenceLink = (index: number, value: string) => {
+    setEvidenceLinks(prev => prev.map((u, i) => (i === index ? value : u)))
+  }
+
+  /** 非空证据行（去首尾空白） */
+  const cleanEvidenceLinks = () => evidenceLinks.map(u => u.trim()).filter(Boolean)
+
   /** 提交前本地校验（不放宽后端门禁，只把「一定会被后端拒」的空值提前拦下） */
   const validate = (): string | null => {
     if (isBusiness && (score == null || score < 1 || score > 5)) {
@@ -137,9 +157,9 @@ export default function DeliveryItemAcceptanceForm() {
       if (valid.length === 0) return '有條件通過必須至少填寫一條整改條件（條件/期限/責任人齊全）'
       if (valid.length !== conditions.length) return '每條整改條件都必須含 條件/期限/責任人，請補全或刪除空行'
     }
-    if (evidenceJson.trim()) {
-      try { JSON.parse(evidenceJson.trim()) } catch { return '驗收證據必須是合法 JSON（截圖/記錄連結等）' }
-    }
+    // UX 校验（不是安全边界）：拦下明显不是链接的内容，避免存进去一条日后看不出是什么的证据
+    const badLink = cleanEvidenceLinks().find(u => !/^https?:\/\//i.test(u))
+    if (badLink) return t('rdm.acceptance.evidenceInvalidUrl', { value: badLink.slice(0, 30) })
     return null
   }
 
@@ -148,6 +168,7 @@ export default function DeliveryItemAcceptanceForm() {
     const err = validate()
     if (err) { message.warning(err); return }
     const cleanConditions = conditions.filter(c => c.condition.trim() && c.deadline.trim() && c.owner.trim())
+    const evidence = cleanEvidenceLinks()
     Modal.confirm({
       title: '確認提交交付項驗收結論？',
       className: 'custom-confirm-modal',
@@ -179,7 +200,8 @@ export default function DeliveryItemAcceptanceForm() {
             testEnv: testEnv || undefined,
             buildId: buildId.trim() || undefined,
             opinion: opinion.trim() || undefined,
-            evidenceJson: evidenceJson.trim() || undefined,
+            // 后端只存不解析，结构由前端统一组装：用户永不需要接触 JSON
+            evidenceJson: evidence.length ? JSON.stringify(evidence.map(url => ({ type: evidenceTypeOf(url), url }))) : undefined,
             // 业务验收必须评分；产品评分可选（仅在有值时回传）
             score: isBusiness ? score : (score ?? undefined),
             conditionsJson: needStructuredConditions ? JSON.stringify(cleanConditions) : undefined,
@@ -329,13 +351,28 @@ export default function DeliveryItemAcceptanceForm() {
             <span>
               <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>構建標識</span>
               <Input style={{ width: 200 }} value={buildId} maxLength={120} placeholder="選填，例：build-a-1" onChange={e => setBuildId(e.target.value)} />
+              <HelpPopover
+                title={t('rdm.acceptance.buildIdHelpTitle')}
+                ariaLabel="構建標識說明"
+                content={t('rdm.acceptance.buildIdHelpBody')}
+              />
             </span>
-            <span>
+            {/* inline-flex 锁同行：antd Rate 渲染为块级 ul，不包一层会把说明挤到下一行 */}
+            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>
                 交付滿意度{isBusiness ? '（業務驗收必填）' : '（選填）'}
               </span>
-              <Rate value={score} onChange={setScore} />
-              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6 }}>分（1=很不滿意）</span>
+              <Rate
+                value={score}
+                onChange={setScore}
+                tooltips={RDM_SCORE_TIERS.map(x => `${t(x.short)}：${t(x.desc)}`)}
+              />
+              {/* 与需求验收同口径：每档含义常驻在星星右侧，不只悬停才有 */}
+              <span style={{ fontSize: 12, color: score ? '#E8720C' : '#8C8C8C', marginLeft: 10 }}>
+                {score
+                  ? `${score} 分 · ${t(RDM_SCORE_TIERS[score - 1].short)}：${t(RDM_SCORE_TIERS[score - 1].desc)}`
+                  : t('rdm.acceptance.scoreHintUnrated')}
+              </span>
             </span>
           </Space>
 
@@ -380,11 +417,49 @@ export default function DeliveryItemAcceptanceForm() {
             <TextArea rows={2} value={opinion} onChange={e => setOpinion(e.target.value)} placeholder="例：功能符合交付項範圍，業務側確認可用。" />
           </div>
 
+          {/* 证据录入：用户只贴链接，JSON 结构由前端组装——业务/产品验收人不应被要求懂技术格式 */}
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
-              驗收證據 JSON（選填，截圖/記錄連結等，必須是合法 JSON）
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: '#595959' }}>{t('rdm.acceptance.evidenceField')}</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6 }}>{t('rdm.acceptance.evidenceHint')}</span>
+              <HelpPopover
+                title={t('rdm.acceptance.evidenceHelpTitle')}
+                ariaLabel="驗收證據填寫說明"
+                width={400}
+                content={[
+                  { tone: 'info', label: t('rdm.acceptance.evidenceHelpWhatLabel'), body: t('rdm.acceptance.evidenceHelpWhatBody') },
+                  { tone: 'neutral', label: t('rdm.acceptance.evidenceHelpHowLabel'), body: t('rdm.acceptance.evidenceHelpHowBody') },
+                ]}
+              />
             </div>
-            <TextArea rows={3} value={evidenceJson} onChange={e => setEvidenceJson(e.target.value)} placeholder='例：[{"type":"screenshot","url":"..."}]' />
+            {evidenceLinks.map((url, i) => (
+              <div key={i} className="rdm-evidence-row">
+                <Input
+                  style={{ flex: 1 }}
+                  value={url}
+                  maxLength={500}
+                  placeholder={i === 0 ? t('rdm.acceptance.evidenceFirstPlaceholder') : t('rdm.acceptance.evidenceMorePlaceholder')}
+                  onChange={e => updateEvidenceLink(i, e.target.value)}
+                />
+                {!!url.trim() && (
+                  <Tag color={evidenceTypeOf(url) === 'screenshot' ? 'blue' : 'default'} style={{ margin: 0, flexShrink: 0 }}>
+                    {evidenceTypeOf(url) === 'screenshot' ? t('rdm.acceptance.evidenceTypeScreenshot') : t('rdm.acceptance.evidenceTypeLink')}
+                  </Tag>
+                )}
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  disabled={evidenceLinks.length === 1}
+                  onClick={() => setEvidenceLinks(prev => prev.filter((_, idx) => idx !== i))}
+                >
+                  {t('common.delete')}
+                </Button>
+              </div>
+            ))}
+            <Button type="link" size="small" icon={<PlusOutlined />} style={{ paddingLeft: 0 }} onClick={() => setEvidenceLinks(prev => [...prev, ''])}>
+              {t('rdm.acceptance.evidenceAdd')}
+            </Button>
           </div>
         </Space>
       </div>

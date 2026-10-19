@@ -2140,6 +2140,74 @@
       "comment": "只 ADD 新表、不改任何现有表，CREATE TABLE IF NOT EXISTS 可安全重放；uk_rrm_user(user_id) 保证一人一条，status(1纳入/0移出) 管理名册而非物理删；与 v3.8 rdm_task_plan_log（任务排期审计）无语义交集。后置校验 requireTables(rdm_resource_member)，缺则不记版本。253 脚本仅作参照文档，不进镜像。回滚=回退代码，表留着无害（无服务读写时不影响存量查询）。"
     },
     {
+      "versionKey": "rdm:schema:v3.10",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.9"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "256_rdm_resource_plan.sql"
+      ],
+      "intent": "团队负载（阶段 B-2.5）：新增 rdm_resource_plan 个人工作计划表 + rdm_resource_plan_log 计划调整审计表，为产品/测试等无个人工时来源提供跨来源工时/剩余工时载体",
+      "author": "Qoder",
+      "comment": "只 ADD 两张新表、不改任何现有表，CREATE TABLE IF NOT EXISTS 可安全重放；work_task_id UNIQUE 防一份任务被重复计时（与 rdm_work_task 不双真值，计划仅补 remaining_hours）；plan_hours/remaining_hours CHECK 非负；rdm_resource_plan_log 只追加不存敏感正文。与 v3.8 rdm_task_plan_log（甘特排期日期审计）语义不同不重叠。后置校验 requireTables(两表)，缺则不记版本。256 脚本仅作参照文档，不进镜像。回滚=回退代码，空表留着无害。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.11",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.10"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "257_rdm_task_type_config.sql"
+      ],
+      "intent": "任务类型字典化：新增 rdm_task_type_config 表（code/label/color/category/enabled/sort_order + company_id 预留）与六条内置种子，任务类型下拉/图例/写校验/负载聚合四件事同源",
+      "author": "Qoder",
+      "comment": "只 ADD 新表、不改任何现有表，classpath 脚本 257_rdm_task_type_config.sql 只含 CREATE TABLE IF NOT EXISTS + INSERT IGNORE 可安全重放；uk_rdm_task_type_code 保证 code 永续唯一，不提供物理删除仅停用（保护 rdm_work_task.task_type 历史引用）。category 三值 design/qa/dev 显式化聚合口径：RdmResourceServiceImpl 分桶、RdmDeliveryServiceImpl 角色推断与写校验白名单全部改查字典，未知 code 兜底归 dev 桶；新类型（android/ios）配 dev 即入研发桶，零迁移。company_id 预留多租户，本期 NULL=全局。后置校验六条种子齐备，缺则不记版本。回滚=回退代码，表留着无害（服务层查不到表时写校验 fail-closed）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.12",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.11"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "258_rdm_task_type_builtin_seeds.sql"
+      ],
+      "intent": "任务类型字典内置扩充：新增 14 个岗位类型（移动端细分 android/ios/harmony/mini_program/h5、全栈/算法/运维/SRE/安全、自动化与性能测试、交互与视觉设计），并按岗位族重排既有六类 sort_order",
+      "author": "Qoder",
+      "comment": "用户反馈「APP 只一档不够用，不同公司研发细分不同」，故按市面工程师岗位与本项目客户端矩阵（设备类型 iOS/安卓/鸿蒙，展示端口 APP/小程序/支付宝H5/Mpay/H5工银）补内置范本。数据全部走字典表行，不改任何代码口径：category 将移动端/平台/全栈归 dev 桶、自动化与性能测试归 qa 桶、交互与视觉归 design 桶，负载与工时统计自动正确。启用策略：移动端五项 + devops + ai_algo 默认启用，其余 7 项默认停用（避免下拉过长，可在「任務類型」页一键启用）；既有 app 保留启用作为跨端/未定端场景。脚本只含 INSERT IGNORE + 条件 UPDATE sort_order，可重放；不改六类 code/label/color，存量任务零影响。后置校验 14 个内置类型齐备且移动端五项已启用，缺则不记版本。258 脚本仅作权威 classpath 副本，backend/sql 下为参考文档。回滚=回退代码；字典行留着无害（可停用）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.13",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.12"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "259_rdm_acceptance_case_evidence.sql"
+      ],
+      "intent": "验收用例补证据附件列 evidence_json（MEDIUMTEXT），支撑业务验收在用例级上传截图/记录证据",
+      "author": "Qoder",
+      "comment": "用户反馈验收只能打字、无法附截图证据。存储沿用 205 口径（Base64 Data URL 存 MEDIUMTEXT，服务端不落盘），上传复用 /rdm/file/upload 既有的 5MB 上限 + 图片 magic bytes + 扩展名白名单与 rdm-acceptance 权限锚点，不新增上传面。ADD COLUMN 不可重放，故 columnExists 先查再加、失败不吞异常；后置校验列就绪，缺列不记版本。关键口径：验收历史接口的用例明细只回元信息（name/type/size）不回 dataUrl 正文，正文走 GET /rdm/acceptance/case/{caseId}/evidence/{index} 单张按需取并带同款读鉴权——返工数轮 × 十余条用例 × 数张图会把列表请求撑到几十 MB，且该接口此前前端一行都不显示。列可空：存量用例无附件为合法事实，不回填。259 脚本仅作参照文档，不进镜像。回滚=回退代码，列留着无害（服务层不读不写）。"
+    },
+    {
       "versionKey": "core:ai-settings-v1",
       "module": "core",
       "phase": "BASE_STRUCTURE",
@@ -2172,6 +2240,108 @@
       "intent": "产研交付个人工作台布局持久化：sys_user.workbench_layout TEXT 列，存储区块显隐与排序偏好，替代原先仅存 localStorage 导致刷新/换设备丢失",
       "author": "Qoder",
       "comment": "与 ai_settings 同一模式：SysUser 实体已带该字段，MyBatis-Plus 显式列清单会 SELECT 它，缺列让全部用户查询报错。addColumnIfAbsent 幂等 + 后置校验 columnExists，缺列不记版本下次重试。255 脚本仅作参照文档。回滚=回退代码，列留着无害。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.14",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.13"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "260_rdm_project_updated_by.sql"
+      ],
+      "intent": "rdm_project 补 updated_by 列（最后更新人姓名快照），支撑项目总览列表显示「最後更新人」",
+      "author": "Qoder",
+      "comment": "用户要求项目总览列表新增最后更新人列，而该表过去只有 updated_at——看得到何时改、看不到谁改。列可空且不回填存量：历史行谁改的已是未知事实，编一个更新人比留空更糟。关键口径：项目 MetaObjectHandler 只按名字填 createdAt/updatedAt，updated_by 不会被自动填充，必须由 RdmProjectService 在 createProject/updateProject 显式赋值（同 hr_leave_request 等既有写法）。ADD COLUMN 不可重放，故 columnExists 先查再加、失败不吞异常；后置校验列就绪，缺列不记版本——缺列会让 MyBatis-Plus 显式列清单的 SELECT 直接报错，整块项目列表挂掉。260 脚本仅作参照文档，不进镜像。回滚=回退代码，列留着无害（服务层不读不写）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.15",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.14"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "261_rdm_iteration_project.sql"
+      ],
+      "intent": "rdm_iteration 补 project_id 列 + idx_rdm_iteration_project 索引，建立「项目 1─N 迭代」归属链（sprint/version 必挂，hotfix 可空）",
+      "author": "Qoder",
+      "comment": "RDM 归属体系改造切片一：对齐 Jira Sprint/Version 归属项目的业界做法，把全局迭代改为项目维度迭代，需求按项目统计才能回答「这个项目上了哪些迭代」。列可空且不回填存量：存量迭代无法自动判定归属（编码里没有项目信息），由管理员在迭代排期列表逐个补挂，未挂行前端显示「未掛項目」警示 Tag。口径：sprint/version 必须挂项目，hotfix 允许不挂（跨项目线上事故的平台级热修，管理员已裁决）。ADD COLUMN 与 CREATE INDEX 均不可重放，故 columnExists/indexExists 先查再加、失败不吞异常；后置校验列与索引就绪，缺失不记版本——缺列会让 MyBatis-Plus 显式列清单的 SELECT 直接报错，整块迭代列表挂掉。261 脚本仅作参照文档，不进镜像。回滚=回退代码，列与索引留着无害（服务层不读不写）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.16",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.15"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "262_rdm_daily_report.sql"
+      ],
+      "intent": "新建日报三表 rdm_daily_report / rdm_daily_report_config / rdm_daily_report_template，支撑每日晨晚报钉钉推送（项目→迭代→需求层级快照 + 可配推送时间/模板/接收范围 + 手动触发），同批把项目编号规则改为 PROJ+YYYYMMDD+2位日流水",
+      "author": "Qoder",
+      "comment": "用户要求每日定时把产研交付进度同步到钉钉群并定向推送给项目经理/产品负责人，且推送模板、推送时间需页面可配、支持手动触发。三表分工：rdm_daily_report 存当日权威快照（通知与移动端详情页同源，杜绝「通知数字≠打开页面数字」），rdm_daily_report_config 存推送时间/开关/接收范围/选用模板（作业改为每分钟 tick + 命中 HH:mm 判定，改时间即时生效无需重启，避开动态注册 cron 的复杂性），rdm_daily_report_template 存推送模板。快照表关键口径：report_type 只有 morning/evening 两档，唯一键 (report_date, report_type) 即「每天每档一行」，既是多实例并发 tick 与重启补跑的幂等兜底，也是详情页按日期取数的唯一口径；手动触发刻意不新增行，语义是「补发当日该档」（快照已存在则复用重推，不存在才生成），触发方式与人记在 last_trigger_type/last_trigger_by/push_count——否则 manual 行会撞唯一键，或让详情页出现同一天多份互相矛盾的口径。配置表用 config_slot 恒为 default + 唯一键做「全表只一行」的数据库级约束，避免多行造成口径分裂（作业不知该读哪行）。模板定义的单一真相源在 RdmDailyReportTemplates（迁移种子与运行期渲染兜底共用，不在两处重写文案而漂移）；渲染只做占位符字符串替换，不引入模板引擎、不 eval，项目→迭代→需求层级循环由服务端渲染成片段填入 projectBlock，因此模板再复杂也不产生注入面；未知占位符保留原样并记日志（静默替空会让用户误以为模板生效）。种子用 INSERT IGNORE 而非 UPSERT：同 key 已存在不覆盖，否则管理员在配置页微调过的模板文案与改过的推送时间会在每次重启被默认值抹除。预置模板 is_preset=1 不可删只可停用，保证「一键恢复默认」永远有底。同批改项目编号规则：sys_biz_seq_rule.rdm_project 由 PJ+YYYYMMDD+4位 改为 PROJ+YYYYMMDD+2位日流水（如 PROJ2026101901，每日从 01 起、超 99 自然扩位），发号代码零改动——BizSeqService 规则驱动，按 (prefix, 日期段) 行锁自增且每日从 seq_start 重置，改 prefix 后当日流水自然从 01 起；该规则行即「平台支撐系統 > 規則配置 > 編號生成規則」菜单数据源，改完即在该页可见可追溯。存量 PJ 编号刻意不改写：历史号已被钉钉通知、审批快照、已发链接引用，改写会造成追溯断链，project_no 唯一键下新旧前缀可共存。本版本不含 rdm_iteration.project_id（已由 v3.15 交付）也不做存量迭代回填（尊重 v3.15 已有裁决：编码里没有项目信息无法自动判定归属，由管理员在迭代排期逐个补挂）。后置校验把种子当硬条件：三表就绪 + 预置模板齐 7 行 + 配置单行存在 + 规则 prefix 已为 PROJ，任一不满足则不记版本、写失败审计、下次启动重试。不吞异常（历史事故：吞异常导致迁移记成功但生产缺表）。262 脚本仅作参照文档，不进镜像。回滚：页面总开关 enabled=0 或 yml rdm.daily-report.enabled=false 即停止出站；三表保留无害（旧代码不读不写）；编号规则行 UPDATE 可逆（回退 prefix/seq_length 即恢复 PJ 发号，已发出的 PROJ 号作为既成事实保留）。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.17",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.16"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "263_rdm_status_stage_nine.sql"
+      ],
+      "intent": "阶段真值同源：rdm_status_def.stage 由旧 6 段（product/delivery/acceptance）细化为 9 段（新增 design/review/dev/test/uat/release），与前端 RDM_STATUS_STAGE 一字对齐",
+      "author": "Qoder",
+      "comment": "用户反馈原 6 段里「研發測試」一段吞了 6 个状态，PM 分不清是研发没动还是测试卡住；详情页状态条与需求看板列已改 9 段，但本表 stage 仍是旧值，导致看板「各階段平均停留」按旧口径聚合、需求配置页显示旧阶段名，同一需求两处说法分裂。本迁移收口。UPDATE 按 code 精确定位（code 有 uk_rdm_status_code 唯一键）且 WHERE 带旧 stage 值，天然幂等、重跑不产生二次变更，也不覆盖管理员在「需求配置」页自定义过的阶段。只 UPDATE stage 一列，不动 code/label/sort_order/final_flag/status，无破坏性操作。后置校验三件事：无 9 值域之外的残留、dev 段与 test 段确实各有行（分开研发与测试正是本次目的，只改标签不落数据不算成功）。校验不过不记版本、下次启动重试。263 脚本仅作参照文档，不进镜像。回滚=按 263 反向 UPDATE 回旧值（旧值仍可从本条 comment 与 git 历史推出），或回退代码让前端退回 6 段常量。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.18",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.17"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "264_rdm_daily_report_trigger_columns.sql"
+      ],
+      "intent": "rdm_daily_report 触发列改名：last_trigger_type/last_trigger_by → trigger_type/trigger_by，收敛开发库与生产库的 schema 分叉",
+      "author": "Qoder",
+      "comment": "v3.16 首版建表时把触发列命名为 last_trigger_type/last_trigger_by，而方案冻结的列名是 trigger_type/trigger_by。共享开发库已跑过旧 v3.16（列为旧名），而生产首次部署会按修正后的 v3.16 定义直接建出新名——同一份代码在两边读写不同列，这类开发/生产 schema 分叉排查成本极高，必须同批收敛。手段是条件式 CHANGE COLUMN（非 DROP+ADD）：迁移规范禁止生产环境 DROP COLUMN，且 CHANGE 保留列上已有数据属非破坏性改名；本表是 v3.16 刚建的新表且改名时 0 行业务数据，不影响任何存量事实。可重放性由两个 columnExists 判定保证：新列已存在则跳过（新库与已收敛库），仅当旧列存在才执行 CHANGE，因此对新库是空操作。不吞异常：改名失败会让服务层读写不存在的列（Unknown column）使整块日报链路挂掉，必须抛出并不记版本、下次启动重试。后置校验同时要求「新列就绪」与「旧列已消失」：只校新列会放过「新旧列共存」的分叉态。同步修正了 v3.16 的 CREATE TABLE 定义与 262 参照文档，使新库一次建到位；本版本只负责把已建库拉齐。另同批把 report_type 口径明确为 morning/evening/manual 三值：定时只写 morning/evening（受唯一键幂等保护），手动触发写 manual（不被定时幂等拦住，补发本就是合法语义），两者各自一行且通知链接指向自己那一行，不会造成同一天两份互相矛盾的口径。264 脚本仅作参照文档，不进镜像。回滚=回退代码；列名已收敛后无需反向迁移，且旧代码不读这些列。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.19",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.18"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "265_rdm_daily_report_rules.sql"
+      ],
+      "intent": "日报改为多规则 + 按项目/迭代范围模型：新建 rdm_daily_report_rule（可建多条：项目+可选迭代+推送时间+内容档位+模板），快照表补 scope_key/rule_id/project_id/iteration_code 并把全局唯一键换成 (report_date, report_type, scope_key)",
+      "author": "Qoder",
+      "comment": "用户反馈单条全局配置无法表达真实用法：A 產品盯 A 項目下的 B1 迭代、B 產品盯 B 項目下的 C1 迭代、W 項目經理盯整個 W 項目——目标、时间、模板都按项目/迭代不同，需可新增多条推送规则。因此拆成「全局开关（原 config 单行表：总开关/群报/个人/各档默认模板）+ 多条规则（新表 rdm_daily_report_rule）」。关键结构决策：旧唯一键 (report_date, report_type) 是全局的，多条规则同一天同一档会直接报 Duplicate entry——这不是可选优化而是硬阻碍，必须换成 (report_date, report_type, scope_key)；scope_key 规则推送写 rule:{id}、手动触发写 manual:{projectId}:{iterationCode}，使「同一天多份不同范围的口径」各自一行、互不覆盖，幂等仍由唯一键兑底。存量行回填 scope_key=CONCAT('legacy:', id) 后旧行不会互撞；该表建表至今无生产数据（功能尚未上线），换键不丢任何业务事实，DROP INDEX 只改元数据不删行不删列（迁移规范禁的是 DROP TABLE/DROP COLUMN/TRUNCATE）。新增列均 columnExists 先查再加、索引均 indexExists 判定、建表用 IF NOT EXISTS，因此可安全重放。不吞异常：规则表缺失或唯一键没换成会让多规则模型整个不可用，必须抛出并不记版本、下次启动重试。后置校验同时要求「新唯一键存在」与「旧唯一键已移除」：只校新键会放过「旧键仍拦住第二条规则」的静默故障。265 脚本仅作参照文档，不进镜像。回滚=回退代码；规则表与新增列留着无害（旧代码不读），但旧唯一键已删——若要完全回退需重建旧索引，故上线前应确认多规则模型符合预期。"
     }
   ]
 }

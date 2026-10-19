@@ -3,6 +3,7 @@ package com.mftb.admin.config;
 import com.mftb.admin.config.migration.MigrationLock;
 import com.mftb.admin.config.migration.RdmBatch34Schema;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.constant.RdmDailyReportTemplates;
 import com.mftb.admin.util.BizSeqService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -207,6 +208,201 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      * <p>参考文档：{@code backend/sql/253_rdm_resource_member.sql}。
      */
     private static final String VERSION_RESOURCE_MEMBER = "rdm:schema:v3.9";
+
+    /**
+     * 团队负载（阶段 B-2.5）：新增 rdm_resource_plan 个人工作计划表 + rdm_resource_plan_log 计划调整审计表。
+     * <p>为产品需求/测试批次等「只有件数无个人工时」的来源提供跨来源工时/剩余工时载体，减少 data_incomplete；
+     * 只 ADD 两张新表、不改任何现有表，work_task_id UNIQUE 避免与 rdm_work_task 双真值，与 v3.8 排期审计无交集。
+     * <p>参考文档：{@code backend/sql/256_rdm_resource_plan.sql}。
+     */
+    private static final String VERSION_RESOURCE_PLAN = "rdm:schema:v3.10";
+
+    /**
+     * v3.11：任务类型字典表 rdm_task_type_config（业务可配置）+ 六条内置种子。
+     * <p>任务类型下拉选项/图例色/聚合桶/写校验四件事同源：新增类型（如 android/ios）
+     * 只配本表即可，category 三值 design/qa/dev 决定负载统计与工时归集口径。
+     * <p>权威脚本：classpath {@code 257_rdm_task_type_config.sql}（参考副本 backend/sql 同名），
+     * CREATE TABLE IF NOT EXISTS + INSERT IGNORE 可安全重放。
+     */
+    private static final String VERSION_TASK_TYPE_DICT = "rdm:schema:v3.11";
+    private static final String TASK_TYPE_DICT_SCRIPT = "257_rdm_task_type_config.sql";
+
+    /**
+     * v3.12：任务类型字典内置扩充（14 类）+ 按岗位族重排既有六类排序。
+     * <p>APP 单档不够用：按市面工程师岗位与本项目客户端矩阵（iOS/安卓/鸿蒙、
+     * APP/小程序/H5/Mpay）补齐移动端细分与 DevOps/SRE/安全/算法/自动化测试/UX 等内置范本。
+     * <p>移动端/平台/全栈一律 dev 桶，自动化与性能测试归 qa 桶，交互与视觉归 design 桶，
+     * 所以负载与工时统计无需改代码就能拿对口径。除移动端细分与运维/算法外默认停用，
+     * 避免下拉过长；按需时在「任務類型」页一键启用。
+     * <p>权威脚本：classpath {@code 258_rdm_task_type_builtin_seeds.sql}（参考副本 backend/sql 同名）。
+     */
+    private static final String VERSION_TASK_TYPE_SEEDS = "rdm:schema:v3.12";
+    private static final String TASK_TYPE_SEEDS_SCRIPT = "258_rdm_task_type_builtin_seeds.sql";
+    /** 本次内置扩充的类型数（后置校验钉住，少一个都不记版本） */
+    private static final int MIN_TASK_TYPE_BUILTIN_SEEDS = 14;
+
+    /**
+     * v3.13：验收用例补证据附件列。
+     * <p>业务验收过去只能打字、无法附截图：证据沿用 205 的 Base64 Data URL 存 MEDIUMTEXT 口径，
+     * 服务端不落盘。正文不随验收历史下发（返工数轮 × 十余条用例 × 数张图会把列表请求撑爆），
+     * 改由按需单张取图端点下发，所以结构上只需一列。
+     */
+    private static final String VERSION_ACCEPTANCE_EVIDENCE = "rdm:schema:v3.13";
+    /** {表, 列, DDL}：ADD COLUMN 不可重跑（必撞 duplicate column），先查再加 */
+    private static final String[] ACCEPTANCE_EVIDENCE_COLUMN = {
+            "rdm_acceptance_case", "evidence_json",
+            "ALTER TABLE rdm_acceptance_case ADD COLUMN evidence_json MEDIUMTEXT DEFAULT NULL COMMENT '驗收證據附件JSON: [{name,type,size,dataUrl}]，列表僅回元信息，正文按需單張取'",
+    };
+
+    /**
+     * v3.14：项目主表补「最后更新人」列。
+     * <p>项目总览列表要显示是谁最后改的：过去只有 updated_at，看得到何时改、看不到谁改，
+     * 追责与交接都断在这一步。全项目已有 updated_by 惯例（sys_user / eam_model /
+     * rdm_task_type_config 等），本列同构、可空且不回填存量（历史行谁改的已是未知事实，
+     * 编一个更新人比留空更糟）。
+     * <p>注意：项目的 MetaObjectHandler 只按名字填 createdAt / updatedAt，updated_by 不会
+     * 被自动填充，必须由 RdmProjectService 在 createProject / updateProject 显式赋值。
+     */
+    private static final String VERSION_PROJECT_UPDATED_BY = "rdm:schema:v3.14";
+    /** {表, 列, DDL}：ADD COLUMN 不可重放（必撞 duplicate column），先查再加 */
+    private static final String[] PROJECT_UPDATED_BY_COLUMN = {
+            "rdm_project", "updated_by",
+            "ALTER TABLE rdm_project ADD COLUMN updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人姓名快照' AFTER updated_at",
+    };
+
+    /**
+     * v3.15：迭代表补「所属项目」列（归属体系改造切片一）。
+     * <p>对齐 Jira Sprint/Version 归属项目的业界做法：改造前迭代是全局的，
+     * 需求按项目统计无法回答「这个项目上了哪些迭代」。口径：sprint / version 必须挂项目，
+     * hotfix（紧急修复）允许不挂（跨项目线上事故的平台级热修，管理员已裁决）。
+     * <p>可空且不回填存量：存量迭代无法自动判定归属（编码里没有项目信息），
+     * 由管理员在迭代排期列表逐个补挂，未挂行前端显示「未掛項目」警示 Tag。
+     */
+    private static final String VERSION_ITERATION_PROJECT = "rdm:schema:v3.15";
+    /** {表, 列, DDL}：ADD COLUMN 不可重放（必撞 duplicate column），先查再加 */
+    private static final String[] ITERATION_PROJECT_COLUMN = {
+            "rdm_iteration", "project_id",
+            "ALTER TABLE rdm_iteration ADD COLUMN project_id BIGINT DEFAULT NULL COMMENT '所属项目ID（sprint/version必填，hotfix可空）' AFTER name",
+    };
+    /** 项目维度检索索引：按项目统计迭代/需求时的扫描路径 */
+    private static final String ITERATION_PROJECT_INDEX = "idx_rdm_iteration_project";
+
+    /**
+     * v3.16：每日钉钉日报三表（快照 / 推送配置 / 推送模板）+ 项目编号规则改 PROJ。
+     * <p>产研交付需要每日定时把「项目 → 迭代 → 需求」进度同步到钉钉群，并定向推送给
+     * 项目经理/产品负责人。三表各管一件事：快照（通知与详情页同源）、配置（时间/开关/接收范围/
+     * 选用模板，页面可配改后即时生效）、模板（预置 7 套，定义单一真相源在
+     * {@link com.mftb.admin.constant.RdmDailyReportTemplates}，迁移与渲染共用）。
+     * <p>快照表唯一键 {@code (report_date, report_type)} 即「每天每档一行」，既是多实例并发 tick /
+     * 重启补跑的幂等兜底，也是详情页按日期取数的唯一口径；<b>手动触发不新增行</b>，语义是
+     * 「补发当日该档」，触发方式与人记在 last_trigger_* 与 push_count，避免同一天出现多份互相矛盾的口径。
+     * <p>同批改项目编号规则（{@code sys_biz_seq_rule.rdm_project}）：PJ+YYYYMMDD+4 位 →
+     * PROJ+YYYYMMDD+2 位日流水。发号代码零改动（{@code BizSeqService} 规则驱动，按 prefix+日期段
+     * 行锁自增、每日从 seq_start 重置）；<b>存量 PJ 号不改写</b>——历史号已被钉钉通知、审批快照、
+     * 已发链接引用，改写会造成追溯断链，唯一键下新旧前缀可共存。
+     */
+    private static final String VERSION_DAILY_REPORT = "rdm:schema:v3.16";
+    /** v3.16 新建三表（CREATE TABLE IF NOT EXISTS 可安全重放） */
+    private static final String[] DAILY_REPORT_TABLES = {
+            "rdm_daily_report", "rdm_daily_report_config", "rdm_daily_report_template",
+    };
+
+    /**
+     * v3.18：日报快照表的触发列改名（last_trigger_type/last_trigger_by → trigger_type/trigger_by）。
+     * <p><b>为何需要这一版</b>：v3.16 首版建表用了 {@code last_trigger_*} 命名，而方案冻结的列名是
+     * {@code trigger_type} / {@code trigger_by}。已跑过旧 v3.16 的库（共享开发库）列名与新定义不一致，
+     * 不收敛就会出现「开发库与生产库 schema 分叉」——新库走 v3.16 建出新名、旧库停在旧名，
+     * 同一份代码在两边读写不同列，这类分叉排查成本极高。
+     * <p><b>用 CHANGE COLUMN 而不是 DROP+ADD</b>：迁移规范禁止生产环境 DROP COLUMN，
+     * 且 CHANGE 保留列上已有数据（非破坏性）。本表是 v3.16 刚建的新表，改名不影响任何存量业务事实。
+     * <p><b>条件执行</b>：仅当旧列存在时才 CHANGE，因此新库（直接建成新名）与已收敛的库重跑都安全。
+     */
+    private static final String VERSION_DAILY_REPORT_TRIGGER_COLUMNS = "rdm:schema:v3.18";
+    /** {表, 旧列, 新列, 完整 CHANGE DDL}：CHANGE COLUMN 不可重放（旧列不存在即报错），先查再改 */
+    private static final String[][] DAILY_REPORT_TRIGGER_RENAMES = {
+            {"rdm_daily_report", "last_trigger_type", "trigger_type",
+                    "ALTER TABLE rdm_daily_report CHANGE COLUMN last_trigger_type trigger_type VARCHAR(16) "
+                            + "DEFAULT NULL COMMENT '最近一次触发方式: schedule/manual'"},
+            {"rdm_daily_report", "last_trigger_by", "trigger_by",
+                    "ALTER TABLE rdm_daily_report CHANGE COLUMN last_trigger_by trigger_by VARCHAR(64) "
+                            + "DEFAULT NULL COMMENT '最近一次手动触发人姓名快照（定时为 NULL）'"},
+    };
+
+    /**
+     * v3.19：日报改为「多规则 + 按项目/迭代范围」模型。
+     *
+     * <p><b>为何要改模型</b>：原设计是全局单条配置（每天两档、覆盖全部在途项目），但实际使用是
+     * 「A 產品盯 A 項目下的 B1 迭代、B 產品盯 B 項目下的 C1 迭代、W 項目經理盯整個 W 項目」——
+     * 目标、时间、模板都按项目/迭代不同，单条配置无法表达。因此：
+     * <ol>
+     *   <li>新增 {@code rdm_daily_report_rule}：一条规则 = （项目 + 可选迭代 + 推送时间 + 内容档位 + 模板），
+     *       可建多条；全局开关（总开关/群报/个人）仍留在原来的单行 config 表作总闸。</li>
+     *   <li>快照表补 {@code scope_key} 并换唯一键：原来 {@code (report_date, report_type)} 全局唯一，
+     *       多条规则同一天同一档会互相覆盖；改为 {@code (report_date, report_type, scope_key)}，
+     *       规则推送用 {@code rule:{id}}、手动触发用 {@code manual:{projectId}:{iterationCode}}，
+     *       于是「同一天多份不同范围的口径」各自一行、互不覆盖，幂等仍由唯一键兑底。</li>
+     * </ol>
+     *
+     * <p><b>为何要 DROP 旧唯一索引</b>：旧键会挡住第二条规则的同一日期同一档写入（直接报
+     * Duplicate entry），这是必须移除的硬阻碍，不是可选优化。该表建表至今无生产数据（功能尚未上线），
+     * 换键不丢任何业务事实；DROP INDEX 只改元数据，不删行、不删列。
+     */
+    private static final String VERSION_DAILY_REPORT_RULES = "rdm:schema:v3.19";
+    /** v3.19 新建规则表 */
+    private static final String DAILY_REPORT_RULE_TABLE = "rdm_daily_report_rule";
+    /** v3.19 快照表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] DAILY_REPORT_SCOPE_COLUMNS = {
+            {"rdm_daily_report", "scope_key",
+                    "ALTER TABLE rdm_daily_report ADD COLUMN scope_key VARCHAR(64) NOT NULL DEFAULT '' "
+                            + "COMMENT '范围键：规则=rule:{id}，手动=manual:{projectId}:{iterationCode}；唯一键用它区分同日多份' "
+                            + "AFTER trigger_by"},
+            {"rdm_daily_report", "rule_id",
+                    "ALTER TABLE rdm_daily_report ADD COLUMN rule_id BIGINT DEFAULT NULL "
+                            + "COMMENT '推送规则ID（手动触发为 NULL）' AFTER scope_key"},
+            {"rdm_daily_report", "project_id",
+                    "ALTER TABLE rdm_daily_report ADD COLUMN project_id BIGINT DEFAULT NULL "
+                            + "COMMENT '快照目标项目ID' AFTER rule_id"},
+            {"rdm_daily_report", "iteration_code",
+                    "ALTER TABLE rdm_daily_report ADD COLUMN iteration_code VARCHAR(32) DEFAULT NULL "
+                            + "COMMENT '快照目标迭代编码（NULL=项目全部迭代）' AFTER project_id"},
+    };
+    /** 旧的全局唯一索引（会挡住同日多规则），需条件性移除 */
+    private static final String DAILY_REPORT_OLD_UNIQUE = "uk_rdm_daily_report";
+    /** 新的范围化唯一索引：同一天 + 同一档 + 同一范围只一行 */
+    private static final String DAILY_REPORT_NEW_UNIQUE = "uk_rdm_daily_report_scope";
+
+    /**
+     * v3.17：rdm_status_def.stage 由旧 6 段细化为 9 段，与前端 RDM_STATUS_STAGE 同源。
+     * <p>详情页状态条与需求看板列已改 9 段，但本表仍是旧值，导致看板「各階段平均停留」
+     * 按旧口径聚合、需求配置页显示旧阶段名 —— 同一需求两处说法分裂，本迁移收口。
+     */
+    private static final String VERSION_STATUS_STAGE_NINE = "rdm:schema:v3.17";
+    /**
+     * {状态码, 旧 stage, 新 stage}：与 src/constants/rdm.ts 的 RDM_STATUS_STAGE 一字对齐。
+     * <p>UPDATE 按 code 定位并带旧值条件：既天然幂等（重跑不产生二次变更），
+     * 也不覆盖管理员在「需求配置」页自定义过的阶段。
+     */
+    private static final String[][] STATUS_STAGE_UPDATES = {
+            {"accepted", "product", "design"},
+            {"prd_designing", "product", "design"},
+            {"reviewing", "product", "review"},
+            {"review_passed", "product", "review"},
+            {"scheduled", "delivery", "dev"},
+            {"designing", "delivery", "dev"},
+            {"developing", "delivery", "dev"},
+            {"integration", "delivery", "dev"},
+            {"testing", "delivery", "test"},
+            {"test_passed", "delivery", "test"},
+            {"uat_pending", "acceptance", "uat"},
+            {"uat_rejected", "acceptance", "uat"},
+            {"released", "acceptance", "release"},
+            {"verified", "acceptance", "release"},
+            {"closed", "acceptance", "release"},
+    };
+    /** 9 段值域：后置校验用它判残留，与前端 RDM_STAGE 一字对齐 */
+    private static final String[] STATUS_STAGE_VALUES = {
+            "submit", "intake", "dispatch", "design", "review", "dev", "test", "uat", "release",
+    };
 
     /** 项目主表负责人列 {表, 列, DDL}：ADD COLUMN 不可重复执行，逐列先查再加 */
     private static final String[][] PROJECT_LEAD_COLUMNS = {
@@ -446,7 +642,19 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_PROJECT_LEADS, this::doProjectLeadsMigrate, this::verifyProjectLeads);
         versionTracker.applyOnce(VERSION_TASK_PLAN, this::doTaskPlanMigrate, this::verifyTaskPlan);
         versionTracker.applyOnce(VERSION_RESOURCE_MEMBER, this::doResourceMemberMigrate, this::verifyResourceMember);
+        versionTracker.applyOnce(VERSION_RESOURCE_PLAN, this::doResourcePlanMigrate, this::verifyResourcePlan);
         versionTracker.applyOnce(VERSION_EXEMPT_TRANSITION, this::doExemptTransitionSeed, this::verifyExemptTransitionSeed);
+        versionTracker.applyOnce(VERSION_TASK_TYPE_DICT, this::doTaskTypeDictMigrate, this::verifyTaskTypeDict);
+        versionTracker.applyOnce(VERSION_TASK_TYPE_SEEDS, this::doTaskTypeSeedsMigrate, this::verifyTaskTypeSeeds);
+        versionTracker.applyOnce(VERSION_ACCEPTANCE_EVIDENCE, this::doAcceptanceEvidenceMigrate, this::verifyAcceptanceEvidence);
+        versionTracker.applyOnce(VERSION_PROJECT_UPDATED_BY, this::doProjectUpdatedByMigrate, this::verifyProjectUpdatedBy);
+        versionTracker.applyOnce(VERSION_ITERATION_PROJECT, this::doIterationProjectMigrate, this::verifyIterationProject);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT, this::doDailyReportMigrate, this::verifyDailyReport);
+        versionTracker.applyOnce(VERSION_STATUS_STAGE_NINE, this::doStatusStageMigrate, this::verifyStatusStage);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_TRIGGER_COLUMNS,
+                this::doDailyReportTriggerColumnsMigrate, this::verifyDailyReportTriggerColumns);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_RULES,
+                this::doDailyReportRulesMigrate, this::verifyDailyReportRules);
     }
 
     /**
@@ -688,6 +896,508 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     /** v3.9 后置校验：名册表存在，缺则不记版本 */
     private void verifyResourceMember() {
         requireTables(new String[]{"rdm_resource_member"});
+    }
+
+    /**
+     * v3.10：建个人工作计划表 rdm_resource_plan + 计划调整审计表 rdm_resource_plan_log（团队负载 B-2.5）。
+     * <p>只 ADD 两张新表，不改任何现有表，CREATE TABLE IF NOT EXISTS 可安全重放；不吞异常：
+     * 建表失败必须抛出且不记版本，下次启动重试。
+     */
+    private void doResourcePlanMigrate() {
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS rdm_resource_plan ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                + "user_id BIGINT NOT NULL COMMENT '承担人 sys_user.id', "
+                + "source_type VARCHAR(16) NOT NULL COMMENT '来源:work_task/requirement/test_batch/project/coordination', "
+                + "source_id BIGINT NOT NULL COMMENT '来源单据主键', "
+                + "work_task_id BIGINT DEFAULT NULL COMMENT '来源为任务时的 rdm_work_task.id;UNIQUE 防重复计时', "
+                + "role_code VARCHAR(16) DEFAULT NULL COMMENT '岗位/阶段', "
+                + "plan_hours DECIMAL(7,2) DEFAULT NULL COMMENT '计划工时', "
+                + "remaining_hours DECIMAL(7,2) DEFAULT NULL COMMENT '负责人确认的剩余工时', "
+                + "plan_start_date DATE DEFAULT NULL COMMENT '计划开始', "
+                + "plan_end_date DATE DEFAULT NULL COMMENT '计划完成', "
+                + "status VARCHAR(16) NOT NULL DEFAULT 'active' COMMENT 'active/done/cancelled', "
+                + "confirmed_by VARCHAR(64) DEFAULT NULL COMMENT '剩余工时确认人快照', "
+                + "confirmed_at DATETIME DEFAULT NULL COMMENT '确认时间', "
+                + "version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本', "
+                + "created_by VARCHAR(64) DEFAULT NULL, updated_by VARCHAR(64) DEFAULT NULL, "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                + "deleted TINYINT NOT NULL DEFAULT 0, "
+                + "UNIQUE KEY uk_rrp_work_task (work_task_id), "
+                + "KEY idx_rrp_user_status (user_id, status, deleted), "
+                + "KEY idx_rrp_source (source_type, source_id), "
+                + "CONSTRAINT ck_rrp_plan_hours CHECK (plan_hours IS NULL OR plan_hours >= 0), "
+                + "CONSTRAINT ck_rrp_remaining CHECK (remaining_hours IS NULL OR remaining_hours >= 0)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RDM个人工作计划'");
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS rdm_resource_plan_log ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                + "plan_id BIGINT DEFAULT NULL COMMENT '关联 rdm_resource_plan.id', "
+                + "user_id BIGINT NOT NULL COMMENT '被计划承担人', "
+                + "source_type VARCHAR(16) NOT NULL, source_id BIGINT NOT NULL, "
+                + "action VARCHAR(32) NOT NULL COMMENT 'create/update/reassign/dispatch/cancel', "
+                + "operator_id BIGINT NOT NULL, operator_name VARCHAR(64) DEFAULT NULL, "
+                + "old_value VARCHAR(512) DEFAULT NULL, new_value VARCHAR(512) DEFAULT NULL, "
+                + "reason VARCHAR(255) DEFAULT NULL, client_request_id VARCHAR(64) DEFAULT NULL, "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                + "KEY idx_rrpl_plan (plan_id), KEY idx_rrpl_source (source_type, source_id), "
+                + "KEY idx_rrpl_created (created_at)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RDM个人计划调整/改派审计(只追加)'");
+        log.info("RDM v3.10 计划层迁移完成：rdm_resource_plan / rdm_resource_plan_log 表就绪");
+    }
+
+    /** v3.10 后置校验：两张计划表存在，缺则不记版本 */
+    private void verifyResourcePlan() {
+        requireTables(new String[]{"rdm_resource_plan", "rdm_resource_plan_log"});
+    }
+
+    /**
+     * v3.11：执行任务类型字典脚本（建表 + 六条内置种子）。
+     * <p>脚本只含 CREATE TABLE IF NOT EXISTS 与 INSERT IGNORE，天然幂等；
+     * 读取或执行失败一律抛出（不吞异常），applyOnce 不记版本、下次启动重试。
+     */
+    private void doTaskTypeDictMigrate() {
+        int executed = executeScript(TASK_TYPE_DICT_SCRIPT);
+        log.info("RDM v3.11 任务类型字典脚本已执行: {} 条语句（{}）", executed, TASK_TYPE_DICT_SCRIPT);
+    }
+
+    /** v3.11 后置校验：六条内置种子必须齐备，否则不记版本（下拉/聚合/校验兜底靠它们） */
+    private void verifyTaskTypeDict() {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_task_type_config WHERE deleted = 0 "
+                        + "AND code IN ('design','frontend','app','backend','qa','data')", Integer.class);
+        if (n == null || n < 6) {
+            throw new IllegalStateException("RDM v3.11 核验失败：rdm_task_type_config 内置种子不足 6 条");
+        }
+    }
+
+    /**
+     * v3.12：执行任务类型内置扩充脚本（14 条 INSERT IGNORE + 六条 sort_order 重排）。
+     * <p>脚本只含 INSERT IGNORE 与条件 UPDATE，可安全重放；失败一律抛出（不吞异常），
+     * applyOnce 不记版本、下次启动重试。
+     */
+    private void doTaskTypeSeedsMigrate() {
+        int executed = executeScript(TASK_TYPE_SEEDS_SCRIPT);
+        log.info("RDM v3.12 任务类型内置扩充脚本已执行: {} 条语句（{}）", executed, TASK_TYPE_SEEDS_SCRIPT);
+    }
+
+    /** v3.12 后置校验：14 个内置类型逐个存在，且移动端细分确实已启用 */
+    private void verifyTaskTypeSeeds() {
+        requireAtLeast("RDM v3.12 任务类型内置扩充",
+                MIN_TASK_TYPE_BUILTIN_SEEDS,
+                "SELECT COUNT(*) FROM rdm_task_type_config WHERE deleted = 0 AND code IN ("
+                        + "'android','ios','harmony','mini_program','h5','fullstack','ai_algo','devops',"
+                        + "'sre','security','automation_qa','performance_qa','ux','visual')");
+        requireAtLeast("RDM v3.12 移动端细分启用",
+                5,
+                "SELECT COUNT(*) FROM rdm_task_type_config WHERE deleted = 0 AND enabled = 1 AND code IN ("
+                        + "'android','ios','harmony','mini_program','h5')");
+    }
+
+    /**
+     * v3.13：验收用例证据附件列。
+     * <p>不吞异常：缺列会让证据保存报「未知列」，失败必须抛出并不记版本，下次启动重试。
+     */
+    private void doAcceptanceEvidenceMigrate() {
+        String table = ACCEPTANCE_EVIDENCE_COLUMN[0];
+        String column = ACCEPTANCE_EVIDENCE_COLUMN[1];
+        if (columnExists(table, column)) {
+            return;
+        }
+        jdbcTemplate.execute(ACCEPTANCE_EVIDENCE_COLUMN[2]);
+        log.info("已添加验收用例证据列: {}.{}", table, column);
+    }
+
+    /** v3.13 后置校验：证据列就绪，否则附件无处可存 */
+    private void verifyAcceptanceEvidence() {
+        if (!columnExists(ACCEPTANCE_EVIDENCE_COLUMN[0], ACCEPTANCE_EVIDENCE_COLUMN[1])) {
+            throw new IllegalStateException("RDM v3.13 核验失败："
+                    + ACCEPTANCE_EVIDENCE_COLUMN[0] + "." + ACCEPTANCE_EVIDENCE_COLUMN[1] + " 列缺失");
+        }
+    }
+
+    /**
+     * v3.14：项目主表「最后更新人」列。
+     * <p>不吞异常：缺列会让 MyBatis-Plus 的显式列清单 SELECT 直接报错（项目列表整块挂掉），
+     * 失败必须抛出并不记版本，下次启动重试。
+     */
+    private void doProjectUpdatedByMigrate() {
+        String table = PROJECT_UPDATED_BY_COLUMN[0];
+        String column = PROJECT_UPDATED_BY_COLUMN[1];
+        if (columnExists(table, column)) {
+            return;
+        }
+        jdbcTemplate.execute(PROJECT_UPDATED_BY_COLUMN[2]);
+        log.info("已添加项目最后更新人列: {}.{}", table, column);
+    }
+
+    /** v3.14 后置校验：更新人列就绪，否则「谁改的」这个事实无法落库 */
+    private void verifyProjectUpdatedBy() {
+        if (!columnExists(PROJECT_UPDATED_BY_COLUMN[0], PROJECT_UPDATED_BY_COLUMN[1])) {
+            throw new IllegalStateException("RDM v3.14 核验失败："
+                    + PROJECT_UPDATED_BY_COLUMN[0] + "." + PROJECT_UPDATED_BY_COLUMN[1] + " 列缺失");
+        }
+    }
+
+    /**
+     * v3.15：迭代表「所属项目」列 + 项目维度索引。
+     * <p>不吞异常：缺列会让 MyBatis-Plus 显式列清单 SELECT 直接报错（迭代列表整块挂掉），
+     * 失败必须抛出并不记版本，下次启动重试。索引与列同批交付（项目维度统计的扫描路径）。
+     */
+    private void doIterationProjectMigrate() {
+        String table = ITERATION_PROJECT_COLUMN[0];
+        String column = ITERATION_PROJECT_COLUMN[1];
+        if (!columnExists(table, column)) {
+            jdbcTemplate.execute(ITERATION_PROJECT_COLUMN[2]);
+            log.info("已添加迭代所属项目列: {}.{}", table, column);
+        }
+        if (!indexExists(table, ITERATION_PROJECT_INDEX)) {
+            jdbcTemplate.execute("CREATE INDEX " + ITERATION_PROJECT_INDEX + " ON " + table + " (" + column + ")");
+            log.info("已添加迭代项目维度索引: {}.{}", table, ITERATION_PROJECT_INDEX);
+        }
+    }
+
+    /** v3.15 后置校验：列与索引就绪，否则按项目统计迭代/需求的链路断裂 */
+    private void verifyIterationProject() {
+        if (!columnExists(ITERATION_PROJECT_COLUMN[0], ITERATION_PROJECT_COLUMN[1])) {
+            throw new IllegalStateException("RDM v3.15 核验失败："
+                    + ITERATION_PROJECT_COLUMN[0] + "." + ITERATION_PROJECT_COLUMN[1] + " 列缺失");
+        }
+        if (!indexExists(ITERATION_PROJECT_COLUMN[0], ITERATION_PROJECT_INDEX)) {
+            throw new IllegalStateException("RDM v3.15 核验失败："
+                    + ITERATION_PROJECT_COLUMN[0] + " 索引 " + ITERATION_PROJECT_INDEX + " 缺失");
+        }
+    }
+
+    /**
+     * v3.16：日报三表 + 预置模板/配置种子 + 项目编号规则改 PROJ。
+     * <p><b>不吞异常</b>：三表任一缺失都会让日报作业与配置页整块报错，失败必须抛出并不记版本，
+     * 下次启动重试。CREATE TABLE IF NOT EXISTS 与 INSERT IGNORE 均可安全重放，因此本方法整体
+     * 可重复执行；<b>种子用 INSERT IGNORE 而非 UPSERT</b>：同 key 已存在时不覆盖，否则管理员
+     * 在配置页微调过的模板与改过的推送时间会在每次重启被默认值抹除。
+     */
+    private void doDailyReportMigrate() {
+        createDailyReportTables();
+        int templates = seedDailyReportTemplates();
+        int configs = seedDailyReportConfig();
+        int scenarios = seedDailyReportScenario();
+        int rules = migrateProjectNoRuleToProj();
+        log.info("RDM v3.16 日报迁移完成: 新增模板 {} 行、新增配置 {} 行、新增通知场景 {} 行、项目编号规则更新 {} 行",
+                templates, configs, scenarios, rules);
+    }
+
+    /**
+     * 登记日报工作通知场景行（{@code rdm_daily_report}）。
+     * <p>沿用 {@code MeetingSchemaMigrationInitializer.syncNotificationScenarios} 的口径：
+     * {@code app_id=NULL} 且 {@code enabled=0} 插入——<b>路由必须由人显式绑定</b>，不回填默认应用，
+     * 也不因为发版重跑就把管理员已开启的场景关掉（INSERT IGNORE 已存在则不动）。
+     * 未绑定时 {@code NotificationAppService.resolve} 返回 null，日报作业跳过个人通知，群报不受影响。
+     */
+    private int seedDailyReportScenario() {
+        return jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_notification_scenario (scenario_key, app_id, enabled, updated_by) "
+                        + "VALUES (?, NULL, 0, 'system')",
+                com.mftb.admin.service.NotificationAppService.RDM_DAILY_REPORT);
+    }
+
+    /** 建日报三表（IF NOT EXISTS 可重放；失败上抛，由 applyOnce 不记版本） */
+    private void createDailyReportTables() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS rdm_daily_report (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                    report_date DATE NOT NULL COMMENT '日报日期（快照口径日）',
+                    report_type VARCHAR(16) NOT NULL COMMENT '档位: morning=晨报 / evening=晚报',
+                    project_count INT NOT NULL DEFAULT 0 COMMENT '快照覆盖的在途项目数',
+                    content_json MEDIUMTEXT COMMENT '快照JSON：项目→迭代→需求层级 + 项目级指标 + 汇总计数',
+                    group_title VARCHAR(200) DEFAULT NULL COMMENT '群报标题快照（渲染后）',
+                    group_content MEDIUMTEXT COMMENT '群报正文快照（渲染后 markdown，与实发内容一致）',
+                    personal_count INT NOT NULL DEFAULT 0 COMMENT '个人工作通知接收人数（已绑定钉钉 userId 者）',
+                    push_count INT NOT NULL DEFAULT 0 COMMENT '累计推送次数（含手动补发）',
+                    trigger_type VARCHAR(16) DEFAULT NULL COMMENT '最近一次触发方式: schedule/manual',
+                    trigger_by VARCHAR(64) DEFAULT NULL COMMENT '最近一次手动触发人姓名快照（定时为 NULL）',
+                    last_push_at DATETIME DEFAULT NULL COMMENT '最近一次推送时间',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+                    UNIQUE KEY uk_rdm_daily_report (report_date, report_type),
+                    KEY idx_rdm_daily_report_date (report_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='RDM每日日报快照（每天每档一行，通知与详情页同源）'""");
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS rdm_daily_report_config (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                    config_slot VARCHAR(16) NOT NULL DEFAULT 'default' COMMENT '配置槽位（恒为 default，唯一键保证单行）',
+                    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '日报总开关 0/1',
+                    morning_time VARCHAR(5) NOT NULL DEFAULT '09:00' COMMENT '晨报推送时间 HH:mm',
+                    evening_time VARCHAR(5) NOT NULL DEFAULT '18:00' COMMENT '晚报推送时间 HH:mm',
+                    group_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '群报开关 0/1',
+                    personal_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '个人工作通知开关 0/1',
+                    receiver_scope VARCHAR(16) NOT NULL DEFAULT 'all_projects' COMMENT '接收范围: all_projects=全部在途项目 / risk_only=仅风险逾期项目',
+                    morning_template_key VARCHAR(64) DEFAULT NULL COMMENT '晨报选用模板键（空=用该档默认模板）',
+                    evening_template_key VARCHAR(64) DEFAULT NULL COMMENT '晚报选用模板键（空=用该档默认模板）',
+                    personal_template_key VARCHAR(64) DEFAULT NULL COMMENT '个人通知选用模板键（空=用默认模板）',
+                    updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人姓名快照',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+                    UNIQUE KEY uk_rdm_daily_report_config (config_slot)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='RDM日报推送配置（单行：时间/开关/接收范围/选用模板）'""");
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS rdm_daily_report_template (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                    template_key VARCHAR(64) NOT NULL COMMENT '模板键（唯一，配置表按此引用）',
+                    name VARCHAR(100) NOT NULL COMMENT '模板名称',
+                    channel VARCHAR(16) NOT NULL COMMENT '投放通道: group=钉钉群 / personal=工作通知',
+                    report_type VARCHAR(16) NOT NULL DEFAULT 'morning' COMMENT '适用档位: morning/evening/any',
+                    title_tpl VARCHAR(200) NOT NULL COMMENT '标题模板（含占位符）',
+                    content_tpl TEXT NOT NULL COMMENT '正文模板（markdown + 占位符，只做字符串替换不 eval）',
+                    is_preset TINYINT NOT NULL DEFAULT 0 COMMENT '是否预置模板 0/1（预置不可删）',
+                    is_default TINYINT NOT NULL DEFAULT 0 COMMENT '是否该 channel+report_type 的默认模板 0/1',
+                    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用 0/1',
+                    remark VARCHAR(500) DEFAULT NULL COMMENT '说明',
+                    created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人',
+                    updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+                    UNIQUE KEY uk_rdm_daily_report_template (template_key),
+                    KEY idx_rdm_daily_report_template_use (channel, report_type, enabled)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='RDM日报推送模板（预置7套，用户可微调另存）'""");
+    }
+
+    /**
+     * 写入预置模板种子（定义读 {@link RdmDailyReportTemplates#PRESETS}，不在这里重写文案）。
+     * <p>INSERT IGNORE：同 key 已存在则跳过，<b>不覆盖管理员在配置页微调过的文案</b>。
+     *
+     * @return 本次新增行数
+     */
+    private int seedDailyReportTemplates() {
+        String sql = "INSERT IGNORE INTO rdm_daily_report_template "
+                + "(template_key, name, channel, report_type, title_tpl, content_tpl, "
+                + " is_preset, is_default, enabled, remark, created_by, updated_by) "
+                + "VALUES (?, ?, ?, ?, ?, ?, 1, ?, 1, ?, 'system', 'system')";
+        int inserted = 0;
+        for (RdmDailyReportTemplates.Preset p : RdmDailyReportTemplates.PRESETS) {
+            inserted += jdbcTemplate.update(sql, p.key(), p.name(), p.channel(), p.reportType(),
+                    p.titleTpl(), p.contentTpl(), p.isDefault() ? 1 : 0, p.remark());
+        }
+        return inserted;
+    }
+
+    /**
+     * 写入默认推送配置（单行，config_slot='default'）。
+     * <p>INSERT IGNORE：已存在则跳过，<b>不把管理员改过的推送时间/开关/选用模板重置回默认</b>。
+     */
+    private int seedDailyReportConfig() {
+        return jdbcTemplate.update(
+                "INSERT IGNORE INTO rdm_daily_report_config "
+                        + "(config_slot, enabled, morning_time, evening_time, group_enabled, personal_enabled, "
+                        + " receiver_scope, morning_template_key, evening_template_key, personal_template_key, updated_by) "
+                        + "VALUES ('default', 1, '09:00', '18:00', 1, 1, 'all_projects', ?, ?, ?, 'system')",
+                RdmDailyReportTemplates.defaultKeyOf(RdmDailyReportTemplates.CHANNEL_GROUP,
+                        RdmDailyReportTemplates.TYPE_MORNING),
+                RdmDailyReportTemplates.defaultKeyOf(RdmDailyReportTemplates.CHANNEL_GROUP,
+                        RdmDailyReportTemplates.TYPE_EVENING),
+                RdmDailyReportTemplates.defaultKeyOf(RdmDailyReportTemplates.CHANNEL_PERSONAL,
+                        RdmDailyReportTemplates.TYPE_ANY));
+    }
+
+    /**
+     * 项目编号规则改 PROJ + YYYYMMDD + 2 位日流水（如 PROJ2026101901）。
+     * <p>幂等 UPDATE，重复执行结果一致。发号代码零改动：{@code RdmProjectService} 仍调
+     * {@code bizSeqService.next("rdm_project")}，{@code BizSeqService} 按 (prefix, 日期段) 行锁自增、
+     * 每日从 seq_start 重置，改 prefix 后当日流水自然从 01 起。
+     * <p><b>存量编号不动</b>：本方法只改规则行，不触碰 {@code rdm_project.project_no} 历史值。
+     * <p>规则行即「平台支撐系統 &gt; 規則配置 &gt; 編號生成規則」菜单的数据源，改完即在该页可见可追溯。
+     *
+     * @return 受影响行数（0 表示规则行不存在，由后置校验拦下）
+     */
+    private int migrateProjectNoRuleToProj() {
+        return jdbcTemplate.update(
+                "UPDATE sys_biz_seq_rule SET prefix = 'PROJ', seq_length = 2, seq_start = 1, "
+                        + "rule_name = '項目編號', biz_menu = '產研交付', status = 1, remark = ?, updated_at = NOW() "
+                        + "WHERE rule_key = 'rdm_project'",
+                "{prefix} + YYYYMMDD + 至少2位自增序號：每日從 01 起，超過 99 自然擴位為 100，"
+                        + "不截斷、不循環複用（如 PROJ2026101901）。生成時機：新建項目時由系統發號，"
+                        + "前端不收手工輸入。存量 PJ 開頭的歷史項目編號為既成事實，保持不變、不改寫。");
+    }
+
+    /**
+     * v3.16 后置校验：三表就绪 + 预置模板齐备 + 配置单行存在 + 编号规则已改 PROJ。
+     * <p>为什么把种子当硬条件：模板与配置缺失时日报作业会渲染出空文案或直接报错，
+     * 不校验等于把「只在代码里存在的路径」记成迁移成功，到生产上才暴露。
+     */
+    private void verifyDailyReport() {
+        requireTables(DAILY_REPORT_TABLES);
+        requireAtLeast("RDM v3.16 预置日报模板", RdmDailyReportTemplates.PRESETS.size(),
+                "SELECT COUNT(*) FROM rdm_daily_report_template WHERE is_preset = 1 AND deleted = 0");
+        requireAtLeast("RDM v3.16 日报推送配置", 1,
+                "SELECT COUNT(*) FROM rdm_daily_report_config WHERE config_slot = 'default' AND deleted = 0");
+        requireAtLeast("RDM v3.16 日报工作通知场景", 1,
+                "SELECT COUNT(*) FROM sys_notification_scenario WHERE scenario_key = 'rdm_daily_report'");
+        String prefix = jdbcTemplate.queryForObject(
+                "SELECT prefix FROM sys_biz_seq_rule WHERE rule_key = 'rdm_project'", String.class);
+        if (!"PROJ".equals(prefix)) {
+            throw new IllegalStateException("RDM v3.16 核验失败：项目编号规则 prefix 未改为 PROJ，实际: " + prefix);
+        }
+    }
+
+    /**
+     * v3.18：将已跑过旧 v3.16 的库上的 {@code last_trigger_*} 列改名为 {@code trigger_*}。
+     * <p><b>不吞异常</b>：改名失败会让服务层读写不存在的列（Unknown column），整块日报链路挂掉，
+     * 因此必须抛出并不记版本，下次启动重试。旧列不存在时跳过（新库直接建的就是新名），
+     * 因此本方法可安全重放。
+     */
+    private void doDailyReportTriggerColumnsMigrate() {
+        for (String[] rename : DAILY_REPORT_TRIGGER_RENAMES) {
+            String table = rename[0];
+            String oldColumn = rename[1];
+            String newColumn = rename[2];
+            if (columnExists(table, newColumn)) {
+                continue;
+            }
+            if (!columnExists(table, oldColumn)) {
+                // 新旧列都不存在：说明表本身不完整，交由后置校验报错，不在这里吞掉
+                continue;
+            }
+            jdbcTemplate.execute(rename[3]);
+            log.info("RDM v3.18 日报快照表列改名: {}.{} -> {}", table, oldColumn, newColumn);
+        }
+    }
+
+    /** v3.18 后置校验：新列名必须就绪且旧列名已消失（否则两边分叉未收敛） */
+    private void verifyDailyReportTriggerColumns() {
+        for (String[] rename : DAILY_REPORT_TRIGGER_RENAMES) {
+            String table = rename[0];
+            if (!columnExists(table, rename[2])) {
+                throw new IllegalStateException("RDM v3.18 核验失败：" + table + "." + rename[2] + " 列缺失");
+            }
+            if (columnExists(table, rename[1])) {
+                throw new IllegalStateException("RDM v3.18 核验失败：" + table + "." + rename[1]
+                        + " 旧列仍存在，开发库与生产库 schema 会分叉");
+            }
+        }
+    }
+
+    /**
+     * v3.19：建规则表 + 快照表补范围列 + 换唯一键。
+     * <p><b>不吞异常</b>：规则表缺失或唯一键没换成，会让第二条规则推送直接报 Duplicate entry，
+     * 多规则模型整个不可用；失败必须抛出并不记版本，下次启动重试。
+     */
+    private void doDailyReportRulesMigrate() {
+        // 1) 规则表（CREATE TABLE IF NOT EXISTS 可重放）
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS rdm_daily_report_rule (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                    name VARCHAR(100) NOT NULL COMMENT '规则名称（如「A產品-B1迭代日報」）',
+                    project_id BIGINT NOT NULL COMMENT '目标项目ID（来自项目总览）',
+                    iteration_code VARCHAR(32) DEFAULT NULL COMMENT '目标迭代编码；NULL=该项目全部迭代',
+                    push_time VARCHAR(5) NOT NULL COMMENT '推送时间 HH:mm',
+                    content_type VARCHAR(16) NOT NULL DEFAULT 'morning' COMMENT '内容档位: morning=今日焦点 / evening=当日复盘',
+                    group_template_key VARCHAR(64) DEFAULT NULL COMMENT '群报模板键（空=按档位默认模板）',
+                    personal_template_key VARCHAR(64) DEFAULT NULL COMMENT '个人通知模板键（空=按档位默认模板）',
+                    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用 0/1',
+                    remark VARCHAR(500) DEFAULT NULL COMMENT '说明',
+                    created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人',
+                    updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人',
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+                    KEY idx_rdm_daily_report_rule_project (project_id, deleted),
+                    KEY idx_rdm_daily_report_rule_time (enabled, push_time, deleted)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                  COMMENT='RDM进度日报推送规则（一条规则=项目+可选迭代+时间+档位+模板，可建多条）'""");
+
+        // 2) 快照表补范围列（逐列先查再加，ADD COLUMN 不可重放）
+        for (String[] col : DAILY_REPORT_SCOPE_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                jdbcTemplate.execute(col[2]);
+                log.info("RDM v3.19 快照表补列: {}.{}", col[0], col[1]);
+            }
+        }
+
+        // 3) 存量行回填 scope_key：空值的旧行按 id 各自成键，否则新唯一键会把它们判成重复
+        int backfilled = jdbcTemplate.update(
+                "UPDATE rdm_daily_report SET scope_key = CONCAT('legacy:', id) WHERE scope_key = '' OR scope_key IS NULL");
+        if (backfilled > 0) {
+            log.info("RDM v3.19 存量快照回填 scope_key: {} 行", backfilled);
+        }
+
+        // 4) 换唯一键：旧键（report_date, report_type）会挡住同日第二条规则，必须移除
+        if (indexExists("rdm_daily_report", DAILY_REPORT_OLD_UNIQUE)) {
+            jdbcTemplate.execute("ALTER TABLE rdm_daily_report DROP INDEX " + DAILY_REPORT_OLD_UNIQUE);
+            log.info("RDM v3.19 已移除旧全局唯一索引 {}", DAILY_REPORT_OLD_UNIQUE);
+        }
+        if (!indexExists("rdm_daily_report", DAILY_REPORT_NEW_UNIQUE)) {
+            jdbcTemplate.execute("ALTER TABLE rdm_daily_report ADD UNIQUE KEY " + DAILY_REPORT_NEW_UNIQUE
+                    + " (report_date, report_type, scope_key)");
+            log.info("RDM v3.19 已建立范围化唯一索引 {}（report_date, report_type, scope_key）", DAILY_REPORT_NEW_UNIQUE);
+        }
+    }
+
+    /** v3.19 后置校验：规则表就绪 + 四个范围列就绪 + 新唯一键就绪 + 旧唯一键已移除 */
+    private void verifyDailyReportRules() {
+        requireTables(new String[]{DAILY_REPORT_RULE_TABLE});
+        for (String[] col : DAILY_REPORT_SCOPE_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("RDM v3.19 核验失败：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
+        if (!indexExists("rdm_daily_report", DAILY_REPORT_NEW_UNIQUE)) {
+            throw new IllegalStateException("RDM v3.19 核验失败：唯一索引 " + DAILY_REPORT_NEW_UNIQUE + " 缺失"
+                    + "（缺它会让同日多规则推送互相覆盖）");
+        }
+        if (indexExists("rdm_daily_report", DAILY_REPORT_OLD_UNIQUE)) {
+            throw new IllegalStateException("RDM v3.19 核验失败：旧全局唯一索引 " + DAILY_REPORT_OLD_UNIQUE
+                    + " 仍存在，第二条规则同日推送会报 Duplicate entry");
+        }
+    }
+
+    /**
+     * v3.17：状态阶段 6 段 → 9 段。
+     * <p>不吞异常：某行没落到位就必须抛出并不记版本，否则看板与状态条会继续各说一套且无人察觉。
+     */
+    private void doStatusStageMigrate() {
+        int changed = 0;
+        for (String[] row : STATUS_STAGE_UPDATES) {
+            int n = jdbcTemplate.update(
+                    "UPDATE rdm_status_def SET stage = ? WHERE code = ? AND stage = ? AND deleted = 0",
+                    row[2], row[0], row[1]);
+            if (n > 0) {
+                changed += n;
+                log.info("已调整状态所属阶段: {} {} → {}", row[0], row[1], row[2]);
+            }
+        }
+        log.info("RDM v3.17 状态阶段细化完成: 本次更新 {} 行（重跑为 0 行属正常，按 code+旧值定位天然幂等）", changed);
+    }
+
+    /**
+     * v3.17 后置校验：无值域外残留 + 开发/测试/上线三段确实分开。
+     * <p>只校“改过”不够：分开研发与测试正是本次目的，若某段落空说明映射写错，
+     * 状态条会出现永远亮不上的节点。
+     */
+    private void verifyStatusStage() {
+        String placeholders = String.join(",", java.util.Collections.nCopies(STATUS_STAGE_VALUES.length, "?"));
+        Integer legacy = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_status_def WHERE deleted = 0 AND stage NOT IN (" + placeholders + ")",
+                Integer.class, (Object[]) STATUS_STAGE_VALUES);
+        if (legacy != null && legacy > 0) {
+            throw new IllegalStateException("RDM v3.17 核验失败：rdm_status_def 存在 " + legacy
+                    + " 行阶段值不在 9 段值域内（可能为管理员自定义或迁移未跑完）");
+        }
+        requireAtLeast("RDM v3.17 開發段（dev）", 4,
+                "SELECT COUNT(*) FROM rdm_status_def WHERE deleted = 0 AND stage = 'dev'");
+        requireAtLeast("RDM v3.17 測試段（test）", 2,
+                "SELECT COUNT(*) FROM rdm_status_def WHERE deleted = 0 AND stage = 'test'");
+        requireAtLeast("RDM v3.17 上線段（release）", 3,
+                "SELECT COUNT(*) FROM rdm_status_def WHERE deleted = 0 AND stage = 'release'");
+    }
+
+    /** 索引是否存在（information_schema.STATISTICS）：CREATE INDEX 不可重放，先查再加 */
+    private boolean indexExists(String table, String indexName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, indexName);
+        return count != null && count > 0;
     }
 
     private void doClaimReqNoMigrate() {

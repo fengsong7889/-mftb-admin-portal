@@ -195,7 +195,7 @@ class RdmFactReuseAndGuardTest {
         // 若把 RdmWorkingDayCalculator 也 mock 掉，本類就證明不了「用的是真實工作日曆」
         workingDayCalculator = new RdmWorkingDayCalculator(calendarMapper);
         projectService = new RdmProjectService(projectMapper, memberMapper, requirementMapper, taskMapper,
-                userMapper, bizSeqService, accessGuard, factService, workingDayCalculator);
+                userMapper, bizSeqService, accessGuard, factService, workingDayCalculator, operatorResolver);
         summaryService = new RdmSummaryService(factService, projectMapper, deliveryItemMapper, taskMapper,
                 testBatchMapper, testExecutionMapper, acceptanceMapper, issueMapper, scheduleService,
                 testBatchService, acceptanceRecordService, accessGuard);
@@ -258,6 +258,10 @@ class RdmFactReuseAndGuardTest {
         doReturn(new Page<RdmFactVO.ProjectFact>(1, 20, 0)).when(factService).projectFactPage(any(), any(), any(), any());
 
         RdmProjectDTO.Query query = query("_alpha", "partial_delivered", 77L, 3, 50);
+        // 新增的三个筛选条件必须走同一个 toFactQuery 投影：漏一个就会「列表已筛、卡片仍全量、导出又多一批」
+        query.setProductOwnerUserId(88L);
+        query.setPlanDateFrom("2026-01-01");
+        query.setPlanDateTo("2026-12-31");
         projectService.listProjects(query, VIEWER);
         projectService.getStatsCards(query, VIEWER);
         projectService.getExportBundle(query, VIEWER);
@@ -280,6 +284,9 @@ class RdmFactReuseAndGuardTest {
             assertEquals("_alpha", fact.getKeyword());
             assertEquals("partial_delivered", fact.getStatus());
             assertEquals(77L, fact.getPmUserId());
+            assertEquals(88L, fact.getProductOwnerUserId(), "產品負責人漏投影就是「列表筛了、卡片没筛」");
+            assertEquals("2026-01-01", fact.getPlanDateFrom());
+            assertEquals("2026-12-31", fact.getPlanDateTo());
             assertTrue(fact.isIncludeTodos(), "不帶待辦時卡片的待辦數會靜默變 0");
             assertTrue(fact.isIncludeItems(), "不帶交付項時導出項數與對賬項數會靜默變 0");
         }

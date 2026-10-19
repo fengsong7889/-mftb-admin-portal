@@ -11,9 +11,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -64,6 +67,37 @@ public class OperatorResolver {
         }
         String name = StringUtils.hasText(user.getName()) ? user.getName() : user.getUsername();
         return StringUtils.hasText(user.getEmpId()) ? name + "(" + user.getEmpId() + ")" : name;
+    }
+
+    /**
+     * 按用户 ID 批量解析展示签名「姓名(工号)」，返回顺序与入参去重后的顺序一致。
+     *
+     * <p>为什么放在本类而不是各服务自己查 sys_user：本类已持有 SysUserMapper，且
+     * {@link #operatorSignature(SysUser)} 就是审批中心的拼接口径，再写一份必然漂移。
+     *
+     * <p>一次 IN 查询，禁止逐 id 回查：单据的人员字段动辄十几个，N+1 会直接拖慢详情首屏。
+     *
+     * <p>只取展示必需的 id/name/username/empId 四列，不得在这里顺手带出部门/职位/职级——
+     * 调用方多是选人、展示人员的业务页，多给一列就会被拼进界面文案。
+     *
+     * @param ids 用户 ID 集合（可含 null/重复，内部去重）；空集合返回空列表
+     * @return 展示签名列表；库中查不到的 id 直接跳过（宁可不显示，也不能把裸 ID 推到界面上）
+     */
+    public List<String> signaturesByIds(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> distinct = ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (distinct.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, String> byId = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .select(SysUser::getId, SysUser::getName, SysUser::getUsername, SysUser::getEmpId)
+                        .in(SysUser::getId, distinct))
+                .stream()
+                .collect(Collectors.toMap(SysUser::getId, this::operatorSignature, (a, b) -> a));
+        return distinct.stream().map(byId::get).filter(StringUtils::hasText)
+                .collect(Collectors.toList());
     }
 
     /** 用户绑定的功能角色编码集合(仅启用状态角色) */

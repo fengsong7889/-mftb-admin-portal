@@ -11,6 +11,7 @@ import com.mftb.admin.entity.RdmMilestone;
 import com.mftb.admin.entity.RdmPrd;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmReview;
+import com.mftb.admin.entity.RdmTaskTypeConfig;
 import com.mftb.admin.entity.RdmWorkLog;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.mapper.RdmChangeRequestMapper;
@@ -33,6 +34,7 @@ import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmFlowVersionGuard;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmRequirementService;
+import com.mftb.admin.service.RdmTaskTypeService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -47,6 +49,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,6 +97,7 @@ class RdmDeliveryGuardTest {
     private OperatorResolver operatorResolver;
     private SysUserMapper userMapper;
     private PermissionService permissionService;
+    private RdmTaskTypeService taskTypeService;
     private RdmDeliveryService service;
 
     @BeforeEach
@@ -109,6 +113,14 @@ class RdmDeliveryGuardTest {
         operatorResolver = mock(OperatorResolver.class);
         userMapper = mock(SysUserMapper.class);
         permissionService = mock(PermissionService.class);
+        taskTypeService = mock(RdmTaskTypeService.class);
+        // 任务类型字典 stub：六种内置 code 放行（resolveByCode 非 null），其余 null 被 validateTaskForm 拒绝；
+        // categoryOf 按内置三桶兑底，保证 roleOfTaskType 的 switch 不落 null
+        when(taskTypeService.resolveByCode(anyString())).thenAnswer(inv -> {
+            String code = inv.getArgument(0);
+            return BUILTIN_TASK_CODES.contains(code) ? taskTypeCfg(code) : null;
+        });
+        when(taskTypeService.categoryOf(anyString())).thenAnswer(inv -> builtinCategoryOf(inv.getArgument(0)));
         when(operatorResolver.operatorSignature(any())).thenReturn("MF00041|李四");
         // 当前登录人固定为任务负责人：工时明细只允许本人填报，多个用例要走到真实分支
         when(operatorResolver.currentUser()).thenReturn(owner41());
@@ -120,7 +132,7 @@ class RdmDeliveryGuardTest {
                 mock(RdmNotifyService.class), mock(RdmRequirementService.class),
                 mock(OaRequestService.class), mock(JdbcTemplate.class), accessGuard,
                 milestoneMapper, workLogMapper, mock(RdmPrdSnapshotMapper.class),
-                permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class));
+                permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class), taskTypeService);
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
@@ -209,6 +221,26 @@ class RdmDeliveryGuardTest {
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString()))
                 .thenThrow(new BusinessException("您不是該需求的參與人"));
         assertThrows(BusinessException.class, () -> service.assignTaskOwner(5L, 41L, 1));
+    }
+
+    /** 内置六码（与字典种子同源）：resolveByCode 只对它们返回非 null */
+    private static final Set<String> BUILTIN_TASK_CODES = Set.of("design", "frontend", "app", "backend", "qa", "data");
+
+    private static RdmTaskTypeConfig taskTypeCfg(String code) {
+        RdmTaskTypeConfig cfg = new RdmTaskTypeConfig();
+        cfg.setCode(code);
+        cfg.setLabel(code);
+        cfg.setCategory(builtinCategoryOf(code));
+        return cfg;
+    }
+
+    /** 内置三桶兑底（与 RdmTaskTypeServiceImpl.legacyCategoryOf 同语义） */
+    private static String builtinCategoryOf(String code) {
+        return switch (code == null ? "" : code) {
+            case RdmTaskTypeConfig.CATEGORY_DESIGN -> RdmTaskTypeConfig.CATEGORY_DESIGN;
+            case RdmTaskTypeConfig.CATEGORY_QA -> RdmTaskTypeConfig.CATEGORY_QA;
+            default -> RdmTaskTypeConfig.CATEGORY_DEV;
+        };
     }
 
     private static RdmWorkTask task() {

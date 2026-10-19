@@ -199,7 +199,9 @@ export default function TestBatchSubmit() {
                 onChange={(value, label) => { setLeadName(label?.split('(')[0] ?? '') }}
               />
             </Form.Item>
-            <Form.Item label="執行人員（可多選）" name="executorUserIds" className="rdm-field-span2">
+            {/* 全局表单规范 §C.4：常规字段一律占网格 1 列，与上方「測試環境」同宽对齐；
+                多选人员不需要整行承载力，撑两列会与同排字段失衡（span2 只留给任务标题这类长文本） */}
+            <Form.Item label="執行人員（可多選）" name="executorUserIds">
               <Select
                 mode="multiple"
                 placeholder="輸入姓名/工號搜索在職員工"

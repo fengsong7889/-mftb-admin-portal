@@ -6,13 +6,20 @@
  *
  * <p>不做前端"权限过滤"：可见范围与能否被选为参会人由服务端判定，这里只是取数与展示。
  */
-import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Select, Space, Tag } from 'antd'
-import { fetchEmployees } from '../../api/employee'
+import { fetchEmployee, fetchEmployees } from '../../api/employee'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
-  value?: number[]
+  /**
+   * 已选人员，契约是 sys_user.id 数组。
+   *
+   * <p>但放进 Form.Item 后，注入进来的其实是那个字段的原值：历史上多个页面把 name 绑到了
+   * 姓名字段上（原值是字符串），旧实现按 value?.[0] 取值会挖出名字的第一个字并当成选项文案渲染，
+   * 界面表现为「编辑页负责人莫名其妙变空」。因此取值一律走 toIds 归一化：只认数字 ID。
+   */
+  value?: number[] | number
   onChange?: (value: number[]) => void
   placeholder?: string
   /** 排除某些人（组织者本人不该出现在自己的参会人名单里） */
@@ -38,14 +45,33 @@ interface Loaded { id: number; name: string; empId?: string; department?: string
 
 interface Option { value: number; label: ReactNode }
 
+/**
+ * 把外部注入的 value 归一化为数字 ID 列表。
+ * <p>Number('') === 0 且是有限数，故额外排除 0 与非正数（sys_user.id 从 1 起）。
+ */
+function toIds(value?: number[] | number): number[] {
+  const raw = Array.isArray(value) ? value : value == null ? [] : [value]
+  return raw
+    .map(item => (typeof item === 'number' ? item : Number(item)))
+    .filter(item => Number.isFinite(item) && item > 0)
+}
+
 export default function EmployeeSelect({
   value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick,
 }: Props) {
   const { t } = useTranslation()
-  const [options, setOptions] = useState<Option[]>([])
+  const [searchResults, setSearchResults] = useState<Loaded[]>([])
+  /** 按 ID 反查到的档案（编辑态回显专用，与搜索结果分开存） */
+  const [resolved, setResolved] = useState<Loaded[]>([])
   const [fetching, setFetching] = useState(false)
-  /** 已选中但不在当前搜索结果里的人要留档，否则一次搜索就把之前选的人从选项里挤掉 */
-  const pinned = useRef<Map<number, Loaded>>(new Map())
+  /** 已见过的人员总账：一次搜索不能把之前选的人从选项里挤掉，否则已选值会退化成裸 ID 显示 */
+  const archive = useRef<Map<number, Loaded>>(new Map())
+  /** 已反查过的 ID（含失败的）：同一次挂载内不重复请求（403 时反复重试只会刷屏） */
+  const attempted = useRef<Set<number>>(new Set())
+
+  const ids = useMemo(() => toIds(value), [value])
+  /** 值语义的依赖键：数组每次渲染都是新对象，不能用身份当依赖 */
+  const idsKey = ids.join(',')
 
   const search = useCallback(async (keyword: string) => {
     setFetching(true)
@@ -62,48 +88,93 @@ export default function EmployeeSelect({
         empId: item.empId,
         department: item.department,
       }))
-      loaded.forEach(item => pinned.current.set(item.id, item))
-      const merged = new Map<number, Loaded>()
-      loaded.forEach(item => merged.set(item.id, item))
-      ;(value ?? []).forEach(id => {
-        const known = pinned.current.get(id)
-        if (known) merged.set(id, known)
-      })
-      setOptions([...merged.values()]
-        .filter(item => !excludeIds.includes(item.id))
-        .map(item => ({
-          value: item.id,
-          label: (
-            <Space size={4}>
-              <span>{item.name}</span>
-              {item.empId && <Tag style={{ marginInlineEnd: 0 }}>{item.empId}</Tag>}
-              {item.department && <span style={{ color: '#8C8C8C', fontSize: 12 }}>{item.department}</span>}
-            </Space>
-          ),
-        })))
+      loaded.forEach(item => archive.current.set(item.id, item))
+      setSearchResults(loaded)
     } catch {
       // 搜索失败不弹错：下拉里空着并保留已选项即可，报错由外层表单提交时统一暴露
-      setOptions([])
+      setSearchResults([])
     } finally {
       setFetching(false)
     }
-  }, [excludeIds, value])
+  }, [])
+
+  /**
+   * 编辑态回显：Select 的 value 若不在 options 里，antd 会把裸 ID 当文案渲染
+   * （缺陷现场：迭代编辑页的「迭代負責人」显示成 7）。首次遇到未知 ID 时走员工详情接口补齐成姓名。
+   * <p>查不到就保持原样：无 employee-management 授权时接口会 403，退化成改造前的行为，
+   * 不得在这里弹错打断表单加载。
+   * <p>依赖必须是 idsKey 而不是 ids：调用方（getValueProps / 内联数组）每次渲染都新建数组，
+   * 用数组身份当依赖会让这个副作用每渲染一次都重跑一遍。
+   */
+  useEffect(() => {
+    const current = idsKey ? idsKey.split(',').map(Number) : []
+    const missing = current.filter(id => !attempted.current.has(id))
+    if (!missing.length) return
+    let cancelled = false
+    void (async () => {
+      const found = await Promise.all(missing.map(async id => {
+        try {
+          const e = await fetchEmployee(id)
+          return { id, name: e.name || e.username, empId: e.empId, department: e.department } as Loaded
+        } catch {
+          return null
+        }
+      }))
+      if (cancelled) return
+      // 成功与失败都记账，且只在请求落地后记：提前记账会让 StrictMode/清理重跑的那一轮直接跳过，
+      // 结果是「第一轮被取消、第二轮不跑」，回显永远补不上姓名。
+      missing.forEach(id => attempted.current.add(id))
+      const ok = found.filter((item): item is Loaded => !!item)
+      if (!ok.length) return
+      ok.forEach(item => archive.current.set(item.id, item))
+      setResolved(prev => [...prev, ...ok])
+    })()
+    return () => { cancelled = true }
+  }, [idsKey])
+
+  const options = useMemo<Option[]>(() => {
+    const currentIds = idsKey ? idsKey.split(',').map(Number) : []
+    const merged = new Map<number, Loaded>()
+    resolved.forEach(item => merged.set(item.id, item))
+    searchResults.forEach(item => merged.set(item.id, item))
+    currentIds.forEach(id => {
+      if (!merged.has(id)) {
+        const known = archive.current.get(id)
+        if (known) merged.set(id, known)
+      }
+    })
+    return [...merged.values()]
+      .filter(item => !excludeIds.includes(item.id))
+      .map(item => ({
+        value: item.id,
+        label: (
+          <Space size={4}>
+            <span>{item.name}</span>
+            {item.empId && <Tag style={{ marginInlineEnd: 0 }}>{item.empId}</Tag>}
+            {item.department && <span style={{ color: '#8C8C8C', fontSize: 12 }}>{item.department}</span>}
+          </Space>
+        ),
+      }))
+  }, [excludeIds, idsKey, resolved, searchResults])
 
   return (
     <Select
       mode={single ? undefined : 'multiple'}
       allowClear
       disabled={disabled}
+      // 远程搜索必须显式开 showSearch：只给 onSearch 时 antd 会告警且输入框只读，
+      // 单选的负责人选择器就变成「只能从默认 30 人里点，搜不到人」
+      showSearch
       placeholder={placeholder ?? t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
-      value={single ? value?.[0] : value}
+      value={single ? ids[0] : ids}
       onChange={next => {
         // 单选清空时回空数组而不是 [undefined]：调用方按"有没有值"判断，不该看到 length=1 的空项
-        const ids = single ? (next == null ? [] : [next as number]) : ((next as number[]) ?? [])
-        onPick?.(ids
-          .map(id => pinned.current.get(id))
+        const picked = single ? (next == null ? [] : [next as number]) : ((next as number[]) ?? [])
+        onPick?.(picked
+          .map(id => archive.current.get(id))
           .filter((item): item is Loaded => !!item)
           .map(item => ({ id: item.id, name: item.name })))
-        onChange?.(ids)
+        onChange?.(picked)
       }}
       onSearch={search}
       onFocus={() => void search('')}

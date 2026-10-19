@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { fetchRequirementPage, fetchScopeCounts } from '../../api/rdm'
 import RequirementIntake from './RequirementIntake'
 
@@ -21,6 +21,7 @@ vi.mock('../../api/rdm', () => ({
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
   fetchProductOptions: vi.fn().mockResolvedValue([]),
   fetchProjectPage: vi.fn().mockResolvedValue({ records: [], total: 0 }),
+  fetchIterations: vi.fn().mockResolvedValue([]),
   claimRequirement: vi.fn(),
   submitRequirement: vi.fn(),
   urgeRequirement: vi.fn(),
@@ -42,6 +43,12 @@ const row = {
   status: 'intake_pending',
   submitterName: '測試提出人',
   submitDeptName: '技術部',
+}
+
+/** 跳转探针：跟着 Router context 重渲染，点完入口落在哪个地址（含 query）直接可见 */
+function WhereAmI() {
+  const location = useLocation()
+  return <div data-testid="where">{location.pathname + location.search}</div>
 }
 
 beforeEach(() => {
@@ -85,12 +92,14 @@ describe('提交需求页（合并视图）', () => {
     expect(screen.getByText('我的提交與待審')).toBeInTheDocument()
   })
 
-  it('提交侧仍给出「提需求」入口，但不给分配/认领', async () => {
-    render(<MemoryRouter><RequirementIntake /></MemoryRouter>)
+  it('提交侧仍给出「提需求」入口，入口带上来源、但不给分配/认领', async () => {
+    render(<MemoryRouter><RequirementIntake /><WhereAmI /></MemoryRouter>)
     await screen.findByText('合并视图里的需求行')
 
     fireEvent.click(screen.getByRole('button', { name: /提需求/ }))
     expect(screen.queryByRole('button', { name: '認領' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '分配' })).not.toBeInTheDocument()
+    // 入口必须把「我是从提需求菜单来的」交给表单页：不带 from，表单页的返回就只能猜（猜错就是本 bug）
+    expect(screen.getByTestId('where')).toHaveTextContent('/rdm-submit?from=rdm-intake-approval')
   })
 })

@@ -41,6 +41,7 @@ import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
+import { buildRdmSubmitPath } from '../../constants/menuDataSource'
 import {
   fetchProjectPage,
   fetchRequirementPage,
@@ -551,7 +552,7 @@ export default function RdmWorkbench() {
         {tracking.length === 0 ? (
           <div className="rdm-empty-hint">
             目前沒有正在推進的需求。
-            <Button type="link" size="small" onClick={() => navigate('/rdm-submit')}>現在提一個需求</Button>
+            <Button type="link" size="small" onClick={() => navigate(buildRdmSubmitPath({ from: 'rdm-workbench' }))}>現在提一個需求</Button>
           </div>
         ) : tracking.map(row => (
           <div key={row.id} className="rdm-track-item">
@@ -639,7 +640,7 @@ export default function RdmWorkbench() {
               type="primary"
               className="rdm-hero-primary"
               icon={<FileAddOutlined />}
-              onClick={() => navigate('/rdm-submit')}
+              onClick={() => navigate(buildRdmSubmitPath({ from: 'rdm-workbench' }))}
             >
               {t('rdm.workbench.submitRequirement', { defaultValue: '我要提需求' })}
             </Button>

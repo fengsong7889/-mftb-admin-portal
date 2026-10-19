@@ -37,6 +37,12 @@ import './index.css'
 /** 阶段耗时（小时 → 天，图表用） */
 const toDays = (hours: number) => Number((hours / 24).toFixed(1))
 
+/**
+ * 阶段中文名：后端 rdm_status_def.stage 已由 rdm:schema:v3.17 迁为与前端同源的 9 段，
+ * 不再需要旧值兜底；遇到未知阶段直显原值，把数据问题暴露出来而不是静默美化。
+ */
+const stageLabel = (stage: RdmStage | string) => RDM_STAGE_LABEL[stage as RdmStage] ?? stage
+
 export default function RdmDashboard() {
   const navigate = useNavigate()
   const [period, setPeriod] = useState('month')
@@ -167,12 +173,12 @@ export default function RdmDashboard() {
           </div>
           <Column
             height={260}
-            data={stageDuration.map(d => ({ stage: RDM_STAGE_LABEL[d.stage as RdmStage] ?? d.stage, days: toDays(d.avgHours) }))}
+            data={stageDuration.map(d => ({ stage: stageLabel(d.stage), days: toDays(d.avgHours) }))}
             xField="stage"
             yField="days"
             style={{ maxWidth: 42 }}
             label={{ text: (d: { days: number }) => `${d.days}`, position: 'top', style: { fill: '#8C8C8C' } }}
-            tooltip={{ title: (d: { stage: string }) => RDM_STAGE_LABEL[d.stage as RdmStage] ?? d.stage }}
+            tooltip={{ title: (d: { stage: string }) => d.stage }}
           />
         </div>
       </div>

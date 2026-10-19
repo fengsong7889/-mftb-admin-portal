@@ -50,6 +50,13 @@ public class RdmAcceptanceCase {
     /** 备注 */
     private String remark;
 
+    /**
+     * 验收证据附件 JSON：[{name,type,size,dataUrl}]。
+     * <p>dataUrl 为 Base64 Data URL（沿用 205 口径，服务端不落盘），体积可达数 MB，
+     * 因此不得随验收历史下发，只按单张取回（见 RdmAcceptanceVO.EvidenceMeta）。
+     */
+    private String evidenceJson;
+
     private String createdBy;
 
     private String updatedBy;

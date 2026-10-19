@@ -82,6 +82,7 @@ class RdmTransitionGuardTest {
                 mock(RdmNotifyService.class), mock(OaRequestService.class),
                 mock(com.mftb.admin.service.RdmIntakeCallbackService.class),
                 permissionService, mock(JdbcTemplate.class), accessGuard,
+                mock(com.mftb.admin.mapper.RdmWorkTaskMapper.class),
                 mock(com.mftb.admin.service.RdmIntakePolicyService.class),
                 mock(com.mftb.admin.service.RdmIntakeRoundService.class),
                 mock(com.mftb.admin.service.RdmReleaseService.class),

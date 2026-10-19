@@ -48,6 +48,7 @@ import {
   PlusOutlined,
   RightOutlined,
   SendOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -68,10 +69,12 @@ import {
   RDM_INTAKE_MODE_LABEL,
   addComment,
   addStructureChild,
+  changeRequirementIteration,
   fetchDeliveryItems,
   fetchDeliverySummary,
   fetchIterations,
   fetchProductOptions,
+  fetchProjectPage,
   fetchRequirementAncestors,
   fetchRequirementDetail,
   fetchRequirementPage,
@@ -84,6 +87,7 @@ import {
   type RdmDeliverySummary,
   type RdmIterationItem,
   type RdmProductOption,
+  type RdmProjectListItem,
   type RdmRequirementDetail,
   type RdmStructureTreeNode,
   type RdmTransitionRow,
@@ -100,6 +104,7 @@ import {
   RDM_ITERATION_STATUS,
   RDM_ACCEPT_RESULT_LABEL,
   RDM_ACCEPTANCE_OPEN_STATUS,
+  RDM_PROJECT_STATUS,
   RDM_REQUIREMENT_KIND,
   RDM_REQUIREMENT_KIND_LABEL,
   RDM_ROLE_LABEL,
@@ -187,7 +192,7 @@ const ACTION_HINT: Partial<Record<RdmAction, string>> = {
   [RDM_ACTION.DEV_DONE]: '開發完成後推進到聯調/測試，任務需帶交付說明',
   [RDM_ACTION.TEST_START]: '請啟動測試並明確用例範圍',
   [RDM_ACTION.TEST_DONE]: '測試完成後轉業務驗收，由業務方逐項確認',
-  [RDM_ACTION.SUBMIT_UAT]: '請提交上線前預驗收，業務方需逐條給出用例結論',
+  [RDM_ACTION.SUBMIT_UAT]: '請提交上線前預驗收，業務方需逐條給出檢查項結論',
   [RDM_ACTION.UAT_PASS]: '預驗收已通過，確認後進入發布放行',
   [RDM_ACTION.RELEASE]: '需有他人裁決且未過期的放行單才能確認上線',
   [RDM_ACTION.VERIFY]: '上線後請由業務驗收人給出 1-5 分滿意度',
@@ -215,7 +220,7 @@ const STATUS_WAIT_HINT: Partial<Record<RdmStatus, string>> = {
   [RDM_STATUS.INTEGRATION]: '聯調中',
   [RDM_STATUS.TESTING]: '測試中',
   [RDM_STATUS.TEST_PASSED]: '測試通過，等待轉業務驗收',
-  [RDM_STATUS.UAT_PENDING]: '等待業務驗收人逐項確認用例',
+  [RDM_STATUS.UAT_PENDING]: '等待業務驗收人逐項確認檢查項',
   [RDM_STATUS.UAT_REJECTED]: '驗收未通過，已退回研發返工',
   [RDM_STATUS.RELEASED]: '已上線，等待上線後的業務驗收打分',
   [RDM_STATUS.VERIFIED]: '交付已確認，等待歸檔',
@@ -226,6 +231,24 @@ const STATUS_WAIT_HINT: Partial<Record<RdmStatus, string>> = {
 type DetailTab = 'activity' | 'task' | 'plan' | 'gate' | 'records'
 
 const TAB_KEYS: DetailTab[] = ['activity', 'task', 'plan', 'gate', 'records']
+
+/**
+ * 可调整迭代的状态白名单（与后端 RdmConstants.IN_PROGRESS_STATUS 同源：pool→uat_rejected）。
+ * <p>已上线/验收/关闭的需求要先 reopen 才能换迭代；服务端会再校验一次，这里只决定按钮显隐。
+ */
+const ITERATION_ADJUSTABLE_STATUS: RdmStatus[] = [
+  RDM_STATUS.POOL, RDM_STATUS.ASSIGNED, RDM_STATUS.EVALUATING, RDM_STATUS.ON_HOLD,
+  RDM_STATUS.ACCEPTED, RDM_STATUS.PRD_DESIGNING, RDM_STATUS.REVIEWING, RDM_STATUS.REVIEW_PASSED,
+  RDM_STATUS.SCHEDULED, RDM_STATUS.DESIGNING, RDM_STATUS.DEVELOPING, RDM_STATUS.INTEGRATION,
+  RDM_STATUS.TESTING, RDM_STATUS.TEST_PASSED, RDM_STATUS.UAT_PENDING, RDM_STATUS.UAT_REJECTED,
+]
+
+/** 可挂迭代的项目状态（与 IterationForm/RequirementSubmit 同口径：排除已关闭与全部交付） */
+const USABLE_PROJECT_STATUS: string[] = [
+  RDM_PROJECT_STATUS.PREPARING,
+  RDM_PROJECT_STATUS.IN_PROGRESS,
+  RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
+]
 
 /** 活动流条目：评论与流转记录合并成一条时间线，但数据源与审计记录不变 */
 type ActivityItem =
@@ -260,6 +283,15 @@ export default function RequirementDetail() {
   const [summary, setSummary] = useState<RdmDeliverySummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [iterationCode, setIterationCode] = useState<string>()
+  /** 归属体系改造：动作弹窗里的所属项目（dispatch/accept 选填，schedule 必填） */
+  const [actionProjectId, setActionProjectId] = useState<number | undefined>()
+  const [projectOptions, setProjectOptions] = useState<RdmProjectListItem[]>([])
+  /** 调整迭代弹窗（独立于流转动作：属性变更不走状态机） */
+  const [iterModalOpen, setIterModalOpen] = useState(false)
+  const [iterModalProjectId, setIterModalProjectId] = useState<number | undefined>()
+  const [iterModalCode, setIterModalCode] = useState<string | undefined>()
+  const [iterModalRemark, setIterModalRemark] = useState('')
+  const [iterModalSaving, setIterModalSaving] = useState(false)
   const [activeAction, setActiveAction] = useState<RdmAction | null>(null)
   const [remark, setRemark] = useState('')
   const [planDate, setPlanDate] = useState<dayjs.Dayjs | null>(null)
@@ -630,6 +662,9 @@ export default function RequirementDetail() {
     if (fields.includes('pm') && !pmUserId) { message.warning('請選擇產品經理'); return false }
     if (fields.includes('versionNo') && !versionNo) { message.warning('請選擇上線版本'); return false }
     if (fields.includes('score') && !score) { message.warning('請給出交付滿意度評分'); return false }
+    // 归属体系改造硬闸门（与后端 applyProjectAndIteration 同口径）：排期必须挂项目+迭代
+    if (fields.includes('project') && !actionProjectId) { message.warning('請選擇所屬項目'); return false }
+    if (fields.includes('iteration') && !iterationCode) { message.warning('請選擇所屬迭代'); return false }
     return true
   }
 
@@ -650,6 +685,7 @@ export default function RequirementDetail() {
       pmUserId,
       pmName: pm?.name,
       iterationCode,
+      projectId: actionProjectId ?? null,
     }
   }
 
@@ -705,6 +741,7 @@ export default function RequirementDetail() {
     setScore(undefined)
     setPmUserId(undefined)
     setIterationCode(undefined)
+    setActionProjectId(undefined)
   }
 
   const resetActionForm = () => {
@@ -761,7 +798,9 @@ export default function RequirementDetail() {
       fetchIterations().catch(() => null),
       // 版本列表拉不到不拦人：AutoComplete 仍可手工输入
       fetchVersionHistory({ page: 1, size: 20 }).catch(() => null),
-    ]).then(([pms, iters, versions]) => {
+      // 归属体系改造：项目候选（dispatch/accept/schedule 弹窗与调整迭代弹窗共用）
+      fetchProjectPage({ pageNo: 1, pageSize: 200 }).catch(() => null),
+    ]).then(([pms, iters, versions, projects]) => {
       if (pms) setPmOptions(pms)
       if (iters) setIterations(iters)
       if (versions) {
@@ -770,7 +809,10 @@ export default function RequirementDetail() {
           label: v.releaseDate ? `${v.versionNo}（${v.releaseDate.slice(0, 10)}）` : v.versionNo,
         })))
       }
-      if (pms && iters && versions) actionOptionsFetched.current = true
+      if (projects) {
+        setProjectOptions((projects.records ?? []).filter(p => USABLE_PROJECT_STATUS.includes(p.status)))
+      }
+      if (pms && iters && versions && projects) actionOptionsFetched.current = true
     }).finally(() => {
       actionOptionsPending.current = false
       setActionOptionsLoading(false)
@@ -786,6 +828,56 @@ export default function RequirementDetail() {
     setActiveAction(code)
     clearActionFields()
     ensureActionOptions()
+  }
+
+  /**
+   * 迭代候选按项目联动（与后端 applyProjectAndIteration 的一致性校验同口径）：
+   * 选了项目就只给该项目下的迭代 + 无项目的 hotfix（平台级热修）；未选项目时给全部未关闭迭代。
+   */
+  const iterationOptionsFor = (pid?: number) => iterations
+    .filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED)
+    .filter(i => pid == null || i.projectId == null || i.projectId === pid)
+    .map(i => ({
+      value: i.code,
+      label: `${i.name}（${i.startDate ?? '-'} ~ ${i.endDate ?? '-'}）${i.projectId == null ? ' · 未掛項目' : ''}`,
+    }))
+
+  /** 打开「调整迭代」弹窗：预填当前项目与迭代，拉候选 */
+  const openIterationModal = () => {
+    if (!detail) return
+    setIterModalProjectId(detail.projectId ?? undefined)
+    setIterModalCode(detail.iterationCode ?? undefined)
+    setIterModalRemark('')
+    setIterModalOpen(true)
+    ensureActionOptions()
+  }
+
+  /**
+   * 提交「调整迭代」：属性变更而非状态流转，走独立端点。
+   * <p>后端会同步未完成任务的迭代归属并留痕通知，成功后刷新正文与交付摘要。
+   */
+  const submitChangeIteration = async () => {
+    if (!detail) return
+    if (!iterModalCode) { message.warning('請選擇目標迭代'); return }
+    if (iterModalCode === detail.iterationCode && (iterModalProjectId ?? null) === (detail.projectId ?? null)) {
+      message.warning('項目與迭代均未變更'); return
+    }
+    setIterModalSaving(true)
+    try {
+      await changeRequirementIteration(detail.id, {
+        projectId: iterModalProjectId ?? null,
+        iterationCode: iterModalCode,
+        remark: iterModalRemark.trim() || undefined,
+      })
+      message.success('迭代已調整，未完成任務已同步')
+      setIterModalOpen(false)
+      await Promise.all([load(), loadSummary()])
+    } catch (err) {
+      // 透传后端真实文案（迭代已关闭/不属于所选项目/无权等都是业务闸门）
+      message.error(err instanceof Error && err.message ? err.message : '調整失敗，請重試')
+    } finally {
+      setIterModalSaving(false)
+    }
   }
 
   if (!detail) {
@@ -834,7 +926,7 @@ export default function RequirementDetail() {
 
       {/* ── 处理条：一眼看清「轮到谁 + 我该做什么」，动作只留一个主位 ── */}
       <div className="rdm-action-bar">
-        {/* 流程节点：提交动作到底部后处理条横向空间腾出来了，六阶段直接铺开，不再收进弹窗 */}
+        {/* 流程节点：提交动作到底部后处理条横向空间腾出来了，九阶段直接铺开，不再收进弹窗 */}
         <div className="rdm-action-bar-stages">
           <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} stayDays={stageStayDays} />
         </div>
@@ -849,9 +941,9 @@ export default function RequirementDetail() {
               placement="bottomLeft"
               width={400}
               content={[
-                { tone: 'info', label: '業務方視角', body: '只看這 6 個摺疊階段，回答「我的需求到哪了」。' },
+                { tone: 'info', label: '業務方視角', body: '只看這 9 個摺疊階段，每個節點對應一個明確的責任人，回答「我的需求到哪了、該催誰」。' },
                 { tone: 'info', label: '產研視角', body: '看細分狀態，回答「這一步誰該做什麼、卡在哪」。' },
-                { tone: 'neutral', body: '兩套語義由「需求配置 · 狀態與流轉」同一份配置維護，不會兩邊各說一套。' },
+                { tone: 'neutral', body: '細分狀態與流轉規則仍由「需求配置 · 狀態與流轉」維護；階段摺疊以產品生命週期 9 段為準。' },
               ]}
             >
               <span className="rdm-judge-trigger"><InfoCircleOutlined /> 階段口徑</span>
@@ -1315,6 +1407,12 @@ export default function RequirementDetail() {
               <PropRow label="業務期望" value={detail.expectDate ?? '未填寫'} />
               <PropRow label="承諾出 PRD" value={detail.promisedPrdDate ?? '未承諾'} />
               <PropRow label="計劃上線" value={detail.planReleaseDate ?? <span style={{ color: '#8C8C8C' }}>待排期</span>} />
+              {/* 归属体系改造：项目与迭代是一等属性，不再收进「更多」里（有值即常显） */}
+              <PropRow label="所屬項目" value={detail.projectId ? (
+                <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
+                  {detail.projectName ?? `項目 #${detail.projectId}`}
+                </a>
+              ) : <span style={{ color: '#8C8C8C' }}>未掛項目</span>} />
               <PropRow label="所屬迭代" value={detail.iterationCode ?? <span style={{ color: '#8C8C8C' }}>未關聯</span>} />
               {showAllProps && (
                 <>
@@ -1337,13 +1435,6 @@ export default function RequirementDetail() {
                   <PropRow label="流程版本" value={detail.flowVersion ? `V${detail.flowVersion}` : '-'} />
                   {detail.parentReqNo && <PropRow label="衍生自" value={<span style={{ color: '#1890FF' }}>{detail.parentReqNo}（驗收遺留）</span>} />}
                   {/* V3 新增屬性 */}
-                  {detail.projectId && (
-                    <PropRow label="所屬項目" value={
-                      <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
-                        {detail.projectName ?? `項目 #${detail.projectId}`}
-                      </a>
-                    } />
-                  )}
                   {detail.requirementKind && (
                     <PropRow label="需求種類" value={
                       <Tag color={detail.requirementKind === 'aggregate' ? 'purple' : 'cyan'} style={{ margin: 0 }}>
@@ -1421,6 +1512,11 @@ export default function RequirementDetail() {
           >
             {detail.status === RDM_STATUS.RELEASED || detail.status === RDM_STATUS.VERIFIED ? '業務驗收（已上線）' : '業務驗收'}
           </Button>
+        )}
+        {/* 归属体系改造：调整迭代（属性变更非流转，独立入口）——研发 bug/需求不足要放另外版本时直接换迭代 */}
+        {ITERATION_ADJUSTABLE_STATUS.includes(detail.status as RdmStatus)
+          && (hasPermission('rdm-requirement:edit') || hasPermission('rdm-requirement:dispatch')) && (
+          <Button icon={<SwapOutlined />} onClick={openIterationModal}>調整迭代</Button>
         )}
         {/* 原先收进「更多操作」下拉的动作全部平铺：藏在下拉里让人根本看不见能做什么 */}
         {otherActions.map(a => (
@@ -1521,20 +1617,46 @@ export default function RequirementDetail() {
                 )}
               </div>
             )}
-            {/* 选填但有入口：不选迭代就进不了产能对账与按迭代的周报 */}
-            {optionalFields.includes('iteration') && (
+            {/* 归属体系改造：项目选择（schedule 必填 / dispatch、accept 选填），迭代候选随项目联动 */}
+            {(requiredFields.includes('project') || optionalFields.includes('project')) && (
               <div>
-                <div className="rdm-action-modal-label">所屬迭代（選填，選了才進產能對賬）</div>
+                <div className="rdm-action-modal-label">
+                  所屬項目{requiredFields.includes('project') ? ' *' : '（選填，分配時可順手掛項目）'}
+                </div>
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="選擇進行中的項目"
+                  value={actionProjectId}
+                  onChange={pid => {
+                    setActionProjectId(pid)
+                    // 换项目后已选迭代若不属于新项目则清空，避免提交时被后端一致性校验打回
+                    if (iterationCode) {
+                      const cur = iterations.find(i => i.code === iterationCode)
+                      if (cur && cur.projectId != null && pid != null && cur.projectId !== pid) {
+                        setIterationCode(undefined)
+                      }
+                    }
+                  }}
+                  loading={actionOptionsLoading}
+                  notFoundContent="暫無可用項目"
+                  options={projectOptions.map(p => ({ value: p.id, label: `${p.projectNo} · ${p.name}` }))}
+                />
+              </div>
+            )}
+            {(requiredFields.includes('iteration') || optionalFields.includes('iteration')) && (
+              <div>
+                <div className="rdm-action-modal-label">
+                  所屬迭代{requiredFields.includes('iteration') ? ' *' : '（選填，選了才進產能對賬）'}
+                </div>
                 <Select
                   allowClear
                   value={iterationCode}
                   onChange={setIterationCode}
                   loading={actionOptionsLoading}
                   notFoundContent="暫無迭代，可先到「迭代排期」新建"
-                  options={iterations.filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED).map(i => ({
-                    value: i.code,
-                    label: `${i.name}（${i.startDate ?? '-'} ~ ${i.endDate ?? '-'}）`,
-                  }))}
+                  options={iterationOptionsFor(actionProjectId)}
                 />
               </div>
             )}
@@ -1558,6 +1680,77 @@ export default function RequirementDetail() {
           value={remark}
           onChange={e => setRemark(e.target.value)}
         />
+      </Modal>
+
+      {/*
+        调整迭代弹窗（归属体系改造）：项目+迭代联动选择，未完成任务由后端同步。
+        场景：研发 bug / 需求不足要放另外版本，直接把需求换到其它迭代（对齐 Jira Move to sprint）。
+      */}
+      <Modal
+        title="調整迭代"
+        open={iterModalOpen}
+        className="custom-confirm-modal"
+        width={560}
+        okText="確認調整"
+        cancelText="取消"
+        confirmLoading={iterModalSaving}
+        okButtonProps={{ disabled: !iterModalCode }}
+        onOk={submitChangeIteration}
+        onCancel={() => setIterModalOpen(false)}
+      >
+        <div className="confirm-info-card" style={{ marginBottom: 16 }}>
+          <div className="confirm-info-row"><span>需求：</span><b>{formatRdmReqNo(detail.reqNo)} · {detail.title}</b></div>
+          <div className="confirm-info-row"><span>當前迭代：</span><b>{detail.iterationCode ?? '未掛'}</b></div>
+        </div>
+        <div className="rdm-action-modal-fields">
+          <div>
+            <div className="rdm-action-modal-label">所屬項目</div>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: '100%' }}
+              placeholder="選擇進行中的項目"
+              value={iterModalProjectId}
+              onChange={pid => {
+                setIterModalProjectId(pid)
+                // 换项目后已选迭代若不属于新项目则清空，避免提交被后端一致性校验打回
+                if (iterModalCode) {
+                  const cur = iterations.find(i => i.code === iterModalCode)
+                  if (cur && cur.projectId != null && pid != null && cur.projectId !== pid) {
+                    setIterModalCode(undefined)
+                  }
+                }
+              }}
+              loading={actionOptionsLoading}
+              notFoundContent="暫無可用項目"
+              options={projectOptions.map(p => ({ value: p.id, label: `${p.projectNo} · ${p.name}` }))}
+            />
+          </div>
+          <div>
+            <div className="rdm-action-modal-label">目標迭代 *</div>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="選擇要換入的迭代"
+              value={iterModalCode}
+              onChange={setIterModalCode}
+              loading={actionOptionsLoading}
+              notFoundContent="暫無迭代，可先到「迭代排期」新建"
+              options={iterationOptionsFor(iterModalProjectId)}
+            />
+          </div>
+        </div>
+        <div className="rdm-action-modal-label" style={{ marginTop: 12 }}>
+          調整原因<span style={{ color: '#8C8C8C' }}>（選填，會寫進流轉記錄）</span>
+        </div>
+        <RemarkTextArea
+          placeholder="例：測試發現遺留缺陷，本迭代產能不足，順延到下一迭代"
+          value={iterModalRemark}
+          onChange={e => setIterModalRemark(e.target.value)}
+        />
+        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+          調整後本需求下未完成的任務會同步換到目標迭代（已完成/已取消的任務保留歷史事實）。
+        </div>
       </Modal>
 
       <Modal

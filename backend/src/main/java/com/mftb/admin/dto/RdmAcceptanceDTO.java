@@ -63,5 +63,32 @@ public class RdmAcceptanceDTO {
 
         /** 备注 */
         private String remark;
+
+        /**
+         * 用例证据附件（截图/记录），可选。
+         * <p>条数与单条体积由服务层钉住，避免一条用例被塞几十张图把验收表写爆。
+         */
+        private List<Evidence> evidences;
+    }
+
+    /**
+     * 单条验收证据附件。
+     * <p>dataUrl 为前端上传接口返回的 Base64 Data URL，服务端不落盘、不转存，
+     * 因此它只能入库与单张取回，不得随验收历史批量下发。
+     */
+    @Data
+    public static class Evidence {
+
+        /** 文件名 */
+        private String name;
+
+        /** MIME 类型（如 image/png） */
+        private String type;
+
+        /** 字节数 */
+        private Long size;
+
+        /** Base64 Data URL 正文 */
+        private String dataUrl;
     }
 }

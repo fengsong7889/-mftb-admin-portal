@@ -5,7 +5,7 @@ import { feature, mesh } from 'topojson-client'
 import type { GeometryCollection, Topology } from 'topojson-specification'
 import worldSource from 'world-atlas/countries-110m.json?raw'
 import { getPortalSystemKey, type PortalSystemKey } from '../../constants/portalSystems'
-import { RDM_STAGE, RDM_STAGE_LABEL, RDM_STAGE_ORDER, type RdmStage } from '../../constants/rdm'
+import { RDM_STAGE, RDM_STAGE_LABEL, type RdmStage } from '../../constants/rdm'
 
 /** 自绘业务场景，不依赖外链；状态文案随门户语言切换。 */
 function Sheet({ x, y, width = 104, height = 112 }: { x: number; y: number; width?: number; height?: number }) {
@@ -148,18 +148,18 @@ function StageGlyph({ stage }: { stage: RdmStage }) {
           <path d="M-6 6a6 6 0 0 1 12 0" />
         </g>
       )
-    // 設計評審：PRD 原型线框
-    case RDM_STAGE.PRODUCT:
+    // PRD 設計：原型线框
+    case RDM_STAGE.DESIGN:
       return (
         <g fill="none" stroke="currentColor" strokeWidth="1.8">
           <rect x="-7" y="-6" width="14" height="12" rx="2" />
           <path d="M-7-1h14M-1-1v7" />
         </g>
       )
-    // 研發測試：代码括号
-    case RDM_STAGE.DELIVERY:
+    // 開發：代码括号
+    case RDM_STAGE.DEV:
       return <path d="M-3-5-8 0-3 5m6-10 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" />
-    // 驗收上線：火箭发布
+    // 上線：火箭发布（本插画只画 6 站，其余阶段均不进入 default）
     default:
       return (
         <g fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -182,6 +182,22 @@ function StageGlyph({ stage }: { stage: RdmStage }) {
  * 阶段名直接取 constants/rdm.ts 的权威文案，保证与系统内的叫法完全一致。
  */
 const RDM_STATION_X = [58, 100, 142, 184, 226, 268] as const
+/**
+ * 门户插画只画 6 站：站距 42/-20 与 global.css 的 12 秒光环节拍（portal-rdm-stage-0..5）绑定，
+ * 直接按 9 段渲染会让 stations[index] 越界为 undefined 而抛 TypeError。
+ * 这里取需求流的 6 个里程碑做概念示意，真实进度以详情页 RequirementStageBar 的 9 段为准。
+ */
+const RDM_ARTWORK_STAGES = [
+  RDM_STAGE.SUBMIT,
+  RDM_STAGE.INTAKE,
+  RDM_STAGE.DISPATCH,
+  RDM_STAGE.DESIGN,
+  RDM_STAGE.DEV,
+  RDM_STAGE.RELEASE,
+] as const
+
+/** 插画实际渲染的阶段子集：artwork 文案键必须与它一一对应，多一个键就会因未渲染而丢文案 */
+type RdmArtworkStage = typeof RDM_ARTWORK_STAGES[number]
 /** 波段站点：偶数站在下轨，奇数站在上轨；dx/dy 用于整组平移，站距 42/-20 不变所以节拍不变 */
 function rdmStations(dy: number, dx = 0) {
   return RDM_STATION_X.map((x, index) => ({ x: x + dx, y: (index % 2 === 0 ? 112 : 92) + dy }))
@@ -196,14 +212,14 @@ function rdmTrack(stations: { x: number; y: number }[]) {
   }
   return path
 }
-/** 站点文案走门户 artwork 语言包；缺键时回落 RDM 权威繁中常量，不会渲染出裸 key */
-const RDM_STAGE_ARTWORK_KEYS: Record<RdmStage, string> = {
+/** 站点文案走门户 artwork 语言包；键集限定为实际渲染的 6 站，缺键时回落 RDM 权威繁中常量 */
+const RDM_STAGE_ARTWORK_KEYS: Record<RdmArtworkStage, string> = {
   [RDM_STAGE.SUBMIT]: 'rdmSubmit',
   [RDM_STAGE.INTAKE]: 'rdmIntake',
   [RDM_STAGE.DISPATCH]: 'rdmDispatch',
-  [RDM_STAGE.PRODUCT]: 'rdmProduct',
-  [RDM_STAGE.DELIVERY]: 'rdmDelivery',
-  [RDM_STAGE.ACCEPTANCE]: 'rdmAcceptance',
+  [RDM_STAGE.DESIGN]: 'rdmDesign',
+  [RDM_STAGE.DEV]: 'rdmDev',
+  [RDM_STAGE.RELEASE]: 'rdmRelease',
 }
 
 /** 看板面板外壳：窗口栏 + 标题胶囊 + 泳道，两版共用 */
@@ -269,7 +285,7 @@ function RdmFlow({ dy, dx = 0 }: { dy: number; dx?: number }) {
         stroke="currentColor"
         strokeWidth="4"
       />
-      {RDM_STAGE_ORDER.map((stage, index) => {
+      {RDM_ARTWORK_STAGES.map((stage, index) => {
         const station = stations[index]
         return <g key={stage}>
           <circle cx={station.x} cy={station.y} r="13" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />

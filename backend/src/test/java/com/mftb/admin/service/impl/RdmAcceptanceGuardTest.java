@@ -83,6 +83,7 @@ class RdmAcceptanceGuardTest {
                         mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
                         mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
                         mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class)),
+                mock(com.mftb.admin.mapper.RdmWorkTaskMapper.class),
                 mock(com.mftb.admin.service.RdmIntakePolicyService.class),
                 mock(com.mftb.admin.service.RdmIntakeRoundService.class),
                 mock(com.mftb.admin.service.RdmReleaseService.class),

@@ -152,13 +152,19 @@ export function fetchEmployee(id: number) {
   return request.get<unknown, EmployeeItem>(`/employees/${id}`)
 }
 
-/** 员工搜索下拉选项（选项值为工号，仅在职状态；门店绑定BD选择员工用，附带部门/职位/职级信息） */
+/**
+ * 员工搜索下拉选项（选项值为工号，仅在职状态）。
+ *
+ * 文案只给「姓名(工号) · 部门」：部门是资产使用人/门店 BD 类场景辨认归属的必要信息，
+ * 但职位与职级属个人敏感信息，选人下拉会把它们批量渲染到任何能打开该页的人眼前，
+ * 不得再拼进文案（需查任职/职级请走员工详情或花名册，那里有独立权限与审计）。
+ */
 export async function fetchEmployeeOptions(keyword: string): Promise<OptionItem[]> {
   const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
-  return (res.records || []).map(e => {
-    const extra = [e.department, e.position, e.jobLevel].filter(Boolean).join(' / ')
-    return { value: e.empId, label: `${e.name}(${e.empId})${extra ? ` · ${extra}` : ''}` }
-  })
+  return (res.records || []).map(e => ({
+    value: e.empId,
+    label: `${e.name}(${e.empId})${e.department ? ` · ${e.department}` : ''}`,
+  }))
 }
 
 /**
@@ -167,13 +173,14 @@ export async function fetchEmployeeOptions(keyword: string): Promise<OptionItem[
  * 为什么不能复用 fetchEmployeeOptions：后者 value 是工号字符串（如 'MF00001'），
  * 凡是后端要求「用户 ID」的接口（RDM 测试负责人/发布负责人等）提交时
  * Number('MF00001') 会得到 NaN，参数静默传错。需要用户 ID 的场景一律用本函数。
+ *
+ * 文案只给「姓名(工号)」，禁止拼部门/职位/职级：工号本身唯一已足够消歧，
+ * 而任职与职级属个人敏感信息，选人下拉会把它们批量渲染进任何有权限
+ * 看到的页面（提测执行人、发布负责人、需求筛选等），越权成本为零。
  */
 export async function fetchEmployeeIdOptions(keyword: string): Promise<OptionItem[]> {
   const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
-  return (res.records || []).map(e => {
-    const extra = [e.department, e.position, e.jobLevel].filter(Boolean).join(' / ')
-    return { value: String(e.id), label: `${e.name}(${e.empId})${extra ? ` · ${extra}` : ''}` }
-  })
+  return (res.records || []).map(e => ({ value: String(e.id), label: `${e.name}(${e.empId})` }))
 }
 
 /** 新增员工 */

@@ -26,12 +26,14 @@ import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmRequirementTarget;
 import com.mftb.admin.entity.RdmStatusLog;
+import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmAcceptanceMapper;
 import com.mftb.admin.mapper.RdmAcceptanceCaseMapper;
 import com.mftb.admin.mapper.RdmAttachmentMapper;
 import com.mftb.admin.mapper.RdmCommentMapper;
+import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmRequirementRoleMapper;
 import com.mftb.admin.mapper.RdmRequirementTargetMapper;
@@ -67,6 +69,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -122,6 +125,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     private final JdbcTemplate jdbcTemplate;
     /** 需求级访问守卫：数据范围与动作资格的唯一口径（交付子资源也回这里反查校验） */
     private final RdmAccessGuard accessGuard;
+    private final RdmWorkTaskMapper taskMapper;
     /** 准入策略裁决：要不要审批、走哪条链、由谁分派 */
     private final RdmIntakePolicyService intakePolicyService;
     /** 准入审批轮次：每轮独立留痕，旧轮回调不能推动新轮 */
@@ -169,7 +173,47 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         List<RdmRequirementVO> records = result.getRecords().stream()
                 .map(r -> RdmRequirementVO.from(r, stageOf))
                 .toList();
+        attachHandlers(records);
         return new PageResult<>(records, result.getTotal());
+    }
+
+    /**
+     * 批量聚合「當前處理人」：一次 IN 查本頁需求的未完成任務負責人，不逐需求回查。
+     * <p>只算 todo/doing/blocked（與寫側可調整排期、列表篩選同源）；同一人負责多個任務只保留一項。
+     * <p>無未完成任務時回填空列表，前端自行回退到 {@code currentHandler} 的流程推演值。
+     */
+    private void attachHandlers(List<RdmRequirementVO> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        List<Long> reqIds = records.stream().map(RdmRequirementVO::getId)
+                .filter(java.util.Objects::nonNull).toList();
+        if (reqIds.isEmpty()) {
+            return;
+        }
+        List<RdmWorkTask> tasks = taskMapper.selectList(new LambdaQueryWrapper<RdmWorkTask>()
+                .in(RdmWorkTask::getReqId, reqIds)
+                .in(RdmWorkTask::getStatus, RdmConstants.TASK_OPEN_STATUSES)
+                .select(RdmWorkTask::getReqId, RdmWorkTask::getOwnerUserId,
+                        RdmWorkTask::getOwnerName, RdmWorkTask::getOwnerEmpNo));
+        Map<Long, Map<Long, RdmRequirementVO.HandlerPerson>> byReq = new LinkedHashMap<>();
+        for (RdmWorkTask t : tasks) {
+            if (t.getOwnerUserId() == null) {
+                continue;
+            }
+            byReq.computeIfAbsent(t.getReqId(), k -> new LinkedHashMap<>())
+                    .computeIfAbsent(t.getOwnerUserId(), k -> {
+                        RdmRequirementVO.HandlerPerson p = new RdmRequirementVO.HandlerPerson();
+                        p.setUserId(t.getOwnerUserId());
+                        p.setName(t.getOwnerName());
+                        p.setEmpNo(t.getOwnerEmpNo());
+                        return p;
+                    });
+        }
+        for (RdmRequirementVO vo : records) {
+            Map<Long, RdmRequirementVO.HandlerPerson> m = byReq.get(vo.getId());
+            vo.setHandlers(m == null ? java.util.List.of() : new java.util.ArrayList<>(m.values()));
+        }
     }
 
     @Override
@@ -360,6 +404,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         q.setOverdueOnly(src.getOverdueOnly());
         // 执行侧地板必须跟着复制：否则需求跟进清单的看板信号卡会比列表多算准入前/需求池的单
         q.setExecutionOnly(src.getExecutionOnly());
+        // 当前处理人筛选必须与列表同源：否则筛人后看板信号卡/视图栏计数与表格行数分叉
+        q.setHandlerUserId(src.getHandlerUserId());
         return q;
     }
 
@@ -370,6 +416,13 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         requireVisible(req, current, "查看詳情");
         Map<String, String> stageOf = configService.stageMap();
         RdmRequirementVO vo = RdmRequirementVO.from(req, stageOf);
+        // 归属体系改造：项目名联表下发（此前 VO 只有 projectId，前端只能拼「項目 #id」兜底）
+        if (req.getProjectId() != null) {
+            // rdm_project 无 deleted 列（Batch 1 建表即无），不能写 deleted = 0
+            vo.setProjectName(jdbcTemplate.queryForList(
+                            "SELECT name FROM rdm_project WHERE id = ?", req.getProjectId())
+                    .stream().findFirst().map(r -> String.valueOf(r.get("name"))).orElse(null));
+        }
         vo.setDescription(req.getDescription());
         vo.setExpectResult(req.getExpectResult());
         vo.setBusinessValue(req.getBusinessValue());
@@ -999,6 +1052,79 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 调整迭代（归属体系改造）：属性变更而非状态流转，故不走 rdm_transition 状态机。
+     * <p>场景：研发 bug / 需求不足要放另外版本，直接把需求换到其它迭代（对齐 Jira Move to sprint）。
+     * <p>关键联动：同步该需求下未完成任务的 iteration_code——需求迭代与任务迭代必须同源，
+     * 否则按迭代统计需求与任务会分裂（本次改造要修的根因之一）。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO changeIteration(Long id, RdmTransitionDTO dto) {
+        RdmRequirement req = requireRequirement(id);
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        requireVisible(req, current, "調整迭代");
+        // 状态白名单：复用「已进入产研受理链路」常量（pool→uat_rejected）；已上线/验收/关闭需先 reopen
+        if (!Arrays.asList(RdmConstants.IN_PROGRESS_STATUS).contains(req.getStatus())) {
+            throw new BusinessException("當前狀態「" + labelOf(req.getStatus()) + "」不允許調整迭代，已上線需求請先重新打開");
+        }
+        // 角色白名单：产品/研发负责人/PMO 参与者，或分配权/全量权限者（技术负责人、管理员）
+        Set<String> roles = accessGuard.activeRoles(id, current);
+        boolean allowed = accessGuard.canSeeAll(current) || accessGuard.canDispatch(current)
+                || roles.contains(RdmConstants.ROLE_PM)
+                || roles.contains(RdmConstants.ROLE_DEV_LEAD)
+                || roles.contains(RdmConstants.ROLE_PMO);
+        if (!allowed) {
+            throw new BusinessException("您沒有權限調整本需求的迭代");
+        }
+        if (dto == null || !StringUtils.hasText(dto.getIterationCode())) {
+            throw new BusinessException("請選擇目標迭代");
+        }
+        String oldIteration = req.getIterationCode();
+        String newIteration = dto.getIterationCode().trim();
+        if (newIteration.equals(oldIteration) && dto.getProjectId() == null) {
+            throw new BusinessException("目標迭代與當前一致，無需調整");
+        }
+        // 复用排期闸门的同一套校验：迭代存在且未关闭、迭代项目与所选项目一致、项目存在（单一真值源）
+        applyProjectAndIteration(req, dto, false);
+        req.setUpdatedBy(operatorResolver.operatorSignature(current));
+        requirementMapper.updateById(req);
+
+        // 同步未完成任务的迭代归属（done/cancelled 是历史事实，不改）
+        int syncedTasks = jdbcTemplate.update(
+                "UPDATE rdm_work_task SET iteration_code = ?, updated_by = ? "
+                        + "WHERE req_id = ? AND deleted = 0 AND status NOT IN ('done', 'cancelled')",
+                newIteration, operatorResolver.operatorSignature(current), id);
+
+        appendStatusLog(req, req.getStatus(), current, "change_iteration",
+                "調整迭代：" + (StringUtils.hasText(oldIteration) ? oldIteration : "未掛") + " → " + newIteration
+                        + (StringUtils.hasText(dto.getRemark()) ? "；" + dto.getRemark() : ""));
+        log.info("需求調整迭代: reqNo={}, {} -> {}, 同步未完成任務 {} 條, operator={}",
+                req.getReqNo(), oldIteration, newIteration, syncedTasks, req.getUpdatedBy());
+
+        // 通知产品与研发负责人：迭代变了会影响他们的排期与产能对账
+        List<Long> notifyIds = new ArrayList<>();
+        if (req.getAssigneePmUserId() != null) {
+            notifyIds.add(req.getAssigneePmUserId());
+        }
+        if (req.getDevOwnerUserId() != null && !notifyIds.contains(req.getDevOwnerUserId())) {
+            notifyIds.add(req.getDevOwnerUserId());
+        }
+        notifyIds.remove(current.getId());
+        if (!notifyIds.isEmpty()) {
+            notifyService.notifyUserIds(RdmConstants.EVENT_STATUS_CHANGED, req, notifyIds,
+                    "需求迭代已調整",
+                    "### 🔁 需求迭代調整\n\n- **需求**: " + req.getReqNo() + " " + req.getTitle()
+                            + "\n- **迭代**: " + (StringUtils.hasText(oldIteration) ? oldIteration : "未掛") + " → " + newIteration
+                            + "\n- **操作人**: " + current.getName()
+                            + (syncedTasks > 0 ? "\n- **同步未完成任務**: " + syncedTasks + " 條" : ""));
+        }
+        return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
+    }
+
+    /**
      * 准入审批代理：把需求详情页的「審批通過 / 審批駁回」转交给 OA 引擎。
      * <p>走 OA 而非直接改状态，才能同时拿到三样东西：审批人身份校验（fail-closed）、
      * 不可篡改的审批留痕、以及通过/驳回后的通知与状态回调。
@@ -1098,18 +1224,20 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             }
         }
         switch (actionCode) {
+            case RdmConstants.ACTION_DISPATCH -> applyProjectAndIteration(req, dto, false);
             case RdmConstants.ACTION_ACCEPT -> {
                 req.setAcceptTime(now);
                 req.setPromisedPrdDate(parseDate(dto == null ? null : dto.getPromisedDate()));
+                // 产品规划版本时可顺手挂项目+迭代（选填；排期闸门会再强制一次）
+                applyProjectAndIteration(req, dto, false);
             }
             case RdmConstants.ACTION_HOLD -> req.setOnHoldUntil(parseDate(dto == null ? null : dto.getHoldUntil()));
             case RdmConstants.ACTION_UNHOLD -> req.setOnHoldUntil(null);
             case RdmConstants.ACTION_SCHEDULE -> {
                 req.setPlanReleaseDate(parseDate(dto == null ? null : dto.getPlanDate()));
                 req.setPlanDevDate(parseDate(dto == null ? null : dto.getPlanDevDate()));
-                if (dto != null && StringUtils.hasText(dto.getIterationCode())) {
-                    req.setIterationCode(dto.getIterationCode());
-                }
+                // 归属体系改造硬闸门：进入研发执行前必须挂项目+迭代（用户已裁决闸门放排期）
+                applyProjectAndIteration(req, dto, true);
                 if (dto != null && dto.getDevOwnerUserId() != null) {
                     SysUser devLead = userMapper.selectById(dto.getDevOwnerUserId());
                     req.setDevOwnerUserId(dto.getDevOwnerUserId());
@@ -1170,6 +1298,69 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         notifyOnTransition(req, rule, actor);
         log.info("需求流轉: reqNo={}, {} -> {}, action={}, operator={}",
                 req.getReqNo(), fromStatus, req.getStatus(), actionCode, req.getUpdatedBy());
+    }
+
+    /**
+     * 归属体系改造：项目/迭代挂接的统一校验与写入（dispatch/accept 选填，schedule 必填）。
+     * <p>三条口径（与前端 RequirementDetail 动作弹窗联动同源）：
+     * <ol>
+     *   <li>迭代必须存在且未关闭（closed 迭代不再承接新排期，与需求排期下拉过滤同口径）；</li>
+     *   <li>迭代有项目时以迭代的项目为准回写需求（单一真值源）；hotfix 迭代可无项目，
+     *       此时以调用方所选项目为准；两者都有且不一致 → 拒绝（防止需求项目与迭代项目分裂）；</li>
+     *   <li>required=true（排期闸门）时，动作完成后需求必须同时有项目与迭代。</li>
+     * </ol>
+     * <p>不信任前端：项目/迭代存在性都走服务端查库校验。
+     * <p>包可见：与 {@link #canPerform}/{@link #applyRequiredGuard} 同构，供单测直接钉住闸门口径。
+     */
+    void applyProjectAndIteration(RdmRequirement req, RdmTransitionDTO dto, boolean required) {
+        Long projectId = dto == null ? null : dto.getProjectId();
+        String iterationCode = dto == null ? null : dto.getIterationCode();
+        boolean hasIteration = StringUtils.hasText(iterationCode);
+        if (!hasIteration && projectId == null) {
+            if (required) {
+                throw new BusinessException("提交排期必須選擇所屬項目與迭代");
+            }
+            return;
+        }
+        Long resolvedProjectId = projectId;
+        if (hasIteration) {
+            String code = iterationCode.trim();
+            Map<String, Object> it = jdbcTemplate.queryForList(
+                            "SELECT project_id, status FROM rdm_iteration WHERE deleted = 0 AND code = ?", code)
+                    .stream().findFirst().orElse(null);
+            if (it == null) {
+                throw new BusinessException("迭代不存在：" + code);
+            }
+            if ("closed".equals(String.valueOf(it.get("status")))) {
+                throw new BusinessException("迭代已關閉，不能排入：" + code);
+            }
+            Object itProject = it.get("project_id");
+            if (itProject != null) {
+                Long itProjectId = ((Number) itProject).longValue();
+                if (resolvedProjectId != null && !resolvedProjectId.equals(itProjectId)) {
+                    throw new BusinessException("該迭代不屬於所選項目，請重新選擇");
+                }
+                resolvedProjectId = itProjectId;
+            }
+            req.setIterationCode(code);
+        }
+        if (resolvedProjectId != null) {
+            // rdm_project 无 deleted 列（Batch 1 建表即无），存在性判断只按主键
+            Integer cnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, resolvedProjectId);
+            if (cnt == null || cnt == 0) {
+                throw new BusinessException("所屬項目不存在");
+            }
+            req.setProjectId(resolvedProjectId);
+        }
+        if (required) {
+            if (!StringUtils.hasText(req.getIterationCode())) {
+                throw new BusinessException("提交排期必須選擇迭代");
+            }
+            if (req.getProjectId() == null) {
+                throw new BusinessException("提交排期必須選擇所屬項目（緊急修復迭代也須指定項目歸屬）");
+            }
+        }
     }
 
     @Override
@@ -1554,6 +1745,51 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 ? 1 : history.get(0).getAttempt() + 1;
     }
 
+    /** 单条用例最多几张证据：不限制会让一条用例被塞几十张图，把验收明细表写成 GB 级 */
+    private static final int MAX_CASE_EVIDENCES = 6;
+    /** 单张 dataUrl 字符上限：与上传接口 5MB 原图同口径（Base64 约 1.37 倍）加余量 */
+    private static final int MAX_EVIDENCE_DATA_URL_CHARS = 7 * 1024 * 1024;
+
+    /**
+     * 证据附件入库前的服务端约束。
+     * <p>不信任前端传的条数与体积（前端校验只是 UX，不是安全边界）：超限直接拒绝并说明原因，
+     * 不做静默截断——默默丢掉证据会让验收人以为已经存上，比报错危险得多。
+     */
+    private static String toEvidenceJson(List<RdmAcceptanceDTO.Evidence> evidences) {
+        if (evidences == null || evidences.isEmpty()) {
+            return null;
+        }
+        if (evidences.size() > MAX_CASE_EVIDENCES) {
+            throw new BusinessException("單條驗收用例最多附 " + MAX_CASE_EVIDENCES + " 張證據，請精簡後再提交");
+        }
+        List<RdmAcceptanceDTO.Evidence> cleaned = new ArrayList<>();
+        for (RdmAcceptanceDTO.Evidence e : evidences) {
+            if (e == null || !StringUtils.hasText(e.getDataUrl())) {
+                // 没正文的条目存进去也取不出图，丢弃不报错：它不构成任何丢失的事实证据
+                continue;
+            }
+            if (e.getDataUrl().length() > MAX_EVIDENCE_DATA_URL_CHARS) {
+                throw new BusinessException("單張證據圖片過大（上限 5MB），請壓縮後重新上傳");
+            }
+            RdmAcceptanceDTO.Evidence safe = new RdmAcceptanceDTO.Evidence();
+            safe.setName(trimToMaxLength(e.getName(), 200));
+            safe.setType(trimToMaxLength(e.getType(), 100));
+            safe.setSize(e.getSize() != null && e.getSize() >= 0 ? e.getSize() : null);
+            safe.setDataUrl(e.getDataUrl());
+            cleaned.add(safe);
+        }
+        return cleaned.isEmpty() ? null : JsonUtils.toJson(cleaned);
+    }
+
+    /** 元信息字段限长截断（不是正文）：超长文件名只影响展示，不值得为此拒收一次验收 */
+    private static String trimToMaxLength(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
+    }
+
     /** 落验收用例明细（数量与结论已在提交前校验） */
     private void saveAcceptanceCases(RdmAcceptance acceptance, RdmRequirement req,
                                      List<RdmAcceptanceDTO.AcceptanceCaseDTO> cases, SysUser current) {
@@ -1569,6 +1805,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             entity.setResult(c.getResult());
             entity.setSeverity(c.getSeverity());
             entity.setRemark(c.getRemark());
+            entity.setEvidenceJson(toEvidenceJson(c.getEvidences()));
             entity.setCreatedBy(operatorResolver.operatorSignature(current));
             entity.setUpdatedBy(entity.getCreatedBy());
             acceptanceCaseMapper.insert(entity);
@@ -1611,6 +1848,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         followUp.setSourceChannel(parent.getSourceChannel());
         followUp.setParentReqId(parent.getId());
         followUp.setParentReqNo(parent.getReqNo());
+        // 归属体系改造：衍生需求继承父需求的项目（统计不断链）；迭代不继承——
+        // 遗留事项放哪个版本由排期时决定（父需求多已上线，其迭代已关闭）
+        followUp.setProjectId(parent.getProjectId());
         followUp.setProgress(0);
         followUp.setBlockedFlag(0);
         followUp.setOverdueFlag(0);
@@ -1719,6 +1959,27 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             list.add(vo);
         }
         return list;
+    }
+
+    @Override
+    public RdmAcceptanceVO.EvidenceContent caseEvidence(Long reqId, Long caseId, int index) {
+        // 取证据与看验收历史同口径：必须能看见这个需求，且用例确实挂在它下面，
+        // 不能让人凭一个自增 caseId 就越权取到别部门的验收截图。
+        requireVisible(requireRequirement(reqId), operatorResolver.currentUser(), "查看驗收證據");
+        RdmAcceptanceCase c = acceptanceCaseMapper.selectById(caseId);
+        if (c == null || !Objects.equals(c.getReqId(), reqId)) {
+            throw new BusinessException("驗收證據不存在");
+        }
+        List<RdmAcceptanceDTO.Evidence> evidences = RdmAcceptanceVO.parseEvidences(c.getEvidenceJson());
+        if (index < 0 || index >= evidences.size()) {
+            throw new BusinessException("該序號的驗收證據不存在");
+        }
+        RdmAcceptanceDTO.Evidence e = evidences.get(index);
+        RdmAcceptanceVO.EvidenceContent content = new RdmAcceptanceVO.EvidenceContent();
+        content.setName(e.getName());
+        content.setType(e.getType());
+        content.setDataUrl(e.getDataUrl());
+        return content;
     }
 
     /* ==================== 工作台与选项 ==================== */

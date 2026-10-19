@@ -49,6 +49,7 @@ import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import HelpPopover from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
+import { keyToPath, resolveRdmSubmitBackMenuKey } from '../../constants/menuDataSource'
 import { fetchEmployees, type EmployeeItem } from '../../api/employee'
 import {
   RDM_INTAKE_MODE_LABEL,
@@ -56,9 +57,7 @@ import {
   fetchFunctionPoints,
   fetchMenuTree,
   fetchProductOptions,
-  fetchProjectPage,
   fetchRequirementDetail,
-  fetchRequirementPage,
   simulateIntake,
   submitRequirement,
   updateRequirement,
@@ -66,7 +65,6 @@ import {
   type RdmIntakeDecision,
   type RdmMenuTreeNode,
   type RdmProductOption,
-  type RdmProjectListItem,
   type RdmRequirementForm,
   type RdmTargetRef,
 } from '../../api/rdm'
@@ -86,9 +84,7 @@ import {
   RDM_REQ_TYPE_LABEL,
   RDM_REQUIREMENT_KIND,
   RDM_REQUIREMENT_KIND_LABEL,
-  RDM_PROJECT_STATUS,
   RDM_STATUS,
-  formatRdmReqNo,
   type RdmComplexity,
   type RdmPriority,
   type RdmReqType,
@@ -108,6 +104,16 @@ const ANCHOR_KIND_LABEL: Record<AnchorKind, string> = {
 
 /** 「新增」时建议同步的需求类型，只提示不改用户已选的值 */
 const NEW_HINT_TEXT = '全新入口會連帶權限、菜單位置與數據口徑，產品受理時會補齊方案；此處只需你說清想要什麼。'
+
+/**
+ * 返回按鈕文案 key，按「回到哪張菜單」取值，與落點同源于 resolveRdmSubmitBackMenuKey。
+ * <p>写错文案比单写「返回」更糟：按钮上写「返回工作台」却把人丢进需求列表，用户会以为系统坏了。
+ */
+const RDM_SUBMIT_BACK_TEXT_KEY: Record<string, string> = {
+  'rdm-workbench': 'rdm.reqSubmit.backToWorkbench',
+  'rdm-intake-approval': 'rdm.reqSubmit.backToSubmit',
+  'rdm-requirement': 'rdm.reqSubmit.backToRequirementList',
+}
 
 interface TargetValues {
   kind: AnchorKind
@@ -301,10 +307,6 @@ export default function RequirementSubmit() {
   /** 服务端准入裁决（只读展示）：提交时服务端会重算一次 */
   const [decision, setDecision] = useState<RdmIntakeDecision | null>(null)
   const [decisionFailed, setDecisionFailed] = useState(false)
-  /** V3：进行中的项目候选（流程版本=V3 时选所属项目） */
-  const [projectOptions, setProjectOptions] = useState<RdmProjectListItem[]>([])
-  /** V3：所选项目下的聚合需求候选（执行需求挂结构父需求） */
-  const [aggregateOptions, setAggregateOptions] = useState<{ value: number; label: string }[]>([])
 
   /*
    * 草稿续编：带 ?id= 进来就是编辑自己那条草稿（服务端也只允许改草稿态）。
@@ -315,6 +317,15 @@ export default function RequirementSubmit() {
   const isDraftEdit = Number.isInteger(draftId) && draftId > 0
   const [draftNo, setDraftNo] = useState<string | null>()
   const [draftLoaded, setDraftLoaded] = useState(!isDraftEdit)
+
+  /*
+   * 返回落点跟随进入来源：入口用 ?from= 标明是从哪张菜单进的表单页（提需求菜单进来就该回提需求），
+   * 白名单外的值一律当无来源。旧逻辑写死跳个人工作台，从「提需求」菜单进来的人点返回却落到工作台，
+   * 刚存的草稿在那张页根本不展示。
+   */
+  const backMenuKey = resolveRdmSubmitBackMenuKey(searchParams.toString(), isDraftEdit)
+  const backPath = keyToPath[backMenuKey]
+  const handleBack = () => navigate(backPath)
 
   useEffect(() => {
     if (!isDraftEdit) return
@@ -374,10 +385,8 @@ export default function RequirementSubmit() {
   const titleValue = Form.useWatch('title', form)
   const expectValue = Form.useWatch('expectResult', form)
   const pmUserId = Form.useWatch('pmUserId', form)
-  /** V3 联动：流程版本 / 所属项目 / 需求种类 */
+  /** V3 联动：流程版本 / 需求种类（项目与结构父需求已后置到产研规划阶段，提交侧不再选择） */
   const flowVersion = Form.useWatch('flowVersion', form)
-  const projectIdValue = Form.useWatch('projectId', form)
-  const requirementKindValue = Form.useWatch('requirementKind', form)
   const isV3 = flowVersion === RDM_FLOW_VERSION.V3
 
   /** 从其它页面带上下文进来时预填第一条对象（例：报表页右上角「提需求」） */
@@ -394,44 +403,6 @@ export default function RequirementSubmit() {
     fetchMenuTree().then(setMenuTree).catch(() => setMenuTree([]))
     fetchProductOptions().then(setPmOptions).catch(() => setPmOptions([]))
   }, [])
-
-  /** V3：切到分批交付时拉可用项目供选所属项目（后端不可用时降级为空）。
-   *  后端无 'active' 状态，故不传 status，改为客户端过滤出仍在进行中的项目
-   *  （筹备中 / 进行中 / 部分交付），排除全部交付与已关闭的项目。 */
-  useEffect(() => {
-    if (!isV3) return
-    let cancelled = false
-    const USABLE_PROJECT_STATUS: string[] = [
-      RDM_PROJECT_STATUS.PREPARING,
-      RDM_PROJECT_STATUS.IN_PROGRESS,
-      RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
-    ]
-    fetchProjectPage({ pageNo: 1, pageSize: 200 })
-      .then(res => {
-        if (cancelled) return
-        const usable = (res.records ?? []).filter(p => USABLE_PROJECT_STATUS.includes(p.status))
-        setProjectOptions(usable)
-      })
-      .catch(() => { if (!cancelled) setProjectOptions([]) })
-    return () => { cancelled = true }
-  }, [isV3])
-
-  /** V3：选定项目后拉该项目下的聚合需求，供执行需求挂结构父需求 */
-  useEffect(() => {
-    if (!isV3 || !projectIdValue) { setAggregateOptions([]); return }
-    let cancelled = false
-    fetchRequirementPage({ page: 1, size: 200, projectId: projectIdValue, requirementKind: RDM_REQUIREMENT_KIND.AGGREGATE })
-      .then(res => {
-        if (cancelled) return
-        // 后端若未支持种类过滤，前端再按 requirementKind + projectId 兜底过滤一次
-        const rows = (res.records ?? []).filter(r =>
-          (!r.requirementKind || r.requirementKind === RDM_REQUIREMENT_KIND.AGGREGATE) &&
-          (r.projectId == null || r.projectId === projectIdValue))
-        setAggregateOptions(rows.map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} · ${r.title}` })))
-      })
-      .catch(() => { if (!cancelled) setAggregateOptions([]) })
-    return () => { cancelled = true }
-  }, [isV3, projectIdValue])
 
   /** 業務驗收人默认选中提交人本人（按工号匹配到 sys_user.id），可改选他人 */
   useEffect(() => {
@@ -620,7 +591,15 @@ export default function RequirementSubmit() {
 
   /** 提交前二次确认（先校验后弹框） */
   const handleSubmit = async () => {
-    const values = await form.validateFields()
+    /*
+     * validateFields() 只返回当前已挂载字段；「更多設置」折叠时 reqType/priority 已卸载，
+     * 直接用它构造 payload 会把这两个字段弄丢，后端回「請選擇需求類型」。
+     * 因此先取全量值（getFieldsValue(true) 含已卸载字段）再合并校验结果。
+     */
+    const values = {
+      ...(form.getFieldsValue(true) as FormValues),
+      ...(await form.validateFields()),
+    }
     const pm = pmOptions.find(p => p.userId === values.pmUserId)
     const targetSummary = describeTargets(values.targets)
 
@@ -722,8 +701,8 @@ export default function RequirementSubmit() {
       {/* ── 页面头部（统一组件）── */}
       <RdmFormHeader
         title={isDraftEdit ? '編輯需求草稿' : '提交需求'}
-        backText={isDraftEdit ? t('rdm.reqSubmit.backToSubmit') : t('rdm.reqSubmit.backToWorkbench')}
-        onBack={() => navigate(isDraftEdit ? '/rdm-intake-approval' : '/rdm-workbench')}
+        backText={t(RDM_SUBMIT_BACK_TEXT_KEY[backMenuKey])}
+        onBack={handleBack}
         meta={isDraftEdit
           ? draftNo
             ? `草稿 ${draftNo} · 修改後可繼續保存，或提交進入準入審批（提交時會按最新內容重新裁決）`
@@ -756,7 +735,7 @@ export default function RequirementSubmit() {
             />
           </div>
           <div className="rdm-more-settings-fields">
-            <Form.Item label="交付流程" name="flowVersion" extra={isV3 ? '分批並行交付：可掛項目、區分聚合 / 執行需求' : '傳統整需求交付'}>
+            <Form.Item label="交付流程" name="flowVersion" extra={isV3 ? '分批並行交付：區分聚合 / 執行需求（項目與迭代由產研規劃時掛接）' : '傳統整需求交付'}>
               <Select
                 options={[
                   { value: RDM_FLOW_VERSION.V2, label: `${RDM_FLOW_VERSION_LABEL[RDM_FLOW_VERSION.V2]}（傳統整需求交付）` },
@@ -764,40 +743,25 @@ export default function RequirementSubmit() {
                 ]}
               />
             </Form.Item>
-            {isV3 && (
-              <Form.Item label="所屬項目" name="projectId" rules={[{ required: true, message: '請選擇所屬項目' }]}>
-                <Select
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="選擇進行中的項目"
-                  notFoundContent="暫無可用項目"
-                  options={projectOptions.map(p => ({ value: p.id, label: `${p.projectNo} · ${p.name}` }))}
-                />
-              </Form.Item>
-            )}
+            {/*
+              归属体系改造：提需求不再选项目——业务方不知道项目划分，项目由产研在分配/规划/排期阶段挂接。
+              隐藏域仅用于旧草稿回传：后端 update 对 V3 直写 projectId，不传会把旧草稿已挂的项目清掉。
+            */}
+            <Form.Item name="projectId" hidden><Input /></Form.Item>
+            <Form.Item name="structureParentReqId" hidden><Input /></Form.Item>
           </div>
           {isV3 && (
-            <>
-              <Form.Item label="需求種類" name="requirementKind" rules={[{ required: true, message: '請選擇需求種類' }]}>
-                <Radio.Group>
-                  <Radio value={RDM_REQUIREMENT_KIND.AGGREGATE}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.AGGREGATE]}</Radio>
-                  <Radio value={RDM_REQUIREMENT_KIND.EXECUTION}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.EXECUTION]}</Radio>
-                </Radio.Group>
-              </Form.Item>
-              {requirementKindValue === RDM_REQUIREMENT_KIND.EXECUTION && (
-                <Form.Item label="結構父需求" name="structureParentReqId" extra="執行需求掛到所選項目下的某個聚合需求，形成主子結構">
-                  <Select
-                    allowClear
-                    showSearch
-                    optionFilterProp="label"
-                    placeholder={projectIdValue ? '選擇聚合父需求（可留空）' : '請先選擇所屬項目'}
-                    disabled={!projectIdValue}
-                    notFoundContent="該項目下暫無聚合需求"
-                    options={aggregateOptions}
-                  />
-                </Form.Item>
-              )}
-            </>
+            <Form.Item
+              label="需求種類"
+              name="requirementKind"
+              rules={[{ required: true, message: '請選擇需求種類' }]}
+              extra="聚合需求可拆執行需求分批交付；結構掛接在需求詳情頁完成（需先由產研掛項目）"
+            >
+              <Radio.Group>
+                <Radio value={RDM_REQUIREMENT_KIND.AGGREGATE}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.AGGREGATE]}</Radio>
+                <Radio value={RDM_REQUIREMENT_KIND.EXECUTION}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.EXECUTION]}</Radio>
+              </Radio.Group>
+            </Form.Item>
           )}
         </div>
         {/* ── ① 需求内容（业务方唯一必须回答的部分）── */}
@@ -1079,7 +1043,7 @@ export default function RequirementSubmit() {
 
       {/* ── 底部操作栏 ── */}
       <div className="form-footer">
-        <Button icon={<RollbackOutlined />} onClick={() => navigate('/rdm-workbench')}>取消</Button>
+        <Button icon={<RollbackOutlined />} onClick={handleBack}>取消</Button>
         <Button icon={<SaveOutlined />} loading={draftSaving} onClick={handleSaveDraft}>保存草稿</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>提交需求</Button>
       </div>

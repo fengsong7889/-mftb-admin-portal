@@ -19,6 +19,7 @@ import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -71,6 +72,12 @@ public class RdmProjectService {
     private final RdmProjectFactService factService;
     /** 任务21 真实工作日历（含请假/周末支援）：交付清单的逾期工作日数与催办口径必须同源 */
     private final RdmWorkingDayCalculator workingDayCalculator;
+    /**
+     * 当前操作人姓名解析：rdm_project.updated_by 的写入源。
+     * <p>必须由服务层显式赋值：项目的 MetaObjectHandler 只按名字填 createdAt / updatedAt，
+     * 不会填 updated_by（同类陷阱已在 hr_leave_request / DocService 上踩过）。
+     */
+    private final OperatorResolver operatorResolver;
 
     /* ==================== 查询 ==================== */
 
@@ -123,6 +130,7 @@ public class RdmProjectService {
         vo.setOpsLeadUserName(project.getOpsLeadUserName());
         vo.setPlanStartDate(DateTimeUtils.format(project.getPlanStartDate()));
         vo.setPlanEndDate(DateTimeUtils.format(project.getPlanEndDate()));
+        vo.setDefaultAcceptancePath(project.getDefaultAcceptancePath());
         vo.setStatus(project.getStatus());
         vo.setPausedFlag(project.getPausedFlag());
         vo.setRiskFlag(project.getRiskFlag());
@@ -131,6 +139,7 @@ public class RdmProjectService {
         vo.setVersion(project.getVersion());
         vo.setCreatedAt(DateTimeUtils.format(project.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(project.getUpdatedAt()));
+        vo.setUpdatedBy(project.getUpdatedBy());
         applyFactStats(vo, fact);
         vo.setMembers(loadMembers(id));
         return vo;
@@ -338,6 +347,8 @@ public class RdmProjectService {
         project.setPausedFlag(0);
         project.setRiskFlag(0);
         project.setOverdueFlag(0);
+        // 新建即「最后一次更新」：不写创建人，列表上刚建的项目会显示「没人改过」
+        project.setUpdatedBy(operatorResolver.currentOperatorName());
         projectMapper.insert(project);
         log.info("創建 RDM 項目成功: id={}, no={}, operator={}", project.getId(), project.getProjectNo(), currentUserId);
 
@@ -371,13 +382,17 @@ public class RdmProjectService {
         if (dto.getObjective() != null) {
             project.setObjective(dto.getObjective());
         }
-        if (dto.getPmUserId() != null) {
+        // 项目经理与产品负责人同样以「userName 非 null」为提供哨兵（与技/设/测/运四组一致）：
+        // 旧写法 if (pmUserId != null) 是 null-skip，表单清空负责人时 ID 传 null 会被跳过，
+        // 永远清不掉。表单恒传字符串（清空传 ''），局部更新（暂停/风险）不带这些 key 则整体跳过。
+        if (dto.getPmUserName() != null) {
             project.setPmUserId(dto.getPmUserId());
             project.setPmUserName(resolveUserName(dto.getPmUserId(), dto.getPmUserName()));
         }
-        if (dto.getProductOwnerUserId() != null) {
+        if (dto.getProductOwnerUserName() != null) {
             project.setProductOwnerUserId(dto.getProductOwnerUserId());
-            project.setProductOwnerUserName(resolveUserName(dto.getProductOwnerUserId(), dto.getProductOwnerUserName()));
+            project.setProductOwnerUserName(
+                    resolveUserName(dto.getProductOwnerUserId(), dto.getProductOwnerUserName()));
         }
         // 四组负责人以「userName 非 null」为提供哨兵：表单恒传字符串（清空传空串），
         // 支持清空；暂停/风险等局部更新不传这些 key，不会误清
@@ -415,6 +430,8 @@ public class RdmProjectService {
         if (dto.getRiskFlag() != null) {
             project.setRiskFlag(dto.getRiskFlag());
         }
+        // 每次成功写入都刷新操作人快照：暂停/恢复等开关型更新也算「谁最后改的」
+        project.setUpdatedBy(operatorResolver.currentOperatorName());
         // @Version 由 MyBatis-Plus 自动 +1 并作为 WHERE 条件；受影响行数为 0 说明并发覆盖
         if (projectMapper.updateById(project) == 0) {
             throw new BusinessException("項目已被他人修改，請刷新後重試");
@@ -498,6 +515,9 @@ public class RdmProjectService {
         fact.setKeyword(q.getKeyword());
         fact.setStatus(q.getStatus());
         fact.setPmUserId(q.getPmUserId());
+        fact.setProductOwnerUserId(q.getProductOwnerUserId());
+        fact.setPlanDateFrom(q.getPlanDateFrom());
+        fact.setPlanDateTo(q.getPlanDateTo());
         fact.setIncludeTodos(true);
         fact.setIncludeItems(true);
         return fact;
@@ -536,8 +556,14 @@ public class RdmProjectService {
         vo.setRiskFlag(fact.getRiskFlag());
         vo.setOverdueFlag(fact.getOverdueFlag());
         vo.setUpdatedAt(fact.getUpdatedAt());
+        vo.setUpdatedBy(fact.getUpdatedBy());
         vo.setDeliveredCount(fact.getDeliveryItemCompleted());
         vo.setTotalDeliveryCount(fact.getDeliveryItemTotal());
+        // 需求数与研发任务数直接搬事实源：列表「交付進度」列要同时展示这三层进度，
+        // 任何一处前端另算都会出现「卡片≠行级导出」（任务22 的同源红线）
+        vo.setRequirementTotal(fact.getRequirementTotal());
+        vo.setTaskTotal(fact.getTaskTotal());
+        vo.setTaskCompleted(fact.getTaskCompleted());
         vo.setBlockedCount(fact.getDeliveryItemBlocked());
         vo.setNextDeliveryDate(fact.getNextDeliveryDate());
         // 逾期标记随汇总刷新（有未完成项已过计划结束日即视为逾期）

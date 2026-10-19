@@ -30,12 +30,20 @@ public class RdmProjectVO {
         private Integer deliveredCount;
         /** 交付项总数 */
         private Integer totalDeliveryCount;
+        /** 范围内需求数（与统计卡/导出同源于事实源，不得前端另算） */
+        private Integer requirementTotal;
+        /** 研发任务总数（项目下全部交付项的任务相加） */
+        private Integer taskTotal;
+        /** 已完成研发任务数 */
+        private Integer taskCompleted;
         /** 下一个交付项计划完成日期（未完成项中最早的 plan_end_date） */
         private String nextDeliveryDate;
         /** 阻塞中的交付项数 */
         private Integer blockedCount;
         /** 待决策事项数（延期申请待裁决 + 待审批变更） */
         private Integer pendingDecisionCount;
+        /** 最后更新人姓名快照（rdm:schema:v3.14 起有值；存量行为空，界面降级显示 -） */
+        private String updatedBy;
         private String updatedAt;
     }
 
@@ -66,6 +74,8 @@ public class RdmProjectVO {
         private String opsLeadUserName;
         private String planStartDate;
         private String planEndDate;
+        /** 默認驗收路徑（A/B，詳情頁回顯與編輯回填用） */
+        private String defaultAcceptancePath;
         private String status;
         private Integer pausedFlag;
         private Integer riskFlag;
@@ -76,6 +86,8 @@ public class RdmProjectVO {
         private Integer blockedCount;
         private Integer pendingDecisionCount;
         private String updatedAt;
+        /** 最后更新人姓名快照（详情页「最后更新」footer 与列表列同源） */
+        private String updatedBy;
         /** 在途成员 */
         private List<MemberItem> members = new ArrayList<>();
         private String scopeSummaryJson;

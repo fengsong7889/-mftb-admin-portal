@@ -7,6 +7,7 @@
  */
 import ExcelJS from 'exceljs'
 import type { RdmRequirementRow } from '../../api/rdm'
+import { formatHandlers, formatPerson } from './handlerDisplay'
 import {
   formatRdmReqNo,
   getRdmPriorityLabel,
@@ -84,11 +85,12 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
       priority: getRdmPriorityLabel(r.priority),
       status: label(RDM_STATUS_LABEL, r.status as RdmStatus),
       stage: label(RDM_STAGE_LABEL, r.stage as RdmStage),
-      submitterName: r.submitterName ?? '',
+      submitterName: formatPerson({ name: r.submitterName, empNo: r.submitterEmpNo }),
       submitDeptName: r.submitDeptName ?? '',
       pmName: r.pmName ?? '',
       devOwnerName: r.devOwnerName ?? '',
-      currentHandler: r.currentHandler ?? '',
+      // 与表格/看板同源：导出不折叠，多人全部列出；无未完成任务时回退流程推演值
+      currentHandler: formatHandlers(r.handlers, r.currentHandler),
       submitTime: r.submitTime ?? '',
       expectDate: r.expectDate ?? '',
       promisedPrdDate: r.promisedPrdDate ?? '',

@@ -189,6 +189,10 @@ public class RdmDeliveryVO {
         private Long id;
         private String code;
         private String name;
+        /** 所属项目ID（sprint/version 必填，hotfix 可空；存量未补挂时为 null） */
+        private Long projectId;
+        /** 所属项目名称（列表展示用，联表 rdm_project 取） */
+        private String projectName;
         private String iterationType;
         private String startDate;
         private String endDate;

@@ -99,6 +99,7 @@ class RdmClaimReassignTest {
                 configService, notifyService,
                 mock(OaRequestService.class), mock(RdmIntakeCallbackService.class),
                 permissionService, jdbcTemplate, accessGuard,
+                mock(com.mftb.admin.mapper.RdmWorkTaskMapper.class),
                 mock(RdmIntakePolicyService.class), mock(RdmIntakeRoundService.class),
                 mock(com.mftb.admin.service.RdmReleaseService.class),
                 mock(com.mftb.admin.service.RdmFlowVersionGuard.class),

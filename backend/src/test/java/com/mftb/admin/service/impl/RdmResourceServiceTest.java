@@ -8,6 +8,7 @@ import com.mftb.admin.dto.RdmResourceVO;
 import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmResourceMember;
+import com.mftb.admin.entity.RdmTaskTypeConfig;
 import com.mftb.admin.entity.RdmTestBatch;
 import com.mftb.admin.entity.RdmWorkCalendar;
 import com.mftb.admin.entity.RdmWorkTask;
@@ -23,6 +24,7 @@ import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmIdempotentService;
 import com.mftb.admin.service.RdmRequirementService;
+import com.mftb.admin.service.RdmTaskTypeService;
 import com.mftb.admin.service.RdmTestBatchService;
 import com.mftb.admin.service.RdmWorkingDayCalculator;
 import com.mftb.admin.util.OperatorResolver;
@@ -44,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -89,6 +92,7 @@ class RdmResourceServiceTest {
     private RdmIdempotentService idempotentService;
     private RdmRequirementService requirementService;
     private RdmTestBatchService testBatchService;
+    private RdmTaskTypeService taskTypeService;
     private RdmResourceServiceImpl service;
 
     private static final String FROM = "2026-10-19";
@@ -109,6 +113,9 @@ class RdmResourceServiceTest {
         idempotentService = mock(RdmIdempotentService.class);
         requirementService = mock(RdmRequirementService.class);
         testBatchService = mock(RdmTestBatchService.class);
+        taskTypeService = mock(RdmTaskTypeService.class);
+        // 任务类型字典 stub：categoryOf 按内置三桶兑底，保证分桶 switch 不落 null
+        when(taskTypeService.categoryOf(anyString())).thenAnswer(inv -> builtinCategoryOf(inv.getArgument(0)));
         RdmWorkCalendarMapper calendarMapper = mock(RdmWorkCalendarMapper.class);
         when(calendarMapper.selectList(any())).thenReturn(List.of());
         // 名册默认空：B-2 名册表尚未纳入人时，聚合仍走项目成员/单据负责人（不影响 B-1 用例）
@@ -117,7 +124,7 @@ class RdmResourceServiceTest {
         service = new RdmResourceServiceImpl(taskMapper, requirementMapper, testBatchMapper,
                 projectMemberMapper, resourceMemberMapper, userMapper, accessGuard, operatorResolver,
                 new RdmWorkingDayCalculator(calendarMapper), jdbcTemplate, deliveryService, idempotentService,
-                requirementService, testBatchService);
+                requirementService, testBatchService, taskTypeService);
 
         SysUser current = user(10L, "张三", "MF00010", "研发一部");
         when(operatorResolver.currentUser()).thenReturn(current);
@@ -427,5 +434,14 @@ class RdmResourceServiceTest {
         assertTrue(r.isSuccess());
         assertEquals("requirement", r.getSource());
         verify(requirementService).batchAssign(List.of(100L), 20L);
+    }
+
+    /** 内置三桶兑底（与 RdmTaskTypeServiceImpl.legacyCategoryOf 同语义），供 taskTypeService stub 用 */
+    private static String builtinCategoryOf(String code) {
+        return switch (code == null ? "" : code) {
+            case RdmTaskTypeConfig.CATEGORY_DESIGN -> RdmTaskTypeConfig.CATEGORY_DESIGN;
+            case RdmTaskTypeConfig.CATEGORY_QA -> RdmTaskTypeConfig.CATEGORY_QA;
+            default -> RdmTaskTypeConfig.CATEGORY_DEV;
+        };
     }
 }

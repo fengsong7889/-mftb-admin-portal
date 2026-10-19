@@ -51,14 +51,12 @@ import {
   RDM_TASK_STATUS,
   RDM_TASK_STATUS_COLOR,
   RDM_TASK_STATUS_LABEL,
-  RDM_TASK_TYPE_COLOR,
-  RDM_TASK_TYPE_LABEL,
   RDM_STATUS_LABEL,
   type RdmTaskAction,
   type RdmTaskStatus,
-  type RdmTaskType,
   type RdmStatus,
 } from '../../constants/rdm'
+import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
 import './index.css'
 
 /** 视角筛选 */
@@ -84,6 +82,8 @@ const GROUP_MODE_OPTIONS = [
 export default function DeliveryBoard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  // 任务类型字典（业务可配置）：类型标签/颜色从接口取，未知 code 兑底原文
+  const { labelOf: taskTypeLabelOf, colorOf: taskTypeColorOf } = useTaskTypeDict()
   const { hasPermission } = useAuth()
   /** 两个视图共用一个页面：新建路由会撞 MenuTabs 的非菜单页名兜底表上限（已达 20/20） */
   const [mode, setMode] = useState('task')
@@ -331,8 +331,8 @@ export default function DeliveryBoard() {
     {
       title: '類型', dataIndex: 'taskType', key: 'taskType', width: 100,
       render: (v: string) => {
-        const color = RDM_TASK_TYPE_COLOR[v as RdmTaskType] ?? '#8C8C8C'
-        return <Tag style={{ margin: 0, color, borderColor: `${color}66`, background: `${color}12` }}>{RDM_TASK_TYPE_LABEL[v as RdmTaskType] ?? v}</Tag>
+        const color = taskTypeColorOf(v)
+        return <Tag style={{ margin: 0, color, borderColor: `${color}66`, background: `${color}12` }}>{taskTypeLabelOf(v)}</Tag>
       },
     },
     {

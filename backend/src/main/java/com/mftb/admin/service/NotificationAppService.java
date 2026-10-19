@@ -30,6 +30,12 @@ public class NotificationAppService {
     public static final String MEETING_REMIND = "meeting_remind";
     /** 释放/爽约/管理员操作告知组织者 */
     public static final String MEETING_OPS = "meeting_ops";
+    /**
+     * 产研交付日报：每日晨/晚报定时推送与手动触发时，向在途项目的项目经理/产品负责人发工作通知。
+     * <p>群报走另一条链路（{@code sys_notification_channel} 的 rdm 场景群机器人），本场景只管个人直发；
+     * 未绑定应用时 {@code resolve} 返回 null，日报作业据此跳过个人通知并记日志，不阻塞群报。
+     */
+    public static final String RDM_DAILY_REPORT = "rdm_daily_report";
     private static final String SIGN_SECRET = DingTalkAppService.SIGN_SECRET;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final JdbcTemplate jdbc;
@@ -47,7 +53,9 @@ public class NotificationAppService {
             MEETING_REMIND,
             List.of("會議開始前提醒", "會議開始前 N 分鐘由定時作業觸發（同一場會只發一次）", "必參與會人與選參與會人及組織者"),
             MEETING_OPS,
-            List.of("會議室釋放告知", "超時未簽到自動釋放或行政手動釋放時", "會議組織者"));
+            List.of("會議室釋放告知", "超時未簽到自動釋放或行政手動釋放時", "會議組織者"),
+            RDM_DAILY_REPORT,
+            List.of("產研交付日報", "每日晨/晚報定時推送與管理員手動觸發時", "在途項目的項目經理與產品負責人（已綁定釘釘用戶 ID）"));
 
     public List<View> list(String name, Boolean enabled) {
         List<ScenarioView> scenarios = scenarios();

@@ -83,12 +83,13 @@ export function canSelectResult(result: RdmAcceptResult | string, stat: Acceptan
 
 /** 提交前校验，返回第一条不满足的原因（页面直接 message 出来） */
 export function validateAcceptance(input: AcceptanceValidationInput): string | null {
-  if (input.total === 0) return '請至少填寫一條驗收用例（可從 PRD 驗收標準導入）'
-  if (input.hasEmptyTitle) return '驗收用例標題不能為空'
-  if (input.unjudged > 0) return `還有 ${input.unjudged} 條用例未判定，請逐條給出結論後再提交`
+  // 检查项不再自动带入，空列表是常见误操作；拦住它才不让「逐项验收」退化成只勾一个通过
+  if (input.total === 0) return '請至少填寫一條檢查項（點右上角「新增檢查項」）'
+  if (input.hasEmptyTitle) return '檢查項內容不能為空'
+  if (input.unjudged > 0) return `還有 ${input.unjudged} 條檢查項未判定，請逐條給出結論後再提交`
   if (!input.testEnv) return '請選擇驗收環境（返工時需要能復現）'
   if (!canSelectResult(input.result, input)) {
-    if (input.result === RDM_ACCEPT_RESULT.PASS) return `有 ${input.defects} 條用例未通過，不能判定驗收通過`
+    if (input.result === RDM_ACCEPT_RESULT.PASS) return `有 ${input.defects} 條檢查項未通過，不能判定驗收通過`
     if (input.result === RDM_ACCEPT_RESULT.CONDITIONAL) {
       return input.defects === 0
         ? '全部用例都已通過，請直接判定驗收通過'

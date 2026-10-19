@@ -35,7 +35,8 @@ import {
   type RdmGanttTask,
   type RdmTaskPlanItem,
 } from '../../api/rdm'
-import { RDM_ROLE_LABEL, RDM_TASK_TYPE_COLOR, RDM_TASK_TYPE_LABEL, type RdmRoleCode, type RdmTaskType } from '../../constants/rdm'
+import { RDM_ROLE_LABEL, type RdmRoleCode } from '../../constants/rdm'
+import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
 import GanttBoard, { type GanttRow, type GanttDraft, type GanttTask } from './components/GanttBoard'
 import './index.css'
 
@@ -58,7 +59,8 @@ const GANTT_MODE_KEY: Record<GanttMode, string> = {
 
 interface Filters {
   keyword?: string
-  taskType?: RdmTaskType
+  // 任务类型已字典化：筛选值接受任意 code（新类型如 android/ios 不再限定内置六码）
+  taskType?: string
   status?: string
   onlyOverdue?: boolean
   onlyUnscheduled?: boolean
@@ -67,6 +69,8 @@ interface Filters {
 export default function RequirementGantt() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  // 任务类型字典（业务可配置）：筛选选项与图例同源，label/color 均从接口取
+  const { options: taskTypeOptions, items: taskTypeItems } = useTaskTypeDict()
   const [searchParams, setSearchParams] = useSearchParams()
   const { hasPermission, user } = useAuth()
   const myId = (user as { id?: number } | null)?.id ?? -1
@@ -343,7 +347,7 @@ export default function RequirementGantt() {
         <div className="search-section">
           <div className="rdm-gantt-filters">
             <Input allowClear placeholder={t('rdm.gantt.keywordPlaceholder')} prefix={<SearchOutlined />} value={filters.keyword} onChange={e => setFilters(f => ({ ...f, keyword: e.target.value }))} onPressEnter={() => setPageNum(1)} />
-            <Select allowClear placeholder={t('rdm.gantt.taskTypePlaceholder')} style={{ width: '100%' }} value={filters.taskType} options={Object.entries(RDM_TASK_TYPE_LABEL).map(([k, v]) => ({ value: k, label: v }))} onChange={v => setFilters(f => ({ ...f, taskType: v }))} />
+            <Select allowClear placeholder={t('rdm.gantt.taskTypePlaceholder')} style={{ width: '100%' }} value={filters.taskType} options={taskTypeOptions} onChange={v => setFilters(f => ({ ...f, taskType: v }))} />
             <Select allowClear placeholder={t('rdm.gantt.taskStatusPlaceholder')} style={{ width: '100%' }} value={filters.status} options={[{ value: 'todo', label: t('rdm.gantt.statusTodo') }, { value: 'doing', label: t('rdm.gantt.statusDoing') }, { value: 'done', label: t('rdm.gantt.statusDone') }, { value: 'blocked', label: t('rdm.gantt.statusBlocked') }]} onChange={v => setFilters(f => ({ ...f, status: v }))} />
             <div className="rdm-gantt-filter-checks">
               <Checkbox checked={!!filters.onlyUnscheduled} onChange={e => setFilters(f => ({ ...f, onlyUnscheduled: e.target.checked }))}>{t('rdm.gantt.onlyUnscheduled')}</Checkbox>
@@ -414,8 +418,8 @@ export default function RequirementGantt() {
 
       <div className="rdm-gantt-legend">
         <span className="rdm-gantt-legend-title">{t('rdm.gantt.legend')}</span>
-        {Object.entries(RDM_TASK_TYPE_LABEL).map(([k, v]) => (
-          <span key={k} className="rdm-gantt-legend-item"><i style={{ background: RDM_TASK_TYPE_COLOR[k as RdmTaskType] }} />{v}</span>
+        {taskTypeItems.map(i => (
+          <span key={i.code} className="rdm-gantt-legend-item"><i style={{ background: i.color }} />{i.label}</span>
         ))}
         <span className="rdm-gantt-legend-sep" />
         <span className="rdm-gantt-legend-item"><i className="lg-mine" />{t('rdm.gantt.legendMine')}</span>

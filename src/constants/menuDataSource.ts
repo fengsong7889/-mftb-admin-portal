@@ -216,7 +216,6 @@ export const keyToPath: Record<string, string> = {
   // 二级「提交需求」是业务侧入口（我的提交 + 待我審批）
   'rdm-pool-group':       '/rdm-intake-approval',
   'rdm-intake-approval':  '/rdm-intake-approval',
-  'rdm-acceptance':       '/rdm-acceptance',
   // 需求總看板已升为一级分组：分组折叠态跳转指向首个子页，交付看板/質量/追溯/周报各自成菜单
   'rdm-dashboard':          '/rdm-dashboard',
   'rdm-dashboard-board':    '/rdm-dashboard',
@@ -242,6 +241,9 @@ export const keyToPath: Record<string, string> = {
   // v3.13 新建分组（声明必须在叶子之前，否则 pathToKey 反向映射被分组覆盖，叶子高亮失效）
   'rdm-test-quality-group':  '/rdm-test',
   'rdm-release-accept-group': '/rdm-acceptance',
+  // 驗收中心叶子菜单必须声明在同路径分组「之后」：pathToKey 反向映射按声明顺序后写覆盖先写，
+  // 早于分组声明会让 '/rdm-acceptance' 归到分组 key 上，侧边栏叶子项拿不到高亮（见本文件分组声明处注释）。
+  'rdm-acceptance':       '/rdm-acceptance',
   // V3 分批交付「測試工作台 / 發布中心」（种子 rdm-delivery-test / rdm-delivery-release）
   'rdm-delivery-test':       '/rdm-test',
   'rdm-delivery-release':    '/rdm-release',
@@ -251,6 +253,13 @@ export const keyToPath: Record<string, string> = {
   'rdm-config-routing':   '/rdm-config-routing',
   'rdm-config-sla':       '/rdm-config-sla',
   'rdm-config-score':     '/rdm-score-rule',
+  'rdm-task-type-config': '/rdm-task-type-config',
+  // 進度日報（一级菜单）：推送配置 / 模板配置 / 发送记录 / 手动触发
+  'rdm-daily-report-group': '/rdm-daily-report-rules',
+  'rdm-daily-report-rule': '/rdm-daily-report-rules',
+  'rdm-daily-report-template': '/rdm-daily-report-templates',
+  'rdm-daily-report-record': '/rdm-daily-report-records',
+  'rdm-daily-report-trigger': '/rdm-daily-report-trigger',
   // 用車管理（階段 B1）—— 歸屬物資管理系統（EAM）的顶级分组「用車管理」。
   // 職責邊界：車輛檔案/辦理/台賬/維護等業務菜單全部在 EAM；OA 側只保留流程定義
   // （biz_oa_process: vehicle_use）、審批待辦與流程中心一張跳轉入口卡，不承載任何
@@ -313,6 +322,12 @@ pathToKey['/rdm-task'] = 'rdm-delivery-board'
 // 分配产品经理独立页：后端 batch-assign 校 rdm-intake 的 edit，此处归属保持一致
 pathToKey['/rdm-assign'] = 'rdm-intake'
 pathToKey['/rdm-iteration-form'] = 'rdm-delivery-iteration'
+// 進度日報的两个独立表单页（非菜单）：归属各自列表页，保证侧栏高亮/页签名/权限守卫有锚点
+pathToKey['/rdm-daily-report-rule-form'] = 'rdm-daily-report-rule'
+pathToKey['/rdm-daily-report-template-form'] = 'rdm-daily-report-template'
+// 移動端日報頁：從釘釘通知連結打開，無獨立菜單，側欄高亮與權限守衛都錨到「推送配置」
+// （後端快照介面的 @RequirePermission 也以 rdm-daily-report-rule 為主錨點、anyOf 放行各 RDM 承載菜單）
+pathToKey['/rdm-daily'] = 'rdm-daily-report-rule'
 // 团队负载子页（人员详情/分派表单）归属同一菜单
 pathToKey['/rdm-resource-load'] = 'rdm-resource-load'
 // V3 分批交付子页（非独立菜单）：归属按后端 @RequirePermission 的菜单锚点，守卫与页签高亮才有锚点
@@ -419,8 +434,8 @@ export const RDM_DETAIL_PATH = '/rdm-detail'
 /** 需求詳情默認歸屬菜單（需求跟進清單，即 pathToKey 裡登記的歸屬）與其列表頁路徑 */
 const RDM_DETAIL_DEFAULT_MENU_KEY = 'rdm-requirement'
 
-/** 允許作為需求詳情歸屬的來源菜單白名單：只列那三張會跳詳情的列表頁所掛的菜單 key */
-export const RDM_DETAIL_FROM_MENUS: readonly string[] = ['rdm-intake-approval', 'rdm-intake', 'rdm-requirement']
+/** 允許作為需求詳情歸屬的來源菜單白名單：只列那些會跳詳情的列表頁所掛的菜單 key */
+export const RDM_DETAIL_FROM_MENUS: readonly string[] = ['rdm-intake-approval', 'rdm-intake', 'rdm-requirement', 'rdm-acceptance']
 
 /**
  * 白名單校驗：只有那三張需求列表的菜單 key 才能作為來源。
@@ -453,6 +468,50 @@ export function resolveRdmDetailBackPath(search: string): string {
   const from = new URLSearchParams(search).get('from')
   const backPath = isRdmDetailFromMenu(from) ? keyToPath[from] : undefined
   return backPath || keyToPath[RDM_DETAIL_DEFAULT_MENU_KEY] || '/rdm-requirement'
+}
+
+/** ────────────────────────────────────────────────────────────
+ *  2.2 提交需求表單頁的返回落點（返回要回到點進來的那張菜單）
+ *
+ *  歷史 bug：/rdm-submit 的「返回」與「取消」寫死跳個人工作台，從「提需求」菜單點
+ *  「提需求」進來的人按返回卻落到工作台，剛存的草稿在那裡根本看不到。
+ *  與詳情頁同一解法：入口帶 from 標明來源，返回落點跟隨來源；from 必須先過白名單再查
+ *  keyToPath，禁止拿 URL 參數直接當路徑跳（開放重定向）。只影響落點，不參與鑒權。
+ *  ──────────────────────────────────────────────────────────── */
+
+/** 提交需求頁 pathname（個人工作台與兩張需求列表共用的表單入口） */
+export const RDM_SUBMIT_PATH = '/rdm-submit'
+
+/** 允許作為提交需求返回來源的菜單 key：只列真的放了「提需求」入口的那幾張頁（治理側不提供入口） */
+export const RDM_SUBMIT_FROM_MENUS: readonly string[] = ['rdm-workbench', 'rdm-requirement', 'rdm-intake-approval']
+
+/** 無來源時的默認落點：草稿回「提需求」（草稿只在那張頁展示），新建回個人工作台（歷史行為） */
+const RDM_SUBMIT_DEFAULT_INTAKE_MENU_KEY = 'rdm-intake-approval'
+const RDM_SUBMIT_DEFAULT_WORKBENCH_MENU_KEY = 'rdm-workbench'
+
+/** 白名單校驗：拼錯/偽造的 from 一律視為沒有來源，不得讓 URL 參數決定用戶被丟到哪一頁 */
+function isRdmSubmitFromMenu(menuKey: string | null | undefined): menuKey is string {
+  return !!menuKey && RDM_SUBMIT_FROM_MENUS.includes(menuKey)
+}
+
+/**
+ * 提交需求頁返回歸屬的菜單 key（落點與按鈕文案共用同一個值，才會出現「返回提需求」就真回提需求）。
+ * @param search 當前頁的 query 串
+ * @param isDraftEdit 是否草稿續編（帶 ?id= 進來）：無來源時草稿必須回「提需求」才找得到
+ */
+export function resolveRdmSubmitBackMenuKey(search: string, isDraftEdit = false): string {
+  const from = new URLSearchParams(search).get('from')
+  if (isRdmSubmitFromMenu(from)) return from
+  return isDraftEdit ? RDM_SUBMIT_DEFAULT_INTAKE_MENU_KEY : RDM_SUBMIT_DEFAULT_WORKBENCH_MENU_KEY
+}
+
+/** 生成提交需求頁路徑 + query；來源不在白名單（如治理側）時不帶 from，URL 與歷史鏈接保持一致 */
+export function buildRdmSubmitPath(query?: { id?: number; from?: string | null }): string {
+  const params = new URLSearchParams()
+  if (query?.id) params.set('id', String(query.id))
+  if (isRdmSubmitFromMenu(query?.from)) params.set('from', query.from)
+  const qs = params.toString()
+  return qs ? `${RDM_SUBMIT_PATH}?${qs}` : RDM_SUBMIT_PATH
 }
 
 /** ────────────────────────────────────────────────────────────

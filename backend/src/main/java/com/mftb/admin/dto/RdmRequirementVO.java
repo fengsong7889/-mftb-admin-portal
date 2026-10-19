@@ -75,6 +75,12 @@ public class RdmRequirementVO {
     private String versionNo;
     private String currentHandler;
 
+    /**
+     * 當前處理人聚合：該需求下未完成任務（todo/doing/blocked）的負責人，按 user 去重。
+     * <p>多人並行時全部返回，列表自行折疊；無未完成任務時為空，前端回退展示 {@link #currentHandler} 的流程推演值。
+     */
+    private java.util.List<HandlerPerson> handlers;
+
     /* ── 状态与风险 ── */
     private Integer progress;
     private Boolean blockedFlag;
@@ -116,6 +122,8 @@ public class RdmRequirementVO {
     /* ── V3 分层链路（Batch 2 / Phase 2） ── */
     /** 所属项目ID */
     private Long projectId;
+    /** 所属项目名称（详情联表 rdm_project 取；归属体系改造后项目是一等属性，不再只回 id 让前端拼「項目 #id」） */
+    private String projectName;
     /** 需求种类：aggregate（聚合）/ execution（执行） */
     private String requirementKind;
     /** 结构父需求ID（主子关系） */
@@ -152,6 +160,14 @@ public class RdmRequirementVO {
 
     /** 当前登录人可执行的流转动作 */
     private List<AllowedAction> allowedActions = new ArrayList<>();
+
+    /** 處理中人員：一份未完成任務的負責人快照（帶工號，供列表展示與按人篩選） */
+    @Data
+    public static class HandlerPerson {
+        private Long userId;
+        private String name;
+        private String empNo;
+    }
 
     /** 需求关联对象 */
     @Data

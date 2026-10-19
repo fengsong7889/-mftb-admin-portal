@@ -1437,6 +1437,10 @@
 }
 .rdm-g2-row.mine .rdm-g2-labels { background: #FFF9F3; }
 .rdm-g2-row.group .rdm-g2-labels { background: #FAFAFA; }
+/* 展开热区扩大到整块标题区：光标提示 + hover 反馈（§B.2 品牌橙浅底） */
+.rdm-g2-labels.group.expandable { cursor: pointer; user-select: none; transition: background .15s; }
+.rdm-g2-labels.group.expandable:hover { background: #FFF7E6; }
+.rdm-g2-labels.group.expandable:focus-visible { outline: 2px solid #E8720C; outline-offset: -2px; }
 .rdm-g2-labels.head {
   z-index: 6; height: 46px; color: #8C8C8C; font-weight: 600;
   background: #fff; border-bottom: 1px solid #e8eaed;
@@ -1545,6 +1549,9 @@
 }
 .rdm-g2-overdue-dot { position: absolute; top: 18px; width: 7px; height: 7px; border-radius: 50%; background: #FF4D4F; z-index: 3; }
 .rdm-g2-unscheduled { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #BFBFBF; font-style: italic; }
+/* 调整模式下的未排期入口 chip：虚线橙色描边，点击唤起日期编辑器（§A.1 品牌橙令牌） */
+.rdm-g2-unscheduled.add { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border: 1px dashed #E8720C; border-radius: 4px; background: #FFF7E6; color: #E8720C; font-style: normal; cursor: pointer; transition: background .15s, border-color .15s; }
+.rdm-g2-unscheduled.add:hover { background: #FFE7BA; border-color: #D46B08; border-style: solid; }
 .rdm-g2-sameday { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10px; color: #8C8C8C; }
 
 /* 悬浮卡片：标题 + 标签-取值键值行，层次清晰、可一眼扫读 */
@@ -2379,6 +2386,127 @@
 /* 需求验收：视角切换与交付项级标识 */
 .rdm-v3-acceptance-mode {
   margin-bottom: 12px;
+}
+
+/* 验收用例卡片流：每条用例一张卡，长文本完整可见（替代原 220px 单行 Input 表格） */
+.rdm-case-source {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 12px;
+}
+
+.rdm-case-empty {
+  text-align: center;
+  color: #8c8c8c;
+  padding: 24px;
+}
+
+.rdm-case-card {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-case-card:hover {
+  border-color: #ffe7d1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.rdm-case-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.rdm-case-no {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff7e6;
+  color: #e8720c;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rdm-case-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rdm-case-head-tail {
+  flex: 1;
+}
+
+.rdm-case-field {
+  margin-bottom: 8px;
+}
+
+.rdm-case-field:last-child {
+  margin-bottom: 0;
+}
+
+.rdm-case-field-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 4px;
+}
+
+.rdm-case-inline-field .rdm-case-field-label {
+  margin-bottom: 0;
+}
+
+.rdm-case-fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* 交付项验收证据：一行一个链接的录入行 */
+.rdm-evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 需求验收用例的证据附件行（上传缩略图 / 回显懒取图共用） */
+.rdm-case-evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rdm-case-evidence-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 历次验收展开的用例明细 */
+.rdm-history-cases {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rdm-history-case {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .rdm-v3-req-title-cell {

@@ -100,6 +100,13 @@ function canMockWrite(err: unknown): boolean {
 
 /* ==================== 类型定义 ==================== */
 
+/** 處理中人員快照（當前處理人聚合列） */
+export interface RdmHandlerPerson {
+  userId?: number | null
+  name: string
+  empNo?: string | null
+}
+
 /** 需求列表行 */
 export interface RdmRequirementRow {
   id: number
@@ -125,6 +132,11 @@ export interface RdmRequirementRow {
   devOwnerName?: string | null
   dispatcherName?: string | null
   currentHandler?: string | null
+  /**
+   * 當前處理人聚合：未完成任務（todo/doing/blocked）的負責人，按人去重。
+   * 多人並行時全部返回；為空時列表回退展示 currentHandler（流程推演值）。
+   */
+  handlers?: RdmHandlerPerson[] | null
   expectDate?: string | null
   promisedPrdDate?: string | null
   planReleaseDate?: string | null
@@ -366,8 +378,10 @@ export interface RdmTransitionForm {
   pmUserId?: number
   pmName?: string
   blockReason?: string
-  /** 所属迭代（提交排期时选填，选了才能进迭代的产能对账与周报过滤） */
+  /** 所属迭代（提交排期时必填；dispatch/accept 选填，选了才能进迭代的产能对账与周报过滤） */
   iterationCode?: string
+  /** 所属项目（归属体系改造）：dispatch/accept 选填，schedule 必填；服务端校验与迭代项目一致 */
+  projectId?: number | null
 }
 
 /** 验收提交 */
@@ -402,14 +416,41 @@ export interface RdmAcceptanceCaseForm {
   result?: string
   severity?: string
   remark?: string
+  /** 证据附件（截图/记录）：上传接口返回的 Data URL 原样回传，服务端不落盘 */
+  evidences?: RdmAcceptanceEvidencePayload[]
 }
 
-/** 验收用例（返回态，带序号与缺陷统计） */
-export interface RdmAcceptanceCase extends RdmAcceptanceCaseForm {
+/** 验收证据附件：提交态（含 Base64 正文） */
+export interface RdmAcceptanceEvidencePayload {
+  name: string
+  type: string
+  size?: number
+  dataUrl: string
+}
+
+/**
+ * 验收证据附件：回显态。
+ * <p>后端刻意不回 dataUrl 正文：一条用例可挂数张图，返工几轮累乘会把一次验收历史
+ * 撑到几十 MB。正文由 fetchAcceptanceEvidence 按 index 单张取。
+ */
+export interface RdmAcceptanceEvidenceMeta {
+  index: number
+  name?: string | null
+  type?: string | null
+  size?: number | null
+}
+
+/**
+ * 验收用例（返回态，带序号与缺陷统计）。
+ * <p>evidences 与提交态不同构（只有元信息、没有正文），故用 Omit 挡掉继承。
+ */
+export interface RdmAcceptanceCase extends Omit<RdmAcceptanceCaseForm, 'evidences'> {
   /** 已落库的用例必有结论 */
   result: string
   id: number
   seq: number
+  /** 证据附件元信息（不含正文） */
+  evidences?: RdmAcceptanceEvidenceMeta[]
   acceptanceId?: number | null
 }
 
@@ -675,6 +716,8 @@ export interface RdmRequirementQuery {
   overdueOnly?: boolean
   /** 提出人用户 ID */
   submitterUserId?: number
+  /** 當前處理人用户 ID：命中該人負責的未完成任務（todo/doing/blocked）所屬需求 */
+  handlerUserId?: number
   /** V3：按所属项目过滤 */
   projectId?: number
   /** V3：按需求种类过滤 aggregate/execution */
@@ -853,6 +896,18 @@ export async function transitionRequirement(id: number, form: RdmTransitionForm)
     }
     throw err
   }
+}
+
+/**
+ * 调整迭代（归属体系改造）：属性变更而非状态流转，独立端点。
+ * <p>后端会同步该需求下未完成任务的迭代归属（需求迭代与任务迭代同源），
+ * 用于「研发 bug / 需求不足要放另外版本」场景（对齐 Jira Move to sprint）。
+ */
+export async function changeRequirementIteration(
+  id: number,
+  form: { projectId?: number | null; iterationCode: string; remark?: string },
+) {
+  return request.put<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/iteration`, form)
 }
 
 /** 批量分配产品经理（需求池） */
@@ -1164,6 +1219,10 @@ export interface RdmIterationItem {
   id: number
   code: string
   name: string
+  /** 所属项目ID（sprint/version 必填，hotfix 可空；存量未补挂时为 null） */
+  projectId?: number | null
+  /** 所属项目名称（列表展示用，后端联表 rdm_project 取） */
+  projectName?: string | null
   iterationType?: string
   startDate?: string
   endDate?: string
@@ -2110,6 +2169,8 @@ export interface RdmIterationForm {
   /** 迭代編碼：系統發號，前端不傳（編輯時後端保留原碼） */
   code?: string
   name: string
+  /** 所属项目ID：sprint/version 必传，hotfix 可空（服务端二次校验） */
+  projectId?: number | null
   iterationType?: string
   startDate: string
   endDate: string
@@ -2245,6 +2306,15 @@ export async function fetchAcceptanceHistory(reqId: number): Promise<RdmAcceptan
     if (isBackendUnavailable(err)) return mockAcceptanceHistory(reqId)
     throw err
   }
+}
+
+/** 单张验收证据正文（Data URL）：按需取，不随验收历史批量下发 */
+export async function fetchAcceptanceEvidence(
+  reqId: number, caseId: number, index: number,
+): Promise<{ name?: string | null; type?: string | null; dataUrl: string }> {
+  return request.get<unknown, { name?: string | null; type?: string | null; dataUrl: string }>(
+    `/rdm/requirement/${reqId}/acceptance/case/${caseId}/evidence/${index}`, SILENT,
+  )
 }
 
 /** 质量口径看板 */
@@ -2616,8 +2686,15 @@ export interface RdmProjectListItem {
   planStartDate: string; planEndDate: string;
   status: string; pausedFlag: RdmTriStateFlag; riskFlag: RdmTriStateFlag; overdueFlag: RdmTriStateFlag;
   deliveredCount: number; totalDeliveryCount: number;
+  /**
+   * 三层进度（后端事实源直传，禁止前端另算）：范围内需求数 / 研发任务总数 / 已完成任务数。
+   * <p>声明为可选是因为 RdmProjectDetail 继承本接口，而详情端点不返这三个字段。
+   */
+  requirementTotal?: number | null; taskTotal?: number | null; taskCompleted?: number | null;
   nextDeliveryDate: string | null; blockedCount: number; pendingDecisionCount: number;
   updatedAt: string;
+  /** 最后更新人（后端 rdm:schema:v3.14 起有值；存量行为空，界面降级显示 -） */
+  updatedBy?: string | null;
 }
 
 export interface RdmProjectDetail extends RdmProjectListItem {
@@ -2688,11 +2765,25 @@ export interface RdmProjectQuery {
    * <p>只给列表接口；统计卡与导出带上了反而会把卡片口径筛成自己筛出的数。
    */
   drill?: string;
+  /** 产品负责人筛选（后端 RdmProjectDTO.Query 已支持，与列表/统计卡/导出同一组 filters） */
+  productOwnerUserId?: number;
+  /**
+   * 计划日期区间（yyyy-MM-dd）：与项目「计划开始~计划结束」区间求交集（overlap）。
+   * <p>服务端对非法日期直接报错，不会静默丢掉条件把结果放大成全量。
+   */
+  planDateFrom?: string; planDateTo?: string;
 }
 
 export interface RdmProjectCreateForm {
-  name: string; objective?: string; pmUserId?: number; pmUserName?: string;
-  productOwnerUserId?: number; productOwnerUserName?: string;
+  name: string; objective?: string;
+  /**
+   * 六组负责人同构契约：清空时 userId 传 null、userName 传空串。
+   * <p>后端以「userName 非 null」为本次提供了该角色的哨兵，且实体列标了
+   * {@code updateStrategy = ALWAYS}（MyBatis-Plus 默认 NOT_NULL 会把 null 从 SET 剔除，
+   * 不标就永远清不掉），两边必须同步，缺一侧都会造成「清空不生效」。
+   */
+  pmUserId?: number | null; pmUserName?: string | null;
+  productOwnerUserId?: number | null; productOwnerUserName?: string | null;
   /** 技术负责人（userId 为权威键；清空时 userId 传 null、userName 传空串） */
   techLeadUserId?: number | null; techLeadUserName?: string | null;
   /** UI 设计负责人 */
@@ -2753,6 +2844,12 @@ export interface RdmTestBatchListItem {
 
 export interface RdmTestBatchDetail extends RdmTestBatchListItem {
   scopeSnapshotJson: string; buildIdsJson: string; executorUserIds: number[];
+  /**
+   * 执行人展示签名「姓名(工号)」，服务端一次 IN 查补齐，与 executorUserIds 同序。
+   * 详情展示只认这个字段，不要把 executorUserIds 直接 join 上界面（会显成裸数字）。
+   * 已注销账户的 id 会被服务端剔除，因此本数组可能短于 ID 数组。
+   */
+  executorUserNames?: string[];
   executions: RdmTestExecutionRecord[]; applicantUserName: string;
   returnedReason: string | null; updatedAt: string;
   /** Batch3：并发控制版本（乐观锁），写操作回传为 expectedVersion；非业务范围版本 */
@@ -3613,6 +3710,8 @@ export async function fetchBlockedTasks(deliveryItemId: number): Promise<RdmBloc
 /** 事實查詢條件（與項目列表同一組 filters；統計卡必須跟隨篩選，禁止卡片全量、列表已篩） */
 export interface RdmFactQuery {
   keyword?: string; status?: string; pmUserId?: number;
+  /** 与列表同口径的新增筛选（后端已支持，统计卡与导出跟随同一组 filters，不会口径错位的） */
+  productOwnerUserId?: number; planDateFrom?: string; planDateTo?: string;
   includeTodos?: boolean; includeItems?: boolean;
 }
 

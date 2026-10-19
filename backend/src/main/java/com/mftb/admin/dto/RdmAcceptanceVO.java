@@ -3,6 +3,7 @@ package com.mftb.admin.dto;
 import com.mftb.admin.entity.RdmAcceptance;
 import com.mftb.admin.entity.RdmAcceptanceCase;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.JsonUtils;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -76,6 +77,47 @@ public class RdmAcceptanceVO {
         private String result;
         private String severity;
         private String remark;
+        /** 证据附件元信息（**不含 dataUrl 正文**）：首屏只需知道有几张、叫什么 */
+        private List<EvidenceMeta> evidences = new ArrayList<>();
+    }
+
+    /**
+     * 证据附件元信息。
+     * <p>不随正文下发是刻意为之：一条用例可挂数张图，返工几轮累乘会把一次验收历史
+     * 撑到几十 MB；正文由 GET .../acceptance/case/{caseId}/evidence/{index} 单张取回。
+     */
+    @Data
+    public static class EvidenceMeta {
+
+        /** 在证据数组中的下标，前端据此拼取正文的 URL */
+        private Integer index;
+
+        /** 文件名 */
+        private String name;
+
+        /** MIME 类型 */
+        private String type;
+
+        /** 字节数 */
+        private Long size;
+    }
+
+    /**
+     * 单张证据正文（仅在按需取图时返回）。
+     * <p>dataUrl 已是完整的 {@code data:image/png;base64,...}，前端直接丢给 img src，
+     * 沿用 EAM/资产照片同一口径。
+     */
+    @Data
+    public static class EvidenceContent {
+
+        /** 文件名 */
+        private String name;
+
+        /** MIME 类型 */
+        private String type;
+
+        /** Base64 Data URL 正文 */
+        private String dataUrl;
     }
 
     /** 实体转 VO（不含用例，用例由调用方按需装配） */
@@ -111,6 +153,41 @@ public class RdmAcceptanceVO {
         item.setResult(c.getResult());
         item.setSeverity(c.getSeverity());
         item.setRemark(c.getRemark());
+        item.setEvidences(evidenceMetas(c.getEvidenceJson()));
         return item;
+    }
+
+    /**
+     * 解析证据 JSON。
+     * <p>读路径上空值/脏数据一律降级为「无附件」：不能让一行历史残留把整个验收历史接口打挂。
+     * （与结构迁移的「不得吞异常」不同：那是不记版本会造成下次重跑缺列，这里是只读展示降级。）
+     */
+    public static List<RdmAcceptanceDTO.Evidence> parseEvidences(String evidenceJson) {
+        if (evidenceJson == null || evidenceJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<RdmAcceptanceDTO.Evidence> parsed =
+                    JsonUtils.parseList(evidenceJson, RdmAcceptanceDTO.Evidence.class);
+            return parsed == null ? List.of() : parsed;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    /** 证据元信息列表：只拷 name/type/size，**不把 dataUrl 放进响应** */
+    private static List<EvidenceMeta> evidenceMetas(String evidenceJson) {
+        List<RdmAcceptanceDTO.Evidence> parsed = parseEvidences(evidenceJson);
+        List<EvidenceMeta> metas = new ArrayList<>();
+        for (int i = 0; i < parsed.size(); i++) {
+            RdmAcceptanceDTO.Evidence e = parsed.get(i);
+            EvidenceMeta meta = new EvidenceMeta();
+            meta.setIndex(i);
+            meta.setName(e.getName());
+            meta.setType(e.getType());
+            meta.setSize(e.getSize());
+            metas.add(meta);
+        }
+        return metas;
     }
 }

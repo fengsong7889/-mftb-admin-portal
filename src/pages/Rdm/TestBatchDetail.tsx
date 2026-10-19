@@ -376,7 +376,11 @@ export default function TestBatchDetail() {
               : '-'}
           </Descriptions.Item>
           <Descriptions.Item label="執行人員" span={2}>
-            {detail.executorUserIds?.length ? detail.executorUserIds.join(', ') : '-'}
+            {/* 只渲染服务端解析好的「姓名(工号)」：executorUserIds 是内部主键，
+                直接 join 上界面会显成一串裸数字（人看不出是谁，还白暴露了用户 ID） */}
+            {detail.executorUserNames?.length
+              ? <Space size={4} wrap>{detail.executorUserNames.map((n, i) => <Tag key={i}>{n}</Tag>)}</Space>
+              : '-'}
           </Descriptions.Item>
           {detail.returnedReason && (
             <Descriptions.Item label="退回原因" span={4}>

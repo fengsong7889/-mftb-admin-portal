@@ -9,6 +9,7 @@ import com.mftb.admin.dto.RdmResourceVO;
 import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.RdmResourceMember;
 import com.mftb.admin.entity.RdmRequirement;
+import com.mftb.admin.entity.RdmTaskTypeConfig;
 import com.mftb.admin.entity.RdmTestBatch;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
@@ -24,6 +25,7 @@ import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmIdempotentService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.service.RdmResourceService;
+import com.mftb.admin.service.RdmTaskTypeService;
 import com.mftb.admin.service.RdmTestBatchService;
 import com.mftb.admin.service.RdmWorkingDayCalculator;
 import com.mftb.admin.util.JsonUtils;
@@ -97,6 +99,8 @@ public class RdmResourceServiceImpl implements RdmResourceService {
     private final RdmIdempotentService idempotentService;
     private final RdmRequirementService requirementService;
     private final RdmTestBatchService testBatchService;
+    /** 任务类型字典：分桶改按 category（design/qa/dev），新类型默认 dev 自动入研发桶 */
+    private final RdmTaskTypeService taskTypeService;
 
     @Override
     public RdmResourceVO.Workload workload(String from, String to) {
@@ -282,7 +286,8 @@ public class RdmResourceServiceImpl implements RdmResourceService {
 
         for (RdmWorkTask t : openTasks) {
             RdmResourceVO.UnassignedItem it = new RdmResourceVO.UnassignedItem();
-            boolean design = "design".equals(t.getTaskType());
+            // 分桶改按字典 category：design→设计桶、其余（含新类型如 android/ios）→研发桶
+            boolean design = RdmTaskTypeConfig.CATEGORY_DESIGN.equals(taskTypeService.categoryOf(t.getTaskType()));
             it.setSource(design ? SOURCE_DESIGN_TASK : SOURCE_DEV_TASK);
             it.setItemId(t.getId());
             it.setCode(t.getTaskNo());
@@ -525,9 +530,11 @@ public class RdmResourceServiceImpl implements RdmResourceService {
         Set<String> roles = new LinkedHashSet<>(memberRoles);
         for (RdmWorkTask t : tasks) {
             String type = t.getTaskType() == null ? "" : t.getTaskType();
-            switch (type) {
-                case "design" -> { designTasks++; roles.add(RdmResourceVO.ROLE_DESIGNER); }
-                case "qa" -> { testTasks++; roles.add(RdmResourceVO.ROLE_QA); }
+            // 三类计数改按字典 category（design/qa/dev），未知桶一律 dev 兑底，新类型自动入研发桶
+            String category = taskTypeService.categoryOf(type);
+            switch (category) {
+                case RdmTaskTypeConfig.CATEGORY_DESIGN -> { designTasks++; roles.add(RdmResourceVO.ROLE_DESIGNER); }
+                case RdmTaskTypeConfig.CATEGORY_QA -> { testTasks++; roles.add(RdmResourceVO.ROLE_QA); }
                 default -> { devTasks++; roles.add(RdmResourceVO.ROLE_DEV); }
             }
             if ("blocked".equals(t.getStatus())) {

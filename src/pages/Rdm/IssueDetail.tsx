@@ -402,6 +402,20 @@ export default function IssueDetail() {
   }
 
   // ===== 渲染：詳情模式 =====
+  /*
+   * 無 id 且非新建模式（直接訪問 /rdm-issue）：loadDetail 會直接 return，
+   * loading 初值 true 就永遠轉圈。這裡先給出參數缺失引導，不能讓頁面白屏。
+   */
+  if (!id && !isCreateMode) {
+    return (
+      <div className="content-area">
+        <Alert type="info" showIcon message="未指定問題"
+          description="請從測試工作台、交付項或問題列表進入問題詳情；如需登記新問題請使用「新增問題」。"
+          action={<Button size="small" onClick={() => navigate(-1)}>返回</Button>} />
+      </div>
+    )
+  }
+
   if (loading) {
     return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><Spin size="large" tip="載入中…" /></div>
   }

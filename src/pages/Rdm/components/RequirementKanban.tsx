@@ -14,6 +14,7 @@ import RequirementStageBar from './RequirementStageBar'
 import { PriorityTag, StatusTag, TypeTag } from './Tags'
 import { RDM_BOARD_COLUMNS, formatRdmReqNo, type RdmStatus } from '../../../constants/rdm'
 import type { RdmRequirementRow } from '../../../api/rdm'
+import { formatHandlers, formatPerson, splitHandlers } from '../handlerDisplay'
 // 样式由承载页（需求清单）引入 index.css，本组件不重复引，与其他 components/ 下的组件一致
 
 interface RequirementKanbanProps {
@@ -47,34 +48,42 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
             </Space>
           </div>
           <div className="rdm-board-col-body">
-            {col.items.map(item => (
-              <Tooltip
-                key={item.id}
-                title={`點擊查看詳情並處理：${item.currentHandler ?? '尚無處理人'}`}
-                placement="top"
-              >
-                <div
-                  className={`rdm-board-card ${item.overdueFlag ? 'overdue' : ''}`}
-                  onClick={() => onOpen(item.id)}
+            {col.items.map(item => {
+              // 處理人口径与表格/导出同源：未完成任务负责人（卡片只直出前 2 位），
+              // 历史上这里直接拿 pmName 当處理人，多人并行时看板与表格会给出两个答案
+              const parts = splitHandlers(item.handlers)
+              const cardHandlers = parts
+                ? `${parts.shown.map(formatPerson).join('、')}${parts.rest.length > 0 ? ` +${parts.rest.length}` : ''}`
+                : (item.currentHandler || '')
+              return (
+                <Tooltip
+                  key={item.id}
+                  title={`點擊查看詳情並處理：${formatHandlers(item.handlers, item.currentHandler) || '尚無處理人'}`}
+                  placement="top"
                 >
-                  <div className="rdm-board-card-title">{item.title}</div>
-                  <div className="rdm-board-card-meta">
-                    <TypeTag reqType={item.reqType} />
-                    <PriorityTag priority={item.priority} />
-                    <StatusTag status={item.status} overdue={item.overdueFlag ?? false} />
+                  <div
+                    className={`rdm-board-card ${item.overdueFlag ? 'overdue' : ''}`}
+                    onClick={() => onOpen(item.id)}
+                  >
+                    <div className="rdm-board-card-title">{item.title}</div>
+                    <div className="rdm-board-card-meta">
+                      <TypeTag reqType={item.reqType} />
+                      <PriorityTag priority={item.priority} />
+                      <StatusTag status={item.status} overdue={item.overdueFlag ?? false} />
+                    </div>
+                    <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
+                      <span>{formatRdmReqNo(item.reqNo)}</span>
+                      <span>提出：{formatPerson({ name: item.submitterName, empNo: item.submitterEmpNo })}</span>
+                    </div>
+                    <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
+                      <span>處理人：{cardHandlers || <span style={{ color: '#FF4D4F' }}>未分配</span>}</span>
+                      {item.planReleaseDate && <span>計劃：{item.planReleaseDate}</span>}
+                    </div>
+                    <RequirementStageBar status={item.status} compact overdue={item.overdueFlag ?? false} />
                   </div>
-                  <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
-                    <span>{formatRdmReqNo(item.reqNo)}</span>
-                    <span>提出：{item.submitterName}</span>
-                  </div>
-                  <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
-                    <span>處理人：{item.pmName ?? <span style={{ color: '#FF4D4F' }}>未分配</span>}</span>
-                    {item.planReleaseDate && <span>計劃：{item.planReleaseDate}</span>}
-                  </div>
-                  <RequirementStageBar status={item.status} compact overdue={item.overdueFlag ?? false} />
-                </div>
-              </Tooltip>
-            ))}
+                </Tooltip>
+              )
+            })}
             {col.items.length === 0 && (
               <div style={{ textAlign: 'center', color: '#BFBFBF', fontSize: 12, padding: '18px 0' }}>
                 無需求

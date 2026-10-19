@@ -292,7 +292,20 @@ export default function GanttBoard(props: GanttBoardProps) {
     const sx = xOf(start)
     const ex = xOf(end)
     if (sx == null || ex == null) {
-      // 无日期：不画条，但在时间轴左端给占位，避免任务「凭空消失」
+      // 无日期：不画条，但在时间轴左端给占位，避免任务「凭空消失」；
+      // 调整模式下本人可排的任务把占位升级成入口，点一下就能唤起左栏日期编辑器
+      if (adjustable(task)) {
+        return (
+          <button
+            type="button"
+            className="rdm-g2-unscheduled add"
+            title={t('rdm.ganttBoard.scheduleThis')}
+            onClick={() => onStartEditDates(task.id)}
+          >
+            + {t('rdm.ganttBoard.scheduleThis')}
+          </button>
+        )
+      }
       return <span className="rdm-g2-unscheduled">{t('rdm.ganttBoard.unscheduled')}</span>
     }
     const left = Math.min(sx, ex)
@@ -424,9 +437,18 @@ export default function GanttBoard(props: GanttBoardProps) {
               const gex = xOf(row.spanEnd ?? null)
               return (
                 <div key={row.id} className="rdm-g2-row group" style={{ height: ROW_GROUP }}>
-                  <div className="rdm-g2-labels group" style={{ width: labelW, gap: COL_GAP, paddingRight: COL_PAD_R, paddingLeft: COL_PAD_L + row.depth * 16 }}>
+                  {/* 整块标题区都是展开热区（小三角单独点太难命中）；键盘可聚焦，Enter/空格同效 */}
+                  <div
+                    className={`rdm-g2-labels group${row.expandable ? ' expandable' : ''}`}
+                    style={{ width: labelW, gap: COL_GAP, paddingRight: COL_PAD_R, paddingLeft: COL_PAD_L + row.depth * 16 }}
+                    role={row.expandable ? 'button' : undefined}
+                    tabIndex={row.expandable ? 0 : undefined}
+                    aria-expanded={row.expandable ? row.expanded : undefined}
+                    onClick={row.expandable ? () => onToggleGroup(row.id) : undefined}
+                    onKeyDown={row.expandable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleGroup(row.id) } } : undefined}
+                  >
                     {row.expandable ? (
-                      <span className="rdm-g2-caret" onClick={() => onToggleGroup(row.id)}>
+                      <span className="rdm-g2-caret">
                         {row.expanded ? <CaretDownOutlined /> : <CaretRightOutlined />}
                       </span>
                     ) : <span className="rdm-g2-caret-ph" />}

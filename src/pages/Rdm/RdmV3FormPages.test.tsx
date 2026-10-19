@@ -28,7 +28,7 @@ import TestBatchSubmit from './TestBatchSubmit'
 import ReleaseBatchCreate from './ReleaseBatchCreate'
 
 vi.mock('../../api/employee', () => ({
-  fetchEmployeeIdOptions: vi.fn(async () => [{ value: '21', label: '張三(MF00021) · 研發部' }]),
+  fetchEmployeeIdOptions: vi.fn(async () => [{ value: '21', label: '張三(MF00021)' }]),
   fetchEmployees: vi.fn(),
 }))
 

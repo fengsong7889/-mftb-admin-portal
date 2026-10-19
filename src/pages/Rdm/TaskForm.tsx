@@ -14,15 +14,14 @@ import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import { fetchEmployees } from '../../api/employee'
 import {
   checkTaskOwner,
-  fetchIterations,
   fetchReqTasks,
   fetchRequirementDetail,
   saveTask,
-  type RdmIterationItem,
   type RdmTaskForm as RdmTaskFormValues,
   type RdmTaskOwnerCheck,
 } from '../../api/rdm'
-import { RDM_ITERATION_STATUS, RDM_TASK_TYPE_LABEL, formatRdmReqNo, type RdmTaskType } from '../../constants/rdm'
+import { formatRdmReqNo } from '../../constants/rdm'
+import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
 import './index.css'
 
 const { TextArea } = Input
@@ -35,7 +34,6 @@ interface FormValues {
   owner?: string
   planHours?: number
   planRange?: [dayjs.Dayjs, dayjs.Dayjs]
-  iterationCode?: string
 }
 
 export default function TaskForm() {
@@ -45,8 +43,13 @@ export default function TaskForm() {
   const taskId = Number(searchParams.get('id') ?? 0)
 
   const [form] = Form.useForm<FormValues>()
-  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string } | null>(null)
-  const [iterations, setIterations] = useState<RdmIterationItem[]>([])
+  // 任务类型字典（业务可配置）：选项/确认框标签都从接口来，编辑旧任务时把当前值并入选项防回显空白
+  const { options: taskTypeDictOptions, labelOf: taskTypeLabelOf } = useTaskTypeDict()
+  const currentTaskType = Form.useWatch('taskType', form)
+  const taskTypeOptions = currentTaskType && !taskTypeDictOptions.some(o => o.value === currentTaskType)
+    ? [{ value: currentTaskType, label: taskTypeLabelOf(currentTaskType) }, ...taskTypeDictOptions]
+    : taskTypeDictOptions
+  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string; iterationCode?: string | null } | null>(null)
   /** 负责人显示名：表单值只有 userId，确认框光靠 id 没法核对派给了谁 */
   const [ownerLabel, setOwnerLabel] = useState<string>()
   /** 负责人资格预检：无研发交付权限只提醒、不阻断保存 */
@@ -82,15 +85,11 @@ export default function TaskForm() {
     }
   }, [])
 
-  useEffect(() => {
-    fetchIterations().then(setIterations).catch(() => setIterations([]))
-  }, [])
-
   /** 编辑态：从需求任务列表里取回原任务，避免再开一个详情接口 */
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: d.status }))
+      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: d.status, iterationCode: d.iterationCode }))
       .catch(() => message.error('需求資訊載入失敗'))
     if (!taskId) return
     fetchReqTasks(reqId).then(tasks => {
@@ -104,7 +103,6 @@ export default function TaskForm() {
         planHours: task.planHours ?? undefined,
         planRange: task.planStartDate && task.planFinishDate
           ? [dayjs(task.planStartDate), dayjs(task.planFinishDate)] : undefined,
-        iterationCode: task.iterationCode ?? undefined,
       })
       if (task.ownerName) {
         setOwnerLabel(task.ownerEmpNo ? `${task.ownerName}（${task.ownerEmpNo}）` : task.ownerName)
@@ -142,7 +140,7 @@ export default function TaskForm() {
       content: (
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>任務標題：</span><b>{values.title.trim()}</b></div>
-          <div className="confirm-info-row"><span>任務類型：</span><b>{RDM_TASK_TYPE_LABEL[values.taskType as RdmTaskType] ?? values.taskType}</b></div>
+          <div className="confirm-info-row"><span>任務類型：</span><b>{taskTypeLabelOf(values.taskType)}</b></div>
           <div className="confirm-info-row"><span>負責人：</span><b>{ownerText}</b></div>
           {/* 无交付权限不阻断保存，但必须在确认框里再提醒一次，否则 PM 会以为对方能直接上报进度 */}
           {ownerCheck?.warning && (
@@ -173,7 +171,7 @@ export default function TaskForm() {
         planHours: values.planHours,
         planStartDate: values.planRange?.[0]?.format('YYYY-MM-DD'),
         planFinishDate: values.planRange?.[1]?.format('YYYY-MM-DD'),
-        iterationCode: values.iterationCode,
+        // 归属体系改造：任务迭代由后端从需求继承（单一真值源），前端不再上送
       }
       await saveTask(payload)
       message.success(taskId ? '任務已更新' : '任務已創建並指派')
@@ -205,7 +203,7 @@ export default function TaskForm() {
             <Form.Item label="任務類型" name="taskType" rules={[{ required: true, message: '請選擇任務類型' }]}>
               <Select
                 placeholder="選擇任務類型"
-                options={Object.entries(RDM_TASK_TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+                options={taskTypeOptions}
               />
             </Form.Item>
             <Form.Item
@@ -258,14 +256,13 @@ export default function TaskForm() {
             <Form.Item label="計劃起止" name="planRange">
               <DatePicker.RangePicker />
             </Form.Item>
-            <Form.Item label="所屬迭代" name="iterationCode">
-              <Select
-                allowClear
-                placeholder="選擇迭代（可選）"
-                options={iterations.filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED).map(i => ({
-                  value: i.code,
-                  label: `${i.name}（${i.startDate ?? '-'} ~ ${i.endDate ?? '-'}）`,
-                }))}
+            {/* 归属体系改造：迭代继承需求（只读），不再让研发/测试自己选——
+                他们不参与项目规划，且任务独立选迭代会与需求迭代分裂，统计对不上 */}
+            <Form.Item label="所屬迭代" extra="繼承自需求排期；要換迭代請在需求詳情頁「調整迭代」">
+              <Input
+                disabled
+                value={requirement?.iterationCode ?? ''}
+                placeholder={requirement ? '需求尚未排期掛迭代' : '載入中…'}
               />
             </Form.Item>
             {ownerCheck?.warning && (

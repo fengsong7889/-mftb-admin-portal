@@ -763,6 +763,51 @@ class RdmProjectFactServiceTest {
     }
 
     @Test
+    @DisplayName("A.2 產品負責人與計劃日期都是 SQL 側條件，不是記憶體過濾（否則分頁 total 与卡片都会错）")
+    void newFiltersAreAppliedInSqlNotInMemory() {
+        canSeeAll = true;
+        projectRows.add(project(PROJECT_A, RdmConstants.PROJECT_IN_PROGRESS));
+
+        RdmFactVO.FactQuery q = query();
+        q.setProductOwnerUserId(PRODUCT_OWNER);
+        q.setPlanDateFrom("2026-01-01");
+        q.setPlanDateTo("2026-12-31");
+        service.projectFacts(q, OUTSIDER);
+
+        ArgumentCaptor<LambdaQueryWrapper<RdmProject>> captor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(projectMapper).selectList(captor.capture());
+        String sql = captor.getValue().getSqlSegment();
+        Collection<Object> params = paramsOf(captor.getValue());
+
+        assertTrue(sql.contains("product_owner_user_id ="), sql);
+        // overlap 口径：计划止 >= 所选起 且 计划起 <= 所选止。两个日期列都可空，
+        // NULL 参与比较恒为 unknown，所以两侧都必须配 IS NOT NULL，否则未填计划的项目会被反向放进结果集。
+        assertTrue(sql.contains("plan_end_date IS NOT NULL"), sql);
+        assertTrue(sql.contains("plan_end_date >="), sql);
+        assertTrue(sql.contains("plan_start_date IS NOT NULL"), sql);
+        assertTrue(sql.contains("plan_start_date <="), sql);
+        assertTrue(params.contains(PRODUCT_OWNER), params.toString());
+        assertTrue(params.contains(java.time.LocalDate.of(2026, 1, 1)), params.toString());
+        assertTrue(params.contains(java.time.LocalDate.of(2026, 12, 31)), params.toString());
+    }
+
+    @Test
+    @DisplayName("A.2 非法計劃日期必须报错，不能静默丢条件退化成全量")
+    void malformedPlanDateIsRejected() {
+        canSeeAll = true;
+        projectRows.add(project(PROJECT_A, RdmConstants.PROJECT_IN_PROGRESS));
+
+        RdmFactVO.FactQuery q = query();
+        q.setPlanDateFrom("2026/01/01");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.projectFacts(q, OUTSIDER));
+        assertTrue(ex.getMessage().contains("計劃日期起"), ex.getMessage());
+        // 报错前不得发项目查询：丢条件发 SQL 就是拿全量当结果给用户
+        verify(projectMapper, never()).selectList(any());
+    }
+
+    @Test
     @DisplayName("A.2 我的工作台跨项目待办：未登录恒空看板，登录后才是真实待办")
     void todoBoardIsFailClosedForAnonymous() {
         givenRichFixture();

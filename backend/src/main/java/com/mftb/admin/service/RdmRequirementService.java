@@ -62,6 +62,16 @@ public interface RdmRequirementService {
     /** 状态流转（按 rdm_transition 校验角色与必填字段） */
     RdmRequirementVO transition(Long id, RdmTransitionDTO dto);
 
+    /**
+     * 调整迭代（归属体系改造）：属性变更而非状态流转，故不走 rdm_transition 状态机，
+     * 与迭代列表直改状态同构（独立端点 + 只回写目标字段）。
+     * <p>用于「研发 bug / 需求不足要放另外版本」场景：直接把需求换到其它迭代，
+     * 并同步该需求下未完成任务的迭代归属（否则需求迭代与任务迭代会分裂，统计对不上）。
+     * <p>状态白名单：分配后到验收前（released 之后需先 reopen）；角色白名单：
+     * PM / DEV_LEAD / PMO / DISPATCHER 参与者或全量权限者。
+     */
+    RdmRequirementVO changeIteration(Long id, RdmTransitionDTO dto);
+
     /** 批量分配产品经理 */
     int batchAssign(List<Long> ids, Long pmUserId);
 
@@ -93,6 +103,13 @@ public interface RdmRequirementService {
      * <p>按验收时间正序返回，attempt 为当时冻结的第几次验收序号。
      */
     List<RdmAcceptanceVO> acceptanceHistory(Long id);
+
+    /**
+     * 单张验收证据正文（Base64 Data URL）。
+     * <p>验收历史的用例明细只回元信息，正文按 index 单张取回；
+     * 必须同时校当前用户对该需求的可见权与用例归属，不得凭 caseId 越权取图。
+     */
+    RdmAcceptanceVO.EvidenceContent caseEvidence(Long reqId, Long caseId, int index);
 
     /** 工作台待办聚合 */
     RdmWorkbenchVO workbench();

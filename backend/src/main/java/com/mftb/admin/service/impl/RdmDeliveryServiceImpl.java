@@ -17,6 +17,7 @@ import com.mftb.admin.entity.RdmPrdSnapshot;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmReview;
+import com.mftb.admin.entity.RdmTaskTypeConfig;
 import com.mftb.admin.entity.RdmWorkLog;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
@@ -34,6 +35,7 @@ import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmRequirementService;
+import com.mftb.admin.service.RdmTaskTypeService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
@@ -128,6 +130,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final com.mftb.admin.mapper.RdmDeliveryItemMapper deliveryItemMapper;
     /** 任务19 / 缺口2：交付项归属的 V3 流程版本校验 */
     private final com.mftb.admin.service.RdmFlowVersionGuard flowVersionGuard;
+    /** 任务类型字典：写校验白名单/标签解析/角色推断与聚合桶同源本表（业务可配置） */
+    private final RdmTaskTypeService taskTypeService;
 
     /* ==================== PRD ==================== */
 
@@ -461,7 +465,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         task.setPlanHours(dto.getPlanHours());
         task.setPlanStartDate(parseDate(dto.getPlanStartDate()));
         task.setPlanFinishDate(parseDate(dto.getPlanFinishDate()));
-        task.setIterationCode(dto.getIterationCode());
+        /*
+         * 归属体系改造：任务迭代继承需求（单一真值源），忽略前端独立传值。
+         * 改造前任务表单可选自己的迭代，与需求迭代是两份独立字段——研发侧填的迭代
+         * 与需求排期的迭代可能不同，按迭代统计需求与任务就分裂了（本次改造要修的根因）。
+         */
+        task.setIterationCode(req.getIterationCode());
         task.setUpdatedBy(operatorResolver.operatorSignature(current));
         // 排期乐观锁：新建初始版本 1；改期/改负责人自增，与甘特拖拽共用同一版本防互盖
         if (task.getId() == null) {
@@ -719,12 +728,26 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     public List<RdmDeliveryVO.Iteration> listIterations() {
         List<RdmIteration> iterations = iterationMapper.selectList(new LambdaQueryWrapper<RdmIteration>()
                 .orderByDesc(RdmIteration::getStartDate).last("LIMIT 50"));
+        // 项目名批量联表（一次 IN 查询）：逐行查 rdm_project 会把迭代列表变成 N+1
+        Map<Long, String> projectNames = new LinkedHashMap<>();
+        List<Long> projectIds = iterations.stream().map(RdmIteration::getProjectId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        if (!projectIds.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(projectIds.size(), "?"));
+            // rdm_project 建表即无 deleted 列（Batch 1），这里不能写 deleted = 0，否则真库报 Unknown column
+            jdbcTemplate.queryForList(
+                            "SELECT id, name FROM rdm_project WHERE id IN (" + placeholders + ")",
+                            projectIds.toArray())
+                    .forEach(row -> projectNames.put(((Number) row.get("id")).longValue(), String.valueOf(row.get("name"))));
+        }
         List<RdmDeliveryVO.Iteration> list = new ArrayList<>();
         for (RdmIteration it : iterations) {
             RdmDeliveryVO.Iteration vo = new RdmDeliveryVO.Iteration();
             vo.setId(it.getId());
             vo.setCode(it.getCode());
             vo.setName(it.getName());
+            vo.setProjectId(it.getProjectId());
+            vo.setProjectName(it.getProjectId() == null ? null : projectNames.get(it.getProjectId()));
             vo.setIterationType(it.getIterationType());
             vo.setStartDate(DateTimeUtils.format(it.getStartDate()));
             vo.setEndDate(DateTimeUtils.format(it.getEndDate()));
@@ -762,6 +785,23 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         SysUser current = operatorResolver.currentUser();
         SysUser owner = dto.getOwnerUserId() == null ? null : userMapper.selectById(dto.getOwnerUserId());
         String type = StringUtils.hasText(dto.getIterationType()) ? dto.getIterationType() : "sprint";
+        /*
+         * 归属体系改造（v3.15）：sprint/version 必须挂项目，hotfix 可空（跨项目平台级热修，管理员已裁决）。
+         * 类型字面量与前端 src/constants/rdm.ts RDM_ITERATION_TYPE 同源；项目存在性服务端校验，不信任前端。
+         * 编辑存量未挂项目的迭代时同样会被拦下——这正是「警示+手工补挂」的落点。
+         */
+        Long projectId = dto.getProjectId();
+        if (projectId == null && !"hotfix".equals(type)) {
+            throw new BusinessException("常規迭代與版本專項必須選擇所屬項目（緊急修復可留空）");
+        }
+        if (projectId != null) {
+            // rdm_project 无 deleted 列（Batch 1 建表即无），存在性判断只按主键
+            Integer projectCnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, projectId);
+            if (projectCnt == null || projectCnt == 0) {
+                throw new BusinessException("所屬項目不存在");
+            }
+        }
         RdmIteration entity;
         if (dto.getId() == null) {
             entity = new RdmIteration();
@@ -776,6 +816,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             // 編輯不改編碼：需求/任務以 iteration_code 掛接迭代，改碼會斷鏈
         }
         entity.setName(dto.getName().trim());
+        entity.setProjectId(projectId);
         entity.setIterationType(type);
         entity.setStartDate(start);
         entity.setEndDate(end);
@@ -1035,24 +1076,19 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         roleMapper.insert(role);
     }
 
-    private static String roleOfTaskType(String taskType) {
-        return switch (taskType == null ? "" : taskType) {
-            case "design" -> RdmConstants.ROLE_DESIGNER;
-            case "qa" -> RdmConstants.ROLE_QA;
+    /** 任务类型 → 参与角色：按字典聚合桶映射（design→设计师、qa→测试、dev/未知→研发），字典缺行时沿用内置兜底 */
+    private String roleOfTaskType(String taskType) {
+        return switch (taskTypeService.categoryOf(taskType)) {
+            case RdmTaskTypeConfig.CATEGORY_DESIGN -> RdmConstants.ROLE_DESIGNER;
+            case RdmTaskTypeConfig.CATEGORY_QA -> RdmConstants.ROLE_QA;
             default -> RdmConstants.ROLE_DEV;
         };
     }
 
-    private static String taskTypeLabel(String taskType) {
-        return switch (taskType == null ? "" : taskType) {
-            case "design" -> "UI 設計";
-            case "frontend" -> "前端開發";
-            case "app" -> "APP 開發";
-            case "backend" -> "後端開發";
-            case "qa" -> "測試";
-            case "data" -> "數據";
-            default -> taskType;
-        };
+    /** 任务类型标签：优先字典 label（含停用），字典缺行时回显 code 原文（与前端 ?? v 口径一致） */
+    private String taskTypeLabel(String taskType) {
+        RdmTaskTypeConfig cfg = taskTypeService.resolveByCode(taskType);
+        return cfg != null ? cfg.getLabel() : (taskType == null ? "" : taskType);
     }
 
     /**
@@ -1754,11 +1790,13 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     }
 
     /** 任务表单硬校验：这些都不拦的话，负载与产能对账会拿到永远对不上的数 */
-    private static void validateTaskForm(RdmDeliveryDTO.Task dto) {
+    private void validateTaskForm(RdmDeliveryDTO.Task dto) {
         if (dto.getTitle() != null && dto.getTitle().length() > 200) {
             throw new BusinessException("任務標題最長 200 字");
         }
-        if (!List.of("design", "frontend", "app", "backend", "qa", "data").contains(dto.getTaskType())) {
+        // 任务类型白名单改查字典（存在即放行，含停用）；字典查询异常不吞、写入直接失败（fail-closed），
+        // 存量 code 永续由「禁物理删除」保证，历史任务不会因配置变更而失去可解析性
+        if (taskTypeService.resolveByCode(dto.getTaskType()) == null) {
             throw new BusinessException("不支援的任務類型: " + dto.getTaskType());
         }
         if (dto.getPlanHours() != null

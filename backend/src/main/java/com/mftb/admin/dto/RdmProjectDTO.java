@@ -93,6 +93,16 @@ public class RdmProjectDTO {
         /** 关键字（匹配项目名称/编号） */
         private String keyword;
         private Long pmUserId;
+        /** 产品负责人筛选（与 pmUserId 同样只收窄列表与卡片口径，不参与数据范围判定） */
+        private Long productOwnerUserId;
+        /**
+         * 计划日期区间下限（yyyy-MM-dd）：与项目「计划开始~计划结束」区间求交集，
+         * 口径为 {@code plan_start_date <= planDateTo AND plan_end_date >= planDateFrom}，
+         * 只给一侧就只卡一侧。不取「计划开始日期落在此区间」：那样会漏掉跨区间的大项目。
+         */
+        private String planDateFrom;
+        /** 计划日期区间上限（yyyy-MM-dd，语义同 {@link #planDateFrom}） */
+        private String planDateTo;
         private String status;
         /**
          * 统计卡下钻口径：inProgress / attention / pending（空值不下钻）。

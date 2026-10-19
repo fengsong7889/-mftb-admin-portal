@@ -1,0 +1,493 @@
+package com.mftb.admin.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mftb.admin.dto.RdmDailyReportVO.Config;
+import com.mftb.admin.dto.RdmDailyReportVO.Snapshot;
+import com.mftb.admin.dto.RdmDailyReportVO.Summary;
+import com.mftb.admin.dto.RdmDailyReportVO.TriggerResult;
+import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.NotificationAppService.Credentials;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * 進度日報推送流程测试（方案 §五「集成」档）：干跑不真发、按规则/项目幂等、两通道解耦、手动档位。
+ *
+ * <p>这几条都是「一旦坏了不会报错、只会静默做错事」的路径：
+ * <ol>
+ *   <li><b>dry-run 必须真的不发</b>：联调环境的测试消息打到生产钉钉群是不可撤回事故。
+ *       两个开关（方法参数 dryRun 与 yml {@code rdm.notify.dry-run}）都要拦得住，
+ *       且干跑时连快照都不落库——否则发送记录里会出现「没发过却有一条记录」的假事实。</li>
+ *   <li><b>按范围幂等</b>：作业每分钟 tick，命中后若不去重，重复触发与重启补跑都会重发；
+ *       而多规则模型下幂等维度必须是<b>范围</b>（scope_key），不能是全局的「日期+档位」，
+ *       否则第二条规则会被第一条挡住。</li>
+ *   <li><b>两通道解耦</b>：个人通知没绑应用/没绑钉钉 userId 时只跳过个人，群报照发；反之亦然。</li>
+ *   <li><b>手动触发写 manual 档且必须选项目</b>：补发不能被定时幂等拦住；不选项目等于
+ *       一次性给全公司刷一遍，必须直接拒。</li>
+ * </ol>
+ *
+ * <p>用真实 {@link RdmDailyReportRenderer}（纯组件、无依赖）而不是 mock：渲染是这条链路里
+ * 唯一会把数据变成对外文案的环节，mock 掉它就等于没测。
+ */
+class RdmDailyReportPushFlowTest {
+
+    private final RdmProjectFactService factService = mock(RdmProjectFactService.class);
+    private final RdmNotifyService notifyService = mock(RdmNotifyService.class);
+    private final DingTalkAppService dingTalkAppService = mock(DingTalkAppService.class);
+    private final NotificationAppService appService = mock(NotificationAppService.class);
+    private final SysUserMapper userMapper = mock(SysUserMapper.class);
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+
+    /**
+     * 被测对象：spy 只为替换两个读库入口（全局配置与快照构建），其余链路走真实实现。
+     * <p>三个 queryForObject 按 SQL 片段分别桩：项目存在性（1 个参数）、迭代归属（2 个）、
+     * 快照存在性（3 个）——按参数个数桩容易写错，按 SQL 内容桩更贴近真实调用。
+     */
+    private RdmDailyReportService service(Config cfg, Snapshot snapshot, Integer snapshotExistsCount) {
+        RdmDailyReportService real = new RdmDailyReportService(factService, new RdmDailyReportRenderer(),
+                notifyService, dingTalkAppService, appService, userMapper, jdbc, new ObjectMapper());
+        RdmDailyReportService spy = spy(real);
+        doReturn(cfg).when(spy).loadConfig();
+        doReturn(snapshot).when(spy).buildSnapshot(any(LocalDate.class), anyString(), any(), any());
+        when(jdbc.queryForObject(contains("FROM rdm_project"), eq(Integer.class), any())).thenReturn(1);
+        when(jdbc.queryForObject(contains("FROM rdm_iteration"), eq(Integer.class), any(), any())).thenReturn(1);
+        when(jdbc.queryForObject(contains("FROM rdm_daily_report"), eq(Integer.class), any(), any(), any()))
+                .thenReturn(snapshotExistsCount);
+        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of());
+        return spy;
+    }
+
+    private Config config(boolean enabled, boolean group, boolean personal) {
+        Config c = new Config();
+        c.setEnabled(enabled);
+        c.setMorningTime("09:00");
+        c.setEveningTime("18:00");
+        c.setGroupEnabled(group);
+        c.setPersonalEnabled(personal);
+        c.setReceiverScope("all_projects");
+        c.setMorningTemplateKey("group_morning_overview");
+        c.setEveningTemplateKey("group_evening_review");
+        c.setPersonalTemplateKey("personal_todo");
+        return c;
+    }
+
+    private Snapshot snapshot(List<com.mftb.admin.dto.RdmDailyReportVO.ProjectNode> projects) {
+        Snapshot s = new Snapshot();
+        s.setReportDate("2026-10-19");
+        s.setReportType("morning");
+        s.setReportTypeLabel("晨報");
+        Summary sum = new Summary();
+        sum.setProjectCount(projects.size());
+        s.setSummary(sum);
+        s.setProjects(projects);
+        return s;
+    }
+
+    private Snapshot snapshot() {
+        return snapshot(List.of());
+    }
+
+    /** 规则推送目标（rule_id=7，项目 3，全部迭代） */
+    private RdmDailyReportService.TriggerTarget ruleTarget() {
+        return new RdmDailyReportService.TriggerTarget(7L, "A產品日報", 3L, null, "morning", null, null);
+    }
+
+    /** 手动推送目标（项目 3 + 迭代 B1） */
+    private RdmDailyReportService.TriggerTarget manualTarget(String iteration) {
+        return new RdmDailyReportService.TriggerTarget(null, null, 3L, iteration, "morning", null, null);
+    }
+
+    /* ==================== dry-run：绝不真发 ==================== */
+
+    @Test
+    @DisplayName("干跑：dryRun=true 时不入队群报、不落库快照，但把渲染结果回显给调用方")
+    void dryRunNeitherDispatchesNorPersists() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, true);
+
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        assertTrue(r.isDryRun(), "结果必须标明是干跑");
+        assertFalse(r.isGroupDispatched(), "干跑不得声称群报已投递");
+        assertTrue(r.getGroupContent() != null && r.getGroupContent().contains("產研交付日報"),
+                "干跑应回显渲染后的群报正文，实际: " + r.getGroupContent());
+    }
+
+    @Test
+    @DisplayName("干跑：yml 的 rdm.notify.dry-run=true 时即使调用方要求真发也不发（环境级开关不被绕过）")
+    void ymlDryRunCannotBeBypassedByCaller() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        ReflectionTestUtils.setField(svc, "notifyDryRun", true);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        assertTrue(r.isDryRun(), "yml 干跑必须反映在结果里，不能被调用方的 dryRun=false 掩盖");
+    }
+
+    @Test
+    @DisplayName("干跑：个人工作通知同样受干跑约束，不调用钉钉应用接口")
+    void dryRunAlsoBlocksPersonalNotification() {
+        RdmDailyReportService svc = service(config(true, false, true), snapshot(), 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(testCredentials());
+
+        svc.push(ruleTarget(), false, null, true);
+
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString());
+    }
+
+    /* ==================== 全局开关 ==================== */
+
+    @Test
+    @DisplayName("全局总开关关闭：定时与手动都不出站，并给出可读结论")
+    void masterSwitchStopsEverything() {
+        RdmDailyReportService svc = service(config(false, true, true), snapshot(), 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        assertFalse(r.isGroupDispatched());
+        assertTrue(r.getMessage().contains("总开关"), "结论应说明被总开关拦下: " + r.getMessage());
+    }
+
+    /* ==================== 按范围幂等 ==================== */
+
+    @Test
+    @DisplayName("按范围幂等：该规则当日该档快照已存在则跳过，绝不重复刷屏")
+    void ruleRunSkipsWhenSnapshotExists() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 1);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        assertFalse(r.isGroupDispatched());
+        assertTrue(r.getMessage().contains("已存在"), "应说明因已存在而跳过: " + r.getMessage());
+    }
+
+    @Test
+    @DisplayName("同一规则重复 tick 只发一次：首次入队，第二次因快照已存在而跳过")
+    void repeatedTickSendsOnlyOnce() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        when(jdbc.queryForObject(contains("FROM rdm_daily_report"), eq(Integer.class), any(), any(), any()))
+                .thenReturn(0, 1);
+
+        TriggerResult first = svc.push(ruleTarget(), false, null, false);
+        TriggerResult second = svc.push(ruleTarget(), false, null, false);
+
+        assertTrue(first.isGroupDispatched(), "首次 tick 应入队投递");
+        assertFalse(second.isGroupDispatched(), "第二次 tick 必须跳过");
+        verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("幂等按范围而非全局：另一条规则（不同 rule_id）同日同档不受前一条影响")
+    void idempotencyIsScopedPerRule() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        // 第一条规则已存在快照 → 跳过；第二条规则尚无快照 → 必须发出
+        when(jdbc.queryForObject(contains("FROM rdm_daily_report"), eq(Integer.class), any(), any(), any()))
+                .thenReturn(1, 0);
+
+        TriggerResult firstRule = svc.push(ruleTarget(), false, null, false);
+        RdmDailyReportService.TriggerTarget anotherRule = new RdmDailyReportService.TriggerTarget(
+                8L, "B產品日報", 4L, null, "morning", null, null);
+        TriggerResult secondRule = svc.push(anotherRule, false, null, false);
+
+        assertFalse(firstRule.isGroupDispatched(), "第一条规则已推送过，应跳过");
+        assertTrue(secondRule.isGroupDispatched(), "第二条规则是不同范围，必须能发出（旧全局唯一键会把它挡住）");
+    }
+
+    @Test
+    @DisplayName("手动触发不受定时幂等约束：当日快照已存在也能补发")
+    void manualTriggerIsNotBlockedByIdempotencyGuard() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 1);
+
+        TriggerResult r = svc.push(manualTarget(null), true, "管理員", false);
+
+        assertTrue(r.isGroupDispatched(), "手动补发必须能发出去");
+        verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    /* ==================== 手动档位与落库 ==================== */
+
+    @Test
+    @DisplayName("手动触发写 manual 档：结果的 reportType 为 manual，与规则行分开各自自洽")
+    void manualTriggerUsesManualReportType() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        TriggerResult manual = svc.push(manualTarget("SP202610001"), true, "管理員", false);
+        assertEquals("manual", manual.getReportType(),
+                "手动触发必须落 manual 档，否则会占用定时档的幂等行、把规则推送挤掉");
+
+        TriggerResult rule = svc.push(ruleTarget(), false, null, false);
+        assertEquals("morning", rule.getReportType(), "规则推送落内容档位 morning");
+    }
+
+    @Test
+    @DisplayName("落库：真发时写入快照行，report_type/触发方式/范围键随目标而变")
+    void persistsSnapshotWithTriggerMetadata() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        svc.push(ruleTarget(), false, null, false);
+
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(anyString(), args.capture());
+        // 用 Arrays.asList 而不是 List.of：定时触发的 trigger_by 就是 null（非人为），List.of 会直接 NPE
+        List<Object> flat = java.util.Arrays.asList(args.getValue());
+        assertTrue(flat.contains("morning"), "规则推送应落 morning 档，实际参数: " + flat);
+        assertTrue(flat.contains("schedule"), "触发方式应记为 schedule，实际参数: " + flat);
+        assertTrue(flat.contains("rule:7"), "范围键应为 rule:7，实际参数: " + flat);
+        assertEquals(7L, flat.get(3), "rule_id 应落 7");
+        assertEquals(3L, flat.get(4), "project_id 应落目标项目 3");
+        assertTrue(flat.contains(null), "定时触发无操作人，trigger_by 应为 null 而不是伪造一个系统账号");
+    }
+
+    @Test
+    @DisplayName("落库：手动按迭代推送时范围键带项目与迭代，与同项目的手动补发互不覆盖")
+    void manualScopeKeyCarriesIteration() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        svc.push(manualTarget("SP202610001"), true, "管理員", false);
+
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(anyString(), args.capture());
+        List<Object> flat = java.util.Arrays.asList(args.getValue());
+        assertTrue(flat.contains("manual:3:SP202610001"), "范围键应带项目与迭代，实际: " + flat);
+        assertTrue(flat.contains("manual"), "report_type 应为 manual");
+        assertTrue(flat.contains("管理員"), "trigger_by 应记录手动触发人");
+    }
+
+    /* ==================== 两通道解耦 ==================== */
+
+    @Test
+    @DisplayName("解耦：个人通知场景未绑定应用时只跳过个人，群报照发")
+    void groupReportStillSendsWhenPersonalAppUnbound() {
+        RdmDailyReportService svc = service(config(true, true, true), snapshot(), 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(null);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        assertTrue(r.isGroupDispatched(), "个人通道未就绪不得阻塞群报");
+        verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        assertEquals(0, r.getPersonalSent());
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("解耦：群报关闭时不发群消息，但个人工作通知照常执行")
+    void personalStillSendsWhenGroupDisabled() {
+        var project = new com.mftb.admin.dto.RdmDailyReportVO.ProjectNode();
+        project.setProjectId(3L);
+        project.setProjectNo("PROJ2026101901");
+        project.setProjectName("項目A");
+        project.setPmUserId(77L);
+        Snapshot s = snapshot(List.of(project));
+
+        RdmDailyReportService svc = service(config(true, false, true), s, 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(testCredentials());
+        SysUser pm = new SysUser();
+        pm.setId(77L);
+        pm.setName("張三");
+        pm.setDingtalkUserId("ding-77");
+        when(userMapper.selectById(77L)).thenReturn(pm);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        assertFalse(r.isGroupDispatched(), "群报开关关闭时不得入队群消息");
+        assertEquals(1, r.getPersonalSent(), "个人通知应独立发出");
+        verify(dingTalkAppService).sendWorkNotification(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+                eq(List.of("ding-77")), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("fail-closed：负责人未绑定钉钉 userId 时跳过该人，不降级成群发或按手机号群发")
+    void skipsReceiverWithoutDingtalkUserId() {
+        var project = new com.mftb.admin.dto.RdmDailyReportVO.ProjectNode();
+        project.setProjectId(3L);
+        project.setPmUserId(88L);
+        Snapshot s = snapshot(List.of(project));
+
+        RdmDailyReportService svc = service(config(true, false, true), s, 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(testCredentials());
+        SysUser pm = new SysUser();
+        pm.setId(88L);
+        pm.setName("李四");
+        pm.setDingtalkUserId(null);
+        when(userMapper.selectById(88L)).thenReturn(pm);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        assertEquals(0, r.getPersonalSent());
+        assertEquals(1, r.getPersonalSkipped(), "未绑定者应计入跳过，便于运维发现漏绑");
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString());
+    }
+
+    /* ==================== 手动触发入口校验 ==================== */
+
+    @Test
+    @DisplayName("手动触发必须选项目：不选直接拒（否则等于一次性给全公司刷一遍）")
+    void manualTriggerRequiresProject() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        com.mftb.admin.common.BusinessException ex = assertThrows(
+                com.mftb.admin.common.BusinessException.class,
+                () -> svc.triggerManual("morning", null, null, "管理員", false));
+        assertTrue(ex.getMessage().contains("項目") || ex.getMessage().contains("项目"),
+                "应提示必须选择项目: " + ex.getMessage());
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("手动触发：指定迭代时必须属于该项目，否则拒绝（避免每天把别的项目的迭代推到群里）")
+    void manualTriggerRejectsIterationOfAnotherProject() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        when(jdbc.queryForObject(contains("FROM rdm_iteration"), eq(Integer.class), any(), any())).thenReturn(0);
+
+        com.mftb.admin.common.BusinessException ex = assertThrows(
+                com.mftb.admin.common.BusinessException.class,
+                () -> svc.triggerManual("morning", 3L, "SP202610999", "管理員", false));
+        assertTrue(ex.getMessage().contains("迭代"), "应提示迭代不属该项目: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("手动触发：项目不存在时拒绝，不静默发出一份空日报")
+    void manualTriggerRejectsMissingProject() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        when(jdbc.queryForObject(contains("FROM rdm_project"), eq(Integer.class), any())).thenReturn(0);
+
+        assertThrows(com.mftb.admin.common.BusinessException.class,
+                () -> svc.triggerManual("morning", 999L, null, "管理員", false));
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("非法档位在推送前就被拒绝，不会误发成晨报")
+    void rejectsInvalidSlotBeforeSending() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        assertThrows(com.mftb.admin.common.BusinessException.class,
+                () -> svc.push(new RdmDailyReportService.TriggerTarget(7L, "x", 3L, null, "noon", null, null),
+                        false, null, false));
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("手动触发节流：同一档位+项目一分钟内重复真发被拒；干跑不受节流约束")
+    void manualThrottleBlocksSecondPush() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        svc.push(manualTarget(null), true, "管理員", false);
+        com.mftb.admin.common.BusinessException ex = assertThrows(
+                com.mftb.admin.common.BusinessException.class,
+                () -> svc.push(manualTarget(null), true, "管理員", false));
+        assertTrue(ex.getMessage().contains("1 分鐘"), "应给出可读的节流原因: " + ex.getMessage());
+        verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+
+        // 干跑不受节流约束：预览可以反复点
+        svc.push(manualTarget(null), true, "管理員", true);
+        verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("同一实例上：被总开关拦下的手动尝试之后，开关打开即可立刻补发")
+    void throttleWindowNotConsumedWhenSwitchBlocked() {
+        RdmDailyReportService svc = service(config(false, true, false), snapshot(), 0);
+        svc.push(manualTarget(null), true, "管理員", false);
+
+        Config on = config(true, true, false);
+        doReturn(on).when(svc).loadConfig();
+        TriggerResult r = svc.push(manualTarget(null), true, "管理員", false);
+
+        assertTrue(r.isGroupDispatched(),
+                "被开关拦下的尝试不得消耗节流窗口，否则管理员刚开开关就要等 1 分钟");
+    }
+
+    /* ==================== 定时入口 ==================== */
+
+    @Test
+    @DisplayName("定时入口 runRule：按规则推送，触发方式记为 schedule 而非人为")
+    void runRuleUsesScheduleTrigger() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        com.mftb.admin.dto.RdmDailyReportVO.Rule rule = new com.mftb.admin.dto.RdmDailyReportVO.Rule();
+        rule.setId(7L);
+        rule.setName("A產品日報");
+        rule.setProjectId(3L);
+        rule.setContentType("morning");
+        doReturn(rule).when(svc).findRule(7L);
+
+        TriggerResult r = svc.runRule(7L);
+
+        assertEquals("morning", r.getReportType());
+        assertTrue(r.isGroupDispatched());
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).update(anyString(), args.capture());
+        List<Object> flat = java.util.Arrays.asList(args.getValue());
+        assertTrue(flat.contains("schedule"), "定时触发方式应记为 schedule，实际: " + flat);
+        assertFalse(flat.contains("manual"), "定时不得记成手动");
+        assertEquals(0, r.getPersonalSent(), "个人通知关闭时不应有人收到工作通知");
+    }
+
+    @Test
+    @DisplayName("定时入口：规则不存在时不抛异常，返回可读的跳过结论（避免作业层反复报错）")
+    void runRuleHandlesMissingRule() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        doReturn(null).when(svc).findRule(99L);
+
+        TriggerResult r = svc.runRule(99L);
+
+        assertFalse(r.isGroupDispatched());
+        assertTrue(r.getMessage().contains("規則不存在"), "应说明规则已不存在: " + r.getMessage());
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("定时规则查询不得 JOIN 迭代表：code 排序规则不一致，真库会 1267")
+    void rulesDueAtMustNotJoinIterationTable() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+        when(jdbc.query(contains("FROM rdm_daily_report_rule"),
+                any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of());
+
+        svc.rulesDueAt(java.time.LocalTime.of(9, 0));
+
+        verify(jdbc).query(
+                argThat((String sql) -> sql.contains("rdm_daily_report_rule") && !sql.contains("rdm_iteration")),
+                any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class));
+    }
+
+    /** 测试用的企业应用凭据快照（构造参数顺序：id, appKey, appSecret, agentId, baseUrl, enabled） */
+    private static Credentials testCredentials() {
+        return new Credentials(9L, "test-app-key", "test-app-secret", "123456",
+                "https://portal.example", true);
+    }
+}

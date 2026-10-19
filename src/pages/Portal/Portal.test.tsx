@@ -649,12 +649,13 @@ describe('场景区分与低干扰动效', () => {
     const image = container.querySelector('svg[data-scene="rdm"]')!
     expect(image).toHaveAttribute('data-motion', 'idle')
     // 静态构图只保留阶段标签（六个站点），交互动效才点亮站点与验收章
+    // 插画固定 6 站（站距与光环节拍绑定），阶段已扩为 9 段，此处 6 是示意里程碑而非阶段总数
     expect(image.querySelectorAll('text')).toHaveLength(6)
     for (let index = 0; index < 6; index += 1) expect(image.querySelector(`.portal-rdm-stage-${index}`)).toHaveAttribute('opacity', '0')
     expect(image.querySelector('.portal-rdm-halo')).toHaveClass('portal-art-motion')
     expect(image.querySelector('.portal-rdm-delivered')).toHaveAttribute('opacity', '0')
     expect(image).toHaveTextContent(zh.portal.artwork.rdmSubmit)
-    expect(image).toHaveTextContent(zh.portal.artwork.rdmAcceptance)
+    expect(image).toHaveTextContent(zh.portal.artwork.rdmRelease)
     // 驳回（红）与挂起（琥珀）两条支路静态可见，不占用主线节拍
     expect(image.querySelector('path[stroke="#FF4D4F"]')).toBeInTheDocument()
     expect(image.querySelector('circle[stroke="#FA8C16"]')).toBeInTheDocument()

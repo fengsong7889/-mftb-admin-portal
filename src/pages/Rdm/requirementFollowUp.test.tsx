@@ -26,6 +26,7 @@ vi.mock('../../api/rdm', () => ({
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
   fetchProductOptions: vi.fn().mockResolvedValue([]),
   fetchProjectPage: vi.fn().mockResolvedValue({ records: [], total: 0 }),
+  fetchIterations: vi.fn().mockResolvedValue([]),
   claimRequirement: vi.fn(),
   submitRequirement: vi.fn(),
   urgeRequirement: vi.fn(),

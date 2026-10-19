@@ -331,8 +331,18 @@ const RdmRiskCenter = lazy(() => import('./pages/Rdm/RiskCenter'))
 const RdmTeamOutput = lazy(() => import('./pages/Rdm/TeamOutput'))
 const RdmResourceLoad = lazy(() => import('./pages/Rdm/ResourceLoad'))
 const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
+const RdmTaskTypeConfig = lazy(() => import('./pages/Rdm/Config/TaskTypeConfig'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
+// 進度日報（一级菜单）：推送配置 / 模板配置 / 发送记录 / 手动触发 四个二级页
+const DailyReportRules = lazy(() => import('./pages/Rdm/DailyReport/Rules'))
+const DailyReportRuleForm = lazy(() => import('./pages/Rdm/DailyReport/RuleForm'))
+const DailyReportTemplates = lazy(() => import('./pages/Rdm/DailyReport/Templates'))
+const DailyReportTemplateForm = lazy(() => import('./pages/Rdm/DailyReport/TemplateForm'))
+const DailyReportRecords = lazy(() => import('./pages/Rdm/DailyReport/Records'))
+const DailyReportTrigger = lazy(() => import('./pages/Rdm/DailyReport/Trigger'))
+// 移動端日報頁：釘釘通知連結的落地頁，無獨立菜單
+const RdmDailyReport = lazy(() => import('./pages/Rdm/DailyReport'))
 // V3 分批交付：项目总览 / 提测工作台 / 发布中心
 const RdmProjectOverview = lazy(() => import('./pages/Rdm/ProjectOverview'))
 const RdmProjectDetail = lazy(() => import('./pages/Rdm/ProjectDetail'))
@@ -712,14 +722,24 @@ function AuthenticatedLayout() {
               <Route path="/rdm-metric-trend" element={<RdmMetricTrend />} />
               <Route path="/rdm-score-rule" element={<RdmScoreRuleConfig />} />
               <Route path="/rdm-config-status" element={<RdmConfigStatus />} />
+                            <Route path="/rdm-task-type-config" element={<RdmTaskTypeConfig />} />
               <Route path="/rdm-config-routing" element={<RdmConfigRouting />} />
               <Route path="/rdm-config-sla" element={<RdmConfigSla />} />
+              {/* 進度日報：四个二级页 + 两个独立表单页（表单不得用 Modal 承载） */}
+              <Route path="/rdm-daily-report-rules" element={<DailyReportRules />} />
+              <Route path="/rdm-daily-report-rule-form" element={<DailyReportRuleForm />} />
+              <Route path="/rdm-daily-report-templates" element={<DailyReportTemplates />} />
+              <Route path="/rdm-daily-report-template-form" element={<DailyReportTemplateForm />} />
+              <Route path="/rdm-daily-report-records" element={<DailyReportRecords />} />
+              <Route path="/rdm-daily-report-trigger" element={<DailyReportTrigger />} />
               {/* V3 分批交付：项目 / 提测 / 发布 / 交付项 / 问题 */}
               <Route path="/rdm-project" element={<RdmProjectOverview />} />
               <Route path="/rdm-project-detail" element={<RdmProjectDetail />} />
               {/* 存量遷移 / 灰度管理：無獨立菜單，入口在項目總覽操作區（僅有權限者可見）*/}
               <Route path="/rdm-stock-migration" element={<RdmStockMigration />} />
               <Route path="/rdm-grayscale" element={<RdmGrayscaleConfig />} />
+              {/* 每日日報（釘釘通知連結落地頁）：無獨立菜單，守衛與側欄高亮錨到 rdm-daily-report-rule */}
+              <Route path="/rdm-daily" element={<RdmDailyReport />} />
               <Route path="/rdm-test" element={<RdmTestWorkbench />} />
               {/* 发起提测 / 创建发布批次：独立页（§9.1 禁止用 Modal 承载新增表单） */}
               <Route path="/rdm-test-submit" element={<RdmTestBatchSubmit />} />
@@ -865,6 +885,25 @@ function AuthenticatedLayout() {
   )
 }
 
+/**
+ * 未登錄兜底：跳登錄頁並帶上原始路徑，登錄後回跳。
+ *
+ * 為什麼要帶 redirect：釘釘日報等通知連結是發到手機上的，用戶點開時多半未登錄，
+ * 舊行為直接跳 /login 會把原路徑丟掉——登錄完落到 /portal，用戶還得自己再找一次那個頁面，
+ * 等於「連結白發」。帶上 redirect 後登錄即回到原本要看的頁面（回跳值由登錄頁白名單校驗）。
+ *
+ * HashRouter 下 location 已是 hash 內的部分，因此 pathname+search 就是站內路徑；
+ * /login 自身不帶 redirect，避免自我循環。
+ */
+function RedirectToLogin() {
+  const location = useLocation()
+  const target = `${location.pathname}${location.search}`
+  const to = target && target !== '/login'
+    ? `/login?redirect=${encodeURIComponent(target)}`
+    : '/login'
+  return <Navigate to={to} replace />
+}
+
 /** 路由守衛 */
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
@@ -906,7 +945,7 @@ function AppRoutes() {
       ) : (
         <>
           <Route path="/login" element={<Login />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<RedirectToLogin />} />
         </>
       )}
     </Routes>

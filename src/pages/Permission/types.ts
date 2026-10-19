@@ -30,9 +30,21 @@ export const SENSITIVE_ACTIONS = [
   { key: 'auditView', label: '人事審計查看' },
 ] as const
 
+/**
+ * 業務專用動作（只掛在確實需要它的菜單上，不進 PERMISSION_ACTIONS）。
+ *
+ * 與 SENSITIVE_ACTIONS 同理：PERMISSION_ACTIONS 同時是「菜單未配 actions 時的默認動作集」
+ * 與「全部菜單·全部權限」批量勾選的展開源，把 trigger 放進去等於給每個新菜單默認授予
+ * 「向全公司釘釘群發消息」的能力——與「未顯式授權默認拒絕」直接相反。
+ * 真值與後端 RdmMenuInitializer.ACTION_ORDER 逐字對齊。
+ */
+export const BUSINESS_ACTIONS = [
+  { key: 'trigger', label: '手動觸發' },
+] as const
+
 /** 动作 key → 中文标签查找表（后端只下发 key 时渲染标签用） */
 export const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
-  [...PERMISSION_ACTIONS, ...SENSITIVE_ACTIONS].map(a => [a.key, a.label]),
+  [...PERMISSION_ACTIONS, ...SENSITIVE_ACTIONS, ...BUSINESS_ACTIONS].map(a => [a.key, a.label]),
 )
 
 /** 菜单功能映射（每个菜单实际包含的功能操作） */
@@ -1250,6 +1262,26 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
+  'rdm-task-type-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 進度日報：四个二级菜单按职责拆权，trigger 只在「手動觸發」上
+  'rdm-daily-report-rule': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-daily-report-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-daily-report-record': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-daily-report-trigger': [
+    { key: 'view', label: '查看' },
+    { key: 'trigger', label: '手動觸發' },
+  ],
 }
 
 /** 获取菜单的功能操作（优先后端 sys_menu.actions 真值源，空时回退前端静态映射） */
@@ -1663,6 +1695,12 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'rdm-config-status',
   'rdm-config-routing',
   'rdm-config-sla',
+  'rdm-daily-report-group',
+  'rdm-daily-report-rule',
+  'rdm-daily-report-template',
+  'rdm-daily-report-record',
+  'rdm-daily-report-trigger',
+  'rdm-task-type-config',
   // 智能中心 (AI)
   'ai-model-provider',
   'ai-model-list',
@@ -1945,6 +1983,17 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/rdm-config-status': 'rdm-config-status',
   '/rdm-config-routing': 'rdm-config-routing',
   '/rdm-config-sla': 'rdm-config-sla',
+  '/rdm-task-type-config': 'rdm-task-type-config',
+  // 進度日報：四个二级页 + 两个独立表单页（表单页归属各自列表页）
+  '/rdm-daily-report-rules': 'rdm-daily-report-rule',
+  '/rdm-daily-report-rule-form': 'rdm-daily-report-rule',
+  '/rdm-daily-report-templates': 'rdm-daily-report-template',
+  '/rdm-daily-report-template-form': 'rdm-daily-report-template',
+  '/rdm-daily-report-records': 'rdm-daily-report-record',
+  '/rdm-daily-report-trigger': 'rdm-daily-report-trigger',
+  // 移動端日報頁（釘釘通知連結落地頁）：無獨立菜單，守衛錨到「推送配置」；
+  // 後端快照介面另以 anyOf 放行各 RDM 承載菜單，故 PM/產品負責人無配置權也能打開日報
+  '/rdm-daily': 'rdm-daily-report-rule',
   // V3 分批交付：三个菜单及其子页（子页归属同 pathToKey，按后端 @RequirePermission 锚点）
   '/rdm-project': 'rdm-dashboard-project',
   '/rdm-project-detail': 'rdm-dashboard-project',

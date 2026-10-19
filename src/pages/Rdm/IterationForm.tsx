@@ -11,12 +11,20 @@ import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { fetchIterations, saveIteration, type RdmIterationForm as RdmIterationPayload, type RdmIterationItem } from '../../api/rdm'
+import {
+  fetchIterations,
+  fetchProjectPage,
+  saveIteration,
+  type RdmIterationForm as RdmIterationPayload,
+  type RdmIterationItem,
+  type RdmProjectListItem,
+} from '../../api/rdm'
 import {
   RDM_ITERATION_STATUS,
   RDM_ITERATION_STATUS_LABEL,
   RDM_ITERATION_TYPE,
   RDM_ITERATION_TYPE_LABEL,
+  RDM_PROJECT_STATUS,
   type RdmIterationStatus,
   type RdmIterationType,
 } from '../../constants/rdm'
@@ -27,6 +35,8 @@ const { TextArea } = Input
 /** 表单内部结构（日期用组件类型，提交时转字符串；编码系统发号，不在表单内） */
 interface FormValues {
   name: string
+  /** 所属项目：sprint/version 必选，hotfix 可空（服务端同口径二次校验） */
+  projectId?: number
   iterationType: RdmIterationType
   range?: [dayjs.Dayjs, dayjs.Dayjs]
   capacityHours?: number
@@ -35,6 +45,13 @@ interface FormValues {
   remark?: string
 }
 
+/** 可挂迭代的项目状态：已关闭/全部交付的项目不再承接新迭代 */
+const USABLE_PROJECT_STATUS: string[] = [
+  RDM_PROJECT_STATUS.PREPARING,
+  RDM_PROJECT_STATUS.IN_PROGRESS,
+  RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
+]
+
 export default function IterationForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -42,7 +59,15 @@ export default function IterationForm() {
 
   const [form] = Form.useForm<FormValues>()
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
+  /** 可挂项目候选（与提需求/排期同一口径：排除已关闭与全部交付） */
+  const [projectOptions, setProjectOptions] = useState<RdmProjectListItem[]>([])
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchProjectPage({ pageNo: 1, pageSize: 200 })
+      .then(res => setProjectOptions((res.records ?? []).filter(p => USABLE_PROJECT_STATUS.includes(p.status))))
+      .catch(() => setProjectOptions([]))
+  }, [])
 
   useEffect(() => {
     fetchIterations().then(list => {
@@ -51,6 +76,7 @@ export default function IterationForm() {
       if (!current) return
       form.setFieldsValue({
         name: current.name,
+        projectId: current.projectId ?? undefined,
         iterationType: (current.iterationType ?? RDM_ITERATION_TYPE.SPRINT) as RdmIterationType,
         range: current.startDate && current.endDate ? [dayjs(current.startDate), dayjs(current.endDate)] : undefined,
         capacityHours: current.capacityHours ?? 0,
@@ -66,6 +92,15 @@ export default function IterationForm() {
   const scheduledHours = currentIteration?.taskHours ?? 0
   const capacity = Form.useWatch('capacityHours', form)
   const loadRate = capacity && capacity > 0 ? Math.round((scheduledHours / capacity) * 100) : 0
+  /** 类型联动：hotfix（紧急修复）可不挂项目，sprint/version 必挂（与后端 saveIteration 同口径） */
+  const iterationTypeValue = Form.useWatch('iterationType', form)
+  const projectRequired = iterationTypeValue !== RDM_ITERATION_TYPE.HOTFIX
+  /** 确认框里的项目文案：候选里找不到（如存量已关闭项目）降级显示 id，不编造项目名 */
+  const projectLabel = (id?: number | null) => {
+    if (id == null) return '-'
+    const p = projectOptions.find(o => o.id === id)
+    return p ? `${p.projectNo} · ${p.name}` : `項目 #${id}`
+  }
 
   const handleSave = async () => {
     let values: Awaited<ReturnType<typeof form.validateFields>>
@@ -79,6 +114,7 @@ export default function IterationForm() {
     const payload: RdmIterationPayload = {
       id: iterationId || undefined,
       name: values.name.trim(),
+      projectId: values.projectId ?? null,
       iterationType: values.iterationType,
       startDate: values.range?.[0]?.format('YYYY-MM-DD') ?? '',
       endDate: values.range?.[1]?.format('YYYY-MM-DD') ?? '',
@@ -100,6 +136,7 @@ export default function IterationForm() {
           <div className="confirm-info-card">
             <div className="confirm-info-row"><span>迭代編號：</span><b>{iterationId ? currentIteration?.code ?? '-' : '系統自動發號'}</b></div>
             <div className="confirm-info-row"><span>迭代名稱：</span><b>{payload.name}</b></div>
+            <div className="confirm-info-row"><span>所屬項目：</span><b>{projectLabel(values.projectId)}</b></div>
             <div className="confirm-info-row"><span>起止日期：</span><b>{payload.startDate} ~ {payload.endDate}</b></div>
             <div className="confirm-info-row"><span>容納工時：</span><b>{payload.capacityHours} h</b></div>
           </div>
@@ -162,6 +199,21 @@ export default function IterationForm() {
             </Form.Item>
             <Form.Item label="類型" name="iterationType" rules={[{ required: true, message: '請選擇類型' }]}>
               <Select options={Object.entries(RDM_ITERATION_TYPE_LABEL).map(([value, label]) => ({ value, label }))} />
+            </Form.Item>
+            <Form.Item
+              label="所屬項目"
+              name="projectId"
+              rules={projectRequired ? [{ required: true, message: '請選擇所屬項目' }] : []}
+              extra={projectRequired ? '常規/版本專項迭代必須掛項目' : '緊急修復可不掛（跨項目平台級熱修）'}
+            >
+              <Select
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                placeholder={projectRequired ? '選擇進行中的項目' : '可留空'}
+                notFoundContent="暫無可用項目"
+                options={projectOptions.map(p => ({ value: p.id, label: `${p.projectNo} · ${p.name}` }))}
+              />
             </Form.Item>
             <Form.Item label="起止日期" name="range" rules={[{ required: true, message: '請選擇起止日期' }]}>
               <DatePicker.RangePicker style={{ width: '100%' }} />

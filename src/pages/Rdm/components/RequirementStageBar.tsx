@@ -1,8 +1,9 @@
 /**
  * RequirementStageBar —— 需求生命周期统一进度条
  *
- * 把 23 个状态折叠为 6 个阶段（提交/审批/分配受理/设计评审/研发测试/验收入库），
- * 业务方一眼看懂「我的需求到哪了」；PM/研发可点开查看完整状态明细。
+ * 把 23 个状态折叠为 9 个阶段（提交/審批/分配受理/PRD设计/評審排期/開發/測試/業務驗收/上線歸檔），
+ * 分段依据是「现在卡在谁手上」：PM 扫一眼就知道该催研发还是催 QA，而不是在“研發測試”里猜。
+ * 业务方一眼看懂「我的需求到哪了」；PM/研发可点开查看阶段口径与细分状态。
  */
 import { Popover, Tag } from 'antd'
 import {
@@ -10,6 +11,7 @@ import {
   RDM_STAGE_ORDER,
   RDM_STAGE_DESC,
   RDM_STAGE,
+  RDM_STALLED_STATUS,
   RDM_STATUS_LABEL,
   RDM_STATUS_STAGE,
   type RdmStage,
@@ -31,7 +33,7 @@ interface StageBarProps {
   stayDays?: Partial<Record<RdmStage, number>>
 }
 
-/** 阶段在 6 段序列中的下标 */
+/** 阶段在 9 段序列中的下标 */
 function stageIndex(stage: RdmStage) {
   return RDM_STAGE_ORDER.indexOf(stage)
 }
@@ -39,8 +41,10 @@ function stageIndex(stage: RdmStage) {
 export default function RequirementStageBar({ status, overdue, compact, stayDays }: StageBarProps) {
   const stage = stageOfStatus(status)
   const currentIdx = stageIndex(stage)
+  /** 驳回/挂起：仍留在原阶段但要把节点标红，否则异常停留会被读成正常推进 */
+  const stalled = RDM_STALLED_STATUS[status as RdmStatus]
 
-  // 紧凑模式（看板卡片）：只画 6 段细分段条 + 当前阶段名，避免列宽溢出
+  // 紧凑模式（看板卡片）：只画 9 段细分段条 + 当前阶段名，避免列宽溢出
   if (compact) {
     return (
       <div style={{ marginTop: 8 }}>
@@ -78,19 +82,21 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
         {RDM_STAGE_ORDER.map((st, idx) => {
           const done = idx < currentIdx
           const active = idx === currentIdx
-          const color = done || active ? '#E8720C' : '#D9D9D9'
+          /** 当前节点且处于逾期/驳回/挂起：用危险色抢回注意力，否则异常停留与普通推进长得一样 */
+          const alarm = active && (overdue || !!stalled)
+          const color = alarm ? '#FF4D4F' : done || active ? '#E8720C' : '#D9D9D9'
           const stay = stayDays?.[st]
           return (
             <div key={st} style={{ flex: 1, display: 'flex', alignItems: 'flex-start', minWidth: 0 }}>
               {/* 节点 */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 72 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%',
-                  background: done ? '#E8720C' : active ? '#FFF7F0' : '#fff',
+                  background: done ? '#E8720C' : active ? (alarm ? '#FFF2F0' : '#FFF7F0') : '#fff',
                   border: `2px solid ${color}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? '#E8720C' : '#BFBFBF',
-                  boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
+                  fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? (alarm ? '#CF1322' : '#E8720C') : '#BFBFBF',
+                  boxShadow: active ? `0 0 0 4px ${alarm ? 'rgba(255,77,79,0.12)' : 'rgba(232,114,12,0.12)'}` : 'none',
                   animation: active ? 'statusPulse 2s ease-in-out infinite' : undefined,
                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
@@ -110,9 +116,12 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                       </div>
                       {active && (
                         <div style={{ fontSize: 12, color: '#8C8C8C' }}>
-                          細分狀態：<Tag color={overdue ? 'error' : 'orange'} style={{ margin: 0 }}>
+                          細分狀態：<Tag color={alarm ? 'error' : 'orange'} style={{ margin: 0 }}>
                             {RDM_STATUS_LABEL[status as RdmStatus] ?? status}
                           </Tag>
+                          {stalled && (
+                            <span style={{ color: '#CF1322', marginLeft: 6 }}>{stalled}，需人工推進</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -121,17 +130,20 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                   <div style={{ marginTop: 6, textAlign: 'center', cursor: 'pointer' }}>
                     <div style={{
                       fontSize: 12, whiteSpace: 'nowrap',
-                      color: active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
+                      color: alarm ? '#CF1322' : active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
                       fontWeight: active ? 600 : 400,
                     }}>
                       {RDM_STAGE_LABEL[st]}
                     </div>
-                    {typeof stay === 'number' && (
+                    {/* 第二行：异常态优先报“被驳回/挂起”，正常推进才报停留天数 */}
+                    {(stalled || typeof stay === 'number') && (
                       <div style={{
                         fontSize: 11, whiteSpace: 'nowrap', marginTop: 2,
-                        color: active && overdue ? '#CF1322' : '#8C8C8C',
+                        color: alarm ? '#CF1322' : '#8C8C8C',
                       }}>
-                        停留 {stay} 天
+                        {stalled
+                          ? `${stalled}${typeof stay === 'number' ? ` · 停留 ${stay} 天` : ''}`
+                          : `停留 ${stay} 天`}
                       </div>
                     )}
                   </div>

@@ -246,6 +246,30 @@ public class RdmProjectFactService {
     }
 
     /**
+     * 系統級項目事實（<b>僅供無認證上下文的系統作業</b>，如每日日報定時/手動觸發）。
+     *
+     * <p><b>為什麼必須有這個方法</b>：{@link #resolveScope} 對 {@code userId == null} 是 fail-closed
+     * （可見項目集合置空、絕不退化全量），因此定時作業直接調 {@code projectFacts(query, null)}
+     * 會拿到空列表、日報恆為「0 個項目」。日報作業是<b>系統身份</b>而非某個用戶的越權請求，
+     * 故在這裡顯式構造全量 Scope；其餘鏈路與用戶視角<b>完全共用同一個</b> {@code loadSnapshot}
+     * 與 {@code toProjectFacts}，因此「日報數字 == 項目總覽數字」的口徑單點不被破壞。
+     *
+     * <p><b>安全邊界（不得放寬）</b>：任何來自 HTTP 請求的路徑都必須走
+     * {@link #projectFacts(RdmFactVO.FactQuery, Long)} 並傳入認證用戶 id，由 {@code RdmAccessGuard}
+     * 裁決可見範圍；<b>禁止</b>把本方法暴露給請求側當作「看全部」的後門，也禁止用請求傳入的
+     * userId 調用本方法（那等於繞過權限收斂）。
+     */
+    public List<RdmFactVO.ProjectFact> projectFactsForSystem(RdmFactVO.FactQuery query) {
+        RdmFactVO.Scope scope = new RdmFactVO.Scope();
+        scope.setAuthenticated(true);
+        scope.setCanSeeAll(true);
+        scope.setRestricted(false);
+        scope.setProjectIds(new ArrayList<>());
+        scope.setComputedAt(DateTimeUtils.format(LocalDateTime.now()));
+        return toProjectFacts(loadSnapshot(scope, normalize(query)));
+    }
+
+    /**
      * 項目事實分頁（總覽列表用）。
      *
      * <p><b>為什麼在內存切片而不是 {@code selectPage}</b>：統計卡必須與列表<b>同一批</b>項目事實行，
@@ -825,6 +849,7 @@ public class RdmProjectFactService {
         f.setVersion(p.getVersion());
         f.setCreatedAt(DateTimeUtils.format(p.getCreatedAt()));
         f.setUpdatedAt(DateTimeUtils.format(p.getUpdatedAt()));
+        f.setUpdatedBy(p.getUpdatedBy());
         f.setRequirementTotal(s.requirementTotalByProject.getOrDefault(p.getId(), 0));
         f.setTestBatchTotal(s.testBatchTotalByProject.getOrDefault(p.getId(), 0));
 
@@ -1175,6 +1200,19 @@ public class RdmProjectFactService {
         if (query.getPmUserId() != null) {
             wrapper.eq(RdmProject::getPmUserId, query.getPmUserId());
         }
+        if (query.getProductOwnerUserId() != null) {
+            wrapper.eq(RdmProject::getProductOwnerUserId, query.getProductOwnerUserId());
+        }
+        // 计划日期区间按「与项目计划区间有交集」判定：plan_start_date <= 所选止 AND plan_end_date >= 所选起。
+        // 两个日期列都可空，未填计划的项目不满足任何区间，故必须配 isNotNull 排除（NULL 参与比较恒为 unknown）。
+        LocalDate planFrom = parseFilterDate(query.getPlanDateFrom(), "計劃日期起");
+        LocalDate planTo = parseFilterDate(query.getPlanDateTo(), "計劃日期止");
+        if (planFrom != null) {
+            wrapper.isNotNull(RdmProject::getPlanEndDate).ge(RdmProject::getPlanEndDate, planFrom);
+        }
+        if (planTo != null) {
+            wrapper.isNotNull(RdmProject::getPlanStartDate).le(RdmProject::getPlanStartDate, planTo);
+        }
         if (scope.isRestricted()) {
             List<Long> projectIds = scope.getProjectIds();
             if (projectIds == null || projectIds.isEmpty()) {
@@ -1249,6 +1287,23 @@ public class RdmProjectFactService {
             return LocalDate.parse(trimmed.substring(0, Math.min(10, trimmed.length())));
         } catch (RuntimeException e) {
             return null;
+        }
+    }
+
+    /**
+     * 解析筛选用日期。与 {@link #parseDate} 的区别：格式错必须抛出，不能返回 null。
+     * <p>筛选条件被静默丢弃等于把用户要的小范围放大成全量返回（fail-open），比直接报错更危险；
+     * 与「未知 drill 值一律拒」同一条口径。
+     */
+    private static LocalDate parseFilterDate(String value, String label) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String trimmed = value.trim();
+        try {
+            return LocalDate.parse(trimmed.substring(0, Math.min(10, trimmed.length())));
+        } catch (RuntimeException e) {
+            throw new BusinessException(label + "格式錯誤，應為 yyyy-MM-dd");
         }
     }
 }

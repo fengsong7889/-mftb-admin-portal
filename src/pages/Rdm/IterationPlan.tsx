@@ -38,6 +38,29 @@ function loadRate(row: RdmIterationItem): number {
   return Math.round(((row.taskHours ?? 0) / row.capacityHours) * 100)
 }
 
+/**
+ * 列元数据（§E.3）：key 与 i18n 键的单一来源，表头与列配置抽屉共用同一份，
+ * 避免两处各写一次导致抽屉里的名字和表头不一致。
+ * <p>titleKey 存字符串而不在此处调 t()：模块顶层常量求值早于 i18n 初始化（见 constants/rdm.ts 同构问题）。
+ * <p>导出仅供回归测试钉住“表头标题与列配置同源 + 双语键齐备”，页面自身不依赖外部改写。
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export const COLUMN_META = [
+  { key: 'name', titleKey: 'rdm.iteration.colName' },
+  { key: 'iterationType', titleKey: 'rdm.iteration.colType' },
+  { key: 'projectName', titleKey: 'rdm.iteration.colProject' },
+  { key: 'startDate', titleKey: 'rdm.iteration.colStartDate' },
+  { key: 'endDate', titleKey: 'rdm.iteration.colEndDate' },
+  { key: 'duration', titleKey: 'rdm.iteration.colDuration' },
+  { key: 'status', titleKey: 'rdm.iteration.colStatus' },
+  { key: 'ownerName', titleKey: 'rdm.iteration.colOwner' },
+  { key: 'reqCount', titleKey: 'rdm.iteration.colReqCount' },
+  { key: 'taskCount', titleKey: 'rdm.iteration.colTaskCount' },
+  { key: 'capacity', titleKey: 'rdm.iteration.colCapacity' },
+  { key: 'remark', titleKey: 'rdm.iteration.colRemark' },
+  { key: 'action', titleKey: 'common.colAction' },
+] as const
+
 export default function IterationPlan() {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -117,9 +140,12 @@ export default function IterationPlan() {
     })
   }
 
+  /** 列配置面板的可选列（标题与表头同源，随语言切换重新取词） */
+  const columnMeta = useMemo(() => COLUMN_META.map(m => ({ key: m.key, title: t(m.titleKey) })), [t])
+
   const columns: TableColumnsType<RdmIterationItem> = [
     {
-      title: '迭代', dataIndex: 'name', key: 'name', width: 220,
+      title: t('rdm.iteration.colName'), dataIndex: 'name', key: 'name', width: 220,
       render: (v: string, r) => (
         <div style={{ lineHeight: 1.4 }}>
           <div style={{ color: '#262626', fontWeight: 500 }}>{v}</div>
@@ -128,7 +154,7 @@ export default function IterationPlan() {
       ),
     },
     {
-      title: '類型', dataIndex: 'iterationType', key: 'iterationType', width: 100,
+      title: t('rdm.iteration.colType'), dataIndex: 'iterationType', key: 'iterationType', width: 100,
       render: (v?: string) => {
         // 历史数据可能没有类型，统一按常规迭代展示
         const key = (v ?? RDM_ITERATION_TYPE.SPRINT) as RdmIterationType
@@ -137,30 +163,54 @@ export default function IterationPlan() {
       },
     },
     {
-      title: '起止', key: 'range', width: 190,
-      render: (_, r) => {
-        const days = r.startDate && r.endDate ? dayjs(r.endDate).diff(dayjs(r.startDate), 'day') + 1 : 0
-        return (
-          <span>
-            {r.startDate ?? '-'} ~ {r.endDate ?? '-'}
-            {days > 0 && <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 6 }}>{days} 天</span>}
-          </span>
-        )
+      /** 归属体系改造：迭代挂项目后才能按项目统计「上了哪些迭代」；未挂行警示，引导管理员补挂 */
+      title: t('rdm.iteration.colProject'), dataIndex: 'projectName', key: 'projectName', width: 180,
+      render: (v: string | null | undefined, r) => {
+        if (r.projectId != null) {
+          return (
+            <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${r.projectId}`)}>
+              {v ?? `項目 #${r.projectId}`}
+            </a>
+          )
+        }
+        // hotfix 允许不挂项目（跨项目平台级热修），不算异常；其余类型未挂是存量待补
+        const isHotfix = (r.iterationType ?? RDM_ITERATION_TYPE.SPRINT) === RDM_ITERATION_TYPE.HOTFIX
+        return isHotfix
+          ? <span style={{ color: '#8C8C8C', fontSize: 12 }}>-</span>
+          : <Tag color="warning" style={{ margin: 0 }}>{t('rdm.iteration.noProject')}</Tag>
       },
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      title: t('rdm.iteration.colStartDate'), dataIndex: 'startDate', key: 'startDate', width: 110,
+      render: (v?: string | null) => v ?? '-',
+    },
+    {
+      title: t('rdm.iteration.colEndDate'), dataIndex: 'endDate', key: 'endDate', width: 110,
+      render: (v?: string | null) => v ?? '-',
+    },
+    {
+      /** 迭代周期天数：拆起止后单独成列，避免旧版把天数黏在日期后面被读成状态数字 */
+      title: t('rdm.iteration.colDuration'), key: 'duration', width: 80,
+      render: (_, r) => {
+        const days = r.startDate && r.endDate ? dayjs(r.endDate).diff(dayjs(r.startDate), 'day') + 1 : 0
+        return days > 0
+          ? <span style={{ color: '#595959' }}>{t('rdm.iteration.durationDays', { days })}</span>
+          : <span style={{ color: '#8C8C8C' }}>-</span>
+      },
+    },
+    {
+      title: t('rdm.iteration.colStatus'), dataIndex: 'status', key: 'status', width: 100,
       render: (v?: string) => (
         <Tag color={RDM_ITERATION_STATUS_COLOR[(v ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus] ?? 'default'} style={{ margin: 0 }}>
           {RDM_ITERATION_STATUS_LABEL[(v ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus] ?? v}
         </Tag>
       ),
     },
-    { title: '負責人', dataIndex: 'ownerName', key: 'ownerName', width: 110, render: (v?: string | null) => v ?? '-' },
-    { title: '需求數', dataIndex: 'reqCount', key: 'reqCount', width: 90, render: (v?: number) => v ?? 0 },
-    { title: '任務數', dataIndex: 'taskCount', key: 'taskCount', width: 90, render: (v?: number) => v ?? 0 },
+    { title: t('rdm.iteration.colOwner'), dataIndex: 'ownerName', key: 'ownerName', width: 110, render: (v?: string | null) => v ?? '-' },
+    { title: t('rdm.iteration.colReqCount'), dataIndex: 'reqCount', key: 'reqCount', width: 90, render: (v?: number) => v ?? 0 },
+    { title: t('rdm.iteration.colTaskCount'), dataIndex: 'taskCount', key: 'taskCount', width: 90, render: (v?: number) => v ?? 0 },
     {
-      title: '產能 / 已排工時', key: 'capacity', width: 220,
+      title: t('rdm.iteration.colCapacity'), key: 'capacity', width: 220,
       render: (_, r) => {
         const rate = loadRate(r)
         const over = rate > 100
@@ -186,7 +236,7 @@ export default function IterationPlan() {
       },
     },
     {
-      title: '說明', dataIndex: 'remark', key: 'remark', ellipsis: true, render: (v?: string | null) => v ?? '-'
+      title: t('rdm.iteration.colRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true, render: (v?: string | null) => v ?? '-'
     },
     {
       title: t('common.colAction'), key: 'action', width: 160, fixed: 'right',
@@ -217,19 +267,11 @@ export default function IterationPlan() {
    * 列配置（§E.3）。
    * <p>注意 locked 只能写在第三个参数（defaultConfig）：hook 从 allColumns 里不读 locked，
    * 写在第二参数会既报错又静默失效。
+   * <p>storageKey 升到 -v3：归属体系改造新增「所属项目」列，旧存档没有该列会被 hook
+   * 当成已删除列抖掉；沿用全站既有惯例（asset-list-v2 / rdm-requirement-v2）换 key 强制重排，
+   * 不去改共享 hook 加版本号——那会把所有列表页的存档行为一起拖进来。
    */
-  const { configComponent, applyConfig } = useColumnConfig('rdm-iteration-plan', [
-    { key: 'name', title: '迭代' },
-    { key: 'iterationType', title: '類型' },
-    { key: 'range', title: '起止' },
-    { key: 'status', title: '狀態' },
-    { key: 'ownerName', title: '負責人' },
-    { key: 'reqCount', title: '需求數' },
-    { key: 'taskCount', title: '任務數' },
-    { key: 'capacity', title: '產能 / 已排工時' },
-    { key: 'remark', title: '說明' },
-    { key: 'action', title: '操作' },
-  ], [
+  const { configComponent, applyConfig } = useColumnConfig('rdm-iteration-plan-v3', columnMeta, [
     { key: 'name', visible: true, locked: 'head' as const },
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
@@ -273,7 +315,7 @@ export default function IterationPlan() {
         loading={loading}
         columns={applyConfig(columns) as TableColumnsType<RdmIterationItem>}
         dataSource={rows}
-        scroll={{ x: 1570 }}
+        scroll={{ x: 1860 }}
         pagination={{
           defaultPageSize: 10,
           showSizeChanger: true,

@@ -119,6 +119,8 @@ public class RdmDeliveryDTO {
         private Long id;
         private String code;
         private String name;
+        /** 所属项目ID：sprint/version 必填，hotfix 可空（服务端校验，不信任前端） */
+        private Long projectId;
         private String iterationType;
         private String startDate;
         private String endDate;

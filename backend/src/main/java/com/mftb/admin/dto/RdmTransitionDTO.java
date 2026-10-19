@@ -43,6 +43,13 @@ public class RdmTransitionDTO {
     /** 迭代/排期标识 */
     private String iterationCode;
 
+    /**
+     * 所属项目ID（归属体系改造）。
+     * <p>dispatch（项目经理分配）/ accept（产品规划）时选填；schedule（提交排期）时必填，
+     * 服务端校验项目存在且与所选迭代的项目一致（迭代有项目时以迭代为准回写）。
+     */
+    private Long projectId;
+
     /** 研发进度百分比 */
     private Integer progress;
 

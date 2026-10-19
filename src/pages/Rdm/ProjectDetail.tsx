@@ -47,6 +47,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import type { FormInstance } from 'antd'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import {
@@ -82,6 +83,33 @@ const PENDING_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string
 
 /** 交付項狀態是否已完成 */
 const isItemDone = (status: string) => status === 'done'
+
+/**
+ * 負責人選擇行：字段存 sys_user.id 标量，姓名快照由 onPick 旁路寫入 *UserName。
+ *
+ * <p>EmployeeSelect 的 value 契约是 number[]，表单里存的却是标量 ID，两边用
+ * getValueProps / normalize 做双向适配。过去把 Form.Item 绑在 *UserName 上、再在 JSX 里
+ * 手写 value/onChange，会被 Form.Item 注入的同名 props 覆盖（rc-field-form 是
+ * `{...childProps, ...valueProps}`，注入的 value 是姓名字符串，组件按 value[0] 只能取出
+ * 一个汉字；注入的 onChange 又会先把字段覆盖成 ID 数组）。实测后果：编辑页六个负责人
+ * 一个都不回显，新建提交时 pmUserName 丢成 undefined（姓名靠后端 resolveUserName 按 ID 兑回来）。
+ */
+function OwnerFormItem({ form, idKey, nameKey, label }: { form: FormInstance; idKey: string; nameKey: string; label: string }) {
+  return (
+    <Form.Item
+      name={idKey}
+      label={label}
+      getValueProps={(v?: number) => ({ value: v == null ? [] : [v] })}
+      normalize={(picked?: number[]) => picked?.[0]}
+    >
+      <EmployeeSelect
+        single
+        placeholder="搜尋姓名或工號"
+        onPick={items => form.setFieldsValue({ [nameKey]: items[0]?.name ?? '' })}
+      />
+    </Form.Item>
+  )
+}
 
 /**
  * 催辦結果（頁面級擴展類型，additive）。
@@ -313,10 +341,13 @@ export default function ProjectDetail() {
       const payload = {
         name: values.name,
         objective: values.objective || undefined,
-        pmUserId: values.pmUserId || undefined,
-        pmUserName: values.pmUserName || undefined,
-        productOwnerUserId: values.productOwnerUserId || undefined,
-        productOwnerUserName: values.productOwnerUserName || undefined,
+        // 六组负责人一律「未选 = userId null + userName 空串」：后端拿 userName 非 null
+        // 当「本次提供了该角色」的哨兵，配合实体列的 updateStrategy=ALWAYS 才能真把负责人清空。
+        // 过去 PM/PO 走 `|| undefined`，JSON 里连 key 都不发，后端哨兵不成立 → 清空不生效。
+        pmUserId: values.pmUserId ?? null,
+        pmUserName: values.pmUserName ?? '',
+        productOwnerUserId: values.productOwnerUserId ?? null,
+        productOwnerUserName: values.productOwnerUserName ?? '',
         techLeadUserId: values.techLeadUserId ?? null,
         techLeadUserName: values.techLeadUserName ?? '',
         uiDesignerUserId: values.uiDesignerUserId ?? null,
@@ -407,42 +438,12 @@ export default function ProjectDetail() {
               <Form.Item name="name" label="項目名稱" rules={[{ required: true, message: '請輸入項目名稱' }]}>
                 <Input placeholder="輸入項目名稱" maxLength={100} />
               </Form.Item>
-              <Form.Item name="pmUserName" label="項目經理">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('pmUserId') ? [form.getFieldValue('pmUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ pmUserId: ids[0] ?? undefined, pmUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ pmUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
-              <Form.Item name="productOwnerUserName" label="產品負責人">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('productOwnerUserId') ? [form.getFieldValue('productOwnerUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ productOwnerUserId: ids[0] ?? undefined, productOwnerUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ productOwnerUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
-              <Form.Item name="techLeadUserName" label="技術負責人">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('techLeadUserId') ? [form.getFieldValue('techLeadUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ techLeadUserId: ids[0] ?? undefined, techLeadUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ techLeadUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
-              <Form.Item name="uiDesignerUserName" label="UI 設計負責人">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('uiDesignerUserId') ? [form.getFieldValue('uiDesignerUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ uiDesignerUserId: ids[0] ?? undefined, uiDesignerUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ uiDesignerUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
-              <Form.Item name="qaLeadUserName" label="測試負責人">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('qaLeadUserId') ? [form.getFieldValue('qaLeadUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ qaLeadUserId: ids[0] ?? undefined, qaLeadUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ qaLeadUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
-              <Form.Item name="opsLeadUserName" label="運維負責人">
-                <EmployeeSelect single placeholder="搜尋姓名或工號"
-                  value={form.getFieldValue('opsLeadUserId') ? [form.getFieldValue('opsLeadUserId')] : undefined}
-                  onChange={(ids: number[]) => { form.setFieldsValue({ opsLeadUserId: ids[0] ?? undefined, opsLeadUserName: undefined }) }}
-                  onPick={(items) => { form.setFieldsValue({ opsLeadUserName: items[0]?.name ?? '' }) }} />
-              </Form.Item>
+              <OwnerFormItem form={form} idKey="pmUserId" nameKey="pmUserName" label="項目經理" />
+              <OwnerFormItem form={form} idKey="productOwnerUserId" nameKey="productOwnerUserName" label="產品負責人" />
+              <OwnerFormItem form={form} idKey="techLeadUserId" nameKey="techLeadUserName" label="技術負責人" />
+              <OwnerFormItem form={form} idKey="uiDesignerUserId" nameKey="uiDesignerUserName" label="UI 設計負責人" />
+              <OwnerFormItem form={form} idKey="qaLeadUserId" nameKey="qaLeadUserName" label="測試負責人" />
+              <OwnerFormItem form={form} idKey="opsLeadUserId" nameKey="opsLeadUserName" label="運維負責人" />
               <Form.Item name="planStartDate" label="計劃開始日期">
                 <DatePicker style={{ width: '100%' }} placeholder="選擇開始日期" />
               </Form.Item>
@@ -553,7 +554,8 @@ export default function ProjectDetail() {
                 {detail.defaultAcceptancePath === 'A' ? '路徑A（先驗收後上線）' :
                  detail.defaultAcceptancePath === 'B' ? '路徑B（先上線後驗收）' : '-'}
               </Descriptions.Item>
-              <Descriptions.Item label="更新時間">{detail.updatedAt?.slice(0, 16).replace('T', ' ') || '-'}</Descriptions.Item>
+              {/* 列名与项目总览列表保持一致：清单叫「最後更新時間」，详情里还叫「更新時間」会让人以为是两个字段 */}
+              <Descriptions.Item label="最後更新時間">{detail.updatedAt?.slice(0, 16).replace('T', ' ') || '-'}</Descriptions.Item>
               <Descriptions.Item label="版本號">v{detail.version}</Descriptions.Item>
             </Descriptions>
           </div>
@@ -831,9 +833,11 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* ── 底部時間戳 ── */}
+      {/* ── 底部時間戳（§D.4 操作記錄：只展示創建/最後更新人/最後更新時間，不做完整操作日誌） ── */}
       <div className="rdm-detail-footer">
         <span>創建於 <b>{detail.createdAt?.slice(0, 16).replace('T', ' ') || '-'}</b></span>
+        {/* 存量行為空（rdm:schema:v3.14 之前没有该列），降级显示 - 而不是空白 */}
+        <span>最後更新人 <b>{detail.updatedBy || '-'}</b></span>
         <span>最後更新 <b>{detail.updatedAt?.slice(0, 16).replace('T', ' ') || '-'}</b></span>
       </div>
 

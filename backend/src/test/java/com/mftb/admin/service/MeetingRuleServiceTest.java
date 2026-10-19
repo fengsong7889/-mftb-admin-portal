@@ -130,11 +130,17 @@ class MeetingRuleServiceTest {
     @DisplayName("提前期以服务端当前时间判定：踩点开始却不足 15 分钟的预约被拒")
     void minLeadTimeIsEnforced() {
         // 用"当前时刻回退一小时并对齐到 15 分钟刻度"作为开始时间：
-        // 既保证一定落在提前期内，又不会因为跑用例的时刻跨过 22:00 或零点而先命中别的规则
+        // 既保证一定落在提前期内，又不会因为跑用例的时刻跨过 22:00 而先命中别的规则。
+        //
+        // 零点边界修正：00:00~00:59 运行时 minusHours(1) 会落到**前一天** 23:xx，
+        // 会议 +30 分钟就跨了零点，先命中「會議需在同一天內結束」而不是提前期规则，
+        // 断言拿不到目标错误（凌晨跑 CI 必红）。此时改用今天 00:00：同样是已过去的踩点时刻，
+        // 且开始与结束落在同一天，不触发跨日规则。
         MeetingRoom r = room(8);
         r.setBookableStartTime(java.time.LocalTime.of(0, 0));
         r.setBookableEndTime(java.time.LocalTime.of(23, 59));
-        LocalDateTime base = LocalDateTime.now().minusHours(1).withSecond(0).withNano(0);
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime base = now.getHour() == 0 ? now.withMinute(0) : now.minusHours(1);
         LocalDateTime start = base.withMinute(base.getMinute() / 15 * 15);
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> validate(r, start, start.plusMinutes(30), 4));

@@ -26,6 +26,14 @@ public class RdmIteration {
     /** 迭代名称 */
     private String name;
 
+    /**
+     * 所属项目ID（rdm_project.id）。
+     * <p>归属体系改造（v3.15）：sprint / version 必须挂项目，hotfix（紧急修复）允许为空
+     * ——跨项目线上事故的「平台级热修」迭代没有单一项目归属。存量迭代不回填，
+     * 由管理员在迭代排期列表逐个补挂（未挂行前端显示「未掛項目」警示）。
+     */
+    private Long projectId;
+
     /** 类型: sprint/version/hotfix */
     private String iterationType;
 

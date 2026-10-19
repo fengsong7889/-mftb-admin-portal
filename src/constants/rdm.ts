@@ -87,14 +87,25 @@ export const RDM_STATUS_COLOR: Record<RdmStatus, string> = {
   [RDM_STATUS.CLOSED]: 'default',
 }
 
-/** 折叠阶段（业务方视角，详情页/工作台统一用 6 段进度） */
+/**
+ * 折叠阶段（业务方视角，详情页/工作台统一用 9 段进度）。
+ * <p>分段依据是「现在卡在谁手上」，不是业务类别：PM 推节点时问的是该催谁，而不是这属于哪个环节。
+ * <p>原 6 段把 23 个状态折叠后，delivery 一段吞了 6 个状态（已排期→测试通过全在同一节点），
+ * 看不出是开发没动还是测试卡住；因此拆出 dev/test，并把 product 拆为 design/review、
+ * acceptance 拆为 uat/release。
+ * <p>注：DB rdm_status_def.stage 已由 rdm:schema:v3.17 迁为 9 段，与本枚举同源；
+ * 本枚举是前端状态条的唯一真值。后续新增状态行时，种子的 stage 必须写这 9 个值之一。
+ */
 export const RDM_STAGE = {
   SUBMIT: 'submit',
   INTAKE: 'intake',
   DISPATCH: 'dispatch',
-  PRODUCT: 'product',
-  DELIVERY: 'delivery',
-  ACCEPTANCE: 'acceptance',
+  DESIGN: 'design',
+  REVIEW: 'review',
+  DEV: 'dev',
+  TEST: 'test',
+  UAT: 'uat',
+  RELEASE: 'release',
 } as const
 export type RdmStage = (typeof RDM_STAGE)[keyof typeof RDM_STAGE]
 
@@ -102,27 +113,37 @@ export const RDM_STAGE_LABEL: Record<RdmStage, string> = {
   [RDM_STAGE.SUBMIT]: '提交需求',
   [RDM_STAGE.INTAKE]: '需求審批',
   [RDM_STAGE.DISPATCH]: '分配受理',
-  [RDM_STAGE.PRODUCT]: '設計評審',
-  [RDM_STAGE.DELIVERY]: '研發測試',
-  [RDM_STAGE.ACCEPTANCE]: '驗收上線',
+  [RDM_STAGE.DESIGN]: 'PRD 設計',
+  [RDM_STAGE.REVIEW]: '評審排期',
+  [RDM_STAGE.DEV]: '開發',
+  [RDM_STAGE.TEST]: '測試',
+  [RDM_STAGE.UAT]: '業務驗收',
+  [RDM_STAGE.RELEASE]: '上線歸檔',
 }
 
+/** 阶段口径：每条都说清「卡在谁手上、下一步该谁动」，不写抽象环节名 */
 export const RDM_STAGE_DESC: Record<RdmStage, string> = {
-  [RDM_STAGE.SUBMIT]: '業務填寫需求內容與期望',
-  [RDM_STAGE.INTAKE]: '上級或指定人審批需求準入',
+  [RDM_STAGE.SUBMIT]: '提出人填寫需求內容與期望',
+  [RDM_STAGE.INTAKE]: '等上級或指定人審批準入',
   [RDM_STAGE.DISPATCH]: '技術負責人分配、產品經理受理',
-  [RDM_STAGE.PRODUCT]: 'PRD 設計與研發評審',
-  [RDM_STAGE.DELIVERY]: 'UI/開發/測試推進',
-  [RDM_STAGE.ACCEPTANCE]: '業務驗收並確認上線交付',
+  [RDM_STAGE.DESIGN]: '產品經理撰寫 PRD 與驗收標準',
+  [RDM_STAGE.REVIEW]: '研發評審 PRD 並排進迭代',
+  [RDM_STAGE.DEV]: '已排期待开工，或 UI/開發/聯調進行中',
+  [RDM_STAGE.TEST]: 'QA 測試與缺陷回歸',
+  [RDM_STAGE.UAT]: '業務方逐條判定檢查項',
+  [RDM_STAGE.RELEASE]: '已上線，待業務評分與歸檔',
 }
 
 export const RDM_STAGE_ORDER: RdmStage[] = [
   RDM_STAGE.SUBMIT,
   RDM_STAGE.INTAKE,
   RDM_STAGE.DISPATCH,
-  RDM_STAGE.PRODUCT,
-  RDM_STAGE.DELIVERY,
-  RDM_STAGE.ACCEPTANCE,
+  RDM_STAGE.DESIGN,
+  RDM_STAGE.REVIEW,
+  RDM_STAGE.DEV,
+  RDM_STAGE.TEST,
+  RDM_STAGE.UAT,
+  RDM_STAGE.RELEASE,
 ]
 
 /** 状态 → 阶段映射（进度条折叠依据） */
@@ -135,31 +156,47 @@ export const RDM_STATUS_STAGE: Record<RdmStatus, RdmStage> = {
   [RDM_STATUS.EVALUATING]: RDM_STAGE.DISPATCH,
   [RDM_STATUS.REJECTED]: RDM_STAGE.DISPATCH,
   [RDM_STATUS.ON_HOLD]: RDM_STAGE.DISPATCH,
-  [RDM_STATUS.ACCEPTED]: RDM_STAGE.PRODUCT,
-  [RDM_STATUS.PRD_DESIGNING]: RDM_STAGE.PRODUCT,
-  [RDM_STATUS.REVIEWING]: RDM_STAGE.PRODUCT,
-  [RDM_STATUS.REVIEW_PASSED]: RDM_STAGE.PRODUCT,
-  [RDM_STATUS.SCHEDULED]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.DESIGNING]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.DEVELOPING]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.INTEGRATION]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.TESTING]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.TEST_PASSED]: RDM_STAGE.DELIVERY,
-  [RDM_STATUS.UAT_PENDING]: RDM_STAGE.ACCEPTANCE,
-  [RDM_STATUS.UAT_REJECTED]: RDM_STAGE.ACCEPTANCE,
-  [RDM_STATUS.RELEASED]: RDM_STAGE.ACCEPTANCE,
-  [RDM_STATUS.VERIFIED]: RDM_STAGE.ACCEPTANCE,
-  [RDM_STATUS.CLOSED]: RDM_STAGE.ACCEPTANCE,
+  [RDM_STATUS.ACCEPTED]: RDM_STAGE.DESIGN,
+  [RDM_STATUS.PRD_DESIGNING]: RDM_STAGE.DESIGN,
+  [RDM_STATUS.REVIEWING]: RDM_STAGE.REVIEW,
+  [RDM_STATUS.REVIEW_PASSED]: RDM_STAGE.REVIEW,
+  // 已排期归入开发段开头：PM 真正关心的是「排进去了为什么还没开工」，
+  // 放在评审段会把这段等待误读成评审还没完。
+  [RDM_STATUS.SCHEDULED]: RDM_STAGE.DEV,
+  [RDM_STATUS.DESIGNING]: RDM_STAGE.DEV,
+  [RDM_STATUS.DEVELOPING]: RDM_STAGE.DEV,
+  [RDM_STATUS.INTEGRATION]: RDM_STAGE.DEV,
+  [RDM_STATUS.TESTING]: RDM_STAGE.TEST,
+  [RDM_STATUS.TEST_PASSED]: RDM_STAGE.TEST,
+  [RDM_STATUS.UAT_PENDING]: RDM_STAGE.UAT,
+  [RDM_STATUS.UAT_REJECTED]: RDM_STAGE.UAT,
+  [RDM_STATUS.RELEASED]: RDM_STAGE.RELEASE,
+  [RDM_STATUS.VERIFIED]: RDM_STAGE.RELEASE,
+  [RDM_STATUS.CLOSED]: RDM_STAGE.RELEASE,
 }
 
 /** 阶段的进度百分比（已达成该阶段时的完成度） */
 export const RDM_STAGE_PERCENT: Record<RdmStage, number> = {
-  [RDM_STAGE.SUBMIT]: 10,
-  [RDM_STAGE.INTAKE]: 25,
-  [RDM_STAGE.DISPATCH]: 40,
-  [RDM_STAGE.PRODUCT]: 60,
-  [RDM_STAGE.DELIVERY]: 80,
-  [RDM_STAGE.ACCEPTANCE]: 100,
+  [RDM_STAGE.SUBMIT]: 8,
+  [RDM_STAGE.INTAKE]: 20,
+  [RDM_STAGE.DISPATCH]: 32,
+  [RDM_STAGE.DESIGN]: 45,
+  [RDM_STAGE.REVIEW]: 57,
+  [RDM_STAGE.DEV]: 70,
+  [RDM_STAGE.TEST]: 82,
+  [RDM_STAGE.UAT]: 92,
+  [RDM_STAGE.RELEASE]: 100,
+}
+
+/**
+ * 异常停留状态：驳回与挂起仍归属原阶段（进度条不倒退），但必须在节点上标出来。
+ * <p>否则一条被挂起 30 天的需求看起来像「正常停在分配受理」，PM 从进度条上看不出异常。
+ */
+export const RDM_STALLED_STATUS: Partial<Record<RdmStatus, string>> = {
+  [RDM_STATUS.INTAKE_REJECTED]: '已駁回',
+  [RDM_STATUS.REJECTED]: '已駁回',
+  [RDM_STATUS.ON_HOLD]: '挂起中',
+  [RDM_STATUS.UAT_REJECTED]: '驗收退回',
 }
 
 /** 终态（不可再流转，仅管理员重开） */
@@ -389,6 +426,19 @@ export const RDM_ACCEPT_RESULT_COLOR: Record<RdmAcceptResult, string> = {
   [RDM_ACCEPT_RESULT.FAIL]: 'error',
 }
 
+/**
+ * 交付满意度分档（下标 0 即 1 分），存 i18n 键而非文案，供需求验收与交付项验收共用。
+ * <p>只给星星不给口径，业务方会凭当下情绪打分、事后也无法解释为何是 3 分；
+ * 每一档写清它意味着什么，分数才能当质量因子用。
+ */
+export const RDM_SCORE_TIERS: readonly { short: string; desc: string }[] = [
+  { short: 'rdm.acceptance.scoreTier1', desc: 'rdm.acceptance.scoreTier1Desc' },
+  { short: 'rdm.acceptance.scoreTier2', desc: 'rdm.acceptance.scoreTier2Desc' },
+  { short: 'rdm.acceptance.scoreTier3', desc: 'rdm.acceptance.scoreTier3Desc' },
+  { short: 'rdm.acceptance.scoreTier4', desc: 'rdm.acceptance.scoreTier4Desc' },
+  { short: 'rdm.acceptance.scoreTier5', desc: 'rdm.acceptance.scoreTier5Desc' },
+]
+
 /** 状态流转动作码（与后端 rdm_transition.action_code 对齐） */
 export const RDM_ACTION = {
   SUBMIT: 'submit',
@@ -509,12 +559,15 @@ export const RDM_ACTION_TONE: Record<RdmAction, RdmActionTone> = {
 export type RdmActionField =
   | 'remark' | 'planDate' | 'promisedDate' | 'versionNo' | 'score' | 'pm' | 'holdUntil' | 'blockReason'
   | 'iteration'
+  /** 所属项目（归属体系改造）：dispatch/accept 选填，schedule 必填 */
+  | 'project'
 
 export const RDM_ACTION_REQUIRED_FIELDS: Partial<Record<RdmAction, RdmActionField[]>> = {
   [RDM_ACTION.REJECT]: ['remark'],
   [RDM_ACTION.HOLD]: ['remark', 'holdUntil'],
   [RDM_ACTION.ACCEPT]: ['promisedDate'],
-  [RDM_ACTION.SCHEDULE]: ['planDate'],
+  // 归属体系改造硬闸门：进入研发执行前必须挂项目+迭代（后端 applyProjectAndIteration 同口径强制）
+  [RDM_ACTION.SCHEDULE]: ['planDate', 'project', 'iteration'],
   [RDM_ACTION.DISPATCH]: ['pm'],
   [RDM_ACTION.REASSIGN]: ['pm', 'remark'],
   [RDM_ACTION.UAT_FAIL]: ['remark'],
@@ -531,7 +584,9 @@ export const RDM_ACTION_REQUIRED_FIELDS: Partial<Record<RdmAction, RdmActionFiel
  * 导致迭代产能对账与按迭代看周报永远拿不到需求级的迭代归属。
  */
 export const RDM_ACTION_OPTIONAL_FIELDS: Partial<Record<RdmAction, RdmActionField[]>> = {
-  [RDM_ACTION.SCHEDULE]: ['iteration'],
+  // 分配产品时项目经理可顺手挂项目；产品受理规划版本时可挂项目+迭代（排期闸门会再强制一次）
+  [RDM_ACTION.DISPATCH]: ['project'],
+  [RDM_ACTION.ACCEPT]: ['project', 'iteration'],
 }
 
 /** 列表视角（Tab），与后端 /rdm/requirement?scope= 对齐 */
@@ -618,30 +673,46 @@ export const RDM_SCOPE_DEFAULT_STATUS: Record<RdmScope, RdmStatus | undefined> =
   [RDM_SCOPE.ALL]: undefined,
 }
 
-/** 看板列（产品经理视角：按阶段折叠为 5 列） */
+/**
+ * 看板列（产品经理视角）：与 9 段阶段同口径。
+ * <p>原来「研發/測試」同列、「待驗收/已上線」同列，看板上也分不清卡在哪一环；
+ * 看板容器是 overflow-x + 固定列宽，拆细只会多一段横向滚动，不会挤压卡片。
+ */
 export const RDM_BOARD_COLUMNS: { key: RdmStage | 'archived'; label: string; statuses: RdmStatus[] }[] = [
   {
     key: RDM_STAGE.DISPATCH,
-    label: '待受理 / 評估',
+    label: '待分配 / 受理',
     statuses: [RDM_STATUS.POOL, RDM_STATUS.ASSIGNED, RDM_STATUS.EVALUATING, RDM_STATUS.ON_HOLD],
   },
   {
-    key: RDM_STAGE.PRODUCT,
-    label: '產品設計 / 評審',
-    statuses: [RDM_STATUS.ACCEPTED, RDM_STATUS.PRD_DESIGNING, RDM_STATUS.REVIEWING, RDM_STATUS.REVIEW_PASSED],
+    key: RDM_STAGE.DESIGN,
+    label: 'PRD 設計',
+    statuses: [RDM_STATUS.ACCEPTED, RDM_STATUS.PRD_DESIGNING],
   },
   {
-    key: RDM_STAGE.DELIVERY,
-    label: '研發 / 測試',
-    statuses: [
-      RDM_STATUS.SCHEDULED, RDM_STATUS.DESIGNING, RDM_STATUS.DEVELOPING,
-      RDM_STATUS.INTEGRATION, RDM_STATUS.TESTING, RDM_STATUS.TEST_PASSED,
-    ],
+    key: RDM_STAGE.REVIEW,
+    label: '評審排期',
+    statuses: [RDM_STATUS.REVIEWING, RDM_STATUS.REVIEW_PASSED],
   },
   {
-    key: RDM_STAGE.ACCEPTANCE,
-    label: '待驗收 / 已上線',
-    statuses: [RDM_STATUS.UAT_PENDING, RDM_STATUS.UAT_REJECTED, RDM_STATUS.RELEASED, RDM_STATUS.VERIFIED],
+    key: RDM_STAGE.DEV,
+    label: '開發中',
+    statuses: [RDM_STATUS.SCHEDULED, RDM_STATUS.DESIGNING, RDM_STATUS.DEVELOPING, RDM_STATUS.INTEGRATION],
+  },
+  {
+    key: RDM_STAGE.TEST,
+    label: '測試中',
+    statuses: [RDM_STATUS.TESTING, RDM_STATUS.TEST_PASSED],
+  },
+  {
+    key: RDM_STAGE.UAT,
+    label: '業務驗收',
+    statuses: [RDM_STATUS.UAT_PENDING, RDM_STATUS.UAT_REJECTED],
+  },
+  {
+    key: RDM_STAGE.RELEASE,
+    label: '已上線',
+    statuses: [RDM_STATUS.RELEASED, RDM_STATUS.VERIFIED],
   },
   {
     key: 'archived',

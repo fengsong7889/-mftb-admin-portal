@@ -48,6 +48,12 @@ public class RdmRequirementQuery {
     private Long submitterUserId;
 
     /**
+     * 當前處理人用戶ID：命中該人負責的未完成任務（todo/doing/blocked）所屬需求。
+     * <p>與列表「當前處理人」聚合列同源（只算未完成任務）；審批人/技術負責人等流程推演值無 userId，不能被此人命中。
+     */
+    private Long handlerUserId;
+
+    /**
      * 流程版本（1/2/3）过滤。
      * <p>为什么需要它：提测批次、发布批次等 V3 专属入口的服务端准入会直接拒绝
      * {@code flow_version != 3} 的需求，但 {@code scope=delivery} 的候选列表并不按版本收敛，
@@ -67,6 +73,12 @@ public class RdmRequirementQuery {
 
     /** 需求种类：aggregate（聚合需求）/ execution（执行需求） */
     private String requirementKind;
+
+    /**
+     * 所属迭代编码过滤（归属体系改造）。
+     * <p>需求跟进清单按迭代筛选用：任务迭代继承需求后，需求与任务在同一迭代口径下可互相对账。
+     */
+    private String iterationCode;
 
     /**
      * 执行侧地板：只保留「已分配到产品」的需求（需求跟进清单专用）。
@@ -133,6 +145,13 @@ public class RdmRequirementQuery {
         if (submitterUserId != null) {
             wrapper.eq(RdmRequirement::getSubmitterUserId, submitterUserId);
         }
+        if (handlerUserId != null) {
+            // 未完成任務負責人命中：只算未完成任務，與列表聚合列同源。
+            // 用 EXISTS 而非 JOIN：不改变分页行数与去重语义。
+            wrapper.exists("SELECT 1 FROM rdm_work_task t WHERE t.req_id = rdm_requirement.id "
+                    + "AND t.owner_user_id = {0} AND t.status IN ('todo','doing','blocked') AND t.deleted = 0",
+                    handlerUserId);
+        }
         if (flowVersion != null) {
             wrapper.eq(RdmRequirement::getFlowVersion, flowVersion);
         }
@@ -141,6 +160,9 @@ public class RdmRequirementQuery {
         }
         if (StringUtils.hasText(requirementKind)) {
             wrapper.eq(RdmRequirement::getRequirementKind, requirementKind);
+        }
+        if (StringUtils.hasText(iterationCode)) {
+            wrapper.eq(RdmRequirement::getIterationCode, iterationCode.trim());
         }
         if (Boolean.TRUE.equals(overdueOnly)) {
             wrapper.eq(RdmRequirement::getOverdueFlag, 1);

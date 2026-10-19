@@ -127,6 +127,17 @@ public class RdmRequirementController {
     }
 
     /**
+     * 调整迭代（归属体系改造）：属性变更而非状态流转，独立端点 + 同步未完成任务迭代。
+     * <p>权限锚点与通用流转同构（edit 主锚 + dispatch 过渡分支）；服务内再按角色白名单收敛。
+     */
+    @PutMapping("/requirement/{id}/iteration")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-intake", "rdm-acceptance"},
+                anyPermissions = {"rdm-requirement:dispatch"})
+    public Result<RdmRequirementVO> changeIteration(@PathVariable Long id, @RequestBody RdmTransitionDTO dto) {
+        return Result.success("迭代已調整", requirementService.changeIteration(id, dto));
+    }
+
+    /**
      * 批量分配产品经理。
      * <p>主锚点已换到 rdm-requirement:dispatch；旧 intake:edit 作为过渡分支保留，
      * 等菜单软删那一批一起摘掉（现在摘会让过渡期新勾的 intake 授权直接失效）。
@@ -194,6 +205,20 @@ public class RdmRequirementController {
                 anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmAcceptanceVO>> acceptanceHistory(@PathVariable Long id) {
         return Result.success(requirementService.acceptanceHistory(id));
+    }
+
+    /**
+     * 单张验收证据正文（截图/记录的 Base64 Data URL）。
+     * <p>读权限与验收历史同口径；正文不随历史列表批量下发，是为了避免返工几轮 ×
+     * 多条用例 × 每张图累乘把一次验收历史撑到几十 MB，前端按需单张取。本接口不记正文日志。
+     */
+    @GetMapping("/requirement/{reqId}/acceptance/case/{caseId}/evidence/{index}")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, anyOf = {"rdm-intake", "rdm-acceptance", "rdm-dashboard-board", "rdm-workbench"},
+                anyPermissions = {"rdm-requirement:view_all"})
+    public Result<RdmAcceptanceVO.EvidenceContent> acceptanceCaseEvidence(@PathVariable Long reqId,
+                                                                        @PathVariable Long caseId,
+                                                                        @PathVariable int index) {
+        return Result.success(requirementService.caseEvidence(reqId, caseId, index));
     }
 
     /* ==================== 下拉选项 ==================== */

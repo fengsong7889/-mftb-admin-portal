@@ -236,6 +236,30 @@ public final class RdmConstants {
     public static final String MENU_DASHBOARD = "rdm-dashboard";
     public static final String MENU_WORKBENCH = "rdm-workbench";
     public static final String MENU_CONFIG = "rdm-config-status";
+    /** 菜单：任務類型配置（交付配置分组下，字典维护独立授权） */
+    public static final String MENU_TASK_TYPE_CONFIG = "rdm-task-type-config";
+    /**
+     * 菜单：進度日報（<b>一级菜单</b>）。
+     * <p>原「日報推送」只是交付配置组下的一个子项，但它实际是一套独立业务：
+     * 多规则推送配置 + 模板库 + 发送记录 + 手动补发，且面向项目经理/产品负责人而非
+     * 「改全局规则的人」。归到交付配置下会让日常使用者找不着，也不符合「一套功能一个入口」的直觉。
+     */
+    public static final String MENU_DAILY_REPORT_GROUP = "rdm-daily-report-group";
+    /** 二级：推送配置（全局开关 + 多条推送规则） */
+    public static final String MENU_DAILY_REPORT_RULE = "rdm-daily-report-rule";
+    /** 二级：模板配置（预置 7 套 + 自建模板） */
+    public static final String MENU_DAILY_REPORT_TEMPLATE = "rdm-daily-report-template";
+    /** 二级：发送记录（只读） */
+    public static final String MENU_DAILY_REPORT_RECORD = "rdm-daily-report-record";
+    /** 二级：手动触发（向项目/迭代立即推送，不可撤回） */
+    public static final String MENU_DAILY_REPORT_TRIGGER = "rdm-daily-report-trigger";
+
+    /**
+     * 旧菜单键（已退役）：保留常量值仅用于历史数据/权限迁移对照，新代码不得再引用。
+     * @deprecated 用 {@link #MENU_DAILY_REPORT_RULE} 等四个二级菜单替代
+     */
+    @Deprecated
+    public static final String MENU_DAILY_REPORT_CONFIG_LEGACY = "rdm-config-daily-report";
 
     /* ==================== 通知事件 ==================== */
 
@@ -256,6 +280,14 @@ public final class RdmConstants {
     public static final String EVENT_TASK_ASSIGNED = "TASK_ASSIGNED";
     public static final String EVENT_CHANGE_TODO = "CHANGE_TODO";
     public static final String EVENT_CHANGE_DECIDED = "CHANGE_DECIDED";
+
+    /**
+     * 事件：每日日报（晨报/晚报，定时与手动触发共用）。
+     * <p>群报走 {@code RdmNotifyService.notifyUsers} 的群播行（{@code dedupe_key=NULL}），
+     * <b>不用事件级去重键</b>：日报的幂等由「当日该档快照已存在则不重建」保证（快照表唯一键），
+     * 而不是靠通知去重；手动补发是合法语义（同一档可重推），用去重键反而会把补发拦住。
+     */
+    public static final String EVENT_DAILY_REPORT = "DAILY_REPORT";
 
     /** 钉钉通知场景（对应 sys_notification_channel.scenarios） */
     public static final String NOTIFY_SCENARIO = "rdm";
@@ -422,6 +454,16 @@ public final class RdmConstants {
     /** 测试批次未结束状态 */
     public static final Set<String> TB_OPEN_STATUSES = Set.of(
             TB_PENDING, TB_ACCEPTED, TB_EXECUTING);
+
+    /* ==================== 工作任务状态（甘特排期 / 当前处理人聚合同源） ==================== */
+
+    public static final String TASK_TODO = "todo";
+    public static final String TASK_DOING = "doing";
+    public static final String TASK_BLOCKED = "blocked";
+
+    /** 未完成工作任务：当前处理人聚合与按人筛选只认这三态 */
+    public static final Set<String> TASK_OPEN_STATUSES = Set.of(
+            TASK_TODO, TASK_DOING, TASK_BLOCKED);
 
     /* ==================== 问题状态（Batch 1） ==================== */
 

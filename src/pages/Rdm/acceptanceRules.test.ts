@@ -112,8 +112,8 @@ describe('提交校验 validateAcceptance', () => {
     followUpTitle: '',
   }
 
-  it('缺用例时优先提示补用例', () => {
-    expect(validateAcceptance({ ...base, ...statCases([]) })).toContain('驗收用例')
+  it('缺检查项时优先提示补检查项', () => {
+    expect(validateAcceptance({ ...base, ...statCases([]) })).toContain('檢查項')
   })
 
   it('未选验收环境时阻断（返工需要可复现）', () => {
@@ -124,7 +124,7 @@ describe('提交校验 validateAcceptance', () => {
   it('有缺陷却判通过时报具体缺陷数', () => {
     const stat = statCases([c('用例一'), c('用例二', RDM_CASE_RESULT.FAIL, RDM_DEFECT_SEVERITY.MINOR)])
     const error = validateAcceptance({ ...base, ...stat })
-    expect(error).toBe('有 1 條用例未通過，不能判定驗收通過')
+    expect(error).toBe('有 1 條檢查項未通過，不能判定驗收通過')
   })
 
   it('不通过结论必须填写问题描述', () => {
