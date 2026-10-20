@@ -368,7 +368,7 @@ export default function EmpRoleAuthEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
-                {t('aiQuotaAuth.totalBoundEmp', { count: <strong>{boundUsers.length}</strong> })}
+                {t('aiQuotaAuth.totalBoundEmp', { count: boundUsers.length })}
               </div>
             </div>
           </div>

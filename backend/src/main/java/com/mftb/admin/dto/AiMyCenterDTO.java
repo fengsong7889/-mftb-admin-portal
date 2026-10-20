@@ -105,6 +105,13 @@ public class AiMyCenterDTO {
         private String modelKey;
         /** 是否放行（true=可调用） */
         private boolean allowed;
+        /**
+         * 当前账号是否已被授予至少一条适用额度维度。
+         *
+         * <p>用于区分两种 reject：「从未配置额度」（false，应引导去申请）
+         * 与「额度已用尽」（true，应引导申请加量），两者文案与后续动作完全不同。</p>
+         */
+        private boolean quotaConfigured;
         /** 是否已超额（命中硬限额） */
         private boolean overLimit;
         /** 是否触发软限额提醒（接近但未超额） */

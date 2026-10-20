@@ -2,6 +2,7 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.entity.AiDeptAuthGroup;
 import com.mftb.admin.entity.AiDeptAuthGroupDept;
@@ -523,11 +524,24 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                 .filter(d -> d.modelId() == null || (targetId != null && d.modelId().equals(targetId)))
                 .toList();
         if (applicable.isEmpty()) {
-            vo.setAllowed(true);
-            vo.setAction("allow");
-            vo.setMessage("無額度限制，放行");
+            /*
+             * 额度必须显式授予才能使用 AI 助手：旧实现在此处直接放行（「無額度限制，放行」），
+             * 等于「没人配额度 = 不限量」，与项目「默认拒绝」的安全基线相反，也让首页早已写好的
+             * 「暫無可用額度，請提交申請」拦截文案永远走不到。现改为默认拒绝，仅内置系统管理员不受额度管控。
+             */
+            vo.setQuotaConfigured(false);
+            if (BuiltinAccounts.isSystemAccount(user.getUsername())) {
+                vo.setAllowed(true);
+                vo.setAction("allow");
+                vo.setMessage("內置系統管理員不受額度管控");
+                return vo;
+            }
+            vo.setAllowed(false);
+            vo.setAction("reject");
+            vo.setMessage("尚未獲得 AI 使用額度，請在「AI 使用申請」提交申請，審批通過後將為你分配額度");
             return vo;
         }
+        vo.setQuotaConfigured(true);
 
         // 加载维度引用模型的 modelKey（用于按模型过滤用量）
         Map<Long, AiModel> modelMap = loadModels(applicable.stream().map(Dim::modelId).toList());
@@ -661,6 +675,17 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
     }
 
     /* ══════════════════════ 我的授权模型 ══════════════════════ */
+
+    @Override
+    public boolean hasModelAccess(String modelKey) {
+        if (modelKey == null || modelKey.isBlank()) {
+            return false;
+        }
+        if (currentUser() == null) {
+            return false;
+        }
+        return myModels().stream().anyMatch(m -> modelKey.equals(m.getModelKey()));
+    }
 
     @Override
     public List<AiMyCenterDTO.MyModelVO> myModels() {

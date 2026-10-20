@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.entity.AiToolExecLog;
 import com.mftb.admin.entity.AiToolPolicy;
+import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AiToolExecLogMapper;
 import com.mftb.admin.mapper.AiToolPolicyMapper;
+import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AiToolPolicyService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +38,7 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
     private final AiToolPolicyMapper policyMapper;
     private final AiToolExecLogMapper execLogMapper;
     private final OperatorResolver operatorResolver;
+    private final SysUserMapper sysUserMapper;
 
     @Override
     public List<AiToolPolicy> listAll() {
@@ -84,7 +90,45 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
         if (StringUtils.hasText(toolKey)) wrapper.eq(AiToolExecLog::getToolKey, toolKey);
         if (StringUtils.hasText(caller)) wrapper.eq(AiToolExecLog::getCaller, caller);
         Page<AiToolExecLog> result = execLogMapper.selectPage(new Page<>(page, size), wrapper);
-        return Map.of("records", result.getRecords(), "total", result.getTotal());
+        // 附人可读姓名：日志里的 caller 是登录账号，纯账号列审计时认不出是谁；
+        // 不统一格式会因历史写入过姓名而“一列里混工号与姓名”（深度测试实测报出）
+        return Map.of("records", withCallerName(result.getRecords()), "total", result.getTotal());
+    }
+
+    /** 把 caller（登录账号）解析成「姓名(工号)」；解析不到时退回原值，绝编造一个名字。 */
+    private List<Map<String, Object>> withCallerName(List<AiToolExecLog> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        List<String> accounts = rows.stream().map(AiToolExecLog::getCaller)
+                .filter(StringUtils::hasText).distinct().toList();
+        Map<String, String> nameByAccount = new HashMap<>();
+        if (!accounts.isEmpty()) {
+            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                            .select(SysUser::getUsername, SysUser::getName, SysUser::getEmpId)
+                            .in(SysUser::getUsername, accounts))
+                    .forEach(user -> nameByAccount.put(user.getUsername(),
+                            StringUtils.hasText(user.getName())
+                                    ? user.getName() + "（" + (StringUtils.hasText(user.getEmpId()) ? user.getEmpId() : user.getUsername()) + "）"
+                                    : user.getUsername()));
+        }
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (AiToolExecLog row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.getId());
+            item.put("toolKey", row.getToolKey());
+            item.put("caller", row.getCaller());
+            item.put("callerName", nameByAccount.getOrDefault(row.getCaller(), row.getCaller()));
+            item.put("conversationId", row.getConversationId());
+            item.put("argsDigest", row.getArgsDigest());
+            item.put("decision", row.getDecision());
+            item.put("rejectReason", row.getRejectReason());
+            item.put("elapsedMs", row.getElapsedMs());
+            item.put("success", row.getSuccess());
+            item.put("createdAt", row.getCreatedAt());
+            records.add(item);
+        }
+        return records;
     }
 
     @Override

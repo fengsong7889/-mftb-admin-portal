@@ -136,9 +136,44 @@ const NOTIFY_STATUS_SOURCE: Record<string, { key: string; label: string; color: 
   sent: { key: 'meeting.meta.notify.sent', label: '已送達', color: 'green' },
   skipped: { key: 'meeting.meta.notify.skipped', label: '未送達', color: 'warning' },
   failed: { key: 'meeting.meta.notify.failed', label: '發送失敗', color: 'red' },
+  // partial 只在纪要批次上出现（群已送达但部分收件人失败），邀约侧永不产生这个取值；
+  // 展示映射可以是超集，落库词表仍是两张表各自的 CHECK
+  partial: { key: 'meeting.meta.notify.partial', label: '部分送達', color: 'orange' },
 }
 
+/**
+ * 投递态映射表同时服务于会议邀约与纪要批次/投递行：pending/sending/success/skipped/failed
+ * 五个取值两边完全同义，另开一张同义表会让同一个「已送達」在两个页面拿到不同 key。
+ */
 export const notifyStatusMeta = (): Record<string, Meta> => lazyMeta(NOTIFY_STATUS_SOURCE)
+
+/**
+ * 纪要主状态（biz_meeting_minutes.status）。
+ * <p>sent 不是「已锁版」：已发送的纪要仍可继续编辑并重发，这一档只告诉界面
+ * 「发送历史不是空的」，不能把它做成禁用编辑的灰态。
+ * <p>与投递态分开两张表：纪要是单据状态（发过没发过），投递是渠道结论，
+ * 两者在同一个 Tag 上共存时必须能分别读出。
+ */
+const MINUTES_STATUS_SOURCE: Record<string, { key: string; label: string; color: NonNullable<TagProps['color']> }> = {
+  draft: { key: 'meeting.meta.minutesStatus.draft', label: '草稿', color: 'orange' },
+  sent: { key: 'meeting.meta.minutesStatus.sent', label: '已發送', color: 'green' },
+}
+
+export const minutesStatusMeta = (): Record<string, Meta> => lazyMeta(MINUTES_STATUS_SOURCE)
+
+/** 投递目标类型：一个批次里群占一行、每个收件人各占一行，两种目标必须分得开 */
+const MINUTES_TARGET_TYPE_SOURCE: Record<string, string> = {
+  GROUP: '釘釘群',
+  USER: '個人（工作通知）',
+}
+
+export function minutesTargetTypeLabels(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [code, zh] of Object.entries(MINUTES_TARGET_TYPE_SOURCE)) {
+    out[code] = tl(`meeting.meta.minutesTarget.${code.toLowerCase()}`, zh)
+  }
+  return out
+}
 
 /** 审计事件码（后端 MeetingConstants.EVENT_*） */
 const EVENT_SOURCE: Record<string, string> = {
@@ -159,6 +194,11 @@ const EVENT_SOURCE: Record<string, string> = {
   config_update: '修改預約規則',
   blacklist_add: '加入預約限制',
   blacklist_revoke: '撤銷預約限制',
+  // 纪要的录入/修改/发送同样进会议轨迹：纪要能改能重发，没有轨迹就说不清"发出去的是哪一版"
+  minutes_create: '錄入紀要',
+  minutes_update: '修改紀要',
+  minutes_send: '發送紀要',
+  minutes_revoke: '作廢紀要鏈接',
 }
 
 export function eventLabel(code?: string | null): string {
@@ -189,6 +229,8 @@ const SCENARIO_SOURCE: Record<string, string> = {
   meeting_invite: '會議邀約',
   meeting_remind: '開始前提醒',
   meeting_ops: '會議室釋放告知',
+  // 纪要的收件人走工作通知，与邀约同一个企业应用通道，场景开关各自独立
+  meeting_minutes: '會議紀要',
 }
 
 export function scenarioLabel(code?: string | null): string {

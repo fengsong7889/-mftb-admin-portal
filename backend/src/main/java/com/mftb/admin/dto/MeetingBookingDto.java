@@ -258,6 +258,14 @@ public final class MeetingBookingDto {
         private String releaseAt;
         /** 未绑定钉钉因而邀约未送达的人数（详情页显式提示） */
         private Integer notifySkippedCount;
+        /**
+         * 纪要入口结论（服务端算：与这场会的关系 + 会议阶段 + 纪要动作权）。
+         * <p>不给前端自己拼：前端拿不到动作权与行政代录分支，拼一份判定迟早与纪要服务口径漂移。
+         */
+        private Boolean canMinutes;
+        /** 本会纪要状态：none/draft/sent（none 时 minutesId 为 null） */
+        private String minutesStatus;
+        private Long minutesId;
         private Integer version;
         private String createdBy;
         private String createdAt;

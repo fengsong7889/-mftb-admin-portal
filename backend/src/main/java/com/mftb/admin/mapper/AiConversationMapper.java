@@ -75,8 +75,19 @@ public interface AiConversationMapper extends BaseMapper<AiConversation> {
     int permanentDeleteById(@Param("id") Long id, @Param("username") String username);
 
     /**
-     * 软删除并记录删除时间戳（替代 deleteById 以同时设置 deleted_at）
+     * 软删并记录删除时间戳（替代 deleteById 以同时设置 deleted_at）
      */
     @Update("UPDATE ai_conversation SET deleted = 1, deleted_at = NOW() WHERE id = #{id} AND username = #{username} AND deleted = 0")
     int softDeleteById(@Param("id") Long id, @Param("username") String username);
+
+    /**
+     * 记一次 AI 问答回合：回填实际使用的模型并累加请求次数。
+     * <p>为什么由服务端写而不靠前端 PUT：对话保存接口从来没传 model_key/request_count，
+     * 导致审计页两列永远显示 {@code --}，管理员无从知道会话跑的是哪个模型、发生了多少次调用。
+     * 口径：tokens 仍由前端累计回写（避免两边互相覆盖），本语句只动 model_key / request_count。
+     * <p>归属限制：{@code username} 必须匹配，前端伪造别人的 conversationPk 不会污染他人会话。
+     */
+    @Update("UPDATE ai_conversation SET model_key = #{modelKey}, request_count = COALESCE(request_count, 0) + 1, "
+            + "updated_at = NOW() WHERE id = #{id} AND username = #{username} AND deleted = 0")
+    int recordAgentTurn(@Param("id") Long id, @Param("username") String username, @Param("modelKey") String modelKey);
 }

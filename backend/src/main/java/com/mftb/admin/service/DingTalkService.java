@@ -76,6 +76,18 @@ public interface DingTalkService {
     /** V0 §八 V0-6：同步发送 Markdown 消息，返回渠道实际受理状态。 */
     SendOutcome sendMarkdownSync(String scenario, String title, String text, java.util.List<String> atMobiles, boolean isAtAll);
 
+    /**
+     * 按渠道 id 精确同步发送 Markdown，返回渠道受理状态。
+     *
+     * <p>与 {@link #sendMarkdownSync} 的区别是存在意义：场景路由拿不到目标时**会回退到平台默认渠道**，
+     * 而会议纪要是要把内部结论发进一个具体的群——回退等于把纪要发进一个谁都没确认过的群。
+     * 因此本方法不解析场景、也不拿任何默认渠道兜底：渠道不存在、未启用或不是钉钉，一律返回未受理。
+     *
+     * @param channelId 通知渠道 id（前端可选，服务端必须复核）
+     */
+    SendOutcome sendMarkdownSyncToChannel(long channelId, String title, String text,
+                                          java.util.List<String> atMobiles, boolean isAtAll);
+
     /** 同步发送的返回：channelAccepted=钉钉侧是否返回 errcode=0 */
     record SendOutcome(boolean channelAccepted, String errcode, String errmsg, String channelName) {
         public static SendOutcome accepted(String channelName) { return new SendOutcome(true, "0", "ok", channelName); }

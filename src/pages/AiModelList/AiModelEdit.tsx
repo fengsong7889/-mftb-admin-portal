@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, InputNumber, Select, Switch, message, Spin, Tag } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, SettingOutlined, EyeOutlined, CodeOutlined, DollarOutlined, PoweroffOutlined } from '@ant-design/icons'
@@ -64,9 +65,9 @@ const ModalityChips = ({ modalities }: { modalities?: string }) => {
   if (list.length === 0) return <span style={{ color: '#BFBFBF' }}>-</span>
   const MODALITY_TAG: Record<string, { color: string; label: string }> = {
     text: { color: 'blue', label: '文本' },
-    image: { color: 'purple', label: '图像' },
+    image: { color: 'purple', label: '圖像' },
     audio: { color: 'cyan', label: '音频' },
-    video: { color: 'magenta', label: '视频' },
+    video: { color: 'magenta', label: '視频' },
   }
   return (
     <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 2 }}>
@@ -80,6 +81,7 @@ const ModalityChips = ({ modalities }: { modalities?: string }) => {
 }
 
 export default function AiModelEdit() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const modelId = searchParams.get('id')
@@ -92,7 +94,7 @@ export default function AiModelEdit() {
   /** 加载模型详情 */
   useEffect(() => {
     if (!modelId) {
-      message.error('缺少模型 ID 參數')
+      message.error(t('aiModel.missingId'))
       navigate('/ai-model-list')
       return
     }
@@ -114,10 +116,10 @@ export default function AiModelEdit() {
       })
       .catch((err) => {
         console.error('Failed to load model:', err)
-        message.error('加載模型信息失敗')
+        message.error(t('aiModel.loadFailed'))
       })
       .finally(() => setLoading(false))
-  }, [modelId, navigate, form])
+  }, [modelId, navigate, form, t])
 
   const handleBack = () => {
     navigate('/ai-model-list')
@@ -152,13 +154,13 @@ export default function AiModelEdit() {
         concurrencyLimit: values.concurrencyLimit,
         status: values.status,
         sortOrder: model.sortOrder,
-        updatedBy: 'admin',
+        updatedBy: undefined, // 最後更新人由服务端按当前登录人写入，前端不再传（以前写死 'admin' 导致审计归不到人）
       })
-      message.success('模型信息已保存')
+      message.success(t('aiModel.saveSuccess'))
       navigate('/ai-model-list')
     } catch (error) {
       console.error('Save failed:', error)
-      message.error(error instanceof Error ? error.message : '保存失败')
+      message.error(error instanceof Error ? error.message : t('aiModel.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -167,7 +169,9 @@ export default function AiModelEdit() {
   if (loading) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="加載中..." />
+        <Spin size="large" tip={t('aiModel.loading')}>
+          <div style={{ width: 200, height: 80 }} />
+        </Spin>
       </div>
     )
   }
@@ -175,8 +179,8 @@ export default function AiModelEdit() {
   if (!model) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>模型信息加載失敗</div>
-        <Button style={{ marginTop: 16 }} onClick={handleBack}>返回列表</Button>
+        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiModel.loadError')}</div>
+        <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('common.back')}</Button>
       </div>
     )
   }
@@ -229,8 +233,8 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基础信息</span>
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.basicInfo')}</span>
+            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.editable')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
@@ -243,7 +247,7 @@ export default function AiModelEdit() {
             <Form.Item name="deployType" label="部署類型" initialValue="cloud"
               extra="私有化部署模型可供「數據不出域」部門選用">
               <Select options={[
-                { value: 'cloud', label: '公有云' },
+                { value: 'cloud', label: '公有雲' },
                 { value: 'private', label: '私有化部署' },
               ]} />
             </Form.Item>
@@ -259,19 +263,19 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型能力</span>
-            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>只读</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.capability')}</span>
+            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <HelpPopover
               title="模型能力"
-              content={'由模型供应商决定，本处不开放调整。\n「支持」=该模型具备此能力，「不支持」=该模型本身不具备此能力。'}
-              ariaLabel="模型能力说明"
+              content={'由模型供應商决定，本处不開放调整。\n「支持」=該模型具备此能力，「不支持」=該模型本身不具备此能力。'}
+              ariaLabel="模型能力說明"
               placement="bottom"
             />
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
             {([
-              { key: 'visionSupport', label: '视觉', color: '#722ED1' },
+              { key: 'visionSupport', label: '視覺', color: '#722ED1' },
               { key: 'functionCalling', label: '工具', color: '#1890FF' },
               { key: 'jsonMode', label: 'JSON', color: '#13C2C2' },
               { key: 'streaming', label: '流式', color: '#52C41A' },
@@ -302,8 +306,8 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CodeOutlined style={{ fontSize: 14, color: '#13C2C2' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>模型属性</span>
-            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>只读</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.attributes')}</span>
+            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -312,8 +316,8 @@ export default function AiModelEdit() {
                 API 兼容
                 <HelpPopover
                   title="API 兼容"
-                  content={'决定调用协议：openai / anthropic / gemini。\n管理后台根据该字段将请求转发到对应 SDK 或协议适配器，实现多供应商统一接入。'}
-                  ariaLabel="API兼容说明"
+                  content={'决定调用协议：openai / anthropic / gemini。\n管理後台根據該字段将請求转發到對應 SDK 或协议适配器，實现多供應商統一接入。'}
+                  ariaLabel="API兼容說明"
                   placement="bottom"
                 />
               </div>
@@ -323,11 +327,11 @@ export default function AiModelEdit() {
             </div>
             <div>
               <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
-                类型
+                類型
                 <HelpPopover
-                  title="类型"
-                  content={'决定模型用途：chat=对话、completion=文本补全、embedding=向量嵌入、token_count=Token 计数。\n由供应商发布时确定，不可调整。'}
-                  ariaLabel="类型说明"
+                  title="類型"
+                  content={'决定模型用途：chat=對話、completion=文本补全、embedding=向量嵌入、token_count=Token 計數。\n由供應商發布時確定，不可调整。'}
+                  ariaLabel="類型說明"
                   placement="bottom"
                 />
               </div>
@@ -337,11 +341,11 @@ export default function AiModelEdit() {
             </div>
             <div>
               <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
-                模态
+                模態
                 <HelpPopover
-                  title="模态"
-                  content={'支持处理的数据类型：text=文本、image=图像、audio=音频、video=视频。\n例：vision-exp 类模型通常支持 text+image。'}
-                  ariaLabel="模态说明"
+                  title="模態"
+                  content={'支持处理的數據類型：text=文本、image=圖像、audio=音频、video=視频。\n例：vision-exp 類模型通常支持 text+image。'}
+                  ariaLabel="模態說明"
                   placement="bottom"
                 />
               </div>
@@ -356,43 +360,43 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <DollarOutlined style={{ fontSize: 14, color: '#52C41A' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>官方价格</span>
-            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>只读</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.officialPrice')}</span>
+            <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <HelpPopover
-              title="官方价格"
-              content="官方定价不可调整；仅本地化部署的模型可在创建供应商时设置自定义费率。"
-              ariaLabel="官方价格说明"
+              title="官方價格"
+              content="官方定價不可调整；仅本地化部署的模型可在創建供應商時設置自定义費率。"
+              ariaLabel="官方價格說明"
               placement="bottom"
             />
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <div style={{ padding: '12px 16px', borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>输入单价</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceInput')}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#52C41A' }}>
                 {CURRENCY_SYMBOL[model.currency || 'CNY']}{model.inputPrice ?? '-'}
               </div>
             </div>
             <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FFF7E6', border: '1px solid #FFE7BA' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>输出单价</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceOutput')}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>
                 {CURRENCY_SYMBOL[model.currency || 'CNY']}{model.outputPrice ?? '-'}
               </div>
             </div>
             <div style={{ padding: '12px 16px', borderRadius: 8, background: '#E6FFFB', border: '1px solid #B5F5EC' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>缓存命中价</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceCached')}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#13C2C2' }}>
                 {model.cachedInputPrice != null ? `${CURRENCY_SYMBOL[model.currency || 'CNY']}${model.cachedInputPrice}` : '-'}
               </div>
             </div>
             <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>计价币种</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceCurrency')}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#595959' }}>
                 {model.currency || '-'}
               </div>
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>以上价格为每百万 tokens 的官方定价，仅供查阅</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t('aiModel.priceNote')}</div>
         </div>
 
         {/* ═══ 分区 5：部署参数（可编辑） ═══ */}
@@ -401,10 +405,10 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>部署参数</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.deployParams')}</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.editable')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>配置模型的运行参数与限流策略</span>
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('aiModel.deployDesc')}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item
@@ -414,10 +418,10 @@ export default function AiModelEdit() {
                 {
                   type: 'number',
                   max: tokenLimits.contextWindowMax,
-                  message: `上下文窗口上限为 ${formatTokenLimit(tokenLimits.contextWindowMax)}（${tokenLimits.contextWindowMax.toLocaleString()} tokens），超出${providerLabel}官方规格`,
+                  message: `上下文窗口上限為 ${formatTokenLimit(tokenLimits.contextWindowMax)}（${tokenLimits.contextWindowMax.toLocaleString()} tokens），超出${providerLabel}官方規格`,
                 },
               ]}
-              extra={`上限 ${formatTokenLimit(tokenLimits.contextWindowMax)}（${tokenLimits.contextWindowMax.toLocaleString()} tokens）· ${providerLabel}官方规格`}
+              extra={`上限 ${formatTokenLimit(tokenLimits.contextWindowMax)}（${tokenLimits.contextWindowMax.toLocaleString()} tokens）· ${providerLabel}官方規格`}
             >
               <InputNumber style={{ width: '100%' }} min={0} max={tokenLimits.contextWindowMax} step={1000} placeholder="如 128000" />
             </Form.Item>
@@ -429,19 +433,19 @@ export default function AiModelEdit() {
                 {
                   type: 'number',
                   max: tokenLimits.maxOutputMax,
-                  message: `最大輸出上限为 ${formatTokenLimit(tokenLimits.maxOutputMax)}（${tokenLimits.maxOutputMax.toLocaleString()} tokens），超出${providerLabel}官方规格`,
+                  message: `最大輸出上限為 ${formatTokenLimit(tokenLimits.maxOutputMax)}（${tokenLimits.maxOutputMax.toLocaleString()} tokens），超出${providerLabel}官方規格`,
                 },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const ctx = getFieldValue('contextWindow')
                     if (value != null && ctx != null && value > ctx) {
-                      return Promise.reject(new Error('最大輸出不得超过上下文窗口大小'))
+                      return Promise.reject(new Error('最大輸出不得超過上下文窗口大小'))
                     }
                     return Promise.resolve()
                   },
                 }),
               ]}
-              extra={`上限 ${formatTokenLimit(tokenLimits.maxOutputMax)}（${tokenLimits.maxOutputMax.toLocaleString()} tokens）· 不得超过上下文窗口`}
+              extra={`上限 ${formatTokenLimit(tokenLimits.maxOutputMax)}（${tokenLimits.maxOutputMax.toLocaleString()} tokens）· 不得超過上下文窗口`}
             >
               <InputNumber style={{ width: '100%' }} min={0} max={tokenLimits.maxOutputMax} step={256} placeholder="如 4096" />
             </Form.Item>
@@ -466,8 +470,8 @@ export default function AiModelEdit() {
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>状态配置</span>
-            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可编辑</Tag>
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>狀態配置</span>
+            <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可編輯</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
@@ -478,7 +482,7 @@ export default function AiModelEdit() {
               getValueFromEvent={(checked) => (checked ? 1 : 0)}
               getValueProps={(value) => ({ checked: value === 1 })}
               style={{ marginBottom: 0 }}
-              extra="停用後該模型將在所有調用端同步不可用，請谨慎操作。"
+              extra="停用後該模型將在所有調用端同步不可用，請謹慎操作。"
             >
               <Switch checkedChildren="啟用" unCheckedChildren="停用" />
             </Form.Item>

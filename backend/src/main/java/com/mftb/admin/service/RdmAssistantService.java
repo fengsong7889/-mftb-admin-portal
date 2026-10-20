@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.LlmUsageRecordRequest;
 import com.mftb.admin.dto.RdmAssistantVO;
@@ -17,12 +18,8 @@ import com.mftb.admin.common.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,7 +61,7 @@ public class RdmAssistantService {
     private final RdmConfigService configService;
     /** 风险取数唯一入口所在：摘要与页面列表必须共用，所以这里依赖而不是再写一份 SQL */
     private final RdmAnalyticsService analyticsService;
-    private final RestTemplate restTemplate;
+    private final LlmHttpClient llmClient;
     private final ObjectMapper objectMapper;
 
     /** 一次 LLM 调用的结果 */
@@ -332,7 +329,14 @@ public class RdmAssistantService {
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)));
         long started = System.currentTimeMillis();
-        JsonNode resp = post(channel, payload);
+        JsonNode resp;
+        try {
+            resp = llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), payload);
+        } catch (LlmHttpClient.LlmCallException e) {
+            log.warn("RDM AI 調用失敗[{}]: purpose={}, caller={}, elapsed={}ms, detail={}", e.getCategory(),
+                    purpose, caller, System.currentTimeMillis() - started, e.getMessage());
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), e.userMessage());
+        }
         if (resp == null) {
             log.warn("RDM AI 調用失敗: purpose={}, caller={}, elapsed={}ms", purpose, caller, System.currentTimeMillis() - started);
             return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), "AI 服務暫時不可用，請稍後再試");
@@ -384,35 +388,6 @@ public class RdmAssistantService {
             return "-";
         }
         return configService.statusLabelMap().getOrDefault(status, status);
-    }
-
-    private JsonNode post(LlmChannelRouter.Channel channel, Map<String, Object> payload) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            if (StringUtils.hasText(channel.getApiKey())) {
-                headers.setBearerAuth(channel.getApiKey());
-            }
-            var resp = restTemplate.exchange(endpoint(channel.getBaseUrl()),
-                    org.springframework.http.HttpMethod.POST,
-                    new HttpEntity<>(payload, headers), String.class);
-            String body = resp.getBody();
-            if (!StringUtils.hasText(body)) {
-                return null;
-            }
-            return objectMapper.readTree(body);
-        } catch (Exception e) {
-            log.warn("RDM AI 網關請求異常: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    private static String endpoint(String base) {
-        if (!StringUtils.hasText(base)) {
-            throw new IllegalStateException("AI 通道缺少 baseUrl");
-        }
-        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
-        return trimmed.endsWith("/chat/completions") ? trimmed : trimmed + "/chat/completions";
     }
 
     /* ==================== 小工具 ==================== */

@@ -1,8 +1,11 @@
 package com.mftb.admin.service.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.service.AiConversationEventService;
+import com.mftb.admin.service.AiConversationService;
 import com.mftb.admin.service.AiMyCenterService;
 import com.mftb.admin.service.agent.AgentOrchestrationService.OrchestrateRequest;
 import com.mftb.admin.service.agent.AgentOrchestrationService.OrchestrateResult;
@@ -16,12 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -30,13 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** V0 §B.1：后端 tool 循环编排的关键路径（无渠道、额度拒绝、内建工具执行、外部工具 pending） */
+/** V0 §B.1：后端 tool 循环编排的关键路径（无渠道、额度拒绝、内建工具执行、外部工具 pending、通道配置缺失） */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AgentOrchestrationServiceTest {
@@ -44,10 +42,13 @@ class AgentOrchestrationServiceTest {
     @Mock private LlmChannelRouter channelRouter;
     @Mock private AiMyCenterService myCenterService;
     @Mock private AiConversationEventService eventService;
-    @Mock private RestTemplate restTemplate;
+    @Mock private AiConversationService conversationService;
+    @Mock private LlmHttpClient llmClient;
+    @Mock private LlmMeteringService metering;
     @Mock private AgentTool dummyTool;
     @Mock private com.mftb.admin.mapper.McpToolMapper mcpToolMapper;
     @Mock private com.mftb.admin.mapper.AiToolPolicyMapper toolPolicyMapper;
+    @Mock private com.mftb.admin.service.AiToolPolicyService toolPolicyService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -57,8 +58,24 @@ class AgentOrchestrationServiceTest {
         when(dummyTool.toolKey()).thenReturn("query_account_balance");
         when(dummyTool.description()).thenReturn("desc");
         when(dummyTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
+        // A3：服务端模型准入——默认给授权，让主链路用例能跑到 LLM；deny 场景单独写用例
+        when(myCenterService.hasModelAccess(any())).thenReturn(true);
+        // A1：token 汇总现在来自计量层（服务端观测到的 usage），这里按真实口径回推，避开测回 0
+        when(metering.settle(any(), any(), any(), any(), any())).thenAnswer(inv -> {
+            JsonNode usage = ((JsonNode) inv.getArgument(4)).path("usage");
+            return usage.path("prompt_tokens").asLong(0) + usage.path("completion_tokens").asLong(0);
+        });
         return new AgentOrchestrationService(List.of(dummyTool), channelRouter, myCenterService,
-                eventService, restTemplate, mapper, mcpToolMapper, toolPolicyMapper);
+                eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
+                toolPolicyService);
+    }
+
+    private JsonNode json(String raw) {
+        try {
+            return mapper.readTree(raw);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Test
@@ -81,7 +98,7 @@ class AgentOrchestrationServiceTest {
 
         OrchestrateResult out = svc.orchestrate(request("hi"), "alice");
         assertEquals("已超額", out.getText());
-        verify(restTemplate, never()).exchange(any(String.class), any(HttpMethod.class), any(HttpEntity.class), eq(String.class));
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
     }
 
     @Test
@@ -94,21 +111,26 @@ class AgentOrchestrationServiceTest {
         String round1 = "{\"model\":\"deepseek-x\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"query_account_balance\",\"arguments\":\"{}\"}}]}}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}";
         // 第二轮：LLM 返回文本
         String round2 = "{\"model\":\"deepseek-x\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"余额 100\"}}],\"usage\":{\"prompt_tokens\":15,\"completion_tokens\":8}}";
-        ResponseEntity<String> r1 = new ResponseEntity<>(round1, HttpStatus.OK);
-        ResponseEntity<String> r2 = new ResponseEntity<>(round2, HttpStatus.OK);
-        when(restTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
-                .thenReturn(r1, r2);
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(json(round1), json(round2));
         when(dummyTool.execute(any(), any())).thenReturn("{\"total\":1}");
 
         OrchestrateResult out = svc.orchestrate(request("查一下余额"), "alice");
         assertEquals("余额 100", out.getText());
         assertEquals(38L, out.getTokens());
+        // A1：每一轮上游往返都要预占 + 结算，不能只回文本不落账（旧缺陷：问答不进 biz_llm_usage）
+        verify(metering, times(2)).reserve(any(), eq("alice"), any(), anyInt(), anyInt());
+        verify(metering, times(2)).settle(any(), eq("alice"), any(), any(), any());
         verify(dummyTool, times(1)).execute(any(), any(ToolCallContext.class));
-        // 事件：USER_TURN + TOOL_CALL + TOOL_RESULT + ASSISTANT_TURN
+        // 事件：USER_TURN + 每轮 QUOTA_CHARGE + TOOL_CALL/TOOL_RESULT + ASSISTANT_TURN
         ArgumentCaptor<String> typeCap = ArgumentCaptor.forClass(String.class);
-        verify(eventService, times(4)).append(any(), any(), typeCap.capture(), any(), any());
-        assertEquals(List.of("USER_TURN", "TOOL_CALL", "TOOL_RESULT", "ASSISTANT_TURN"),
+        verify(eventService, times(6)).append(any(), any(), typeCap.capture(), any(), any());
+        assertEquals(List.of("USER_TURN", "QUOTA_CHARGE", "TOOL_CALL", "TOOL_RESULT",
+                        "QUOTA_CHARGE", "ASSISTANT_TURN"),
                 typeCap.getAllValues());
+        // B4：回合完成后服务端必须记一次调用并固定实际模型（以前没人写，审计页两列永远 --）
+        verify(conversationService, times(1)).recordAgentTurn(eq(1L), eq("alice"), eq("deepseek-x"));
+        // D2：内建工具执行要进 ai_tool_exec_log，否则「執行日誌」页永远为空
+        verify(toolPolicyService, times(1)).logExecution(any());
     }
 
     @Test
@@ -120,8 +142,7 @@ class AgentOrchestrationServiceTest {
         String body = "{\"model\":\"m\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"\","
                 + "\"tool_calls\":[{\"id\":\"call_9\",\"type\":\"function\",\"function\":{\"name\":\"email_sender\",\"arguments\":\"{\\\"to\\\":\\\"x@y.z\\\"}\"}}]}}],"
                 + "\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}";
-        when(restTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
-                .thenReturn(new ResponseEntity<>(body, HttpStatus.OK));
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(json(body));
 
         OrchestrateResult out = svc.orchestrate(request("发邮件"), "alice");
         assertNotNull(out.getPendingExternalCalls());
@@ -129,6 +150,55 @@ class AgentOrchestrationServiceTest {
         Map<?, ?> first = (Map<?, ?>) out.getPendingExternalCalls().get(0);
         assertEquals("email_sender", first.get("name"));
         verify(dummyTool, never()).execute(any(), any());
+    }
+
+    /**
+     * 通道缺 API Key 时必须给「去供应商管理补配置」的文案，而不是「稍后再试」——
+     * 线上真实踩过：Key 为空时用户与管理员都把它当成模型故障反复重试。
+     */
+    @Test
+    void misconfiguredChannelTellsAdminToFixProvider() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenThrow(
+                new LlmHttpClient.LlmCallException(LlmHttpClient.Category.MISSING_KEY, null, "AI 通道未配置 API Key"));
+
+        OrchestrateResult out = svc.orchestrate(request("hi"), "alice");
+        assertTrue(out.getText().contains("API Key"), "应指向配置缺失：" + out.getText());
+        verify(eventService, times(1)).append(any(), any(), eq("GATEWAY_ERROR"), any(), any());
+    }
+
+    /** 逾时（思考型模型跑满读超时）单独文案，让用户知道可以重简提问而不是服务挂了。 */
+    @Test
+    void timeoutChannelTellsUserToRetry() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenThrow(
+                new LlmHttpClient.LlmCallException(LlmHttpClient.Category.TIMEOUT, null, "上游讀取逾時"));
+
+        OrchestrateResult out = svc.orchestrate(request("hi"), "alice");
+        assertTrue(out.getText().contains("逾時"), "应指向逾时：" + out.getText());
+        // 失败轮必须释放预占，不然账上会留一条永久 RESERVED
+        verify(metering, times(1)).release(any(), eq("TIMEOUT"));
+    }
+
+    /**
+     * A3：未授权模型必须在后端拦住。
+     * <p>钉住的原因：首页把输入框置灰只是 UX，不是安全边界——以前直接 POST /api/agent/orchestrate
+     * 就能绕开“未開通”偷跑模型，计量与权控形同虚设。
+     */
+    @Test
+    void unauthorizedModelRejectedAtServerSide() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.hasModelAccess(any())).thenReturn(false);
+
+        OrchestrateResult out = svc.orchestrate(request("hi"), "alice");
+        assertTrue(out.getText().contains("未被授權"), "应拒绝：" + out.getText());
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+        verify(eventService, times(1)).append(any(), any(), eq("POLICY_DECISION"), any(), any());
     }
 
     private static OrchestrateRequest request(String userText) {
@@ -142,6 +212,7 @@ class AgentOrchestrationServiceTest {
         Channel c = new Channel();
         c.setLabel("primary");
         c.setBaseUrl("https://api.deepseek.com");
+        c.setApiKey("sk-test");
         c.setDefaultModelKey("deepseek-chat");
         c.setInputPrice(new java.math.BigDecimal("1"));
         c.setOutputPrice(new java.math.BigDecimal("2"));
@@ -175,17 +246,14 @@ class AgentOrchestrationServiceTest {
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(ch);
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
         String resp = "{\"model\":\"m\",\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"hi\"}}]}";
-        ArgumentCaptor<HttpEntity> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
-        when(restTemplate.exchange(any(String.class), eq(HttpMethod.POST), entityCap.capture(), eq(String.class)))
-                .thenReturn(new ResponseEntity<>(resp, HttpStatus.OK));
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(json(resp));
 
         OrchestrateResult out = svc.orchestrate(request("随便"), "alice");
         assertEquals("hi", out.getText());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> payload = (Map<String, Object>) entityCap.getValue().getBody();
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> toolsSent = (List<Map<String, Object>>) payload.get("tools");
+        List<Map<String, Object>> toolsSent = (List<Map<String, Object>>) payloadCap.getValue().get("tools");
         assertNotNull(toolsSent);
         List<String> names = toolsSent.stream()
                 .map(t -> (String) ((Map<?, ?>) t.get("function")).get("name"))
@@ -211,15 +279,13 @@ class AgentOrchestrationServiceTest {
         Channel ch = channel();
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(ch);
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
-        ArgumentCaptor<HttpEntity> entityCap = ArgumentCaptor.forClass(HttpEntity.class);
-        when(restTemplate.exchange(any(String.class), eq(HttpMethod.POST), entityCap.capture(), eq(String.class)))
-                .thenReturn(new ResponseEntity<>("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}", HttpStatus.OK));
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
 
         svc.orchestrate(request("x"), "alice");
         @SuppressWarnings("unchecked")
-        Map<String, Object> payload = (Map<String, Object>) entityCap.getValue().getBody();
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> toolsSent = (List<Map<String, Object>>) payload.get("tools");
+        List<Map<String, Object>> toolsSent = (List<Map<String, Object>>) payloadCap.getValue().get("tools");
         assertTrue(toolsSent.stream().noneMatch(t ->
                 "email_sender".equals(((Map<?, ?>) t.get("function")).get("name"))),
                 "未启用的外部工具不应下发");

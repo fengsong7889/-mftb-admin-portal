@@ -38,8 +38,33 @@ describe('agent.sendAgentMessage (V0 §B.1 orchestrate)', () => {
       orchestrateResp({ text: '你好', model: 'deepseek-chat', tokens: 12, pendingExternalCalls: [] }),
     ) as unknown as typeof fetch
     const reply: AgentReply = await sendAgentMessage([chat('hi')])
-    expect(reply).toEqual({ text: '你好', model: 'deepseek-chat', tokens: 12 })
+    // traces 是服务端本轮实际调过的内建工具；后端未返回时为空数组，UI 据此决定要不要画工具标签
+    expect(reply).toEqual({ text: '你好', model: 'deepseek-chat', tokens: 12, traces: [] })
     expect(confirmExternalCall).not.toHaveBeenCalled()
+  })
+
+  /**
+   * 错误提示不能与正常回复同构：前端靠 errorKind 区分，否则会把「无权/超时/熔斷」
+   * 当助手回复写进会话历史，下一次问答又把它当上下文发回去（实测会污染整个会话）。
+   */
+  it('后端标记 errorKind 时透传给调用方', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce(
+      orchestrateResp({ text: 'AI 回應逾時', model: 'qwen3.7-flash', tokens: 0, errorKind: 'timeout', pendingExternalCalls: [] }),
+    ) as unknown as typeof fetch
+    const reply = await sendAgentMessage([chat('hi')])
+    expect(reply.errorKind).toBe('timeout')
+  })
+
+  it('上报内建工具痕迹（多轮累加）', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce(
+      orchestrateResp({
+        text: '餘額 100', model: 'ds', tokens: 9,
+        traces: [{ toolKey: 'query_account_balance', elapsedMs: 201, success: true }],
+        pendingExternalCalls: [],
+      }),
+    ) as unknown as typeof fetch
+    const reply = await sendAgentMessage([chat('查餘額')])
+    expect(reply.traces).toEqual([{ toolKey: 'query_account_balance', elapsedMs: 201, success: true }])
   })
 
   it('外部工具一次一循环：确认后回传 tool 结果并二次 orchestrate 得到文本', async () => {

@@ -137,7 +137,6 @@ export const keyToPath: Record<string, string> = {
   'version-history': '/version-history',
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
-  'ai_quota_auth': '/ai-quota-auth',
   'ai-operation-auth': '/ai-operation-auth',
   'ai-access-request': '/ai-access-apply',
   'ai-mcp-service': '/ai-mcp-service',
@@ -294,6 +293,11 @@ export const keyToPath: Record<string, string> = {
   'meeting-room':          '/meeting-room',
   'meeting-record':        '/meeting-record',
   'meeting-config':        '/meeting-config',
+  // 行政側紀要檢索（會議治理 › 會議紀要）
+  'meeting-minutes-list':  '/meeting-minutes-list',
+  // 通知模板 / 推送開關：緊鄰「通知渠道配置」
+  'notification-template': '/notification-template',
+  'notification-switch':   '/notification-switch',
 }
 
 /** 菜单接口省略 path 时使用本地路由登记；只接受站内路径，不推测未知菜单。 */
@@ -562,7 +566,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'rule-config', 'notification-config', 'workflow-config', 'version-history',
   'rule-ad-sales', 'rule-gift', 'rule-security', 'rule-algorithm', 'rule-seq',
   // 智能中心(AI)
-  'ai_model_hub', 'ai_quota_auth', 'ai-operation-auth', 'ai-access-request',
+  'ai_model_hub', 'ai-operation-auth', 'ai-access-request',
   'ai-mcp-service', 'ai-conversation-audit', 'ai_usage_stats', 'ai_energy_detail',
   'ai-model-provider', 'ai-model-list', 'ai-auth',
   'ai-dept-model-auth', 'ai-emp-model-auth', 'ai-pos-auth',
@@ -596,7 +600,8 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'attendance-schedule', 'attendance-punch', 'attendance-exception', 'attendance-daily',
   'attendance-monthly', 'attendance-setting',
   // 会议管理：四个菜单及其详情页全部走真实 /api/meeting/*，无前端 mock 回退
-  'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config',
+  'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config', 'meeting-minutes-list',
+  'notification-template', 'notification-switch',
   // 文檔中心：四個菜單及子頁全部走真實 /api/doc/*，無前端 mock 回退
   'doc-library', 'doc-space', 'doc-stats', 'doc-learning',
   // EAM 採購

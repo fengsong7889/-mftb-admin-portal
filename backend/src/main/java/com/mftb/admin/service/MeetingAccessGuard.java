@@ -73,6 +73,18 @@ public class MeetingAccessGuard {
     }
 
     /**
+     * 是否持有纪要的使用侧动作权（{@code meeting-my:edit}）。
+     *
+     * <p>这一条只回答"能不能记"，不回答"能记谁的"：后者由 {@code requireBookingReadable} 与
+     * {@code isOrganizer}/{@code myRole} 收敛，两者合起来才是前端 deriveCanRecordMinutes 的同口径。
+     * 行政的代录权走 {@link #canOperateRecords}，不从这里扩。
+     */
+    public boolean canRecordMinutes(SysUser user) {
+        return isAdmin(user)
+                || permissionService.hasPermission(user, MeetingConstants.MENU_MY, MeetingConstants.ACTION_EDIT);
+    }
+
+    /**
      * 规则与黑名单维护的统一守卫。
      *
      * <p>判定锚点刻意取 {@code meeting-record:edit}（行政专属）而不是 {@code meeting-config:edit}：

@@ -186,7 +186,6 @@ const AiModelEdit = lazy(() => import('./pages/AiModelList/AiModelEdit'))
 const AiModelDetail = lazy(() => import('./pages/AiModelList/AiModelDetail'))
 // AI 配額与策略管理 - 子菜单（独立页面）
 import AiDeptModelAuth from './pages/AiQuotaAuth/QuotaAndPolicy'
-import { AiDeptQuota } from './pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from './pages/AiQuotaAuth/AiEmployeeAuthControl'
 import EmpQuotaList from './pages/AiQuotaAuth/empQuota/EmpQuotaList'
 const DeptAuthGroupEdit = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroupEdit'))
@@ -194,6 +193,8 @@ const DeptAuthGroupDetail = lazy(() => import('./pages/AiQuotaAuth/DeptAuthGroup
 // 部门额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门模型权控）
 const DeptQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/deptQuota/DeptQuotaEdit'))
 const DeptQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/deptQuota/DeptQuotaDetail'))
+/** 部门额度列表：走真实 /api/ai/dept-quota，与上方 edit/detail 同一代实现 */
+const AiDeptQuotaList = lazy(() => import('./pages/AiQuotaAuth/deptQuota/AiDeptQuotaList'))
 // 员工模型权控 - 按职位/角色授权的独立编辑页与详情页
 const EmpPosAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuthEdit'))
 const EmpPosAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpPosAuthDetail'))
@@ -201,6 +202,8 @@ const EmpRoleAuthEdit = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAu
 const EmpRoleAuthDetail = lazy(() => import('./pages/AiQuotaAuth/empAuth/EmpRoleAuthDetail'))
 // 员工额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门额度）
 const EmpQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaEdit'))
+/** 員工專屬額度（ai_quota_config，按人定向配額）新增/編輯頁 */
+const DirectQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/DirectQuotaEdit'))
 const EmpQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaDetail'))
 const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaEdit'))
 const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
@@ -289,8 +292,17 @@ const MeetingConfig = lazy(() => import('./pages/MeetingManagement/MeetingConfig
 const MeetingRoomForm = lazy(() => import('./pages/MeetingManagement/RoomFiles/MeetingRoomForm'))
 const MeetingBookingForm = lazy(() => import('./pages/MeetingManagement/RoomBooking/MeetingBookingForm'))
 const MeetingBlacklistForm = lazy(() => import('./pages/MeetingManagement/MeetingConfig/MeetingBlacklistForm'))
+// 会议纪要：录入/编辑页与站内只读查看页都不是菜单项（从会议列表、详情页与钉钉卡片跳进来），
+// 但必须显式注册：路由守卫按精确路径校验
+const MeetingMinutesForm = lazy(() => import('./pages/MeetingManagement/MeetingMinutes/MinutesForm'))
+const MeetingMinutesView = lazy(() => import('./pages/MeetingManagement/MeetingMinutes/MinutesView'))
 // 免登签到页（扫码直达，公开路由，不套后台布局）
 const MeetingCheckin = lazy(() => import('./pages/MeetingCheckin'))
+// 纪要免登查看页（钉钉卡片直达，凭 HMAC 令牌鉴权，同样不套后台布局）
+const MeetingMinutesPage = lazy(() => import('./pages/MeetingMinutesView'))
+const MeetingMinutesAdmin = lazy(() => import('./pages/MeetingMinutesAdmin'))
+const NotificationTemplateConfig = lazy(() => import('./pages/NotificationTemplate'))
+const NotificationSwitchConfig = lazy(() => import('./pages/NotificationSwitch'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
 const AssetTagView = lazy(() => import('./pages/AssetTagView'))
 // 資產領用簽署頁（釘釘工作通知直達，令牌免登，不含後台佈局）
@@ -374,7 +386,9 @@ function PageLoading() {
   const { t } = useTranslation()
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
-      <Spin size="large" tip={t('common.loading')} />
+      <Spin size="large" tip={t('common.loading')}>
+        <div style={{ width: 200, height: 80 }} />
+      </Spin>
     </div>
   )
 }
@@ -649,11 +663,12 @@ function AuthenticatedLayout() {
               <Route path="/ai-pos-auth-detail" element={<EmpPosAuthDetail />} />
               <Route path="/ai-role-auth-edit" element={<EmpRoleAuthEdit />} />
               <Route path="/ai-role-auth-detail" element={<EmpRoleAuthDetail />} />
-              <Route path="/ai-dept-quota" element={<AiDeptQuota />} />
+              <Route path="/ai-dept-quota" element={<AiDeptQuotaList />} />
               <Route path="/ai-dept-quota-edit" element={<DeptQuotaEdit />} />
               <Route path="/ai-dept-quota-detail" element={<DeptQuotaDetail />} />
               <Route path="/ai-emp-quota" element={<EmpQuotaList />} />
                             <Route path="/ai-emp-quota-edit" element={<EmpQuotaEdit />} />
+                            <Route path="/ai-emp-direct-quota-edit" element={<DirectQuotaEdit />} />
                             <Route path="/ai-emp-quota-detail" element={<EmpQuotaDetail />} />
                             <Route path="/ai-role-quota-edit" element={<RoleQuotaEdit />} />
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
@@ -834,6 +849,14 @@ function AuthenticatedLayout() {
               <Route path="/meeting-record" element={<BookingRecords />} />
               <Route path="/meeting-config" element={<MeetingConfig />} />
               <Route path="/meeting-blacklist-form" element={<MeetingBlacklistForm />} />
+              {/* 会议纪要：表单页与只读查看页（菜单权限挂 meeting-my，同 meeting-detail） */}
+              <Route path="/meeting-minutes-form" element={<MeetingMinutesForm />} />
+              <Route path="/meeting-minutes" element={<MeetingMinutesView />} />
+              {/* 行政侧纪要检索（會議治理 › 會議紀要）：菜单 key meeting-minutes-list */}
+              <Route path="/meeting-minutes-list" element={<MeetingMinutesAdmin />} />
+              {/* 通知模板 / 推送开关：紧邻「通知渠道配置」的两个独立菜单 */}
+              <Route path="/notification-template" element={<NotificationTemplateConfig />} />
+              <Route path="/notification-switch" element={<NotificationSwitchConfig />} />
               <Route path="/my-vehicle-use" element={<MyVehicleUse />} />
               <Route path="/my-vehicle-use/apply" element={<MyVehicleUse />} />
               <Route path="/my-vehicle-use/detail" element={<MyVehicleUse />} />
@@ -925,10 +948,12 @@ function AppRoutes() {
   const isPublicSignPath = location.pathname.startsWith('/asset-claim-sign')
   // 会议签到页与签署页同构：凭 HMAC 令牌鉴权，页面本身不能要求后台登录态
   const isPublicMeetingCheckin = location.pathname.startsWith('/meeting-checkin')
+  // 纪要免登查看页同源：凭签名令牌鉴权，钉钉里点开的人可能没有后台账号
+  const isPublicMeetingMinutes = location.pathname.startsWith('/meeting-minutes-view')
 
   return (
     <Routes>
-      {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin ? (
+      {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin || isPublicMeetingMinutes ? (
         <>
           <Route path="/m/asset-tag-view" element={
             <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
@@ -938,6 +963,9 @@ function AppRoutes() {
           } />
           <Route path="/meeting-checkin" element={
             <Suspense fallback={<PageLoading />}><MeetingCheckin /></Suspense>
+          } />
+          <Route path="/meeting-minutes-view" element={
+            <Suspense fallback={<PageLoading />}><MeetingMinutesPage /></Suspense>
           } />
         </>
       ) : isAuthenticated ? (

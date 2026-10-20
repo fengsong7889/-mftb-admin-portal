@@ -36,6 +36,7 @@ import {
   type MeetingVO,
 } from '../../../api/meeting'
 import { bizTypeLabels, phaseMeta } from '../meetingMeta'
+import { deriveCanRecordMinutes, hasMinutesRecord, minutesPathOf } from '../MeetingMinutes/minutesAccess'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -76,6 +77,11 @@ export default function BookingRecords() {
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission('meeting-record:edit')
+  /** 纪要入口能力：本页以行政视野为主，canManageRecords 与 canEdit 同源 */
+  const minutesCapability = {
+    canRecordOwn: hasPermission('meeting-my:edit'),
+    canManageRecords: canEdit,
+  }
 
   const [rows, setRows] = useState<MeetingVO[]>([])
   const [stats, setStats] = useState<MeetingStats>(EMPTY_STATS)
@@ -292,11 +298,19 @@ export default function BookingRecords() {
       ),
     },
     {
-      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 190, fixed: 'right',
+      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 250, fixed: 'right',
       // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作在后
       render: (_, record) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
+        <Space size={0} wrap split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
+          {/* 纪要：行政可代录，口径与详情页一致（不能出现详情有、记录列没有） */}
+          {deriveCanRecordMinutes(record, minutesCapability) && (
+            <Button type="link" size="small" onClick={() => navigate(minutesPathOf(record))}>
+              {hasMinutesRecord(record)
+                ? t('meeting.minutes.viewShort', { defaultValue: '查看紀要' })
+                : t('meeting.minutes.recordShort', { defaultValue: '錄入紀要' })}
+            </Button>
+          )}
           {canEdit && record.canRelease && (
             <Button type="link" size="small" onClick={() => handleRelease(record)}>{t('meeting.releaseRoom', { defaultValue: '釋放房間' })}</Button>
           )}

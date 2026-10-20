@@ -25,8 +25,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -70,6 +72,7 @@ public class MeetingNotifyDispatcher {
     private final SysUserMapper userMapper;
     private final NotificationAppService appService;
     private final DingTalkAppService dingTalkAppService;
+    private final MeetingNotifyTemplateService templateService;
 
     @Value("${meeting.notify.dry-run:false}")
     private boolean dryRun;
@@ -315,8 +318,64 @@ public class MeetingNotifyDispatcher {
 
     /* ==================== 卡片内容 ==================== */
 
-    private static String buildTitle(MeetingBooking booking, String eventCode) {
-        return eventLabel(eventCode) + "：" + booking.getTitle();
+    /**
+     * 事件 → 模板场景。
+     * <p>只有「邀約/變更」走 invite、「開始前提醒」走 remind，其余（取消/釋放/签退等）走 ops；
+     * 三个场景的默认模板里都留有 ${extraLine}，用来装“原定安排已失效”这类事件专属的一句话。
+     */
+    private static String sceneOf(String eventCode) {
+        if (eventCode == null) {
+            return MeetingConstants.SCENARIO_OPS;
+        }
+        if (eventCode.startsWith(MeetingConstants.NOTIFY_EVT_UPDATED)
+                || MeetingConstants.NOTIFY_EVT_CREATED.equals(eventCode)) {
+            return MeetingConstants.SCENARIO_INVITE;
+        }
+        if (MeetingConstants.NOTIFY_EVT_REMIND.equals(eventCode)) {
+            return MeetingConstants.SCENARIO_REMIND;
+        }
+        return MeetingConstants.SCENARIO_OPS;
+    }
+
+    private String buildTitle(MeetingBooking booking, String eventCode) {
+        MeetingNotifyTemplateService.Rendered rendered =
+                templateService.render(sceneOf(eventCode), templateVars(booking, eventCode, null));
+        return rendered != null && StringUtils.hasText(rendered.title())
+                ? rendered.title() : eventLabel(eventCode) + "：" + booking.getTitle();
+    }
+
+    /** 模板变量：全部取自会议单，不接受调用方传自由正文（防止议程里的内部信息被拼进推送） */
+    private Map<String, String> templateVars(MeetingBooking booking, String eventCode, String baseUrl) {
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("meetingTitle", Objects.toString(booking.getTitle(), ""));
+        vars.put("meetingNo", Objects.toString(booking.getBookingNo(), ""));
+        vars.put("startTime", DateTimeUtils.format(booking.getStartTime()));
+        vars.put("endTime", DateTimeUtils.format(booking.getEndTime()));
+        vars.put("roomName", Objects.toString(booking.getRoomName(), ""));
+        vars.put("roomLocation", StringUtils.hasText(booking.getRoomLocation())
+                ? "（" + booking.getRoomLocation() + "）" : "");
+        vars.put("organizer", Objects.toString(booking.getOrganizerName(), ""));
+        vars.put("delegateLine", StringUtils.hasText(booking.getDelegateForName())
+                ? "實際使用人：**" + booking.getDelegateForName() + "**（由 "
+                        + Objects.toString(booking.getOrganizerName(), "") + " 代訂）\n" : "");
+        vars.put("agendaLine", StringUtils.hasText(booking.getDescription())
+                ? "議程：" + truncate(booking.getDescription(), 200) + "\n" : "");
+        vars.put("onlineLine", StringUtils.hasText(booking.getOnlineMeetingUrl())
+                ? "線上會議：[點擊進入](" + booking.getOnlineMeetingUrl() + ")\n" : "");
+        String extra = "";
+        if (isChange(eventCode)) {
+            extra = "\n**請以最新時間為準，原定安排已失效。**\n";
+        } else if (MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
+            extra = "\n**本場會議已取消，無需到場。**\n";
+        } else if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
+            extra = "\n**會議室已被釋放，如需使用請重新預約。**\n";
+        }
+        vars.put("extraLine", extra);
+        vars.put("reason", MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)
+                ? "會議室已釋放" : eventLabel(eventCode));
+        String link = meetingDetailUrl(baseUrl, booking.getId());
+        vars.put("viewUrl", link == null ? "" : link);
+        return vars;
     }
 
     /**
@@ -325,7 +384,13 @@ public class MeetingNotifyDispatcher {
      * <p>字段全部取自会议单，不接受调用方传入的自由正文：通知一旦能带任意文本，
      * 议程里的内部信息就会原样出现在钉钉推送日志里。
      */
-    private static String buildContent(MeetingBooking booking, String eventCode, String baseUrl) {
+    private String buildContent(MeetingBooking booking, String eventCode, String baseUrl) {
+        // 模板优先：管理员在「通知模板」页改完即生效；模板停用/缺失时回落到下面的内置文案
+        MeetingNotifyTemplateService.Rendered rendered =
+                templateService.render(sceneOf(eventCode), templateVars(booking, eventCode, baseUrl));
+        if (rendered != null && StringUtils.hasText(rendered.body())) {
+            return rendered.body();
+        }
         StringBuilder sb = new StringBuilder();
         sb.append("**").append(eventLabel(eventCode)).append("**<br><br>");
         sb.append("會議主題：").append(booking.getTitle()).append("<br>");

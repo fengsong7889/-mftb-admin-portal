@@ -24,6 +24,13 @@ public interface AiMyCenterService {
     List<AiMyCenterDTO.MyModelVO> myModels();
 
     /**
+     * 当前账号是否被授权使用指定模型（与 {@link #myModels()} 同源口径）。
+     * <p>给 AI 网关/编排做服务端准入：首页把输入框置灰不是安全边界，模型授权必须在后端判定。
+     * 未登录、无授权、模型标识为空均视为拒绝。
+     */
+    boolean hasModelAccess(String modelKey);
+
+    /**
      * 配额校验闭环：判定当前账号调用指定模型是否放行。
      * 汇总所有作用于该模型的额度维度，按团队成员聚合本期已用，命中限额时消费
      * over_limit_action（reject/approve/downgrade）与 downgrade_model_id 给出处置。

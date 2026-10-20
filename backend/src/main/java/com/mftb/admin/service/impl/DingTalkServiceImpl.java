@@ -128,6 +128,40 @@ public class DingTalkServiceImpl implements DingTalkService {
         return doPostSync(channel, body);
     }
 
+    /**
+     * 按渠道 id 精确发送。
+     *
+     * <p>这里没有也不应该有“回退默认渠道”：会议纪要发错群是内部信息外泄，
+     * 而默认渠道的含义是“全站没绑定时的兜底群”，两者放在一起迟早会把纪要送进运营大群。
+     * 渠道不存在/停用/非钉钉都当成未受理返回，不抛异常：调用方是投递回调，
+     * 抛出去只会把异步线程打断，留下一个停在「投递中」的死任务。
+     */
+    @Override
+    public SendOutcome sendMarkdownSyncToChannel(long channelId, String title, String text,
+                                                 List<String> atMobiles, boolean isAtAll) {
+        SysNotificationChannel channel = channelMapper.selectById(channelId);
+        if (channel == null) {
+            return SendOutcome.unknown("channel_not_found");
+        }
+        if (!"dingtalk".equals(channel.getChannel())) {
+            return SendOutcome.unknown("channel_platform_not_dingtalk");
+        }
+        if (channel.getEnabled() == null || channel.getEnabled() != 1) {
+            return SendOutcome.unknown("channel_disabled");
+        }
+        if (!StringUtils.hasText(channel.getWebhookUrl())) {
+            return SendOutcome.unknown("channel_webhook_missing");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "markdown");
+        Map<String, String> md = new HashMap<>();
+        md.put("title", title);
+        md.put("text", text);
+        body.put("markdown", md);
+        body.put("at", buildAt(channel, atMobiles, isAtAll));
+        return doPostSync(channel, body);
+    }
+
     /** 同步执行 HTTP POST，捕获渠道 errcode；异常不抛，转为 SendOutcome.rejected */
     @SuppressWarnings("unchecked")
     private SendOutcome doPostSync(SysNotificationChannel channel, Map<String, Object> body) {
@@ -144,7 +178,8 @@ public class DingTalkServiceImpl implements DingTalkService {
             return SendOutcome.rejected(code, msg, name);
         } catch (Exception e) {
             log.error("[DingTalk Sync] 渠道 {} 发送异常: {}", name, e.getMessage());
-            return SendOutcome.rejected("EXCEPTION", e.getClass().getSimpleName() + ": " + e.getMessage(), name);
+            // 只回异常类型：RestClient 异常文本里带着完整 webhook URL（含 access_token 与 sign），不得入上下文
+            return SendOutcome.rejected("EXCEPTION", e.getClass().getSimpleName(), name);
         }
     }
 

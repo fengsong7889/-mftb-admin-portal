@@ -7,6 +7,7 @@ import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.mapper.MeetingNotifyLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.MeetingNotifyTemplateService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,8 @@ class MeetingNotifyDispatcherOutcomeTest {
         appService = mock(NotificationAppService.class);
         dingTalkAppService = mock(DingTalkAppService.class);
         dispatcher = new MeetingNotifyDispatcher(notifyMapper, attendeeMapper, bookingMapper,
-                mock(SysUserMapper.class), appService, dingTalkAppService);
+                mock(SysUserMapper.class), appService, dingTalkAppService,
+                mock(MeetingNotifyTemplateService.class));
     }
 
     private MeetingNotifyLog task() {

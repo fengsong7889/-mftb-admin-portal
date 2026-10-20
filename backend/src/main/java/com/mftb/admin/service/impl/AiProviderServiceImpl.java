@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -114,6 +115,10 @@ public class AiProviderServiceImpl implements AiProviderService {
                     .set(AiProvider::getIsDefault, 0));
         }
 
+        // 强制刷新更新时间：MyBatis-Plus 的 strictUpdateFill 只在字段为 null 时才填，
+        // 而实体是 selectById 读出来的（updatedAt 带旧值），不显式置新值就会让
+        // 「最后更新时间」永远停在种子时间，管理员无法判断配置到底改过没有
+        existing.setUpdatedAt(LocalDateTime.now());
         providerMapper.updateById(existing);
         return true;
     }

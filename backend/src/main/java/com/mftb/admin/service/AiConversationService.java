@@ -19,6 +19,16 @@ public interface AiConversationService {
     /** 更新会话（标题 / 消息 / 模型 / tokens） */
     void updateConversation(Long id, String title, String messages, String modelKey, Integer totalTokens);
 
+    /**
+     * 服务端记一次问答回合（回填实际使用的模型 + 请求次数 +1）。
+     * <p>会话不存在、不属于该账号或已被回收时静默跳过，不影响已生成的回复。
+     *
+     * @param conversationPk 会话主键（前端未传会话上下文时为 null，直接跳过）
+     * @param account        当前登录账号（归属校验，不信任前端传入的会话 ID）
+     * @param modelKey       本次实际使用的模型标识
+     */
+    void recordAgentTurn(Long conversationPk, String account, String modelKey);
+
     /** 删除指定会话（移至回收站） */
     void deleteConversation(Long id);
 

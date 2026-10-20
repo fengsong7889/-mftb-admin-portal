@@ -23,6 +23,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class QueryAccountBalanceTool implements AgentTool {
 
+    /** 库内品牌字段取值（biz_fin_account.brand）：与前端品牌字典保持一致 */
+    static final String BRAND_FLASH_BEE = "flashBee";
+    static final String BRAND_MFOOD = "mFood";
+
     private final FinAccountService finAccountService;
     private final ObjectMapper objectMapper;
 
@@ -38,7 +42,11 @@ public class QueryAccountBalanceTool implements AgentTool {
     public Map<String, Object> schema() {
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("groupName", Map.of("type", "string", "description", "集團名稱（支持模糊匹配）"));
-        props.put("brand", Map.of("type", "string", "description", "品牌：1=閃蜂, 2=mFood", "enum", List.of("1", "2")));
+        // enum 必须与库内实际取值一致：biz_fin_account.brand 存 flashBee / mFood，
+        // 而旧 schema 告知模型用 "1"/"2"，导致按品牌筛选永远命中空结果（模型然后回答“未找到”）
+        props.put("brand", Map.of("type", "string",
+                "description", "品牌：flashBee=閃蜂，mFood=mFood（也接受 1 / 2 / 中文名，服务端会归一化）",
+                "enum", List.of("flashBee", "mFood")));
         return Map.of(
                 "type", "object",
                 "properties", props
@@ -53,7 +61,17 @@ public class QueryAccountBalanceTool implements AgentTool {
             query.setSize(10);
             if (args != null) {
                 Object gn = args.get("groupName"); if (gn != null) query.setGroupName(String.valueOf(gn));
-                Object br = args.get("brand"); if (br != null) query.setBrand(String.valueOf(br));
+                Object br = args.get("brand");
+                if (br != null && !String.valueOf(br).isBlank()) {
+                    String normalized = normalizeBrand(String.valueOf(br));
+                    if (normalized == null) {
+                        // 不能默默丢掉筛选条件：那会把全量结果当成“该品牌结果”交给模型，比查不到更危险
+                        return toJson(Map.of("error", "無法識別的品牌取值",
+                                "allowedValues", List.of("flashBee", "mFood"),
+                                "hint", "請用 flashBee（閃蜂）或 mFood"));
+                    }
+                    query.setBrand(normalized);
+                }
             }
             PageResult<FinAccountVO> result = finAccountService.page(query);
             List<FinAccountVO> rows = result.getRecords();
@@ -77,9 +95,24 @@ public class QueryAccountBalanceTool implements AgentTool {
         }
     }
 
+    /**
+     * 品牌取值归一化：模型经常传 "1"/"2"、中文名或带空格的小写变体，而库内存的是
+     * {@code flashBee} / {@code mFood}。不归一化就过滤不出任何数据（实测：mFood 实有 4 条余额，
+     * 模型带品牌条件却答“未找到”）。无法识别时返回 null，由调用方给出可选值而不是默默丢条件。
+     */
+    static String normalizeBrand(String raw) {
+        if (raw == null) return null;
+        String v = raw.trim().toLowerCase().replace(" ", "").replace("_", "");
+        return switch (v) {
+            case "1", "flashbee", "flashb", "閃蜂", "闪蜂" -> BRAND_FLASH_BEE;
+            case "2", "mfood", "m-food" -> BRAND_MFOOD;
+            default -> null;
+        };
+    }
+
     private static String brandLabel(String b) {
-        if ("1".equals(b) || "flashBee".equals(b)) return "閃蜂";
-        if ("2".equals(b) || "mFood".equals(b)) return "mFood";
+        if (BRAND_FLASH_BEE.equalsIgnoreCase(b) || "1".equals(b)) return "閃蜂";
+        if (BRAND_MFOOD.equalsIgnoreCase(b) || "2".equals(b)) return "mFood";
         return b;
     }
 

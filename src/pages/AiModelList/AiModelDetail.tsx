@@ -46,7 +46,9 @@ export default function AiModelDetail() {
   if (loading) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip="加載中..." />
+        <Spin size="large" tip="加載中...">
+          <div style={{ width: 200, height: 80 }} />
+        </Spin>
       </div>
     )
   }
@@ -116,7 +118,7 @@ export default function AiModelDetail() {
 
       {/* ═══ 分区 1：基础信息 ═══ */}
       <SectionCard>
-        <SectionHeader icon={<AppstoreOutlined />} iconBg="#e6f7ff" iconColor="#1890ff" title="基础信息" />
+        <SectionHeader icon={<AppstoreOutlined />} iconBg="#e6f7ff" iconColor="#1890ff" title="基礎信息" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 24px' }}>
           <FieldRow label="供應商" value={model.providerName || '-'} />
           <FieldRow label="模型標識" value={<span style={{ fontFamily: 'monospace' }}>{model.modelKey}</span>} />
@@ -135,7 +137,7 @@ export default function AiModelDetail() {
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 16 }}>
           {([
-            { key: 'visionSupport', label: '视觉', color: '#722ED1', desc: '圖像輸入理解' },
+            { key: 'visionSupport', label: '視覺', color: '#722ED1', desc: '圖像輸入理解' },
             { key: 'functionCalling', label: '工具', color: '#1890FF', desc: '外部函數調用' },
             { key: 'jsonMode', label: 'JSON', color: '#13C2C2', desc: '結構化 JSON 輸出' },
             { key: 'streaming', label: '流式', color: '#52C41A', desc: 'SSE 流式響應' },
@@ -163,7 +165,7 @@ export default function AiModelDetail() {
 
       {/* ═══ 分区 3：价格信息 ═══ */}
       <SectionCard>
-        <SectionHeader icon={<DollarOutlined />} iconBg="#f6ffed" iconColor="#52C41A" title="价格信息" />
+        <SectionHeader icon={<DollarOutlined />} iconBg="#f6ffed" iconColor="#52C41A" title="價格信息" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           <div style={{ padding: '14px 16px', borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' }}>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>输入单价</div>
@@ -189,7 +191,7 @@ export default function AiModelDetail() {
 
       {/* ═══ 分区 4：运行参数 ═══ */}
       <SectionCard>
-        <SectionHeader icon={<SettingOutlined />} iconBg="#fff7e6" iconColor="#fa8c16" title="运行参数" />
+        <SectionHeader icon={<SettingOutlined />} iconBg="#fff7e6" iconColor="#fa8c16" title="運行参數" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
           <FieldRow label="上下文窗口" value={<span style={{ color: '#1890FF', fontWeight: 600 }}>{contextLengthText(model.contextWindow)}</span>} />
           <FieldRow label="最大輸出" value={contextLengthText(model.maxOutputTokens)} />
@@ -199,7 +201,7 @@ export default function AiModelDetail() {
 
       {/* ═══ 分区 5：状态与更新 ═══ */}
       <SectionCard>
-        <SectionHeader icon={<PoweroffOutlined />} iconBg="#fff7e6" iconColor="#E8720C" title="状态与更新" />
+        <SectionHeader icon={<PoweroffOutlined />} iconBg="#fff7e6" iconColor="#E8720C" title="狀態與更新" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
           <FieldRow label="狀態" value={model.status === 1 ? <Tag color="success">啟用</Tag> : <Tag color="default">停用</Tag>} />
           <FieldRow label="最後更新人" value={model.updatedBy || '-'} />

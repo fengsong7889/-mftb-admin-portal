@@ -89,8 +89,12 @@ public class AiGovernanceSchemaInitializer implements CommandLineRunner {
         insertPolicyIfAbsent("query_batches", "low");
         insertPolicyIfAbsent("query_approvals", "low");
         // 外部通知类：默认关闭 + 需审批凭证（V0 阶段仍允许 L3 弹窗产生的临时凭证）
-        insertPolicyIfAbsent("send_email", "medium", 1);
-        insertPolicyIfAbsent("dingtalk_sender", "medium", 1);
+        // tool_key 必须与 mcp_tool 一致：以前这里写成 send_email（真实键是 email_sender），
+        // 导致邮件工具永远查不到自己的策略，两页风险等级打架（由 ai:tool-policy-align:v1.1 修存量）
+        insertPolicyIfAbsent("email_sender", "high", 0);
+        insertPolicyIfAbsent("dingtalk_sender", "high", 0);
+        insertPolicyIfAbsent("wecom_bot", "high", 0);
+        insertPolicyIfAbsent("wechat_desktop", "high", 0);
     }
 
     private void insertPolicyIfAbsent(String toolKey, String riskLevel) {

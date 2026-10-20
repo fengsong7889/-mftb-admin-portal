@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Pagination, Select, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
+import { PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../../utils/tableDisplay'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import {
@@ -56,7 +57,7 @@ export default function AiConversationAudit() {
   const [createDates, setCreateDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [updateDates, setUpdateDates] = useState<[Dayjs, Dayjs] | null>(null)
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(PAGE_SIZE)
 
   /* ─ 数据 ── */
   const [result, setResult] = useState<AuditPageResult | null>(null)
@@ -380,9 +381,12 @@ export default function AiConversationAudit() {
             pageSize={result.size}
             total={result.total}
             showSizeChanger
+            showQuickJumper
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
             showTotal={(total) => t('common.totalRecords', { count: total })}
             onChange={(p, ps) => {
-              setPage(p)
+              // §E.4：改每页条数必须回第 1 页，否则停在越界页会看到空表
+              setPage(ps !== pageSize ? 1 : p)
               setPageSize(ps)
             }}
           />

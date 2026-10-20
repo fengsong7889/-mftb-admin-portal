@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Form, Input, Modal, Popover, Progress, Select, Space, Switch, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, IdcardOutlined, TeamOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, IdcardOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchModels, type AiModel } from '../../../api'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
 import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR, POSITION_SEQUENCE_OPTIONS } from '../../../api/position'
@@ -30,6 +30,7 @@ import {
   fetchRoleQuotas, deleteRoleQuota, toggleRoleQuotaStatus,
   type PosQuotaVO, type RoleQuotaVO,
 } from '../../../api/empQuota'
+import { fetchEmpQuotas, deleteQuota, type QuotaVO } from '../../../api/quotaConfig'
 
 /**
  * 員工額度 - 兩種額度方式融合頁（對標員工模型權控 AiEmployeeAuthControl）
@@ -40,6 +41,7 @@ import {
 export default function EmpQuotaList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
 
   /* ── 基础数据 ── */
   const [models, setModels] = useState<AiModel[]>([])
@@ -442,13 +444,154 @@ export default function EmpQuotaList() {
     </>
   )
 
+  /* ═══════════ Tab3: 員工專屬額度（ai_quota_config，按人定向配額） ═══════════ */
+  const [directQuotas, setDirectQuotas] = useState<QuotaVO[]>([])
+  const [directLoading, setDirectLoading] = useState(false)
+  const [directQuery, setDirectQuery] = useState('')
+
+  const reloadDirect = () => {
+    setDirectLoading(true)
+    fetchEmpQuotas()
+      .then(setDirectQuotas)
+      .catch(() => setDirectQuotas([]))
+      .finally(() => setDirectLoading(false))
+  }
+
+  useEffect(() => { reloadDirect() }, [])
+
+  const filteredDirect = useMemo(
+    () => directQuotas.filter((q) => !directQuery || (q.targetName ?? '').toLowerCase().includes(directQuery.toLowerCase())),
+    [directQuotas, directQuery],
+  )
+
+  const handleDirectCreate = () => navigate('/ai-emp-direct-quota-edit?type=add')
+  const handleDirectEdit = (row: QuotaVO) => navigate(`/ai-emp-direct-quota-edit?id=${row.id}`)
+  const handleDirectDelete = (row: QuotaVO) => {
+    Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('aiQuotaAuth.confirmDeleteDirectQuota'),
+      content: t('aiQuotaAuth.deleteDirectQuotaContent', { name: row.targetName ?? `#${row.targetId}` }),
+      okText: t('common.delete'),
+      okButtonProps: { danger: true },
+      cancelText: t('common.cancel'),
+      onOk: () => deleteQuota('employee', row.targetId).then(() => {
+        message.success(t('aiQuotaAuth.directQuotaDeleted'))
+        reloadDirect()
+      }),
+    })
+  }
+
+  /** 額度數字：0 表示該維度不限制，展示為 -- */
+  const quotaNumber = (v: number) => (v > 0 ? v.toLocaleString() : <span style={{ color: '#BFBFBF' }}>--</span>)
+
+  const directColumnMeta = [
+    { key: 'targetName', title: t('aiQuotaAuth.employeeCol') },
+    { key: 'modelName', title: t('aiQuotaAuth.authModelCol') },
+    { key: 'dailyQuota', title: t('aiQuotaAuth.dailyQuotaLabel') },
+    { key: 'monthlyQuota', title: t('aiQuotaAuth.monthlyQuotaLabel') },
+    { key: 'usedToday', title: t('aiQuotaAuth.usedTodayCol') },
+    { key: 'usedMonth', title: t('aiQuotaAuth.usedMonthCol') },
+    { key: 'resetDayOfMonth', title: t('aiQuotaAuth.resetDayLabel') },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol') },
+    { key: 'action', title: t('common.action') },
+  ]
+  const { configComponent: directConfigComponent, applyConfig: directApplyConfig } = useColumnConfig('ai-emp-direct-quota', directColumnMeta, [
+    { key: 'action', visible: true, locked: 'tail' as const },
+  ])
+
+  const directColumns: ColumnsType<QuotaVO> = [
+    {
+      key: 'targetName', title: t('aiQuotaAuth.employeeCol'), dataIndex: 'targetName', width: 180,
+      render: (v: string | null, row) => v || `#${row.targetId}`,
+    },
+    {
+      key: 'modelName', title: t('aiQuotaAuth.authModelCol'), dataIndex: 'modelName', width: 200,
+      render: (v: string | null) => (v
+        ? <Tag style={{ color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>{v}</Tag>
+        : <Tag color="blue">{t('aiQuotaAuth.allModelsShared')}</Tag>),
+    },
+    {
+      key: 'dailyQuota', title: t('aiQuotaAuth.dailyQuotaLabel'), dataIndex: 'dailyQuota', width: 130, align: 'right',
+      render: (v: number) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{quotaNumber(v)}</span>,
+    },
+    {
+      key: 'monthlyQuota', title: t('aiQuotaAuth.monthlyQuotaLabel'), dataIndex: 'monthlyQuota', width: 140, align: 'right',
+      render: (v: number) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{quotaNumber(v)}</span>,
+    },
+    {
+      key: 'usedToday', title: t('aiQuotaAuth.usedTodayCol'), dataIndex: 'usedToday', width: 120, align: 'right',
+      render: (v: number) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v.toLocaleString()}</span>,
+    },
+    {
+      key: 'usedMonth', title: t('aiQuotaAuth.usedMonthCol'), dataIndex: 'usedMonth', width: 130, align: 'right',
+      render: (v: number) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v.toLocaleString()}</span>,
+    },
+    {
+      key: 'resetDayOfMonth', title: t('aiQuotaAuth.resetDayLabel'), dataIndex: 'resetDayOfMonth', width: 110, align: 'center',
+      render: (v: number, row) => (row.autoReset === 1 ? t('aiQuotaAuth.resetDayValue', { day: v }) : t('aiQuotaAuth.disabledTag')),
+    },
+    { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol'), dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    {
+      key: 'action', title: t('common.action'), width: 140, align: 'center', fixed: 'right',
+      render: (_, row) => (
+        <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" onClick={() => handleDirectEdit(row)}>{t('common.edit')}</Button>
+          <Button type="link" danger onClick={() => handleDirectDelete(row)}>{t('common.delete')}</Button>
+        </Space>
+      ),
+    },
+  ]
+
+  const directContent = (
+    <>
+      <Alert
+        type="info" showIcon style={{ marginBottom: 16 }}
+        message={t('aiQuotaAuth.directQuotaAlertMsg')}
+        description={<span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('aiQuotaAuth.directQuotaAlertDesc')}</span>}
+      />
+      {/* 查詢區域 */}
+      <div className="search-section">
+        <Form layout="inline">
+          <Form.Item label={t('aiQuotaAuth.employeeCol')}>
+            <Input value={directQuery} placeholder={t('aiQuotaAuth.selectEmployeePh')} allowClear onChange={(e) => setDirectQuery(e.target.value)} />
+          </Form.Item>
+        </Form>
+      </div>
+      {/* 操作區 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <span style={{ fontSize: 13, color: '#595959' }}>
+            {t('aiQuotaAuth.directQuotaCount', { count: filteredDirect.length })}
+          </span>
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleDirectCreate}>{t('common.add')}</Button>
+          {directConfigComponent}
+        </div>
+      </div>
+      <Table
+        rowKey="id"
+        size="middle"
+        loading={directLoading}
+        columns={directApplyConfig(directColumns)}
+        dataSource={filteredDirect}
+        scroll={{ x: 'max-content' }}
+        pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.paginationTotal', { total }) }}
+      />
+    </>
+  )
+
   const tabItems = [
     { key: 'position', label: <Space><IdcardOutlined /><span>{t('aiQuotaAuth.posQuotaTab')}</span></Space>, children: positionContent },
     { key: 'role', label: <Space><TeamOutlined /><span>{t('aiQuotaAuth.roleQuotaTab')}</span></Space>, children: roleContent },
+    { key: 'direct', label: <Space><SettingOutlined /><span>{t('aiQuotaAuth.directQuotaTab')}</span></Space>, children: directContent },
   ]
 
-  /** 支持 hash 定位 Tab */
-  const defaultTab = window.location.hash.includes('#role') ? 'role' : 'position'
+  /** 支持 hash 定位 Tab，也支持从專屬額度編輯頁返回時指定落回該 Tab */
+  const stateTab = (location.state as { tab?: string } | null)?.tab
+  const defaultTab = stateTab
+    ?? (window.location.hash.includes('#role') ? 'role' : window.location.hash.includes('#direct') ? 'direct' : 'position')
 
   return (
     <div className="content-area">

@@ -196,7 +196,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       )}
 
       <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
-        {t('aiQuotaAuth.authorizedCount', { count: <strong style={{ color: '#722ED1' }}>{value.length}</strong> })}
+        {t('aiQuotaAuth.authorizedCount', { count: value.length })}
       </div>
     </div>
   )

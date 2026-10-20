@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Pagination, Popover, Select, Table, Tag, TreeSelect, message } from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, DatePicker, Form, Input, Pagination, Popover, Select, Table, Tag, Tooltip, TreeSelect, message } from 'antd'
 import type { Dayjs } from 'dayjs'
-import type { DataNode } from 'antd/es/tree'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -25,12 +24,9 @@ import { fetchDepartments, type DepartmentItem } from '../../api/department'
 const QUOTA_TYPE_LABEL: Record<string, string> = { token: 'tokens', request: 'requests', currency: '元' }
 const QUOTA_PERIOD_LABEL: Record<string, string> = { daily: '日', monthly: '月' }
 
-/** 額度狀態篩選選項 */
-const QUOTA_STATUS_OPTIONS: { label: string; value: QuotaStatus }[] = [
-  { label: '正常', value: 'normal' },
-  { label: '已用完', value: 'exhausted' },
-  { label: '凍結', value: 'frozen' },
-]
+/** 額度狀態篩選選項：由標籤映射派生，避免新增狀態時漏配筛选项 */
+const QUOTA_STATUS_OPTIONS: { label: string; value: QuotaStatus }[] =
+  (Object.entries(QUOTA_STATUS_LABEL) as [QuotaStatus, string][]).map(([value, label]) => ({ label, value }))
 
 /** 來源篩選選項 */
 const SOURCE_OPTIONS: { label: string; value: PermissionSource }[] = [
@@ -61,16 +57,23 @@ function groupQuotas(grants: EmpQuotaGrant[]): QuotaGroup[] {
 
 /* ══════════ 部門樹 ══════════ */
 
-/** 構建 TreeSelect 用的樹形數據 */
-function buildDeptTreeData(depts: DepartmentItem[]): DataNode[] {
-  const nodeMap = new Map<number, DataNode>()
-  depts.forEach((d) => nodeMap.set(d.id, { key: d.id, title: d.name, children: [] }))
-  const roots: DataNode[] = []
+/**
+ * 部门树节点。
+ *
+ * TreeSelect 要求 key 与 value 一致，只给 key 会整棵树刷出
+ * 「TreeNode `value` is invalidate: undefined」警告（实测 34 条）。
+ */
+type DeptTreeNode = { key: number; value: number; title: string; children: DeptTreeNode[] }
+
+function buildDeptTreeData(depts: DepartmentItem[]): DeptTreeNode[] {
+  const nodeMap = new Map<number, DeptTreeNode>()
+  depts.forEach((d) => nodeMap.set(d.id, { key: d.id, value: d.id, title: d.name, children: [] }))
+  const roots: DeptTreeNode[] = []
   depts.forEach((d) => {
     const node = nodeMap.get(d.id)!
     if (d.parentId != null) {
       const parent = nodeMap.get(d.parentId)
-      if (parent) parent.children!.push(node)
+      if (parent) parent.children.push(node)
     } else {
       roots.push(node)
     }
@@ -108,7 +111,18 @@ export default function AiEmpPermission() {
     updatedBy: '', updateTime: null as [Dayjs, Dayjs] | null,
   })
 
+  /**
+   * 已落定（成功或已提示失败）的查询条件快照。
+   * `applied` 只在用户查询/重置时才新建对象，因此它的引用天然就是条件代次：
+   * StrictMode 双发与用户连点共用同一引用，同一条件下只认第一个落定的结果。
+   */
+  const landedAppliedRef = useRef<typeof applied | null>(null)
+  /** 最新一次发出的请求所对应的条件（用于丢弃旧条件的迟到响应） */
+  const latestAppliedRef = useRef(applied)
+
   const reload = useCallback(() => {
+    const snapshot = applied
+    latestAppliedRef.current = snapshot
     setLoading(true)
     fetchEmpPermissionList({
       queryName: applied.name || undefined,
@@ -117,8 +131,21 @@ export default function AiEmpPermission() {
       queryUpdateTimeStart: applied.updateTime?.[0]?.format('YYYY-MM-DD') ?? undefined,
       queryUpdateTimeEnd: applied.updateTime?.[1]?.format('YYYY-MM-DD') ?? undefined,
     })
-      .then(setData)
-      .catch(() => { message.error('加載數據失敗'); setData([]) })
+      .then((rows) => {
+        // 条件已被更新的查询取代：丢弃旧响应，不得把新结果打回去
+        if (latestAppliedRef.current !== snapshot) return
+        // 同一条件已有结果时，后到的重复响应不再覆盖
+        if (landedAppliedRef.current === snapshot) return
+        landedAppliedRef.current = snapshot
+        setData(rows)
+      })
+      .catch(() => {
+        if (latestAppliedRef.current !== snapshot) return
+        // 本条件已成功落库：迟到的超时/失败不得清空数据，也不该再弹错误提示
+        if (landedAppliedRef.current === snapshot) return
+        landedAppliedRef.current = snapshot
+        message.error('加載數據失敗')
+      })
       .finally(() => setLoading(false))
   }, [applied])
 
@@ -128,12 +155,17 @@ export default function AiEmpPermission() {
     fetchDepartments().then(setDepartments).catch(() => {})
   }, [])
 
-  const handleSearch = () => setApplied({
-    name: queryName.trim(), dept: queryDept,
-    source: querySource, quotaStatus: queryQuotaStatus,
-    updatedBy: queryUpdatedBy.trim(), updateTime: queryUpdateTime,
-  })
+  const handleSearch = () => {
+    // 换筛选条件必须回到第一页，否则会停在旧页码上看到「没有数据」
+    setPage(1)
+    setApplied({
+      name: queryName.trim(), dept: queryDept,
+      source: querySource, quotaStatus: queryQuotaStatus,
+      updatedBy: queryUpdatedBy.trim(), updateTime: queryUpdateTime,
+    })
+  }
   const handleReset = () => {
+    setPage(1)
     setQueryName(''); setQueryDept(undefined); setQuerySource(undefined); setQueryQuotaStatus(undefined)
     setQueryUpdatedBy(''); setQueryUpdateTime(null)
     setApplied({ name: '', dept: undefined, source: undefined, quotaStatus: undefined, updatedBy: '', updateTime: null })
@@ -257,7 +289,11 @@ export default function AiEmpPermission() {
       title: '額度狀態', key: 'quotaStatus', width: 100, align: 'center',
       render: (_, r) => {
         const status = calcQuotaStatus(r.quotaGrants)
-        return <Tag color={QUOTA_STATUS_COLOR[status]}>{QUOTA_STATUS_LABEL[status]}</Tag>
+        const tag = <Tag color={QUOTA_STATUS_COLOR[status]}>{QUOTA_STATUS_LABEL[status]}</Tag>
+        // 「未授予額度」极易被读成「用不了」，补一句短说明区分于后端的放行口径
+        return status === 'ungranted'
+          ? <Tooltip title="未配置任何額度；系統當前對該員工不按額度攔截"><span>{tag}</span></Tooltip>
+          : tag
       },
     },
     {
@@ -302,6 +338,12 @@ export default function AiEmpPermission() {
   /* ── 分頁 ── */
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
+  /** 当前页切片：表格必须吃切片后的数据，否则分页器只改页码而永远渲染全量 */
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
+  )
 
   return (
     <div className="content-area">
@@ -392,7 +434,7 @@ export default function AiEmpPermission() {
         <Table<EmpPermissionSummary>
           rowKey="employeeId"
           columns={columns}
-          dataSource={filtered}
+          dataSource={paged}
           rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}
           loading={loading}
           pagination={false}

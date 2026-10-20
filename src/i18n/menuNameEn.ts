@@ -137,7 +137,6 @@ export const MENU_NAME_EN: Record<string, string> = {
   'version-history': 'Version History',
   'ai-assistant': 'AI Center (AI)',
   'ai_model_hub': 'Model Access',
-  'ai_quota_auth': 'Authorization & Quota',
   'ai-operation-auth': 'AI Access Control',
   'ai_usage_stats': 'Energy Statistics',
   'ai_energy_detail': 'Energy Detail',

@@ -12,7 +12,9 @@
  *      我发起的与我被邀请的会议一并列在其中；
  *   3. 只要会议没开始（phase=pending），参会人就能确认或婉拒参会，且开始前可改表态：
  *      后端 respond 接口本就允许覆盖响应，前端只收窄按钮展示窗口、不放宽；
- *   4. 取消必填原因，写入审计并附在通知里。
+ *   4. 取消必填原因，写入审计并附在通知里；
+ *   5. 纪要么入口与详情页同一口径（deriveCanRecordMinutes）：已进入或已收尾的相关会议才给按钮，
+ *      已录入过的直接跳查看页，避免两个页面对同一场会给出不同结论。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tabs, Tag, message } from 'antd'
@@ -37,6 +39,8 @@ import {
   type MeetingVO,
 } from '../../../api/meeting'
 import { phaseMeta, statusMeta } from '../meetingMeta'
+import { useAuth } from '../../../contexts/AuthContext'
+import { deriveCanRecordMinutes, hasMinutesRecord, minutesPathOf } from '../MeetingMinutes/minutesAccess'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -83,6 +87,12 @@ const COLUMN_META = (t: TFunction) => [
 export default function MyMeeting() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
+  /** 纪要入口能力：员工侧给自己的会记纪要，行政侧可代录（与详情页同一口径） */
+  const minutesCapability = {
+    canRecordOwn: hasPermission('meeting-my:edit'),
+    canManageRecords: hasPermission('meeting-record:edit'),
+  }
   const [summary, setSummary] = useState({ todayCount: 0, upcomingCount: 0, pendingResponseCount: 0 })
   // 默认 Tab 为「我參與的」：我发起的与我被邀请的会议一并列在其中，不再单设「待我響應」入口
   const [tab, setTab] = useState<'mine' | 'attended' | 'done'>('attended')
@@ -301,6 +311,14 @@ export default function MyMeeting() {
     // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作（取消）在最后
     <Space size={0} wrap split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
+      {/* 纪要：已录入跳查看页，未录入跳录入页；按钮位不变，文案随状态变 */}
+      {deriveCanRecordMinutes(record, minutesCapability) && (
+        <Button type="link" size="small" onClick={() => navigate(minutesPathOf(record))}>
+          {hasMinutesRecord(record)
+            ? t('meeting.minutes.viewShort', { defaultValue: '查看紀要' })
+            : t('meeting.minutes.recordShort', { defaultValue: '錄入紀要' })}
+        </Button>
+      )}
       {/* 没开始就能确认或婉拒，且开始前可改表态：只看 phase，不看已有响应 */}
       {record.myRole !== 'organizer' && record.myRole !== 'none' && record.phase === 'pending' && (
         <>
@@ -369,7 +387,7 @@ export default function MyMeeting() {
       },
     },
     {
-      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 300, fixed: 'right',
+      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 340, fixed: 'right',
       render: (_, record) => renderActions(record),
     },
   ]

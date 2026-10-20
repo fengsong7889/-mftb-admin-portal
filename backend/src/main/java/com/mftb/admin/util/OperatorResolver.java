@@ -36,6 +36,16 @@ public class OperatorResolver {
         return user != null && StringUtils.hasText(user.getName()) ? user.getName() : extractUsername();
     }
 
+    /**
+     * 当前登录账号（{@code sys_user.username}，即工号）。
+     * <p>凡是要写进「账号口径」的数据——AI 通道白名单匹配、用量记账 username、审计 actor——
+     * 必须用本方法，而不是 {@link #currentOperatorName()}：白名单登记的是登录账号，
+     * {@code biz_llm_usage} 又按 username join 员工表补姓名，用显示名会两者都对不上。
+     */
+    public String currentOperatorAccount() {
+        return extractUsername();
+    }
+
     /** 当前登录用户实体, 未登录返回 null（优先复用 Filter 已查的缓存，避免重复查库） */
     public SysUser currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

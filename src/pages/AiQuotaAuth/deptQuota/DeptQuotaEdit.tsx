@@ -319,10 +319,11 @@ export default function DeptQuotaEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
+                {/* t() 无法插值 React 元素（会渲染成 [object Object]），且 count 是 i18next 复数保留字，只能传纯值 */}
                 {t('aiQuotaAuth.deptsCount', {
-                                  count: <strong>{selectedDeptIds.length}</strong>,
-                                  empCount: <strong>{selectedEmployeeCount}</strong>,
-                                })}
+                  count: selectedDeptIds.length,
+                  empCount: selectedEmployeeCount,
+                })}
               </div>
             </div>
           </div>

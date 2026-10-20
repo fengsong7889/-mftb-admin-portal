@@ -26,9 +26,9 @@ export const MODEL_TYPE_LABEL: Record<ModelType, string> = {
 /** 模态标签颜色 */
 export const MODALITY_TAG: Record<Modality, { color: string; label: string }> = {
   text: { color: 'blue', label: '文本' },
-  image: { color: 'purple', label: '图像' },
+  image: { color: 'purple', label: '圖像' },
   audio: { color: 'cyan', label: '音频' },
-  video: { color: 'magenta', label: '视频' },
+  video: { color: 'magenta', label: '視频' },
 }
 
 /** API 兼容格式标签 */
@@ -79,7 +79,7 @@ export const CapabilityTag = ({ enabled, icon, label, color }: { enabled: boolea
 /** 能力矩阵胶囊组 */
 export const CapabilityMatrix = ({ model }: { model: AiModel }) => (
   <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 0 }}>
-    <CapabilityTag enabled={!!model.visionSupport} icon={<EyeOutlined />} label="视觉" color="#722ED1" />
+    <CapabilityTag enabled={!!model.visionSupport} icon={<EyeOutlined />} label="視覺" color="#722ED1" />
     <CapabilityTag enabled={!!model.functionCalling} icon={<ToolOutlined />} label="工具" color="#1890FF" />
     <CapabilityTag enabled={!!model.jsonMode} icon={<CodeOutlined />} label="JSON" color="#13C2C2" />
     <CapabilityTag enabled={!!model.streaming} icon={<ThunderboltOutlined />} label="流式" color="#52C41A" />

@@ -166,7 +166,7 @@ export default function QuotaConfigSection({
         <div style={{ fontSize: 12, fontWeight: 600, color: '#E8720C', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretTitle')}</div>
         <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.9 }}>
           {interpretPrefix}
-          <div>· {t('aiQuotaAuth.quotaAlertLabel')}：{t('aiQuotaAuth.quotaAlertText', { percent: <strong style={{ color: '#FAAD14' }}>{softThreshold ?? 80}</strong> })}</div>
+          <div>· {t('aiQuotaAuth.quotaAlertLabel')}：{t('aiQuotaAuth.quotaAlertText', { percent: softThreshold ?? 80 })}</div>
           <div>· {t('aiQuotaAuth.quotaOverLabel')}：<strong style={{ color: '#FF4D4F' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong>
             {overLimitAction === 'downgrade' ? t('aiQuotaAuth.quotaOverDowngrade') : ''}</div>
         </div>

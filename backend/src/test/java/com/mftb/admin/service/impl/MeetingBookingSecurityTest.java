@@ -14,6 +14,7 @@ import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.mapper.MeetingEventMapper;
+import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.MeetingNotifyLogMapper;
 import com.mftb.admin.mapper.MeetingRoomMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -68,6 +69,7 @@ class MeetingBookingSecurityTest {
     private MeetingAttendeeMapper attendeeMapper;
     private MeetingEventMapper eventMapper;
     private MeetingNotifyLogMapper notifyMapper;
+    private MeetingMinutesMapper minutesMapper;
     private SysUserMapper userMapper;
     private MeetingAccessGuard guard;
     private MeetingRuleService ruleService;
@@ -158,6 +160,7 @@ class MeetingBookingSecurityTest {
         attendeeMapper = mock(MeetingAttendeeMapper.class);
         eventMapper = mock(MeetingEventMapper.class);
         notifyMapper = mock(MeetingNotifyLogMapper.class);
+        minutesMapper = mock(MeetingMinutesMapper.class);
         userMapper = mock(SysUserMapper.class);
         guard = mock(MeetingAccessGuard.class);
         ruleService = mock(MeetingRuleService.class);
@@ -166,7 +169,7 @@ class MeetingBookingSecurityTest {
         blacklistService = mock(MeetingBlacklistService.class);
         bizSeqService = mock(BizSeqService.class);
         service = new MeetingBookingServiceImpl(bookingMapper, roomMapper, attendeeMapper, eventMapper,
-                notifyMapper, userMapper, guard, ruleService, auditRecorder, notifyDispatcher,
+                notifyMapper, minutesMapper, userMapper, guard, ruleService, auditRecorder, notifyDispatcher,
                 blacklistService, bizSeqService);
 
         ADMIN.setRole("admin");

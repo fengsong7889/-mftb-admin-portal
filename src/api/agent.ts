@@ -29,6 +29,17 @@ export interface ChatMessage {
   content: string
   attachments?: ChatAttachment[]
   timestamp: Date
+  /**
+   * 错误提示气泡（熔断/无权/额度/超时），仅当轮展示。
+   * 不写入会话历史、也不作为下一轮上下文：否则一条超时文案会被模型当成历史继续背，
+   * 导致该会话后续每轮都越拖越慢甚至必挂。
+   */
+  isError?: boolean
+  /**
+   * 本轮服务端实际调用的内建工具（仅当轮展示，不写入会话历史）。
+   * 与 isError 同理：它们是渲染用的元信息，不是对话内容。
+   */
+  toolTraces?: ToolTrace[]
 }
 
 /** auto=后端按单价值最优选通道；primary/off-peak=显式固定 */
@@ -42,10 +53,28 @@ export interface LlmRequestOptions {
   conversationPk?: number
 }
 
+/** 服务端已执行的内建工具痕迹（与 OrchestrateResult.traces 同构） */
+export interface ToolTrace {
+  toolKey: string
+  elapsedMs: number
+  success: boolean
+}
+
 export interface AgentReply {
   text: string
   model: string
   tokens: number
+  /**
+   * 后端标记本轮为异常提示而非 AI 回复（no_channel / no_model_auth / quota_reject /
+   * timeout / missing_key / upstream_http / network ...）。
+   * 调用方必须按错误态展示，不能把它当助手回复存进会话。
+   */
+  errorKind?: string
+  /**
+   * 本轮真正调用过的内建工具。UI 必须展示：“查到了但界面什么也没说”会让用户以为 AI 在编数据，
+   * 而审计事件里其实已有 TOOL_CALL/TOOL_RESULT。
+   */
+  traces?: ToolTrace[]
 }
 
 /* ────────────────── 引擎模式持久化（仅前端选择） ────────────────── */
@@ -67,6 +96,8 @@ interface OrchestrateResponse {
   text: string | null
   model: string | null
   tokens: number
+  errorKind?: string | null
+  traces?: { toolKey: string; argsDigest?: string; elapsedMs: number; success: boolean }[]
   pendingExternalCalls?: { id: string; name: string; argumentsJson: string }[]
   nextMessages?: unknown[]
 }
@@ -79,9 +110,13 @@ function buildOrchestrateHeaders(): Record<string, string> {
   return headers
 }
 
-/** 将最近 10 条前端消息映射为 OpenAI Chat 消息数组（图片走多模态、文件走文本附加） */
+/**
+ * 将最近 10 条前端消息映射为 OpenAI Chat 消息数组（图片走多模态、文件走文本附加）。
+ * <p>错误提示气泡（isError）必须先剔除：它们是人看的提示，不是模型说过的话，
+ * 留在上下文里会让模型模仿错误文案、也会白白撑大 prompt。
+ */
 function toOrchestratorMessages(history: ChatMessage[]): unknown[] {
-  return history.slice(-10).map((m) => {
+  return history.filter((m) => !m.isError).slice(-10).map((m) => {
     if (m.role === 'user' && m.attachments?.length) {
       const images = m.attachments.filter((a) => a.type === 'image' && a.data.startsWith('data:'))
       const files = m.attachments.filter((a) => a.type === 'file' && a.data)
@@ -183,17 +218,27 @@ export async function sendAgentMessage(
   let messages: unknown[] = toOrchestratorMessages(history)
   let totalTokens = 0
   let lastModel = ''
+  const traces: ToolTrace[] = []
   try {
     for (let hop = 0; hop <= MAX_EXTERNAL_HOPS; hop++) {
       const resp = await callOrchestrate(messages, opts, mode)
       totalTokens += resp.tokens ?? 0
       if (resp.model) lastModel = resp.model
+      // 汇总每一轮的内建工具痕迹（多轮工具循环会分批返回）
+      if (resp.traces?.length) {
+        for (const t of resp.traces) {
+          traces.push({ toolKey: t.toolKey, elapsedMs: t.elapsedMs ?? 0, success: t.success !== false })
+        }
+      }
       const pendings = resp.pendingExternalCalls ?? []
       if (pendings.length === 0) {
         return {
           text: resp.text || '抱歉，我不太理解你的意思，請嘗試更具體地描述。',
           model: lastModel,
           tokens: totalTokens,
+          traces,
+          // 后端的错误标记必须透传给调用方：错误提示不能当助手回复入库
+          ...(resp.errorKind ? { errorKind: resp.errorKind } : {}),
         }
       }
       // 用后端返回的 nextMessages（含 assistant.tool_calls）作为基线，追加真实 tool 结果
@@ -208,11 +253,13 @@ export async function sendAgentMessage(
       text: '查詢完成，但外部工具調用次數超過上限，請簡化請求後重試。',
       model: lastModel,
       tokens: totalTokens,
+      traces,
+      errorKind: 'external_tool_rounds_exceeded',
     }
   } catch (err) {
     console.error('[Agent Error]', err)
     const msg = err instanceof Error ? err.message : String(err)
-    return { text: `⚠️ AI 服務異常：${msg}`, model: lastModel, tokens: totalTokens }
+    return { text: `⚠️ AI 服務異常：${msg}`, model: lastModel, tokens: totalTokens, traces, errorKind: 'client_error' }
   }
 }
 
@@ -226,6 +273,10 @@ export interface LlmEngineStatus {
   account?: string
   /** 当前账号被限制的通道（primary/off-peak），后端基于 sys_config 白名单推导 */
   denied?: string[]
+  /** 服务端全局熍断态：不透出来时，急停期间首页仍会显示「在線」 */
+  killSwitch?: boolean
+  /** 不可用原因（ok=false 时）：no_api_key / account_restricted / no_model_auth / no_provider */
+  reason?: string
 }
 
 export async function fetchEngineStatus(): Promise<LlmEngineStatus | null> {

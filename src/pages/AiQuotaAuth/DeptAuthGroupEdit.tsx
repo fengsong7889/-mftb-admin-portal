@@ -435,10 +435,11 @@ export default function DeptAuthGroupEdit() {
                 padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
                 borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
               }}>
-                                {t('aiQuotaAuth.deptsCount', {
-                                  count: <strong>{selectedDeptIds.length}</strong>,
-                                  empCount: <strong>{selectedEmployeeCount}</strong>,
-                                })}
+                                {/* 与 DeptQuotaEdit 同一复制粘贴缺陷：t() 不能插值 React 元素，count 为 i18next 保留字 */}
+                {t('aiQuotaAuth.deptsCount', {
+                  count: selectedDeptIds.length,
+                  empCount: selectedEmployeeCount,
+                })}
               </div>
             </div>
           </div>

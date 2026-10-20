@@ -16,6 +16,8 @@ import {
 import { fetchUsageSummary } from '../../api/llmUsage'
 import type { UsageSummary, UsageModelRow, UsageUserRow, CostEntry } from '../../api/llmUsage'
 import AnimatedNumber from '../../components/AnimatedNumber'
+import { tablePagination, costDecimals } from '../../utils/tableDisplay'
+
 
 const { RangePicker } = DatePicker
 
@@ -139,12 +141,19 @@ export default function AiUsageStats() {
     { label: '輸出 Tokens', value: <AnimatedNumber value={summary?.totalCompletionTokens ?? 0} />, icon: <ApiOutlined />, color: '#E8720C', bg: '#FFF7E6' },
     {
       label: '總費用（分幣種）',
+      // AI 单次问答费用常在 0.001~0.01 元量级，固定 2 位小数会把有真实消耗的数字显示成 ¥0.00，
+      // 看起来像“免费”；按量级自适应到 4 位（≥1 元仍保留 2 位）。
       value: totalCosts.length === 0
         ? <AnimatedNumber value={0} decimals={2} />
         : (
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {totalCosts.map((entry) => (
-              <AnimatedNumber key={entry.currency || 'none'} value={entry.cost} prefix={currencySymbol(entry.currency)} decimals={2} />
+              <AnimatedNumber
+                key={entry.currency || 'none'}
+                value={entry.cost}
+                prefix={currencySymbol(entry.currency)}
+                decimals={costDecimals(entry.cost)}
+              />
             ))}
           </span>
         ),
@@ -222,7 +231,7 @@ export default function AiUsageStats() {
         loading={loading}
         columns={modelColumns}
         dataSource={summary?.byModel ?? []}
-        pagination={false}
+        pagination={tablePagination(t)}
       />
 
       {/* 按員工消耗匯總 */}
@@ -233,7 +242,7 @@ export default function AiUsageStats() {
         loading={loading}
         columns={userColumns}
         dataSource={summary?.byUser ?? []}
-        pagination={false}
+        pagination={tablePagination(t)}
       />
     </div>
   )

@@ -39,6 +39,12 @@ public class LlmChannelRouter {
     private final ProviderKeyCipher keyCipher;
     private final SysConfigService sysConfigService;
 
+    /** 白名单拒用（账号不在受限名单）/ 无可用供应商的区分原因，供 /api/agent/status 回给前端定位问题。 */
+    public static final String REASON_OK = "ok";
+    public static final String REASON_ACCOUNT_RESTRICTED = "account_restricted";
+    public static final String REASON_NO_PROVIDER = "no_provider";
+    public static final String REASON_NO_API_KEY = "no_api_key";
+
     @Data
     public static class Channel {
         private String label;
@@ -51,6 +57,24 @@ public class LlmChannelRouter {
         private String currency;
     }
 
+    /**
+     * 通道诊断：返回 {@code ok} 或不可用原因，给管理端状态接口做「到底是账号无权、还是供应商没配 Key」的区分。
+     * <p>旧行为只回 ok=true/false：API Key 为空时也算可用，用户一路点到问答才看到「服務暫時不可用」。
+     */
+    public String diagnose(String channelLabel, String username) {
+        if (!isChannelAllowed(channelLabel, username)) {
+            return REASON_ACCOUNT_RESTRICTED;
+        }
+        AiProvider provider = findProviderByChannel(channelLabel);
+        if (provider == null) {
+            return REASON_NO_PROVIDER;
+        }
+        if (!StringUtils.hasText(provider.getApiKey()) || !StringUtils.hasText(keyCipher.decrypt(provider.getApiKey()))) {
+            return REASON_NO_API_KEY;
+        }
+        return REASON_OK;
+    }
+
     public boolean isChannelAllowed(String channel, String username) {
         List<String> accounts = loadAccounts(channel);
         if (accounts.isEmpty()) return true;
@@ -61,11 +85,14 @@ public class LlmChannelRouter {
         if (!isChannelAllowed(channelLabel, username)) return null;
         AiProvider provider = findProviderByChannel(channelLabel);
         if (provider == null) return null;
+        // 没有可用 Key 的通道不能当「可用」交给上游：以前空 Key 照样放行，导致 status 报可用而问答必挂
+        String apiKey = StringUtils.hasText(provider.getApiKey()) ? keyCipher.decrypt(provider.getApiKey()) : null;
+        if (!StringUtils.hasText(apiKey)) return null;
         AiModel model = findModelByProvider(provider.getId());
         Channel ch = new Channel();
         ch.setLabel(channelLabel);
         ch.setBaseUrl(provider.getApiUrlBase());
-        ch.setApiKey(StringUtils.hasText(provider.getApiKey()) ? keyCipher.decrypt(provider.getApiKey()) : null);
+        ch.setApiKey(apiKey);
         if (model != null) {
             ch.setDefaultModelKey(model.getModelKey());
             ch.setInputPrice(model.getInputPrice());

@@ -19,7 +19,9 @@ import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
 import TodayMeetingCard from './TodayMeetingCard'
-import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, formatAiText, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import AiRichText from './AiRichText'
+import HelpPopover from '../../components/HelpPopover'
 import type { AiBlockReason } from './homeUtils'
 import {
   SearchOutlined,
@@ -52,12 +54,13 @@ import {
   CheckOutlined,
   UndoOutlined,
   CompressOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
 import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
 import { fetchMyQuotaUsage, fetchMyModels, fetchQuotaCheck, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
 import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource, QuotaCheckResult } from '../../api/aiMyCenter'
-import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation } from '../../api/aiConversation'
+import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation, serializeChatMessages, parseConversation } from '../../api/aiConversation'
 import type { AiConversation } from '../../api/aiConversation'
 import type { Conversation } from '../../api/aiConversation'
 import './index.css'
@@ -115,6 +118,13 @@ const ENGINE_LABELS: Record<string, string> = {
   'deepseek-v4-pro': 'DS Pro',
 }
 
+/** 内建工具 toolKey → i18n 展示名（与后端 AgentTool.toolKey 同名） */
+const TOOL_NAME_KEYS: Record<string, string> = {
+  query_account_balance: 'home.toolNameAccountBalance',
+  query_approvals: 'home.toolNameApprovals',
+  query_batches: 'home.toolNameBatches',
+}
+
 
 
 /** 未開通原因 → Hero 引導卡標題 i18n key（標題直接突出缺失項） */
@@ -124,6 +134,7 @@ const BLOCKED_TITLE_KEY: Record<AiBlockReason, string> = {
   'no-both': 'home.aiBlockedNoBothTitle',
   'quota-exhausted': 'home.aiQuotaExhaustedTitle',
   'needs-approval': 'home.aiNeedsApprovalTitle',
+  'check-failed': 'home.aiCheckFailedTitle',
 }
 
 /** 未開通原因 → Hero 引導卡描述 i18n key */
@@ -133,6 +144,7 @@ const BLOCKED_DESC_KEY: Record<AiBlockReason, string> = {
   'no-both': 'home.aiBlockedNoBothDesc',
   'quota-exhausted': 'home.aiQuotaExhaustedDesc',
   'needs-approval': 'home.aiNeedsApprovalDesc',
+  'check-failed': 'home.aiCheckFailedDesc',
 }
 
 /** 未開通原因 → 模型選擇下拉面板標題/描述 i18n key */
@@ -142,6 +154,7 @@ const ENGINE_PANEL_TITLE_KEY: Record<AiBlockReason, string> = {
   'no-both': 'home.enginePanelNoBothTitle',
   'quota-exhausted': 'home.aiQuotaExhaustedTitle',
   'needs-approval': 'home.aiNeedsApprovalTitle',
+  'check-failed': 'home.aiCheckFailedTitle',
 }
 const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
   'no-models': 'home.enginePanelNoModelsDesc',
@@ -149,6 +162,7 @@ const ENGINE_PANEL_DESC_KEY: Record<AiBlockReason, string> = {
   'no-both': 'home.enginePanelNoBothDesc',
   'quota-exhausted': 'home.aiQuotaExhaustedDesc',
   'needs-approval': 'home.aiNeedsApprovalDesc',
+  'check-failed': 'home.aiCheckFailedDesc',
 }
 
 
@@ -223,24 +237,9 @@ export default function Home() {
     let cancelled = false
     fetchConversations().then((list) => {
       if (cancelled) return
-      const parsed = list.map((c) => {
-        // 复用 parseConversation 逻辑
-        let msgs: ChatMessage[] = []
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const raw: any[] = JSON.parse(c.messages)
-          if (Array.isArray(raw)) {
-            msgs = raw.map((m) => ({
-              id: m.id as string,
-              role: m.role as 'user' | 'assistant',
-              content: m.content as string,
-              attachments: m.attachments as ChatAttachment[] | undefined,
-              timestamp: m.timestamp ? new Date(m.timestamp as string) : new Date(),
-            }))
-          }
-        } catch { /* 损坏数据回退空 */ }
-        return { id: c.id, title: c.title, messages: msgs, totalTokens: c.totalTokens ?? 0, createdAt: c.createdAt, updatedAt: c.updatedAt } as Conversation
-      })
+      // 必须走 parseConversation：以前这里自己手写了一遍字段列表（注释还写着“复用”），
+      // 新增 toolTraces 后只有这条路径没加，导致刷新时工具痕迹被静默丢弃（实测字段比对报出）
+      const parsed = list.map((c) => parseConversation(c))
       setConversations(parsed)
       // 默认激活最新会话，若无则自动创建一个
       if (parsed.length > 0) {
@@ -370,8 +369,11 @@ export default function Home() {
     })
   }
 
-  /** 更新活跃会话的消息（debounce 保存到后端） */
-  const updateActiveMessages = useCallback((updater: (prev: ChatMessage[]) => ChatMessage[]) => {
+  /** 更新活跃会话的消息（debounce 保存到后端；opts.immediate 用于回复完成那一轮，不等防抖窗口） */
+  const updateActiveMessages = useCallback((
+    updater: (prev: ChatMessage[]) => ChatMessage[],
+    opts?: { immediate?: boolean },
+  ) => {
     setConversations((prev) => {
       const idx = prev.findIndex((c) => c.id === activeConvId)
       if (idx === -1) return prev
@@ -383,20 +385,15 @@ export default function Home() {
         if (firstUser) conv.title = firstUser.content.slice(0, 20) + (firstUser.content.length > 20 ? '...' : '')
       }
       updated[idx] = conv
-      // debounce 保存到后端
+      // debounce 保存到后端；回复完成那一轮要立即落库，不能等 2 秒：
+      // 实测用户在回复后 2 秒内刷新时，最后一条 assistant 消息（含工具痕迹）会丢
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         updateConversation(conv.id, {
           title: conv.title,
-          messages: JSON.stringify(conv.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            attachments: m.attachments,
-            timestamp: m.timestamp.toISOString(),
-          }))),
+          messages: serializeChatMessages(conv.messages),
         }).catch(() => { /* 静默失败 */ })
-      }, 2000)
+      }, opts?.immediate ? 0 : 2000)
       return updated
     })
   }, [activeConvId])
@@ -429,6 +426,8 @@ export default function Home() {
   /* ── 配額校驗結果（後端綜合所有維度給出處置動作） ── */
   const [quotaCheck, setQuotaCheck] = useState<QuotaCheckResult | null>(null)
   const [quotaCheckLoaded, setQuotaCheckLoaded] = useState(false)
+  /** 额度校验接口本身是否失败（且从未拿到任何结果）——驱动 fail-closed 拦截态 */
+  const [quotaCheckFailed, setQuotaCheckFailed] = useState(false)
 
   /** 打開「我的用量」抽屜（每次打開重新拉取，與能耗統計同源） */
   const handleOpenUsage = () => {
@@ -480,15 +479,21 @@ export default function Home() {
     }
     // 后端配额校验结果优先（已加载时以服务端结论为准）
     if (quotaCheckLoaded && quotaCheck) {
-      if (quotaCheck.action === 'reject') return 'quota-exhausted'
+      if (quotaCheck.action === 'reject') {
+        // quotaConfigured=false：从未配过额度，引导去「AI 使用申請」；
+        // 否则是已有额度但用完了，引导申请加量。两种文案不能混。
+        return quotaCheck.quotaConfigured === false ? 'no-quota' : 'quota-exhausted'
+      }
       if (quotaCheck.action === 'approve') return 'needs-approval'
       // downgrade / allow → 不阻塞
       return null
     }
+    // 校验接口本身失败且从未拿到任何结果 → fail-closed，不得静默当作可用
+    if (quotaCheckFailed && !quotaCheckLoaded) return 'check-failed'
     // 后端未返回时，前端兆底判定
     if (noQuota) return 'no-quota'
     return quotaExhaustedFallback ? 'quota-exhausted' : null
-  }, [noModels, noQuota, quotaCheckLoaded, quotaCheck, quotaExhaustedFallback])
+  }, [noModels, noQuota, quotaCheckLoaded, quotaCheck, quotaCheckFailed, quotaExhaustedFallback])
   const aiBlocked = blockReason !== null
 
   /** 定時刷新引擎路由結果（手動切換 / 代理重啟後同步到膠囊） */
@@ -616,18 +621,24 @@ export default function Home() {
     return () => { cancelled = true }
   }, [])
 
-  /** 初始加載配額校驗（綜合所有維度給出處置動作） + 定時刷新 */
-  useEffect(() => {
-    let cancelled = false
-    const load = () => {
-      fetchQuotaCheck().then((result) => {
-        if (!cancelled) { setQuotaCheck(result); setQuotaCheckLoaded(true) }
-      }).catch(() => { /* 靜默失敗，前端兆底兜底 */ })
-    }
-    load()
-    const timer = setInterval(load, 60000)
-    return () => { cancelled = true; clearInterval(timer) }
+  /**
+   * 额度校验拉取（综合所有维度给出处置动作），供首屏、60s 轮询与手动重试共用。
+   *
+   * 失败时必须置 quotaCheckFailed：旧实现只留一行注释就静默吞掉错误，
+   * 使 blockReason 落到 `return null` 的 fail-open 分支——后端已经会拒，但界面看起来可用，
+   * 用户敲下去才报错。成功时才清位，避免 60s 轮询开始时闪一下未拦截态。
+   */
+  const loadQuotaCheck = useCallback(() => {
+    fetchQuotaCheck()
+      .then((result) => { setQuotaCheck(result); setQuotaCheckLoaded(true); setQuotaCheckFailed(false) })
+      .catch(() => { setQuotaCheckFailed(true) })
   }, [])
+
+  useEffect(() => {
+    loadQuotaCheck()
+    const timer = setInterval(loadQuotaCheck, 60000)
+    return () => clearInterval(timer)
+  }, [loadQuotaCheck])
 
   const menuList = useMemo(() => {
     // 空导航是有效结果；加载中或失败时不回退到全量菜单，避免串入其他系统。
@@ -659,6 +670,12 @@ export default function Home() {
   const engineModeLabel = (mode: LlmEngineMode): string => {
     if (mode === 'auto') return t('home.engineCostSaving')
     return modelDisplayName(modeModelKey(mode)) ?? mode
+  }
+
+  /** 内建工具 toolKey → 展示名（工具气泡用）；未登记的工具直接显示原 key，不编造名字 */
+  const toolDisplayName = (key: string): string => {
+    const labelKey = TOOL_NAME_KEYS[key]
+    return labelKey ? t(labelKey) : key
   }
 
   /** 模型展示名：優先授權模型清單，其次縮寫映射，最後原始標識 */
@@ -800,9 +817,12 @@ export default function Home() {
         role: 'assistant',
         content: reply.text,
         timestamp: new Date(),
-      }])
+        // 后端标记为异常提示（无权/额度/超时/熔断）时：按错误态展示且不入库、不进上下文
+        isError: !!reply.errorKind,
+        toolTraces: reply.traces,
+      }], { immediate: true })
       // 累积 tokens 并更新会话
-      if (activeConvId) {
+      if (activeConvId && !reply.errorKind) {
         setConversations((prev) => prev.map((c) =>
           c.id === activeConvId ? { ...c, totalTokens: (c.totalTokens ?? 0) + reply.tokens } : c
         ))
@@ -818,6 +838,7 @@ export default function Home() {
         role: 'assistant',
         content: t('home.aiServiceError'),
         timestamp: new Date(),
+        isError: true,
       }])
     } finally {
       setSending(false)
@@ -863,10 +884,7 @@ export default function Home() {
       c.id === activeConvId ? { ...c, totalTokens: estimatedTokens, messages: compressed } : c
     ))
     updateConversation(activeConvId, {
-      messages: JSON.stringify(compressed.map((m) => ({
-        ...m,
-        timestamp: m.timestamp.toISOString(),
-      }))),
+      messages: serializeChatMessages(compressed),
       totalTokens: estimatedTokens,
     }).catch(() => {})
     message.success(t('home.convCompressed'))
@@ -991,9 +1009,11 @@ export default function Home() {
         role: 'assistant',
         content: reply.text,
         timestamp: new Date(),
-      }])
+        isError: !!reply.errorKind,
+        toolTraces: reply.traces,
+      }], { immediate: true })
       // 累积 tokens
-      if (activeConvId) {
+      if (activeConvId && !reply.errorKind) {
         setConversations((prev) => prev.map((c) =>
           c.id === activeConvId ? { ...c, totalTokens: (c.totalTokens ?? 0) + reply.tokens } : c
         ))
@@ -1007,6 +1027,7 @@ export default function Home() {
         role: 'assistant',
         content: t('home.aiServiceError'),
         timestamp: new Date(),
+        isError: true,
       }])
     } finally {
       setSending(false)
@@ -1108,15 +1129,20 @@ export default function Home() {
 
   /** 當前引擎：auto 模式只顯示策略名（模型多時拼接會溢位）；手動模式顯示指定模型名稱 */
   const engineName = engine?.model ? (modelDisplayName(engine.model) ?? engine.model) : null
-  const engineChipText = blockReason
-    ? (blockReason === 'quota-exhausted' || blockReason === 'no-quota'
-        ? t('home.engineChipNoQuota')
-        : blockReason === 'needs-approval'
-          ? t('home.engineChipNeedsApproval')
-          : t('home.engineChipNoModels'))
-    : engine
-      ? engineMode === 'auto' ? t('home.engineCostSaving') : (engineName ?? t('home.aiEngineNotDetected'))
-      : t('home.aiEngineNotDetected')
+  const engineChipText = engine?.killSwitch
+    // 全局熍断期间不能仍显示「在線」：用户会以为系统坏了，而实际是管理员已急停
+    ? t('home.engineChipKilled')
+    : blockReason
+      ? (blockReason === 'quota-exhausted' || blockReason === 'no-quota'
+          ? t('home.engineChipNoQuota')
+          : blockReason === 'needs-approval'
+            ? t('home.engineChipNeedsApproval')
+            : blockReason === 'check-failed'
+              ? t('home.engineChipCheckFailed')
+              : t('home.engineChipNoModels'))
+      : engine
+        ? engineMode === 'auto' ? t('home.engineCostSaving') : (engineName ?? t('home.aiEngineNotDetected'))
+        : t('home.aiEngineNotDetected')
 
   /** 高亮項 */
   const selectedEngineKey = engineMode
@@ -1262,12 +1288,22 @@ export default function Home() {
           <div className="home-ai-title">
             <h3>
               {t('home.aiTitle')}
-              <Tooltip title={t('home.aiBetaTip')}>
+              {/* 内测口径说明是三句话长文本：按规范走 HelpPopover（白底 Tooltip 阅读体验差、移开即消失） */}
+              <HelpPopover
+                title={t('home.aiBeta')}
+                ariaLabel={t('home.aiBetaTipAria')}
+                placement="bottomLeft"
+                width={360}
+                content={[
+                  { tone: 'warn', label: t('home.aiBetaTipLabelStage'), body: t('home.aiBetaTip') },
+                  { tone: 'info', label: t('home.aiBetaTipLabelAction'), body: t('home.aiBetaTipAction') },
+                ]}
+              >
                 <span className="home-ai-badge"><InfoCircleOutlined className="home-ai-badge-icon" />{t('home.aiBeta')}</span>
-              </Tooltip>
+              </HelpPopover>
             </h3>
-            <span className={`home-ai-status${aiBlocked ? ' home-ai-status--blocked' : ''}`}>
-              <i />{aiBlocked ? t('home.aiBlockedBadge') : t('home.aiOnline')}
+            <span className={`home-ai-status${aiBlocked || engine?.killSwitch ? ' home-ai-status--blocked' : ''}`}>
+              <i />{engine?.killSwitch ? t('home.engineChipKilled') : aiBlocked ? t('home.aiBlockedBadge') : t('home.aiOnline')}
             </span>
           </div>
           <div className="home-ai-badges">
@@ -1275,7 +1311,7 @@ export default function Home() {
               menu={aiBlocked
                 ? { items: [] }
                 : { items: engineMenuItems, selectable: true, selectedKeys: [selectedEngineKey], onClick: handleEngineModeSelect }}
-              dropdownRender={aiBlocked && blockReason
+              popupRender={aiBlocked && blockReason
                 /* 未開通時下拉不再展示智能路由選項，替換為原因說明面板 */
                 ? () => (
                   <div className="home-ai-engine-panel">
@@ -1399,7 +1435,8 @@ export default function Home() {
                   </>
                 )}
                 {infoBarUsedPercent === null && (
-                  <span style={{ fontSize: 11, color: '#BFBFBF' }}>—</span>
+                  // 未配额度不等于“没数据”：以前是个干枛的「—」，用户会误读为用量丢失
+                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('home.infoBarNoQuotaLimit')}</span>
                 )}
               </div>
               <button
@@ -1521,7 +1558,14 @@ export default function Home() {
                 </div>
                 <h4>{t(BLOCKED_TITLE_KEY[blockReason])}</h4>
                 <p>{t(BLOCKED_DESC_KEY[blockReason])}</p>
-                {blockReason === 'needs-approval' ? (
+                {blockReason === 'check-failed' ? (
+                  /* 校验取不到状态时「去申请」是误导：申请解决不了接口失败，
+                     而提醒条只在非空会话渲染，所以空态必须自己带重试入口 */
+                  <button type="button" className="home-ai-blocked-action" onClick={loadQuotaCheck}>
+                    <ReloadOutlined />
+                    {t('home.aiCheckFailedRetryBtn')}
+                  </button>
+                ) : blockReason === 'needs-approval' ? (
                   <button type="button" className="home-ai-blocked-action" onClick={() => navigate(`/ai-access-apply?reason=needs-approval`)}>
                     <SendOutlined />
                     {t('home.aiBlockedApplyBtn')}
@@ -1558,7 +1602,27 @@ export default function Home() {
                     {msg.role === 'assistant' ? <AiLogo size={32} /> : isPikachuAvatar ? <PikachuFace expression={avatarExpression} size={32} /> : isCustomOrPresetAvatar ? <img src={avatarKey} alt="avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} /> : <UserOutlined />}
                   </div>
                   <div className="home-chat-content">
-                    <div className="home-chat-text">{msg.role === 'assistant' ? formatAiText(msg.content) : msg.content}</div>
+                    {/* 本轮服务端实际调用的内建工具：不展示出来，用户会以为数据是编的（审计事件里其实有 TOOL_CALL） */}
+                    {msg.role === 'assistant' && !!msg.toolTraces?.length && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                        {msg.toolTraces.map((tr, i) => (
+                          <span key={`${tr.toolKey}-${i}`}
+                            style={{
+                              fontSize: 11, lineHeight: '18px', padding: '0 8px', borderRadius: 4,
+                              color: tr.success ? '#1890FF' : '#FF4D4F',
+                              background: tr.success ? '#E6F7FF' : '#FFEBEE',
+                              border: `1px solid ${tr.success ? '#91D5FF' : '#FFA39E'}`,
+                            }}>
+                            {toolDisplayName(tr.toolKey)}{tr.elapsedMs ? ` · ${tr.elapsedMs}ms` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* 错误提示按危险色区分，不能用普通回复气泡假装成功 */}
+                    <div className="home-chat-text"
+                      style={msg.isError ? { color: '#FF4D4F', background: '#FFF1F0', border: '1px solid #FFCCC7', borderRadius: 8, padding: '8px 12px' } : undefined}>
+                      {msg.role === 'assistant' ? <AiRichText text={msg.content} /> : msg.content}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1694,10 +1758,17 @@ export default function Home() {
                 ? t('home.aiQuotaExhaustedReminder')
                 : blockReason === 'needs-approval'
                   ? t('home.aiNeedsApprovalReminder')
-                  : t('home.aiBlockedReminder')}
+                  : blockReason === 'check-failed'
+                    ? t('home.aiCheckFailedReminder')
+                    : t('home.aiBlockedReminder')}
             </span>
-            {/* 仅 needs-approval 或前端兆底非 quota-exhausted 时显示申请按钮 */}
-            {(blockReason === 'needs-approval' || (blockReason !== 'quota-exhausted' && !quotaCheckLoaded)) && (
+            {/* 校验失败时给「重新校验」而不是「我要申请」：申请解决不了取不到状态的问题 */}
+            {blockReason === 'check-failed' ? (
+              <button type="button" className="home-ai-blocked-reminder-btn" onClick={loadQuotaCheck}>
+                <ReloadOutlined />
+                {t('home.aiCheckFailedRetryBtn')}
+              </button>
+            ) : blockReason !== 'quota-exhausted' && (
               <button type="button" className="home-ai-blocked-reminder-btn" onClick={() => navigate(`/ai-access-apply?reason=${blockReason}`)}>
                 <SendOutlined />
                 {t('home.aiBlockedApplyBtn')}

@@ -39,6 +39,13 @@ interface Props {
    * 等于把"同一个人在两处显示成两个名字"的风险再造一遍。
    */
   onPick?: (items: { id: number; name: string }[]) => void
+  /**
+   * 已存快照回显（编辑场景）：把 id → 姓名(工号) 先垫进选项，避免选中项显示成裸 ID。
+   *
+   * <p>为什么需要这个入参：表单从服务端拿到的是 userId + 姓名快照，而搜到的选项靠 onSearch。
+   * 没垫底时，用户一打开编辑页就只看到一个数字，不选新的人就永远不知道那是谁。
+   */
+  seed?: { id: number; name: string; empId?: string | null }[]
 }
 
 interface Loaded { id: number; name: string; empId?: string; department?: string }
@@ -57,7 +64,7 @@ function toIds(value?: number[] | number): number[] {
 }
 
 export default function EmployeeSelect({
-  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick,
+  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick, seed,
 }: Props) {
   const { t } = useTranslation()
   const [searchResults, setSearchResults] = useState<Loaded[]>([])
@@ -72,6 +79,28 @@ export default function EmployeeSelect({
   const ids = useMemo(() => toIds(value), [value])
   /** 值语义的依赖键：数组每次渲染都是新对象，不能用身份当依赖 */
   const idsKey = ids.join(',')
+
+  /**
+   * 快照垫底：seed 只用来回显已知的人，不代表搜到了他们。
+   * 依赖里用 JSON 钥匙而不是数组引用，否则父组件每次渲染都传新数组，这里会无限重跑。
+   * <p>同时把 seed 的 ID 记进 attempted：已有姓名快照就不必再走员工详情反查（无授权时那接口是 403）。
+   */
+  const seedKey = JSON.stringify(seed ?? [])
+  useEffect(() => {
+    const known = (JSON.parse(seedKey || '[]') as { id: number; name: string; empId?: string | null }[])
+      .filter(item => item && item.id > 0)
+      .map(item => ({ id: item.id, name: item.name, empId: item.empId ?? undefined }))
+    if (known.length === 0) return
+    known.forEach(item => {
+      archive.current.set(item.id, item)
+      attempted.current.add(item.id)
+    })
+    setResolved(prev => {
+      const merged = new Map(prev.map(item => [item.id, item]))
+      known.forEach(item => { if (!merged.has(item.id)) merged.set(item.id, item) })
+      return [...merged.values()]
+    })
+  }, [seedKey])
 
   const search = useCallback(async (keyword: string) => {
     setFetching(true)

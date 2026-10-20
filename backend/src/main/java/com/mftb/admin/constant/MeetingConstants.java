@@ -166,6 +166,11 @@ public final class MeetingConstants {
     public static final String EVENT_CONFIG_UPDATE = "config_update";
     public static final String EVENT_BLACKLIST_ADD = "blacklist_add";
     public static final String EVENT_BLACKLIST_REVOKE = "blacklist_revoke";
+    /** 会议纪要：录入/修改/发送/作废链接都写进同一张轨迹表，纪要能改能重发，没轨迹就说不清"发出去的是哪一版" */
+    public static final String EVENT_MINUTES_CREATE = "minutes_create";
+    public static final String EVENT_MINUTES_UPDATE = "minutes_update";
+    public static final String EVENT_MINUTES_SEND = "minutes_send";
+    public static final String EVENT_MINUTES_REVOKE = "minutes_revoke";
 
     /** 系统触发的动作（自动释放/收尾），审计里必须与人工操作分得开 */
     public static final String OPERATOR_SYSTEM = "SYSTEM";
@@ -178,6 +183,47 @@ public final class MeetingConstants {
     public static final String SCENARIO_REMIND = "meeting_remind";
     /** 释放/爽约/管理员操作告知组织者 */
     public static final String SCENARIO_OPS = "meeting_ops";
+    /** 会议纪要发给自选收件人（工作通知通道，可与邀约共用企业应用，开关独立） */
+    public static final String SCENARIO_MINUTES = "meeting_minutes";
+    /** 跟进事项逾期提醒（发给负责人本人） */
+    public static final String SCENARIO_FOLLOW_OVERDUE = "follow_overdue";
+    /** 跟进事项完成通知（回到纪要群） */
+    public static final String SCENARIO_FOLLOW_DONE = "follow_done";
+
+    /* ==================== 会议纪要 ==================== */
+
+    /** 纪要状态：还没发出去 */
+    public static final String MINUTES_DRAFT = "draft";
+    /**
+     * 纪要状态：至少发过一批。
+     * <p>不是"锁版"：纪要仍可继续编辑并重发，这一档只说明发送历史不是空的。
+     */
+    public static final String MINUTES_SENT = "sent";
+
+    /** 投递目标：钉钉群（群机器人 Webhook） */
+    public static final String MINUTES_TARGET_GROUP = "GROUP";
+    /** 投递目标：个人（企业内部应用工作通知） */
+    public static final String MINUTES_TARGET_USER = "USER";
+    /**
+     * 群投递行的 receiver_user_id 占位值。
+     * <p>必须是 0 而不是 NULL：{@code uk_meeting_minutes_delivery} 里 MySQL 的 NULL 不参与
+     * 唯一性判定，拿 NULL 承载"没有收件人"等于同一批次能重复插多条群投递。
+     */
+    public static final long MINUTES_GROUP_RECEIVER = 0L;
+
+    /** 批次结论：部分送达（群成功但有收件人失败），只在批次层出现 */
+    public static final String MINUTES_SEND_PARTIAL = "partial";
+
+    /** 纪要单号 rule_key（sys_biz_seq_rule） */
+    public static final String SEQ_MINUTES = "meeting_minutes";
+    /** 免登查看链接的 HMAC 密钥配置键（与签到密钥分开：换一把不该让另一类链接失效） */
+    public static final String CFG_MINUTES_TOKEN_SECRET = "meeting_minutes_token_secret";
+    /** 纪要能力总开关（灰度与回滚用，关闭时接口拒绝、前端入口隐藏） */
+    public static final String CFG_MINUTES_ENABLED = "meeting_minutes_enabled";
+    /** 免登链接有效期（天）：纪要要能回看，但无限期链接等于把内部结论长期挂在网上 */
+    public static final int MINUTES_LINK_TTL_DAYS = 90;
+    /** 钉钉 markdown 正文上限的保守值：机器人约 4000 字符，留出截断标记与链接的空间 */
+    public static final int MINUTES_MARKDOWN_MAX_CHARS = 3000;
 
     /** 变更邀约的事件码按预约版本递增（见 updateEventCode）；M2 签到/释放/收尾也留痕 */
     public static final String NOTIFY_EVT_CHECKED_IN = "ops_checked_in";

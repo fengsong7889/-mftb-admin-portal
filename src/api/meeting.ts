@@ -347,6 +347,14 @@ export interface MeetingVO {
   releaseAt?: string | null
   /** 邀约未送达人数（未绑定钉钉等），详情页显式提示而不是静默少发 */
   notifySkippedCount?: number | null
+  /**
+   * 纪要入口结论（服务端算）：与这场会的关系 + 会议阶段 + 纪要动作权限三者一起判定。
+   * 旧版本后端不下发时为 null，前端按 minutesAccess 的同口径派生兜底（只收窄不放宽）。
+   */
+  canMinutes?: boolean | null
+  /** 本会纪要状态：none/draft/sent，列表行据此把「紀要」按钮显示成「查看紀要」 */
+  minutesStatus?: string | null
+  minutesId?: number | null
   version: number
   createdBy?: string | null
   createdAt?: string | null

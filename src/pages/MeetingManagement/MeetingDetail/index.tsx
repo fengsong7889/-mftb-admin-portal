@@ -7,8 +7,9 @@
  * 越权处理：服务端把"不是你相关的会"与"不存在的会"统一按无权限/查不到返回，
  * 页面只如实转述接口结论，不区分两者——能区分就等于在探测单号是否存在。
  *
- * 四个模块固定顺序：基本信息 → 参会人与响应 → 邀约投递状态 → 会议轨迹。
+ * 五个模块固定顺序：基本信息 → 参会人与响应 → 邀约投递状态 → 会议纪要 → 会议轨迹。
  * 「N 人未綁定釘釘」的提示必须出现在基本信息附近：组织者最关心的是"人到底知不知道"。
+ * 纪要模块永远排在投递状态之后：先看清"人到没到、邀约送没送"，再谈"会开完了记了什么"。
  *
  * 界面口径：
  *   1. 头部统一用 DetailPageHeader（§D.1），业务动作放它的 extra 槽，不自己手写返回按钮；
@@ -18,10 +19,10 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tag, Timeline, message } from 'antd'
+import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tabs, Tag, Timeline, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  BellOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, TeamOutlined,
+  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '../../../components/DetailPageHeader'
@@ -47,9 +48,14 @@ import {
   notifyStatusMeta,
   eventLabel,
   notifyEventLabel,
+  minutesStatusMeta,
   phaseMeta,
   scenarioLabel,
 } from '../meetingMeta'
+import { fetchMinutes, type MinutesVO } from '../../../api/meetingMinutes'
+import MinutesContentCard from '../MeetingMinutes/MinutesContentCard'
+import { deriveCanRecordMinutes } from '../MeetingMinutes/minutesAccess'
+import { useAuth } from '../../../contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 
 /** 详情卡片（§D.3）：白底、8px 圆角、不加 border，阴影统一 0.06 */
@@ -61,12 +67,23 @@ const cardStyle: CSSProperties = {
 export default function MeetingDetail() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
   const [searchParams] = useSearchParams()
   const idParam = searchParams.get('id')
   const bookingId = idParam && /^[1-9]\d*$/.test(idParam) ? Number(idParam) : undefined
 
   const [record, setRecord] = useState<MeetingVO>()
   const [events, setEvents] = useState<MeetingEventVO[]>([])
+  const [minutes, setMinutes] = useState<MinutesVO>()
+  /** 纪要单独一个 Tab：会议基本信息与纪要的阅读时机不同（一个开会前看、一个会后看） */
+  const [detailTab, setDetailTab] = useState('detail')
+  /** 纪要入口能力：员工侧给自己的会记纪要，行政侧可代录（与代取消同源） */
+  const minutesCapability = {
+    canRecordOwn: hasPermission('meeting-my:edit'),
+    canManageRecords: hasPermission('meeting-record:edit'),
+  }
+  /** 纪要读取失败不阻断详情页（详情先看会，再看纪要），但原因要能展示 */
+  const [minutesError, setMinutesError] = useState<string>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [qr, setQr] = useState<{ url: string; expireAt: string }>()
@@ -82,6 +99,14 @@ export default function MeetingDetail() {
       const [detail, trail] = await Promise.all([fetchMeetingDetail(bookingId), fetchMeetingEvents(bookingId)])
       setRecord(detail)
       setEvents(trail ?? [])
+      // 纪要单独取：读不到只影响纪要模块，不能把整场会的详情变成加载失败
+      try {
+        setMinutes(await fetchMinutes(bookingId))
+        setMinutesError(undefined)
+      } catch (e) {
+        setMinutes(undefined)
+        setMinutesError(e instanceof Error ? e.message : String(e))
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe2', { defaultValue: '會議詳情加載失敗' }))
       setRecord(undefined)
@@ -361,6 +386,17 @@ export default function MeetingDetail() {
 
       {record && (
         <>
+          <Tabs
+            activeKey={detailTab}
+            onChange={setDetailTab}
+            style={{ marginBottom: 4 }}
+            items={[
+              { key: 'detail', label: t('meeting.detailTabInfo', { defaultValue: '會議詳情' }) },
+              { key: 'minutes', label: t('meeting.minutes.moduleTitle', { defaultValue: '會議紀要' }) },
+            ]}
+          />
+
+          {detailTab === 'detail' && (<>
           {/* 一、基本信息 */}
           <div style={cardStyle}>
             <CardTitle icon={<ProfileOutlined />} tone="info" title={t('meeting.basicInfo', { defaultValue: '基本信息' })}
@@ -459,7 +495,58 @@ export default function MeetingDetail() {
             />
           </div>
 
-          {/* 四、会议轨迹（业务事件，不是审计日志表格） */}
+          </>)}
+
+          {/* 四、会议纪要：单独 Tab（没录入时也要看得到入口） */}
+          {detailTab === 'minutes' && (
+          <div style={cardStyle}>
+            <CardTitle icon={<FileTextOutlined />} tone="purple" title={t('meeting.minutes.moduleTitle', { defaultValue: '會議紀要' })}
+              note={minutes?.exists
+                ? t('meeting.minutes.moduleNoteExists', { count: minutes.sendCount ?? 0, defaultValue: '{{minutesNo}} · 已發送 {{count}} 次', minutesNo: minutes.minutesNo ?? '' })
+                : t('meeting.minutes.moduleNoteEmpty', { defaultValue: '本場會可記錄結論與行動項，並發送釘釘群與相關人' })}
+              tag={(() => {
+                if (!minutes?.exists || !minutes.status) return undefined
+                const meta = minutesStatusMeta()[minutes.status]
+                return meta ? <Tag color={meta.color}>{meta.label}</Tag> : undefined
+              })()}
+            />
+            {minutes?.exists && minutes.content ? (
+              <>
+                <MinutesContentCard content={minutes.content} />
+                <Space size={8} wrap style={{ marginTop: 8 }}>
+                  <Button size="small" icon={<HistoryOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}`)}>
+                    {t('meeting.minutes.viewMinutes', { defaultValue: '查看紀要與發送歷史' })}
+                  </Button>
+                  {minutes.canEdit && (
+                    <Button size="small" onClick={() => navigate(`/meeting-minutes-form?id=${minutes.id}`)}>{t('meeting.minutes.edit', { defaultValue: '編輯紀要' })}</Button>
+                  )}
+                  {minutes.canSend && (
+                    <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}&send=1`)}>
+                      {t('meeting.minutes.sendNow', { defaultValue: '立即發送' })}
+                    </Button>
+                  )}
+                </Space>
+              </>
+            ) : (
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.minutes.emptyHint', { defaultValue: '本場會尚未錄入紀要' })}</span>
+                {minutesError && (
+                  <span style={{ fontSize: 12, color: '#FF4D4F' }}>{`${t('meeting.minutes.loadFailedShort', { defaultValue: '紀要讀取失敗：' })}${minutesError}`}</span>
+                )}
+                {record && deriveCanRecordMinutes(record, minutesCapability) && (
+                  <div>
+                    <Button size="small" type="primary" icon={<FileTextOutlined />} onClick={() => navigate(`/meeting-minutes-form?bookingId=${record.id}`)}>
+                      {t('meeting.minutes.recordNow', { defaultValue: '錄入紀要' })}
+                    </Button>
+                  </div>
+                )}
+              </Space>
+            )}
+          </div>
+          )}
+
+          {detailTab === 'detail' && (<>
+          {/* 五、会议轨迹（业务事件，不是审计日志表格） */}
           <div style={cardStyle}>
             <CardTitle icon={<HistoryOutlined />} tone="purple" title={t('meeting.meetingTrail', { defaultValue: '會議軌跡' })}
               note={t('meeting.trailCount', { count: events.length, defaultValue: `${events.length} 條` })} />
@@ -499,6 +586,7 @@ export default function MeetingDetail() {
               <span style={{ marginRight: 4 }}>{t('meeting.lastUpdatedAtLabel', { defaultValue: '最後更新時間：' })}</span><span style={{ color: '#595959' }}>{lastEvent?.occurredAt ?? record.startTime}</span>
             </span>
           </div>
+          </>)}
         </>
       )}
 

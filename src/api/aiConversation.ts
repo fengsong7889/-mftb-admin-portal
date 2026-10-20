@@ -42,6 +42,35 @@ export interface Conversation {
   updatedAt: string
 }
 
+/** 落库的单条消息结构（与 parseConversation 严格对称） */
+export interface StoredChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  attachments?: ChatMessage['attachments']
+  toolTraces?: ChatMessage['toolTraces']
+  timestamp: string
+}
+
+/**
+ * 会话消息落库序列化的**唯一入口**。
+ * <p>为什么必须有：以前两处保存路径（防抖保存 / 上下文压缩）各自手写 `map` 字段列表，
+ * 新增字段时只需漏一处就会出现“界面看得到、刷新就没了”（实测：工具痕迹刷新后丢）。
+ * <p>规则：`isError` 气泡不入库——它是给人看的提示，不是模型说过的话，
+ * 一旦被当成历史回传，模型会继续模仿那段错误文案而且越堆越长。
+ */
+export function serializeChatMessages(messages: ChatMessage[]): string {
+  const stored: StoredChatMessage[] = messages.filter((m) => !m.isError).map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    ...(m.attachments ? { attachments: m.attachments } : {}),
+    ...(m.toolTraces ? { toolTraces: m.toolTraces } : {}),
+    timestamp: (m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp)).toISOString(),
+  }))
+  return JSON.stringify(stored)
+}
+
 /** 反序列化后端会话为前端结构 */
 export function parseConversation(conv: AiConversation): Conversation {
   let messages: ChatMessage[] = []
@@ -55,6 +84,8 @@ export function parseConversation(conv: AiConversation): Conversation {
         content: m.content as string,
         attachments: m.attachments,
         timestamp: m.timestamp ? new Date(m.timestamp as string) : new Date(),
+        // 工具痕迹要一起回放：刷新后“查了数据但界面上看不出来”会让用户怀疑结果是编的
+        toolTraces: m.toolTraces,
       }))
     }
   } catch { /* 损坏数据回退空 */ }

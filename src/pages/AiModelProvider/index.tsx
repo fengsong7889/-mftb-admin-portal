@@ -13,6 +13,7 @@ import {
   type ProviderQueryParams
 } from '../../api'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { tablePagination } from '../../utils/tableDisplay'
 
 export default function AiModelProvider() {
   const { t } = useTranslation()
@@ -88,7 +89,7 @@ export default function AiModelProvider() {
       } else {
         // 新增（如果表单支持）
         // await createProvider(values)
-        message.info('新增功能待实现')
+        message.info('新增功能待實现')
       }
       
       setEditingProvider(null)
@@ -115,7 +116,7 @@ export default function AiModelProvider() {
           loadProviders()
         } catch (error: any) {
           console.error('Delete failed:', error)
-          message.error(error.message || '删除失败')
+          message.error(error.message || '刪除失败')
         }
       },
     })
@@ -134,6 +135,8 @@ export default function AiModelProvider() {
       content: `${actionText}後「${row.name}」${toDisable ? '及其下所有模型將立即不可調用' : '將恢復可用，用戶端可正常調用'}`,
       okText: '確認',
       cancelText: '取消',
+      // 停用会使该供应商及其全部模型立即不可调用，属危险操作（§B.1 要求红色按钮）
+      okButtonProps: toDisable ? { danger: true } : undefined,
       onOk: async () => {
         try {
           await updateProvider(row.id, {
@@ -176,11 +179,11 @@ export default function AiModelProvider() {
   /* ── 列字段配置 ── */
   const columnMeta = [
     { key: 'name', title: '供應商' },
-    { key: 'providerKey', title: '供应商标识' },
+    { key: 'providerKey', title: '供應商標識' },
     { key: 'apiUrlBase', title: '接入地址' },
     { key: 'apiKeyStatus', title: 'API Key' },
-    { key: 'status', title: '状态' },
-    { key: 'updatedAt', title: '最后更新时间' },
+    { key: 'status', title: '狀態' },
+    { key: 'updatedAt', title: '最後更新時間' },
     { key: 'action', title: '操作' },
   ]
 
@@ -191,7 +194,7 @@ export default function AiModelProvider() {
   /* ── 表格列 ── */
   const columns: ColumnsType<AiProvider> = [
     { title: '供應商', key: 'name', dataIndex: 'name', width: 200 },
-    { title: '供应商标识', key: 'providerKey', dataIndex: 'providerKey', width: 150 },
+    { title: '供應商標識', key: 'providerKey', dataIndex: 'providerKey', width: 150 },
     {
       title: '接入地址', 
       key: 'apiUrlBase',
@@ -221,7 +224,7 @@ export default function AiModelProvider() {
       },
     },
     {
-      title: '状态', 
+      title: '狀態', 
       key: 'status',
       dataIndex: 'status', 
       width: 100, 
@@ -236,7 +239,7 @@ export default function AiModelProvider() {
       ),
     },
     {
-      title: '最后更新时间', 
+      title: '最後更新時間', 
       key: 'updatedAt',
       dataIndex: 'updatedAt', 
       width: 180,
@@ -293,7 +296,7 @@ export default function AiModelProvider() {
           <Button 
             type="primary" 
             icon={<PlusOutlined />} 
-            onClick={() => message.warning('新增功能待实现')}
+            onClick={() => message.warning('新增功能待實现')}
           >
             新增
           </Button>
@@ -307,7 +310,7 @@ export default function AiModelProvider() {
         loading={loading}
         columns={applyConfig(columns)}
         dataSource={filteredProviders}
-        pagination={false}
+        pagination={tablePagination(t)}
         scroll={{ x: 1200 }}
       />
 
@@ -325,7 +328,7 @@ export default function AiModelProvider() {
         destroyOnHidden
       >
         <Form form={providerForm} layout="vertical">
-          <Form.Item name="providerKey" label="供应商标识" rules={[{ required: true, message: '請輸入供应標識' }]}> 
+          <Form.Item name="providerKey" label="供應商標識" rules={[{ required: true, message: '請輸入供應標識' }]}> 
             <Input placeholder="如：bailian、deepseek" disabled={!!editingProvider} />
           </Form.Item>
           <Form.Item name="name" label="供應商名稱" rules={[{ required: true, message: '請輸入供應商名稱' }]}> 

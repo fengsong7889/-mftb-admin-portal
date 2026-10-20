@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Form, Input, Modal, Popover, Select, Space, Switch, Table, Tabs, Tag, message, Alert } from 'antd'
+import { Button, Form, Input, Modal, Popover, Select, Space, Switch, Table, Tag, message, Alert } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import {
   fetchModels,
@@ -12,22 +12,15 @@ import {
   type AiModel,
   type DeptAuthGroupItem,
 } from '../../api'
-import {
-  fetchMockEmployeeOverrides,
-} from '../../api/mock/aiPlatformMock'
-import type {
-  EmployeeModelOverride,
-} from '../../api/mock/aiPlatformMock'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { CAPABILITY_SHORT_FIELDS, type CapabilityKey } from './empAuth/modelAuthCapability'
+import { CAPABILITY_SHORT_FIELDS } from './empAuth/modelAuthCapability'
 
-export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } = {}) {
+export default function AiAuth() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   /* ── 基礎數據 ── */
   const [models, setModels] = useState<AiModel[]>([])
   const [deptGroups, setDeptGroups] = useState<DeptAuthGroupItem[]>([])
-  const [overrides, setOverrides] = useState<EmployeeModelOverride[]>([])
   const [loading, setLoading] = useState(false)
 
   /** 加載模型列表 */
@@ -46,13 +39,8 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
 
   useEffect(() => {
     loadModels()
-    if (fixedTab !== 'employee') {
-      loadDeptGroups()
-    }
-    if (fixedTab === 'employee' || fixedTab == null) {
-      fetchMockEmployeeOverrides().then(setOverrides).catch(() => {})
-    }
-  }, [fixedTab])
+    loadDeptGroups()
+  }, [])
 
   /** 模型 id → 名稱 */
   const modelName = useMemo(() => {
@@ -326,121 +314,6 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
     },
   ]
 
-  /* ══════════════ Tab2: 員工額外授權 ══════════════ */
-  const [queryEmp, setQueryEmp] = useState('')
-  const [queryEmpDept, setQueryEmpDept] = useState<string | undefined>(undefined)
-  const [appliedEmp, setAppliedEmp] = useState({ keyword: '', dept: undefined as string | undefined })
-
-  const handleEmpSearch = () => setAppliedEmp({ keyword: queryEmp.trim(), dept: queryEmpDept })
-  const handleEmpReset = () => {
-    setQueryEmp('')
-    setQueryEmpDept(undefined)
-    setAppliedEmp({ keyword: '', dept: undefined })
-  }
-
-  const filteredOverrides = useMemo(() => overrides.filter((o) => {
-    if (appliedEmp.keyword) {
-      const kw = appliedEmp.keyword.toLowerCase()
-      if (!o.empName.toLowerCase().includes(kw) && !o.username.toLowerCase().includes(kw) && !o.empId.toLowerCase().includes(kw)) return false
-    }
-    if (appliedEmp.dept && o.deptName !== appliedEmp.dept) return false
-    return true
-  }), [overrides, appliedEmp])
-
-  /* ── 員工覆蓋編輯/新增彈窗 ── */
-  const [editingOverride, setEditingOverride] = useState<EmployeeModelOverride | 'new' | null>(null)
-  const [overrideForm] = Form.useForm()
-
-  const handleOverrideEdit = (row: EmployeeModelOverride) => {
-    setEditingOverride(row)
-    overrideForm.setFieldsValue({ username: row.username, empName: row.empName, deptName: row.deptName, extraModelIds: row.extraModelIds, remark: row.remark })
-  }
-
-  const handleOverrideCreate = () => {
-    overrideForm.resetFields()
-    setEditingOverride('new')
-  }
-
-  const handleOverrideSave = () => {
-    overrideForm.validateFields().then((values) => {
-      if (editingOverride === 'new') {
-        setOverrides((prev) => [...prev, { ...values, empId: values.username.toUpperCase() } as EmployeeModelOverride])
-        message.success(t('aiQuotaAuth.overrideAdded'))
-      } else if (editingOverride) {
-        setOverrides((prev) => prev.map((o) => (o.username === editingOverride.username ? { ...o, ...values } : o)))
-        message.success(t('aiQuotaAuth.overrideSavedAiAuth'))
-      }
-      setEditingOverride(null)
-    })
-  }
-
-  const handleOverrideDelete = (row: EmployeeModelOverride) => {
-    Modal.confirm({
-      className: 'custom-confirm-modal',
-      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
-      title: t('aiQuotaAuth.confirmRemoveOverride'),
-      content: t('aiQuotaAuth.removeOverrideContent', { name: row.empName }),
-      okText: t('aiQuotaAuth.removeBtnOverride'),
-      okButtonProps: { danger: true },
-      cancelText: t('common.cancel'),
-      onOk: () => {
-        setOverrides((prev) => prev.filter((o) => o.username !== row.username))
-        message.success(t('aiQuotaAuth.overrideRemovedAiAuth'))
-      },
-    })
-  }
-
-  /* ── 列字段配置（員工覆蓋） ── */
-  const overrideColumnMeta = [
-    { key: 'employee', title: t('aiQuotaAuth.employeeCol') },
-    { key: 'deptName', title: t('aiQuotaAuth.deptLabel') },
-    { key: 'extraModelIds', title: t('aiQuotaAuth.extraAuthModelsCol') },
-    { key: 'remark', title: t('aiQuotaAuth.remarkCol') },
-    { key: 'action', title: t('common.action') },
-  ]
-
-  const { configComponent: overrideConfigComponent } = useColumnConfig('ai-auth-override', overrideColumnMeta, [
-    { key: 'action', visible: true, locked: 'tail' as const },
-  ])
-
-  /* ── 表格列（員工覆蓋） ── */
-  const overrideColumns: ColumnsType<EmployeeModelOverride> = [
-    {
-      title: t('aiQuotaAuth.employeeCol'), key: 'employee', width: 180,
-      render: (_, row) => (
-        <div>
-          <div style={{ fontWeight: 600 }}>{row.empName}</div>
-          <div style={{ fontSize: 11, color: '#8C8C8C' }}>{row.empId} · {row.username}</div>
-        </div>
-      ),
-    },
-    { title: t('aiQuotaAuth.deptLabel'), dataIndex: 'deptName', width: 120 },
-    {
-      title: t('aiQuotaAuth.extraAuthModelsCol'), dataIndex: 'extraModelIds', width: 280,
-      render: (v: string[]) => (v.length ? v.map((id) => (
-        <Tag key={id} style={{ marginRight: 4, color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>
-          {modelName[id] ?? id}
-        </Tag>
-      )) : <span style={{ color: '#BFBFBF' }}>--</span>),
-    },
-    { title: t('aiQuotaAuth.remarkCol'), dataIndex: 'remark', ellipsis: true },
-    {
-      title: t('common.action'), key: 'action', width: 110, align: 'center',
-      render: (_, row) => (
-        <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => handleOverrideEdit(row)}>{t('common.edit')}</Button>
-          <Button type="link" danger onClick={() => handleOverrideDelete(row)}>{t('aiQuotaAuth.removeBtnOverride')}</Button>
-        </Space>
-      ),
-    },
-  ]
-
-  /* ── 部門選項（員工覆蓋搜索/表單復用） ── */
-  const deptOptions = useMemo(() => {
-    const names = new Set<string>()
-    deptGroups.forEach((g) => g.deptNames.forEach((n) => names.add(n)))
-    return [...names].map((n) => ({ value: n, label: n }))
-  }, [deptGroups])
 
   /* ══════════════ Tab 頁簽 ══════════════ */
   const deptContent = (
@@ -500,87 +373,6 @@ export default function AiAuth({ fixedTab }: { fixedTab?: 'dept' | 'employee' } 
         </>
   )
 
-  const empContent = (
-        <>
-          {/* 查詢區域 */}
-          <div className="search-section">
-            <Form layout="inline">
-              <Form.Item label={t('aiQuotaAuth.employeeCol')}>
-                <Input value={queryEmp} placeholder={t('aiQuotaAuth.empSearchPh')} allowClear onChange={(e) => setQueryEmp(e.target.value)} />
-              </Form.Item>
-              <Form.Item label={t('aiQuotaAuth.deptLabel')}>
-                <Select
-                  value={queryEmpDept}
-                  placeholder={t('aiQuotaAuth.allOption')}
-                  allowClear
-                  showSearch
-                  options={deptOptions}
-                  onChange={(v) => setQueryEmpDept(v)}
-                />
-              </Form.Item>
-              <Form.Item>
-                <div className="search-actions">
-                  <Button type="primary" icon={<SearchOutlined />} onClick={handleEmpSearch}>{t('common.query')}</Button>
-                  <Button icon={<ReloadOutlined />} onClick={handleEmpReset}>{t('common.reset')}</Button>
-                </div>
-              </Form.Item>
-            </Form>
-          </div>
 
-          {/* 操作區：右側新增 + 列配置 */}
-          <div className="action-section">
-            <div className="action-section-right">
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleOverrideCreate}>{t('common.add')}</Button>
-              {overrideConfigComponent}
-            </div>
-          </div>
-
-          <Table
-            rowKey="username"
-            size="middle"
-            loading={loading}
-            columns={overrideColumns}
-            dataSource={filteredOverrides}
-            pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => t('aiQuotaAuth.recordsTotal', { total }) }}
-          />
-        </>
-  )
-
-  const tabItems = [
-    { key: 'dept', label: t('aiQuotaAuth.deptModelAuthTab', { count: deptGroups.length }), children: deptContent },
-    { key: 'employee', label: t('aiQuotaAuth.empExtraAuthTab', { count: overrides.length }), children: empContent },
-  ]
-
-  return (
-    <div className="content-area">
-      {fixedTab === 'dept' ? deptContent : fixedTab === 'employee' ? empContent : <Tabs defaultActiveKey="dept" items={tabItems} />}
-
-      {/* 員工額外授權編輯/新增彈窗 */}
-      <Modal
-        title={editingOverride === 'new' ? t('aiQuotaAuth.addOverride') : t('aiQuotaAuth.editOverride')}
-        open={editingOverride !== null}
-        onOk={handleOverrideSave}
-        onCancel={() => setEditingOverride(null)}
-        okText={t('common.save')}
-        cancelText={t('common.cancel')}
-        destroyOnHidden
-      >
-        <Form form={overrideForm} layout="vertical">
-          <Form.Item name="username" label={t('aiQuotaAuth.accountLabel')} rules={[{ required: true, message: t('aiQuotaAuth.accountRequired') }]}>
-            <Input disabled={editingOverride !== 'new'} placeholder={t('aiQuotaAuth.accountPh')} />
-          </Form.Item>
-          <Form.Item name="empName" label={t('aiQuotaAuth.empNameLabel')} rules={[{ required: true, message: t('aiQuotaAuth.empNameRequired') }]}>
-            <Input placeholder={t('aiQuotaAuth.empNamePh')} />
-          </Form.Item>
-          <Form.Item name="deptName" label={t('aiQuotaAuth.deptLabel')} rules={[{ required: true, message: t('aiQuotaAuth.deptRequired') }]}>
-            <Select showSearch placeholder={t('aiQuotaAuth.deptPh')} options={deptOptions} />
-          </Form.Item>
-          <Form.Item name="extraModelIds" label={t('aiQuotaAuth.extraAuthModelsLabel')} rules={[{ required: true, message: t('aiQuotaAuth.extraAuthRequired') }]}>
-            <Select mode="multiple" placeholder={t('aiQuotaAuth.selectModelPh')} allowClear options={models.map((m) => ({ value: String(m.id), label: m.name }))} />
-          </Form.Item>
-          <Form.Item name="remark" label={t('aiQuotaAuth.remarkCol')}><Input placeholder={t('aiQuotaAuth.remarkPh')} /></Form.Item>
-        </Form>
-      </Modal>
-    </div>
-  )
+  return <div className="content-area">{deptContent}</div>
 }

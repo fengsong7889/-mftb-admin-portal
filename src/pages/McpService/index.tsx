@@ -106,6 +106,8 @@ export default function McpService() {
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       okText: t('mcpService.confirm'),
       cancelText: t('mcpService.cancel'),
+      // 卸载会直接拿掉 AI 的一项能力，属危险操作（§B.1）；安装是新增能力，不标红
+      okButtonProps: next ? undefined : { danger: true },
     })
   }
 

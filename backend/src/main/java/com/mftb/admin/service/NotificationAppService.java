@@ -36,6 +36,12 @@ public class NotificationAppService {
      * 未绑定应用时 {@code resolve} 返回 null，日报作业据此跳过个人通知并记日志，不阻塞群报。
      */
     public static final String RDM_DAILY_REPORT = "rdm_daily_report";
+    /** 会议纪要发给自选收件人（可含非参会人） */
+    public static final String MEETING_MINUTES = "meeting_minutes";
+    /** 跟进事项逾期提醒（发给负责人本人） */
+    public static final String FOLLOW_OVERDUE = "follow_overdue";
+    /** 跟进事项完成通知（发回纪要群） */
+    public static final String FOLLOW_DONE = "follow_done";
     private static final String SIGN_SECRET = DingTalkAppService.SIGN_SECRET;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final JdbcTemplate jdbc;
@@ -55,7 +61,14 @@ public class NotificationAppService {
             MEETING_OPS,
             List.of("會議室釋放告知", "超時未簽到自動釋放或行政手動釋放時", "會議組織者"),
             RDM_DAILY_REPORT,
-            List.of("產研交付日報", "每日晨/晚報定時推送與管理員手動觸發時", "在途項目的項目經理與產品負責人（已綁定釘釘用戶 ID）"));
+            List.of("產研交付日報", "每日晨/晚報定時推送與管理員手動觸發時", "在途項目的項目經理與產品負責人（已綁定釘釘用戶 ID）"),
+            MEETING_MINUTES,
+            // 收件人由记录人在发送面板自选，因此对象列不能写成“參會人”：那会让人以为只能发参会人
+            List.of("會議紀要", "紀要録入後手動發送（每一批一個通知，重發带批次標記）", "發送人選定的人（可含非參會人，已綁定釘釘用戶 ID）"),
+            FOLLOW_OVERDUE,
+            List.of("跟進事項逾期提醒", "每日掃描：事項過了完成時限仍未處理（同一事項同一天只提醒一次）", "該事項負責人"),
+            FOLLOW_DONE,
+            List.of("跟進事項完成通知", "負責人更新處理結果後（回到當初發紀要的钉钉群）", "紀要發送時選定的群"));
 
     public List<View> list(String name, Boolean enabled) {
         List<ScenarioView> scenarios = scenarios();

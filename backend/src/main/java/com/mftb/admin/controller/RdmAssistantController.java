@@ -73,7 +73,7 @@ public class RdmAssistantController {
             draft.setNotice(blocked);
             return Result.success(draft);
         }
-        return Result.success(assistantService.prdDraft(reqId, operatorResolver.currentOperatorName()));
+        return Result.success(assistantService.prdDraft(reqId, operatorResolver.currentOperatorAccount()));
     }
 
     /**
@@ -95,7 +95,7 @@ public class RdmAssistantController {
             summary.setNotice(blocked);
             return Result.success(summary);
         }
-        return Result.success(assistantService.riskSummary(stay, operatorResolver.currentOperatorName()));
+        return Result.success(assistantService.riskSummary(stay, operatorResolver.currentOperatorAccount()));
     }
 
     /** 熔断时给前端的统一提示（带操作人与原因，便于管理员沟通而非让用户猜） */

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -8,6 +8,7 @@ import {
   Select,
   Switch,
   Table,
+  Tabs,
   Tag,
   Space,
   Form,
@@ -19,18 +20,24 @@ import {
   SearchOutlined,
   ReloadOutlined,
   PlusOutlined,
+  PoweroffOutlined,
 } from '@ant-design/icons'
 import {
-  fetchMockToolRegistry,
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
-import type { ToolDefinition, ToolLevel } from '../../api/mock/aiPlatformMock'
+import type { ToolLevel } from '../../api/mock/aiPlatformMock'
 import {
   fetchToolRegistry,
   toggleToolStatus,
+  aggregateCallStats,
+  fetchKillSwitch,
+  toggleKillSwitch,
+  type KillSwitchStatus,
   type ToolPolicyRow,
 } from '../../api/aiOperationAuth'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { tablePagination, formatEpochOrDash } from '../../utils/tableDisplay'
+import AccountWhitelistPanel from './AccountWhitelistPanel'
 
 /* ────────────────── 展示常量 ────────────────── */
 
@@ -43,20 +50,31 @@ export default function AiOperationAuth() {
   /* ── 數據 ── */
   const [tools, setTools] = useState<ToolPolicyRow[]>([])
   const [loading, setLoading] = useState(false)
+  const [killSwitch, setKillSwitch] = useState<KillSwitchStatus | null>(null)
+  const [killSwitchSaving, setKillSwitchSaving] = useState(false)
+  /**
+   * 急停原因用 ref 而不是 useState：`Modal.confirm` 的 `onOk` 是在弹窗创建那一刻固定的闭包，
+   * 读 state 只能拿到当时的快照（实测：填了原因仍永远报“必须填写原因”，导致开关根本开不了）。
+   */
+  const killSwitchReasonRef = useRef('')
 
   const loadTools = () => {
     setLoading(true)
+    // 拉策略列表后再用执行日志聚合真实调用量；失败就如实报错，
+    // 不象以前那样静默回退 mock 假数据（管理员会把假数据当真实授权状态）
     fetchToolRegistry()
+      .then((rows) => aggregateCallStats(rows).catch(() => rows))
       .then(setTools)
       .catch(() => {
-        // 后端不可用时回退 mock 列表，保证管理页不白屏；日志中已含真实失败信息
-        fetchMockToolRegistry().then(setTools as unknown as (rows: ToolDefinition[]) => void)
+        setTools([])
+        message.error(t('aiOperationAuth.loadFailed'))
       })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     loadTools()
+    fetchKillSwitch().then(setKillSwitch).catch(() => setKillSwitch(null))
   }, [])
 
   /* ── 查詢條件 ── */
@@ -82,17 +100,17 @@ export default function AiOperationAuth() {
 
   /* ── 列字段配置 ── */
   const columnMeta = [
-    { key: 'name', title: '工具名稱' },
-    { key: 'code', title: '工具編碼' },
-    { key: 'menuName', title: '對應菜單' },
-    { key: 'level', title: '權限等級' },
-    { key: 'description', title: '描述' },
-    { key: 'callCount30d', title: '近30天調用次數' },
-    { key: 'lastCalledAt', title: '最近調用時間' },
-    { key: 'status', title: '狀態' },
-    { key: 'updatedBy', title: '最後更新人' },
-    { key: 'updatedAt', title: '最後更新時間' },
-    { key: 'action', title: '操作' },
+    { key: 'name', title: t('aiOperationAuth.colToolName') },
+    { key: 'code', title: t('aiOperationAuth.colToolCode') },
+    { key: 'menuName', title: t('aiOperationAuth.colMenuName') },
+    { key: 'level', title: t('aiOperationAuth.colLevel') },
+    { key: 'description', title: t('aiOperationAuth.colDescription') },
+    { key: 'callCount30d', title: t('aiOperationAuth.colCallCount30d') },
+    { key: 'lastCalledAt', title: t('aiOperationAuth.colLastCalledAt') },
+    { key: 'status', title: t('aiOperationAuth.colStatus') },
+    { key: 'updatedBy', title: t('aiOperationAuth.colUpdatedBy') },
+    { key: 'updatedAt', title: t('aiOperationAuth.colUpdatedAt') },
+    { key: 'action', title: t('common.action') },
   ]
 
   const { configComponent, applyConfig } = useColumnConfig('ai-operation-auth', columnMeta, [
@@ -102,22 +120,94 @@ export default function AiOperationAuth() {
   /* ── 工具啟停（二次確認 + 真实后端） ── */
   const handleToggleStatus = (row: ToolPolicyRow) => {
     const toDisable = row.status === 1
-    const actionText = toDisable ? '停用' : '啟用'
+    const actionText = toDisable ? t('aiOperationAuth.disableAction') : t('aiOperationAuth.enableAction')
     Modal.confirm({
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
-      title: `確認${actionText}該工具？`,
-      content: `${actionText}後「${row.name}」將${toDisable ? '不再' : '恢復'}在 AI 對話中提供該能力`,
-      okText: '確認',
-      cancelText: '取消',
+      title: t('aiOperationAuth.confirmToggleTool', { action: actionText }),
+      content: t('aiOperationAuth.confirmToggleToolContent', {
+        verb: toDisable ? t('aiOperationAuth.disablingVerb') : t('aiOperationAuth.enablingVerb'),
+        name: row.name,
+        effect: toDisable ? t('aiOperationAuth.toggleEffectDisable') : t('aiOperationAuth.toggleEffectEnable'),
+      }),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      // 停用是削减可用能力的危险操作，按 §B.1 必须红色按钮（以前只有「刪除」上了 danger）
+      okButtonProps: toDisable ? { danger: true } : undefined,
       onOk: async () => {
         try {
           await toggleToolStatus(row.code, toDisable ? 0 : 1)
           setTools((prev) => prev.map((t) => (t.id === row.id ? { ...t, status: toDisable ? 0 : 1 } : t)))
-          message.success(`${row.name} 已${actionText}`)
+          message.success(t('aiOperationAuth.toolToggled', { name: row.name, action: actionText }))
         } catch {
-          message.error(`${actionText}失敗`)
+          message.error(t('aiOperationAuth.toolToggleFailed', { action: actionText }))
         }
+      },
+    })
+  }
+
+  /** 应急急停开关切换（后端 GET/POST /api/agent/kill-switch） */
+  const applyKillSwitch = async (engaged: boolean, reason: string) => {
+    setKillSwitchSaving(true)
+    try {
+      const status = await toggleKillSwitch(engaged, reason)
+      setKillSwitch(status)
+      message.success(t('aiOperationAuth.killSwitchSuccess'))
+    } catch {
+      message.error(t('aiOperationAuth.killSwitchFailed'))
+      throw new Error('kill switch failed')
+    } finally {
+      setKillSwitchSaving(false)
+    }
+  }
+
+  /**
+   * 开启急停必须填原因：没有原因的急停事后无法回溯、也无法向业务方解释为什么 AI 突然不可用。
+   * 解除则沿用当前已记录的原因，不强制再填一次。
+   */
+  const handleKillSwitchToggle = (next: boolean) => {
+    if (!next) {
+      Modal.confirm({
+        className: 'custom-confirm-modal',
+        icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+        title: t('aiOperationAuth.killSwitchConfirmOff'),
+        content: `${t('aiOperationAuth.killSwitchTitle')}：${killSwitch?.reason || '-'}`,
+        okText: t('common.confirm'),
+        cancelText: t('common.cancel'),
+        onOk: () => applyKillSwitch(false, killSwitch?.reason ?? ''),
+      })
+      return
+    }
+    Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('aiOperationAuth.killSwitchConfirmTitle'),
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('aiOperationAuth.killSwitchOnWarn')}</span></div>
+          <div style={{ marginTop: 8 }}>
+            <Input.TextArea
+              rows={2}
+              maxLength={200}
+              showCount
+              placeholder={t('aiOperationAuth.killSwitchReasonLabel')}
+              onChange={(e) => { killSwitchReasonRef.current = e.target.value }}
+            />
+          </div>
+        </div>
+      ),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        const reason = killSwitchReasonRef.current.trim()
+        if (!reason) {
+          message.warning(t('aiOperationAuth.killSwitchReasonRequired'))
+          // 返回 rejected 让确认框保持打开，避免用户填了原因却被静默关掉
+          return Promise.reject(new Error('reason required'))
+        }
+        await applyKillSwitch(true, reason)
+        killSwitchReasonRef.current = ''
       },
     })
   }
@@ -125,7 +215,7 @@ export default function AiOperationAuth() {
   /* ── 表格列 ── */
   const toolColumns: ColumnsType<ToolPolicyRow> = [
     {
-      title: '工具名稱', dataIndex: 'name', width: 130,
+      title: t('aiOperationAuth.colToolName'), dataIndex: 'name', width: 130,
       render: (_, row) => (
         <div>
           <div>{row.name}</div>
@@ -133,74 +223,112 @@ export default function AiOperationAuth() {
         </div>
       ),
     },
-    { title: '對應業務菜單', dataIndex: 'menuName', width: 140 },
+    { title: t('aiOperationAuth.colMenuName'), dataIndex: 'menuName', width: 140 },
     {
-      title: '權限等級', dataIndex: 'level', width: 130, align: 'center',
+      title: t('aiOperationAuth.colLevel'), dataIndex: 'level', width: 130, align: 'center',
       render: (v: ToolLevel) => (
         <Tag color={TOOL_LEVEL_META[v].tagColor} style={{ borderRadius: 4 }}>
-          {v} · {TOOL_LEVEL_META[v].name}
+          {v} · {t(`aiOperationAuth.levelName.${v}`)}
         </Tag>
       ),
     },
     {
-      title: '參數白名單', key: 'params', width: 100, align: 'center',
-      render: (_, row) => (row.params.length ? `${row.params.length} 個` : <span style={{ color: '#BFBFBF' }}>--</span>),
+      title: t('aiOperationAuth.colParams'), key: 'params', width: 100, align: 'center',
+      render: (_, row) => (row.params.length
+        ? t('aiOperationAuth.paramCount', { count: row.params.length })
+        : <span style={{ color: '#BFBFBF' }}>--</span>),
     },
-    { title: '近 30 天調用', dataIndex: 'callCount30d', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
-    { title: '最近調用', dataIndex: 'lastCalledAt', width: 160, render: (v: string | null) => v ?? <span style={{ color: '#BFBFBF' }}>--</span> },
+    { title: t('aiOperationAuth.colCallCount30d'), dataIndex: 'callCount30d', width: 110, align: 'right', render: (v: number) => (v ? v.toLocaleString() : <span style={{ color: '#BFBFBF' }}>0</span>) },
+    { title: t('aiOperationAuth.colLastCalledAt'), dataIndex: 'lastCalledAt', width: 160, render: (v: string | null) => v ?? <span style={{ color: '#BFBFBF' }}>--</span> },
     {
-      title: '狀態', dataIndex: 'status', width: 80, align: 'center',
+      title: t('aiOperationAuth.colStatus'), dataIndex: 'status', width: 80, align: 'center',
       render: (_: unknown, row: ToolPolicyRow) => (
         <Switch
           checked={row.status === 1}
-          checkedChildren="啟用"
-          unCheckedChildren="停用"
+          checkedChildren={t('aiOperationAuth.enableAction')}
+          unCheckedChildren={t('aiOperationAuth.disableAction')}
           onChange={() => handleToggleStatus(row)}
         />
       ),
     },
-    { title: '最後更新人', dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
-    { title: '最後更新時間', dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
+    { title: t('aiOperationAuth.colUpdatedBy'), dataIndex: 'updatedBy', width: 100, render: (v: string) => v || '-' },
+    // 後端 LocalDateTime 序列化成 Unix 毫秒，直接渲染会把 1790183892000 印到页面上
+    { title: t('aiOperationAuth.colUpdatedAt'), dataIndex: 'updatedAt', width: 160, render: (v: string) => formatEpochOrDash(v) },
     {
-      title: '操作', key: 'action', width: 140, align: 'center',
+      title: t('common.action'), key: 'action', width: 140, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?toolKey=${encodeURIComponent(row.code)}`)}>編輯</Button>
-          <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?toolKey=${encodeURIComponent(row.code)}`)}>調用日誌</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?toolKey=${encodeURIComponent(row.code)}`)}>{t('common.edit')}</Button>
+          <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?toolKey=${encodeURIComponent(row.code)}`)}>{t('aiOperationAuth.toolCallLog')}</Button>
         </Space>
       ),
     },
   ]
 
-  return (
-    <div className="content-area">
-      {/* 智能中心 (AI) 菜單界面頂部沒有菜單名稱 */}
-
+  /** 工具授權主體：包進 Tab，與同屬「AI 操作授權」的賬號白名單並列 */
+  const toolContent = (
+    <>
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="工具名稱">
-            <Input value={queryName} placeholder="請輸入工具名稱" allowClear onChange={(e) => setQueryName(e.target.value)} />
+          <Form.Item label={t('aiOperationAuth.colToolName')}>
+            <Input value={queryName} placeholder={t('aiOperationAuth.searchToolNamePh')} allowClear onChange={(e) => setQueryName(e.target.value)} />
           </Form.Item>
-          <Form.Item label="對應菜單">
-            <Input value={queryMenu} placeholder="請輸入業務菜單名稱" allowClear onChange={(e) => setQueryMenu(e.target.value)} />
+          <Form.Item label={t('aiOperationAuth.colMenuName')}>
+            <Input value={queryMenu} placeholder={t('aiOperationAuth.searchMenuNamePh')} allowClear onChange={(e) => setQueryMenu(e.target.value)} />
           </Form.Item>
-          <Form.Item label="權限等級">
+          <Form.Item label={t('aiOperationAuth.colLevel')}>
             <Select
               value={queryLevel}
-              placeholder="全部"
+              placeholder={t('aiOperationAuth.allOption')}
               allowClear
-              options={TOOL_LEVELS.map((l) => ({ value: l, label: `${l} · ${TOOL_LEVEL_META[l].name}` }))}
+              options={TOOL_LEVELS.map((l) => ({ value: l, label: `${l} · ${t(`aiOperationAuth.levelName.${l}`)}` }))}
               onChange={(v) => setQueryLevel(v)}
             />
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
+      </div>
+
+      {/* 紧急熍断：后端能力早就有了，但全站没有任何入口，出事时管理员无法急停（深度测试实锤） */}
+      <div
+        style={{
+          border: `1px solid ${killSwitch?.engaged ? '#FFCCC7' : '#f0f0f0'}`,
+          background: killSwitch?.engaged ? '#FFF1F0' : '#fff',
+          borderRadius: 8, padding: '16px 20px', marginBottom: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PoweroffOutlined style={{ color: killSwitch?.engaged ? '#FF4D4F' : '#8C8C8C' }} />
+            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiOperationAuth.killSwitchTitle')}</span>
+            <Tag color={killSwitch?.engaged ? 'error' : 'success'} style={{ borderRadius: 4 }}>
+              {killSwitch?.engaged ? t('aiOperationAuth.killSwitchOn') : t('aiOperationAuth.killSwitchOff')}
+            </Tag>
+          </div>
+          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiOperationAuth.killSwitchDesc')}</div>
+          {killSwitch?.engaged && (
+            <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}>
+              {t('aiOperationAuth.killSwitchOperator')}：{killSwitch.operator}｜{t('aiOperationAuth.killSwitchReasonLabel')}
+              ：{killSwitch.reason || '-'}｜{t('aiOperationAuth.killSwitchUpdatedAt')}：{formatEpochOrDash(killSwitch.updatedAt)}
+            </div>
+          )}
+        </div>
+        <Space>
+          <Switch
+            checked={!!killSwitch?.engaged}
+            checkedChildren={t('aiOperationAuth.killSwitchOn')}
+            unCheckedChildren={t('aiOperationAuth.killSwitchOff')}
+            loading={killSwitchSaving}
+            onChange={(next) => handleKillSwitchToggle(next)}
+          />
+        </Space>
       </div>
 
       {/* 權限等級圖例 */}
@@ -225,10 +353,10 @@ export default function AiOperationAuth() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <span style={{ fontWeight: 700, color: meta.color }}>{level}</span>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>{meta.name}</span>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{t(`aiOperationAuth.levelName.${level}`)}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: 1.5 }}>{meta.desc}</div>
-              <div style={{ fontSize: 11, color: meta.color, marginTop: 4 }}>人工介入：{meta.human}</div>
+              <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: 1.5 }}>{t(`aiOperationAuth.levelDesc.${level}`)}</div>
+              <div style={{ fontSize: 11, color: meta.color, marginTop: 4 }}>{t('aiOperationAuth.humanIntervention')}{t(`aiOperationAuth.levelHuman.${level}`)}</div>
             </div>
           )
         })}
@@ -238,14 +366,14 @@ export default function AiOperationAuth() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="人工干預策略"
-        description="L2 操作 AI 生成內容後需用戶在界面點擊「確認提交」才真正執行；L3 操作自動進入審批流；L0 操作 AI 僅提示前往對應菜單人工處理；涉及金額超過風控閾值的操作自動升級為 L0。"
+        message={t('aiOperationAuth.manualPolicyTitle')}
+        description={t('aiOperationAuth.manualPolicyDesc')}
       />
 
       {/* 操作區：右側新增 + 列配置 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-operation-auth-edit')}>新增</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-operation-auth-edit')}>{t('common.add')}</Button>
           {configComponent}
         </div>
       </div>
@@ -256,9 +384,21 @@ export default function AiOperationAuth() {
         loading={loading}
         columns={toolColumns}
         dataSource={filteredTools}
-        pagination={false}
+        pagination={tablePagination(t)}
       />
+    </>
+  )
 
+  return (
+    <div className="content-area">
+      {/* 賬號白名單按決策口徑歸屬本菜單：此前它只存在於無菜單入口的 /ai-quota-auth，管理員無處可改 */}
+      <Tabs
+        defaultActiveKey="tools"
+        items={[
+          { key: 'tools', label: t('aiOperationAuth.toolAuthTab'), children: toolContent },
+          { key: 'whitelist', label: t('aiOperationAuth.whitelistTab'), children: <AccountWhitelistPanel /> },
+        ]}
+      />
     </div>
   )
 }

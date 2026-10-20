@@ -39,8 +39,21 @@ class RuleConfigKeyRegistryTest {
     void securityAndAlgorithm() {
         assertEquals(RuleConfigKeyRegistry.MENU_SECURITY, RuleConfigKeyRegistry.resolveOwnerMenu("session_idle_timeout_ms"));
         assertEquals(RuleConfigKeyRegistry.MENU_ALGORITHM, RuleConfigKeyRegistry.resolveOwnerMenu("organic_traffic_show_dimension_weight"));
-        assertEquals(RuleConfigKeyRegistry.MENU_ALGORITHM, RuleConfigKeyRegistry.resolveOwnerMenu("ai_model_qw_accounts"));
-        assertEquals(RuleConfigKeyRegistry.MENU_ALGORITHM, RuleConfigKeyRegistry.resolveOwnerMenu("ai_model_ds_accounts"));
+    }
+
+    /**
+     * AI 通道账号白名单归 AI 治理菜单，不归规则中心。
+     * <p>钉住这个归属的原因：LlmChannelRouter 运行时按它做准入，若把它留在 rule-algorithm，
+     * 内置超管（工号账号无 rule-algorithm 授权）会 GET/PUT 皆 403 —— 配置能生效但没人能改，
+     * 等于“不可运维的黑盒开关”。改到 ai-operation-auth（超管持有 view/edit）后才闭环。
+     */
+    @Test
+    @DisplayName("AI 通道賬號白名單歸 AI 治理菜單（可被超管讀寫）")
+    void aiChannelWhitelistBelongsToAiGovernance() {
+        assertEquals(RuleConfigKeyRegistry.MENU_AI_GOVERNANCE,
+                RuleConfigKeyRegistry.resolveOwnerMenu("ai_model_qw_accounts"));
+        assertEquals(RuleConfigKeyRegistry.MENU_AI_GOVERNANCE,
+                RuleConfigKeyRegistry.resolveOwnerMenu("ai_model_ds_accounts"));
     }
 
     @Test

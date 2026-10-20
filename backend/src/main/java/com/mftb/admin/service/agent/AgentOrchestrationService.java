@@ -1,5 +1,6 @@
 package com.mftb.admin.service.agent;
 
+import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.service.agent.tool.AgentTool;
 import com.mftb.admin.entity.AiToolPolicy;
 import com.mftb.admin.entity.McpTool;
@@ -9,16 +10,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.service.AiConversationEventService;
+import com.mftb.admin.service.AiConversationService;
 import com.mftb.admin.service.AiMyCenterService;
 import com.mftb.admin.dto.AiMyCenterDTO;
 
@@ -41,11 +37,13 @@ public class AgentOrchestrationService {
 
     private static final int MAX_TOOL_ROUNDS = 5;
     private static final int MAX_MESSAGES = 20;
+    /** 预占用的单次补全上限（无 max_tokens 时的兑底，与旧网关口径一致） */
+    private static final int ESTIMATED_COMPLETION_TOKENS = 2048;
     private static final String SYSTEM_RULES = """
             規則：
             - 使用繁體中文回覆
             - 金額顯示使用千分位格式（如 1,000,000）
-            - 品牌名稱：1=閃蜂，2=mFood
+            - 品牌名稱：flashBee=閃蜂，mFood=mFood；調用工具時 brand 參數必須傳 flashBee 或 mFood，不要傳 1/2 或中文名
             - 如果用戶提到的集團名稱模糊，先嘗試模糊匹配，有多個結果時列出讓用戶選擇
             - 查詢結果為空時，明確告知用戶未找到數據
             - 不要編造數據，只根據工具返回的實際結果回覆
@@ -57,11 +55,17 @@ public class AgentOrchestrationService {
     private final LlmChannelRouter channelRouter;
     private final AiMyCenterService myCenterService;
     private final AiConversationEventService eventService;
-    private final RestTemplate restTemplate;
+    private final LlmHttpClient llmClient;
     private final ObjectMapper objectMapper;
+    /** A1：问答链路计量与预算统一入口（与网关口径一致，避得换了入口就丢账） */
+    private final LlmMeteringService metering;
+    /** B4：服务端回填会话的 model_key / request_count（前端 PUT 从来不传这两个字段） */
+    private final AiConversationService conversationService;
     /** 将已安装的外部工具（mcp_tool + ai_tool_policy）一并下放到 LLM tools schema */
     private final McpToolMapper mcpToolMapper;
     private final AiToolPolicyMapper toolPolicyMapper;
+    /** D2：内建工具执行也要写 ai_tool_exec_log（复用工具策略的日志入口） */
+    private final com.mftb.admin.service.AiToolPolicyService toolPolicyService;
 
     @Data
     public static class OrchestrateRequest {
@@ -87,6 +91,13 @@ public class AgentOrchestrationService {
         private List<Map<String, Object>> nextMessages = List.of();
         /** 已执行过的内建工具调用（供事件时间线展示） */
         private List<ToolTrace> traces = new ArrayList<>();
+        /**
+         * 本轮不是 AI 正常回复（熔断/无权限/额度/上游异常），而是给用户的提示文案。
+         * <p>为什么需要这个标记：以前错误文案与正常回复一样回 HTTP 200 + text，前端把它当助手回复
+         * 写入会话历史，下一轮又当作上下文发给模型 → 一次超时会让整个会话每轮必挂（实测）。
+         * 有了 errorKind，前端可以按错误态展示且不入库、不进上下文。
+         */
+        private String errorKind;
     }
 
     @Data
@@ -106,11 +117,22 @@ public class AgentOrchestrationService {
         String username = caller;
         LlmChannelRouter.Channel channel = pickChannel(req.getMode(), username);
         if (channel == null) {
+            out.setErrorKind("no_channel");
             out.setText("當前賬號沒有可用模型（部分模型未對你開放），請聯繫管理員申請開通");
             return out;
         }
-        AiMyCenterDTO.QuotaCheckVO quota = myCenterService.checkQuota(null, channel.getDefaultModelKey());
+        // A3：模型授权必须在服务端判定——前端把输入框置灰不是安全边界，绕过 UI 直接 POST 就能偷跑模型
+        String modelKey = channel.getDefaultModelKey();
+        if (!isModelAuthorized(modelKey)) {
+            appendEvent(req.getConversationPk(), "POLICY_DECISION", username, Map.of(
+                    "decision", "reject", "reason", "no_model_auth", "model", String.valueOf(modelKey)));
+            out.setErrorKind("no_model_auth");
+            out.setText("當前賬號未被授權使用模型「" + modelKey + "」，請聯繫管理員在「員工模型權控」開通後重試");
+            return out;
+        }
+        AiMyCenterDTO.QuotaCheckVO quota = myCenterService.checkQuota(null, modelKey);
         if (quota != null && "reject".equals(quota.getAction())) {
+            out.setErrorKind("quota_reject");
             out.setText(quota.getMessage() == null ? "已超出額度限制" : quota.getMessage());
             return out;
         }
@@ -125,6 +147,8 @@ public class AgentOrchestrationService {
         long totalTokens = 0;
         String modelUsed = channel.getDefaultModelKey();
         List<Map<String, Object>> toolSchemas = allToolSchemas();
+        // 每轮单独一个 requestId：一次上游往返 = 一条用量明细 + 一条预算流水，多轮工具循环不能共账
+        String requestIdBase = "orch-" + java.util.UUID.randomUUID();
 
         for (int round = 0; round <= MAX_TOOL_ROUNDS; round++) {
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -135,14 +159,36 @@ public class AgentOrchestrationService {
                 payload.put("tools", toolSchemas);
                 payload.put("tool_choice", "auto");
             }
-            JsonNode resp = callLlm(channel, payload);
+            JsonNode resp;
+            String roundRequestId = requestIdBase + "-r" + round;
+            metering.reserve(roundRequestId, username, channel,
+                    estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+            try {
+                resp = callLlm(channel, payload);
+            } catch (LlmHttpClient.LlmCallException e) {
+                log.warn("[AgentOrch] LLM 调用失败[{}]: {}", e.getCategory(), e.getMessage());
+                metering.release(roundRequestId, e.getCategory().name());
+                appendEvent(req.getConversationPk(), "GATEWAY_ERROR", username,
+                        Map.of("category", e.getCategory().name(), "round", round));
+                out.setErrorKind(e.getCategory().name().toLowerCase());
+                out.setText(e.userMessage());
+                out.setTokens(totalTokens);
+                out.setModel(modelUsed);
+                return out;
+            }
             if (resp == null) {
+                metering.release(roundRequestId, "empty_body");
+                out.setErrorKind("upstream_empty");
                 out.setText("AI 服務暫時不可用，請稍後再試。");
                 out.setTokens(totalTokens);
                 out.setModel(modelUsed);
                 return out;
             }
-            totalTokens += usageTokens(resp);
+            // A1：服务端观测到的 usage 落账（biz_llm_usage）+ 预算结算（ai_budget_ledger）
+            totalTokens += metering.settle(roundRequestId, username, req.getMode(), channel, resp);
+            appendEvent(req.getConversationPk(), "QUOTA_CHARGE", username, Map.of(
+                    "requestId", roundRequestId, "model", String.valueOf(modelUsed),
+                    "verification", LlmMeteringService.verification(channel)));
             modelUsed = resp.path("model").asText(modelUsed);
             JsonNode choice = resp.path("choices").path(0).path("message");
             String content = choice.path("content").asText("");
@@ -153,17 +199,35 @@ public class AgentOrchestrationService {
                 out.setModel(modelUsed);
                 appendEvent(req.getConversationPk(), "ASSISTANT_TURN", username,
                         Map.of("chars", content.length(), "preview", preview(content, 200), "toolCalls", 0));
+                // B4：本回合真正完成，服务端记一次调用并固定实际使用的模型
+                conversationService.recordAgentTurn(req.getConversationPk(), username, modelUsed);
                 return out;
             }
             if (round == MAX_TOOL_ROUNDS) {
                 // 轮次超限，去掉 tools 再拿一次收尾
                 payload.remove("tools");
                 payload.remove("tool_choice");
-                JsonNode finalResp = callLlm(channel, payload);
-                String finalContent = finalResp == null ? "查詢完成，但無法生成回覆。"
-                        : finalResp.path("choices").path(0).path("message").path("content").asText("");
+                String finalRequestId = requestIdBase + "-rfinal";
+                metering.reserve(finalRequestId, username, channel,
+                        estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+                String finalContent;
+                try {
+                    JsonNode finalResp = callLlm(channel, payload);
+                    if (finalResp == null) {
+                        metering.release(finalRequestId, "empty_body");
+                        finalContent = "查詢完成，但無法生成回覆。";
+                    } else {
+                        totalTokens += metering.settle(finalRequestId, username, req.getMode(), channel, finalResp);
+                        finalContent = finalResp.path("choices").path(0).path("message").path("content").asText("");
+                    }
+                } catch (LlmHttpClient.LlmCallException e) {
+                    log.warn("[AgentOrch] 收尾调用失败[{}]: {}", e.getCategory(), e.getMessage());
+                    metering.release(finalRequestId, e.getCategory().name());
+                    out.setErrorKind(e.getCategory().name().toLowerCase());
+                    finalContent = e.userMessage();
+                }
                 out.setText(finalContent);
-                out.setTokens(totalTokens + usageTokens(finalResp));
+                out.setTokens(totalTokens);
                 out.setModel(modelUsed);
                 return out;
             }
@@ -207,6 +271,9 @@ public class AgentOrchestrationService {
                         Map.of("toolKey", name, "argsDigest", shortDigest(argsJson)));
                 appendEvent(req.getConversationPk(), "TOOL_RESULT", username,
                         Map.of("toolKey", name, "success", ok ? 1 : 0, "elapsed", cost));
+                // D2：内建工具也必须进 ai_tool_exec_log。以前只有外部工具走 /api/mcp/exec 时写日志，
+                // 导致「執行日誌」页永远为空，而页面承诺“所有 AI 调用均留痕”——审计不能只盖一半。
+                recordToolExecLog(name, username, shortDigest(argsJson), cost, ok);
                 working.add(Map.of("role", "tool", "tool_call_id", callId,
                         "content", toolResult == null ? "" : toolResult));
             }
@@ -224,6 +291,25 @@ public class AgentOrchestrationService {
 
     /* ────────────────── 内部工具 ────────────────── */
 
+    /** 内建工具执行留痕（与 /api/mcp/exec 同一张表、同一口径）；失败只留警告不阻断回复。 */
+    private void recordToolExecLog(String toolKey, String caller, String digest, long elapsedMs, boolean ok) {
+        try {
+            com.mftb.admin.entity.AiToolExecLog entry = new com.mftb.admin.entity.AiToolExecLog();
+            entry.setToolKey(toolKey);
+            entry.setCaller(caller);
+            entry.setArgsDigest(digest);
+            entry.setDecision("allow");
+            entry.setElapsedMs(elapsedMs);
+            entry.setSuccess(ok ? 1 : 0);
+            if (!ok) {
+                entry.setRejectReason("tool_execution_failed");
+            }
+            toolPolicyService.logExecution(entry);
+        } catch (Exception e) {
+            log.warn("[AgentOrch] 工具執行日誌写入失敗 tool={}: {}", toolKey, e.getMessage());
+        }
+    }
+
     private LlmChannelRouter.Channel pickChannel(String mode, String username) {
         List<String> candidates = new ArrayList<>();
         if ("primary".equals(mode)) candidates.add(LlmChannelRouter.CHANNEL_PRIMARY);
@@ -239,23 +325,9 @@ public class AgentOrchestrationService {
         return null;
     }
 
+    /** 转发到 OpenAI 兼容端点；失败以 {@link LlmHttpClient.LlmCallException} 抛出，由调用方映射文案。 */
     private JsonNode callLlm(LlmChannelRouter.Channel channel, Map<String, Object> payload) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            if (channel.getApiKey() != null && !channel.getApiKey().isBlank()) {
-                headers.setBearerAuth(channel.getApiKey());
-            }
-            String url = normalizeBaseUrl(channel.getBaseUrl());
-            ResponseEntity<String> resp = restTemplate.exchange(
-                    url, HttpMethod.POST, new HttpEntity<>(payload, headers), String.class);
-            String body = resp.getBody();
-            if (body == null || body.isEmpty()) return null;
-            return objectMapper.readTree(body);
-        } catch (Exception e) {
-            log.warn("[AgentOrch] LLM 调用失败: {}", e.getMessage());
-            return null;
-        }
+        return llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), payload);
     }
 
     private List<Map<String, Object>> builtInToolSchemas() {
@@ -345,17 +417,22 @@ public class AgentOrchestrationService {
         catch (Exception e) { return Map.of(); }
     }
 
-    private static long usageTokens(JsonNode resp) {
-        if (resp == null) return 0L;
-        JsonNode u = resp.path("usage");
-        return u.path("prompt_tokens").asLong(0) + u.path("completion_tokens").asLong(0);
+    /**
+     * A3：模型授权校验。走 {@link AiMyCenterService#hasModelAccess(String)}（与首页 my-models 同源），
+     * 网关与编排共用一个口径，避开“前端置灰、后端放行”的越权。
+     */
+    private boolean isModelAuthorized(String modelKey) {
+        try {
+            return myCenterService.hasModelAccess(modelKey);
+        } catch (Exception e) {
+            log.warn("[AgentOrch] 授权模型查询失败，拒绝调用: {}", e.getMessage());
+            return false;
+        }
     }
 
-    private static String normalizeBaseUrl(String base) {
-        if (base == null || base.isBlank()) return "https://api.deepseek.com/chat/completions";
-        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
-        if (trimmed.endsWith("/chat/completions")) return trimmed;
-        return trimmed + "/chat/completions";
+    /** 预占用的 prompt 估算：消息条数 × 200 兑底（无 tokenizer），结算以服务端实际 usage 为准。 */
+    private static int estimatePromptTokens(List<Map<String, Object>> working) {
+        return Math.max(1, working.size()) * 200;
     }
 
     private static String shortDigest(String s) {

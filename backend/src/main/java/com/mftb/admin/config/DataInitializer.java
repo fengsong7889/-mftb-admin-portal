@@ -1755,12 +1755,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + " ('deepseek', 'DeepSeek', 'DeepSeek 大模型', 'https://api.deepseek.com/v1', 1, 0, 2)");
 
         // 模型种子: 使用子查询获取 provider_id, 避免硬编码自增 ID
+        // version 必须写非空值: 唯一键 uk_provider_key_version(provider_id, model_key, version) 在 MySQL 下不约束 NULL,
+        // 写 NULL 会让下面的 INSERT IGNORE 每次启动都多插一份重复模型（存量 21 行/3 个模型即由此而来，
+        // 由 ai:model-dedup:v1.0 清理）
         jdbcTemplate.execute(
             "INSERT IGNORE INTO ai_model (provider_id, model_key, name, version, description, api_compat, type, deploy_type,"
             + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
             + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
             + " status, sort_order)"
-            + " SELECT p.id, 'qwen3.7-flash', '通义千问 3.7 Flash', NULL, '阿里云百炼 qwen3.7-flash 轻量模型',"
+            + " SELECT p.id, 'qwen3.7-flash', '通义千问 3.7 Flash', 'default', '阿里云百炼 qwen3.7-flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
             + " 200000, 8192, 0.200000, 0.800000, 0.040000, 'CNY', 1, 1"
             + " FROM ai_provider p WHERE p.provider_key = 'dashscope' LIMIT 1");
@@ -1770,7 +1773,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
             + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
             + " status, sort_order)"
-            + " SELECT p.id, 'deepseek-chat', 'DeepSeek Chat', NULL, 'DeepSeek-V3 对话模型',"
+            + " SELECT p.id, 'deepseek-chat', 'DeepSeek Chat', 'default', 'DeepSeek-V3 对话模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 1,"
             + " 128000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 2"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");
@@ -1780,7 +1783,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + " modalities, vision_support, function_calling, json_mode, streaming, thinking_mode,"
             + " context_window, max_output_tokens, input_price, output_price, cached_input_price, currency,"
             + " status, sort_order)"
-            + " SELECT p.id, 'deepseek-v4-flash', 'DeepSeek V4 Flash', NULL, 'DeepSeek V4 Flash 轻量模型',"
+            + " SELECT p.id, 'deepseek-v4-flash', 'DeepSeek V4 Flash', 'default', 'DeepSeek V4 Flash 轻量模型',"
             + " 'openai', 'chat', 'cloud', 'text', 0, 1, 1, 1, 0,"
             + " 128000, 8192, 0.220000, 0.660000, NULL, 'USD', 1, 3"
             + " FROM ai_provider p WHERE p.provider_key = 'deepseek' LIMIT 1");

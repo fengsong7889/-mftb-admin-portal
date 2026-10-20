@@ -10,12 +10,14 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingEvent;
+import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingNotifyLog;
 import com.mftb.admin.entity.MeetingRoom;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.mapper.MeetingEventMapper;
+import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.MeetingNotifyLogMapper;
 import com.mftb.admin.mapper.MeetingRoomMapper;
 import com.mftb.admin.mapper.SysUserMapper;
@@ -69,6 +71,17 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
 
     /** 摘要里"即将开始"的观察天数 */
     private static final int UPCOMING_DAYS = 7;
+
+    /**
+     * 纪要入口的阶段口径：已进入或已收尾才谈得上纪要。
+     * <p>必须与 {@code MeetingMinutesServiceImpl.RECORDABLE_PHASES} 逐字一致：
+     * 两边不一致时会出现"列表给了按钮、点进去被拒"，那比不给按钮更让人怀疑系统。
+     */
+    private static final List<String> RECORDABLE_PHASES = List.of(PHASE_ONGOING, PHASE_ENDED,
+            MeetingConstants.STATUS_FINISHED);
+    /** 已取消/已释放的会不产生纪要（与纪要服务同一口径） */
+    private static final List<String> NON_RECORDABLE_STATUSES = List.of(
+            MeetingConstants.STATUS_CANCELLED, MeetingConstants.STATUS_RELEASED);
     /** 单日日程最多条目：真实会议密度远低于此，超出说明查询条件传错 */
     private static final int SCHEDULE_LIMIT = 200;
     /** 通知正文里的短时格式：卡片要短，重复日期在上一行已经给过 */
@@ -80,6 +93,7 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
     private final MeetingAttendeeMapper attendeeMapper;
     private final MeetingEventMapper eventMapper;
     private final MeetingNotifyLogMapper notifyMapper;
+    private final MeetingMinutesMapper minutesMapper;
     private final SysUserMapper userMapper;
     private final MeetingAccessGuard guard;
     private final MeetingRuleService ruleService;
@@ -125,6 +139,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         vo.setAttendees(attendees.stream().map(this::toAttendeeVO).toList());
         vo.setNotifies(notifyMapper.findByBooking(id).stream().map(this::toNotifyVO).toList());
         vo.setNotifySkippedCount(notifyMapper.countInviteSkipped(id));
+        applyMinutes(vo, minutesMapper.findByBooking(id),
+                guard.canRecordMinutes(current) || guard.canOperateRecords(current));
         return vo;
     }
 
@@ -1232,15 +1248,36 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 : roomMapper.selectBatchIds(roomIds).stream()
                         .collect(Collectors.toMap(MeetingRoom::getId, room -> room, (left, right) -> left));
         MeetingRuleService.GlobalRule global = ruleService.globalRule();
+        // 纪要状态与入口一次批量取：逐行查会变成 20 行 × 1 次往返，而列表页每次切 Tab 都要重跑
+        Map<Long, MeetingMinutes> minutesByBooking = minutesMapper.findByBookings(ids).stream()
+                .collect(Collectors.toMap(MeetingMinutes::getBookingId, row -> row, (left, right) -> left));
+        boolean mayRecordMinutes = guard.canRecordMinutes(current) || guard.canOperateRecords(current);
         List<MeetingBookingDto.VO> records = new ArrayList<>(bookings.size());
         for (MeetingBooking booking : bookings) {
             List<MeetingAttendee> attendees = byBooking.getOrDefault(booking.getId(), List.of());
             MeetingBookingDto.VO vo = toVO(booking, current,
                     rooms.get(booking.getRoomId()), global, findMyRow(attendees, current.getId()));
             vo.setAttendees(attendees.stream().map(this::toAttendeeVO).toList());
+            applyMinutes(vo, minutesByBooking.get(booking.getId()), mayRecordMinutes);
             records.add(vo);
         }
         return records;
+    }
+
+    /**
+     * 把纪要状态挂到会议行上。
+     *
+     * <p>canMinutes 在服务端算而不是让前端复算：前端只看到 myRole/phase，看不到动作权与行政代录的分支，
+     * 自己拼一份判定迟早与 {@code MeetingMinutesServiceImpl.requireRecordable} 漂移，
+     * 结果是列表给了入口、点进去被拒——这种"按钮能点但一定失败"比没有按钮更糟。
+     */
+    private void applyMinutes(MeetingBookingDto.VO vo, MeetingMinutes minutes, boolean mayRecordMinutes) {
+        vo.setMinutesId(minutes == null ? null : minutes.getId());
+        vo.setMinutesStatus(minutes == null ? "none" : minutes.getStatus());
+        boolean related = vo.getMyRole() != null && !"none".equals(vo.getMyRole());
+        boolean phaseAllowed = !NON_RECORDABLE_STATUSES.contains(vo.getStatus())
+                && RECORDABLE_PHASES.contains(vo.getPhase());
+        vo.setCanMinutes(mayRecordMinutes && related && phaseAllowed);
     }
 
     /** 单行兜底入口（改期/响应等写后立即回显的路径）：自己补齐房间、规则与"我"的行 */

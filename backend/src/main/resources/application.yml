@@ -110,6 +110,13 @@ schema:
 app:
   build-tag: ${APP_BUILD_TAG:unknown}
 
+# AI 智能中心运行参数
+ai:
+  llm:
+    # LLM 专用 HTTP 超时：思考型模型单次补全常超 10s，不能复用通用 RestTemplate 的短超时
+    connect-timeout-ms: ${AI_LLM_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${AI_LLM_READ_TIMEOUT_MS:120000}
+
 # 騰訊文檔開放平台集成（個人開發者）：憑據經 backend/.env.local 注入，嚴禁寫死進受版本控制文件
 tencent:
   docs:

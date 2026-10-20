@@ -276,7 +276,6 @@ const _OLD_KEY_TO_PATH_REMOVED = {
     'version-history': '/version-history',
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
-  'ai_quota_auth': '/ai-quota-auth',
   'ai-operation-auth': '/ai-operation-auth',
   'ai-access-request': '/ai-access-apply',
   'ai-mcp-service': '/ai-mcp-service',
@@ -534,7 +533,6 @@ const keyToIcon: Record<string, ReactNode> = {
   // 智能中心 (AI)
   'ai-assistant': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
-  'ai_quota_auth': <SafetyCertificateOutlined />,
   'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
   'ai-access-request': <KeyOutlined />,    // AI 使用申請
   'ai-mcp-service': <BlockOutlined />,     // MCP 服務

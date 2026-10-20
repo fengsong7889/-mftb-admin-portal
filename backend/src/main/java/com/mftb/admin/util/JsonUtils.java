@@ -116,6 +116,20 @@ public final class JsonUtils {
         }
     }
 
+    /** 泛型解析 JSON 对象为任意 POJO（如会议紀要正文）；解析失败返回 null，由调用方决定降级还是报错 */
+    public static <T> T parse(String json, Class<T> type) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return MAPPER.readValue(json, type);
+        } catch (Exception e) {
+            // 不记原文：正文里可能含员工姓名与会议结论，日志只留类型与原因
+            log.warn("解析 JSON 对象失败, 返回 null: type={}, msg={}", type.getSimpleName(), e.getMessage());
+            return null;
+        }
+    }
+
     /** 泛型解析 JSON 数组为 List<T>，解析失败返回空列表 */
     public static <T> List<T> parseList(String json, Class<T> elementClass) {
         if (json == null || json.isBlank()) {

@@ -11,6 +11,7 @@ import {
   ExportOutlined,
 } from '@ant-design/icons'
 import { fetchUsageSummary, fetchUsageRecords } from '../../api/llmUsage'
+import { tablePagination } from '../../utils/tableDisplay'
 import type { UsageRecord, UsageSummary } from '../../api/llmUsage'
 
 const { RangePicker } = DatePicker
@@ -19,26 +20,21 @@ const { RangePicker } = DatePicker
 const CURRENCY_SYMBOL: Record<string, string> = { CNY: '¥', USD: '$' }
 const currencySymbol = (currency: string) => CURRENCY_SYMBOL[currency] ?? (currency ? `${currency} ` : '')
 
-/** 引擎模式 → 展示文案與狀態色 */
-const MODE_META: Record<string, { label: string; color: string }> = {
-  'auto': { label: '省錢優先', color: 'success' },
-  'primary': { label: '固定 QW', color: 'processing' },
-  'off-peak': { label: '固定 DS', color: 'warning' },
+/** 引擎模式 → i18n key 與狀態色 */
+const MODE_META: Record<string, { labelKey: string; color: string }> = {
+  'auto': { labelKey: 'aiEnergyDetail.modeAuto', color: 'success' },
+  'primary': { labelKey: 'aiEnergyDetail.modePrimary', color: 'processing' },
+  'off-peak': { labelKey: 'aiEnergyDetail.modeOffPeak', color: 'warning' },
 }
 
-/** 路由通道 → 展示文案 */
+/** 路由通道 → 展示文案（产品名，保持原样） */
 const CHANNEL_LABEL: Record<string, string> = { primary: 'QW（百煉）', 'off-peak': 'DS（DeepSeek）' }
 
 /** V0 §B.5：计量可信度标签（VERIFIED=服务端实取，ESTIMATED=无单价但取到 tokens，UNKNOWN=历史自报） */
-const VERIFICATION_META: Record<string, { label: string; color: string }> = {
-  VERIFIED: { label: '已核實', color: 'green' },
-  ESTIMATED: { label: '估算', color: 'blue' },
-  UNKNOWN: { label: '未知', color: 'default' },
-}
-const VERIFICATION_LABEL: Record<string, string> = {
-  VERIFIED: '已核實',
-  ESTIMATED: '估算',
-  UNKNOWN: '未知',
+const VERIFICATION_META: Record<string, { labelKey: string; color: string }> = {
+  VERIFIED: { labelKey: 'aiEnergyDetail.verified', color: 'green' },
+  ESTIMATED: { labelKey: 'aiEnergyDetail.estimated', color: 'blue' },
+  UNKNOWN: { labelKey: 'aiEnergyDetail.unknown', color: 'default' },
 }
 
 /** 格式化時間（後端 LocalDateTime 序列化為時間戳/字串均可解析） */
@@ -126,24 +122,30 @@ export default function AiEnergyDetail() {
     setExporting(true)
     try {
       if (filteredRecords.length === 0) {
-        message.info('當前範圍內沒有可導出的記錄')
+        message.info(t('aiEnergyDetail.noRecordsToExport'))
         return
       }
-      const header = '時間,使用員工,引擎模式,通道,模型,輸入tokens,輸出tokens,緩存tokens,費用,幣種,計量可信度'
+      const header = [
+        t('aiEnergyDetail.colTime'), t('aiEnergyDetail.colEmployee'), t('aiEnergyDetail.colMode'),
+        t('aiEnergyDetail.colChannel'), t('aiEnergyDetail.colModel'), t('aiEnergyDetail.colPromptTokens'),
+        t('aiEnergyDetail.colCompletionTokens'), t('aiEnergyDetail.colCachedTokens'), t('aiEnergyDetail.colCost'),
+        t('aiEnergyDetail.colCurrency'), t('aiEnergyDetail.colCredibility'),
+      ].join(',')
       const lines = filteredRecords.map((r) => [
-        formatTime(r.createdAt), employeeLabel(r), MODE_META[r.mode]?.label ?? r.mode,
+        formatTime(r.createdAt), employeeLabel(r),
+        MODE_META[r.mode] ? t(MODE_META[r.mode].labelKey) : r.mode,
         CHANNEL_LABEL[r.channel] ?? r.channel, r.model,
         r.promptTokens, r.completionTokens, r.cachedTokens, r.cost, r.currency || '--',
-        VERIFICATION_LABEL[r.verificationStatus ?? 'ESTIMATED'] ?? r.verificationStatus ?? 'ESTIMATED',
+        t(VERIFICATION_META[r.verificationStatus ?? 'ESTIMATED']?.labelKey ?? 'aiEnergyDetail.estimated'),
       ].join(','))
       const blob = new Blob([`\uFEFF${header}\n${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `AI能耗明細_${rangeParams().startDate}_${rangeParams().endDate}.csv`
+      link.download = `${t('aiEnergyDetail.exportFileName')}_${rangeParams().startDate}_${rangeParams().endDate}.csv`
       link.click()
       URL.revokeObjectURL(url)
-      message.success(`已導出 ${filteredRecords.length} 條記錄`)
+      message.success(t('aiEnergyDetail.exportSuccess', { count: filteredRecords.length }))
     } finally {
       setExporting(false)
     }
@@ -151,38 +153,38 @@ export default function AiEnergyDetail() {
 
   /* ── 明細列（平鋪，無折疊） ── */
   const detailColumns: ColumnsType<UsageRecord> = [
-    { title: '時間', dataIndex: 'createdAt', width: 170, render: formatTime },
+    { title: t('aiEnergyDetail.colTime'), dataIndex: 'createdAt', width: 170, render: formatTime },
     {
-      title: '使用員工', key: 'employee', width: 160,
+      title: t('aiEnergyDetail.colEmployee'), key: 'employee', width: 160,
       render: (_, row) => employeeLabel(row),
     },
     {
-      title: '引擎模式', dataIndex: 'mode', width: 110,
+      title: t('aiEnergyDetail.colMode'), dataIndex: 'mode', width: 110,
       render: (mode: string) => {
         const meta = MODE_META[mode]
-        return meta ? <Tag color={meta.color}>{meta.label}</Tag> : mode
+        return meta ? <Tag color={meta.color}>{t(meta.labelKey)}</Tag> : mode
       },
     },
-    { title: '通道', dataIndex: 'channel', width: 120, render: (channel: string) => CHANNEL_LABEL[channel] ?? channel },
-    { title: '模型', dataIndex: 'model', width: 160 },
-    { title: '輸入 tokens', dataIndex: 'promptTokens', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
-    { title: '輸出 tokens', dataIndex: 'completionTokens', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
+    { title: t('aiEnergyDetail.colChannel'), dataIndex: 'channel', width: 120, render: (channel: string) => CHANNEL_LABEL[channel] ?? channel },
+    { title: t('aiEnergyDetail.colModel'), dataIndex: 'model', width: 160 },
+    { title: t('aiEnergyDetail.colPromptTokens'), dataIndex: 'promptTokens', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
+    { title: t('aiEnergyDetail.colCompletionTokens'), dataIndex: 'completionTokens', width: 110, align: 'right', render: (v: number) => v.toLocaleString() },
     {
-      title: '費用', key: 'cost', width: 130, align: 'right',
+      title: t('aiEnergyDetail.colCost'), key: 'cost', width: 130, align: 'right',
       render: (_, record) => {
         // V0 §B.5：UNKNOWN 不再伪装为 0；无单价时展示“未知”灰字
         if (record.verificationStatus === 'UNKNOWN' || !record.currency) {
-          return <span style={{ color: '#8C8C8C' }}>未知</span>
+          return <span style={{ color: '#8C8C8C' }}>{t('aiEnergyDetail.unknown')}</span>
         }
         return `${currencySymbol(record.currency)}${Number(record.cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
       },
     },
     {
-      title: '計量可信度', key: 'verification', width: 110, align: 'center',
+      title: t('aiEnergyDetail.colCredibility'), key: 'verification', width: 110, align: 'center',
       render: (_, record) => {
         const status = record.verificationStatus ?? 'ESTIMATED'
         const meta = VERIFICATION_META[status] ?? VERIFICATION_META.ESTIMATED
-        return <Tag color={meta.color} style={{ margin: 0 }}>{meta.label}</Tag>
+        return <Tag color={meta.color} style={{ margin: 0 }}>{t(meta.labelKey)}</Tag>
       },
     },
   ]
@@ -192,7 +194,7 @@ export default function AiEnergyDetail() {
       {/* 查詢區域 */}
       <div className="search-section">
         <Form layout="inline">
-          <Form.Item label="日期範圍">
+          <Form.Item label={t('aiEnergyDetail.dateRange')}>
             <RangePicker
               value={dates}
               allowClear={false}
@@ -201,10 +203,10 @@ export default function AiEnergyDetail() {
               }}
             />
           </Form.Item>
-          <Form.Item label="員工">
+          <Form.Item label={t('aiEnergyDetail.employee')}>
             <Select
               value={username}
-              placeholder="全部"
+              placeholder={t('aiEnergyDetail.all')}
               allowClear
               showSearch
               optionFilterProp="label"
@@ -212,10 +214,10 @@ export default function AiEnergyDetail() {
               onChange={(value) => setUsername(value)}
             />
           </Form.Item>
-          <Form.Item label="模型">
+          <Form.Item label={t('aiEnergyDetail.model')}>
             <Select
               value={model}
-              placeholder="全部"
+              placeholder={t('aiEnergyDetail.all')}
               allowClear
               showSearch
               options={(optionsSummary?.byModel ?? []).map((row) => ({ value: row.model, label: row.model }))}
@@ -224,8 +226,8 @@ export default function AiEnergyDetail() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>
@@ -234,7 +236,7 @@ export default function AiEnergyDetail() {
       {/* 功能區：左側導出 */}
       <div className="action-section">
         <div className="action-section-left">
-          <Button className="btn-export" icon={<ExportOutlined />} loading={exporting} onClick={handleExport}>導出</Button>
+          <Button className="btn-export" icon={<ExportOutlined />} loading={exporting} onClick={handleExport}>{t('aiEnergyDetail.export')}</Button>
         </div>
       </div>
 
@@ -246,10 +248,8 @@ export default function AiEnergyDetail() {
         columns={detailColumns}
         dataSource={filteredRecords}
         pagination={{
-          defaultPageSize: 20,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (value) => `共 ${value} 條`,
+          ...tablePagination(t),
+          total: filteredRecords.length,
         }}
       />
     </div>

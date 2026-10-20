@@ -26,13 +26,15 @@ export const SOURCE_TAG_COLOR: Record<PermissionSource, string> = {
 }
 
 /** 額度狀態 */
-export type QuotaStatus = 'normal' | 'exhausted' | 'frozen'
+export type QuotaStatus = 'normal' | 'exhausted' | 'frozen' | 'ungranted'
 
 /** 額度狀態標籤 */
 export const QUOTA_STATUS_LABEL: Record<QuotaStatus, string> = {
   normal: '正常',
   exhausted: '已用完',
   frozen: '凍結',
+  /** 未授予任何額度配置：不是「不限量」的褒义，也不是凍結，就是没配 */
+  ungranted: '未授予額度',
 }
 
 /** 額度狀態 Tag 顏色 */
@@ -40,6 +42,7 @@ export const QUOTA_STATUS_COLOR: Record<QuotaStatus, string> = {
   normal: 'success',
   exhausted: 'error',
   frozen: 'default',
+  ungranted: 'default',
 }
 
 /** 模型權限項 */
@@ -92,7 +95,9 @@ export interface EmpPermissionSummary {
 
 /** 根據額度記錄計算員工額度狀態 */
 export function calcQuotaStatus(grants: EmpQuotaGrant[]): QuotaStatus {
-  if (!grants.length) return 'frozen'
+  // 没有任何额度配置 ≠ 凍結：后端 checkQuota 对「无适用额度维度」是 allowed=true 放行，
+  // 标成凍結会让管理员误判这个人用不了 AI。单独给一个「未授予額度」状态。
+  if (!grants.length) return 'ungranted'
   const active = grants.filter((g) => g.status === 1)
   if (!active.length) return 'frozen'
   const allExhausted = active.every((g) => g.usedValue >= g.quotaValue)

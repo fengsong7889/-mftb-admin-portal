@@ -573,10 +573,6 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
-  'ai_quota_auth': [
-    { key: 'view', label: '查看' },
-    { key: 'edit', label: '編輯' },
-  ],
   'ai-operation-auth': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
@@ -974,6 +970,21 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'meeting-config': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '修改規則/黑名單' },
+  ],
+  // 行政側紀要檢索（會議治理 › 會議紀要）：只讀，匯出跟隨後端 export 動作
+  'meeting-minutes-list': [
+    { key: 'view', label: '查看全部紀要' },
+    { key: 'export', label: '匯出' },
+  ],
+  // 通知模板：改文案與停用模板都是寫操作
+  'notification-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯模板' },
+  ],
+  // 推送開關：臨時靜音/恢復
+  'notification-switch': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '開啟/靜音' },
   ],
   // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
   'asset-claim': [
@@ -2090,6 +2101,13 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/meeting-record': 'meeting-record',
   '/meeting-config': 'meeting-config',
   '/meeting-blacklist-form': 'meeting-config',
+  // 会议纪要：表单页/查看页都不是菜单项，但都能从钉钉卡片与列表跳进来，
+  // 统一挂 meeting-my（纪要权限与「我与这场会的关系」同源，不另开一份菜单授权）
+  '/meeting-minutes': 'meeting-my',
+  '/meeting-minutes-list': 'meeting-minutes-list',
+  '/notification-template': 'notification-template',
+  '/notification-switch': 'notification-switch',
+  '/meeting-minutes-form': 'meeting-my',
   // 文檔中心（詳情/登記/編輯為文檔庫非菜單子頁，空間表單為空間管理子頁）
   '/doc-center': 'doc-library',
   '/doc-center/detail': 'doc-library',
@@ -2103,6 +2121,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/doc-learning/form': 'doc-learning',
   // 免登签到页（扫码直达）：不是菜单项，归到「我的會議」，没有登录态时由路由本身放行
   '/meeting-checkin': 'meeting-my',
+  // 纪要免登查看页（钉钉卡片直达）：与签到页同构，凭签名令牌放行
+  '/meeting-minutes-view': 'meeting-my',
   // 領用管理（子路由歸屬 asset-claim 菜單）
   '/asset-claim': 'asset-claim',
   '/asset-claim/add': 'asset-claim',

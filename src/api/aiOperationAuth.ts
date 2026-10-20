@@ -1,4 +1,5 @@
 import request from './request'
+import { formatEpochOrDash } from '../utils/tableDisplay'
 import { fetchMcpTools, type McpTool } from './mcpService'
 
 /** 与 aiPlatformMock 的 ToolDefinition 兼容的最小视图（V0 §B.2 后端真实数据源） */
@@ -43,12 +44,20 @@ const CATEGORY_LABEL: Record<string, string> = {
   notify: '通知渠道',
 }
 
-/** risk_level → L1/L2/L3；未登记或停用统一降为 L0（默认拒绝） */
+/**
+ * risk_level → L1/L2/L3（风险分级本身）。
+ * <p>以前把「未启用」也压成 L0，导致同一个工具在「MCP 服務」页显示 L3 需審批、
+ * 在「AI 操作授權」页显示 L0 禁止調用，管理员无从判断哪个是真的。
+ * 口径：分级只看 risk_level；是否放行由 status（enabled）单独表达，两件事不耦合。
+ * 未登记策略时回 L0（默认拒绝，与网关 enforce 一致）。
+ */
 function mapLevel(riskLevel: string | undefined, enabled: number): ToolPolicyRow['level'] {
-  if (enabled !== 1) return 'L0'
+  if (!riskLevel) return 'L0'
   if (riskLevel === 'high') return 'L3'
   if (riskLevel === 'medium') return 'L2'
-  return 'L1'
+  if (riskLevel === 'low') return 'L1'
+  void enabled
+  return 'L0'
 }
 
 function parseParams(paramsJson: string | null | undefined): ToolPolicyRow['params'] {
@@ -88,7 +97,7 @@ export async function fetchToolRegistry(): Promise<ToolPolicyRow[]> {
       description: tool.description ?? '',
       params: parseParams(tool.paramsJson),
       status: (enabled === 1 ? 1 : 0) as 0 | 1,
-      // 近 30 天调用次数与最近调用时间属审计聚合，本 PR 暂返回 0/null，V1 增加聚合视图
+      // 近 30 天调用量与最近调用时间：不编数，由调用方用 aggregateCallStats() 从执行日志聚合后覆盖
       callCount30d: 0,
       lastCalledAt: null,
       updatedBy: policy?.updatedBy,
@@ -103,6 +112,58 @@ export async function fetchToolRegistry(): Promise<ToolPolicyRow[]> {
 /** 启停工具（网关侧下次 enforce 立即生效） */
 export async function toggleToolStatus(toolKey: string, enabled: 0 | 1): Promise<void> {
   await request.patch(`/ai/tool-policy/${encodeURIComponent(toolKey)}/toggle?enabled=${enabled}`)
+}
+
+/* ────────────────── 紧急熔断（V0 §八 V0-7） ────────────────── */
+
+/** 熔断状态（后端 AgentKillSwitchService.Status） */
+export interface KillSwitchStatus {
+  engaged: boolean
+  operator: string
+  reason: string
+  updatedAt: string
+}
+
+/** 查当前熔断状态（GET /api/agent/kill-switch，需 ai-operation-auth:view） */
+export async function fetchKillSwitch(): Promise<KillSwitchStatus> {
+  return (await request.get('/agent/kill-switch')) as unknown as KillSwitchStatus
+}
+
+/** 切换熔断（需 ai-operation-auth:edit）；后端会落操作人与原因，并让跨实例在 5 秒内收敛 */
+export async function toggleKillSwitch(engaged: boolean, reason: string): Promise<KillSwitchStatus> {
+  return (await request.post('/agent/kill-switch', { engaged, reason })) as unknown as KillSwitchStatus
+}
+
+/**
+ * 用执行审计日志聚合「近 30 天调用 / 最近调用时间」。
+ * <p>为什么需要：以前两个字段在 API 层写死 0/null，页面上永远是一串假 0，
+ * 管理员会误读为“这些工具从未被调用过”。日志表已有数据，聚合就能拿真值。
+ */
+export async function aggregateCallStats(
+  rows: ToolPolicyRow[],
+  lookbackDays = 30,
+): Promise<ToolPolicyRow[]> {
+  const { records } = await fetchExecLogs({ page: 1, size: 200 })
+  const since = Date.now() - lookbackDays * 24 * 60 * 60 * 1000
+  const count = new Map<string, number>()
+  const latest = new Map<string, number>()
+  for (const log of records) {
+    // createdAt 实际是后端序列化的毫秒数字；旧写法 Date.parse(number) 会得到 NaN，
+    // 把全部记录都当“超出窗口”跳过，导致「近 30 天調用」永远显示 0
+    const ts = typeof log.createdAt === 'number' ? log.createdAt : Date.parse(String(log.createdAt))
+    if (!Number.isFinite(ts) || ts < since) continue
+    count.set(log.toolKey, (count.get(log.toolKey) ?? 0) + 1)
+    latest.set(log.toolKey, Math.max(latest.get(log.toolKey) ?? 0, ts))
+  }
+  return rows.map((row) => {
+    const hit = latest.get(row.code)
+    return {
+      ...row,
+      callCount30d: count.get(row.code) ?? row.callCount30d,
+      // 用本地时间格式，不用 toLocaleString 的环境相关输出（不同浏览器/语言下列宽会抖）
+      lastCalledAt: hit ? formatEpochOrDash(hit) : row.lastCalledAt,
+    }
+  })
 }
 
 /** 更新策略（风险等级 / 审批凭证 / 数据范围 / 备注） */
@@ -124,13 +185,16 @@ export interface ExecLogRow {
   id: number
   toolKey: string
   caller: string | null
+  /** 服务端解析出的人可读姓名（姓名（工号）），解析不到时等于 caller */
+  callerName?: string | null
   conversationId: string | null
   argsDigest: string | null
   decision: string
   rejectReason: string | null
   elapsedMs: number | null
   success: number | null
-  createdAt: string
+  /** 后端 Jackson 把 LocalDateTime 序列化成 Unix 毫秒数字，不是日期字符串 */
+  createdAt: string | number
 }
 
 /** 查询：GET /ai/tool-policy/exec-logs */

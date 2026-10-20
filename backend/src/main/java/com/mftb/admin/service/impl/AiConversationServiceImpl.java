@@ -98,6 +98,23 @@ public class AiConversationServiceImpl implements AiConversationService {
     }
 
     @Override
+    public void recordAgentTurn(Long conversationPk, String account, String modelKey) {
+        if (conversationPk == null || account == null || account.isBlank()) {
+            return;
+        }
+        try {
+            int rows = conversationMapper.recordAgentTurn(conversationPk, account,
+                    modelKey == null ? "" : modelKey);
+            if (rows == 0) {
+                // 会话不存在 / 不属于该账号 / 已在回收站：不阻断回复，但留得下痕迹
+                log.warn("AI 回合计数未命中会话 pk={} account={}（不存在、非本人或已软删）", conversationPk, account);
+            }
+        } catch (Exception e) {
+            log.warn("AI 回合计数失败 pk={}: {}", conversationPk, e.getMessage());
+        }
+    }
+
+    @Override
     public void deleteConversation(Long id) {
         String username = currentUsername();
         if (username == null) throw new IllegalStateException("未登录");

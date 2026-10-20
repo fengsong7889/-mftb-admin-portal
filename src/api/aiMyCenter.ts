@@ -92,6 +92,12 @@ export interface QuotaCheckResult {
   modelKey: string | null
   /** 是否放行（true=可调用） */
   allowed: boolean
+  /**
+   * 当前账号是否已被授予至少一条适用额度维度。
+   * reject 且此值为 false = 「从未配过额度」（应引导去申请），
+   * reject 且此值为 true = 「额度已用尽」（应引导申请加量）。
+   */
+  quotaConfigured?: boolean
   /** 是否已超额（命中硬限额） */
   overLimit: boolean
   /** 是否触发软限额提醒（接近但未超额） */

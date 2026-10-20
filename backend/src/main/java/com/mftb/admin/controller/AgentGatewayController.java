@@ -2,34 +2,30 @@ package com.mftb.admin.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.common.Result;
-import com.mftb.admin.dto.LlmUsageRecordRequest;
 import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiMyCenterService;
-import com.mftb.admin.service.LlmUsageService;
 import com.mftb.admin.service.agent.AiKillSwitchService;
 import com.mftb.admin.service.agent.AiKillSwitchService.Status;
-import com.mftb.admin.service.agent.BudgetReservationService;
 import com.mftb.admin.service.agent.LlmChannelRouter;
 import com.mftb.admin.service.agent.LlmChannelRouter.Channel;
+import com.mftb.admin.service.agent.LlmMeteringService;
 import com.mftb.admin.util.OperatorResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,12 +45,10 @@ public class AgentGatewayController {
 
     private final LlmChannelRouter channelRouter;
     private final AiMyCenterService myCenterService;
-    private final LlmUsageService llmUsageService;
+    private final LlmMeteringService metering;
     private final OperatorResolver operatorResolver;
-    private final RestTemplate restTemplate;
+    private final LlmHttpClient llmClient;
     private final ObjectMapper objectMapper;
-    /** V0 §B.1：预算预占/结算/释放 */
-    private final BudgetReservationService budgetService;
     /** V0 §B.6：会话执行事件（仅在 header 传 conversationPk 时写入） */
     private final AiConversationEventService conversationEventService;
     /** V0 §八 V0-7：紧急熍断，命中时 chat 直接 503 */
@@ -67,7 +61,7 @@ public class AgentGatewayController {
                                   @RequestHeader(value = "x-llm-mode", required = false, defaultValue = DEFAULT_MODE) String mode,
                                   @RequestHeader(value = "x-llm-request-id", required = false) String requestIdHeader,
                                   @RequestHeader(value = "x-llm-conversation-pk", required = false) Long conversationPk) {
-        String username = operatorResolver.currentOperatorName();
+        String username = operatorResolver.currentOperatorAccount();
         if (username == null) {
             return ResponseEntity.status(401).body(Map.of("error", "登录状态无效或已过期，请重新登录后使用 AI 助手"));
         }
@@ -103,6 +97,14 @@ public class AgentGatewayController {
                     "當前賬號沒有可用模型（部分模型未對你開放），請聯繫管理員申請開通"));
         }
 
+        // A3：服务端模型准入（与编排同源）；不信任前端，也不把“置灰”当安全边界
+        if (!myCenterService.hasModelAccess(chosen.getDefaultModelKey())) {
+            appendEvent(conversationPk, "POLICY_DECISION", username, Map.of(
+                    "decision", "reject", "reason", "no_model_auth", "model", String.valueOf(chosen.getDefaultModelKey())));
+            return ResponseEntity.status(403).body(Map.of("error",
+                    "當前賬號未被授權使用模型「" + chosen.getDefaultModelKey() + "」，請聯繫管理員在「員工模型權控」開通"));
+        }
+
         // 配额校验：命中 reject 直接拒绝；downgrade 不改变通道选择（模型降级留待下一 PR）
         AiMyCenterDTO.QuotaCheckVO quota = myCenterService.checkQuota(null, chosen.getDefaultModelKey());
         if (quota != null && "reject".equals(quota.getAction())) {
@@ -116,46 +118,26 @@ public class AgentGatewayController {
 
         // V0 §B.1：预占预算（估算 prompt = 消息条数×200 兑底，completion = max_tokens 或 2048）
         String requestId = requestIdHeader != null ? requestIdHeader : UUID.randomUUID().toString();
-        int promptEst = estimatePromptTokens(payload);
-        int completionEst = estimateCompletionTokens(payload);
-        try {
-            budgetService.reserve(requestId, username, chosen.getDefaultModelKey(),
-                    promptEst, completionEst,
-                    chosen.getInputPrice(), chosen.getOutputPrice(), chosen.getCurrency());
-        } catch (RuntimeException e) {
-            log.warn("[AgentGateway] 预算预占失败 request={}: {}", requestId, e.getMessage());
-            // 不阻断业务，后续 usage 上报仍会写 UNKNOWN；无预占行时 settle 会命中 0 行自然忽略
-        }
+        metering.reserve(requestId, username, chosen, estimatePromptTokens(payload), estimateCompletionTokens(payload));
 
         // 改写请求体：替换 model 为通道默认；其余字段透传（messages/tools/temperature 等）
         Map<String, Object> outbound = new LinkedHashMap<>(payload);
         if (chosen.getDefaultModelKey() != null) {
             outbound.put("model", chosen.getDefaultModelKey());
         }
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        if (chosen.getApiKey() != null && !chosen.getApiKey().isBlank()) {
-            headers.setBearerAuth(chosen.getApiKey());
-        }
-        String url = normalizeBaseUrl(chosen.getBaseUrl());
-
         try {
-            ResponseEntity<String> upstream = restTemplate.exchange(
-                    url, HttpMethod.POST, new HttpEntity<>(outbound, headers), String.class);
-            String body = upstream.getBody();
+            String body = llmClient.chatCompletionRaw(chosen.getBaseUrl(), chosen.getApiKey(), outbound);
             reportUsageAndSettle(username, mode, chosen, chosenLabel, body, requestId, conversationPk);
             maybeAppendAssistantTurn(conversationPk, body, username);
-            return ResponseEntity.status(upstream.getStatusCode())
-                    .contentType(MediaType.APPLICATION_JSON)
+            return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                     .body(body == null ? "{}" : body);
-        } catch (Exception e) {
-            log.warn("[AgentGateway] 通道 {} 调用失败: {}", chosenLabel, e.getMessage());
-            budgetService.release(requestId, e.getMessage());
+        } catch (LlmHttpClient.LlmCallException e) {
+            log.warn("[AgentGateway] 通道 {} 调用失败[{}]: {}", chosenLabel, e.getCategory(), e.getMessage());
+            metering.release(requestId, e.getCategory().name());
             appendEvent(conversationPk, "GATEWAY_ERROR", username, Map.of(
-                    "requestId", requestId, "channel", chosenLabel, "error",
-                    e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
-            return ResponseEntity.status(502).body(Map.of("error",
-                    "LLM 請求失敗: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())));
+                    "requestId", requestId, "channel", chosenLabel, "category", e.getCategory().name()));
+            int status = e.getCategory() == LlmHttpClient.Category.TIMEOUT ? 504 : 502;
+            return ResponseEntity.status(status).body(Map.of("error", e.userMessage()));
         }
     }
 
@@ -173,46 +155,24 @@ public class AgentGatewayController {
         return 2048;
     }
 
-    /** 上报 usage + 预算结算 + 写 QUOTA_CHARGE 事件（一次性处理，异常不阻断主链路）。 */
+    /** 上报 usage + 预算结算 + 写 QUOTA_CHARGE 事件（计量口径统一走 LlmMeteringService）。 */
     private void reportUsageAndSettle(String username, String mode, Channel channel, String channelLabel,
                                        String rawBody, String requestId, Long conversationPk) {
-        if (rawBody == null || rawBody.isEmpty()) {
-            budgetService.release(requestId, "empty_body");
-            return;
-        }
-        try {
-            JsonNode root = objectMapper.readTree(rawBody);
-            JsonNode usage = root.path("usage");
-            if (usage.isMissingNode() || usage.isNull()) {
-                budgetService.release(requestId, "no_usage_field");
-                return;
+        JsonNode root = null;
+        if (rawBody != null && !rawBody.isEmpty()) {
+            try {
+                root = objectMapper.readTree(rawBody);
+            } catch (Exception e) {
+                log.warn("[AgentGateway] 上游回應解析失败 request={}: {}", requestId, e.getMessage());
             }
-            int prompt = usage.path("prompt_tokens").asInt(0);
-            int completion = usage.path("completion_tokens").asInt(0);
-            int cached = usage.path("prompt_tokens_details").path("cached_tokens").asInt(0);
-
-            LlmUsageRecordRequest req = new LlmUsageRecordRequest();
-            req.setMode(mode);
-            req.setChannel(channelLabel);
-            req.setModel(root.path("model").asText(channel.getDefaultModelKey()));
-            req.setPromptTokens(prompt);
-            req.setCompletionTokens(completion);
-            req.setCachedTokens(cached);
-            req.setRequestId(requestId);
-            llmUsageService.record(username, req);
-
-            budgetService.settle(requestId, prompt, completion, cached,
-                    channel.getInputPrice(), channel.getOutputPrice(),
-                    channel.getCachedInputPrice(), channel.getCurrency());
-
+        }
+        long charged = metering.settle(requestId, username, mode, channel, root);
+        if (charged > 0) {
             appendEvent(conversationPk, "QUOTA_CHARGE", username, Map.of(
                     "requestId", requestId,
-                    "model", req.getModel(),
-                    "prompt", prompt, "completion", completion,
-                    "verification", channel.getInputPrice() != null && channel.getOutputPrice() != null
-                            ? "VERIFIED" : "UNKNOWN"));
-        } catch (Exception e) {
-            log.warn("[AgentGateway] 用量上报或预算结算失败 request={}: {}", requestId, e.getMessage());
+                    "model", root != null ? root.path("model").asText(channel.getDefaultModelKey()) : String.valueOf(channel.getDefaultModelKey()),
+                    "tokens", charged,
+                    "verification", LlmMeteringService.verification(channel)));
         }
     }
 
@@ -263,18 +223,31 @@ public class AgentGatewayController {
         }
     }
 
-    /** GET /api/agent/status：与旧 Vite 中间件的 status 语义对齐，供前端展示当前通道 */
+    /** GET /api/agent/status：当前账号可用通道/模型概览（附不可用原因，避免“显示可用但一问就挂”） */
     @GetMapping("/status")
     @Operation(summary = "当前账号可用通道/模型概览")
     public Result<Map<String, Object>> status(
             @RequestHeader(value = "x-llm-mode", required = false, defaultValue = DEFAULT_MODE) String mode) {
-        String username = operatorResolver.currentOperatorName();
+        String username = operatorResolver.currentOperatorAccount();
+        // 首页挂载会高频调这个接口：预先取一次授权模型，避开“每个候选通道都重跑一次四维授权查询”
+        Set<String> authorizedModels = new HashSet<>();
+        try {
+            myCenterService.myModels().forEach(m -> {
+                if (m.getModelKey() != null) authorizedModels.add(m.getModelKey());
+            });
+        } catch (Exception e) {
+            log.warn("[AgentGateway] 授权模型预取失败，本轮按无授权处理: {}", e.getMessage());
+        }
         Channel ch = null;
         for (String label : List.of(LlmChannelRouter.CHANNEL_PRIMARY, LlmChannelRouter.CHANNEL_OFF_PEAK)) {
             if ("primary".equals(mode) && !LlmChannelRouter.CHANNEL_PRIMARY.equals(label)) continue;
             if ("off-peak".equals(mode) && !LlmChannelRouter.CHANNEL_OFF_PEAK.equals(label)) continue;
             Channel candidate = channelRouter.resolveChannel(label, username);
-            if (candidate != null) { ch = candidate; break; }
+            // A3：通道能解析不等于账号有权用；未授权模型不能报 ok=true，否则首页芯片与后端准入不一致
+            if (candidate != null && authorizedModels.contains(candidate.getDefaultModelKey())) {
+                ch = candidate;
+                break;
+            }
         }
         Map<String, Object> info = new HashMap<>();
         info.put("ok", ch != null);
@@ -282,6 +255,12 @@ public class AgentGatewayController {
         info.put("channel", ch == null ? null : ch.getLabel());
         info.put("model", ch == null ? null : ch.getDefaultModelKey());
         info.put("account", username);
+        // 熍断是全局态：不透给前端的话，急停期间首页仍会显示「在線」，用户只能靠发送失败发现（实测）
+        info.put("killSwitch", killSwitchService.isEngaged());
+        // 不可用时的具体原因：no_api_key（供供应商未配 Key）/ account_restricted（白名单）/ no_model_auth（未授权）
+        if (ch == null) {
+            info.put("reason", resolveUnavailableReason(mode, username));
+        }
         // V0 §B.1：为首页提供与旧 Vite 中间件同语义的 denied，前端能直接接接展示无权限提示
         List<String> denied = new ArrayList<>();
         if (!channelRouter.isChannelAllowed(LlmChannelRouter.CHANNEL_PRIMARY, username)) {
@@ -294,10 +273,22 @@ public class AgentGatewayController {
         return Result.success(info);
     }
 
-    private static String normalizeBaseUrl(String base) {
-        if (base == null || base.isBlank()) return "https://api.deepseek.com/chat/completions";
-        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
-        if (trimmed.endsWith("/chat/completions")) return trimmed;
-        return trimmed + "/chat/completions";
+    /** 按用户选择的 mode 维度给出可读的不可用原因；auto 时逐个候选取第一个具体病因。 */
+    private String resolveUnavailableReason(String mode, String username) {
+        List<String> labels = new ArrayList<>();
+        if ("primary".equals(mode)) labels.add(LlmChannelRouter.CHANNEL_PRIMARY);
+        else if ("off-peak".equals(mode)) labels.add(LlmChannelRouter.CHANNEL_OFF_PEAK);
+        else {
+            labels.add(LlmChannelRouter.CHANNEL_PRIMARY);
+            labels.add(LlmChannelRouter.CHANNEL_OFF_PEAK);
+        }
+        for (String label : labels) {
+            String reason = channelRouter.diagnose(label, username);
+            if (!LlmChannelRouter.REASON_OK.equals(reason)) {
+                return reason;
+            }
+        }
+        // 通道都健康，但账号没任何一个授权模型
+        return "no_model_auth";
     }
 }

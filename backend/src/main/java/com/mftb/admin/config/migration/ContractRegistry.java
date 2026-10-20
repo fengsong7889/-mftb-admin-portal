@@ -53,6 +53,9 @@ public class ContractRegistry {
         combined.addAll(hrOffboardingContracts());
         // 系統權限申請：门户「我要申請」的唯一落库表，缺表会让提交与审批兑现同时 500
         combined.add(systemAccessRequestContract());
+        // 会议纪要三表（主表/发送批次/投递队列）：发送是关键写入路径，缺表会让纪要发不出去且无留痕；
+        // DDL 从 classpath 脚本切片，不在这里重抄一份，避免两份真值漂移
+        combined.addAll(com.mftb.admin.config.MeetingMinutesSchema.contracts());
         return combined;
     }
 

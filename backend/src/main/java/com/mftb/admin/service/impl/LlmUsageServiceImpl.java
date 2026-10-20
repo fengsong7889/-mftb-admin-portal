@@ -8,8 +8,10 @@ import com.mftb.admin.dto.LlmUsageRecordRequest;
 import com.mftb.admin.dto.LlmUsageRecordVO;
 import com.mftb.admin.dto.LlmUsageSummaryVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.entity.AiModel;
 import com.mftb.admin.entity.LlmUsage;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.AiModelMapper;
 import com.mftb.admin.mapper.LlmUsageMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.LlmUsageService;
@@ -48,6 +50,7 @@ public class LlmUsageServiceImpl implements LlmUsageService {
     private final LlmUsageMapper llmUsageMapper;
     private final SysUserMapper sysUserMapper;
     private final SysConfigService sysConfigService;
+    private final AiModelMapper aiModelMapper;
     private final ObjectMapper objectMapper;
 
     /** 单个模型的计价条目（来自官方价目表，只读配置） */
@@ -76,6 +79,12 @@ public class LlmUsageServiceImpl implements LlmUsageService {
         usage.setRequestId(request.getRequestId());
 
         ModelPrice price = loadPrices().get(request.getModel());
+        if (price == null) {
+            // 单价回落：模型接入表(ai_model)本来就维护了输入/输出/缓存单价，而 sys_config.llm_model_prices
+            // 经常没配。两边各读一份会让「预算台账按 ai_model 算出真实费用、用量明细却记 0 元 + UNKNOWN」，
+            // 能耗统计的费用永远为 0。口径统一到先配好的那一份，而不是再多一处配置。
+            price = priceFromAiModel(request.getModel());
+        }
         if (price != null && price.getInput() != null && price.getOutput() != null) {
             int cached = Math.min(Math.max(0, request.getCachedTokens()), Math.max(0, request.getPromptTokens()));
             int nonCachedInput = Math.max(0, request.getPromptTokens()) - cached;
@@ -235,6 +244,41 @@ public class LlmUsageServiceImpl implements LlmUsageService {
         } catch (Exception e) {
             log.warn("模型单价配置解析失败，本次按未配置处理: {}", e.getMessage());
             return Map.of();
+        }
+    }
+
+    /**
+     * 单价回落源：{@code ai_model} 的输入/输出/缓存单价（单位同为「元/百万 tokens」，
+     * 与 {@code ai_budget_ledger} 的预占/结算口径一致）。
+     * <p>同名重复行（历史脏数据）取 sort_order 最小的一条，与 LlmChannelRouter 选模型的口径对齐。
+     */
+    private ModelPrice priceFromAiModel(String modelKey) {
+        if (!StringUtils.hasText(modelKey)) {
+            return null;
+        }
+        try {
+            List<AiModel> rows = aiModelMapper.selectList(new LambdaQueryWrapper<AiModel>()
+                    .eq(AiModel::getModelKey, modelKey)
+                    .eq(AiModel::getStatus, 1)
+                    .isNotNull(AiModel::getInputPrice)
+                    .isNotNull(AiModel::getOutputPrice)
+                    .orderByAsc(AiModel::getSortOrder)
+                    .orderByAsc(AiModel::getId)
+                    .last("LIMIT 1"));
+            if (rows.isEmpty()) {
+                return null;
+            }
+            AiModel row = rows.get(0);
+            ModelPrice price = new ModelPrice();
+            price.setInput(row.getInputPrice());
+            price.setOutput(row.getOutputPrice());
+            price.setCachedInput(row.getCachedInputPrice());
+            price.setCurrency(row.getCurrency());
+            return price;
+        } catch (Exception e) {
+            // 回落失败不阻断记账：明细仍然入库，只是标 UNKNOWN 让报表能看出单价缺失
+            log.warn("从 ai_model 回落单价失败 model={}: {}", modelKey, e.getMessage());
+            return null;
         }
     }
 

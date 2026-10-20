@@ -1,0 +1,182 @@
+/**
+ * 会议纪要模块样式（表单页 / 查看页 / 发送弹窗共用）。
+ *
+ * 色值一律取自 §A.1 设计令牌；系列纪要条的"当前场"沿用会议日历已验证过的暖橙口径
+ * （#FFF7F0 底 + #FFE7D1 描边），同一个模块里两套选中态会让用户怀疑它们含义不同。
+ */
+
+/* ---------- 系列纪要连续查看条 ---------- */
+
+.mm-series-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.mm-series-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+
+.mm-series-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+  font-size: 12px;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mm-series-chip:hover {
+  transform: translateY(-1px);
+  border-color: #ffd8a8;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* 已录入纪要：绿点区分"能点进去看"，未录入的点了没有内容，必须先看得出来 */
+.mm-series-chip--done::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #52c41a;
+}
+
+.mm-series-chip--todo::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d9d9d9;
+}
+
+.mm-series-chip--todo {
+  cursor: default;
+  color: #bfbfbf;
+}
+
+.mm-series-chip--todo:hover {
+  transform: none;
+  border-color: #f0f0f0;
+  box-shadow: none;
+}
+
+.mm-series-chip--current {
+  background: #fff7f0;
+  border-color: #ffe7d1;
+  color: #e8720c;
+  font-weight: 600;
+}
+
+/* 上一場/下一場跳转按钮：放在条的右端，与"看内容"的 chip 语义分开 */
+.mm-series-nav {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- 发送弹窗 ---------- */
+
+.mm-send-summary {
+  border-radius: 8px;
+  background: #fff7f0;
+  border: 1px solid #ffe7d1;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.mm-send-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.mm-send-row > span:first-child {
+  color: #8c8c8c;
+  flex-shrink: 0;
+}
+
+.mm-send-row > b {
+  color: #262626;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* 弹窗内的纪要预览区：限高滚动，避免整弹窗撑到超出视口 */
+.mm-send-preview {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+/* ---------- 表单页动态行 ---------- */
+
+/* 议题/行动项的每一行：左侧序号 + 右侧字段区，行间用浅分隔线而不是表格边框 */
+.mm-dyn-row {
+  position: relative;
+  padding: 12px 0 16px;
+  border-bottom: 1px dashed #f0f0f0;
+}
+
+.mm-dyn-row:last-child {
+  border-bottom: none;
+}
+
+.mm-dyn-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #e6f7ff;
+  color: #1890ff;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.mm-dyn-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mm-dyn-body {
+  padding-left: 30px;
+}
+
+/* 只读展示的行内标签（会议资讯模块）：与全站详情页口径一致，标签不换行 */
+.mm-readonly-value {
+  font-size: 13px;
+  color: #262626;
+  word-break: break-word;
+}
+
+.mm-char-counter {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.mm-char-counter--warn {
+  color: #fa8c16;
+}

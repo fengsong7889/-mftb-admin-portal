@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Input, Select, Table, Tag, message, Switch, Tooltip, Space, DatePicker, Segmented } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EyeOutlined, RobotOutlined, ApiOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
@@ -20,6 +21,7 @@ import {
   MODEL_TYPE_TAG, MODEL_TYPE_LABEL, MODALITY_TAG, CURRENCY_SYMBOL,
   contextLengthText, CapabilityMatrix, ModalityChips,
 } from './modelDisplayUtils'
+import { tablePagination } from '../../utils/tableDisplay'
 
 /** 统计卡（12.1 标准） */
 const StatCard = ({ icon, value, label, color, bg }: { icon: React.ReactNode; value: React.ReactNode; label: string; color: string; bg: string }) => (
@@ -44,6 +46,7 @@ const StatCard = ({ icon, value, label, color, bg }: { icon: React.ReactNode; va
 )
 
 export default function AiModelList() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   /* ── 數據 ── */
   const [models, setModels] = useState<AiModel[]>([])
@@ -164,11 +167,28 @@ export default function AiModelList() {
     return true
   }), [models, applied, viewMode, connectedProviderIds])
 
-  /** 已接入模型數 */
+  /** 已接入模型数 */
   const connectedModelCount = useMemo(
     () => models.filter((m) => m.providerId && connectedProviderIds.has(m.providerId)).length,
     [models, connectedProviderIds],
   )
+  
+  /**
+   * 统计卡口径：跟随搜索条件但不跟随「已接入/全部」Tab。
+   * 卡片叫「全部模型」却受接入状态影响时，会出现“全部模型 1 / 列表 3 行”的自相矛盾，
+   * 管理员会怀疑数据丢了（深度测试实测报出）。Tab 只是一个视图切换，不应改变“全部”的含义。
+   */
+  const statScope = useMemo(() => models.filter((m) => {
+    if (applied.provider && String(m.providerId) !== applied.provider) return false
+    if (applied.updatedBy && !(m.updatedBy || '').includes(applied.updatedBy)) return false
+    if (applied.updateDateStart && m.updatedAt) {
+      if (dayjs(m.updatedAt).isBefore(applied.updateDateStart.startOf('day'))) return false
+    }
+    if (applied.updateDateEnd && m.updatedAt) {
+      if (dayjs(m.updatedAt).isAfter(applied.updateDateEnd.endOf('day'))) return false
+    }
+    return true
+  }), [models, applied])
 
   /* ── 模型啟停（二次確認） ── */
   const handleToggleModel = async (row: AiModel) => {
@@ -183,6 +203,8 @@ export default function AiModelList() {
       content: `${actionText}後「${row.name}」${toDisable ? '將立即不可調用，所有用戶端同步失效' : '將恢復可用，用戶端可正常調用'}`,
       okText: '確認',
       cancelText: '取消',
+      // 停用 = 所有客户端立即不可用，按 §B.1 危险操作必须红色按钮
+      okButtonProps: toDisable ? { danger: true } : undefined,
       onOk: async () => {
         try {
           await updateModel(row.id, {
@@ -252,18 +274,18 @@ export default function AiModelList() {
   const stats = [
     {
       label: '已接入模型',
-      value: <AnimatedNumber value={filteredModels.filter((m) => m.providerId && connectedProviderIds.has(m.providerId)).length} />,
+      value: <AnimatedNumber value={statScope.filter((m) => m.providerId && connectedProviderIds.has(m.providerId)).length} />,
       icon: <ApiOutlined />, color: '#52C41A', bg: '#F6FFED',
     },
-    { label: '全部模型', value: <AnimatedNumber value={filteredModels.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+    { label: '全部模型', value: <AnimatedNumber value={statScope.length} />, icon: <RobotOutlined />, color: '#722ED1', bg: '#F9F0FF' },
     {
       label: '涉及供應商',
-      value: <AnimatedNumber value={new Set(filteredModels.map((m) => m.providerId).filter(Boolean)).size} />,
+      value: <AnimatedNumber value={new Set(statScope.map((m) => m.providerId).filter(Boolean)).size} />,
       icon: <span>🏢</span>, color: '#E8720C', bg: '#FFF7E6',
     },
     {
       label: '視覺模型',
-      value: <AnimatedNumber value={filteredModels.filter((m) => m.visionSupport === 1).length} />,
+      value: <AnimatedNumber value={statScope.filter((m) => m.visionSupport === 1).length} />,
       icon: <EyeOutlined />, color: '#1890FF', bg: '#E6F7FF',
     },
   ]
@@ -487,7 +509,7 @@ export default function AiModelList() {
         loading={loading}
         columns={columns}
         dataSource={filteredModels}
-        pagination={false}
+        pagination={tablePagination(t)}
         scroll={{ x: 1760 }}
       />
     </div>

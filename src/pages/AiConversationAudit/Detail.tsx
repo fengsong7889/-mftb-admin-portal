@@ -12,6 +12,7 @@ import {
   HistoryOutlined,
 } from '@ant-design/icons'
 import DetailPageHeader from '../../components/DetailPageHeader'
+import AiRichText from '../Home/AiRichText'
 import {
   fetchAuditConversation,
   fetchConversationEvents,
@@ -249,7 +250,7 @@ export default function AiConversationAuditDetail() {
                     lineHeight: 1.7,
                     color: '#262626',
                   }}>
-                    {msg.role === 'assistant' ? formatAiText(msg.content) : msg.content}
+                    {msg.role === 'assistant' ? <AiRichText text={msg.content} /> : msg.content}
                   </div>
 
                   {/* 附件 */}

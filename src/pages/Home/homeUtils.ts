@@ -6,7 +6,14 @@ import { resolveMenuPath } from '../../constants/menuDataSource'
 /* ── 类型定义 ── */
 
 /** AI 助手未开通原因：无模型权限 / 无额度 / 两者皆无 / 额度已用完(拒绝) / 需审批 */
-export type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval'
+/**
+ * AI 助手拦截原因。
+ *
+ * `check-failed`：额度校验接口本身失败（网络/5xx/超时）且从未拿到任何结果。
+ * 必须作为一个独立拦截态存在：旧实现把校验失败静默吞掉，blockReason 落到 null，
+ * 造成「后端拒不了但界面看起来可用」的 fail-open，与额度默认拒绝口径相悖。
+ */
+export type AiBlockReason = 'no-models' | 'no-quota' | 'no-both' | 'quota-exhausted' | 'needs-approval' | 'check-failed'
 
 /* ── 常量 ── */
 

@@ -376,6 +376,22 @@ export async function fetchAiModelAccounts(): Promise<Record<AiModelKey, string[
   return Object.fromEntries(entries) as Record<AiModelKey, string[]>
 }
 
+/**
+ * 保存賬號白名單到後端 sys_config（JSON 數組，空數組 = 全部賬號可用）。
+ * <p>超長直接抛错而不是静默截断：白名单一旦写坏，後端讀到的就是「名单外 = 全员拒绝」，
+ * 比保存失败更难排查。调用方失败时必须保留草稿，不能假装已保存。
+ */
+export async function saveAiModelAccounts(model: AiModelKey, accounts: string[]): Promise<void> {
+  const normalized = accounts.map(item => item.trim()).filter(Boolean)
+  const payload = JSON.stringify(normalized)
+  if (payload.length > SYS_CONFIG_VALUE_MAX_LENGTH) {
+    throw new Error(`白名單過長（${payload.length} > ${SYS_CONFIG_VALUE_MAX_LENGTH}），請精簡賬號後重試`)
+  }
+  // 本地留一份，後端不可用时下一次进入页面仍能看到刚才的值
+  localStorage.setItem(AI_MODEL_ACCOUNT_RULE_KEYS[model], payload)
+  await updateSystemConfig(AI_MODEL_ACCOUNT_RULE_KEYS[model], payload)
+}
+
 /* ==================== 同步讀取（供非組件場景使用） ==================== */
 
 /** 同步讀取某條規則的當前值（優先 localStorage，回退默認值） */

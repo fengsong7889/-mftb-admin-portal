@@ -2342,6 +2342,120 @@
       "intent": "日报改为多规则 + 按项目/迭代范围模型：新建 rdm_daily_report_rule（可建多条：项目+可选迭代+推送时间+内容档位+模板），快照表补 scope_key/rule_id/project_id/iteration_code 并把全局唯一键换成 (report_date, report_type, scope_key)",
       "author": "Qoder",
       "comment": "用户反馈单条全局配置无法表达真实用法：A 產品盯 A 項目下的 B1 迭代、B 產品盯 B 項目下的 C1 迭代、W 項目經理盯整個 W 項目——目标、时间、模板都按项目/迭代不同，需可新增多条推送规则。因此拆成「全局开关（原 config 单行表：总开关/群报/个人/各档默认模板）+ 多条规则（新表 rdm_daily_report_rule）」。关键结构决策：旧唯一键 (report_date, report_type) 是全局的，多条规则同一天同一档会直接报 Duplicate entry——这不是可选优化而是硬阻碍，必须换成 (report_date, report_type, scope_key)；scope_key 规则推送写 rule:{id}、手动触发写 manual:{projectId}:{iterationCode}，使「同一天多份不同范围的口径」各自一行、互不覆盖，幂等仍由唯一键兑底。存量行回填 scope_key=CONCAT('legacy:', id) 后旧行不会互撞；该表建表至今无生产数据（功能尚未上线），换键不丢任何业务事实，DROP INDEX 只改元数据不删行不删列（迁移规范禁的是 DROP TABLE/DROP COLUMN/TRUNCATE）。新增列均 columnExists 先查再加、索引均 indexExists 判定、建表用 IF NOT EXISTS，因此可安全重放。不吞异常：规则表缺失或唯一键没换成会让多规则模型整个不可用，必须抛出并不记版本、下次启动重试。后置校验同时要求「新唯一键存在」与「旧唯一键已移除」：只校新键会放过「旧键仍拦住第二条规则」的静默故障。265 脚本仅作参照文档，不进镜像。回滚=回退代码；规则表与新增列留着无害（旧代码不读），但旧唯一键已删——若要完全回退需重建旧索引，故上线前应确认多规则模型符合预期。"
+    },
+    {
+      "versionKey": "ai:model-dedup:v1.0",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiModelDedupInitializer",
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "266_ai_model_dedup.sql"
+      ],
+      "intent": "清理 ai_model 同名重复启用行（3 个模型被种成 21 行），并把启用行 version 空值归一为 'default' 使唯一键真正防重",
+      "author": "Qoder",
+      "comment": "根因：uk_provider_key_version(provider_id, model_key, version) 里 version 一直是 NULL，而 MySQL 唯一索引不约束 NULL ⇒ DataInitializer 的 INSERT IGNORE 每次启动都能再插一整组；7 次启动后模型接入列表/授权下拉/申请页卡片都出现 7 份同名模型，管理员无法判断选的是哪一条（AI 问答深度测试实测暴露）。顺序不可颠倒：先把组内最新行的能力/上下文/价格回填给最小 id 的保留行（授权数据可能已引用它），再软删其余重复行，最后才把 version 归一为 'default'——先归一会让软删前的多行撞唯一键。只 UPDATE 不物理删除，保留追溯与回滚。后置校验两条：启用行不得同名重复、启用行 version 不得为空，任一不过不记版本并在下次启动重试。同批把 DataInitializer 模型种子的 version 由 NULL 改为 'default'（否则根因仍在，下次重启又长出来）。266 腳本僅作參考文檔，不進鏡像。回滚：软删行可按 updated_by='system-ai-model-dedup' 复原 deleted=0，version='default' 无害。"
+    },
+    {
+      "versionKey": "ai:tool-policy-align:v1.0",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiToolPolicyAlignInitializer",
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "status": "SUPERSEDED",
+      "intent": "消除工具风险等级双源：纠正错键 send_email→email_sender，并为 mcp_tool 里缺策略的工具按默认拒绝补登 ai_tool_policy",
+      "author": "Qoder",
+      "comment": "风险等级以前存两份且互不同步：mcp_tool.risk_level 是展示分级 L0~L4，ai_tool_policy.risk_level 是执行分级 low/medium/high，而服务端 enforce 只认后者；再叠加早期种子把邮件工具写成 send_email（真实 tool_key 是 email_sender），导致同一个工具在「MCP 服務」页显示 L3 需審批、在「AI 操作授權」页显示 L0 禁止調用（AI 深度测试实测）。口径：执行闸门只认 ai_tool_policy，缺行按 enabled=0 默认拒绝补齐，L 级按 L0/L1→low、L2→medium、其余→high 映射；已存在的行不覆盖，保留管理员在 UI 上的调整。后置校验：每个 mcp_tool 都必须有策略行，否则不记版本、下次启动重试。 v1.0 已被 v1.1 取代：v1.0 只补登记缺失行，未按工具清单的 L 级重写种子遗留的 medium。",
+      "supersededBy": "ai:tool-policy-align:v1.1"
+    },
+    {
+      "versionKey": "ai:tool-policy-align:v1.1",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiToolPolicyAlignInitializer",
+      "dependencies": [
+        "ai:tool-policy-align:v1.0"
+      ],
+      "status": "ACTIVE",
+      "intent": "在 v1.0 基础上再把「从未被人工改过」的策略行（updated_by=system）按 mcp_tool 的 L 级重写，彻底消除两页风险等级不一致",
+      "author": "Qoder",
+      "comment": "v1.0 只补登记缺失的策略行，没有回写种子遗留的错误等级：email_sender/dingtalk_sender 仍是种子里随手写的 medium（前端算 L2 生成草稿），而工具广场按 mcp_tool.risk_level 显示 L3 需審批 —— 两页继续打架。本版按 L0/L1→low、L2→medium、其余→high 的映射重写，但只重写 updated_by=system 或 NULL 的行：管理员在界面上调过的策略一律不动，否则会把人工决策悄悄改回去。幂等（ne 条件已一致则 0 行），后置校验沿用 v1.0 的「每个 mcp_tool 必须有策略行」。"
+    },
+    {
+      "versionKey": "ai:model-ref-remap:v1.0",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiModelRefRemapInitializer",
+      "dependencies": [
+        "ai:model-dedup:v1.0"
+      ],
+      "status": "ACTIVE",
+      "intent": "把指向被去重软删模型的授权/额度引用重映射到同名组保留行（bigint 列 + model_configs JSON 里的 modelId）",
+      "author": "Qoder",
+      "comment": "ai:model-dedup:v1.0 只把重复行软删，但 ai_employee_auth / ai_dept_auth_group_model / 各额度策略的 model_id，以及职位/角色授权策略的 model_configs JSON 里存的仍是老 id —— 变成“配置还在、模型已不存在”的悬空引用：界面显示 #4 这种原始 id，四维授权并集里这条实际失效，用户表现为“管理员明明配了模型却没权限”。本次深度测试去重后实测到 ai_emp_pos_auth_strategy 引用了 4/8。重映射规则：被软删 id → 同 (provider_id, model_key) 组保留的最小 id；JSON 只做 modelId 数值替换，不动能力开关；历史用量表（ai_usage_log 等事实记录）不改，引用当时真实存在过的模型是对的。后置校验：授权/额度侧不允许再有指向软删模型的引用，未过不记版本、下次启动重试。回滚：本迁移只改引用值，按 remap 反向 UPDATE 即可还原。"
+    },
+    {
+      "versionKey": "ai:conversation-count-backfill:v1.0",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiConversationCountBackfillInitializer",
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "status": "ACTIVE",
+      "intent": "回填历史会话 request_count（以前无人写入，审计页该列全是 --；改为服务端计数后存量仍是 0）",
+      "author": "Qoder",
+      "comment": "请求次数原先没有任何写入方，ai_conversation.request_count 恒为 0，对话审计页该列一律显示 --，管理员无法判断一次会话被调用多少次。本次把计数改由服务端在回合完成时累加，但存量行不会自动获得历史值，于是同一列出现「新数据可信、老数据全是 --」的混合口径。本迁移用 GREATEST(事件表 USER_TURN 条数, messages 里 \"role\":\"user\" 出现次数) 回填，且只动 request_count=0 的行——绝不覆盖已有真值。只处理 deleted=0 的活跃会话：回收站里的记录留着不动。后置校验：仍含用户消息却 request_count=0 的活跃会话必须为 0 条，否则不记版本、下次启动重试。"
+    },
+    {
+      "versionKey": "meeting:minutes:v1.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "meeting:schema:v1.0",
+        "meeting:schema:v1.1",
+        "notify:schema:v1.0"
+      ],
+      "scriptFiles": [
+        "267_meeting_minutes.sql"
+      ],
+      "intent": "会议纪要底座：biz_meeting_minutes（一场会一条纪要）+ biz_meeting_minutes_send（发送批次与内容快照）+ biz_meeting_minutes_delivery（群/收件人投递留痕兼重试队列）+ 纪要单号规则 + meeting_minutes 通知场景",
+      "author": "Qoder",
+      "ticket": "meeting-minutes",
+      "comment": "三个版本键合为一个而不是拆 schema/seed：本迁移只建三张新表加两条种子，建表与种子在同一份脚本里一次成型，拆开只会多一个「表建好了但没编号规则」的中间失败态。DDL 只在 classpath 资源 267_meeting_minutes.sql 存一份，backend/sql/ 同名文件为参考副本（结构锁用例断言逐字一致），三张表的结构契约也从同一份脚本切片登记进 ContractRegistry，避免 Java 再抄一份 DDL 后与脚本漂移。唯一键是并发正确性的全部依据：uk_meeting_minutes_booking（软删感知生成列）挡「同一场会长出两条并列纪要」，否则事后没人能说清哪条是这场会的结论；uk_meeting_minutes_send_seq(minutes_id, batch_seq) 挡两人同时点发送时批次号互相覆盖——被覆盖的那一批等于「发出去了但历史里没有」；uk_meeting_minutes_delivery(send_id, target_type, receiver_user_id) 挡同一批次给同一个人重复投递，而群行的 receiver_user_id 必须写 0 而不是 NULL：MySQL 唯一键不约束 NULL，拿 NULL 承载「没有收件人」等于群消息可以重复插。纪要表的外键不带 ON DELETE CASCADE：230 已实测「外键列被 STORED 生成列引用」与 CASCADE 在 MySQL 8.4 互斥（1215 直接拒建），本表 active_booking 生成列同样引用 booking_id。通知场景 meeting_minutes 首次插入即 enabled=0，与会议其余场景同一上线默认：行政在通知配置绑定企业应用后才开启；每次启动只补行不动 enabled/app_id，否则发版会把管理员关掉的开关翻回去。verifyColumns 放在 applyOnce 之外每次启动跑：新实体字段在任何已记过 v1.0 的环境上都要立刻暴露缺列，而不是等用户打开纪要页报 bad SQL grammar。"
+    },
+    {
+      "versionKey": "meeting:minutes:v1.1",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes:v1.0",
+        "notify:schema:v1.0"
+      ],
+      "scriptFiles": [
+        "268_meeting_minutes_v2.sql"
+      ],
+      "intent": "会议纪要 v1.1：biz_meeting_minutes_item（行动项/跟进事项，可跟踪状态与逾期）+ biz_meeting_minutes_link（关联纪要，带来源快照）+ sys_notification_template（按场景的通知模板）+ sys_notification_switch（按场景×渠道的推送开关）+ 两个通知场景 + 三个菜单",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-v2",
+      "comment": "与 v1.0 共用同一个执行器（而不是另开一个 @Order(29) 的类）：新表的两个外键指向 biz_meeting_minutes，两个同序号 Bean 在全新库上的执行顺序不确定，可能先建子表而 1215 失败。事项从 content_json 搬到独立表，是因为它要按行更新状态、按行扫描逾期、按行去重提醒——JSON 只能整行覆盖，两个人同时更新必互相抹掉；唯一键 (minutes_id, kind, seq) 让保存成为“按位置 upsert”：组织者改措辞不会把负责人已填的处理结果清掉。关联表存 booking_no/title/time_text 快照而不是只存 id：被引用的纪要改期改名后，引用方仍要能说清“引自哪场会”。模板与开关分表：模板回答“怎么写”、开关回答“发不发”，使用者常常不是同一个人，合成一行会互相覆盖。模板只做 ${var} 字面替换，不引入模板引擎（配置页不应成为可执行逻辑入口）。历史事项回填只处理“该纪要还没有任何事项行”的行，且状态统一 pending：旧数据没有进度，凭空造一个“已完成”比空着更危险。菜单写入用“存在则不动”：管理员改过的名称/排序不能被每次启动重置。"
     }
   ]
 }

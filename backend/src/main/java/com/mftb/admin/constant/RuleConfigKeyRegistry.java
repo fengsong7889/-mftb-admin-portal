@@ -29,6 +29,8 @@ public final class RuleConfigKeyRegistry {
     public static final String MENU_ALGORITHM = "rule-algorithm";
     /** 編號生成規則 */
     public static final String MENU_SEQ = "rule-seq";
+    /** AI 治理（工具策略/緊急熔斷/通道賬號白名單同一域） */
+    public static final String MENU_AI_GOVERNANCE = "ai-operation-auth";
 
     /** 精確 key → 歸屬菜單 */
     private static final Set<String> AD_SALES_KEYS = Set.of(
@@ -46,7 +48,16 @@ public final class RuleConfigKeyRegistry {
     );
 
     private static final Set<String> ALGORITHM_KEYS = Set.of(
-            "organic_traffic_show_dimension_weight",
+            "organic_traffic_show_dimension_weight"
+    );
+
+    /**
+     * AI 通道账号白名单：归 AI 治理菜单 {@link #MENU_AI_GOVERNANCE}。
+     * <p>以前挂在规则中心 rule-algorithm 下，但内置超管（工号账号）并无该菜单授权，
+     * 结果：后端运行时按它做准入判定，管理端却读不到也写不了（GET/PUT 皆 403），
+     * 规则页也没这两项。归到已经持有 view/edit 的「AI 操作授權」后，配置才真的可维护。
+     */
+    private static final Set<String> AI_GOVERNANCE_KEYS = Set.of(
             "ai_model_qw_accounts",
             "ai_model_ds_accounts"
     );
@@ -73,6 +84,9 @@ public final class RuleConfigKeyRegistry {
             return null;
         }
         String key = configKey.trim();
+        if (AI_GOVERNANCE_KEYS.contains(key)) {
+            return MENU_AI_GOVERNANCE;
+        }
         if (SECURITY_KEYS.contains(key) || ALGORITHM_KEYS.contains(key)) {
             return SECURITY_KEYS.contains(key) ? MENU_SECURITY : MENU_ALGORITHM;
         }

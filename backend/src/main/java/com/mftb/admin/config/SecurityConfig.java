@@ -60,6 +60,11 @@ public class SecurityConfig {
             // 会议免登签到页（凭 HMAC 令牌校验身份，令牌绑人且会议结束 2 小时后失效）：
             // 服务层仍会查参会人表判定归属，白名单只解决"没有 JWT 也能访问"，不等于放行
             "/api/meeting/checkin-page/**",
+            // 会议纪要免登查看页（钉钉卡片直达）：令牌绑「纪要 + 批次 + 令牌版本 + 到期」，
+            // 服务层仍要复核批次归属与版本是否已作废；输出不含手机号与凭据
+            "/api/meeting/minutes-page/**",
+            "/api/public/meeting-minutes",
+            "/api/public/meeting-minutes/**",
             "/api/health/live",   // 存活探针（匿名，不依赖数据库）
             "/api/health/ready",  // 就绪探针（匿名，迁移/结构校验未通过时返回 503）
             "/error"

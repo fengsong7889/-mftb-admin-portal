@@ -8,6 +8,7 @@ import com.mftb.admin.mapper.AiModelMapper;
 import com.mftb.admin.service.AiModelService;
 import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -15,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -32,6 +34,8 @@ public class AiModelServiceImpl implements AiModelService {
 
     private final AiModelMapper modelMapper;
     private final JdbcTemplate jdbcTemplate;
+    /** 当前登录人：updated_by 由服务端权威写入，不采信前端传的审计字段 */
+    private final OperatorResolver operatorResolver;
 
     @Override
     public List<AiModelDTO.ModelVO> list(String modelKey, String name, String type, Integer status, String modality) {
@@ -100,6 +104,8 @@ public class AiModelServiceImpl implements AiModelService {
             model.setInputPrice(ConvertUtils.toBigDecimal(request.getInputPrice()));
             model.setOutputPrice(ConvertUtils.toBigDecimal(request.getOutputPrice()));
             model.setCachedInputPrice(ConvertUtils.toBigDecimal(request.getCachedInputPrice()));
+            // 审计字段不信任前端：以前前端写死 'admin'，所有限额/模型变更都归不到人
+            model.setUpdatedBy(operatorResolver.currentOperatorName());
 
             modelMapper.insert(model);
             return true;
@@ -123,6 +129,11 @@ public class AiModelServiceImpl implements AiModelService {
         existing.setOutputPrice(ConvertUtils.toBigDecimal(request.getOutputPrice()));
         existing.setCachedInputPrice(ConvertUtils.toBigDecimal(request.getCachedInputPrice()));
 
+        // 审计与时间：updatedBy 服务端权威覆盖（前端传什么都不认），
+        // updatedAt 显式置新值——strictUpdateFill 只在字段为 null 时才填，
+        // selectById 读出的实体带旧值，不显式设置就永远不刷新「最后更新时间」
+        existing.setUpdatedBy(operatorResolver.currentOperatorName());
+        existing.setUpdatedAt(LocalDateTime.now());
         modelMapper.updateById(existing);
         return true;
     }
