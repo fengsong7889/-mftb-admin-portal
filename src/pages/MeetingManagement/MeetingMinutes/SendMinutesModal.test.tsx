@@ -85,7 +85,8 @@ describe('紀要發送面板', () => {
     open()
     fireEvent.click(screen.getByRole('button', { name: /確認發送/ }))
     await waitFor(() => expect(sendMinutes).not.toHaveBeenCalled())
-    expect(screen.getByText('請選擇釘釘群或至少一位收件人')).toBeInTheDocument()
+    // antd message 走独立容器异步挂载，同步 getByText 在 CI 冷启动下会扑空（曾红过流水线），必须 findBy 等待
+    expect(await screen.findByText('請選擇釘釘群或至少一位收件人', {}, { timeout: 2000 })).toBeInTheDocument()
   })
 
   it('带摘要与批次去重提示：确认前必须看得见"发给谁"和"为什么重发不会丢"', async () => {
