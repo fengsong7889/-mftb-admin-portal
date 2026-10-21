@@ -34,3 +34,20 @@ export function sanitizeRedirectPath(raw: string | null | undefined): string | n
     return null
   }
 }
+
+/**
+ * 计算登录后的落地路径。
+ *
+ * <p>`?redirect=/` 只能说明“用户在旧首页被踢下线”，而 `/` 是带全量侧栏的旧工作台；
+ * 统一门户（/portal）上线后，裸 `/` 不应压过 `redirectPath`，否则登录后会被送回
+ * 一个“所有系统菜单平铺”的页面，而不是集团门户。
+ *
+ * <p>深链（如钉钉日报、详情页）仍然优先回跳。
+ */
+export function resolveLoginLanding(
+  back: string | null | undefined,
+  redirectPath?: string | null,
+): string {
+  const target = back && back !== '/' ? back : redirectPath
+  return target || back || '/'
+}

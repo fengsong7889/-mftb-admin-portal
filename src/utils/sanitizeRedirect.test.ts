@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeRedirectPath } from './sanitizeRedirect'
+import { resolveLoginLanding, sanitizeRedirectPath } from './sanitizeRedirect'
 
 /**
  * 登录回跳白名单校验（安全边界）。
@@ -56,5 +56,25 @@ describe('sanitizeRedirectPath', () => {
     const cross = `${window.location.origin.replace(/^https?:/, 'http:').replace(/localhost/, '127.0.0.1')}/rdm-daily`
     // 该值以字母开头（http:）会被 scheme 规则先拦下
     expect(sanitizeRedirectPath(cross)).toBeNull()
+  })
+})
+
+describe('登录落地路径 resolveLoginLanding', () => {
+  it('?redirect=/ 不应压过门户默认入口', () => {
+    expect(resolveLoginLanding('/', '/portal')).toBe('/portal')
+  })
+
+  it('深链仍优先回跳', () => {
+    expect(resolveLoginLanding('/rdm-daily', '/portal')).toBe('/rdm-daily')
+    expect(resolveLoginLanding('/ai-assistant/memory', '/portal')).toBe('/ai-assistant/memory')
+  })
+
+  it('无 redirect 时用登录计算的默认入口', () => {
+    expect(resolveLoginLanding(null, '/portal')).toBe('/portal')
+  })
+
+  it('两者都没有时回落首页', () => {
+    expect(resolveLoginLanding(null, null)).toBe('/')
+    expect(resolveLoginLanding('/', null)).toBe('/')
   })
 })

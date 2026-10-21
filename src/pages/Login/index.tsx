@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { sanitizeRedirectPath } from '../../utils/sanitizeRedirect'
+import { resolveLoginLanding, sanitizeRedirectPath } from '../../utils/sanitizeRedirect'
 import { Button, Tooltip, message, Modal, Select } from 'antd'
 import {
   UserOutlined,
@@ -210,7 +210,7 @@ export default function Login() {
         // 带 redirect（如钉钉日报链接）时优先回跳原页面：用户从通知点进来就是为了看那一页，
         // 把他丢到门户首页等于链接白发（回跳值已经白名单校验，防开放重定向）。
         const back = sanitizeRedirectPath(searchParams.get('redirect'))
-        navigate(back || result.redirectPath || '/', { replace: true })
+        navigate(resolveLoginLanding(back, result.redirectPath), { replace: true })
       } else if (result.accountDisabled) {
         // 账号被停用: 弹窗提醒（不显示 toast、不计入失败次数）
         setAccountDisabledVisible(true)
