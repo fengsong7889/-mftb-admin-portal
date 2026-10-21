@@ -28,7 +28,7 @@ export interface AiFeedbackRow {
 }
 
 /** 管理员低分看板：按评分筛选最近反馈（需 AI 助手配置查看权） */
-export function fetchFeedback(params?: { rating?: number; limit?: number }): Promise<AiFeedbackRow[]> {
+export function fetchFeedback(params?: { rating?: number; limit?: number; systemCode?: string }): Promise<AiFeedbackRow[]> {
   return request.get<unknown, AiFeedbackRow[]>('/ai/feedback', { params })
 }
 
@@ -45,6 +45,8 @@ export interface AiFeedbackStats {
 }
 
 /** 反馈聚合：按工具/原因/日趋势，供配置中心判断改哪里 */
-export function fetchFeedbackStats(days = 30): Promise<AiFeedbackStats> {
-  return request.get<unknown, AiFeedbackStats>('/ai/feedback/stats', { params: { days } })
+export function fetchFeedbackStats(days = 30, systemCode?: string): Promise<AiFeedbackStats> {
+  return request.get<unknown, AiFeedbackStats>('/ai/feedback/stats', {
+    params: systemCode ? { days, systemCode } : { days },
+  })
 }

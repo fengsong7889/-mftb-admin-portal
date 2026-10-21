@@ -129,6 +129,21 @@ const arraySeedMenus = readdirSync(join(ROOT, initializerDir))
   .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
     /^\s*\{"([^"]+)",\s*"([^"]+)",\s*(?:"[^"]*"|null),\s*"(\/[^"\s]*)"/gm,
   )].map((m) => ({ key: m[1], name: m[2], path: m[3], file })))
+/**
+ * record 式种子菜单（`new MenuDef("key", "名", "英文名", "/path", "Component", "Icon", ...)`）。
+ * <p>背景：AI 助手配置中心由 AiAssistantConfigMenuInitializer 的 MenuDef 声明子菜单，
+ * 既不在 DataInitializer 主种子，也不符合 ensureMenu / 数组式模式，长期落在本脚本盲区：
+ * 新增子页漏配 keyToPath/权限/图标时 CI 全绿，但点击报“开发中”或授权中心少动作集。
+ * <p>此处按 ensureMenu 同档检查（导航/页面/后端连接/权限路由/受控/图标/操作集）。
+ */
+const menuDefMenus = readdirSync(join(ROOT, initializerDir))
+  .filter((file) => file.endsWith('.java'))
+  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+    /new MenuDef\(\s*"([^"]+)",\s*"[^"]*",\s*"[^"]*",\s*"(\/[^"\s]*)",\s*"[^"]*",\s*"([^"]+)"/g,
+  )].map((m) => ({ key: m[1], path: m[2], icon: m[3], file })))
+if (!menuDefMenus.some((menu) => menu.file === 'AiAssistantConfigMenuInitializer.java')) {
+  fail('未能解析 AI 助手配置中心的 MenuDef 种子，不能跳过该域菜单检查')
+}
 const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KEYS[^=]*= new Set\(\[([\s\S]*?)\]\)/)
 const backendKeys = new Set(backendKeysBlock
   ? [...backendKeysBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
@@ -256,11 +271,17 @@ for (const { key, name, path, file } of arraySeedMenus) {
       + '点击菜单将落到“該功能模塊開發中”兜底提示')
   }
 }
+for (const { key, path, file } of menuDefMenus) {
+  if (keyToPath[key] !== path) {
+    fail(`${file} MenuDef 菜单 ${key} 缺少/不匹配 Sidebar.keyToPath 映射（应为 ${path}）, `
+      + '点击菜单将落到“該功能模塊開發中”兜底提示')
+  }
+}
 
 // ────────── 校验 6：叶子菜单必须登记功能操作集 ──────────
 // 后端 sys_menu.actions 大多未回填（主种子不写 actions），授权中心「功能操作」面板实际取
 // MENU_ACTIONS_MAP；缺失即回退成全部 8 个通用动作，会把導入/啟用 等无关动作授予出去。
-for (const key of [...seedLeafKeys, ...domainSeedMenus.map((m) => m.key), ...arraySeedMenus.map((m) => m.key)]) {
+for (const key of [...seedLeafKeys, ...domainSeedMenus.map((m) => m.key), ...arraySeedMenus.map((m) => m.key), ...menuDefMenus.map((m) => m.key)]) {
   if (!menuActionKeys.has(key)) {
     fail(`菜单 ${key}「${seedNames[key] || ''}」未在 MENU_ACTIONS_MAP 登记功能操作集, `
       + '授权中心将回退展示全部通用动作（按后端 @RequirePermission 实际动作补齐）')
@@ -290,10 +311,22 @@ for (const { key, name, path, icon, file } of domainSeedMenus) {
   if (fallbackIcons[key] !== icon) reportAccessIssue(`${label} 缺少与 ${icon} 一致的 Sidebar 兜底图标`)
 }
 
+// ────────── 校验 9：MenuDef 式菜单（AI 助手配置中心）──────────
+for (const { key, path, icon, file } of menuDefMenus) {
+  const label = `${file}: ${key}`
+  if (!appRoutes.has(path)) fail(`${label} 未在 App.tsx 注册页面 ${path}`)
+  if (!backendKeys.has(key)) fail(`${label} 未登记 BACKEND_CONNECTED_KEYS，离线路由无法阻断`)
+  if (routeMenuMap[path] !== key) fail(`${label} 缺少 ROUTE_MENU_KEY_MAP 权限路由登记`)
+  if (!controlledKeys.includes(key)) fail(`${label} 未登记 CONTROLLED_MENU_KEYS`)
+  if (!registeredIcons.has(icon)) fail(`${label} 的后端图标 ${icon} 未在 MenuIcon 注册`)
+  if (fallbackIcons[key] !== icon) fail(`${label} 缺少与 ${icon} 一致的 Sidebar 兜底图标`)
+}
+
 // ────────── 输出 ──────────
 console.log('菜单一致性检查')
 console.log(`  域初始化器菜单声明 ${domainSeedMenus.length} 条（含导航、权限、图标检查）/ `
-  + `数组式种子菜单 ${arraySeedMenus.length} 条（导航 + 功能操作集检查）`)
+  + `数组式种子菜单 ${arraySeedMenus.length} 条（导航 + 功能操作集检查）/ `
+  + `MenuDef 菜单 ${menuDefMenus.length} 条（导航/页面/权限/图标）`)
 console.log(`  后端种子菜单 ${seedKeys.length} 条 / 前端路由映射 ${Object.keys(keyToPath).length} 条 / `
   + `离线菜单 ${offlineKeys.length} 条 / 受控菜单 ${controlledKeys.length} 条 / `
   + `功能操作登记 ${menuActionKeys.size} 条`)

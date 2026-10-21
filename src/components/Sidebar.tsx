@@ -59,6 +59,7 @@ import {
   ControlOutlined,
   GlobalOutlined,
   ThunderboltOutlined,
+  BulbOutlined,
   StopOutlined,
   SafetyCertificateOutlined,
   SafetyOutlined,
@@ -78,6 +79,7 @@ import {
   UserOutlined,
   ApartmentOutlined,
   RobotOutlined,
+  MessageOutlined,
   IdcardOutlined,
   SolutionOutlined,
   ScheduleOutlined,
@@ -277,7 +279,17 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
   'ai-operation-auth': '/ai-operation-auth',
-  'ai-assistant-config': '/ai-assistant-config',
+  'ai-assistant-overview': '/ai-assistant',
+  'ai-assistant-capability': '/ai-assistant/capability',
+  'ai-assistant-profile': '/ai-assistant/profile',
+  'ai-assistant-glossary': '/ai-assistant/glossary',
+  'ai-assistant-knowledge': '/ai-assistant/knowledge',
+  'ai-assistant-guardrail': '/ai-assistant/guardrail',
+  'ai-assistant-feedback': '/ai-assistant/feedback',
+  'ai-assistant-audit': '/ai-assistant/audit',
+  'ai-assistant-quick-prompt': '/ai-assistant/quick-prompt',
+  'ai-assistant-push-template': '/ai-assistant/push-template',
+  'ai-assistant-memory': '/ai-assistant/memory',
   'ai-access-request': '/ai-access-apply',
   'ai-mcp-service': '/ai-mcp-service',
   'ai-conversation-audit': '/ai-conversation-audit',
@@ -532,10 +544,20 @@ const keyToIcon: Record<string, ReactNode> = {
   'version-history': <HistoryOutlined />,
   'notification-config': <BellOutlined />,
   // 智能中心 (AI)
-  'ai-assistant': <RobotOutlined />,
+  'ai-assistant-group': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
   'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
-  'ai-assistant-config': <SettingOutlined />, // AI 助手配置
+  'ai-assistant-overview': <DashboardOutlined />,
+  'ai-assistant-capability': <AppstoreOutlined />,
+  'ai-assistant-profile': <FileTextOutlined />,
+  'ai-assistant-glossary': <BookOutlined />,
+  'ai-assistant-knowledge': <ReadOutlined />,
+  'ai-assistant-guardrail': <SafetyCertificateOutlined />,
+  'ai-assistant-feedback': <MessageOutlined />,
+  'ai-assistant-audit': <AuditOutlined />,
+  'ai-assistant-quick-prompt': <ThunderboltOutlined />,
+  'ai-assistant-push-template': <SendOutlined />,
+  'ai-assistant-memory': <BulbOutlined />,
   'ai-access-request': <KeyOutlined />,    // AI 使用申請
   'ai-mcp-service': <BlockOutlined />,     // MCP 服務
   'ai-conversation-audit': <AuditOutlined />, // 对话审计

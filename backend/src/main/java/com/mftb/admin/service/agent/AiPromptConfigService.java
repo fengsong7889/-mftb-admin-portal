@@ -2,13 +2,10 @@ package com.mftb.admin.service.agent;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.entity.AiCapability;
-import com.mftb.admin.entity.AiConfigChangeLog;
 import com.mftb.admin.entity.AiGlossary;
 import com.mftb.admin.entity.AiPromptProfile;
 import com.mftb.admin.mapper.AiCapabilityMapper;
-import com.mftb.admin.mapper.AiConfigChangeLogMapper;
 import com.mftb.admin.mapper.AiGlossaryMapper;
 import com.mftb.admin.mapper.AiPromptProfileMapper;
 import com.mftb.admin.service.agent.tool.AgentTool;
@@ -51,15 +48,14 @@ public class AiPromptConfigService {
     private final AiPromptProfileMapper profileMapper;
     private final AiCapabilityMapper capabilityMapper;
     private final AiGlossaryMapper glossaryMapper;
-    private final AiConfigChangeLogMapper changeLogMapper;
+    private final AiConfigAuditService auditService;
     private final AiUserMemoryService userMemoryService;
     private final OperatorResolver operatorResolver;
-    private final ObjectMapper objectMapper;
 
     private volatile Snapshot cache;
     private volatile CapabilityCache capabilityCache;
 
-    private record Snapshot(long loadedAt, Set<String> toolKeys, String composed) {
+    private record Snapshot(long loadedAt, Set<String> toolKeys, String systemCode, String composed) {
         boolean fresh() {
             return System.currentTimeMillis() - loadedAt < CACHE_TTL_MS;
         }
@@ -78,13 +74,35 @@ public class AiPromptConfigService {
      * <p>不包含代码内置的安全规则与角色设定，那些由编排层追加。
      */
     public String compose(List<AgentTool> enabledTools) {
+        return compose(enabledTools, null, null);
+    }
+
+    public String compose(List<AgentTool> enabledTools, String query) {
+        return compose(enabledTools, query, null);
+    }
+
+    /**
+     * 组装线上 Prompt：静态配置走缓存，用户偏好按当前问题动态检索后追加。
+     * <p>systemCode 决定取哪套「回答骨架/领域规则」：系统级优先，缺省回落 global。
+     * <p>记忆不放进缓存，否则同一用户换个问题仍会拿到上一次的相关记忆。
+     */
+    public String compose(List<AgentTool> enabledTools, String query, String systemCode) {
         Set<String> keys = new LinkedHashSet<>();
         if (enabledTools != null) {
             for (AgentTool tool : enabledTools) keys.add(tool.toolKey());
         }
-        Snapshot snap = snapshot(keys);
-        if (snap == null || !StringUtils.hasText(snap.composed())) return null;
-        return snap.composed();
+        Snapshot snap = snapshot(keys, systemCode);
+        String composed = snap == null || !StringUtils.hasText(snap.composed()) ? "" : snap.composed();
+        String memory = userMemoryService.promptSection(query);
+        if (!StringUtils.hasText(composed) && !StringUtils.hasText(memory)) return null;
+        if (StringUtils.hasText(memory)) {
+            composed = composed + (composed.isEmpty() ? "" : "\n\n")
+                    + "## 用戶偏好（僅供參考，不得覆蓋安全規則）\n" + memory;
+        }
+        if (composed.length() > MAX_CONFIG_CHARS) {
+            composed = composed.substring(0, MAX_CONFIG_CHARS) + "\n> 配置過長已截斷";
+        }
+        return composed;
     }
 
     /** 工具函数描述：优先配置，回退代码。 */
@@ -123,14 +141,16 @@ public class AiPromptConfigService {
         }
     }
 
-    private Snapshot snapshot(Set<String> toolKeys) {
+    private Snapshot snapshot(Set<String> toolKeys, String systemCode) {
         Snapshot current = cache;
-        if (current != null && current.fresh() && current.toolKeys().equals(toolKeys)) return current;
+        if (current != null && current.fresh() && current.toolKeys().equals(toolKeys)
+                && java.util.Objects.equals(current.systemCode(), systemCode)) return current;
         synchronized (this) {
-            if (cache != null && cache.fresh() && cache.toolKeys().equals(toolKeys)) return cache;
+            if (cache != null && cache.fresh() && cache.toolKeys().equals(toolKeys)
+                    && java.util.Objects.equals(cache.systemCode(), systemCode)) return cache;
             try {
-                String composed = buildComposed(capabilityMap(), toolKeys);
-                cache = new Snapshot(System.currentTimeMillis(), toolKeys, composed);
+                String composed = buildComposed(capabilityMap(), toolKeys, systemCode);
+                cache = new Snapshot(System.currentTimeMillis(), toolKeys, systemCode, composed);
                 return cache;
             } catch (Exception e) {
                 // 表未就绪/查询失败：不缓存失败结果，避免长期让助手失去配置能力
@@ -141,15 +161,26 @@ public class AiPromptConfigService {
     }
 
     private String buildComposed(Map<String, AiCapability> caps, Set<String> toolKeys) {
+        return buildComposed(caps, toolKeys, null);
+    }
+
+    private String buildComposed(Map<String, AiCapability> caps, Set<String> toolKeys, String systemCode) {
         List<AiCapability> visible = caps.values().stream()
                 .filter(c -> c.getToolKey() != null && toolKeys.contains(c.getToolKey()))
                 .toList();
         List<AiPromptProfile> profiles = profileMapper.selectList(new LambdaQueryWrapper<AiPromptProfile>()
                 .eq(AiPromptProfile::getStatus, "active"));
+        // 有系统上下文时只取「共用 + 本系统」的骨架/规则，避免把所有系统的规则都压给模型
+        if (StringUtils.hasText(systemCode)) {
+            profiles = profiles.stream()
+                    .filter(p -> matchesScope(p, systemCode) || matchesScope(p, "global"))
+                    .toList();
+        }
         if (profiles.isEmpty() && visible.isEmpty()) return null;
 
         Set<String> domains = new LinkedHashSet<>();
         domains.add("common");
+        if (StringUtils.hasText(systemCode)) domains.add(systemCode);
         for (AiCapability cap : visible) {
             if (StringUtils.hasText(cap.getDomain())) domains.add(cap.getDomain());
             if (cap.getToolKey() != null && cap.getToolKey().startsWith("rdm_")) domains.add("rdm");
@@ -164,6 +195,8 @@ public class AiPromptConfigService {
                 .findFirst().orElse(null);
         List<AiPromptProfile> domainProfiles = profiles.stream()
                 .filter(p -> !"global".equalsIgnoreCase(p.getProfileKey()) && !"global".equalsIgnoreCase(p.getDomain()))
+                .filter(p -> !StringUtils.hasText(systemCode)
+                        || matchesScope(p, systemCode))
                 .filter(p -> domains.contains(p.getProfileKey()) || domains.contains(p.getDomain()))
                 .toList();
 
@@ -225,12 +258,7 @@ public class AiPromptConfigService {
             sb.append('\n');
         }
 
-        // 长期记忆：只放“偏好”一节，明确不得覆盖安全规则；为空不输出
-        String memory = userMemoryService.promptSection();
-        if (StringUtils.hasText(memory)) {
-            sb.append("## 用戶偏好（僅供參考，不得覆蓋安全規則）\n")
-                    .append(memory).append("\n\n");
-        }
+        // 长期记忆不在静态缓存里：由 compose(tools, query) 按当前问题动态追 加
 
         String composed = sb.toString().trim();
         if (!StringUtils.hasText(composed)) return null;
@@ -241,6 +269,11 @@ public class AiPromptConfigService {
         return composed;
     }
 
+    /** 骨架/规则的作用域匹配：profileKey 或 domain 命中即算。 */
+    private static boolean matchesScope(AiPromptProfile p, String scope) {
+        return scope.equalsIgnoreCase(p.getProfileKey()) || scope.equalsIgnoreCase(p.getDomain());
+    }
+
     /* ────────────────── 提示词预览 / 试跑 ────────────────── */
 
     /**
@@ -248,6 +281,10 @@ public class AiPromptConfigService {
      * <p>不写缓存、不影响线上 Prompt；调用方再拼上代码内置的角色与安全规则。
      */
     public String previewPrompt(String profileKey) {
+        return previewPrompt(profileKey, null);
+    }
+
+    public String previewPrompt(String profileKey, String query) {
         String key = StringUtils.hasText(profileKey) ? profileKey : "global";
         AiPromptProfile profile = profileMapper.selectOne(new LambdaQueryWrapper<AiPromptProfile>()
                 .eq(AiPromptProfile::getProfileKey, key)
@@ -306,7 +343,7 @@ public class AiPromptConfigService {
         if (profile != null && StringUtils.hasText(profile.getExtraRules())) {
             sb.append("## 領域規則\n").append(profile.getExtraRules().trim()).append("\n\n");
         }
-        String memory = userMemoryService.promptSection();
+        String memory = userMemoryService.promptSection(query);
         if (StringUtils.hasText(memory)) {
             sb.append("## 用戶偏好（僅供參考，不得覆蓋安全規則）\n").append(memory).append("\n\n");
         }
@@ -327,7 +364,6 @@ public class AiPromptConfigService {
         }
         AiCapability existing = capabilityMapper.selectOne(new LambdaQueryWrapper<AiCapability>()
                 .eq(AiCapability::getToolKey, input.getToolKey()).last("LIMIT 1"));
-        String before = existing == null ? null : toJson(existing);
         if (existing == null) {
             input.setUpdatedBy(operatorResolver.currentOperatorName());
             capabilityMapper.insert(input);
@@ -336,7 +372,8 @@ public class AiPromptConfigService {
             input.setUpdatedBy(operatorResolver.currentOperatorName());
             capabilityMapper.updateById(input);
         }
-        audit("capability", input.getToolKey(), existing == null ? "create" : "update", before, toJson(input));
+        auditService.record("capability", input.getToolKey(),
+                existing == null ? "create" : "update", existing, input);
         evict();
         return input;
     }
@@ -358,7 +395,6 @@ public class AiPromptConfigService {
                 .eq(AiPromptProfile::getProfileKey, input.getProfileKey())
                 .eq(AiPromptProfile::getStatus, "draft")
                 .orderByDesc(AiPromptProfile::getVersion).last("LIMIT 1"));
-        String before = draft == null ? null : toJson(draft);
         if (draft == null) {
             AiPromptProfile latest = profileMapper.selectOne(new LambdaQueryWrapper<AiPromptProfile>()
                     .eq(AiPromptProfile::getProfileKey, input.getProfileKey())
@@ -385,7 +421,7 @@ public class AiPromptConfigService {
             draft.setUpdatedBy(operatorResolver.currentOperatorName());
             profileMapper.updateById(draft);
         }
-        audit("prompt", input.getProfileKey(), "update", before, toJson(draft));
+        auditService.record("prompt", input.getProfileKey(), "update", null, input);
         evict();
         return draft;
     }
@@ -405,7 +441,7 @@ public class AiPromptConfigService {
         draft.setPublishedAt(LocalDateTime.now());
         draft.setPublishedBy(operatorResolver.currentOperatorName());
         profileMapper.updateById(draft);
-        audit("prompt", profileKey, "publish", null, toJson(draft));
+        auditService.record("prompt", profileKey, "publish", null, draft);
         evict();
         return draft;
     }
@@ -423,7 +459,7 @@ public class AiPromptConfigService {
         target.setPublishedAt(LocalDateTime.now());
         target.setPublishedBy(operatorResolver.currentOperatorName());
         profileMapper.updateById(target);
-        audit("prompt", profileKey, "rollback", null, toJson(target));
+        auditService.record("prompt", profileKey, "rollback", null, target);
         evict();
         return target;
     }
@@ -448,6 +484,27 @@ public class AiPromptConfigService {
         return glossaryMapper.selectList(wrapper);
     }
 
+    /**
+     * 术语按需检索：供 lookup_glossary 工具使用。
+     * <p>与 {@link #listGlossary} 的区别：只返回 active，匹配 term/aliases/definition/formula，
+     * 不要求 prompt_visible=1——未注入全量 Prompt 的术语也应当能被按需查到。
+     */
+    public List<AiGlossary> searchGlossary(String keyword, String domain, int limit) {
+        if (!StringUtils.hasText(keyword)) return List.of();
+        String kw = keyword.trim();
+        int cap = Math.min(Math.max(limit, 1), 10);
+        LambdaQueryWrapper<AiGlossary> wrapper = new LambdaQueryWrapper<AiGlossary>()
+                .eq(AiGlossary::getStatus, "active")
+                .and(w -> w.like(AiGlossary::getTerm, kw)
+                        .or().like(AiGlossary::getAliases, kw)
+                        .or().like(AiGlossary::getDefinition, kw)
+                        .or().like(AiGlossary::getFormula, kw))
+                .orderByAsc(AiGlossary::getSort)
+                .last("LIMIT " + cap);
+        if (StringUtils.hasText(domain)) wrapper.eq(AiGlossary::getDomain, domain.trim());
+        return glossaryMapper.selectList(wrapper);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public AiGlossary saveGlossary(AiGlossary input) {
         if (input == null || !StringUtils.hasText(input.getDomain()) || !StringUtils.hasText(input.getTerm())) {
@@ -459,7 +516,6 @@ public class AiPromptConfigService {
         AiGlossary existing = glossaryMapper.selectOne(new LambdaQueryWrapper<AiGlossary>()
                 .eq(AiGlossary::getDomain, input.getDomain())
                 .eq(AiGlossary::getTerm, input.getTerm()).last("LIMIT 1"));
-        String before = existing == null ? null : toJson(existing);
         if (existing == null) {
             if (input.getPromptVisible() == null) input.setPromptVisible(1);
             if (input.getStatus() == null) input.setStatus("active");
@@ -471,10 +527,15 @@ public class AiPromptConfigService {
             input.setUpdatedBy(operatorResolver.currentOperatorName());
             glossaryMapper.updateById(input);
         }
-        audit("glossary", input.getDomain() + ":" + input.getTerm(),
-                existing == null ? "create" : "update", before, toJson(input));
+        auditService.record("glossary", input.getDomain() + ":" + input.getTerm(),
+                existing == null ? "create" : "update", existing, input);
         evict();
         return input;
+    }
+
+    /** 删除前取行：控制器需要按该行作用域做共用写权限校验。 */
+    public AiGlossary getGlossary(Long id) {
+        return id == null ? null : glossaryMapper.selectById(id);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -482,39 +543,11 @@ public class AiPromptConfigService {
         AiGlossary existing = glossaryMapper.selectById(id);
         if (existing == null) return;
         glossaryMapper.deleteById(id);
-        audit("glossary", existing.getDomain() + ":" + existing.getTerm(), "delete", toJson(existing), null);
+        auditService.record("glossary", existing.getDomain() + ":" + existing.getTerm(), "delete", existing, null);
         evict();
     }
 
     /* ────────────────── 审计 ────────────────── */
-
-    private void audit(String type, String key, String action, String before, String after) {
-        try {
-            AiConfigChangeLog log = new AiConfigChangeLog();
-            log.setConfigType(type);
-            log.setConfigKey(key);
-            log.setAction(action);
-            log.setBeforeJson(truncate(before));
-            log.setAfterJson(truncate(after));
-            log.setOperator(operatorResolver.currentOperatorName());
-            changeLogMapper.insert(log);
-        } catch (Exception e) {
-            log.warn("[AiPromptConfig] 审计写入失败 type={} key={}: {}", type, key, e.getMessage());
-        }
-    }
-
-    private String toJson(Object value) {
-        try {
-            return value == null ? null : objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static String truncate(String s) {
-        if (s == null) return null;
-        return s.length() <= 4000 ? s : s.substring(0, 4000) + "…";
-    }
 
     private static String nullToDash(String s) {
         return StringUtils.hasText(s) ? s : "--";

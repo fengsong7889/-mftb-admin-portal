@@ -26,6 +26,9 @@ public class AiGuardRule {
     /** input / output / both */
     private String scope;
 
+    /** 作用域：common=共用，其余为业务系统编码 */
+    private String systemCode;
+
     private String replacement;
 
     private Integer enabled;

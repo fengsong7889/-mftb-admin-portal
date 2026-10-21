@@ -99,6 +99,8 @@ public class AgentOrchestrationService {
         private boolean sandbox;
         /** 试跑：完全不使用工具，只测回答风格 */
         private boolean disableTools;
+        /** 当前业务系统（rdm/finance/eam/hr…）：决定取哪套骨架/护栏/记忆；空=共用 */
+        private String systemCode;
     }
 
     @Data
@@ -152,7 +154,7 @@ public class AgentOrchestrationService {
         String lastUserText = lastUserText(req.getMessages());
         // 输入护栏：命中 block 直接返回，不调模型也不落会话事件（避免敏感内容进入后续上下文）
         AiGuardrailService.GuardResult inputGuard = guardrailService == null
-                ? null : guardrailService.checkInput(lastUserText);
+                ? null : guardrailService.checkInput(lastUserText, req.getSystemCode());
         String effectiveUserText = lastUserText;
         if (inputGuard != null) {
             if (inputGuard.isBlocked()) {
@@ -207,7 +209,7 @@ public class AgentOrchestrationService {
         // 复制 messages，前置 System Prompt；截断到最近 MAX_MESSAGES 条
         List<Map<String, Object>> working = new ArrayList<>();
         String systemPrompt = StringUtils.hasText(req.getSystemPromptOverride())
-                ? req.getSystemPromptOverride() : buildSystemPrompt(enabledTools);
+                ? req.getSystemPromptOverride() : buildSystemPrompt(enabledTools, effectiveUserText, req.getSystemCode());
         working.add(Map.of("role", "system", "content", systemPrompt));
         working.addAll(withSanitizedLastUser(req.getMessages(), lastUserText, effectiveUserText));
 
@@ -516,8 +518,13 @@ public class AgentOrchestrationService {
         catch (Exception e) { return Map.of("type", "object", "properties", Map.of()); }
     }
 
-    private String buildSystemPrompt(List<AgentTool> enabledTools) {
-        String configured = promptConfigService == null ? null : promptConfigService.compose(enabledTools);
+    private String buildSystemPrompt(List<AgentTool> enabledTools, String userQuery) {
+        return buildSystemPrompt(enabledTools, userQuery, null);
+    }
+
+    private String buildSystemPrompt(List<AgentTool> enabledTools, String userQuery, String systemCode) {
+        String configured = promptConfigService == null ? null
+                : promptConfigService.compose(enabledTools, userQuery, systemCode);
         StringBuilder sb = new StringBuilder();
         sb.append(basePrompt());
         if (StringUtils.hasText(configured)) {
@@ -658,7 +665,7 @@ public class AgentOrchestrationService {
                                        OrchestrateRequest req, String effectiveUserText) {
         String text = content;
         if (guardrailService != null) {
-            AiGuardrailService.GuardResult guard = guardrailService.checkOutput(text);
+            AiGuardrailService.GuardResult guard = guardrailService.checkOutput(text, req.getSystemCode());
             if (guard != null && guard.isBlocked()) {
                 appendEvent(req.getConversationPk(), "POLICY_DECISION", username,
                         Map.of("decision", "reject", "reason", "guardrail_output"));

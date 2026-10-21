@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Statistic, Switch, Table, Tabs, Tag, message,
+  Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Select, Space, Spin, Statistic, Switch, Table, Tag, message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, SendOutlined, UndoOutlined, PlayCircleOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusOutlined, ReloadOutlined, UndoOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import { Navigate } from 'react-router-dom'
+import { formatDateTime } from '../../utils/datetime'
+import { confirmDelete } from '../../utils/confirmDelete'
+import AiScopeSwitch from '../../components/AiScopeSwitch'
+import { AI_SCOPE_OPTIONS, aiScopeLabel, useAiScope } from '../../constants/aiScope'
 import { fetchFeedback, fetchFeedbackStats, type AiFeedbackRow, type AiFeedbackStats } from '../../api/aiFeedback'
 import {
   deleteKnowledgeDoc,
@@ -51,54 +55,30 @@ const DOMAIN_OPTIONS = [
 ]
 
 /**
- * AI 助手配置中心（MVP）：能力清单 / 回答骨架 / 术语与口径。
+ * AI 助手配置中心：拆分为独立页面后，本组件只负责旧地址重定向。
  *
- * <p>菜单管“怎么说”，不管“能不能”：工具启停仍在 AI 操作授权，数据权限仍在各业务服务。
- * <p>回答骨架必须发布才生效；能力/术语保存即生效（30 秒内）。
+ * <p>各面板仍在此文件维护，由 ../AiAssistant/*Page.tsx 通过命名导出复用；
+ * 避免一次性搬移 1000+ 行代码引入无关回归，后续可再逐个物理拆分。
  */
 export default function AiAssistantConfig() {
-  const { t } = useTranslation()
-  const [tab, setTab] = useState('capability')
-
-  return (
-    <div className="content-area">
-      <DetailPageHeader
-        title={t('aiAssistantConfig.pageTitle', { defaultValue: 'AI 助手配置' })}
-        onBack={() => history.back()}
-      />
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 12 }}
-        message={t('aiAssistantConfig.intro', {
-          defaultValue: '这里只调整回答方式、能力说明与术语口径；工具启停仍在「AI 操作授权」，数据权限仍由各业务菜单控制。回答骨架需发布后生效。',
-        })}
-      />
-      <Tabs
-        activeKey={tab}
-        onChange={setTab}
-        items={[
-          { key: 'capability', label: t('aiAssistantConfig.tabCapability', { defaultValue: '能力清單' }), children: <CapabilityTab /> },
-          { key: 'profile', label: t('aiAssistantConfig.tabProfile', { defaultValue: '回答骨架' }), children: <ProfileTab /> },
-          { key: 'glossary', label: t('aiAssistantConfig.tabGlossary', { defaultValue: '術語與口徑' }), children: <GlossaryTab /> },
-          { key: 'knowledge', label: t('aiAssistantConfig.tabKnowledge', { defaultValue: '知識庫' }), children: <KnowledgeTab /> },
-          { key: 'guardrail', label: t('aiAssistantConfig.tabGuardrail', { defaultValue: '合規護欄' }), children: <GuardrailTab /> },
-          { key: 'feedback', label: t('aiAssistantConfig.tabFeedback', { defaultValue: '回答反饋' }), children: <FeedbackTab /> },
-        ]}
-      />
-    </div>
-  )
+  return <Navigate to="/ai-assistant" replace />
 }
 
 /* ────────────────── 能力清单 ────────────────── */
 
-function CapabilityTab() {
+export function CapabilityTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiCapability[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<AiCapability | null>(null)
   const [saving, setSaving] = useState(false)
+  const [scope, setScope] = useAiScope('ai-capability', 'all')
   const [form] = Form.useForm<AiCapability>()
+
+  const scopedRows = useMemo(
+    () => (scope === 'all' ? rows : rows.filter((r) => (r.domain || 'common') === scope)),
+    [rows, scope],
+  )
 
   const load = useCallback(() => {
     setLoading(true)
@@ -145,9 +125,10 @@ function CapabilityTab() {
     {
       title: t('aiAssistantConfig.colUseWhen', { defaultValue: '何時用' }), dataIndex: 'useWhen', key: 'useWhen', width: 240, ellipsis: true,
     },
-    { title: t('common.updatedAt', { defaultValue: '更新時間' }), dataIndex: 'updatedAt', key: 'updatedAt', width: 160 },
+    { title: t('common.updatedAt', { defaultValue: '更新時間' }), dataIndex: 'updatedAt', key: 'updatedAt', width: 160,
+      render: (v?: string | number) => formatDateTime(v) },
     {
-      title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 80,
+      title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 90,
       render: (_, row) => <Button type="link" onClick={() => openEdit(row)}>{t('common.edit', { defaultValue: '編輯' })}</Button>,
     },
   ]
@@ -155,16 +136,28 @@ function CapabilityTab() {
   return (
     <>
       <div className="action-section" style={{ marginBottom: 8 }}>
-        <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
+        <div className="action-section-left">
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
+        </div>
+        <div className="action-section-right">
+          <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
+        </div>
       </div>
       <Table<AiCapability>
         rowKey="toolKey"
         size="small"
         loading={loading}
         columns={columns}
-        dataSource={rows}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
+        dataSource={scopedRows}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: (total) => t('common.total', { count: total, defaultValue: '共 {{count}} 條' }),
+        }}
         scroll={{ x: 'max-content' }}
+        locale={{ emptyText: t('aiAssistantConfig.capabilityEmpty', { defaultValue: '暫無能力配置' }) }}
       />
       <Modal
         open={!!editing}
@@ -173,7 +166,7 @@ function CapabilityTab() {
         onOk={submit}
         confirmLoading={saving}
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item name="toolKey" label="Tool Key">
@@ -205,7 +198,7 @@ function CapabilityTab() {
 
 /* ────────────────── 回答骨架 ────────────────── */
 
-function ProfileTab() {
+export function ProfileTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiPromptProfile[]>([])
   const [loading, setLoading] = useState(false)
@@ -213,6 +206,7 @@ function ProfileTab() {
   const [saving, setSaving] = useState(false)
   const [versionsKey, setVersionsKey] = useState<string | null>(null)
   const [testRunKey, setTestRunKey] = useState<string | null>(null)
+  const [scope, setScope] = useAiScope('ai-profile', 'all')
   const [form] = Form.useForm<AiPromptProfile>()
 
   const load = useCallback(() => {
@@ -227,7 +221,10 @@ function ProfileTab() {
 
   const grouped = useMemo(() => {
     const map = new Map<string, { active?: AiPromptProfile; draft?: AiPromptProfile; all: AiPromptProfile[] }>()
-    for (const p of rows) {
+    const scoped = scope === 'all'
+      ? rows
+      : rows.filter((p) => p.profileKey === scope || p.domain === scope)
+    for (const p of scoped) {
       const entry = map.get(p.profileKey) ?? { all: [] }
       entry.all.push(p)
       if (p.status === 'active') entry.active = p
@@ -235,7 +232,23 @@ function ProfileTab() {
       map.set(p.profileKey, entry)
     }
     return Array.from(map.entries()).map(([key, value]) => ({ key, ...value }))
-  }, [rows])
+  }, [rows, scope])
+
+  /** 为当前选中的系统建立一套骨架（已有则进入草稿编辑） */
+  const openCreateForScope = () => {
+    if (scope === 'all') return
+    const value: AiPromptProfile = {
+      profileKey: scope,
+      name: aiScopeLabel(scope),
+      domain: scope,
+      responseSkeleton: '',
+      extraRules: '',
+      status: 'draft',
+      version: 1,
+    }
+    setEditing(value)
+    form.setFieldsValue(value)
+  }
 
   const openEdit = (row: { key: string; active?: AiPromptProfile; draft?: AiPromptProfile }) => {
     const source = row.draft ?? row.active
@@ -304,16 +317,17 @@ function ProfileTab() {
       title: t('aiAssistantConfig.colDraft', { defaultValue: '草稿' }), key: 'draft', width: 100,
       render: (_, r) => r.draft ? <Tag color="processing">v{r.draft.version}</Tag> : '--',
     },
-    { title: t('aiAssistantConfig.colPublishedAt', { defaultValue: '發布時間' }), key: 'publishedAt', width: 170, render: (_, r) => r.active?.publishedAt ?? '--' },
+    { title: t('aiAssistantConfig.colPublishedAt', { defaultValue: '發布時間' }), key: 'publishedAt', width: 170,
+      render: (_, r) => formatDateTime(r.active?.publishedAt) },
     {
-      title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 260,
+      title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 260, fixed: 'right',
       render: (_, r) => (
         <Space>
           <Button type="link" size="small" onClick={() => openEdit(r)}>{t('common.edit', { defaultValue: '編輯' })}</Button>
-          <Button type="link" size="small" icon={<SendOutlined />} disabled={!r.draft} onClick={() => publish(r.key)}>
+          <Button type="link" size="small" disabled={!r.draft} onClick={() => publish(r.key)}>
             {t('aiAssistantConfig.publish', { defaultValue: '發布' })}
           </Button>
-          <Button type="link" size="small" icon={<PlayCircleOutlined />} onClick={() => setTestRunKey(r.key)}>
+          <Button type="link" size="small" onClick={() => setTestRunKey(r.key)}>
             {t('aiAssistantConfig.testRun', { defaultValue: '試跑' })}
           </Button>
           <Button type="link" size="small" onClick={() => setVersionsKey(r.key)}>{t('aiAssistantConfig.versions', { defaultValue: '版本歷史' })}</Button>
@@ -328,7 +342,17 @@ function ProfileTab() {
   return (
     <>
       <div className="action-section" style={{ marginBottom: 8 }}>
-        <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
+        <div className="action-section-left">
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
+        </div>
+        <div className="action-section-right">
+          <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
+          {scope !== 'all' && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateForScope}>
+              新增本系統骨架
+            </Button>
+          )}
+        </div>
       </div>
       <Table
         rowKey="key"
@@ -338,6 +362,7 @@ function ProfileTab() {
         dataSource={grouped}
         pagination={false}
         scroll={{ x: 'max-content' }}
+        locale={{ emptyText: t('aiAssistantConfig.profileEmpty', { defaultValue: '暫無回答骨架' }) }}
       />
       <Modal
         open={!!editing}
@@ -346,7 +371,7 @@ function ProfileTab() {
         onOk={submit}
         confirmLoading={saving}
         width={860}
-        destroyOnClose
+        destroyOnHidden
         okText={t('aiAssistantConfig.saveDraft', { defaultValue: '保存草稿' })}
       >
         <Form form={form} layout="vertical">
@@ -371,7 +396,7 @@ function ProfileTab() {
             type="warning"
             showIcon
             message={t('aiAssistantConfig.safetyNote', {
-              defaultValue: '安全不变量（不编造、不越权、不泄露、推送必须确认）由代码保留，配置无法覆盖。',
+              defaultValue: '安全不變量（不編造、不越權、不洩露、推送必須確認）由代碼保留，配置無法覆蓋。',
             })}
           />
         </Form>
@@ -391,7 +416,8 @@ function ProfileTab() {
           columns={[
             { title: 'Version', dataIndex: 'version', key: 'version', width: 90, render: (v) => `v${v}` },
             { title: 'Status', dataIndex: 'status', key: 'status', width: 110, render: (v) => <Tag color={v === 'active' ? 'success' : 'default'}>{v}</Tag> },
-            { title: t('aiAssistantConfig.colPublishedAt', { defaultValue: '發布時間' }), dataIndex: 'publishedAt', key: 'publishedAt' },
+            { title: t('aiAssistantConfig.colPublishedAt', { defaultValue: '發布時間' }), dataIndex: 'publishedAt', key: 'publishedAt',
+              render: (v?: string | number) => formatDateTime(v) },
             { title: t('aiAssistantConfig.colUpdatedBy', { defaultValue: '更新人' }), dataIndex: 'updatedBy', key: 'updatedBy', width: 120 },
             {
               title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 110,
@@ -425,7 +451,7 @@ function ProfileTab() {
         footer={null}
         onCancel={() => setTestRunKey(null)}
         width={900}
-        destroyOnClose
+        destroyOnHidden
       >
         {testRunKey && <TestRunPanel profileKey={testRunKey} />}
       </Modal>
@@ -521,28 +547,38 @@ function TestRunPanel({ profileKey }: { profileKey: string }) {
 
 /* ────────────────── 术语与口径 ────────────────── */
 
-function GlossaryTab() {
+export function GlossaryTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiGlossary[]>([])
   const [loading, setLoading] = useState(false)
-  const [domain, setDomain] = useState<string | undefined>(undefined)
+  const [scope, setScope] = useAiScope('ai-glossary', 'all')
   const [keyword, setKeyword] = useState('')
   const [editing, setEditing] = useState<AiGlossary | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<AiGlossary>()
+  const [searchForm] = Form.useForm<{ keyword?: string }>()
 
   const load = useCallback(() => {
     setLoading(true)
-    fetchGlossary({ domain, keyword: keyword.trim() || undefined })
+    fetchGlossary({ domain: scope === 'all' ? undefined : scope, keyword: keyword || undefined })
       .then(setRows)
       .catch(() => message.error(t('aiAssistantConfig.loadFailed', { defaultValue: '加載失敗' })))
       .finally(() => setLoading(false))
-  }, [domain, keyword, t])
+  }, [scope, keyword, t])
 
   useEffect(() => { load() }, [load])
 
+  const handleSearch = () => {
+    setKeyword((searchForm.getFieldValue('keyword') ?? '').trim())
+  }
+
+  const handleReset = () => {
+    searchForm.resetFields()
+    setKeyword('')
+  }
+
   const openCreate = () => {
-    const value: AiGlossary = { domain: domain ?? 'rdm', term: '', definition: '', promptVisible: 1, sort: 0 }
+    const value: AiGlossary = { domain: scope === 'all' ? 'common' : scope, term: '', definition: '', promptVisible: 1, sort: 0 }
     setEditing(value)
     form.setFieldsValue(value)
   }
@@ -586,21 +622,23 @@ function GlossaryTab() {
       render: (_, row) => (
         <Space>
           <Button type="link" size="small" onClick={() => openEdit(row)}>{t('common.edit', { defaultValue: '編輯' })}</Button>
-          <Popconfirm
-            title={t('aiAssistantConfig.deleteConfirm', { defaultValue: '確認刪除？' })}
-            onConfirm={async () => {
-              if (row.id == null) return
-              try {
-                await deleteGlossary(row.id)
-                message.success(t('common.deleted', { defaultValue: '已刪除' }))
-                load()
-              } catch {
-                message.error(t('common.deleteFailed', { defaultValue: '刪除失敗' }))
-              }
-            }}
-          >
-            <Button type="link" size="small" danger>{t('common.delete', { defaultValue: '刪除' })}</Button>
-          </Popconfirm>
+          <Button type="link" size="small" danger
+            onClick={() => confirmDelete({
+              title: t('aiAssistantConfig.deleteConfirm', { defaultValue: '確認刪除？' }),
+              content: '刪除後助手不再引用該術語；已生成的回答不受影響。',
+              onOk: async () => {
+                if (row.id == null) return
+                try {
+                  await deleteGlossary(row.id)
+                  message.success(t('common.deleted', { defaultValue: '已刪除' }))
+                  load()
+                } catch {
+                  message.error(t('common.deleteFailed', { defaultValue: '刪除失敗' }))
+                }
+              },
+            })}>
+            {t('common.delete', { defaultValue: '刪除' })}
+          </Button>
         </Space>
       ),
     },
@@ -608,29 +646,31 @@ function GlossaryTab() {
 
   return (
     <>
-      <div className="search-section" style={{ marginBottom: 8 }}>
-        <Space wrap>
-          <Select
-            allowClear
-            placeholder={t('aiAssistantConfig.colDomain', { defaultValue: '領域' })}
-            options={DOMAIN_OPTIONS}
-            value={domain}
-            onChange={setDomain}
-            style={{ width: 160 }}
-          />
-          <Input.Search
-            placeholder={t('aiAssistantConfig.searchTerm', { defaultValue: '搜索术语/定义' })}
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onSearch={load}
-            style={{ width: 240 }}
-            allowClear
-          />
-          <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
-        </Space>
+      <div className="search-section">
+        <Form form={searchForm} layout="inline" onFinish={handleSearch}>
+          <Form.Item label={t('aiAssistantConfig.colTerm', { defaultValue: '術語' })} name="keyword">
+            <Input allowClear placeholder={t('aiAssistantConfig.searchTerm', { defaultValue: '搜尋術語/定義' })}
+              onPressEnter={handleSearch} />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+                {t('common.search', { defaultValue: '查詢' })}
+              </Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>
+                {t('common.reset', { defaultValue: '重置' })}
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
       </div>
       <div className="action-section" style={{ marginBottom: 8 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('common.add', { defaultValue: '新增' })}</Button>
+        <div className="action-section-left">
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
+        </div>
+        <div className="action-section-right">
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('common.add', { defaultValue: '新增' })}</Button>
+        </div>
       </div>
       <Table<AiGlossary>
         rowKey={(r) => String(r.id ?? `${r.domain}:${r.term}`)}
@@ -638,8 +678,15 @@ function GlossaryTab() {
         loading={loading}
         columns={columns}
         dataSource={rows}
-        pagination={{ pageSize: 20, showSizeChanger: false }}
         scroll={{ x: 'max-content' }}
+        pagination={{
+          pageSize: 20,
+          showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: (total) => t('common.total', { count: total, defaultValue: '共 {{count}} 條' }),
+        }}
+        locale={{ emptyText: t('aiAssistantConfig.glossaryEmpty', { defaultValue: '暫無術語' }) }}
       />
       <Modal
         open={!!editing}
@@ -648,7 +695,7 @@ function GlossaryTab() {
         onOk={submit}
         confirmLoading={saving}
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Space size="large" style={{ display: 'flex' }}>
@@ -691,33 +738,37 @@ function GlossaryTab() {
 
 /* ────────────────── 回答反馈（低分看板） ────────────────── */
 
-function FeedbackTab() {
+export function FeedbackTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiFeedbackRow[]>([])
   const [loading, setLoading] = useState(false)
   const [rating, setRating] = useState<'all' | 'up' | 'down'>('down')
+  const [scope, setScope] = useAiScope('ai-feedback', 'all')
   const [stats, setStats] = useState<AiFeedbackStats | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
     const value = rating === 'all' ? undefined : rating === 'up' ? 1 : -1
-    fetchFeedback({ rating: value, limit: 100 })
+    fetchFeedback({ rating: value, limit: 100, systemCode: scope === 'all' ? undefined : scope })
       .then(setRows)
       .catch(() => message.error(t('aiAssistantConfig.loadFailed', { defaultValue: '加載失敗' })))
       .finally(() => setLoading(false))
-  }, [rating, t])
+  }, [rating, scope, t])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    fetchFeedbackStats(30).then(setStats).catch(() => setStats(null))
-  }, [])
+    fetchFeedbackStats(30, scope === 'all' ? undefined : scope)
+      .then(setStats)
+      .catch(() => setStats(null))
+  }, [scope])
 
   const columns: ColumnsType<AiFeedbackRow> = [
-    { title: t('aiAssistantConfig.colFeedbackTime', { defaultValue: '時間' }), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
+    { title: t('aiAssistantConfig.colFeedbackTime', { defaultValue: '時間' }), dataIndex: 'createdAt', key: 'createdAt', width: 170,
+      render: (v?: string | number) => formatDateTime(v) },
     {
       title: t('aiAssistantConfig.colRating', { defaultValue: '評分' }), dataIndex: 'rating', key: 'rating', width: 90,
-      render: (v: number) => v === 1 ? <Tag color="success">贊</Tag> : <Tag color="error">踩</Tag>,
+      render: (v: number) => v === 1 ? <Tag color="success">讚</Tag> : <Tag color="error">踩</Tag>,
     },
     {
       title: t('aiAssistantConfig.colReason', { defaultValue: '原因' }), dataIndex: 'reason', key: 'reason', width: 130,
@@ -738,22 +789,24 @@ function FeedbackTab() {
       <div className="search-section" style={{ marginBottom: 8 }}>
         <Space wrap>
           <Select
+            aria-label="評分篩選"
             style={{ width: 160 }}
             value={rating}
             onChange={setRating}
             options={[
               { value: 'down', label: t('aiAssistantConfig.feedbackDown', { defaultValue: '只看踩' }) },
-              { value: 'up', label: t('aiAssistantConfig.feedbackUp', { defaultValue: '只看贊' }) },
+              { value: 'up', label: t('aiAssistantConfig.feedbackUp', { defaultValue: '只看讚' }) },
               { value: 'all', label: t('aiAssistantConfig.feedbackAll', { defaultValue: '全部' }) },
             ]}
           />
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
           <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
         </Space>
       </div>
       <div className="action-section" style={{ marginBottom: 12 }}>
         <Space size={32} wrap>
           <Statistic title={t('aiAssistantConfig.statFeedbackTotal', { defaultValue: '近 30 天反饋' })} value={stats?.total ?? 0} />
-          <Statistic title={t('aiAssistantConfig.statFeedbackUp', { defaultValue: '贊' })} value={stats?.up ?? 0} valueStyle={{ color: '#3f8600' }} />
+          <Statistic title={t('aiAssistantConfig.statFeedbackUp', { defaultValue: '讚' })} value={stats?.up ?? 0} valueStyle={{ color: '#3f8600' }} />
           <Statistic title={t('aiAssistantConfig.statFeedbackDown', { defaultValue: '踩' })} value={stats?.down ?? 0} valueStyle={{ color: '#cf1322' }} />
           <Statistic title={t('aiAssistantConfig.statFeedbackRate', { defaultValue: '差評率' })} value={stats?.downRate ?? 0} suffix="%" />
         </Space>
@@ -798,12 +851,12 @@ function FeedbackTab() {
 
 /* ────────────────── 知识库（RAG） ────────────────── */
 
-function KnowledgeTab() {
+export function KnowledgeTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiKnowledgeDoc[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
-  const [systemFilter, setSystemFilter] = useState<string | undefined>()
+  const [scope, setScope] = useAiScope('ai-knowledge', 'all')
   const [editing, setEditing] = useState<AiKnowledgeDoc | null>(null)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<AiKnowledgeDoc>()
@@ -813,11 +866,11 @@ function KnowledgeTab() {
 
   const load = useCallback(() => {
     setLoading(true)
-    fetchKnowledgeDocs({ keyword: keyword || undefined, systemCode: systemFilter })
+    fetchKnowledgeDocs({ keyword: keyword || undefined, systemCode: scope === 'all' ? undefined : scope })
       .then(setRows)
       .catch(() => message.error(t('aiAssistantConfig.loadFailed', { defaultValue: '加載失敗' })))
       .finally(() => setLoading(false))
-  }, [keyword, systemFilter, t])
+  }, [keyword, scope, t])
 
   useEffect(() => { load() }, [load])
 
@@ -889,7 +942,7 @@ function KnowledgeTab() {
     if (!query) return
     setTesting(true)
     try {
-      setHits(await searchKnowledge({ query, systemCode: systemFilter, limit: 5 }))
+      setHits(await searchKnowledge({ query, systemCode: scope === 'all' ? undefined : scope, limit: 5 }))
     } catch (e) {
       message.error(e instanceof Error ? e.message : t('aiAssistantConfig.loadFailed', { defaultValue: '加載失敗' }))
     } finally {
@@ -898,7 +951,7 @@ function KnowledgeTab() {
   }
 
   const columns: ColumnsType<AiKnowledgeDoc> = [
-    { title: t('aiAssistantConfig.colTitle', { defaultValue: '標題' }), dataIndex: 'title', key: 'title', ellipsis: true },
+    { title: t('aiAssistantConfig.colTitle', { defaultValue: '標題' }), dataIndex: 'title', key: 'title', width: 220, ellipsis: true },
     {
       title: t('aiAssistantConfig.colSystem', { defaultValue: '系統' }), dataIndex: 'systemCode', key: 'systemCode', width: 100,
       render: (v: string) => <Tag>{v}</Tag>,
@@ -910,7 +963,7 @@ function KnowledgeTab() {
     { title: t('aiAssistantConfig.colChunks', { defaultValue: '分塊' }), dataIndex: 'chunkCount', key: 'chunkCount', width: 70 },
     {
       title: t('aiAssistantConfig.colUpdatedAt', { defaultValue: '更新時間' }), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
-      render: (v?: string) => v ? String(v).replace('T', ' ').slice(0, 19) : '--',
+      render: (v?: string | number) => formatDateTime(v),
     },
     {
       title: t('common.action', { defaultValue: '操作' }), key: 'action', width: 250,
@@ -921,9 +974,14 @@ function KnowledgeTab() {
             {row.status === 'active' ? t('common.disable', { defaultValue: '停用' }) : t('common.enable', { defaultValue: '啟用' })}
           </Button>
           <Button type="link" size="small" onClick={() => rebuild(row)}>{t('aiAssistantConfig.knowledgeRebuild', { defaultValue: '重建分塊' })}</Button>
-          <Popconfirm title={t('aiAssistantConfig.knowledgeDeleteConfirm', { defaultValue: '確認刪除這篇文檔？' })} onConfirm={() => remove(row)}>
-            <Button type="link" size="small" danger>{t('common.delete', { defaultValue: '刪除' })}</Button>
-          </Popconfirm>
+          <Button type="link" size="small" danger
+            onClick={() => confirmDelete({
+              title: t('aiAssistantConfig.knowledgeDeleteConfirm', { defaultValue: '確認刪除這篇文檔？' }),
+              content: '刪除後文檔及其分塊一併移除，助手將檢索不到該內容；不可恢復。',
+              onOk: () => remove(row),
+            })}>
+            {t('common.delete', { defaultValue: '刪除' })}
+          </Button>
         </Space>
       ),
     },
@@ -939,17 +997,16 @@ function KnowledgeTab() {
             placeholder={t('aiAssistantConfig.knowledgeSearchPlaceholder', { defaultValue: '按標題搜索' })}
             onSearch={setKeyword}
           />
-          <Select
-            allowClear
-            style={{ width: 150 }}
-            placeholder={t('aiAssistantConfig.colSystem', { defaultValue: '系統' })}
-            value={systemFilter}
-            onChange={setSystemFilter}
-            options={KNOWLEDGE_SYSTEMS.map((s) => ({ value: s, label: s }))}
-          />
+        </Space>
+      </div>
+      <div className="action-section" style={{ marginBottom: 12 }}>
+        <div className="action-section-left">
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
+        </div>
+        <div className="action-section-right">
           <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>{t('aiAssistantConfig.knowledgeAdd', { defaultValue: '新增文檔' })}</Button>
-        </Space>
+        </div>
       </div>
       <div className="action-section" style={{ marginBottom: 12 }}>
         <Space.Compact style={{ width: '100%' }}>
@@ -1015,28 +1072,30 @@ function KnowledgeTab() {
 
 /* ────────────────── 合规护栏 ────────────────── */
 
-function GuardrailTab() {
+export function GuardrailTab() {
   const { t } = useTranslation()
   const [rows, setRows] = useState<AiGuardRule[]>([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState<AiGuardRule | null>(null)
   const [saving, setSaving] = useState(false)
+  const [scope, setScope] = useAiScope('ai-guardrail', 'all')
   const [form] = Form.useForm<AiGuardRule>()
   const action = Form.useWatch('action', form)
 
   const load = useCallback(() => {
     setLoading(true)
-    fetchGuardRules()
+    fetchGuardRules(scope === 'all' ? undefined : scope)
       .then(setRows)
       .catch(() => message.error(t('aiAssistantConfig.loadFailed', { defaultValue: '加載失敗' })))
       .finally(() => setLoading(false))
-  }, [t])
+  }, [scope, t])
 
   useEffect(() => { load() }, [load])
 
   const openEditor = (row?: AiGuardRule) => {
     const model: AiGuardRule = row ?? {
       ruleType: 'keyword', pattern: '', action: 'warn', scope: 'both', enabled: 1, replacement: '', remark: '',
+      systemCode: scope === 'all' ? 'common' : scope,
     }
     setEditing(model)
     form.setFieldsValue(model)
@@ -1073,7 +1132,11 @@ function GuardrailTab() {
 
   const columns: ColumnsType<AiGuardRule> = [
     { title: t('aiAssistantConfig.colRuleType', { defaultValue: '類型' }), dataIndex: 'ruleType', key: 'ruleType', width: 90 },
-    { title: t('aiAssistantConfig.colPattern', { defaultValue: '規則' }), dataIndex: 'pattern', key: 'pattern', ellipsis: true },
+    {
+      title: '所屬系統', dataIndex: 'systemCode', key: 'systemCode', width: 110,
+      render: (v?: string) => <Tag>{v && v !== 'common' ? AI_SCOPE_OPTIONS.find(o => o.value === v)?.label ?? v : '共用'}</Tag>,
+    },
+    { title: t('aiAssistantConfig.colPattern', { defaultValue: '規則' }), dataIndex: 'pattern', key: 'pattern', width: 260, ellipsis: true },
     {
       title: t('aiAssistantConfig.colRuleAction', { defaultValue: '動作' }), dataIndex: 'action', key: 'action', width: 90,
       render: (v: string) => <Tag color={v === 'block' ? 'error' : v === 'replace' ? 'processing' : 'warning'}>{ACTION_LABEL[v] ?? v}</Tag>,
@@ -1092,9 +1155,14 @@ function GuardrailTab() {
       render: (_: unknown, row: AiGuardRule) => (
         <Space size={0}>
           <Button type="link" size="small" onClick={() => openEditor(row)}>{t('common.edit', { defaultValue: '編輯' })}</Button>
-          <Popconfirm title={t('aiAssistantConfig.guardrailDeleteConfirm', { defaultValue: '確認刪除這條規則？' })} onConfirm={() => remove(row)}>
-            <Button type="link" size="small" danger>{t('common.delete', { defaultValue: '刪除' })}</Button>
-          </Popconfirm>
+          <Button type="link" size="small" danger
+            onClick={() => confirmDelete({
+              title: t('aiAssistantConfig.guardrailDeleteConfirm', { defaultValue: '確認刪除這條規則？' }),
+              content: '刪除後該規則立即失效，後續對話不再被它攔截；不可恢復。',
+              onOk: () => remove(row),
+            })}>
+            {t('common.delete', { defaultValue: '刪除' })}
+          </Button>
         </Space>
       ),
     },
@@ -1111,10 +1179,13 @@ function GuardrailTab() {
         })}
       />
       <div className="action-section" style={{ marginBottom: 12 }}>
-        <Space>
+        <div className="action-section-left">
+          <AiScopeSwitch value={scope} onChange={setScope} includeAll />
+        </div>
+        <div className="action-section-right">
           <Button icon={<ReloadOutlined />} onClick={load}>{t('common.refresh', { defaultValue: '刷新' })}</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>{t('aiAssistantConfig.guardrailAdd', { defaultValue: '新增規則' })}</Button>
-        </Space>
+        </div>
       </div>
       <Table
         rowKey="id"
@@ -1145,6 +1216,9 @@ function GuardrailTab() {
           </Form.Item>
           <Form.Item name="scope" label={t('aiAssistantConfig.colScope', { defaultValue: '範圍' })}>
             <Select options={[{ value: 'both', label: '輸入+輸出' }, { value: 'input', label: '僅輸入' }, { value: 'output', label: '僅輸出' }]} />
+          </Form.Item>
+          <Form.Item name="systemCode" label="所屬系統" extra="共用規則對所有系統生效；系統規則只攔截該系統的對話">
+            <Select options={AI_SCOPE_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
           </Form.Item>
           {action === 'replace' && (
             <Form.Item name="replacement" label={t('aiAssistantConfig.colReplacement', { defaultValue: '替換為' })}>

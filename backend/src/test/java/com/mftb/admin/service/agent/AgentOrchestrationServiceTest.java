@@ -361,7 +361,7 @@ class AgentOrchestrationServiceTest {
     @Test
     void inputGuardrailBlocksBeforeLlmCall() {
         AgentOrchestrationService svc = buildService();
-        when(guardrailService.checkInput(any())).thenReturn(
+        when(guardrailService.checkInput(any(), any())).thenReturn(
                 AiGuardrailService.GuardResult.block("input", "敏感詞"));
 
         OrchestrateResult out = svc.orchestrate(request("包含敏感詞"), "alice");
@@ -375,7 +375,7 @@ class AgentOrchestrationServiceTest {
     @Test
     void guardrailReplaceRewritesUserMessageBeforeLlm() {
         AgentOrchestrationService svc = buildService();
-        when(guardrailService.checkInput(any())).thenReturn(
+        when(guardrailService.checkInput(any(), any())).thenReturn(
                 AiGuardrailService.GuardResult.ok("改寫後問題", List.of("已替換敏感內容")));
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());

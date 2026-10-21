@@ -55,7 +55,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
 
     static final List<String> AI_TOP_LEVEL_MENUS = List.of(
             "ai-models", "ai-auth-manage", "ai-quota-manage", "ai-emp-permission",
-            "ai-operation-auth", "ai-assistant-config", "ai-energy-billing", "ai-mcp-service",
+            "ai-operation-auth", "ai-assistant-group", "ai-energy-billing", "ai-mcp-service",
             "ai-conversation-audit", "ai-access-request");
 
     private static final String MISSING_AI_DESCENDANTS =
@@ -490,7 +490,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 "search-verify-group", "report"));
         updateMenuSystem(SystemCode.FINANCE.code(),   List.of("promotion", "merchant-reconcile", "approval"));
         updateMenuSystem(SystemCode.AI.code(),        List.of("ai-models", "ai-auth-manage", "ai-quota-manage",
-                "ai-emp-permission", "ai-operation-auth", "ai-assistant-config", "ai-energy-billing", "ai-mcp-service",
+                "ai-emp-permission", "ai-operation-auth", "ai-assistant-group", "ai-energy-billing", "ai-mcp-service",
                 "ai-conversation-audit", "ai-access-request"));
         updateMenuSystem(SystemCode.HR.code(),        List.of("hr-profile", "hr-lifecycle", "hr-config",
                 "org-center", "perf-center", "perf-report-center", "ess-center"));

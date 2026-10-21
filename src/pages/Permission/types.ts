@@ -577,9 +577,46 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
-  'ai-assistant-config': [
+  'ai-assistant-overview': [
+    { key: 'view', label: '查看' },
+  ],
+  'ai-assistant-capability': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-profile': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-glossary': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-knowledge': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-guardrail': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-quick-prompt': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-push-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-memory': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-feedback': [
+    { key: 'view', label: '查看' },
+  ],
+  'ai-assistant-audit': [
+    { key: 'view', label: '查看' },
   ],
   // ── AI 菜单动作集（与后端 @RequirePermission 实测集一致）──
   // 未在此表登记的菜单会回退成全部 8 个通用动作（導入/啟用 等无关项），必须逐菜单补齐
@@ -1726,7 +1763,17 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ai-emp-quota',
   'ai-emp-permission',
   'ai-operation-auth',
-  'ai-assistant-config',
+  'ai-assistant-overview',
+  'ai-assistant-capability',
+  'ai-assistant-profile',
+  'ai-assistant-glossary',
+  'ai-assistant-knowledge',
+  'ai-assistant-guardrail',
+  'ai-assistant-feedback',
+  'ai-assistant-audit',
+  'ai-assistant-quick-prompt',
+  'ai-assistant-push-template',
+  'ai-assistant-memory',
   'ai_usage_stats',
   'ai_energy_detail',
   'ai-access-request',
@@ -2036,7 +2083,17 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ai-emp-permission': 'ai-emp-permission',
   '/ai-emp-permission-detail': 'ai-emp-permission',
   '/ai-operation-auth': 'ai-operation-auth',
-  '/ai-assistant-config': 'ai-assistant-config',
+  '/ai-assistant': 'ai-assistant-overview',
+  '/ai-assistant/capability': 'ai-assistant-capability',
+  '/ai-assistant/profile': 'ai-assistant-profile',
+  '/ai-assistant/glossary': 'ai-assistant-glossary',
+  '/ai-assistant/knowledge': 'ai-assistant-knowledge',
+  '/ai-assistant/guardrail': 'ai-assistant-guardrail',
+  '/ai-assistant/feedback': 'ai-assistant-feedback',
+  '/ai-assistant/audit': 'ai-assistant-audit',
+  '/ai-assistant/quick-prompt': 'ai-assistant-quick-prompt',
+  '/ai-assistant/push-template': 'ai-assistant-push-template',
+  '/ai-assistant/memory': 'ai-assistant-memory',
   '/ai-operation-auth-edit': 'ai-operation-auth',
   '/ai-operation-auth-log': 'ai-operation-auth',
   '/ai-usage-stats': 'ai_usage_stats',

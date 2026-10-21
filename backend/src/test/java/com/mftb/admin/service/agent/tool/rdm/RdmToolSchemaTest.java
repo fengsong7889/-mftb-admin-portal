@@ -34,7 +34,7 @@ class RdmToolSchemaTest {
                 new RdmStatsOverviewTool(null, null),
                 new RdmRisksTool(null, null),
                 new RdmListTasksTool(null, null, null),
-                new RdmPrepareProgressPushTool(null, null, null));
+                new RdmPrepareProgressPushTool(null, null, null, null));
     }
 
     @Test

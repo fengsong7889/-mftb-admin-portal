@@ -3693,6 +3693,8 @@
     "toolNameRdmRisks": "Risk list",
     "toolNameRdmTasks": "Task query",
     "toolNameRdmPush": "Progress push",
+    "toolNameKnowledge": "Knowledge search",
+    "toolNameGlossary": "Glossary lookup",
     "agentView": {
       "total": "{{count}} result(s)",
       "empty": "No matching data"
@@ -13117,5 +13119,32 @@
       "empty": "No switches yet; run the database migration first",
       "forbidden": "Failed to load: check that this account can view delivery switches"
     }
+  },
+  "aiAssistantConfig": {
+    "pageOverview": "Assistant Overview",
+    "introOverview": "Only modules you can access are shown; click a card to open its page.",
+    "pageCapability": "Capabilities",
+    "introCapability": "Adjust descriptions, use cases and examples here. Tool switches remain in AI Access Control; data scope stays with each business menu.",
+    "pageProfile": "Answer Skeleton",
+    "introProfile": "The answer skeleton takes effect after publishing. Save a draft and test-run it before publishing or rolling back.",
+    "pageGlossary": "Glossary",
+    "introGlossary": "Glossary aligns assistant wording with business definitions. Only entries with \"inject into prompt\" enabled enter the answer context.",
+    "pageKnowledge": "Knowledge Base",
+    "introKnowledge": "The knowledge base stores how-tos, process rules and field definitions. Documents are chunked on save and cited through search_knowledge.",
+    "pageGuardrail": "Guardrails",
+    "introGuardrail": "Guardrails check input and output around every model call. Blocked content is never written to logs or echoed back.",
+    "pageQuickPrompt": "Quick Prompts",
+    "introQuickPrompt": "Suggestions shown under the home chat input. They are filtered by system and role, up to 6 items, and never change permissions or tool scope.",
+    "pagePushTemplate": "Push Templates",
+    "introPushTemplate": "Templates only control how the push text looks. Recipients, confirmation card, permissions and rate limits stay server-side. Missing or disabled templates fall back to the built-in one.",
+    "pageMemory": "Memory Policy",
+    "introMemory": "Memory stores only preferences the user explicitly confirmed. Limits and retention can be tuned here; sensitive-content filtering and per-user isolation stay enforced in code.",
+    "pageFeedback": "Answer Quality",
+    "introFeedback": "Read-only view of likes/dislikes, low-scoring tools and reasons for the last 30 days, used to decide what to tune next.",
+    "pageAudit": "Config Audit",
+    "introAudit": "Records every write to capabilities, answer skeleton, glossary, knowledge base and guardrails. Audit is read-only; rollback happens on each config page.",
+    "capabilityEmpty": "No capability configured",
+    "profileEmpty": "No answer skeleton",
+    "glossaryEmpty": "No glossary entry"
   }
 }

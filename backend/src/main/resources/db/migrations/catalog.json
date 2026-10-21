@@ -2664,6 +2664,103 @@
       "author": "Qoder",
       "ticket": "rdm-daily-report-receivers",
       "comment": "v3.16 起个人通知收件人被硬编码为 PM + 产品负责人，实际需要技术/测试/UI/运维负责人也收、PMO 额外收、某人不收等场景，只能改代码。只加三列：receiver_roles_json（默认 [\"pm\",\"product_owner\"]，与改造前完全一致）、extra_receiver_user_ids_json（追加名单，收到规则范围全量项目汇总）、exclude_receiver_user_ids_json（排除名单，优先级最高）。v3.16 预留的 receiver_scope 从未被发送链路消费，本版起停止读写但保留列不删（禁止 DROP COLUMN）。ADD COLUMN 不可重放，初始化器逐列先查再加并做后置校验，ContractRegistry 同步登记以便启动自愈。275 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "ai:assistant-menu-split-v2.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantConfigMenuInitializer",
+      "dependencies": [
+        "ai:assistant-config-menu-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "275_ai_assistant_menu_split.sql"
+      ],
+      "intent": "AI 助手配置中心拆分：新增一级分组 ai-assistant 与 8 个二级菜单，旧 ai-assistant-config 的 view/edit 授权按动作迁移后软删旧菜单",
+      "author": "Qoder",
+      "comment": "菜单每次启动 upsert 自愈；授权迁移只执行一次且 INSERT IGNORE，先搬后删避免存量角色失权。菜单 group 作为目录，不进入受控叶子集合。"
+    },
+    {
+      "versionKey": "ai:assistant-menu-split-v2.1",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantConfigMenuInitializer",
+      "dependencies": [
+        "ai:assistant-menu-split-v2.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "275_ai_assistant_menu_split.sql"
+      ],
+      "intent": "修正菜单拆分授权迁移：edit 持有者若先被插入 view-only 行，用 ON DUPLICATE KEY UPDATE 提升为 view/edit",
+      "author": "Qoder",
+      "comment": "v2.0 的 view 插入先于 edit 插入，INSERT IGNORE 会让 edit 行被忽略；v2.1 重放同一脚本并把 edit 行改为 upsert，存量库与全新建库都能收敛到正确动作集。"
+    },
+    {
+      "versionKey": "ai:lookup-glossary-tool-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiLookupGlossaryToolInitializer",
+      "dependencies": [
+        "ai:assistant-phase3-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "276_ai_lookup_glossary.sql"
+      ],
+      "intent": "二期遗漏项：登记 lookup_glossary 工具（mcp_tool + ai_tool_policy + ai_capability），术语按需检索",
+      "author": "Qoder",
+      "comment": "只登记元数据，不建表；三处缺一即管理页/能力清单不同源，后置校验三处均存在。"
+    },
+    {
+      "versionKey": "ai:memory-search-index-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiMemorySearchIndexInitializer",
+      "dependencies": [
+        "ai:assistant-phase2-v1.0"
+      ],
+      "status": "ACTIVE",
+      "intent": "长期记忆相关检索：为 ai_user_memory.content 建 FULLTEXT（ngram → 普通 → LIKE 回退）",
+      "author": "Qoder",
+      "comment": "索引失败不阻断启动，服务层有 LIKE 兜底；不建表不加列，仅索引探测。"
+    },
+    {
+      "versionKey": "ai:assistant-config-ops-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantPhase4SchemaInitializer",
+      "dependencies": [
+        "ai:assistant-menu-split-v2.1"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "277_ai_config_ops.sql"
+      ],
+      "intent": "AI 助手配置中心收尾：新建 ai_runtime_setting（记忆策略四项默认值）并补快捷提问种子；推送模板不种子化",
+      "author": "Qoder",
+      "comment": "只 CREATE IF NOT EXISTS / INSERT IGNORE，不覆盖管理员已改配置；推送模板以 Java 默认值为准，页面可還原，避免库内副本漂移。"
+    },
+    {
+      "versionKey": "ai:scope-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiScopeSchemaInitializer",
+      "dependencies": [
+        "ai:assistant-phase3-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "AI 配置多系统作用域：ai_guard_rule / ai_push_template 补 system_code，RDM 推送模板回填 rdm",
+      "author": "Qoder",
+      "comment": "ADD COLUMN 走 INFORMATION_SCHEMA 探测，不执行 278 脚本（脚本含非幂等 ALTER）；能力/骨架/术语复用既有 domain 列。"
     }
   ]
 }

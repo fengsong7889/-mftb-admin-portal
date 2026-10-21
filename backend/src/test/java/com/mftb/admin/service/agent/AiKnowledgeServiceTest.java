@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,12 +39,13 @@ class AiKnowledgeServiceTest {
     @Mock private AiKnowledgeDocMapper docMapper;
     @Mock private AiKnowledgeChunkMapper chunkMapper;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private AiConfigAuditService auditService;
 
     private AiKnowledgeService service;
 
     @BeforeEach
     void setUp() {
-        service = new AiKnowledgeService(docMapper, chunkMapper, jdbcTemplate);
+        service = new AiKnowledgeService(docMapper, chunkMapper, jdbcTemplate, auditService);
     }
 
     @Test
@@ -99,6 +101,7 @@ class AiKnowledgeServiceTest {
         verify(chunkMapper).delete(any());
         verify(chunkMapper, times(saved.getChunkCount())).insert(any(AiKnowledgeChunk.class));
         verify(docMapper, times(2)).updateById(any(AiKnowledgeDoc.class));
+        verify(auditService).record(eq("knowledge"), eq("doc:5"), eq("update"), any(), any());
     }
 
     @Test

@@ -7,6 +7,8 @@ export interface AiGuardRule {
   pattern: string
   action: 'block' | 'warn' | 'replace'
   scope: 'input' | 'output' | 'both'
+  /** 作用域：common=共用，其余为业务系统编码 */
+  systemCode?: string
   replacement?: string | null
   enabled: 0 | 1
   remark?: string | null
@@ -14,8 +16,10 @@ export interface AiGuardRule {
   updatedAt?: string
 }
 
-export function fetchGuardRules() {
-  return request.get<unknown, AiGuardRule[]>('/ai/prompt-config/guardrails')
+export function fetchGuardRules(systemCode?: string) {
+  return request.get<unknown, AiGuardRule[]>('/ai/prompt-config/guardrails', {
+    params: systemCode ? { systemCode } : {},
+  })
 }
 
 export function saveGuardRule(rule: AiGuardRule) {

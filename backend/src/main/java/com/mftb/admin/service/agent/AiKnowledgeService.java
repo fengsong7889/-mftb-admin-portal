@@ -14,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -42,6 +44,7 @@ public class AiKnowledgeService {
     private final AiKnowledgeDocMapper docMapper;
     private final AiKnowledgeChunkMapper chunkMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final AiConfigAuditService auditService;
 
     /** 列表不返回正文，避免配置页一次拉回几十万字。 */
     public List<AiKnowledgeDoc> list(String keyword, String systemCode) {
@@ -73,6 +76,7 @@ public class AiKnowledgeService {
             throw new BusinessException("文檔內容最多 " + MAX_CONTENT + " 字，請拆分為多篇");
         }
         AiKnowledgeDoc doc = input.getId() == null ? new AiKnowledgeDoc() : get(input.getId());
+        Map<String, Object> before = doc.getId() == null ? null : snapshot(doc);
         doc.setTitle(title.length() > 200 ? title.substring(0, 200) : title);
         doc.setSystemCode(StringUtils.hasText(input.getSystemCode()) ? input.getSystemCode().trim() : "common");
         doc.setSourceType(StringUtils.hasText(input.getSourceType()) ? input.getSourceType().trim() : "manual");
@@ -88,6 +92,8 @@ public class AiKnowledgeService {
         int chunks = rebuildChunks(doc.getId(), content);
         doc.setChunkCount(chunks);
         docMapper.updateById(doc);
+        auditService.record("knowledge", "doc:" + doc.getId(),
+                before == null ? "create" : "update", before, snapshot(doc));
         return doc;
     }
 
@@ -97,25 +103,31 @@ public class AiKnowledgeService {
             throw new BusinessException("不支持的狀態");
         }
         AiKnowledgeDoc doc = get(id);
+        Map<String, Object> before = snapshot(doc);
         doc.setStatus(status);
         docMapper.updateById(doc);
+        auditService.record("knowledge", "doc:" + id, "status", before, snapshot(doc));
         return doc;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        get(id);
+        AiKnowledgeDoc doc = get(id);
         chunkMapper.delete(new LambdaQueryWrapper<AiKnowledgeChunk>().eq(AiKnowledgeChunk::getDocId, id));
         docMapper.deleteById(id);
+        auditService.record("knowledge", "doc:" + id, "delete", snapshot(doc), null);
     }
 
     /** 重建分块：配置页保存后自动执行；返回分块数。 */
     @Transactional(rollbackFor = Exception.class)
     public int rebuild(Long id) {
         AiKnowledgeDoc doc = get(id);
+        int previous = doc.getChunkCount() == null ? 0 : doc.getChunkCount();
         int count = rebuildChunks(doc.getId(), doc.getContent());
         doc.setChunkCount(count);
         docMapper.updateById(doc);
+        auditService.record("knowledge", "doc:" + id, "rebuild",
+                Map.of("chunks", previous), Map.of("chunks", count));
         return count;
     }
 
@@ -259,6 +271,22 @@ public class AiKnowledgeService {
 
     private static String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    /** 审计快照：不把整篇正文写进审计，只留标题/状态/长度与预览。 */
+    private static Map<String, Object> snapshot(AiKnowledgeDoc doc) {
+        if (doc == null) return null;
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", doc.getId());
+        map.put("title", doc.getTitle());
+        map.put("systemCode", doc.getSystemCode());
+        map.put("status", doc.getStatus());
+        map.put("chunkCount", doc.getChunkCount());
+        String content = doc.getContent();
+        map.put("contentLength", content == null ? 0 : content.length());
+        map.put("contentPreview", content == null ? null
+                : content.substring(0, Math.min(content.length(), 300)));
+        return map;
     }
 
     /** 检索命中；{@code score} 为全文相关度或关键词命中数。 */

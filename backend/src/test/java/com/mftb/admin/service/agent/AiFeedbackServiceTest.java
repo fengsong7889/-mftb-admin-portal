@@ -37,13 +37,14 @@ import static org.mockito.Mockito.when;
 class AiFeedbackServiceTest {
 
     @Mock private AiFeedbackMapper feedbackMapper;
+    @Mock private com.mftb.admin.mapper.AiCapabilityMapper capabilityMapper;
     @Mock private OperatorResolver operatorResolver;
 
     private AiFeedbackService service;
 
     @BeforeEach
     void setUp() {
-        service = new AiFeedbackService(feedbackMapper, operatorResolver);
+        service = new AiFeedbackService(feedbackMapper, capabilityMapper, operatorResolver);
         SysUser user = new SysUser();
         user.setId(9L);
         when(operatorResolver.currentUser()).thenReturn(user);

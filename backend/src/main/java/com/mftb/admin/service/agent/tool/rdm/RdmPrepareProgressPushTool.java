@@ -8,6 +8,7 @@ import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.service.RdmProjectFactService;
 import com.mftb.admin.service.agent.AgentActionService;
+import com.mftb.admin.service.agent.AiPushTemplateService;
 import com.mftb.admin.service.agent.tool.AgentTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,8 @@ public class RdmPrepareProgressPushTool implements AgentTool {
     private final RdmToolSupport support;
     private final RdmProjectFactService factService;
     private final AgentActionService actionService;
+    /** 推送长什么样由配置中心决定；未配置时回落内置模板 */
+    private final AiPushTemplateService pushTemplateService;
 
     @Override
     public String toolKey() {
@@ -121,8 +124,11 @@ public class RdmPrepareProgressPushTool implements AgentTool {
         }
 
         String note = support.truncate(support.argStr(args, "note"), 200);
-        String title = "項目進度 · " + project.getName() + "（" + project.getProjectNo() + "）";
-        String content = compose(project, fact, recipientLabel, note);
+        String templateKey = "person".equals(targetType)
+                ? AiPushTemplateService.KEY_PERSON : AiPushTemplateService.KEY_GROUP;
+        Map<String, String> vars = templateVars(project, fact, recipientLabel, note);
+        String title = pushTemplateService.renderTitle(templateKey, vars, "rdm");
+        String content = pushTemplateService.renderContent(templateKey, vars, "rdm");
         String summary = "person".equals(targetType)
                 ? "發送給 " + recipientLabel + "（釘釘工作通知）"
                 : "發送到釘釘群（AI 助手通知渠道）";
@@ -170,36 +176,35 @@ public class RdmPrepareProgressPushTool implements AgentTool {
         return new RichOutput(support.json(contentJson), view, pending);
     }
 
-    private String compose(RdmProject project, RdmFactVO.ProjectFact fact, String recipientLabel, String note) {
-        StringBuilder sb = new StringBuilder();
-        if (!"釘釘群".equals(recipientLabel)) {
-            sb.append("您好 ").append(recipientLabel).append("，以下是項目進度：\n\n");
-        }
-        sb.append("## ").append(project.getName()).append("（").append(project.getProjectNo()).append("）\n");
-        sb.append("- 項目經理：").append(nullToDash(fact.getPmUserName())).append("\n");
-        sb.append("- 產品負責人：").append(nullToDash(fact.getProductOwnerUserName())).append("\n");
-        sb.append("- 計劃週期：").append(nullToDash(fact.getPlanStartDate()))
-                .append(" ~ ").append(nullToDash(fact.getPlanEndDate())).append("\n");
-        sb.append("- 交付項：").append(support.progressText(fact.getDeliveryItemCompleted(), fact.getDeliveryItemTotal()))
-                .append("（進行中 ").append(fact.getDeliveryItemInProgress())
-                .append("，測試中 ").append(fact.getDeliveryItemTesting())
-                .append("，待驗收 ").append(fact.getDeliveryItemPendingAcceptance())
-                .append("，阻塞 ").append(fact.getDeliveryItemBlocked())
-                .append("，逾期 ").append(fact.getDeliveryItemOverdue()).append("）\n");
-        sb.append("- 任務：").append(support.progressText(fact.getTaskCompleted(), fact.getTaskTotal()))
-                .append("（阻塞 ").append(fact.getBlockedTaskCount()).append("）\n");
-        sb.append("- 需求：共 ").append(fact.getRequirementTotal()).append(" 個\n");
-        sb.append("- 缺陷：開放 ").append(fact.getIssueOpen())
-                .append("（嚴重 ").append(fact.getIssueCritical())
-                .append("，主要 ").append(fact.getIssueMajor()).append("）\n");
-        if (fact.getPendingDecisionCount() > 0) {
-            sb.append("- 待決策：").append(fact.getPendingDecisionCount()).append(" 項\n");
-        }
-        if (note != null) {
-            sb.append("\n> ").append(note).append("\n");
-        }
-        sb.append("\n> 數據更新於 ").append(nullToDash(fact.getComputedAt())).append("，由 AI 助手生成，請以系統頁面為準。");
-        return sb.toString();
+    /** 模板变量：只放展示用文本，不放任何权限/数据范围信息。 */
+    private Map<String, String> templateVars(RdmProject project, RdmFactVO.ProjectFact fact,
+                                            String recipientLabel, String note) {
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("recipient", nullToDash(recipientLabel));
+        vars.put("projectName", nullToDash(project.getName()));
+        vars.put("projectNo", nullToDash(project.getProjectNo()));
+        vars.put("pm", nullToDash(fact.getPmUserName()));
+        vars.put("productOwner", nullToDash(fact.getProductOwnerUserName()));
+        vars.put("planStart", nullToDash(fact.getPlanStartDate()));
+        vars.put("planEnd", nullToDash(fact.getPlanEndDate()));
+        vars.put("deliveryProgress",
+                support.progressText(fact.getDeliveryItemCompleted(), fact.getDeliveryItemTotal()));
+        vars.put("deliveryInProgress", String.valueOf(fact.getDeliveryItemInProgress()));
+        vars.put("deliveryTesting", String.valueOf(fact.getDeliveryItemTesting()));
+        vars.put("deliveryPendingAcceptance", String.valueOf(fact.getDeliveryItemPendingAcceptance()));
+        vars.put("deliveryBlocked", String.valueOf(fact.getDeliveryItemBlocked()));
+        vars.put("deliveryOverdue", String.valueOf(fact.getDeliveryItemOverdue()));
+        vars.put("taskProgress", support.progressText(fact.getTaskCompleted(), fact.getTaskTotal()));
+        vars.put("blockedTasks", String.valueOf(fact.getBlockedTaskCount()));
+        vars.put("requirementTotal", String.valueOf(fact.getRequirementTotal()));
+        vars.put("issueOpen", String.valueOf(fact.getIssueOpen()));
+        vars.put("issueCritical", String.valueOf(fact.getIssueCritical()));
+        vars.put("issueMajor", String.valueOf(fact.getIssueMajor()));
+        vars.put("pendingDecisionLine", fact.getPendingDecisionCount() > 0
+                ? "- 待決策：" + fact.getPendingDecisionCount() + " 項\n" : "");
+        vars.put("noteLine", note == null ? "" : "\n> " + note + "\n");
+        vars.put("computedAt", nullToDash(fact.getComputedAt()));
+        return vars;
     }
 
     private static String nullToDash(String s) {

@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,12 +44,19 @@ class AiUserMemoryServiceTest {
 
     @Mock private AiUserMemoryMapper memoryMapper;
     @Mock private OperatorResolver operatorResolver;
+    @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private AiRuntimeSettingService settingService;
 
     private AiUserMemoryService service;
 
     @BeforeEach
     void setUp() {
-        service = new AiUserMemoryService(memoryMapper, operatorResolver);
+        service = new AiUserMemoryService(memoryMapper, operatorResolver, jdbcTemplate, settingService);
+        // 未配置时按代码默认值（50 条/180 天/注入 10 条），避免 mock 返回 0 把 LIMIT 变成 0
+        when(settingService.getInt(anyString(), anyInt()))
+                .thenAnswer(inv -> inv.getArgument(1));
+        when(settingService.getBool(anyString(), anyBoolean()))
+                .thenAnswer(inv -> inv.getArgument(1));
         SysUser user = new SysUser();
         user.setId(9L);
         when(operatorResolver.currentUser()).thenReturn(user);
@@ -136,6 +147,17 @@ class AiUserMemoryServiceTest {
         assertTrue(section.startsWith("- "), section);
         assertTrue(section.endsWith("…"), "超长记忆要截断：" + section);
         assertEquals(2 + 120 + 1, section.length());
+    }
+
+    @Test
+    @DisplayName("按问题检索无命中时回退最近记忆")
+    void relevantSearchFallsBackToLatest() {
+        AiUserMemory row = input("回答先給結論");
+        when(memoryMapper.selectList(any())).thenReturn(List.of(row));
+
+        String section = service.promptSection("完全不相關的問題");
+
+        assertEquals("- 回答先給結論", section);
     }
 
     @Test

@@ -59,6 +59,8 @@ export interface LlmRequestOptions {
   thinkingDepth?: ThinkingDepth
   /** 会话主键（ai_conversation.id）；后端据此写 ai_conversation_event */
   conversationPk?: number
+  /** 当前业务系统：后端据此取对应骨架/护栏（共用+本系统） */
+  systemCode?: string | null
 }
 
 /** 服务端已执行的内建工具痕迹（与 OrchestrateResult.traces 同构） */
@@ -218,6 +220,7 @@ async function callOrchestrate(
       messages,
       conversationPk: opts?.conversationPk ?? null,
       mode,
+      systemCode: opts?.systemCode ?? null,
       contextWindow: opts?.contextWindow ?? null,
       thinkingDepth: opts?.thinkingDepth ?? null,
     }),

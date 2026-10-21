@@ -9,10 +9,12 @@ import com.mftb.admin.entity.AiGlossary;
 import com.mftb.admin.entity.AiGuardRule;
 import com.mftb.admin.entity.AiKnowledgeDoc;
 import com.mftb.admin.entity.AiPromptProfile;
+import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.service.agent.AgentOrchestrationService;
 import com.mftb.admin.service.agent.AiGuardrailService;
 import com.mftb.admin.service.agent.AiKnowledgeService;
 import com.mftb.admin.service.agent.AiPromptConfigService;
+import com.mftb.admin.service.agent.AiScopeGuard;
 import com.mftb.admin.util.OperatorResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.Data;
@@ -39,7 +41,8 @@ import java.util.Deque;
 /**
  * AI 助手配置中心：能力清单 / 回答骨架 / 术语口径。
  *
- * <p>权限挂 {@code ai-assistant-config}：控制“谁能改配置”；数据权限仍由各业务菜单控制。
+ * <p>权限按页面拆分：能力/骨架/术语/知识库/护栏各自独立菜单，运营看板与审计只读；
+ * 数据权限仍由各业务菜单控制。
  * <p>配置只影响“怎么说”，不影响工具启停、数据权限与安全不变量。
  */
 @RestController
@@ -47,12 +50,17 @@ import java.util.Deque;
 @RequiredArgsConstructor
 public class AiPromptConfigController {
 
-    private static final String MENU = "ai-assistant-config";
+    private static final String MENU_CAPABILITY = "ai-assistant-capability";
+    private static final String MENU_PROFILE = "ai-assistant-profile";
+    private static final String MENU_GLOSSARY = "ai-assistant-glossary";
+    private static final String MENU_KNOWLEDGE = "ai-assistant-knowledge";
+    private static final String MENU_GUARDRAIL = "ai-assistant-guardrail";
 
     private final AiPromptConfigService configService;
     private final AgentOrchestrationService orchestrationService;
     private final OperatorResolver operatorResolver;
     private final AiKnowledgeService knowledgeService;
+    private final AiScopeGuard scopeGuard;
     private final AiGuardrailService guardrailService;
 
     /** 试跑限流：每账号每小时 10 次（内存级，单实例足够；多实例可放宽到 10×实例数） */
@@ -68,17 +76,18 @@ public class AiPromptConfigController {
     /* ────────────────── 能力清单 ────────────────── */
 
     @GetMapping("/capabilities")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_CAPABILITY, action = "view")
     @Operation(summary = "能力清单列表")
     public Result<List<AiCapability>> capabilities() {
         return Result.success(configService.listCapabilities());
     }
 
     @PutMapping("/capabilities/{toolKey}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_CAPABILITY, action = "edit")
     @Operation(summary = "保存能力清单的 prompt 元数据")
     public Result<AiCapability> saveCapability(@PathVariable String toolKey,
                                                @RequestBody AiCapability body) {
+        assertScopeWritable(body.getDomain());
         body.setToolKey(toolKey);
         return Result.success(configService.saveCapability(body));
     }
@@ -86,37 +95,40 @@ public class AiPromptConfigController {
     /* ────────────────── 回答骨架 ────────────────── */
 
     @GetMapping("/profiles")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_PROFILE, action = "view")
     @Operation(summary = "回答骨架列表（含版本历史）")
     public Result<List<AiPromptProfile>> profiles() {
         return Result.success(configService.listProfiles());
     }
 
     @PostMapping("/profiles/draft")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_PROFILE, action = "edit")
     @Operation(summary = "保存回答骨架草稿")
     public Result<AiPromptProfile> saveDraft(@RequestBody AiPromptProfile body) {
+        assertScopeWritable(body.getDomain());
         return Result.success(configService.saveDraft(body));
     }
 
     @PostMapping("/profiles/{profileKey}/publish")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_PROFILE, action = "edit")
     @Operation(summary = "发布回答骨架草稿")
     public Result<AiPromptProfile> publish(@PathVariable String profileKey) {
+        assertScopeWritable(profileKey);
         return Result.success(configService.publish(profileKey));
     }
 
     @PostMapping("/profiles/{profileKey}/rollback/{version}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_PROFILE, action = "edit")
     @Operation(summary = "回滚回答骨架到指定版本")
     public Result<AiPromptProfile> rollback(@PathVariable String profileKey, @PathVariable int version) {
+        assertScopeWritable(profileKey);
         return Result.success(configService.rollback(profileKey, version));
     }
 
     /* ────────────────── 术语与口径 ────────────────── */
 
     @GetMapping("/glossary")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_GLOSSARY, action = "view")
     @Operation(summary = "术语与口径列表")
     public Result<List<AiGlossary>> glossary(@RequestParam(required = false) String domain,
                                              @RequestParam(required = false) String keyword) {
@@ -124,16 +136,19 @@ public class AiPromptConfigController {
     }
 
     @PostMapping("/glossary")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_GLOSSARY, action = "edit")
     @Operation(summary = "新增或保存术语/口径")
     public Result<AiGlossary> saveGlossary(@RequestBody AiGlossary body) {
+        assertScopeWritable(body.getDomain());
         return Result.success(configService.saveGlossary(body));
     }
 
     @DeleteMapping("/glossary/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_GLOSSARY, action = "edit")
     @Operation(summary = "删除术语/口径")
     public Result<Boolean> deleteGlossary(@PathVariable Long id) {
+        AiGlossary existing = configService.getGlossary(id);
+        if (existing != null) scopeGuard.assertWritable(existing.getDomain());
         configService.deleteGlossary(id);
         return Result.success(true);
     }
@@ -145,7 +160,7 @@ public class AiPromptConfigController {
      * 不写会话、不暴露外部工具与推送工具；限流 10 次/小时/账号。
      */
     @PostMapping("/test-run")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_PROFILE, action = "edit")
     @Operation(summary = "提示詞草稿試跑（sandbox）")
     public Result<AiPromptTestRunVO> testRun(@RequestBody TestRunRequest body) {
         if (body == null || !StringUtils.hasText(body.getQuestion())) {
@@ -153,7 +168,7 @@ public class AiPromptConfigController {
         }
         String account = operatorResolver.currentOperatorAccount();
         checkTestRunRate(account);
-        String sections = configService.previewPrompt(body.getProfileKey());
+        String sections = configService.previewPrompt(body.getProfileKey(), body.getQuestion());
         String prompt = AgentOrchestrationService.basePrompt()
                 + (StringUtils.hasText(sections) ? sections + "\n\n" : "")
                 + AgentOrchestrationService.safetyRules();
@@ -187,7 +202,7 @@ public class AiPromptConfigController {
     /* ────────────────── 知识库（RAG） ────────────────── */
 
     @GetMapping("/knowledge")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "view")
     @Operation(summary = "知識庫文檔列表")
     public Result<List<AiKnowledgeDoc>> knowledgeList(@RequestParam(required = false) String keyword,
                                                       @RequestParam(required = false) String systemCode) {
@@ -195,28 +210,29 @@ public class AiPromptConfigController {
     }
 
     @GetMapping("/knowledge/{id}")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "view")
     @Operation(summary = "知識庫文檔詳情")
     public Result<AiKnowledgeDoc> knowledgeDetail(@PathVariable Long id) {
         return Result.success(knowledgeService.get(id));
     }
 
     @PostMapping("/knowledge")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "edit")
     @Operation(summary = "新增/保存知識庫文檔（自動重建分塊）")
     public Result<AiKnowledgeDoc> saveKnowledge(@RequestBody AiKnowledgeDoc body) {
+        scopeGuard.assertWritable(body.getSystemCode());
         return Result.success(knowledgeService.save(body, operatorResolver.currentOperatorName()));
     }
 
     @PutMapping("/knowledge/{id}/status")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "edit")
     @Operation(summary = "啟用/停用知識庫文檔")
     public Result<AiKnowledgeDoc> knowledgeStatus(@PathVariable Long id, @RequestParam String status) {
         return Result.success(knowledgeService.setStatus(id, status));
     }
 
     @PostMapping("/knowledge/{id}/rebuild")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "edit")
     @Operation(summary = "重建知識庫分塊")
     public Result<Map<String, Object>> rebuildKnowledge(@PathVariable Long id) {
         int chunks = knowledgeService.rebuild(id);
@@ -224,15 +240,17 @@ public class AiPromptConfigController {
     }
 
     @DeleteMapping("/knowledge/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "edit")
     @Operation(summary = "刪除知識庫文檔")
     public Result<Void> deleteKnowledge(@PathVariable Long id) {
+        AiKnowledgeDoc doc = knowledgeService.get(id);
+        if (doc != null) scopeGuard.assertWritable(doc.getSystemCode());
         knowledgeService.delete(id);
         return Result.success(null);
     }
 
     @GetMapping("/knowledge/search")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_KNOWLEDGE, action = "view")
     @Operation(summary = "知識庫檢索（配置頁試搜）")
     public Result<List<AiKnowledgeService.KnowledgeHit>> searchKnowledge(
             @RequestParam String query,
@@ -244,25 +262,36 @@ public class AiPromptConfigController {
     /* ────────────────── 輸入/輸出護欄 ────────────────── */
 
     @GetMapping("/guardrails")
-    @RequirePermission(menu = MENU, action = "view")
+    @RequirePermission(menu = MENU_GUARDRAIL, action = "view")
     @Operation(summary = "護欄規則列表")
-    public Result<List<AiGuardRule>> guardrails() {
-        return Result.success(guardrailService.listRules());
+    public Result<List<AiGuardRule>> guardrails(@RequestParam(required = false) String systemCode) {
+        return Result.success(guardrailService.listRules(systemCode));
     }
 
     @PostMapping("/guardrails")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_GUARDRAIL, action = "edit")
     @Operation(summary = "新增/保存護欄規則")
     public Result<AiGuardRule> saveGuardrail(@RequestBody AiGuardRule body) {
+        assertScopeWritable(body.getSystemCode());
         return Result.success(guardrailService.saveRule(body, operatorResolver.currentOperatorName()));
     }
 
     @DeleteMapping("/guardrails/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU_GUARDRAIL, action = "edit")
     @Operation(summary = "刪除護欄規則")
     public Result<Void> deleteGuardrail(@PathVariable Long id) {
+        AiGuardRule rule = guardrailService.getRule(id);
+        if (rule != null) scopeGuard.assertWritable(rule.getSystemCode());
         guardrailService.deleteRule(id);
         return Result.success(null);
+    }
+
+    /**
+     * 共用配置（common/空）仅管理员可写；系统级配置由拥有该页面 edit 权限的人维护。
+     * <p>共用判定与角色解析统一在 {@link AiScopeGuard}，避免多入口各写一套。
+     */
+    private void assertScopeWritable(String scope) {
+        scopeGuard.assertWritable(scope);
     }
 
     private void checkTestRunRate(String account) {

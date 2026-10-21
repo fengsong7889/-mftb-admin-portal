@@ -3573,6 +3573,8 @@
     "toolNameRdmRisks": "風險清單",
     "toolNameRdmTasks": "任務查詢",
     "toolNameRdmPush": "進度推送",
+    "toolNameKnowledge": "知識庫檢索",
+    "toolNameGlossary": "術語口徑查詢",
     "agentView": {
       "total": "共 {{count}} 條",
       "empty": "未找到符合條件的數據"
@@ -13119,5 +13121,32 @@
       "empty": "尚無開關配置，請先執行資料庫遷移",
       "forbidden": "載入失敗：請確認目前帳號有「推送開關」的查看權限"
     }
+  },
+  "aiAssistantConfig": {
+    "pageOverview": "助手概覽",
+    "introOverview": "只展示你有權限的模組；點擊卡片進入對應配置頁。",
+    "pageCapability": "能力清單",
+    "introCapability": "這裡只調整能力說明、適用場景與範例；工具啟停仍在「AI 操作授權」，資料權限仍由各業務選單控制。",
+    "pageProfile": "回答骨架",
+    "introProfile": "回答骨架必須發布後生效；可先儲存草稿並試跑，確認效果後再發布或回滾。",
+    "pageGlossary": "術語與口徑",
+    "introGlossary": "術語用於統一助手與業務的口徑；只有「注入 Prompt」開啟的術語會進入回答上下文。",
+    "pageKnowledge": "知識庫",
+    "introKnowledge": "知識庫用於收錄操作說明、流程規範與欄位口徑；儲存後自動切分，助手透過 search_knowledge 檢索並標註來源。",
+    "pageGuardrail": "合規護欄",
+    "introGuardrail": "護欄在模型調用前後統一檢查輸入與回答；攔截不會把原文寫入日誌或回覆。",
+    "pageQuickPrompt": "快捷提問",
+    "introQuickPrompt": "首頁對話底部的建議問題由這裡維護：按系統與角色收斂，最多展示 6 條；問題只影響「點一下填什麼」，不改變權限與工具範圍。",
+    "pagePushTemplate": "推送模板",
+    "introPushTemplate": "模板只決定推送文案的呈現；推送對象、聊天內確認卡、權限與限流仍由服務端控制。留空或停用時回落至內置模板。",
+    "pageMemory": "記憶策略",
+    "introMemory": "記憶只保存使用者主動確認的偏好；上限、保留期與注入條數可在這裡調整，敏感內容過濾與按使用者隔離仍由服務端強制。",
+    "pageFeedback": "回答質量",
+    "introFeedback": "這裡只讀展示近 30 天讚/踩、低分工具與原因，用於判斷該調整哪項配置；不提供刪除或修改反饋。",
+    "pageAudit": "變更審計",
+    "introAudit": "記錄能力、回答骨架、術語、知識庫與護欄的每次寫操作；審計只讀，回滾仍在各自配置頁執行。",
+    "capabilityEmpty": "暫無能力配置",
+    "profileEmpty": "暫無回答骨架",
+    "glossaryEmpty": "暫無術語"
   }
 }

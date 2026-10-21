@@ -2,8 +2,10 @@ package com.mftb.admin.service.agent;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.entity.AiCapability;
 import com.mftb.admin.entity.AiFeedback;
 import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.AiCapabilityMapper;
 import com.mftb.admin.mapper.AiFeedbackMapper;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ import java.util.Map;
 public class AiFeedbackService {
 
     private final AiFeedbackMapper feedbackMapper;
+    private final AiCapabilityMapper capabilityMapper;
     private final OperatorResolver operatorResolver;
 
     @Transactional(rollbackFor = Exception.class)
@@ -65,24 +68,72 @@ public class AiFeedbackService {
 
     /** 管理员低分看板：按评分筛选，最近优先。 */
     public List<AiFeedback> recent(Integer rating, int limit) {
+        return recent(rating, limit, null);
+    }
+
+    /** 管理員看板：可按系統作用域筛選（按命中的工具歸屬判斷）。 */
+    public List<AiFeedback> recent(Integer rating, int limit, String systemCode) {
         int cap = Math.min(Math.max(limit, 1), 200);
         LambdaQueryWrapper<AiFeedback> wrapper = new LambdaQueryWrapper<AiFeedback>()
                 .orderByDesc(AiFeedback::getCreatedAt)
-                .last("LIMIT " + cap);
+                .last("LIMIT " + (StringUtils.hasText(systemCode) ? Math.min(cap * 5, 1000) : cap));
         if (rating != null) wrapper.eq(AiFeedback::getRating, rating);
-        return feedbackMapper.selectList(wrapper);
+        List<AiFeedback> rows = feedbackMapper.selectList(wrapper);
+        if (!StringUtils.hasText(systemCode)) return rows;
+        Map<String, String> scopeByTool = toolScopeMap();
+        return rows.stream()
+                .filter(r -> matchesScope(r, systemCode, scopeByTool))
+                .limit(cap)
+                .toList();
     }
 
-    /**
-     * 低分聚合：按工具与原因统计，给配置中心提供“改哪里”的依据。
+    private Map<String, String> toolScopeMap() {
+        Map<String, String> map = new LinkedHashMap<>();
+        try {
+            for (AiCapability cap : capabilityMapper.selectList(null)) {
+                if (cap.getToolKey() != null) {
+                    map.put(cap.getToolKey(), StringUtils.hasText(cap.getDomain()) ? cap.getDomain() : "common");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[AiFeedback] 读取能力归属失败，按工具前缀推断: {}", e.getMessage());
+        }
+        return map;
+    }
+
+    /** 反馈是否属于该系统：工具归属命中本系统，或命中共用工具（共用工具在所有系统都会被用到）。 */
+    private static boolean matchesScope(AiFeedback row, String systemCode, Map<String, String> scopeByTool) {
+        if (row.getToolKeys() == null || row.getToolKeys().isBlank()) return true;
+        for (String key : row.getToolKeys().split(",")) {
+            String tool = key.trim();
+            if (tool.isEmpty()) continue;
+            String scope = scopeByTool.get(tool);
+            if (scope == null) {
+                scope = tool.startsWith("rdm_") ? "rdm"
+                        : tool.startsWith("query_") ? "finance" : "common";
+            }
+            if (systemCode.equals(scope) || "common".equals(scope)) return true;
+        }
+        return false;
+    }
+
+    /** 低分聚合：按工具与原因统计，给配置中心提供“改哪里”的依据。
      * <p>只拉最近 5000 条在内存聚合：反馈量级远小于此，避免为看板新增专用 SQL 表/作业。
      */
     public Map<String, Object> stats(int days) {
+        return stats(days, null);
+    }
+
+    public Map<String, Object> stats(int days, String systemCode) {
         int window = Math.min(Math.max(days, 1), 365);
         List<AiFeedback> rows = feedbackMapper.selectList(new LambdaQueryWrapper<AiFeedback>()
                 .ge(AiFeedback::getCreatedAt, java.time.LocalDateTime.now().minusDays(window))
                 .orderByDesc(AiFeedback::getCreatedAt)
                 .last("LIMIT 5000"));
+        if (StringUtils.hasText(systemCode)) {
+            Map<String, String> scopeByTool = toolScopeMap();
+            rows = rows.stream().filter(r -> matchesScope(r, systemCode, scopeByTool)).toList();
+        }
         long up = 0;
         long down = 0;
         Map<String, Integer> byTool = new LinkedHashMap<>();

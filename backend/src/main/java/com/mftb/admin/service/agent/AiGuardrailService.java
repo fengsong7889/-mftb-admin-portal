@@ -31,11 +31,24 @@ public class AiGuardrailService {
     private static final int MAX_RULES = 200;
 
     private final AiGuardRuleMapper ruleMapper;
+    private final AiConfigAuditService auditService;
 
     public List<AiGuardRule> listRules() {
-        return ruleMapper.selectList(new LambdaQueryWrapper<AiGuardRule>()
+        return listRules(null);
+    }
+
+    /** 删除前取行：控制器需要按该行作用域做共用写权限校验。 */
+    public AiGuardRule getRule(Long id) {
+        return id == null ? null : ruleMapper.selectById(id);
+    }
+
+    /** 配置页列表：传 systemCode 时只看该作用域；不传看全部。 */
+    public List<AiGuardRule> listRules(String systemCode) {
+        LambdaQueryWrapper<AiGuardRule> wrapper = new LambdaQueryWrapper<AiGuardRule>()
                 .orderByDesc(AiGuardRule::getEnabled)
-                .orderByDesc(AiGuardRule::getUpdatedAt));
+                .orderByDesc(AiGuardRule::getUpdatedAt);
+        if (StringUtils.hasText(systemCode)) wrapper.eq(AiGuardRule::getSystemCode, systemCode);
+        return ruleMapper.selectList(wrapper);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -62,42 +75,64 @@ public class AiGuardrailService {
         }
         AiGuardRule row = input.getId() == null ? new AiGuardRule() : ruleMapper.selectById(input.getId());
         if (row == null) throw new BusinessException("規則不存在");
+        AiGuardRule before = row.getId() == null ? null : copyOf(row);
         row.setRuleType(ruleType);
         row.setPattern(pattern);
         row.setAction(action);
         row.setScope(scope);
+        row.setSystemCode(StringUtils.hasText(input.getSystemCode()) ? input.getSystemCode().trim() : "common");
         row.setReplacement(trimTo(input.getReplacement(), 200));
         row.setEnabled(input.getEnabled() == null ? 1 : input.getEnabled());
         row.setRemark(trimTo(input.getRemark(), 200));
         row.setUpdatedBy(operator);
         if (row.getId() == null) ruleMapper.insert(row);
         else ruleMapper.updateById(row);
+        auditService.record("guardrail", "rule:" + row.getId(),
+                before == null ? "create" : "update", before, row);
         return row;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteRule(Long id) {
-        if (id == null || ruleMapper.selectById(id) == null) throw new BusinessException("規則不存在");
+        AiGuardRule existing = id == null ? null : ruleMapper.selectById(id);
+        if (existing == null) throw new BusinessException("規則不存在");
         ruleMapper.deleteById(id);
+        auditService.record("guardrail", "rule:" + id, "delete", existing, null);
     }
 
     /** 输入护栏：block 直接拦截，replace 改写后继续，warn 仅记录。 */
     public GuardResult checkInput(String text) {
-        return evaluate(text, "input");
+        return checkInput(text, null);
+    }
+
+    /** 输入护栏：合并「共用 + 当前系统」规则；systemCode 为空时只用共用规则。 */
+    public GuardResult checkInput(String text, String systemCode) {
+        return evaluate(text, "input", systemCode);
     }
 
     /** 输出护栏：block 用安全话术替换整段回答，replace 局部改写。 */
     public GuardResult checkOutput(String text) {
-        return evaluate(text, "output");
+        return checkOutput(text, null);
+    }
+
+    public GuardResult checkOutput(String text, String systemCode) {
+        return evaluate(text, "output", systemCode);
     }
 
     GuardResult evaluate(String text, String stage) {
+        return evaluate(text, stage, null);
+    }
+
+    GuardResult evaluate(String text, String stage, String systemCode) {
         if (!StringUtils.hasText(text)) return GuardResult.pass(text);
         List<AiGuardRule> rules;
         try {
+            List<String> scopes = StringUtils.hasText(systemCode)
+                    ? List.of("common", systemCode) : List.of("common");
             rules = ruleMapper.selectList(new LambdaQueryWrapper<AiGuardRule>()
                     .eq(AiGuardRule::getEnabled, 1)
-                    .in(AiGuardRule::getScope, List.of(stage, "both")));
+                    .in(AiGuardRule::getScope, List.of(stage, "both"))
+                    .in(AiGuardRule::getSystemCode, scopes));
         } catch (Exception e) {
             // 规则表不可用时放行，但不能让回答整条挂掉；失败会体现在日志里
             log.warn("[AiGuardrail] 读取规则失败，跳过护栏: {}", e.getMessage());
@@ -154,6 +189,20 @@ public class AiGuardrailService {
     private long countRules() {
         Long count = ruleMapper.selectCount(new LambdaQueryWrapper<AiGuardRule>());
         return count == null ? 0 : count;
+    }
+
+    /** 审计快照：规则对象很小，直接逐字段复制，避免 update 后丢失修改前值。 */
+    private static AiGuardRule copyOf(AiGuardRule row) {
+        AiGuardRule copy = new AiGuardRule();
+        copy.setId(row.getId());
+        copy.setRuleType(row.getRuleType());
+        copy.setPattern(row.getPattern());
+        copy.setAction(row.getAction());
+        copy.setScope(row.getScope());
+        copy.setReplacement(row.getReplacement());
+        copy.setEnabled(row.getEnabled());
+        copy.setRemark(row.getRemark());
+        return copy;
     }
 
     private static String trimTo(String value, int max) {

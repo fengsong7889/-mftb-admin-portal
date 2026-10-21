@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,12 +36,13 @@ import static org.mockito.Mockito.when;
 class AiGuardrailServiceTest {
 
     @Mock private AiGuardRuleMapper ruleMapper;
+    @Mock private AiConfigAuditService auditService;
 
     private AiGuardrailService service;
 
     @BeforeEach
     void setUp() {
-        service = new AiGuardrailService(ruleMapper);
+        service = new AiGuardrailService(ruleMapper, auditService);
     }
 
     private static AiGuardRule rule(String type, String pattern, String action) {
@@ -98,6 +101,13 @@ class AiGuardrailServiceTest {
         AiGuardRule invalid = rule("regex", "[", "warn");
         assertThrows(BusinessException.class, () -> service.saveRule(invalid, "alice"));
         verify(ruleMapper, never()).insert(any(AiGuardRule.class));
+    }
+
+    @Test
+    @DisplayName("新增/修改规则写审计")
+    void writesAudit() {
+        service.saveRule(rule("keyword", "競品A", "block"), "alice");
+        verify(auditService).record(eq("guardrail"), contains("rule:"), eq("create"), any(), any());
     }
 
     @Test

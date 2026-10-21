@@ -25,6 +25,7 @@ import AgentViewCard from './AgentViewCard'
 import AgentActionCard from './AgentActionCard'
 import { MyMemoryDrawer, RememberMemoryModal } from './MyMemory'
 import { submitFeedback } from '../../api/aiFeedback'
+import { fetchVisibleQuickPrompts } from '../../api/aiQuickPrompt'
 import HelpPopover from '../../components/HelpPopover'
 import type { AiBlockReason } from './homeUtils'
 import {
@@ -141,6 +142,8 @@ const TOOL_NAME_KEYS: Record<string, string> = {
   rdm_risks: 'home.toolNameRdmRisks',
   rdm_list_tasks: 'home.toolNameRdmTasks',
   rdm_prepare_progress_push: 'home.toolNameRdmPush',
+  search_knowledge: 'home.toolNameKnowledge',
+  lookup_glossary: 'home.toolNameGlossary',
 }
 
 
@@ -743,8 +746,20 @@ export default function Home() {
   const modeModelKey = (mode: LlmEngineMode): string | null =>
     Object.entries(connectedModels).find(([, mapped]) => mapped === mode)?.[0] ?? null
 
+  /** 快捷提问：优先用后端配置（按系统/角色收敛），无配置或后端不可用时回落内置 */
+  const [remoteQuickQuestions, setRemoteQuickQuestions] = useState<Array<{ id: number; question: string }>>([])
+  useEffect(() => {
+    let cancelled = false
+    fetchVisibleQuickPrompts(currentSystemCode ?? undefined)
+      .then((list) => { if (!cancelled) setRemoteQuickQuestions(list ?? []) })
+      .catch(() => { if (!cancelled) setRemoteQuickQuestions([]) })
+    return () => { cancelled = true }
+  }, [currentSystemCode])
+
+  const QUICK_QUESTION_ICONS = [<SearchOutlined />, <AuditOutlined />, <ThunderboltOutlined />, <LineChartOutlined />]
+
   /** 快捷提问 */
-  const quickQuestions = currentSystemCode ? [
+  const fallbackQuickQuestions = currentSystemCode ? [
     { icon: <SearchOutlined />, text: isAiCenter ? '如何規劃跨系統的數據分析？' : `介紹${systemName}的常用功能` },
     { icon: <AuditOutlined />, text: '查詢資料與新增資料需要哪些不同權限？' },
     { icon: <ThunderboltOutlined />, text: isAiCenter ? '跨系統操作前需要確認哪些資訊？' : `如何整理${systemName}的日常工作？` },
@@ -755,6 +770,13 @@ export default function Home() {
     { icon: <ThunderboltOutlined />, text: t('home.quickQ2') },
     { icon: <LineChartOutlined />, text: t('home.quickQ3') },
   ]
+
+  const quickQuestions = remoteQuickQuestions.length > 0
+    ? remoteQuickQuestions.map((q, index) => ({
+        icon: QUICK_QUESTION_ICONS[index % QUICK_QUESTION_ICONS.length],
+        text: q.question,
+      }))
+    : fallbackQuickQuestions
 
   /** 消息自动滚动 */
   useEffect(() => {
@@ -1049,8 +1071,10 @@ export default function Home() {
     if (thinkingEnabled && thinkingAvailable) opts.thinkingDepth = thinkingDepth
     // V0 §B.6：当前会话主键 → 后端写 ai_conversation_event（QUOTA_CHARGE/TOOL_CALL/…）
     if (activeConvId) opts.conversationPk = activeConvId
+    // 当前业务系统：后端据此只取「共用 + 本系统」的骨架/护栏，不再把全部系统规则压给模型
+    if (currentSystemCode) opts.systemCode = currentSystemCode
     return opts
-  }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth, activeConvId])
+  }, [contextWindow, thinkingEnabled, thinkingAvailable, thinkingDepth, activeConvId, currentSystemCode])
 
   /** 处理排队中的下一条消息 */
   const processNextInQueue = useCallback(async () => {

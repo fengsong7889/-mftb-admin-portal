@@ -33,17 +33,19 @@ public class AiFeedbackController {
     }
 
     @GetMapping
-    @RequirePermission(menu = "ai-assistant-config", action = "view")
+    @RequirePermission(menu = "ai-assistant-feedback", action = "view")
     @Operation(summary = "低分/最近反饋列表（管理員）")
     public Result<List<AiFeedback>> recent(@RequestParam(required = false) Integer rating,
-                                           @RequestParam(defaultValue = "50") int limit) {
-        return Result.success(feedbackService.recent(rating, limit));
+                                           @RequestParam(defaultValue = "50") int limit,
+                                           @RequestParam(required = false) String systemCode) {
+        return Result.success(feedbackService.recent(rating, limit, systemCode));
     }
 
     @GetMapping("/stats")
-    @RequirePermission(menu = "ai-assistant-config", action = "view")
+    @RequirePermission(menu = "ai-assistant-feedback", action = "view")
     @Operation(summary = "反饋聚合（按工具/原因/日趨勢）")
-    public Result<Map<String, Object>> stats(@RequestParam(defaultValue = "30") int days) {
-        return Result.success(feedbackService.stats(days));
+    public Result<Map<String, Object>> stats(@RequestParam(defaultValue = "30") int days,
+                                             @RequestParam(required = false) String systemCode) {
+        return Result.success(feedbackService.stats(days, systemCode));
     }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Drawer, Empty, Input, List, Modal, Popconfirm, Space, Tag, message } from 'antd'
+import { Button, Drawer, Empty, Input, List, Modal, Space, Tag, message } from 'antd'
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,6 +9,7 @@ import {
   updateMemory,
   type AiUserMemory,
 } from '../../api/aiMemory'
+import { confirmDelete } from '../../utils/confirmDelete'
 
 /**
  * 我的記憶抽屉：用户显式保存的长期偏好/事实，可查看/编辑/停用/删除。
@@ -133,10 +134,12 @@ export function MyMemoryDrawer({ open, onClose }: { open: boolean; onClose: () =
                     ? t('home.memoryDisable', { defaultValue: '停用' })
                     : t('home.memoryEnable', { defaultValue: '啟用' })}
                 </Button>,
-                <Popconfirm key="delete" title={t('home.memoryDeleteConfirm', { defaultValue: '確認刪除這條記憶？' })}
-                  onConfirm={() => remove(row)}>
-                  <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>,
+                <Button key="delete" type="link" size="small" danger icon={<DeleteOutlined />}
+                  onClick={() => confirmDelete({
+                    title: t('home.memoryDeleteConfirm', { defaultValue: '確認刪除這條記憶？' }),
+                    content: '刪除後助手不會再使用這條偏好；需要時可重新新增。',
+                    onOk: () => remove(row),
+                  })} />,
               ]}
             >
               <List.Item.Meta

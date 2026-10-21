@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import AiAssistantConfig from './index'
+import { FeedbackTab, GuardrailTab, KnowledgeTab } from './index'
 import { fetchKnowledgeDocs, searchKnowledge } from '../../api/aiKnowledge'
 import { fetchGuardRules } from '../../api/aiGuardrail'
 import { fetchFeedbackStats } from '../../api/aiFeedback'
@@ -50,7 +50,7 @@ vi.mock('../../api/aiGuardrail', () => ({
   deleteGuardRule: vi.fn(),
 }))
 
-describe('AI 助手配置中心 · 三期页签', () => {
+describe('AI 助手配置中心 · 三期面板', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(fetchKnowledgeDocs).mockResolvedValue([
@@ -74,10 +74,9 @@ describe('AI 助手配置中心 · 三期页签', () => {
     })
   })
 
-  it('知識庫页签加载文档并可试搜', async () => {
-    render(<AiAssistantConfig />)
+  it('知識庫面板加载文档并可试搜', async () => {
+    render(<KnowledgeTab />)
 
-    fireEvent.click(screen.getByRole('tab', { name: '知識庫' }))
     expect(await screen.findByText('日報推送規範')).toBeTruthy()
     expect(fetchKnowledgeDocs).toHaveBeenCalled()
 
@@ -92,21 +91,19 @@ describe('AI 助手配置中心 · 三期页签', () => {
     expect(await screen.findByText('每日 09:00 推送')).toBeTruthy()
   })
 
-  it('合規護欄页签展示规则并提示拦截口径', async () => {
-    render(<AiAssistantConfig />)
+  it('合規護欄面板展示规则并提示拦截口径', async () => {
+    render(<GuardrailTab />)
 
-    fireEvent.click(screen.getByRole('tab', { name: '合規護欄' }))
     expect(await screen.findByText('競品A')).toBeTruthy()
     expect(screen.getByText(/輸入命中「攔截」時不調模型/)).toBeTruthy()
   })
 
-  it('回答反饋页签展示聚合指标与低分工具', async () => {
-    render(<AiAssistantConfig />)
+  it('回答反饋面板展示聚合指标与低分工具', async () => {
+    render(<FeedbackTab />)
 
-    fireEvent.click(screen.getByRole('tab', { name: '回答反饋' }))
     expect(await screen.findByText('近 30 天反饋')).toBeTruthy()
     expect(await screen.findByText('rdm_list_projects')).toBeTruthy()
     expect(await screen.findByText('數據不對')).toBeTruthy()
-    expect(fetchFeedbackStats).toHaveBeenCalledWith(30)
+    expect(fetchFeedbackStats).toHaveBeenCalledWith(30, undefined)
   })
 })

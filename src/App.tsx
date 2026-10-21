@@ -209,6 +209,17 @@ const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaE
 const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
 const AiOperationAuth = lazy(() => import('./pages/AiOperationAuth'))
 const AiAssistantConfig = lazy(() => import('./pages/AiAssistantConfig'))
+const AiAssistantOverview = lazy(() => import('./pages/AiAssistant/OverviewPage'))
+const AiAssistantCapability = lazy(() => import('./pages/AiAssistant/CapabilityPage'))
+const AiAssistantProfile = lazy(() => import('./pages/AiAssistant/ProfilePage'))
+const AiAssistantGlossary = lazy(() => import('./pages/AiAssistant/GlossaryPage'))
+const AiAssistantKnowledge = lazy(() => import('./pages/AiAssistant/KnowledgePage'))
+const AiAssistantGuardrail = lazy(() => import('./pages/AiAssistant/GuardrailPage'))
+const AiAssistantFeedback = lazy(() => import('./pages/AiAssistant/FeedbackPage'))
+const AiAssistantAudit = lazy(() => import('./pages/AiAssistant/AuditPage'))
+const AiAssistantQuickPrompt = lazy(() => import('./pages/AiAssistant/QuickPromptPage'))
+const AiAssistantPushTemplate = lazy(() => import('./pages/AiAssistant/PushTemplatePage'))
+const AiAssistantMemory = lazy(() => import('./pages/AiAssistant/MemoryPolicyPage'))
 const AiOperationAuthEdit = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthEdit'))
 const AiOperationAuthLog = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthLog'))
 const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
@@ -677,6 +688,18 @@ function AuthenticatedLayout() {
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
               <Route path="/ai-operation-auth" element={<AiOperationAuth />} />
+              <Route path="/ai-assistant" element={<AiAssistantOverview />} />
+              <Route path="/ai-assistant/capability" element={<AiAssistantCapability />} />
+              <Route path="/ai-assistant/profile" element={<AiAssistantProfile />} />
+              <Route path="/ai-assistant/glossary" element={<AiAssistantGlossary />} />
+              <Route path="/ai-assistant/knowledge" element={<AiAssistantKnowledge />} />
+              <Route path="/ai-assistant/guardrail" element={<AiAssistantGuardrail />} />
+              <Route path="/ai-assistant/feedback" element={<AiAssistantFeedback />} />
+              <Route path="/ai-assistant/audit" element={<AiAssistantAudit />} />
+              <Route path="/ai-assistant/quick-prompt" element={<AiAssistantQuickPrompt />} />
+              <Route path="/ai-assistant/push-template" element={<AiAssistantPushTemplate />} />
+              <Route path="/ai-assistant/memory" element={<AiAssistantMemory />} />
+              {/* 旧入口保留重定向，避免历史收藏 404 */}
               <Route path="/ai-assistant-config" element={<AiAssistantConfig />} />
               <Route path="/ai-operation-auth-edit" element={<AiOperationAuthEdit />} />
               <Route path="/ai-operation-auth-log" element={<AiOperationAuthLog />} />
