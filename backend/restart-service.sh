@@ -21,8 +21,9 @@
 # 就绪等待（冷启动不要误判为失败）：
 #   阶段1 轮询 /api/health/live  → Tomcat 已起来
 #   阶段2 轮询 /api/health/ready → 迁移与结构契约校验通过（DatabaseReadinessState）
-#   实测冷启动到 ready=200 约 140s（应用启动 66s + 各初始化器串行跑到契约校验），
-#   故窗口上限设为 240s；ready 在初始化期间返回 503 属中间态，不是失败。
+#   实测冷启动到 ready=200 约 140s（应用启动 66s + 各初始化器串行跑到契约校验）；
+#   2026-10-21 拉取新迁移后实测达 273s（初始化器随模块增多而变长），
+#   故窗口上限设为 480s；ready 在初始化期间返回 503 属中间态，不是失败。
 #   禁止改用根路径 / 或登录前接口作就绪判据：/ 需鉴权恒 401，
 #   而 /api/auth/captcha 只要 Tomcat 起来就 200，无法证明数据库已就绪。
 #
@@ -280,9 +281,10 @@ start_jar() {
 
     # 等待启动确认
     # 窗口需覆盖「应用启动 + 全部初始化器跑到结构契约校验通过」的总时长：
-    # 实测冷启动约 140s，120s 会在契约校验完成前就到期并误报「迁移未就绪」
+    # 实测 140s（轻载）~273s（拉取新迁移后初始化器全跑），480s 留足余量；
+    # 窗口过小会在契约校验完成前到期并误报「迁移未就绪」
     echo -e "${CYAN}⏳ 等待服务启动...${NC}"
-    local max_wait=240
+    local max_wait=480
     local waited=0
     local live_ok=false
 
@@ -331,7 +333,8 @@ start_jar() {
     if [ "$live_ok" = false ]; then
         echo -e "${YELLOW}   进程未通过存活探针（Tomcat 可能未起来），查看日志: tail -f $LOG_FILE${NC}"
     else
-        echo -e "${YELLOW}   已存活但未就绪（ready≠200），可能存在无法自愈的结构漂移，查看日志: tail -f $LOG_FILE${NC}"
+        echo -e "${YELLOW}   已存活但未就绪（ready≠200），可能仍在跑初始化器或存在无法自愈的结构漂移${NC}"
+        echo -e "${YELLOW}   可稍后用 bash restart-service.sh --status 重探；日志: tail -f $LOG_FILE${NC}"
     fi
     echo -e "${YELLOW}─────────── 日志末尾 20 行 ───────────${NC}"
     tail -20 "$LOG_FILE"
